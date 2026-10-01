@@ -1,3 +1,4 @@
+import { t, type VocabularyKey } from '../t.js';
 /**
  * HA-01 background-review guardrails.
  *
@@ -30,25 +31,27 @@ export interface BackgroundReviewPolicyDecision {
 const PROHIBITED_RULES: Array<{
   rule: NonNullable<BackgroundReviewPolicyDecision['rule']>;
   pattern: RegExp;
-  reason: string;
+  reasonKey: VocabularyKey;
 }> = [
   {
     rule: 'transient_incident',
+    // i18n-exempt: intent-matching pattern (bilingual lexicon)
     pattern:
       /(?:one[- ]off|temporary|transient|一過性|一時的)[^\n.!。！]{0,80}(?:error|failure|outage|network|timeout|障害|エラー|失敗|タイムアウト)/iu,
-    reason: '一過性・一時的な障害は durable knowledge に記録しない',
+    reasonKey: 'mission_ops:bg_review_rule_transient',
   },
   {
     rule: 'environment_specific_failure',
     pattern:
       /(?:ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|localhost:\d+|\/Users\/|\/private\/tmp\/|[A-Z]:\\)/u,
-    reason: '環境固有の失敗やローカルパスは durable knowledge に記録しない',
+    reasonKey: 'mission_ops:bg_review_rule_environment',
   },
   {
     rule: 'provider_assertion',
+    // i18n-exempt: intent-matching pattern (bilingual lexicon)
     pattern:
       /\b(?:provider|backend|model)\b[^\n.!。！]{0,80}\b(?:always|never|broken|unreliable|bad|useless|壊れている|信用できない|常に失敗)/iu,
-    reason: '単一事例から provider/backend/model を断定しない',
+    reasonKey: 'mission_ops:bg_review_rule_provider',
   },
 ];
 
@@ -57,7 +60,7 @@ export function evaluateBackgroundReviewText(text: string): BackgroundReviewPoli
   if (!normalized) {
     return {
       allowed: false,
-      reason: 'レビュー結果が空です',
+      reason: t('mission_ops:bg_review_empty'),
     };
   }
   for (const prohibited of PROHIBITED_RULES) {
@@ -65,7 +68,7 @@ export function evaluateBackgroundReviewText(text: string): BackgroundReviewPoli
       return {
         allowed: false,
         rule: prohibited.rule,
-        reason: prohibited.reason,
+        reason: t(prohibited.reasonKey),
       };
     }
   }

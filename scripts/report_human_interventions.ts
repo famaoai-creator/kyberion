@@ -4,6 +4,7 @@ import {
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
 import { isFixtureApproval } from '@agent/core/governance/approval-store-hygiene';
+import { listHumanChatChannels } from '@agent/core/surface/channel-adapter-registry';
 import { listMissionsInSearchDirs, loadStateAtPath } from '@agent/core/mission/mission-state';
 import { safeExecResult } from '@agent/core/secure-io';
 import * as path from 'node:path';
@@ -76,7 +77,6 @@ export const INTERVENTION_CATEGORIES: readonly InterventionCategory[] = [
 // Older policy auto-approvals were stamped decidedByType=human; for those
 // records the workflow note is the only durable marker that no human acted.
 const AUTO_APPROVAL_NOTE = /^auto-approved/i;
-const CHAT_CHANNELS = new Set(['slack', 'telegram', 'discord', 'imessage']);
 const BOT_AUTHOR = /\[bot\]|github-actions|dependabot|renovate/i;
 const PR_MERGE_SUBJECT = /^Merge pull request #(\d+)/;
 const PR_SQUASH_SUBJECT = /\(#(\d+)\)$/;
@@ -109,7 +109,7 @@ export function classifyApproval(
   }
   if (channel === 'plugin-install') return 'plugin_install';
   if (channel === 'project-trust' || channel === 'pipeline-approval') return 'pipeline_gate';
-  if (record.steering || CHAT_CHANNELS.has(channel)) return 'steering';
+  if (record.steering || listHumanChatChannels().includes(channel)) return 'steering';
   return 'other';
 }
 

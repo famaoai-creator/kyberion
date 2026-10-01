@@ -25,6 +25,7 @@ import {
   isDirectScript,
   ScriptExitError,
 } from './lib/harness.js';
+import { guardCliArgs, type CliGuardSpec } from './lib/cli-guard.js';
 import { main as runEnvRegistry } from './generate_env_registry.js';
 import { runGenerateKnowledgeIndex } from './generate_knowledge_index.js';
 import { main as runRoleAssumptions } from './analyze_role_assumptions.js';
@@ -150,10 +151,18 @@ function stagePaths(paths: readonly string[]): void {
   }
 }
 
+/** CU-01: `--help` / typos exit before any generator runs or anything is staged. */
+export const RESOLVE_GENERATED_CLI: CliGuardSpec = {
+  command: 'pnpm kyberion resolve generated',
+  manifestId: 'script.resolve.generated',
+  options: [{ flag: '--check' }, { flag: '--no-stage' }, { flag: '--json' }, { flag: '--quiet' }],
+};
+
 export const main = defineScript({
   name: 'resolve:generated',
   flags: ['check', 'json', 'quiet'],
   async run(context) {
+    if (guardCliArgs(context.argv, RESOLVE_GENERATED_CLI, context.print)) return undefined;
     const stage = !context.argv.includes('--no-stage');
     const installed = driverInstalled();
     if (installed === false && !context.json) context.print(DRIVER_HINT);

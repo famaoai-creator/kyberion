@@ -448,7 +448,9 @@ describe('expandChronosComponents: display:* → kyberion-base', () => {
       { id: 'bad' } as never,
     ]);
     expect(byId(list, 'sec')!.children).toEqual(['t']);
-    expect(byId(list, 't')!.props).toEqual({ text: 'hi' });
+    expect(byId(list, 't')!.props).toEqual({
+      text: 'hi＜script＞alert(1)＜/script＞', // fullwidth substitution (9fdbe791c), not tag stripping
+    });
     expect(byId(list, 'u')).toEqual({ id: 'u', type: 'display:hologram', props: { onclick: 'x' } });
     expect(byId(list, 'bad')).toBeUndefined();
   });

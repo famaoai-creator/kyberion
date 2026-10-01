@@ -18,25 +18,25 @@ last_updated: 2026-04-29
 
 対象は次の 3 層である。
 
-| 層 | 見るもの |
-|---|---|
-| Intent layer | ユーザー発話がどの意図に正規化されるか |
-| Pipeline layer | その意図がどの ADF / workflow に落ちるか |
-| Runtime layer | mission、team、actuator、evidence、audit がどう繋がるか |
+| 層             | 見るもの                                                |
+| -------------- | ------------------------------------------------------- |
+| Intent layer   | ユーザー発話がどの意図に正規化されるか                  |
+| Pipeline layer | その意図がどの ADF / workflow に落ちるか                |
+| Runtime layer  | mission、team、actuator、evidence、audit がどう繋がるか |
 
 ## 2. 参照した主な資産
 
-- [`kyberion-intent-catalog.md`](knowledge/product/architecture/kyberion-intent-catalog.md)
-- [`kyberion-scenario-coverage-matrix.md`](knowledge/product/architecture/kyberion-scenario-coverage-matrix.md)
-- [`intent-domain-evaluation-2026-04-29.md`](knowledge/product/architecture/intent-domain-evaluation-2026-04-29.md)
-- [`mission-workflow-catalog.json`](knowledge/product/governance/mission-workflow-catalog.json)
-- [`mission-classification-policy.json`](knowledge/product/governance/mission-classification-policy.json)
-- [`standard-intents.json`](knowledge/product/governance/standard-intents.json)
-- [`intent-coverage-matrix.json`](knowledge/product/governance/intent-coverage-matrix.json)
-- [`pipelines/README.md`](pipelines/README.md)
-- [`simulation-findings.md`](knowledge/product/architecture/simulation-findings.md)
-- [`agent-mission-control-model.md`](knowledge/product/architecture/agent-mission-control-model.md)
-- [`mission-team-composition-model.md`](knowledge/product/architecture/mission-team-composition-model.md)
+- [`kyberion-intent-catalog.md`](kyberion-intent-catalog.md)
+- [`kyberion-scenario-coverage-matrix.md`](kyberion-scenario-coverage-matrix.md)
+- [`intent-domain-evaluation-2026-04-29.md`](intent-domain-evaluation-2026-04-29.md)
+- [`mission-workflow-catalog.json`](../governance/mission-workflow-catalog.json)
+- [`mission-classification-policy.json`](../governance/mission-classification-policy.json)
+- [`standard-intents.json`](../governance/standard-intents.json)
+- [`intent-coverage-matrix.json`](../governance/intent-coverage-matrix.json)
+- [`pipelines/README.md`](../../../pipelines/README.md)
+- [`simulation-findings.md`](simulation-findings.md)
+- [`agent-mission-control-model.md`](agent-mission-control-model.md)
+- [`mission-team-composition-model.md`](mission-team-composition-model.md)
 
 ## 3. シミュレーション方法
 
@@ -60,11 +60,11 @@ last_updated: 2026-04-29
 
 ### 3.1 実地 probe の要約
 
-| Probe | 結果 | 含意 |
-|---|---|---|
-| `pnpm pipeline --input pipelines/baseline-check.json` | 成功 | session start gate は稼働している |
-| `node dist/scripts/mission_controller.js create ... --dry-run` | 成功 | CLI 引数解釈は正常 |
-| `node dist/scripts/mission_controller.js start ...` | 成功 | mission activation 経路は成立 |
+| Probe                                                                          | 結果       | 含意                                        |
+| ------------------------------------------------------------------------------ | ---------- | ------------------------------------------- |
+| `pnpm pipeline --input pipelines/baseline-check.json`                          | 成功       | session start gate は稼働している           |
+| `node dist/scripts/mission_controller.js create ... --dry-run`                 | 成功       | CLI 引数解釈は正常                          |
+| `node dist/scripts/mission_controller.js start ...`                            | 成功       | mission activation 経路は成立               |
 | `node dist/scripts/mission_controller.js create ...` と `start ...` の同時実行 | 一方が失敗 | 同一 mission ID の bootstrap は直列化が必要 |
 
 ## 4. 総合結論
@@ -100,11 +100,11 @@ Kyberion の intent / pipeline は、かなり高い完成度で
 
 #### 評価
 
-| 観点 | 評価 | コメント |
-|---|---:|---|
-| 意図の正規化 | A- | 成果物への落とし込みは明確 |
-| workflow への接続 | B+ | mission class 経由で安定するが、直結ではない intent もある |
-| 実行の再現性 | B+ | gate は強いが、自然言語の揺れを吸う層はまだ薄い |
+| 観点              | 評価 | コメント                                                   |
+| ----------------- | ---: | ---------------------------------------------------------- |
+| 意図の正規化      |   A- | 成果物への落とし込みは明確                                 |
+| workflow への接続 |   B+ | mission class 経由で安定するが、直結ではない intent もある |
+| 実行の再現性      |   B+ | gate は強いが、自然言語の揺れを吸う層はまだ薄い            |
 
 #### 改善点
 
@@ -127,12 +127,12 @@ Kyberion の intent / pipeline は、かなり高い完成度で
 
 #### 評価
 
-| 観点 | 評価 | コメント |
-|---|---:|---|
-| divergence quality | A | 複数視点の出し分けが強い |
-| governed output | A- | シミュレーション結果が evidence として残る |
-| input normalization | B | 入口の自然言語揺れを吸う規約はさらに必要 |
-| rerun robustness | B+ | ensemble / rubric はあるが、比較と収束の UX は改善余地あり |
+| 観点                | 評価 | コメント                                                   |
+| ------------------- | ---: | ---------------------------------------------------------- |
+| divergence quality  |    A | 複数視点の出し分けが強い                                   |
+| governed output     |   A- | シミュレーション結果が evidence として残る                 |
+| input normalization |    B | 入口の自然言語揺れを吸う規約はさらに必要                   |
+| rerun robustness    |   B+ | ensemble / rubric はあるが、比較と収束の UX は改善余地あり |
 
 #### 改善点
 
@@ -157,11 +157,11 @@ Kyberion の intent / pipeline は、かなり高い完成度で
 
 #### 評価
 
-| 観点 | 評価 | コメント |
-|---|---:|---|
-| 網羅性 | A | 起動・状態・診断の基礎が揃っている |
-| 失敗時の説明力 | B+ | status は返るが、intent からの resolution はまだ直感的ではない |
-| operator UX | B | 人間向け summary と機械向け diagnostics を分ける余地がある |
+| 観点           | 評価 | コメント                                                       |
+| -------------- | ---: | -------------------------------------------------------------- |
+| 網羅性         |    A | 起動・状態・診断の基礎が揃っている                             |
+| 失敗時の説明力 |   B+ | status は返るが、intent からの resolution はまだ直感的ではない |
+| operator UX    |    B | 人間向け summary と機械向け diagnostics を分ける余地がある     |
 
 #### 改善点
 
@@ -182,11 +182,11 @@ Kyberion の intent / pipeline は、かなり高い完成度で
 
 #### 評価
 
-| 観点 | 評価 | コメント |
-|---|---:|---|
-| readiness model | A- | manifest と policy が揃っている |
-| user-facing intent 化 | B | 実装はあるが、catalog の見通しをもう少し上げられる |
-| failure isolation | B+ | 障害時に止まる設計は良い |
+| 観点                  | 評価 | コメント                                           |
+| --------------------- | ---: | -------------------------------------------------- |
+| readiness model       |   A- | manifest と policy が揃っている                    |
+| user-facing intent 化 |    B | 実装はあるが、catalog の見通しをもう少し上げられる |
+| failure isolation     |   B+ | 障害時に止まる設計は良い                           |
 
 #### 改善点
 
@@ -205,11 +205,11 @@ Kyberion の intent / pipeline は、かなり高い完成度で
 
 #### 評価
 
-| 観点 | 評価 | コメント |
-|---|---:|---|
-| 学習ループ | A- | distill と promotion は既に有効 |
-| 公開/非公開の統治 | A | tier boundary が強い |
-| lifecycle の明示性 | B | search は強いが organize / retire / sanitize が intent として薄い |
+| 観点               | 評価 | コメント                                                          |
+| ------------------ | ---: | ----------------------------------------------------------------- |
+| 学習ループ         |   A- | distill と promotion は既に有効                                   |
+| 公開/非公開の統治  |    A | tier boundary が強い                                              |
+| lifecycle の明示性 |    B | search は強いが organize / retire / sanitize が intent として薄い |
 
 #### 改善点
 
@@ -231,11 +231,11 @@ Kyberion の intent / pipeline は、かなり高い完成度で
 
 #### 評価
 
-| 観点 | 評価 | コメント |
-|---|---:|---|
-| lifecycle completeness | A | mission の状態遷移は明確 |
-| team binding | A- | role / capability / provider の結線がかなり安定した |
-| UX | B | ミッション作成の引数群は強いが、自然言語からの導線はまだ補強余地あり |
+| 観点                   | 評価 | コメント                                                             |
+| ---------------------- | ---: | -------------------------------------------------------------------- |
+| lifecycle completeness |    A | mission の状態遷移は明確                                             |
+| team binding           |   A- | role / capability / provider の結線がかなり安定した                  |
+| UX                     |    B | ミッション作成の引数群は強いが、自然言語からの導線はまだ補強余地あり |
 
 #### 実地観察
 
@@ -259,11 +259,11 @@ Kyberion の intent / pipeline は、かなり高い完成度で
 
 #### 評価
 
-| 観点 | 評価 | コメント |
-|---|---:|---|
-| 実用性 | A- | 具体的な runtime surface に落ちている |
-| 契約の明確さ | A | schema と procedure が揃っている |
-| 追加の改善 | B | 体験の一貫性はまだ伸ばせる |
+| 観点         | 評価 | コメント                              |
+| ------------ | ---: | ------------------------------------- |
+| 実用性       |   A- | 具体的な runtime surface に落ちている |
+| 契約の明確さ |    A | schema と procedure が揃っている      |
+| 追加の改善   |    B | 体験の一貫性はまだ伸ばせる            |
 
 #### 改善点
 
@@ -281,11 +281,11 @@ Kyberion の intent / pipeline は、かなり高い完成度で
 
 #### 評価
 
-| 観点 | 評価 | コメント |
-|---|---:|---|
-| governance strength | A | 説明責任はかなり強い |
-| bundle completeness | A- | bundle の構成は十分だが、生成をもっと自動化したい |
-| operator burden | B | 手作業の比率がまだある |
+| 観点                | 評価 | コメント                                          |
+| ------------------- | ---: | ------------------------------------------------- |
+| governance strength |    A | 説明責任はかなり強い                              |
+| bundle completeness |   A- | bundle の構成は十分だが、生成をもっと自動化したい |
+| operator burden     |    B | 手作業の比率がまだある                            |
 
 #### 改善点
 

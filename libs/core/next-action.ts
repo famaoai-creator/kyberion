@@ -167,7 +167,7 @@ function buildPipelineFailureNextAction(
         next_action_key: 'next_action:verify_missing_runtime_prerequisites',
         reason: classification.remediation,
         next_action_type: 'bootstrap_environment',
-        suggested_command: 'pnpm doctor',
+        suggested_command: 'pnpm kyberion doctor',
       });
     case 'auth.invalid-key':
       return buildNextAction({
@@ -175,7 +175,7 @@ function buildPipelineFailureNextAction(
         next_action_key: 'next_action:repair_credentials',
         reason: classification.remediation,
         next_action_type: 'bootstrap_environment',
-        suggested_command: 'pnpm onboard',
+        suggested_command: 'pnpm onboarding',
       });
     case 'secret.not-found':
       return buildNextAction({
@@ -246,7 +246,7 @@ function buildPipelineFailureNextAction(
       next_action_key: 'next_action:verify_runtime_prerequisites',
       reason: classification.remediation,
       next_action_type: 'bootstrap_environment',
-      suggested_command: 'pnpm doctor',
+      suggested_command: 'pnpm kyberion doctor',
     });
   }
 
@@ -256,7 +256,7 @@ function buildPipelineFailureNextAction(
       next_action_key: 'next_action:repair_credentials',
       reason: classification.remediation,
       next_action_type: 'bootstrap_environment',
-      suggested_command: 'pnpm onboard',
+      suggested_command: 'pnpm onboarding',
     });
   }
 
@@ -355,7 +355,7 @@ export function buildNextActionFromError(
       reason:
         context.serviceSetupHint || `${classification.remediation}${missingSecrets}${fallbackNote}`,
       next_action_type: 'bootstrap_environment',
-      suggested_command: 'pnpm services:setup',
+      suggested_command: 'pnpm service:setup',
     });
   }
 
@@ -369,7 +369,7 @@ export function buildNextActionFromError(
       next_action_type: 'bootstrap_environment',
       suggested_command: context.manifestId
         ? `pnpm env:bootstrap --manifest ${context.manifestId} --apply`
-        : 'pnpm doctor',
+        : 'pnpm kyberion doctor',
     });
   }
 

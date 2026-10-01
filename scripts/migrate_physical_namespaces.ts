@@ -6,10 +6,10 @@
  * tenant by inference.
  *
  * Usage:
- *   pnpm migrate:physical-namespaces -- --dry-run
- *   pnpm migrate:physical-namespaces -- --kind surface --apply
- *   pnpm migrate:physical-namespaces -- --kind intent --dry-run
- *   pnpm migrate:physical-namespaces -- --kind promotion --apply
+ *   pnpm namespace:migrate-physical -- --dry-run
+ *   pnpm namespace:migrate-physical -- --kind surface --apply
+ *   pnpm namespace:migrate-physical -- --kind intent --dry-run
+ *   pnpm namespace:migrate-physical -- --kind promotion --apply
  */
 
 import * as path from 'node:path';
@@ -30,6 +30,7 @@ import {
 import { withExecutionContext } from '@agent/core/authority';
 import { isRecord, nowIso, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { guardCliArgsNormalized, type CliGuardSpec } from './lib/cli-guard.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './lib/json-input.js';
 
 type Print = (value: unknown) => void;
@@ -714,8 +715,20 @@ function parseArgs(argv: string[]): { kind: MigrationSelection; apply: boolean }
   };
 }
 
+/** CU-01: `--help` / typos exit before any plan is built or applied. */
+export const MIGRATE_PHYSICAL_NAMESPACES_CLI: CliGuardSpec = {
+  command: 'pnpm kyberion namespace migrate-physical',
+  manifestId: 'script.namespace.migrate-physical',
+  options: [
+    { flag: '--apply' },
+    { flag: '--kind', value: '<schedule|surface|feedback|intent|ledger|promotion|all>' },
+  ],
+};
+
 export function main(argv: string[], print: Print = () => undefined): void {
-  const options = parseArgs(argv);
+  const guarded = guardCliArgsNormalized(argv, MIGRATE_PHYSICAL_NAMESPACES_CLI, print);
+  if (guarded.handled) return;
+  const options = parseArgs(guarded.argv);
   const kinds: MigrationKind[] =
     options.kind === 'all'
       ? ['schedule', 'surface', 'feedback', 'intent', 'ledger', 'promotion']
@@ -727,7 +740,7 @@ export function main(argv: string[], print: Print = () => undefined): void {
 }
 
 const script = defineScript({
-  name: 'migrate:physical-namespaces',
+  name: 'namespace:migrate-physical',
   flags: [],
   run: ({ argv, print }) => main(argv, print),
 });

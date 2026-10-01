@@ -12,7 +12,7 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "mode": { "type": "string", "minLength": 1 },
+          "mode": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
           "provider": { "type": "string", "minLength": 1 },
           "module": { "type": "string", "minLength": 1 },
           "capabilities": {
@@ -45,9 +45,355 @@
           "cost_tier": {
             "description": "Billing shape of a completed request. 'free' = local runtime or flat-rate subscription CLI, so a revoked speculative request costs nothing extra. 'metered' = per-token/per-request billing, so a revoked speculative request burns real money. Optional; callers treat a missing or unrecognised value as 'metered'.",
             "enum": ["free", "metered"]
+          },
+          "transport": {
+            "description": "How the adapter reaches the model. 'cli' requires a `cli` block.",
+            "enum": ["cli", "sdk", "api", "local-server", "in-process"]
+          },
+          "data_egress": {
+            "description": "Whether prompts stay on this machine or are sent to a hosted provider. Independent of transport: a local CLI may still send data out.",
+            "enum": ["local-only", "external-api"]
+          },
+          "adapter": {
+            "description": "Execution/readiness adapter id. Providers sharing a protocol share an adapter, so a new provider on an existing adapter is a registry-only change; a new protocol adds one adapter here.",
+            "enum": [
+              "claude-cli",
+              "claude-agent-sdk",
+              "provider-cli",
+              "anthropic-api",
+              "gemini-api",
+              "grok-api",
+              "openrouter-api",
+              "openai-compatible",
+              "stub"
+            ]
+          },
+          "openai_compatible_preset": {
+            "description": "Env/endpoint preset of the openai-compatible adapter. Required when adapter is 'openai-compatible'.",
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "profile": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Execution capability declarations beyond `capabilities` (backend capability profile).",
+            "properties": {
+              "streaming": { "type": "boolean" },
+              "tool_calling": { "type": "boolean" },
+              "native_subagent": { "type": "boolean" },
+              "thinking_levels": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "low": { "type": ["string", "null"] },
+                  "medium": { "type": ["string", "null"] },
+                  "high": { "type": ["string", "null"] }
+                }
+              },
+              "supports_strict_tools": { "type": "boolean" },
+              "supports_grammar_tools": { "type": "boolean" },
+              "utility_fit": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": { "enum": ["judge", "classify", "summarize", "divergent"] }
+              }
+            },
+            "required": [
+              "streaming",
+              "tool_calling",
+              "native_subagent",
+              "thinking_levels",
+              "supports_strict_tools",
+              "supports_grammar_tools",
+              "utility_fit"
+            ]
+          },
+          "aliases": {
+            "description": "Runtime backend names (e.g. ReasoningBackend.name) that identify this provider.",
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }
+          },
+          "model_vendor": {
+            "description": "Vendor id used by the model registry (`<vendor>:<model>` ids).",
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "endpoint": {
+            "description": "Static HTTPS origin the provider sends data to (egress policy input). Omit for configurable endpoints; name-only egress checks then fail closed.",
+            "type": "string",
+            "pattern": "^https://[a-z0-9.-]+$"
+          },
+          "egress_provider_id": {
+            "description": "Provider id declared in provider-egress-policy.json.",
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "model_env_keys": {
+            "description": "Registered env vars that override the model for this mode, highest precedence first.",
+            "type": "array",
+            "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" }
+          },
+          "setup_hint": {
+            "description": "Operator remediation shown by the route doctor when this mode is not configured.",
+            "type": "string",
+            "minLength": 1
+          },
+          "runtime_instructions": {
+            "description": "Provider notes appended to worker prompts; subordinate to Kyberion contracts.",
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "cli": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "binary": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+              "version_args": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+              "help_args": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+              "bin_env_key": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+              "discovery": {
+                "description": "Availability is answered by provider discovery; chain construction must not spawn again when discovery reports it absent.",
+                "type": "boolean"
+              },
+              "model_flag": {
+                "description": "Flag that forwards an explicit model id when the CLI is launched as a pane agent.",
+                "type": "string",
+                "pattern": "^--?[a-z][a-z0-9-]*$"
+              },
+              "sandbox": {
+                "description": "Opt-in sandbox-enforcement probe. Tokens {prompt} and {permission_args} are substituted. Omit when the provider has no permission profile.",
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "args": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+                  "prompt_via_stdin": { "type": "boolean" },
+                  "enforcement_preflight": { "type": "boolean" }
+                },
+                "required": ["args"]
+              },
+              "install": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "npm_package": { "type": "string", "minLength": 1 },
+                  "brew_formula": { "type": "string", "minLength": 1 },
+                  "hint": { "type": "string", "minLength": 1 }
+                },
+                "required": ["hint"]
+              },
+              "capability_probe": {
+                "description": "XP-01 cheap capability probe for this CLI (binary/auth/sandbox-flag help probes). Commands run this descriptor's cli.binary (or its bin_env_key override); code hooks are referenced by id.",
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["binary_args", "headless", "structured_output"],
+                "properties": {
+                  "binary_args": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "auth_args": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "auth_interpreter": {
+                    "description": "Named auth-result interpreter; default is exit-status success.",
+                    "enum": ["claude-auth-status"]
+                  },
+                  "placeholder_fallback": {
+                    "description": "Named placeholder-shim detector + fallback binary resolver.",
+                    "enum": ["claude-cli-shim"]
+                  },
+                  "headless": {
+                    "type": "boolean"
+                  },
+                  "structured_output": {
+                    "type": "boolean"
+                  },
+                  "sandbox_flags": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["args", "expected_flags"],
+                    "properties": {
+                      "args": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "expected_flags": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "string",
+                          "pattern": "^--?[a-z][a-z0-9-]*$"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "permission_profiles": {
+                "description": "XP-02 KD-05 tier to provider permission projection. Every declared tier is an explicit grant (args) or refusal; an undeclared tier fails closed.",
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "implementer": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "args": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "notes": {
+                        "type": "string"
+                      },
+                      "refused": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "requires_full_sandbox_enforcement": {
+                        "type": "boolean"
+                      }
+                    },
+                    "oneOf": [
+                      {
+                        "required": ["args"],
+                        "not": {
+                          "required": ["refused"]
+                        }
+                      },
+                      {
+                        "required": ["refused"],
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": ["args"]
+                            },
+                            {
+                              "required": ["notes"]
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "explorer": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "args": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "notes": {
+                        "type": "string"
+                      },
+                      "refused": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "requires_full_sandbox_enforcement": {
+                        "type": "boolean"
+                      }
+                    },
+                    "oneOf": [
+                      {
+                        "required": ["args"],
+                        "not": {
+                          "required": ["refused"]
+                        }
+                      },
+                      {
+                        "required": ["refused"],
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": ["args"]
+                            },
+                            {
+                              "required": ["notes"]
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "planner": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "args": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "notes": {
+                        "type": "string"
+                      },
+                      "refused": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "requires_full_sandbox_enforcement": {
+                        "type": "boolean"
+                      }
+                    },
+                    "oneOf": [
+                      {
+                        "required": ["args"],
+                        "not": {
+                          "required": ["refused"]
+                        }
+                      },
+                      {
+                        "required": ["refused"],
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": ["args"]
+                            },
+                            {
+                              "required": ["notes"]
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "required": ["binary", "version_args", "discovery"]
           }
         },
-        "required": ["mode", "provider", "module", "capabilities", "env_keys"]
+        "required": [
+          "mode",
+          "provider",
+          "module",
+          "capabilities",
+          "env_keys",
+          "transport",
+          "data_egress",
+          "adapter",
+          "profile"
+        ]
       }
     }
   },

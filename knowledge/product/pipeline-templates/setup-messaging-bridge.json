@@ -43,8 +43,18 @@
                   "role": "gate",
                   "op": "core:if",
                   "params": {
-                    "condition": { "from": "install_status", "operator": "eq", "value": "installed" },
+                    "condition": {
+                      "from": "install_status",
+                      "operator": "eq",
+                      "value": "installed"
+                    },
                     "then": [
+                      {
+                        "id": "enable-bridge-surface",
+                        "role": "sink",
+                        "op": "system:shell",
+                        "params": { "cmd": "pnpm surfaces enable --surface slack-bridge" }
+                      },
                       {
                         "id": "reconcile-surfaces",
                         "role": "sink",
@@ -110,7 +120,11 @@
                         "role": "gate",
                         "op": "core:if",
                         "params": {
-                          "condition": { "from": "host_platform", "operator": "eq", "value": "darwin" },
+                          "condition": {
+                            "from": "host_platform",
+                            "operator": "eq",
+                            "value": "darwin"
+                          },
                           "then": [
                             {
                               "id": "check-readiness",
@@ -126,8 +140,20 @@
                               "role": "gate",
                               "op": "core:if",
                               "params": {
-                                "condition": { "from": "install_status", "operator": "eq", "value": "installed" },
+                                "condition": {
+                                  "from": "install_status",
+                                  "operator": "eq",
+                                  "value": "installed"
+                                },
                                 "then": [
+                                  {
+                                    "id": "enable-bridge-surface",
+                                    "role": "sink",
+                                    "op": "system:shell",
+                                    "params": {
+                                      "cmd": "pnpm surfaces enable --surface imessage-bridge"
+                                    }
+                                  },
                                   {
                                     "id": "reconcile-surfaces",
                                     "role": "sink",

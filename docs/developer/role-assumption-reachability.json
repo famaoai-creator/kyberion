@@ -163,6 +163,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/locale.ts#resolveScopedLocale",
+      "roles": ["scope_locale_reader"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": [
         "chronos_gateway",
@@ -494,6 +499,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/operational-learning.ts#enqueueOperationalLearningSignal",
+      "roles": ["operational_learning_writer"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/plugin/plugin-managed-install.ts#ensurePluginApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -588,6 +598,11 @@
     {
       "site": "libs/core/storage-janitor.ts#sweepStatusRules",
       "roles": ["ecosystem_architect"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/operator-notifications.ts#deliver",
+      "roles": ["surface_runtime"],
       "unresolved": []
     },
     {
@@ -790,6 +805,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/surface-mission-proposals.ts#<module>",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/surface-mission-proposals.ts#clearChronosMissionProposalState (via libs/core/surface/surface-mission-proposals.ts#withSurfaceRole)",
       "roles": ["chronos_gateway"],
       "unresolved": []
@@ -819,11 +839,6 @@
     {
       "site": "libs/core/surface/surface-mission-proposals.ts#emitSlackMissionEvent (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["slack_bridge"],
-      "unresolved": []
-    },
-    {
-      "site": "libs/core/surface/surface-mission-proposals.ts#emitSurfaceMissionIssueEvent",
-      "roles": ["mission_controller"],
       "unresolved": []
     },
     {
@@ -1655,6 +1670,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/lib/work-inventory-cli-shared.ts#governedTenant",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/license_audit.ts#writeReport",
       "roles": ["ecosystem_architect"],
       "unresolved": []
@@ -1857,7 +1877,7 @@
     "libs/actuators/process-actuator/src/process-actuator-helpers.ts#handleAction": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
-    "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#opCapture": [
+    "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#<module>": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
     "libs/core/actuator/deployment-adapter.ts#ShellDeploymentAdapter": [
@@ -1997,6 +2017,15 @@
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
     "libs/core/windows-os-automation.ts#runWindowsPointerActions": [
+      "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
+    ],
+    "presence/displays/operator-surface/src/lib/view.ts#<module>": [
+      "module specifier '@agent/shared-ui/vanilla' does not resolve to an analysed source (presence/displays/operator-surface/src/lib/view.ts#<module>)"
+    ],
+    "presence/displays/terminal-hud/src/actions/exec.ts#defaultExec": [
+      "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
+    ],
+    "presence/displays/terminal-hud/src/actions/schedule-actions.ts#runScheduleNow": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
     "scripts/backup.ts#runRequired": [
@@ -2365,6 +2394,24 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "operational_learning_writer": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/agent/chronos-quick-action-helpers.ts#runScheduleQuickAction",
+            "libs/core/generation-scheduler.ts#runGenerationScheduleAction",
+            "libs/core/generation-scheduler.ts#tickGenerationSchedule",
+            "libs/core/generation-scheduler.ts#resolveHandleAction",
+            "libs/core/generation-scheduler.ts#loadMediaGenerationActuator",
+            "libs/actuators/media-generation-actuator/src/index.ts#<module>",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#<module>",
+            "libs/actuators/media-generation-actuator/src/capture-actions.ts#<module>",
+            "libs/actuators/system-actuator/src/index.ts#<module>",
+            "libs/actuators/system-actuator/src/system-action-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#<module>",
+            "scripts/run_baseline_check.ts#runBaselineCheck",
+            "libs/core/operational-learning.ts#enqueueOperationalLearningSignal"
+          ]
+        },
         "reconcile_config_fallbacks": {
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/agent/chronos-quick-action-helpers.ts#runScheduleQuickAction",
@@ -2372,14 +2419,24 @@
             "libs/core/generation-scheduler.ts#tickGenerationSchedule",
             "libs/core/generation-scheduler.ts#resolveHandleAction",
             "libs/core/generation-scheduler.ts#loadMediaGenerationActuator",
-            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#handleAction",
-            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#executeSingleAction",
-            "libs/actuators/media-generation-actuator/src/capture-actions.ts#handleCaptureAction",
-            "libs/actuators/system-actuator/src/system-action-helpers.ts#handleSystemAction",
-            "libs/actuators/system-actuator/src/system-pipeline-helpers.ts#executePipeline",
-            "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#opCapture",
+            "libs/actuators/media-generation-actuator/src/index.ts#<module>",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#<module>",
+            "libs/actuators/media-generation-actuator/src/capture-actions.ts#<module>",
+            "libs/actuators/system-actuator/src/index.ts#<module>",
+            "libs/actuators/system-actuator/src/system-action-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#<module>",
             "libs/core/reconcile-ops.ts#reconcileConfigFallbacks",
             "libs/core/reconcile-ops.ts#handleFileMissing"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/agent/agent-route-helpers.ts#intentResolutionA2ui",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
           ]
         },
         "slack_bridge": {
@@ -2421,7 +2478,7 @@
         }
       },
       "unresolved_sites": [
-        "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#opCapture",
+        "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#<module>",
         "libs/core/actuator/deployment-adapter.ts#ShellDeploymentAdapter",
         "libs/core/agent/agent-adapter.ts#BaseACPAdapter",
         "libs/core/agent/agent-adapter.ts#runCliProcess",
@@ -2594,6 +2651,27 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "scope_locale_reader": {
+          "example_path": [
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
+            "scripts/surface_runtime.ts#buildDisabledSurfaceReconcileRow [child process]",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
         "slack_bridge": {
           "example_path": [
             "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
@@ -2642,6 +2720,7 @@
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
+        "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
         "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
@@ -2936,6 +3015,15 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "scope_locale_reader": {
+          "example_path": [
+            "presence/displays/concierge/src/lib/front-desk-nav.ts#buildFrontDeskNavPayload",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
         "slack_bridge": {
           "example_path": [
             "presence/displays/concierge/src/app/api/message/route.ts#POST",
@@ -3048,7 +3136,7 @@
       "reachable_roles": {
         "chronos_gateway": {
           "example_path": [
-            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordInteraction",
             "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
             "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord",
             "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
@@ -3068,6 +3156,7 @@
         "ecosystem_architect": {
           "example_path": [
             "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#main [child process]",
@@ -3080,7 +3169,7 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordInteraction",
             "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
             "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord",
             "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
@@ -3100,6 +3189,7 @@
         "knowledge_steward": {
           "example_path": [
             "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#handoffMission [child process]",
@@ -3111,6 +3201,7 @@
         "mission_controller": {
           "example_path": [
             "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#<module> [child process]",
@@ -3126,9 +3217,17 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
-        "slack_bridge": {
+        "scope_locale_reader": {
           "example_path": [
             "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "libs/core/locale.ts#deriveReplyLocale",
+            "libs/core/locale.ts#resolveScopeLocale",
+            "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
+        "slack_bridge": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordInteraction",
             "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
             "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord",
             "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
@@ -3147,7 +3246,7 @@
         },
         "sovereign_concierge": {
           "example_path": [
-            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordInteraction",
             "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
             "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord",
             "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
@@ -3275,6 +3374,7 @@
             "satellites/imessage-bridge/src/index.ts#<module>",
             "satellites/imessage-bridge/src/index.ts#main",
             "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#main [child process]",
@@ -3308,6 +3408,7 @@
             "satellites/imessage-bridge/src/index.ts#<module>",
             "satellites/imessage-bridge/src/index.ts#main",
             "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#handoffMission [child process]",
@@ -3321,6 +3422,7 @@
             "satellites/imessage-bridge/src/index.ts#<module>",
             "satellites/imessage-bridge/src/index.ts#main",
             "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#<module> [child process]",
@@ -3334,6 +3436,15 @@
             "libs/core/agent/agent-identity.ts#bindAgentRuntimeInstanceBestEffort",
             "libs/core/agent/agent-identity.ts#bindRuntimeInstance",
             "libs/core/agent/agent-identity.ts#appendGoverned"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#buildIMessageChannelAdapter",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
           ]
         },
         "slack_bridge": {
@@ -3543,6 +3654,21 @@
             "libs/core/agent/agent-identity.ts#bindAgentRuntimeInstanceBestEffort",
             "libs/core/agent/agent-identity.ts#bindRuntimeInstance",
             "libs/core/agent/agent-identity.ts#appendGoverned"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
+            "scripts/surface_runtime.ts#buildDisabledSurfaceReconcileRow [child process]",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
           ]
         },
         "slack_bridge": {
@@ -3797,6 +3923,25 @@
             "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction"
           ]
         },
+        "operational_learning_writer": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/system-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/system-actuator/src/system-action-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#<module>",
+            "scripts/run_baseline_check.ts#runBaselineCheck",
+            "libs/core/operational-learning.ts#enqueueOperationalLearningSignal"
+          ]
+        },
         "reconcile_config_fallbacks": {
           "example_path": [
             "presence/bridge/nexus-daemon.ts#<module>",
@@ -3809,11 +3954,29 @@
             "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
             "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
             "libs/actuators/system-actuator/src/index.ts#<module> [child process]",
-            "libs/actuators/system-actuator/src/system-action-helpers.ts#handleSystemAction",
-            "libs/actuators/system-actuator/src/system-pipeline-helpers.ts#executePipeline",
-            "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#opCapture",
+            "libs/actuators/system-actuator/src/system-action-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#<module>",
             "libs/core/reconcile-ops.ts#reconcileConfigFallbacks",
             "libs/core/reconcile-ops.ts#handleFileMissing"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/browser-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/browser-actuator/src/browser-runtime-helpers.ts#<module>",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
           ]
         },
         "slack_bridge": {
@@ -3865,7 +4028,7 @@
       "unresolved_sites": [
         "libs/actuators/compute-actuator/src/local-compute-driver.ts#LocalComputeDriver",
         "libs/actuators/process-actuator/src/process-actuator-helpers.ts#handleAction",
-        "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#opCapture",
+        "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#<module>",
         "libs/core/actuator/deployment-adapter.ts#ShellDeploymentAdapter",
         "libs/core/agent/agent-adapter.ts#BaseACPAdapter",
         "libs/core/agent/agent-adapter.ts#runCliProcess",
@@ -3947,8 +4110,288 @@
         "chronos_gateway",
         "infrastructure_sentinel",
         "knowledge_steward",
+        "scope_locale_reader",
         "slack_bridge"
       ]
+    },
+    "operator_surface": {
+      "entries": [
+        "presence/displays/operator-surface/src/app/api/inbox/inbox-input.ts",
+        "presence/displays/operator-surface/src/app/api/inbox/route.ts",
+        "presence/displays/operator-surface/src/app/audit/page.tsx",
+        "presence/displays/operator-surface/src/app/auth/callback/route.ts",
+        "presence/displays/operator-surface/src/app/auth/start/route.ts",
+        "presence/displays/operator-surface/src/app/health/page.tsx",
+        "presence/displays/operator-surface/src/app/inbox/page.tsx",
+        "presence/displays/operator-surface/src/app/intent-snapshots/page.tsx",
+        "presence/displays/operator-surface/src/app/knowledge/page.tsx",
+        "presence/displays/operator-surface/src/app/layout.tsx",
+        "presence/displays/operator-surface/src/app/login/route.ts",
+        "presence/displays/operator-surface/src/app/logout/route.ts",
+        "presence/displays/operator-surface/src/app/missions/[id]/page.tsx",
+        "presence/displays/operator-surface/src/app/operator-shell.tsx",
+        "presence/displays/operator-surface/src/app/page.tsx",
+        "presence/displays/operator-surface/src/app/reasoning/page.tsx",
+        "presence/displays/operator-surface/src/app/surfaces/page.tsx",
+        "presence/displays/operator-surface/src/components/CapabilityDashboard.tsx",
+        "presence/displays/operator-surface/src/components/OsControlPlanePanel.tsx",
+        "presence/displays/operator-surface/src/lib/api-guard.ts",
+        "presence/displays/operator-surface/src/lib/audit-mos.ts",
+        "presence/displays/operator-surface/src/lib/data.ts",
+        "presence/displays/operator-surface/src/lib/display-preferences.ts",
+        "presence/displays/operator-surface/src/lib/i18n.ts",
+        "presence/displays/operator-surface/src/lib/intent-snapshots.ts",
+        "presence/displays/operator-surface/src/lib/peer.ts",
+        "presence/displays/operator-surface/src/lib/request-locale.ts",
+        "presence/displays/operator-surface/src/lib/surface-auth-route.ts",
+        "presence/displays/operator-surface/src/lib/table-rows.ts",
+        "presence/displays/operator-surface/src/lib/view.ts",
+        "presence/displays/operator-surface/src/lib/viewer-context.ts",
+        "presence/displays/operator-surface/src/middleware.ts"
+      ],
+      "reviewed_infeasible": [],
+      "child_process_entries": [],
+      "reachable_roles": {
+        "chronos_token_registry_reader": {
+          "example_path": [
+            "presence/displays/operator-surface/src/lib/viewer-context.ts#<module>",
+            "libs/core/surface/surface-authn.ts#<module>",
+            "libs/core/authn-providers.ts#<module>",
+            "libs/core/authn-providers.ts#loadRegistrations"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "presence/displays/operator-surface/src/app/intent-snapshots/page.tsx#IntentSnapshotsPage",
+            "presence/displays/operator-surface/src/app/intent-snapshots/page.tsx#IntentResolutionSummary",
+            "libs/core/intent/intent-resolution-contract.ts#resolveIntentResolutionContract",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
+        "sovereign_concierge": {
+          "example_path": [
+            "presence/displays/operator-surface/src/lib/viewer-context.ts#<module>",
+            "libs/core/surface/surface-authn.ts#<module>",
+            "libs/core/authn-providers.ts#<module>"
+          ]
+        }
+      },
+      "unresolved_sites": [
+        "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
+        "presence/displays/operator-surface/src/lib/view.ts#<module>"
+      ],
+      "policy_roles_not_reachable": []
+    },
+    "personal_pads": {
+      "entries": ["scripts/personal-pads/server.ts"],
+      "reviewed_infeasible": [],
+      "child_process_entries": [
+        {
+          "site": "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+          "targets": ["scripts/agent_runtime_supervisor_daemon.ts"]
+        },
+        {
+          "site": "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+          "targets": ["scripts/run_agent_runtime_supervisor.ts"]
+        },
+        {
+          "site": "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+          "targets": ["scripts/run_mission_orchestration_event_worker.ts"]
+        },
+        {
+          "site": "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
+          "targets": ["scripts/surface_runtime.ts"]
+        },
+        {
+          "site": "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+          "targets": ["scripts/mission_controller.ts"]
+        }
+      ],
+      "reachable_roles": {
+        "chronos_gateway": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "scripts/mission_controller.ts#memoryCommands",
+            "scripts/refactor/mission-memory-commands.ts#promoteMemoryCandidate",
+            "libs/core/knowledge/memory-promotion-workflow.ts#promoteMemoryCandidateToKnowledge",
+            "libs/core/promoted-memory.ts#savePromotedMemoryRecord"
+          ]
+        },
+        "chronos_token_registry_reader": {
+          "example_path": [
+            "scripts/personal-pads/server.ts#<module>",
+            "libs/core/surface/surface-authn.ts#<module>",
+            "libs/core/authn-providers.ts#<module>",
+            "libs/core/authn-providers.ts#loadRegistrations"
+          ]
+        },
+        "ecosystem_architect": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
+            "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
+            "libs/core/actuator/deployment-adapter.ts#installShellDeploymentAdapterFromConfigIfAvailable",
+            "libs/core/actuator/deployment-adapter.ts#loadShellDeploymentAdapterConfig"
+          ]
+        },
+        "infrastructure_sentinel": {
+          "example_path": [
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
+            "scripts/surface_runtime.ts#startSurfaceById [child process]",
+            "scripts/surface_runtime.ts#recordProtocolSurfaceLifecycle",
+            "libs/core/protocol-service-lifecycle.ts#recordProtocolServiceLifecycle"
+          ]
+        },
+        "knowledge_steward": {
+          "example_path": [
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#createMission"
+          ]
+        },
+        "mission_controller": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/agent/agent-runtime-supervisor.ts#<module>",
+            "libs/core/agent/agent-lifecycle.ts#<module>",
+            "libs/core/agent/agent-lifecycle.ts#AgentLifecycleManagerImpl",
+            "libs/core/agent/agent-identity.ts#bindAgentRuntimeInstanceBestEffort",
+            "libs/core/agent/agent-identity.ts#bindRuntimeInstance",
+            "libs/core/agent/agent-identity.ts#appendGoverned"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "scripts/personal-pads/server.ts#createPersonalPadsServer",
+            "scripts/lib/pad-ui.ts#resolvePadLocale",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
+        "slack_bridge": {
+          "example_path": [
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-planning.ts#emitSlackMissionEvent"
+          ]
+        },
+        "sovereign_concierge": {
+          "example_path": [
+            "scripts/personal-pads/server.ts#<module>",
+            "libs/core/surface/surface-authn.ts#<module>",
+            "libs/core/authn-providers.ts#<module>"
+          ]
+        },
+        "surface_runtime": {
+          "example_path": [
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested"
+          ]
+        }
+      },
+      "unresolved_sites": [
+        "libs/core/actuator/deployment-adapter.ts#ShellDeploymentAdapter",
+        "libs/core/agent/agent-adapter.ts#BaseACPAdapter",
+        "libs/core/agent/agent-adapter.ts#runCliProcess",
+        "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
+        "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
+        "libs/core/mesh/acp-mediator.ts#<module>",
+        "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
+        "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
+        "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
+        "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/plugin/plugin-lifecycle.ts#importTarget",
+        "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
+        "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
+        "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
+        "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
+        "libs/core/provider/cursor-cli-reasoning-backend.ts#CursorCliReasoningBackend",
+        "libs/core/provider/devin-cli-reasoning-backend.ts#DevinCliReasoningBackend",
+        "libs/core/provider/gemini-cli-backend.ts#GeminiCliBackend",
+        "libs/core/provider/gemini-cli-backend.ts#runGeminiCliQuery",
+        "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
+        "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
+        "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/shell/pty-engine.ts#PtyRegistry",
+        "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
+        "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
+        "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
+        "libs/core/windows-os-automation.ts#runWindowsPointerActions"
+      ],
+      "policy_roles_not_reachable": []
     },
     "presence_studio": {
       "entries": ["presence/displays/presence-studio/server.ts"],
@@ -4070,6 +4513,14 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "scope_locale_reader": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
         "slack_bridge": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
@@ -4125,6 +4576,7 @@
         "libs/core/mic-capture.ts#startMicCapture",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
+        "libs/core/ocr-bridge.ts#AppleVisionOcrProvider",
         "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
         "libs/core/plugin/skill-plugin-loader.ts#loadAuthorizedSkillPlugins",
         "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
@@ -4275,6 +4727,15 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "scope_locale_reader": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "libs/core/locale.ts#deriveReplyLocale",
+            "libs/core/locale.ts#resolveScopeLocale",
+            "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
         "slack_bridge": {
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
@@ -4361,6 +4822,15 @@
             "scripts/surface_runtime.ts#startSurfaceById",
             "scripts/surface_runtime.ts#recordProtocolSurfaceLifecycle",
             "libs/core/protocol-service-lifecycle.ts#recordProtocolServiceLifecycle"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "scripts/surface_runtime.ts#buildDisabledSurfaceReconcileRow",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
           ]
         },
         "slack_bridge": {
@@ -4497,6 +4967,21 @@
             "libs/core/agent/agent-identity.ts#bindAgentRuntimeInstanceBestEffort",
             "libs/core/agent/agent-identity.ts#bindRuntimeInstance",
             "libs/core/agent/agent-identity.ts#appendGoverned"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
+            "scripts/surface_runtime.ts#buildDisabledSurfaceReconcileRow [child process]",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
           ]
         },
         "slack_bridge": {
@@ -4636,6 +5121,7 @@
         "ecosystem_architect": {
           "example_path": [
             "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#main [child process]",
@@ -4668,6 +5154,7 @@
         "knowledge_steward": {
           "example_path": [
             "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#handoffMission [child process]",
@@ -4679,6 +5166,7 @@
         "mission_controller": {
           "example_path": [
             "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
             "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#<module> [child process]",
@@ -4692,6 +5180,14 @@
             "libs/core/agent/agent-identity.ts#bindAgentRuntimeInstanceBestEffort",
             "libs/core/agent/agent-identity.ts#bindRuntimeInstance",
             "libs/core/agent/agent-identity.ts#appendGoverned"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "libs/core/locale.ts#deriveReplyLocale",
+            "libs/core/locale.ts#resolveScopeLocale",
+            "libs/core/locale.ts#resolveScopedLocale"
           ]
         },
         "slack_bridge": {
@@ -4783,6 +5279,190 @@
       "child_process_entries": [],
       "reachable_roles": {},
       "unresolved_sites": ["libs/core/shell/pty-engine.ts#PtyRegistry"],
+      "policy_roles_not_reachable": []
+    },
+    "terminal_hud": {
+      "entries": ["presence/displays/terminal-hud/src/index.ts"],
+      "reviewed_infeasible": [],
+      "child_process_entries": [
+        {
+          "site": "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+          "targets": ["scripts/agent_runtime_supervisor_daemon.ts"]
+        },
+        {
+          "site": "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+          "targets": ["scripts/run_agent_runtime_supervisor.ts"]
+        },
+        {
+          "site": "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+          "targets": ["scripts/run_mission_orchestration_event_worker.ts"]
+        },
+        {
+          "site": "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
+          "targets": ["scripts/surface_runtime.ts"]
+        },
+        {
+          "site": "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+          "targets": ["scripts/mission_controller.ts"]
+        }
+      ],
+      "reachable_roles": {
+        "chronos_gateway": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "scripts/mission_controller.ts#memoryCommands",
+            "scripts/refactor/mission-memory-commands.ts#promoteMemoryCandidate",
+            "libs/core/knowledge/memory-promotion-workflow.ts#promoteMemoryCandidateToKnowledge",
+            "libs/core/promoted-memory.ts#savePromotedMemoryRecord"
+          ]
+        },
+        "ecosystem_architect": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
+            "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
+            "libs/core/actuator/deployment-adapter.ts#installShellDeploymentAdapterFromConfigIfAvailable",
+            "libs/core/actuator/deployment-adapter.ts#loadShellDeploymentAdapterConfig"
+          ]
+        },
+        "infrastructure_sentinel": {
+          "example_path": [
+            "presence/displays/terminal-hud/src/index.ts#<module>",
+            "presence/displays/terminal-hud/src/snapshot.ts#<module>",
+            "presence/displays/terminal-hud/src/store/agent-graph.ts#loadAgentGraph",
+            "presence/displays/terminal-hud/src/store/agent-graph.ts#loadAgentGraphUncached",
+            "libs/core/mesh/peer-conversation.ts#collectPeerTranscriptTails"
+          ]
+        },
+        "knowledge_steward": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#createMission"
+          ]
+        },
+        "mission_controller": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/agent/agent-runtime-supervisor.ts#<module>",
+            "libs/core/agent/agent-lifecycle.ts#<module>",
+            "libs/core/agent/agent-lifecycle.ts#AgentLifecycleManagerImpl",
+            "libs/core/agent/agent-identity.ts#bindAgentRuntimeInstanceBestEffort",
+            "libs/core/agent/agent-identity.ts#bindRuntimeInstance",
+            "libs/core/agent/agent-identity.ts#appendGoverned"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
+            "scripts/surface_runtime.ts#buildDisabledSurfaceReconcileRow [child process]",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
+        "slack_bridge": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-planning.ts#emitSlackMissionEvent"
+          ]
+        },
+        "sovereign_concierge": {
+          "example_path": [
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
+            "scripts/surface_runtime.ts#startSurfaceById [child process]",
+            "scripts/surface_runtime.ts#recordProtocolSurfaceLifecycle",
+            "libs/core/protocol-service-lifecycle.ts#recordProtocolServiceLifecycle"
+          ]
+        },
+        "surface_runtime": {
+          "example_path": [
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested"
+          ]
+        }
+      },
+      "unresolved_sites": [
+        "libs/core/actuator/deployment-adapter.ts#ShellDeploymentAdapter",
+        "libs/core/agent/agent-adapter.ts#BaseACPAdapter",
+        "libs/core/agent/agent-adapter.ts#runCliProcess",
+        "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
+        "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
+        "libs/core/mesh/acp-mediator.ts#<module>",
+        "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
+        "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
+        "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
+        "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
+        "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
+        "libs/core/provider/cursor-cli-reasoning-backend.ts#CursorCliReasoningBackend",
+        "libs/core/provider/devin-cli-reasoning-backend.ts#DevinCliReasoningBackend",
+        "libs/core/provider/gemini-cli-backend.ts#GeminiCliBackend",
+        "libs/core/provider/gemini-cli-backend.ts#runGeminiCliQuery",
+        "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
+        "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
+        "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/shell/pty-engine.ts#PtyRegistry",
+        "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
+        "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
+        "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
+        "presence/displays/terminal-hud/src/actions/exec.ts#defaultExec",
+        "presence/displays/terminal-hud/src/actions/schedule-actions.ts#runScheduleNow"
+      ],
       "policy_roles_not_reachable": []
     },
     "voice_hub": {
@@ -4890,6 +5570,14 @@
             "libs/core/agent/agent-identity.ts#bindAgentRuntimeInstanceBestEffort",
             "libs/core/agent/agent-identity.ts#bindRuntimeInstance",
             "libs/core/agent/agent-identity.ts#appendGoverned"
+          ]
+        },
+        "scope_locale_reader": {
+          "example_path": [
+            "satellites/voice-hub/server.ts#<module>",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
           ]
         },
         "slack_bridge": {

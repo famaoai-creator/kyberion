@@ -1,14 +1,17 @@
 import { classifyTaskSessionIntent } from '../task/task-session.js';
+import { detectTextLocale } from '../locale-normalize.js';
 import {
   resolveIntentResolutionPacket,
   type IntentResolutionPacket,
 } from '../intent/intent-resolution.js';
 import {
   deriveSurfaceDelegationReceiverForProvider,
+  getSurfaceProviderManifestRecord,
   resolveSurfaceConversationReceiverForProvider,
   shouldForceSurfaceDelegationFromProviderPolicy,
 } from './surface-provider-policy.js';
 import { listSurfaceProviderManifests } from './surface-provider-manifest.js';
+import { resolveChannelMessageShape } from './channel-adapter-registry.js';
 import type { SurfaceDelegationReceiver } from './surface-provider-policy.js';
 import type { SurfaceIntentResolution } from '../router-contract.js';
 export type { SurfaceDelegationReceiver } from './surface-provider-policy.js';
@@ -60,7 +63,7 @@ export function parseSlackSurfacePrompt(query: string): ParsedSlackSurfacePrompt
     channel: readLine('Channel'),
     thread: readLine('Thread'),
     user: readLine('User'),
-    derivedLanguage: /[ぁ-んァ-ン一-龯]/.test(userMessage) ? 'ja' : 'en',
+    derivedLanguage: detectTextLocale(userMessage) ?? 'en',
     executionMode: readLine('Execution mode') as SlackExecutionMode | undefined,
     userMessage,
   };
@@ -107,13 +110,17 @@ export function surfaceRoutingText(input: SurfaceConversationInput): {
   text: string;
   parsedSlackPrompt: ParsedSlackSurfacePrompt | null;
 } {
-  const slackMetadata =
-    input.surface === 'slack'
-      ? (input.surfaceMetadata as SlackSurfaceMetadata | undefined)
-      : undefined;
+  // Structured thread metadata applies to surfaces whose channel adapter declares
+  // the slack-thread message shape, addressed by that surface's own agent (RS-06).
+  const surface = input.surface;
+  const slackThreadShape =
+    Boolean(surface) && resolveChannelMessageShape(surface!) === 'slack-thread';
+  const slackMetadata = slackThreadShape
+    ? (input.surfaceMetadata as SlackSurfaceMetadata | undefined)
+    : undefined;
   const hasStructuredSlackMetadata =
-    input.agentId === 'slack-surface-agent' &&
-    input.surface === 'slack' &&
+    slackThreadShape &&
+    input.agentId === getSurfaceProviderManifestRecord(surface!).agentId &&
     (typeof input.surfaceText === 'string' ||
       typeof slackMetadata?.channel === 'string' ||
       typeof slackMetadata?.threadTs === 'string' ||
@@ -123,7 +130,7 @@ export function surfaceRoutingText(input: SurfaceConversationInput): {
         channel: typeof slackMetadata?.channel === 'string' ? slackMetadata.channel : undefined,
         thread: typeof slackMetadata?.threadTs === 'string' ? slackMetadata.threadTs : undefined,
         user: typeof slackMetadata?.user === 'string' ? slackMetadata.user : undefined,
-        derivedLanguage: /[ぁ-んァ-ン一-龯]/.test(input.surfaceText || input.query) ? 'ja' : 'en',
+        derivedLanguage: detectTextLocale(input.surfaceText || input.query) ?? 'en',
         executionMode:
           slackMetadata?.execution_mode === 'conversation' ||
           slackMetadata?.execution_mode === 'task'

@@ -2,6 +2,8 @@ import { listDesignStyles } from '@agent/core/design-foundation';
 import { draftDeckSectionBodies, selectDeckTheme } from '@agent/core/deck-theme-direction';
 import { htmlToDeckProtocol } from './html-deck-helpers.js';
 import { logger } from '@agent/core/core';
+import { resolveLocale } from '@agent/core/locale';
+import { localeToBcp47 } from '@agent/core/locale-normalize';
 import { clamp, nowIso } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
@@ -639,7 +641,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       const inferred: Record<string, { value: string; rationale: string }> = {};
       if (!stated.locale) {
         inferred.locale = {
-          value: 'ja-JP',
+          value: localeToBcp47(resolveLocale()),
           rationale: 'no locale stated; defaulted to the workspace locale',
         };
       }

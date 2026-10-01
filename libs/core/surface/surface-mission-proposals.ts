@@ -26,9 +26,13 @@ import {
 } from '../workforce/artifact-store.js';
 import type { AgentRoutingDecision } from '../intent/intent-contract.js';
 import { nowIso } from '../foundation/time.js';
-import type { SupportedLocale } from '../locale.js';
+import { resolveLocale, type SupportedLocale } from '../locale.js';
 
 import { getSurfaceCoordinationRole } from './surface-coordination-role-map.js';
+import {
+  resolveChannelMissionEventStream,
+  type ChannelMissionEventStream,
+} from './channel-adapter-registry.js';
 
 import type {
   ChronosMissionProposalState,
@@ -354,7 +358,7 @@ export async function resolveMissionProposalReply(params: {
     clearMissionProposalState(params.surface, params.channel, params.thread);
     return {
       handled: true,
-      reply: t('bridge:mission_proposal_cancelled', undefined, params.locale ?? 'ja'),
+      reply: t('bridge:mission_proposal_cancelled', undefined, params.locale ?? resolveLocale()),
     };
   }
   if (isMissionConfirmation(params.text)) {
@@ -384,7 +388,7 @@ export function buildMissionIssuanceReply(
   > & { routingDecision?: AgentRoutingDecision },
   options?: { locale?: SupportedLocale; includeDetails?: boolean }
 ): string {
-  const locale = options?.locale ?? 'ja';
+  const locale = options?.locale ?? resolveLocale();
   const details = options?.includeDetails
     ? [
         t('bridge:mission_issued_type', { missionType: issued.missionType }, locale),
@@ -446,7 +450,7 @@ export function stashMissionProposalForConfirmation(params: {
   });
   const summary =
     String(params.proposal.summary || params.fallbackSummary || '').trim() ||
-    t('bridge:mission_proposal_fallback', undefined, params.locale ?? 'ja');
+    t('bridge:mission_proposal_fallback', undefined, params.locale ?? resolveLocale());
   return buildMissionProposalConfirmationText({
     summary,
     intentResolution: params.intentResolution,
@@ -459,7 +463,7 @@ export function buildMissionProposalConfirmationText(params: {
   intentResolution?: IntentResolutionContract;
   locale?: SupportedLocale;
 }): string {
-  const locale = params.locale ?? 'ja';
+  const locale = params.locale ?? resolveLocale();
   return [
     `${params.summary}\n${t('bridge:mission_proposal_confirmation_choices', undefined, locale)}`,
     ...(params.intentResolution
@@ -629,20 +633,25 @@ export async function issueMissionFromProposal(
   };
 }
 
+// Mission-event stream writers keyed by the channel adapter registry's
+// `mission_event_stream` (RS-06). Surfaces without a dedicated channel stream
+// record into the shared mission-control observability stream
+// (mission_controller-writable).
+const MISSION_EVENT_STREAM_WRITERS: Record<
+  ChannelMissionEventStream,
+  (surface: string, event: Record<string, unknown>) => void
+> = {
+  slack: (_surface, event) =>
+    emitSlackMissionEvent({ ...event, slack_channel: event.surface_channel }),
+  chronos: (_surface, event) => emitChronosMissionEvent(event),
+  shared: (surface, event) =>
+    withExecutionContext('mission_controller', () =>
+      emitMissionOrchestrationObservation({ surface_channel: surface, ...event })
+    ),
+};
+
 function emitSurfaceMissionIssueEvent(surface: string, event: Record<string, unknown>): void {
-  if (surface === 'slack') {
-    emitSlackMissionEvent({ ...event, slack_channel: event.surface_channel });
-    return;
-  }
-  if (surface === 'chronos') {
-    emitChronosMissionEvent(event);
-    return;
-  }
-  // Surfaces without a dedicated channel stream record into the shared
-  // mission-control observability stream (mission_controller-writable).
-  withExecutionContext('mission_controller', () =>
-    emitMissionOrchestrationObservation({ surface_channel: surface, ...event })
-  );
+  MISSION_EVENT_STREAM_WRITERS[resolveChannelMissionEventStream(surface)](surface, event);
 }
 
 export async function issueSlackMissionFromProposal(params: {

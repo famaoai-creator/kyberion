@@ -1,6 +1,7 @@
 import { formatDateTime, formatNumber, resolveTimeZone } from '@agent/core/format';
 import type { KbStatus, KbStatusDomain } from '@agent/core/surface/a2ui-catalog';
 import { createTranslator, statusLabel } from '@agent/shared-ui/vanilla';
+import { localeToBcp47 } from '@agent/core/locale-normalize';
 import { operatorUiMessages, type OperatorLocale, type OperatorTranslate } from './i18n';
 
 /**
@@ -8,8 +9,6 @@ import { operatorUiMessages, type OperatorLocale, type OperatorTranslate } from 
  * formatting and the mapping of record values onto the canonical status
  * vocabulary (`ui:status-pill` shows icon + text, never color alone).
  */
-
-const BCP47: Record<OperatorLocale, string> = { ja: 'ja-JP', en: 'en-US' };
 
 const KB_STATUSES: ReadonlySet<string> = new Set([
   'active',
@@ -61,14 +60,18 @@ export function formatTimestamp(
 ): string {
   if (value === undefined || value === null || value === '') return '—';
   try {
-    return formatDateTime(value, { locale: BCP47[locale], timeZone: resolveTimeZone(), style });
+    return formatDateTime(value, {
+      locale: localeToBcp47(locale),
+      timeZone: resolveTimeZone(),
+      style,
+    });
   } catch {
     return String(value);
   }
 }
 
 export function formatCount(value: number, locale: OperatorLocale): string {
-  return formatNumber(value, { locale: BCP47[locale] });
+  return formatNumber(value, { locale: localeToBcp47(locale) });
 }
 
 export type TierTone = 'info' | 'warning' | 'danger' | 'neutral';

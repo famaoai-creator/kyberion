@@ -1,0 +1,193 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "meeting-platforms.schema.json",
+  "title": "Meeting Platform Registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "default_selector_platform", "platforms"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "default_selector_platform": {
+      "type": "string",
+      "minLength": 1
+    },
+    "platforms": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/platform"
+      }
+    }
+  },
+  "$defs": {
+    "selectorList": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["selector", "locale"],
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1
+              },
+              "locale": {
+                "type": "string",
+                "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "preJoinSelectors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name_input",
+        "meeting_id_input",
+        "meeting_passcode_input",
+        "continue_without_audio_video_button",
+        "settings_button",
+        "microphone_device_button",
+        "speaker_device_button",
+        "camera_device_button",
+        "device_option",
+        "mute_mic_button",
+        "disable_camera_button",
+        "join_button",
+        "leave_button"
+      ],
+      "properties": {
+        "name_input": {
+          "$ref": "#/$defs/selectorList"
+        },
+        "meeting_id_input": {
+          "$ref": "#/$defs/selectorList"
+        },
+        "meeting_passcode_input": {
+          "$ref": "#/$defs/selectorList"
+        },
+        "continue_without_audio_video_button": {
+          "$ref": "#/$defs/selectorList"
+        },
+        "settings_button": {
+          "$ref": "#/$defs/selectorList"
+        },
+        "microphone_device_button": {
+          "$ref": "#/$defs/selectorList"
+        },
+        "speaker_device_button": {
+          "$ref": "#/$defs/selectorList"
+        },
+        "camera_device_button": {
+          "$ref": "#/$defs/selectorList"
+        },
+        "device_option": {
+          "$ref": "#/$defs/selectorList"
+        },
+        "mute_mic_button": {
+          "$ref": "#/$defs/selectorList"
+        },
+        "disable_camera_button": {
+          "$ref": "#/$defs/selectorList"
+        },
+        "join_button": {
+          "$ref": "#/$defs/selectorList"
+        },
+        "leave_button": {
+          "$ref": "#/$defs/selectorList"
+        }
+      }
+    },
+    "inMeetingSelectors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["captions_toggle", "captions_container"],
+      "properties": {
+        "captions_toggle": {
+          "$ref": "#/$defs/selectorList"
+        },
+        "captions_container": {
+          "$ref": "#/$defs/selectorList"
+        }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "display_name",
+        "provider_id",
+        "provider_aliases",
+        "execution_provider",
+        "hosts",
+        "pre_join_selectors",
+        "in_meeting_selectors"
+      ],
+      "properties": {
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider_aliases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "execution_provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hosts": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Allowed URL hosts in match order (a host also matches its subdomains). The first matching entry decides; required_path restricts a broad host to its meeting entry page.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["host"],
+            "properties": {
+              "host": {
+                "type": "string",
+                "minLength": 1
+              },
+              "required_path": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "pre_join_selectors": {
+          "$ref": "#/$defs/preJoinSelectors"
+        },
+        "in_meeting_selectors": {
+          "$ref": "#/$defs/inMeetingSelectors"
+        }
+      }
+    }
+  }
+}

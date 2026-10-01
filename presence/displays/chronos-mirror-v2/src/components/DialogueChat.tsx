@@ -1,5 +1,6 @@
 'use client';
 
+import { localeToBcp47 } from '@agent/core/locale-normalize';
 import * as React from 'react';
 import {
   ArrowDown,
@@ -49,7 +50,7 @@ interface PendingMessage {
 }
 
 function formatTime(ts: string, locale: DiscussionLocale): string {
-  return new Date(ts).toLocaleTimeString(locale === 'ja' ? 'ja-JP' : 'en-US', {
+  return new Date(ts).toLocaleTimeString(localeToBcp47(locale), {
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -59,7 +60,7 @@ function dayLabel(ts: string, locale: DiscussionLocale): string {
   const date = new Date(ts);
   const now = new Date();
   if (date.toDateString() === now.toDateString()) return dt('today', locale);
-  return date.toLocaleDateString(locale === 'ja' ? 'ja-JP' : 'en-US', {
+  return date.toLocaleDateString(localeToBcp47(locale), {
     month: 'short',
     day: 'numeric',
     weekday: 'short',
@@ -142,7 +143,7 @@ function MessageItem({
       return;
     }
     const utterance = new SpeechSynthesisUtterance(message.text.replace(/[*_`#>]/gu, ''));
-    utterance.lang = locale === 'ja' ? 'ja-JP' : 'en-US';
+    utterance.lang = localeToBcp47(locale);
     utterance.onend = () => setSpeaking(false);
     setSpeaking(true);
     window.speechSynthesis.speak(utterance);
@@ -702,7 +703,7 @@ export const Composer = React.forwardRef<
       return;
     }
     const instance = new Recognition();
-    instance.lang = locale === 'ja' ? 'ja-JP' : 'en-US';
+    instance.lang = localeToBcp47(locale);
     instance.continuous = true;
     instance.interimResults = true;
     draftBeforeVoice.current = text;

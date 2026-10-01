@@ -270,8 +270,8 @@ The simulation is now backed by first-class surface intents:
 
 Two schemas anchor the learning layer:
 
-- [`operator-profile.schema.json`](knowledge/product/schemas/operator-profile.schema.json)
-- [`operator-request-log.schema.json`](knowledge/product/schemas/operator-request-log.schema.json)
+- [`operator-profile.schema.json`](../schemas/operator-profile.schema.json)
+- [`operator-request-log.schema.json`](../schemas/operator-request-log.schema.json)
 - `operator-learning-scenario-pack.json` and `operator-learning-dispatch-registry.json` (+ schemas) — retired 2026-10-01 with their loader to `retired/knowledge/product/` (no reader left; see `retired/README.md`)
 
 The runtime helper is:

@@ -1,6 +1,7 @@
 /** Domain barrel — public surface for libs/core/surface */
 export * from './a2ui-catalog.js';
 export * from './channel-adapter.js';
+export * from './channel-adapter-registry.js';
 export * from './channel-directory.js';
 export * from './channel-registry.js';
 export * from './channel-surface-types.js';

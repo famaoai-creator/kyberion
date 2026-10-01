@@ -9,15 +9,15 @@ function read(relPath: string): string {
 }
 
 describe('Customer aggregation contract', () => {
-  it('documents customer:create as an available command', () => {
+  it('documents stance:create as an available command', () => {
     const doc = read('docs/developer/CUSTOMER_AGGREGATION.md');
     const jp = read('docs/developer/CUSTOMER_AGGREGATION.ja.md');
     const customerReadme = read('customer/README.md');
-    expect(doc).toContain('pnpm customer:create <slug>');
-    expect(doc).toContain('[x] CLI: `pnpm customer:create <slug>`');
-    expect(doc).toContain('[x] CLI: `pnpm customer:list`');
-    expect(doc).toContain('[x] CLI: `pnpm customer:switch <slug>`');
-    expect(doc).toContain('[x] Migration helper: `pnpm customer:migrate-from-personal`');
+    expect(doc).toContain('pnpm stance:create <slug>');
+    expect(doc).toContain('[x] CLI: `pnpm stance:create <slug>`');
+    expect(doc).toContain('[x] CLI: `pnpm stance:list`');
+    expect(doc).toContain('[x] CLI: `pnpm stance:switch <slug>`');
+    expect(doc).toContain('[x] Migration helper: `pnpm stance:migrate-from-personal`');
     expect(doc).toContain('[x] Connections consumer (`libs/core/service/service-engine.ts`)');
     expect(doc).toContain('[x] Policy consumer (`libs/core/governance/approval-policy.ts`)');
     expect(doc).toContain(
@@ -39,9 +39,9 @@ describe('Customer aggregation contract', () => {
     );
     expect(doc).toContain('Legacy personal fallback (`knowledge/personal/`)');
     expect(doc).toContain('knowledge/personal/{path}     ← existing, legacy fallback');
-    expect(jp).toContain('[x] `pnpm customer:create`');
-    expect(jp).toContain('[x] `customer:list`');
-    expect(jp).toContain('[x] `customer:switch`');
+    expect(jp).toContain('[x] `pnpm stance:create`');
+    expect(jp).toContain('[x] `stance:list`');
+    expect(jp).toContain('[x] `stance:switch`');
     expect(jp).toContain('[x] 移行ヘルパ');
     expect(jp).toContain('customer overlay がないレガシー単一利用前提');
     expect(jp).toContain('レガシーフォールバック');
@@ -51,15 +51,15 @@ describe('Customer aggregation contract', () => {
     expect(jp).toContain(
       '[x] slack onboarding consumer (`libs/core/integrations/slack-onboarding.ts`)'
     );
-    expect(customerReadme).toContain('pnpm customer:create acme-corp');
-    expect(customerReadme).toContain('pnpm customer:list');
+    expect(customerReadme).toContain('pnpm stance:create acme-corp');
+    expect(customerReadme).toContain('pnpm stance:list');
     expect(customerReadme).toContain(
       'required customer.json / identity.json / vision.md files are present'
     );
-    expect(customerReadme).toContain('pnpm customer:migrate-from-personal acme-corp');
-    expect(customerReadme).toContain('pnpm customer:switch acme-corp');
+    expect(customerReadme).toContain('pnpm stance:migrate-from-personal acme-corp');
+    expect(customerReadme).toContain('pnpm stance:switch acme-corp');
     expect(customerReadme).toContain(
-      'customer:switch requires customer.json / identity.json / vision.md to be present'
+      'stance:switch requires customer.json / identity.json / vision.md to be present'
     );
   });
 });

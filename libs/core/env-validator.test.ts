@@ -4,6 +4,7 @@ import {
   loadEnvRegistryEntries,
   validateEnv,
   validateEnvAgainstRegistry,
+  validateStartupEnv,
   type EnvRegistryValidationEntry,
 } from './env-validator.js';
 import { getRegisteredEnvBool } from './foundation/env.js';
@@ -176,5 +177,40 @@ describe('registry-backed validation', () => {
         strict: true,
       })
     ).toThrow('KYBERION_PROVIDER_DEMOTION_TTL_MS');
+  });
+});
+
+describe('validateStartupEnv', () => {
+  const entries = [
+    { name: 'KYBERION_TENANT', type: 'string' as const, required: false },
+    { name: 'KYBERION_FLAG', type: 'boolean' as const, required: false },
+    { name: 'KYBERION_ENV_REGISTRY_STRICT', type: 'boolean' as const, required: false },
+  ];
+
+  it('warns with did-you-mean for unknown names outside CI', () => {
+    const report = validateStartupEnv({ KYBERION_TENNANT: 'x' }, entries);
+    expect(report.errors).toEqual([]);
+    expect(report.warnings).toHaveLength(1);
+    expect(report.warnings[0]).toContain('did you mean KYBERION_TENANT');
+    expect(report.warnings[0]).toContain(' — ');
+    expect(report.warnings[0]).toContain('| next:');
+    expect(report.warnings[0]).toContain('| evidence:');
+  });
+
+  it('fails on unknown names in CI or when strict is explicit', () => {
+    expect(validateStartupEnv({ CI: 'true', KYBERION_X: '1' }, entries).errors).toHaveLength(1);
+    expect(
+      validateStartupEnv({ KYBERION_ENV_REGISTRY_STRICT: '1', KYBERION_X: '1' }, entries).errors
+    ).toHaveLength(1);
+    expect(
+      validateStartupEnv(
+        { CI: 'true', KYBERION_ENV_REGISTRY_STRICT: '0', KYBERION_X: '1' },
+        entries
+      ).errors
+    ).toEqual([]);
+  });
+
+  it('keeps invalid values of known variables fatal outside CI', () => {
+    expect(validateStartupEnv({ KYBERION_FLAG: 'maybe' }, entries).errors).toHaveLength(1);
   });
 });

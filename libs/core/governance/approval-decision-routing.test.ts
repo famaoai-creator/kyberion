@@ -64,6 +64,10 @@ function routedReasonsLine(requestId: string): string {
   return loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, requestId)!.decisionCard!.riskReasons[0];
 }
 
+// These assertions pin the Japanese rendering, so the locale is explicit rather
+// than inherited from the host environment.
+process.env.KYBERION_LOCALE = 'ja';
+
 describe('routeAutonomousDecision', () => {
   beforeEach(() => {
     notifications.prefs = { default_channel: { surface: 'telegram', target: CHAT } };

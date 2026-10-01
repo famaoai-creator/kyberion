@@ -199,6 +199,41 @@ export async function executePipeline(
   return result;
 }
 
+type ModelingControlValue = Parameters<typeof opControl>[2];
+interface ModelingControlOpHandlerInput {
+  op: string;
+  params: Parameters<typeof opControl>[1];
+  ctx: ModelingControlValue;
+  runNested: (
+    steps: ModelingControlValue[],
+    seedCtx: ModelingControlValue
+  ) => Promise<ModelingControlValue>;
+}
+type ModelingControlOpHandler = (
+  input: ModelingControlOpHandlerInput
+) => Promise<ModelingControlValue>;
+
+/** Op handlers keyed by op name (RS-07: mechanical replacement of the former switch). */
+export const MODELING_CONTROL_OP_HANDLERS: Readonly<Record<string, ModelingControlOpHandler>> = {
+  if: async ({ params, ctx, runNested }) => {
+    if (evaluateCondition(params.condition, ctx)) {
+      return await runNested(params.then, ctx);
+    } else if (params.else) {
+      return await runNested(params.else, ctx);
+    }
+    return ctx;
+  },
+  while: async ({ params, ctx, runNested }) => {
+    let iterations = 0;
+    const maxIter = params.max_iterations || 100;
+    while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
+      ctx = await runNested(params.pipeline, ctx);
+      iterations++;
+    }
+    return ctx;
+  },
+};
+
 async function opControl(
   op: string,
   params: any,
@@ -217,91 +252,108 @@ async function opControl(
     return res.context;
   };
 
-  switch (op) {
-    case 'if':
-      if (evaluateCondition(params.condition, ctx)) {
-        return await runNested(params.then, ctx);
-      } else if (params.else) {
-        return await runNested(params.else, ctx);
-      }
-      return ctx;
-
-    case 'while': {
-      let iterations = 0;
-      const maxIter = params.max_iterations || 100;
-      while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
-        ctx = await runNested(params.pipeline, ctx);
-        iterations++;
-      }
-      return ctx;
-    }
-
-    default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+  const handler = Object.prototype.hasOwnProperty.call(MODELING_CONTROL_OP_HANDLERS, op)
+    ? MODELING_CONTROL_OP_HANDLERS[op]
+    : undefined;
+  if (!handler) {
+    throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
+  return handler({ op, params, ctx, runNested });
 }
+
+interface ModelingCaptureOpHandlerInput {
+  op: string;
+  params: Parameters<typeof opCapture>[1];
+  ctx: Parameters<typeof opCapture>[2];
+  resolve: Parameters<typeof opCapture>[3];
+  rootDir: string;
+}
+type ModelingCaptureOpHandler = (
+  input: ModelingCaptureOpHandlerInput
+) => Promise<Parameters<typeof opCapture>[2]>;
+
+/** Op handlers keyed by op name (RS-07: mechanical replacement of the former switch). */
+export const MODELING_CAPTURE_OP_HANDLERS: Readonly<Record<string, ModelingCaptureOpHandler>> = {
+  read_json: async ({ params, ctx, resolve, rootDir }) => {
+    return {
+      ...ctx,
+      [params.export_as || 'last_capture_data']: await retry(
+        async () =>
+          readModelingJson(
+            resolveModelingRepositoryPath(rootDir, resolve(params.path), 'read_json'),
+            'modeling read_json input'
+          ),
+        buildRetryOptions()
+      ),
+    };
+  },
+  read_file: async ({ params, ctx, resolve, rootDir }) => {
+    return {
+      ...ctx,
+      [params.export_as || 'last_capture']: await retry(
+        async () =>
+          safeReadFile(resolveModelingRepositoryPath(rootDir, resolve(params.path), 'read_file'), {
+            encoding: 'utf8',
+          }),
+        buildRetryOptions()
+      ),
+    };
+  },
+  glob_files: async ({ params, ctx, resolve, rootDir }) => {
+    return {
+      ...ctx,
+      [params.export_as || 'file_list']: await retry(
+        async () =>
+          getAllFiles(resolveModelingRepositoryPath(rootDir, resolve(params.dir), 'glob_files'))
+            .filter((f) => !params.ext || f.endsWith(params.ext))
+            .map((f) => path.relative(rootDir, f)),
+        buildRetryOptions()
+      ),
+    };
+  },
+  shell: async ({ params, ctx, resolve }) => {
+    return {
+      ...ctx,
+      [params.export_as || 'last_capture']: await retry(async () => {
+        const result = runGovernedShellScript('/bin/sh', resolve(params.cmd));
+        if (result.error || result.status !== 0) {
+          throw (
+            result.error ||
+            new Error(result.stderr || `Command failed with exit code ${result.status}`)
+          );
+        }
+        return result.stdout.trim();
+      }, buildRetryOptions()),
+    };
+  },
+};
 
 async function opCapture(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
-  switch (op) {
-    case 'read_json':
-      return {
-        ...ctx,
-        [params.export_as || 'last_capture_data']: await retry(
-          async () =>
-            readModelingJson(
-              resolveModelingRepositoryPath(rootDir, resolve(params.path), 'read_json'),
-              'modeling read_json input'
-            ),
-          buildRetryOptions()
-        ),
-      };
-    case 'read_file':
-      return {
-        ...ctx,
-        [params.export_as || 'last_capture']: await retry(
-          async () =>
-            safeReadFile(
-              resolveModelingRepositoryPath(rootDir, resolve(params.path), 'read_file'),
-              { encoding: 'utf8' }
-            ),
-          buildRetryOptions()
-        ),
-      };
-    case 'glob_files':
-      return {
-        ...ctx,
-        [params.export_as || 'file_list']: await retry(
-          async () =>
-            getAllFiles(resolveModelingRepositoryPath(rootDir, resolve(params.dir), 'glob_files'))
-              .filter((f) => !params.ext || f.endsWith(params.ext))
-              .map((f) => path.relative(rootDir, f)),
-          buildRetryOptions()
-        ),
-      };
-    case 'shell':
-      return {
-        ...ctx,
-        [params.export_as || 'last_capture']: await retry(async () => {
-          const result = runGovernedShellScript('/bin/sh', resolve(params.cmd));
-          if (result.error || result.status !== 0) {
-            throw (
-              result.error ||
-              new Error(result.stderr || `Command failed with exit code ${result.status}`)
-            );
-          }
-          return result.stdout.trim();
-        }, buildRetryOptions()),
-      };
-    default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+  const handler = Object.prototype.hasOwnProperty.call(MODELING_CAPTURE_OP_HANDLERS, op)
+    ? MODELING_CAPTURE_OP_HANDLERS[op]
+    : undefined;
+  if (!handler) {
+    throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
+  return handler({ op, params, ctx, resolve, rootDir });
 }
 
-async function opTransform(op: string, params: any, ctx: any, resolve: (value: any) => any) {
-  const rootDir = pathResolver.rootDir();
-  switch (op) {
-    case 'analyze_source_tree': {
+interface ModelingTransformOpHandlerInput {
+  op: string;
+  params: Parameters<typeof opTransform>[1];
+  ctx: Parameters<typeof opTransform>[2];
+  resolve: Parameters<typeof opTransform>[3];
+  rootDir: string;
+}
+type ModelingTransformOpHandler = (
+  input: ModelingTransformOpHandlerInput
+) => Promise<Parameters<typeof opTransform>[2]>;
+
+/** Op handlers keyed by op name (RS-07: mechanical replacement of the former switch). */
+export const MODELING_TRANSFORM_OP_HANDLERS: Readonly<Record<string, ModelingTransformOpHandler>> =
+  {
+    analyze_source_tree: async ({ params, ctx, resolve, rootDir }) => {
       const sourceRootPath = resolveModelingRepositoryPath(
         rootDir,
         resolve(params.source_root || params.dir || '.'),
@@ -315,8 +367,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
           maxFiles: params.max_files,
         }),
       };
-    }
-    case 'compile_engineering_artifacts': {
+    },
+    compile_engineering_artifacts: async ({ params, ctx, resolve }) => {
       const analysis = ctx[params.from || 'source_analysis_ir'];
       if (!analysis || analysis.kind !== 'source-analysis-ir') {
         throw new Error('compile_engineering_artifacts requires source-analysis-ir');
@@ -329,8 +381,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
           targetProvider: resolve(params.target_provider || ctx.target_provider || ''),
         }),
       };
-    }
-    case 'compile_agentic_source_review_plan': {
+    },
+    compile_agentic_source_review_plan: async ({ params, ctx, resolve }) => {
       const analysis = ctx[params.from || 'source_analysis_ir'];
       if (!analysis || analysis.kind !== 'source-analysis-ir') {
         throw new Error('compile_agentic_source_review_plan requires source-analysis-ir');
@@ -359,8 +411,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
             : [],
         }),
       };
-    }
-    case 'build_agentic_source_review_participants': {
+    },
+    build_agentic_source_review_participants: async ({ params, ctx, resolve }) => {
       return {
         ...ctx,
         [params.export_as || 'review_participants']: buildAgenticSourceReviewParticipants({
@@ -380,8 +432,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
             : [],
         }),
       };
-    }
-    case 'compile_agentic_source_review_verification': {
+    },
+    compile_agentic_source_review_verification: async ({ params, ctx, resolve }) => {
       const analysis = ctx[params.analysis_from || 'source_analysis_ir'];
       const plan = ctx[params.plan_from || 'agentic_source_review_plan'];
       if (!analysis || analysis.kind !== 'source-analysis-ir') {
@@ -421,8 +473,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
                 : undefined,
           }),
       };
-    }
-    case 'ajv_validate':
+    },
+    ajv_validate: async ({ params, ctx }) => {
       const validate = ajv.compile(ctx[params.schema_from || 'last_schema_data']);
       const valid = validate(ctx[params.data_from || 'last_capture_data']);
       return {
@@ -430,17 +482,20 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
         [params.export_as || 'is_valid']: valid,
         [params.errors_as || 'validation_errors']: validate.errors,
       };
-    case 'json_query':
+    },
+    json_query: async ({ params, ctx }) => {
       const res = getPathValue(ctx[params.from || 'last_capture_data'], params.path);
       return { ...ctx, [params.export_as]: res };
-    case 'mermaid_gen':
+    },
+    mermaid_gen: async ({ params, ctx }) => {
       const items = ctx[params.from || 'skills_list'] || [];
       let mermaid = 'graph TD\n';
       items.forEach((item: any) => {
         mermaid += `  ${item.n.replace(/-/g, '_')}["${item.n}"]\n`;
       });
       return { ...ctx, [params.export_as || 'last_transform']: mermaid };
-    case 'web_profile_to_ui_flow_adf': {
+    },
+    web_profile_to_ui_flow_adf: async ({ params, ctx }) => {
       const profile = ctx[params.from || 'last_capture_data'];
       if (!profile || typeof profile !== 'object') {
         throw new Error('web_profile_to_ui_flow_adf requires a web app profile object');
@@ -537,8 +592,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
           transitions,
         } satisfies UIFlowADF,
       };
-    }
-    case 'ui_flow_to_test_inventory': {
+    },
+    ui_flow_to_test_inventory: async ({ params, ctx }) => {
       const flow = ctx[params.from || 'ui_flow_adf'];
       if (!flow || typeof flow !== 'object' || !Array.isArray(flow.transitions)) {
         throw new Error('ui_flow_to_test_inventory requires a ui-flow-adf object');
@@ -568,8 +623,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
           cases,
         } satisfies TestCaseADF,
       };
-    }
-    case 'test_inventory_to_browser_pipeline': {
+    },
+    test_inventory_to_browser_pipeline: async ({ op, params, ctx }) => {
       const flow = ctx[params.ui_flow_from || 'ui_flow_adf'];
       const tests = ctx[params.from || 'test_case_inventory'];
       const profile = ctx[params.profile_from || 'web_profile'];
@@ -745,8 +800,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
           steps,
         },
       };
-    }
-    case 'test_inventory_to_device_pipeline': {
+    },
+    test_inventory_to_device_pipeline: async ({ params, ctx }) => {
       const tests = ctx[params.from || 'test_case_inventory'];
       const profile = ctx[params.profile_from || 'app_profile'];
       const platform = String(params.platform || profile?.platform || '');
@@ -772,8 +827,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
           }
         ),
       };
-    }
-    case 'terraform_to_architecture_adf': {
+    },
+    terraform_to_architecture_adf: async ({ params, ctx, resolve }) => {
       const rootDir = pathResolver.rootDir();
       const terraformRoot = resolveModelingRepositoryPath(
         rootDir,
@@ -787,8 +842,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
           title,
         }),
       };
-    }
-    case 'terraform_to_topology_ir': {
+    },
+    terraform_to_topology_ir: async ({ params, ctx, resolve }) => {
       const rootDir = pathResolver.rootDir();
       const terraformRoot = resolveModelingRepositoryPath(
         rootDir,
@@ -800,15 +855,284 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
         ...ctx,
         [params.export_as || 'topology_ir']: terraformToTopologyIr(terraformRoot, { title }),
       };
-    }
-    default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+    },
+  };
+
+async function opTransform(op: string, params: any, ctx: any, resolve: (value: any) => any) {
+  const rootDir = pathResolver.rootDir();
+  const handler = Object.prototype.hasOwnProperty.call(MODELING_TRANSFORM_OP_HANDLERS, op)
+    ? MODELING_TRANSFORM_OP_HANDLERS[op]
+    : undefined;
+  if (!handler) {
+    throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
+  return handler({ op, params, ctx, resolve, rootDir });
 }
 
 async function loadBrowserExecutionPresetCatalog(): Promise<BrowserExecutionPresetCatalog> {
   return browserExecutionPresetCatalog.load();
 }
+
+interface ModelingApplyOpHandlerInput {
+  op: string;
+  params: Parameters<typeof opApply>[1];
+  ctx: Parameters<typeof opApply>[2];
+  resolve: Parameters<typeof opApply>[3];
+  rootDir: string;
+  assertMissionEvidenceOutput: (outputDir: string, missionId: string, tenantSlug: string) => void;
+}
+type ModelingApplyOpHandler = (
+  input: ModelingApplyOpHandlerInput
+) => Promise<Parameters<typeof opApply>[2]>;
+
+const MODELING_APPLY_OP_HANDLERS_SHARED_0: ModelingApplyOpHandler = async ({
+  params,
+  ctx,
+  resolve,
+  rootDir,
+}) => {
+  const spec = resolveWriteArtifactSpec(params, ctx, resolve);
+  const outPath = resolveModelingRepositoryPath(rootDir, spec.path, 'write_file');
+  const content = spec.content;
+  if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+  await retry(async () => {
+    safeWriteFile(
+      outPath,
+      typeof content === 'string'
+        ? content
+        : content === undefined
+          ? ''
+          : JSON.stringify(content, null, 2)
+    );
+    return undefined;
+  }, buildRetryOptions());
+  return undefined;
+};
+/** Op handlers keyed by op name (RS-07: mechanical replacement of the former switch). */
+export const MODELING_APPLY_OP_HANDLERS: Readonly<Record<string, ModelingApplyOpHandler>> = {
+  write_engineering_artifacts: async ({ params, ctx, resolve, rootDir }) => {
+    const bundle = ctx[params.from || 'engineering_artifacts'];
+    if (!bundle || bundle.analysis_ir?.kind !== 'source-analysis-ir') {
+      throw new Error('write_engineering_artifacts requires engineering artifacts');
+    }
+    const outputDir = String(resolve(params.output_dir || 'active/shared/tmp/source-engineering'));
+    const outputPath = resolveModelingRepositoryPath(
+      rootDir,
+      outputDir,
+      'write_engineering_artifacts'
+    );
+    const relative = path.relative(rootDir, outputPath).replaceAll(path.sep, '/');
+    if (!relative.startsWith('active/shared/tmp/') && !relative.startsWith('active/missions/')) {
+      throw new Error(
+        'write_engineering_artifacts output_dir must stay under active/shared/tmp or active/missions'
+      );
+    }
+    const outputs = writeEngineeringArtifactBundle(bundle, outputPath);
+    Object.assign(ctx, { [params.export_as || 'engineering_outputs']: outputs });
+    return undefined;
+  },
+  write_agentic_source_review_plan: async ({
+    params,
+    ctx,
+    resolve,
+    rootDir,
+    assertMissionEvidenceOutput,
+  }) => {
+    const plan = ctx[params.from || 'agentic_source_review_plan'];
+    if (!plan || plan.kind !== 'agentic-source-review-plan') {
+      throw new Error('write_agentic_source_review_plan requires an agentic source review plan');
+    }
+    validateAgenticSourceReviewPlan(plan);
+    const outputDir = String(
+      resolve(params.output_dir || 'active/shared/tmp/agentic-source-review')
+    );
+    const outputDirPath = resolveModelingRepositoryPath(
+      rootDir,
+      outputDir,
+      'write_agentic_source_review_plan'
+    );
+    const relative = path.relative(rootDir, outputDirPath).replaceAll(path.sep, '/');
+    if (!relative.startsWith('active/shared/tmp/') && !relative.startsWith('active/missions/')) {
+      throw new Error(
+        'write_agentic_source_review_plan output_dir must stay under active/shared/tmp or active/missions'
+      );
+    }
+    if (plan.threat_model.status === 'approved') {
+      const missionId = String(resolve(params.mission_id || ctx.mission_id || '')).trim();
+      const tenantSlug = String(resolve(params.tenant_slug || ctx.tenant_slug || '')).trim();
+      assertMissionEvidenceOutput(outputDir, missionId, tenantSlug);
+    }
+    const outputPath = assertSafeRepositoryPath(
+      path.join(outputDirPath, 'agentic-source-review-plan.json'),
+      { allowMissingLeaf: true }
+    );
+    if (!safeExistsSync(path.dirname(outputPath)))
+      safeMkdir(path.dirname(outputPath), { recursive: true });
+    safeWriteFile(outputPath, JSON.stringify(plan, null, 2));
+    return {
+      ...ctx,
+      [params.export_as || 'agentic_source_review_output']: path
+        .relative(rootDir, outputPath)
+        .replaceAll(path.sep, '/'),
+    };
+  },
+  write_agentic_source_review_verification: async ({
+    params,
+    ctx,
+    resolve,
+    rootDir,
+    assertMissionEvidenceOutput,
+  }) => {
+    const report = ctx[params.from || 'agentic_source_review_verification'];
+    if (!report || report.kind !== 'agentic-source-review-verification') {
+      throw new Error(
+        'write_agentic_source_review_verification requires an agentic source review verification report'
+      );
+    }
+    validateAgenticSourceReviewVerification(report);
+    const outputDir = String(
+      resolve(params.output_dir || 'active/shared/tmp/agentic-source-review')
+    );
+    const outputDirPath = resolveModelingRepositoryPath(
+      rootDir,
+      outputDir,
+      'write_agentic_source_review_verification'
+    );
+    const relative = path.relative(rootDir, outputDirPath).replaceAll(path.sep, '/');
+    if (!relative.startsWith('active/shared/tmp/') && !relative.startsWith('active/missions/')) {
+      throw new Error(
+        'write_agentic_source_review_verification output_dir must stay under active/shared/tmp or active/missions'
+      );
+    }
+    const plan = ctx[params.plan_from || 'agentic_source_review_plan'];
+    if (plan?.threat_model?.status === 'approved') {
+      const missionId = String(resolve(params.mission_id || ctx.mission_id || '')).trim();
+      const tenantSlug = String(resolve(params.tenant_slug || ctx.tenant_slug || '')).trim();
+      assertMissionEvidenceOutput(outputDir, missionId, tenantSlug);
+    }
+    const outputPath = assertSafeRepositoryPath(
+      path.join(outputDirPath, 'agentic-source-review-verification.json'),
+      { allowMissingLeaf: true }
+    );
+    if (!safeExistsSync(path.dirname(outputPath)))
+      safeMkdir(path.dirname(outputPath), { recursive: true });
+    safeWriteFile(outputPath, JSON.stringify(report, null, 2));
+    return {
+      ...ctx,
+      [params.export_as || 'agentic_source_review_verification_output']: path
+        .relative(rootDir, outputPath)
+        .replaceAll(path.sep, '/'),
+    };
+  },
+  write_file: MODELING_APPLY_OP_HANDLERS_SHARED_0,
+  write_artifact: MODELING_APPLY_OP_HANDLERS_SHARED_0,
+  extract_requirements: async ({ params, ctx, resolve }) => {
+    const result = await extractRequirements({
+      mission_id: resolve(params.mission_id),
+      project_name: resolve(params.project_name),
+      source_path: resolve(params.source_path) || resolve(params.transcript_path),
+      source_type: resolve(params.source_type),
+      language: resolve(params.language),
+      customer_name: resolve(params.customer_name),
+      customer_person_slug: resolve(params.customer_person_slug),
+      customer_org: resolve(params.customer_org),
+      prior_draft_ref: resolve(params.prior_draft_ref),
+    });
+    return { ...ctx, [params.export_as || 'requirements_result']: result };
+  },
+  extract_design_spec: async ({ params, ctx, resolve }) => {
+    const result = await extractDesignSpec({
+      mission_id: resolve(params.mission_id),
+      project_name: resolve(params.project_name),
+      requirements_draft_path: resolve(params.requirements_draft_path),
+      additional_context: resolve(params.additional_context),
+    });
+    return { ...ctx, [params.export_as || 'design_spec_result']: result };
+  },
+  extract_test_plan: async ({ params, ctx, resolve }) => {
+    const result = await extractTestPlan({
+      mission_id: resolve(params.mission_id),
+      project_name: resolve(params.project_name),
+      app_id: resolve(params.app_id),
+      requirements_draft_path: resolve(params.requirements_draft_path),
+      design_spec_path: resolve(params.design_spec_path),
+    });
+    return { ...ctx, [params.export_as || 'test_plan_result']: result };
+  },
+  derive_test_inventory: async ({ params, ctx, resolve }) => {
+    const contractPath = resolve(params.contract_path);
+    const contractFilePath = contractPath
+      ? assertSafeRepositoryPath(pathResolver.rootResolve(contractPath), {
+          allowMissingLeaf: true,
+        })
+      : undefined;
+    const contractValue = params.contract ?? ctx[params.contract_from || 'quality_contract'];
+    const contract =
+      contractValue !== undefined && contractValue !== null
+        ? parseSoftwareQualityContract(contractValue)
+        : contractFilePath && safeExistsSync(contractFilePath)
+          ? loadSoftwareQualityContractAtPath(contractFilePath)
+          : null;
+    if (!contract) throw new Error('[derive_test_inventory] quality contract is invalid');
+    const systemTags = params.system_tags ?? ctx[params.system_tags_from || 'system_tags'];
+    const riskRefs = params.risk_refs ?? ctx[params.risk_refs_from || 'risk_refs'];
+    const result = await deriveTestInventory({
+      contract,
+      system_tags: Array.isArray(systemTags) ? systemTags.map(String) : [],
+      risk_refs: Array.isArray(riskRefs) ? riskRefs.map(String) : [],
+      additional_context: resolve(params.additional_context),
+      project_id: resolve(params.project_id) || undefined,
+    });
+    const outputPath = resolve(params.output_path);
+    if (outputPath) {
+      const safeOutputPath = assertSafeRepositoryPath(pathResolver.rootResolve(outputPath), {
+        allowMissingLeaf: true,
+      });
+      safeWriteFile(safeOutputPath, `${JSON.stringify(result, null, 2)}\n`, { encoding: 'utf8' });
+    }
+    return {
+      ...ctx,
+      [params.export_as || 'test_inventory']: result,
+      ...(outputPath ? { written_to: outputPath } : {}),
+    };
+  },
+  evaluate_requirements_completeness: async ({ params, ctx, resolve }) => {
+    return {
+      ...ctx,
+      [params.export_as || 'requirements_completeness']: evaluateRequirementsCompleteness(
+        resolve(params.mission_id)
+      ),
+    };
+  },
+  evaluate_customer_signoff: async ({ params, ctx, resolve }) => {
+    return {
+      ...ctx,
+      [params.export_as || 'customer_signoff']: evaluateCustomerSignoff(resolve(params.mission_id)),
+    };
+  },
+  evaluate_architecture_ready: async ({ params, ctx, resolve }) => {
+    return {
+      ...ctx,
+      [params.export_as || 'architecture_ready']: evaluateArchitectureReady(
+        resolve(params.mission_id)
+      ),
+    };
+  },
+  evaluate_qa_ready: async ({ params, ctx, resolve }) => {
+    const mustHaveIds = params.must_have_ids ?? ctx[params.must_have_ids_from || 'must_have_ids'];
+    return {
+      ...ctx,
+      [params.export_as || 'qa_ready']: evaluateQaReady(
+        resolve(params.mission_id),
+        Array.isArray(mustHaveIds) ? mustHaveIds.map(String) : []
+      ),
+    };
+  },
+  log: async ({ params, resolve }) => {
+    logger.info(`[MODELING_LOG] ${resolve(params.message || 'Action completed')}`);
+    return undefined;
+  },
+};
 
 async function opApply(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
@@ -836,234 +1160,19 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
     }
   };
 
-  switch (op) {
-    case 'write_engineering_artifacts': {
-      const bundle = ctx[params.from || 'engineering_artifacts'];
-      if (!bundle || bundle.analysis_ir?.kind !== 'source-analysis-ir') {
-        throw new Error('write_engineering_artifacts requires engineering artifacts');
-      }
-      const outputDir = String(
-        resolve(params.output_dir || 'active/shared/tmp/source-engineering')
-      );
-      const outputPath = resolveModelingRepositoryPath(
-        rootDir,
-        outputDir,
-        'write_engineering_artifacts'
-      );
-      const relative = path.relative(rootDir, outputPath).replaceAll(path.sep, '/');
-      if (!relative.startsWith('active/shared/tmp/') && !relative.startsWith('active/missions/')) {
-        throw new Error(
-          'write_engineering_artifacts output_dir must stay under active/shared/tmp or active/missions'
-        );
-      }
-      const outputs = writeEngineeringArtifactBundle(bundle, outputPath);
-      Object.assign(ctx, { [params.export_as || 'engineering_outputs']: outputs });
-      break;
-    }
-    case 'write_agentic_source_review_plan': {
-      const plan = ctx[params.from || 'agentic_source_review_plan'];
-      if (!plan || plan.kind !== 'agentic-source-review-plan') {
-        throw new Error('write_agentic_source_review_plan requires an agentic source review plan');
-      }
-      validateAgenticSourceReviewPlan(plan);
-      const outputDir = String(
-        resolve(params.output_dir || 'active/shared/tmp/agentic-source-review')
-      );
-      const outputDirPath = resolveModelingRepositoryPath(
-        rootDir,
-        outputDir,
-        'write_agentic_source_review_plan'
-      );
-      const relative = path.relative(rootDir, outputDirPath).replaceAll(path.sep, '/');
-      if (!relative.startsWith('active/shared/tmp/') && !relative.startsWith('active/missions/')) {
-        throw new Error(
-          'write_agentic_source_review_plan output_dir must stay under active/shared/tmp or active/missions'
-        );
-      }
-      if (plan.threat_model.status === 'approved') {
-        const missionId = String(resolve(params.mission_id || ctx.mission_id || '')).trim();
-        const tenantSlug = String(resolve(params.tenant_slug || ctx.tenant_slug || '')).trim();
-        assertMissionEvidenceOutput(outputDir, missionId, tenantSlug);
-      }
-      const outputPath = assertSafeRepositoryPath(
-        path.join(outputDirPath, 'agentic-source-review-plan.json'),
-        { allowMissingLeaf: true }
-      );
-      if (!safeExistsSync(path.dirname(outputPath)))
-        safeMkdir(path.dirname(outputPath), { recursive: true });
-      safeWriteFile(outputPath, JSON.stringify(plan, null, 2));
-      return {
-        ...ctx,
-        [params.export_as || 'agentic_source_review_output']: path
-          .relative(rootDir, outputPath)
-          .replaceAll(path.sep, '/'),
-      };
-    }
-    case 'write_agentic_source_review_verification': {
-      const report = ctx[params.from || 'agentic_source_review_verification'];
-      if (!report || report.kind !== 'agentic-source-review-verification') {
-        throw new Error(
-          'write_agentic_source_review_verification requires an agentic source review verification report'
-        );
-      }
-      validateAgenticSourceReviewVerification(report);
-      const outputDir = String(
-        resolve(params.output_dir || 'active/shared/tmp/agentic-source-review')
-      );
-      const outputDirPath = resolveModelingRepositoryPath(
-        rootDir,
-        outputDir,
-        'write_agentic_source_review_verification'
-      );
-      const relative = path.relative(rootDir, outputDirPath).replaceAll(path.sep, '/');
-      if (!relative.startsWith('active/shared/tmp/') && !relative.startsWith('active/missions/')) {
-        throw new Error(
-          'write_agentic_source_review_verification output_dir must stay under active/shared/tmp or active/missions'
-        );
-      }
-      const plan = ctx[params.plan_from || 'agentic_source_review_plan'];
-      if (plan?.threat_model?.status === 'approved') {
-        const missionId = String(resolve(params.mission_id || ctx.mission_id || '')).trim();
-        const tenantSlug = String(resolve(params.tenant_slug || ctx.tenant_slug || '')).trim();
-        assertMissionEvidenceOutput(outputDir, missionId, tenantSlug);
-      }
-      const outputPath = assertSafeRepositoryPath(
-        path.join(outputDirPath, 'agentic-source-review-verification.json'),
-        { allowMissingLeaf: true }
-      );
-      if (!safeExistsSync(path.dirname(outputPath)))
-        safeMkdir(path.dirname(outputPath), { recursive: true });
-      safeWriteFile(outputPath, JSON.stringify(report, null, 2));
-      return {
-        ...ctx,
-        [params.export_as || 'agentic_source_review_verification_output']: path
-          .relative(rootDir, outputPath)
-          .replaceAll(path.sep, '/'),
-      };
-    }
-    case 'write_file':
-    case 'write_artifact':
-      const spec = resolveWriteArtifactSpec(params, ctx, resolve);
-      const outPath = resolveModelingRepositoryPath(rootDir, spec.path, 'write_file');
-      const content = spec.content;
-      if (!safeExistsSync(path.dirname(outPath)))
-        safeMkdir(path.dirname(outPath), { recursive: true });
-      await retry(async () => {
-        safeWriteFile(
-          outPath,
-          typeof content === 'string'
-            ? content
-            : content === undefined
-              ? ''
-              : JSON.stringify(content, null, 2)
-        );
-        return undefined;
-      }, buildRetryOptions());
-      break;
-    case 'extract_requirements': {
-      const result = await extractRequirements({
-        mission_id: resolve(params.mission_id),
-        project_name: resolve(params.project_name),
-        source_path: resolve(params.source_path) || resolve(params.transcript_path),
-        source_type: resolve(params.source_type),
-        language: resolve(params.language),
-        customer_name: resolve(params.customer_name),
-        customer_person_slug: resolve(params.customer_person_slug),
-        customer_org: resolve(params.customer_org),
-        prior_draft_ref: resolve(params.prior_draft_ref),
-      });
-      return { ...ctx, [params.export_as || 'requirements_result']: result };
-    }
-    case 'extract_design_spec': {
-      const result = await extractDesignSpec({
-        mission_id: resolve(params.mission_id),
-        project_name: resolve(params.project_name),
-        requirements_draft_path: resolve(params.requirements_draft_path),
-        additional_context: resolve(params.additional_context),
-      });
-      return { ...ctx, [params.export_as || 'design_spec_result']: result };
-    }
-    case 'extract_test_plan': {
-      const result = await extractTestPlan({
-        mission_id: resolve(params.mission_id),
-        project_name: resolve(params.project_name),
-        app_id: resolve(params.app_id),
-        requirements_draft_path: resolve(params.requirements_draft_path),
-        design_spec_path: resolve(params.design_spec_path),
-      });
-      return { ...ctx, [params.export_as || 'test_plan_result']: result };
-    }
-    case 'derive_test_inventory': {
-      const contractPath = resolve(params.contract_path);
-      const contractFilePath = contractPath
-        ? assertSafeRepositoryPath(pathResolver.rootResolve(contractPath), {
-            allowMissingLeaf: true,
-          })
-        : undefined;
-      const contractValue = params.contract ?? ctx[params.contract_from || 'quality_contract'];
-      const contract =
-        contractValue !== undefined && contractValue !== null
-          ? parseSoftwareQualityContract(contractValue)
-          : contractFilePath && safeExistsSync(contractFilePath)
-            ? loadSoftwareQualityContractAtPath(contractFilePath)
-            : null;
-      if (!contract) throw new Error('[derive_test_inventory] quality contract is invalid');
-      const systemTags = params.system_tags ?? ctx[params.system_tags_from || 'system_tags'];
-      const riskRefs = params.risk_refs ?? ctx[params.risk_refs_from || 'risk_refs'];
-      const result = await deriveTestInventory({
-        contract,
-        system_tags: Array.isArray(systemTags) ? systemTags.map(String) : [],
-        risk_refs: Array.isArray(riskRefs) ? riskRefs.map(String) : [],
-        additional_context: resolve(params.additional_context),
-        project_id: resolve(params.project_id) || undefined,
-      });
-      const outputPath = resolve(params.output_path);
-      if (outputPath) {
-        const safeOutputPath = assertSafeRepositoryPath(pathResolver.rootResolve(outputPath), {
-          allowMissingLeaf: true,
-        });
-        safeWriteFile(safeOutputPath, `${JSON.stringify(result, null, 2)}\n`, { encoding: 'utf8' });
-      }
-      return {
-        ...ctx,
-        [params.export_as || 'test_inventory']: result,
-        ...(outputPath ? { written_to: outputPath } : {}),
-      };
-    }
-    case 'evaluate_requirements_completeness':
-      return {
-        ...ctx,
-        [params.export_as || 'requirements_completeness']: evaluateRequirementsCompleteness(
-          resolve(params.mission_id)
-        ),
-      };
-    case 'evaluate_customer_signoff':
-      return {
-        ...ctx,
-        [params.export_as || 'customer_signoff']: evaluateCustomerSignoff(
-          resolve(params.mission_id)
-        ),
-      };
-    case 'evaluate_architecture_ready':
-      return {
-        ...ctx,
-        [params.export_as || 'architecture_ready']: evaluateArchitectureReady(
-          resolve(params.mission_id)
-        ),
-      };
-    case 'evaluate_qa_ready': {
-      const mustHaveIds = params.must_have_ids ?? ctx[params.must_have_ids_from || 'must_have_ids'];
-      return {
-        ...ctx,
-        [params.export_as || 'qa_ready']: evaluateQaReady(
-          resolve(params.mission_id),
-          Array.isArray(mustHaveIds) ? mustHaveIds.map(String) : []
-        ),
-      };
-    }
-    case 'log':
-      logger.info(`[MODELING_LOG] ${resolve(params.message || 'Action completed')}`);
-      break;
+  const handler = Object.prototype.hasOwnProperty.call(MODELING_APPLY_OP_HANDLERS, op)
+    ? MODELING_APPLY_OP_HANDLERS[op]
+    : undefined;
+  if (handler) {
+    const handled = await handler({
+      op,
+      params,
+      ctx,
+      resolve,
+      rootDir,
+      assertMissionEvidenceOutput,
+    });
+    if (handled !== undefined) return handled;
   }
   return ctx;
 }

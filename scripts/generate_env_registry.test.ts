@@ -68,6 +68,34 @@ describe('discoverEnvNames', () => {
     expect(discovered).not.toContain('KYBERION_TEST_ONLY');
     expect(discovered).not.toContain('KYBERION_DYNAMIC_');
   });
+
+  it('includes env names declared only in reasoning-provider descriptors', () => {
+    const providersRoot = path.join(
+      fixtureRoot,
+      'knowledge/product/governance/reasoning-providers'
+    );
+    safeMkdir(providersRoot, { recursive: true });
+    safeWriteFile(
+      path.join(providersRoot, 'fixture-cli.json'),
+      JSON.stringify({
+        id: 'fixture-cli',
+        detection: { env_keys: ['FIXTURE_CLI', 'KYBERION_FIXTURE_DETECT'] },
+        models: { model_env_keys: ['KYBERION_FIXTURE_CLI_MODEL'] },
+        runtime: { bin_env_key: 'KYBERION_FIXTURE_CLI_BIN', note: 'KYBERION_NOT_AN_ENV_FIELD' },
+      })
+    );
+
+    const discovered = discoverEnvNames(fixtureRoot);
+    expect(discovered).toEqual(
+      expect.arrayContaining([
+        'KYBERION_FIXTURE_DETECT',
+        'KYBERION_FIXTURE_CLI_MODEL',
+        'KYBERION_FIXTURE_CLI_BIN',
+      ])
+    );
+    expect(discovered).not.toContain('FIXTURE_CLI');
+    expect(discovered).not.toContain('KYBERION_NOT_AN_ENV_FIELD');
+  });
 });
 
 describe('mergeRegistry', () => {

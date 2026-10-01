@@ -4,6 +4,7 @@ import {
   type BrowserVocabularyEntry,
 } from '@agent/core/locale-normalize';
 import {
+  localeToBcp47,
   normalizeLocale,
   nextSupportedLocale,
   type SupportedLocale,
@@ -21,18 +22,6 @@ import { renderMessage } from '@agent/core/message-format';
 export type { SupportedLocale };
 
 const browserVocabulary = createBrowserVocabularyResolver(vocabularyCatalog);
-
-// I18N-07 finding: this was `Record<SupportedLocale, string>` (every locale
-// required), which broke `tsc` the moment `SupportedLocale` grew a third
-// member (`qps-ploc`) that has no real speech-synthesis tag. Widened to
-// `Partial` — `chronosSpeechLocale` below already falls back to
-// `speechLocales.en` for any locale without an entry, so a pseudo-locale (or
-// any future locale added before it has STT/TTS support) degrades to English
-// speech instead of failing to compile.
-const speechLocales: Partial<Record<SupportedLocale, string>> = {
-  en: 'en-US',
-  ja: 'ja-JP',
-};
 
 // I18N-02: the catalog moved from a single flat `domains.ux` to namespaced
 // domains (`chronos`, `cli`, `status`, `error`, `question`, `common`, plus
@@ -117,7 +106,7 @@ export function resolveChronosLocale(): SupportedLocale {
 }
 
 export function chronosSpeechLocale(locale = resolveChronosLocale()): string {
-  return speechLocales[locale] || speechLocales.en;
+  return localeToBcp47(locale);
 }
 
 /**

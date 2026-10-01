@@ -294,6 +294,7 @@ export * from './pipeline/adf-engine.js';
 export * from './pipeline/adf-lifecycle.js';
 
 export * from './surface/channel-adapter.js';
+export * from './surface/channel-adapter-registry.js';
 
 export * from './actuator/actuator-sdk.js';
 export * from './actuator/actuator-op-discovery.js';
@@ -357,6 +358,7 @@ export * from './process-guards.js';
 export * from './process-guards.js';
 
 export * from './guided-coordination-brief.js';
+export * from './coordination-actuator-routing.js';
 
 export * from './integrations/email-workflow.js';
 

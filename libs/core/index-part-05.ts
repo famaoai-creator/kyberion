@@ -344,6 +344,8 @@ export {
   loadEnvRegistryEntries,
   validateEnv,
   validateEnvAgainstRegistry,
+  validateStartupEnv,
+  suggestRegisteredEnvNames,
 } from './env-validator.js';
 
 export type {

@@ -1,3 +1,4 @@
+import { t } from './t.js';
 import type { AutomationBlueprint, AutomationFormSchema } from './automation-blueprint.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 
@@ -91,14 +92,16 @@ export function buildAutomationSlackModal(
     callback_id: 'kyberion_automation_submit',
     private_metadata: privateMetadata,
     title: { type: 'plain_text', text: boundedText(blueprint.name, 'Automation schedule') },
-    submit: { type: 'plain_text', text: '登録' },
-    close: { type: 'plain_text', text: 'キャンセル' },
+    submit: { type: 'plain_text', text: t('automation:slack_modal_submit') },
+    close: { type: 'plain_text', text: t('automation:slack_modal_cancel') },
     blocks: [
       {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `*${boundedText(blueprint.name, blueprint.blueprint_id)}* の実行条件を指定してください。`,
+          text: t('automation:slack_modal_intro', {
+            name: boundedText(blueprint.name, blueprint.blueprint_id),
+          }),
         },
       },
       ...form.fields.map((slot) => ({

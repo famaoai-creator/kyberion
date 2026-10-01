@@ -2,6 +2,7 @@ import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { loadStandardIntentCatalog } from './intent/intent-resolution.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
+import { t } from './t.js';
 import { resolveLocale, type SupportedLocale } from './locale.js';
 import {
   assessContextualClarification,
@@ -157,24 +158,28 @@ function localizeContextualReason(
   reason: string,
   fallback: string
 ): string {
-  if (locale !== 'ja') return reason;
+  // The source reasons are generated in English; only other locales re-render them.
+  if (locale === 'en') return reason;
   if (reason.startsWith('Missing inputs remain above the clarification threshold')) {
-    return `不足している入力は確認しきい値を超えています${reason.slice(reason.indexOf('('), reason.lastIndexOf(')') + 1) || ''}`;
+    const detail = reason.slice(reason.indexOf('('), reason.lastIndexOf(')') + 1) || '';
+    return t('question:contextual_reason_missing_threshold', { detail }, locale);
   }
   if (reason.startsWith('Missing critical inputs:')) {
-    return `重要な不足入力があります: ${reason.replace(/^Missing critical inputs:\s*/u, '').replace(/\.$/u, '。')}`;
+    const items = reason.replace(/^Missing critical inputs:\s*/u, '').replace(/\.$/u, '');
+    return t('question:contextual_reason_missing_critical', { items }, locale);
   }
   if (reason === 'No clarification is required because no inputs are missing.') {
-    return '入力の不足がないため、追加の確認は不要です。';
+    return t('question:contextual_reason_none_missing', undefined, locale);
   }
   if (reason === 'The request matches a force-clarification ambiguity pattern.') {
-    return '依頼が強制確認の曖昧性パターンに一致しました。';
+    return t('question:contextual_reason_force_pattern', undefined, locale);
   }
   if (reason === 'The missing inputs are covered by policy defaults.') {
-    return '不足入力はポリシーの既定値で補完できます。';
+    return t('question:contextual_reason_policy_defaults', undefined, locale);
   }
   if (reason.startsWith('The request can proceed with policy defaults because confidence is')) {
-    return `confidence ${reason.match(/(\d+(?:\.\d+)*)\./u)?.[1] || ''} なので、ポリシーの既定値で進められます。`;
+    const confidence = reason.match(/(\d+(?:\.\d+)*)\./u)?.[1] || '';
+    return t('question:contextual_reason_policy_confidence', { confidence }, locale);
   }
   return fallback;
 }

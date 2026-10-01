@@ -27,22 +27,22 @@ Kyberion 全体を「何に対して、何を実施するのか」というイ�
 
 ## 2. 参照した主な定義
 
-- [`kyberion-intent-catalog.md`](knowledge/product/architecture/kyberion-intent-catalog.md)
-- [`intent-classifier-routing.md`](knowledge/product/architecture/intent-classifier-routing.md)
-- [`intent-coverage-matrix.md`](knowledge/product/architecture/intent-coverage-matrix.md)
-- [`intent-observability-model.md`](knowledge/product/architecture/intent-observability-model.md)
-- [`agent-mission-control-model.md`](knowledge/product/architecture/agent-mission-control-model.md)
-- [`mission-runtime-primitives.md`](knowledge/product/architecture/mission-runtime-primitives.md)
-- [`mission-team-composition-model.md`](knowledge/product/architecture/mission-team-composition-model.md)
-- [`actuator-op-taxonomy.md`](knowledge/product/architecture/actuator-op-taxonomy.md)
-- [`standard-intents.json`](knowledge/product/governance/standard-intents.json)
-- [`intent-resolution-policy.json`](knowledge/product/governance/intent-resolution-policy.json)
-- [`mission-classification-policy.json`](knowledge/product/governance/mission-classification-policy.json)
-- [`mission-workflow-catalog.json`](knowledge/product/governance/mission-workflow-catalog.json)
-- [`model-registry.json`](knowledge/product/governance/model-registry.json)
-- [`runtime-design-profiles.json`](knowledge/product/governance/runtime-design-profiles.json)
-- [`environment-manifests/`](knowledge/product/governance/environment-manifests)
-- [`CAPABILITIES_GUIDE.md`](CAPABILITIES_GUIDE.md)
+- [`kyberion-intent-catalog.md`](kyberion-intent-catalog.md)
+- [`intent-classifier-routing.md`](intent-classifier-routing.md)
+- [`intent-coverage-matrix.md`](intent-coverage-matrix.md)
+- [`intent-observability-model.md`](intent-observability-model.md)
+- [`agent-mission-control-model.md`](agent-mission-control-model.md)
+- [`mission-runtime-primitives.md`](mission-runtime-primitives.md)
+- [`mission-team-composition-model.md`](mission-team-composition-model.md)
+- [`actuator-op-taxonomy.md`](actuator-op-taxonomy.md)
+- [`standard-intents.json`](../governance/standard-intents.json)
+- [`intent-resolution-policy.json`](../governance/intent-resolution-policy.json)
+- [`mission-classification-policy.json`](../governance/mission-classification-policy.json)
+- [`mission-workflow-catalog.json`](../governance/mission-workflow-catalog.json)
+- [`model-registry.json`](../governance/model-registry.json)
+- [`runtime-design-profiles.json`](../governance/runtime-design-profiles.json)
+- [`environment-manifests/`](../governance/environment-manifests)
+- [`CAPABILITIES_GUIDE.md`](../../../CAPABILITIES_GUIDE.md)
 
 ## 3. 総合評価
 

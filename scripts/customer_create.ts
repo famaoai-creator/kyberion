@@ -133,7 +133,7 @@ if (
   isDirectScript(import.meta.url, 'customer_create.js')
 )
   void defineScript({
-    name: 'customer:create',
+    name: 'stance:create',
     flags: [],
     run(context) {
       context.print(main(context.argv, context.print).join('\n'));

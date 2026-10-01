@@ -15,6 +15,7 @@ import { createLogger } from './logger.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { assertSandboxWriteAllowed } from './shell/sandbox-policy.js';
 import { isAllowedVaultMountPath } from './secret/vault-mount.js';
+import { currentExecutionScope } from './foundation/execution-scope.js';
 import type {
   TierLevel,
   TierWeightMap,
@@ -158,6 +159,7 @@ function checkProjectScope(
 
 const TENANT_PLACEHOLDER = '${KYBERION_TENANT}';
 const PROJECT_ID_PLACEHOLDER = '${KYBERION_PROJECT_ID}';
+const ORGANIZATION_ID_PLACEHOLDER = '${KYBERION_ORGANIZATION_ID}';
 
 /**
  * Expand policy placeholders. `${KYBERION_TENANT}` expands to the tenant bound
@@ -166,8 +168,15 @@ const PROJECT_ID_PLACEHOLDER = '${KYBERION_PROJECT_ID}';
  * when no valid tenant is bound (missing, reserved such as `shared`/`public`,
  * or malformed) the pattern returns null and must never match, so an unbound
  * process gets no tenant-parameterised grant at all rather than a wildcard.
+ * `${KYBERION_ORGANIZATION_ID}` is narrower still: it is expanded only from
+ * an explicit organization bound to the current execution scope.
  */
 function expandPolicyPath(pattern: string, missionId?: string, tenantSlug?: string): string | null {
+  if (pattern.includes(ORGANIZATION_ID_PLACEHOLDER)) {
+    const organizationId = currentExecutionScope()?.organizationId?.trim() || '';
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(organizationId)) return null;
+    pattern = pattern.split(ORGANIZATION_ID_PLACEHOLDER).join(organizationId);
+  }
   if (pattern.includes(TENANT_PLACEHOLDER)) {
     const tenant = tenantSlug?.trim() || '';
     if (!tenant || !isValidTenantSlug(tenant)) return null;

@@ -1,14 +1,14 @@
-# 🚀 Kyberion Ecosystem: Onboarding & Initialization Guide
+# Kyberion Initialization Guide (Day-2 Command Reference)
 
-この文書は、first-win 後の Day-2 初期化で使うコマンドの詳しい説明と、環境ごとの注意をまとめたものです。
+This document is the detailed command reference for the day-2 initialization steps that follow the first win, plus per-environment notes. A Japanese edition is kept in [INITIALIZATION.ja.md](./INITIALIZATION.ja.md); this English file is canonical ([localization policy](./DOCUMENTATION_LOCALIZATION_POLICY.md)).
 
-- first-win の正本は [QUICKSTART.md](./QUICKSTART.md) です。
-- **手順の順序とルート分岐（個人のみ / AI 会社 / 既存テナント追加）の正本は [オンボーディング標準フロー](../knowledge/product/governance/onboarding-flow.md) です。** 迷ったらまずそちらを見てください。
-- 文書カテゴリごとの正本と補足資料の対応は [documentation-source-map.json](./documentation-source-map.json) にあります。
+- **Start with [QUICKSTART.md](./QUICKSTART.md).** It is the single front door and owns the first-win sequence and the [onboarding entry points table](./QUICKSTART.md#onboarding-entry-points).
+- **The order of steps and the route split (personal only / AI company / add an existing tenant) is canonical in the [onboarding standard flow](../knowledge/product/governance/onboarding-flow.md).** When in doubt, read that first.
+- The canonical source per document category is listed in [documentation-source-map.json](./documentation-source-map.json).
 
-## 📋 クイック・スタート (Quick Commands)
+## Quick commands
 
-first-win をまだ実行していない場合は、先に QUICKSTART.md の 5 コマンドを完了してください。
+If you have not run the first win yet, finish the five commands in QUICKSTART.md first.
 
 # kyberion-first-win
 
@@ -16,36 +16,36 @@ first-win をまだ実行していない場合は、先に QUICKSTART.md の 5 �
 pnpm install
 pnpm build
 pnpm env:bootstrap --manifest kyberion-toolchain
-pnpm doctor
+pnpm kyberion doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
 
-Kyberion の readiness check は `pnpm run doctor` です。`pnpm build` の後なら、上の `pnpm doctor` はリポジトリのスクリプトを実行します。`run` を付けない素の `pnpm doctor` は、ビルド前の文脈では pnpm 自身の診断になります。
+Kyberion's readiness check is `pnpm kyberion doctor` (`pnpm run doctor` runs the same check). A bare `pnpm doctor`, without `run` or `kyberion`, is pnpm's built-in diagnostic (registry/cache) and does not run Kyberion's checks.
 
-first-win の後は、標準フローの順に次を進めます。
+After the first win, continue in the order of the standard flow:
 
 ```bash
-# readiness を一括確認（標準フロー Step 2）
+# Check readiness in one pass (standard flow Step 2)
 pnpm kyberion setup report --persona first-time-user
 pnpm surfaces reconcile
 
-# stance を決めてから identity を保存（Step 3）
-pnpm customer:switch <customer-slug>   # 顧客・会社として使う場合のみ
-pnpm onboard
+# Choose a stance, then save the identity (Step 3)
+pnpm stance:switch <customer-slug>   # only when working as a customer / company
+pnpm onboarding
 
-# baseline を all_clear にする（Step 4）
+# Bring the baseline to all_clear (Step 4)
 pnpm pipeline --input pipelines/baseline-check.json
 ```
 
-個人のみのルートはここで完了確認（下の「健全性確認」）に進みます。tenant を扱う場合は標準フローの Step 5〜8 に進んでください。
+The personal-only route ends here; continue with the health check below. If you work with tenants, continue with standard flow Steps 5-8.
 
-## 前提
+## Prerequisites
 
-- Node.js `24+`（`package.json` の `engines` が正。`.nvmrc` も `24`。`nvm use` で揃えられます）
+- Node.js `24+` (`engines` in `package.json` is the source of truth; `.nvmrc` is also `24`; `nvm use` aligns it)
 - `pnpm`
 - `git`
 
-Windows では、PowerShell から winget で基盤ツールを導入できます。
+On Windows, install the base tools from PowerShell with winget.
 
 ```powershell
 winget install --id OpenJS.NodeJS.LTS --exact --source winget --accept-source-agreements --accept-package-agreements
@@ -53,15 +53,15 @@ winget install --id pnpm.pnpm --exact --source winget --accept-source-agreements
 winget install --id Git.Git --exact --source winget --accept-source-agreements --accept-package-agreements
 ```
 
-Windows でローカル AI 支援（Foundry Local）を使う場合は、追加で次を実行します。これは任意機能です。
+To use local AI assistance on Windows (Foundry Local), also run the following. It is optional.
 
 ```powershell
 winget install --id Microsoft.FoundryLocal --exact --source winget --accept-source-agreements --accept-package-agreements
 ```
 
-導入後は Foundry Local のローカル API を起動し、必要に応じて `KYBERION_WINDOWS_AI_ENDPOINT` と `KYBERION_WINDOWS_AI_MODEL` を設定してください。
+After installing, start the Foundry Local API and, if needed, set `KYBERION_WINDOWS_AI_ENDPOINT` and `KYBERION_WINDOWS_AI_MODEL`.
 
-導入後に PowerShell を開き直し、通常の手順を続けてください。既存の governed manifest を使う場合は、次のコマンドで不足を確認し、承認付きで適用できます。
+Reopen PowerShell after installing and continue with the normal steps. If you use an existing governed manifest, check what is missing and apply it with approval:
 
 ```powershell
 pnpm install
@@ -72,184 +72,183 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 
 ---
 
-## 🔍 詳細プロセスと物理的効果 (Detailed Process)
+## Detailed process and physical effects
 
-各 Stage と標準フローの Step の対応は次のとおりです。
+How each stage maps to a step of the standard flow:
 
-| Stage | 内容                             | 標準フロー |
-| ----- | -------------------------------- | ---------- |
-| 1〜3  | 導入、ビルド、事前ツール確認     | Step 1     |
-| 4〜5  | readiness と surface の起動      | Step 2     |
-| 6〜7  | stance の選択と identity の保存  | Step 3     |
-| 8     | baseline を all_clear にする     | Step 4     |
-| 9     | tenant、organization、activation | Step 5〜8  |
+| Stage | Content                                 | Standard flow |
+| ----- | --------------------------------------- | ------------- |
+| 1-3   | Install, build, prerequisite tool check | Step 1        |
+| 4-5   | Readiness and starting surfaces         | Step 2        |
+| 6-7   | Choose a stance and save the identity   | Step 3        |
+| 8     | Bring the baseline to all_clear         | Step 4        |
+| 9     | Tenant, organization, activation        | Steps 5-8     |
 
-### Stage 1: 物理的基盤の確立 (Physical Foundation)
+### Stage 1: Physical foundation
 
-- **実行コマンド**: `pnpm install`
-- **目的**: 必要なライブラリを全てロードし、内部モジュール間の接続を確立します。
-- **物理的変化**:
-  - `node_modules/` が生成されます。
-  - ワークスペース間のシンボリックリンク（`@agent/core` など）が構築されます。
+- **Command**: `pnpm install`
+- **Purpose**: load every library and wire up the internal modules.
+- **Physical changes**:
+  - `node_modules/` is created.
+  - Symlinks between workspaces (such as `@agent/core`) are built.
 
-### Stage 2: システムの具現化 (System Manifestation)
+### Stage 2: System manifestation
 
-- **実行コマンド**: `pnpm build`
-- **目的**: 依存関係をコンパイルし、実行可能な JavaScript を生成します。`env:bootstrap`、`doctor`、`onboard` の一部など、後続コマンドの多くが `dist/` を使うため、この Stage を先に済ませます。
-- **物理的変化**:
-  - `dist/` ディレクトリが生成されます。
-  - Chronos（`presence/displays/chronos-mirror-v2/.next/`）と concierge の UI がビルドされます（`build:ui`）。
-  - workspace 間の runtime contract が再構築されます。
-- **ステップ構成**: `build:packages` → `build:actuators` → terminal-hud → `build:repo` → `build:ui`。
-  UI だけを作り直す場合は `pnpm build:ui` を使います。
+- **Command**: `pnpm build`
+- **Purpose**: compile the dependencies and produce runnable JavaScript. Many later commands (`env:bootstrap`, `doctor`, parts of `onboarding`) use `dist/`, so do this stage first.
+- **Physical changes**:
+  - The `dist/` directory is created.
+  - The Chronos (`presence/displays/chronos-mirror-v2/.next/`) and concierge UIs are built (`build:ui`).
+  - Runtime contracts between workspaces are rebuilt.
+- **Build steps**: `build:packages` -> `build:actuators` -> terminal-hud -> `build:repo` -> `build:ui`. To rebuild only the UI, use `pnpm build:ui`.
 
-### Stage 3: 事前ツール確認 (Prerequisite Toolchain Check)
+### Stage 3: Prerequisite toolchain check
 
-- **実行コマンド**: `pnpm env:bootstrap --manifest kyberion-toolchain`
-- **目的**: Node / pnpm / git / TypeScript / tsx / vitest など、Kyberion をソースから動かすための基本ツールが揃っているかを確認します。
-- **チェック内容の補足**:
-  - **Node floor 検証**: 実行中の Node が `package.json` の `engines`（`>=24.0.0`）を満たすかを実バージョン比較で検証し、不足なら `nvm install 24 && nvm use 24` を案内して失敗します。
-  - **Playwright ブラウザ有無**: ブラウザキャッシュ（`ms-playwright`）が見つからない場合、**非致命の警告**として `pnpm exec playwright install chromium` を案内します。ブラウザ first-win を使うなら導入してください。postinstall では自動ダウンロードしません。
-- **物理的変化**:
-  - 実体の変更は行いません。足りないツールやローカル依存が要約されます。
+- **Command**: `pnpm env:bootstrap --manifest kyberion-toolchain`
+- **Purpose**: confirm that the basic tools for running Kyberion from source (Node / pnpm / git / TypeScript / tsx / vitest, and so on) are present.
+- **Notes on the checks**:
+  - **Node floor**: compares the running Node version with `engines` in `package.json` (`>=24.0.0`) and, if it is too old, fails and suggests `nvm install 24 && nvm use 24`.
+  - **Playwright browsers**: if the browser cache (`ms-playwright`) is missing, a **non-fatal warning** suggests `pnpm exec playwright install chromium`. Install it if you want the browser first win. Browsers are not downloaded automatically in postinstall.
+- **Physical changes**:
+  - None. Missing tools and local dependencies are summarized.
 
-### Python Runtime Resolution
+### Python runtime resolution
 
-- Python 系の bridge は、原則として `KYBERION_PYTHON_BIN` → `KYBERION_PYTHON` → managed runtime (`active/shared/runtime/tool-runtimes/*/bin/python`) → `.venv/bin/python3` → `python3` の順で解決されます。
-- `.venv/bin/python3` は legacy compatibility 用の repo-local 実行環境候補であり、新規標準ではありません。
-- AGY native subagent を使う場合は、公式 SDK を managed runtime へ `pnpm agy:sdk:setup --apply`（内部では `uv venv` + `uv pip install`）で導入できます。Python 3.10+ が必要で、任意の Python 実行ファイルは `KYBERION_AGY_SDK_PYTHON` で上書きできます。
-- AGY CLI の Kyberion 用カスタムエージェント定義は `pnpm agents:generate` で `.agents/agents/` に生成されます。手動で一覧を確認する場合は `agy --add-dir "$PWD" agent`、特定の定義を選ぶ場合は `agy --add-dir "$PWD" --agent kyberion-implementer ...` を使います。`AgyCliBackend` はワークスペースを自動的に `--add-dir` へ渡します。
-- 同一マシンで複数の Google アカウントを使い分ける場合: AGY CLI は通常 `~/.gemini/antigravity-cli/` を使用しますが、`pnpm kyberion agy profile add <name>` で作成したプロファイル（`~/.agy-profiles/<name>`）にアカウントを分離できます。ホスト環境へのインストールは `pnpm kyberion agy profile setup-host`、Kyberion 推論バックエンドでの特定アカウント指定は `KYBERION_AGY_PROFILE=<name>` を使用します（詳細は [`antigravity-multi-account-operations.md`](../knowledge/product/orchestration/antigravity-multi-account-operations.md) 参照）。
-- Devin CLI 向けのカスタムサブエージェント定義も同じ `pnpm agents:generate` で `.devin/agents/` に生成されます(ロール名そのまま: `implementer` / `reviewer` / `devils_advocate`)。Devin の `allowed-tools` は厳格な許可リストなので、AGY 向け `.agents/agents/` 側の `kyberion-*` 定義は Devin ではツール名が解決できず実質ツール無しになります — Devin 配下では `.devin/agents/` 側の名前を指定してください。
-- Cursor 向けのカスタムサブエージェント定義も同じ `pnpm agents:generate` で `.cursor/agents/` に生成されます(ロール名そのまま)。Cursor は frontmatter に `tools:` 許可リストがなく、親 Agent のツール(MCP 含む)を継承します。読み取り専用ロールは `readonly: true` で書き込みと状態変更シェルを抑止します。呼び出し例: `/implementer` / `/reviewer` / `/devils_advocate`。
-- Codex CLI 向けのカスタムサブエージェント定義も同じ `pnpm agents:generate` で `.codex/agents/` に生成されます(ロール名そのままの TOML: `implementer` / `reviewer` / `devils_advocate`)。`sandbox_mode` は KD-05 の権限ティアから射影され、実装担当は `workspace-write`、調査・レビュー担当は `read-only` になります。
-- 音声サンプルやプロモート後の voice profile データは `active/shared/tmp/` または `active/shared/runtime/voice-profiles/<profile_id>/` に置きます。
+- Python-based bridges resolve their interpreter in this order: `KYBERION_PYTHON_BIN` -> `KYBERION_PYTHON` -> managed runtime (`active/shared/runtime/tool-runtimes/*/bin/python`) -> `.venv/bin/python3` -> `python3`.
+- `.venv/bin/python3` is a repo-local candidate kept for legacy compatibility and is not the new standard.
+- To use the AGY native subagent, install the official SDK into a managed runtime with `pnpm agy:sdk-setup --apply` (internally `uv venv` + `uv pip install`). Python 3.10+ is required; override the interpreter with `KYBERION_AGY_SDK_PYTHON`.
+- Kyberion's custom agent definitions for the AGY CLI are generated into `.agents/agents/` by `pnpm agents:generate`. To list them manually use `agy --add-dir "$PWD" agent`; to pick one use `agy --add-dir "$PWD" --agent kyberion-implementer ...`. `AgyCliBackend` passes the workspace to `--add-dir` automatically.
+- To use several Google accounts on one machine: the AGY CLI normally uses `~/.gemini/antigravity-cli/`, but profiles created with `pnpm kyberion agy profile add <name>` (`~/.agy-profiles/<name>`) isolate accounts. Install into the host with `pnpm kyberion agy profile setup-host`, and select an account for the Kyberion reasoning backend with `KYBERION_AGY_PROFILE=<name>` (details: [`antigravity-multi-account-operations.md`](../knowledge/product/orchestration/antigravity-multi-account-operations.md)).
+- Custom subagent definitions for the Devin CLI are generated by the same `pnpm agents:generate` into `.devin/agents/` (role names as-is: `implementer` / `reviewer` / `devils_advocate`). Devin's `allowed-tools` is a strict allowlist, so the `kyberion-*` definitions in `.agents/agents/` (for AGY) cannot resolve tool names there and effectively have no tools. Under Devin, use the names in `.devin/agents/`.
+- Custom subagent definitions for Cursor are generated into `.cursor/agents/` (role names as-is). Cursor has no `tools:` allowlist in frontmatter and inherits the parent agent's tools (including MCP). Read-only roles use `readonly: true` to suppress writes and state-changing shell commands. Example invocations: `/implementer` / `/reviewer` / `/devils_advocate`.
+- Custom subagent definitions for the Codex CLI are generated into `.codex/agents/` (TOML, role names as-is: `implementer` / `reviewer` / `devils_advocate`). `sandbox_mode` is projected from the KD-05 authority tier: implementers get `workspace-write`, investigators and reviewers get `read-only`.
+- Voice samples and promoted voice profile data live under `active/shared/tmp/` or `active/shared/runtime/voice-profiles/<profile_id>/`.
 
-### Stage 4: Readiness の確認
+### Stage 4: Check readiness
 
-- **実行コマンド**: `pnpm kyberion setup report --persona first-time-user`
-- **目的**: surface / service / reasoning / doctor の readiness を一度に確認し、初期セットアップの抜けをまとめて見つけます。まずこれを実行し、報告に出た項目だけを下の個別コマンドで詳しく見てください。
-- **物理的変化**: 実体の変更は行いません。
+- **Command**: `pnpm kyberion setup report --persona first-time-user`
+- **Purpose**: check surface / service / reasoning / doctor readiness in one pass and find the gaps in the initial setup. Run this first, then use the individual commands below only for the items it reports.
+- **Physical changes**: none.
 
-#### 4a. Runtime Surface Setup
+#### 4a. Runtime surface setup
 
-- **実行コマンド**: `pnpm surfaces setup`
-- **目的**: `concierge`、`presence-studio`、`chronos-mirror-v2`、`voice-hub`、`slack-bridge`、`imessage-bridge`、`discord-bridge`、`telegram-bridge`、`nexus-daemon`、`terminal-bridge` などの background surface について、認証の不足項目、CLI 代替、ホスト管理 surface を確認します。
-- **補助コマンド**:
-  - `pnpm surfaces status` で起動状態を確認できます。
-  - `pnpm surfaces repair -- --surface <surface-id>` で stale / unhealthy な surface を再起動できます。
-  - `pnpm surfaces start -- --surface <surface-id>` / `pnpm surfaces stop -- --surface <surface-id>` で個別に開始・停止できます。
+- **Command**: `pnpm surfaces setup`
+- **Purpose**: for background surfaces such as `concierge`, `presence-studio`, `chronos-mirror-v2`, `voice-hub`, `slack-bridge`, `imessage-bridge`, `discord-bridge`, `telegram-bridge`, `nexus-daemon` and `terminal-bridge`, show missing auth items, CLI alternatives, and host-managed surfaces.
+- **Helpers**:
+  - `pnpm surfaces status` shows what is running.
+  - `pnpm surfaces repair -- --surface <surface-id>` restarts a stale or unhealthy surface.
+  - `pnpm surfaces start -- --surface <surface-id>` / `pnpm surfaces stop -- --surface <surface-id>` start or stop one surface.
 
-#### 4b. External Service Setup と Preflight
+#### 4b. External service setup and preflight
 
-- **実行コマンド**: `pnpm services:setup`
-- **目的**: GitHub、Google Workspace、Slack、Notion、Jira などの service preset について、必要な secret、CLI 代替、customer/personal connection の置き場を先に確認します。実体の変更は行いません。
-- **実行直前の確認**: `pnpm service:preflight -- --service <service-id>`。`services:setup` が「準備」、`service:preflight` が「いま使えるか」です。auth が不足していれば失敗します。
-  - `voice` / `meeting` のように bridge health を持つもの
-  - `google-workspace` のように auth と CLI health を合わせて見たいもの
-  - `media-generation` のようにローカル runtime に依存するもの。ComfyUI などの runtime に到達できるかを確かめる入口です。失敗した場合は ComfyUI の起動、プロビジョニング、接続先を確認してください。
-- **secret の登録**: `services:setup` で不足と出た secret は、`pnpm kyberion secret introduce <service-id> <secret-key>` で登録します。
-  - 値は argv では受け付けません。TTY の非表示プロンプトで入力するか、`active/shared/tmp/` 配下のファイルを `--from-file <path>` で渡します。
-  - 提案（propose）と適用（apply）の二段階です。ローカルで自動承認された場合はそのまま適用されます。承認待ちになった場合は、表示に従って `pnpm kyberion approve <approval-id>` の後に `pnpm kyberion secret apply <approval-id> --from-file <path>` を実行します。自動承認を使わない場合は `--no-auto-approve` を付けます。
-  - 登録状況は `pnpm kyberion secret status <service-id>` で確認します。値は表示されません。
-  - GUI では concierge の `/settings` →「サービス連携」から同じ流れで登録できます。
-  - 接続 JSON や `.env` に値を直接書かないでください。
+- **Command**: `pnpm service:setup`
+- **Purpose**: for service presets such as GitHub, Google Workspace, Slack, Notion and Jira, show the required secrets, CLI alternatives, and where customer/personal connections live. Nothing is changed.
+- **Check right before use**: `pnpm service:preflight -- --service <service-id>`. `service:setup` is "preparation"; `service:preflight` is "can I use it now". It fails if auth is missing.
+  - Services with bridge health, such as `voice` / `meeting`
+  - Services where auth and CLI health are checked together, such as `google-workspace`
+  - Services that depend on a local runtime, such as `media-generation`. This is the entry point for checking whether a runtime such as ComfyUI is reachable. If it fails, check that ComfyUI is running, provisioned, and pointed at the right endpoint.
+- **Registering a secret**: for a secret that `service:setup` reports missing, use `pnpm kyberion secret introduce <service-id> <secret-key>`.
+  - The value is never accepted on argv. Enter it at a hidden TTY prompt, or pass a file under `active/shared/tmp/` with `--from-file <path>`.
+  - It is a two-phase propose and apply. If it is auto-approved locally, it is applied immediately. If approval is pending, follow the output: `pnpm kyberion approve <approval-id>`, then `pnpm kyberion secret apply <approval-id> --from-file <path>`. Add `--no-auto-approve` to opt out of auto-approval.
+  - Check registration with `pnpm kyberion secret status <service-id>`. Values are never printed.
+  - In the GUI, the concierge `/settings` -> "Service connections" offers the same flow.
+  - Never write values directly into connection JSON or `.env`.
 
-#### 4c. Reasoning Backend Setup
+#### 4c. Reasoning backend setup
 
-- **実行コマンド**: `pnpm reasoning:setup`
-- **目的**: 現在の host で使える reasoning backend を確認します。候補は `knowledge/product/governance/reasoning-backend-policy.json` の `allowed_modes` が正本で、主に次のものがあります。
-  - ローカル CLI: `claude-cli` / `codex-cli` / `gemini-cli` / `agy-cli` / `grok-cli` / `copilot` / `cursor-cli` / `opencode-cli`
-  - API: `anthropic` / `claude-agent` / `gemini-api` / `grok-api` / `openrouter` / `nemotron-api`
-  - ローカルモデル: `local` / `ollama` / `vllm` / `lmstudio` / `llamacpp` / `mlx` / `localai`
-  - オフライン・テスト用: `stub`
-- **物理的変化**:
-  - 対話モードで backend を選択した場合のみ、`.env.local` に `KYBERION_REASONING_BACKEND` が保存されます。
-- **既知の落とし穴（claude-cli のシャドウイング）**: repo 依存の `@anthropic-ai/claude-code` は postinstall 未承認のあいだ `node_modules/.bin/claude` に placeholder shim を置き、pnpm 環境ではこれが PATH 上で本物の `claude`（例: `~/.local/bin/claude`）を隠します。`claude` 実行時に `claude native binary not installed` と表示されたらこの状態です。対処: `pnpm approve-builds` で `@anthropic-ai/claude-code` を承認するか、`KYBERION_CLAUDE_CLI_BIN=$HOME/.local/bin/claude` を設定してください（probe は placeholder 検出時に `~/.local/bin` / `/opt/homebrew/bin` / `/usr/local/bin` などへ自動フォールバックしますが、明示設定が最も確実です）。
+- **Command**: `pnpm reasoning:setup`
+- **Purpose**: see which reasoning backends this host can use. The source of truth for candidates is `allowed_modes` in `knowledge/product/governance/reasoning-backend-policy.json`; the main ones are:
+  - Local CLIs: `claude-cli` / `codex-cli` / `gemini-cli` / `agy-cli` / `grok-cli` / `copilot` / `cursor-cli` / `opencode-cli`
+  - APIs: `anthropic` / `claude-agent` / `gemini-api` / `grok-api` / `openrouter` / `nemotron-api`
+  - Local models: `local` / `ollama` / `vllm` / `lmstudio` / `llamacpp` / `mlx` / `localai`
+  - Offline / testing: `stub`
+- **Physical changes**:
+  - `KYBERION_REASONING_BACKEND` is saved to `.env.local` only if you pick a backend in interactive mode.
+- **Known pitfall (claude-cli shadowing)**: until its postinstall is approved, the repo dependency `@anthropic-ai/claude-code` places a placeholder shim at `node_modules/.bin/claude`, which under pnpm can hide the real `claude` (for example `~/.local/bin/claude`) on PATH. If running `claude` prints `claude native binary not installed`, this is the cause. Fix: approve `@anthropic-ai/claude-code` with `pnpm approve-builds`, or set `KYBERION_CLAUDE_CLI_BIN=$HOME/.local/bin/claude` (the probe falls back to `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin` and so on when it detects the placeholder, but an explicit setting is the most reliable).
 
-#### 4d. 機能ごとの依存と system tool
+#### 4d. Per-feature dependencies and system tools
 
-- **actuator 単位の依存**: `pnpm deps:check --actuator browser|voice|media-generation`。その機能を使う前に個別の依存だけを確認します。
-- **system tool**: `pnpm tool:setup -- --list` で一覧を確認し、`pnpm tool:setup -- --tool <tool> --apply` で導入します。lightpanda のように `managed_binary` を宣言した tool は、チェックサム固定の upstream release を managed env に入れます。
+- **Per-actuator dependencies**: `pnpm deps:check --actuator browser|voice|media-generation`. Check only that feature's dependencies before you use it.
+- **System tools**: list with `pnpm tool:setup -- --list` and install with `pnpm tool:setup -- --tool <tool> --apply`. A tool that declares `managed_binary`, such as lightpanda, installs a checksum-pinned upstream release into the managed env.
 
-### Stage 5: Runtime Surface Reconciliation
+### Stage 5: Runtime surface reconciliation
 
-- **実行コマンド**: `pnpm surfaces reconcile`
-- **目的**: setup で確認した状態をもとに、background surface を manifest から標準起動します。concierge（秘書室、`http://127.0.0.1:3050`）もここで起動し、Stage 7 の GUI 経路が使えるようになります。
-- **物理的変化**:
-  - `active/shared/runtime/surfaces/state.json` が生成または更新されます。
-  - `active/shared/logs/surfaces/` に surface ごとのログが出力されます。
-  - `runtime-supervisor` に surface runtime が登録されます。
+- **Command**: `pnpm surfaces reconcile`
+- **Purpose**: start the background surfaces from the manifest, based on what setup found. The concierge (secretary room, `http://127.0.0.1:3050`) also starts here, which makes the Stage 7 GUI route available.
+- **Physical changes**:
+  - `active/shared/runtime/surfaces/state.json` is created or updated.
+  - Per-surface logs are written to `active/shared/logs/surfaces/`.
+  - Surface runtimes are registered with `runtime-supervisor`.
 
-### Stage 6: stance の選択
+### Stage 6: Choose a stance
 
-identity の保存先と、baseline-check の L3 が確認する場所は、アクティブな stance で決まります。**identity を保存する前に**決めてください。
+Where the identity is saved, and where baseline-check L3 looks, depends on the active stance. Decide **before saving the identity**.
 
-- 自分として使う: `KYBERION_CUSTOMER` を設定しません。保存先は `knowledge/personal/` です。
-- 顧客・会社として使う: `pnpm customer:switch <customer-slug>` で切り替えます（overlay がなければ `pnpm customer:create <customer-slug>`）。保存先は `customer/{slug}/` です。
+- Use as yourself: leave `KYBERION_CUSTOMER` unset. The destination is `knowledge/personal/`.
+- Use as a customer / company: switch with `pnpm stance:switch <customer-slug>` (create the overlay first with `pnpm stance:create <customer-slug>` if it does not exist). The destination is `customer/{slug}/`.
 
-### Stage 7: 魂の注入 (Soul Infusion)
+### Stage 7: Soul infusion (identity)
 
-- **実行コマンド**: `pnpm onboard`（`dist/` が必要です）
-- **目的**: 主権者の名前、言語、対話スタイル、専門分野、vision をシステムに記憶させます。
-- **GUI で行う場合**: concierge の `/settings` を開きます（旧 `/setup` と `/onboarding` はここへリダイレクトされます）。「あなたのこと」で identity を保存し、「組織とメンバー」でメンバーと承認者を登録します。承認者は後の tenant activation で `--owner-id` に指定します。
-- **非対話環境の場合**: TTY が無い環境では `pnpm onboard` は exit 2 で停止します。代わりに以下のいずれかを使用します。
-  - `pnpm onboard apply --identity <path/to/identity.json>` — JSON ファイルからアイデンティティを適用（Path B）
-    - ひな形は [`knowledge/public/templates/onboarding/identity.example.json`](../knowledge/public/templates/onboarding/identity.example.json) をコピーして使ってください。まず `--dry-run` で検証すると安全です。
-  - `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 pnpm onboard` — 意図的に default 値で進める（評価環境向け）
-- **やり直す場合**: `pnpm onboard reset` で onboarding state と生成された identity / vision / agent の成果物を削除します。
-- **物理的変化**:
-  - `customer/{slug}/my-identity.json` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/my-identity.json` になります。
-  - `customer/{slug}/my-vision.md` が生成（または更新）されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/my-vision.md` になります。
-  - `customer/{slug}/onboarding/onboarding-state.json` と `onboarding-summary.md` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/onboarding/` 配下になります。
-  - アイデンティティ設定の最後に、エージェントが自己紹介を行い、主権者との間で Agent ID（A2A 通信や記録に使う公的な名前）を合意します。`customer/{slug}/agent-identity.json` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/agent-identity.json` になります。
-  - サービス接続の候補（`connections/*.json`）、tenant 候補、最初の tutorial plan（`onboarding/tutorial-plan.md`）が同じ profile 配下に生成されます。これらは候補であり、外部への副作用は起きません。
+- **Command**: `pnpm onboarding` (needs `dist/`)
+- **Purpose**: make the system remember the sovereign's name, language, interaction style, specialty, and vision.
+- **To do it in the GUI**: open the concierge `/settings` (the old `/setup` and `/onboarding` redirect there). Save the identity under "About you", and register members and approvers under "Organization and members". The approver is later given as `--owner-id` in tenant activation.
+- **In a non-interactive environment**: without a TTY, `pnpm onboarding` stops with exit 2. Use one of these instead:
+  - `pnpm onboarding apply --identity <path/to/identity.json>` — apply the identity from a JSON file (Path B)
+    - Copy the template [`knowledge/public/templates/onboarding/identity.example.json`](../knowledge/public/templates/onboarding/identity.example.json). Validating with `--dry-run` first is safest.
+  - `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 pnpm onboarding` — proceed with default values on purpose (for evaluation environments)
+- **To start over**: `pnpm onboarding reset` removes the onboarding state and the generated identity / vision / agent artifacts.
+- **Physical changes**:
+  - `customer/{slug}/my-identity.json` is created. When `KYBERION_CUSTOMER` is unset, it is `knowledge/personal/my-identity.json`.
+  - `customer/{slug}/my-vision.md` is created (or updated). When `KYBERION_CUSTOMER` is unset, it is `knowledge/personal/my-vision.md`.
+  - `customer/{slug}/onboarding/onboarding-state.json` and `onboarding-summary.md` are created. When `KYBERION_CUSTOMER` is unset, they are under `knowledge/personal/onboarding/`.
+  - At the end of identity setup the agent introduces itself and agrees an Agent ID (its public name for A2A communication and records) with the sovereign. `customer/{slug}/agent-identity.json` is created; with `KYBERION_CUSTOMER` unset, `knowledge/personal/agent-identity.json`.
+  - Service connection candidates (`connections/*.json`), tenant candidates, and the first tutorial plan (`onboarding/tutorial-plan.md`) are created under the same profile. They are candidates; no external side effects occur.
 
-### Stage 8: baseline を all_clear にする
+### Stage 8: Bring the baseline to all_clear
 
-- **実行コマンド**: `pnpm pipeline --input pipelines/baseline-check.json`
-- **目的**: 判定層 L0〜L11 がすべて通ることを確認します。層の一覧は標準フローの Step 0 にあります。
-- **初回に落ちやすい層**:
-  - **L8（storage janitor）**: baseline-check が janitor を自動で投入します。完了後に再実行すれば通ります。手動で走らせる場合は `pnpm pipeline --input pipelines/storage-janitor.json --context '{"dry_run":false}'` を使います。
-  - **L10（scheduler）**: 有効なスケジュールがなければ通ります。スケジュールを登録したら chronos daemon を常駐させます。macOS では `pnpm kyberion chronos install` で内容を確認し、`--apply` で LaunchAgent に登録します。その場で動かすだけなら `pnpm chronos` です。
-  - **L11（監査台帳）**: 監査記録が一つもないか古いと落ちます。Stage 7 などの governed 操作で記録されます。
+- **Command**: `pnpm pipeline --input pipelines/baseline-check.json`
+- **Purpose**: confirm that every judgment layer L0-L11 passes. The layers are listed in standard flow Step 0.
+- **Layers that often fail the first time**:
+  - **L8 (storage janitor)**: baseline-check enqueues the janitor automatically. Re-run after it completes. To run it by hand: `pnpm pipeline --input pipelines/storage-janitor.json --context '{"dry_run":false}'`.
+  - **L10 (scheduler)**: passes when no schedule is enabled. After registering schedules, keep the chronos daemon resident. On macOS, `pnpm kyberion scheduler install` shows what it will do and `--apply` registers a LaunchAgent. To just run it in the foreground, use `pnpm scheduler`. The same ceremony registers the media generation scheduler and the daemon watchdog (a 5-minute one-shot) with `--daemon generation-schedule` / `--daemon daemon-watchdog`. The node binary passed to launchd resolves to `<prefix>/opt/node/bin/node` (a version-independent symlink), so `brew upgrade node` does not break it.
+  - **L11 (audit ledger)**: fails if there are no audit records, or they are stale. Governed operations such as Stage 7 record them.
 
-### Stage 9: tenant・organization・activation（必要な場合のみ）
+### Stage 9: Tenant, organization, activation (only when needed)
 
-個人のみで使う場合、この Stage は不要です。tenant を扱う場合は、[標準フロー](../knowledge/product/governance/onboarding-flow.md) の Step 5〜8 を順に実行してください。ここでは、そこで結び付ける 3 つの別物を整理しておきます。
+For personal-only use this stage is not needed. If you work with tenants, run Steps 5-8 of the [standard flow](../knowledge/product/governance/onboarding-flow.md) in order. Here are the three distinct things those steps tie together.
 
-| 何を指すか                             | 役割                                                           | 置き場                                          |
-| -------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------- |
-| **customer-slug**（stance / 運用主体） | 「いま自分はどの主体として振る舞っているか」— **実行時の設定** | `customer/{slug}/` + `KYBERION_CUSTOMER`        |
-| **tenant-slug**（テナント）            | 「いまどの機密境界の内側にいるか」— **データ境界**             | `knowledge/confidential/{tenant-slug}/`         |
-| **organization-id**（組織）            | 「そのテナントをどう運営しているか」— テナント配下の運用モデル | `active/organizations/{tier}/{tenant}/{org_id}` |
+| What it refers to                         | Role                                                             | Where it lives                                  |
+| ----------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------- |
+| **customer-slug** (stance / acting party) | "Which party am I acting as right now" — **runtime setting**     | `customer/{slug}/` + `KYBERION_CUSTOMER`        |
+| **tenant-slug** (tenant)                  | "Inside which confidentiality boundary am I" — **data boundary** | `knowledge/confidential/{tenant-slug}/`         |
+| **organization-id** (organization)        | "How that tenant is run" — the operating model under the tenant  | `active/organizations/{tier}/{tenant}/{org_id}` |
 
-`customer-slug` と `tenant-slug` は同じ綴りになることが多いですが同一物ではありません（前者は設定、後者は境界）。包含順の正本は [entity-scope-hierarchy](../knowledge/product/architecture/entity-scope-hierarchy.md)、3 層の区別は [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md) を参照してください。テナント自身の顧客は `knowledge/confidential/{tenant-slug}/customers/` に置き、`customer/{slug}/` には置きません。
+`customer-slug` and `tenant-slug` are often spelled the same but are not the same thing (one is a setting, the other a boundary). The containment order is canonical in [entity-scope-hierarchy](../knowledge/product/architecture/entity-scope-hierarchy.md); the three-way distinction is in [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md). A tenant's own customers live in `knowledge/confidential/{tenant-slug}/customers/`, not in `customer/{slug}/`.
 
-AI 会社として始める場合は、`pnpm onboard company --vertical <vertical> --slug <company-slug> --name "<会社名>" --owner-id human:<owner> --goal "<最初の成果>" --tenant-slug <tenant-slug> --dry-run` で tenant 登録と context binding をまとめて確認できます。AI worker は作業を準備・実行できますが、契約、支払、外部公開、権限変更などの最終判断は `--owner-id` の人間が保持します。会社オンボーディングは activation を自動完了しません。
+To start as an AI company, `pnpm onboarding company --vertical <vertical> --slug <company-slug> --name "<company name>" --owner-id human:<owner> --goal "<first outcome>" --tenant-slug <tenant-slug> --dry-run` previews tenant registration and context binding together. AI workers can prepare and execute work, but final decisions on contracts, payments, external publication and permission changes stay with the human given as `--owner-id`. Company onboarding does not complete activation automatically.
 
 ---
 
-## 🩺 健全性確認 (Vital Check)
+## Vital check
 
-オンボーディングが正しく完了したかを確認するには、以下のコマンドを実行してください。
+To confirm onboarding completed correctly, run:
 
 ```bash
 pnpm pipeline vital-check
 pnpm pipeline --input pipelines/baseline-check.json
 ```
 
-**期待される出力例**:
+**Expected output (example)**:
 
-- ✅ [OK] Physical Foundation (node_modules)
-- ✅ [OK] System Build (dist)
-- ✅ [OK] Sovereign Identity
-- ✅ [OK] Sovereign Vision
-- ✅ [OK] Onboarding Summary
+- [OK] Physical Foundation (node_modules)
+- [OK] System Build (dist)
+- [OK] Sovereign Identity
+- [OK] Sovereign Vision
+- [OK] Onboarding Summary
 
-baseline-check の `status` が `all_clear` であれば完了です。
+You are done when the baseline-check `status` is `all_clear`.
 
 ---
 
 _Status: Mandated by AGENTS.md — day-2 command reference (ONB-02)_
-_Last Updated: 2026-09-22_
+_Last Updated: 2026-10-01_

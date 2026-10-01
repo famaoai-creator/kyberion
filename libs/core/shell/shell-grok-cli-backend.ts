@@ -15,6 +15,7 @@
  * field (camelCase; falls back to parsing `text` when absent).
  */
 
+import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { spawn } from 'node:child_process';
 import { memoizedCliSpawnSync } from '../provider/provider-discovery.js';
 import * as readline from 'node:readline';
@@ -84,7 +85,8 @@ function normalizePermissionProfile(
   throw new Error(`[shell-grok-cli] unsupported permission profile: ${value}`);
 }
 
-const DEFAULT_MODEL = 'grok-4.7';
+/** provider-config.json runtime_defaults['grok-default'] (RS-02). */
+const defaultGrokModel = (): string => resolveRuntimeModelId('grok-default');
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 
 export function resolveGrokModelForTier(
@@ -95,9 +97,9 @@ export function resolveGrokModelForTier(
   // 2x token rates, Grok Build/Cursor only, and outside the free tier and the
   // public API. A fast task tier must not select that SKU.
   if (tier === 'fast' || tier === 'standard' || tier === 'deep') {
-    return defaultModel || DEFAULT_MODEL;
+    return defaultModel || defaultGrokModel();
   }
-  return defaultModel || DEFAULT_MODEL;
+  return defaultModel || defaultGrokModel();
 }
 
 export interface ShellGrokCliBackendOptions {
@@ -146,7 +148,7 @@ export class ShellGrokCliBackend implements ReasoningBackend {
 
   constructor(options: ShellGrokCliBackendOptions = {}) {
     this.bin = options.bin ?? 'grok';
-    this.model = options.model ?? DEFAULT_MODEL;
+    this.model = options.model ?? defaultGrokModel();
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.extraArgs = options.extraArgs ?? [];
     this.injectedHarnessSession = options.harnessSession;
@@ -721,7 +723,7 @@ export function buildShellGrokCliBackendFromEnv(
   const options = buildGrokCliOptionsFromEnv(env);
   const backend = new ShellGrokCliBackend(options);
   logger.debug(
-    `[shell-grok-cli] backend ready (bin=${options.bin ?? 'grok'}, model=${options.model ?? DEFAULT_MODEL})`
+    `[shell-grok-cli] backend ready (bin=${options.bin ?? 'grok'}, model=${options.model ?? defaultGrokModel()})`
   );
   return backend;
 }

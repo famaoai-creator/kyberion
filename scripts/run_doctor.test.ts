@@ -115,6 +115,17 @@ describe('run_doctor', () => {
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Governance controls:'));
   });
 
+  it('prints usage for --help and exits 0 without running any probe', async () => {
+    const { runDoctor } = await import('./run_doctor.js');
+
+    await runDoctor(['--help']);
+
+    expect(process.exitCode ?? 0).toBe(0);
+    expect(mocks.loadEnvironmentManifest).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('pnpm run doctor'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('--runtime'));
+  });
+
   it('emits the same doctor report as structured JSON when requested', async () => {
     const yargsStub = {
       option: vi.fn(() => yargsStub),

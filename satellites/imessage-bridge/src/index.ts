@@ -3,6 +3,7 @@ import { installProcessGuards } from '@agent/core/process-guards';
 import { defineScript, isDirectScript } from '@agent/core/script-harness';
 import { getRegisteredEnvText, parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
 import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
+import { deriveReplyLocale, runWithReplyLocale } from '@agent/core/locale';
 import { t } from '@agent/core/t';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { logger } from '@agent/core/core';
@@ -326,6 +327,15 @@ export function buildIMessageChannelAdapter(msg: IMessageStimulus): ChannelAdapt
 const processedMessageKeys = new Set<string>();
 
 async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageProcessingResult> {
+  // IT-02: replies follow the language the user wrote in (explicit locale still wins).
+  return runWithReplyLocale(deriveReplyLocale({ text: msg.text }), () =>
+    processIncomingIMessageInner(msg)
+  );
+}
+
+async function processIncomingIMessageInner(
+  msg: IMessageStimulus
+): Promise<IMessageProcessingResult> {
   const key = `${msg.chatGuid || msg.chatId}:${msg.id}`;
   if (processedMessageKeys.has(key)) return 'duplicate';
   processedMessageKeys.add(key);
@@ -433,7 +443,6 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
       ({ threadContext }) =>
         runSurfaceMessageConversation({
           surface: 'imessage',
-          locale: resolveOperatorLocale(),
           text: incomingText,
           channel: msg.chatId,
           threadTs: msg.id,

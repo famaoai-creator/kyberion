@@ -1,5 +1,7 @@
 # Engine Refinement Roadmap
 
+> **Superseded — kept for history.** This is the older engine-level plan. Current status of work is tracked in [`improvement-plans-2026-08/README.ja.md`](./developer/improvement-plans-2026-08/README.ja.md); the master strategy is [`PRODUCTIZATION_ROADMAP.md`](./PRODUCTIZATION_ROADMAP.md). See the [docs index](./README.md#roadmaps-and-plans) for how the roadmap documents relate. Content below is unchanged.
+
 エコシステムの次の抽象化レベルへの引き上げ。6つの柱を順に実装する。
 
 ## Status Legend

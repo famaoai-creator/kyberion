@@ -173,7 +173,7 @@ Phase A〜D' は OSS / self-hosted / FDE の基盤レーンであり、SaaS の�
 | A-1 | ✅   | ポジショニング / WHY 文書             | "誰の何の問題を、なぜ Kyberion でなければ解けないか" を 1 ページに      | `docs/WHY.md` (en/ja)                                  | D6     |
 | A-2 | 🔶   | README 全面書き直し                   | 1 段目: WHY と GIF。2 段目: 5 分 quickstart。3 段目: 比較・拡張への入口 | `README.md` (英語ベース)                               | D6, D1 |
 | A-3 | ✅   | ワンライナー起動 + **on-demand pull** | actuator 起動前に must/should/nice 依存を確認・案内                     | `scripts/dependency_resolver.ts` (`pnpm deps:check`)   | D1     |
-| A-4 | ✅   | preflight doctor 強化                 | `pnpm doctor` が must/should/nice の 3 列で不足を出す                   | `pipelines/vital-check.json` + `scripts/run_doctor.ts` | D1     |
+| A-4 | ✅   | preflight doctor 強化                 | `pnpm run doctor` が must/should/nice の 3 列で不足を出す               | `pipelines/vital-check.json` + `scripts/run_doctor.ts` | D1     |
 | A-5 | ✅   | **Voice first win 実装**              | "Hello Kyberion" pipeline (tier-0, zero external deps)                  | `pipelines/voice-hello.json`                           | D1, D6 |
 | A-6 | ❌   | デモ素材 3 本                         | terminal cast / GIF / 短編動画 を README から見える場所に               | `docs/demos/` + README 埋め込み                        | D6     |
 | A-7 | ✅   | エラー分類器                          | `unknown` エラーを原因タイプ × 推奨対処に分類（12 カテゴリ 28+ ルール） | `libs/core/error-classifier.ts`                        | D3     |
@@ -582,7 +582,7 @@ A-5 のタスク完了条件に「30 秒以内の terminal cast + ブラウザ�
 #### B.3 keying と再現性
 
 - 各依存の version pin と sha256 を `dependencies/manifest.json` に記録
-- `pnpm doctor --strict` で manifest と実環境の乖離を検出
+- `pnpm run doctor --strict` で manifest と実環境の乖離を検出
 - FDE 案件用の "frozen" モード: manifest 通りの依存以外の install を拒否
 
 ---

@@ -104,8 +104,8 @@ Tenant backup includes the tenant namespaces for peer messaging, conversations, 
 For an existing checkout that still has flat legacy records, first create a dry-run migration plan and then apply that exact plan after review:
 
 ```bash
-pnpm migrate:peer-tenant-runtime
-pnpm migrate:peer-tenant-runtime -- --plan active/shared/runtime/migrations/peer-tenant/manifests/<migration-id>.json --apply
+pnpm peer:migrate-tenant-runtime
+pnpm peer:migrate-tenant-runtime -- --plan active/shared/runtime/migrations/peer-tenant/manifests/<migration-id>.json --apply
 ```
 
 Records without an explicit, valid tenant remain quarantined. After a tenant restore, request and resolve the human resume gate only after the peer has been re-enrolled and its heartbeat is healthy:

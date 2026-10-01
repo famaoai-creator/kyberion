@@ -11,7 +11,7 @@
  * (knowledge/confidential/{tenant}/_ledger/assets.jsonl).
  *
  * Usage:
- *   pnpm ingest --tenant <slug> --file <path> [--format docx|pdf|xlsx|pptx|html|slack_thread|markdown|text] [--ocr]
+ *   pnpm knowledge:ingest --tenant <slug> --file <path> [--format docx|pdf|xlsx|pptx|html|slack_thread|markdown|text] [--ocr]
  *               [--source-system <sys>] [--source-id <id>] [--target <relative_path>]
  *               [--kind <card kind>] [--approval-id <id>] [--ingested-by <who>]
  *               [--dry-run] [--root-dir <fixture root>]
@@ -74,7 +74,7 @@ const EXTENSION_FORMATS: Record<string, IngestFormat> = {
 const USAGE = `DA-05 explicit ingest ceremony — land one document as a governed knowledge card.
 
 Usage:
-  pnpm ingest --tenant <slug> --file <path> [options]
+  pnpm knowledge:ingest --tenant <slug> --file <path> [options]
 
 Required:
   --tenant <slug>          Registered tenant slug (or 'common' for the shared namespace)
@@ -261,7 +261,7 @@ function assertCeremonyIdentity(tenant: string): void {
   throw new Error(
     `the current identity cannot read the tenant profile (${path.relative(pathResolver.rootDir(), profile)}): ` +
       `${String(decision.reason || 'denied').replace(/[.\s]+$/, '')}. Run the ceremony as ` +
-      '`KYBERION_PERSONA=ecosystem_architect MISSION_ROLE=mission_controller pnpm ingest …`. ' +
+      '`KYBERION_PERSONA=ecosystem_architect MISSION_ROLE=mission_controller pnpm knowledge:ingest …`. ' +
       'Nothing was read or written.'
   );
 }
@@ -482,7 +482,7 @@ export async function main(argv: string[] = [], print: Print = () => undefined):
 }
 
 const script = defineScript({
-  name: 'ingest',
+  name: 'knowledge:ingest',
   flags: [],
   run: ({ argv, print }) => main(argv, print),
 });

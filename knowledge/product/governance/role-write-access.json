@@ -96,8 +96,12 @@
     "chronos_token_registry_reader": {
       "allow": []
     },
+    "scope_locale_reader": {
+      "allow": []
+    },
     "surface_runtime": {
       "allow": [
+        "active/shared/inbox/",
         "active/shared/runtime/",
         "active/shared/logs/surfaces/",
         "active/shared/observability/protocol-services/",
@@ -116,6 +120,15 @@
     },
     "knowledge_steward": {
       "allow": ["knowledge/"]
+    },
+    "operational_learning_writer": {
+      "allow": [
+        "active/organizations/personal/shared/${KYBERION_ORGANIZATION_ID}/state/learning/",
+        "active/organizations/personal/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/state/learning/",
+        "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/state/learning/",
+        "active/organizations/public/shared/${KYBERION_ORGANIZATION_ID}/state/learning/",
+        "active/organizations/public/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/state/learning/"
+      ]
     },
     "ceo": {
       "allow": ["knowledge/ceo/", "knowledge/personal/my-identity.json"]

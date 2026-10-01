@@ -2,6 +2,8 @@ import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import type { GuidedCoordinationBrief } from './contracts/guided-coordination-brief.js';
+import { matchesIntentPhrase } from './intent/intent-phrase-lexicon.js';
+import { resolveCoordinationActuatorRoute } from './coordination-actuator-routing.js';
 
 const GUIDED_COORDINATION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/guided-coordination-brief.schema.json'
@@ -82,31 +84,23 @@ function inferCoordinationKind(
 ): GuidedCoordinationBrief['coordination_kind'] {
   if (seed.coordinationKind) return seed.coordinationKind;
   const text = seed.requestText;
-  if (
-    /会議|ミーティング|打ち合わせ|Teams|Zoom|Meet|meeting|call|facilitate|進行|議事録|アクションアイテム|代理参加/i.test(
-      text
-    )
-  ) {
+  if (matchesIntentPhrase(text, 'coordination.meeting_request')) {
     return 'meeting';
   }
-  if (/パワーポイント|powerpoint|ppt|スライド|deck|briefing pack|presentation|提案書/i.test(text)) {
+  if (matchesIntentPhrase(text, 'guided_coordination.presentation')) {
     return 'presentation';
   }
-  if (/動画|video|movie|ナレーション|narrated/i.test(text)) return 'narrated_video';
-  if (/予約|booking|reservation|purchase|order|appointment|apply/i.test(text)) return 'booking';
-  if (/旅行|travel|trip|tour|宿泊|hotel|flight/i.test(text)) return 'travel';
-  if (
-    /スケジュール|予定|日程|リスケ|resched|reschedule|calendar|調整|変更|空き時間|availability/i.test(
-      text
-    )
-  ) {
+  if (matchesIntentPhrase(text, 'guided_coordination.narrated_video')) return 'narrated_video';
+  if (matchesIntentPhrase(text, 'guided_coordination.booking')) return 'booking';
+  if (matchesIntentPhrase(text, 'guided_coordination.travel')) return 'travel';
+  if (matchesIntentPhrase(text, 'guided_coordination.schedule')) {
     return 'schedule';
   }
-  if (/オンボーディング|onboarding|初回設定|初期設定|setup/i.test(text)) return 'onboarding';
-  if (/proposal|提案|ストーリー|storyline|稟議|decision support|意思決定/i.test(text))
-    return 'proposal';
-  if (/比較|compare|strategy|優先順位|priorit/i.test(text)) return 'decision_support';
-  if (/service|運用|operation|diagnos|inspec/i.test(text)) return 'service_operation';
+  if (matchesIntentPhrase(text, 'guided_coordination.onboarding')) return 'onboarding';
+  if (matchesIntentPhrase(text, 'guided_coordination.proposal')) return 'proposal';
+  if (matchesIntentPhrase(text, 'guided_coordination.decision_support')) return 'decision_support';
+  if (matchesIntentPhrase(text, 'guided_coordination.service_operation'))
+    return 'service_operation';
   return 'general';
 }
 
@@ -138,26 +132,6 @@ function inferExpectedOutputs(kind: GuidedCoordinationBrief['coordination_kind']
   };
 
   return outputsByKind[kind] || outputsByKind.general;
-}
-
-function inferSuggestedTargetActuators(
-  kind: GuidedCoordinationBrief['coordination_kind']
-): string[] {
-  const byKind: Record<GuidedCoordinationBrief['coordination_kind'], string[]> = {
-    meeting: ['meeting-actuator', 'meeting-browser-driver'],
-    presentation: ['orchestrator-actuator', 'media-actuator'],
-    narrated_video: ['video-composition-actuator', 'voice-actuator'],
-    booking: ['browser-actuator', 'orchestrator-actuator'],
-    travel: ['browser-actuator', 'orchestrator-actuator'],
-    schedule: ['browser-actuator', 'service-actuator'],
-    onboarding: ['orchestrator-actuator', 'artifact-actuator'],
-    proposal: ['orchestrator-actuator', 'media-actuator'],
-    decision_support: ['task-session-manager', 'wisdom-actuator'],
-    service_operation: ['service-orchestrator', 'task-session-manager'],
-    general: ['orchestrator-actuator', 'intent-compiler'],
-  };
-
-  return byKind[kind] || byKind.general;
 }
 
 function inferSuggestedDeliverables(kind: GuidedCoordinationBrief['coordination_kind']): string[] {
@@ -279,6 +253,7 @@ export function buildGuidedCoordinationBrief(
 ): GuidedCoordinationBrief {
   const coordination_kind = inferCoordinationKind(seed);
   const missing_inputs = inferMissingInputs(coordination_kind);
+  const route = resolveCoordinationActuatorRoute(coordination_kind);
   return {
     kind: 'guided-coordination-brief',
     request_text: seed.requestText,
@@ -289,7 +264,11 @@ export function buildGuidedCoordinationBrief(
     approval_boundary: seed.approvalBoundary || inferApprovalBoundary(coordination_kind),
     missing_inputs,
     expected_outputs: inferExpectedOutputs(coordination_kind),
-    suggested_target_actuators: inferSuggestedTargetActuators(coordination_kind),
+    // Actuator routing per kind is registry data (coordination-actuator-routing.json, RS-07).
+    suggested_target_actuators: route.target_actuators,
+    ...(route.support_components.length > 0
+      ? { suggested_support_components: route.support_components }
+      : {}),
     suggested_deliverables: inferSuggestedDeliverables(coordination_kind),
     preference_profile_refs: seed.preferenceProfileRefs?.length
       ? seed.preferenceProfileRefs
@@ -373,6 +352,16 @@ export function normalizeGuidedCoordinationBrief(
       Array.isArray(raw.suggested_target_actuators) && raw.suggested_target_actuators.length > 0
         ? raw.suggested_target_actuators.map((item) => String(item).trim()).filter(Boolean)
         : fallback.suggested_target_actuators,
+    ...(Array.isArray(raw.suggested_support_components) &&
+    raw.suggested_support_components.length > 0
+      ? {
+          suggested_support_components: raw.suggested_support_components
+            .map((item) => String(item).trim())
+            .filter(Boolean),
+        }
+      : fallback.suggested_support_components
+        ? { suggested_support_components: fallback.suggested_support_components }
+        : {}),
     suggested_deliverables:
       Array.isArray(raw.suggested_deliverables) && raw.suggested_deliverables.length > 0
         ? raw.suggested_deliverables.map((item) => String(item).trim()).filter(Boolean)

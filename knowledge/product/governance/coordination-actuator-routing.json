@@ -1,0 +1,79 @@
+{
+  "$schema": "../schemas/coordination-actuator-routing.schema.json",
+  "version": "1.0.0",
+  "description": "Coordination kind → actuator routing (RS-07). `target_actuators` must be actuators in the actuator manifest catalog (libs/actuators/*/manifest.json); runtime components that are not actuators (task-session-manager, intent-compiler, virtual-camera-bridge, service-orchestrator) are listed separately in `support_components`. `execution_overrides` are the request-shape overrides the execution brief applies after its trigger predicate matches.",
+  "default_kind": "general",
+  "coordination_kinds": {
+    "meeting": {
+      "target_actuators": ["meeting-actuator", "meeting-browser-driver"],
+      "support_components": []
+    },
+    "presentation": {
+      "target_actuators": ["orchestrator-actuator", "media-actuator"],
+      "support_components": []
+    },
+    "narrated_video": {
+      "target_actuators": ["video-composition-actuator", "voice-actuator"],
+      "support_components": []
+    },
+    "booking": {
+      "target_actuators": ["browser-actuator", "orchestrator-actuator"],
+      "support_components": []
+    },
+    "travel": {
+      "target_actuators": ["browser-actuator", "orchestrator-actuator"],
+      "support_components": []
+    },
+    "schedule": {
+      "target_actuators": ["browser-actuator", "service-actuator"],
+      "support_components": []
+    },
+    "onboarding": {
+      "target_actuators": ["orchestrator-actuator", "artifact-actuator"],
+      "support_components": []
+    },
+    "proposal": {
+      "target_actuators": ["orchestrator-actuator", "media-actuator"],
+      "support_components": []
+    },
+    "decision_support": {
+      "target_actuators": ["wisdom-actuator"],
+      "support_components": ["task-session-manager"]
+    },
+    "service_operation": {
+      "target_actuators": [],
+      "support_components": ["service-orchestrator", "task-session-manager"]
+    },
+    "general": {
+      "target_actuators": ["orchestrator-actuator"],
+      "support_components": ["intent-compiler"]
+    }
+  },
+  "execution_overrides": {
+    "schedule_agenda_read": {
+      "target_actuators": ["calendar-actuator", "wisdom-actuator"],
+      "support_components": [],
+      "deliverables": ["calendar_agenda_summary"]
+    },
+    "approval_request_resolution": {
+      "target_actuators": ["browser-actuator", "approval-actuator", "service-actuator"],
+      "support_components": [],
+      "deliverables": ["approval_resolved"]
+    },
+    "approval_request_creation": {
+      "target_actuators": ["browser-actuator", "approval-actuator", "service-actuator"],
+      "support_components": [],
+      "deliverables": ["approval_request_created"]
+    },
+    "project_bootstrap": {
+      "target_actuators": ["orchestrator-actuator", "artifact-actuator", "wisdom-actuator"],
+      "support_components": [],
+      "deliverables": ["project_created"]
+    },
+    "capture_photo": {
+      "target_actuators": ["vision-actuator", "artifact-actuator"],
+      "support_components": ["virtual-camera-bridge"],
+      "deliverables": ["artifact:image"]
+    }
+  }
+}

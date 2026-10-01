@@ -145,7 +145,7 @@ export async function issueMissionForDiscussion(
       `[discussion] mission_controller did not start a mission for ${room.id}: ${error instanceof Error ? error.message : String(error)}`
     );
     throw new DiscussionUserError(
-      'mission_controller could not start the mission. Check that onboarding is complete (pnpm onboard) and see the server log.',
+      'mission_controller could not start the mission. Check that onboarding is complete (pnpm onboarding) and see the server log.',
       { cause: error }
     );
   }

@@ -1,6 +1,6 @@
 /**
  * WI-07 (docs/developer/improvement-plans-2026-08/WORK_INVENTORY_PLAN_2026-09-22.ja.md
- * §3/§6): `pnpm inventory` — the governed CLI over the work-inventory.v1
+ * §3/§6): `pnpm work:inventory` — the governed CLI over the work-inventory.v1
  * record type and its decomposition / harvest / consent / observation /
  * scoring / promotion modules.
  *
@@ -50,6 +50,9 @@ import {
 import { runLearn, runPromote } from './lib/work-inventory-cli-promotion.js';
 import {
   governed,
+  governedTenant,
+  optionalDecidedBy,
+  resolveScope,
   resolveRootDir,
   WorkInventoryCliUsageError,
 } from './lib/work-inventory-cli-shared.js';
@@ -94,7 +97,7 @@ function requirePositional(value: string | undefined, usage: string): string {
 }
 
 /**
- * Testable core of `pnpm inventory`. `options.rootDir` (also accepted as an
+ * Testable core of `pnpm work:inventory`. `options.rootDir` (also accepted as an
  * undocumented `--root-dir <path>` argv flag) isolates storage for hermetic
  * tests without an env var; production runs always default to the real repo
  * root via the core modules' own `pathResolver.rootDir()` fallback.
@@ -248,7 +251,19 @@ export async function run(argv: string[], options: WorkInventoryRunOptions = {})
       return;
     }
     case 'learn': {
-      const result = governed(() => runLearn(argv, { ...coreOptions, dryRun, now }));
+      const scope = resolveScope(argv);
+      if (scope.tenant_slug && coreOptions.rootDir) {
+        throw new WorkInventoryCliUsageError(
+          'inventory learn --tenant cannot use an isolated root override; authorization and learning records must use the configured repository root'
+        );
+      }
+      const run = () => runLearn(argv, { ...coreOptions, dryRun, now });
+      const result = scope.tenant_slug
+        ? governedTenant(scope.tenant_slug, run, {
+            ...(coreOptions.rootDir ? { rootDir: coreOptions.rootDir } : {}),
+            decidedBy: optionalDecidedBy(argv),
+          })
+        : governed(run);
       emit(
         result,
         [
@@ -273,7 +288,7 @@ export async function run(argv: string[], options: WorkInventoryRunOptions = {})
 }
 
 export const runWorkInventory = defineScript({
-  name: 'inventory',
+  name: 'work:inventory',
   flags: ['json', 'dry-run', 'quiet'],
   async run(context) {
     try {

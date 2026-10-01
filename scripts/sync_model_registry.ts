@@ -89,6 +89,7 @@ const outputPaths = [
 
 export const runSyncModelRegistry = defineGenerator({
   id: 'model-registry',
+  flags: ['--bootstrap'],
   outputs: outputPaths,
   normalize: (content) =>
     JSON.stringify(parseSafeJsonObjectInput(content, 'model registry generated output')),

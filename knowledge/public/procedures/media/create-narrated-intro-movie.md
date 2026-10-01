@@ -13,11 +13,11 @@ Execute a single top-level scenario that:
 
 - **Actuator**: `video-composition-actuator`
 - **Schemas**:
-  - [`narrated-video-brief.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/narrated-video-brief.schema.json)
-  - [`video-content-brief.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/video-content-brief.schema.json)
+  - [`narrated-video-brief.schema.json`](../../../product/schemas/narrated-video-brief.schema.json)
+  - [`video-content-brief.schema.json`](../../../product/schemas/video-content-brief.schema.json)
   - [`video-composition-action.schema.json`](/Users/famao/kyberion/schemas/video-composition-action.schema.json)
 - **Procedure**:
-  - [`compose-video-from-adf.md`](/Users/famao/kyberion/knowledge/public/procedures/media/compose-video-from-adf.md)
+  - [`compose-video-from-adf.md`](compose-video-from-adf.md)
 
 ## 3. Contract Shape
 
@@ -39,7 +39,7 @@ Optional:
 
 Example input:
 
-- [`create-kyberion-intro-movie.json`](/Users/famao/kyberion/libs/actuators/video-composition-actuator/examples/create-kyberion-intro-movie.json)
+- [`create-kyberion-intro-movie.json`](../../../../libs/actuators/video-composition-actuator/examples/create-kyberion-intro-movie.json)
 
 Run:
 
@@ -88,7 +88,7 @@ This is the composed-video equivalent of HyperFrames' `writer`,
 
 When backend rendering is enabled and `await_completion` is omitted, `execution.status` will default to `queued`.
 When you want a longer render to survive operator attention shifts, use the background pattern from
-[`compose-video-from-adf.md`](/Users/famao/kyberion/knowledge/public/procedures/media/compose-video-from-adf.md):
+[`compose-video-from-adf.md`](compose-video-from-adf.md):
 
 - submit with `await_completion: false`
 - persist the returned `job_id` and `job_ticket_path`
@@ -96,4 +96,4 @@ When you want a longer render to survive operator attention shifts, use the back
 
 For the end-to-end operator workflow, including brief capture, narration, submit, collect, and validation, use:
 
-- [`produce-narrated-video.md`](/Users/famao/kyberion/knowledge/public/procedures/media/produce-narrated-video.md)
+- [`produce-narrated-video.md`](produce-narrated-video.md)

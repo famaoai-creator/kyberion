@@ -480,6 +480,7 @@ async function renderImportDesignMdCatalog(context: ScriptContext): Promise<Gene
 
 export const runImportDesignMdCatalog = defineGenerator({
   id: 'design-md-catalog',
+  flags: ['--source', '--readme'],
   outputs: [THEMES_OUTPUT, SYSTEMS_OUTPUT, INDEX_OUTPUT],
   normalize: normalizeGeneratedContent,
   render: renderImportDesignMdCatalog,

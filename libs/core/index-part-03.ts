@@ -91,6 +91,10 @@ export {
 
 export {
   PPTX_PALETTE,
+  resolvePptxPalette,
+  createPptxLayoutKit,
+  type PptxLayoutKit,
+  type PptxPalette,
   textElement,
   shapeElement,
   lineElement,

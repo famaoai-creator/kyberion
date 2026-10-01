@@ -7,6 +7,7 @@ import {
 } from '@agent/core/deliverable-inbox';
 import { withExecutionContext } from '@agent/core/authority';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
+import { conciergeText, resolveConciergeLocale } from '../../../../lib/i18n';
 import { readRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
 import {
@@ -23,11 +24,13 @@ const ALLOWED_STATUSES: DeliverableInboxStatus[] = [
   'changes_requested',
 ];
 
+function requestLocale(req: NextRequest) {
+  return resolveConciergeLocale(req.headers.get('accept-language') ?? undefined);
+}
+
 function isAllowedStatus(value: unknown): value is DeliverableInboxStatus {
   return typeof value === 'string' && ALLOWED_STATUSES.includes(value as DeliverableInboxStatus);
 }
-
-const ENTRY_NOT_FOUND = '該当する成果物が見つかりません';
 
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const denied = requireConciergeMutationAccess(req);
@@ -46,7 +49,12 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     const status = isAllowedStatus(body?.status) ? body.status : null;
     if (!id || !status) {
       return NextResponse.json(
-        { ok: false, error: `id と status (${ALLOWED_STATUSES.join('|')}) が必要です` },
+        {
+          ok: false,
+          error: conciergeText('api.id_status_required', requestLocale(req), {
+            statuses: ALLOWED_STATUSES.join('|'),
+          }),
+        },
         { status: 400 }
       );
     }
@@ -56,7 +64,10 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       listInboxEntries({}).find((item) => item.entry_id === id)
     );
     if (!entry) {
-      return NextResponse.json({ ok: false, error: ENTRY_NOT_FOUND }, { status: 404 });
+      return NextResponse.json(
+        { ok: false, error: conciergeText('api.outcome_not_found', requestLocale(req)) },
+        { status: 404 }
+      );
     }
     const decisionDenied = conciergeDecisionDenied(resolved.context, entry.tenant_slug);
     if (decisionDenied) return decisionDenied;
@@ -75,7 +86,10 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
             reviewedBy: decidedBy?.id ?? 'concierge',
           });
     if (!updated) {
-      return NextResponse.json({ ok: false, error: ENTRY_NOT_FOUND }, { status: 404 });
+      return NextResponse.json(
+        { ok: false, error: conciergeText('api.outcome_not_found', requestLocale(req)) },
+        { status: 404 }
+      );
     }
     return NextResponse.json({ ok: true, entry: updated });
   } catch (error) {

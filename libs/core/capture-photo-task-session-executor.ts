@@ -1,3 +1,4 @@
+import { t } from './t.js';
 import { pathResolver } from './path-resolver.js';
 import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath } from './secure-io.js';
@@ -81,9 +82,11 @@ export async function executeCapturePhotoTaskSession(
   });
 
   const summaryParts = [
-    '写真を取得しました。',
-    capture.selected_camera ? `使用カメラ: ${capture.selected_camera}` : '',
-    `保存先: ${outputPath}`,
+    t('surface:photo_captured'),
+    capture.selected_camera
+      ? t('surface:photo_camera_used', { camera: capture.selected_camera })
+      : '',
+    t('surface:photo_saved_to', { path: outputPath }),
   ].filter(Boolean);
 
   const updated = updateTaskSession(params.session.session_id, {
