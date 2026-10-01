@@ -1,5 +1,4 @@
 /** Domain barrel — public surface for libs/core/meeting */
-export * from './booking-preference-profile.js';
 export * from './calendar-provider-bridge.js';
 export * from './calendar-slot-planner.js';
 export * from './calendar-workflow.js';

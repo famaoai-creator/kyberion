@@ -270,12 +270,6 @@
       "note": "mission-less calibration probe output; mission-bound runs use mission evidence"
     },
     {
-      "file": "libs/core/spill-result.ts",
-      "count": 1,
-      "classification": "legit-tmp",
-      "note": "bounded secure spill for oversized text results"
-    },
-    {
       "file": "libs/core/media/docx-utils.ts",
       "count": 1,
       "classification": "legit-tmp",

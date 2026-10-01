@@ -134,8 +134,6 @@ export * from './chain-integrity.js';
 
 export * as classifier from './classifier.js';
 
-export * from './knowledge/knowledge-provider.js';
-
 export {
   buildKnowledgeIndex,
   buildScopedIndex,
@@ -180,8 +178,6 @@ export {
   verifyPeerMessage,
 } from './mesh/peer-messaging.js';
 
-export { buildPeerBackupArtifactReferenceNotification } from './mesh/peer-backup-reference.js';
-
 export {
   createPeerRuntimeRecoveryApprovalRequest,
   resumePeerRuntimeFromQuarantine,
@@ -193,11 +189,6 @@ export type {
   PeerRuntimeRecoveryResumeInput,
   PeerRuntimeRecoveryResult,
 } from './mesh/peer-runtime-recovery.js';
-
-export type {
-  BuildPeerBackupArtifactReferenceInput,
-  PeerBackupArtifactReference,
-} from './mesh/peer-backup-reference.js';
 
 export type {
   BuildPeerMessageInput,
@@ -268,15 +259,6 @@ export type {
 } from './mesh/mesh-hub-peer-messaging-adapter.js';
 
 export type { MeshRequest } from './mesh/mesh-hub-contract.js';
-
-export { routeMeshRequest } from './mesh/mesh-router.js';
-
-export type {
-  MeshRouteCandidate,
-  MeshRouteDecision,
-  MeshRouteExclusion,
-  MeshRouteOptions,
-} from './mesh/mesh-router.js';
 
 export { formatMeshHubInspectionReport, inspectMeshHub } from './mesh/mesh-hub-inspection.js';
 

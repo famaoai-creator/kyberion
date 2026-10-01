@@ -49,6 +49,7 @@ import {
   type TaskModelHint,
 } from '../reasoning/reasoning-model-routing.js';
 import { routeTaskWithJudgment } from '../task/task-routing-judgment.js';
+import { ensureJudgmentBackendsRegistered } from '../reasoning/judgment-provider-bootstrap.js';
 import { type TaskResultBlock } from '../surface/channel-surface-types.js';
 import { type OperatorInteractionPacket } from '../contracts/operator-interaction-packet.js';
 import { HarnessSubagentDispatcher } from '../agent/agent-dispatch.js';
@@ -691,8 +692,11 @@ export function getTaskModelHint(
  * that was wrong — which is why this is the one judgment call site allowed to
  * act without a calibration fit. See `task-routing-judgment.ts`.
  *
- * Inert until a judgment provider is registered, which nothing does by
- * default; `KYBERION_TASK_ROUTING_JUDGMENT=off` turns it off even then.
+ * Registers the judgment providers on first use
+ * (`ensureJudgmentBackendsRegistered`): the built-in floor always, and the
+ * opt-in providers listed in `KYBERION_JUDGMENT_PROVIDERS`. The floor cannot
+ * answer the tier question, so this stays inert until an operator opts a
+ * provider in; `KYBERION_TASK_ROUTING_JUDGMENT=off` turns it off even then.
  */
 export async function getTaskModelHintAssisted(
   item: WorkItem,
@@ -710,6 +714,7 @@ export async function getTaskModelHintAssisted(
   if (getRegisteredEnvText('KYBERION_TASK_ROUTING_JUDGMENT') === 'off') {
     return { hint: baseline, baseline, downgraded: false };
   }
+  ensureJudgmentBackendsRegistered();
   const result = await routeTaskWithJudgment({
     task: [item.title, item.description].filter(Boolean).join('\n'),
     baseline,

@@ -72,11 +72,9 @@ export {
 } from './channel-surface.js';
 export * from './operator-home-summary.js';
 export * from './operator-identity.js';
-export * from './operator-learning.js';
 export * from './operator-notifications.js';
 export * from './operator-provider-preferences.js';
 export * from './surface-access-policy.js';
-export * from './surface-action-routing.js';
 export * from './surface-agent-catalog.js';
 export type {
   SurfaceApproval,
