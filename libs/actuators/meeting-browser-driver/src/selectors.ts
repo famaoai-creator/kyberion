@@ -96,18 +96,43 @@ export function inMeetingSelectorsForPlatform(
   return selectors;
 }
 
+/**
+ * Deprecated constants resolve on first property access, not at module import,
+ * so importing the driver never loads the meeting platform registry eagerly.
+ */
+function lazySelectors<T extends object>(resolve: () => T): T {
+  return new Proxy({} as T, {
+    get: (_target, key) => Reflect.get(resolve(), key),
+    has: (_target, key) => Reflect.has(resolve(), key),
+    ownKeys: () => Reflect.ownKeys(resolve()),
+    getOwnPropertyDescriptor: (_target, key) => {
+      const descriptor = Reflect.getOwnPropertyDescriptor(resolve(), key);
+      return descriptor ? { ...descriptor, configurable: true } : undefined;
+    },
+  });
+}
+
 /** @deprecated Per-platform constants kept for compatibility; use selectorsForPlatform(). */
-export const MEET_SELECTORS: MeetingPreJoinSelectors = selectorsForPlatform('meet');
+export const MEET_SELECTORS: MeetingPreJoinSelectors = lazySelectors(() =>
+  selectorsForPlatform('meet')
+);
 /** @deprecated Use selectorsForPlatform('zoom'). */
-export const ZOOM_SELECTORS: MeetingPreJoinSelectors = selectorsForPlatform('zoom');
+export const ZOOM_SELECTORS: MeetingPreJoinSelectors = lazySelectors(() =>
+  selectorsForPlatform('zoom')
+);
 /** @deprecated Use selectorsForPlatform('teams'). */
-export const TEAMS_SELECTORS: MeetingPreJoinSelectors = selectorsForPlatform('teams');
+export const TEAMS_SELECTORS: MeetingPreJoinSelectors = lazySelectors(() =>
+  selectorsForPlatform('teams')
+);
 /** @deprecated Use inMeetingSelectorsForPlatform('meet'). */
-export const MEET_IN_MEETING_SELECTORS: MeetingInMeetingSelectors =
-  inMeetingSelectorsForPlatform('meet');
+export const MEET_IN_MEETING_SELECTORS: MeetingInMeetingSelectors = lazySelectors(() =>
+  inMeetingSelectorsForPlatform('meet')
+);
 /** @deprecated Use inMeetingSelectorsForPlatform('zoom'). */
-export const ZOOM_IN_MEETING_SELECTORS: MeetingInMeetingSelectors =
-  inMeetingSelectorsForPlatform('zoom');
+export const ZOOM_IN_MEETING_SELECTORS: MeetingInMeetingSelectors = lazySelectors(() =>
+  inMeetingSelectorsForPlatform('zoom')
+);
 /** @deprecated Use inMeetingSelectorsForPlatform('teams'). */
-export const TEAMS_IN_MEETING_SELECTORS: MeetingInMeetingSelectors =
-  inMeetingSelectorsForPlatform('teams');
+export const TEAMS_IN_MEETING_SELECTORS: MeetingInMeetingSelectors = lazySelectors(() =>
+  inMeetingSelectorsForPlatform('teams')
+);

@@ -3,7 +3,8 @@ import * as path from 'node:path';
 import * as net from 'node:net';
 import { pathResolver } from '../path-resolver.js';
 import { compileSchema } from '../foundation/ajv.js';
-import { parseSafeJsonObjectValue } from '../foundation/safe-json.js';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
+import { nowIso } from '../foundation/time.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { readTextFile } from '../foundation/text.js';
 import { createLogger } from '../logger.js';
@@ -106,6 +107,11 @@ export function readSurfaceLogTail(logPath: string, maxLines = 20): string[] {
 const DEFAULT_MANIFEST_PATH = 'knowledge/product/governance/active-surfaces.json';
 const DEFAULT_MANIFEST_DIR = 'knowledge/product/governance/surfaces';
 const STATE_PATH = pathResolver.shared('runtime/surfaces/state.json');
+/**
+ * Operator enable/disable state (`pnpm surfaces enable|disable`). Untracked
+ * runtime overlay on top of the committed registry, which stays the default.
+ */
+const ENABLEMENT_OVERRIDES_PATH = pathResolver.shared('runtime/surfaces/overrides.json');
 const LOG_DIR = pathResolver.shared('logs/surfaces');
 let surfaceManifestValidateFn: ValidateFunction | null = null;
 
@@ -307,10 +313,132 @@ function readSurfaceManifestDirectory(
   return { version: 1, surfaces };
 }
 
-export function loadSurfaceManifest(manifestPath = surfaceManifestPath()): SurfaceRuntimeManifest {
+export interface SurfaceEnablementOverride {
+  enabled: boolean;
+  updatedAt: string;
+}
+
+export interface SurfaceEnablementOverrides {
+  version: 1;
+  surfaces: Record<string, SurfaceEnablementOverride>;
+}
+
+export function surfaceEnablementOverridesPath(): string {
+  return assertSafeRepositoryPath(ENABLEMENT_OVERRIDES_PATH, { allowMissingLeaf: true });
+}
+
+function parseSurfaceEnablementOverrides(value: unknown): SurfaceEnablementOverrides {
+  const root = parseSafeJsonObjectValue(value, 'surface enablement overrides');
+  if (root.version !== 1) throw new Error('surface enablement overrides version is invalid');
+  const surfaces = parseSafeJsonObjectValue(root.surfaces, 'surface enablement overrides.surfaces');
+  const parsed: Record<string, SurfaceEnablementOverride> = {};
+  for (const [id, candidate] of Object.entries(surfaces)) {
+    assertSurfaceId(id);
+    const entry = parseSafeJsonObjectValue(candidate, `surface enablement overrides.${id}`);
+    if (typeof entry.enabled !== 'boolean') {
+      throw new Error(`surface enablement overrides.${id}.enabled must be a boolean`);
+    }
+    parsed[id] = {
+      enabled: entry.enabled,
+      updatedAt: typeof entry.updatedAt === 'string' ? entry.updatedAt : '',
+    };
+  }
+  return { version: 1, surfaces: parsed };
+}
+
+/**
+ * Load the operator enablement overlay. A missing file means "no overrides";
+ * an unreadable or invalid file is ignored with a warning so the committed
+ * registry defaults apply.
+ */
+export function loadSurfaceEnablementOverrides(
+  overridesPath = surfaceEnablementOverridesPath()
+): SurfaceEnablementOverrides {
+  const safePath = assertSafeRepositoryPath(pathResolver.resolve(overridesPath), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(safePath)) return { version: 1, surfaces: {} };
+  try {
+    return parseSurfaceEnablementOverrides(
+      parseSafeJsonInput(readTextFile(safePath), 'surface enablement overrides')
+    );
+  } catch (error) {
+    logger.warn(
+      `surface enablement overrides ignored — ${error instanceof Error ? error.message : String(error)} | fix or delete the file | ${safePath}`
+    );
+    return { version: 1, surfaces: {} };
+  }
+}
+
+/**
+ * Record an operator enable/disable decision in the untracked overlay. When
+ * the decision equals the committed default the override is dropped, so the
+ * overlay only ever holds real deviations from the registry.
+ */
+export function setSurfaceEnablementOverride(
+  surfaceId: string,
+  enabled: boolean,
+  committedEnabled: boolean,
+  overridesPath = surfaceEnablementOverridesPath()
+): SurfaceEnablementOverrides {
+  const safePath = assertSafeRepositoryPath(pathResolver.resolve(overridesPath), {
+    allowMissingLeaf: true,
+  });
+  const overrides = loadSurfaceEnablementOverrides(safePath);
+  const id = assertSurfaceId(surfaceId);
+  if (enabled === committedEnabled) {
+    delete overrides.surfaces[id];
+  } else {
+    overrides.surfaces[id] = { enabled, updatedAt: nowIso() };
+  }
+  ensureParentDir(safePath);
+  safeWriteFile(safePath, JSON.stringify(overrides, null, 2));
+  return overrides;
+}
+
+/** Merge the operator overlay onto a manifest (pure; the input is not mutated). */
+export function applySurfaceEnablementOverrides(
+  manifest: SurfaceRuntimeManifest,
+  overrides: SurfaceEnablementOverrides
+): SurfaceRuntimeManifest {
+  return {
+    ...manifest,
+    surfaces: manifest.surfaces.map((surface) => {
+      const override = overrides.surfaces[surface.id];
+      return override ? { ...surface, enabled: override.enabled } : surface;
+    }),
+  };
+}
+
+export interface LoadSurfaceManifestOptions {
+  /**
+   * Merge the operator enablement overlay. Defaults to true for the canonical
+   * registry and false for any other manifest path. Pass false when the result
+   * is written back (register/unregister) so overrides never reach the
+   * committed registry.
+   */
+  applyOverrides?: boolean;
+  overridesPath?: string;
+}
+
+export function loadSurfaceManifest(
+  manifestPath = surfaceManifestPath(),
+  options: LoadSurfaceManifestOptions = {}
+): SurfaceRuntimeManifest {
   const resolvedManifestPath = assertSafeRepositoryPath(pathResolver.resolve(manifestPath), {
     allowMissingLeaf: true,
   });
+  const applyOverrides = options.applyOverrides ?? resolvedManifestPath === surfaceManifestPath();
+  const manifest = loadCommittedSurfaceManifest(resolvedManifestPath);
+  return applyOverrides
+    ? applySurfaceEnablementOverrides(
+        manifest,
+        loadSurfaceEnablementOverrides(options.overridesPath)
+      )
+    : manifest;
+}
+
+function loadCommittedSurfaceManifest(resolvedManifestPath: string): SurfaceRuntimeManifest {
   if (
     resolvedManifestPath === surfaceManifestPath() &&
     safeExistsSync(surfaceManifestDirectoryPath())
