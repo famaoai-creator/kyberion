@@ -8,6 +8,8 @@ export type SetupConnection = {
   owner_kind: 'person' | 'organization' | 'operator';
   owner_ref?: string;
   group: 'mine' | 'organization';
+  /** Derived from the record only (no secret read, no service contacted). Older payloads omit it. */
+  readiness?: 'ready' | 'needs_credential';
 };
 export type SetupDiagnostic = {
   id: string;
@@ -215,7 +217,10 @@ function parseSetup(value: unknown): Setup | undefined {
               entry.owner_kind !== 'organization' &&
               entry.owner_kind !== 'operator') ||
             (entry.group !== 'mine' && entry.group !== 'organization') ||
-            !optionalString(entry, 'owner_ref')
+            !optionalString(entry, 'owner_ref') ||
+            (entry.readiness !== undefined &&
+              entry.readiness !== 'ready' &&
+              entry.readiness !== 'needs_credential')
         ))) ||
     !Array.isArray(value.diagnostics) ||
     value.diagnostics.some(

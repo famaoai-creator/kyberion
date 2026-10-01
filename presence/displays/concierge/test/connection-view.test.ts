@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { groupConnections, visibleConnections } from '../src/lib/connection-view';
+import {
+  connectionReadiness,
+  groupConnections,
+  visibleConnections,
+} from '../src/lib/connection-view';
 
 const records = [
   {
@@ -73,5 +77,39 @@ describe('groupConnections', () => {
     const grouped = groupConnections(items);
     expect(grouped.mine.map((c) => c.binding_id)).toEqual(['b-legacy', 'b-mail']);
     expect(grouped.organizations.map((o) => o.tenant_slug)).toEqual(['acme', 'beta']);
+  });
+});
+
+describe('connectionReadiness', () => {
+  it('flags a stored-credential connection that references no credential, and nothing else', () => {
+    expect(connectionReadiness({ auth_mode: 'secret-guard', secret_refs: [] })).toBe(
+      'needs_credential'
+    );
+    expect(connectionReadiness({ auth_mode: 'secret-guard', secret_refs: [' '] })).toBe(
+      'needs_credential'
+    );
+    expect(connectionReadiness({ auth_mode: 'secret-guard' })).toBe('needs_credential');
+    expect(
+      connectionReadiness({ auth_mode: 'secret-guard', secret_refs: ['vault://b/x/token'] })
+    ).toBe('ready');
+    expect(connectionReadiness({ auth_mode: 'session', secret_refs: [] })).toBe('ready');
+    expect(connectionReadiness({})).toBe('ready');
+  });
+
+  it('is carried on each visible connection', () => {
+    const items = visibleConnections(
+      [
+        {
+          binding_id: 'b-x',
+          service_id: 'slack',
+          owner_kind: 'person',
+          owner_ref: 'user:alice',
+          auth_mode: 'secret-guard',
+          secret_refs: [],
+        },
+      ],
+      { loopback: false, memberId: 'alice', tenantSlugs: [] }
+    );
+    expect(items[0].readiness).toBe('needs_credential');
   });
 });

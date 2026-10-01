@@ -161,7 +161,10 @@ function ConnectionsByOwner({ t, setup }: { t: SettingsTranslate; setup: Setup }
               : t('setup.connection_owner_person')
           }
           tone={item.group === 'organization' ? 'info' : 'neutral'}
-        />
+        />{' '}
+        {item.readiness === 'needs_credential' ? (
+          <Badge label={t('setup.connection_needs_credential')} tone="warning" />
+        ) : null}
       </p>
     ));
   return (

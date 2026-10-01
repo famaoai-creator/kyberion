@@ -10966,6 +10966,11 @@
         "ja": "{tenant} の連携",
         "qps-ploc": "⟦{tenant} ƈőññėƈŧïőñş ŀőřėɱ ⟧"
       },
+      "setup.connection_needs_credential": {
+        "en": "Credential not set",
+        "ja": "認証情報が未設定",
+        "qps-ploc": "⟦Ƈřėḓėñŧïȧŀ ñőŧ şėŧ ŀőřėɱ⟧"
+      },
       "setup.connection_owner_person": {
         "en": "Yours",
         "ja": "あなたの",
