@@ -11,6 +11,7 @@ const writes = vi.hoisted(() => ({
 
 vi.mock('../../../lib/api-guard', () => ({ requireConciergeMutationAccess: guard }));
 vi.mock('../../../lib/viewer-context', () => ({ resolveConciergeViewer: vi.fn() }));
+vi.mock('../../../lib/front-desk-member', () => ({ resolveConciergeDecidedBy: vi.fn(() => null) }));
 vi.mock('../../../lib/i18n', () => ({
   conciergeText: vi.fn((key: string) => key),
   resolveConciergeLocale: vi.fn(() => 'en'),
