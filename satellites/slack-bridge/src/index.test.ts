@@ -465,7 +465,7 @@ describe('slack team channel', () => {
       actorId: 'U-member',
       channelPolicy,
     });
-    expect(refused).toContain('権限がありません');
+    expect(refused).toBe(t('bridge:approval_not_authorized', undefined, resolveOperatorLocale()));
     expect(loadApprovalRequest('autonomy', record.id)).toMatchObject({ status: 'pending' });
 
     resolveSlackApprovalText({
