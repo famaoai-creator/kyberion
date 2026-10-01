@@ -125,7 +125,7 @@ jobs:
       - name: Run documented first-win sequence
         run: |
           pnpm env:bootstrap --manifest kyberion-toolchain
-          pnpm doctor
+          pnpm kyberion doctor
           pnpm pipeline --input pipelines/verify-session.json
           test -s active/shared/tmp/first-win-session.png
 

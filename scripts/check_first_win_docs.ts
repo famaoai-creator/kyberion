@@ -13,7 +13,7 @@ export const FIRST_WIN_COMMANDS = [
   'pnpm install',
   'pnpm build',
   'pnpm env:bootstrap --manifest kyberion-toolchain',
-  'pnpm doctor',
+  'pnpm kyberion doctor',
   'pnpm pipeline --input pipelines/verify-session.json',
 ] as const;
 
