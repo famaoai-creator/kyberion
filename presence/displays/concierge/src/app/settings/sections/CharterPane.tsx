@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { formatCurrency } from '@agent/core/format';
 import { Button, Select, SettingRow, SettingsGroup, TextField } from '@agent/shared-ui';
 import {
   DEFAULT_CHARTER_DRAFT,
@@ -143,8 +142,13 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
   if (tenants.length === 0) return null;
   const stopped = current ? isManuallyStopped(current) : false;
   const currency = current?.charter?.money.currency ?? 'JPY';
-  const yen = (value: number) =>
-    formatCurrency(value, { locale, currency, maximumFractionDigits: 0 });
+  // Client component: `@agent/core/format` pulls node-only modules into the bundle, so use Intl with an explicit locale.
+  const money = new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0,
+  });
+  const yen = (value: number) => money.format(value);
   const onOff = (value: boolean) => (value ? 'on' : 'off');
   const yesNo = [
     { value: 'off', label: t('setup.charter_off_option') },
