@@ -8,6 +8,8 @@ This glossary translates Kyberion's ecosystem language into practical terms for 
 - **Contributor vocabulary**: the canonical terms most contributors encounter while changing the repository.
 - **FDE full glossary**: the complete reference below, including governance, tenancy, runtime, and delivery terms.
 
+Entries added for the surface layer are tagged **(first-win)** — meet them in the first hour — or **(advanced)** — needed only when you operate or change surfaces. For the five ideas to learn before anything else, read [CORE_CONCEPTS](./CORE_CONCEPTS.md).
+
 ### First-win vocabulary
 
 Intent, Plan, Result, Mission, Task Session, and Artifact are the six terms to learn first.
@@ -182,6 +184,64 @@ A short-lived, audience-bound authority issued to one NHI for one task (NI-04, `
 ### NHI offboarding
 
 Retiring the identities that belonged to a scope when that scope closes (NI-05, `libs/core/nhi-lifecycle-governance.ts`): mission finish/archive retires the mission's identities, tenant/project offboarding retires theirs. The inverse check — a non-retired identity whose scope no longer exists — is an _orphan NHI_, surfaced by baseline-check (layer L9 → `needs_attention`) and in the operator packet's NHI ledger. OWASP ranks improper offboarding as the #1 non-human identity risk, which is why this is a lifecycle hook rather than a periodic cleanup.
+
+## Surfaces and channels
+
+One canonical term per layer; the aliases are names you will meet in code, docs, or the UI, and all of them mean the canonical term. Surface roles are defined in `knowledge/product/governance/surface-roles.json`; the operator map is [SURFACES](./SURFACES.md).
+
+| Layer                                           | Canonical term | Aliases you may see                                     | Level     |
+| ----------------------------------------------- | -------------- | ------------------------------------------------------- | --------- |
+| What a human meets                              | **Surface**    | entry point, 入口, screen                               | first-win |
+| A web UI surface                                | **Display**    | UI surface, headless surface, `presence/displays/*` app | advanced  |
+| The runtime that hosts surfaces                 | **Presence**   | `presence/` layer                                       | advanced  |
+| An external-facing process outside core         | **Satellite**  | external bridge, `satellites/*`                         | advanced  |
+| Chat-service connection                         | **Bridge**     | chat bridge, Slack/Telegram/Discord/iMessage bridge     | advanced  |
+| The delivery/ingress contract bridges implement | **Gateway**    | surface gateway, channel gateway                        | advanced  |
+| A named conversation/delivery route             | **Channel**    | surface channel, outbox channel                         | advanced  |
+| A local capture screen                          | **Pad**        | capture pad, Capture desk                               | first-win |
+| The CEO-secretary surface                       | **Concierge**  | 秘書室                                                  | first-win |
+| The shared 5-verb menu rail                     | **Front Desk** | フロントデスク, front-desk nav                          | first-win |
+| A runtime identity overlay                      | **Stance**     | customer overlay, `customer/{slug}/`                    | advanced  |
+
+### Surface
+
+**(first-win)** A human-facing entrance to Kyberion, each with exactly one role: Chronos Mirror (control tower), Concierge (decide), Presence Studio (companion), Operator Surface (audit monitor), Computer Surface (hands-on mirror), the terminal home / HUD, the chat bridges, and the local capture pads. Surfaces never own missions; they read and write through governed APIs and the Surface Outbox. Role badges and the map live in [SURFACES](./SURFACES.md).
+
+### Display
+
+**(advanced)** A surface that is a web UI served from `presence/displays/<name>/` (concierge, presence-studio, chronos-mirror-v2, operator-surface, computer-surface, terminal-hud). All displays render through the shared `kyberion-base` A2UI catalog. "Display" names the implementation form; "surface" names the role it plays.
+
+### Presence
+
+**(advanced)** The `presence/` runtime layer: `displays/` (the UI surfaces above), `bridge/` (the nexus daemon and channel registry that route stimuli between surfaces and the core), and `sensors/`. It is where Kyberion is "present" to a human; it is not a user-visible product name.
+
+### Satellite
+
+**(advanced)** A component under `satellites/` that runs outside the core process and talks to an external system or native API: the chat bridges (`slack-bridge`, `telegram-bridge`, `discord-bridge`, `imessage-bridge`), `voice-hub`, and the native helpers `fluid-audio-cli` and `macos-camera`.
+
+### Bridge
+
+**(advanced)** A satellite that connects one external chat service to Kyberion. It normalizes inbound events into governed artifacts and renders outbound updates from the Surface Outbox. A bridge is the concrete process; the contract it implements is the **Gateway**, and the route a message travels on is a **Channel**.
+
+### Channel
+
+**(advanced)** A named delivery route for one surface or chat conversation, backed by a per-surface outbox under `active/shared/coordination/channels/<surface>/outbox/` and declared in `presence/bridge/channel-registry.json`. See [Channel Outbox](#channel-outbox) and [Gateway](#gateway).
+
+### Pad
+
+**(first-win)** A localhost-only (127.0.0.1) capture screen for something already on your desk — a sketch, meeting notes, a screenshot, a file, the clipboard, today's TODO. `pnpm pads` serves all of them from one **Capture desk** (port 8160); each record is stored in the server-derived tenant/tier partition and never starts a mission or sends anything on its own. The legacy per-pad ports (8147…) apply only when a single pad is started directly.
+
+### Concierge
+
+**(first-win)** The CEO-secretary surface (秘書室, `presence/displays/concierge`, port 3050): requests, approvals, outcomes, exceptions, plus `/setup` onboarding. It answers "what do I need to decide now?" and hosts the 決める and 設定 items of the Front Desk.
+
+### Front Desk
+
+**(first-win)** The shared menu rail rendered by both Concierge and Presence Studio, built from `libs/core/front-desk-nav.ts`: five human verbs — ホーム (home), 頼む (ask), 決める (decide), 進み具合 (progress), 設定 (settings). One implementation, two hosting surfaces, so a person sees one menu.
+
+### Stance (vs tenant customer)
+
+**(advanced)** A **stance** is the `customer/{slug}/` overlay selected by `KYBERION_CUSTOMER` — "which hat am I wearing" — layered over `knowledge/personal/`. It is runtime configuration, **not** a scope in the `tenant → organization → project → mission → task` chain. A **tenant's customers** are the end customers a tenant delivers to; they live inside that tenant's own boundary (`knowledge/confidential/{tenant-slug}/`), never under `customer/`. See [Stance (Customer Overlay)](#stance-customer-overlay) and [Tenant's Customers](#tenants-customers).
 
 ## Lifecycle terms
 

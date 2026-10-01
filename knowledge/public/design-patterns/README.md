@@ -4,28 +4,28 @@
 
 ## Pattern Catalog
 
-| カテゴリ | パターン ID | 対象 | エンジン |
-| :--- | :--- | :--- | :--- |
-| **Presentation** | `KYBERION-MARKETING-DECK` | クライアント・投資家 | pptx |
-| **Presentation** | `PPTX-ROADMAP-01` | ステークホルダー・チーム | pptx |
-| **Presentation** | `PPTX-VISUAL-ROADMAP-02` | ステークホルダー・チーム | pptx |
-| **Presentation** | `PPTX-EXEC-BRIEF-01` | 経営層・ボード | pptx |
-| **Presentation** | `PPTX-INVESTOR-PITCH-01` | 投資家・パートナー | pptx |
-| **Presentation** | `PPTX-QBR-01` | 部門責任者・スポンサー | pptx |
-| **Presentation** | `PPTX-CLIENT-PROPOSAL-01` | クライアント・調達 | pptx |
-| **Presentation** | `PPTX-CASE-STUDY-01` | 営業・顧客成功・経営層 | pptx |
-| **Presentation** | `PPTX-WORKSHOP-01` | ファシリテーター・プロジェクトチーム | pptx |
-| **Presentation** | `STRAT-EXE-01` | 経営層 | puppeteer |
-| **Presentation** | `REL-PROP-01` | クライアント | puppeteer |
-| **Presentation** | `STRAT-ROAD-01` | ボードメンバー | mermaid |
-| **Spreadsheet** | `XLSX-EXEC-DASHBOARD-01` | 経営層・ボード | xlsx |
-| **Spreadsheet** | `XLSX-OPS-TRACKER-01` | オペレーター・PM | xlsx |
-| **Spreadsheet** | `XLSX-QBR-WORKBOOK-01` | 部門責任者・スポンサー | xlsx |
-| **Spreadsheet** | `XLSX-BUDGET-ACTUAL-01` | 財務・経営 | xlsx |
-| **Report** | `TECH-RCA-01` | エンジニアリング | mermaid |
-| **Report** | `ANA-PERF-01` | アナリスト | chartjs |
-| **Infographic** | `INFO-PROCESS-01` | 社内オペレーション | d2 |
-| **Infographic** | `TECH-ARCH-01` | アーキテクト | d2 |
+| カテゴリ         | パターン ID               | 対象                                 | エンジン  |
+| :--------------- | :------------------------ | :----------------------------------- | :-------- |
+| **Presentation** | `KYBERION-MARKETING-DECK` | クライアント・投資家                 | pptx      |
+| **Presentation** | `PPTX-ROADMAP-01`         | ステークホルダー・チーム             | pptx      |
+| **Presentation** | `PPTX-VISUAL-ROADMAP-02`  | ステークホルダー・チーム             | pptx      |
+| **Presentation** | `PPTX-EXEC-BRIEF-01`      | 経営層・ボード                       | pptx      |
+| **Presentation** | `PPTX-INVESTOR-PITCH-01`  | 投資家・パートナー                   | pptx      |
+| **Presentation** | `PPTX-QBR-01`             | 部門責任者・スポンサー               | pptx      |
+| **Presentation** | `PPTX-CLIENT-PROPOSAL-01` | クライアント・調達                   | pptx      |
+| **Presentation** | `PPTX-CASE-STUDY-01`      | 営業・顧客成功・経営層               | pptx      |
+| **Presentation** | `PPTX-WORKSHOP-01`        | ファシリテーター・プロジェクトチーム | pptx      |
+| **Presentation** | `STRAT-EXE-01`            | 経営層                               | puppeteer |
+| **Presentation** | `REL-PROP-01`             | クライアント                         | puppeteer |
+| **Presentation** | `STRAT-ROAD-01`           | ボードメンバー                       | mermaid   |
+| **Spreadsheet**  | `XLSX-EXEC-DASHBOARD-01`  | 経営層・ボード                       | xlsx      |
+| **Spreadsheet**  | `XLSX-OPS-TRACKER-01`     | オペレーター・PM                     | xlsx      |
+| **Spreadsheet**  | `XLSX-QBR-WORKBOOK-01`    | 部門責任者・スポンサー               | xlsx      |
+| **Spreadsheet**  | `XLSX-BUDGET-ACTUAL-01`   | 財務・経営                           | xlsx      |
+| **Report**       | `TECH-RCA-01`             | エンジニアリング                     | mermaid   |
+| **Report**       | `ANA-PERF-01`             | アナリスト                           | chartjs   |
+| **Infographic**  | `INFO-PROCESS-01`         | 社内オペレーション                   | d2        |
+| **Infographic**  | `TECH-ARCH-01`            | アーキテクト                         | d2        |
 
 ## Media-Actuator Pipeline 連携
 
@@ -51,9 +51,19 @@ node dist/scripts/generate_marketing_deck.js \
   "action": "pipeline",
   "steps": [
     { "type": "transform", "op": "apply_theme", "params": { "theme": "kyberion-standard" } },
-    { "type": "transform", "op": "apply_pattern", "params": { "pattern_path": "knowledge/public/design-patterns/presentation/kyberion-marketing-deck.json" } },
+    {
+      "type": "transform",
+      "op": "apply_pattern",
+      "params": {
+        "pattern_path": "knowledge/public/design-patterns/presentation/kyberion-marketing-deck.json"
+      }
+    },
     { "type": "transform", "op": "merge_content", "params": { "output_format": "pptx" } },
-    { "type": "apply", "op": "pptx_render", "params": { "path": "active/shared/exports/output.pptx" } }
+    {
+      "type": "apply",
+      "op": "pptx_render",
+      "params": { "path": "active/shared/exports/output.pptx" }
+    }
   ]
 }
 ```
@@ -88,12 +98,12 @@ design-patterns/
 
 ## Transform Operations
 
-| Op | 説明 |
-| :--- | :--- |
-| `apply_theme` | `media-templates/themes/` からテーマをロードし `active_theme` に設定 |
-| `apply_pattern` | デザインパターン JSON をロードし `active_pattern` に設定 |
+| Op              | 説明                                                                       |
+| :-------------- | :------------------------------------------------------------------------- |
+| `apply_theme`   | `media-templates/themes/` からテーマをロードし `active_theme` に設定       |
+| `apply_pattern` | デザインパターン JSON をロードし `active_pattern` に設定                   |
 | `merge_content` | テーマ + パターン + コンテンツを統合してレンダリング可能なプロトコルを生成 |
-| `set` | コンテキスト変数を任意に設定 |
+| `set`           | コンテキスト変数を任意に設定                                               |
 
 ## Page Layouts For PPTX
 
@@ -112,17 +122,23 @@ PPTX パターンでは、テーマとは別に `page_layouts` でページ単�
     "cover": {
       "backgroundFill": "F8FAFC",
       "elements": [
-        { "type": "shape", "shapeType": "rect", "pos": { "x": 0, "y": 0, "w": 10, "h": 0.3 }, "style": { "fill": "0F172A" } }
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": { "x": 0, "y": 0, "w": 10, "h": 0.3 },
+          "style": { "fill": "0F172A" }
+        }
       ],
       "placeholders": {
-        "title": { "pos": { "x": 0.8, "y": 1.0, "w": 8.4, "h": 0.9 }, "style": { "align": "left" } },
+        "title": {
+          "pos": { "x": 0.8, "y": 1.0, "w": 8.4, "h": 0.9 },
+          "style": { "align": "left" }
+        },
         "body": false
       }
     }
   },
-  "content_data": [
-    { "page_layout": "cover", "title": "Quarterly Roadmap" }
-  ]
+  "content_data": [{ "page_layout": "cover", "title": "Quarterly Roadmap" }]
 }
 ```
 
@@ -146,7 +162,7 @@ Excel テンプレート群は次で管理する。
 
 共通 theme 定義は `media-templates/themes/` に集約する。
 
-テーマ / 外部デザインシステム / PPTX抽出の関係は [theme-and-design-system-reference.md](/Users/famao/kyberion/knowledge/public/procedures/media/theme-and-design-system-reference.md) を参照。
+テーマ / 外部デザインシステム / PPTX抽出の関係は [theme-and-design-system-reference.md](../procedures/media/theme-and-design-system-reference.md) を参照。
 
 Web サイト向けの theme / design system 分離は `web/` に集約する。
 
@@ -170,4 +186,5 @@ Excel 系は `themes.json` だけでは足りず、`sheet UX` の規律も別に
 - `print-layout-sheet`: 配布・印刷前提の座席表向け
 
 ---
-*Status: Managed under MISSION-DESIGN-PATTERNS*
+
+_Status: Managed under MISSION-DESIGN-PATTERNS_

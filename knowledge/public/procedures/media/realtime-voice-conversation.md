@@ -171,12 +171,12 @@ It does not itself train or promote a voice profile.
 
 If the user says `use my voice`, registration and promotion still have to happen first via:
 
-- [register-voice-profile.md](/Users/famao/kyberion/knowledge/public/procedures/media/register-voice-profile.md)
-- [promote-voice-profile.md](/Users/famao/kyberion/knowledge/public/procedures/media/promote-voice-profile.md)
+- [register-voice-profile.md](register-voice-profile.md)
+- [promote-voice-profile.md](promote-voice-profile.md)
 
 After promotion, the runtime will read the registered profile from `active/shared/runtime/voice-profiles/<profile_id>/` through the voice profile registry.
 
 ## Related Procedures
 
-- [`transcribe-audio-from-asset.md`](/Users/famao/kyberion/knowledge/public/procedures/media/transcribe-audio-from-asset.md) covers batch transcription without the live turn-taking loop.
-- [`generate-video-from-adf.md`](/Users/famao/kyberion/knowledge/public/procedures/media/generate-video-from-adf.md) covers prompt-based video generation.
+- [`transcribe-audio-from-asset.md`](transcribe-audio-from-asset.md) covers batch transcription without the live turn-taking loop.
+- [`generate-video-from-adf.md`](generate-video-from-adf.md) covers prompt-based video generation.

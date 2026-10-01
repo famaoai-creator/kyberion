@@ -80,7 +80,7 @@ For tenant-bound work, continue with [the standard onboarding flow](../../knowle
 ### 1.5 Verify
 
 ```bash
-pnpm doctor                 # preflight: must, should, nice
+pnpm kyberion doctor                 # preflight: must, should, nice
 pnpm dashboard              # visual status
 ```
 
@@ -208,7 +208,7 @@ pattern for `mission:orchestrator` if needed.
 ```bash
 sudo -iu kyberion
 cd ~/kyberion
-pnpm doctor
+pnpm kyberion doctor
 ```
 
 ## Windows Workstation
@@ -257,7 +257,7 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 ### Verify
 
 ```powershell
-pnpm doctor
+pnpm kyberion doctor
 pnpm kyberion list --check
 pnpm pipeline --input pipelines/baseline-check.json
 ```
@@ -339,7 +339,7 @@ docker run -d \
 After any of the three deploys above:
 
 ```bash
-pnpm doctor                 # preflight: must / should / nice
+pnpm kyberion doctor                 # preflight: must / should / nice
 pnpm kyberion list --check       # actuator capability check
 pnpm pipeline --input pipelines/baseline-check.json   # full health
 ```
@@ -364,7 +364,7 @@ node migration/<script>.js   # run each one in order
 sudo systemctl restart kyberion-supervisor   # Linux
 launchctl kickstart -k gui/$UID/com.kyberion.supervisor   # macOS
 
-pnpm doctor                  # confirm health
+pnpm kyberion doctor                  # confirm health
 ```
 
 For breaking changes, see `CHANGELOG.md` and per-major migration guides under `migration/`.
@@ -390,14 +390,14 @@ Mission state is forward-compatible by design (additive fields only). If a major
 
 ## 7. Troubleshooting
 
-| Symptom                                         | Likely cause                     | Action                                                                                                                                                           |
-| ----------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm doctor` reports Playwright missing        | browser-actuator dependency      | `pnpm env:bootstrap --manifest meeting-participation-runtime --apply --force`                                                                                    |
-| `pnpm onboard` says "no reasoning backend"      | No CLI/API key configured        | Set `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` (or `KYBERION_OPENROUTER_KEY`), `KYBERION_NEMOTRON_URL`, `KYBERION_LOCAL_LLM_URL`, or run `claude` to authenticate |
-| Mission stuck in `active` after process crash   | Stale lock                       | Lock has PID-based stale detection; next command auto-recovers                                                                                                   |
-| `Trace persisted path` empty in pipeline output | Persistence policy denied        | Check `KYBERION_PERSONA` and `MISSION_ROLE` env vars                                                                                                             |
-| Customer overlay not picked up                  | `KYBERION_CUSTOMER` not exported | `echo $KYBERION_CUSTOMER` — must show your slug                                                                                                                  |
-| Voice surface silent                            | OS TTS not installed             | Linux: `sudo apt-get install espeak`. macOS: built-in. Windows: built-in (SAPI)                                                                                  |
+| Symptom                                           | Likely cause                     | Action                                                                                                                                                           |
+| ------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm kyberion doctor` reports Playwright missing | browser-actuator dependency      | `pnpm env:bootstrap --manifest meeting-participation-runtime --apply --force`                                                                                    |
+| `pnpm onboard` says "no reasoning backend"        | No CLI/API key configured        | Set `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` (or `KYBERION_OPENROUTER_KEY`), `KYBERION_NEMOTRON_URL`, `KYBERION_LOCAL_LLM_URL`, or run `claude` to authenticate |
+| Mission stuck in `active` after process crash     | Stale lock                       | Lock has PID-based stale detection; next command auto-recovers                                                                                                   |
+| `Trace persisted path` empty in pipeline output   | Persistence policy denied        | Check `KYBERION_PERSONA` and `MISSION_ROLE` env vars                                                                                                             |
+| Customer overlay not picked up                    | `KYBERION_CUSTOMER` not exported | `echo $KYBERION_CUSTOMER` — must show your slug                                                                                                                  |
+| Voice surface silent                              | OS TTS not installed             | Linux: `sudo apt-get install espeak`. macOS: built-in. Windows: built-in (SAPI)                                                                                  |
 
 ---
 

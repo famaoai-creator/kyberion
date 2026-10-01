@@ -23,6 +23,7 @@
 文書体系は 2 軸で整理します。
 
 1. `Lifecycle`
+
 - Initiate
 - Define
 - Design
@@ -31,6 +32,7 @@
 - Transfer / Run
 
 2. `Control Layer`
+
 - Why
 - What
 - How
@@ -55,9 +57,9 @@ project の存在理由と成功条件を定義する層です。
 
 代表文書:
 
-- [`project-charter.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/project-charter.md)
-- [`business-impact-analysis.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/business-impact-analysis.md)
-- [`stakeholder-communication-register.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/stakeholder-communication-register.md)
+- [`project-charter.md`](../../public/templates/blueprints/project-charter.md)
+- [`business-impact-analysis.md`](../../public/templates/blueprints/business-impact-analysis.md)
+- [`stakeholder-communication-register.md`](../../public/templates/blueprints/stakeholder-communication-register.md)
 
 ### 2. What
 
@@ -65,10 +67,10 @@ track ごとに、何を作るか、何を満たすべきかを定義する層�
 
 代表文書:
 
-- [`requirements-definition.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/requirements-definition.md)
-- [`requirements-traceability-matrix.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/requirements-traceability-matrix.md)
-- [`slo-sli-definition.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/slo-sli-definition.md)
-- [`information-asset-registry.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/information-asset-registry.md)
+- [`requirements-definition.md`](../../public/templates/blueprints/requirements-definition.md)
+- [`requirements-traceability-matrix.md`](../../public/templates/blueprints/requirements-traceability-matrix.md)
+- [`slo-sli-definition.md`](../../public/templates/blueprints/slo-sli-definition.md)
+- [`information-asset-registry.md`](../../public/templates/blueprints/information-asset-registry.md)
 
 ### 3. How
 
@@ -76,14 +78,14 @@ track ごとに、どう作るか、どう動かすかを定義する層です�
 
 代表文書:
 
-- [`basic-design.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/basic-design.md)
-- [`architecture-design.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/architecture-design.md)
-- [`detailed-design.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/detailed-design.md)
-- [`operational-design.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/operational-design.md)
-- [`operation-runbook.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/operation-runbook.md)
-- [`data-flow-lifecycle-map.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/data-flow-lifecycle-map.md)
-- [`environment-setup-guide.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/environment-setup-guide.md)
-- [`compliance-control-matrix.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/compliance-control-matrix.md)
+- [`basic-design.md`](../../public/templates/blueprints/basic-design.md)
+- [`architecture-design.md`](../../public/templates/blueprints/architecture-design.md)
+- [`detailed-design.md`](../../public/templates/blueprints/detailed-design.md)
+- [`operational-design.md`](../../public/templates/blueprints/operational-design.md)
+- [`operation-runbook.md`](../../public/templates/blueprints/operation-runbook.md)
+- [`data-flow-lifecycle-map.md`](../../public/templates/blueprints/data-flow-lifecycle-map.md)
+- [`environment-setup-guide.md`](../../public/templates/blueprints/environment-setup-guide.md)
+- [`compliance-control-matrix.md`](../../public/templates/blueprints/compliance-control-matrix.md)
 
 ### 4. Control
 
@@ -92,12 +94,12 @@ track ごとに、どう作るか、どう動かすかを定義する層です�
 
 代表文書:
 
-- [`project-management-plan.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/project-management-plan.md)
-- [`mission-ledger.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/mission-ledger.md)
-- [`raid-log.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/raid-log.md)
-- [`issue-log.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/issue-log.md)
-- [`change-control-ledger.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/change-control-ledger.md)
-- [`gate-review-packet.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/gate-review-packet.md)
+- [`project-management-plan.md`](../../public/templates/blueprints/project-management-plan.md)
+- [`mission-ledger.md`](../../public/templates/blueprints/mission-ledger.md)
+- [`raid-log.md`](../../public/templates/blueprints/raid-log.md)
+- [`issue-log.md`](../../public/templates/blueprints/issue-log.md)
+- [`change-control-ledger.md`](../../public/templates/blueprints/change-control-ledger.md)
+- [`gate-review-packet.md`](../../public/templates/blueprints/gate-review-packet.md)
 
 ### 5. Evidence
 
@@ -105,15 +107,15 @@ track ごとに、本当にできたか、出荷してよいかを証明する�
 
 代表文書:
 
-- [`test-plan.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/test-plan.md)
-- [`test-case-specification.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/test-case-specification.md)
-- [`test-validation-report.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/test-validation-report.md)
-- [`security-audit-report.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/security-audit-report.md)
-- [`release-readiness-checklist.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/release-readiness-checklist.md)
-- [`rollback-plan.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/rollback-plan.md)
-- [`deployment-verification-report.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/deployment-verification-report.md)
-- [`incident-report.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/incident-report.md)
-- [`mission-closure-report.md`](/Users/famao/kyberion/knowledge/public/templates/blueprints/mission-closure-report.md)
+- [`test-plan.md`](../../public/templates/blueprints/test-plan.md)
+- [`test-case-specification.md`](../../public/templates/blueprints/test-case-specification.md)
+- [`test-validation-report.md`](../../public/templates/blueprints/test-validation-report.md)
+- [`security-audit-report.md`](../../public/templates/blueprints/security-audit-report.md)
+- [`release-readiness-checklist.md`](../../public/templates/blueprints/release-readiness-checklist.md)
+- [`rollback-plan.md`](../../public/templates/blueprints/rollback-plan.md)
+- [`deployment-verification-report.md`](../../public/templates/blueprints/deployment-verification-report.md)
+- [`incident-report.md`](../../public/templates/blueprints/incident-report.md)
+- [`mission-closure-report.md`](../../public/templates/blueprints/mission-closure-report.md)
 
 ## Lifecycle View
 
@@ -295,27 +297,34 @@ Project Operating System では、各 phase の終わりに gate を置きます
 通常、`Initiation Approval` は project scope、それ以降は track scope です。
 
 1. `Initiation Approval`
+
 - Project Charter と Business Impact Analysis を承認する
 
 2. `Requirements Baseline`
+
 - Requirements Definition と Traceability Matrix を baseline 化する
 
 3. `Design Approval`
+
 - Architecture / Detailed / Operational Design と Control Matrix を承認する
 
 4. `Build Readiness`
+
 - PM / Mission / Change の control artifacts が稼働していることを確認する
 
 5. `Validation Approval`
+
 - Test, Security, Traceability, Gate Packet を揃えて release candidate を評価する
 
 6. `Release Readiness`
+
 - Release Checklist, Cutover, Rollback, Deployment Verification を揃えて go / no-go を決める
 
 7. `Closure Review`
+
 - Incident / Post-Mortem / Closure Report で学習を固定する
 
-gate 詳細は [`sdlc-gating-model.md`](/Users/famao/kyberion/knowledge/product/architecture/sdlc-gating-model.md) と [`sdlc-gate-catalog.json`](/Users/famao/kyberion/knowledge/product/governance/sdlc-gate-catalog.json) を参照します。
+gate 詳細は [`sdlc-gating-model.md`](../architecture/sdlc-gating-model.md) と [`sdlc-gate-catalog.json`](../governance/sdlc-gate-catalog.json) を参照します。
 
 ## Recommended Directory Structure
 
@@ -430,4 +439,4 @@ active/projects/<tier>/<tenant_or_shared>/<project_id>/
 この `state/` は、実行中の状況、現在の track / mission の関係、一次証跡を保持するための場所です。
 Knowledge tier には直接書かず、レビュー・checkpoint・distill を経て `knowledge/product/evolution/` や `knowledge/product/incidents/` に要約して移します。
 
-See also: [`project-operational-state-store.md`](/Users/famao/kyberion/knowledge/product/architecture/project-operational-state-store.md)
+See also: [`project-operational-state-store.md`](../architecture/project-operational-state-store.md)

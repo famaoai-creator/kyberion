@@ -150,7 +150,7 @@ Use `pnpm services:setup` when you want the external service catalog to tell you
 
 Use `pnpm kyberion setup report` when you want a consolidated readiness view across surfaces, services, reasoning, and doctor without checking each domain one by one.
 
-Kyberion doctor is **`pnpm run doctor`**. Bare `pnpm doctor` is pnpm's own diagnostic (registry/cache) and does not run Kyberion's readiness checks.
+Kyberion doctor is **`pnpm kyberion doctor`** (`pnpm run doctor` is equivalent). Bare `pnpm doctor` is pnpm's own diagnostic (registry/cache) and does not run Kyberion's readiness checks.
 
 `pnpm run doctor` includes the baseline runtime and reasoning backend manifest checks; use it when you want the consolidated readiness view rather than a domain-specific setup report.
 
@@ -231,7 +231,7 @@ Use this when you want to register a new operator voice profile before meeting w
 pnpm meeting:preflight
 ```
 
-失敗したら `pnpm doctor -- --runtime meeting --mission MSN-...` を先に実行し、表示された `fix` を直してからやり直す。
+失敗したら `pnpm kyberion doctor --runtime meeting --mission MSN-...` を先に実行し、表示された `fix` を直してからやり直す。
 
 2. 初回だけ voice profile と consent をまとめて作る。
 
@@ -259,7 +259,7 @@ pnpm meeting:participate \
   --display-name "Kyberion (operator delegate)"
 ```
 
-失敗したら `pnpm doctor -- --runtime meeting --mission MSN-...` を再実行し、ブラウザ・音声・consent の欠落を先に解消する。
+失敗したら `pnpm kyberion doctor --runtime meeting --mission MSN-...` を再実行し、ブラウザ・音声・consent の欠落を先に解消する。
 
 5. 会議後フォローアップで議事録と action items を作る。
 
@@ -431,7 +431,7 @@ Examples:
 
 For distillation and other structured reasoning tasks, see:
 
-- [`knowledge/product/governance/wisdom-policy-guide.md`](knowledge/product/governance/wisdom-policy-guide.md)
+- [`knowledge/product/governance/wisdom-policy-guide.md`](../knowledge/product/governance/wisdom-policy-guide.md)
 
 Those flows are policy-driven. The operator should not need to pick a specific CLI provider when `wisdom-policy.json` already defines the profile and adapter.
 
@@ -500,7 +500,7 @@ Practical rules:
 pnpm install
 pnpm build
 pnpm onboard
-pnpm doctor
+pnpm kyberion doctor
 pnpm capabilities
 pnpm dashboard -- --once --focus onboarding
 ```
@@ -545,15 +545,15 @@ mission/task で実作業を進め、結果の証拠ができたら `organizatio
 ### Mission hygiene(未開始ミッションの整理)
 
 ```bash
-pnpm mission-controller hygiene            # planned 滞留の一覧+ミッション別の推奨コマンド
-pnpm mission-controller hygiene --notify   # 要対応分を ops alert + inbox に通知
+pnpm mission hygiene            # planned 滞留の一覧+ミッション別の推奨コマンド
+pnpm mission hygiene --notify   # 要対応分を ops alert + inbox に通知
 ```
 
 `planned` は「作成済み・未開始」の正規状態(start か gate 通過で active 化)。
 hygiene は滞留理由を分類する: design_missing(タスク未展開)/
 ready_not_started(タスクあり・未ディスパッチ)/ awaiting_gate(gate 未通過)。
 状態は一切変更しない — 開始(start / dispatch-workitems)か整理(cancel)は
-常にオペレーターの判断。`pnpm doctor` にも滞留サマリが1行出る。
+常にオペレーターの判断。`pnpm kyberion doctor` にも滞留サマリが1行出る。
 
 ### Virtual Office(エージェント稼働の可視化)
 

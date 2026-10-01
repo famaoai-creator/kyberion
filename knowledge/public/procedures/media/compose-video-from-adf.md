@@ -8,17 +8,17 @@ This path is for deterministic scene composition, not prompt-led model generatio
 
 For single-action scenario execution (`brief -> compile -> prepare`), use:
 
-- [`create-narrated-intro-movie.md`](/Users/famao/kyberion/knowledge/public/procedures/media/create-narrated-intro-movie.md)
-- [`create-music-video-from-adf.md`](/Users/famao/kyberion/knowledge/public/procedures/media/create-music-video-from-adf.md)
+- [`create-narrated-intro-movie.md`](create-narrated-intro-movie.md)
+- [`create-music-video-from-adf.md`](create-music-video-from-adf.md)
 
 ## 2. Dependencies
 
 - **Actuator**: `video-composition-actuator`
-- **Schema**: [`video-composition-adf.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/video-composition-adf.schema.json)
-- **Brief Schema**: [`narrated-video-brief.schema.json`](/Users/famao/kyberion/knowledge/product/schemas/narrated-video-brief.schema.json)
+- **Schema**: [`video-composition-adf.schema.json`](../../../product/schemas/video-composition-adf.schema.json)
+- **Brief Schema**: [`narrated-video-brief.schema.json`](../../../product/schemas/narrated-video-brief.schema.json)
 - **Governance**:
-  - [`video-composition-template-registry.json`](/Users/famao/kyberion/knowledge/product/governance/video-composition-template-registry.json)
-  - [`video-render-runtime-policy.json`](/Users/famao/kyberion/knowledge/product/governance/video-render-runtime-policy.json)
+  - [`video-composition-template-registry.json`](../../../product/governance/video-composition-template-registry.json)
+  - [`video-render-runtime-policy.json`](../../../product/governance/video-render-runtime-policy.json)
 
 ## 3. Contract Shape
 
@@ -78,8 +78,8 @@ HyperFrames-style guidance is especially useful here:
 
 Example input:
 
-- [`prepare-product-explainer.json`](/Users/famao/kyberion/libs/actuators/video-composition-actuator/examples/prepare-product-explainer.json)
-- [`compile-kyberion-intro-brief.json`](/Users/famao/kyberion/libs/actuators/video-composition-actuator/examples/compile-kyberion-intro-brief.json)
+- [`prepare-product-explainer.json`](../../../../libs/actuators/video-composition-actuator/examples/prepare-product-explainer.json)
+- [`compile-kyberion-intro-brief.json`](../../../../libs/actuators/video-composition-actuator/examples/compile-kyberion-intro-brief.json)
 
 Run the actuator directly:
 
@@ -113,7 +113,7 @@ When backend rendering is enabled and `await_completion` is omitted, the actuato
 
 For the full production flow, including narration preparation and deferred collection, see:
 
-- [`produce-narrated-video.md`](/Users/famao/kyberion/knowledge/public/procedures/media/produce-narrated-video.md)
+- [`produce-narrated-video.md`](produce-narrated-video.md)
 
 ### 4.1 Background submit/collect pattern
 
