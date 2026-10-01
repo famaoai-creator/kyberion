@@ -5,6 +5,14 @@ import {
   type DecisionDigest,
   type DigestMissionWait,
 } from '@agent/core/governance/approval-digest';
+import {
+  buildAccountabilityReport,
+  renderAccountabilityReportText,
+} from '@agent/core/governance/accountability-report';
+import {
+  listActiveCharters,
+  readCharterLedger,
+} from '@agent/core/governance/accountability-charter-registry';
 import { isFixtureApproval } from '@agent/core/governance/approval-store-hygiene';
 import { listApprovalRequests } from '@agent/core/governance/approval-store';
 import {
@@ -22,7 +30,13 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
  * Autonomous-operation P1-7 / P1-8: the operator's decision inbox.
  *
  *   node dist/scripts/approval_inbox.js digest [--hours N] [--send] [--json] [--locale en]
+ *   node dist/scripts/approval_inbox.js charter [--hours N] [--send] [--json] [--locale en]
  *   node dist/scripts/approval_inbox.js tick [--json]
+ *
+ * `charter` is the accountable human's report under an accountability charter
+ * (one per charter in force): what ran inside it, what is held for a decision,
+ * budget use, standing tripwires, and charters about to expire. Schedule it
+ * daily with `--send`; with no charter in force it prints nothing to do.
  *
  * `digest` answers "what needs me?" — decisions waiting on the operator, veto
  * windows about to proceed, what the agents did on their own, and waits that
@@ -105,6 +119,55 @@ export function formatVetoTick(result: VetoWindowTickResult): string {
   return lines.join('\n');
 }
 
+function runCharterReport(
+  context: { argv: string[]; json: boolean; print: (text: string) => void },
+  now: number
+) {
+  const locale = readFlag(context.argv, '--locale') === 'en' ? 'en' : 'ja';
+  const hours = readHours(context.argv);
+  const at = new Date(now);
+  const send = context.argv.includes('--send');
+  const reports = withExecutionContext('mission_controller', () =>
+    listActiveCharters(at).map((charter) => {
+      const report = buildAccountabilityReport({
+        charter,
+        ledger: readCharterLedger(charter),
+        now: at,
+        hours,
+      });
+      const text = renderAccountabilityReportText(report, { locale });
+      let sent = false;
+      // An all-clear day is still sent: silence must never be ambiguous
+      // between "nothing happened" and "the report broke".
+      if (send) {
+        sent = notifyOperatorSync(
+          report.tripwires_standing.length > 0 ? 'ops_alert' : 'decision_digest',
+          {
+            title: text.split('\n')[0] ?? 'accountability report',
+            body: text.split('\n').slice(1).join('\n'),
+            correlation_id: `charter-report:${charter.charter_id}:${at.toISOString().slice(0, 10)}`,
+          }
+        );
+      }
+      return { report, text, sent };
+    })
+  );
+  const output =
+    reports.length > 0
+      ? reports.map((r) => r.text).join('\n\n')
+      : 'No accountability charter is in force.';
+  context.print(
+    context.json
+      ? JSON.stringify(
+          reports.map((r) => ({ ...r.report, sent: r.sent })),
+          null,
+          2
+        )
+      : output
+  );
+  return reports.map((r) => r.report);
+}
+
 export const runApprovalInbox = defineScript({
   name: 'approval-inbox',
   flags: ['json'],
@@ -119,8 +182,12 @@ export const runApprovalInbox = defineScript({
       context.print(context.json ? JSON.stringify(result, null, 2) : formatVetoTick(result));
       return result;
     }
+    if (command === 'charter') return runCharterReport(context, now);
     if (command !== 'digest') {
-      throw new ScriptExitError(2, `Unknown approval-inbox command: ${command} (digest | tick)`);
+      throw new ScriptExitError(
+        2,
+        `Unknown approval-inbox command: ${command} (digest | charter | tick)`
+      );
     }
     const digest = collectDecisionDigest({ now, hours: readHours(context.argv) });
     const locale = readFlag(context.argv, '--locale') === 'en' ? 'en' : 'ja';

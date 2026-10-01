@@ -9246,6 +9246,171 @@
         "ja": "通知チャネル",
         "qps-ploc": "⟦Ƈħȧññėŀ ŀőř⟧"
       },
+      "setup.charter_title": {
+        "en": "Responsibility charter",
+        "ja": "責任者憲章",
+        "qps-ploc": "⟦Řėşṗőñşïƀïŀïŧẏ ƈħȧřŧėř ŀőřėɱ ï⟧"
+      },
+      "setup.charter_description": {
+        "en": "Decide what your AI may do without asking, and who answers for it. Anything outside stays a per-decision approval.",
+        "ja": "AI が承認なしで実行してよい範囲と、その責任を負う人を決めます。範囲を超える判断は、これまでどおり人が判断します。",
+        "qps-ploc": "⟦Ḓėƈïḓė ẇħȧŧ ẏőůř ȦÏ ɱȧẏ ḓő ẇïŧħőůŧ ȧşķïñɠ, ȧñḓ ẇħő ȧñşẇėřş ƒőř ïŧ. Ȧñẏŧħïñɠ őůŧşïḓė şŧȧẏş ȧ ṗėř-ḓėƈïşïőñ ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+      },
+      "setup.charter_tenant": {
+        "en": "Organization",
+        "ja": "組織",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
+      },
+      "setup.charter_none": {
+        "en": "No charter is in force. Decisions the AI makes are approved one by one, as before.",
+        "ja": "有効な憲章はありません。AI が実行する判断は、これまでどおり人が承認します。",
+        "qps-ploc": "⟦Ñő ƈħȧřŧėř ïş ïñ ƒőřƈė. Ḓėƈïşïőñş ŧħė ȦÏ ɱȧķėş ȧřė ȧṗṗřőṽėḓ őñė ƀẏ őñė, ȧş ƀėƒőřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "setup.charter_owner_only": {
+        "en": "Only an owner of this organization can create a charter.",
+        "ja": "憲章をつくれるのは、この組織のオーナーだけです。",
+        "qps-ploc": "⟦Őñŀẏ ȧñ őẇñėř őƒ ŧħïş őřɠȧñïẑȧŧïőñ ƈȧñ ƈřėȧŧė ȧ ƈħȧřŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "setup.charter_responsible": {
+        "en": "Accountable: {name}",
+        "ja": "責任者: {name}",
+        "qps-ploc": "⟦Ȧƈƈőůñŧȧƀŀė: {name} ŀőřėɱ ⟧"
+      },
+      "setup.charter_expires": {
+        "en": "Valid until {date}",
+        "ja": "期限: {date}",
+        "qps-ploc": "⟦Ṽȧŀïḓ ůñŧïŀ {date} ŀőřėɱ⟧"
+      },
+      "setup.charter_stop": {
+        "en": "Stop everything",
+        "ja": "全て停止する",
+        "qps-ploc": "⟦Şŧőṗ ėṽėřẏŧħïñɠ ŀőřė⟧"
+      },
+      "setup.charter_resume": {
+        "en": "Resume",
+        "ja": "再開する",
+        "qps-ploc": "⟦Řėşůɱė ŀőř⟧"
+      },
+      "setup.charter_retire": {
+        "en": "Retire this charter",
+        "ja": "この憲章をやめる",
+        "qps-ploc": "⟦Řėŧïřė ŧħïş ƈħȧřŧėř ŀőřėɱ ⟧"
+      },
+      "setup.charter_stopped": {
+        "en": "Stopped. The AI cannot run anything under this charter, even inside its limits.",
+        "ja": "停止中です。AI は、憲章の範囲内でも実行できません。",
+        "qps-ploc": "⟦Şŧőṗṗėḓ. Ŧħė ȦÏ ƈȧññőŧ řůñ ȧñẏŧħïñɠ ůñḓėř ŧħïş ƈħȧřŧėř, ėṽėñ ïñşïḓė ïŧş ŀïɱïŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "setup.charter_form_title": {
+        "en": "Create or update the charter",
+        "ja": "憲章をつくる・更新する",
+        "qps-ploc": "⟦Ƈřėȧŧė őř ůṗḓȧŧė ŧħė ƈħȧřŧėř ŀőřėɱ ïṗş⟧"
+      },
+      "setup.charter_per_action": {
+        "en": "Limit per spend (JPY)",
+        "ja": "1 回の支出の上限(JPY)",
+        "qps-ploc": "⟦Ŀïɱïŧ ṗėř şṗėñḓ (ĴṖẎ) ŀőřėɱ ⟧"
+      },
+      "setup.charter_per_day": {
+        "en": "Limit per day (JPY)",
+        "ja": "1 日の上限(JPY)",
+        "qps-ploc": "⟦Ŀïɱïŧ ṗėř ḓȧẏ (ĴṖẎ) ŀőřėɱ ⟧"
+      },
+      "setup.charter_per_month": {
+        "en": "Limit per month (JPY)",
+        "ja": "1 か月の上限(JPY)",
+        "qps-ploc": "⟦Ŀïɱïŧ ṗėř ɱőñŧħ (ĴṖẎ) ŀőřėɱ ⟧"
+      },
+      "setup.charter_max_loss": {
+        "en": "Most you accept losing on one item (JPY)",
+        "ja": "1 件で引き受ける損失の上限(JPY)",
+        "qps-ploc": "⟦Ɱőşŧ ẏőů ȧƈƈėṗŧ ŀőşïñɠ őñ őñė ïŧėɱ (ĴṖẎ) ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "setup.charter_deputies": {
+        "en": "Deputies (user:name, comma separated)",
+        "ja": "代理責任者(user:名前 をカンマ区切り)",
+        "qps-ploc": "⟦Ḓėṗůŧïėş (ůşėř:ñȧɱė, ƈőɱɱȧ şėṗȧřȧŧėḓ) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup.charter_expires_days": {
+        "en": "Valid for (days, 1–365)",
+        "ja": "有効な日数(1〜365)",
+        "qps-ploc": "⟦Ṽȧŀïḓ ƒőř (ḓȧẏş, 1–365) ŀőřėɱ ï⟧"
+      },
+      "setup.charter_named_spend": {
+        "en": "Let irreversible spend run without asking",
+        "ja": "取り消せない支出を、承認なしで実行させる",
+        "qps-ploc": "⟦Ŀėŧ ïřřėṽėřşïƀŀė şṗėñḓ řůñ ẇïŧħőůŧ ȧşķïñɠ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "setup.charter_supersedes": {
+        "en": "Stand in for the decision-rights matrix within these limits",
+        "ja": "decision-rights matrix の人の受け入れを、この範囲で代わりにする",
+        "qps-ploc": "⟦Şŧȧñḓ ïñ ƒőř ŧħė ḓėƈïşïőñ-řïɠħŧş ɱȧŧřïẋ ẇïŧħïñ ŧħėşė ŀïɱïŧş ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "setup.charter_on_option": {
+        "en": "Allow",
+        "ja": "許可する",
+        "qps-ploc": "⟦Ȧŀŀőẇ ŀőř⟧"
+      },
+      "setup.charter_off_option": {
+        "en": "Do not allow",
+        "ja": "許可しない",
+        "qps-ploc": "⟦Ḓő ñőŧ ȧŀŀőẇ ŀőř⟧"
+      },
+      "setup.charter_review": {
+        "en": "Review what I am agreeing to",
+        "ja": "同意する内容を確認する",
+        "qps-ploc": "⟦Řėṽïėẇ ẇħȧŧ Ï ȧɱ ȧɠřėėïñɠ ŧő ŀőřėɱ ïṗş⟧"
+      },
+      "setup.charter_statement_title": {
+        "en": "What you are agreeing to",
+        "ja": "あなたが同意する内容",
+        "qps-ploc": "⟦Ẇħȧŧ ẏőů ȧřė ȧɠřėėïñɠ ŧő ŀőřėɱ ï⟧"
+      },
+      "setup.charter_agree": {
+        "en": "I agree, and I answer for the result",
+        "ja": "上の内容に同意し、その結果に責任を負います",
+        "qps-ploc": "⟦Ï ȧɠřėė, ȧñḓ Ï ȧñşẇėř ƒőř ŧħė řėşůŀŧ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup.charter_accept": {
+        "en": "Agree and put the charter in force",
+        "ja": "同意して憲章を有効にする",
+        "qps-ploc": "⟦Ȧɠřėė ȧñḓ ṗůŧ ŧħė ƈħȧřŧėř ïñ ƒőřƈė ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "setup.charter_saved": {
+        "en": "The charter is in force.",
+        "ja": "憲章を有効にしました。",
+        "qps-ploc": "⟦Ŧħė ƈħȧřŧėř ïş ïñ ƒőřƈė. ŀőřėɱ ï⟧"
+      },
+      "setup.charter_done": {
+        "en": "Done.",
+        "ja": "反映しました。",
+        "qps-ploc": "⟦Ḓőñė. ŀőř⟧"
+      },
+      "setup.charter_err_owner": {
+        "en": "Only an owner of this organization can do this.",
+        "ja": "この操作ができるのは、この組織のオーナーだけです。",
+        "qps-ploc": "⟦Őñŀẏ ȧñ őẇñėř őƒ ŧħïş őřɠȧñïẑȧŧïőñ ƈȧñ ḓő ŧħïş. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "setup.charter_err_member": {
+        "en": "You are not registered as a member, so no one can be accountable. Register first.",
+        "ja": "メンバーとして登録されていないため、責任者になれません。先にメンバー登録が必要です。",
+        "qps-ploc": "⟦Ẏőů ȧřė ñőŧ řėɠïşŧėřėḓ ȧş ȧ ɱėɱƀėř, şő ñő őñė ƈȧñ ƀė ȧƈƈőůñŧȧƀŀė. Řėɠïşŧėř ƒïřşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "setup.charter_err_changed": {
+        "en": "The text changed since you reviewed it. Review it again.",
+        "ja": "確認した後に内容が変わりました。もう一度確認してください。",
+        "qps-ploc": "⟦Ŧħė ŧėẋŧ ƈħȧñɠėḓ şïñƈė ẏőů řėṽïėẇėḓ ïŧ. Řėṽïėẇ ïŧ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "setup.charter_err_responsible": {
+        "en": "Only the accountable person or a deputy can do this.",
+        "ja": "この操作ができるのは、責任者か代理責任者だけです。",
+        "qps-ploc": "⟦Őñŀẏ ŧħė ȧƈƈőůñŧȧƀŀė ṗėřşőñ őř ȧ ḓėṗůŧẏ ƈȧñ ḓő ŧħïş. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "setup.charter_err_generic": {
+        "en": "Could not save: {detail}",
+        "ja": "保存できませんでした: {detail}",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ şȧṽė: {detail} ŀőřėɱ ï⟧"
+      },
       "setup.quiet_hours_title": {
         "en": "Quiet hours",
         "ja": "おやすみ時間",
@@ -21658,6 +21823,111 @@
         "en": "No policy escalation was recorded; this was raised directly.",
         "ja": "ポリシーによる引き上げの記録はありません。直接の依頼として上がっています。",
         "qps-ploc": "⟦Ñő ṗőŀïƈẏ ėşƈȧŀȧŧïőñ ẇȧş řėƈőřḓėḓ; ŧħïş ẇȧş řȧïşėḓ ḓïřėƈŧŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "charter_report_title": {
+        "en": "Accountability report — {charter} ({time})",
+        "ja": "説明責任レポート — {charter}({time})",
+        "qps-ploc": "⟦Ȧƈƈőůñŧȧƀïŀïŧẏ řėṗőřŧ — {charter} ({time}) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "charter_report_headline": {
+        "en": "Ran inside your charter: {executed} · Held for your decision: {denied}",
+        "ja": "憲章の範囲内で実行: {executed}件 ・ あなたの判断に回したもの: {denied}件",
+        "qps-ploc": "⟦Řȧñ ïñşïḓė ẏőůř ƈħȧřŧėř: {executed} · Ħėŀḓ ƒőř ẏőůř ḓėƈïşïőñ: {denied} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "charter_report_money_day": {
+        "en": "Spent today: {spent} / {limit} ({percent}%)",
+        "ja": "本日の支出: {spent} / {limit}({percent}%)",
+        "qps-ploc": "⟦Şṗėñŧ ŧőḓȧẏ: {spent} / {limit} ({percent}%) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "charter_report_money_month": {
+        "en": "Spent this month: {spent} / {limit} ({percent}%)",
+        "ja": "今月の支出: {spent} / {limit}({percent}%)",
+        "qps-ploc": "⟦Şṗėñŧ ŧħïş ɱőñŧħ: {spent} / {limit} ({percent}%) ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "charter_report_near_limit": {
+        "en": "Near the limit: {items}",
+        "ja": "上限が近いもの: {items}",
+        "qps-ploc": "⟦Ñėȧř ŧħė ŀïɱïŧ: {items} ŀőřėɱ ï⟧"
+      },
+      "charter_report_tripwire": {
+        "en": "STOPPED by tripwire: {items} — only you can clear this",
+        "ja": "tripwire で停止中: {items} — 解除できるのはあなただけです",
+        "qps-ploc": "⟦ŞŦŐṖṖĖḒ ƀẏ ŧřïṗẇïřė: {items} — őñŀẏ ẏőů ƈȧñ ƈŀėȧř ŧħïş ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "charter_report_amendment": {
+        "en": "Asked to widen the charter: {field} ×{count}",
+        "ja": "憲章を広げてほしいと出ているもの: {field} ×{count}",
+        "qps-ploc": "⟦Ȧşķėḓ ŧő ẇïḓėñ ŧħė ƈħȧřŧėř: {field} ×{count} ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "charter_report_expiry": {
+        "en": "This charter expires in {days} days ({date})",
+        "ja": "この憲章の期限まであと{days}日({date})",
+        "qps-ploc": "⟦Ŧħïş ƈħȧřŧėř ėẋṗïřėş ïñ {days} ḓȧẏş ({date}) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "charter_report_all_clear": {
+        "en": "Nothing needed you. Everything ran inside your charter.",
+        "ja": "あなたの判断が必要なことはありませんでした。すべて憲章の範囲内で動きました。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ñėėḓėḓ ẏőů. Ėṽėřẏŧħïñɠ řȧñ ïñşïḓė ẏőůř ƈħȧřŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "charter_statement_intro": {
+        "en": "I, {name} ({id}), authorize AI agents to act without my approval within the limits below for organization \"{tenant}\", and I accept final responsibility for the result.",
+        "ja": "私 {name}({id})は、組織「{tenant}」について、次の範囲内で AI エージェントが私の承認なしに実行することを認め、その結果について最終的な責任を負います。",
+        "qps-ploc": "⟦Ï, {name} ({id}), ȧůŧħőřïẑė ȦÏ ȧɠėñŧş ŧő ȧƈŧ ẇïŧħőůŧ ɱẏ ȧṗṗřőṽȧŀ ẇïŧħïñ ŧħė ŀïɱïŧş ƀėŀőẇ ƒőř őřɠȧñïẑȧŧïőñ \"{tenant}\", ȧñḓ Ï ȧƈƈėṗŧ ƒïñȧŀ řėşṗőñşïƀïŀïŧẏ ƒőř ŧħė řėşůŀŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ï⟧"
+      },
+      "charter_statement_limits": {
+        "en": "- Per spend: {per_action} / per day: {per_day} / per month: {per_month}",
+        "ja": "・1 回の支出の上限: {per_action} / 1 日: {per_day} / 1 か月: {per_month}",
+        "qps-ploc": "⟦- Ṗėř şṗėñḓ: {per_action} / ṗėř ḓȧẏ: {per_day} / ṗėř ɱőñŧħ: {per_month} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "charter_statement_loss": {
+        "en": "- Most I accept losing on one item: {loss}",
+        "ja": "・1 件で引き受ける損失の上限: {loss}",
+        "qps-ploc": "⟦- Ɱőşŧ Ï ȧƈƈėṗŧ ŀőşïñɠ őñ őñė ïŧėɱ: {loss} ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "charter_statement_spend_on": {
+        "en": "- Irreversible spend (operational_spend) MAY run without approval within these limits",
+        "ja": "・取り消せない支出(operational_spend)を、上の範囲内で承認なしに実行させる",
+        "qps-ploc": "⟦- Ïřřėṽėřşïƀŀė şṗėñḓ (őṗėřȧŧïőñȧŀ_şṗėñḓ) ⱮȦẎ řůñ ẇïŧħőůŧ ȧṗṗřőṽȧŀ ẇïŧħïñ ŧħėşė ŀïɱïŧş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "charter_statement_spend_off": {
+        "en": "- Irreversible spend does NOT run without approval",
+        "ja": "・取り消せない支出は、承認なしには実行させない",
+        "qps-ploc": "⟦- Ïřřėṽėřşïƀŀė şṗėñḓ ḓőėş ÑŐŦ řůñ ẇïŧħőůŧ ȧṗṗřőṽȧŀ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "charter_statement_matrix_on": {
+        "en": "- Where the decision-rights matrix requires a person to accept, this charter stands in for that within these limits",
+        "ja": "・decision-rights matrix が人の受け入れを求める判断についても、上の範囲内であればこの憲章が代わりになる",
+        "qps-ploc": "⟦- Ẇħėřė ŧħė ḓėƈïşïőñ-řïɠħŧş ɱȧŧřïẋ řėɋůïřėş ȧ ṗėřşőñ ŧő ȧƈƈėṗŧ, ŧħïş ƈħȧřŧėř şŧȧñḓş ïñ ƒőř ŧħȧŧ ẇïŧħïñ ŧħėşė ŀïɱïŧş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+      },
+      "charter_statement_matrix_off": {
+        "en": "- Where the decision-rights matrix requires a person to accept, a person still accepts, as before",
+        "ja": "・decision-rights matrix が人の受け入れを求める判断は、これまでどおり人が受け入れる",
+        "qps-ploc": "⟦- Ẇħėřė ŧħė ḓėƈïşïőñ-řïɠħŧş ɱȧŧřïẋ řėɋůïřėş ȧ ṗėřşőñ ŧő ȧƈƈėṗŧ, ȧ ṗėřşőñ şŧïŀŀ ȧƈƈėṗŧş, ȧş ƀėƒőřė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "charter_statement_stop": {
+        "en": "- When I press \"Stop\", or a declared stop condition stands, everything stops; only I and my deputies can clear it",
+        "ja": "・私が「停止」を押したとき、または宣言した停止条件が立ったときは、全ての実行を止める。解除できるのは私と代理責任者だけ",
+        "qps-ploc": "⟦- Ẇħėñ Ï ṗřėşş \"Şŧőṗ\", őř ȧ ḓėƈŀȧřėḓ şŧőṗ ƈőñḓïŧïőñ şŧȧñḓş, ėṽėřẏŧħïñɠ şŧőṗş; őñŀẏ Ï ȧñḓ ɱẏ ḓėṗůŧïėş ƈȧñ ƈŀėȧř ïŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+      },
+      "charter_statement_deputies": {
+        "en": "- Deputies: {deputies}",
+        "ja": "・代理責任者: {deputies}",
+        "qps-ploc": "⟦- Ḓėṗůŧïėş: {deputies} ŀőřėɱ ï⟧"
+      },
+      "charter_statement_deputies_none": {
+        "en": "none",
+        "ja": "なし",
+        "qps-ploc": "⟦ñőñė ŀőř⟧"
+      },
+      "charter_statement_expires": {
+        "en": "- Valid until: {date} (after that, per-decision approval applies again)",
+        "ja": "・期限: {date}(期限を過ぎると、従来の承認に戻る)",
+        "qps-ploc": "⟦- Ṽȧŀïḓ ůñŧïŀ: {date} (ȧƒŧėř ŧħȧŧ, ṗėř-ḓėƈïşïőñ ȧṗṗřőṽȧŀ ȧṗṗŀïėş ȧɠȧïñ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "charter_statement_authority": {
+        "en": "Anything beyond these limits is decided by me (or a deputy) individually. A delegation beyond the authority I actually hold is not made valid by this statement.",
+        "ja": "この範囲を超える判断は、私(または代理責任者)が個別に行う。私が実際に持っている権限を超える委任は、この宣言では有効にならない。",
+        "qps-ploc": "⟦Ȧñẏŧħïñɠ ƀėẏőñḓ ŧħėşė ŀïɱïŧş ïş ḓėƈïḓėḓ ƀẏ ɱė (őř ȧ ḓėṗůŧẏ) ïñḓïṽïḓůȧŀŀẏ. Ȧ ḓėŀėɠȧŧïőñ ƀėẏőñḓ ŧħė ȧůŧħőřïŧẏ Ï ȧƈŧůȧŀŀẏ ħőŀḓ ïş ñőŧ ɱȧḓė ṽȧŀïḓ ƀẏ ŧħïş şŧȧŧėɱėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ⟧"
       },
       "digest_title": {
         "en": "Decision digest ({time})",

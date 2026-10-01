@@ -1094,6 +1094,16 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/app/api/charters/route.ts#asContext",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/charters/tripwire/route.ts#POST",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/app/api/config-missions/route.ts#GET",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -1385,6 +1395,11 @@
     },
     {
       "site": "scripts/approval_inbox.ts#collectDecisionDigest",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/approval_inbox.ts#runCharterReport",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2645,6 +2660,8 @@
       "entries": [
         "presence/displays/concierge/src/app/api/agent-avatar/[expression]/route.ts",
         "presence/displays/concierge/src/app/api/approvals/[id]/route.ts",
+        "presence/displays/concierge/src/app/api/charters/route.ts",
+        "presence/displays/concierge/src/app/api/charters/tripwire/route.ts",
         "presence/displays/concierge/src/app/api/config-mission-data.ts",
         "presence/displays/concierge/src/app/api/config-missions/route.ts",
         "presence/displays/concierge/src/app/api/events/route.ts",
@@ -2708,6 +2725,7 @@
         "presence/displays/concierge/src/app/settings/page.tsx",
         "presence/displays/concierge/src/app/settings/sections/AdvancedSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/AvatarGenerationPanel.tsx",
+        "presence/displays/concierge/src/app/settings/sections/CharterPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/DisplaySection.tsx",
         "presence/displays/concierge/src/app/settings/sections/IntroduceSecretPanel.tsx",
         "presence/displays/concierge/src/app/settings/sections/MembersSection.tsx",
@@ -2726,6 +2744,8 @@
         "presence/displays/concierge/src/lib/agent-avatar-sources.ts",
         "presence/displays/concierge/src/lib/api-guard.ts",
         "presence/displays/concierge/src/lib/avatar-generation-jobs.ts",
+        "presence/displays/concierge/src/lib/charter-server.ts",
+        "presence/displays/concierge/src/lib/charter-view.ts",
         "presence/displays/concierge/src/lib/concierge-advisory-response.ts",
         "presence/displays/concierge/src/lib/concierge-theme.ts",
         "presence/displays/concierge/src/lib/conversation-types.ts",
