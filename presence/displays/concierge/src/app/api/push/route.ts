@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withExecutionContext } from '@agent/core/authority';
 import * as secureIo from '@agent/core/secure-io';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
-import { readPushStatus, subscribePush, unsubscribePush } from '../../../lib/push-server';
+import { readPushStatus, subscribeOperatorPush, unsubscribePush } from '../../../lib/push-server';
 import { readRequestObject } from '../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
 
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     }
     const result = asContext(() =>
       action === 'subscribe'
-        ? subscribePush(resolved.context, body?.subscription)
+        ? subscribeOperatorPush(resolved.context, body?.subscription)
         : unsubscribePush(resolved.context, body?.endpoint)
     );
     if (!result.ok) {

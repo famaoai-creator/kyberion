@@ -126,7 +126,7 @@ describe('trace-feed', () => {
 
   it('uses schema-valid mission state for trace scope fallback', () => {
     resetTestDir();
-    const missionId = `TRACE-SCOPE-${process.pid}-${randomUUID().slice(0, 8)}`;
+    const missionId = `TRACE-SCOPE-${process.pid}-${randomUUID().slice(0, 8)}`.toUpperCase();
     missionIds.push(missionId);
     const missionDir = pathResolver.missionDir(missionId, 'public');
     withExecutionContext('mission_controller', () => {

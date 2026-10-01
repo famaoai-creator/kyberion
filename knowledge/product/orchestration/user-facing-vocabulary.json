@@ -12116,6 +12116,41 @@
         "ja": "ご用件をどうぞ。ご依頼・状況のご確認・修正のご相談を承ります。",
         "qps-ploc": "⟦Ħőẇ ƈȧñ ẇė ħėŀṗ ŧőḓȧẏ? Řėɋůėşŧş, şŧȧŧůş ƈħėƈķş, ȧñḓ ƈħȧñɠė řėɋůėşŧş ȧřė ȧŀŀ ẇėŀƈőɱė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
       },
+      "dock.history.loading": {
+        "en": "Restoring your conversation…",
+        "ja": "前回の会話を読み込んでいます…",
+        "qps-ploc": "⟦Řėşŧőřïñɠ ẏőůř ƈőñṽėřşȧŧïőñ… ŀőřėɱ ïṗş⟧"
+      },
+      "dock.history.failed": {
+        "en": "Your conversation could not be restored. Check your connection or sign in again.",
+        "ja": "前回の会話を読み込めませんでした。接続やログイン状態をご確認ください。",
+        "qps-ploc": "⟦Ẏőůř ƈőñṽėřşȧŧïőñ ƈőůŀḓ ñőŧ ƀė řėşŧőřėḓ. Ƈħėƈķ ẏőůř ƈőññėƈŧïőñ őř şïɠñ ïñ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "dock.history.retry": {
+        "en": "Try loading again",
+        "ja": "もう一度読み込む",
+        "qps-ploc": "⟦Ŧřẏ ŀőȧḓïñɠ ȧɠȧïñ ŀőřėɱ⟧"
+      },
+      "dock.history.pending": {
+        "en": "Some saved requests have no recorded reply yet. Check their progress before sending them again.",
+        "ja": "返信がまだ記録されていない依頼があります。再送する前に進み具合をご確認ください。",
+        "qps-ploc": "⟦Şőɱė şȧṽėḓ řėɋůėşŧş ħȧṽė ñő řėƈőřḓėḓ řėṗŀẏ ẏėŧ. Ƈħėƈķ ŧħėïř ṗřőɠřėşş ƀėƒőřė şėñḓïñɠ ŧħėɱ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "dock.history.unsaved": {
+        "en": "Some replies could not be saved, or used a voice-only path. They may not appear when you return. Do not repeat completed work just to save its reply.",
+        "ja": "一部の返信は保存できなかったか、音声専用の経路で処理されました。次回の履歴に表示されない場合があります。保存のために完了した仕事を再実行しないでください。",
+        "qps-ploc": "⟦Şőɱė řėṗŀïėş ƈőůŀḓ ñőŧ ƀė şȧṽėḓ, őř ůşėḓ ȧ ṽőïƈė-őñŀẏ ṗȧŧħ. Ŧħėẏ ɱȧẏ ñőŧ ȧṗṗėȧř ẇħėñ ẏőů řėŧůřñ. Ḓő ñőŧ řėṗėȧŧ ƈőɱṗŀėŧėḓ ẇőřķ ĵůşŧ ŧő şȧṽė ïŧş řėṗŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀ⟧"
+      },
+      "api.message_too_long": {
+        "en": "Please keep each message within 8,192 characters.",
+        "ja": "メッセージは 8,192 文字以内で送信してください。",
+        "qps-ploc": "⟦Ṗŀėȧşė ķėėṗ ėȧƈħ ɱėşşȧɠė ẇïŧħïñ 8,192 ƈħȧřȧƈŧėřş. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "api.history_unavailable": {
+        "en": "Your request could not be saved, so work has not started. Please check your connection and try again.",
+        "ja": "依頼を保存できなかったため、仕事は開始していません。接続をご確認のうえ再度お試しください。",
+        "qps-ploc": "⟦Ẏőůř řėɋůėşŧ ƈőůŀḓ ñőŧ ƀė şȧṽėḓ, şő ẇőřķ ħȧş ñőŧ şŧȧřŧėḓ. Ṗŀėȧşė ƈħėƈķ ẏőůř ƈőññėƈŧïőñ ȧñḓ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
       "dock.placeholder": {
         "en": "Type a request for the secretary…",
         "ja": "秘書へのご依頼をご記入ください…",
@@ -13437,9 +13472,9 @@
         "qps-ploc": "⟦Ñőŧïƒẏ ŧħïş ḓėṽïƈė ŀőřėɱ⟧"
       },
       "setup.push_description": {
-        "en": "A short alert that something is waiting. It never says what, so nothing private is sent through the push service.",
-        "ja": "「決めることがあります」とだけ知らせます。内容は一切送らないので、通知サービスに機密が渡ることはありません。",
-        "qps-ploc": "⟦Ȧ şħőřŧ ȧŀėřŧ ŧħȧŧ şőɱėŧħïñɠ ïş ẇȧïŧïñɠ. Ïŧ ñėṽėř şȧẏş ẇħȧŧ, şő ñőŧħïñɠ ṗřïṽȧŧė ïş şėñŧ ŧħřőůɠħ ŧħė ṗůşħ şėřṽïƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+        "en": "Process-wide approval and question alerts go only to the local operator's device. Tenant-member devices are not eligible for this global stream.",
+        "ja": "プロセス全体の承認・質問通知はローカル運用者の端末だけに届きます。テナント利用者の端末には通知されません。",
+        "qps-ploc": "⟦Ṗřőƈėşş-ẇïḓė ȧṗṗřőṽȧŀ ȧñḓ ɋůėşŧïőñ ȧŀėřŧş ɠő őñŀẏ ŧő ŧħė ŀőƈȧŀ őṗėřȧŧőř'ş ḓėṽïƈė. Ŧėñȧñŧ-ɱėɱƀėř ḓėṽïƈėş ȧřė ñőŧ ėŀïɠïƀŀė ƒőř ŧħïş ɠŀőƀȧŀ şŧřėȧɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
       },
       "setup.push_on": {
         "en": "Turn on notifications on this device",

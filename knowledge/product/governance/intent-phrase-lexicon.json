@@ -1353,7 +1353,12 @@
           "patterns": ["「(.+?)」", "\"(.+?)\"", "『(.+?)』"]
         },
         "ja": {
-          "patterns": ["(.+?)を押して", "(.+?)をクリック", "(.+?)をタップ", "(.+?)ボタン"]
+          "patterns": [
+            "(.{1,200}?)を押して",
+            "(.{1,200}?)をクリック",
+            "(.{1,200}?)をタップ",
+            "(.{1,200}?)ボタン"
+          ]
         }
       }
     },
@@ -1361,10 +1366,10 @@
       "description": "Extraction patterns (first capture group) for the value to type into a field. Used via captureIntentPhrase.",
       "locales": {
         "ja": {
-          "patterns": ["「([^」]+)」を.*(?:入力|入れて)", "(.+?)\\s*と入力"]
+          "patterns": ["「([^」]+)」を.{0,200}?(?:入力|入れて)", "(.{1,500}?)\\s*と入力"]
         },
         "en": {
-          "patterns": ["\"([^\"]+)\".*(?:input|type|fill)"]
+          "patterns": ["\"([^\"]+)\".{0,200}?(?:input|type|fill)"]
         }
       }
     },
