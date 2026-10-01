@@ -513,7 +513,9 @@ function reportResidualStubDegradation(mode: string, reason: string): void {
 
 function _installReasoningBackendsCore(options: InstallReasoningOptions): boolean {
   initializeAdapterDefaultPreferences();
-  const effectiveOptions = applyOperatorLlmSelection(options);
+  // Copy before applying route-derived defaults — applyOperatorLlmSelection
+  // may return the caller's object, and these fields must not leak back.
+  const effectiveOptions: InstallReasoningOptions = { ...applyOperatorLlmSelection(options) };
   // The default (unscoped) chain serves every dispatch whose role is not in
   // the governed role map. Give it the `default` role's resolved route so the
   // profile's timeout_ms / tools_enabled / allowed_tools actually reach the
