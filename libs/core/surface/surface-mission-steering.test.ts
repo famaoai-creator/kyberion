@@ -242,6 +242,10 @@ function unsatisfiedReconciliationBuilder() {
   });
 }
 
+// These assertions pin the Japanese rendering, so the locale is explicit rather
+// than inherited from the host environment.
+process.env.KYBERION_LOCALE = 'ja';
+
 describe('classifySteeringMessage', () => {
   it('matches the documented trigger phrases (Japanese + English) conservatively', () => {
     expect(classifySteeringMessage('ステータス')).toEqual({ verb: 'status', note: undefined });

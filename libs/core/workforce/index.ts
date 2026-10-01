@@ -65,7 +65,6 @@ export * from './worker-context-compaction.js';
 export * from './worker-event-stream.js';
 export * from './worker-goal-driver.js';
 export * from './worker-goal.js';
-export * from './worker-proxy.js';
 export * from './worker-state-journal.js';
 export * from './workspace-budget.js';
 export * from './workspace-ledger.js';

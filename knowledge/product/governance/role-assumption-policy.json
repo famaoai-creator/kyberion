@@ -7,10 +7,11 @@
       "chronos_gateway",
       "infrastructure_sentinel",
       "knowledge_steward",
+      "scope_locale_reader",
       "slack_bridge",
       "surface_runtime"
     ],
-    "rationale": "Narrow roles that libs/core modules assume internally on behalf of their callers to write their own governed stores: infrastructure_sentinel (work coordination, peer messaging, mesh, the stimuli journal), knowledge_steward (mission creation), and the GovernedArtifactRole set of artifact-store / surface stores (chronos_gateway, slack_bridge, surface_runtime; surface-coordination-store maps a surface to its role from a governed plus a personal-tier map, so any GovernedArtifactRole is reachable wherever it is used). operational_learning_writer is deliberately restricted to the system roles that reach its learning path. The broad roles (ecosystem_architect, mission_controller, sovereign_concierge) are never shared: each system role lists them only where docs/developer/role-assumption-reachability.json reaches them. The report shows oauth_callback_surface and surface_runtime do not reach some shared roles; they stay shared because removing a shared role for one system role needs a policy-shape change (tracked as a follow-up)."
+    "rationale": "Narrow roles that libs/core modules assume internally on behalf of their callers to write their own governed stores: infrastructure_sentinel (work coordination, peer messaging, mesh, the stimuli journal), knowledge_steward (mission creation), scope_locale_reader (read-only: libs/core/locale.ts reads the tenant reply locale, knowledge/confidential/<tenant>/locale.json, bound to the turn's tenant, for every surface that renders a reply), and the GovernedArtifactRole set of artifact-store / surface stores (chronos_gateway, slack_bridge, surface_runtime; surface-coordination-store maps a surface to its role from a governed plus a personal-tier map, so any GovernedArtifactRole is reachable wherever it is used). operational_learning_writer is deliberately restricted to the system roles that reach its learning path. The broad roles (ecosystem_architect, mission_controller, sovereign_concierge) are never shared: each system role lists them only where docs/developer/role-assumption-reachability.json reaches them. The report shows oauth_callback_surface and surface_runtime do not reach some shared roles; they stay shared because removing a shared role for one system role needs a policy-shape change (tracked as a follow-up)."
   },
   "system_roles": {
     "chronos_mirror_v2": {

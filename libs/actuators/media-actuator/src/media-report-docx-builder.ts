@@ -2,6 +2,7 @@ import { resolveEastAsianFontFamily } from '@agent/core/design-fonts';
 import { resolveDocumentContentsLabel } from '@agent/core/media/document-contents-policy';
 import { resolveReportSectionTitle } from '@agent/core/media/document-outline-label-policy';
 import { nowIso } from '@agent/core/foundation';
+import { semanticToken } from '@agent/core/semantic-design-tokens';
 import { normalizeStructuredSection } from './media-structured-content.js';
 import {
   buildMediaGenerationBoundary,
@@ -50,11 +51,11 @@ export function buildReportDocxProtocol(
     {}) as Record<string, unknown>;
   const themeColor = (key: string, fallback: string) =>
     String(themeColorMap[key] || fallback).replace('#', '');
-  const accentHex = themeColor('accent', themeHints.accent || '#2563EB');
-  const borderHex = themeColor('border', '#D8D8DB');
-  const surfaceHex = themeColor('surface', '#F1F1F4');
-  const mutedHex = themeColor('muted_text', '#4D4D4D');
-  const textHex = themeColor('text', '#1A1A1A');
+  const accentHex = themeColor('accent', themeHints.accent || semanticToken('docx', 'docx.accent'));
+  const borderHex = themeColor('border', semanticToken('docx', 'docx.border'));
+  const surfaceHex = themeColor('surface', semanticToken('docx', 'docx.surface'));
+  const mutedHex = themeColor('muted_text', semanticToken('docx', 'docx.muted_text'));
+  const textHex = themeColor('text', semanticToken('docx', 'docx.text'));
   const primaryHex = themeColor('primary', accentHex);
   // Design tokens: the same spacing/typography tables the slide layout
   // system reads, projected onto DOCX units — spacing is inches → twips

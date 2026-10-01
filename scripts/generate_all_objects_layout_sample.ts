@@ -1,14 +1,13 @@
 import { generateNativePptx } from '@agent/core/media/media-contracts';
 import {
-  PPTX_PALETTE as C,
+  createPptxLayoutKit,
   textElement as txt,
   shapeElement as shape,
   lineElement as line,
-  sectionHeaderElements,
-  footerElements,
 } from '@agent/core/media/native-pptx-engine/layout-primitives';
 import type { PptxDesignProtocol, PptxElement, PptxSlide } from '@agent/core/types';
 import { nowIso } from '@agent/core/foundation';
+import { currentProcessArgv } from './lib/harness.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const TOTAL_PAGES = 16;
@@ -16,10 +15,19 @@ const TOTAL_PAGES = 16;
 // LE-02: layout primitives live in the engine (@agent/core layout-primitives);
 // per-element font/size/color defaults come from the designDefaults cascade on
 // the protocol below, so every render path shares the same fills.
-const sectionHeader = (title: string): PptxElement[] => sectionHeaderElements(title);
+//
+// The render's tenant (`--tenant <slug>`; default: the process tenant) is bound
+// once into the layout kit so the tenant's semantic-token overlay colours the
+// palette, headers and footers of every slide.
+const tenantArgIndex = currentProcessArgv().indexOf('--tenant');
+const RENDER_TENANT =
+  tenantArgIndex >= 0 ? currentProcessArgv()[tenantArgIndex + 1]?.trim() || undefined : undefined;
+const layoutKit = createPptxLayoutKit({ tenantSlug: RENDER_TENANT });
+const C = layoutKit.palette;
+const sectionHeader = (title: string): PptxElement[] => layoutKit.sectionHeader(title);
 
 const footer = (pageNum: number): PptxElement[] =>
-  footerElements({
+  layoutKit.footer({
     pageNum,
     totalPages: TOTAL_PAGES,
     label: 'Kyberion OS Sovereign Presentation Engine Showcase',
@@ -1380,6 +1388,7 @@ const slide15: PptxSlide = {
     ),
 
     txt(
+      // i18n-exempt: JA demo deck content generator
       '■ Setup Requirements:\n・Node.js v18+\n・TypeScript 5.x with ESNext ESM setup\n・pnpm Workspace Monorepo resolved dependencies\n\n■ Deliverable Output:\nSuccessful compiler generates output locally within: \n`active/shared/tmp/all_objects_layout_sample.pptx` \nwhich adheres strictly to OOXML ECMA-376 ISO standards.',
       { x: 5.4, y: 3.6, w: 3.8, h: 2.6 },
       { fontSize: 11, color: C.gray700, lineSpacing: 1.2 }

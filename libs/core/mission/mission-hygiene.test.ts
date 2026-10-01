@@ -137,6 +137,17 @@ describe('mission hygiene', () => {
       path.resolve(process.cwd(), 'knowledge/product/schemas/mission-next-tasks.schema.json'),
       path.join(schemaDir, 'mission-next-tasks.schema.json')
     );
+    // User-facing text is rendered from the vocabulary catalog under KYBERION_ROOT.
+    const orchestrationDir = path.join(tmpRoot, 'knowledge', 'product', 'orchestration');
+    fs.mkdirSync(orchestrationDir, { recursive: true });
+    fs.copyFileSync(
+      path.resolve(process.cwd(), 'knowledge/product/orchestration/user-facing-vocabulary.json'),
+      path.join(orchestrationDir, 'user-facing-vocabulary.json')
+    );
+    fs.copyFileSync(
+      path.resolve(process.cwd(), 'knowledge/product/schemas/user-facing-vocabulary.schema.json'),
+      path.join(schemaDir, 'user-facing-vocabulary.schema.json')
+    );
     process.env.KYBERION_ROOT = tmpRoot;
 
     seedMission('MSN-FRESH', 'planned', 0, {}); // fresh — not stale yet

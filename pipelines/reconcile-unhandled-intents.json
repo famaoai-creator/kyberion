@@ -3,7 +3,13 @@
   "pipeline_id": "reconcile-unhandled-intents",
   "version": "1.0.0",
   "name": "Unhandled Intent Reconciler",
-  "description": "Reads the unhandled-intent registry (unrouted + unrecognized) and writes proposal stubs. Invokes reasoning:analyze to suggest routing entries (for unrouted) or new intent definitions (for unrecognized).",
+  "description": "Reads the unhandled-intent registry (unrouted + unrecognized) and writes proposal stubs under active/shared/tmp/ for a human to turn into routing entries (unrouted) or new intent definitions (unrecognized). It runs no reasoning step and writes nothing under knowledge/. Ships with its schedule disabled; opt in on a host by listing the schedule id (reconcile-unhandled-intents-weekly) in KYBERION_CHRONOS_SCHEDULES.",
+  "schedule": {
+    "id": "reconcile-unhandled-intents-weekly",
+    "cron": "20 3 * * 0",
+    "timezone": "Asia/Tokyo",
+    "enabled": false
+  },
   "context": {
     "registry_path": "active/shared/tmp/unhandled-intent-registry.json",
     "proposals_dir": "active/shared/tmp/unhandled-intent-proposals",

@@ -9,6 +9,7 @@ import {
   useA2UIActions,
 } from '@agent/shared-ui';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
+import { resolveConciergeLocale } from '../lib/i18n';
 import {
   normalizeThemePreference,
   onDisplayPreferencesChange,
@@ -48,7 +49,7 @@ export function ConciergeHeader() {
         setTheme(next);
         updateDisplayPreferences({ theme: next });
       } else if (actionId === KB_DISPLAY_CONTROLS_ACTIONS.locale) {
-        setLocale(payload?.value === 'en' ? 'en' : 'ja');
+        setLocale(resolveConciergeLocale(String(payload?.value ?? '')));
       }
     },
     [setLocale]

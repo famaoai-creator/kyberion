@@ -3,6 +3,7 @@ import {
   hasRegisteredReasoningBackend,
 } from '../reasoning/reasoning-backend.js';
 import { discussionRoleLabel, fillCopy, loadDiscussionCopy } from './discussion-copy.js';
+import { pickByLocale } from '../locale-normalize.js';
 import type {
   DiscussionAgendaItem,
   DiscussionParticipant,
@@ -460,7 +461,7 @@ export class ReasoningDiscussionSpeaker implements DiscussionSpeaker {
   private readonly fallback = new ScriptedDiscussionSpeaker();
 
   private language(room: DiscussionRoomState): string {
-    return room.config.locale === 'ja' ? 'Japanese' : 'English';
+    return pickByLocale(room.config.locale, { en: 'English', ja: 'Japanese' });
   }
 
   private async ask(instruction: string, context: string): Promise<string> {
