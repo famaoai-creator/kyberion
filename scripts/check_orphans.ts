@@ -223,7 +223,7 @@ export function importedNames(source: string): Set<string> {
     for (const name of bindingNames(match[1] ?? match[2] ?? '')) names.add(name);
   }
   for (const match of source.matchAll(NAMESPACE_IMPORT)) {
-    const namespace = match[1]!.replace(/\$/gu, '\\$');
+    const namespace = match[1]!.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
     const member = new RegExp(`(?<![\\w$])${namespace}\\.([A-Za-z_$][\\w$]*)`, 'gu');
     for (const access of source.matchAll(member)) names.add(access[1]!);
   }
