@@ -3,7 +3,8 @@
   "services": {
     "discord": {
       "base_url": "https://discord.com/api/v10",
-      "preset_path": "knowledge/product/orchestration/service-presets/discord.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/discord.json",
+      "auth_strategy": "Bot"
     }
   }
 }

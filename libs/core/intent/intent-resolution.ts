@@ -14,6 +14,7 @@ import {
 } from '../contextual-intent-frame.js';
 import { sanitizeIntentPathSegment } from './intent-path-utils.js';
 import { matchesIntentPhrase } from './intent-phrase-lexicon.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 const STANDARD_INTENTS_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/standard-intents.schema.json'
@@ -26,32 +27,18 @@ const PERSONAL_INTENT_OVERLAY_PATH = pathResolver.knowledge(
 );
 const CONFIDENTIAL_INTENT_OVERLAY_DIR = 'confidential';
 
-export type StandardIntentDefinition = {
-  id?: string;
-  category?: string;
-  legacy_category?: string;
-  exposed_to_surface?: boolean;
-  target?: string;
-  action?: string;
-  object?: string;
-  execution_shape?: string;
-  mission_class?: string;
-  risk_profile?: 'low' | 'review_required' | 'approval_required' | 'high_stakes';
-  description?: string;
-  surface_examples?: string[];
-  trigger_keywords?: string[];
-  outcome_ids?: string[];
-  specialist_id?: string;
-  execution_profile_id?: string;
-  plan_outline?: string[];
-  intake_requirements?: string[];
-  pipeline?: Array<{ op?: string; params?: Record<string, unknown> }>;
-  resolution?: {
-    shape?: string;
-    task_kind?: string;
-    result_shape?: string;
-  };
-};
+import type { StandardIntentDefinition } from './standard-intents.generated.js';
+export type {
+  StandardIntentDefinition,
+  StandardIntentCategory,
+  StandardIntentTarget,
+  StandardIntentAction,
+  StandardIntentExecutionShape,
+  StandardIntentMissionClass,
+  StandardIntentRiskProfile,
+  StandardIntentResolution,
+  StandardIntentPipelineStep,
+} from './standard-intents.generated.js';
 
 export type IntentDomainOntologyEntry = {
   intent_id: string;
@@ -682,28 +669,69 @@ function inferMessagingBridgePlatformId(utterance: string): string | undefined {
   return undefined;
 }
 
+export type IntentParamExtractor = (
+  utterance: string
+) => IntentResolutionSelectedParameters | undefined;
+
+const intentParamExtractorSeam = createSeam<IntentParamExtractor>({
+  key: 'intent:param-extract',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+
+export function registerIntentParamExtractor(
+  intentId: string,
+  extractor: IntentParamExtractor,
+  metadata: SeamProviderMetadata = {
+    provenance: 'builtin',
+    source: 'libs/core/intent/intent-resolution.ts',
+  }
+): () => void {
+  return intentParamExtractorSeam.register(intentId, extractor, metadata);
+}
+
+export function getIntentParamExtractor(
+  intentId: string | undefined
+): IntentParamExtractor | undefined {
+  if (!intentId) return undefined;
+  return intentParamExtractorSeam.getOptional(intentId);
+}
+
+function extractMessagingBridgeParameters(
+  utterance: string
+): IntentResolutionSelectedParameters | undefined {
+  const platformId = inferMessagingBridgePlatformId(utterance);
+  if (!platformId) return undefined;
+  return { platform_id: platformId, target_platform: platformId };
+}
+
+function extractServiceNameParameters(
+  utterance: string
+): IntentResolutionSelectedParameters | undefined {
+  const serviceMatch =
+    utterance.match(
+      /([A-Za-z0-9._-]+)\s*(?:の|を)?\s*(?:再起動|restart|起動|停止|stop|status|状態|ログ)/i
+    ) || utterance.match(/service\s+([A-Za-z0-9._-]+)/i);
+  if (!serviceMatch?.[1]) return undefined;
+  return { service_name: serviceMatch[1] };
+}
+
+registerIntentParamExtractor('setup-messaging-bridge', extractMessagingBridgeParameters);
+for (const serviceIntentId of [
+  'inspect-service',
+  'start-service',
+  'stop-service',
+  'restart-service',
+]) {
+  registerIntentParamExtractor(serviceIntentId, extractServiceNameParameters);
+}
+
 function inferSelectedParameters(
   intentId: string | undefined,
   utterance: string
 ): IntentResolutionSelectedParameters | undefined {
-  const parameters: IntentResolutionSelectedParameters = {};
-  if (intentId === 'setup-messaging-bridge') {
-    const platformId = inferMessagingBridgePlatformId(utterance);
-    if (platformId) {
-      parameters.platform_id = platformId;
-      parameters.target_platform = platformId;
-    }
-  }
-
-  if (
-    ['inspect-service', 'start-service', 'stop-service', 'restart-service'].includes(intentId || '')
-  ) {
-    const serviceMatch =
-      utterance.match(
-        /([A-Za-z0-9._-]+)\s*(?:の|を)?\s*(?:再起動|restart|起動|停止|stop|status|状態|ログ)/i
-      ) || utterance.match(/service\s+([A-Za-z0-9._-]+)/i);
-    if (serviceMatch?.[1]) parameters.service_name = serviceMatch[1];
-  }
+  const extractor = getIntentParamExtractor(intentId);
+  const parameters = extractor?.(utterance) || {};
 
   return Object.keys(parameters).length > 0 ? parameters : undefined;
 }

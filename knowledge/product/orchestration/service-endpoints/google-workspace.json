@@ -3,7 +3,8 @@
   "services": {
     "google-workspace": {
       "preset_path": "knowledge/product/orchestration/service-presets/google-workspace.json",
-      "allow_unsafe_cli": true
+      "allow_unsafe_cli": true,
+      "auth_strategy": "session"
     }
   }
 }

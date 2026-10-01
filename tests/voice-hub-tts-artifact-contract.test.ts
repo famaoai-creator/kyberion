@@ -39,6 +39,6 @@ describe('voice-hub TTS artifact lifecycle contract', () => {
     expect(source).toContain(
       "const safeArtifactPath = resolveRegularRepositoryFile(artifactPath, 'TTS artifact');"
     );
-    expect(source).toContain("spawn('/usr/bin/afplay', [safeArtifactPath]");
+    expect(source).toContain("spawnSupervisedChild('/usr/bin/afplay', [safeArtifactPath]");
   });
 });

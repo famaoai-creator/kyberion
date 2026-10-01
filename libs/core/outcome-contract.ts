@@ -1,3 +1,7 @@
+import { isArtifactKind, type ArtifactKind } from './workforce/artifact-registry.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { pathResolver } from './path-resolver.js';
+
 export type OutcomeVerificationMethod = 'self_check' | 'review_gate' | 'human_acceptance' | 'test';
 
 export interface VisionRefSummary {
@@ -11,10 +15,11 @@ export interface VisionRefSummary {
 export interface OutcomeContract {
   outcome_id: string;
   requested_result: string;
-  deliverable_kind: string;
+  /** Constrained to the outcome-catalog正本 vocabulary (ArtifactKind union). */
+  deliverable_kind: ArtifactKind;
   success_criteria: string[];
   evidence_required: boolean;
-  expected_artifacts: Array<{ kind: string; storage_class: string }>;
+  expected_artifacts: Array<{ kind: ArtifactKind; storage_class: string }>;
   verification_method: OutcomeVerificationMethod;
   vision_ref?: VisionRefSummary | null;
 }
@@ -48,13 +53,97 @@ export function createOutcomeContract(input: {
   return {
     outcome_id: input.outcomeId || `outcome_${Date.now().toString(36)}`,
     requested_result: String(input.requestedResult || '').trim(),
-    deliverable_kind: String(input.deliverableKind || '').trim(),
+    deliverable_kind: normalizeArtifactKind(input.deliverableKind),
     success_criteria: successCriteria,
     evidence_required: Boolean(input.evidenceRequired),
-    expected_artifacts: expectedArtifacts,
+    expected_artifacts: expectedArtifacts.map((item) => ({
+      kind: normalizeArtifactKind(item.kind),
+      storage_class: item.storage_class,
+    })),
     verification_method: input.verificationMethod || 'self_check',
     ...(vision_ref ? { vision_ref } : {}),
   };
+}
+
+/**
+ * D6: tasktype→artifact-kind catalog.
+ * 正本: knowledge/product/governance/tasktype-artifact-map.json
+ * (schema: knowledge/product/schemas/tasktype-artifact-map.schema.json).
+ * libs/core/workforce/work-design.ts の outcomeCatalog (defineCatalog) とは
+ * outcome-catalog.json を共有正本とし、こちらは tasktype 解決のみを持つ。
+ * 解決結果・デフォルトは従来の直書きマップと同一。
+ */
+export interface TasktypeArtifactMapping {
+  kind: ArtifactKind;
+  storage_class: string;
+}
+
+interface TasktypeArtifactMapFile {
+  version?: string | number;
+  mappings?: Record<string, TasktypeArtifactMapping>;
+  fallback?: { kind?: ArtifactKind };
+}
+
+interface OutcomeCatalogFile {
+  outcomes?: Record<string, { deliverable_kind?: ArtifactKind }>;
+}
+
+const tasktypeArtifactCatalog = defineCatalog<TasktypeArtifactMapFile>({
+  id: 'tasktype-artifact-map',
+  path: pathResolver.knowledge('product/governance/tasktype-artifact-map.json'),
+  schema: pathResolver.knowledge('product/schemas/tasktype-artifact-map.schema.json'),
+});
+
+const outcomeCatalogForResolution = defineCatalog<OutcomeCatalogFile>({
+  id: 'outcome-catalog',
+  path: pathResolver.knowledge('product/governance/outcome-catalog.json'),
+  schema: pathResolver.knowledge('product/schemas/outcome-catalog.schema.json'),
+});
+
+function loadTasktypeArtifactMap(): {
+  mappings: Record<string, TasktypeArtifactMapping>;
+  fallbackKind: ArtifactKind;
+} {
+  const parsed = tasktypeArtifactCatalog.load();
+  return {
+    mappings: parsed.mappings || {},
+    fallbackKind: parsed.fallback!.kind!,
+  };
+}
+
+/** Resolve a task_type to its governed artifact mapping; null when unmapped. */
+export function resolveTaskTypeArtifact(taskType: string): TasktypeArtifactMapping | null {
+  const normalized = String(taskType || '').trim();
+  if (!normalized) return null;
+  const mapped = loadTasktypeArtifactMap().mappings[normalized];
+  if (!mapped || !mapped.kind || !mapped.storage_class) return null;
+  return { kind: mapped.kind, storage_class: mapped.storage_class };
+}
+
+/** Fallback deliverable kind for task types without a catalog mapping (default: summary). */
+export function resolveTaskTypeFallbackKind(): ArtifactKind {
+  return loadTasktypeArtifactMap().fallbackKind;
+}
+
+/**
+ * Resolve a missionType to a governed deliverable kind via outcome-catalog.json:
+ * outcome-id 一致 → その deliverable_kind、
+ * deliverable_kind 語彙一致 → そのまま、
+ * 既知の legacy mission type は保持し、未知語彙は governed fallback に解決する。
+ */
+export function resolveMissionDeliverableKind(missionType: string): ArtifactKind {
+  const normalized = String(missionType || 'development').trim() || 'development';
+  try {
+    const outcomes = outcomeCatalogForResolution.load().outcomes || {};
+    const byId = outcomes[normalized];
+    if (byId?.deliverable_kind) return byId.deliverable_kind;
+    if (Object.values(outcomes).some((entry) => entry?.deliverable_kind === normalized)) {
+      if (isArtifactKind(normalized)) return normalized;
+    }
+  } catch {
+    // Catalog unavailable: preserve the legacy pass-through below.
+  }
+  return isArtifactKind(normalized) ? normalized : resolveTaskTypeFallbackKind();
 }
 
 function parseVisionRef(input: string, tenantSlug?: string | null): VisionRefSummary {
@@ -128,15 +217,11 @@ export function inferTaskSessionOutcomeContract(input: {
   goal: { summary: string; success_condition: string };
   taskType: string;
 }): OutcomeContract {
-  const artifactByTaskType: Record<string, { kind: string; storage: string }> = {
-    presentation_deck: { kind: 'pptx', storage: 'artifact_store' },
-    report_document: { kind: 'docx', storage: 'artifact_store' },
-    workbook_wbs: { kind: 'xlsx', storage: 'artifact_store' },
-    capture_photo: { kind: 'image', storage: 'artifact_store' },
-  };
-  const mapped = artifactByTaskType[input.taskType];
-  const deliverableKind = mapped ? mapped.kind : 'summary';
-  const expectedArtifacts = mapped ? [{ kind: mapped.kind, storage_class: mapped.storage }] : [];
+  const mapped = resolveTaskTypeArtifact(input.taskType);
+  const deliverableKind: ArtifactKind = mapped ? mapped.kind : resolveTaskTypeFallbackKind();
+  const expectedArtifacts: Array<{ kind: ArtifactKind; storage_class: string }> = mapped
+    ? [{ kind: mapped.kind, storage_class: mapped.storage_class }]
+    : [];
 
   return createOutcomeContract({
     outcomeId: `ts_${input.sessionId}`,
@@ -183,11 +268,18 @@ export function inferMissionOutcomeContract(input: {
   return createOutcomeContract({
     outcomeId: `msn_${input.missionId}`,
     requestedResult,
-    deliverableKind: missionType,
+    deliverableKind: resolveMissionDeliverableKind(missionType),
     successCriteria,
     evidenceRequired: false,
     expectedArtifacts: [],
     verificationMethod: 'review_gate',
     visionRef: input.visionRef,
   });
+}
+
+function normalizeArtifactKind(value: string): ArtifactKind {
+  const normalized = String(value || '').trim();
+  if (!isArtifactKind(normalized))
+    throw new Error(`[ARTIFACT_KIND_INVALID] Unsupported artifact kind: ${normalized}`);
+  return normalized;
 }

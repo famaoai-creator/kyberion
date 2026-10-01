@@ -2093,6 +2093,9 @@
     "presence/displays/terminal-hud/src/actions/schedule-actions.ts#runScheduleNow": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
+    "satellites/shared/supervise-child.ts#spawnSupervisedChild": [
+      "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
+    ],
     "scripts/backup.ts#runRequired": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
@@ -5728,7 +5731,8 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/virtual/virtual-audio-input-recording-bridge.ts#VirtualAudioInputRecordingBridgeImpl",
-        "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge"
+        "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
+        "satellites/shared/supervise-child.ts#spawnSupervisedChild"
       ],
       "policy_roles_not_reachable": []
     }

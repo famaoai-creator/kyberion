@@ -3,7 +3,8 @@
   "services": {
     "voice": {
       "preset_path": "knowledge/product/orchestration/service-presets/voice.json",
-      "intent_aliases": ["speak-with-my-voice", "live-voice"]
+      "intent_aliases": ["speak-with-my-voice", "live-voice"],
+      "auth_strategy": "none"
     }
   }
 }

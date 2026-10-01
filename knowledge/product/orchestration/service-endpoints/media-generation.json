@@ -3,7 +3,8 @@
   "services": {
     "media-generation": {
       "preset_path": "knowledge/product/orchestration/service-presets/media-generation.json",
-      "intent_aliases": ["generate-video", "generate-image", "generate-music"]
+      "intent_aliases": ["generate-video", "generate-image", "generate-music"],
+      "auth_strategy": "none"
     }
   }
 }

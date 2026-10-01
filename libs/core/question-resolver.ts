@@ -14,6 +14,7 @@ import { getNarratedVideoBriefQuestions } from './video/narrated-video-preferenc
 import { getPresentationPreferenceProfile } from './presentation-preference-registry.js';
 import { getPresentationBriefQuestions } from './presentation-preference-profile.js';
 import { clamp, slugify } from './foundation/text.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
 import type { ActuatorExecutionBrief } from './contracts/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from './contracts/operator-interaction-packet.js';
 import type { MeetingOperationsProfile } from './contracts/meeting-operations-profile.js';
@@ -325,46 +326,7 @@ function buildOperatorInteractionPacket(
 }
 
 function buildProfileQuestions(intentId: string | undefined): QuestionResolutionQuestion[] {
-  switch (intentId) {
-    case 'meeting-operations':
-      return getMeetingBriefQuestions(getMeetingProfileFallback(), undefined, 3).questions.map(
-        (question, index) => ({
-          id: `meeting_profile_${index + 1}_${slugify(question, { maxLength: 48, fallback: 'question' })}`,
-          question,
-          reason:
-            'The meeting profile provides reusable preflight questions for this coordination flow.',
-          source: 'profile' as const,
-          blocking: false,
-        })
-      );
-    case 'generate-presentation':
-      return getPresentationBriefQuestions(
-        getPresentationPreferenceProfile(),
-        undefined,
-        3
-      ).questions.map((question, index) => ({
-        id: `presentation_profile_${index + 1}_${slugify(question, { maxLength: 48, fallback: 'question' })}`,
-        question,
-        reason: 'The presentation profile provides reusable brief questions for this deck flow.',
-        source: 'profile' as const,
-        blocking: false,
-      }));
-    case 'generate-narrated-video':
-      return getNarratedVideoBriefQuestions(
-        getNarratedVideoProfileFallback(),
-        undefined,
-        3
-      ).questions.map((question, index) => ({
-        id: `video_profile_${index + 1}_${slugify(question, { maxLength: 48, fallback: 'question' })}`,
-        question,
-        reason:
-          'The narrated video profile provides reusable preflight questions for this media flow.',
-        source: 'profile' as const,
-        blocking: false,
-      }));
-    default:
-      return [];
-  }
+  return getProfileQuestionProvider(intentId)?.() ?? [];
 }
 
 function getMeetingProfileFallback(): MeetingOperationsProfile {
@@ -374,6 +336,70 @@ function getMeetingProfileFallback(): MeetingOperationsProfile {
 function getNarratedVideoProfileFallback(): NarratedVideoPreferenceProfile {
   return narratedVideoProfileCatalog.load();
 }
+
+export type ProfileQuestionProvider = () => QuestionResolutionQuestion[];
+
+const profileQuestionProviderSeam = createSeam<ProfileQuestionProvider>({
+  key: 'question-profile-provider',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+
+export function registerProfileQuestionProvider(
+  intentId: string,
+  provider: ProfileQuestionProvider,
+  metadata: SeamProviderMetadata = {
+    provenance: 'builtin',
+    source: 'libs/core/question-resolver.ts',
+  }
+): () => void {
+  return profileQuestionProviderSeam.register(intentId, provider, metadata);
+}
+
+export function getProfileQuestionProvider(
+  intentId: string | undefined
+): ProfileQuestionProvider | undefined {
+  if (!intentId) return undefined;
+  return profileQuestionProviderSeam.getOptional(intentId);
+}
+
+registerProfileQuestionProvider('meeting-operations', () =>
+  getMeetingBriefQuestions(getMeetingProfileFallback(), undefined, 3).questions.map(
+    (question, index) => ({
+      id: `meeting_profile_${index + 1}_${slugify(question, { maxLength: 48, fallback: 'question' })}`,
+      question,
+      reason:
+        'The meeting profile provides reusable preflight questions for this coordination flow.',
+      source: 'profile' as const,
+      blocking: false,
+    })
+  )
+);
+
+registerProfileQuestionProvider('generate-presentation', () =>
+  getPresentationBriefQuestions(getPresentationPreferenceProfile(), undefined, 3).questions.map(
+    (question, index) => ({
+      id: `presentation_profile_${index + 1}_${slugify(question, { maxLength: 48, fallback: 'question' })}`,
+      question,
+      reason: 'The presentation profile provides reusable brief questions for this deck flow.',
+      source: 'profile' as const,
+      blocking: false,
+    })
+  )
+);
+
+registerProfileQuestionProvider('generate-narrated-video', () =>
+  getNarratedVideoBriefQuestions(getNarratedVideoProfileFallback(), undefined, 3).questions.map(
+    (question, index) => ({
+      id: `video_profile_${index + 1}_${slugify(question, { maxLength: 48, fallback: 'question' })}`,
+      question,
+      reason:
+        'The narrated video profile provides reusable preflight questions for this media flow.',
+      source: 'profile' as const,
+      blocking: false,
+    })
+  )
+);
 
 export function resolveQuestionResolution(input: ResolveQuestionInput): QuestionResolutionResult {
   const locale = resolveQuestionLocale(input.locale);

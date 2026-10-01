@@ -1,7 +1,7 @@
 {
   "action": "pipeline",
   "name": "Trial Narrated Report",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "End-to-end narrated executive report: voice narration + video composition with strict ADF preflight.",
   "context": {
     "audio_path": "active/shared/tmp/narration.aiff",
@@ -27,32 +27,11 @@
     },
     {
       "id": "preflight_tools",
-      "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "tool_check", "type": "ShellResult" },
+      "role": "gate",
+      "op": "core:include",
+      "comment": "C2: say/espeak/ffmpeg/ffprobe preflight plus voice-action and render-policy authoring now live in the fragment; caller templates ({{input.narration_text}}) resolve at runtime.",
       "params": {
-        "cmd": "which say && which espeak || true && which ffmpeg && which ffprobe",
-        "preflight_artifacts": ["say", "espeak", "ffmpeg", "ffprobe"]
-      }
-    },
-    {
-      "id": "write_voice_action",
-      "role": "source",
-      "op": "system:write_file",
-      "produces": { "channel": "voice_action_path", "type": "PathResult" },
-      "params": {
-        "path": "active/shared/tmp/voice-action.json",
-        "content": "{\"action\":\"generate_voice\",\"engine\":{\"engine_id\":\"local_say\"},\"delivery\":{\"mode\":\"artifact\",\"format\":\"aiff\"},\"rendering\":{\"language\":\"ja\",\"speed\":1.0},\"text\":\"{{input.narration_text}}\"}"
-      }
-    },
-    {
-      "id": "write_video_render_policy",
-      "role": "source",
-      "op": "system:write_file",
-      "produces": { "channel": "video_render_policy_json", "type": "PathResult" },
-      "params": {
-        "path": "active/shared/tmp/video-composition/render-policy.json",
-        "content": "{\"enable_backend_rendering\":true,\"backend\":\"hyperframes_cli\",\"output_format\":\"mp4\",\"resolution\":\"1920x1080\"}"
+        "fragment": "fragments/narrated-report-preflight.json"
       }
     },
     {
@@ -84,11 +63,11 @@
     },
     {
       "id": "validate_audio_output",
-      "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "audio_check", "type": "ShellResult" },
+      "role": "gate",
+      "op": "core:include",
+      "comment": "C2: audio presence + ffprobe stream validation now live in the fragment (typed audio validation op, no shell chain). Emits audio_check as before.",
       "params": {
-        "cmd": "test -f {{audio_path}} && ffprobe -v error -select_streams a:0 -show_entries stream=codec_type -of csv=p=0 {{audio_path}}"
+        "fragment": "fragments/narrated-report-artifact-validate.json"
       }
     },
     {

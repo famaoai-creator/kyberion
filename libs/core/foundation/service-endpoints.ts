@@ -1,10 +1,38 @@
 import { getRegisteredEnvText } from './env.js';
+import { defineCatalog } from './governed-catalog.js';
+import { pathResolver } from '../path-resolver.js';
 
-/** Default local ComfyUI endpoint; override with KYBERION_COMFY_BASE_URL. */
-export const DEFAULT_COMFYUI_BASE_URL = 'http://127.0.0.1:8188';
+interface ServiceEndpointDefaultsFile {
+  default_pattern?: string;
+  defaults?: {
+    comfyui_base_url?: string;
+    product_repository_url?: string;
+  };
+  services?: Record<string, { base_url?: string }>;
+}
 
-/** Canonical product repository URL; override with KYBERION_REPOSITORY_URL. */
-export const DEFAULT_PRODUCT_REPOSITORY_URL = 'https://github.com/famaoai-creator/kyberion';
+const SERVICE_ENDPOINTS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/service-endpoints.schema.json'
+);
+
+const serviceEndpointsCatalog = defineCatalog<ServiceEndpointDefaultsFile>({
+  id: 'service-endpoints',
+  path: () => pathResolver.knowledge('product/orchestration/service-endpoints.json'),
+  schema: SERVICE_ENDPOINTS_SCHEMA_PATH,
+});
+
+/** Endpoint defaults are validated by the canonical service-endpoints catalog. */
+function catalogDefault(key: 'comfyui_base_url' | 'product_repository_url'): string {
+  const value = serviceEndpointsCatalog.load().defaults?.[key]?.trim();
+  if (!value) throw new Error('[SERVICE_ENDPOINT_DEFAULT_MISSING] ' + key);
+  return value;
+}
+function defaultComfyBaseUrl(): string {
+  return catalogDefault('comfyui_base_url');
+}
+function defaultProductRepositoryUrl(): string {
+  return catalogDefault('product_repository_url');
+}
 
 /** Linear-time trailing-slash trim (a `/\/+$/` regex is polynomial on long slash runs). */
 function stripTrailingSlashes(value: string): string {
@@ -15,7 +43,7 @@ function stripTrailingSlashes(value: string): string {
 
 export function resolveComfyBaseUrl(override?: string): string {
   return stripTrailingSlashes(
-    (override || getRegisteredEnvText('KYBERION_COMFY_BASE_URL') || DEFAULT_COMFYUI_BASE_URL).trim()
+    (override || getRegisteredEnvText('KYBERION_COMFY_BASE_URL') || defaultComfyBaseUrl()).trim()
   );
 }
 
@@ -26,12 +54,12 @@ export function resolveComfyPort(): number {
   } catch {
     /* fall through to the default */
   }
-  return Number(new URL(DEFAULT_COMFYUI_BASE_URL).port);
+  return Number(new URL(defaultComfyBaseUrl()).port);
 }
 
 export function resolveProductRepositoryUrl(): string {
   return (
     stripTrailingSlashes(getRegisteredEnvText('KYBERION_REPOSITORY_URL')?.trim() ?? '') ||
-    DEFAULT_PRODUCT_REPOSITORY_URL
+    defaultProductRepositoryUrl()
   );
 }

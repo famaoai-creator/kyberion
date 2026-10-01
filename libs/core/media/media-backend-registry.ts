@@ -23,6 +23,11 @@ export type MediaBackendPlatform = 'any' | 'darwin' | 'linux' | 'win32';
 export type MediaBackendProbeKind =
   'service_runtime' | 'tool_runtime' | 'native_bridge' | 'registry';
 
+export interface MediaBackendProbeDescriptor {
+  kind: MediaBackendProbeKind;
+  ref?: string;
+}
+
 export interface MediaBackendRecord {
   backend_id: string;
   modality: MediaBackendModality;
@@ -44,6 +49,13 @@ export interface MediaBackendRecord {
   endpoint_env?: string;
   command?: string;
   args?: string[];
+  /** Legacy backend ids governed by the registry that resolve to this record. */
+  aliases?: string[];
+  /**
+   * Governed availability-probe dispatch descriptor. Records without one use
+   * the registry-kind generic path (credential presence check).
+   */
+  probe?: MediaBackendProbeDescriptor;
   fallback_backend_id?: string;
   cost_tier?: 'free' | 'paid' | 'self_hosted' | 'environment';
   data_policy?: 'training_eligible' | 'zero_retention' | 'local_only';
@@ -207,24 +219,21 @@ export function getMediaBackendRecord(
     ? configuredDefault || registry.default_backend_ids[modality]
     : undefined;
   const resolvedId = backendId || defaultBackendId || registry.default_backend_ids.image;
-  const aliasId =
-    modality === 'video' && resolvedId === 'media-generation.comfyui'
-      ? 'media-generation.comfyui.video'
-      : modality === 'music' && resolvedId === 'media-generation.comfyui'
-        ? 'media-generation.comfyui.music'
-        : modality === 'image' && resolvedId === 'local_flux'
-          ? 'media-generation.local_flux'
-          : modality === 'image' && resolvedId === 'apple_playground'
-            ? 'media-generation.apple_playground'
-            : modality === 'music' &&
-                (resolvedId === 'musicgen_mlx' || resolvedId === 'media-generation.musicgen_mlx')
-              ? 'media-generation.musicgen_mlx'
-              : modality === 'music' &&
-                  (resolvedId === 'stable_audio_3' ||
-                    resolvedId === 'stable_audio_3_small_music' ||
-                    resolvedId === 'media-generation.stable_audio_3_small_music')
-                ? 'media-generation.stable_audio_3_small_music'
-                : resolvedId;
+
+  // Alias resolution is registry-driven: a record's `aliases` apply when the
+  // requested modality matches the record's modality (or no modality was
+  // requested). Exact backend_id matches always win, so the no-modality path
+  // is byte-identical to the pre-registry behavior.
+  const exactIdMatch = registry.backends.find(
+    (backend) => backend.backend_id === resolvedId && (!modality || backend.modality === modality)
+  );
+  const aliasId = exactIdMatch
+    ? exactIdMatch.backend_id
+    : modality
+      ? registry.backends.find(
+          (backend) => backend.modality === modality && backend.aliases?.includes(resolvedId)
+        )?.backend_id || resolvedId
+      : resolvedId;
 
   const voiceBackendMatch =
     aliasId.startsWith('voice.') &&
@@ -281,8 +290,16 @@ async function probeMediaBackendAvailabilityUncached(
     };
   }
 
-  if (backend.provider === 'comfyui') {
-    const resolution = await probeServiceRuntime('comfyui', 'trial', platform);
+  // Governed probe dispatch: the record's `probe` descriptor selects the live
+  // runtime registry (service/tool) or native bridge. Records without a
+  // descriptor use the registry-kind generic path below. No provider literals.
+  const probeKind = backend.probe?.kind || 'registry';
+  if (probeKind === 'service_runtime') {
+    const resolution = await probeServiceRuntime(
+      backend.probe?.ref || backend.provider,
+      'trial',
+      platform
+    );
     return {
       backend_id: backend.backend_id,
       modality: backend.modality,
@@ -291,8 +308,8 @@ async function probeMediaBackendAvailabilityUncached(
       reason: resolution.reason,
     };
   }
-  if (backend.provider === 'mflux') {
-    const resolution = probeToolRuntime('mflux', 'trial', platform);
+  if (probeKind === 'tool_runtime') {
+    const resolution = probeToolRuntime(backend.probe?.ref || backend.provider, 'trial', platform);
     return {
       backend_id: backend.backend_id,
       modality: backend.modality,
@@ -301,27 +318,7 @@ async function probeMediaBackendAvailabilityUncached(
       reason: resolution.reason,
     };
   }
-  if (backend.provider === 'musicgen_mlx') {
-    const resolution = probeToolRuntime('musicgen_mlx', 'trial', platform);
-    return {
-      backend_id: backend.backend_id,
-      modality: backend.modality,
-      available: resolution.selected_action !== 'install',
-      probe_kind: 'tool_runtime',
-      reason: resolution.reason,
-    };
-  }
-  if (backend.provider === 'stable_audio_3') {
-    const resolution = probeToolRuntime('stable_audio_3', 'trial', platform);
-    return {
-      backend_id: backend.backend_id,
-      modality: backend.modality,
-      available: resolution.selected_action !== 'install',
-      probe_kind: 'tool_runtime',
-      reason: resolution.reason,
-    };
-  }
-  if (backend.provider === 'apple_image_playground') {
+  if (probeKind === 'native_bridge') {
     const resolution = await probeAppleImageGeneration();
     return {
       backend_id: backend.backend_id,

@@ -13,7 +13,8 @@ import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import { deriveReplyLocale, runWithReplyLocale } from '@agent/core/locale';
 import { t } from '@agent/core/t';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { startBridgeTypingLoop } from '@agent/core/bridge-typing';
+// C7: shared poll-loop + typing guards (behavior unchanged).
+import { startBridgePollLoop, startBridgeTypingIndicator } from '../../shared/bridge-poll-loop.js';
 import { logger } from '@agent/core/core';
 import * as pathResolver from '@agent/core/path-resolver';
 import {
@@ -726,7 +727,8 @@ async function handleTelegramUpdateInner(
     actorId: String(message.from?.id || chatId),
     threadContext: () => priorThreadContext || undefined,
     typing: () =>
-      startBridgeTypingLoop(
+      // C7: shared typing guard (4s cadence preserved).
+      startBridgeTypingIndicator(
         'telegram-bridge',
         () => sendTelegramTypingAction(chatId, options),
         4000
@@ -1018,7 +1020,16 @@ async function main(args: string[] = []): Promise<void> {
       { includeTenantNamespaces: true }
     );
   const runTelegramOutbox = createSurfaceOutboxDrainGuard('telegram');
-  setInterval(() => void runTelegramOutbox(drainOutbox), 15_000).unref();
+  // C7: shared poll loop (fixed 15s cadence + drain guard preserved).
+  startBridgePollLoop({
+    name: 'telegram-outbox',
+    intervalMs: 15_000,
+    poll: () => runTelegramOutbox(drainOutbox),
+    onError: (error) =>
+      logger.error(
+        `❌ [TelegramBridge] Outbox poll failed: ${error instanceof Error ? error.message : String(error)}`
+      ),
+  });
   void runTelegramOutbox(drainOutbox);
 }
 

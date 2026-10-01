@@ -27,6 +27,8 @@ import '../libs/core/integrations/email-account-catalog.js';
 import '../libs/core/knowledge/knowledge-adapter.js';
 import '../libs/core/media/image-generation-bridge.js';
 import '../libs/core/intent/intent-extractor.js';
+import '../libs/core/question-resolver.js';
+import '../libs/core/surface/surface-runtime-helpers.js';
 import '../libs/core/reasoning/judgment-backend.js';
 import '../libs/core/identity-context-bridge.js';
 import '../libs/core/meeting/meeting-join-driver.js';

@@ -17,7 +17,7 @@
     "track_name": { "type": "string" },
     "mission_id": { "type": "string" },
     "task_session_id": { "type": "string" },
-    "kind": { "type": "string", "minLength": 1 },
+    "kind": { "$ref": "./artifact-kind.schema.json" },
     "storage_class": {
       "type": "string",
       "enum": ["repo", "artifact_store", "vault", "tmp", "external_ref"]

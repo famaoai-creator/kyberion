@@ -3,111 +3,142 @@
   "services": {
     "aws-ce": {
       "base_url": "https://ce.us-east-1.amazonaws.com",
-      "preset_path": "knowledge/product/orchestration/service-presets/aws-ce.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/aws-ce.json",
+      "auth_strategy": "AWS_SIGV4"
     },
     "asana": {
       "base_url": "https://app.asana.com/api/1.0",
-      "preset_path": "knowledge/product/orchestration/service-presets/asana.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/asana.json",
+      "auth_strategy": "Bearer"
     },
     "backlog": {
       "base_url": "https://{{space}}.backlog.com/api/v2",
       "preset_path": "knowledge/product/orchestration/service-presets/backlog.json",
       "credential_suffixes": {
         "accessToken": ["API_KEY"]
-      }
+      },
+      "auth_strategy": "api_key_query"
     },
     "box": {
       "base_url": "https://api.box.com/2.0",
       "preset_path": "knowledge/product/orchestration/service-presets/box.json",
       "credential_suffixes": {
         "accessToken": ["ACCESS_TOKEN", "DEVELOPER_TOKEN", "TOKEN"]
-      }
+      },
+      "auth_strategy": "Bearer"
     },
     "brave-search": {
-      "preset_path": "knowledge/product/orchestration/service-presets/brave-search.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/brave-search.json",
+      "auth_strategy": "none"
     },
     "canva": {
       "base_url": "https://api.canva.com/rest/v1",
-      "preset_path": "knowledge/product/orchestration/service-presets/canva.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/canva.json",
+      "credential_suffixes": {
+        "accessToken": ["CANVA_ACCESS_TOKEN"],
+        "refreshToken": ["CANVA_REFRESH_TOKEN"],
+        "clientId": ["CANVA_CLIENT_ID"],
+        "clientSecret": ["CANVA_CLIENT_SECRET"]
+      },
+      "auth_strategy": "Bearer"
     },
     "cloudflare": {
       "base_url": "https://api.cloudflare.com/client/v4",
-      "preset_path": "knowledge/product/orchestration/service-presets/cloudflare.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/cloudflare.json",
+      "auth_strategy": "Bearer"
     },
     "comfyui": {
-      "preset_path": "knowledge/product/orchestration/service-presets/comfyui.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/comfyui.json",
+      "auth_strategy": "none"
     },
     "confluence": {
       "base_url": "https://{{domain}}.atlassian.net/wiki/api/v2",
-      "preset_path": "knowledge/product/orchestration/service-presets/confluence.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/confluence.json",
+      "auth_strategy": "basic"
     },
     "discord": {
       "base_url": "https://discord.com/api/v10",
-      "preset_path": "knowledge/product/orchestration/service-presets/discord.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/discord.json",
+      "auth_strategy": "Bot"
     },
     "figma": {
       "base_url": "https://api.figma.com/v1",
-      "preset_path": "knowledge/product/orchestration/service-presets/figma.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/figma.json",
+      "auth_strategy": "Bearer"
     },
     "github": {
       "base_url": "https://api.github.com",
-      "preset_path": "knowledge/product/orchestration/service-presets/github.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/github.json",
+      "auth_strategy": "Bearer"
     },
     "github-mcp": {
-      "preset_path": "knowledge/product/orchestration/service-presets/github-mcp.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/github-mcp.json",
+      "auth_strategy": "none"
     },
     "gitlab": {
       "base_url": "https://{{host}}.com/api/v4",
-      "preset_path": "knowledge/product/orchestration/service-presets/gitlab.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/gitlab.json",
+      "auth_strategy": "bearer"
     },
     "gemini": {
       "base_url": "https://generativelanguage.googleapis.com/v1beta",
       "preset_path": "knowledge/product/orchestration/service-presets/gemini.json",
       "credential_suffixes": {
         "accessToken": ["API_KEY"]
-      }
+      },
+      "auth_strategy": "api_key_query"
     },
     "google-maps": {
-      "preset_path": "knowledge/product/orchestration/service-presets/google-maps.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/google-maps.json",
+      "auth_strategy": "none"
     },
     "google-workspace": {
       "preset_path": "knowledge/product/orchestration/service-presets/google-workspace.json",
-      "allow_unsafe_cli": true
+      "allow_unsafe_cli": true,
+      "auth_strategy": "session"
     },
     "jira": {
       "base_url": "https://atlassian.net/rest/api/3",
-      "preset_path": "knowledge/product/orchestration/service-presets/jira.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/jira.json",
+      "auth_strategy": "basic"
     },
     "linear": {
       "base_url": "https://api.linear.app/graphql",
-      "preset_path": "knowledge/product/orchestration/service-presets/linear.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/linear.json",
+      "auth_strategy": "Bearer"
     },
     "m365": {
       "preset_path": "knowledge/product/orchestration/service-presets/m365.json",
       "allow_unsafe_cli": true,
-      "intent_aliases": ["outlook_calendar"]
+      "intent_aliases": ["outlook_calendar"],
+      "auth_strategy": "none"
     },
     "media-generation": {
       "preset_path": "knowledge/product/orchestration/service-presets/media-generation.json",
-      "intent_aliases": ["generate-video", "generate-image", "generate-music"]
+      "intent_aliases": ["generate-video", "generate-image", "generate-music"],
+      "auth_strategy": "none"
     },
     "meeting": {
       "preset_path": "knowledge/product/orchestration/service-presets/meeting.json",
-      "intent_aliases": ["meeting-operations", "live-voice"]
+      "intent_aliases": ["meeting-operations", "live-voice"],
+      "auth_strategy": "none"
     },
     "moltbook": {
-      "base_url": "https://www.moltbook.com/api/v1"
+      "base_url": "https://www.moltbook.com/api/v1",
+      "auth_strategy": "none"
     },
     "notion": {
       "base_url": "https://api.notion.com/v1",
-      "preset_path": "knowledge/product/orchestration/service-presets/notion.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/notion.json",
+      "auth_strategy": "Bearer"
     },
     "paper2any": {
       "base_url": "{{paper2any_base_url}}",
       "preset_path": "knowledge/product/orchestration/service-presets/paper2any.json",
       "credential_suffixes": {
         "baseUrl": ["PAPER2ANY_BASE_URL"]
-      }
+      },
+      "auth_strategy": "none"
     },
     "slack": {
       "base_url": "https://slack.com/api",
@@ -116,22 +147,27 @@
       "credential_suffixes": {
         "accessToken": ["ACCESS_TOKEN", "BOT_TOKEN", "TOKEN"],
         "appToken": ["APP_TOKEN"]
-      }
+      },
+      "auth_strategy": "Bearer"
     },
     "smoke-test": {
       "base_url": "https://postman-echo.com",
-      "preset_path": "knowledge/product/orchestration/service-presets/smoke-test.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/smoke-test.json",
+      "auth_strategy": "none"
     },
     "sqlite": {
-      "preset_path": "knowledge/product/orchestration/service-presets/sqlite.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/sqlite.json",
+      "auth_strategy": "none"
     },
     "stripe": {
       "base_url": "https://api.stripe.com/v1",
-      "preset_path": "knowledge/product/orchestration/service-presets/stripe.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/stripe.json",
+      "auth_strategy": "Bearer"
     },
     "telegram": {
       "base_url": "https://api.telegram.org",
-      "preset_path": "knowledge/product/orchestration/service-presets/telegram.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/telegram.json",
+      "auth_strategy": "none"
     },
     "vision": {
       "preset_path": "knowledge/product/orchestration/service-presets/media-generation.json",
@@ -142,19 +178,23 @@
         "generate-music",
         "capture-screen",
         "record-screen"
-      ]
+      ],
+      "auth_strategy": "none"
     },
     "voice": {
       "preset_path": "knowledge/product/orchestration/service-presets/voice.json",
-      "intent_aliases": ["speak-with-my-voice", "live-voice"]
+      "intent_aliases": ["speak-with-my-voice", "live-voice"],
+      "auth_strategy": "none"
     },
     "whisper": {
       "preset_path": "knowledge/product/orchestration/service-presets/whisper.json",
-      "intent_aliases": ["transcribe-audio", "live-voice"]
+      "intent_aliases": ["transcribe-audio", "live-voice"],
+      "auth_strategy": "none"
     },
     "x-docs": {
       "preset_path": "knowledge/product/orchestration/service-presets/x-docs.json",
-      "intent_aliases": ["x-documentation", "x-api-docs", "x-mcp-docs"]
+      "intent_aliases": ["x-documentation", "x-api-docs", "x-mcp-docs"],
+      "auth_strategy": "none"
     },
     "xapi": {
       "preset_path": "knowledge/product/orchestration/service-presets/xapi.json",
@@ -164,19 +204,23 @@
         "clientId": ["CLIENT_ID"],
         "clientSecret": ["CLIENT_SECRET"],
         "redirectUri": ["REDIRECT_URI"]
-      }
+      },
+      "auth_strategy": "session"
     },
     "youtube": {
-      "preset_path": "knowledge/product/orchestration/service-presets/youtube.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/youtube.json",
+      "auth_strategy": "none"
     },
     "zendesk": {
       "base_url": "https://{{subdomain}}.zendesk.com/api/v2",
-      "preset_path": "knowledge/product/orchestration/service-presets/zendesk.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/zendesk.json",
+      "auth_strategy": "basic"
     },
     "video-analysis": {
       "preset_path": "knowledge/product/orchestration/service-presets/video-analysis.json",
       "allow_unsafe_cli": true,
-      "intent_aliases": ["analyze-video", "extract-keyframes"]
+      "intent_aliases": ["analyze-video", "extract-keyframes"],
+      "auth_strategy": "none"
     }
   }
 }

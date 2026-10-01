@@ -612,29 +612,38 @@ export function migrateLegacyWorkItemContexts(options: { apply?: boolean } = {})
   for (const item of currentWorkItems()) {
     const metadata = item.metadata || {};
     const missionLabel = item.labels.find((label) => label.startsWith('mission:'));
-    const hasTypedContext = Boolean(item.context?.project_id && item.context?.work_shape);
-    if (hasTypedContext) continue;
-    const context = normalizeWorkItemContext(
-      {
-        ...(item.context || {}),
-        ...(typeof metadata.organization_id === 'string'
-          ? { organization_id: metadata.organization_id }
+    const teamRoleLabel = item.labels.find((label) => label.startsWith('team_role:'));
+    const legacyContext = {
+      ...(typeof metadata.organization_id === 'string'
+        ? { organization_id: metadata.organization_id }
+        : {}),
+      ...(typeof metadata.tenant_slug === 'string' ? { tenant_slug: metadata.tenant_slug } : {}),
+      ...(typeof metadata.mission_id === 'string'
+        ? { mission_id: metadata.mission_id }
+        : missionLabel
+          ? { mission_id: missionLabel.slice('mission:'.length) }
           : {}),
-        ...(typeof metadata.tenant_slug === 'string' ? { tenant_slug: metadata.tenant_slug } : {}),
-        ...(typeof metadata.mission_id === 'string'
-          ? { mission_id: metadata.mission_id }
-          : missionLabel
-            ? { mission_id: missionLabel.slice('mission:'.length) }
-            : {}),
-        ...(typeof metadata.task_id === 'string' ? { task_id: metadata.task_id } : {}),
-      },
+      ...(typeof metadata.task_id === 'string' ? { task_id: metadata.task_id } : {}),
+    };
+    // Migration fills gaps only: typed context remains authoritative on disagreement.
+    const context = normalizeWorkItemContext(
+      { ...legacyContext, ...(item.context || {}) },
       item.project_id
     );
+    const teamRole =
+      typeof metadata.team_role === 'string' && metadata.team_role.trim()
+        ? metadata.team_role
+        : teamRoleLabel?.slice('team_role:'.length).trim();
+    const metadataUpdate = teamRole ? { ...metadata, team_role: teamRole } : metadata;
+    const needsMigration =
+      JSON.stringify(context) !== JSON.stringify(item.context || {}) ||
+      metadataUpdate.team_role !== metadata.team_role;
+    if (!needsMigration) continue;
     if (!options.apply) {
       remaining.push(item.item_id);
       continue;
     }
-    updateWorkItem({ itemId: item.item_id, context });
+    updateWorkItem({ itemId: item.item_id, context, metadata: metadataUpdate });
     migrated.push(item.item_id);
   }
   return { migrated, remaining, migrated_context: remaining.length };
