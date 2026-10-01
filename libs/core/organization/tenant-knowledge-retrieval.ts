@@ -252,7 +252,20 @@ export async function queryTenantKnowledge(
 
     const byPath = new Map<string, TenantKnowledgeHit>();
     for (const scope of scopeSet.scopes) {
-      const index = await buildScopedIndex(scope, knowledgeBase);
+      // A scope the reader may not see (e.g. a tenant-bound surface without
+      // the customer overlay grant) contributes nothing; it never fails the
+      // tenant's own subtree.
+      let index;
+      try {
+        index = await buildScopedIndex(scope, knowledgeBase);
+      } catch (error) {
+        logger.debug(
+          `[DA-07] tenant knowledge scope skipped for '${input.tenantSlug}': ${
+            (error as Error)?.message || String(error)
+          }`
+        );
+        continue;
+      }
       const results = queryKnowledge(index, input.topic, {
         maxResults: limit,
         includeScores: true,
