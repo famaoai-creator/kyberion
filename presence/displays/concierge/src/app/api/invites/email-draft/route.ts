@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
     if (!parsedBody.ok) {
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     }
+    // i18n-exempt: normalizes a client-supplied locale query param into 'en'|'ja'
     const locale = req.nextUrl.searchParams.get('locale') === 'en' ? 'en' : 'ja';
     const result = await withExecutionContext('sovereign_concierge', () =>
       secureIo.withSensitivePathMediation(() =>
