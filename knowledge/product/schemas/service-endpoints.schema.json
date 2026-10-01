@@ -59,6 +59,7 @@
             "description": "Catalog-governed credential env suffixes. Omitted services fall back to the schema defaults below (mirror of the former TS literals in service-binding.ts); the endpoint registry applies them on load so ServiceBinding resolution never hardcodes auth knowledge.",
             "default": {
               "accessToken": ["ACCESS_TOKEN", "BOT_TOKEN", "TOKEN"],
+              "basicAuthToken": ["ACCESS_TOKEN"],
               "refreshToken": ["REFRESH_TOKEN"],
               "clientId": ["CLIENT_ID"],
               "clientSecret": ["CLIENT_SECRET"],
@@ -71,6 +72,13 @@
                   "type": "string"
                 },
                 "default": ["ACCESS_TOKEN", "BOT_TOKEN", "TOKEN"]
+              },
+              "basicAuthToken": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": ["ACCESS_TOKEN"]
               },
               "appToken": {
                 "type": "array",
