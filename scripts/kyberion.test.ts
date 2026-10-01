@@ -200,7 +200,8 @@ describe('kyberion command router', () => {
     });
     expect(help).toContain('<home>');
     expect(help).toContain('ask');
-    expect(help).toContain('governed registry');
+    // Entries without a description key fall back to `noun verb`.
+    expect(help).toContain('ask default');
   });
 
   it('routes help output through the supplied harness printer', async () => {
@@ -208,7 +209,7 @@ describe('kyberion command router', () => {
     const { main } = await import('./kyberion.js');
     await main(['--help'], (value) => output.push(value));
     expect(output).toHaveLength(1);
-    expect(output[0]).toEqual(expect.stringContaining('governed registry'));
+    expect(output[0]).toEqual(expect.stringContaining('pr create'));
   });
 
   it('ignores the pnpm `--` separator pnpm forwards literally (npm strips it)', async () => {
@@ -216,7 +217,7 @@ describe('kyberion command router', () => {
     const { main } = await import('./kyberion.js');
     await main(['--', '--help'], (value) => output.push(value));
     expect(output).toHaveLength(1);
-    expect(output[0]).toEqual(expect.stringContaining('governed registry'));
+    expect(output[0]).toEqual(expect.stringContaining('pr create'));
   });
 
   it('does not write directly to stdout from the unified router', () => {
@@ -258,10 +259,23 @@ describe('kyberion command router', () => {
     ).toThrow('KYBERION_MYSTERY');
   });
 
-  it('uses strict environment validation by default', () => {
-    expect(() => validateKyberionStartupEnvironment({ KYBERION_MYSTERY: '1' })).toThrow(
+  it('is strict by default in CI', () => {
+    expect(() => validateKyberionStartupEnvironment({ CI: 'true', KYBERION_MYSTERY: '1' })).toThrow(
       'KYBERION_MYSTERY'
     );
+  });
+
+  it('warns once and continues on unknown variables outside CI', () => {
+    expect(() => validateKyberionStartupEnvironment({ KYBERION_MYSTERY: '1' })).not.toThrow();
+    expect(() =>
+      validateKyberionStartupEnvironment({ CI: 'false', KYBERION_MYSTERY: '1' })
+    ).not.toThrow();
+  });
+
+  it('still fails on invalid values of known variables outside CI', () => {
+    expect(() =>
+      validateKyberionStartupEnvironment({ KYBERION_ENV_REGISTRY_STRICT_DOCS: 'banana' })
+    ).toThrow('KYBERION_ENV_REGISTRY_STRICT_DOCS');
   });
 
   it('allows an explicit false opt-out for local compatibility', () => {
