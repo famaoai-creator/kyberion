@@ -75,7 +75,7 @@ New here? Read [`docs/CORE_CONCEPTS.md`](./docs/CORE_CONCEPTS.md) — the 5 conc
 
 ## Quick Start
 
-> **Canonical cold-start source: [`docs/QUICKSTART.md`](./docs/QUICKSTART.md).** This page is the short version. Day-2 tenant / organization / activation work: [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md). Documentation authority map: [`docs/documentation-source-map.json`](./docs/documentation-source-map.json).
+> **Start here — canonical cold-start source: [`docs/QUICKSTART.md`](./docs/QUICKSTART.md)** (it also explains which onboarding command to use when). Map of all docs: [`docs/README.md`](./docs/README.md). This page is the short version. Day-2 tenant / organization / activation work: [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md). Documentation authority map: [`docs/documentation-source-map.json`](./docs/documentation-source-map.json).
 
 Kyberion's first visible result comes in three short steps:
 
@@ -144,7 +144,7 @@ Day to day you rarely write a pipeline — you use one command per sense (Markdo
 | Video → timeline   | `pnpm kyberion watch`   | Document ↔ document | `pnpm kyberion diff`      |
 | Ask in plain words | `pnpm kyberion ask "…"` | Approve / reject    | `pnpm kyberion approvals` |
 
-`pnpm kyberion` with no arguments is the terminal home: a status digest plus your next move. Verb inventory: [`capability-verb-inventory`](./knowledge/product/orchestration/capability-verb-inventory.md).
+`pnpm kyberion` with no arguments is the terminal home: a status digest plus your next move. Every command is listed in the generated [CLI Reference](./docs/CLI_REFERENCE.md); task-oriented notes are in the [Commands Guide](./docs/user/COMMANDS_GUIDE.md). Verb inventory: [`capability-verb-inventory`](./knowledge/product/orchestration/capability-verb-inventory.md).
 
 ### Design-system-governed output
 

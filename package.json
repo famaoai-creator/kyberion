@@ -32,6 +32,7 @@
     "generate:op-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_op_registry.ts",
     "generate:vocabulary-types": "node --import ./scripts/ts-loader.mjs scripts/generate_vocabulary_types.ts",
     "generate:pseudo-locale": "node --import ./scripts/ts-loader.mjs scripts/generate_pseudo_locale.ts",
+    "generate:cli-reference": "node --import ./scripts/ts-loader.mjs scripts/generate_cli_reference.ts",
     "generate:env-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_env_registry.ts",
     "config:report": "node --import ./scripts/ts-loader.mjs scripts/env_config_report.ts",
     "agents:generate": "node --import ./scripts/ts-loader.mjs scripts/generate_subagent_definitions.ts",

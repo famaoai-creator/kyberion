@@ -1114,6 +1114,27 @@
       "group": "operate"
     },
     {
+      "id": "script.generate.cli-reference",
+      "script": "generate:cli-reference",
+      "command": "generate cli-reference",
+      "noun": "generate",
+      "verb": "cli-reference",
+      "audience": "dev",
+      "description": "cli_cmd_script_generate_cli_reference",
+      "group": "dev"
+    },
+    {
+      "id": "script.docs.check",
+      "module": "scripts/check_docs_drift.ts",
+      "command": "docs check",
+      "noun": "docs",
+      "verb": "check",
+      "audience": "dev",
+      "description": "cli_cmd_script_docs_check",
+      "group": "dev",
+      "native_help": true
+    },
+    {
       "id": "script.generate.env-registry",
       "script": "generate:env-registry",
       "command": "generate env-registry",

@@ -10,6 +10,8 @@ The operator can always see the request, plan, result, and next action.
 
 This guide explains how to operate Kyberion without forcing people to think in implementation details first.
 
+> Setup and the first win live in [QUICKSTART](./QUICKSTART.md) (the single front door). Every command is listed in the generated [CLI Reference](./CLI_REFERENCE.md); task-oriented notes for the everyday ones are in the [Commands Guide](./user/COMMANDS_GUIDE.md).
+
 Surface map: [`docs/SURFACES.md`](./SURFACES.md).
 
 For enterprise role separation above the operator layer, also read:

@@ -63,12 +63,9 @@ export function checkFirstWinDocs(): string[] {
     const markdown = read(relativePath);
     if (relativePath === 'docs/INITIALIZATION.md') {
       const stageOrder = [
-        // i18n-exempt: JA test fixture (expected doc text)
-        '### Stage 1: 物理的基盤の確立',
-        // i18n-exempt: JA test fixture (expected doc text)
-        '### Stage 2: システムの具現化',
-        // i18n-exempt: JA test fixture (expected doc text)
-        '### Stage 3: 事前ツール確認',
+        '### Stage 1: Physical foundation',
+        '### Stage 2: System manifestation',
+        '### Stage 3: Prerequisite toolchain check',
       ].map((heading) => markdown.indexOf(heading));
       if (
         stageOrder.some((index) => index < 0) ||
