@@ -70,6 +70,7 @@ export function registerBuiltinAgentExecAdapters(): void {
         allowedTools,
         disallowedTools,
         permissionMode: 'auto',
+        ...(request.toolsDisabled ? { toolsDisabled: true } : {}),
       });
     },
   });

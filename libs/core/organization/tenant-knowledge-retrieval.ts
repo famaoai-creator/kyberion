@@ -252,7 +252,22 @@ export async function queryTenantKnowledge(
 
     const byPath = new Map<string, TenantKnowledgeHit>();
     for (const scope of scopeSet.scopes) {
-      const index = await buildScopedIndex(scope, knowledgeBase);
+      // A scope the reader may not see (e.g. a tenant-bound surface without
+      // the customer overlay grant) contributes nothing; it never fails the
+      // tenant's own subtree.
+      let index;
+      try {
+        index = await buildScopedIndex(scope, knowledgeBase);
+      } catch (error) {
+        const message = `[DA-07] tenant knowledge scope ${scope.tiers.join('+')}:${
+          scope.customerId ?? '-'
+        } skipped for '${input.tenantSlug}' (fail-open): ${(error as Error)?.message || String(error)}`;
+        // Losing the tenant's own subtree is a misconfiguration worth a warning;
+        // an optional scope (overlay, common) the reader may not see is not.
+        if (scope === scopeSet.scopes[0]) warnOncePerTenant(input.tenantSlug, message);
+        else logger.debug(message);
+        continue;
+      }
       const results = queryKnowledge(index, input.topic, {
         maxResults: limit,
         includeScores: true,

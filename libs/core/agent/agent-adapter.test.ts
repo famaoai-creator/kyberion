@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AgyAdapter, ClaudeAdapter, CodexAdapter, CodexAppServerAdapter } from './agent-adapter.js';
 import { normalizeCodexAppServerMessage } from './agent-codex-app-server-adapter.js';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { pathResolver } from '../path-resolver.js';
@@ -205,6 +205,52 @@ describe('AgyAdapter', () => {
       ],
       expect.objectContaining({ stdio: ['ignore', 'pipe', 'pipe'] })
     );
+  });
+});
+
+describe('ClaudeAdapter tool lockdown', () => {
+  it('disables every tool and ignores MCP servers when toolsDisabled is set', async () => {
+    const child = Object.assign(new EventEmitter(), {
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+      kill: vi.fn(),
+    });
+    codexMocks.spawnManagedProcess.mockImplementationOnce(
+      (spec: {
+        resourceId: string;
+        command: string;
+        args: string[];
+        spawnOptions: SpawnOptions;
+      }) => ({
+        resourceId: spec.resourceId,
+        child: spawn(spec.command, spec.args, spec.spawnOptions),
+      })
+    );
+    vi.mocked(spawn).mockImplementationOnce(() => {
+      queueMicrotask(() => {
+        child.stdout.end(JSON.stringify({ result: 'ok' }));
+        child.emit('close', 0, null);
+      });
+      return child as unknown as ChildProcess;
+    });
+
+    const adapter = new ClaudeAdapter({
+      toolsDisabled: true,
+      allowedTools: ['Read', 'Bash'],
+      disallowedTools: ['Write'],
+    });
+    await adapter.ask('What is our plan?');
+
+    const args = vi.mocked(spawn).mock.calls.at(-1)?.[1] as string[];
+    const toolsAt = args.indexOf('--tools');
+    expect(args[toolsAt + 1]).toBe('');
+    expect(args).toContain('--strict-mcp-config');
+    // No CLAUDE.md, user hooks, plugins, slash commands or saved session.
+    expect(args).toContain('--setting-sources=');
+    expect(args).toContain('--disable-slash-commands');
+    expect(args).toContain('--no-session-persistence');
+    expect(args).not.toContain('--allowedTools');
+    expect(args).not.toContain('--disallowedTools');
   });
 });
 

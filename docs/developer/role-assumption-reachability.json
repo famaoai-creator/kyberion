@@ -1420,6 +1420,11 @@
       "unresolved": []
     },
     {
+      "site": "satellites/slack-bridge/src/team-channel.ts#runInTeamTurnContext",
+      "roles": ["slack_bridge"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/apply_dependency_patch.ts#main",
       "roles": ["ecosystem_architect"],
       "unresolved": []
@@ -4746,6 +4751,7 @@
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
             "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
             "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#main [child process]",
@@ -4778,6 +4784,7 @@
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
             "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
             "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#handoffMission [child process]",
@@ -4790,6 +4797,7 @@
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
             "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
             "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
             "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
             "scripts/mission_controller.ts#<module> [child process]",

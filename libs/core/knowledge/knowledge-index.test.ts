@@ -3,7 +3,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 // Mock dependencies
-vi.mock('../path-resolver.js', () => ({
+vi.mock('../path-resolver.js', async (importOriginal) => ({
+  // Structural symlink check used by the markdown scanner.
+  assertSafeRepositoryPath: (await importOriginal<typeof import('../path-resolver.js')>())
+    .assertSafeRepositoryPath,
   knowledge: (sub = '') => (sub ? `/tmp/test-knowledge-base/${sub}` : '/tmp/test-knowledge-base'),
   // Named pathResolver object used by core.ts / embedding-backend.ts
   pathResolver: {
@@ -14,8 +17,15 @@ vi.mock('../path-resolver.js', () => ({
   },
 }));
 
+// Paths the reader may not stat (tier-guard denial), e.g. a tenant-bound
+// surface that may read only its own confidential subtree.
+const deniedStat = vi.hoisted(() => new Set<string>());
+
 vi.mock('../secure-io.js', () => ({
-  safeExistsSync: (p: string) => fs.existsSync(p),
+  safeExistsSync: (p: string) => {
+    if (deniedStat.has(p)) throw new Error(`[ROLE_VIOLATION] ${p}`);
+    return fs.existsSync(p);
+  },
   safeReaddir: (p: string) => fs.readdirSync(p),
   safeReadFile: (p: string, opts: any) => fs.readFileSync(p, opts.encoding),
   safeWriteFile: () => {
@@ -25,7 +35,10 @@ vi.mock('../secure-io.js', () => ({
     /* no-op in tests */
   },
   safeStat: (p: string) => fs.statSync(p),
-  safeLstat: (p: string) => fs.lstatSync(p),
+  safeLstat: (p: string) => {
+    if (deniedStat.has(p)) throw new Error(`[ROLE_VIOLATION] ${p}`);
+    return fs.lstatSync(p);
+  },
   assertSafeRepositoryPath: (p: string) => p,
   safeUnlinkSync: () => {
     /* no-op in tests */
@@ -46,6 +59,7 @@ vi.mock('../foundation/text.js', async (importOriginal) => {
 
 import {
   buildKnowledgeIndex,
+  buildScopedIndex,
   queryKnowledge,
   queryKnowledgeHybrid,
   KnowledgeHintIndex,
@@ -424,6 +438,49 @@ describe('knowledge-index', () => {
       } finally {
         registerEmbeddingBackend(null as never);
       }
+    });
+  });
+
+  describe('tenant-bound scanning', () => {
+    afterEach(() => deniedStat.clear());
+
+    it('scans an authorized tenant subtree when the shared confidential parents are not visible', async () => {
+      const tenantDir = path.join(TEST_ROOT, 'confidential/acme');
+      ensureDir(tenantDir);
+      ensureDir(path.join(TEST_ROOT, 'confidential/common'));
+      fs.writeFileSync(
+        path.join(tenantDir, 'runbook.md'),
+        '---\ntitle: Acme runbook\n---\n\nAcme deployment checklist.\n'
+      );
+      deniedStat.add(path.join(TEST_ROOT, 'confidential'));
+      deniedStat.add(path.join(TEST_ROOT, 'confidential/common'));
+
+      const index = await buildScopedIndex(
+        { tiers: ['confidential'], customerId: 'acme' },
+        TEST_ROOT
+      );
+      const sources = index.hints.map((hint) => hint.source);
+      expect(sources).toContain('confidential/acme/runbook.md');
+    });
+
+    it('never follows a symlink from the tenant subtree into another tenant', async () => {
+      const acme = path.join(TEST_ROOT, 'confidential/acme');
+      const globex = path.join(TEST_ROOT, 'confidential/globex');
+      ensureDir(acme);
+      ensureDir(path.join(globex, 'plans'));
+      fs.writeFileSync(
+        path.join(globex, 'plans/secret.md'),
+        '---\ntitle: Globex secret\n---\n\nGlobex secret plan.\n'
+      );
+      fs.symlinkSync(path.join(globex, 'plans/secret.md'), path.join(acme, 'leak.md'));
+      fs.symlinkSync(path.join(globex, 'plans'), path.join(acme, 'plans'));
+      deniedStat.add(path.join(TEST_ROOT, 'confidential'));
+
+      const index = await buildScopedIndex(
+        { tiers: ['confidential'], customerId: 'acme' },
+        TEST_ROOT
+      );
+      expect(index.hints.map((hint) => hint.topic)).not.toContain('Globex secret');
     });
   });
 });

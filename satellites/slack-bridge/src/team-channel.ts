@@ -1,10 +1,14 @@
+import { withExecutionContextAsync } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
+import type { SurfaceTenantIsolation } from '@agent/core/surface/channel-surface-types';
 import { issueSlackMissionFromProposal } from '@agent/core/surface/surface-mission-proposals';
+import type { TierLevel } from '@agent/core/types';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
 import { t } from '@agent/core/t';
 import {
   buildChannelDisclosureDirective,
+  channelTurnScope,
   evaluateChannelActorAccess,
   evaluateChannelApprovalAuthority,
   resolveChannelModePolicy,
@@ -321,6 +325,35 @@ export function linkSlackMissionToThread(
       `[SlackBridge] Thread work link failed — status queries will not list ${missionId} | check thread-work store | ${errorDetail(error)}`
     );
   }
+}
+
+/**
+ * The team-channel part of one Slack turn: the tenant scope, whether the
+ * speaker may only ask (P1), and the tenant isolation of the turn (E: never
+ * above confidential). All empty for owner turns.
+ */
+export function resolveSlackTeamTurn(
+  policy: ChannelModePolicy | undefined,
+  speaker: ChannelSpeakerPrincipal | undefined
+): {
+  scope?: { tier: TierLevel; tenant_slug: string };
+  askOnly: boolean;
+  isolation?: SurfaceTenantIsolation;
+} {
+  const scope = policy ? channelTurnScope(policy) : undefined;
+  const askOnly = Boolean(speaker && !speakerCan(speaker, 'request_work'));
+  if (!scope) return { askOnly };
+  const maxTier = scope.tier === 'public' ? 'public' : 'confidential';
+  return { scope, askOnly, isolation: { tenantSlug: scope.tenant_slug, maxTier } };
+}
+
+/** Runs an isolated turn with the channel's tenant bound, so reads stay in it. */
+export function runInTeamTurnContext<T>(
+  isolation: SurfaceTenantIsolation | undefined,
+  fn: () => Promise<T>
+): Promise<T> {
+  if (!isolation) return fn();
+  return withExecutionContextAsync('slack_bridge', fn, undefined, isolation.tenantSlug);
 }
 
 /**
