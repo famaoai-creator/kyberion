@@ -1,11 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { Button, Callout, IntegrationItem, SettingsGroup, Switch } from '@agent/shared-ui';
+import { Badge, Button, Callout, IntegrationItem, SettingsGroup, Switch } from '@agent/shared-ui';
 import type { KbActionRef } from '@agent/core/surface/a2ui-catalog';
 import { frontDeskText } from '../../../lib/i18n';
 import type { ConciergeLocale } from '../../../lib/i18n';
 import type { Setup } from '../../../lib/settings-types';
+import { groupConnections, type ConnectionViewItem } from '../../../lib/connection-view';
 import { IntroduceSecretPanel } from './IntroduceSecretPanel';
 import { FormScope, type SettingsTranslate } from './form-scope';
 
@@ -116,6 +117,7 @@ export function ServicesSection({
               );
             })}
           </div>
+          {(setup.connections ?? []).length > 0 ? <ConnectionsByOwner t={t} setup={setup} /> : null}
           {oauthMessage ? (
             <div className="settings-row-block">
               <Callout tone="info" title={oauthMessage} />
@@ -140,5 +142,42 @@ export function ServicesSection({
         }))}
       />
     </div>
+  );
+}
+
+/** Connections by owner: "yours" first, then one block per organization, each with an owner badge. */
+function ConnectionsByOwner({ t, setup }: { t: SettingsTranslate; setup: Setup }) {
+  const grouped = groupConnections((setup.connections ?? []) as ConnectionViewItem[]);
+  const label = (serviceId: string) =>
+    setup.service_catalog.find((service) => service.id === serviceId)?.label ?? serviceId;
+  const rows = (items: ConnectionViewItem[]) =>
+    items.map((item) => (
+      <p key={item.binding_id} className="kb-text kb-text--body">
+        {label(item.service_id)}{' '}
+        <Badge
+          label={
+            item.group === 'organization'
+              ? t('setup.connection_owner_organization', { tenant: item.owner_ref ?? '' })
+              : t('setup.connection_owner_person')
+          }
+          tone={item.group === 'organization' ? 'info' : 'neutral'}
+        />
+      </p>
+    ));
+  return (
+    <>
+      {grouped.mine.length > 0 ? (
+        <div className="settings-row-block">
+          <h4>{t('setup.connections_mine')}</h4>
+          {rows(grouped.mine)}
+        </div>
+      ) : null}
+      {grouped.organizations.map((group) => (
+        <div className="settings-row-block" key={group.tenant_slug}>
+          <h4>{t('setup.connections_organization', { tenant: group.tenant_slug })}</h4>
+          {rows(group.items)}
+        </div>
+      ))}
+    </>
   );
 }
