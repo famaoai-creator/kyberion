@@ -1,4 +1,6 @@
 import * as path from 'node:path';
+import { resolveLocale } from './locale.js';
+import { localeToBcp47 } from './locale-normalize.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
@@ -242,7 +244,7 @@ export async function ingestAudioIntoDealRequirements(input: {
   try {
     transcript = await stt.transcribe({
       audioPath: input.audioPath,
-      language: input.language || 'ja-JP',
+      language: input.language || localeToBcp47(resolveLocale()),
     });
   } catch (err) {
     logger.warn(

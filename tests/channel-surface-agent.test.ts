@@ -118,11 +118,18 @@ describe('Channel surface agents', { concurrent: false }, () => {
     }
   };
 
+  let savedLocale: string | undefined;
+
   beforeEach(() => {
+    // Hermetic: these assertions are on Japanese copy regardless of host locale.
+    savedLocale = process.env.KYBERION_LOCALE;
+    process.env.KYBERION_LOCALE = 'ja';
     cleanupSurfaceState();
   });
 
   afterEach(() => {
+    if (savedLocale === undefined) delete process.env.KYBERION_LOCALE;
+    else process.env.KYBERION_LOCALE = savedLocale;
     cleanupSurfaceState();
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.KYBERION_PERSONA = 'sovereign';

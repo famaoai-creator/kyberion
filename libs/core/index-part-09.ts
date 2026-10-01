@@ -217,6 +217,8 @@ export * from './analysis/analysis-intent-support.js';
 
 export * from './intent/intent-outcome-patterns.js';
 
+export * from './intent/intent-phrase-lexicon.js';
+
 export * from './analysis/analysis-corpus.js';
 
 export * from './analysis/analysis-impact-bands.js';

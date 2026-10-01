@@ -17,7 +17,7 @@ import type {
 } from '@agent/core/surface/channel-surface-types';
 
 const captured = vi.hoisted(() => ({
-  conversationInputs: [] as { threadContext?: string; text: string }[],
+  conversationInputs: [] as { threadContext?: string; text: string; locale?: string }[],
   replyText: 'ok',
 }));
 
@@ -29,6 +29,7 @@ vi.mock('@agent/core/surface/channel-surface', async (importOriginal) => {
       captured.conversationInputs.push({
         threadContext: input.threadContext,
         text: input.text,
+        locale: input.locale,
       });
       return {
         text: captured.replyText,
@@ -267,8 +268,14 @@ describe('telegram bridge thread context', () => {
 
     expect(captured.conversationInputs).toHaveLength(2);
     expect(captured.conversationInputs[0].threadContext).toBeUndefined();
+    // No explicit turn locale: the orchestrator derives it (user text > scope > operator),
+    // and the Japanese input makes the thread context Japanese on every host locale.
+    expect(captured.conversationInputs.map((input) => input.locale)).toEqual([
+      undefined,
+      undefined,
+    ]);
     expect(captured.conversationInputs[1].threadContext).toContain(
-      t('bridge:thread_user', { author: 'alice', text: '最初の相談' }, resolveOperatorLocale())
+      t('bridge:thread_user', { author: 'alice', text: '最初の相談' }, 'ja')
     );
     expect(captured.conversationInputs[1].threadContext).not.toContain('それで、どうなりましたか');
   });
@@ -293,9 +300,7 @@ describe('telegram bridge thread context', () => {
     );
 
     expect(receipt).toMatchObject({ ok: true, chatId: historyChatId });
-    expect(receipt.reply?.text).toBe(
-      buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() })
-    );
+    expect(receipt.reply?.text).toBe(buildBridgeEmptyReplyText({ locale: 'ja' }));
   });
 
   it('routes a Telegram callback query through the shared approval decision API', async () => {

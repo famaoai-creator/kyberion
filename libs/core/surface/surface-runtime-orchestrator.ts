@@ -6,8 +6,8 @@ import { missionSteeringRouteHandler } from './surface-mission-steering.js';
 
 import { pathResolver } from '../path-resolver.js';
 import { safeExec } from '../secure-io.js';
-import { resolveLocale } from '../locale.js';
-import { normalizeLocale, type SupportedLocale } from '../locale-normalize.js';
+import { deriveReplyLocale, getReplyLocale, resolveLocale, runWithReplyLocale } from '../locale.js';
+import { detectTextLocale, normalizeLocale, type SupportedLocale } from '../locale-normalize.js';
 import { t } from '../t.js';
 import { a2aBridge } from '../mesh/a2a-bridge.js';
 import type { A2AMessage } from '../mesh/a2a-bridge.js';
@@ -167,7 +167,7 @@ async function handleGovernedExecutionHint(
     }
     return emptySurfaceResult(
       [
-        t('bridge:mission_promoted_for_approval', { missionId }, 'ja'),
+        t('bridge:mission_promoted_for_approval', { missionId }),
         '',
         formatExecutionReceipt({
           intentId: resolved.intentId,
@@ -350,7 +350,7 @@ async function handleGovernedExecutionHint(
     }
     return emptySurfaceResult(
       [
-        t('bridge:mission_created_for_approval', { missionId }, 'ja'),
+        t('bridge:mission_created_for_approval', { missionId }),
         '',
         formatExecutionReceipt({
           intentId: resolved.intentId,
@@ -687,7 +687,7 @@ export function buildSlackSurfacePrompt(input: SlackSurfaceInput): string {
   const threadTs = input.threadTs || input.ts || 'unknown';
   const channelType = input.channelType || 'unknown';
   const normalizedText = input.text.trim();
-  const language = /[ぁ-んァ-ン一-龯]/.test(normalizedText) ? 'ja' : 'en';
+  const language = detectTextLocale(normalizedText) ?? 'en';
   warnOnUserLanguageDisagreement(language, 'buildSlackSurfacePrompt content heuristic');
   const executionMode = deriveSlackExecutionMode(normalizedText);
   return [
@@ -1062,10 +1062,42 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: surfaceRuntimeData.SurfaceRuntimeRouteHand
   },
 ];
 
+/**
+ * IT-02: the reply locale of a turn — explicit request locale, else the
+ * language the user wrote in, else the locale stored for the turn's scope,
+ * else the locale an enclosing caller already entered (a bridge's turn
+ * wrapper). `undefined` lets the rest of the resolveLocale() chain decide.
+ */
+function turnReplyLocale(input: {
+  locale?: string | null;
+  text?: string | null;
+  scope?: Parameters<typeof deriveReplyLocale>[0]['scope'];
+}) {
+  return (
+    deriveReplyLocale({ explicit: input.locale, text: input.text, scope: input.scope }) ??
+    getReplyLocale()
+  );
+}
+
 export async function runSurfaceConversation(
   input: SurfaceConversationInput
 ): Promise<SurfaceConversationResult> {
   surfaceRuntimeData.surfaceRuntimeContextStore.enterWith(input);
+  // Scoped with run(), not enterWith(): the locale must end with the turn and
+  // never leak into the caller's continuation.
+  return runWithReplyLocale(
+    turnReplyLocale({
+      locale: input.locale,
+      text: input.surfaceText || input.query,
+      scope: input.scope,
+    }),
+    () => runSurfaceConversationTurn(input)
+  );
+}
+
+async function runSurfaceConversationTurn(
+  input: SurfaceConversationInput
+): Promise<SurfaceConversationResult> {
   const parsedExecutionFeedback =
     input.executionFeedback || parseExecutionFeedbackText(input.query);
   if (parsedExecutionFeedback) {
@@ -1404,6 +1436,17 @@ export async function runSurfaceConversation(
 }
 
 export async function runSurfaceMessageConversation(
+  input: SurfaceConversationMessageInput
+): Promise<SurfaceConversationResult> {
+  // Enter the turn's reply locale before anything else runs — including the
+  // HA-01 background review fork below — and scope it to this turn.
+  return runWithReplyLocale(
+    turnReplyLocale({ locale: input.locale, text: input.text, scope: input.scope }),
+    () => runSurfaceMessageConversationTurn(input)
+  );
+}
+
+async function runSurfaceMessageConversationTurn(
   input: SurfaceConversationMessageInput
 ): Promise<SurfaceConversationResult> {
   // HA-01: count one non-blocking worker turn per surface thread. The

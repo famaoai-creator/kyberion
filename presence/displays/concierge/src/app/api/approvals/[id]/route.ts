@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/governance/approval-store';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
+import { conciergeText, resolveConciergeLocale } from '../../../../lib/i18n';
 import { readRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
 import {
@@ -38,7 +39,13 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
         : channel;
     if (!id || !decision) {
       return NextResponse.json(
-        { ok: false, error: 'id と decision (approved|rejected) が必要です' },
+        {
+          ok: false,
+          error: conciergeText(
+            'api.id_decision_required',
+            resolveConciergeLocale(req.headers.get('accept-language') ?? undefined)
+          ),
+        },
         { status: 400 }
       );
     }

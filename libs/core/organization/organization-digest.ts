@@ -44,7 +44,7 @@ import type {
   OrganizationServiceState,
   OrganizationTier,
 } from './organization-operating-model.js';
-import type { SupportedLocale } from '../locale-normalize.js';
+import { localeToBcp47, type SupportedLocale } from '../locale-normalize.js';
 import type { MessageParams } from '../message-format.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReaddir, safeStat } from '../secure-io.js';
@@ -359,7 +359,7 @@ export function buildOrganizationDigest(
 }
 
 function formatLocal(iso: string, timeZone: string, locale: SupportedLocale, withTime = true) {
-  const parts = new Intl.DateTimeFormat(locale === 'ja' ? 'ja-JP' : 'en-US', {
+  const parts = new Intl.DateTimeFormat(localeToBcp47(locale), {
     timeZone,
     month: 'numeric',
     day: 'numeric',

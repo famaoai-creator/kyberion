@@ -1,4 +1,6 @@
 import { clamp } from './foundation/text.js';
+import type { SupportedLocale } from './locale-normalize.js';
+import { t } from './t.js';
 
 export interface LeadScoreSignals {
   has_budget: boolean;
@@ -19,32 +21,33 @@ export interface LeadScoreResult {
   reasons: string[];
 }
 
-const SCORE_WEIGHTS: Array<[keyof LeadScoreSignals, number, string]> = [
-  ['has_budget', 15, '予算の見込みがある'],
-  ['has_timeline', 15, '導入時期が明確'],
-  ['has_decision_maker', 10, '決裁者が把握できている'],
-  ['clear_pain', 20, '課題が明確'],
-  ['technical_fit', 15, '技術要件との整合がある'],
-  ['strategic_fit', 15, '事業要件との整合がある'],
+const SCORE_WEIGHTS: Array<[keyof LeadScoreSignals, number]> = [
+  ['has_budget', 15],
+  ['has_timeline', 15],
+  ['has_decision_maker', 10],
+  ['clear_pain', 20],
+  ['technical_fit', 15],
+  ['strategic_fit', 15],
 ];
 
 const clampScore = (score: number): number => clamp(score, 0, 100);
 
-function buildReasons(signals: LeadScoreSignals): string[] {
+function buildReasons(signals: LeadScoreSignals, locale?: SupportedLocale): string[] {
   const reasons: string[] = [];
 
-  if (signals.clear_pain) reasons.push('課題が明確');
-  if (signals.has_timeline) reasons.push('導入期限がある');
-  if (!signals.has_decision_maker) reasons.push('決裁者は未確認');
-  if (signals.wrong_fit_signal) reasons.push('不適合シグナルがある');
+  if (signals.clear_pain) reasons.push(t('lead_score:reason_clear_pain', undefined, locale));
+  if (signals.has_timeline) reasons.push(t('lead_score:reason_has_timeline', undefined, locale));
+  if (!signals.has_decision_maker)
+    reasons.push(t('lead_score:reason_no_decision_maker', undefined, locale));
+  if (signals.wrong_fit_signal) reasons.push(t('lead_score:reason_wrong_fit', undefined, locale));
   if (signals.has_budget && !signals.clear_pain && !signals.has_timeline) {
-    reasons.push('予算確認が先行している');
+    reasons.push(t('lead_score:reason_budget_first', undefined, locale));
   }
 
   return reasons;
 }
 
-export function scoreLead(signals: LeadScoreSignals): LeadScoreResult {
+export function scoreLead(signals: LeadScoreSignals, locale?: SupportedLocale): LeadScoreResult {
   let score = 0;
   for (const [key, weight] of SCORE_WEIGHTS) {
     if (signals[key]) {
@@ -52,7 +55,7 @@ export function scoreLead(signals: LeadScoreSignals): LeadScoreResult {
     }
   }
 
-  const reasons = buildReasons(signals);
+  const reasons = buildReasons(signals, locale);
 
   if (signals.wrong_fit_signal) {
     return {

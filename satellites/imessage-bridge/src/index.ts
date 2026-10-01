@@ -3,6 +3,7 @@ import { installProcessGuards } from '@agent/core/process-guards';
 import { defineScript, isDirectScript } from '@agent/core/script-harness';
 import { getRegisteredEnvText, parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
 import { resolveOperatorLocale } from '@agent/core/surface/operator-identity';
+import { deriveReplyLocale, runWithReplyLocale } from '@agent/core/locale';
 import { t } from '@agent/core/t';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { logger } from '@agent/core/core';
@@ -305,12 +306,11 @@ export function buildIMessageChannelAdapter(msg: IMessageStimulus): ChannelAdapt
     // UX-02: iMessage has no typing API — send a one-time working note
     // only if processing outlives 5s (quick replies stay clean).
     typing: () => {
+      // Capture the turn's reply locale now: the note fires later, outside the turn's async context.
+      const noteLocale = resolveOperatorLocale();
       const processingNote = scheduleBridgeProcessingNote('imessage-bridge', () =>
         sendIMessageText(
-          buildIMessageReplyRequest(
-            msg,
-            t('bridge:processing_note', undefined, resolveOperatorLocale())
-          )
+          buildIMessageReplyRequest(msg, t('bridge:processing_note', undefined, noteLocale))
         )
       );
       return { stop: () => processingNote.cancel() };
@@ -326,6 +326,15 @@ export function buildIMessageChannelAdapter(msg: IMessageStimulus): ChannelAdapt
 const processedMessageKeys = new Set<string>();
 
 async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageProcessingResult> {
+  // IT-02: replies follow the language the user wrote in (explicit locale still wins).
+  return runWithReplyLocale(deriveReplyLocale({ text: msg.text }), () =>
+    processIncomingIMessageInner(msg)
+  );
+}
+
+async function processIncomingIMessageInner(
+  msg: IMessageStimulus
+): Promise<IMessageProcessingResult> {
   const key = `${msg.chatGuid || msg.chatId}:${msg.id}`;
   if (processedMessageKeys.has(key)) return 'duplicate';
   processedMessageKeys.add(key);
@@ -433,7 +442,6 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
       ({ threadContext }) =>
         runSurfaceMessageConversation({
           surface: 'imessage',
-          locale: resolveOperatorLocale(),
           text: incomingText,
           channel: msg.chatId,
           threadTs: msg.id,

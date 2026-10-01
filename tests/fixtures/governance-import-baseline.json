@@ -17,6 +17,7 @@
     "libs/core/cowork-health-check.test.ts",
     "libs/core/cowork-knowledge-bridge.test.ts",
     "libs/core/creative-design-resolver.test.ts",
+    "libs/core/semantic-design-tokens.test.ts",
     "libs/core/customer-channel-binding.test.ts",
     "libs/core/data-vault.test.ts",
     "libs/core/deliverable-inbox.test.ts",

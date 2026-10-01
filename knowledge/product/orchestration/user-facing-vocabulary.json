@@ -6280,6 +6280,61 @@
         "en": "Workflow steps",
         "ja": "進め方の手順",
         "qps-ploc": "⟦Ẇőřķƒŀőẇ şŧėṗş ŀőřė⟧"
+      },
+      "learned_patterns_available": {
+        "en": "Learned patterns such as {titles} are also available.",
+        "ja": "過去の learned pattern（{titles}）も参照できます。",
+        "qps-ploc": "⟦Ŀėȧřñėḓ ṗȧŧŧėřñş şůƈħ ȧş {titles} ȧřė ȧŀşő ȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "list_separator": {
+        "en": ", ",
+        "ja": "、",
+        "qps-ploc": "⟦,  ŀőř⟧"
+      },
+      "chronos_a2ui_approval_approved": {
+        "en": "Approval request {id} was approved.",
+        "ja": "承認リクエスト {id} を承認しました。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řėɋůėşŧ {id} ẇȧş ȧṗṗřőṽėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "chronos_a2ui_approval_rejected": {
+        "en": "Approval request {id} was sent back.",
+        "ja": "承認リクエスト {id} を差し戻しました。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řėɋůėşŧ {id} ẇȧş şėñŧ ƀȧƈķ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "chronos_a2ui_intervention_sent": {
+        "en": "Sent the intervention response \"{label}\" to mission {missionId}.",
+        "ja": "ミッション {missionId} へ介入回答「{label}」を送信しました。",
+        "qps-ploc": "⟦Şėñŧ ŧħė ïñŧėřṽėñŧïőñ řėşṗőñşė \"{label}\" ŧő ɱïşşïőñ {missionId}. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "chronos_a2ui_intervention_no_target": {
+        "en": "This intervention panel has no target (mission_id / approval_id).",
+        "ja": "この介入パネルには対象（mission_id / approval_id）が指定されていません。",
+        "qps-ploc": "⟦Ŧħïş ïñŧėřṽėñŧïőñ ṗȧñėŀ ħȧş ñő ŧȧřɠėŧ (ɱïşşïőñ_ïḓ / ȧṗṗřőṽȧŀ_ïḓ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "chronos_a2ui_artifact_no_path": {
+        "en": "This artifact tile has no path.",
+        "ja": "この成果物タイルにはパスがありません。",
+        "qps-ploc": "⟦Ŧħïş ȧřŧïƒȧƈŧ ŧïŀė ħȧş ñő ṗȧŧħ. ŀőřėɱ ïṗşů⟧"
+      },
+      "chronos_plan_request_required": {
+        "en": "Enter the request text.",
+        "ja": "依頼文を入力してください",
+        "qps-ploc": "⟦Ėñŧėř ŧħė řėɋůėşŧ ŧėẋŧ. ŀőřėɱ ï⟧"
+      },
+      "chronos_plan_preview_required": {
+        "en": "Create a plan preview first.",
+        "ja": "先に plan preview を作成してください",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧ ṗŀȧñ ṗřėṽïėẇ ƒïřşŧ. ŀőřėɱ ïṗş⟧"
+      },
+      "chronos_plan_preview_stale": {
+        "en": "The input changed, so rerun the plan preview.",
+        "ja": "入力を変更したので plan preview を再実行してください",
+        "qps-ploc": "⟦Ŧħė ïñṗůŧ ƈħȧñɠėḓ, şő řėřůñ ŧħė ṗŀȧñ ṗřėṽïėẇ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "chronos_deliverable_select_required": {
+        "en": "Select a deliverable.",
+        "ja": "成果物を選択してください",
+        "qps-ploc": "⟦Şėŀėƈŧ ȧ ḓėŀïṽėřȧƀŀė. ŀőřėɱ ⟧"
       }
     },
     "cli": {
@@ -9231,6 +9286,16 @@
         "en": "stopped",
         "ja": "停止",
         "qps-ploc": "⟦şŧőṗṗėḓ ŀőř⟧"
+      },
+      "probe_node_engines_unmet": {
+        "en": "Node {current} does not satisfy package.json engines \"{range}\". Fix: `nvm install {major} && nvm use {major}` (or `mise install node@{major}`), then rerun.",
+        "ja": "実行中の Node {current} は engines \"{range}\" を満たしていません。`nvm install {major} && nvm use {major}`(または `mise install node@{major}`)でアップグレードしてから再実行してください。",
+        "qps-ploc": "⟦Ñőḓė {current} ḓőėş ñőŧ şȧŧïşƒẏ ṗȧƈķȧɠė.ĵşőñ ėñɠïñėş \"{range}\". Ƒïẋ: `ñṽɱ ïñşŧȧŀŀ {major} && ñṽɱ ůşė {major}` (őř `ɱïşė ïñşŧȧŀŀ ñőḓė@{major}`), ŧħėñ řėřůñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőř⟧"
+      },
+      "probe_playwright_missing": {
+        "en": "No Playwright browser cache at {dir} — browser features (first-win screenshot, browser:goto) will silently fall back to text. Fix: `pnpm env:bootstrap` (installs the managed browser runtime).",
+        "ja": "Playwright ブラウザ未導入です ({dir})。ブラウザ機能 (first-win スクリーンショット, browser:goto) はテキストにフォールバックします。`pnpm env:bootstrap` で管理ブラウザランタイムを導入してください。",
+        "qps-ploc": "⟦Ñő Ṗŀȧẏẇřïɠħŧ ƀřőẇşėř ƈȧƈħė ȧŧ {dir} — ƀřőẇşėř ƒėȧŧůřėş (ƒïřşŧ-ẇïñ şƈřėėñşħőŧ, ƀřőẇşėř:ɠőŧő) ẇïŀŀ şïŀėñŧŀẏ ƒȧŀŀ ƀȧƈķ ŧő ŧėẋŧ. Ƒïẋ: `ṗñṗɱ ėñṽ:ƀőőŧşŧřȧṗ` (ïñşŧȧŀŀş ŧħė ɱȧñȧɠėḓ ƀřőẇşėř řůñŧïɱė). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
       }
     },
     "error": {
@@ -9370,6 +9435,136 @@
         "en": "What should Kyberion do, and what outcome should count as success?",
         "ja": "Kyberion は何を実行し、何を成功とみなせばよいですか?",
         "qps-ploc": "⟦Ẇħȧŧ şħőůŀḓ Ķẏƀėřïőñ ḓő, ȧñḓ ẇħȧŧ őůŧƈőɱė şħőůŀḓ ƈőůñŧ ȧş şůƈƈėşş? ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "contextual_reason_missing_threshold": {
+        "en": "Missing inputs remain above the clarification threshold{detail}",
+        "ja": "不足している入力は確認しきい値を超えています{detail}",
+        "qps-ploc": "⟦Ɱïşşïñɠ ïñṗůŧş řėɱȧïñ ȧƀőṽė ŧħė ƈŀȧřïƒïƈȧŧïőñ ŧħřėşħőŀḓ{detail} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "contextual_reason_missing_critical": {
+        "en": "Missing critical inputs: {items}.",
+        "ja": "重要な不足入力があります: {items}。",
+        "qps-ploc": "⟦Ɱïşşïñɠ ƈřïŧïƈȧŀ ïñṗůŧş: {items}. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "contextual_reason_none_missing": {
+        "en": "No clarification is required because no inputs are missing.",
+        "ja": "入力の不足がないため、追加の確認は不要です。",
+        "qps-ploc": "⟦Ñő ƈŀȧřïƒïƈȧŧïőñ ïş řėɋůïřėḓ ƀėƈȧůşė ñő ïñṗůŧş ȧřė ɱïşşïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "contextual_reason_force_pattern": {
+        "en": "The request matches a force-clarification ambiguity pattern.",
+        "ja": "依頼が強制確認の曖昧性パターンに一致しました。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ɱȧŧƈħėş ȧ ƒőřƈė-ƈŀȧřïƒïƈȧŧïőñ ȧɱƀïɠůïŧẏ ṗȧŧŧėřñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "contextual_reason_policy_defaults": {
+        "en": "The missing inputs are covered by policy defaults.",
+        "ja": "不足入力はポリシーの既定値で補完できます。",
+        "qps-ploc": "⟦Ŧħė ɱïşşïñɠ ïñṗůŧş ȧřė ƈőṽėřėḓ ƀẏ ṗőŀïƈẏ ḓėƒȧůŀŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "contextual_reason_policy_confidence": {
+        "en": "The request can proceed with policy defaults because confidence is {confidence}.",
+        "ja": "confidence {confidence} なので、ポリシーの既定値で進められます。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ƈȧñ ṗřőƈėėḓ ẇïŧħ ṗőŀïƈẏ ḓėƒȧůŀŧş ƀėƈȧůşė ƈőñƒïḓėñƈė ïş {confidence}. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "clarification_injection_warning": {
+        "en": "⚠️ Injection suspected in external content",
+        "ja": "⚠️ 外部コンテンツにインジェクションの疑いがあります",
+        "qps-ploc": "⟦⚠️ Ïñĵėƈŧïőñ şůşṗėƈŧėḓ ïñ ėẋŧėřñȧŀ ƈőñŧėñŧ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "clarification_none_missing": {
+        "en": "No missing inputs. Ready to proceed.",
+        "ja": "不足している情報はありません。実行を進められます。",
+        "qps-ploc": "⟦Ñő ɱïşşïñɠ ïñṗůŧş. Řėȧḓẏ ŧő ṗřőƈėėḓ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "clarification_next_required": {
+        "en": "Next required{more}: `{id}`",
+        "ja": "次に必要な情報{more}: `{id}`",
+        "qps-ploc": "⟦Ñėẋŧ řėɋůïřėḓ{more}: `{id}` ŀőřėɱ ïṗ⟧"
+      },
+      "clarification_more_hint": {
+        "en": " (+ {count} more)",
+        "ja": "（他 {count} 件）",
+        "qps-ploc": "⟦ (+ {count} ɱőřė) ŀőřėɱ⟧"
+      },
+      "clarification_reason_line": {
+        "en": "Reason: {reason}",
+        "ja": "理由: {reason}",
+        "qps-ploc": "⟦Řėȧşőñ: {reason} ŀőřėɱ⟧"
+      },
+      "clarification_default_line": {
+        "en": "Default: {value}",
+        "ja": "デフォルト: {value}",
+        "qps-ploc": "⟦Ḓėƒȧůŀŧ: {value} ŀőřėɱ⟧"
+      },
+      "orch_brief_q_reference_source": {
+        "en": "Specify the reference screen, URL, document, or app name.",
+        "ja": "参照元となる画面、URL、資料、またはアプリ名を指定してください。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė řėƒėřėñƈė şƈřėėñ, ŮŘĿ, ḓőƈůɱėñŧ, őř ȧṗṗ ñȧɱė. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "orch_brief_q_preserved_elements": {
+        "en": "Which elements should be preserved? Specify colors, layout, tone, navigation flow, and so on.",
+        "ja": "踏襲したい要素は何ですか。配色、レイアウト、トーン、導線などを指定してください。",
+        "qps-ploc": "⟦Ẇħïƈħ ėŀėɱėñŧş şħőůŀḓ ƀė ṗřėşėřṽėḓ? Şṗėƈïƒẏ ƈőŀőřş, ŀȧẏőůŧ, ŧőñė, ñȧṽïɠȧŧïőñ ƒŀőẇ, ȧñḓ şő őñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "orch_brief_q_new_concept": {
+        "en": "State the new concept or goal you want to achieve in one sentence.",
+        "ja": "新しく実現したいコンセプトや目的を一文で指定してください。",
+        "qps-ploc": "⟦Şŧȧŧė ŧħė ñėẇ ƈőñƈėṗŧ őř ɠőȧŀ ẏőů ẇȧñŧ ŧő ȧƈħïėṽė ïñ őñė şėñŧėñƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "orch_brief_q_target_environment": {
+        "en": "Specify the target environment. Example: local / staging / production-like.",
+        "ja": "対象環境を指定してください。例: local / staging / production-like。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė ŧȧřɠėŧ ėñṽïřőñɱėñŧ. Ėẋȧɱṗŀė: ŀőƈȧŀ / şŧȧɠïñɠ / ṗřőḓůƈŧïőñ-ŀïķė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "orch_brief_q_execution_environment": {
+        "en": "Specify the execution environment. Example: simulator / emulator / local browser.",
+        "ja": "実行環境を指定してください。例: simulator / emulator / local browser。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė ėẋėƈůŧïőñ ėñṽïřőñɱėñŧ. Ėẋȧɱṗŀė: şïɱůŀȧŧőř / ėɱůŀȧŧőř / ŀőƈȧŀ ƀřőẇşėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "orch_brief_q_source_materials": {
+        "en": "Specify the documents or input files to build on.",
+        "ja": "ベースにする資料や入力ファイルを指定してください。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė ḓőƈůɱėñŧş őř ïñṗůŧ ƒïŀėş ŧő ƀůïŀḓ őñ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "orch_brief_q_target_audience": {
+        "en": "Specify the intended readers or users.",
+        "ja": "想定読者または利用者を指定してください。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė ïñŧėñḓėḓ řėȧḓėřş őř ůşėřş. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "orch_brief_q_storyline": {
+        "en": "Specify the flow you want to convey: chapter outline or key points.",
+        "ja": "どういう流れで伝えたいか、章立てまたは要点を指定してください。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė ƒŀőẇ ẏőů ẇȧñŧ ŧő ƈőñṽėẏ: ƈħȧṗŧėř őůŧŀïñė őř ķėẏ ṗőïñŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "orch_brief_q_required_output_format": {
+        "en": "Specify the required output format. Example: pptx / docx / pdf.",
+        "ja": "必要な出力形式を指定してください。例: pptx / docx / pdf。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė řėɋůïřėḓ őůŧṗůŧ ƒőřɱȧŧ. Ėẋȧɱṗŀė: ṗṗŧẋ / ḓőƈẋ / ṗḓƒ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "orch_brief_q_project_name": {
+        "en": "Specify the project name. The official or working name is fine.",
+        "ja": "プロジェクト名を指定してください。正式名または運用名で構いません。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė ṗřőĵėƈŧ ñȧɱė. Ŧħė őƒƒïƈïȧŀ őř ẇőřķïñɠ ñȧɱė ïş ƒïñė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "orch_brief_q_delivery_scope": {
+        "en": "Specify the delivery scope this time. Example: project OS / document pack / design pack.",
+        "ja": "今回の納品範囲を指定してください。例: project OS / document pack / design pack。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė ḓėŀïṽėřẏ şƈőṗė ŧħïş ŧïɱė. Ėẋȧɱṗŀė: ṗřőĵėƈŧ ŐŞ / ḓőƈůɱėñŧ ṗȧƈķ / ḓėşïɠñ ṗȧƈķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "orch_brief_q_phase_or_gate": {
+        "en": "Specify the target phase or gate. Example: define / design / gate-requirements-baseline.",
+        "ja": "対象の phase または gate を指定してください。例: define / design / gate-requirements-baseline。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė ŧȧřɠėŧ ṗħȧşė őř ɠȧŧė. Ėẋȧɱṗŀė: ḓėƒïñė / ḓėşïɠñ / ɠȧŧė-řėɋůïřėɱėñŧş-ƀȧşėŀïñė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "orch_brief_q_related_missions": {
+        "en": "Specify any related mission. If there is none, answer none.",
+        "ja": "関連する mission があれば指定してください。無ければ none と答えてください。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ȧñẏ řėŀȧŧėḓ ɱïşşïőñ. Ïƒ ŧħėřė ïş ñőñė, ȧñşẇėř ñőñė. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "orch_brief_q_default": {
+        "en": "Specify {name}.",
+        "ja": "{name} を指定してください。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ {name}. ŀőřė⟧"
       }
     },
     "common": {
@@ -9671,6 +9866,46 @@
         "en": "Bootstrap {runtime}",
         "ja": "{runtime} を初期設定",
         "qps-ploc": "⟦Ƀőőŧşŧřȧṗ {runtime} ŀőřėɱ ⟧"
+      },
+      "followup_reconcile_surface": {
+        "en": "Reconcile {surface} and re-check its status.",
+        "ja": "{surface} を reconcile して状態を再確認してください。",
+        "qps-ploc": "⟦Řėƈőñƈïŀė {surface} ȧñḓ řė-ƈħėƈķ ïŧş şŧȧŧůş. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "followup_fix_esm_integrity": {
+        "en": "Fix the failing ESM integrity checks.",
+        "ja": "ESM integrity の失敗箇所を修正してください。",
+        "qps-ploc": "⟦Ƒïẋ ŧħė ƒȧïŀïñɠ ĖŞⱮ ïñŧėɠřïŧẏ ƈħėƈķş. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "followup_fix_catalog_integrity": {
+        "en": "Fix the failing catalog integrity checks.",
+        "ja": "catalog integrity の失敗箇所を修正してください。",
+        "qps-ploc": "⟦Ƒïẋ ŧħė ƒȧïŀïñɠ ƈȧŧȧŀőɠ ïñŧėɠřïŧẏ ƈħėƈķş. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "followup_review_active_missions": {
+        "en": "Review the checkpoints or finish criteria of the active missions.",
+        "ja": "active な mission の checkpoint または finish 条件を確認してください。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ƈħėƈķṗőïñŧş őř ƒïñïşħ ƈřïŧėřïȧ őƒ ŧħė ȧƈŧïṽė ɱïşşïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "followup_review_mission_artifacts": {
+        "en": "Review the artifacts and distillation of {missionId}.",
+        "ja": "{missionId} の成果物と distillation を確認してください。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ȧřŧïƒȧƈŧş ȧñḓ ḓïşŧïŀŀȧŧïőñ őƒ {missionId}. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "followup_resume_mission": {
+        "en": "Resume {missionId} and check its progress.",
+        "ja": "{missionId} を再開して進捗を確認してください。",
+        "qps-ploc": "⟦Řėşůɱė {missionId} ȧñḓ ƈħėƈķ ïŧş ṗřőɠřėşş. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "followup_review_project_ledger": {
+        "en": "Review the target project mission ledger and gate documents.",
+        "ja": "対象 project の mission ledger と gate 資料を確認してください。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ŧȧřɠėŧ ṗřőĵėƈŧ ɱïşşïőñ ŀėḓɠėř ȧñḓ ɠȧŧė ḓőƈůɱėñŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "followup_specify_other_target": {
+        "en": "If needed, specify another mission or project to check its detailed status.",
+        "ja": "必要なら別の mission または project を指定して詳細状態を確認してください。",
+        "qps-ploc": "⟦Ïƒ ñėėḓėḓ, şṗėƈïƒẏ ȧñőŧħėř ɱïşşïőñ őř ṗřőĵėƈŧ ŧő ƈħėƈķ ïŧş ḓėŧȧïŀėḓ şŧȧŧůş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
       }
     },
     "bridge": {
@@ -9849,26 +10084,6 @@
         "ja": "どこが期待と違いましたか？(スキップ可)",
         "qps-ploc": "⟦Ẇħȧŧ ḓïḓ ñőŧ ɱėėŧ ėẋṗėƈŧȧŧïőñş? (Őṗŧïőñȧŀ) ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
-      "approval_not_authorized": {
-        "en": "You are not authorized to decide this approval request. Please ask an approver.",
-        "ja": "この承認要求を判断する権限がありません。承認者に依頼してください。",
-        "qps-ploc": "⟦Ẏőů ȧřė ñőŧ ȧůŧħőřïẑėḓ ŧő ḓėƈïḓė ŧħïş ȧṗṗřőṽȧŀ řėɋůėşŧ. Ṗŀėȧşė ȧşķ ȧñ ȧṗṗřőṽėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
-      },
-      "approval_action_not_authorized": {
-        "en": "You are not authorized to perform this action. Please ask an approver.",
-        "ja": "この操作を行う権限がありません。承認者に依頼してください。",
-        "qps-ploc": "⟦Ẏőů ȧřė ñőŧ ȧůŧħőřïẑėḓ ŧő ṗėřƒőřɱ ŧħïş ȧƈŧïőñ. Ṗŀėȧşė ȧşķ ȧñ ȧṗṗřőṽėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
-      },
-      "work_request_not_authorized": {
-        "en": "You can ask questions here, but starting work (missions, approvals) needs a registered team member with an operator role or higher.",
-        "ja": "このチャンネルでは質問にはお答えできますが、ミッションや承認を伴う作業の依頼には、オペレーター以上の役割を持つ登録メンバーが必要です。",
-        "qps-ploc": "⟦Ẏőů ƈȧñ ȧşķ ɋůėşŧïőñş ħėřė, ƀůŧ şŧȧřŧïñɠ ẇőřķ (ɱïşşïőñş, ȧṗṗřőṽȧŀş) ñėėḓş ȧ řėɠïşŧėřėḓ ŧėȧɱ ɱėɱƀėř ẇïŧħ ȧñ őṗėřȧŧőř řőŀė őř ħïɠħėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
-      },
-      "mission_proposal_not_authorized": {
-        "en": "You are not authorized to decide this mission proposal. Please ask an approver.",
-        "ja": "このミッション提案を判断する権限がありません。承認者に依頼してください。",
-        "qps-ploc": "⟦Ẏőů ȧřė ñőŧ ȧůŧħőřïẑėḓ ŧő ḓėƈïḓė ŧħïş ɱïşşïőñ ṗřőṗőşȧŀ. Ṗŀėȧşė ȧşķ ȧñ ȧṗṗřőṽėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
-      },
       "operation_not_allowed": {
         "en": "This operation is not allowed.",
         "ja": "この操作は許可されていません。",
@@ -10003,6 +10218,36 @@
         "en": "This approval request has expired.",
         "ja": "この承認要求は期限切れです。",
         "qps-ploc": "⟦Ŧħïş ȧṗṗřőṽȧŀ řėɋůėşŧ ħȧş ėẋṗïřėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "approval_action_approved": {
+        "en": "Approved by {actor}: {title}",
+        "ja": "{actor} が承認しました: {title}",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ ƀẏ {actor}: {title} ŀőřėɱ ïṗş⟧"
+      },
+      "approval_action_rejected": {
+        "en": "Rejected by {actor}: {title}",
+        "ja": "{actor} が却下しました: {title}",
+        "qps-ploc": "⟦Řėĵėƈŧėḓ ƀẏ {actor}: {title} ŀőřėɱ ïṗş⟧"
+      },
+      "approval_not_authorized": {
+        "en": "You are not authorized to decide this approval request. Please ask an approver.",
+        "ja": "この承認要求を判断する権限がありません。承認者に依頼してください。",
+        "qps-ploc": "⟦Ẏőů ȧřė ñőŧ ȧůŧħőřïẑėḓ ŧő ḓėƈïḓė ŧħïş ȧṗṗřőṽȧŀ řėɋůėşŧ. Ṗŀėȧşė ȧşķ ȧñ ȧṗṗřőṽėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "approval_action_not_authorized": {
+        "en": "You are not authorized to perform this action. Please ask an approver.",
+        "ja": "この操作を行う権限がありません。承認者に依頼してください。",
+        "qps-ploc": "⟦Ẏőů ȧřė ñőŧ ȧůŧħőřïẑėḓ ŧő ṗėřƒőřɱ ŧħïş ȧƈŧïőñ. Ṗŀėȧşė ȧşķ ȧñ ȧṗṗřőṽėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "mission_proposal_not_authorized": {
+        "en": "You are not authorized to decide this mission proposal. Please ask an approver.",
+        "ja": "このミッション提案を判断する権限がありません。承認者に依頼してください。",
+        "qps-ploc": "⟦Ẏőů ȧřė ñőŧ ȧůŧħőřïẑėḓ ŧő ḓėƈïḓė ŧħïş ɱïşşïőñ ṗřőṗőşȧŀ. Ṗŀėȧşė ȧşķ ȧñ ȧṗṗřőṽėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "work_request_not_authorized": {
+        "en": "You can ask questions here, but starting work (missions, approvals) needs a registered team member with an operator role or higher.",
+        "ja": "このチャンネルでは質問にはお答えできますが、ミッションや承認を伴う作業の依頼には、オペレーター以上の役割を持つ登録メンバーが必要です。",
+        "qps-ploc": "⟦Ẏőů ƈȧñ ȧşķ ɋůėşŧïőñş ħėřė, ƀůŧ şŧȧřŧïñɠ ẇőřķ (ɱïşşïőñş, ȧṗṗřőṽȧŀş) ñėėḓş ȧ řėɠïşŧėřėḓ ŧėȧɱ ɱėɱƀėř ẇïŧħ ȧñ őṗėřȧŧőř řőŀė őř ħïɠħėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
       }
     },
     "concierge": {
@@ -10865,186 +11110,6 @@
         "en": "Retire this charter",
         "ja": "この憲章をやめる",
         "qps-ploc": "⟦Řėŧïřė ŧħïş ƈħȧřŧėř ŀőřėɱ ⟧"
-      },
-      "setup.invite_title": {
-        "en": "Invite people",
-        "ja": "メンバーを招待する",
-        "qps-ploc": "⟦Ïñṽïŧė ṗėőṗŀė ŀőřė⟧"
-      },
-      "setup.invite_description": {
-        "en": "Create a one-time link for someone to join an organization. They must sign in themselves; the link alone gives nothing.",
-        "ja": "組織に参加するための 1 回限りのリンクを作ります。参加する人が自分でサインインする必要があり、リンクだけでは何も得られません。",
-        "qps-ploc": "⟦Ƈřėȧŧė ȧ őñė-ŧïɱė ŀïñķ ƒőř şőɱėőñė ŧő ĵőïñ ȧñ őřɠȧñïẑȧŧïőñ. Ŧħėẏ ɱůşŧ şïɠñ ïñ ŧħėɱşėŀṽėş; ŧħė ŀïñķ ȧŀőñė ɠïṽėş ñőŧħïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
-      },
-      "setup.invite_tenant": {
-        "en": "Organization",
-        "ja": "組織",
-        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
-      },
-      "setup.invite_role": {
-        "en": "Role",
-        "ja": "役割",
-        "qps-ploc": "⟦Řőŀė ŀőř⟧"
-      },
-      "setup.invite_ttl": {
-        "en": "Valid for (hours)",
-        "ja": "有効時間(時間)",
-        "qps-ploc": "⟦Ṽȧŀïḓ ƒőř (ħőůřş) ŀőřėɱ⟧"
-      },
-      "setup.invite_create": {
-        "en": "Create invite link",
-        "ja": "招待リンクを作る",
-        "qps-ploc": "⟦Ƈřėȧŧė ïñṽïŧė ŀïñķ ŀőřėɱ⟧"
-      },
-      "setup.invite_link_once": {
-        "en": "Share this link now. It is shown only once.",
-        "ja": "このリンクを今、相手に渡してください。表示されるのは 1 回だけです。",
-        "qps-ploc": "⟦Şħȧřė ŧħïş ŀïñķ ñőẇ. Ïŧ ïş şħőẇñ őñŀẏ őñƈė. ŀőřėɱ ïṗşůɱ ḓő⟧"
-      },
-      "setup.invite_list_title": {
-        "en": "Invites",
-        "ja": "招待の一覧",
-        "qps-ploc": "⟦Ïñṽïŧėş ŀőř⟧"
-      },
-      "setup.invite_none": {
-        "en": "No invites yet.",
-        "ja": "招待はまだありません。",
-        "qps-ploc": "⟦Ñő ïñṽïŧėş ẏėŧ. ŀőřė⟧"
-      },
-      "setup.invite_line": {
-        "en": "{role} · {status} · until {date}",
-        "ja": "{role} · {status} · {date} まで",
-        "qps-ploc": "⟦{role} · {status} · ůñŧïŀ {date} ŀőřėɱ ïṗşů⟧"
-      },
-      "setup.invite_status_pending": {
-        "en": "waiting",
-        "ja": "待機中",
-        "qps-ploc": "⟦ẇȧïŧïñɠ ŀőř⟧"
-      },
-      "setup.invite_status_accepted": {
-        "en": "used",
-        "ja": "使用済み",
-        "qps-ploc": "⟦ůşėḓ ŀőř⟧"
-      },
-      "setup.invite_status_revoked": {
-        "en": "revoked",
-        "ja": "取り消し済み",
-        "qps-ploc": "⟦řėṽőķėḓ ŀőř⟧"
-      },
-      "setup.invite_status_expired": {
-        "en": "expired",
-        "ja": "期限切れ",
-        "qps-ploc": "⟦ėẋṗïřėḓ ŀőř⟧"
-      },
-      "setup.invite_revoke": {
-        "en": "Revoke",
-        "ja": "取り消す",
-        "qps-ploc": "⟦Řėṽőķė ŀőř⟧"
-      },
-      "setup.invite_role_approver": {
-        "en": "Approver",
-        "ja": "承認者",
-        "qps-ploc": "⟦Ȧṗṗřőṽėř ŀőř⟧"
-      },
-      "setup.invite_role_operator": {
-        "en": "Operator",
-        "ja": "実行者",
-        "qps-ploc": "⟦Őṗėřȧŧőř ŀőř⟧"
-      },
-      "setup.invite_role_viewer": {
-        "en": "Viewer",
-        "ja": "閲覧者",
-        "qps-ploc": "⟦Ṽïėẇėř ŀőř⟧"
-      },
-      "setup.invite_err": {
-        "en": "Could not complete: {detail}",
-        "ja": "実行できませんでした: {detail}",
-        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ƈőɱṗŀėŧė: {detail} ŀőřėɱ ïṗş⟧"
-      },
-      "setup.connections_mine": {
-        "en": "Your connections",
-        "ja": "あなたの連携",
-        "qps-ploc": "⟦Ẏőůř ƈőññėƈŧïőñş ŀőřėɱ⟧"
-      },
-      "setup.connections_organization": {
-        "en": "{tenant} connections",
-        "ja": "{tenant} の連携",
-        "qps-ploc": "⟦{tenant} ƈőññėƈŧïőñş ŀőřėɱ ⟧"
-      },
-      "setup.connection_owner_person": {
-        "en": "Yours",
-        "ja": "あなたの",
-        "qps-ploc": "⟦Ẏőůřş ŀőř⟧"
-      },
-      "setup.connection_owner_organization": {
-        "en": "Organization: {tenant}",
-        "ja": "組織: {tenant}",
-        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ: {tenant} ŀőřėɱ ï⟧"
-      },
-      "setup.org_ready_title": {
-        "en": "Setting up an organization",
-        "ja": "組織の立ち上げ",
-        "qps-ploc": "⟦Şėŧŧïñɠ ůṗ ȧñ őřɠȧñïẑȧŧïőñ ŀőřėɱ ïṗ⟧"
-      },
-      "setup.org_ready_description": {
-        "en": "What is done and where to do the rest. Each step opens the section that does it.",
-        "ja": "済んでいることと、残りをどこで進めるかです。各手順は、それを行うセクションを開きます。",
-        "qps-ploc": "⟦Ẇħȧŧ ïş ḓőñė ȧñḓ ẇħėřė ŧő ḓő ŧħė řėşŧ. Ėȧƈħ şŧėṗ őṗėñş ŧħė şėƈŧïőñ ŧħȧŧ ḓőėş ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
-      },
-      "setup.org_ready_progress": {
-        "en": "{tenant}: {done} of {total} steps done",
-        "ja": "{tenant}: {total} 手順のうち {done} 手順が完了",
-        "qps-ploc": "⟦{tenant}: {done} őƒ {total} şŧėṗş ḓőñė ŀőřėɱ ïṗşůɱ ⟧"
-      },
-      "setup.org_ready_organization": {
-        "en": "The organization is active",
-        "ja": "組織が有効になっている",
-        "qps-ploc": "⟦Ŧħė őřɠȧñïẑȧŧïőñ ïş ȧƈŧïṽė ŀőřėɱ ïṗ⟧"
-      },
-      "setup.org_ready_members": {
-        "en": "Someone besides you has joined, or an invite is out",
-        "ja": "あなた以外のメンバーが参加した(または招待を出した)",
-        "qps-ploc": "⟦Şőɱėőñė ƀėşïḓėş ẏőů ħȧş ĵőïñėḓ, őř ȧñ ïñṽïŧė ïş őůŧ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
-      },
-      "setup.org_ready_connections": {
-        "en": "A connection owned by the organization",
-        "ja": "組織の連携を 1 つ以上つないだ",
-        "qps-ploc": "⟦Ȧ ƈőññėƈŧïőñ őẇñėḓ ƀẏ ŧħė őřɠȧñïẑȧŧïőñ ŀőřėɱ ïṗşůɱ ⟧"
-      },
-      "setup.org_ready_charter": {
-        "en": "An accountability charter is in force",
-        "ja": "責任者憲章が有効になっている",
-        "qps-ploc": "⟦Ȧñ ȧƈƈőůñŧȧƀïŀïŧẏ ƈħȧřŧėř ïş ïñ ƒőřƈė ŀőřėɱ ïṗşůɱ ⟧"
-      },
-      "setup.org_ready_go": {
-        "en": "Go to it",
-        "ja": "進める",
-        "qps-ploc": "⟦Ɠő ŧő ïŧ ŀőř⟧"
-      },
-      "setup.charter_usage_day": {
-        "en": "Spent today: {spent} of {limit}",
-        "ja": "本日の使用額: {limit} のうち {spent}",
-        "qps-ploc": "⟦Şṗėñŧ ŧőḓȧẏ: {spent} őƒ {limit} ŀőřėɱ ïṗşů⟧"
-      },
-      "setup.charter_usage_month": {
-        "en": "Spent this month: {spent} of {limit}",
-        "ja": "今月の使用額: {limit} のうち {spent}",
-        "qps-ploc": "⟦Şṗėñŧ ŧħïş ɱőñŧħ: {spent} őƒ {limit} ŀőřėɱ ïṗşůɱ ⟧"
-      },
-      "setup.charter_proposals_title": {
-        "en": "Things the AI could not do (change proposals)",
-        "ja": "AI が実行できなかったこと(変更の提案)",
-        "qps-ploc": "⟦Ŧħïñɠş ŧħė ȦÏ ƈőůŀḓ ñőŧ ḓő (ƈħȧñɠė ṗřőṗőşȧŀş) ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
-      },
-      "setup.charter_proposal_line": {
-        "en": "Refused {count} time(s) — {field}: {current} → {requested}",
-        "ja": "{count} 回拒否 — {field}: {current} → {requested}",
-        "qps-ploc": "⟦Řėƒůşėḓ {count} ŧïɱė(ş) — {field}: {current} → {requested} ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
-      },
-      "setup.charter_proposal_apply": {
-        "en": "Put this in the form",
-        "ja": "フォームに入れる",
-        "qps-ploc": "⟦Ṗůŧ ŧħïş ïñ ŧħė ƒőřɱ ŀőřėɱ ⟧"
       },
       "setup.charter_stopped": {
         "en": "Stopped. The AI cannot run anything under this charter, even inside its limits.",
@@ -12785,6 +12850,196 @@
         "en": "Could not complete the request: {error}",
         "ja": "申請を完了できませんでした: {error}",
         "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ƈőɱṗŀėŧė ŧħė řėɋůėşŧ: {error} ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "api.id_status_required": {
+        "en": "id and status ({statuses}) are required",
+        "ja": "id と status ({statuses}) が必要です",
+        "qps-ploc": "⟦ïḓ ȧñḓ şŧȧŧůş ({statuses}) ȧřė řėɋůïřėḓ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "api.id_decision_required": {
+        "en": "id and decision (approved|rejected) are required",
+        "ja": "id と decision (approved|rejected) が必要です",
+        "qps-ploc": "⟦ïḓ ȧñḓ ḓėƈïşïőñ (ȧṗṗřőṽėḓ|řėĵėƈŧėḓ) ȧřė řėɋůïřėḓ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "setup.charter_usage_day": {
+        "en": "Spent today: {spent} of {limit}",
+        "ja": "本日の使用額: {limit} のうち {spent}",
+        "qps-ploc": "⟦Şṗėñŧ ŧőḓȧẏ: {spent} őƒ {limit} ŀőřėɱ ïṗşů⟧"
+      },
+      "setup.charter_usage_month": {
+        "en": "Spent this month: {spent} of {limit}",
+        "ja": "今月の使用額: {limit} のうち {spent}",
+        "qps-ploc": "⟦Şṗėñŧ ŧħïş ɱőñŧħ: {spent} őƒ {limit} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup.charter_proposals_title": {
+        "en": "Things the AI could not do (change proposals)",
+        "ja": "AI が実行できなかったこと(変更の提案)",
+        "qps-ploc": "⟦Ŧħïñɠş ŧħė ȦÏ ƈőůŀḓ ñőŧ ḓő (ƈħȧñɠė ṗřőṗőşȧŀş) ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "setup.charter_proposal_line": {
+        "en": "Refused {count} time(s) — {field}: {current} → {requested}",
+        "ja": "{count} 回拒否 — {field}: {current} → {requested}",
+        "qps-ploc": "⟦Řėƒůşėḓ {count} ŧïɱė(ş) — {field}: {current} → {requested} ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "setup.charter_proposal_apply": {
+        "en": "Put this in the form",
+        "ja": "フォームに入れる",
+        "qps-ploc": "⟦Ṗůŧ ŧħïş ïñ ŧħė ƒőřɱ ŀőřėɱ ⟧"
+      },
+      "setup.connections_mine": {
+        "en": "Your connections",
+        "ja": "あなたの連携",
+        "qps-ploc": "⟦Ẏőůř ƈőññėƈŧïőñş ŀőřėɱ⟧"
+      },
+      "setup.connections_organization": {
+        "en": "{tenant} connections",
+        "ja": "{tenant} の連携",
+        "qps-ploc": "⟦{tenant} ƈőññėƈŧïőñş ŀőřėɱ ⟧"
+      },
+      "setup.connection_owner_person": {
+        "en": "Yours",
+        "ja": "あなたの",
+        "qps-ploc": "⟦Ẏőůřş ŀőř⟧"
+      },
+      "setup.connection_owner_organization": {
+        "en": "Organization: {tenant}",
+        "ja": "組織: {tenant}",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ: {tenant} ŀőřėɱ ï⟧"
+      },
+      "setup.invite_title": {
+        "en": "Invite people",
+        "ja": "メンバーを招待する",
+        "qps-ploc": "⟦Ïñṽïŧė ṗėőṗŀė ŀőřė⟧"
+      },
+      "setup.invite_description": {
+        "en": "Create a one-time link for someone to join an organization. They must sign in themselves; the link alone gives nothing.",
+        "ja": "組織に参加するための 1 回限りのリンクを作ります。参加する人が自分でサインインする必要があり、リンクだけでは何も得られません。",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧ őñė-ŧïɱė ŀïñķ ƒőř şőɱėőñė ŧő ĵőïñ ȧñ őřɠȧñïẑȧŧïőñ. Ŧħėẏ ɱůşŧ şïɠñ ïñ ŧħėɱşėŀṽėş; ŧħė ŀïñķ ȧŀőñė ɠïṽėş ñőŧħïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "setup.invite_tenant": {
+        "en": "Organization",
+        "ja": "組織",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
+      },
+      "setup.invite_role": {
+        "en": "Role",
+        "ja": "役割",
+        "qps-ploc": "⟦Řőŀė ŀőř⟧"
+      },
+      "setup.invite_ttl": {
+        "en": "Valid for (hours)",
+        "ja": "有効時間(時間)",
+        "qps-ploc": "⟦Ṽȧŀïḓ ƒőř (ħőůřş) ŀőřėɱ⟧"
+      },
+      "setup.invite_create": {
+        "en": "Create invite link",
+        "ja": "招待リンクを作る",
+        "qps-ploc": "⟦Ƈřėȧŧė ïñṽïŧė ŀïñķ ŀőřėɱ⟧"
+      },
+      "setup.invite_link_once": {
+        "en": "Share this link now. It is shown only once.",
+        "ja": "このリンクを今、相手に渡してください。表示されるのは 1 回だけです。",
+        "qps-ploc": "⟦Şħȧřė ŧħïş ŀïñķ ñőẇ. Ïŧ ïş şħőẇñ őñŀẏ őñƈė. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "setup.invite_list_title": {
+        "en": "Invites",
+        "ja": "招待の一覧",
+        "qps-ploc": "⟦Ïñṽïŧėş ŀőř⟧"
+      },
+      "setup.invite_none": {
+        "en": "No invites yet.",
+        "ja": "招待はまだありません。",
+        "qps-ploc": "⟦Ñő ïñṽïŧėş ẏėŧ. ŀőřė⟧"
+      },
+      "setup.invite_line": {
+        "en": "{role} · {status} · until {date}",
+        "ja": "{role} · {status} · {date} まで",
+        "qps-ploc": "⟦{role} · {status} · ůñŧïŀ {date} ŀőřėɱ ïṗşů⟧"
+      },
+      "setup.invite_status_pending": {
+        "en": "waiting",
+        "ja": "待機中",
+        "qps-ploc": "⟦ẇȧïŧïñɠ ŀőř⟧"
+      },
+      "setup.invite_status_accepted": {
+        "en": "used",
+        "ja": "使用済み",
+        "qps-ploc": "⟦ůşėḓ ŀőř⟧"
+      },
+      "setup.invite_status_revoked": {
+        "en": "revoked",
+        "ja": "取り消し済み",
+        "qps-ploc": "⟦řėṽőķėḓ ŀőř⟧"
+      },
+      "setup.invite_status_expired": {
+        "en": "expired",
+        "ja": "期限切れ",
+        "qps-ploc": "⟦ėẋṗïřėḓ ŀőř⟧"
+      },
+      "setup.invite_revoke": {
+        "en": "Revoke",
+        "ja": "取り消す",
+        "qps-ploc": "⟦Řėṽőķė ŀőř⟧"
+      },
+      "setup.invite_role_approver": {
+        "en": "Approver",
+        "ja": "承認者",
+        "qps-ploc": "⟦Ȧṗṗřőṽėř ŀőř⟧"
+      },
+      "setup.invite_role_operator": {
+        "en": "Operator",
+        "ja": "実行者",
+        "qps-ploc": "⟦Őṗėřȧŧőř ŀőř⟧"
+      },
+      "setup.invite_role_viewer": {
+        "en": "Viewer",
+        "ja": "閲覧者",
+        "qps-ploc": "⟦Ṽïėẇėř ŀőř⟧"
+      },
+      "setup.invite_err": {
+        "en": "Could not complete: {detail}",
+        "ja": "実行できませんでした: {detail}",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ƈőɱṗŀėŧė: {detail} ŀőřėɱ ïṗş⟧"
+      },
+      "setup.org_ready_title": {
+        "en": "Setting up an organization",
+        "ja": "組織の立ち上げ",
+        "qps-ploc": "⟦Şėŧŧïñɠ ůṗ ȧñ őřɠȧñïẑȧŧïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "setup.org_ready_description": {
+        "en": "What is done and where to do the rest. Each step opens the section that does it.",
+        "ja": "済んでいることと、残りをどこで進めるかです。各手順は、それを行うセクションを開きます。",
+        "qps-ploc": "⟦Ẇħȧŧ ïş ḓőñė ȧñḓ ẇħėřė ŧő ḓő ŧħė řėşŧ. Ėȧƈħ şŧėṗ őṗėñş ŧħė şėƈŧïőñ ŧħȧŧ ḓőėş ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "setup.org_ready_progress": {
+        "en": "{tenant}: {done} of {total} steps done",
+        "ja": "{tenant}: {total} 手順のうち {done} 手順が完了",
+        "qps-ploc": "⟦{tenant}: {done} őƒ {total} şŧėṗş ḓőñė ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup.org_ready_organization": {
+        "en": "The organization is active",
+        "ja": "組織が有効になっている",
+        "qps-ploc": "⟦Ŧħė őřɠȧñïẑȧŧïőñ ïş ȧƈŧïṽė ŀőřėɱ ïṗ⟧"
+      },
+      "setup.org_ready_members": {
+        "en": "Someone besides you has joined, or an invite is out",
+        "ja": "あなた以外のメンバーが参加した(または招待を出した)",
+        "qps-ploc": "⟦Şőɱėőñė ƀėşïḓėş ẏőů ħȧş ĵőïñėḓ, őř ȧñ ïñṽïŧė ïş őůŧ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "setup.org_ready_connections": {
+        "en": "A connection owned by the organization",
+        "ja": "組織の連携を 1 つ以上つないだ",
+        "qps-ploc": "⟦Ȧ ƈőññėƈŧïőñ őẇñėḓ ƀẏ ŧħė őřɠȧñïẑȧŧïőñ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup.org_ready_charter": {
+        "en": "An accountability charter is in force",
+        "ja": "責任者憲章が有効になっている",
+        "qps-ploc": "⟦Ȧñ ȧƈƈőůñŧȧƀïŀïŧẏ ƈħȧřŧėř ïş ïñ ƒőřƈė ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "setup.org_ready_go": {
+        "en": "Go to it",
+        "ja": "進める",
+        "qps-ploc": "⟦Ɠő ŧő ïŧ ŀőř⟧"
       }
     },
     "onboarding": {
@@ -17453,6 +17708,11 @@
         "en": " (audio was too short; minutes were not generated)",
         "ja": " （音声が短すぎたため議事録は未生成）",
         "qps-ploc": "⟦ (ȧůḓïő ẇȧş ŧőő şħőřŧ; ɱïñůŧėş ẇėřė ñőŧ ɠėñėřȧŧėḓ) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "segment_transcription_failed": {
+        "en": "(Transcription of segment {segment} failed: {detail})",
+        "ja": "(segment {segment} の文字起こしに失敗: {detail})",
+        "qps-ploc": "⟦(Ŧřȧñşƈřïṗŧïőñ őƒ şėɠɱėñŧ {segment} ƒȧïŀėḓ: {detail}) ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
       }
     },
     "presence_studio": {
@@ -18055,6 +18315,21 @@
         "en": "Failed to generate minutes",
         "ja": "議事録の生成に失敗しました",
         "qps-ploc": "⟦Ƒȧïŀėḓ ŧő ɠėñėřȧŧė ɱïñůŧėş ŀőřėɱ ïṗ⟧"
+      },
+      "minutes_already_recording": {
+        "en": "Already recording ({missionId})",
+        "ja": "既に録音中です ({missionId})",
+        "qps-ploc": "⟦Ȧŀřėȧḓẏ řėƈőřḓïñɠ ({missionId}) ŀőřėɱ ïṗşů⟧"
+      },
+      "minutes_mic_unavailable": {
+        "en": "The microphone is not available",
+        "ja": "マイクが利用できません",
+        "qps-ploc": "⟦Ŧħė ɱïƈřőṗħőñė ïş ñőŧ ȧṽȧïŀȧƀŀė ŀőřėɱ ïṗşů⟧"
+      },
+      "minutes_no_active_session": {
+        "en": "There is no recording session in progress",
+        "ja": "録音中のセッションがありません",
+        "qps-ploc": "⟦Ŧħėřė ïş ñő řėƈőřḓïñɠ şėşşïőñ ïñ ṗřőɠřėşş ŀőřėɱ ïṗşůɱ ḓ⟧"
       }
     },
     "tui": {
@@ -18875,16 +19150,6 @@
       }
     },
     "surface": {
-      "surface_enable_hint": {
-        "en": "Disabled. Enable with: pnpm surfaces enable --surface {surface}",
-        "ja": "無効です。有効化: pnpm surfaces enable --surface {surface}",
-        "qps-ploc": "⟦Ḓïşȧƀŀėḓ. Ėñȧƀŀė ẇïŧħ: ṗñṗɱ şůřƒȧƈėş ėñȧƀŀė --şůřƒȧƈė {surface} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
-      },
-      "surface_gateway_disabled_by_default_warning": {
-        "en": "Gateway \"{surface}\" has credentials configured but is now disabled by default, so it was not started. Enable it with: pnpm surfaces enable --surface {surface}",
-        "ja": "ゲートウェイ「{surface}」は認証情報が設定済みですが、既定で無効になったため起動していません。有効化: pnpm surfaces enable --surface {surface}",
-        "qps-ploc": "⟦Ɠȧŧėẇȧẏ \"{surface}\" ħȧş ƈřėḓėñŧïȧŀş ƈőñƒïɠůřėḓ ƀůŧ ïş ñőẇ ḓïşȧƀŀėḓ ƀẏ ḓėƒȧůŀŧ, şő ïŧ ẇȧş ñőŧ şŧȧřŧėḓ. Ėñȧƀŀė ïŧ ẇïŧħ: ṗñṗɱ şůřƒȧƈėş ėñȧƀŀė --şůřƒȧƈė {surface} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřė⟧"
-      },
       "voice_hub_error_fallback": {
         "en": "I could not process that. Please try again.",
         "ja": "うまく処理できませんでした。もう一度お願いします。",
@@ -18939,6 +19204,811 @@
         "en": "A hands-on mirror for the current browser and terminal work.",
         "ja": "作業の手元ミラー — ブラウザ/ターミナルの現在の手元",
         "qps-ploc": "⟦Ȧ ħȧñḓş-őñ ɱïřřőř ƒőř ŧħė ƈůřřėñŧ ƀřőẇşėř ȧñḓ ŧėřɱïñȧŀ ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "steering_status_unavailable": {
+        "en": "State: could not fetch the status of mission {missionId}.",
+        "ja": "状態: ミッション {missionId} の状態を取得できませんでした。",
+        "qps-ploc": "⟦Şŧȧŧė: ƈőůŀḓ ñőŧ ƒėŧƈħ ŧħė şŧȧŧůş őƒ ɱïşşïőñ {missionId}. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "steering_status_unavailable_next": {
+        "en": "Next action: Check the mission ID and your permissions.",
+        "ja": "次のアクション: ミッションIDと権限を確認してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ƈħėƈķ ŧħė ɱïşşïőñ ÏḒ ȧñḓ ẏőůř ṗėřɱïşşïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "steering_status_current": {
+        "en": "State: Mission {missionId} is currently {status}.",
+        "ja": "状態: ミッション {missionId} は現在 {status} です。",
+        "qps-ploc": "⟦Şŧȧŧė: Ɱïşşïőñ {missionId} ïş ƈůřřėñŧŀẏ {status}. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "steering_status_recent_history": {
+        "en": "Result: recent history\n{history}",
+        "ja": "結果: 直近の履歴\n{history}",
+        "qps-ploc": "⟦Řėşůŀŧ: řėƈėñŧ ħïşŧőřẏ\n{history} ŀőřėɱ ïṗşů⟧"
+      },
+      "steering_next_action_line": {
+        "en": "Next action: {action}",
+        "ja": "次のアクション: {action}",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: {action} ŀőřėɱ ⟧"
+      },
+      "steering_none": {
+        "en": "None.",
+        "ja": "特にありません。",
+        "qps-ploc": "⟦Ñőñė. ŀőř⟧"
+      },
+      "steering_status_failed": {
+        "en": "State: failed to fetch the status of mission {missionId} ({error}).",
+        "ja": "状態: ミッション {missionId} の状態取得に失敗しました({error})。",
+        "qps-ploc": "⟦Şŧȧŧė: ƒȧïŀėḓ ŧő ƒėŧƈħ ŧħė şŧȧŧůş őƒ ɱïşşïőñ {missionId} ({error}). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "steering_retry_later": {
+        "en": "Next action: Please try again later.",
+        "ja": "次のアクション: しばらくしてから再度お試しください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ṗŀėȧşė ŧřẏ ȧɠȧïñ ŀȧŧėř. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "steering_checkpoint_default_note": {
+        "en": "Steering checkpoint via {surface}",
+        "ja": "{surface} 経由の操縦チェックポイント",
+        "qps-ploc": "⟦Şŧėėřïñɠ ƈħėƈķṗőïñŧ ṽïȧ {surface} ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "steering_checkpoint_recorded": {
+        "en": "State: Recorded a checkpoint for mission {missionId}.",
+        "ja": "状態: ミッション {missionId} にチェックポイントを記録しました。",
+        "qps-ploc": "⟦Şŧȧŧė: Řėƈőřḓėḓ ȧ ƈħėƈķṗőïñŧ ƒőř ɱïşşïőñ {missionId}. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "steering_result_line": {
+        "en": "Result: {text}",
+        "ja": "結果: {text}",
+        "qps-ploc": "⟦Řėşůŀŧ: {text} ŀőřė⟧"
+      },
+      "steering_continue_work": {
+        "en": "Next action: Please continue the work.",
+        "ja": "次のアクション: 作業を継続してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ṗŀėȧşė ƈőñŧïñůė ŧħė ẇőřķ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "steering_checkpoint_failed": {
+        "en": "State: Failed to record the checkpoint ({error}).",
+        "ja": "状態: チェックポイントの記録に失敗しました({error})。",
+        "qps-ploc": "⟦Şŧȧŧė: Ƒȧïŀėḓ ŧő řėƈőřḓ ŧħė ƈħėƈķṗőïñŧ ({error}). ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "steering_check_then_retry": {
+        "en": "Next action: Check the mission state, then try again.",
+        "ja": "次のアクション: ミッションの状態を確認してから再試行してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ƈħėƈķ ŧħė ɱïşşïőñ şŧȧŧė, ŧħėñ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "steering_pause_reason": {
+        "en": "Steering pause via {surface}",
+        "ja": "{surface} 経由の操縦一時停止",
+        "qps-ploc": "⟦Şŧėėřïñɠ ṗȧůşė ṽïȧ {surface} ŀőřėɱ ïṗş⟧"
+      },
+      "steering_paused": {
+        "en": "State: Paused mission {missionId}.",
+        "ja": "状態: ミッション {missionId} を一時停止しました。",
+        "qps-ploc": "⟦Şŧȧŧė: Ṗȧůşėḓ ɱïşşïőñ {missionId}. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "steering_paused_next": {
+        "en": "Next action: To resume, send \"resume\".",
+        "ja": "次のアクション: 再開する場合は「再開」と送信してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ŧő řėşůɱė, şėñḓ \"řėşůɱė\". ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "steering_pause_failed": {
+        "en": "State: Failed to pause ({error}).",
+        "ja": "状態: 一時停止に失敗しました({error})。",
+        "qps-ploc": "⟦Şŧȧŧė: Ƒȧïŀėḓ ŧő ṗȧůşė ({error}). ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "steering_check_state": {
+        "en": "Next action: Check the mission state.",
+        "ja": "次のアクション: ミッションの状態を確認してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ƈħėƈķ ŧħė ɱïşşïőñ şŧȧŧė. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "steering_resumed": {
+        "en": "State: Resumed mission {missionId}.",
+        "ja": "状態: ミッション {missionId} を再開しました。",
+        "qps-ploc": "⟦Şŧȧŧė: Řėşůɱėḓ ɱïşşïőñ {missionId}. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "steering_resumed_next": {
+        "en": "Next action: You can check progress with \"status\".",
+        "ja": "次のアクション: 進捗は「ステータス」で確認できます。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ẏőů ƈȧñ ƈħėƈķ ṗřőɠřėşş ẇïŧħ \"şŧȧŧůş\". ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "steering_resume_failed": {
+        "en": "State: Failed to resume ({error}).",
+        "ja": "状態: 再開に失敗しました({error})。",
+        "qps-ploc": "⟦Şŧȧŧė: Ƒȧïŀėḓ ŧő řėşůɱė ({error}). ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "steering_note_line": {
+        "en": "Note: {note}",
+        "ja": "メモ: {note}",
+        "qps-ploc": "⟦Ñőŧė: {note} ŀőř⟧"
+      },
+      "steering_gate_title": {
+        "en": "Gate approval for mission {missionId}",
+        "ja": "ミッション {missionId} のゲート承認",
+        "qps-ploc": "⟦Ɠȧŧė ȧṗṗřőṽȧŀ ƒőř ɱïşşïőñ {missionId} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "steering_gate_summary_note": {
+        "en": "Gate approval request: {note}",
+        "ja": "ゲート承認要求: {note}",
+        "qps-ploc": "⟦Ɠȧŧė ȧṗṗřőṽȧŀ řėɋůėşŧ: {note} ŀőřėɱ ïṗş⟧"
+      },
+      "steering_gate_summary": {
+        "en": "Gate approval request for mission {missionId}.",
+        "ja": "ミッション {missionId} のゲート承認要求です。",
+        "qps-ploc": "⟦Ɠȧŧė ȧṗṗřőṽȧŀ řėɋůėşŧ ƒőř ɱïşşïőñ {missionId}. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "steering_verb_gate": {
+        "en": "gate approval",
+        "ja": "ゲート承認",
+        "qps-ploc": "⟦ɠȧŧė ȧṗṗřőṽȧŀ ŀőřė⟧"
+      },
+      "steering_finish_not_found": {
+        "en": "State: Cannot finish mission {missionId} because it was not found.",
+        "ja": "状態: ミッション {missionId} が見つからないため完了にできません。",
+        "qps-ploc": "⟦Şŧȧŧė: Ƈȧññőŧ ƒïñïşħ ɱïşşïőñ {missionId} ƀėƈȧůşė ïŧ ẇȧş ñőŧ ƒőůñḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "steering_check_mission_id": {
+        "en": "Next action: Check the mission ID.",
+        "ja": "次のアクション: ミッションIDを確認してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ƈħėƈķ ŧħė ɱïşşïőñ ÏḒ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "steering_gap_unknown": {
+        "en": "- (details unknown)",
+        "ja": "- (詳細不明)",
+        "qps-ploc": "⟦- (ḓėŧȧïŀş ůñķñőẇñ) ŀőřėɱ ⟧"
+      },
+      "steering_finish_unsatisfied": {
+        "en": "State: Cannot finish mission {missionId} because the completion criteria (IL-04) are not met.",
+        "ja": "状態: ミッション {missionId} は完了条件(IL-04)を満たしていないため完了にできません。",
+        "qps-ploc": "⟦Şŧȧŧė: Ƈȧññőŧ ƒïñïşħ ɱïşşïőñ {missionId} ƀėƈȧůşė ŧħė ƈőɱṗŀėŧïőñ ƈřïŧėřïȧ (ÏĿ-04) ȧřė ñőŧ ɱėŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "steering_finish_gaps": {
+        "en": "Result: unmet gaps\n{gaps}",
+        "ja": "結果: 未充足のギャップ\n{gaps}",
+        "qps-ploc": "⟦Řėşůŀŧ: ůñɱėŧ ɠȧṗş\n{gaps} ŀőřėɱ ïṗ⟧"
+      },
+      "steering_finish_gaps_next": {
+        "en": "Next action: Resolve the gaps above, then send \"finish\" again.",
+        "ja": "次のアクション: 上記のギャップを解消してから、再度「完了にして」と送信してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Řėşőŀṽė ŧħė ɠȧṗş ȧƀőṽė, ŧħėñ şėñḓ \"ƒïñïşħ\" ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "steering_finish_title": {
+        "en": "Finish mission {missionId}",
+        "ja": "ミッション {missionId} の完了",
+        "qps-ploc": "⟦Ƒïñïşħ ɱïşşïőñ {missionId} ŀőřėɱ ïṗ⟧"
+      },
+      "steering_finish_summary": {
+        "en": "Finish mission {missionId}. The completion criteria (IL-04) are met.",
+        "ja": "ミッション {missionId} を完了(finish)します。完了条件(IL-04)は満たされています。",
+        "qps-ploc": "⟦Ƒïñïşħ ɱïşşïőñ {missionId}. Ŧħė ƈőɱṗŀėŧïőñ ƈřïŧėřïȧ (ÏĿ-04) ȧřė ɱėŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "steering_verb_finish": {
+        "en": "finish",
+        "ja": "完了(finish)",
+        "qps-ploc": "⟦ƒïñïşħ ŀőř⟧"
+      },
+      "steering_authority_lost": {
+        "en": "State: The approved action ({verb}) was not executed — this thread has lost ownership of mission {missionId} ({caseId}).",
+        "ja": "状態: 承認された操作({verb})は実行されませんでした — このスレッドはミッション {missionId} の所有権を失っています({caseId})。",
+        "qps-ploc": "⟦Şŧȧŧė: Ŧħė ȧṗṗřőṽėḓ ȧƈŧïőñ ({verb}) ẇȧş ñőŧ ėẋėƈůŧėḓ — ŧħïş ŧħřėȧḓ ħȧş ŀőşŧ őẇñėřşħïṗ őƒ ɱïşşïőñ {missionId} ({caseId}). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "steering_outcome_gate_approved": {
+        "en": "Approved the gate for mission {missionId}.",
+        "ja": "ミッション {missionId} のゲートを承認しました。",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ ŧħė ɠȧŧė ƒőř ɱïşşïőñ {missionId}. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "steering_outcome_finished": {
+        "en": "Finished mission {missionId}.",
+        "ja": "ミッション {missionId} を完了しました。",
+        "qps-ploc": "⟦Ƒïñïşħėḓ ɱïşşïőñ {missionId}. ŀőřėɱ ïṗş⟧"
+      },
+      "steering_outcome_line": {
+        "en": "State: {outcome}",
+        "ja": "状態: {outcome}",
+        "qps-ploc": "⟦Şŧȧŧė: {outcome} ŀőřėɱ⟧"
+      },
+      "steering_check_status_next": {
+        "en": "Next action: Check with \"status\" if needed.",
+        "ja": "次のアクション: 必要であれば「ステータス」で確認してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ƈħėƈķ ẇïŧħ \"şŧȧŧůş\" ïƒ ñėėḓėḓ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "steering_label_steer": {
+        "en": "steering instruction",
+        "ja": "操縦指示",
+        "qps-ploc": "⟦şŧėėřïñɠ ïñşŧřůƈŧïőñ ŀőřėɱ ⟧"
+      },
+      "steering_label_follow_up": {
+        "en": "next-turn instruction",
+        "ja": "次回 turn 指示",
+        "qps-ploc": "⟦ñėẋŧ-ŧůřñ ïñşŧřůƈŧïőñ ŀőřėɱ ⟧"
+      },
+      "steering_queued": {
+        "en": "State: Added the {label} to the queue.",
+        "ja": "状態: {label}を queue に追加しました。",
+        "qps-ploc": "⟦Şŧȧŧė: Ȧḓḓėḓ ŧħė {label} ŧő ŧħė ɋůėůė. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "steering_queued_next": {
+        "en": "Next action: The running turn is not interrupted; the worker will handle it at the next turn boundary.",
+        "ja": "次のアクション: 実行中の turn は中断せず、次の turn boundary で worker が処理します。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Ŧħė řůññïñɠ ŧůřñ ïş ñőŧ ïñŧėřřůṗŧėḓ; ŧħė ẇőřķėř ẇïŀŀ ħȧñḓŀė ïŧ ȧŧ ŧħė ñėẋŧ ŧůřñ ƀőůñḓȧřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "steering_unparsed": {
+        "en": "State: Could not interpret the steering intent.",
+        "ja": "状態: 操縦意図を解釈できませんでした。",
+        "qps-ploc": "⟦Şŧȧŧė: Ƈőůŀḓ ñőŧ ïñŧėřṗřėŧ ŧħė şŧėėřïñɠ ïñŧėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "steering_unparsed_next": {
+        "en": "Next action: Send one of \"status\", \"checkpoint: <note>\", \"pause\", \"resume\", \"approve\" or \"finish\".",
+        "ja": "次のアクション: 「ステータス」「チェックポイント: <メモ>」「一時停止」「再開」「承認」「完了にして」のいずれかを送信してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Şėñḓ őñė őƒ \"şŧȧŧůş\", \"ƈħėƈķṗőïñŧ: <ñőŧė>\", \"ṗȧůşė\", \"řėşůɱė\", \"ȧṗṗřőṽė\" őř \"ƒïñïşħ\". ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "steering_session_missing": {
+        "en": "State: No orchestrator session was found for this thread.",
+        "ja": "状態: このスレッドのオーケストレータセッションが見つかりません。",
+        "qps-ploc": "⟦Şŧȧŧė: Ñő őřƈħėşŧřȧŧőř şėşşïőñ ẇȧş ƒőůñḓ ƒőř ŧħïş ŧħřėȧḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "steering_session_missing_next": {
+        "en": "Next action: Recreate the session, then steer the mission.",
+        "ja": "次のアクション: セッションを再作成してから操縦してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: Řėƈřėȧŧė ŧħė şėşşïőñ, ŧħėñ şŧėėř ŧħė ɱïşşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "feedback_prompt_line1": {
+        "en": "Feedback: to improve this scenario, reply with \"feedback {scenarioId}: satisfied\", ",
+        "ja": "評価: このシナリオを改善する場合は、「評価 {scenarioId}: 満足」、",
+        "qps-ploc": "⟦Ƒėėḓƀȧƈķ: ŧő ïɱṗřőṽė ŧħïş şƈėñȧřïő, řėṗŀẏ ẇïŧħ \"ƒėėḓƀȧƈķ {scenarioId}: şȧŧïşƒïėḓ\",  ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "feedback_prompt_line2": {
+        "en": "\"feedback {scenarioId}: partially_satisfied: what to fix\", or \"feedback {scenarioId}: dissatisfied: reason\".",
+        "ja": "「評価 {scenarioId}: 一部違う: 修正点」、または「評価 {scenarioId}: 不満: 理由」で返信できます。",
+        "qps-ploc": "⟦\"ƒėėḓƀȧƈķ {scenarioId}: ṗȧřŧïȧŀŀẏ_şȧŧïşƒïėḓ: ẇħȧŧ ŧő ƒïẋ\", őř \"ƒėėḓƀȧƈķ {scenarioId}: ḓïşşȧŧïşƒïėḓ: řėȧşőñ\". ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
+      },
+      "feedback_outcome_satisfied": {
+        "en": "satisfied",
+        "ja": "満足",
+        "qps-ploc": "⟦şȧŧïşƒïėḓ ŀőř⟧"
+      },
+      "feedback_outcome_partially_satisfied": {
+        "en": "partially different",
+        "ja": "一部違う",
+        "qps-ploc": "⟦ṗȧřŧïȧŀŀẏ ḓïƒƒėřėñŧ ŀőřėɱ ⟧"
+      },
+      "feedback_outcome_dissatisfied": {
+        "en": "dissatisfied",
+        "ja": "不満",
+        "qps-ploc": "⟦ḓïşşȧŧïşƒïėḓ ŀőř⟧"
+      },
+      "feedback_recorded": {
+        "en": "Recorded your feedback ({outcome}). It will be reflected as an improvement candidate the next time the \"{scenarioId}\" scenario is generated.",
+        "ja": "評価を記録しました（{outcome}）。次回の「{scenarioId}」シナリオ生成時に改善候補として反映します。",
+        "qps-ploc": "⟦Řėƈőřḓėḓ ẏőůř ƒėėḓƀȧƈķ ({outcome}). Ïŧ ẇïŀŀ ƀė řėƒŀėƈŧėḓ ȧş ȧñ ïɱṗřőṽėɱėñŧ ƈȧñḓïḓȧŧė ŧħė ñėẋŧ ŧïɱė ŧħė \"{scenarioId}\" şƈėñȧřïő ïş ɠėñėřȧŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñ⟧"
+      },
+      "slot_correct_last": {
+        "en": "Understood. I will correct {slot}. Please tell me again.",
+        "ja": "了解です。{slot} を修正します。もう一度教えてください。",
+        "qps-ploc": "⟦Ůñḓėřşŧőőḓ. Ï ẇïŀŀ ƈőřřėƈŧ {slot}. Ṗŀėȧşė ŧėŀŀ ɱė ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "slot_ask_again": {
+        "en": "Understood. Please tell me {slot} again.",
+        "ja": "了解です。{slot} をもう一度教えてください。",
+        "qps-ploc": "⟦Ůñḓėřşŧőőḓ. Ṗŀėȧşė ŧėŀŀ ɱė {slot} ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "slot_needed": {
+        "en": "I need the information for slot [{slot}]. Please enter it.",
+        "ja": "スロット [{slot}] の情報が必要です。入力してください。",
+        "qps-ploc": "⟦Ï ñėėḓ ŧħė ïñƒőřɱȧŧïőñ ƒőř şŀőŧ [{slot}]. Ṗŀėȧşė ėñŧėř ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "session_reopened": {
+        "en": "Reopened the previous session. Tell me what you would like to correct.",
+        "ja": "前回のセッションを再オープンしました。修正したい点を教えてください。",
+        "qps-ploc": "⟦Řėőṗėñėḓ ŧħė ṗřėṽïőůş şėşşïőñ. Ŧėŀŀ ɱė ẇħȧŧ ẏőů ẇőůŀḓ ŀïķė ŧő ƈőřřėƈŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "external_data_url_missing": {
+        "en": "No URL was specified for the data source. Please enter a URL.",
+        "ja": "データ取得先のURLが指定されていません。URLを入力してください。",
+        "qps-ploc": "⟦Ñő ŮŘĿ ẇȧş şṗėƈïƒïėḓ ƒőř ŧħė ḓȧŧȧ şőůřƈė. Ṗŀėȧşė ėñŧėř ȧ ŮŘĿ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "external_data_extract_failed": {
+        "en": "Could not extract text from the fetched page (URL: {url})",
+        "ja": "取得したページからテキストを抽出できませんでした (URL: {url})",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ėẋŧřȧƈŧ ŧėẋŧ ƒřőɱ ŧħė ƒėŧƈħėḓ ṗȧɠė (ŮŘĿ: {url}) ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "external_data_fetched": {
+        "en": "Fetched information for **{topic}**.",
+        "ja": "**{topic}** の情報を取得しました。",
+        "qps-ploc": "⟦Ƒėŧƈħėḓ ïñƒőřɱȧŧïőñ ƒőř **{topic}**. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "external_data_omitted": {
+        "en": "\n...({count} more characters omitted)",
+        "ja": "\n...(以降 {count} 文字省略)",
+        "qps-ploc": "⟦\n...({count} ɱőřė ƈħȧřȧƈŧėřş őɱïŧŧėḓ) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "external_data_source": {
+        "en": "`Source: {url}`",
+        "ja": "`ソース: {url}`",
+        "qps-ploc": "⟦`Şőůřƈė: {url}` ŀőřė⟧"
+      },
+      "external_data_failed": {
+        "en": "Failed to fetch external data: {error}",
+        "ja": "外部データの取得に失敗しました: {error}",
+        "qps-ploc": "⟦Ƒȧïŀėḓ ŧő ƒėŧƈħ ėẋŧėřñȧŀ ḓȧŧȧ: {error} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "service_approval_completed": {
+        "en": "[Approval-Actuator] Approval action [{action}] completed successfully.\nResult: {result}",
+        "ja": "[Approval-Actuator] 承認アクション [{action}] が正常に完了しました。\n結果: {result}",
+        "qps-ploc": "⟦[Ȧṗṗřőṽȧŀ-Ȧƈŧůȧŧőř] Ȧṗṗřőṽȧŀ ȧƈŧïőñ [{action}] ƈőɱṗŀėŧėḓ şůƈƈėşşƒůŀŀẏ.\nŘėşůŀŧ: {result} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "service_bridge_enabled": {
+        "en": "[Messaging Bridge] Started and enabled the message-sync bridge with {platform}. Verified the connected auth token and completed the channel integration.",
+        "ja": "[Messaging Bridge] {platform} とのメッセージ同期連携ブリッジを正常に起動・有効化しました。接続された認証トークンを確認し、チャンネル統合を完了しました。",
+        "qps-ploc": "⟦[Ɱėşşȧɠïñɠ Ƀřïḓɠė] Şŧȧřŧėḓ ȧñḓ ėñȧƀŀėḓ ŧħė ɱėşşȧɠė-şẏñƈ ƀřïḓɠė ẇïŧħ {platform}. Ṽėřïƒïėḓ ŧħė ƈőññėƈŧėḓ ȧůŧħ ŧőķėñ ȧñḓ ƈőɱṗŀėŧėḓ ŧħė ƈħȧññėŀ ïñŧėɠřȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀő⟧"
+      },
+      "service_inspected": {
+        "en": "Checked the status of service [{service}].\n\n{output}",
+        "ja": "サービス [{service}] のステータスを確認しました。\n\n{output}",
+        "qps-ploc": "⟦Ƈħėƈķėḓ ŧħė şŧȧŧůş őƒ şėřṽïƈė [{service}].\n\n{output} ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "service_started": {
+        "en": "Started service [{service}].\n\n{output}",
+        "ja": "サービス [{service}] を起動しました。\n\n{output}",
+        "qps-ploc": "⟦Şŧȧřŧėḓ şėřṽïƈė [{service}].\n\n{output} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "service_stopped": {
+        "en": "Stopped service [{service}].\n\n{output}",
+        "ja": "サービス [{service}] を停止しました。\n\n{output}",
+        "qps-ploc": "⟦Şŧőṗṗėḓ şėřṽïƈė [{service}].\n\n{output} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "service_voice_enabled_detail": {
+        "en": "[System-Actuator] Enabled voice input. Target: {service}\nResult: {result}",
+        "ja": "[System-Actuator] 音声入力を有効化しました。対象: {service}\n結果: {result}",
+        "qps-ploc": "⟦[Şẏşŧėɱ-Ȧƈŧůȧŧőř] Ėñȧƀŀėḓ ṽőïƈė ïñṗůŧ. Ŧȧřɠėŧ: {service}\nŘėşůŀŧ: {result} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "service_operation_executed": {
+        "en": "Service operation [{intent}] executed successfully.",
+        "ja": "サービスオペレーション [{intent}] を正常に実行しました。",
+        "qps-ploc": "⟦Şėřṽïƈė őṗėřȧŧïőñ [{intent}] ėẋėƈůŧėḓ şůƈƈėşşƒůŀŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "service_voice_enabled": {
+        "en": "Enabled voice input.",
+        "ja": "音声入力を有効化しました。",
+        "qps-ploc": "⟦Ėñȧƀŀėḓ ṽőïƈė ïñṗůŧ. ŀőřėɱ ⟧"
+      },
+      "service_operation_completed": {
+        "en": "Operation [{intent}] completed successfully.",
+        "ja": "オペレーション [{intent}] が正常に完了しました。",
+        "qps-ploc": "⟦Őṗėřȧŧïőñ [{intent}] ƈőɱṗŀėŧėḓ şůƈƈėşşƒůŀŀẏ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "confirmation_needed": {
+        "en": "There are points to confirm.",
+        "ja": "必要な確認点があります。",
+        "qps-ploc": "⟦Ŧħėřė ȧřė ṗőïñŧş ŧő ƈőñƒïřɱ. ŀőřėɱ ïṗş⟧"
+      },
+      "confirmation_none": {
+        "en": "I have all the information I need.",
+        "ja": "必要な情報はそろっています。",
+        "qps-ploc": "⟦Ï ħȧṽė ȧŀŀ ŧħė ïñƒőřɱȧŧïőñ Ï ñėėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "task_reply_completed": {
+        "en": "Completed as a short task.",
+        "ja": "短い作業として完了しました。",
+        "qps-ploc": "⟦Ƈőɱṗŀėŧėḓ ȧş ȧ şħőřŧ ŧȧşķ. ŀőřėɱ ïṗ⟧"
+      },
+      "task_reply_pending": {
+        "en": "Working on it as a short task.",
+        "ja": "短い作業として進めます。",
+        "qps-ploc": "⟦Ẇőřķïñɠ őñ ïŧ ȧş ȧ şħőřŧ ŧȧşķ. ŀőřėɱ ïṗşů⟧"
+      },
+      "task_reply_failed": {
+        "en": "Could not complete the short task.",
+        "ja": "短い作業としてうまく進められませんでした。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ƈőɱṗŀėŧė ŧħė şħőřŧ ŧȧşķ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "task_reply_check_done": {
+        "en": "The check is done.",
+        "ja": "確認が終わりました。",
+        "qps-ploc": "⟦Ŧħė ƈħėƈķ ïş ḓőñė. ŀőřėɱ⟧"
+      },
+      "task_reply_schedule_check_done": {
+        "en": "The schedule check is done.",
+        "ja": "予定の確認が終わりました。",
+        "qps-ploc": "⟦Ŧħė şƈħėḓůŀė ƈħėƈķ ïş ḓőñė. ŀőřėɱ ïṗ⟧"
+      },
+      "task_reply_check_pending": {
+        "en": "Working on the check.",
+        "ja": "確認を進めます。",
+        "qps-ploc": "⟦Ẇőřķïñɠ őñ ŧħė ƈħėƈķ. ŀőřėɱ ⟧"
+      },
+      "task_reply_schedule_check_pending": {
+        "en": "Working on the schedule check.",
+        "ja": "予定の確認を進めます。",
+        "qps-ploc": "⟦Ẇőřķïñɠ őñ ŧħė şƈħėḓůŀė ƈħėƈķ. ŀőřėɱ ïṗşů⟧"
+      },
+      "task_reply_check_failed": {
+        "en": "The check did not go well.",
+        "ja": "うまく進められませんでした。",
+        "qps-ploc": "⟦Ŧħė ƈħėƈķ ḓïḓ ñőŧ ɠő ẇėŀŀ. ŀőřėɱ ïṗ⟧"
+      },
+      "task_reply_schedule_check_failed": {
+        "en": "The schedule check did not go well.",
+        "ja": "予定の確認がうまく進みませんでした。",
+        "qps-ploc": "⟦Ŧħė şƈħėḓůŀė ƈħėƈķ ḓïḓ ñőŧ ɠő ẇėŀŀ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "task_reply_slot_schedule_scope": {
+        "en": "scope",
+        "ja": "対象",
+        "qps-ploc": "⟦şƈőṗė ŀőř⟧"
+      },
+      "task_reply_slot_date_range": {
+        "en": "date range",
+        "ja": "期間",
+        "qps-ploc": "⟦ḓȧŧė řȧñɠė ŀőř⟧"
+      },
+      "task_reply_slot_fixed_constraints": {
+        "en": "fixed constraints",
+        "ja": "動かせない条件",
+        "qps-ploc": "⟦ƒïẋėḓ ƈőñşŧřȧïñŧş ŀőřėɱ⟧"
+      },
+      "task_reply_slot_calendar_action_boundary": {
+        "en": "whether to only propose or also update the calendar",
+        "ja": "提案だけか更新まで行うか",
+        "qps-ploc": "⟦ẇħėŧħėř ŧő őñŀẏ ṗřőṗőşė őř ȧŀşő ůṗḓȧŧė ŧħė ƈȧŀėñḓȧř ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "task_reply_slot_meeting_handoff_boundary": {
+        "en": "whether to hand off to meeting coordination",
+        "ja": "会議調整への引き継ぎ可否",
+        "qps-ploc": "⟦ẇħėŧħėř ŧő ħȧñḓ őƒƒ ŧő ɱėėŧïñɠ ƈőőřḓïñȧŧïőñ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "task_reply_list_separator": {
+        "en": ", ",
+        "ja": "、",
+        "qps-ploc": "⟦,  ŀőř⟧"
+      },
+      "task_reply_schedule_missing": {
+        "en": "Points to confirm: {items}",
+        "ja": "確認したい点があります: {items}",
+        "qps-ploc": "⟦Ṗőïñŧş ŧő ƈőñƒïřɱ: {items} ŀőřėɱ ïṗ⟧"
+      },
+      "task_reply_missing": {
+        "en": "Information needed: {items}",
+        "ja": "必要な情報があります: {items}",
+        "qps-ploc": "⟦Ïñƒőřɱȧŧïőñ ñėėḓėḓ: {items} ŀőřėɱ ïṗ⟧"
+      },
+      "task_reply_stop_candidates": {
+        "en": "Services that can be stopped:",
+        "ja": "停止するサービス候補:",
+        "qps-ploc": "⟦Şėřṽïƈėş ŧħȧŧ ƈȧñ ƀė şŧőṗṗėḓ: ŀőřėɱ ïṗş⟧"
+      },
+      "task_reply_stop_prompt": {
+        "en": "Please specify the name of the service to stop.",
+        "ja": "停止したいサービス名を指定してください。",
+        "qps-ploc": "⟦Ṗŀėȧşė şṗėƈïƒẏ ŧħė ñȧɱė őƒ ŧħė şėřṽïƈė ŧő şŧőṗ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "task_reply_start_candidates": {
+        "en": "Services that can be started:",
+        "ja": "起動するサービス候補:",
+        "qps-ploc": "⟦Şėřṽïƈėş ŧħȧŧ ƈȧñ ƀė şŧȧřŧėḓ: ŀőřėɱ ïṗş⟧"
+      },
+      "task_reply_start_prompt": {
+        "en": "Please specify the name of the service to start.",
+        "ja": "起動したいサービス名を指定してください。",
+        "qps-ploc": "⟦Ṗŀėȧşė şṗėƈïƒẏ ŧħė ñȧɱė őƒ ŧħė şėřṽïƈė ŧő şŧȧřŧ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "task_reply_handoff_meeting": {
+        "en": "If needed, I can hand this off to meeting coordination.",
+        "ja": "必要なら会議調整まで引き継げます。",
+        "qps-ploc": "⟦Ïƒ ñėėḓėḓ, Ï ƈȧñ ħȧñḓ ŧħïş őƒƒ ŧő ɱėėŧïñɠ ƈőőřḓïñȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "task_reply_handoff_next": {
+        "en": "If needed, I can hand this off to the next owner.",
+        "ja": "必要なら次の担当に引き継げます。",
+        "qps-ploc": "⟦Ïƒ ñėėḓėḓ, Ï ƈȧñ ħȧñḓ ŧħïş őƒƒ ŧő ŧħė ñėẋŧ őẇñėř. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "task_reply_detail": {
+        "en": "Details: {error}",
+        "ja": "詳細: {error}",
+        "qps-ploc": "⟦Ḓėŧȧïŀş: {error} ŀőřėɱ⟧"
+      },
+      "knowledge_reply_none": {
+        "en": "I couldn't find a match. If you want, I can try a different phrasing.",
+        "ja": "見つかった情報はありませんでした。必要なら別の言い方で探し直せます。",
+        "qps-ploc": "⟦Ï ƈőůŀḓñ'ŧ ƒïñḓ ȧ ɱȧŧƈħ. Ïƒ ẏőů ẇȧñŧ, Ï ƈȧñ ŧřẏ ȧ ḓïƒƒėřėñŧ ṗħřȧşïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "knowledge_reply_opener": {
+        "en": "Here is the short summary from {provider}: I found {count} item(s).",
+        "ja": "確認できた内容を短くまとめると、{provider} で {count} 件見つかりました。",
+        "qps-ploc": "⟦Ħėřė ïş ŧħė şħőřŧ şůɱɱȧřẏ ƒřőɱ {provider}: Ï ƒőůñḓ {count} ïŧėɱ(ş). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "knowledge_reply_tags": {
+        "en": " ({tags})",
+        "ja": "（{tags}）",
+        "qps-ploc": "⟦ ({tags}) ŀőř⟧"
+      },
+      "knowledge_reply_closing": {
+        "en": "If you'd like, I can narrow this down further.",
+        "ja": "必要なら、ここからさらに絞って見ます。",
+        "qps-ploc": "⟦Ïƒ ẏőů'ḓ ŀïķė, Ï ƈȧñ ñȧřřőẇ ŧħïş ḓőẇñ ƒůřŧħėř. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ux_repair_adf": {
+        "en": "execution flow",
+        "ja": "実行フロー",
+        "qps-ploc": "⟦ėẋėƈůŧïőñ ƒŀőẇ ŀőřė⟧"
+      },
+      "ux_repair_actuator": {
+        "en": "capability",
+        "ja": "機能",
+        "qps-ploc": "⟦ƈȧṗȧƀïŀïŧẏ ŀőř⟧"
+      },
+      "ux_repair_runtime_supervisor": {
+        "en": "control service",
+        "ja": "制御サービス",
+        "qps-ploc": "⟦ƈőñŧřőŀ şėřṽïƈė ŀőřė⟧"
+      },
+      "ux_repair_intent_resolution_packet": {
+        "en": "intent summary",
+        "ja": "意図要約",
+        "qps-ploc": "⟦ïñŧėñŧ şůɱɱȧřẏ ŀőřė⟧"
+      },
+      "ux_repair_execution_shape": {
+        "en": "execution route",
+        "ja": "実行形",
+        "qps-ploc": "⟦ėẋėƈůŧïőñ řőůŧė ŀőřė⟧"
+      },
+      "ux_repair_mission_class": {
+        "en": "mission type",
+        "ja": "ミッション種別",
+        "qps-ploc": "⟦ɱïşşïőñ ŧẏṗė ŀőř⟧"
+      },
+      "ux_repair_workflow_id": {
+        "en": "workflow ID",
+        "ja": "ワークフローID",
+        "qps-ploc": "⟦ẇőřķƒŀőẇ ÏḒ ŀőř⟧"
+      },
+      "ux_repair_needs_clarification": {
+        "en": "needs clarification",
+        "ja": "追加確認が必要",
+        "qps-ploc": "⟦ñėėḓş ƈŀȧřïƒïƈȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "ux_repair_fully_automatable": {
+        "en": "ready to run",
+        "ja": "そのまま実行可能",
+        "qps-ploc": "⟦řėȧḓẏ ŧő řůñ ŀőř⟧"
+      },
+      "ux_repair_needs_external_assets": {
+        "en": "needs external assets",
+        "ja": "外部素材が必要",
+        "qps-ploc": "⟦ñėėḓş ėẋŧėřñȧŀ ȧşşėŧş ŀőřėɱ ⟧"
+      },
+      "ux_repair_missing_runtime_prerequisites": {
+        "en": "missing runtime prerequisites",
+        "ja": "実行環境が不足",
+        "qps-ploc": "⟦ɱïşşïñɠ řůñŧïɱė ṗřėřėɋůïşïŧėş ŀőřėɱ ïṗş⟧"
+      },
+      "steering_reject_no_session": {
+        "en": "State: This thread is not the owner of mission {missionId} (no orchestrator session has been created).\nNext action: Issue the mission from this thread to become its owner, or ask the current owner's thread to steer it.",
+        "ja": "状態: このスレッドはミッション {missionId} のオーナーではありません(オーケストレータセッション未作成)。\n次のアクション: このスレッドからミッションを発行してオーナーになるか、現在のオーナーのスレッドから操縦を依頼してください。",
+        "qps-ploc": "⟦Şŧȧŧė: Ŧħïş ŧħřėȧḓ ïş ñőŧ ŧħė őẇñėř őƒ ɱïşşïőñ {missionId} (ñő őřƈħėşŧřȧŧőř şėşşïőñ ħȧş ƀėėñ ƈřėȧŧėḓ).\nÑėẋŧ ȧƈŧïőñ: Ïşşůė ŧħė ɱïşşïőñ ƒřőɱ ŧħïş ŧħřėȧḓ ŧő ƀėƈőɱė ïŧş őẇñėř, őř ȧşķ ŧħė ƈůřřėñŧ őẇñėř'ş ŧħřėȧḓ ŧő şŧėėř ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "steering_reject_different_mission": {
+        "en": "State: This thread owns a different mission ({ownerMissionId}) and is not the owner of mission {missionId}.\nNext action: Steer from the target mission's owner thread, or request a handoff.",
+        "ja": "状態: このスレッドは別のミッション({ownerMissionId})のオーナーであり、ミッション {missionId} のオーナーではありません。\n次のアクション: 対象ミッションのオーナースレッドから操縦するか、ハンドオフを依頼してください。",
+        "qps-ploc": "⟦Şŧȧŧė: Ŧħïş ŧħřėȧḓ őẇñş ȧ ḓïƒƒėřėñŧ ɱïşşïőñ ({ownerMissionId}) ȧñḓ ïş ñőŧ ŧħė őẇñėř őƒ ɱïşşïőñ {missionId}.\nÑėẋŧ ȧƈŧïőñ: Şŧėėř ƒřőɱ ŧħė ŧȧřɠėŧ ɱïşşïőñ'ş őẇñėř ŧħřėȧḓ, őř řėɋůėşŧ ȧ ħȧñḓőƒƒ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "steering_reject_session_released": {
+        "en": "State: This thread's orchestrator session has been released (reason: {reason}).\nNext action: Create a new orchestrator session, then steer the mission.",
+        "ja": "状態: このスレッドのオーケストレータセッションは解放済みです(理由: {reason})。\n次のアクション: 新しいオーケストレータセッションを作成してから操縦してください。",
+        "qps-ploc": "⟦Şŧȧŧė: Ŧħïş ŧħřėȧḓ'ş őřƈħėşŧřȧŧőř şėşşïőñ ħȧş ƀėėñ řėŀėȧşėḓ (řėȧşőñ: {reason}).\nÑėẋŧ ȧƈŧïőñ: Ƈřėȧŧė ȧ ñėẇ őřƈħėşŧřȧŧőř şėşşïőñ, ŧħėñ şŧėėř ŧħė ɱïşşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀő⟧"
+      },
+      "steering_reject_lease_expired": {
+        "en": "State: This thread's ownership lease has expired or was reacquired by another process.\nNext action: Recreate the session, or renew the lease on the owner side, then try again.",
+        "ja": "状態: このスレッドの所有権リースが期限切れか、他プロセスに再取得されています。\n次のアクション: セッションを再作成する、またはオーナー側でリースを更新してから再試行してください。",
+        "qps-ploc": "⟦Şŧȧŧė: Ŧħïş ŧħřėȧḓ'ş őẇñėřşħïṗ ŀėȧşė ħȧş ėẋṗïřėḓ őř ẇȧş řėȧƈɋůïřėḓ ƀẏ ȧñőŧħėř ṗřőƈėşş.\nÑėẋŧ ȧƈŧïőñ: Řėƈřėȧŧė ŧħė şėşşïőñ, őř řėñėẇ ŧħė ŀėȧşė őñ ŧħė őẇñėř şïḓė, ŧħėñ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşů⟧"
+      },
+      "steering_reject_default": {
+        "en": "State: This thread cannot steer the mission right now ({reason}).\nNext action: Check the owner status, then try the operation again.",
+        "ja": "状態: このスレッドは現在ミッションを操縦できません({reason})。\n次のアクション: オーナー状況を確認のうえ、あらためて操作してください。",
+        "qps-ploc": "⟦Şŧȧŧė: Ŧħïş ŧħřėȧḓ ƈȧññőŧ şŧėėř ŧħė ɱïşşïőñ řïɠħŧ ñőẇ ({reason}).\nÑėẋŧ ȧƈŧïőñ: Ƈħėƈķ ŧħė őẇñėř şŧȧŧůş, ŧħėñ ŧřẏ ŧħė őṗėřȧŧïőñ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
+      },
+      "steering_unknown": {
+        "en": "unknown",
+        "ja": "不明",
+        "qps-ploc": "⟦ůñķñőẇñ ŀőř⟧"
+      },
+      "ask_why_incorrect_content": {
+        "en": "Incorrect content",
+        "ja": "内容が誤り",
+        "qps-ploc": "⟦Ïñƈőřřėƈŧ ƈőñŧėñŧ ŀőřėɱ⟧"
+      },
+      "ask_why_wrong_direction": {
+        "en": "Wrong direction",
+        "ja": "方向が違う",
+        "qps-ploc": "⟦Ẇřőñɠ ḓïřėƈŧïőñ ŀőřė⟧"
+      },
+      "ask_why_quality": {
+        "en": "Insufficient quality",
+        "ja": "品質不足",
+        "qps-ploc": "⟦Ïñşůƒƒïƈïėñŧ ɋůȧŀïŧẏ ŀőřėɱ ⟧"
+      },
+      "ask_why_scope": {
+        "en": "Scope too broad or narrow",
+        "ja": "スコープ過不足",
+        "qps-ploc": "⟦Şƈőṗė ŧőő ƀřőȧḓ őř ñȧřřőẇ ŀőřėɱ ïṗ⟧"
+      },
+      "ask_why_other": {
+        "en": "Other",
+        "ja": "その他",
+        "qps-ploc": "⟦Őŧħėř ŀőř⟧"
+      },
+      "ask_why_skip": {
+        "en": "Skip",
+        "ja": "スキップ",
+        "qps-ploc": "⟦Şķïṗ ŀőř⟧"
+      },
+      "ask_why_target_missing": {
+        "en": "This rejection does not exist or is in a different thread.",
+        "ja": "この却下要求は存在しないか、別のスレッドにあります。",
+        "qps-ploc": "⟦Ŧħïş řėĵėƈŧïőñ ḓőėş ñőŧ ėẋïşŧ őř ïş ïñ ȧ ḓïƒƒėřėñŧ ŧħřėȧḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "ask_why_skipped": {
+        "en": "Skipped recording the reason.",
+        "ja": "理由の記録をスキップしました。",
+        "qps-ploc": "⟦Şķïṗṗėḓ řėƈőřḓïñɠ ŧħė řėȧşőñ. ŀőřėɱ ïṗş⟧"
+      },
+      "ask_why_recorded": {
+        "en": "Recorded the rejection reason ({category}). It will be reflected in future improvements.",
+        "ja": "却下理由を記録しました({category})。次回の作業改善に反映されます。",
+        "qps-ploc": "⟦Řėƈőřḓėḓ ŧħė řėĵėƈŧïőñ řėȧşőñ ({category}). Ïŧ ẇïŀŀ ƀė řėƒŀėƈŧėḓ ïñ ƒůŧůřė ïɱṗřőṽėɱėñŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "approval_not_found_or_done": {
+        "en": "This approval request does not exist or has already been handled.",
+        "ja": "この承認要求は存在しないか、すでに処理済みです。",
+        "qps-ploc": "⟦Ŧħïş ȧṗṗřőṽȧŀ řėɋůėşŧ ḓőėş ñőŧ ėẋïşŧ őř ħȧş ȧŀřėȧḓẏ ƀėėñ ħȧñḓŀėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "approval_other_thread": {
+        "en": "This approval request is in a different thread.",
+        "ja": "この承認要求は別のスレッドにあります。",
+        "qps-ploc": "⟦Ŧħïş ȧṗṗřőṽȧŀ řėɋůėşŧ ïş ïñ ȧ ḓïƒƒėřėñŧ ŧħřėȧḓ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "approval_expired": {
+        "en": "This approval request has expired.",
+        "ja": "この承認要求は期限切れです。",
+        "qps-ploc": "⟦Ŧħïş ȧṗṗřőṽȧŀ řėɋůėşŧ ħȧş ėẋṗïřėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "approval_approved_reply": {
+        "en": "Approved: {title}",
+        "ja": "承認しました: {title}",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ: {title} ŀőřėɱ⟧"
+      },
+      "approval_rejected_reply": {
+        "en": "Rejected: {title}",
+        "ja": "却下しました: {title}",
+        "qps-ploc": "⟦Řėĵėƈŧėḓ: {title} ŀőřėɱ⟧"
+      },
+      "approval_decision_unparsed": {
+        "en": "Could not interpret the approval action.",
+        "ja": "承認操作を解釈できませんでした。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ïñŧėřṗřėŧ ŧħė ȧṗṗřőṽȧŀ ȧƈŧïőñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "approval_none_pending": {
+        "en": "There is no approval request waiting in this thread.",
+        "ja": "このスレッドに処理待ちの承認要求はありません。",
+        "qps-ploc": "⟦Ŧħėřė ïş ñő ȧṗṗřőṽȧŀ řėɋůėşŧ ẇȧïŧïñɠ ïñ ŧħïş ŧħřėȧḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "approval_multiple_pending": {
+        "en": "There are multiple approval requests. Reply with appr:<id>:approve / reject from the request message.",
+        "ja": "承認要求が複数あります。要求メッセージの appr:<id>:approve / reject を返信してください。",
+        "qps-ploc": "⟦Ŧħėřė ȧřė ɱůŀŧïṗŀė ȧṗṗřőṽȧŀ řėɋůėşŧş. Řėṗŀẏ ẇïŧħ ȧṗṗř:<ïḓ>:ȧṗṗřőṽė / řėĵėƈŧ ƒřőɱ ŧħė řėɋůėşŧ ɱėşşȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "agenda_none": {
+        "en": "No events were found for {range}.",
+        "ja": "{range} の予定は見つかりませんでした。",
+        "qps-ploc": "⟦Ñő ėṽėñŧş ẇėřė ƒőůñḓ ƒőř {range}. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "agenda_header": {
+        "en": "Events for {range}:",
+        "ja": "{range} の予定:",
+        "qps-ploc": "⟦Ėṽėñŧş ƒőř {range}: ŀőřėɱ ⟧"
+      },
+      "agenda_assume_self": {
+        "en": "Checking the operator's default calendar.",
+        "ja": "本人の既定カレンダーとして確認します。",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ŧħė őṗėřȧŧőř'ş ḓėƒȧůŀŧ ƈȧŀėñḓȧř. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "agenda_assume_range": {
+        "en": "Assuming the period {range}.",
+        "ja": "期間は {range} として補完します。",
+        "qps-ploc": "⟦Ȧşşůɱïñɠ ŧħė ṗėřïőḓ {range}. ŀőřėɱ ïṗş⟧"
+      },
+      "agenda_read_failed": {
+        "en": "Tried to fetch events for {range}, but calendar-actuator could not read them: {error}",
+        "ja": "{range} の予定を取得しようとしましたが、calendar-actuator で読めませんでした: {error}",
+        "qps-ploc": "⟦Ŧřïėḓ ŧő ƒėŧƈħ ėṽėñŧş ƒőř {range}, ƀůŧ ƈȧŀėñḓȧř-ȧƈŧůȧŧőř ƈőůŀḓ ñőŧ řėȧḓ ŧħėɱ: {error} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "operator_event_question": {
+        "en": "❓ Question",
+        "ja": "❓ 質問",
+        "qps-ploc": "⟦❓ Ɋůėşŧïőñ ŀőř⟧"
+      },
+      "operator_event_approval_required": {
+        "en": "🔐 Awaiting approval",
+        "ja": "🔐 承認待ち",
+        "qps-ploc": "⟦🔐 Ȧẇȧïŧïñɠ ȧṗṗřőṽȧŀ ŀőřėɱ ⟧"
+      },
+      "operator_event_mission_completed": {
+        "en": "✅ Mission completed",
+        "ja": "✅ ミッション完了",
+        "qps-ploc": "⟦✅ Ɱïşşïőñ ƈőɱṗŀėŧėḓ ŀőřėɱ ⟧"
+      },
+      "operator_event_mission_failed": {
+        "en": "❌ Mission failed",
+        "ja": "❌ ミッション失敗",
+        "qps-ploc": "⟦❌ Ɱïşşïőñ ƒȧïŀėḓ ŀőřėɱ⟧"
+      },
+      "operator_event_deliverable_ready": {
+        "en": "📦 Deliverable",
+        "ja": "📦 成果物",
+        "qps-ploc": "⟦📦 Ḓėŀïṽėřȧƀŀė ŀőřė⟧"
+      },
+      "operator_event_ops_alert": {
+        "en": "🚨 Ops alert",
+        "ja": "🚨 運用アラート",
+        "qps-ploc": "⟦🚨 Őṗş ȧŀėřŧ ŀőř⟧"
+      },
+      "recovery_next_step": {
+        "en": "Next step: {value}",
+        "ja": "次の一手: {value}",
+        "qps-ploc": "⟦Ñėẋŧ şŧėṗ: {value} ŀőřėɱ⟧"
+      },
+      "recovery_command": {
+        "en": "Command: {value}",
+        "ja": "実行コマンド: {value}",
+        "qps-ploc": "⟦Ƈőɱɱȧñḓ: {value} ŀőřėɱ⟧"
+      },
+      "recovery_fallback": {
+        "en": "Fallback: {value}",
+        "ja": "代替手段: {value}",
+        "qps-ploc": "⟦Ƒȧŀŀƀȧƈķ: {value} ŀőřėɱ⟧"
+      },
+      "async_accepted": {
+        "en": "Accepted. Routing this to {receiver}. The request id is {requestId}. You can track it in Presence Studio async requests, and I will notify this surface when it completes.",
+        "ja": "依頼を受け付けました。{receiver} に回しています。リクエストIDは {requestId} です。進行状況は Presence Studio の async requests で確認でき、完了したらこの surface に通知します。",
+        "qps-ploc": "⟦Ȧƈƈėṗŧėḓ. Řőůŧïñɠ ŧħïş ŧő {receiver}. Ŧħė řėɋůėşŧ ïḓ ïş {requestId}. Ẏőů ƈȧñ ŧřȧƈķ ïŧ ïñ Ṗřėşėñƈė Şŧůḓïő ȧşẏñƈ řėɋůėşŧş, ȧñḓ Ï ẇïŀŀ ñőŧïƒẏ ŧħïş şůřƒȧƈė ẇħėñ ïŧ ƈőɱṗŀėŧėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗ⟧"
+      },
+      "voice_tts_request_id_token": {
+        "en": "request id",
+        "ja": "リクエストID",
+        "qps-ploc": "⟦řėɋůėşŧ ïḓ ŀőř⟧"
+      },
+      "voice_tts_url_token": {
+        "en": "link",
+        "ja": "URL",
+        "qps-ploc": "⟦ŀïñķ ŀőř⟧"
+      },
+      "photo_captured": {
+        "en": "Photo captured.",
+        "ja": "写真を取得しました。",
+        "qps-ploc": "⟦Ṗħőŧő ƈȧṗŧůřėḓ. ŀőřė⟧"
+      },
+      "photo_camera_used": {
+        "en": "Camera used: {camera}",
+        "ja": "使用カメラ: {camera}",
+        "qps-ploc": "⟦Ƈȧɱėřȧ ůşėḓ: {camera} ŀőřėɱ ⟧"
+      },
+      "photo_saved_to": {
+        "en": "Saved to: {path}",
+        "ja": "保存先: {path}",
+        "qps-ploc": "⟦Şȧṽėḓ ŧő: {path} ŀőřėɱ⟧"
+      },
+      "collab_event_received": {
+        "en": "Event received",
+        "ja": "イベントを受信しました",
+        "qps-ploc": "⟦Ėṽėñŧ řėƈėïṽėḓ ŀőřė⟧"
+      },
+      "surface_enable_hint": {
+        "en": "Disabled. Enable with: pnpm surfaces enable --surface {surface}",
+        "ja": "無効です。有効化: pnpm surfaces enable --surface {surface}",
+        "qps-ploc": "⟦Ḓïşȧƀŀėḓ. Ėñȧƀŀė ẇïŧħ: ṗñṗɱ şůřƒȧƈėş ėñȧƀŀė --şůřƒȧƈė {surface} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "surface_gateway_disabled_by_default_warning": {
+        "en": "Gateway \"{surface}\" has credentials configured but is now disabled by default, so it was not started. Enable it with: pnpm surfaces enable --surface {surface}",
+        "ja": "ゲートウェイ「{surface}」は認証情報が設定済みですが、既定で無効になったため起動していません。有効化: pnpm surfaces enable --surface {surface}",
+        "qps-ploc": "⟦Ɠȧŧėẇȧẏ \"{surface}\" ħȧş ƈřėḓėñŧïȧŀş ƈőñƒïɠůřėḓ ƀůŧ ïş ñőẇ ḓïşȧƀŀėḓ ƀẏ ḓėƒȧůŀŧ, şő ïŧ ẇȧş ñőŧ şŧȧřŧėḓ. Ėñȧƀŀė ïŧ ẇïŧħ: ṗñṗɱ şůřƒȧƈėş ėñȧƀŀė --şůřƒȧƈė {surface} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřė⟧"
       },
       "surface_notes_slack_bridge": {
         "en": "External channel ingress. Auth readiness matters before runtime repair.",
@@ -19719,11 +20789,6 @@
         "ja": "すべて",
         "qps-ploc": "⟦Ȧŀŀ ŀőř⟧"
       },
-      "decide_filter_no_tenant": {
-        "en": "Not tied to an organization",
-        "ja": "組織に属さないもの",
-        "qps-ploc": "⟦Ñőŧ ŧïėḓ ŧő ȧñ őřɠȧñïẑȧŧïőñ ŀőřėɱ ïṗ⟧"
-      },
       "decide_filter_tenant": {
         "en": "Organization",
         "ja": "組織",
@@ -20338,111 +21403,6 @@
         "en": "Member updated.",
         "ja": "メンバーを更新しました。",
         "qps-ploc": "⟦Ɱėɱƀėř ůṗḓȧŧėḓ. ŀőřė⟧"
-      },
-      "join_title": {
-        "en": "Join an organization",
-        "ja": "組織に参加する",
-        "qps-ploc": "⟦Ĵőïñ ȧñ őřɠȧñïẑȧŧïőñ ŀőřėɱ ⟧"
-      },
-      "join_lead": {
-        "en": "Check what you are joining, then confirm.",
-        "ja": "参加先と、あなたに見える範囲を確認して、参加してください。",
-        "qps-ploc": "⟦Ƈħėƈķ ẇħȧŧ ẏőů ȧřė ĵőïñïñɠ, ŧħėñ ƈőñƒïřɱ. ŀőřėɱ ïṗşůɱ ḓ⟧"
-      },
-      "join_missing_code": {
-        "en": "This link has no invite code.",
-        "ja": "このリンクには招待コードがありません。",
-        "qps-ploc": "⟦Ŧħïş ŀïñķ ħȧş ñő ïñṽïŧė ƈőḓė. ŀőřėɱ ïṗş⟧"
-      },
-      "join_sign_in_required": {
-        "en": "Sign in first, then open this link again.",
-        "ja": "先にサインインしてから、もう一度このリンクを開いてください。",
-        "qps-ploc": "⟦Şïɠñ ïñ ƒïřşŧ, ŧħėñ őṗėñ ŧħïş ŀïñķ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
-      },
-      "join_org": {
-        "en": "Organization: {tenant}",
-        "ja": "参加先: {tenant}",
-        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ: {tenant} ŀőřėɱ ï⟧"
-      },
-      "join_role": {
-        "en": "You will join as: {role}",
-        "ja": "あなたの役割: {role}",
-        "qps-ploc": "⟦Ẏőů ẇïŀŀ ĵőïñ ȧş: {role} ŀőřėɱ ï⟧"
-      },
-      "join_role_viewer": {
-        "en": "You can see this organization's decisions and progress. You cannot change anything.",
-        "ja": "この組織の判断と進み具合を見られます。変更はできません。",
-        "qps-ploc": "⟦Ẏőů ƈȧñ şėė ŧħïş őřɠȧñïẑȧŧïőñ'ş ḓėƈïşïőñş ȧñḓ ṗřőɠřėşş. Ẏőů ƈȧññőŧ ƈħȧñɠė ȧñẏŧħïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
-      },
-      "join_role_operator": {
-        "en": "You can see this organization's work and ask for work to be done. You cannot decide approvals.",
-        "ja": "この組織の仕事を見て、依頼を出せます。承認の判断はできません。",
-        "qps-ploc": "⟦Ẏőů ƈȧñ şėė ŧħïş őřɠȧñïẑȧŧïőñ'ş ẇőřķ ȧñḓ ȧşķ ƒőř ẇőřķ ŧő ƀė ḓőñė. Ẏőů ƈȧññőŧ ḓėƈïḓė ȧṗṗřőṽȧŀş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
-      },
-      "join_role_approver": {
-        "en": "You can see this organization's work and decide approvals within its limits.",
-        "ja": "この組織の仕事を見て、決められた範囲で承認の判断ができます。",
-        "qps-ploc": "⟦Ẏőů ƈȧñ şėė ŧħïş őřɠȧñïẑȧŧïőñ'ş ẇőřķ ȧñḓ ḓėƈïḓė ȧṗṗřőṽȧŀş ẇïŧħïñ ïŧş ŀïɱïŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
-      },
-      "join_separation": {
-        "en": "Your other organizations stay separate, and your personal data stays yours.",
-        "ja": "他の組織の情報は混ざりません。あなたの個人の情報も、あなたのものです。",
-        "qps-ploc": "⟦Ẏőůř őŧħėř őřɠȧñïẑȧŧïőñş şŧȧẏ şėṗȧřȧŧė, ȧñḓ ẏőůř ṗėřşőñȧŀ ḓȧŧȧ şŧȧẏş ẏőůřş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
-      },
-      "join_display_name": {
-        "en": "Your name",
-        "ja": "あなたの名前",
-        "qps-ploc": "⟦Ẏőůř ñȧɱė ŀőř⟧"
-      },
-      "join_submit": {
-        "en": "Join",
-        "ja": "参加する",
-        "qps-ploc": "⟦Ĵőïñ ŀőř⟧"
-      },
-      "join_done": {
-        "en": "You joined {tenant}.",
-        "ja": "{tenant} に参加しました。",
-        "qps-ploc": "⟦Ẏőů ĵőïñėḓ {tenant}. ŀőřėɱ ⟧"
-      },
-      "join_next": {
-        "en": "Next: set up your personal preferences.",
-        "ja": "次は、あなた自身の設定を整えましょう。",
-        "qps-ploc": "⟦Ñėẋŧ: şėŧ ůṗ ẏőůř ṗėřşőñȧŀ ṗřėƒėřėñƈėş. ŀőřėɱ ïṗşůɱ ḓ⟧"
-      },
-      "join_err_not_found": {
-        "en": "This invite was not found. Check the link.",
-        "ja": "この招待は見つかりません。リンクを確認してください。",
-        "qps-ploc": "⟦Ŧħïş ïñṽïŧė ẇȧş ñőŧ ƒőůñḓ. Ƈħėƈķ ŧħė ŀïñķ. ŀőřėɱ ïṗşůɱ ḓő⟧"
-      },
-      "join_err_expired": {
-        "en": "This invite has expired. Ask for a new one.",
-        "ja": "この招待は期限切れです。新しい招待を依頼してください。",
-        "qps-ploc": "⟦Ŧħïş ïñṽïŧė ħȧş ėẋṗïřėḓ. Ȧşķ ƒőř ȧ ñėẇ őñė. ŀőřėɱ ïṗşůɱ ḓő⟧"
-      },
-      "join_err_used": {
-        "en": "This invite was already used.",
-        "ja": "この招待は使用済みです。",
-        "qps-ploc": "⟦Ŧħïş ïñṽïŧė ẇȧş ȧŀřėȧḓẏ ůşėḓ. ŀőřėɱ ïṗş⟧"
-      },
-      "join_err_revoked": {
-        "en": "This invite was revoked.",
-        "ja": "この招待は取り消されました。",
-        "qps-ploc": "⟦Ŧħïş ïñṽïŧė ẇȧş řėṽőķėḓ. ŀőřėɱ ï⟧"
-      },
-      "join_err_already_member": {
-        "en": "You are already a member of this organization (or this sign-in already has an account).",
-        "ja": "すでにこの組織のメンバーです(または、このサインインにはすでにアカウントがあります)。",
-        "qps-ploc": "⟦Ẏőů ȧřė ȧŀřėȧḓẏ ȧ ɱėɱƀėř őƒ ŧħïş őřɠȧñïẑȧŧïőñ (őř ŧħïş şïɠñ-ïñ ȧŀřėȧḓẏ ħȧş ȧñ ȧƈƈőůñŧ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
-      },
-      "join_err_forbidden": {
-        "en": "This account cannot join right now.",
-        "ja": "このアカウントでは、いま参加できません。",
-        "qps-ploc": "⟦Ŧħïş ȧƈƈőůñŧ ƈȧññőŧ ĵőïñ řïɠħŧ ñőẇ. ŀőřėɱ ïṗşůɱ⟧"
-      },
-      "join_err_generic": {
-        "en": "Could not join: {detail}",
-        "ja": "参加できませんでした: {detail}",
-        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ĵőïñ: {detail} ŀőřėɱ ï⟧"
       },
       "signin_title": {
         "en": "Who's there?",
@@ -21128,6 +22088,116 @@
         "en": "Sign in with your organization account instead",
         "ja": "組織のアカウントでサインインする",
         "qps-ploc": "⟦Şïɠñ ïñ ẇïŧħ ẏőůř őřɠȧñïẑȧŧïőñ ȧƈƈőůñŧ ïñşŧėȧḓ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "decide_filter_no_tenant": {
+        "en": "Not tied to an organization",
+        "ja": "組織に属さないもの",
+        "qps-ploc": "⟦Ñőŧ ŧïėḓ ŧő ȧñ őřɠȧñïẑȧŧïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "join_title": {
+        "en": "Join an organization",
+        "ja": "組織に参加する",
+        "qps-ploc": "⟦Ĵőïñ ȧñ őřɠȧñïẑȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "join_lead": {
+        "en": "Check what you are joining, then confirm.",
+        "ja": "参加先と、あなたに見える範囲を確認して、参加してください。",
+        "qps-ploc": "⟦Ƈħėƈķ ẇħȧŧ ẏőů ȧřė ĵőïñïñɠ, ŧħėñ ƈőñƒïřɱ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "join_missing_code": {
+        "en": "This link has no invite code.",
+        "ja": "このリンクには招待コードがありません。",
+        "qps-ploc": "⟦Ŧħïş ŀïñķ ħȧş ñő ïñṽïŧė ƈőḓė. ŀőřėɱ ïṗş⟧"
+      },
+      "join_sign_in_required": {
+        "en": "Sign in first, then open this link again.",
+        "ja": "先にサインインしてから、もう一度このリンクを開いてください。",
+        "qps-ploc": "⟦Şïɠñ ïñ ƒïřşŧ, ŧħėñ őṗėñ ŧħïş ŀïñķ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "join_org": {
+        "en": "Organization: {tenant}",
+        "ja": "参加先: {tenant}",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ: {tenant} ŀőřėɱ ï⟧"
+      },
+      "join_role": {
+        "en": "You will join as: {role}",
+        "ja": "あなたの役割: {role}",
+        "qps-ploc": "⟦Ẏőů ẇïŀŀ ĵőïñ ȧş: {role} ŀőřėɱ ï⟧"
+      },
+      "join_role_viewer": {
+        "en": "You can see this organization's decisions and progress. You cannot change anything.",
+        "ja": "この組織の判断と進み具合を見られます。変更はできません。",
+        "qps-ploc": "⟦Ẏőů ƈȧñ şėė ŧħïş őřɠȧñïẑȧŧïőñ'ş ḓėƈïşïőñş ȧñḓ ṗřőɠřėşş. Ẏőů ƈȧññőŧ ƈħȧñɠė ȧñẏŧħïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "join_role_operator": {
+        "en": "You can see this organization's work and ask for work to be done. You cannot decide approvals.",
+        "ja": "この組織の仕事を見て、依頼を出せます。承認の判断はできません。",
+        "qps-ploc": "⟦Ẏőů ƈȧñ şėė ŧħïş őřɠȧñïẑȧŧïőñ'ş ẇőřķ ȧñḓ ȧşķ ƒőř ẇőřķ ŧő ƀė ḓőñė. Ẏőů ƈȧññőŧ ḓėƈïḓė ȧṗṗřőṽȧŀş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "join_role_approver": {
+        "en": "You can see this organization's work and decide approvals within its limits.",
+        "ja": "この組織の仕事を見て、決められた範囲で承認の判断ができます。",
+        "qps-ploc": "⟦Ẏőů ƈȧñ şėė ŧħïş őřɠȧñïẑȧŧïőñ'ş ẇőřķ ȧñḓ ḓėƈïḓė ȧṗṗřőṽȧŀş ẇïŧħïñ ïŧş ŀïɱïŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "join_separation": {
+        "en": "Your other organizations stay separate, and your personal data stays yours.",
+        "ja": "他の組織の情報は混ざりません。あなたの個人の情報も、あなたのものです。",
+        "qps-ploc": "⟦Ẏőůř őŧħėř őřɠȧñïẑȧŧïőñş şŧȧẏ şėṗȧřȧŧė, ȧñḓ ẏőůř ṗėřşőñȧŀ ḓȧŧȧ şŧȧẏş ẏőůřş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "join_display_name": {
+        "en": "Your name",
+        "ja": "あなたの名前",
+        "qps-ploc": "⟦Ẏőůř ñȧɱė ŀőř⟧"
+      },
+      "join_submit": {
+        "en": "Join",
+        "ja": "参加する",
+        "qps-ploc": "⟦Ĵőïñ ŀőř⟧"
+      },
+      "join_done": {
+        "en": "You joined {tenant}.",
+        "ja": "{tenant} に参加しました。",
+        "qps-ploc": "⟦Ẏőů ĵőïñėḓ {tenant}. ŀőřėɱ ⟧"
+      },
+      "join_next": {
+        "en": "Next: set up your personal preferences.",
+        "ja": "次は、あなた自身の設定を整えましょう。",
+        "qps-ploc": "⟦Ñėẋŧ: şėŧ ůṗ ẏőůř ṗėřşőñȧŀ ṗřėƒėřėñƈėş. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "join_err_not_found": {
+        "en": "This invite was not found. Check the link.",
+        "ja": "この招待は見つかりません。リンクを確認してください。",
+        "qps-ploc": "⟦Ŧħïş ïñṽïŧė ẇȧş ñőŧ ƒőůñḓ. Ƈħėƈķ ŧħė ŀïñķ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "join_err_expired": {
+        "en": "This invite has expired. Ask for a new one.",
+        "ja": "この招待は期限切れです。新しい招待を依頼してください。",
+        "qps-ploc": "⟦Ŧħïş ïñṽïŧė ħȧş ėẋṗïřėḓ. Ȧşķ ƒőř ȧ ñėẇ őñė. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "join_err_used": {
+        "en": "This invite was already used.",
+        "ja": "この招待は使用済みです。",
+        "qps-ploc": "⟦Ŧħïş ïñṽïŧė ẇȧş ȧŀřėȧḓẏ ůşėḓ. ŀőřėɱ ïṗş⟧"
+      },
+      "join_err_revoked": {
+        "en": "This invite was revoked.",
+        "ja": "この招待は取り消されました。",
+        "qps-ploc": "⟦Ŧħïş ïñṽïŧė ẇȧş řėṽőķėḓ. ŀőřėɱ ï⟧"
+      },
+      "join_err_already_member": {
+        "en": "You are already a member of this organization (or this sign-in already has an account).",
+        "ja": "すでにこの組織のメンバーです(または、このサインインにはすでにアカウントがあります)。",
+        "qps-ploc": "⟦Ẏőů ȧřė ȧŀřėȧḓẏ ȧ ɱėɱƀėř őƒ ŧħïş őřɠȧñïẑȧŧïőñ (őř ŧħïş şïɠñ-ïñ ȧŀřėȧḓẏ ħȧş ȧñ ȧƈƈőůñŧ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "join_err_forbidden": {
+        "en": "This account cannot join right now.",
+        "ja": "このアカウントでは、いま参加できません。",
+        "qps-ploc": "⟦Ŧħïş ȧƈƈőůñŧ ƈȧññőŧ ĵőïñ řïɠħŧ ñőẇ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "join_err_generic": {
+        "en": "Could not join: {detail}",
+        "ja": "参加できませんでした: {detail}",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ĵőïñ: {detail} ŀőřėɱ ï⟧"
       }
     },
     "operator": {
@@ -23324,6 +24394,66 @@
         "en": "⚠️  {what}: {reason}",
         "ja": "⚠️  {what}: {reason}",
         "qps-ploc": "⟦⚠️  {what}: {reason} ŀőřėɱ ⟧"
+      },
+      "repair_resume": {
+        "en": "Resuming the repair session for {sampleId}. The first recording and verification are not rerun.",
+        "ja": "{sampleId} の修復セッションを再開します。初回録音と確認を再実行しません。",
+        "qps-ploc": "⟦Řėşůɱïñɠ ŧħė řėṗȧïř şėşşïőñ ƒőř {sampleId}. Ŧħė ƒïřşŧ řėƈőřḓïñɠ ȧñḓ ṽėřïƒïƈȧŧïőñ ȧřė ñőŧ řėřůñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "repair_stt_checking": {
+        "en": "Verifying {sampleId} with STT (preferring a timestamped backend)...",
+        "ja": "{sampleId} のSTT確認中（タイムスタンプ付きバックエンドを優先）...",
+        "qps-ploc": "⟦Ṽėřïƒẏïñɠ {sampleId} ẇïŧħ ŞŦŦ (ṗřėƒėřřïñɠ ȧ ŧïɱėşŧȧɱṗėḓ ƀȧƈķėñḓ)... ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "repair_stt_start_failed": {
+        "en": "Could not start STT verification: {detail}",
+        "ja": "STT確認を開始できませんでした: {detail}",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ şŧȧřŧ ŞŦŦ ṽėřïƒïƈȧŧïőñ: {detail} ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "repair_stt_ok": {
+        "en": "{sampleId} passed STT verification. No re-recording is needed.",
+        "ja": "{sampleId} STT確認OK。再録音は不要です。",
+        "qps-ploc": "⟦{sampleId} ṗȧşşėḓ ŞŦŦ ṽėřïƒïƈȧŧïőñ. Ñő řė-řėƈőřḓïñɠ ïş ñėėḓėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "repair_no_timestamps": {
+        "en": "Cannot locate the sentence with timestamped STT, so a safe partial replacement cannot run. Check the STT settings and retry.",
+        "ja": "タイムスタンプ付きSTTで文の位置を特定できないため、安全な部分置換を実行できません。STT設定を確認してから再試行してください。",
+        "qps-ploc": "⟦Ƈȧññőŧ ŀőƈȧŧė ŧħė şėñŧėñƈė ẇïŧħ ŧïɱėşŧȧɱṗėḓ ŞŦŦ, şő ȧ şȧƒė ṗȧřŧïȧŀ řėṗŀȧƈėɱėñŧ ƈȧññőŧ řůñ. Ƈħėƈķ ŧħė ŞŦŦ şėŧŧïñɠş ȧñḓ řėŧřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+      },
+      "repair_segment_mismatch": {
+        "en": "{sampleId} repair {index}/{total}: {segmentId} does not match. Re-recording only this sentence ({attempt}/{maxAttempts}).\nScript: \"{text}\"",
+        "ja": "{sampleId} 修復 {index}/{total} {segmentId} が不一致。この文だけ再録音します ({attempt}/{maxAttempts})。\n原稿: 「{text}」",
+        "qps-ploc": "⟦{sampleId} řėṗȧïř {index}/{total}: {segmentId} ḓőėş ñőŧ ɱȧŧƈħ. Řė-řėƈőřḓïñɠ őñŀẏ ŧħïş şėñŧėñƈė ({attempt}/{maxAttempts}).\nŞƈřïṗŧ: \"{text}\" ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈï⟧"
+      },
+      "repair_stt_failed": {
+        "en": "STT verification failed: {detail}",
+        "ja": "STT確認に失敗: {detail}",
+        "qps-ploc": "⟦ŞŦŦ ṽėřïƒïƈȧŧïőñ ƒȧïŀėḓ: {detail} ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "repair_no_source_span": {
+        "en": "Partial replacement aborted because the source audio span of {segmentId} could not be located",
+        "ja": "{segmentId} の元音声区間を特定できないため、部分置換を中止しました",
+        "qps-ploc": "⟦Ṗȧřŧïȧŀ řėṗŀȧƈėɱėñŧ ȧƀőřŧėḓ ƀėƈȧůşė ŧħė şőůřƈė ȧůḓïő şṗȧñ őƒ {segmentId} ƈőůŀḓ ñőŧ ƀė ŀőƈȧŧėḓ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "repair_done": {
+        "en": "Re-recorded only the mismatched sentences of {sampleId} and passed STT verification.",
+        "ja": "{sampleId} のズレた文だけ再録音し、STT確認を通過しました。",
+        "qps-ploc": "⟦Řė-řėƈőřḓėḓ őñŀẏ ŧħė ɱïşɱȧŧƈħėḓ şėñŧėñƈėş őƒ {sampleId} ȧñḓ ṗȧşşėḓ ŞŦŦ ṽėřïƒïƈȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "recorder_prompt_text": {
+        "en": "Text to read aloud:\n\"{text}\"",
+        "ja": "読み上げる文章:\n「{text}」",
+        "qps-ploc": "⟦Ŧėẋŧ ŧő řėȧḓ ȧŀőůḓ:\n\"{text}\" ŀőřėɱ ïṗş⟧"
+      },
+      "recorder_countdown": {
+        "en": "Mic on in {seconds}s...",
+        "ja": "マイク ON まで {seconds} 秒...",
+        "qps-ploc": "⟦Ɱïƈ őñ ïñ {seconds}ş... ŀőřėɱ ï⟧"
+      },
+      "recorder_start": {
+        "en": "Recording started. Read the following text aloud exactly as written:\n\"{text}\"",
+        "ja": "録音開始。次の文章をそのまま読み上げてください:\n「{text}」",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ şŧȧřŧėḓ. Řėȧḓ ŧħė ƒőŀŀőẇïñɠ ŧėẋŧ ȧŀőůḓ ėẋȧƈŧŀẏ ȧş ẇřïŧŧėñ:\n\"{text}\" ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
       }
     },
     "plugin": {
@@ -24130,6 +25260,537 @@
         "en": "Too many sign-in attempts. Wait a minute and try again.",
         "ja": "サインインの試行が多すぎます。1 分ほど待ってからもう一度お試しください。",
         "qps-ploc": "⟦Ŧőő ɱȧñẏ şïɠñ-ïñ ȧŧŧėɱṗŧş. Ẇȧïŧ ȧ ɱïñůŧė ȧñḓ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      }
+    },
+    "integrations": {
+      "slack_onboarding_q_name": {
+        "en": "First, what should I call you?",
+        "ja": "まず、どのようにお呼びすれば良いですか？",
+        "qps-ploc": "⟦Ƒïřşŧ, ẇħȧŧ şħőůŀḓ Ï ƈȧŀŀ ẏőů? ŀőřėɱ ïṗşů⟧"
+      },
+      "slack_onboarding_q_language": {
+        "en": "Which language would you like to use for everyday conversation? e.g. Japanese / English",
+        "ja": "普段のやり取りで使いたい言語を教えてください。例: Japanese / English",
+        "qps-ploc": "⟦Ẇħïƈħ ŀȧñɠůȧɠė ẇőůŀḓ ẏőů ŀïķė ŧő ůşė ƒőř ėṽėřẏḓȧẏ ƈőñṽėřşȧŧïőñ? ė.ɠ. Ĵȧṗȧñėşė / Ėñɠŀïşħ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "slack_onboarding_q_interaction_style": {
+        "en": "Which interaction style do you prefer? Choose from Senior Partner / Concierge / Minimalist.",
+        "ja": "対話スタイルはどうしますか？ Senior Partner / Concierge / Minimalist から選んでください。",
+        "qps-ploc": "⟦Ẇħïƈħ ïñŧėřȧƈŧïőñ şŧẏŀė ḓő ẏőů ṗřėƒėř? Ƈħőőşė ƒřőɱ Şėñïőř Ṗȧřŧñėř / Ƈőñƈïėřɠė / Ɱïñïɱȧŀïşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "slack_onboarding_q_primary_domain": {
+        "en": "What is your main area of work? e.g. Software Engineering / Data Analysis / Writing",
+        "ja": "主な活動領域を教えてください。例: Software Engineering / Data Analysis / Writing",
+        "qps-ploc": "⟦Ẇħȧŧ ïş ẏőůř ɱȧïñ ȧřėȧ őƒ ẇőřķ? ė.ɠ. Şőƒŧẇȧřė Ėñɠïñėėřïñɠ / Ḓȧŧȧ Ȧñȧŀẏşïş / Ẇřïŧïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "slack_onboarding_q_vision": {
+        "en": "Briefly tell me the vision you want to achieve in this environment.",
+        "ja": "この環境で実現したい vision を短く教えてください。",
+        "qps-ploc": "⟦Ƀřïėƒŀẏ ŧėŀŀ ɱė ŧħė ṽïşïőñ ẏőů ẇȧñŧ ŧő ȧƈħïėṽė ïñ ŧħïş ėñṽïřőñɱėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "slack_onboarding_q_agent_id": {
+        "en": "Lastly, let's decide the main Agent ID for this environment. Tell me your preferred name if you have one. To use the default, send \"default\". The default is KYBERION-PRIME.",
+        "ja": "最後に、この環境のメイン Agent ID を決めます。希望名があれば教えてください。既定値を使う場合は「そのまま」「default」「おまかせ」のいずれかを送ってください。既定値は KYBERION-PRIME です。",
+        "qps-ploc": "⟦Ŀȧşŧŀẏ, ŀėŧ'ş ḓėƈïḓė ŧħė ɱȧïñ Ȧɠėñŧ ÏḒ ƒőř ŧħïş ėñṽïřőñɱėñŧ. Ŧėŀŀ ɱė ẏőůř ṗřėƒėřřėḓ ñȧɱė ïƒ ẏőů ħȧṽė őñė. Ŧő ůşė ŧħė ḓėƒȧůŀŧ, şėñḓ \"ḓėƒȧůŀŧ\". Ŧħė ḓėƒȧůŀŧ ïş ĶẎɃĖŘÏŐÑ-ṖŘÏⱮĖ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗş⟧"
+      },
+      "slack_onboarding_start": {
+        "en": "This environment has not been initialized yet, so let's start with onboarding.",
+        "ja": "この環境はまだ初期化されていないため、まずオンボーディングを進めます。",
+        "qps-ploc": "⟦Ŧħïş ėñṽïřőñɱėñŧ ħȧş ñőŧ ƀėėñ ïñïŧïȧŀïẑėḓ ẏėŧ, şő ŀėŧ'ş şŧȧřŧ ẇïŧħ őñƀőȧřḓïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "slack_onboarding_one_at_a_time": {
+        "en": "I'll ask one question at a time.",
+        "ja": "1問ずつ確認していきます。",
+        "qps-ploc": "⟦Ï'ŀŀ ȧşķ őñė ɋůėşŧïőñ ȧŧ ȧ ŧïɱė. ŀőřėɱ ïṗşů⟧"
+      },
+      "slack_onboarding_saved": {
+        "en": "Saved your onboarding information.",
+        "ja": "オンボーディング情報を保存しました。",
+        "qps-ploc": "⟦Şȧṽėḓ ẏőůř őñƀőȧřḓïñɠ ïñƒőřɱȧŧïőñ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "slack_onboarding_switch_routing": {
+        "en": "Initialization is complete, so from your next message I'll switch to normal routing.",
+        "ja": "初期化が完了したので、次のメッセージから通常の routing に切り替えます。",
+        "qps-ploc": "⟦Ïñïŧïȧŀïẑȧŧïőñ ïş ƈőɱṗŀėŧė, şő ƒřőɱ ẏőůř ñėẋŧ ɱėşşȧɠė Ï'ŀŀ şẇïŧƈħ ŧő ñőřɱȧŀ řőůŧïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "slack_onboarding_already_done": {
+        "en": "Onboarding is already complete. Please send your regular request.",
+        "ja": "オンボーディングは完了しています。通常の依頼を送ってください。",
+        "qps-ploc": "⟦Őñƀőȧřḓïñɠ ïş ȧŀřėȧḓẏ ƈőɱṗŀėŧė. Ṗŀėȧşė şėñḓ ẏőůř řėɠůŀȧř řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "slack_ask_why_prompt": {
+        "en": "Where did it differ from what you expected? (One question only, skippable — your answer is used to improve future work)",
+        "ja": "どこが期待と違いましたか？(1問だけ・スキップ可 — 理由は次回の作業改善に使われます)",
+        "qps-ploc": "⟦Ẇħėřė ḓïḓ ïŧ ḓïƒƒėř ƒřőɱ ẇħȧŧ ẏőů ėẋṗėƈŧėḓ? (Őñė ɋůėşŧïőñ őñŀẏ, şķïṗṗȧƀŀė — ẏőůř ȧñşẇėř ïş ůşėḓ ŧő ïɱṗřőṽė ƒůŧůřė ẇőřķ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      }
+    },
+    "mission_ops": {
+      "hygiene_rec_design_missing": {
+        "en": "Tasks not expanded yet. To continue, start from process design: pnpm mission-controller start <ID> / otherwise: pnpm mission-controller cancel <ID>",
+        "ja": "タスク未展開。続けるなら process 設計から: pnpm mission-controller start <ID> / 不要なら: pnpm mission-controller cancel <ID>",
+        "qps-ploc": "⟦Ŧȧşķş ñőŧ ėẋṗȧñḓėḓ ẏėŧ. Ŧő ƈőñŧïñůė, şŧȧřŧ ƒřőɱ ṗřőƈėşş ḓėşïɠñ: ṗñṗɱ ɱïşşïőñ-ƈőñŧřőŀŀėř şŧȧřŧ <ÏḒ> / őŧħėřẇïşė: ṗñṗɱ ɱïşşïőñ-ƈőñŧřőŀŀėř ƈȧñƈėŀ <ÏḒ> ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ⟧"
+      },
+      "hygiene_rec_ready_not_started": {
+        "en": "Tasks are ready but not started. Start: pnpm mission-controller dispatch-workitems <ID> --mode subagent",
+        "ja": "タスクは準備済みで未着手。開始: pnpm mission-controller dispatch-workitems <ID> --mode subagent",
+        "qps-ploc": "⟦Ŧȧşķş ȧřė řėȧḓẏ ƀůŧ ñőŧ şŧȧřŧėḓ. Şŧȧřŧ: ṗñṗɱ ɱïşşïőñ-ƈőñŧřőŀŀėř ḓïşṗȧŧƈħ-ẇőřķïŧėɱş <ÏḒ> --ɱőḓė şůƀȧɠėñŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "hygiene_rec_awaiting_gate": {
+        "en": "Dispatched but the activation gate has not passed. Run the gate or confirm the planned→active transition.",
+        "ja": "ディスパッチ済みだが activation gate 未通過。gate 実行または planned→active の確認を",
+        "qps-ploc": "⟦Ḓïşṗȧŧƈħėḓ ƀůŧ ŧħė ȧƈŧïṽȧŧïőñ ɠȧŧė ħȧş ñőŧ ṗȧşşėḓ. Řůñ ŧħė ɠȧŧė őř ƈőñƒïřɱ ŧħė ṗŀȧññėḓ→ȧƈŧïṽė ŧřȧñşïŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
+      },
+      "hygiene_age_days": {
+        "en": "{days}d",
+        "ja": "{days}日",
+        "qps-ploc": "⟦{days}ḓ ŀőř⟧"
+      },
+      "hygiene_alert_title": {
+        "en": "{count} mission hygiene item(s) need attention (planned: {planned})",
+        "ja": "ミッション衛生の要対応が {count} 件あります (planned {planned} 件)",
+        "qps-ploc": "⟦{count} ɱïşşïőñ ħẏɠïėñė ïŧėɱ(ş) ñėėḓ ȧŧŧėñŧïőñ (ṗŀȧññėḓ: {planned}) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "hygiene_question_title": {
+        "en": "Decide what to do with {count} unstarted mission(s)",
+        "ja": "未開始ミッション {count} 件の扱いを決めてください",
+        "qps-ploc": "⟦Ḓėƈïḓė ẇħȧŧ ŧő ḓő ẇïŧħ {count} ůñşŧȧřŧėḓ ɱïşşïőñ(ş) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "hygiene_rec_distilling_stale": {
+        "en": "distilling has continued for {days}+ days. Check the review / finish: pnpm mission-controller finish {missionId}",
+        "ja": "distilling が {days}日以上継続。レビュー/finish を確認: pnpm mission-controller finish {missionId}",
+        "qps-ploc": "⟦ḓïşŧïŀŀïñɠ ħȧş ƈőñŧïñůėḓ ƒőř {days}+ ḓȧẏş. Ƈħėƈķ ŧħė řėṽïėẇ / ƒïñïşħ: ṗñṗɱ ɱïşşïőñ-ƈőñŧřőŀŀėř ƒïñïşħ {missionId} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "hygiene_rec_active_stale": {
+        "en": "active has continued for {days}+ days. Check checkpoints and remaining tasks: pnpm mission-controller status {missionId}",
+        "ja": "active が {days}日以上継続。checkpoint と残タスクを確認: pnpm mission-controller status {missionId}",
+        "qps-ploc": "⟦ȧƈŧïṽė ħȧş ƈőñŧïñůėḓ ƒőř {days}+ ḓȧẏş. Ƈħėƈķ ƈħėƈķṗőïñŧş ȧñḓ řėɱȧïñïñɠ ŧȧşķş: ṗñṗɱ ɱïşşïőñ-ƈőñŧřőŀŀėř şŧȧŧůş {missionId} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "hygiene_question_body_stalled": {
+        "en": "Some missions are stuck in planned ({days}+ days).",
+        "ja": "planned のまま止まっているミッションがあります({days}日以上)。",
+        "qps-ploc": "⟦Şőɱė ɱïşşïőñş ȧřė şŧůƈķ ïñ ṗŀȧññėḓ ({days}+ ḓȧẏş). ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "hygiene_question_body_action": {
+        "en": "Start them, or cancel them if they are not needed:",
+        "ja": "開始するか、不要なら cancel してください:",
+        "qps-ploc": "⟦Şŧȧřŧ ŧħėɱ, őř ƈȧñƈėŀ ŧħėɱ ïƒ ŧħėẏ ȧřė ñőŧ ñėėḓėḓ: ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "retro_wo_kind": {
+        "en": "- Kind: {value}",
+        "ja": "- 種別: {value}",
+        "qps-ploc": "⟦- Ķïñḓ: {value} ŀőřė⟧"
+      },
+      "retro_wo_target": {
+        "en": "- Target: {value}",
+        "ja": "- 対象: {value}",
+        "qps-ploc": "⟦- Ŧȧřɠėŧ: {value} ŀőřėɱ⟧"
+      },
+      "retro_wo_mission": {
+        "en": "- Originating mission: {value}",
+        "ja": "- 発生ミッション: {value}",
+        "qps-ploc": "⟦- Őřïɠïñȧŧïñɠ ɱïşşïőñ: {value} ŀőřėɱ ïṗşů⟧"
+      },
+      "retro_wo_approved_at": {
+        "en": "- Approved at: {value}",
+        "ja": "- 承認日: {value}",
+        "qps-ploc": "⟦- Ȧṗṗřőṽėḓ ȧŧ: {value} ŀőřėɱ ï⟧"
+      },
+      "retro_wo_changes_heading": {
+        "en": "## Changes",
+        "ja": "## 変更内容",
+        "qps-ploc": "⟦## Ƈħȧñɠėş ŀőř⟧"
+      },
+      "retro_wo_rationale_heading": {
+        "en": "## Rationale",
+        "ja": "## 根拠",
+        "qps-ploc": "⟦## Řȧŧïőñȧŀė ŀőř⟧"
+      },
+      "retro_wo_evidence_heading": {
+        "en": "## Evidence",
+        "ja": "## エビデンス",
+        "qps-ploc": "⟦## Ėṽïḓėñƈė ŀőř⟧"
+      },
+      "retro_wo_footer": {
+        "en": "> After implementing, append the result to this file and update the related plan doc / ledger.",
+        "ja": "> 実装したら本ファイルに結果を追記し、関連する plan doc / ledger を更新すること。",
+        "qps-ploc": "⟦> Ȧƒŧėř ïɱṗŀėɱėñŧïñɠ, ȧṗṗėñḓ ŧħė řėşůŀŧ ŧő ŧħïş ƒïŀė ȧñḓ ůṗḓȧŧė ŧħė řėŀȧŧėḓ ṗŀȧñ ḓőƈ / ŀėḓɠėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "retro_wo_issued_title": {
+        "en": "Improvement work order issued: {kind} ({id})",
+        "ja": "改善ワークオーダー発行: {kind} ({id})",
+        "qps-ploc": "⟦Ïɱṗřőṽėɱėñŧ ẇőřķ őřḓėř ïşşůėḓ: {kind} ({id}) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "retro_stats_heading": {
+        "en": "## Execution statistics (deterministic)",
+        "ja": "## 実行統計(決定論)",
+        "qps-ploc": "⟦## Ėẋėƈůŧïőñ şŧȧŧïşŧïƈş (ḓėŧėřɱïñïşŧïƈ) ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "retro_proposals_heading": {
+        "en": "## Improvement proposals (awaiting approval — process-improvement queue)",
+        "ja": "## 改善提案(承認待ち — process-improvement queue)",
+        "qps-ploc": "⟦## Ïɱṗřőṽėɱėñŧ ṗřőṗőşȧŀş (ȧẇȧïŧïñɠ ȧṗṗřőṽȧŀ — ṗřőƈėşş-ïɱṗřőṽėɱėñŧ ɋůėůė) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "retro_rationale_label": {
+        "en": "Rationale",
+        "ja": "根拠",
+        "qps-ploc": "⟦Řȧŧïőñȧŀė ŀőř⟧"
+      },
+      "retro_none": {
+        "en": "None",
+        "ja": "なし",
+        "qps-ploc": "⟦Ñőñė ŀőř⟧"
+      },
+      "retro_queue_footer": {
+        "en": "> Approve or reject proposals by updating the queue ({path}); only approved ones are reflected into the blueprint / workflow catalog.",
+        "ja": "> 提案の承認/却下は queue ({path}) を更新し、承認済みのみ blueprint / workflow catalog へ反映すること。",
+        "qps-ploc": "⟦> Ȧṗṗřőṽė őř řėĵėƈŧ ṗřőṗőşȧŀş ƀẏ ůṗḓȧŧïñɠ ŧħė ɋůėůė ({path}); őñŀẏ ȧṗṗřőṽėḓ őñėş ȧřė řėƒŀėƈŧėḓ ïñŧő ŧħė ƀŀůėṗřïñŧ / ẇőřķƒŀőẇ ƈȧŧȧŀőɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈ⟧"
+      },
+      "retro_question_title": {
+        "en": "Retrospective: {count} process improvement proposal(s) ({missionId})",
+        "ja": "Retrospective: {count} 件のプロセス改善提案 ({missionId})",
+        "qps-ploc": "⟦Řėŧřőşṗėƈŧïṽė: {count} ṗřőƈėşş ïɱṗřőṽėɱėñŧ ṗřőṗőşȧŀ(ş) ({missionId}) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "bg_review_rule_transient": {
+        "en": "Do not record one-off or temporary failures in durable knowledge",
+        "ja": "一過性・一時的な障害は durable knowledge に記録しない",
+        "qps-ploc": "⟦Ḓő ñőŧ řėƈőřḓ őñė-őƒƒ őř ŧėɱṗőřȧřẏ ƒȧïŀůřėş ïñ ḓůřȧƀŀė ķñőẇŀėḓɠė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "bg_review_rule_environment": {
+        "en": "Do not record environment-specific failures or local paths in durable knowledge",
+        "ja": "環境固有の失敗やローカルパスは durable knowledge に記録しない",
+        "qps-ploc": "⟦Ḓő ñőŧ řėƈőřḓ ėñṽïřőñɱėñŧ-şṗėƈïƒïƈ ƒȧïŀůřėş őř ŀőƈȧŀ ṗȧŧħş ïñ ḓůřȧƀŀė ķñőẇŀėḓɠė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "bg_review_rule_provider": {
+        "en": "Do not draw conclusions about a provider/backend/model from a single case",
+        "ja": "単一事例から provider/backend/model を断定しない",
+        "qps-ploc": "⟦Ḓő ñőŧ ḓřȧẇ ƈőñƈŀůşïőñş ȧƀőůŧ ȧ ṗřőṽïḓėř/ƀȧƈķėñḓ/ɱőḓėŀ ƒřőɱ ȧ şïñɠŀė ƈȧşė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "bg_review_empty": {
+        "en": "The review result is empty",
+        "ja": "レビュー結果が空です",
+        "qps-ploc": "⟦Ŧħė řėṽïėẇ řėşůŀŧ ïş ėɱṗŧẏ ŀőřėɱ ïṗ⟧"
+      },
+      "resume_journal_next_event": {
+        "en": "Resuming from journal: next event={eventType} ({eventId}) / tasks to recover={count}",
+        "ja": "journal から再開: 次イベント={eventType} ({eventId}) / 回収タスク={count} 件",
+        "qps-ploc": "⟦Řėşůɱïñɠ ƒřőɱ ĵőůřñȧŀ: ñėẋŧ ėṽėñŧ={eventType} ({eventId}) / ŧȧşķş ŧő řėƈőṽėř={count} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "resume_worker_restarted": {
+        "en": "Restarted the orchestration worker: {eventId} ({path})",
+        "ja": "orchestration worker を再起動しました: {eventId} ({path})",
+        "qps-ploc": "⟦Řėşŧȧřŧėḓ ŧħė őřƈħėşŧřȧŧïőñ ẇőřķėř: {eventId} ({path}) ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "resume_journal_nothing": {
+        "en": "Resuming from journal: no orchestration event to resume.",
+        "ja": "journal から再開: 再開対象の orchestration event はありません。",
+        "qps-ploc": "⟦Řėşůɱïñɠ ƒřőɱ ĵőůřñȧŀ: ñő őřƈħėşŧřȧŧïőñ ėṽėñŧ ŧő řėşůɱė. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "resume_blocked_reissued": {
+        "en": "Returned blocked tasks to planned (to be re-preflighted): {taskIds}",
+        "ja": "blocked タスクを planned に戻しました (再preflight対象): {taskIds}",
+        "qps-ploc": "⟦Řėŧůřñėḓ ƀŀőƈķėḓ ŧȧşķş ŧő ṗŀȧññėḓ (ŧő ƀė řė-ṗřėƒŀïɠħŧėḓ): {taskIds} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "bg_review_notice_needs_approval": {
+        "en": "The background review proposal needs human approval.",
+        "ja": "background review の提案に人間の承認が必要です。",
+        "qps-ploc": "⟦Ŧħė ƀȧƈķɠřőůñḓ řėṽïėẇ ṗřőṗőşȧŀ ñėėḓş ħůɱȧñ ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "bg_review_notice_request": {
+        "en": "Approval request: {id}",
+        "ja": "承認要求: {id}",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řėɋůėşŧ: {id} ŀőřėɱ ï⟧"
+      },
+      "bg_review_notice_candidate": {
+        "en": "Candidate: {id}",
+        "ja": "候補: {id}",
+        "qps-ploc": "⟦Ƈȧñḓïḓȧŧė: {id} ŀőřė⟧"
+      },
+      "bg_review_notice_reply": {
+        "en": "Reply: appr:{id}:approve or appr:{id}:reject",
+        "ja": "返信: appr:{id}:approve または appr:{id}:reject",
+        "qps-ploc": "⟦Řėṗŀẏ: ȧṗṗř:{id}:ȧṗṗřőṽė őř ȧṗṗř:{id}:řėĵėƈŧ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "bg_review_notice_approve_cmd": {
+        "en": "Approve: pnpm kyberion approve {id} background-review",
+        "ja": "承認: pnpm kyberion approve {id} background-review",
+        "qps-ploc": "⟦Ȧṗṗřőṽė: ṗñṗɱ ķẏƀėřïőñ ȧṗṗřőṽė {id} ƀȧƈķɠřőůñḓ-řėṽïėẇ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "bg_review_notice_apply": {
+        "en": "After approval, apply the candidate.",
+        "ja": "承認後に候補の apply を実行してください。",
+        "qps-ploc": "⟦Ȧƒŧėř ȧṗṗřőṽȧŀ, ȧṗṗŀẏ ŧħė ƈȧñḓïḓȧŧė. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "approval_chrome_run_title": {
+        "en": "Chrome run: {origin}",
+        "ja": "Chrome 実行: {origin}",
+        "qps-ploc": "⟦Ƈħřőɱė řůñ: {origin} ŀőřėɱ ⟧"
+      },
+      "approval_chrome_high_risk_summary": {
+        "en": "{count} high-risk operation(s) ({operations})",
+        "ja": "{count} 件の高リスク操作（{operations}）",
+        "qps-ploc": "⟦{count} ħïɠħ-řïşķ őṗėřȧŧïőñ(ş) ({operations}) ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "approval_service_run_title": {
+        "en": "Service run: {name}",
+        "ja": "Service 実行: {name}",
+        "qps-ploc": "⟦Şėřṽïƈė řůñ: {name} ŀőřėɱ ⟧"
+      },
+      "approval_service_external_effect_summary": {
+        "en": "{count} external-effect step(s) ({operations})",
+        "ja": "{count} 件の external-effect（{operations}）",
+        "qps-ploc": "⟦{count} ėẋŧėřñȧŀ-ėƒƒėƈŧ şŧėṗ(ş) ({operations}) ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "deliverables_in_inbox": {
+        "en": "{count} deliverable(s) arrived in the inbox.",
+        "ja": "成果物 {count} 件が inbox に届きました。",
+        "qps-ploc": "⟦{count} ḓėŀïṽėřȧƀŀė(ş) ȧřřïṽėḓ ïñ ŧħė ïñƀőẋ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      }
+    },
+    "lead_score": {
+      "reason_clear_pain": {
+        "en": "Pain point is clear",
+        "ja": "課題が明確",
+        "qps-ploc": "⟦Ṗȧïñ ṗőïñŧ ïş ƈŀėȧř ŀőřėɱ ⟧"
+      },
+      "reason_has_timeline": {
+        "en": "A rollout deadline exists",
+        "ja": "導入期限がある",
+        "qps-ploc": "⟦Ȧ řőŀŀőůŧ ḓėȧḓŀïñė ėẋïşŧş ŀőřėɱ ïṗ⟧"
+      },
+      "reason_no_decision_maker": {
+        "en": "Decision maker not yet confirmed",
+        "ja": "決裁者は未確認",
+        "qps-ploc": "⟦Ḓėƈïşïőñ ɱȧķėř ñőŧ ẏėŧ ƈőñƒïřɱėḓ ŀőřėɱ ïṗşů⟧"
+      },
+      "reason_wrong_fit": {
+        "en": "A wrong-fit signal is present",
+        "ja": "不適合シグナルがある",
+        "qps-ploc": "⟦Ȧ ẇřőñɠ-ƒïŧ şïɠñȧŀ ïş ṗřėşėñŧ ŀőřėɱ ïṗş⟧"
+      },
+      "reason_budget_first": {
+        "en": "Budget confirmation came first",
+        "ja": "予算確認が先行している",
+        "qps-ploc": "⟦Ƀůḓɠėŧ ƈőñƒïřɱȧŧïőñ ƈȧɱė ƒïřşŧ ŀőřėɱ ïṗşů⟧"
+      }
+    },
+    "project_ops": {
+      "bootstrap_web_frame": {
+        "en": "Pin down the purpose, users, and key use cases of {project}.",
+        "ja": "{project} の目的、利用者、主要ユースケースを固める。",
+        "qps-ploc": "⟦Ṗïñ ḓőẇñ ŧħė ṗůřṗőşė, ůşėřş, ȧñḓ ķėẏ ůşė ƈȧşėş őƒ {project}. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "bootstrap_web_arch": {
+        "en": "Design the information architecture, key components, and operational boundaries.",
+        "ja": "情報設計、主要コンポーネント、運用境界を設計する。",
+        "qps-ploc": "⟦Ḓėşïɠñ ŧħė ïñƒőřɱȧŧïőñ ȧřƈħïŧėƈŧůřė, ķėẏ ƈőɱṗőñėñŧş, ȧñḓ őṗėřȧŧïőñȧŀ ƀőůñḓȧřïėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "bootstrap_web_build": {
+        "en": "Carve out the smallest implementation slice and the repository/worktree strategy.",
+        "ja": "最小の実装スライスと repository/worktree 戦略を切る。",
+        "qps-ploc": "⟦Ƈȧřṽė őůŧ ŧħė şɱȧŀŀėşŧ ïɱṗŀėɱėñŧȧŧïőñ şŀïƈė ȧñḓ ŧħė řėṗőşïŧőřẏ/ẇőřķŧřėė şŧřȧŧėɠẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "bootstrap_web_verify": {
+        "en": "Verify tests, operating flow, and external service integration.",
+        "ja": "試験、運用導線、外部サービス連携を確認する。",
+        "qps-ploc": "⟦Ṽėřïƒẏ ŧėşŧş, őṗėřȧŧïñɠ ƒŀőẇ, ȧñḓ ėẋŧėřñȧŀ şėřṽïƈė ïñŧėɠřȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "bootstrap_doc_scope": {
+        "en": "Organize the purpose, target readers, and required deliverables of {project}.",
+        "ja": "{project} の目的、対象読者、必要成果物を整理する。",
+        "qps-ploc": "⟦Őřɠȧñïẑė ŧħė ṗůřṗőşė, ŧȧřɠėŧ řėȧḓėřş, ȧñḓ řėɋůïřėḓ ḓėŀïṽėřȧƀŀėş őƒ {project}. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "bootstrap_doc_source": {
+        "en": "Collect the available documents, requirements, and references.",
+        "ja": "利用可能な資料、要件、参照元を集める。",
+        "qps-ploc": "⟦Ƈőŀŀėƈŧ ŧħė ȧṽȧïŀȧƀŀė ḓőƈůɱėñŧş, řėɋůïřėɱėñŧş, ȧñḓ řėƒėřėñƈėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "bootstrap_doc_draft": {
+        "en": "Generate the first draft of the main deliverables.",
+        "ja": "主要な成果物の初版を生成する。",
+        "qps-ploc": "⟦Ɠėñėřȧŧė ŧħė ƒïřşŧ ḓřȧƒŧ őƒ ŧħė ɱȧïñ ḓėŀïṽėřȧƀŀėş. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "bootstrap_generic_frame": {
+        "en": "Organize the purpose and success criteria of {project}.",
+        "ja": "{project} の目的と成功条件を整理する。",
+        "qps-ploc": "⟦Őřɠȧñïẑė ŧħė ṗůřṗőşė ȧñḓ şůƈƈėşş ƈřïŧėřïȧ őƒ {project}. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "bootstrap_generic_plan": {
+        "en": "Carve out the first durable work and decide how to proceed.",
+        "ja": "最初の durable work を切り出し、進め方を決める。",
+        "qps-ploc": "⟦Ƈȧřṽė őůŧ ŧħė ƒïřşŧ ḓůřȧƀŀė ẇőřķ ȧñḓ ḓėƈïḓė ħőẇ ŧő ṗřőƈėėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      }
+    },
+    "automation": {
+      "cron_field_minute": {
+        "en": "minute",
+        "ja": "分",
+        "qps-ploc": "⟦ɱïñůŧė ŀőř⟧"
+      },
+      "cron_field_hour": {
+        "en": "hour",
+        "ja": "時",
+        "qps-ploc": "⟦ħőůř ŀőř⟧"
+      },
+      "cron_field_day_of_month": {
+        "en": "day of month",
+        "ja": "日",
+        "qps-ploc": "⟦ḓȧẏ őƒ ɱőñŧħ ŀőř⟧"
+      },
+      "cron_field_month": {
+        "en": "month",
+        "ja": "月",
+        "qps-ploc": "⟦ɱőñŧħ ŀőř⟧"
+      },
+      "cron_field_day_of_week": {
+        "en": "day of week",
+        "ja": "曜日",
+        "qps-ploc": "⟦ḓȧẏ őƒ ẇėėķ ŀőř⟧"
+      },
+      "cron_field_prompt": {
+        "en": "Specify the {field}",
+        "ja": "{field}を指定してください",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė {field} ŀőřėɱ ⟧"
+      },
+      "slot_delivery_label": {
+        "en": "Delivery channel",
+        "ja": "配信先 channel",
+        "qps-ploc": "⟦Ḓėŀïṽėřẏ ƈħȧññėŀ ŀőřėɱ⟧"
+      },
+      "slot_delivery_prompt": {
+        "en": "Specify the channel to deliver the result to",
+        "ja": "結果を届ける channel を指定してください",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė ƈħȧññėŀ ŧő ḓėŀïṽėř ŧħė řėşůŀŧ ŧő ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "question_intro": {
+        "en": "Specify the run conditions for {name}.",
+        "ja": "{name} の実行条件を指定してください。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė řůñ ƈőñḓïŧïőñş ƒőř {name}. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "slash_description": {
+        "en": "Register the schedule of {name} from slot input.",
+        "ja": "{name} の schedule を slot 入力から登録します。",
+        "qps-ploc": "⟦Řėɠïşŧėř ŧħė şƈħėḓůŀė őƒ {name} ƒřőɱ şŀőŧ ïñṗůŧ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "slack_modal_submit": {
+        "en": "Register",
+        "ja": "登録",
+        "qps-ploc": "⟦Řėɠïşŧėř ŀőř⟧"
+      },
+      "slack_modal_cancel": {
+        "en": "Cancel",
+        "ja": "キャンセル",
+        "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
+      },
+      "slack_modal_intro": {
+        "en": "Specify the run conditions for *{name}*.",
+        "ja": "*{name}* の実行条件を指定してください。",
+        "qps-ploc": "⟦Şṗėƈïƒẏ ŧħė řůñ ƈőñḓïŧïőñş ƒőř *{name}*. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      }
+    },
+    "deal_ops": {
+      "learning_outcome_won": {
+        "en": "won and delivered",
+        "ja": "受注・納品まで完了",
+        "qps-ploc": "⟦ẇőñ ȧñḓ ḓėŀïṽėřėḓ ŀőřėɱ⟧"
+      },
+      "learning_outcome_lost": {
+        "en": "lost",
+        "ja": "失注",
+        "qps-ploc": "⟦ŀőşŧ ŀőř⟧"
+      },
+      "learning_headline": {
+        "en": "Learning candidate from deal {dealId} ({outcome}): {summary}",
+        "ja": "商談 {dealId}({outcome})の学び候補: {summary}",
+        "qps-ploc": "⟦Ŀėȧřñïñɠ ƈȧñḓïḓȧŧė ƒřőɱ ḓėȧŀ {dealId} ({outcome}): {summary} ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "learning_agreed_amount": {
+        "en": "Agreed amount {value} {currency}",
+        "ja": "合意金額 {value} {currency}",
+        "qps-ploc": "⟦Ȧɠřėėḓ ȧɱőůñŧ {value} {currency} ŀőřėɱ ïṗşů⟧"
+      },
+      "learning_recent_notes": {
+        "en": "Recent exchanges: {notes}",
+        "ja": "直近のやりとり: {notes}",
+        "qps-ploc": "⟦Řėƈėñŧ ėẋƈħȧñɠėş: {notes} ŀőřėɱ ïṗ⟧"
+      },
+      "customer_question_title": {
+        "en": "Customer question ({tenant} / {dealId})",
+        "ja": "顧客からの確認事項 ({tenant} / {dealId})",
+        "qps-ploc": "⟦Ƈůşŧőɱėř ɋůėşŧïőñ ({tenant} / {dealId}) ŀőřėɱ ïṗşůɱ ḓ⟧"
+      }
+    },
+    "browser_conversation": {
+      "control_resumed": {
+        "en": "Resuming browser control.",
+        "ja": "ブラウザ操作を再開します。",
+        "qps-ploc": "⟦Řėşůɱïñɠ ƀřőẇşėř ƈőñŧřőŀ. ŀőřėɱ ïṗ⟧"
+      },
+      "control_paused": {
+        "en": "Browser control is paused for now.",
+        "ja": "ブラウザ操作をいったん停止しました。",
+        "qps-ploc": "⟦Ƀřőẇşėř ƈőñŧřőŀ ïş ṗȧůşėḓ ƒőř ñőẇ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "candidates_found": {
+        "en": "Found {count} candidates. Checking the target.",
+        "ja": "候補が {count} 件あります。対象を確認します。",
+        "qps-ploc": "⟦Ƒőůñḓ {count} ƈȧñḓïḓȧŧėş. Ƈħėƈķïñɠ ŧħė ŧȧřɠėŧ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "target_proceeding": {
+        "en": "Proceeding with \"{label}\" as the target.",
+        "ja": "「{label}」を対象として操作を進めます。",
+        "qps-ploc": "⟦Ṗřőƈėėḓïñɠ ẇïŧħ \"{label}\" ȧş ŧħė ŧȧřɠėŧ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "task_preparing": {
+        "en": "Getting ready for browser control.",
+        "ja": "ブラウザ操作の準備を始めます。",
+        "qps-ploc": "⟦Ɠėŧŧïñɠ řėȧḓẏ ƒőř ƀřőẇşėř ƈőñŧřőŀ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "step_proceeding": {
+        "en": "Checking the target and proceeding.",
+        "ja": "対象を確認して操作を進めます。",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ŧħė ŧȧřɠėŧ ȧñḓ ṗřőƈėėḓïñɠ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "input_unresolved": {
+        "en": "Could not work out the value to enter from the conversation.",
+        "ja": "入力する値が会話から解決できませんでした。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ẇőřķ őůŧ ŧħė ṽȧŀůė ŧő ėñŧėř ƒřőɱ ŧħė ƈőñṽėřşȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "action_unsupported": {
+        "en": "This kind of action is not yet wired to automatic execution.",
+        "ja": "この操作種別はまだ自動実行に接続されていません。",
+        "qps-ploc": "⟦Ŧħïş ķïñḓ őƒ ȧƈŧïőñ ïş ñőŧ ẏėŧ ẇïřėḓ ŧő ȧůŧőɱȧŧïƈ ėẋėƈůŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "action_done": {
+        "en": "Operated \"{label}\".",
+        "ja": "「{label}」を操作しました。",
+        "qps-ploc": "⟦Őṗėřȧŧėḓ \"{label}\". ŀőřėɱ ⟧"
+      },
+      "action_failed": {
+        "en": "Browser control failed: {error}",
+        "ja": "ブラウザ操作に失敗しました: {error}",
+        "qps-ploc": "⟦Ƀřőẇşėř ƈőñŧřőŀ ƒȧïŀėḓ: {error} ŀőřėɱ ïṗşů⟧"
+      },
+      "candidates_ask": {
+        "en": "There are {count} candidates. Specify one by number or say \"that one\".",
+        "ja": "候補は {count} 件あります。番号か「それ」で指定してください。",
+        "qps-ploc": "⟦Ŧħėřė ȧřė {count} ƈȧñḓïḓȧŧėş. Şṗėƈïƒẏ őñė ƀẏ ñůɱƀėř őř şȧẏ \"ŧħȧŧ őñė\". ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "candidate_selected": {
+        "en": "Selected candidate {index}.",
+        "ja": "候補 {index} を選択しました。",
+        "qps-ploc": "⟦Şėŀėƈŧėḓ ƈȧñḓïḓȧŧė {index}. ŀőřėɱ ïṗ⟧"
+      }
+    },
+    "ceo_summary": {
+      "approval_title_fallback": {
+        "en": "Approval request",
+        "ja": "承認のご依頼",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řėɋůėşŧ ŀőřėɱ⟧"
+      },
+      "exception_title_fallback": {
+        "en": "Event needing attention",
+        "ja": "要確認の事象",
+        "qps-ploc": "⟦Ėṽėñŧ ñėėḓïñɠ ȧŧŧėñŧïőñ ŀőřėɱ ï⟧"
       }
     }
   }

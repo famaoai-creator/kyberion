@@ -488,12 +488,12 @@
     },
     {
       "id": "i18n",
-      "scope": "full",
+      "scope": "pr",
       "executable": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_i18n_hardcoding.ts"],
       "baseline": "knowledge/product/governance/i18n-baseline.json",
       "owner": "experience",
-      "rationale": "Checks internationalization hardcoding ratchets."
+      "rationale": "Checks internationalization hardcoding ratchets: Japanese literals, Japanese intent regexes, ad-hoc locale comparisons and tags, and raw colour literals in artifact engines."
     },
     {
       "id": "intent-domain-coverage",
