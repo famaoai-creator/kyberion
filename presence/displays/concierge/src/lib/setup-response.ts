@@ -2,6 +2,13 @@ const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const DIAGNOSTIC_STATUSES = new Set(['ok', 'incomplete', 'error']);
 
 export type SetupService = { id: string; label: string; auth: string; configured: boolean };
+export type SetupConnection = {
+  binding_id: string;
+  service_id: string;
+  owner_kind: 'person' | 'organization' | 'operator';
+  owner_ref?: string;
+  group: 'mine' | 'organization';
+};
 export type SetupDiagnostic = {
   id: string;
   status: 'ok' | 'incomplete' | 'error';
@@ -39,6 +46,8 @@ export type Setup = {
     }>;
   };
   service_catalog: SetupService[];
+  /** The connections the viewer may see, by owner. Older payloads omit it. */
+  connections?: SetupConnection[];
   diagnostics: SetupDiagnostic[];
   capabilities: Array<{ id: string; label: string; status: string; href?: string }>;
   tenant: {
@@ -195,6 +204,19 @@ function parseSetup(value: unknown): Setup | undefined {
         !stringField(entry, 'auth') ||
         typeof entry.configured !== 'boolean'
     ) ||
+    (value.connections !== undefined &&
+      (!Array.isArray(value.connections) ||
+        value.connections.some(
+          (entry) =>
+            !isRecord(entry) ||
+            !stringField(entry, 'binding_id') ||
+            !stringField(entry, 'service_id') ||
+            (entry.owner_kind !== 'person' &&
+              entry.owner_kind !== 'organization' &&
+              entry.owner_kind !== 'operator') ||
+            (entry.group !== 'mine' && entry.group !== 'organization') ||
+            !optionalString(entry, 'owner_ref')
+        ))) ||
     !Array.isArray(value.diagnostics) ||
     value.diagnostics.some(
       (entry) =>

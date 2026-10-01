@@ -114,22 +114,30 @@ const RATE_WINDOW_MS = 60_000;
 const RATE_LIMIT_PER_CLIENT = 120;
 /** Whole-surface ceiling: a rotating caller-supplied key cannot exceed it. */
 const RATE_LIMIT_PER_SURFACE = 600;
-const RATE_MAX_TRACKED_KEYS = 5_000;
+const DEFAULT_RATE_MAX_TRACKED_KEYS = 5_000;
+let rateMaxTrackedKeys = DEFAULT_RATE_MAX_TRACKED_KEYS;
 const rateBuckets = new Map<string, { windowStart: number; count: number }>();
 
-export function resetSurfaceAuthRateLimitForTests(): void {
+export function resetSurfaceAuthRateLimitForTests(maxTrackedKeys?: number): void {
   rateBuckets.clear();
+  rateMaxTrackedKeys = maxTrackedKeys ?? DEFAULT_RATE_MAX_TRACKED_KEYS;
 }
 
 function takeRateToken(key: string, limit: number, now: number): boolean {
   const bucket = rateBuckets.get(key);
+  if (bucket && now - bucket.windowStart < RATE_WINDOW_MS) {
+    // Re-insert so Map order tracks recency: eviction below drops the least
+    // recently used bucket, never a hot attacker's.
+    rateBuckets.delete(key);
+    rateBuckets.set(key, bucket);
+  }
   if (!bucket || now - bucket.windowStart >= RATE_WINDOW_MS) {
-    if (rateBuckets.size >= RATE_MAX_TRACKED_KEYS) {
+    if (rateBuckets.size >= rateMaxTrackedKeys) {
       // Bound memory under key-rotation abuse: drop expired buckets, then the oldest.
       for (const [k, v] of rateBuckets) {
         if (now - v.windowStart >= RATE_WINDOW_MS) rateBuckets.delete(k);
       }
-      if (rateBuckets.size >= RATE_MAX_TRACKED_KEYS) {
+      if (rateBuckets.size >= rateMaxTrackedKeys) {
         const oldest = rateBuckets.keys().next().value;
         if (oldest !== undefined) rateBuckets.delete(oldest);
       }
@@ -314,7 +322,7 @@ export async function handleSurfaceAuthRoute(
       // An <img> or link on another origin (or a sibling subdomain) must not be
       // able to sign the user out.
       if (isForeignLogout(req, [req.requestOrigin, ...(publicOrigin ? [publicOrigin] : [])])) {
-        return redirect(loginHrefFor(req));
+        return html(req, 403, { kind: 'failed', code: 'logout_blocked' });
       }
       return redirect(`${SURFACE_LOGIN_PATH}?signedout=1`, [
         serializeClearedCookie(SURFACE_SESSION_COOKIE, secure),
