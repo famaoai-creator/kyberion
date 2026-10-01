@@ -385,6 +385,56 @@ describe('ios-actuator', () => {
       });
     });
 
+    describe('uninstall_app', () => {
+      it('uninstalls the bundle from the selected simulator', async () => {
+        const { safeExec } = await import('@agent/core/secure-io');
+        vi.mocked(safeExec)
+          .mockReturnValueOnce('xcrun version 64.\n') // xcrun --version
+          .mockReturnValueOnce(MOCK_DEVICES_JSON) // xcrun simctl list devices --json
+          .mockReturnValueOnce(''); // xcrun simctl uninstall
+
+        const result = await handleAction({
+          action: 'pipeline',
+          steps: [
+            {
+              type: 'apply',
+              op: 'uninstall_app',
+              params: { device_udid: 'TEST-UDID-1234', bundle_id: 'com.example.demo' },
+            },
+          ],
+        });
+
+        expect(result.status).toBe('succeeded');
+        expect(result.context.ios_bundle_id).toBe('com.example.demo');
+        const uninstall = vi
+          .mocked(safeExec)
+          .mock.calls.find((call) => (call[1] as string[]).includes('uninstall'));
+        expect(uninstall?.[1]).toEqual([
+          'simctl',
+          'uninstall',
+          'TEST-UDID-1234',
+          'com.example.demo',
+        ]);
+      });
+
+      it('fails without a bundle id', async () => {
+        const { safeExec } = await import('@agent/core/secure-io');
+        vi.mocked(safeExec)
+          .mockReturnValueOnce('xcrun version 64.\n')
+          .mockReturnValueOnce(MOCK_DEVICES_JSON);
+
+        const result = await handleAction({
+          action: 'pipeline',
+          steps: [
+            { type: 'apply', op: 'uninstall_app', params: { device_udid: 'TEST-UDID-1234' } },
+          ],
+        });
+
+        expect(result.status).toBe('failed');
+        expect(result.results[0].error).toContain('uninstall_app requires params.bundle_id');
+      });
+    });
+
     describe('log', () => {
       it('logオペレーターはメッセージをログに記録する', async () => {
         const { logger } = await import('@agent/core/core');

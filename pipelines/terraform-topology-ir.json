@@ -1,0 +1,29 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "terraform-topology-ir",
+  "version": "1.0.0",
+  "name": "Terraform To Topology IR",
+  "description": "Parse a Terraform directory into a topology IR (resources and relationships) and write it as JSON for diagramming or review.",
+  "labels": ["modeling", "terraform"],
+  "context": {
+    "terraform_dir": ".",
+    "title": "terraform-topology",
+    "output_path": "active/shared/tmp/modeling/topology-ir.json"
+  },
+  "steps": [
+    {
+      "id": "build_topology_ir",
+      "role": "transform",
+      "op": "modeling:terraform_to_topology_ir",
+      "produces": { "channel": "topology_ir", "type": "TopologyIR" },
+      "params": { "dir": "{{terraform_dir}}", "title": "{{title}}", "export_as": "topology_ir" }
+    },
+    {
+      "id": "write_topology_ir",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "topology_ir",
+      "params": { "path": "{{output_path}}", "content": "{{topology_ir}}" }
+    }
+  ]
+}

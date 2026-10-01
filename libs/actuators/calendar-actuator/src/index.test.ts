@@ -8,7 +8,7 @@
  * Set NODE_ENV=test (default in vitest) so the module does not auto-run main().
  */
 import { describe, it, expect, vi } from 'vitest';
-import { handleAction } from './index.js';
+import { actuator, handleAction } from './index.js';
 import { CalendarBackendRegistry, type CalendarBackendAdapter } from './calendar-backend.js';
 
 describe('calendar-actuator: input validation', () => {
@@ -202,5 +202,17 @@ describe('calendar-actuator: JXA injection safety', () => {
   it('preserves null and array values', () => {
     const obj = { calendar_names: ['Personal', 'Work'], filter: null };
     expect(roundTrip(obj)).toEqual(obj);
+  });
+});
+
+describe('calendar-actuator SDK dispatch (pipeline / ADF path)', () => {
+  it('reaches the calendar handler with { op, params }', async () => {
+    const result = await actuator.dispatch('create_event', {
+      calendar_targets: [{ backend: 'sdk-dispatch-unknown', calendar_id: 'x' }],
+      title: 'SDK dispatch probe',
+      start_date: '2026-10-02T10:00:00Z',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('unsupported backend "sdk-dispatch-unknown"');
   });
 });

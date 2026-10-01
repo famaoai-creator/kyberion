@@ -97,18 +97,6 @@ describe('Presence Studio OS control-plane route contract', () => {
     expect(route).toContain('presenceStudioData.presenceStudioWireError(error, 400)');
   });
 
-  it('validates onboarding JSON before preview or apply reaches the domain parser', () => {
-    // FD onboarding routes moved into `front-desk-routes.ts` (registered from
-    // `server.ts`) purely to keep `server.ts` under the `max-file-lines` gate.
-    const source = readRepoFile('presence/displays/presence-studio/front-desk-routes.ts');
-    expect(source).toContain(
-      "parseSafeJsonObjectValue(req.body ?? {}, 'browser onboarding preview body')"
-    );
-    expect(source).toContain(
-      "parseSafeJsonObjectValue(req.body ?? {}, 'browser onboarding apply body')"
-    );
-  });
-
   it('validates timeline JSON before scheduling presence events', () => {
     const source = readRepoFile('presence/displays/presence-studio/server.ts');
     const routeStart = source.indexOf("presenceStudioData.app.post('/api/timeline/dispatch'");

@@ -6,13 +6,7 @@
  */
 
 export type GateStatus =
-  | 'draft'
-  | 'open'
-  | 'reviewing'
-  | 'approved'
-  | 'blocked'
-  | 'waived'
-  | 'closed';
+  'draft' | 'open' | 'reviewing' | 'approved' | 'blocked' | 'waived' | 'closed';
 
 const ALLOWED_TRANSITIONS: Record<GateStatus, readonly GateStatus[]> = {
   draft: ['open'],

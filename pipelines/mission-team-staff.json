@@ -1,0 +1,25 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "mission-team-staff",
+  "version": "1.0.0",
+  "name": "Mission Team Staffing",
+  "description": "Ensure a mission's team runtimes are staffed through the agent-runtime supervisor and return the runtime plan (synchronous; waits for the supervisor).",
+  "labels": ["agent", "mission"],
+  "context": { "mission_id": "MSN-EXAMPLE" },
+  "steps": [
+    {
+      "id": "staff",
+      "role": "source",
+      "op": "agent:staff_mission",
+      "produces": { "channel": "staff_result", "type": "MissionStaffingResult" },
+      "params": { "missionId": "{{mission_id}}" }
+    },
+    {
+      "id": "log_staff",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "staff_result",
+      "params": { "message": "Mission {{mission_id}} staffed: {{staff_result}}" }
+    }
+  ]
+}

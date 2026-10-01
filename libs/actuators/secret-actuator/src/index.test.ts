@@ -192,6 +192,22 @@ describe('secret-actuator: governed mutation', () => {
     expect(mocks.fetchSecret).toHaveBeenCalledWith('slack', 'test_user');
   });
 
+  it('serves get through SDK dispatch (pipeline / ADF path)', async () => {
+    mocks.fetchSecret.mockResolvedValue('sdk-secret-value');
+
+    const { actuator } = await import('./index.js');
+    const result = await actuator.dispatch('get', {
+      account: 'test_user',
+      service: 'slack',
+      export_as: 'slack_token',
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      output: { status: 'success', slack_token: 'sdk-secret-value' },
+    });
+  });
+
   it('get action returns failed when secret not found', async () => {
     mocks.fetchSecret.mockResolvedValue(null);
 

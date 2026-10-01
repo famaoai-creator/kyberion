@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/i18n-baseline.schema.json",
   "version": 1,
-  "generated_at": "2026-10-01T05:37:17.171Z",
+  "generated_at": "2026-10-01T06:24:18.393Z",
   "scan_roots": [
     "libs/core",
     "libs/shared-ui",
@@ -68,7 +68,6 @@
       "libs/core/surface/surface-query-helpers.ts": 1,
       "libs/core/surface/surface-query.ts": 4,
       "libs/core/surface/surface-runtime-conversation-data.ts": 2,
-      "libs/core/task/task-distill-candidate.ts": 2,
       "libs/core/task/task-session.ts": 3,
       "libs/core/virtual/virtual-device-inventory-bridge.ts": 1,
       "libs/actuators/browser-actuator/src/browser-pipeline-helpers.ts": 1,
@@ -82,7 +81,6 @@
     "locale_compare": {
       "libs/core/apple-intelligence-bridge.ts": 1,
       "libs/core/question-resolver.ts": 1,
-      "libs/core/surface/operator-learning.ts": 1,
       "libs/core/surface/surface-auth-routes.ts": 2,
       "libs/core/surface/surface-login-pages.ts": 2,
       "scripts/capture_surface_screenshots.ts": 2,
