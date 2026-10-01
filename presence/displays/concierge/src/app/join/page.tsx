@@ -6,7 +6,7 @@ import { frontDeskText, type FrontDeskMessageKey } from '../../lib/i18n';
 import { codeFromSearch, inviteErrorKind, type InviteErrorKind } from '../../lib/invite-view';
 
 /**
- * 参加オンボーディング: the page behind an invite link. It shows what the code
+ * Join onboarding: the page behind an invite link. It shows what the code
  * grants (organization, role, what that role can see), then joins — as the
  * identity the server verified, never one typed here. A brand-new person gives
  * only a display name. Everything else (who may invite, single use, expiry)
