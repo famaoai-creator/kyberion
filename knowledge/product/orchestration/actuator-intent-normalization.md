@@ -3,7 +3,7 @@
 曖昧な依頼をそのまま actuator 実行へ落とさず、まず `guided-coordination-brief` に正規化するための考え方です。
 この shared brief は booking や presentation だけでなく、全ての repeated coordination intent の最初の共通層として扱います。
 
-The shared coordination flow is documented in [guided-coordination-protocol.md](knowledge/product/orchestration/guided-coordination-protocol.md).
+The shared coordination flow is documented in [guided-coordination-protocol.md](guided-coordination-protocol.md).
 
 ## Core Rule
 
@@ -75,22 +75,22 @@ This packet is the human-facing surface of the shared coordination protocol.
 
 The following media intents are normalized through the same shared brief flow, then routed to intent-scoped execution profiles:
 
-| Intent | Execution Profile | Capability Bundle | Primary Procedure |
-|---|---|---|---|
-| `generate-video` | `media-generate-video-default` | `video-generation-governed` | [`generate-video-from-adf.md`](knowledge/public/procedures/media/generate-video-from-adf.md) |
-| `transcribe-audio` | `audio-transcribe-default` | `audio-transcription-governed` | [`transcribe-audio-from-asset.md`](knowledge/public/procedures/media/transcribe-audio-from-asset.md) |
-| `live-voice` | `voice-live-conversation-default` | `realtime-voice-governed` | [`realtime-voice-conversation.md`](knowledge/public/procedures/media/realtime-voice-conversation.md) |
+| Intent             | Execution Profile                 | Capability Bundle              | Primary Procedure                                                                                |
+| ------------------ | --------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `generate-video`   | `media-generate-video-default`    | `video-generation-governed`    | [`generate-video-from-adf.md`](../../public/procedures/media/generate-video-from-adf.md)         |
+| `transcribe-audio` | `audio-transcribe-default`        | `audio-transcription-governed` | [`transcribe-audio-from-asset.md`](../../public/procedures/media/transcribe-audio-from-asset.md) |
+| `live-voice`       | `voice-live-conversation-default` | `realtime-voice-governed`      | [`realtime-voice-conversation.md`](../../public/procedures/media/realtime-voice-conversation.md) |
 
 ## Document Review Routing
 
 Document review requests also begin with the shared coordination brief, but they immediately split by source type and review purpose.
 
-| Source kind | Normalized path | Primary review intent | Typical lens |
-|---|---|---|---|
-| `pdf` / `docx` / `pptx` / `xlsx` | document digest → markdown | `contract-review` | legal, ops, red-team |
-| `txt` / `md` | direct text normalization | `review-text` | content, approval, role fit |
-| `html` / URL | browser capture → text extraction | web copy review flow | content, CTA, display risk |
-| approval-critical request | review decision gate | `active-learning-escalate` when needed | authority, tenant, approval chain |
+| Source kind                      | Normalized path                   | Primary review intent                  | Typical lens                      |
+| -------------------------------- | --------------------------------- | -------------------------------------- | --------------------------------- |
+| `pdf` / `docx` / `pptx` / `xlsx` | document digest → markdown        | `contract-review`                      | legal, ops, red-team              |
+| `txt` / `md`                     | direct text normalization         | `review-text`                          | content, approval, role fit       |
+| `html` / URL                     | browser capture → text extraction | web copy review flow                   | content, CTA, display risk        |
+| approval-critical request        | review decision gate              | `active-learning-escalate` when needed | authority, tenant, approval chain |
 
 The important rule is:
 

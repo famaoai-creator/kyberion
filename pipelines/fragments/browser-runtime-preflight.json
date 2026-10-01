@@ -10,7 +10,7 @@
       "params": {
         "fragment": "fragments/runtime-preflight.json",
         "context": {
-          "preflight_cmd": "pnpm doctor --runtime browser"
+          "preflight_cmd": "pnpm kyberion doctor --runtime browser"
         }
       }
     }

@@ -2,6 +2,8 @@
 
 **Just want to run something?** → Run the five commands in [§2 First Win Smoke](#2-first-win-smoke). This is the canonical first-win command order. The broader documentation source map is [`documentation-source-map.json`](./documentation-source-map.json).
 
+New to the vocabulary? Read [CORE_CONCEPTS](./CORE_CONCEPTS.md) first — the 5 concepts you need (Mission, Pipeline, Actuator, Tenant/Tier, Surface).
+
 ---
 
 Kyberion should be approached as a request-driven system.
@@ -42,11 +44,11 @@ The canonical first-win command sequence is deliberately short:
 pnpm install
 pnpm build
 pnpm env:bootstrap --manifest kyberion-toolchain
-pnpm doctor
+pnpm kyberion doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
 
-`env:bootstrap` verifies the Node 24+ floor and warns if Playwright browsers are missing. After `pnpm build`, the `pnpm doctor` line runs the repo script. Bare `pnpm doctor` without a prior `pnpm run` / build context is pnpm's own diagnostic — use `pnpm run doctor` when you mean Kyberion.
+`env:bootstrap` verifies the Node 24+ floor and warns if Playwright browsers are missing. Use `pnpm kyberion doctor` for the readiness check: bare `pnpm doctor` is pnpm's own built-in diagnostic and does not run Kyberion's checks.
 
 ### Day-2 setup: AI company, tenant activation (optional)
 
@@ -104,7 +106,7 @@ If you only want the shortest path to a visible result, start here.
 
 The first-win path is intentionally staged:
 
-- 30 seconds: `pnpm doctor` shows whether the local runtime is ready and what value boundary is currently blocked
+- 30 seconds: `pnpm kyberion doctor` shows whether the local runtime is ready and what value boundary is currently blocked
 - 60 seconds: `pnpm kyberion setup report --persona first-time-user` tells you which surface to use next and whether auth/setup is still blocking it
 - 5 minutes: `pnpm pipeline --input pipelines/verify-session.json` writes `active/shared/tmp/first-win-session.png`
 - optional voice path: `pnpm pipeline --input pipelines/voice-hello.json`
@@ -112,7 +114,7 @@ The first-win path is intentionally staged:
 - 15 minutes: skim sections 4-10, then open `pipelines/verify-session.json`, `CAPABILITIES_GUIDE.md`, and `docs/developer/EXTENSION_POINTS.md` to understand the structure
 
 ```bash
-pnpm doctor
+pnpm kyberion doctor
 pnpm kyberion setup report --persona first-time-user
 pnpm pipeline --input pipelines/verify-session.json
 ```
@@ -333,7 +335,7 @@ When you need to operate internals directly:
 ### Health and discovery
 
 ```bash
-pnpm doctor
+pnpm kyberion doctor
 pnpm capabilities
 pnpm run kyberion -- list
 pnpm run kyberion -- search browser

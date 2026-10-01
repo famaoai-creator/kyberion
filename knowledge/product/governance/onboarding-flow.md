@@ -98,11 +98,11 @@ pnpm install
 pnpm build
 pnpm env:bootstrap --manifest kyberion-toolchain
 pnpm exec playwright install chromium   # 任意。ブラウザ系 first-win を使う場合
-pnpm doctor
+pnpm kyberion doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
 
-`pnpm doctor` と verify-session の first-win は [QUICKSTART](../../../docs/QUICKSTART.md) が正本である。
+`pnpm kyberion doctor` と verify-session の first-win は [QUICKSTART](../../../docs/QUICKSTART.md) が正本である。
 
 ### Step 2: readiness を確認する（A）
 
@@ -397,7 +397,7 @@ identity をやり直す場合は `pnpm onboard reset` を使い、生成物を�
 
 全ルート共通:
 
-- `pnpm env:bootstrap` と `pnpm doctor` が成功している
+- `pnpm env:bootstrap` と `pnpm kyberion doctor` が成功している
 - アクティブな profile に identity と onboarding summary が保存されている
 - `pnpm pipeline vital-check` が成功し、baseline-check が `all_clear` である
 
