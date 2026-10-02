@@ -130,6 +130,18 @@ describe('check_orphans (OW-07)', () => {
     expect(report.documented_only).toEqual(['pipelines/documented.json']);
   });
 
+  it('does not count a ratchet inventory listing as a pipeline caller', () => {
+    const report = findOrphans(
+      snapshot({
+        'pipelines/listed.json': JSON.stringify({ pipeline_id: 'listed' }),
+        'knowledge/product/governance/shared-tmp-allowlist.json': JSON.stringify({
+          pipeline_literals: [{ file: 'pipelines/listed.json', count: 1 }],
+        }),
+      })
+    );
+    expect(report.pipelines).toEqual(['pipelines/listed.json']);
+  });
+
   it('counts a disabled (opt-in) schedule as wired', () => {
     const report = findOrphans(
       snapshot({
