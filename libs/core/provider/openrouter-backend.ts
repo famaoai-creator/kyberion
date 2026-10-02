@@ -23,6 +23,9 @@ import {
 } from './openrouter-model-policy.js';
 import type {
   ReasoningBackend,
+  ReasoningCallOptions,
+  GenerateWithToolsResult,
+  ToolDefinition,
   DivergeHypothesisInput,
   HypothesisSketch,
   CritiqueInput,
@@ -359,8 +362,17 @@ export class OpenRouterBackend implements ReasoningBackend {
 
   private async fetchChatCompletion(
     messages: ChatMessage[],
-    opts: { useTools?: boolean } = {}
+    opts: {
+      useTools?: boolean;
+      toolDefinitions?: readonly ToolDefinition[];
+      signal?: AbortSignal;
+    } = {}
   ): Promise<ChatCompletionResponse> {
+    if (opts.signal?.aborted) {
+      throw opts.signal.reason instanceof Error
+        ? opts.signal.reason
+        : new Error('[DELEGATION_CANCELLED] local reasoning operation aborted');
+    }
     assertReasoningEgressAllowedAtEndpoint(this.name, this.baseURL);
     const headers: Record<string, string> = {
       'content-type': 'application/json',
@@ -372,8 +384,20 @@ export class OpenRouterBackend implements ReasoningBackend {
     const body: ChatCompletionRequest = {
       model: this.model,
       messages: redactSensitiveObject(messages),
-      ...((opts.useTools ?? this.toolsEnabled) && this.allowedTools.size > 0
-        ? { tools: createToolDefinitions(this.allowedTools), tool_choice: 'auto' }
+      ...((opts.useTools ?? this.toolsEnabled)
+        ? {
+            tools: opts.toolDefinitions
+              ? opts.toolDefinitions.map((tool) => ({
+                  type: 'function' as const,
+                  function: {
+                    name: tool.name,
+                    description: tool.description,
+                    parameters: tool.inputSchema,
+                  },
+                }))
+              : createToolDefinitions(this.allowedTools),
+            tool_choice: 'auto' as const,
+          }
         : {}),
     };
 
@@ -381,7 +405,7 @@ export class OpenRouterBackend implements ReasoningBackend {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-      signal: buildAbortSignal(this.timeoutMs),
+      signal: opts.signal ?? buildAbortSignal(this.timeoutMs),
     });
 
     const text = await response.text();
@@ -494,6 +518,49 @@ export class OpenRouterBackend implements ReasoningBackend {
     }
 
     return extractTextContent(message.content);
+  }
+
+  /** Return model tool calls to the governed runtime without executing them here. */
+  async generateWithTools(
+    prompt: string,
+    tools: ToolDefinition[],
+    options?: ReasoningCallOptions
+  ): Promise<GenerateWithToolsResult> {
+    if (tools.length === 0) return { text: await this.prompt(prompt) };
+    const response = await this.fetchChatCompletion(
+      [
+        {
+          role: 'system',
+          content:
+            'You are Kyberion. Use only the governed tools supplied for this turn. ' +
+            'Tool calls are returned to the runtime for policy-checked execution.',
+        },
+        { role: 'user', content: prompt },
+      ],
+      { useTools: true, toolDefinitions: tools, signal: options?.signal }
+    );
+    const message = response.choices[0].message;
+    const toolCalls = (message.tool_calls ?? []).map((call) => {
+      let input: unknown;
+      try {
+        input = parseSafeJsonInput(call.function.arguments, 'OpenRouter tool arguments');
+      } catch {
+        throw new Error(
+          `[OPENROUTER_TOOL_ARGUMENTS_INVALID] tool '${call.function.name}' arguments`
+        );
+      }
+      if (!input || typeof input !== 'object' || Array.isArray(input)) {
+        throw new Error(
+          `[OPENROUTER_TOOL_ARGUMENTS_INVALID] tool '${call.function.name}' arguments`
+        );
+      }
+      return { name: call.function.name, input: input as Record<string, unknown> };
+    });
+    const text = extractTextContent(message.content);
+    return {
+      ...(text ? { text } : {}),
+      ...(toolCalls.length > 0 ? { toolCalls } : {}),
+    };
   }
 
   /** Single toolless completion returning raw model text — used for structured reasoning. */
