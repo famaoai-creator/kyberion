@@ -13,6 +13,7 @@ import { resolveProjectScope, resolveProjectScopeId } from './foundation/project
 import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 import { createLogger } from './logger.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { storageFloorTier } from './storage-layout.js';
 import { assertSandboxWriteAllowed } from './shell/sandbox-policy.js';
 import { isAllowedVaultMountPath } from './secret/vault-mount.js';
 import { currentExecutionScope } from './foundation/execution-scope.js';
@@ -113,8 +114,14 @@ function isProtectedTierPath(relativePath: string): boolean {
     pathStartsWith(relativePath, 'active/organizations/confidential') ||
     pathStartsWith(relativePath, 'active/projects/personal') ||
     pathStartsWith(relativePath, 'active/missions/confidential') ||
-    pathStartsWith(relativePath, 'active/projects/confidential')
+    pathStartsWith(relativePath, 'active/projects/confidential') ||
+    isProtectedStorageFloorTier(storageFloorTier(relativePath))
   );
+}
+
+/** Personal/confidential partitions of the shared storage floors (storage-layout.ts). */
+function isProtectedStorageFloorTier(tier: TierLevel | undefined): boolean {
+  return tier === 'personal' || tier === 'confidential';
 }
 
 const CORRUPT_POLICY_DENIAL = {
@@ -731,6 +738,8 @@ export function detectTier(filePath: string): TierLevel {
     resolved.includes('/active/projects/personal/')
   )
     return 'personal';
+  const floorTier = storageFloorTier(resolved);
+  if (floorTier) return floorTier;
   if (
     resolved.includes('/knowledge/confidential/') ||
     resolved.includes('/active/organizations/confidential/') ||
@@ -765,10 +774,17 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
     /^active\/projects\/(personal|confidential|public)(?:\/|$)/
   )?.[1];
   const protectedProjectPath = projectTier === 'personal' || projectTier === 'confidential';
+  const floorTier = storageFloorTier(relativePath);
+  const protectedFloorPath = isProtectedStorageFloorTier(floorTier);
   const organizationTier = relativePath.match(
     /^active\/organizations\/(personal|confidential|public)(?:\/|$)/
   )?.[1];
-  if (!pathStartsWith(relativePath, 'knowledge') && !organizationStatePath && !protectedProjectPath)
+  if (
+    !pathStartsWith(relativePath, 'knowledge') &&
+    !organizationStatePath &&
+    !protectedProjectPath &&
+    !protectedFloorPath
+  )
     return { allowed: true };
   if (pathStartsWith(relativePath, 'knowledge/public')) return { allowed: true };
 
@@ -776,7 +792,8 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
     !pathStartsWith(relativePath, 'knowledge/personal') &&
     !pathStartsWith(relativePath, 'knowledge/confidential') &&
     !organizationStatePath &&
-    !protectedProjectPath
+    !protectedProjectPath &&
+    !protectedFloorPath
   ) {
     return { allowed: true };
   }
@@ -863,6 +880,12 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
     return { allowed: false, reason: policy.tier_restrictions.personal.block_message };
   }
   if (projectTier === 'confidential') {
+    return { allowed: false, reason: policy.tier_restrictions.confidential.block_message };
+  }
+  if (floorTier === 'personal') {
+    return { allowed: false, reason: policy.tier_restrictions.personal.block_message };
+  }
+  if (floorTier === 'confidential') {
     return { allowed: false, reason: policy.tier_restrictions.confidential.block_message };
   }
 

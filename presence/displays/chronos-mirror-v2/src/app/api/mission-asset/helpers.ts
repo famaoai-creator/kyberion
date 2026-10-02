@@ -1,5 +1,6 @@
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
 import { loadState } from '@agent/core/mission/mission-state';
+import { classifyStorageFloorPath } from '@agent/core/storage-layout';
 import { inferDeliverableTier } from '../../../lib/deliverable-inbox';
 
 export type AssetTier = 'personal' | 'confidential' | 'public';
@@ -11,8 +12,28 @@ function normalizeAssetPath(value: string | undefined): string | undefined {
   return normalized.startsWith(`${root}/`) ? normalized.slice(root.length + 1) : normalized;
 }
 
+/**
+ * Tier/tenant of a storage-layout artifact floor path: the system partition
+ * carries public, tenant-free data; tier partitions carry their own tier and
+ * tenant. Other floors (tmp/staging/cache) are never served as assets.
+ */
+function artifactFloorPartition(
+  normalized: string | undefined
+): { tier: AssetTier; tenant?: string } | undefined {
+  if (!normalized) return undefined;
+  const floor = classifyStorageFloorPath(normalized);
+  if (floor?.floor !== 'artifact') return undefined;
+  if (floor.partition.kind === 'system') return { tier: 'public' };
+  if (floor.partition.kind === 'tier') {
+    return { tier: floor.partition.tier, tenant: floor.partition.tenant };
+  }
+  return undefined;
+}
+
 function tierFromPath(value: string | undefined): AssetTier | undefined {
   const normalized = normalizeAssetPath(value);
+  const floorPartition = artifactFloorPartition(normalized);
+  if (floorPartition) return floorPartition.tier;
   const match = normalized?.match(
     /(?:^|\/)active\/(?:missions|projects)\/(personal|confidential|public)(?:\/|$)/
   );
@@ -21,6 +42,8 @@ function tierFromPath(value: string | undefined): AssetTier | undefined {
 
 export function tenantFromPath(value: string | undefined): string | undefined {
   const normalized = normalizeAssetPath(value);
+  const floorPartition = artifactFloorPartition(normalized);
+  if (floorPartition) return floorPartition.tenant;
   const match = normalized?.match(
     /^active\/(?:missions|projects)\/(?:personal|confidential|public)\/([^/]+)\//
   );

@@ -1,6 +1,6 @@
 {
   "$schema": "../schemas/storage-retention-catalog.schema.json",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Single source of truth for storage retention (AL-01/AL-04). Declares, per repo-relative directory, the artifact class, TTL, and expiry action enforced by libs/core/storage-janitor.ts. AL-04 extends the AL-01 seed to full coverage of active/shared/runtime/, active/shared/exports/ and active/archive/: every directory is either TTL-governed or declared action=review_required (no automatic deletion; surfaced in the janitor report for a human decision — never a silent forever-retention). Entries with audit=true leave a deletion audit record in active/shared/logs/audit/storage-retention.jsonl; entries with soft_delete_days move expired files to active/archive/.trash/<original-path> for that many further days before the trash sweep purges them. Directories not declared here are never deleted by the janitor; runtime/ subdirectories without an entry are surfaced in the janitor report as uncovered. EV-06 extends coverage beyond active/shared/runtime/ to the append-only event stores (active/shared/observability/, active/shared/coordination/orchestration/events/, presence/bridge/runtime/): these sat outside every janitor scan root, so they were neither TTL-governed nor surfaced as uncovered. scanEventStores enforces their TTLs and listUncoveredEventStoreDirs reports undeclared event streams. WI-10 declares the work-inventory personal/member knowledge subtrees (knowledge/personal/work-inventory, knowledge/personal/members) as never-auto-delete evidence. WI-16 adds an entry-level status_rules vocabulary — a generic, declarative per-file status+age expiry rule nested under a directory entry — and uses it on knowledge/personal/members to expire stale pending_review and discarded work-inventory observation summaries by their own JSON status/date fields (see storage-janitor.ts's sweepStatusRules) without touching confirmed summaries, consents, or unrelated member records.",
   "entries": [
     {
@@ -8,7 +8,27 @@
       "artifact_class": "tmp",
       "ttl_days": 1,
       "action": "delete",
-      "note": "Formerly DEFAULT_TMP_TTL_MS (24h). Shared scratch floor — anything here is consumable by contract."
+      "note": "Formerly DEFAULT_TMP_TTL_MS (24h). Shared scratch floor — anything here is consumable by contract. Partitioned as tmp/system/<domain>/ or tmp/<tier>/<tenant|shared>/<domain>/ (libs/core/storage-layout.ts); unpartitioned subtrees are legacy call sites ratcheted by shared-tmp-allowlist.json."
+    },
+    {
+      "path": "active/shared/staging",
+      "artifact_class": "tmp",
+      "ttl_days": 3,
+      "action": "delete",
+      "note": "Storage-layout staging floor: inbound external files copied in for perception / ingest (staging/<partition>/<domain>/<job>/). Consumed by ingest; a short grace beyond the tmp TTL covers multi-day review of an inbound batch."
+    },
+    {
+      "path": "active/shared/cache",
+      "artifact_class": "cache",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "Storage-layout cache floor: derived, re-generable data (digest-keyed sidecars, model/build trees, knowledge-index ki-*.json). Deletion only costs a rebuild; anything that cannot be rebuilt belongs in runtime/ state instead."
+    },
+    {
+      "path": "active/shared/artifacts",
+      "artifact_class": "report",
+      "action": "review_required",
+      "note": "Storage-layout artifact floor: system- and tenant-owned deliverables written by writeScopedArtifact (artifacts/system/<class>/, artifacts/<tier>/<tenant|shared>/<class>/). Deliverables are never silently expired; mission/project-owned artifacts live in their scope directories instead."
     },
     {
       "path": "active/shared/local-pads",

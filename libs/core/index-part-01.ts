@@ -231,6 +231,8 @@ export * from './scope-migration.js';
 
 export * from './physical-namespace.js';
 
+export * from './storage-layout.js';
+
 export * from './config-change.js';
 
 export * from './mcp-request-context.js';

@@ -1035,6 +1035,10 @@
       "types": "./dist/physical-namespace.d.ts",
       "default": "./dist/physical-namespace.js"
     },
+    "./storage-layout": {
+      "types": "./dist/storage-layout.d.ts",
+      "default": "./dist/storage-layout.js"
+    },
     "./scope-migration": {
       "types": "./dist/scope-migration.d.ts",
       "default": "./dist/scope-migration.js"
