@@ -180,12 +180,15 @@ export function validateMissionStartCreateInput(
   }
   if (project?.project_id) {
     const projectRecord = loadProjectRecord(project.project_id);
+    // relationships.project is the single source of project membership: it
+    // must name a managed project (create it with `pnpm project create`).
+    if (!projectRecord) {
+      throw new Error(
+        `[PROJECT_LINK_INVALID] ${actionName} ${missionId}: project not found: ${project.project_id}. ` +
+          'Create it with `pnpm project create` or fix --project-id.'
+      );
+    }
     if (track?.track_id) {
-      if (!projectRecord) {
-        throw new Error(
-          `${actionName} ${missionId}: project record not found for track scope validation: ${project.project_id}`
-        );
-      }
       const trackRecord = loadProjectTrackRecord(track.track_id);
       if (!trackRecord) {
         throw new Error(`${actionName} ${missionId}: project track not found: ${track.track_id}`);
@@ -211,6 +214,21 @@ export function validateMissionStartCreateInput(
         throw new Error(
           `${actionName} ${missionId}: mission tenant '${requestedTenant}' must match project tenant '${projectTenant}'.`
         );
+      }
+      // Inherit the project's scope so the mission state carries it (a
+      // --tenant-id alone was never persisted as tenant_slug).
+      if (projectRecord.tenant_slug && !input.tenantSlug) {
+        input.tenantSlug = projectRecord.tenant_slug;
+      }
+      const projectOrganization = projectRecord.organization_id;
+      if (projectOrganization) {
+        if (input.organizationId && input.organizationId !== projectOrganization) {
+          throw new Error(
+            `[PROJECT_LINK_INVALID] ${actionName} ${missionId}: organization '${input.organizationId}' ` +
+              `must match project organization '${projectOrganization}'.`
+          );
+        }
+        input.organizationId = projectOrganization;
       }
     }
   }
