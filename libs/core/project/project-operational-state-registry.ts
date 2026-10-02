@@ -11,7 +11,12 @@ import {
   safeStat,
   safeWriteFile,
 } from '../secure-io.js';
-import { saveProjectTrackState } from './project-operational-state-links.js';
+import {
+  projectOperationalTrackStatePath,
+  saveProjectTrackState,
+} from './project-operational-state-links.js';
+import { listProjectTracksForProject } from './project-track-registry.js';
+import { readJson } from '../foundation/json.js';
 import {
   ACTIVE_PROJECT_MISSION_STATUSES,
   deriveProjectMissionIndex,
@@ -388,6 +393,27 @@ export function listProjectOperationalStatePaths(
   return projectStateFilesForQuery(query).sort();
 }
 
+interface TrackStateSnapshot {
+  name?: string;
+  summary?: string;
+  lifecycle_model?: string;
+  required_artifacts?: string[];
+}
+
+function readTrackStateIfExists(
+  projectId: string,
+  tier: ProjectOperationalState['tier'],
+  tenantSlug: string | undefined,
+  trackId: string
+): TrackStateSnapshot | null {
+  try {
+    const trackPath = projectOperationalTrackStatePath(projectId, tier, tenantSlug, trackId);
+    return safeExistsSync(trackPath) ? readJson<TrackStateSnapshot>(trackPath) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 function readProjectStateIfExists(
   projectId: string,
   tier: ProjectOperationalState['tier'],
@@ -487,35 +513,61 @@ export function syncProjectOperationalStateFromMission(
   const isActive = ACTIVE_PROJECT_MISSION_STATUSES.has(input.status);
 
   const trackId = relationships.track?.track_id?.trim();
-  if (trackId) {
-    const trackActiveMissionIds = index.activeMissionIdsByTrack.get(trackId) || [];
+  // Registered active tracks stay active with no missions yet — the same rule
+  // `pnpm project reconcile` applies, so sync and reconcile never disagree.
+  const registeredActiveTrackIds = listProjectTracksForProject(projectId)
+    .filter(
+      (track) =>
+        track.status === 'active' &&
+        track.tier === input.tier &&
+        (track.tenant_slug || 'shared') === (tenantSlug || 'shared')
+    )
+    .map((track) => track.track_id);
+  // Rebuild every track this sync can affect: the mission's current track and
+  // tracks previously active in this scope (a mission that left a track must
+  // leave its projection too).
+  const previousState = readProjectStateIfExists(projectId, input.tier, tenantSlug);
+  const tracksToRebuild = new Set<string>([
+    ...(trackId ? [trackId] : []),
+    ...(previousState?.active_track_ids || []),
+  ]);
+  for (const rebuildTrackId of tracksToRebuild) {
+    const trackActiveMissionIds = index.activeMissionIdsByTrack.get(rebuildTrackId) || [];
+    const isCurrentTrack = rebuildTrackId === trackId;
+    const existing = readTrackStateIfExists(projectId, input.tier, tenantSlug, rebuildTrackId);
+    if (!isCurrentTrack && !existing) continue;
     saveProjectTrackState({
       project_id: projectId,
       tier: input.tier,
       tenant_slug: tenantSlug,
-      track_id: trackId,
-      name: relationships.track?.track_name || trackId,
-      summary: relationships.track?.note || relationships.track?.track_name || trackId,
-      // A track stays active while any of its missions is active.
+      track_id: rebuildTrackId,
+      name: (isCurrentTrack && relationships.track?.track_name) || existing?.name || rebuildTrackId,
+      summary:
+        (isCurrentTrack && (relationships.track?.note || relationships.track?.track_name)) ||
+        existing?.summary ||
+        rebuildTrackId,
+      // A track stays active while any of its missions is active; otherwise it
+      // reflects how its last mission ended.
       status:
-        trackActiveMissionIds.length > 0
+        trackActiveMissionIds.length > 0 || registeredActiveTrackIds.includes(rebuildTrackId)
           ? 'active'
-          : input.status === 'archived'
-            ? 'archived'
-            : input.status === 'completed'
-              ? 'completed'
-              : input.status === 'paused'
-                ? 'paused'
-                : 'active',
-      lifecycle_model: relationships.track?.lifecycle_model,
-      required_artifacts: [],
+          : !isCurrentTrack
+            ? 'completed'
+            : input.status === 'archived' || input.status === 'completed'
+              ? input.status
+              : input.status === 'failed'
+                ? 'failed'
+                : 'completed',
+      lifecycle_model:
+        (isCurrentTrack && relationships.track?.lifecycle_model) || existing?.lifecycle_model,
+      required_artifacts: existing?.required_artifacts || [],
       active_mission_ids: trackActiveMissionIds,
     });
   }
 
   const projectStateDirPath = projectOperationalStateDir(projectId, input.tier, tenantSlug);
   const activeMissionIds = new Set<string>(index.activeMissionIds);
-  const activeTrackIds = new Set<string>(index.activeTrackIds);
+  const activeTrackIds = new Set<string>([...index.activeTrackIds, ...registeredActiveTrackIds]);
   // Refs accumulate within this scope's own state only. (This used to walk
   // every tier under active/projects/, which failed the whole sync for roles
   // that may not read the confidential tier.)
@@ -615,19 +667,20 @@ export function syncProjectOperationalStateFromMission(
   };
 
   const savedPath = saveProjectOperationalState(nextState);
-  if (existingProject) refreshProjectRecordActiveLists(existingProject, nextState);
+  if (existingProject) refreshProjectRecordActiveLists(projectId, nextState);
   return savedPath;
 }
 
 /**
- * Keep the project record's active lists a projection of the same index
- * (what `pnpm project reconcile --apply` computes), so readers such as the
- * organization lineage stop seeing a stale `active_missions`.
+ * Keep the project record's active lists a projection of the same index and
+ * track rule as `pnpm project reconcile --apply`, so readers such as the
+ * organization lineage stop seeing a stale `active_missions`. The record is
+ * re-read right before the write and only the two lists are patched, so a
+ * concurrent `pnpm project` edit to other fields is not overwritten.
  */
-function refreshProjectRecordActiveLists(
-  project: NonNullable<ReturnType<typeof loadProjectRecord>>,
-  state: ProjectOperationalState
-): void {
+function refreshProjectRecordActiveLists(projectId: string, state: ProjectOperationalState): void {
+  const project = loadProjectRecord(projectId);
+  if (!project) return;
   if (
     state.tier !== project.tier ||
     (state.tenant_slug || 'shared') !== (project.tenant_slug || 'shared')

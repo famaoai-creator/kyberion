@@ -17,6 +17,7 @@ import {
   syncProjectOperationalStateFromMission,
 } from './project-operational-state-registry.js';
 import { loadProjectRecord, projectRecordPath, saveProjectRecord } from './project-registry.js';
+import { saveProjectTrackRecord } from './project-track-registry.js';
 import { readJson } from '../foundation/json.js';
 
 const suffix = `${process.pid}-${Date.now().toString(36)}`.toUpperCase();
@@ -134,6 +135,67 @@ describe('project mission index (single source: relationships.project)', () => {
       [M1, M2].sort()
     );
     expect(loadProjectRecord(PROJECT_ID)?.active_missions).toEqual([M1, M2].sort());
+  });
+
+  function trackState(id: string): { active_mission_ids: string[]; status: string } {
+    return readJson(projectOperationalTrackStatePath(PROJECT_ID, 'public', undefined, id));
+  }
+
+  it('keeps a registered active track with no missions (same rule as reconcile)', () => {
+    const emptyTrack = `TRK-LINK-IDX-EMPTY-${suffix}`;
+    created.push(pathResolver.shared(`runtime/project-tracks/${emptyTrack}.json`));
+    saveProjectTrackRecord({
+      track_id: emptyTrack,
+      project_id: PROJECT_ID,
+      name: 'Empty lane',
+      summary: 'Registered, no missions yet',
+      status: 'active',
+      track_type: 'delivery',
+      lifecycle_model: 'sdlc',
+      tier: 'public',
+    } as Parameters<typeof saveProjectTrackRecord>[0]);
+    writeAt(pathResolver.missionDir(M1, 'public'), mission(M1, 'active'));
+    sync(mission(M1, 'active'));
+    expect(loadProjectOperationalState(PROJECT_ID, 'public')?.active_track_ids).toEqual(
+      [TRACK_ID, emptyTrack].sort()
+    );
+    expect(loadProjectRecord(PROJECT_ID)?.active_tracks).toEqual([TRACK_ID, emptyTrack].sort());
+  });
+
+  it('marks a track failed when its last mission fails, and rebuilds a track a mission left', () => {
+    writeAt(pathResolver.missionDir(M1, 'public'), mission(M1, 'active'));
+    sync(mission(M1, 'active'));
+    writeAt(pathResolver.missionDir(M1, 'public'), mission(M1, 'failed'));
+    sync(mission(M1, 'failed'));
+    expect(trackState(TRACK_ID)).toMatchObject({ status: 'failed', active_mission_ids: [] });
+
+    // M2 starts on TRACK_ID, then moves to another track.
+    writeAt(pathResolver.missionDir(M2, 'public'), mission(M2, 'active'));
+    sync(mission(M2, 'active'));
+    expect(trackState(TRACK_ID).active_mission_ids).toEqual([M2]);
+    const moved = mission(M2, 'active');
+    const otherTrack = `TRK-LINK-IDX-OTHER-${suffix}`;
+    (moved.relationships as { track: { track_id: string } }).track.track_id = otherTrack;
+    writeAt(pathResolver.missionDir(M2, 'public'), moved);
+    sync(moved);
+    expect(trackState(TRACK_ID).active_mission_ids).toEqual([]);
+    expect(trackState(otherTrack).active_mission_ids).toEqual([M2]);
+  });
+
+  it('finds confidential tenant missions in their tenant directory', () => {
+    const confidential = {
+      ...mission(M1, 'active'),
+      tier: 'confidential',
+      tenant_slug: 'acme-idx',
+    } as MissionState;
+    writeAt(pathResolver.missionDir(M1, 'confidential', 'acme-idx'), confidential);
+    expect(
+      deriveProjectMissionIndex(PROJECT_ID, { tier: 'confidential', tenant: 'acme-idx' })
+        .activeMissionIds
+    ).toEqual([M1]);
+    expect(
+      deriveProjectMissionIndex(PROJECT_ID, { tier: 'confidential', tenant: 'other-idx' }).linked
+    ).toEqual([]);
   });
 
   it('derives the index from mission state only, scoped by tier/tenant', () => {
