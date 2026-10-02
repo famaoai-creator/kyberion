@@ -13,6 +13,6 @@
     "@agent/core": "workspace:*",
     "@agent/shared-vision": "workspace:*",
     "chalk": "^6.0.0",
-    "yargs": "^17.7.2"
+    "yargs": "^17.7.3"
   }
 }

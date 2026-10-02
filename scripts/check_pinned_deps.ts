@@ -51,20 +51,50 @@ export function checkPinnedDependencies(): string[] {
   }
 
   try {
-    const npmrc = readPinnedTextFile(pathResolver.rootResolve('.npmrc'), '.npmrc');
-    const releaseAge = npmrc.match(/^\s*minimum-release-age\s*=\s*(\d+)\s*$/mu);
-    if (!releaseAge) {
-      findings.push('.npmrc must set minimum-release-age');
-    } else if (Number(releaseAge[1]) < MINIMUM_RELEASE_AGE_MINUTES) {
+    let releaseAgeMinutes: number | undefined;
+    let strict: boolean | undefined;
+
+    // Check pnpm-workspace.yaml (canonical pnpm workspace settings)
+    try {
+      const workspaceYaml = readPinnedTextFile(
+        pathResolver.rootResolve('pnpm-workspace.yaml'),
+        'pnpm-workspace.yaml'
+      );
+      const wsAge = workspaceYaml.match(/^\s*minimumReleaseAge\s*:\s*(\d+)\s*$/mu);
+      if (wsAge) releaseAgeMinutes = Number(wsAge[1]);
+      const wsStrict = workspaceYaml.match(/^\s*minimumReleaseAgeStrict\s*:\s*true\s*$/imu);
+      if (wsStrict) strict = true;
+    } catch {
+      // workspace file optional or read error handled below
+    }
+
+    // Fall back to .npmrc if not found in workspace file
+    if (releaseAgeMinutes === undefined || !strict) {
+      try {
+        const npmrc = readPinnedTextFile(pathResolver.rootResolve('.npmrc'), '.npmrc');
+        const releaseAge = npmrc.match(/^\s*minimum-release-age\s*=\s*(\d+)\s*$/mu);
+        if (releaseAge && releaseAgeMinutes === undefined)
+          releaseAgeMinutes = Number(releaseAge[1]);
+        if (/^\s*minimum-release-age-strict\s*=\s*true\s*$/imu.test(npmrc)) strict = true;
+      } catch {
+        // handled below
+      }
+    }
+
+    if (releaseAgeMinutes === undefined) {
       findings.push(
-        `.npmrc minimum-release-age must be at least ${MINIMUM_RELEASE_AGE_MINUTES} minutes`
+        'pnpm-workspace.yaml or .npmrc must set minimumReleaseAge / minimum-release-age'
+      );
+    } else if (releaseAgeMinutes < MINIMUM_RELEASE_AGE_MINUTES) {
+      findings.push(
+        `minimumReleaseAge must be at least ${MINIMUM_RELEASE_AGE_MINUTES} minutes (found ${releaseAgeMinutes})`
       );
     }
-    if (!/^\s*minimum-release-age-strict\s*=\s*true\s*$/imu.test(npmrc)) {
-      findings.push('.npmrc must set minimum-release-age-strict=true');
+    if (!strict) {
+      findings.push('pnpm-workspace.yaml or .npmrc must set minimumReleaseAgeStrict=true');
     }
   } catch {
-    findings.push('.npmrc is required for the dependency release-age policy');
+    findings.push('configuration file is required for the dependency release-age policy');
   }
 
   return findings;

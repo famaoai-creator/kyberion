@@ -1,11 +1,15 @@
 import * as path from 'node:path';
 import { PDFParse } from 'pdf-parse';
-import mammoth from 'mammoth';
 import Tesseract from 'tesseract.js';
 import { safeWriteFile, safeReadFile, safeUnlink } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import AdmZip from 'adm-zip';
-import { distillPdfDesign, distillPptxDesign } from '@agent/core/media/media-contracts';
+import {
+  distillPdfDesign,
+  distillPptxDesign,
+  distillDocxDesign,
+  docxToMarkdown,
+} from '@agent/core/media/media-contracts';
 import { distillExcelDesign } from '@agent/shared-media';
 
 /**
@@ -167,22 +171,10 @@ async function processPDF(buffer: Buffer, mode: ExtractionMode, result: Extracti
   }
 }
 
-// mammoth's bundled .d.ts predates its own convertToMarkdown export (present in
-// lib/index.js since 1.x) — augment locally instead of losing type coverage on
-// the whole module.
-type MammothWithMarkdown = typeof mammoth & {
-  convertToMarkdown: (input: { buffer: Buffer }) => Promise<{ value: string; messages: unknown[] }>;
-};
-
 async function processDocx(buffer: Buffer, mode: ExtractionMode, result: ExtractionResult) {
   if (wantsLayer(mode, 'content')) {
-    try {
-      const data = await (mammoth as MammothWithMarkdown).convertToMarkdown({ buffer });
-      result.layers.content = data.value;
-    } catch (_) {
-      const data = await mammoth.extractRawText({ buffer });
-      result.layers.content = data.value;
-    }
+    const design = await distillDocxDesign(buffer);
+    result.layers.content = docxToMarkdown(design);
   }
   if (wantsLayer(mode, 'metadata')) {
     result.layers.metadata = { type: 'Word Document', extension: 'docx' };

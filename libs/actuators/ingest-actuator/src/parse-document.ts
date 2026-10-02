@@ -15,7 +15,6 @@
 
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import mammoth from 'mammoth';
 import ExcelJS from 'exceljs';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertReadableOfficeBytes, readDocument } from '@agent/core/media/document-reader';
@@ -77,15 +76,6 @@ interface SlackMessage {
   ts?: string;
   text?: string;
 }
-
-// mammoth's bundled .d.ts predates its own convertToMarkdown export (present
-// in lib/index.js since 1.x) — augment locally, same as media-actuator.
-type MammothWithMarkdown = typeof mammoth & {
-  convertToMarkdown: (
-    input: { buffer: Buffer },
-    options?: { convertImage?: unknown }
-  ) => Promise<{ value: string; messages: unknown[] }>;
-};
 
 function resolveRawBytes(input: ParseDocumentInput): Buffer {
   if (input.source_path) {
@@ -149,25 +139,6 @@ function extractSections(markdown: string): IngestSection[] | undefined {
   return sections.length > 0 ? sections : undefined;
 }
 
-/**
- * Fallback docx reader (mammoth) for documents the native reader rejects.
- * Images become `[image]` markers instead of mammoth's default base64 data
- * URIs (one image-heavy document once produced an 11 MB card).
- */
-async function parseDocx(raw: Buffer): Promise<string> {
-  const convertImage = mammoth.images.imgElement(async () => ({ src: 'kyberion-docx-image' }));
-  try {
-    const result = await (mammoth as MammothWithMarkdown).convertToMarkdown(
-      { buffer: raw },
-      { convertImage }
-    );
-    return result.value.replace(/!\[[^\]]*\]\(kyberion-docx-image\)/g, '_[image]_');
-  } catch {
-    const result = await mammoth.extractRawText({ buffer: raw });
-    return result.value;
-  }
-}
-
 function excelCellText(value: ExcelJS.CellValue): string {
   if (value === null || value === undefined) return '';
   if (value instanceof Date) return value.toISOString();
@@ -196,9 +167,6 @@ async function parseXlsx(raw: Buffer): Promise<{ markdown: string; tables: Inges
       const cells: string[] = [];
       for (let col = 1; col <= sheet.columnCount; col += 1) {
         const cell = row.getCell(col);
-        // exceljs reports a merged range's value on every cell of the range;
-        // only the top-left master keeps it, so a banner row is not repeated
-        // across every column.
         const isMergedSlave = cell.isMerged && cell.master && cell.master.address !== cell.address;
         cells.push(
           isMergedSlave
@@ -230,8 +198,8 @@ async function parseXlsx(raw: Buffer): Promise<{ markdown: string; tables: Inges
 /**
  * pdf / pptx / docx / xlsx go through the shared document reader
  * (@agent/core/document-reader) — the same path as `pnpm kyberion read` and
- * media:document_digest. mammoth / exceljs remain only as a fallback for a
- * docx / xlsx the native reader rejects.
+ * media:document_digest. exceljs remains only as a fallback for an
+ * xlsx the native reader rejects.
  */
 async function readOfficeDocument(
   raw: Buffer,
@@ -242,10 +210,6 @@ async function readOfficeDocument(
     const result = await readDocument(raw, format, { ocr });
     return { markdown: result.markdown, tables: result.tables, title: result.title };
   } catch (error) {
-    if (format === 'docx') {
-      const markdown = await parseDocx(raw);
-      return { markdown, tables: [], title: extractTitle(markdown) };
-    }
     if (format === 'xlsx') return parseXlsx(raw);
     throw error;
   }
