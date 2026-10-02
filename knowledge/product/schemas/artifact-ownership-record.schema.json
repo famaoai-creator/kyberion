@@ -36,6 +36,7 @@
   "anyOf": [
     { "required": ["project_id"] },
     { "required": ["mission_id"] },
+    { "required": ["organization_id"] },
     { "required": ["task_session_id"] }
   ]
 }

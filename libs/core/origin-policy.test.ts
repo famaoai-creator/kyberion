@@ -8,7 +8,9 @@ describe('origin-policy', () => {
   });
 
   it('rejects prefix tricks and sibling hosts', () => {
-    expect(matchesAllowedOrigin('https://trusted.example.com', 'https://trusted.example.com.evil')).toBe(false);
+    expect(
+      matchesAllowedOrigin('https://trusted.example.com', 'https://trusted.example.com.evil')
+    ).toBe(false);
     expect(matchesAllowedOrigin('https://github.com', 'https://gist.github.com')).toBe(false);
   });
 

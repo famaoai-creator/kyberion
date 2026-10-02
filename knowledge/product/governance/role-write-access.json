@@ -4,6 +4,9 @@
   "default_allow": [
     "active/missions/${MISSION_ID}/",
     "active/shared/tmp/",
+    "active/shared/staging/",
+    "active/shared/cache/",
+    "active/shared/artifacts/",
     "active/shared/exports/",
     "work/metrics/"
   ],
