@@ -565,6 +565,11 @@ export async function startMission(args: {
     if (policy === 'warn') logger.warn(message);
   }
 
+  if (state?.status === 'active') {
+    logger.info(`Mission ${upperId} is already active.`);
+    return;
+  }
+
   const prerequisites = normalizeMissionIdList([
     ...normalizeMissionIdList(state?.relationships?.prerequisites),
     ...normalizeMissionIdList(normalizedRelationships?.prerequisites),
@@ -617,10 +622,6 @@ export async function startMission(args: {
         activated = true;
       }
     } else {
-      if (state.status === 'active') {
-        logger.info(`Mission ${upperId} is already active.`);
-        return;
-      }
       if (!state.outcome_contract) {
         state.outcome_contract = inferMissionOutcomeContract({
           missionId: upperId,
@@ -722,7 +723,7 @@ export async function startMission(args: {
     if (activated) {
       logger.warn(
         `Mission ${upperId} is active, but a post-activation step failed — ${err.message} ` +
-          `| next: rerun the failed step (repo init / role procedure) | evidence: mission-state.json`
+          `| next: fix the cause; the mission is already active, so 'start' is a no-op — redo that step by hand (e.g. 'git init' in the mission directory) | evidence: ${findMissionPath(upperId) || 'mission-state.json'}`
       );
       return;
     }
