@@ -468,6 +468,41 @@ function isEventStorePath(repoRelativePath: string): boolean {
 }
 
 /**
+ * Storage-layout floors outside `tmp/` (see storage-layout.ts). `tmp/` keeps
+ * its dedicated `scanTmp` sweep; these roots are swept per catalog entry with
+ * the same longest-prefix contract as the event stores.
+ */
+export const STORAGE_FLOOR_RETENTION_PREFIXES = [
+  'active/shared/staging',
+  'active/shared/cache',
+  'active/shared/artifacts',
+] as const;
+
+function isStorageFloorRetentionPath(repoRelativePath: string): boolean {
+  return STORAGE_FLOOR_RETENTION_PREFIXES.some(
+    (prefix) => repoRelativePath === prefix || repoRelativePath.startsWith(`${prefix}/`)
+  );
+}
+
+/** TTL rules for declared storage-floor directories (never `review_required`). */
+export function storageFloorRetentionRules(
+  catalog: LoadedRetentionCatalog
+): Array<{ repoRelativeDir: string; ttlMs: number; entry: RetentionCatalogEntry }> {
+  return catalog.entries
+    .filter(
+      (e) =>
+        isStorageFloorRetentionPath(e.path) &&
+        e.ttl_days !== undefined &&
+        e.action !== 'review_required'
+    )
+    .map((e) => ({
+      repoRelativeDir: e.path,
+      ttlMs: (e.ttl_days as number) * RETENTION_DAY_MS,
+      entry: e,
+    }));
+}
+
+/**
  * TTL rules for declared event-store directories. Same contract as
  * {@link runtimeRetentionRules}: only entries carrying a `ttl_days`
  * participate, and `review_required` never becomes a deletion rule (status

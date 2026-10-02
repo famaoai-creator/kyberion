@@ -454,3 +454,164 @@ describe('mission-lifecycle-service — argv independence (SO-01 landmine regres
     expect(pollutedState!.status).toBe('active');
   });
 });
+
+describe('mission-lifecycle-service — prerequisite gate on start', () => {
+  const RUN_ID = Date.now();
+  const CUSTOMER_SLUG = `prereq-gate-${RUN_ID}`;
+  const PROFILE_ROOT = path.join(pathResolver.rootDir(), 'customer', CUSTOMER_SLUG);
+  const archivedPre = `MSN-PREGATE-ARCH-${RUN_ID}`;
+  const childOk = `MSN-PREGATE-OK-${RUN_ID}`;
+  const childBlocked = `MSN-PREGATE-BLOCKED-${RUN_ID}`;
+  const missingPre = `MSN-PREGATE-MISSING-${RUN_ID}`;
+  let previousCustomer: string | undefined;
+
+  beforeEach(() => {
+    previousCustomer = process.env.KYBERION_CUSTOMER;
+    process.env.KYBERION_CUSTOMER = CUSTOMER_SLUG;
+    fs.mkdirSync(PROFILE_ROOT, { recursive: true });
+    fs.writeFileSync(path.join(PROFILE_ROOT, 'my-identity.json'), '{"sovereign":"test"}');
+    fs.writeFileSync(path.join(PROFILE_ROOT, 'my-vision.md'), '# Vision\n');
+    fs.writeFileSync(
+      path.join(PROFILE_ROOT, 'agent-identity.json'),
+      '{"agent_id":"test-agent","version":"1.0.0","trust_tier":"sovereign"}'
+    );
+    // A finished prerequisite lives only in the archive, as finishMission leaves it.
+    const archiveDir = pathResolver.archivedMissionDir(archivedPre);
+    fs.mkdirSync(archiveDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(archiveDir, 'mission-state.json'),
+      JSON.stringify({
+        mission_id: archivedPre,
+        tier: 'public',
+        status: 'archived',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'worker',
+        confidence_score: 1,
+        git: { branch: 'mission/pre', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+        history: [],
+      })
+    );
+    process.env.MISSION_ROLE = 'mission_controller';
+  });
+
+  afterEach(() => {
+    if (previousCustomer === undefined) delete process.env.KYBERION_CUSTOMER;
+    else process.env.KYBERION_CUSTOMER = previousCustomer;
+    fs.rmSync(PROFILE_ROOT, { recursive: true, force: true });
+    fs.rmSync(pathResolver.archivedMissionDir(archivedPre), { recursive: true, force: true });
+    for (const id of [childOk, childBlocked]) {
+      fs.rmSync(pathResolver.missionDir(id, 'public'), { recursive: true, force: true });
+    }
+  });
+
+  it('starts once prerequisites are archived and persists them (case-normalized)', async () => {
+    const { missionLifecycleService: realFacade } = await import('./mission-lifecycle-service.js');
+    await realFacade.start(
+      childOk,
+      'public',
+      'worker',
+      'default',
+      'development',
+      undefined,
+      { prerequisites: [archivedPre.toLowerCase()] },
+      undefined,
+      {}
+    );
+    const { loadState } = await import('./mission-state.js');
+    const started = loadState(childOk);
+    expect(started?.status).toBe('active');
+    expect(started?.relationships?.prerequisites).toEqual([archivedPre]);
+  });
+
+  it('--force starts despite unmet prerequisites', async () => {
+    const { missionLifecycleService: realFacade } = await import('./mission-lifecycle-service.js');
+    await realFacade.start(
+      childBlocked,
+      'public',
+      'worker',
+      'default',
+      'development',
+      undefined,
+      { prerequisites: [missingPre] },
+      undefined,
+      { force: true }
+    );
+    const { loadState } = await import('./mission-state.js');
+    expect(loadState(childBlocked)?.status).toBe('active');
+  });
+
+  it('refuses to start an archived mission id instead of recreating it', async () => {
+    const { missionLifecycleService: realFacade } = await import('./mission-lifecycle-service.js');
+    await expect(
+      realFacade.start(
+        archivedPre,
+        'public',
+        'worker',
+        'default',
+        'development',
+        undefined,
+        {},
+        undefined,
+        {}
+      )
+    ).rejects.toThrow(`[MISSION_ARCHIVED] Mission ${archivedPre} is archived`);
+    expect(fs.existsSync(pathResolver.missionDir(archivedPre, 'public'))).toBe(false);
+  });
+
+  it('propagates a start failure that happens before activation', async () => {
+    const { missionLifecycleService: realFacade } = await import('./mission-lifecycle-service.js');
+    // An invalid tenant slug fails inside createMission (after the gate).
+    await expect(
+      realFacade.start(
+        childBlocked,
+        'public',
+        'worker',
+        'default',
+        'development',
+        undefined,
+        {},
+        'Not A Slug',
+        {}
+      )
+    ).rejects.toThrow(/invalid tenant slug/i);
+  });
+
+  it('treats start on an already-active mission as a no-op', async () => {
+    const { missionLifecycleService: realFacade } = await import('./mission-lifecycle-service.js');
+    const args = [
+      'public',
+      'worker',
+      'default',
+      'development',
+      undefined,
+      {},
+      undefined,
+      {},
+    ] as const;
+    await realFacade.start(childOk, ...args);
+    await expect(realFacade.start(childOk, ...args)).resolves.toBeUndefined();
+    const { loadState } = await import('./mission-state.js');
+    expect(loadState(childOk)?.status).toBe('active');
+  });
+
+  it('refuses to start with unmet prerequisites and creates nothing', async () => {
+    const { missionLifecycleService: realFacade } = await import('./mission-lifecycle-service.js');
+    await expect(
+      realFacade.start(
+        childBlocked,
+        'public',
+        'worker',
+        'default',
+        'development',
+        undefined,
+        { prerequisites: [archivedPre, missingPre] },
+        undefined,
+        {}
+      )
+    ).rejects.toThrow(
+      `[MISSION_PREREQUISITES_UNMET] Mission ${childBlocked} cannot start: ${missingPre} (not found)`
+    );
+    expect(fs.existsSync(pathResolver.missionDir(childBlocked, 'public'))).toBe(false);
+  });
+});

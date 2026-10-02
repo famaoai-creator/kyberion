@@ -63,7 +63,7 @@ export function isSafeMissionManagementPath(value: unknown): value is string {
 
 type MissionTier = 'personal' | 'confidential' | 'public';
 
-function readConfiguredMissionSubPath(tier: MissionTier): string | undefined {
+function readConfiguredMissionSubPath(tier: MissionTier | 'archive'): string | undefined {
   if (!rawExistsSync(MISSION_MANAGEMENT_CONFIG_PATH)) return undefined;
   try {
     const config = parseSafeJsonInput(
@@ -464,6 +464,24 @@ export function organizationStateDir(
 }
 
 /**
+ * Returns where a finished mission lives once archived
+ * (mission-management-config.json `directories.archive`, default
+ * `active/archive/missions/<ID>`). `findMissionPath` deliberately does not
+ * search here: archived missions are read-only history, looked up explicitly.
+ */
+export function archivedMissionsRoot(): string {
+  return path.join(
+    PROJECT_ROOT_DIR,
+    readConfiguredMissionSubPath('archive') || 'active/archive/missions'
+  );
+}
+
+export function archivedMissionDir(missionId: string): string {
+  assertMissionIdArgument(missionId);
+  return path.join(archivedMissionsRoot(), missionId.toUpperCase());
+}
+
+/**
  * Returns the path to the audit directory for a given mission (tier-aware).
  */
 export function missionAuditDir(
@@ -639,6 +657,8 @@ export const pathResolver = {
   missionEvidenceDir,
   tenantMissionDir,
   findMissionPath,
+  archivedMissionsRoot,
+  archivedMissionDir,
   volatile,
   resolve,
   rootResolve,

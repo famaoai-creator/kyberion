@@ -1,5 +1,6 @@
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
 import { loadState } from '@agent/core/mission/mission-state';
+import { classifyStorageFloorPath } from '@agent/core/storage-layout';
 import { inferDeliverableTier } from '../../../lib/deliverable-inbox';
 
 export type AssetTier = 'personal' | 'confidential' | 'public';
@@ -11,18 +12,41 @@ function normalizeAssetPath(value: string | undefined): string | undefined {
   return normalized.startsWith(`${root}/`) ? normalized.slice(root.length + 1) : normalized;
 }
 
+/**
+ * Tier/tenant of a storage-layout floor path (artifacts, and the tmp floor the
+ * route still serves): the system partition carries public, tenant-free data;
+ * tier partitions carry their own tier and tenant, which then bind the request
+ * like a project path does. Legacy unpartitioned paths return undefined.
+ */
+function floorPartition(
+  normalized: string | undefined
+): { tier: AssetTier; tenant?: string } | undefined {
+  if (!normalized) return undefined;
+  const floor = classifyStorageFloorPath(normalized);
+  if (!floor) return undefined;
+  if (floor.partition.kind === 'system') return { tier: 'public' };
+  if (floor.partition.kind === 'tier') {
+    return { tier: floor.partition.tier, tenant: floor.partition.tenant };
+  }
+  return undefined;
+}
+
 function tierFromPath(value: string | undefined): AssetTier | undefined {
   const normalized = normalizeAssetPath(value);
+  const partition = floorPartition(normalized);
+  if (partition) return partition.tier;
   const match = normalized?.match(
-    /(?:^|\/)active\/(?:missions|projects)\/(personal|confidential|public)(?:\/|$)/
+    /(?:^|\/)active\/(?:missions|projects|organizations)\/(personal|confidential|public)(?:\/|$)/
   );
   return match?.[1] as AssetTier | undefined;
 }
 
 export function tenantFromPath(value: string | undefined): string | undefined {
   const normalized = normalizeAssetPath(value);
+  const partition = floorPartition(normalized);
+  if (partition) return partition.tenant;
   const match = normalized?.match(
-    /^active\/(?:missions|projects)\/(?:personal|confidential|public)\/([^/]+)\//
+    /^active\/(?:missions|projects|organizations)\/(?:personal|confidential|public)\/([^/]+)\//
   );
   return match?.[1] && match[1] !== 'shared' ? match[1] : undefined;
 }

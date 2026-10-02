@@ -89,7 +89,7 @@ Other provider CLIs (`claude`, `codex`, `agy`, …) may be operating on this sam
 - Read any repo file freely — reads never race.
 - Write only what your active work-item claim covers — never a file outside your assignment scope.
 - Never touch `.git/` or repo config (`.gitignore`, workspace wiring, etc.) — that's the mission owner's, never a worker CLI's.
-- Temp files only under `active/shared/tmp/` (or mission-local storage) — never ad hoc directories.
+- Place runtime data by purpose (runtime-storage-layout): scratch under `active/shared/tmp/`, inbound files under `active/shared/staging/`, re-generable data under `active/shared/cache/`, deliverables via `writeScopedArtifact` or mission-local storage — never ad hoc directories.
 - Do not create or hand-edit provider state directories (`.claude/`, `.codex/`, `.agy/`, `.gemini/`, …) — they are gitignored and reproduced by generation ceremonies.
 
 Canonical contract: [multi-provider-coexecution-contract](../../knowledge/product/governance/multi-provider-coexecution-contract.md)

@@ -80,12 +80,7 @@
     "allowed_tiers": ["public"],
     "comment": "Only public tier knowledge is supplied to Cowork. confidential/personal are never exposed.",
 
-    "domains": [
-      "procedures",
-      "architecture",
-      "governance",
-      "hints"
-    ],
+    "domains": ["procedures", "architecture", "governance", "hints"],
 
     "delivery": {
       "channel": "cowork",

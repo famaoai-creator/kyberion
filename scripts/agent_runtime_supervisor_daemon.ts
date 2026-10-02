@@ -44,8 +44,8 @@ import {
   dotDailyTokenCapReached,
   evaluateDotTriggersDue,
   recordDotWakeOutcome,
-  runDotWake,
 } from '@agent/core/dot/dot-runtime';
+import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
 import { isRecord } from '@agent/core/foundation/text';
 import { logger } from '@agent/core/core';
 import { pathResolver, rootDir } from '@agent/core/path-resolver';
@@ -236,9 +236,10 @@ setInterval(
  * Resident-dot sweep: multiplexes active charters. Each tick evaluates every
  * active charter's attention triggers and routes due wakes through the
  * governed TriggerRunner (idempotency + audit + authority attribution), whose
- * deliver handler runs one bounded goal turn via runDotWake. Malformed
- * charters warn+continue — a bad charter file must never kill the daemon
- * (MSN-RESIDENT-DOT-20261002's alert-path lesson). Exported for hermetic tests.
+ * deliver handler runs one bounded goal turn via runDotWakeWithGoalDriver.
+ * Malformed charters warn+continue — a bad charter file must never kill the
+ * daemon (MSN-RESIDENT-DOT-20261002's alert-path lesson). Exported for hermetic
+ * tests.
  */
 const dotTriggerRunner = createTriggerRunner();
 let dotSweepInFlight = false;
@@ -295,7 +296,7 @@ export async function runDotSweepOnce(now: Date = new Date()): Promise<number> {
                 },
                 async () => {
                   deliverRan = true;
-                  const wake = await runDotWake(loaded, { trigger });
+                  const wake = await runDotWakeWithGoalDriver(loaded, { trigger });
                   // Only a real delivery may close the runner's idempotency
                   // key — 'delivered' is terminal there, so throwing on
                   // skipped/failed keeps the key retryable and lets the dot

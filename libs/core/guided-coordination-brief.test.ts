@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  buildGuidedCoordinationBrief,
-} from './guided-coordination-brief.js';
+import { buildGuidedCoordinationBrief } from './guided-coordination-brief.js';
 import { buildExecutionBriefFromGuidedCoordinationBrief } from './execution-brief.js';
 
 describe('guided-coordination-brief', () => {

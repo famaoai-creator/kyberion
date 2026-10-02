@@ -13,6 +13,12 @@ import { resolveProjectScope, resolveProjectScopeId } from './foundation/project
 import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 import { createLogger } from './logger.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import {
+  STORAGE_FLOOR_ROOTS,
+  classifyStorageFloorPath,
+  storageFloorTier,
+  storageFloorTierInPath,
+} from './storage-layout.js';
 import { assertSandboxWriteAllowed } from './shell/sandbox-policy.js';
 import { isAllowedVaultMountPath } from './secret/vault-mount.js';
 import { currentExecutionScope } from './foundation/execution-scope.js';
@@ -113,8 +119,23 @@ function isProtectedTierPath(relativePath: string): boolean {
     pathStartsWith(relativePath, 'active/organizations/confidential') ||
     pathStartsWith(relativePath, 'active/projects/personal') ||
     pathStartsWith(relativePath, 'active/missions/confidential') ||
-    pathStartsWith(relativePath, 'active/projects/confidential')
+    pathStartsWith(relativePath, 'active/projects/confidential') ||
+    isProtectedStorageFloorTier(storageFloorTier(relativePath))
   );
+}
+
+/** `<floor>/<tier>/` prefix when the path is in a personal/confidential floor partition. */
+function protectedFloorPartitionPrefix(relativePath: string): string | undefined {
+  const floor = classifyStorageFloorPath(relativePath);
+  if (floor?.partition.kind !== 'tier') return undefined;
+  const { tier } = floor.partition;
+  if (!isProtectedStorageFloorTier(tier)) return undefined;
+  return `${STORAGE_FLOOR_ROOTS[floor.floor]}/${tier}/`;
+}
+
+/** Personal/confidential partitions of the shared storage floors (storage-layout.ts). */
+function isProtectedStorageFloorTier(tier: TierLevel | undefined): boolean {
+  return tier === 'personal' || tier === 'confidential';
 }
 
 const CORRUPT_POLICY_DENIAL = {
@@ -203,8 +224,42 @@ function policyPathMatches(
   return expanded !== null && pathStartsWith(relativePath, expanded);
 }
 
-function matchesAny(relativePath: string, patterns: string[] = [], missionId?: string): boolean {
-  return patterns.some((p) => policyPathMatches(relativePath, p, missionId));
+/**
+ * Read-grant match for a personal/confidential storage-floor partition. A grant
+ * on the floor root or an `active/shared` ancestor (e.g. `active/shared/tmp/`)
+ * predates the partitions and keeps covering legacy/system/public data only;
+ * reading a protected partition needs a grant naming `<floor>/<tier>/` or
+ * deeper (or a deliberately broad `active/`-level grant).
+ */
+function readGrantMatches(
+  relativePath: string,
+  pattern: string,
+  missionId: string | undefined,
+  tenantSlug: string | undefined,
+  partitionPrefix: string | undefined
+): boolean {
+  if (!policyPathMatches(relativePath, pattern, missionId, tenantSlug)) return false;
+  if (!partitionPrefix) return true;
+  const expanded = normalizePath(expandPolicyPath(pattern, missionId, tenantSlug) ?? '').replace(
+    /\/+$/u,
+    ''
+  );
+  const isSharedAncestor =
+    pathStartsWith(expanded, 'active/shared') &&
+    pathStartsWith(partitionPrefix, expanded) &&
+    expanded.length < partitionPrefix.replace(/\/+$/u, '').length;
+  return !isSharedAncestor;
+}
+
+function matchesAny(
+  relativePath: string,
+  patterns: string[] = [],
+  missionId?: string,
+  partitionPrefix?: string
+): boolean {
+  return patterns.some((p) =>
+    readGrantMatches(relativePath, p, missionId, undefined, partitionPrefix)
+  );
 }
 
 function hasScopedSudoAccess(relativePath: string, sudoScope?: string[]): boolean {
@@ -217,11 +272,17 @@ function hasAuthorityAccess(
   authorities: Authority[],
   relativePath: string,
   missionId?: string,
-  accessType: 'allow_read' | 'allow_write' = 'allow_write'
+  accessType: 'allow_read' | 'allow_write' = 'allow_write',
+  partitionPrefix?: string
 ): boolean {
   const authorityPermissions = policy.authority_permissions || {};
   return authorities.some((authority) =>
-    matchesAny(relativePath, authorityPermissions[authority]?.[accessType], missionId)
+    matchesAny(
+      relativePath,
+      authorityPermissions[authority]?.[accessType],
+      missionId,
+      partitionPrefix
+    )
   );
 }
 
@@ -731,6 +792,8 @@ export function detectTier(filePath: string): TierLevel {
     resolved.includes('/active/projects/personal/')
   )
     return 'personal';
+  const floorTier = storageFloorTierInPath(resolved);
+  if (floorTier) return floorTier;
   if (
     resolved.includes('/knowledge/confidential/') ||
     resolved.includes('/active/organizations/confidential/') ||
@@ -765,10 +828,17 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
     /^active\/projects\/(personal|confidential|public)(?:\/|$)/
   )?.[1];
   const protectedProjectPath = projectTier === 'personal' || projectTier === 'confidential';
+  const floorTier = storageFloorTier(relativePath);
+  const protectedFloorPath = isProtectedStorageFloorTier(floorTier);
   const organizationTier = relativePath.match(
     /^active\/organizations\/(personal|confidential|public)(?:\/|$)/
   )?.[1];
-  if (!pathStartsWith(relativePath, 'knowledge') && !organizationStatePath && !protectedProjectPath)
+  if (
+    !pathStartsWith(relativePath, 'knowledge') &&
+    !organizationStatePath &&
+    !protectedProjectPath &&
+    !protectedFloorPath
+  )
     return { allowed: true };
   if (pathStartsWith(relativePath, 'knowledge/public')) return { allowed: true };
 
@@ -776,7 +846,8 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
     !pathStartsWith(relativePath, 'knowledge/personal') &&
     !pathStartsWith(relativePath, 'knowledge/confidential') &&
     !organizationStatePath &&
-    !protectedProjectPath
+    !protectedProjectPath &&
+    !protectedFloorPath
   ) {
     return { allowed: true };
   }
@@ -810,37 +881,30 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
 
   if (authorities.includes('SUDO') && hasScopedSudoAccess(relativePath, sudoScope))
     return { allowed: true };
-  if (hasAuthorityAccess(policy, authorities, relativePath, currentMission, 'allow_read'))
-    return { allowed: true };
-  if (hasAuthorityAccess(policy, authorities, relativePath, currentMission, 'allow_write'))
-    return { allowed: true };
+  const floorPartitionPrefix = protectedFloorPartitionPrefix(relativePath);
+  const grants = (patterns: string[] | undefined): boolean =>
+    (patterns || []).some((p: string) =>
+      readGrantMatches(relativePath, p, currentMission, tenantSlug, floorPartitionPrefix)
+    );
+  for (const accessType of ['allow_read', 'allow_write'] as const) {
+    if (
+      hasAuthorityAccess(
+        policy,
+        authorities,
+        relativePath,
+        currentMission,
+        accessType,
+        floorPartitionPrefix
+      )
+    )
+      return { allowed: true };
+  }
 
   const roleRules = currentRole ? policy.authority_role_permissions?.[currentRole] : null;
-  if (
-    roleRules?.allow_read?.some((p: string) =>
-      policyPathMatches(relativePath, p, currentMission, tenantSlug)
-    )
-  )
-    return { allowed: true };
-  if (
-    roleRules?.allow_write?.some((p: string) =>
-      policyPathMatches(relativePath, p, currentMission, tenantSlug)
-    )
-  )
-    return { allowed: true };
+  if (grants(roleRules?.allow_read) || grants(roleRules?.allow_write)) return { allowed: true };
 
   const personaRules = policy.persona_permissions?.[currentPersona];
-  if (
-    personaRules?.allow_read?.some((p: string) =>
-      policyPathMatches(relativePath, p, currentMission, tenantSlug)
-    )
-  )
-    return { allowed: true };
-  if (
-    personaRules?.allow_write?.some((p: string) =>
-      policyPathMatches(relativePath, p, currentMission, tenantSlug)
-    )
-  )
+  if (grants(personaRules?.allow_read) || grants(personaRules?.allow_write))
     return { allowed: true };
 
   // Project scope check for confidential tier (before generic tier restrictions)
@@ -863,6 +927,12 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
     return { allowed: false, reason: policy.tier_restrictions.personal.block_message };
   }
   if (projectTier === 'confidential') {
+    return { allowed: false, reason: policy.tier_restrictions.confidential.block_message };
+  }
+  if (floorTier === 'personal') {
+    return { allowed: false, reason: policy.tier_restrictions.personal.block_message };
+  }
+  if (floorTier === 'confidential') {
     return { allowed: false, reason: policy.tier_restrictions.confidential.block_message };
   }
 

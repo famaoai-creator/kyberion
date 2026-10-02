@@ -174,7 +174,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
     },
     finishMission(id: string, seal = false) {
       return _finishMission(id, seal, {
-        archiveDir: pathResolver.active('archive/missions'),
+        archiveDir: pathResolver.archivedMissionsRoot(),
         agentRuntimeEventPath: pathResolver.shared(
           'observability/mission-control/agent-runtime-events.jsonl'
         ),

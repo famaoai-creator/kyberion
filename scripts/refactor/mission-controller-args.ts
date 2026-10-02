@@ -102,6 +102,12 @@ export interface ResolvedMissionCliInput {
     json: string;
   };
   routingDecision?: string;
+  /**
+   * Set only in --dry-run when the linked project is not registered yet (a
+   * dry-run plan may preview `project create` alongside); the real run fails
+   * closed with the same [PROJECT_LINK_INVALID] message.
+   */
+  projectLinkWarning?: string;
 }
 
 export function resolveMissionStartCreateInputFromArgv(
@@ -180,12 +186,16 @@ export function validateMissionStartCreateInput(
   }
   if (project?.project_id) {
     const projectRecord = loadProjectRecord(project.project_id);
-    if (track?.track_id) {
-      if (!projectRecord) {
-        throw new Error(
-          `${actionName} ${missionId}: project record not found for track scope validation: ${project.project_id}`
-        );
-      }
+    // relationships.project is the single source of project membership: it
+    // must name a managed project (create it with `pnpm project create`).
+    if (!projectRecord) {
+      const message =
+        `[PROJECT_LINK_INVALID] ${actionName} ${missionId}: project not found: ${project.project_id}. ` +
+        'Create it with `pnpm project create` or fix --project-id.';
+      if (!argv.includes('--dry-run')) throw new Error(message);
+      input.projectLinkWarning = `${message} (dry-run: the real run requires the project record)`;
+    }
+    if (projectRecord && track?.track_id) {
       const trackRecord = loadProjectTrackRecord(track.track_id);
       if (!trackRecord) {
         throw new Error(`${actionName} ${missionId}: project track not found: ${track.track_id}`);
@@ -194,23 +204,37 @@ export function validateMissionStartCreateInput(
     }
     if (projectRecord) {
       const requestedTier = input.tier;
-      const requestedTenant = input.tenantSlug || input.tenantId || 'shared';
+      // An omitted tenant is inherited from the project below; a stated one
+      // must match it.
+      const statedTenant = input.tenantSlug || input.tenantId;
+      const requestedTenant = statedTenant || projectRecord.tenant_slug || 'shared';
       const projectTenant = projectRecord.tenant_slug || 'shared';
       if (requestedTier && requestedTier !== projectRecord.tier) {
         throw new Error(
           `${actionName} ${missionId}: mission tier '${requestedTier}' must match project tier '${projectRecord.tier}'.`
         );
       }
-      if (
-        (projectRecord.tier === 'confidential' ||
-          projectRecord.tenant_slug ||
-          input.tenantSlug ||
-          input.tenantId) &&
-        requestedTenant !== projectTenant
-      ) {
+      if (requestedTenant !== projectTenant) {
         throw new Error(
           `${actionName} ${missionId}: mission tenant '${requestedTenant}' must match project tenant '${projectTenant}'.`
         );
+      }
+      // Inherit the project's scope so the mission state carries it (a
+      // --tenant-id alone was never persisted as tenant_slug, and a missing
+      // --tier fell back to confidential even for a public project).
+      if (!input.tier) input.tier = projectRecord.tier;
+      if (projectRecord.tenant_slug && !input.tenantSlug) {
+        input.tenantSlug = projectRecord.tenant_slug;
+      }
+      const projectOrganization = projectRecord.organization_id;
+      if (projectOrganization) {
+        if (input.organizationId && input.organizationId !== projectOrganization) {
+          throw new Error(
+            `[PROJECT_LINK_INVALID] ${actionName} ${missionId}: organization '${input.organizationId}' ` +
+              `must match project organization '${projectOrganization}'.`
+          );
+        }
+        input.organizationId = projectOrganization;
       }
     }
   }

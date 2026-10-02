@@ -41,11 +41,12 @@ import {
 } from '../secure-io.js';
 import { recordMissionGateOverride, writeMissionGateRecord } from './mission-gate-engine.js';
 import { closeMissionArtifacts } from './mission-artifact-closure.js';
+import { promoteMissionArtifactsToProject } from './mission-artifact-promotion.js';
 import {
   reconcileCompletion,
   reconcileCompletionStructurally,
 } from '../intent/intent-reconciliation.js';
-import { loadState, saveState } from './mission-state.js';
+import { loadMissionStateIncludingArchive, loadState, saveState } from './mission-state.js';
 import {
   buildMissionCompletionReconciliationInput,
   collectMissionEvidence,
@@ -662,6 +663,10 @@ export async function finishMission(
   const upperId = id.toUpperCase();
   const preState = loadState(upperId);
   if (!preState) {
+    if (loadMissionStateIncludingArchive(upperId)?.status === 'archived') {
+      logger.info(`Mission ${upperId} is already archived.`);
+      return;
+    }
     logger.error(`❌ Mission ${upperId} not found. Run "list" to see available missions.`);
     return;
   }
@@ -1174,6 +1179,31 @@ export async function finishMission(
     traceCtx.endSpan('error', err?.message || String(err));
   }
 
+  // Hand published deliverables (report/export) of a project-linked mission to
+  // the project before the archive move: copied into the project scope and
+  // the ArtifactRecord re-pointed; the original is archived with the mission.
+  // Best-effort like closure — never fails a finish that already succeeded.
+  traceCtx.startSpan('mission:artifact-promotion');
+  try {
+    const promotion = promoteMissionArtifactsToProject({ missionId: upperId, missionDir, state });
+    if (promotion.status !== 'skipped' || promotion.reason !== 'no_project') {
+      state.context = {
+        ...(state.context || {}),
+        mission_artifact_promotion: {
+          status: promotion.status,
+          ...(promotion.reason ? { reason: promotion.reason } : {}),
+          project_id: promotion.project_id,
+          promoted: promotion.promoted,
+          ...(promotion.failed.length > 0 ? { failed: promotion.failed } : {}),
+        },
+      };
+    }
+    traceCtx.endSpan(promotion.failed.length > 0 ? 'error' : 'ok');
+  } catch (err: any) {
+    logger.warn(`⚠️ [ARTIFACT_PROMOTION] skipped for ${upperId}: ${err?.message || err}`);
+    traceCtx.endSpan('error', err?.message || String(err));
+  }
+
   const missionTmpDir = pathResolver.sharedTmp(path.join('missions', upperId));
   const safeMissionTmpDir = assertSafeRepositoryPath(missionTmpDir, { allowMissingLeaf: true });
   if (safeExistsSync(safeMissionTmpDir)) {
@@ -1200,7 +1230,9 @@ export async function finishMission(
     event: 'ARCHIVE',
     note: `Mission archived to ${archivePath}.`,
   });
-  await saveState(upperId, state);
+  // The active directory is gone: persist into the archive copy so no state
+  // stub is recreated at the active path (dependents read it from there).
+  await saveState(upperId, state, { missionDir: archivePath });
   traceCtx.endSpan('ok');
   const traceResult = finalizeActuatorTrace(traceCtx);
   state.context = {
@@ -1218,7 +1250,7 @@ export async function finishMission(
     mission_finish_trace_summary: traceResult.trace_summary,
     mission_finish_trace_persisted_path: traceResult.trace_persisted_path,
   };
-  await saveState(upperId, state);
+  await saveState(upperId, state, { missionDir: archivePath });
   logger.success(`📦 Mission ${upperId} archived and finalized.`);
 }
 

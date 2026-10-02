@@ -136,6 +136,7 @@
 - [Realtime Media Session, Meeting Intelligence, and Avatar Model](./product/architecture/realtime-media-session-architecture.md) (public | Ecosystem Architect)
 - [Remote Compute Actuator and Seam Provider Model](./product/architecture/remote-compute-actuator-model.md) (public | Ecosystem Architect)
 - [Resident Dot Model — always-on agents in Kyberion](./product/architecture/resident-dot-model.md) (public | Ecosystem Architect)
+- [Runtime Storage Layout](./product/architecture/runtime-storage-layout.md) (public | Unknown)
 - [SDLC Gating Model](./product/architecture/sdlc-gating-model.md) (public | Kyberion)
 - [Satellite Architecture Model (Hybrid-C)](./product/architecture/satellite-model.md) (public | Unknown)
 - [Seam Provider Selection — Choosing Between Providers of the Same Function](./product/architecture/seam-provider-selection.md) (public | ecosystem_architect)

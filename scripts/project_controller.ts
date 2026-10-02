@@ -156,7 +156,9 @@ async function mainImpl(args: string[] = []): Promise<void> {
         printOutput(
           `tracks=${view.tracks.length} tasks=${view.lineage.tasks.length} missions=${view.missions.length} task_sessions=${view.task_sessions.length} pipelines=${view.lineage.pipelines.length}`
         );
-        printOutput(`operational_states=${view.operational_states.length}`);
+        printOutput(
+          `archived_missions=${view.archived_missions.length} artifacts=${view.artifacts.length} operational_states=${view.operational_states.length}`
+        );
         printOutput('hierarchy=Project -> Track -> Mission -> Task / Task Session');
         printOutput(
           'Task is a work item; Task Session is the resumable execution context and does not own the Task.'

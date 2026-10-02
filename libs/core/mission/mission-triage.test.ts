@@ -122,6 +122,33 @@ describe('collectMissionTriageReport', () => {
     expect(report.recommendation.commands.join(' ')).toContain('archive --mission');
   });
 
+  it('finds a finished mission in the archive instead of reporting not_found', () => {
+    const archivedId = 'MSN-TRIAGE-ARCHIVED';
+    const archiveDir = pathResolver.archivedMissionDir(archivedId);
+    try {
+      safeMkdir(archiveDir, { recursive: true });
+      safeWriteFile(
+        nodePath.join(archiveDir, 'mission-state.json'),
+        JSON.stringify({
+          mission_id: archivedId,
+          tier: 'public',
+          status: 'archived',
+          execution_mode: 'local',
+          priority: 1,
+          assigned_persona: 'triage-test-actor',
+          confidence_score: 1,
+          git: { branch: 'test', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+          history: [],
+        })
+      );
+      const report = collectMissionTriageReport(archivedId);
+      expect(report.classification).toBe('terminal');
+      expect(report.status).toBe('archived');
+    } finally {
+      safeRmSync(archiveDir, { recursive: true, force: true });
+    }
+  });
+
   it('classifies a distilling mission with pending tasks as unfinished_tasks', () => {
     prepareMission('distilling', {}, [pendingTask]);
     const report = collectMissionTriageReport(missionId);

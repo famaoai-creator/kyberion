@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
-import { loadProjectRecord } from './project-registry.js';
+import { loadProjectRecord, saveProjectRecord } from './project-registry.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -12,9 +12,15 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import {
-  saveProjectMissionLink,
+  projectOperationalTrackStatePath,
   saveProjectTrackState,
 } from './project-operational-state-links.js';
+import { listProjectTracksForProject } from './project-track-registry.js';
+import { readJson } from '../foundation/json.js';
+import {
+  ACTIVE_PROJECT_MISSION_STATUSES,
+  deriveProjectMissionIndex,
+} from './project-mission-index.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 
 export {
@@ -387,6 +393,27 @@ export function listProjectOperationalStatePaths(
   return projectStateFilesForQuery(query).sort();
 }
 
+interface TrackStateSnapshot {
+  name?: string;
+  summary?: string;
+  lifecycle_model?: string;
+  required_artifacts?: string[];
+}
+
+function readTrackStateIfExists(
+  projectId: string,
+  tier: ProjectOperationalState['tier'],
+  tenantSlug: string | undefined,
+  trackId: string
+): TrackStateSnapshot | null {
+  try {
+    const trackPath = projectOperationalTrackStatePath(projectId, tier, tenantSlug, trackId);
+    return safeExistsSync(trackPath) ? readJson<TrackStateSnapshot>(trackPath) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 function readProjectStateIfExists(
   projectId: string,
   tier: ProjectOperationalState['tier'],
@@ -399,46 +426,6 @@ function readProjectStateIfExists(
   } catch (_) {
     return null;
   }
-}
-
-function listProjectStateFiles(rootDir: string): string[] {
-  if (!safeExistsSync(rootDir)) return [];
-  const entries = safeReaddir(rootDir);
-  const files: string[] = [];
-  for (const entry of entries) {
-    const fullPath = path.join(rootDir, entry);
-    if (!safeExistsSync(fullPath)) continue;
-    const stat = safeStat(fullPath);
-    if (stat.isDirectory()) {
-      files.push(...listProjectStateFiles(fullPath));
-      continue;
-    }
-    if (entry === STATE_FILE_NAME) files.push(fullPath);
-  }
-  return files;
-}
-
-function loadAllProjectStateRecords(projectId: string): Array<{
-  tier: ProjectOperationalState['tier'];
-  tenant_slug?: string;
-  record: ProjectOperationalState;
-}> {
-  const files = listProjectStateFiles(STATE_ROOT);
-  const records: Array<{
-    tier: ProjectOperationalState['tier'];
-    tenant_slug?: string;
-    record: ProjectOperationalState;
-  }> = [];
-  for (const filePath of files) {
-    try {
-      const parsed = projectOperationalStateFileCatalog(filePath).load();
-      if (parsed.project_id !== projectId) continue;
-      records.push({ tier: parsed.tier, tenant_slug: parsed.tenant_slug, record: parsed });
-    } catch (_) {
-      continue;
-    }
-  }
-  return records;
 }
 
 function collectSourceRefs(input: ProjectOperationalStateMissionContext): string[] {
@@ -516,71 +503,88 @@ export function syncProjectOperationalStateFromMission(
       updated_at: nowIso(),
     } satisfies ProjectOperationalState);
 
-  const missionLinkPath = saveProjectMissionLink({
-    project_id: projectId,
+  // Membership is derived from mission state (relationships.project/track),
+  // the single source of truth — never accumulated here. The per-mission
+  // mission-link.json is no longer written: nothing read it.
+  const index = deriveProjectMissionIndex(projectId, {
     tier: input.tier,
-    tenant_slug: tenantSlug,
-    mission_id: input.mission_id,
-    relationship_type: relationships.project?.relationship_type || 'independent',
-    summary:
-      relationships.project?.note ||
-      input.outcome_contract?.requested_result ||
-      input.mission_type ||
-      'mission',
-    status: input.status,
-    evidence_refs: input.context?.mission_finish_trace_persisted_path
-      ? [input.context.mission_finish_trace_persisted_path]
-      : [],
+    tenant: tenantSlug || 'shared',
   });
+  const isActive = ACTIVE_PROJECT_MISSION_STATUSES.has(input.status);
 
   const trackId = relationships.track?.track_id?.trim();
-  if (trackId) {
+  // Registered active tracks stay active with no missions yet — the same rule
+  // `pnpm project reconcile` applies, so sync and reconcile never disagree.
+  const registeredActiveTrackIds = listProjectTracksForProject(projectId)
+    .filter(
+      (track) =>
+        track.status === 'active' &&
+        track.tier === input.tier &&
+        // A tenantless track belongs to its project's tenant (isTrackInProjectScope).
+        (track.tenant_slug || existingProject?.tenant_slug || 'shared') === (tenantSlug || 'shared')
+    )
+    .map((track) => track.track_id);
+  // Rebuild every track this sync can affect: the mission's current track and
+  // tracks previously active in this scope (a mission that left a track must
+  // leave its projection too).
+  const previousState = readProjectStateIfExists(projectId, input.tier, tenantSlug);
+  const tracksToRebuild = new Set<string>([
+    ...(trackId ? [trackId] : []),
+    ...(previousState?.active_track_ids || []),
+  ]);
+  for (const rebuildTrackId of tracksToRebuild) {
+    const trackActiveMissionIds = index.activeMissionIdsByTrack.get(rebuildTrackId) || [];
+    const isCurrentTrack = rebuildTrackId === trackId;
+    const existing = readTrackStateIfExists(projectId, input.tier, tenantSlug, rebuildTrackId);
+    if (!isCurrentTrack && !existing) continue;
     saveProjectTrackState({
       project_id: projectId,
       tier: input.tier,
       tenant_slug: tenantSlug,
-      track_id: trackId,
-      name: relationships.track?.track_name || trackId,
-      summary: relationships.track?.note || relationships.track?.track_name || trackId,
+      track_id: rebuildTrackId,
+      name: (isCurrentTrack && relationships.track?.track_name) || existing?.name || rebuildTrackId,
+      summary:
+        (isCurrentTrack && (relationships.track?.note || relationships.track?.track_name)) ||
+        existing?.summary ||
+        rebuildTrackId,
+      // A track stays active while any of its missions is active; otherwise it
+      // reflects how its last mission ended.
       status:
-        input.status === 'archived'
-          ? 'archived'
-          : input.status === 'completed'
+        trackActiveMissionIds.length > 0 || registeredActiveTrackIds.includes(rebuildTrackId)
+          ? 'active'
+          : !isCurrentTrack
             ? 'completed'
-            : input.status === 'paused'
-              ? 'paused'
-              : 'active',
-      lifecycle_model: relationships.track?.lifecycle_model,
-      required_artifacts: [],
-      active_mission_ids: input.status === 'archived' ? [] : [input.mission_id],
+            : input.status === 'archived' || input.status === 'completed'
+              ? input.status
+              : input.status === 'failed'
+                ? 'failed'
+                : 'completed',
+      lifecycle_model:
+        (isCurrentTrack && relationships.track?.lifecycle_model) || existing?.lifecycle_model,
+      required_artifacts: existing?.required_artifacts || [],
+      active_mission_ids: trackActiveMissionIds,
     });
   }
 
-  const allStates = loadAllProjectStateRecords(projectId).filter(
-    (entry) => entry.record.tenant_slug === tenantSlug && entry.tier === input.tier
-  );
   const projectStateDirPath = projectOperationalStateDir(projectId, input.tier, tenantSlug);
-  const missionStates: Array<{ record: ProjectOperationalState }> = allStates;
-  const activeMissionIds = new Set<string>();
-  const activeTrackIds = new Set<string>();
-  const sourceRefs = new Set<string>(collectSourceRefs(input));
-  for (const entry of missionStates) {
-    const record = entry.record;
-    if (record.status !== 'archived') {
-      if (record.active_mission_ids?.length) {
-        for (const missionId of record.active_mission_ids) activeMissionIds.add(missionId);
-      }
-      if (record.active_track_ids?.length) {
-        for (const id of record.active_track_ids) activeTrackIds.add(id);
-      }
-    }
-    for (const ref of record.source_refs || []) sourceRefs.add(ref);
-    for (const knowledgeRef of record.knowledge_refs || []) {
-      if (knowledgeRef) sourceRefs.add(knowledgeRef);
-    }
+  const activeMissionIds = new Set<string>(index.activeMissionIds);
+  const activeTrackIds = new Set<string>([...index.activeTrackIds, ...registeredActiveTrackIds]);
+  // Refs accumulate within this scope's own state only. (This used to walk
+  // every tier under active/projects/, which failed the whole sync for roles
+  // that may not read the confidential tier.)
+  const sourceRefs = new Set<string>([
+    ...collectSourceRefs(input),
+    ...(projectState.source_refs || []),
+    ...(projectState.knowledge_refs || []).filter(Boolean),
+  ]);
+  // The syncing mission may be mid-transition (its state is passed in, not
+  // yet re-read from disk): apply its current status explicitly.
+  if (isActive) {
+    activeMissionIds.add(input.mission_id);
+    if (trackId) activeTrackIds.add(trackId);
+  } else {
+    activeMissionIds.delete(input.mission_id);
   }
-  if (input.status !== 'archived') activeMissionIds.add(input.mission_id);
-  if (trackId) activeTrackIds.add(trackId);
 
   const knowledgeRefs = new Set<string>(projectState.knowledge_refs || []);
   const distillTarget = `knowledge/product/evolution/projects/${projectId}/project-state.md`;
@@ -655,7 +659,6 @@ export function syncProjectOperationalStateFromMission(
     updated_at: nowIso(),
     metadata: {
       ...(projectState.metadata || {}),
-      mission_link_path: missionLinkPath,
       project_state_dir: projectStateDirPath,
       last_mission_id: input.mission_id,
       last_mission_status: input.status,
@@ -664,5 +667,35 @@ export function syncProjectOperationalStateFromMission(
     },
   };
 
-  return saveProjectOperationalState(nextState);
+  const savedPath = saveProjectOperationalState(nextState);
+  if (existingProject) refreshProjectRecordActiveLists(projectId, nextState);
+  return savedPath;
+}
+
+/**
+ * Keep the project record's active lists a projection of the same index and
+ * track rule as `pnpm project reconcile --apply`, so readers such as the
+ * organization lineage stop seeing a stale `active_missions`. The record is
+ * re-read right before the write and only the two lists are patched, so a
+ * concurrent `pnpm project` edit to other fields is not overwritten.
+ */
+function refreshProjectRecordActiveLists(projectId: string, state: ProjectOperationalState): void {
+  const project = loadProjectRecord(projectId);
+  if (!project) return;
+  if (
+    state.tier !== project.tier ||
+    (state.tenant_slug || 'shared') !== (project.tenant_slug || 'shared')
+  ) {
+    return;
+  }
+  const activeMissions = [...state.active_mission_ids].sort();
+  const activeTracks = [...state.active_track_ids].sort();
+  if (
+    JSON.stringify([...(project.active_missions || [])].sort()) ===
+      JSON.stringify(activeMissions) &&
+    JSON.stringify([...(project.active_tracks || [])].sort()) === JSON.stringify(activeTracks)
+  ) {
+    return;
+  }
+  saveProjectRecord({ ...project, active_missions: activeMissions, active_tracks: activeTracks });
 }
