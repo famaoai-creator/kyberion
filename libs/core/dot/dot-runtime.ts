@@ -40,16 +40,11 @@ import { appendJsonLine, readJsonLines, writeJson } from '../foundation/json.js'
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { getZonedDateParts, matchesCron } from '../pipeline/cron-utils.js';
 import { recordDaemonHeartbeat } from '../daemon-heartbeat.js';
-import {
-  estimateGoalTurnTokensFromText,
-  runGoalDrivenLoop,
-  type GoalDrivenLoopResult,
-  type RunGoalDrivenLoopOptions,
-} from '../workforce/worker-goal-driver.js';
 import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
 import type { ReasoningBackend } from '../reasoning/reasoning-backend-contracts.js';
 import type { DelegationHandle } from '../delegated-task-observability.js';
 import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
+import { estimateTokens } from '../workforce/worker-context-compaction.js';
 import {
   listDotCharters,
   type DotCharter,
@@ -67,6 +62,42 @@ export const DOT_WATCH_STATE_PATH = 'active/shared/runtime/dot-watch-state.json'
 export const DOT_WAKE_RETRY_AFTER_MS = 5 * 60 * 1000;
 /** Ceiling for a delegated-turn wake when the charter sets no wall clock. */
 const DEFAULT_DELEGATED_WAKE_TIMEOUT_MS = 15 * 60 * 1000;
+
+/**
+ * Port for the goal-driven loop. Domain must not import the orchestration
+ * driver (`worker-goal-driver`); callers under scripts / supervisor inject
+ * `runGoalDrivenLoop` (or a test double) through {@link DotRuntimeDeps.runLoop}.
+ */
+export interface DotWakeLoopOptions {
+  objective: string;
+  goalId?: string;
+  systemPrompt?: string;
+  toolRole?: string;
+  maxTurns?: number;
+  budget?: {
+    wallClockBudgetMs?: number;
+    turnBudget?: number;
+  };
+}
+
+/** Minimal wake receipt shape — only the fields the ledger/CLI need. */
+export interface DotWakeLoopResult {
+  turnsRun: number;
+  finalState?: string;
+  goal: { budgetStats?: { tokensUsed?: number } };
+}
+
+/** Same ~3-chars/token heuristic as the goal driver; governance-grade only. */
+function estimateWakeTokensFromText(input: {
+  prompt: string;
+  result: { text?: string; toolCalls?: Array<{ name: string; input: unknown }> };
+}): number {
+  const responseText = [
+    input.result.text ?? '',
+    ...(input.result.toolCalls ?? []).map((call) => `${call.name} ${JSON.stringify(call.input)}`),
+  ].join(' ');
+  return estimateTokens(input.prompt) + estimateTokens(responseText);
+}
 
 export type DotWakeOutcome = 'delivered' | 'skipped' | 'failed' | 'rejected';
 
@@ -106,8 +137,12 @@ export interface DueDotTrigger {
 export interface DotRuntimeDeps {
   rootDir?: string;
   now?: () => Date;
-  /** Injectable for hermetic tests; defaults to runGoalDrivenLoop. */
-  runLoop?: (options: RunGoalDrivenLoopOptions) => Promise<GoalDrivenLoopResult>;
+  /**
+   * Goal-loop port. Required when the backend exposes `generateWithTools`.
+   * Orchestration callers inject `runGoalDrivenLoop`; tests inject a stub.
+   * Domain never defaults to the orchestration driver (layer boundary).
+   */
+  runLoop?: (options: DotWakeLoopOptions) => Promise<DotWakeLoopResult>;
   /**
    * Injectable backend; defaults to getReasoningBackend(). When the backend
    * lacks `generateWithTools` (local shell CLIs), the wake degrades to a
@@ -428,7 +463,7 @@ export interface DotWakeReceipt {
   dot_id: string;
   outcome: DotWakeOutcome;
   reason?: string;
-  result?: GoalDrivenLoopResult;
+  result?: DotWakeLoopResult;
 }
 
 function dotSystemPrompt(charter: DotCharter): string {
@@ -568,7 +603,7 @@ export async function runDotWake(
           prompt,
           budget?.wall_clock_ms_per_wake ?? DEFAULT_DELEGATED_WAKE_TIMEOUT_MS
         );
-        const tokens = estimateGoalTurnTokensFromText({
+        const tokens = estimateWakeTokensFromText({
           prompt,
           result: { text, toolCalls: [] },
         });
@@ -584,7 +619,12 @@ export async function runDotWake(
         });
         return { dot_id: current.dot_id, outcome: 'delivered', reason: 'delegated-turn' };
       }
-      const runLoop = deps.runLoop ?? runGoalDrivenLoop;
+      const runLoop = deps.runLoop;
+      if (!runLoop) {
+        throw new Error(
+          'runDotWake requires deps.runLoop when the backend supports generateWithTools (orchestration must inject the goal driver)'
+        );
+      }
       const result = await runLoop({
         objective: wakePrompt(current, deps.trigger),
         goalId: `dot-${current.dot_id}`,

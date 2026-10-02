@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
-import type { GoalDrivenLoopResult } from '../workforce/worker-goal-driver.js';
 import type { DotCharter } from './dot-charter.js';
 import {
   DOT_INBOX_PATH,
@@ -14,6 +13,7 @@ import {
   recordDotTokenUsage,
   recordDotWatchSnapshot,
   runDotWake,
+  type DotWakeLoopResult,
 } from './dot-runtime.js';
 
 const TEST_ROOT = 'active/shared/tmp/dot-runtime-tests';
@@ -43,15 +43,12 @@ function writeCharter(charter: unknown, name = 'dot.json'): void {
   safeWriteFile(`${TEST_ROOT}/dots/${name}`, JSON.stringify(charter, null, 2) + '\n');
 }
 
-function fakeResult(turns: number, tokens: number): GoalDrivenLoopResult {
+function fakeResult(turns: number, tokens: number): DotWakeLoopResult {
   return {
-    goalId: 'g',
     finalState: 'completed',
-    goal: { budgetStats: { tokensUsed: tokens, turnsUsed: turns, wallClockMsUsed: 0 } },
+    goal: { budgetStats: { tokensUsed: tokens } },
     turnsRun: turns,
-    rewindCount: 0,
-    persisted: null,
-  } as unknown as GoalDrivenLoopResult;
+  };
 }
 
 afterEach(() => {
