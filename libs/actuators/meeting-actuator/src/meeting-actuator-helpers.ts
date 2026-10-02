@@ -38,7 +38,7 @@ import {
   DEFAULT_PIPELINE_TIMEOUT_MS,
 } from '@agent/core/execution-bounds';
 
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator/actuator-trace';
 import { resolveIdentityContext } from '@agent/core/authority';
 import {
@@ -271,13 +271,7 @@ export interface MeetingActionResult {
 const MEETING_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/meeting-actuator/manifest.json'
 );
-const DEFAULT_MEETING_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 5000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_MEETING_RETRY = getRetryDefaults('meeting');
 
 function isPlainObject(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);

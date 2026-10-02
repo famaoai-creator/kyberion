@@ -60,7 +60,29 @@ vi.mock('@agent/core/secure-io', () => ({
   safeExec: vi.fn(),
   safeOpenAppendFile: vi.fn(),
 }));
-vi.mock('@agent/core/async-utils', () => ({ retry: mocks.retry }));
+vi.mock('@agent/core/async-utils', () => ({
+  retry: mocks.retry,
+  getRetryDefaults: vi.fn(() => ({
+    maxRetries: 2,
+    initialDelayMs: 250,
+    maxDelayMs: 2000,
+    factor: 2,
+    jitter: true,
+  })),
+  loadRetryPolicy: vi.fn(() => ({
+    version: '1.0.0',
+    defaults: { maxRetries: 2, initialDelayMs: 500, maxDelayMs: 5000, factor: 2, jitter: true },
+    actuators: {
+      'service-actuator': {
+        maxRetries: 2,
+        initialDelayMs: 250,
+        maxDelayMs: 2000,
+        factor: 2,
+        jitter: true,
+      },
+    },
+  })),
+}));
 vi.mock('@agent/core/tool/runtime-supervisor', () => ({
   runtimeSupervisor: mocks.runtimeSupervisor,
 }));

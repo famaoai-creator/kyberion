@@ -16,7 +16,7 @@ import {
 } from '@agent/core/locale-normalize';
 import { createServer } from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
-import { spawn, type ChildProcess } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import * as path from 'node:path';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
@@ -61,7 +61,6 @@ import {
 } from '@agent/core/surface/channel-surface';
 import {
   assertSafeRepositoryPath,
-  buildSafeExecEnv,
   safeReadFile,
   safeExistsSync,
   safeLstat,
@@ -82,6 +81,8 @@ import {
   readVoiceHubEventScope,
   readVoiceHubRequestObject,
 } from './request-input.js';
+// C7: shared supervised spawn/stop (cmd/args/stop-signal preserved).
+import { spawnSupervisedChild, stopSupervisedChild } from '../shared/supervise-child.js';
 import { STT_ADAPTER_BEHAVIORS } from './voice-stt-transcribe.js';
 import {
   createVoiceHubSpeechSynthesizeHandler,
@@ -291,12 +292,11 @@ async function listVoiceInputDevices(): Promise<{
 
 async function convertWavForWhisper(inputPath: string, outputPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(
+    // C7: shared supervised spawn (cmd/args/stdio preserved; cwd+env via helper defaults).
+    const child = spawnSupervisedChild(
       '/usr/bin/afconvert',
       ['-f', 'WAVE', '-d', 'LEI16@16000', '-c', '1', inputPath, outputPath],
       {
-        cwd: pathResolver.rootDir(),
-        env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
         stdio: ['ignore', 'pipe', 'pipe'],
       }
     );
@@ -383,12 +383,8 @@ async function stopSpeechPlayback(
   const child = activeSpeechProcess;
   activeSpeechProcess = null;
   activeSpeechState = { status: 'idle' };
-  try {
-    child.kill('SIGTERM');
-  } catch (_) {
-    return { ok: true, stopped: false, reason };
-  }
-  return { ok: true, stopped: true, reason };
+  // C7: shared supervised stop (SIGTERM preserved).
+  return { ok: true, stopped: stopSupervisedChild(child, 'SIGTERM'), reason };
 }
 
 async function runVoiceTtsPythonBridge(
@@ -444,9 +440,8 @@ async function runVoiceTtsPythonBridge(
 
   try {
     await new Promise<void>((resolve, reject) => {
-      const child = spawn(pythonBin, [bridgeScript], {
-        cwd: pathResolver.rootDir(),
-        env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
+      // C7: shared supervised spawn (cmd/args/stdio preserved; cwd+env via helper defaults).
+      const child = spawnSupervisedChild(pythonBin, [bridgeScript], {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
       let stdout = '';
@@ -502,9 +497,8 @@ async function playVoiceArtifact(
   const safeArtifactPath = resolveRegularRepositoryFile(artifactPath, 'TTS artifact');
   const estimatedMs = readWavDurationMs(safeArtifactPath) ?? estimateHostSpeechMs(text);
   await new Promise<void>((resolve, reject) => {
-    const player = spawn('/usr/bin/afplay', [safeArtifactPath], {
-      cwd: pathResolver.rootDir(),
-      env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
+    // C7: shared supervised spawn (cmd/args/stdio preserved; cwd+env via helper defaults).
+    const player = spawnSupervisedChild('/usr/bin/afplay', [safeArtifactPath], {
       stdio: ['ignore', 'ignore', 'pipe'],
     });
     activeSpeechProcess = player;
@@ -582,9 +576,8 @@ const TTS_ADAPTER_BEHAVIORS: Record<
       rate: languageProfile.rate,
     });
     if (!command) throw new Error(`Native TTS is unsupported on ${process.platform}`);
-    const child = spawn(command.cmd, command.args, {
-      cwd: pathResolver.rootDir(),
-      env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
+    // C7: shared supervised spawn (cmd/args/stdio preserved; cwd+env via helper defaults).
+    const child = spawnSupervisedChild(command.cmd, command.args, {
       stdio: ['ignore', 'ignore', 'pipe'],
     });
     activeSpeechProcess = child;

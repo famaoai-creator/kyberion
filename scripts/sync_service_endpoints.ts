@@ -15,6 +15,7 @@ const SNAPSHOT_PATH = pathResolver.rootResolve(
 type ServiceEndpointPayload = {
   default_pattern: string;
   version?: string;
+  defaults?: Record<string, unknown>;
   services: Record<string, Record<string, unknown>>;
 };
 
@@ -51,6 +52,7 @@ function render(): GeneratedFile[] {
     services: {},
   };
   let version = '';
+  const mergedDefaults: Record<string, unknown> = {};
 
   for (const file of files) {
     const filePath = path.join(DIRECTORY, file);
@@ -78,12 +80,21 @@ function render(): GeneratedFile[] {
       throw new Error(`Service endpoints version mismatch in ${file}`);
     }
 
+    for (const [key, value] of Object.entries(payload.defaults || {})) {
+      if (!(key in mergedDefaults)) {
+        mergedDefaults[key] = value;
+      } else if (mergedDefaults[key] !== value) {
+        throw new Error(`Service endpoints defaults mismatch for "${key}" in ${file}`);
+      }
+    }
+
     merged.services[serviceId] = payload.services[serviceId];
   }
 
   const snapshot: Record<string, unknown> = {
     ...(version ? { version } : {}),
     default_pattern: merged.default_pattern,
+    ...(Object.keys(mergedDefaults).length > 0 ? { defaults: mergedDefaults } : {}),
     services: Object.keys(merged.services)
       .sort()
       .reduce<Record<string, Record<string, unknown>>>((acc, serviceId) => {

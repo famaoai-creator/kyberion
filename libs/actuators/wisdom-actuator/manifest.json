@@ -6,14 +6,7 @@
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "wisdom_boundary_retry",
-    "retry": {
-      "maxRetries": 2,
-      "initialDelayMs": 250,
-      "maxDelayMs": 2000,
-      "factor": 2,
-      "jitter": true
-    },
-    "retryable_categories": ["resource_unavailable", "timeout", "network"]
+    "retry_profile": "wisdom-actuator"
   },
   "capabilities": [
     {

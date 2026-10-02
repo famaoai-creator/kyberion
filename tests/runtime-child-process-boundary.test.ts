@@ -59,10 +59,6 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/video/video-render-backend.ts',
   'libs/core/virtual/virtual-audio-input-recording-bridge.ts',
   'satellites/voice-hub/server.ts',
-  'satellites/voice-hub/speech-synthesis-runtime.ts',
-  // Extracted from the voice-hub server: one-shot whisper.cpp and managed-python
-  // STT spawns, the same ephemeral pattern as speech-to-text-bridge.
-  'satellites/voice-hub/voice-stt-transcribe.ts',
 ].sort((a, b) => a.localeCompare(b));
 
 function normalize(relPath: string): string {

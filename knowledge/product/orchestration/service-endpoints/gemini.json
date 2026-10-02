@@ -6,7 +6,8 @@
       "preset_path": "knowledge/product/orchestration/service-presets/gemini.json",
       "credential_suffixes": {
         "accessToken": ["API_KEY"]
-      }
+      },
+      "auth_strategy": "api_key_query"
     }
   }
 }

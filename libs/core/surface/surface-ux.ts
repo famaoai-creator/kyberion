@@ -1,3 +1,7 @@
+import {
+  getCredentialSuffixSchemaDefaults,
+  type CredentialSuffixMap,
+} from '../service/service-endpoint-registry.js';
 import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
 import { secretGuard } from '../secret/secret-guard.js';
 import {
@@ -61,6 +65,22 @@ export interface SurfaceRecoveryAction {
   next_step?: string;
   command?: string;
   fallback?: string;
+}
+
+export function resolveSurfaceRequiredSecrets(
+  serviceId: string,
+  strategy: string,
+  suffixes: CredentialSuffixMap
+): string[] {
+  const candidates =
+    strategy === 'bearer'
+      ? suffixes.accessToken
+      : strategy === 'basic'
+        ? [...suffixes.clientId, ...suffixes.clientSecret, ...suffixes.basicAuthToken]
+        : strategy === 'session'
+          ? [...suffixes.clientId, ...suffixes.clientSecret, ...suffixes.redirectUri]
+          : [];
+  return Array.from(new Set(candidates)).map((suffix) => `${serviceId.toUpperCase()}_${suffix}`);
 }
 
 export interface SurfaceLauncherRecommendation {
@@ -149,26 +169,8 @@ function inspectSurfaceAuthReadOnly(
   const policy = getServicePresetPolicy(preset);
   const strategy = (policy.auth_strategy || 'none').toLowerCase();
   const endpoint = getServiceEndpointRecord(serviceId);
-  const suffixes = endpoint?.credential_suffixes || {};
-  const requiredSecrets = Array.from(
-    new Set(
-      strategy === 'bearer'
-        ? [...(suffixes.accessToken || ['ACCESS_TOKEN', 'BOT_TOKEN', 'TOKEN'])]
-        : strategy === 'basic'
-          ? [
-              ...(suffixes.clientId || ['CLIENT_ID']),
-              ...(suffixes.clientSecret || ['CLIENT_SECRET']),
-              ...(suffixes.accessToken || ['ACCESS_TOKEN']),
-            ]
-          : strategy === 'session'
-            ? [
-                ...(suffixes.clientId || ['CLIENT_ID']),
-                ...(suffixes.clientSecret || ['CLIENT_SECRET']),
-                ...(suffixes.redirectUri || ['REDIRECT_URI']),
-              ]
-            : []
-    )
-  ).map((suffix) => `${serviceId.toUpperCase()}_${suffix}`);
+  const suffixes = endpoint?.credential_suffixes || getCredentialSuffixSchemaDefaults();
+  const requiredSecrets = resolveSurfaceRequiredSecrets(serviceId, strategy, suffixes);
   const hasAnySecret = requiredSecrets.some((envName) => Boolean(secretGuard.getSecret(envName)));
 
   if (strategy === 'session') {

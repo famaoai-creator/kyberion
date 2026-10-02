@@ -1,4 +1,5 @@
 import { extractSurfaceBlocks, sanitizeSurfaceReplyText } from './surface-response-blocks.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 import { t } from '../t.js';
 import { detectTextLocale } from '../locale-normalize.js';
 import { resolveLocale } from '../locale.js';
@@ -107,6 +108,90 @@ export function buildDelegationSummaryContext(params: {
   return lines.join('\n');
 }
 
+export type ServiceCandidateChoice =
+  | string
+  | {
+      service_name?: string;
+      service_id?: string;
+      surface_id?: string;
+      description?: string;
+      kind?: string;
+      startup_mode?: string;
+    };
+
+function appendServiceCandidateLines(
+  lines: string[],
+  serviceOptions: ServiceCandidateChoice[],
+  headerKey: 'surface:task_reply_stop_candidates' | 'surface:task_reply_start_candidates',
+  promptKey: 'surface:task_reply_stop_prompt' | 'surface:task_reply_start_prompt'
+): void {
+  lines.push(t(headerKey));
+  serviceOptions.forEach((choice, index) => {
+    const serviceName =
+      typeof choice === 'string'
+        ? choice
+        : choice.service_name || choice.surface_id || choice.service_id || 'unknown';
+    const serviceId =
+      typeof choice === 'string'
+        ? undefined
+        : choice.service_id && choice.service_id !== serviceName
+          ? choice.service_id
+          : undefined;
+    const description = typeof choice === 'string' ? undefined : choice.description;
+    lines.push(
+      `  ${index + 1}. ${serviceName}${serviceId ? ` (service: ${serviceId})` : ''}${description ? ` - ${description}` : ''}`
+    );
+  });
+  lines.push(t(promptKey));
+}
+
+export type ServiceOptionSectionProvider = (
+  serviceOptions: ServiceCandidateChoice[],
+  lines: string[]
+) => void;
+
+const serviceOptionSectionSeam = createSeam<ServiceOptionSectionProvider>({
+  key: 'surface-task-reply-section',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+
+export function registerServiceOptionSection(
+  intentId: string,
+  provider: ServiceOptionSectionProvider,
+  metadata: SeamProviderMetadata = {
+    provenance: 'builtin',
+    source: 'libs/core/surface/surface-runtime-helpers.ts',
+  }
+): () => void {
+  return serviceOptionSectionSeam.register(intentId, provider, metadata);
+}
+
+export function getServiceOptionSection(
+  intentId: string | undefined
+): ServiceOptionSectionProvider | undefined {
+  if (!intentId) return undefined;
+  return serviceOptionSectionSeam.getOptional(intentId);
+}
+
+registerServiceOptionSection('stop-service', (serviceOptions, lines) =>
+  appendServiceCandidateLines(
+    lines,
+    serviceOptions,
+    'surface:task_reply_stop_candidates',
+    'surface:task_reply_stop_prompt'
+  )
+);
+
+registerServiceOptionSection('start-service', (serviceOptions, lines) =>
+  appendServiceCandidateLines(
+    lines,
+    serviceOptions,
+    'surface:task_reply_start_candidates',
+    'surface:task_reply_start_prompt'
+  )
+);
+
 function buildTaskSessionReply(params: {
   session: { session_id: string };
   status: 'completed' | 'failed' | 'pending';
@@ -119,17 +204,7 @@ function buildTaskSessionReply(params: {
   kind?: string;
   completionSummary?: string[];
   approvalRequired?: boolean;
-  serviceOptions?: Array<
-    | string
-    | {
-        service_name?: string;
-        service_id?: string;
-        surface_id?: string;
-        description?: string;
-        kind?: string;
-        startup_mode?: string;
-      }
-  >;
+  serviceOptions?: ServiceCandidateChoice[];
 }): string {
   const lines: string[] = [];
   const isScheduleCoordination = params.intentId === 'schedule-coordination';
@@ -194,47 +269,10 @@ function buildTaskSessionReply(params: {
     lines.push(t('dock.intent_resolution.approval_action'));
   }
 
-  const serviceOptions = params.serviceOptions || [];
-  if (params.intentId === 'stop-service' && serviceOptions.length > 0) {
-    lines.push(t('surface:task_reply_stop_candidates'));
-    serviceOptions.forEach((choice, index) => {
-      const serviceName =
-        typeof choice === 'string'
-          ? choice
-          : choice.service_name || choice.surface_id || choice.service_id || 'unknown';
-      const serviceId =
-        typeof choice === 'string'
-          ? undefined
-          : choice.service_id && choice.service_id !== serviceName
-            ? choice.service_id
-            : undefined;
-      const description = typeof choice === 'string' ? undefined : choice.description;
-      lines.push(
-        `  ${index + 1}. ${serviceName}${serviceId ? ` (service: ${serviceId})` : ''}${description ? ` - ${description}` : ''}`
-      );
-    });
-    lines.push(t('surface:task_reply_stop_prompt'));
-  }
-
-  if (params.intentId === 'start-service' && serviceOptions.length > 0) {
-    lines.push(t('surface:task_reply_start_candidates'));
-    serviceOptions.forEach((choice, index) => {
-      const serviceName =
-        typeof choice === 'string'
-          ? choice
-          : choice.service_name || choice.surface_id || choice.service_id || 'unknown';
-      const serviceId =
-        typeof choice === 'string'
-          ? undefined
-          : choice.service_id && choice.service_id !== serviceName
-            ? choice.service_id
-            : undefined;
-      const description = typeof choice === 'string' ? undefined : choice.description;
-      lines.push(
-        `  ${index + 1}. ${serviceName}${serviceId ? ` (service: ${serviceId})` : ''}${description ? ` - ${description}` : ''}`
-      );
-    });
-    lines.push(t('surface:task_reply_start_prompt'));
+  const serviceOptions: ServiceCandidateChoice[] = params.serviceOptions || [];
+  const serviceSection = getServiceOptionSection(params.intentId);
+  if (serviceSection && serviceOptions.length > 0) {
+    serviceSection(serviceOptions, lines);
   }
 
   if (params.handoffIntentId) {

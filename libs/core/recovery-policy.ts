@@ -1,3 +1,4 @@
+import { loadRetryPolicy } from './async-utils.js';
 import { classifyError } from './error-classifier.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
@@ -53,7 +54,16 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 /** Load only the recovery_policy envelope from an actuator manifest. */
 export function loadRecoveryPolicy(manifestPath: string): RecoveryPolicy {
   const manifest = getManifestCatalog(manifestPath).load();
-  return isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+  const policy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
+  if (typeof policy.retry_profile !== 'string') return policy;
+  const profile = loadRetryPolicy().actuators?.[policy.retry_profile];
+  if (!profile) throw new Error(`Unknown actuator retry profile: ${policy.retry_profile}`);
+  const { retryable_categories, ...retry } = profile;
+  return {
+    ...policy,
+    retry: { ...retry, ...(isPlainObject(policy.retry) ? policy.retry : {}) },
+    ...(retryable_categories ? { retryable_categories } : {}),
+  };
 }
 
 /**

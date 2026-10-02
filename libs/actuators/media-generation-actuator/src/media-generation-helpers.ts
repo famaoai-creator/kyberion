@@ -3,7 +3,7 @@ import { executeServicePreset } from '@agent/core/service/service-engine';
 import { pathResolver } from '@agent/core/path-resolver';
 import { loadRecoveryPolicy as loadCoreRecoveryPolicy } from '@agent/core/recovery-policy';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
-import { retry, sleep } from '@agent/core/async-utils';
+import { retry, sleep, getRetryDefaults } from '@agent/core/async-utils';
 import {
   compileMusicGenerationADF,
   buildMusicPromptFromAdf,
@@ -76,13 +76,7 @@ const GENERATION_JOB_DIR = 'active/shared/runtime/media-generation/jobs';
 const MEDIA_GENERATION_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/media-generation-actuator/manifest.json'
 );
-const DEFAULT_MEDIA_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 10000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_MEDIA_RETRY = getRetryDefaults('media-generation-actuator:defaults');
 const GENERATION_JOB_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/generation-job.schema.json'
 );

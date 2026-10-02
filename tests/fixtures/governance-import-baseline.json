@@ -222,8 +222,6 @@
     "libs/core/voice/audio-playback.ts",
     "libs/core/voice/speech-to-text-bridge.ts",
     "satellites/voice-hub/server.ts",
-    "satellites/voice-hub/speech-synthesis-runtime.ts",
-    "satellites/voice-hub/voice-stt-transcribe.ts",
     "scripts/agy_profile_controller.ts",
     "scripts/capability_discovery_entry.mjs",
     "scripts/check_chronos_dom_contrast.ts",

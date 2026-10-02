@@ -1,0 +1,49 @@
+{
+  "action": "pipeline",
+  "name": "narrated-report-preflight-fragment",
+  "version": "1.0.0",
+  "description": "Narrated-report tool preflight through one typed op, followed by reusable voice-action and render-policy authoring steps.",
+  "context": {
+    "narration_text": "",
+    "voice_action_path": "active/shared/tmp/voice-action.json",
+    "render_policy_path": "active/shared/tmp/video-composition/render-policy.json"
+  },
+  "steps": [
+    {
+      "id": "preflight-tools",
+      "role": "source",
+      "op": "system:narrated_report_preflight",
+      "produces": {
+        "channel": "narrated_report_tools",
+        "type": "NarratedReportTools"
+      },
+      "params": {}
+    },
+    {
+      "id": "write_voice_action",
+      "role": "source",
+      "op": "system:write_file",
+      "produces": {
+        "channel": "voice_action_path",
+        "type": "PathResult"
+      },
+      "params": {
+        "path": "active/shared/tmp/voice-action.json",
+        "content": "{\"action\":\"generate_voice\",\"engine\":{\"engine_id\":\"local_say\"},\"delivery\":{\"mode\":\"artifact\",\"format\":\"aiff\"},\"rendering\":{\"language\":\"ja\",\"speed\":1.0},\"text\":\"{{input.narration_text}}\"}"
+      }
+    },
+    {
+      "id": "write_video_render_policy",
+      "role": "source",
+      "op": "system:write_file",
+      "produces": {
+        "channel": "video_render_policy_json",
+        "type": "PathResult"
+      },
+      "params": {
+        "path": "active/shared/tmp/video-composition/render-policy.json",
+        "content": "{\"enable_backend_rendering\":true,\"backend\":\"hyperframes_cli\",\"output_format\":\"mp4\",\"resolution\":\"1920x1080\"}"
+      }
+    }
+  ]
+}

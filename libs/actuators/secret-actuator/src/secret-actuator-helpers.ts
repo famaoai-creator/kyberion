@@ -9,7 +9,7 @@ import {
 } from '@agent/core/foundation';
 import { ledger } from '@agent/core/ledger';
 
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import {
   fetchSecret,
   storeSecret,
@@ -41,13 +41,7 @@ function withVaultIo<T>(operation: () => T): T {
   return secureIo.withSensitivePathMediation(operation);
 }
 
-const DEFAULT_SECRET_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 5000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_SECRET_RETRY = getRetryDefaults('secret-actuator:defaults');
 
 interface RegistryEntry {
   service: string;

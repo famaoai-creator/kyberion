@@ -1,3 +1,8 @@
+import { randomUUID } from 'node:crypto';
+import {
+  startBridgePollLoop,
+  type BridgePollLoopHandle,
+} from '../../../../../../../satellites/shared/bridge-poll-loop';
 import type { NextRequest } from 'next/server';
 import { readConciergeHome } from '../../../lib/headless-projections';
 import { readConciergeScopeQuery } from '../../../lib/request-input';
@@ -28,7 +33,7 @@ export function GET(req: NextRequest) {
   if (resolved.response) return resolved.response;
   const encoder = new TextEncoder();
   let previousPayload = '';
-  let summaryTimer: ReturnType<typeof setInterval> | null = null;
+  let summaryTimer: BridgePollLoopHandle | null = null;
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   let closed = false;
 
@@ -36,7 +41,7 @@ export function GET(req: NextRequest) {
     if (closed) return;
     closed = true;
     if (summaryTimer) {
-      clearInterval(summaryTimer);
+      summaryTimer.stop();
       summaryTimer = null;
     }
     if (heartbeatTimer) {
@@ -79,7 +84,12 @@ export function GET(req: NextRequest) {
       }
       // Initial snapshot immediately, then change-detection every 5 s.
       push();
-      summaryTimer = setInterval(push, SUMMARY_CHECK_INTERVAL_MS);
+      if (closed) return;
+      summaryTimer = startBridgePollLoop({
+        name: 'surface-sse:' + randomUUID(),
+        intervalMs: SUMMARY_CHECK_INTERVAL_MS,
+        poll: push,
+      });
       heartbeatTimer = setInterval(() => {
         if (closed) return;
         try {

@@ -2,7 +2,8 @@
   "default_pattern": "https://api.{service_id}.com/v1",
   "services": {
     "google-maps": {
-      "preset_path": "knowledge/product/orchestration/service-presets/google-maps.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/google-maps.json",
+      "auth_strategy": "none"
     }
   }
 }

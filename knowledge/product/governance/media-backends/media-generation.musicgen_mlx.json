@@ -21,6 +21,8 @@
       },
       "command": "uvx",
       "args": ["--from", "mlx-audiocraft", "musicgen-mlx"],
+      "aliases": ["musicgen_mlx", "media-generation.musicgen_mlx"],
+      "probe": { "kind": "tool_runtime", "ref": "musicgen_mlx" },
       "cost_tier": "self_hosted",
       "data_policy": "local_only",
       "execution_locality": "local",

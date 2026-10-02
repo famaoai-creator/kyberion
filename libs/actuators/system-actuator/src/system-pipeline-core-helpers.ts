@@ -1,3 +1,4 @@
+import { runStandardPrLifecycle } from './system-pr-lifecycle.js';
 /** Shared guards and control/display helpers for the system pipeline actuator. */
 
 import { logger } from '@agent/core/core';
@@ -18,7 +19,7 @@ import { assertVolatileId, pathResolver } from '@agent/core/path-resolver';
 import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
 
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { createVirtualMediaDeviceControlBridge } from '@agent/core/virtual/virtual-media-device-control-bridge';
 import { createVirtualAudioOutputPlaybackBridge } from '@agent/core/virtual/virtual-audio-output-playback-bridge';
 import { createVirtualAudioInputRecordingBridge } from '@agent/core/virtual/virtual-audio-input-recording-bridge';
@@ -121,13 +122,7 @@ export const COMPUTER_RUNTIME_DIR = pathResolver.shared('runtime/computer');
 export const SYSTEM_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/system-actuator/manifest.json'
 );
-export const DEFAULT_SYSTEM_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 250,
-  maxDelayMs: 2000,
-  factor: 2,
-  jitter: true,
-};
+export const DEFAULT_SYSTEM_RETRY = getRetryDefaults('system-actuator:defaults');
 
 /**
  * Scratch dir for raw screen frames awaiting redaction: inside the running
@@ -206,6 +201,36 @@ const SYSTEM_CAPTURE_OP_HANDLERS_SHARED_0: SystemCaptureOpHandler = async ({ par
   return { ...ctx, [String(params.export_as ?? 'incident_list_data')]: data };
 };
 /** Op handlers keyed by op name (RS-07: mechanical replacement of the former switch). */
+import {
+  probeProvider,
+  probeNarratedTools,
+  validateAudioArtifact,
+  partitionSurfaceHealth,
+  collectSurfaceErrors,
+  parseProviderProbe,
+} from './system-procedure-helpers.js';
+export const SYSTEM_PROCEDURE_OP_HANDLERS: Readonly<Record<string, SystemCaptureOpHandler>> = {
+  standard_pr_lifecycle: async ({ params, ctx, resolve }) => {
+    assertUnsafeShellAllowed();
+    const result = await runStandardPrLifecycle({
+      branch_name: String(resolve(params.branch_name)),
+      commit_message: String(resolve(params.commit_message)),
+      pr_title: String(resolve(params.pr_title)),
+      pr_body: String(resolve(params.pr_body)),
+      auto_merge: resolve(params.auto_merge) === true,
+    });
+    return { ...ctx, [String(params.export_as ?? 'pr_creation_result')]: result };
+  },
+  provider_preflight: async ({ params, ctx, resolve }) => {
+    assertUnsafeShellAllowed();
+    const providers = resolve(params.providers);
+    if (!Array.isArray(providers)) throw new Error('providers must be an array');
+    const result = providers.map(parseProviderProbe).map((p) => probeProvider(p));
+    for (const p of result) logger.info(JSON.stringify(p));
+    return { ...ctx, [String(params.export_as ?? 'provider_preflight')]: result };
+  },
+};
+
 export const SYSTEM_CAPTURE_OP_HANDLERS: Readonly<Record<string, SystemCaptureOpHandler>> = {
   screenshot: async ({ params, ctx, resolve }) => {
     const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(
@@ -537,6 +562,26 @@ export const SYSTEM_CAPTURE_OP_HANDLERS: Readonly<Record<string, SystemCaptureOp
       }),
     };
   },
+  narrated_report_preflight: async ({ params, ctx }) => ({
+    ...ctx,
+    [String(params.export_as ?? 'narrated_report_tools')]: probeNarratedTools(),
+  }),
+  validate_audio_artifact: async ({ params, ctx, resolve }) => ({
+    ...ctx,
+    [String(params.export_as ?? 'audio_check')]: validateAudioArtifact(
+      String(resolve(params.path))
+    ),
+  }),
+  partition_surface_health: async ({ params, ctx, resolve }) => ({
+    ...ctx,
+    [String(params.export_as ?? 'surface_health')]: partitionSurfaceHealth(
+      resolve(params.surfaces)
+    ),
+  }),
+  collect_surface_errors: async ({ params, ctx }) => ({
+    ...ctx,
+    [String(params.export_as ?? 'recent_service_errors')]: collectSurfaceErrors(),
+  }),
   cli_health_check: async ({ params, ctx, resolve }) => {
     const command = String(resolve(params.command));
     const args = params.args
@@ -1175,11 +1220,23 @@ export async function opCapture(
   ctx: Record<string, unknown>,
   resolve: (value: unknown) => unknown
 ) {
+  if (Object.prototype.hasOwnProperty.call(SYSTEM_PROCEDURE_OP_HANDLERS, op))
+    throw new Error('Mutating procedures require apply routing');
+  return opProcedure(op, params, ctx, resolve);
+}
+
+export async function opProcedure(
+  op: string,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>,
+  resolve: (value: unknown) => unknown
+) {
   const rootDir = pathResolver.rootDir();
   assertSystemOpInput(op, params);
-  const handler = Object.prototype.hasOwnProperty.call(SYSTEM_CAPTURE_OP_HANDLERS, op)
-    ? SYSTEM_CAPTURE_OP_HANDLERS[op]
-    : undefined;
+  const handlers = Object.prototype.hasOwnProperty.call(SYSTEM_PROCEDURE_OP_HANDLERS, op)
+    ? SYSTEM_PROCEDURE_OP_HANDLERS
+    : SYSTEM_CAPTURE_OP_HANDLERS;
+  const handler = Object.prototype.hasOwnProperty.call(handlers, op) ? handlers[op] : undefined;
   if (!handler) {
     throw new Error(`Unsupported capture operator in System-Actuator: ${op}`);
   }

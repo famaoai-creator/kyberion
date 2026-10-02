@@ -1,5 +1,5 @@
 import * as pathResolver from '@agent/core/path-resolver';
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { safeExec } from '@agent/core/secure-io';
 import { parseSafeJsonInput } from '@agent/core/foundation';
 import { isRecord } from '@agent/core/foundation/text';
@@ -114,13 +114,7 @@ export type CalendarBackend = CalendarBackendAdapter;
 const CALENDAR_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/calendar-actuator/manifest.json'
 );
-const DEFAULT_CALENDAR_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 5000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_CALENDAR_RETRY = getRetryDefaults('calendar');
 
 function parseISODate(value: string | undefined, label: string): Date | null {
   if (!value) return null;

@@ -3,7 +3,47 @@ import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { readJson } from '../foundation/json.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from '../secure-io.js';
+
+/**
+ * Canonical service binding auth modes. Single source for the
+ * `ServiceBinding.authMode` union (mirrors the `auth_mode` enum in
+ * `knowledge/product/schemas/service-binding-record.schema.json`).
+ */
+export const SERVICE_AUTH_MODES = ['none', 'secret-guard', 'session'] as const;
+export type ServiceAuthMode = (typeof SERVICE_AUTH_MODES)[number];
+
+/**
+ * Catalog-governed HTTP auth strategies. Mirrors the `auth_strategy` enum in
+ * `knowledge/product/schemas/service-endpoints.schema.json`; the service
+ * engine compares these case-insensitively.
+ */
+export const SERVICE_AUTH_STRATEGIES = [
+  'none',
+  'bearer',
+  'Bearer',
+  'basic',
+  'Basic',
+  'Bot',
+  'session',
+  'api_key_query',
+  'AWS_SIGV4',
+  'host-managed',
+] as const;
+export type ServiceAuthStrategy = (typeof SERVICE_AUTH_STRATEGIES)[number];
+
+export const CREDENTIAL_SUFFIX_KEYS = [
+  'accessToken',
+  'basicAuthToken',
+  'appToken',
+  'refreshToken',
+  'clientId',
+  'clientSecret',
+  'redirectUri',
+] as const;
+export type CredentialSuffixKey = (typeof CREDENTIAL_SUFFIX_KEYS)[number];
+export type CredentialSuffixMap = Record<CredentialSuffixKey, string[]>;
 
 export interface ServiceEndpointRecord {
   base_url?: string;
@@ -11,16 +51,11 @@ export interface ServiceEndpointRecord {
   allow_unsafe_cli?: boolean;
   allow_local_network?: boolean;
   allow_stream_ingress?: boolean;
-  auth_strategy?: string;
+  auth_strategy?: ServiceAuthStrategy;
   intent_aliases?: string[];
   headers?: Record<string, string>;
   oauth?: Record<string, unknown>;
-  credential_suffixes?: Partial<
-    Record<
-      'accessToken' | 'appToken' | 'refreshToken' | 'clientId' | 'clientSecret' | 'redirectUri',
-      string[]
-    >
-  >;
+  credential_suffixes?: Partial<Record<CredentialSuffixKey, string[]>>;
   [key: string]: unknown;
 }
 
@@ -28,6 +63,17 @@ export interface ServiceEndpointsCatalog {
   version?: string;
   default_pattern: string;
   services: Record<string, ServiceEndpointRecord>;
+}
+
+/** A catalog whose service records are guaranteed to carry credential suffixes. */
+export interface ResolvedServiceEndpointRecord extends ServiceEndpointRecord {
+  credential_suffixes: CredentialSuffixMap;
+}
+
+export interface ResolvedServiceEndpointsCatalog {
+  version?: string;
+  default_pattern: string;
+  services: Record<string, ResolvedServiceEndpointRecord>;
 }
 
 const DEFAULT_SERVICE_ENDPOINTS_PATH = pathResolver.knowledge(
@@ -65,6 +111,90 @@ const serviceEndpointsCatalog = defineCatalog<ServiceEndpointsCatalog>({
     }),
   schema: SERVICE_ENDPOINTS_SCHEMA_PATH,
 });
+
+/**
+ * Canonical credential-suffix fallbacks, read from the schema defaults in
+ * `knowledge/product/schemas/service-endpoints.schema.json` (`credential_suffixes`
+ * object-level and per-key `default` keywords). The endpoint registry is the
+ * only place that knows these values; binding resolution never hardcodes them.
+ * Missing schema defaults are an explicit error, never a silent empty fallback.
+ */
+let cachedCredentialSuffixDefaults: CredentialSuffixMap | null = null;
+
+export function getCredentialSuffixSchemaDefaults(): CredentialSuffixMap {
+  if (cachedCredentialSuffixDefaults) return cachedCredentialSuffixDefaults;
+  let properties: Record<string, { default?: unknown }> | undefined;
+  try {
+    const schema = readJson<{
+      properties?: {
+        services?: {
+          additionalProperties?: {
+            properties?: {
+              credential_suffixes?: {
+                default?: unknown;
+                properties?: Record<string, { default?: unknown }>;
+              };
+            };
+          };
+        };
+      };
+    }>(SERVICE_ENDPOINTS_SCHEMA_PATH);
+    const suffixSchema =
+      schema?.properties?.services?.additionalProperties?.properties?.credential_suffixes;
+    properties = suffixSchema?.properties;
+    const objectDefault =
+      suffixSchema?.default && typeof suffixSchema.default === 'object'
+        ? (suffixSchema.default as Record<string, unknown>)
+        : undefined;
+    const defaults = {} as CredentialSuffixMap;
+    for (const key of CREDENTIAL_SUFFIX_KEYS) {
+      const objectValue = objectDefault?.[key];
+      const keyValue = properties?.[key]?.default;
+      const raw = Array.isArray(objectValue) ? objectValue : keyValue;
+      if (
+        key !== 'appToken' &&
+        (!Array.isArray(raw) || raw.some((entry) => typeof entry !== 'string' || !entry.trim()))
+      ) {
+        throw new Error(`Missing or invalid credential suffix default for ${key}`);
+      }
+      defaults[key] = Array.isArray(raw)
+        ? raw.filter((entry): entry is string => typeof entry === 'string')
+        : [];
+    }
+    cachedCredentialSuffixDefaults = defaults;
+    return defaults;
+  } catch (error: any) {
+    throw new Error(
+      `[SERVICE_ENDPOINTS_SCHEMA] credential suffix defaults are unavailable: ${error?.message || error}`
+    );
+  }
+}
+
+export function _resetCredentialSuffixSchemaDefaultsForTests(): void {
+  cachedCredentialSuffixDefaults = null;
+}
+
+/** Fill a raw record's suffixes from the schema defaults (record wins per key). */
+export function normalizeServiceCredentialSuffixes(
+  suffixes: ServiceEndpointRecord['credential_suffixes']
+): CredentialSuffixMap {
+  const defaults = getCredentialSuffixSchemaDefaults();
+  const normalized = {} as CredentialSuffixMap;
+  for (const key of CREDENTIAL_SUFFIX_KEYS) {
+    normalized[key] = [...(suffixes?.[key] ?? defaults[key])];
+  }
+  return normalized;
+}
+
+function normalizeServiceEndpointRecord(
+  serviceId: string,
+  record: ServiceEndpointRecord
+): ResolvedServiceEndpointRecord {
+  return {
+    ...record,
+    credential_suffixes: normalizeServiceCredentialSuffixes(record.credential_suffixes),
+  };
+}
 
 function loadServiceEndpointsCatalogFromPath(catalogPath: string): ServiceEndpointsCatalog {
   try {
@@ -134,7 +264,10 @@ function loadServiceEndpointsDirectory(catalogDir: string): ServiceEndpointsCata
     if (services[serviceId]) {
       throw new Error(`Duplicate service endpoints entry for ${serviceId}`);
     }
-    services[serviceId] = serviceEntries[serviceId];
+    services[serviceId] = normalizeServiceEndpointRecord(
+      serviceId,
+      serviceEntries[serviceId] as ServiceEndpointRecord
+    );
   }
 
   if (Object.keys(services).length === 0) {
@@ -150,11 +283,11 @@ function loadServiceEndpointsDirectory(catalogDir: string): ServiceEndpointsCata
 
 export function loadServiceEndpointsDirectoryCatalog(
   catalogDir = DEFAULT_SERVICE_ENDPOINTS_DIR
-): ServiceEndpointsCatalog {
-  return loadServiceEndpointsDirectory(catalogDir);
+): ResolvedServiceEndpointsCatalog {
+  return loadServiceEndpointsDirectory(catalogDir) as ResolvedServiceEndpointsCatalog;
 }
 
-export function loadServiceEndpointsCatalog(): ServiceEndpointsCatalog {
+export function loadServiceEndpointsCatalog(): ResolvedServiceEndpointsCatalog {
   const catalogPath = getServiceEndpointsPath();
   const catalogDir = getServiceEndpointsDir();
   if (
@@ -162,8 +295,18 @@ export function loadServiceEndpointsCatalog(): ServiceEndpointsCatalog {
     cachedServiceEndpointsDir === catalogDir &&
     cachedServiceEndpoints
   ) {
-    return cachedServiceEndpoints;
+    return cachedServiceEndpoints as ResolvedServiceEndpointsCatalog;
   }
+
+  const normalizeCatalog = (parsed: ServiceEndpointsCatalog): ResolvedServiceEndpointsCatalog => ({
+    ...parsed,
+    services: Object.fromEntries(
+      Object.entries(parsed.services || {}).map(([serviceId, record]) => [
+        serviceId,
+        normalizeServiceEndpointRecord(serviceId, record),
+      ])
+    ),
+  });
 
   if (
     catalogPath === DEFAULT_SERVICE_ENDPOINTS_PATH &&
@@ -175,26 +318,30 @@ export function loadServiceEndpointsCatalog(): ServiceEndpointsCatalog {
     const dirEntries = safeReaddir(resolvedCatalogDir);
     const hasJsonFiles = dirEntries.some((entry) => entry.endsWith('.json'));
     if (hasJsonFiles) {
-      const parsed = loadServiceEndpointsDirectory(catalogDir);
+      const parsed = normalizeCatalog(
+        loadServiceEndpointsDirectory(catalogDir) as ServiceEndpointsCatalog
+      );
       cachedServiceEndpointsPath = catalogPath;
       cachedServiceEndpointsDir = catalogDir;
-      cachedServiceEndpoints = parsed;
+      cachedServiceEndpoints = parsed as unknown as ServiceEndpointsCatalog;
       return parsed;
     }
   }
 
-  const parsed = serviceEndpointsCatalog.load();
+  const parsed = normalizeCatalog(serviceEndpointsCatalog.load());
   cachedServiceEndpointsPath = catalogPath;
   cachedServiceEndpointsDir = catalogDir;
-  cachedServiceEndpoints = parsed;
+  cachedServiceEndpoints = parsed as unknown as ServiceEndpointsCatalog;
   return parsed;
 }
 
-export function getServiceEndpointRecord(serviceId: string): ServiceEndpointRecord | null {
+export function getServiceEndpointRecord(serviceId: string): ResolvedServiceEndpointRecord | null {
   return loadServiceEndpointsCatalog().services?.[serviceId] || null;
 }
 
-export function getServiceEndpointRecordForIntent(intentId: string): ServiceEndpointRecord | null {
+export function getServiceEndpointRecordForIntent(
+  intentId: string
+): ResolvedServiceEndpointRecord | null {
   const normalizedIntent = intentId.trim();
   if (!normalizedIntent) return null;
   const catalog = loadServiceEndpointsCatalog();

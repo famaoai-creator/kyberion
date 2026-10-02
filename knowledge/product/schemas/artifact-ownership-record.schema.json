@@ -15,7 +15,7 @@
     "organization_id": { "type": "string", "minLength": 1 },
     "mission_id": { "type": "string", "minLength": 1 },
     "task_session_id": { "type": "string", "minLength": 1 },
-    "kind": { "type": "string", "minLength": 1 },
+    "kind": { "$ref": "./artifact-kind.schema.json" },
     "storage_class": {
       "type": "string",
       "enum": ["repo", "artifact_store", "vault", "tmp", "external_ref"]

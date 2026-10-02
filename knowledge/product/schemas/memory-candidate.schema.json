@@ -48,14 +48,14 @@
         "content": { "type": "string", "minLength": 20, "maxLength": 12000 },
         "evidence_refs": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": { "$ref": "#/definitions/evidenceRef" },
           "minItems": 1
         }
       }
     },
     "evidence_refs": {
       "type": "array",
-      "items": { "type": "string", "minLength": 1 },
+      "items": { "$ref": "#/definitions/evidenceRef" },
       "minItems": 1
     },
     "sensitivity_tier": {
@@ -127,6 +127,32 @@
     }
   },
   "additionalProperties": false,
+  "definitions": {
+    "evidenceRef": {
+      "description": "Tagged evidence reference. Legacy plain strings remain valid: 'artifact:<id>' denotes an artifact_id, any other string denotes a knowledge_path. Canonical parsing lives in parseMemoryEvidenceRef() (libs/core/knowledge/memory-promotion-queue.ts).",
+      "anyOf": [
+        { "type": "string", "minLength": 1 },
+        {
+          "type": "object",
+          "required": ["kind", "artifact_id"],
+          "properties": {
+            "kind": { "const": "artifact_id" },
+            "artifact_id": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "knowledge_path"],
+          "properties": {
+            "kind": { "const": "knowledge_path" },
+            "knowledge_path": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
   "allOf": [
     {
       "if": {
@@ -143,6 +169,22 @@
           "scope": { "type": "object", "required": ["tenant_slug"] }
         }
       }
+    },
+    {
+      "description": "A promotion grant is meaningless without the scope envelope it was brokered from.",
+      "if": { "required": ["promotion"] },
+      "then": { "required": ["scope"] }
+    },
+    {
+      "description": "A tenant-scoped candidate needs a brokered promotion to become public (mirrors assertPublicTierReferencesSafe).",
+      "if": {
+        "required": ["sensitivity_tier", "scope"],
+        "properties": {
+          "sensitivity_tier": { "const": "public" },
+          "scope": { "type": "object", "required": ["tenant_slug"] }
+        }
+      },
+      "then": { "required": ["promotion"] }
     }
   ]
 }

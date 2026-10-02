@@ -5,7 +5,7 @@ import { encodeTerminalInput } from '@agent/core/shell/terminal-keys';
 import { emitComputerSurfacePatch } from '@agent/core/virtual/computer-surface';
 import * as pathResolver from '@agent/core/path-resolver';
 
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { resolveShellAdapter } from '@agent/core/platform-command-adapters';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
@@ -21,13 +21,7 @@ import * as path from 'node:path';
 const TERMINAL_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/terminal-actuator/manifest.json'
 );
-const DEFAULT_TERMINAL_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 250,
-  maxDelayMs: 2000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_TERMINAL_RETRY = getRetryDefaults('terminal-actuator:defaults');
 
 export interface TerminalAction {
   action: 'spawn' | 'poll' | 'write' | 'kill' | 'list' | 'resize' | 'llm_decide' | 'shell_command';
