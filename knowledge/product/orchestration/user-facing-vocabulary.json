@@ -8687,6 +8687,36 @@
         "en": "List resident-agent (dot) charters and their status",
         "ja": "常駐エージェント（dot）のチャーターと状態を一覧表示",
         "qps-ploc": "⟦Ŀïşŧ řėşïḓėñŧ-ȧɠėñŧ (ḓőŧ) ƈħȧřŧėřş ȧñḓ ŧħėïř şŧȧŧůş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_script_dot_status": {
+        "en": "Show wake/heartbeat/token status for dot charters",
+        "ja": "dot の wake・ハートビート・トークン使用状況を表示",
+        "qps-ploc": "⟦Şħőẇ ẇȧķė/ħėȧřŧƀėȧŧ/ŧőķėñ şŧȧŧůş ƒőř ḓőŧ ƈħȧřŧėřş ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "cli_cmd_script_dot_validate": {
+        "en": "Validate dot charters against schema and the activation gate",
+        "ja": "dot チャーターをスキーマとアクティベーションゲートで検証",
+        "qps-ploc": "⟦Ṽȧŀïḓȧŧė ḓőŧ ƈħȧřŧėřş ȧɠȧïñşŧ şƈħėɱȧ ȧñḓ ŧħė ȧƈŧïṽȧŧïőñ ɠȧŧė ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "cli_cmd_script_dot_activate": {
+        "en": "Activate a dot charter after the role/heartbeat gate passes",
+        "ja": "ロール・ハートビートゲート通過後に dot チャーターを有効化",
+        "qps-ploc": "⟦Ȧƈŧïṽȧŧė ȧ ḓőŧ ƈħȧřŧėř ȧƒŧėř ŧħė řőŀė/ħėȧřŧƀėȧŧ ɠȧŧė ṗȧşşėş ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "cli_cmd_script_dot_pause": {
+        "en": "Pause an active dot (triggers stop firing)",
+        "ja": "active な dot を一時停止（トリガーは停止）",
+        "qps-ploc": "⟦Ṗȧůşė ȧñ ȧƈŧïṽė ḓőŧ (ŧřïɠɠėřş şŧőṗ ƒïřïñɠ) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_script_dot_retire": {
+        "en": "Retire a dot charter permanently",
+        "ja": "dot チャーターを恒久的に退役",
+        "qps-ploc": "⟦Řėŧïřė ȧ ḓőŧ ƈħȧřŧėř ṗėřɱȧñėñŧŀẏ ŀőřėɱ ïṗşů⟧"
+      },
+      "cli_cmd_script_dot_wake": {
+        "en": "Run one bounded wake for a dot immediately",
+        "ja": "dot の wake を1回だけ即時実行",
+        "qps-ploc": "⟦Řůñ őñė ƀőůñḓėḓ ẇȧķė ƒőř ȧ ḓőŧ ïɱɱėḓïȧŧėŀẏ ŀőřėɱ ïṗşůɱ ḓő⟧"
       }
     },
     "recorder": {

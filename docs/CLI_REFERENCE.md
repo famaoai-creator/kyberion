@@ -112,6 +112,8 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion config report`                | `pnpm config:report`              | Report operational configuration                                                     |
 | `pnpm kyberion cost report`                  | `pnpm cost:report`                | Report usage cost                                                                    |
 | `pnpm kyberion dot list`                     |                                   | List resident-agent (dot) charters and their status                                  |
+| `pnpm kyberion dot status`                   |                                   | Show wake/heartbeat/token status for dot charters                                    |
+| `pnpm kyberion dot validate`                 |                                   | Validate dot charters against schema and the activation gate                         |
 | `pnpm kyberion egress report`                | `pnpm egress:report`              | Report egress warnings                                                               |
 | `pnpm kyberion history search`               | `pnpm history:search`             | Search history                                                                       |
 | `pnpm kyberion hooks discover`               |                                   | List project-local Claude/Codex hook configs and whether each is trusted.            |
@@ -176,6 +178,10 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion daily-desk server`             |                                     | Start the daily desk pad                                                                            |
 | `pnpm kyberion dashboard`                     | `pnpm dashboard`                    | Open the sovereign dashboard                                                                        |
 | `pnpm kyberion doc-drop server`               |                                     | Start the document drop pad                                                                         |
+| `pnpm kyberion dot activate`                  |                                     | Activate a dot charter after the role/heartbeat gate passes                                         |
+| `pnpm kyberion dot pause`                     |                                     | Pause an active dot (triggers stop firing)                                                          |
+| `pnpm kyberion dot retire`                    |                                     | Retire a dot charter permanently                                                                    |
+| `pnpm kyberion dot wake`                      |                                     | Run one bounded wake for a dot immediately                                                          |
 | `pnpm kyberion email archive-inbox`           |                                     | Archive processed inbox messages                                                                    |
 | `pnpm kyberion email workflow`                | `pnpm email:workflow`               | Run the email workflow                                                                              |
 | `pnpm kyberion generation schedule`           | `pnpm generation:schedule`          | Run the generation schedule tick                                                                    |

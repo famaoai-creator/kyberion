@@ -48,7 +48,8 @@
         "active/shared/observability/",
         "active/shared/runtime/",
         "presence/bridge/runtime/",
-        "../../../Library/LaunchAgents/"
+        "../../../Library/LaunchAgents/",
+        "active/shared/tmp/"
       ]
     },
     "slack_bridge": {
@@ -146,6 +147,9 @@
         "active/shared/observability/",
         "active/audit/"
       ]
+    },
+    "dot_lifecycle_writer": {
+      "allow": ["dots/", "active/shared/runtime/", "active/shared/tmp/"]
     }
   }
 }
