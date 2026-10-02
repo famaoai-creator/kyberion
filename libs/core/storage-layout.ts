@@ -163,7 +163,7 @@ export function storageFloorTier(filePath: string): StorageDataTier | undefined 
 
 const FLOOR_TIER_SEGMENT = new RegExp(
   `(?:^|/)(?:${Object.values(STORAGE_FLOOR_ROOTS)
-    .map((root) => root.replace(/\//gu, '\\/'))
+    .map((root) => root.replace(/[.*+?^${}()|[\]\\/]/gu, '\\$&'))
     .join('|')})/(personal|confidential|public)/`,
   'u'
 );
