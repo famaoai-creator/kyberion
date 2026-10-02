@@ -14,6 +14,8 @@ describe('production-evidence-summary-policy', () => {
   });
 
   it('resolves the policy object', () => {
-    expect(resolveProductionEvidenceSummaryPolicy().complete_message).toBe('all production evidence is verified');
+    expect(resolveProductionEvidenceSummaryPolicy().complete_message).toBe(
+      'all production evidence is verified'
+    );
   });
 });

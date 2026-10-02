@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildContextualIntentFrame, validateContextualIntentFrame } from './contextual-intent-frame.js';
+import {
+  buildContextualIntentFrame,
+  validateContextualIntentFrame,
+} from './contextual-intent-frame.js';
 
 describe('contextual-intent-frame schema', () => {
   it('validates a representative read-only frame', () => {

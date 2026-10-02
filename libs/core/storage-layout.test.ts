@@ -9,6 +9,7 @@ import {
   resolveStorageFloor,
   storageFloorRelativePath,
   storageFloorTier,
+  storageFloorTierInPath,
 } from './storage-layout.js';
 
 describe('storage-layout floors', () => {
@@ -78,6 +79,17 @@ describe('storage-layout floors', () => {
     });
     expect(classifyStorageFloorPath('active/shared/runtime/x')).toBeNull();
     expect(classifyStorageFloorPath('active/shared/tmpfoo/x')).toBeNull();
+  });
+
+  it('finds a floor tier anywhere in a path, independent of the project root', () => {
+    expect(storageFloorTierInPath('/elsewhere/checkout/active/shared/cache/confidential/a/x')).toBe(
+      'confidential'
+    );
+    expect(storageFloorTierInPath('C:\\repo\\active\\shared\\tmp\\personal\\shared\\x')).toBe(
+      'personal'
+    );
+    expect(storageFloorTierInPath('/repo/active/shared/tmp/system/x')).toBeUndefined();
+    expect(storageFloorTierInPath('/repo/active/shared/tmp/confidential-notes/x')).toBeUndefined();
   });
 
   it('reports the tier of tier partitions only', () => {
