@@ -10,7 +10,6 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { MissionState } from './mission-types.js';
@@ -52,8 +51,8 @@ function missionState(missionId: string, projectId?: string): MissionState {
 
 describe('mission artifact promotion', () => {
   beforeAll(async () => {
-    tmpRoot = path.join(os.tmpdir(), `kyb-artifact-promotion-${randomUUID()}`);
-    fs.mkdirSync(tmpRoot, { recursive: true });
+    // mkdtemp creates the directory atomically with a private 0700 mode.
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kyb-artifact-promotion-'));
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
     const policy = path.join(tmpRoot, 'knowledge/product/governance/agent-policies.yaml');
     fs.mkdirSync(path.dirname(policy), { recursive: true });
