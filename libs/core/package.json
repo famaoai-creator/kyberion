@@ -7015,6 +7015,10 @@
       "types": "./dist/dot/dot-runtime.d.ts",
       "default": "./dist/dot/dot-runtime.js"
     },
+    "./dot/dot-wake-orchestration": {
+      "types": "./dist/dot/dot-wake-orchestration.d.ts",
+      "default": "./dist/dot/dot-wake-orchestration.js"
+    },
     "./dot/dot-lifecycle": {
       "types": "./dist/dot/dot-lifecycle.d.ts",
       "default": "./dist/dot/dot-lifecycle.js"

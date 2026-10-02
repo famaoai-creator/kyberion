@@ -246,6 +246,14 @@
     },
     {
       "layer": "orchestration",
+      "pattern": "scripts/agent_runtime_supervisor_daemon.ts"
+    },
+    {
+      "layer": "orchestration",
+      "pattern": "scripts/dot_charters.ts"
+    },
+    {
+      "layer": "orchestration",
       "pattern": "scripts/check_seam_multiplicity.ts"
     },
     {
