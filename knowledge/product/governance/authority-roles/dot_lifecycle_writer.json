@@ -1,0 +1,9 @@
+{
+  "role": "dot_lifecycle_writer",
+  "description": "Writes dot charters (dots/) and the lifecycle audit ledger during governed status transitions (kyberion dot activate/pause/retire). Deliberately separate from any role a dot may bind at runtime, so an active dot can never rewrite the contract it runs under.",
+  "default_persona": "worker",
+  "write_scopes": ["dots/", "active/shared/runtime/", "active/shared/tmp/"],
+  "scope_classes": ["operations_runtime"],
+  "allowed_actuators": [],
+  "tier_access": ["public"]
+}

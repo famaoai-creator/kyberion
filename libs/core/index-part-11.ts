@@ -147,3 +147,6 @@ export * from './html-to-markdown.js';
 // Dot charters: declarative standing-responsibility contracts for resident
 // agents (see dots/README.md and knowledge/product/architecture/resident-dot-model.md).
 export * from './dot/dot-charter.js';
+export * from './dot/dot-runtime.js';
+export * from './dot/dot-wake-orchestration.js';
+export * from './dot/dot-lifecycle.js';

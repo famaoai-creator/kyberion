@@ -1,14 +1,19 @@
 /**
- * scripts/dot_charters.ts — list resident-agent ('dot') charters.
+ * scripts/dot_charters.ts — resident-agent ('dot') charter commands.
  *
  * Usage:
- *   pnpm kyberion dot list             # human-readable table (active dots)
- *   pnpm kyberion dot list --json      # machine-readable
- *   pnpm kyberion dot list --all       # include draft/paused/retired
- *   pnpm kyberion dot list --status=paused
+ *   pnpm kyberion dot list [--all|--status=<s>] [--json]
+ *   pnpm kyberion dot validate [<dot_id>]        # schema + activation gate check
+ *   pnpm kyberion dot activate <dot_id>          # governed draft|paused → active
+ *   pnpm kyberion dot pause <dot_id>             # active → paused (wakes stop)
+ *   pnpm kyberion dot retire <dot_id>            # any non-retired → retired
+ *   pnpm kyberion dot wake <dot_id>              # run one bounded wake now
+ *   pnpm kyberion dot status [<dot_id>]          # last wake + token usage per dot
  *
  * Charters are the declarative contract for resident agents; see dots/README.md
- * and knowledge/product/architecture/resident-dot-model.md.
+ * and knowledge/product/architecture/resident-dot-model.md. Status changes are
+ * gated by @agent/core/dot/dot-lifecycle — activation validates the authority
+ * role and heartbeat uniqueness before flipping status.
  */
 
 import {
@@ -16,11 +21,43 @@ import {
   loadDotCharter,
   type DotCharterStatus,
 } from '@agent/core/dot/dot-charter';
+import {
+  checkDotActivationReadiness,
+  transitionDotCharterStatus,
+} from '@agent/core/dot/dot-lifecycle';
+import { withExecutionContextAsync } from '@agent/core/authority';
+import { dotTokensUsedToday, readDotWakeLedger } from '@agent/core/dot/dot-runtime';
+import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
+import { DEFAULT_DAEMONS } from './daemon_watchdog.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const STATUSES: DotCharterStatus[] = ['draft', 'active', 'paused', 'retired'];
+const SUBCOMMANDS = ['list', 'validate', 'activate', 'pause', 'retire', 'wake', 'status'] as const;
+type Subcommand = (typeof SUBCOMMANDS)[number];
 
-async function main(argv: string[]): Promise<Record<string, unknown>> {
+function loadAll() {
+  const loaded = [];
+  const errors = [];
+  for (const filePath of listDotCharterPaths()) {
+    try {
+      loaded.push({ path: filePath, charter: loadDotCharter(filePath) });
+    } catch (error) {
+      errors.push({
+        path: filePath,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  return { loaded, errors };
+}
+
+function findDot(dotId: string) {
+  const found = loadAll().loaded.find((entry) => entry.charter.dot_id === dotId);
+  if (!found) throw new Error(`[DOT_NOT_FOUND] no charter for dot_id '${dotId}' under dots/`);
+  return found;
+}
+
+function reportList(argv: string[]) {
   const wantAll = argv.includes('--all');
   const statusArg = argv.find((arg) => arg.startsWith('--status='))?.split('=')[1];
   if (statusArg && !STATUSES.includes(statusArg as DotCharterStatus)) {
@@ -29,37 +66,165 @@ async function main(argv: string[]): Promise<Record<string, unknown>> {
   const wanted: DotCharterStatus | undefined = wantAll
     ? undefined
     : ((statusArg as DotCharterStatus | undefined) ?? 'active');
-
-  const dots: Array<Record<string, unknown>> = [];
-  const errors: Array<{ path: string; error: string }> = [];
-  // One malformed charter must not hide the rest — report and continue.
-  for (const filePath of listDotCharterPaths()) {
-    try {
-      const charter = loadDotCharter(filePath);
-      if (wanted && charter.status !== wanted) continue;
-      dots.push({
-        dot_id: charter.dot_id,
-        status: charter.status,
-        title: charter.title,
-        authority_role: charter.authority.authority_role,
-        heartbeat_id: charter.runtime.heartbeat_id,
-        triggers: charter.attention.triggers.map((trigger) => trigger.kind),
-        path: filePath,
-      });
-    } catch (error) {
-      errors.push({
-        path: filePath,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
+  const { loaded, errors } = loadAll();
+  const dots = loaded
+    .filter((entry) => !wanted || entry.charter.status === wanted)
+    .map((entry) => ({
+      dot_id: entry.charter.dot_id,
+      status: entry.charter.status,
+      title: entry.charter.title,
+      authority_role: entry.charter.authority.authority_role,
+      heartbeat_id: entry.charter.runtime.heartbeat_id,
+      triggers: entry.charter.attention.triggers.map((trigger) => trigger.kind),
+      path: entry.path,
+    }));
   return {
     ok: errors.length === 0,
     count: dots.length,
     dots,
-    ...(errors.length > 0 ? { errors } : {}),
+    ...(errors.length ? { errors } : {}),
   };
+}
+
+function reportValidate(argv: string[]) {
+  const dotId = argv.find((arg) => !arg.startsWith('--'));
+  const { loaded, errors } = loadAll();
+  const results = loaded
+    .filter((entry) => !dotId || entry.charter.dot_id === dotId)
+    .map((entry) => {
+      const gate =
+        entry.charter.status === 'active' || entry.charter.status === 'paused'
+          ? checkDotActivationReadiness(entry.charter, {
+              supervisedDaemonIds: DEFAULT_DAEMONS,
+            })
+          : { ready: true, errors: [] as string[] };
+      return {
+        dot_id: entry.charter.dot_id,
+        status: entry.charter.status,
+        schema_ok: true,
+        activation_ready: gate.ready,
+        gate_errors: gate.errors,
+        path: entry.path,
+      };
+    });
+  if (dotId && results.length === 0 && errors.length === 0) {
+    throw new Error(`[DOT_NOT_FOUND] no charter for dot_id '${dotId}' under dots/`);
+  }
+  return {
+    ok: errors.length === 0 && results.every((r) => r.activation_ready),
+    results,
+    schema_errors: errors,
+  };
+}
+
+function reportTransition(verb: 'activate' | 'pause' | 'retire', argv: string[]) {
+  const dotId = argv.find((arg) => !arg.startsWith('--'));
+  if (!dotId) throw new Error(`usage: pnpm kyberion dot ${verb} <dot_id>`);
+  const target: DotCharterStatus =
+    verb === 'activate' ? 'active' : verb === 'pause' ? 'paused' : 'retired';
+  const charter = transitionDotCharterStatus(dotId, target, {
+    supervisedDaemonIds: DEFAULT_DAEMONS,
+  });
+  return { ok: true, dot_id: dotId, status: charter.status };
+}
+
+async function reportWake(argv: string[]) {
+  const dotId = argv.find((arg) => !arg.startsWith('--'));
+  if (!dotId) throw new Error('usage: pnpm kyberion dot wake <dot_id>');
+  const loaded = findDot(dotId);
+  // Same attribution as the daemon sweep: ledger/heartbeat writes and the
+  // turn all happen under the charter's declared role.
+  const receipt = await withExecutionContextAsync(
+    loaded.charter.authority.authority_role,
+    () => runDotWakeWithGoalDriver(loaded, {}),
+    undefined,
+    loaded.charter.scope.tenant_slug
+  );
+  return {
+    ok: receipt.outcome !== 'failed',
+    ...receipt,
+    result: receipt.result
+      ? { final_state: receipt.result.finalState, turns_run: receipt.result.turnsRun }
+      : undefined,
+  };
+}
+
+function reportStatus(argv: string[]) {
+  const dotId = argv.find((arg) => !arg.startsWith('--'));
+  const ledger = readDotWakeLedger({});
+  const { loaded } = loadAll();
+  const dots = loaded
+    .filter((entry) => !dotId || entry.charter.dot_id === dotId)
+    .map((entry) => {
+      const wakes = ledger.filter((row) => row.dot_id === entry.charter.dot_id);
+      const last = wakes[wakes.length - 1];
+      return {
+        dot_id: entry.charter.dot_id,
+        status: entry.charter.status,
+        heartbeat_id: entry.charter.runtime.heartbeat_id,
+        tokens_today: dotTokensUsedToday(entry.charter.dot_id, {}),
+        wake_count: wakes.length,
+        last_wake: last
+          ? { at: last.fired_at, outcome: last.outcome, trigger: last.trigger_key }
+          : null,
+      };
+    });
+  if (dotId && dots.length === 0) {
+    throw new Error(`[DOT_NOT_FOUND] no charter for dot_id '${dotId}' under dots/`);
+  }
+  return { ok: true, dots };
+}
+
+async function main(argv: string[]): Promise<Record<string, unknown>> {
+  const [sub, ...rest] = argv;
+  const subcommand = (SUBCOMMANDS as readonly string[]).includes(sub)
+    ? (sub as Subcommand)
+    : 'list';
+  const args = subcommand === sub ? rest : argv;
+  switch (subcommand) {
+    case 'validate':
+      return reportValidate(args);
+    case 'activate':
+    case 'pause':
+    case 'retire':
+      return reportTransition(subcommand, args);
+    case 'wake':
+      return reportWake(args);
+    case 'status':
+      return reportStatus(args);
+    case 'list':
+    default:
+      return reportList(args);
+  }
+}
+
+function printReport(report: Record<string, unknown>, print: (line: string) => void): void {
+  if (Array.isArray(report.dots)) {
+    for (const dot of report.dots as Array<Record<string, unknown>>) {
+      const last = dot.last_wake as Record<string, unknown> | null | undefined;
+      const tail =
+        last !== undefined
+          ? `  wakes=${dot.wake_count} tokens_today=${dot.tokens_today}${last ? `  last=${last.at} ${last.outcome}` : ''}`
+          : `  [${dot.authority_role}]  triggers=${(dot.triggers as string[]).join(',')}  heartbeat=${dot.heartbeat_id}`;
+      print(`${dot.status}  ${String(dot.dot_id).padEnd(24)} ${dot.title ?? ''}${tail}`.trimEnd());
+    }
+    print(`-- ${(report.dots as unknown[]).length} dot(s)`);
+  }
+  for (const error of (report.errors ?? report.schema_errors ?? []) as Array<{
+    path: string;
+    error: string;
+  }>) {
+    print(`invalid  ${error.path}: ${error.error}`);
+  }
+  for (const result of (report.results ?? []) as Array<Record<string, unknown>>) {
+    const gate = result.activation_ready
+      ? 'ready'
+      : `BLOCKED: ${(result.gate_errors as string[]).join('; ')}`;
+    print(`${result.dot_id}  schema=ok  activation=${gate}`);
+  }
+  if (report.status || report.outcome) {
+    print(JSON.stringify(report));
+  }
 }
 
 export const runDotCharters = defineScript({
@@ -71,15 +236,7 @@ export const runDotCharters = defineScript({
       context.print(report);
       return report;
     }
-    for (const dot of report.dots as Array<Record<string, unknown>>) {
-      context.print(
-        `${dot.status}  ${String(dot.dot_id).padEnd(24)} ${dot.title}  [${dot.authority_role}]  triggers=${(dot.triggers as string[]).join(',')}  heartbeat=${dot.heartbeat_id}`
-      );
-    }
-    for (const error of (report.errors ?? []) as Array<{ path: string; error: string }>) {
-      context.print(`invalid  ${error.path}: ${error.error}`);
-    }
-    context.print(`-- ${report.count} dot(s)`);
+    printReport(report, context.print);
     return report;
   },
 });

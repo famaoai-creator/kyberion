@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "title": "Repository guardian",
   "purpose": "Hold standing responsibility for repository health: watch scheduled-pipeline and CI signals, classify failures, dispatch bounded repair work, and keep the operator informed through digests and approvals.",
-  "status": "draft",
+  "status": "active",
   "scope": {
     "tier": "public"
   },
@@ -24,9 +24,19 @@
   },
   "attention": {
     "triggers": [
-      { "kind": "cron", "cron": "*/15 * * * *", "timezone": "Asia/Tokyo" },
-      { "kind": "watch", "paths": ["active/shared/observability/ops-alerts.jsonl"] },
-      { "kind": "wake", "channels": ["slack", "inbox"] }
+      {
+        "kind": "cron",
+        "cron": "*/15 * * * *",
+        "timezone": "Asia/Tokyo"
+      },
+      {
+        "kind": "watch",
+        "paths": ["active/shared/observability/ops-alerts.jsonl"]
+      },
+      {
+        "kind": "wake",
+        "channels": ["slack", "inbox"]
+      }
     ]
   },
   "authority": {
@@ -45,7 +55,11 @@
       "channel": "kyberion-ops"
     },
     "digest_cron": "0 9,18 * * *",
-    "quiet_hours": { "start": "23:00", "end": "07:00", "timezone": "Asia/Tokyo" }
+    "quiet_hours": {
+      "start": "23:00",
+      "end": "07:00",
+      "timezone": "Asia/Tokyo"
+    }
   },
   "runtime": {
     "heartbeat_id": "dot-repo-guardian",

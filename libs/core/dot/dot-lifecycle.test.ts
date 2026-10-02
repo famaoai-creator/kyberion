@@ -1,0 +1,110 @@
+import { afterEach, describe, expect, it } from 'vitest';
+
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { loadDotCharter, type DotCharter } from './dot-charter.js';
+import {
+  DOT_LIFECYCLE_AUDIT_PATH,
+  checkDotActivationReadiness,
+  isDotStatusTerminal,
+  transitionDotCharterStatus,
+} from './dot-lifecycle.js';
+
+const TEST_ROOT = 'active/shared/tmp/dot-lifecycle-tests';
+
+const DRAFT: DotCharter = {
+  kind: 'dot-charter',
+  dot_id: 'repo-guardian',
+  version: '1.0.0',
+  title: 'Repo guardian',
+  purpose: 'Keep the repository healthy.',
+  status: 'draft',
+  scope: { tier: 'public' },
+  goal: { statement: 'Keep CI green.' },
+  attention: { triggers: [{ kind: 'cron', cron: '*/15 * * * *' }] },
+  authority: { authority_role: 'infrastructure_sentinel' },
+  notification: { deliver_to: { surface: 'slack', channel: '#ops' } },
+  runtime: { heartbeat_id: 'dot-repo-guardian' },
+};
+
+const KNOWN_ROLES = new Set(['infrastructure_sentinel']);
+const deps = {
+  rootDir: TEST_ROOT,
+  hasRole: (role: string) => KNOWN_ROLES.has(role),
+  supervisedDaemonIds: ['chronos-daemon', 'agent-runtime-supervisor-daemon'],
+};
+
+function writeCharter(charter: unknown, name = 'dot.json'): string {
+  safeMkdir(`${TEST_ROOT}/dots`, { recursive: true });
+  const filePath = `${TEST_ROOT}/dots/${name}`;
+  safeWriteFile(filePath, JSON.stringify(charter, null, 2) + '\n');
+  return filePath;
+}
+
+afterEach(() => {
+  safeRmSync(TEST_ROOT, { recursive: true, force: true });
+});
+
+describe('transitionDotCharterStatus', () => {
+  it('activates a draft charter when the gate passes', () => {
+    const filePath = writeCharter({ ...DRAFT, $schema: '../schema.json' });
+    const updated = transitionDotCharterStatus('repo-guardian', 'active', deps);
+    expect(updated.status).toBe('active');
+    // The on-disk file retains $schema and the new status.
+    expect(loadDotCharter(filePath).status).toBe('active');
+    expect(safeExistsSync(`${TEST_ROOT}/${DOT_LIFECYCLE_AUDIT_PATH}`)).toBe(true);
+  });
+
+  it('rejects activation when the authority role is not in the registry', () => {
+    writeCharter({ ...DRAFT, authority: { authority_role: 'ghost_role' } });
+    expect(() => transitionDotCharterStatus('repo-guardian', 'active', deps)).toThrow(
+      /DOT_ACTIVATE_ROLE.*ghost_role/
+    );
+    expect(loadDotCharter(`${TEST_ROOT}/dots/dot.json`).status).toBe('draft');
+  });
+
+  it('rejects activation when the heartbeat id collides with a supervised daemon', () => {
+    writeCharter({ ...DRAFT, runtime: { heartbeat_id: 'chronos-daemon' } });
+    expect(() => transitionDotCharterStatus('repo-guardian', 'active', deps)).toThrow(
+      /DOT_ACTIVATE_HEARTBEAT/
+    );
+  });
+
+  it('rejects activation when the heartbeat id is used by another active dot', () => {
+    writeCharter({ ...DRAFT, status: 'active' }, 'one.json');
+    writeCharter({ ...DRAFT, dot_id: 'second-dot' }, 'two.json');
+    expect(() => transitionDotCharterStatus('second-dot', 'active', deps)).toThrow(
+      /DOT_ACTIVATE_HEARTBEAT.*repo-guardian/
+    );
+  });
+
+  it('allows pause and re-activation, forbids retiring a retired dot', () => {
+    writeCharter({ ...DRAFT, status: 'active' });
+    expect(transitionDotCharterStatus('repo-guardian', 'paused', deps).status).toBe('paused');
+    expect(transitionDotCharterStatus('repo-guardian', 'active', deps).status).toBe('active');
+    transitionDotCharterStatus('repo-guardian', 'retired', deps);
+    expect(isDotStatusTerminal('retired')).toBe(true);
+    expect(() => transitionDotCharterStatus('repo-guardian', 'active', deps)).toThrow(
+      /DOT_TRANSITION/
+    );
+  });
+
+  it('rejects draft → paused directly and unknown dots', () => {
+    writeCharter(DRAFT);
+    expect(() => transitionDotCharterStatus('repo-guardian', 'paused', deps)).toThrow(
+      /DOT_TRANSITION/
+    );
+    expect(() => transitionDotCharterStatus('nope', 'active', deps)).toThrow(/DOT_NOT_FOUND/);
+  });
+});
+
+describe('checkDotActivationReadiness', () => {
+  it('reports gate errors without mutating the charter', () => {
+    writeCharter({ ...DRAFT, authority: { authority_role: 'ghost_role' } });
+    const check = checkDotActivationReadiness(
+      { ...DRAFT, authority: { authority_role: 'ghost_role' } },
+      deps
+    );
+    expect(check.ready).toBe(false);
+    expect(check.errors[0]).toContain('ghost_role');
+  });
+});
