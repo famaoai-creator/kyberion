@@ -59,7 +59,14 @@ import {
   safeUnlinkSync,
   safeWriteFile,
 } from '../secure-io.js';
+import type { ArtifactOwnershipRecord } from '../workforce/artifact-registry.js';
 import { projectOperationalMissionLinkPath } from './project-operational-state-links.js';
+import {
+  ACTIVE_PROJECT_MISSION_STATUSES,
+  projectArchivedMissions,
+  projectArtifactRecords,
+  projectScopeOf,
+} from './project-mission-index.js';
 import { resolveTenant } from '../organization/tenant-registry.js';
 import {
   loadOrganizationOperationalState,
@@ -88,6 +95,10 @@ export interface ProjectManagementView {
   tasks: ProjectBootstrapWorkItem[];
   work_items: WorkItem[];
   missions: MissionState[];
+  /** Finished missions of this project, read from the mission archive. */
+  archived_missions: MissionState[];
+  /** Artifact ownership records of the project or of its missions. */
+  artifacts: ArtifactOwnershipRecord[];
   task_sessions: TaskSession[];
   operational_states: ProjectOperationalState[];
   lineage: ProjectLineageView;
@@ -199,13 +210,7 @@ export interface ManagedProjectTrackCreateInput {
   metadata?: Record<string, unknown>;
 }
 
-const ACTIVE_MISSION_STATUSES = new Set([
-  'planned',
-  'active',
-  'validating',
-  'distilling',
-  'paused',
-]);
+const ACTIVE_MISSION_STATUSES = ACTIVE_PROJECT_MISSION_STATUSES;
 const ACTIVE_TASK_SESSION_STATUSES = new Set([
   'awaiting_instruction',
   'collecting_requirements',
@@ -740,6 +745,21 @@ export function getProjectManagementView(
   const taskSessions = projectSessions(project.project_id, rootDir).filter((session) =>
     isInProjectScope(session, project)
   );
+  const scope = projectScopeOf(project);
+  const archivedMissions = isWorkerProjectContext()
+    ? []
+    : projectArchivedMissions(project.project_id, scope, rootDir);
+  const visibleMissionIds = [
+    ...missions.map((mission) => mission.mission_id),
+    ...archivedMissions.map((mission) => mission.mission_id),
+  ];
+  // A worker sees only its own mission, so it sees only that mission's
+  // artifacts — not project-wide records from sibling missions.
+  const artifacts = projectArtifactRecords(project.project_id, scope, visibleMissionIds).filter(
+    (record) =>
+      !isWorkerProjectContext() ||
+      Boolean(record.mission_id && visibleMissionIds.includes(record.mission_id))
+  );
   const projectTrackIds = new Set(tracks.map((track) => track.track_id));
   const pipelineRefs = Array.isArray(project.pipeline_refs)
     ? project.pipeline_refs
@@ -752,6 +772,8 @@ export function getProjectManagementView(
     tasks,
     work_items: workItems,
     missions,
+    archived_missions: archivedMissions,
+    artifacts,
     task_sessions: taskSessions,
     operational_states: listProjectOperationalStates({
       projectId: project.project_id,

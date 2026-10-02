@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, project, operational-state, tenant, distillation, active-projects]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-06-05
+last_updated: 2026-10-02
 ---
 
 # Project Operational State Store
@@ -38,8 +38,6 @@ active/projects/
           project-state.json  # canonical live project snapshot
           tracks/
             <track_id>/track-state.json
-          missions/
-            <mission_id>/mission-link.json
           task-sessions/
             <session_id>/session-link.json
           evidence/           # raw evidence, receipts, and operational snapshots
@@ -123,20 +121,25 @@ They are siblings, not competitors.
 
 ## 5. Mission and Track Links
 
-Operational state is how the system remembers which missions and tracks belong to a project.
+The single source of project membership is each mission's own state:
+`mission-state.json` `relationships.project` / `relationships.track`. Everything the project
+side stores about its missions is a projection of that source, rebuilt on every mission sync
+(`libs/core/project/project-mission-index.ts`):
 
-Recommended record types:
+- `project-state.json` — one file per project workspace; `active_mission_ids` /
+  `active_track_ids` are the linked missions in an active status (planned, active,
+  validating, distilling, paused). Finished missions leave the list.
+- `track-state.json` — one file per track; `active_mission_ids` holds every active mission
+  on the track (not only the last one synced).
+- the project record's `active_missions` / `active_tracks` — the same projection
+  (`pnpm project reconcile --apply` computes the identical result).
+- `session-link.json` — one file per linked task session under the project workspace.
 
-- `project-state.json`
-  - one file per project workspace
-- `track-state.json`
-  - one file per track under the project workspace
-- `mission-link.json`
-  - one file per linked mission under the project workspace
-- `session-link.json`
-  - one file per linked task session under the project workspace
-
-This keeps the project view durable without forcing every mission or track to be the source of truth for the whole project.
+A mission can link only to a registered project (`[PROJECT_LINK_INVALID]` otherwise); it
+inherits the project's tenant and organization. Finished missions are read from the
+mission archive (`pnpm project show` lists them as `archived_missions`, next to the
+project's artifact records). The former per-mission `mission-link.json` is no longer
+written: nothing read it.
 
 ## 6. Why This Exists
 
