@@ -1184,19 +1184,25 @@ export async function finishMission(
   // the ArtifactRecord re-pointed; the original is archived with the mission.
   // Best-effort like closure — never fails a finish that already succeeded.
   traceCtx.startSpan('mission:artifact-promotion');
-  const promotion = promoteMissionArtifactsToProject({ missionId: upperId, missionDir, state });
-  if (promotion.status !== 'skipped' || promotion.failed.length > 0) {
-    state.context = {
-      ...(state.context || {}),
-      mission_artifact_promotion: {
-        status: promotion.status,
-        project_id: promotion.project_id,
-        promoted: promotion.promoted,
-        ...(promotion.failed.length > 0 ? { failed: promotion.failed } : {}),
-      },
-    };
+  try {
+    const promotion = promoteMissionArtifactsToProject({ missionId: upperId, missionDir, state });
+    if (promotion.status !== 'skipped' || promotion.reason !== 'no_project') {
+      state.context = {
+        ...(state.context || {}),
+        mission_artifact_promotion: {
+          status: promotion.status,
+          ...(promotion.reason ? { reason: promotion.reason } : {}),
+          project_id: promotion.project_id,
+          promoted: promotion.promoted,
+          ...(promotion.failed.length > 0 ? { failed: promotion.failed } : {}),
+        },
+      };
+    }
+    traceCtx.endSpan(promotion.failed.length > 0 ? 'error' : 'ok');
+  } catch (err: any) {
+    logger.warn(`⚠️ [ARTIFACT_PROMOTION] skipped for ${upperId}: ${err?.message || err}`);
+    traceCtx.endSpan('error', err?.message || String(err));
   }
-  traceCtx.endSpan(promotion.failed.length > 0 ? 'error' : 'ok');
 
   const missionTmpDir = pathResolver.sharedTmp(path.join('missions', upperId));
   const safeMissionTmpDir = assertSafeRepositoryPath(missionTmpDir, { allowMissingLeaf: true });

@@ -135,6 +135,35 @@ describe('writeScopedArtifact (AL-02)', () => {
     });
   });
 
+  it('mission scope without a tier takes the existing mission tier, not the default', async () => {
+    const first = store.writeScopedArtifact({
+      scope: { mission: 'MSN-TIER-INFER' },
+      tier: 'public',
+      artifact_class: 'report',
+      name: 'first.md',
+      content: 'x',
+    });
+    const missionDir = path.dirname(path.dirname(path.dirname(first.absolute_path)));
+    fs.writeFileSync(
+      path.join(missionDir, 'mission-state.json'),
+      JSON.stringify({ mission_id: 'MSN-TIER-INFER', tier: 'public' })
+    );
+    const result = store.writeScopedArtifact({
+      scope: { mission: 'MSN-TIER-INFER' },
+      artifact_class: 'report',
+      name: 'second.md',
+      content: 'y',
+      publish: { kind: 'report' },
+    });
+    expect(result.repo_relative_path).toBe(
+      path.posix.join(path.posix.dirname(first.repo_relative_path), 'second.md')
+    );
+    const { loadArtifactRecord } = await import('./artifact-record.js');
+    expect(loadArtifactRecord(result.artifact_id as string)?.metadata).toMatchObject({
+      tier: 'public',
+    });
+  });
+
   it('organization scope: places under the tier/tenant organization workspace', async () => {
     const result = store.writeScopedArtifact({
       scope: { organization: 'org-ops', tenant: 'acme' },
