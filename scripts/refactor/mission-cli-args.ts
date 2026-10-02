@@ -6,7 +6,11 @@
 import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { BOOLEAN_FLAGS, VALUE_FLAGS, type MissionRelationships } from './mission-types.js';
-import { normalizeMissionIdList, normalizeRelationships } from './mission-state.js';
+import {
+  assertValidMissionIdList,
+  normalizeMissionIdList,
+  normalizeRelationships,
+} from './mission-state.js';
 import { currentProcessArgv } from '../lib/harness.js';
 import { parseSafeJsonObjectInput, readSafeJsonFile } from '../lib/json-input.js';
 
@@ -190,7 +194,10 @@ function mergeRelationshipSources(
 
 /** `--prerequisites MSN-A,MSN-B` → `relationships.prerequisites` (ids normalized). */
 export function extractPrerequisitesOptionFromArgv(argv: string[]): Partial<MissionRelationships> {
-  const prerequisites = normalizeMissionIdList(getOptionValue('--prerequisites', argv));
+  const prerequisites = assertValidMissionIdList(
+    normalizeMissionIdList(getOptionValue('--prerequisites', argv)),
+    '--prerequisites'
+  );
   return prerequisites.length > 0 ? { prerequisites } : {};
 }
 

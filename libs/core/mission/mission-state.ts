@@ -401,8 +401,21 @@ export function normalizeMissionIdList(value: unknown): string[] {
  */
 export function loadMissionStateIncludingArchive(id: string): MissionState | null {
   const upperId = id.trim().toUpperCase();
+  if (!isValidMissionId(upperId)) return null;
   const active = loadState(upperId);
   if (active) return active;
+  const archived = loadArchivedMissionState(upperId);
+  // The archive is one flat directory for every tier and tenant: apply the
+  // same visibility as active lookup (findMissionPath) — a tenant mission is
+  // visible only to that tenant's binding.
+  if (!archived?.tenant_slug) return archived;
+  const boundTenant = String(getRegisteredEnvText('KYBERION_TENANT') || '')
+    .trim()
+    .toLowerCase();
+  return archived.tenant_slug.toLowerCase() === boundTenant ? archived : null;
+}
+
+function loadArchivedMissionState(upperId: string): MissionState | null {
   try {
     const statePath = assertSafeRepositoryPath(
       path.join(pathResolver.archivedMissionDir(upperId), 'mission-state.json')
@@ -413,9 +426,49 @@ export function loadMissionStateIncludingArchive(id: string): MissionState | nul
   }
 }
 
+function isValidMissionId(missionId: string): boolean {
+  try {
+    pathResolver.assertMissionIdArgument(missionId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validate mission ids used as dependencies (CLI flag, queue). Throws a
+ * `[MISSION_PREREQUISITES_INVALID]` error naming every malformed id.
+ */
+export function assertValidMissionIdList(ids: string[], label = 'prerequisites'): string[] {
+  const invalid = ids.filter((missionId) => !isValidMissionId(missionId));
+  if (invalid.length > 0) {
+    throw new Error(
+      `[MISSION_PREREQUISITES_INVALID] Invalid mission id(s) in ${label}: ${invalid.join(', ')}`
+    );
+  }
+  return ids;
+}
+
+/**
+ * Archived missions are read-only history. Re-creating one under the same id
+ * would shadow it for dependents and, on its own finish, overwrite the
+ * archive copy — so create/start refuse it.
+ */
+export function assertMissionNotArchived(missionId: string): void {
+  const upperId = missionId.trim().toUpperCase();
+  if (!isValidMissionId(upperId) || loadState(upperId)) return;
+  if (loadArchivedMissionState(upperId)) {
+    throw new Error(
+      `[MISSION_ARCHIVED] Mission ${upperId} is archived at ` +
+        `${pathResolver.toRepoRelative(pathResolver.archivedMissionDir(upperId))}; archived missions ` +
+        'are read-only history. Start a new mission with a new id.'
+    );
+  }
+}
+
 export interface UnmetMissionPrerequisite {
   mission_id: string;
-  reason: 'not_found' | 'not_finished';
+  reason: 'not_found' | 'not_finished' | 'invalid_id';
   status?: string;
 }
 
@@ -429,6 +482,10 @@ export function evaluateMissionPrerequisites(prerequisites: unknown): {
 } {
   const missing: UnmetMissionPrerequisite[] = [];
   for (const missionId of normalizeMissionIdList(prerequisites)) {
+    if (!isValidMissionId(missionId)) {
+      missing.push({ mission_id: missionId, reason: 'invalid_id' });
+      continue;
+    }
     const preState = loadMissionStateIncludingArchive(missionId);
     if (!preState) missing.push({ mission_id: missionId, reason: 'not_found' });
     else if (!SATISFIED_PREREQUISITE_STATUSES.has(preState.status)) {
@@ -444,7 +501,9 @@ export function describeUnmetPrerequisites(missing: UnmetMissionPrerequisite[]):
     .map((entry) =>
       entry.reason === 'not_found'
         ? `${entry.mission_id} (not found)`
-        : `${entry.mission_id} (status=${entry.status})`
+        : entry.reason === 'invalid_id'
+          ? `${entry.mission_id} (invalid id)`
+          : `${entry.mission_id} (status=${entry.status})`
     )
     .join(', ');
 }

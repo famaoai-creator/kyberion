@@ -12,15 +12,19 @@ import {
 } from '@agent/core/secure-io';
 import { withLock } from '@agent/core/lock-utils';
 import { appendJsonLine, isRecord, nowIso, readJsonLines } from '@agent/core/foundation';
-import { normalizeMissionIdList } from './mission-state.js';
+import { assertValidMissionIdList, normalizeMissionIdList } from './mission-state.js';
+
+/** A start that fails this many times is parked as `failed` instead of blocking the queue. */
+export const MAX_DISPATCH_ATTEMPTS = 3;
 
 export interface MissionQueueEntry {
   mission_id: string;
   tier: 'personal' | 'confidential' | 'public';
   priority: number;
-  status: 'pending' | 'dispatched';
+  status: 'pending' | 'dispatched' | 'failed';
   enqueued_at: string;
   dependencies: string[];
+  metadata?: { dispatch_attempts?: number; last_error?: string; last_attempt_at?: string };
 }
 
 function parseMissionQueueEntry(value: unknown): MissionQueueEntry | null {
@@ -54,7 +58,7 @@ function parseMissionQueueEntry(value: unknown): MissionQueueEntry | null {
     typeof missionId !== 'string' ||
     !missionId.trim() ||
     (tier !== 'personal' && tier !== 'confidential' && tier !== 'public') ||
-    (status !== 'pending' && status !== 'dispatched') ||
+    (status !== 'pending' && status !== 'dispatched' && status !== 'failed') ||
     typeof enqueuedAt !== 'string' ||
     !enqueuedAt.trim() ||
     !Number.isFinite(Date.parse(enqueuedAt))
@@ -69,6 +73,9 @@ function parseMissionQueueEntry(value: unknown): MissionQueueEntry | null {
     status,
     enqueued_at: enqueuedAt,
     dependencies: normalizedDependencies,
+    ...(isRecord(value.metadata)
+      ? { metadata: value.metadata as MissionQueueEntry['metadata'] }
+      : {}),
   };
 }
 
@@ -88,12 +95,12 @@ export async function enqueueMission(
   deps: string[] = []
 ): Promise<void> {
   const entry: MissionQueueEntry = {
-    mission_id: missionId.toUpperCase(),
+    mission_id: assertValidMissionIdList([missionId.trim().toUpperCase()], 'mission id')[0]!,
     tier,
     priority,
     status: 'pending',
     enqueued_at: nowIso(),
-    dependencies: normalizeMissionIdList(deps),
+    dependencies: assertValidMissionIdList(normalizeMissionIdList(deps), 'dependencies'),
   };
 
   await withLock('mission-queue', async () => {
@@ -140,14 +147,35 @@ export async function dispatchNextQueuedMission(
       }
 
       logger.info(`🚀 Dispatching Mission: ${mission.mission_id}...`);
-      // Mark dispatched only after start succeeded: a failed start must leave
-      // the entry pending so the next dispatch retries it instead of losing it.
-      await onDispatch(mission.mission_id, mission.tier);
+      const persist = () =>
+        safeWriteFile(
+          resolvedQueuePath,
+          queue.map((entry) => JSON.stringify(entry)).join('\n') + '\n'
+        );
+      // Mark dispatched only after start succeeded. A failed start stays
+      // pending for a retry, and is parked as failed after
+      // MAX_DISPATCH_ATTEMPTS so it cannot block the rest of the queue.
+      try {
+        await onDispatch(mission.mission_id, mission.tier);
+      } catch (error) {
+        const attempts = (mission.metadata?.dispatch_attempts || 0) + 1;
+        mission.metadata = {
+          ...(mission.metadata || {}),
+          dispatch_attempts: attempts,
+          last_error: error instanceof Error ? error.message : String(error),
+          last_attempt_at: nowIso(),
+        };
+        if (attempts >= MAX_DISPATCH_ATTEMPTS) mission.status = 'failed';
+        persist();
+        logger.warn(
+          `Queue entry ${mission.mission_id} failed to start (attempt ${attempts}/${MAX_DISPATCH_ATTEMPTS})` +
+            (mission.status === 'failed' ? ' — parked as failed' : ' — kept pending') +
+            ` | next: fix the cause, then dispatch again | evidence: ${resolvedQueuePath}`
+        );
+        throw error;
+      }
       mission.status = 'dispatched';
-      safeWriteFile(
-        resolvedQueuePath,
-        queue.map((entry) => JSON.stringify(entry)).join('\n') + '\n'
-      );
+      persist();
       return;
     }
 
