@@ -181,6 +181,16 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => ({
 vi.mock('@agent/core/async-utils', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/async-utils')>()),
   retry: mocks.retry,
+  // The real getRetryDefaults loads the governed retry-policy catalog through
+  // foundation io — the /tmp pathResolver mock above makes that read miss, so
+  // stub it like `retry` itself.
+  getRetryDefaults: () => ({
+    maxRetries: 2,
+    initialDelayMs: 0,
+    maxDelayMs: 1,
+    factor: 1,
+    jitter: false,
+  }),
 }));
 vi.mock('@agent/core/path-resolver', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/path-resolver')>()),

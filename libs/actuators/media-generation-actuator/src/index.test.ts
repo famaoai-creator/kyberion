@@ -230,8 +230,10 @@ async function installMockFoundationIo(): Promise<void> {
   const readFile = (filePath: string): string => {
     const normalizedPath = String(filePath).replaceAll('\\', '/');
     const useActualFile =
-      normalizedPath.includes('/knowledge/product/schemas/') ||
-      normalizedPath.endsWith('/knowledge/product/governance/error-classifier-rules.json') ||
+      // Every governed product catalog (schemas, governance, orchestration)
+      // must read the real file — a fixture stub returns manifest JSON for any
+      // path, which fails schema validation.
+      normalizedPath.includes('/knowledge/product/') ||
       normalizedPath.endsWith('/libs/actuators/media-generation-actuator/manifest.json');
     return String(
       useActualFile
