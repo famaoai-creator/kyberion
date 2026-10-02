@@ -26,7 +26,8 @@ import {
   transitionDotCharterStatus,
 } from '@agent/core/dot/dot-lifecycle';
 import { withExecutionContextAsync } from '@agent/core/authority';
-import { dotTokensUsedToday, readDotWakeLedger, runDotWake } from '@agent/core/dot/dot-runtime';
+import { dotTokensUsedToday, readDotWakeLedger } from '@agent/core/dot/dot-runtime';
+import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
 import { DEFAULT_DAEMONS } from './daemon_watchdog.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -135,7 +136,7 @@ async function reportWake(argv: string[]) {
   // turn all happen under the charter's declared role.
   const receipt = await withExecutionContextAsync(
     loaded.charter.authority.authority_role,
-    () => runDotWake(loaded, {}),
+    () => runDotWakeWithGoalDriver(loaded, {}),
     undefined,
     loaded.charter.scope.tenant_slug
   );

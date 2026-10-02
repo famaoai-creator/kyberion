@@ -571,6 +571,10 @@
       "types": "./dist/organization/organization-digest.d.ts",
       "default": "./dist/organization/organization-digest.js"
     },
+    "./organization-digest-artifacts": {
+      "types": "./dist/organization/organization-digest-artifacts.d.ts",
+      "default": "./dist/organization/organization-digest-artifacts.js"
+    },
     "./business-calendar": {
       "types": "./dist/business-calendar.d.ts",
       "default": "./dist/business-calendar.js"
@@ -1034,6 +1038,10 @@
     "./physical-namespace": {
       "types": "./dist/physical-namespace.d.ts",
       "default": "./dist/physical-namespace.js"
+    },
+    "./storage-layout": {
+      "types": "./dist/storage-layout.d.ts",
+      "default": "./dist/storage-layout.js"
     },
     "./scope-migration": {
       "types": "./dist/scope-migration.d.ts",
@@ -5015,6 +5023,10 @@
       "types": "./dist/organization/organization-digest.d.ts",
       "default": "./dist/organization/organization-digest.js"
     },
+    "./organization/organization-digest-artifacts": {
+      "types": "./dist/organization/organization-digest-artifacts.d.ts",
+      "default": "./dist/organization/organization-digest-artifacts.js"
+    },
     "./organization/organization-interventions": {
       "types": "./dist/organization/organization-interventions.d.ts",
       "default": "./dist/organization/organization-interventions.js"
@@ -7014,6 +7026,10 @@
     "./dot/dot-runtime": {
       "types": "./dist/dot/dot-runtime.d.ts",
       "default": "./dist/dot/dot-runtime.js"
+    },
+    "./dot/dot-wake-orchestration": {
+      "types": "./dist/dot/dot-wake-orchestration.d.ts",
+      "default": "./dist/dot/dot-wake-orchestration.js"
     },
     "./dot/dot-lifecycle": {
       "types": "./dist/dot/dot-lifecycle.d.ts",

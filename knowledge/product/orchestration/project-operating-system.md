@@ -430,7 +430,6 @@ active/projects/<tier>/<tenant_or_shared>/<project_id>/
   state/
     project-state.json
     tracks/<track_id>/track-state.json
-    missions/<mission_id>/mission-link.json
     task-sessions/<session_id>/session-link.json
     evidence/
     distill/

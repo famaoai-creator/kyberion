@@ -71,7 +71,18 @@ export function normalizeRelationships(
   input: any = {},
   overlays: Partial<MissionRelationships> = {}
 ): MissionRelationships {
-  const relationships: MissionRelationships = { ...(input || {}) };
+  // project/track overlays merge field-by-field below; every other overlay key
+  // (e.g. --prerequisites, --relationships-json) used to be dropped here.
+  const { project: _project, track: _track, ...overlayRest } = overlays;
+  const relationships: MissionRelationships = { ...(input || {}), ...overlayRest };
+  for (const key of ['prerequisites', 'successors', 'blockers'] as const) {
+    if (input?.[key] !== undefined || overlays[key] !== undefined) {
+      relationships[key] = normalizeMissionIdList([
+        ...normalizeMissionIdList(input?.[key]),
+        ...normalizeMissionIdList(overlays[key]),
+      ]);
+    }
+  }
 
   if (overlays.project) {
     relationships.project = {
@@ -311,13 +322,25 @@ export function loadStateForRepair(
 export async function saveState(
   id: string,
   state: MissionState,
-  { alreadyLocked = false } = {}
+  {
+    alreadyLocked = false,
+    missionDir,
+  }: {
+    alreadyLocked?: boolean;
+    /**
+     * Write to this mission directory instead of resolving it. finishMission
+     * passes the archive copy so the post-archive state never recreates a
+     * stub at the (deleted) active path.
+     */
+    missionDir?: string;
+  } = {}
 ): Promise<void> {
   assertMissionStateSchema(state);
   const tenantDir = state.tenant_slug
     ? tenantMissionDir(id, state.tenant_slug, state.tier)
     : undefined;
   const dir =
+    missionDir ||
     (tenantDir && safeExistsSync(tenantDir) ? tenantDir : undefined) ||
     findMissionPath(id) ||
     tenantDir ||
@@ -353,19 +376,177 @@ export async function saveState(
   }
 }
 
-export function checkDependencies(missionId: string): { ok: boolean; missing: string[] } {
-  const state = loadState(missionId);
-  if (!state || !state.relationships?.prerequisites) return { ok: true, missing: [] };
+/** Mission statuses that satisfy a dependent's prerequisite. */
+export const SATISFIED_PREREQUISITE_STATUSES: ReadonlySet<string> = new Set([
+  'completed',
+  'archived',
+]);
 
-  const missing: string[] = [];
-  for (const pre of state.relationships.prerequisites) {
-    const preState = loadState(pre);
-    if (!preState || preState.status !== 'completed') {
-      missing.push(pre);
+/**
+ * Normalize a mission id list (prerequisites / successors / blockers):
+ * trim, uppercase (mission ids are stored uppercase), drop empties, dedupe.
+ * Accepts an array or a comma-separated string.
+ */
+export function normalizeMissionIdList(value: unknown): string[] {
+  const raw = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : [];
+  const ids = raw
+    .map((entry) => (typeof entry === 'string' ? entry.trim().toUpperCase() : ''))
+    .filter(Boolean);
+  return [...new Set(ids)];
+}
+
+/**
+ * Load a mission's state from the active tiers, falling back to the archive
+ * (`finishMission` moves a mission there and ends it in status `archived`).
+ */
+export function loadMissionStateIncludingArchive(
+  id: string,
+  options: { tenantSlug?: string } = {}
+): MissionState | null {
+  const upperId = id.trim().toUpperCase();
+  if (!isValidMissionId(upperId)) return null;
+  const active = loadState(upperId);
+  if (active) return active;
+  const archived = loadArchivedMissionState(upperId);
+  return archived && isArchivedMissionVisible(archived, options.tenantSlug) ? archived : null;
+}
+
+/**
+ * The archive is one flat directory for every tier and tenant: apply the same
+ * visibility as active lookup (findMissionPath) — a tenant mission is visible
+ * only to that tenant (explicit `tenantSlug`, else the KYBERION_TENANT binding).
+ */
+function isArchivedMissionVisible(archived: MissionState, tenantSlug?: string): boolean {
+  if (!archived.tenant_slug) return true;
+  const boundTenant = String(tenantSlug || getRegisteredEnvText('KYBERION_TENANT') || '')
+    .trim()
+    .toLowerCase();
+  return archived.tenant_slug.toLowerCase() === boundTenant;
+}
+
+function loadArchivedMissionState(upperId: string): MissionState | null {
+  try {
+    const statePath = assertSafeRepositoryPath(
+      path.join(pathResolver.archivedMissionDir(upperId), 'mission-state.json')
+    );
+    return safeExistsSync(statePath) ? loadMissionStateAtPath(statePath) : null;
+  } catch {
+    return null;
+  }
+}
+
+function isValidMissionId(missionId: string): boolean {
+  try {
+    pathResolver.assertMissionIdArgument(missionId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validate mission ids used as dependencies (CLI flag, queue). Throws a
+ * `[MISSION_PREREQUISITES_INVALID]` error naming every malformed id.
+ */
+export function assertValidMissionIdList(ids: string[], label = 'prerequisites'): string[] {
+  const invalid = ids.filter((missionId) => !isValidMissionId(missionId));
+  if (invalid.length > 0) {
+    throw new Error(
+      `[MISSION_PREREQUISITES_INVALID] Invalid mission id(s) in ${label}: ${invalid.join(', ')}`
+    );
+  }
+  return ids;
+}
+
+/**
+ * Archived missions are read-only history. Re-creating one under the same id
+ * would shadow it for dependents and, on its own finish, overwrite the
+ * archive copy — so create/start refuse it.
+ */
+export function assertMissionNotArchived(
+  missionId: string,
+  options: { tenantSlug?: string } = {}
+): void {
+  const upperId = missionId.trim().toUpperCase();
+  if (!isValidMissionId(upperId) || loadState(upperId)) return;
+  const archived = loadArchivedMissionState(upperId);
+  if (!archived) return;
+  // The id is blocked either way (one flat archive), but another tenant's
+  // archived mission must not be disclosed.
+  if (!isArchivedMissionVisible(archived, options.tenantSlug)) {
+    throw new Error(
+      `[MISSION_ID_UNAVAILABLE] Mission id ${upperId} is unavailable. Choose a new mission id.`
+    );
+  }
+  throw new Error(
+    `[MISSION_ARCHIVED] Mission ${upperId} is archived at ` +
+      `${pathResolver.toRepoRelative(pathResolver.archivedMissionDir(upperId))}; archived missions ` +
+      'are read-only history. Start a new mission with a new id.'
+  );
+}
+
+export interface UnmetMissionPrerequisite {
+  mission_id: string;
+  reason: 'not_found' | 'not_finished' | 'invalid_id';
+  status?: string;
+}
+
+/**
+ * Evaluate mission prerequisites. A prerequisite is satisfied once its mission
+ * is completed or archived, wherever its state lives (active tier or archive).
+ */
+export function evaluateMissionPrerequisites(
+  prerequisites: unknown,
+  options: { tenantSlug?: string } = {}
+): {
+  ok: boolean;
+  missing: UnmetMissionPrerequisite[];
+} {
+  const missing: UnmetMissionPrerequisite[] = [];
+  for (const missionId of normalizeMissionIdList(prerequisites)) {
+    if (!isValidMissionId(missionId)) {
+      missing.push({ mission_id: missionId, reason: 'invalid_id' });
+      continue;
+    }
+    const preState = loadMissionStateIncludingArchive(missionId, options);
+    if (!preState) missing.push({ mission_id: missionId, reason: 'not_found' });
+    else if (!SATISFIED_PREREQUISITE_STATUSES.has(preState.status)) {
+      missing.push({ mission_id: missionId, reason: 'not_finished', status: preState.status });
     }
   }
-
   return { ok: missing.length === 0, missing };
+}
+
+/** Human-readable `<ID> (not found)` / `<ID> (status=active)` list. */
+export function describeUnmetPrerequisites(missing: UnmetMissionPrerequisite[]): string {
+  return missing
+    .map((entry) =>
+      entry.reason === 'not_found'
+        ? `${entry.mission_id} (not found)`
+        : entry.reason === 'invalid_id'
+          ? `${entry.mission_id} (invalid id)`
+          : `${entry.mission_id} (status=${entry.status})`
+    )
+    .join(', ');
+}
+
+/**
+ * Dependency check used by the mission queue: the mission's declared
+ * prerequisites plus any extra ids (e.g. a queue entry's `dependencies`).
+ */
+export function checkDependencies(
+  missionId: string,
+  extraPrerequisites: unknown = []
+): { ok: boolean; missing: string[] } {
+  const state = loadState(missionId);
+  const { ok, missing } = evaluateMissionPrerequisites(
+    [
+      ...normalizeMissionIdList(state?.relationships?.prerequisites),
+      ...normalizeMissionIdList(extraPrerequisites),
+    ],
+    { tenantSlug: state?.tenant_slug }
+  );
+  return { ok, missing: missing.map((entry) => entry.mission_id) };
 }
 
 export function getActiveMissionSearchDirs(rootDir = pathResolver.rootDir()): string[] {

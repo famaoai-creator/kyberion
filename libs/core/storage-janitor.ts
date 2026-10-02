@@ -16,6 +16,7 @@ import {
   safeMoveSync,
   safeRmSync,
 } from './secure-io.js';
+import { collectDirsPostOrder, collectFiles } from './storage-walk.js';
 import { logger } from './core.js';
 import { withExecutionContext } from './authority.js';
 import { loadVaultEntryAtPath } from './data-vault.js';
@@ -34,6 +35,7 @@ import {
   reviewRequiredCatalogPaths,
   runtimeRetentionRules,
   eventStoreRetentionRules,
+  storageFloorRetentionRules,
   coveredEventStoreDirs,
   coveredRuntimeSubdirs,
   catalogStatusRules,
@@ -188,6 +190,9 @@ export interface JanitorReport {
   /** EV-06: append-only event-store files expired / deleted this run. */
   expiredEventStores: number;
   deletedEventStores: number;
+  /** Storage-layout floors (staging/cache/artifacts) expired / deleted this run. */
+  expiredStorageFloors: number;
+  deletedStorageFloors: number;
   /** AC-10: dated supervisor-event files expired / deleted this run (legacy file never included). */
   expiredSupervisorEvents: number;
   deletedSupervisorEvents: number;
@@ -242,68 +247,6 @@ export interface LegacyJanitorReport {
   rotated_logs: unknown[];
   scanned_data_vault: unknown[];
   removed: number;
-}
-
-function collectFiles(dir: string): string[] {
-  if (!safeExistsSync(dir)) return [];
-  const results: string[] = [];
-  const walk = (current: string): void => {
-    let entries: string[];
-    try {
-      entries = safeReaddir(current);
-    } catch {
-      return;
-    }
-    for (const name of entries) {
-      const fullPath = nodePath.join(current, name);
-      try {
-        const stat = safeLstat(fullPath);
-        if (stat.isSymbolicLink()) {
-          continue;
-        }
-        if (stat.isDirectory()) {
-          walk(fullPath);
-        } else {
-          results.push(fullPath);
-        }
-      } catch {
-        // skip unreadable entries
-      }
-    }
-  };
-  walk(dir);
-  return results;
-}
-
-/** Directories under `dir` in post-order (deepest first); symlinks skipped. */
-function collectDirsPostOrder(dir: string): string[] {
-  if (!safeExistsSync(dir)) return [];
-  const results: string[] = [];
-  const walk = (current: string): void => {
-    let entries: string[];
-    try {
-      entries = safeReaddir(current);
-    } catch {
-      return;
-    }
-    for (const name of entries) {
-      const fullPath = nodePath.join(current, name);
-      try {
-        const stat = safeLstat(fullPath);
-        if (stat.isSymbolicLink()) {
-          continue;
-        }
-        if (stat.isDirectory()) {
-          walk(fullPath);
-          results.push(fullPath);
-        }
-      } catch {
-        // skip unreadable entries
-      }
-    }
-  };
-  walk(dir);
-  return results;
 }
 
 /** Repo-relative POSIX path under the (possibly test-overridden) root. */
@@ -682,12 +625,31 @@ export function scanEventStores(opts: {
   dryRun: boolean;
   catalog?: LoadedRetentionCatalog;
 }): ScanRuntimeResult {
+  const catalog = opts.catalog ?? loadRetentionCatalog();
+  return sweepRepoRootedRules(eventStoreRetentionRules(catalog), catalog, opts.dryRun);
+}
+
+/**
+ * Storage-layout floors (`active/shared/{staging,cache,artifacts}`): same
+ * declared-entry sweep as the event stores, so a new floor subtree needs only
+ * a catalog entry.
+ */
+export function scanStorageFloors(opts: {
+  dryRun: boolean;
+  catalog?: LoadedRetentionCatalog;
+}): ScanRuntimeResult {
+  const catalog = opts.catalog ?? loadRetentionCatalog();
+  return sweepRepoRootedRules(storageFloorRetentionRules(catalog), catalog, opts.dryRun);
+}
+
+function sweepRepoRootedRules(
+  rules: Array<{ repoRelativeDir: string; ttlMs: number; entry: RetentionCatalogEntry }>,
+  catalog: LoadedRetentionCatalog,
+  dryRun: boolean
+): ScanRuntimeResult {
   const now = Date.now();
   const expired: string[] = [];
   const outcome = { deleted: [] as string[], softDeleted: [] as string[] };
-
-  const catalog = opts.catalog ?? loadRetentionCatalog();
-  const rules = eventStoreRetentionRules(catalog);
   for (const rule of rules) {
     const dir = nodePath.join(rootDir(), rule.repoRelativeDir);
     for (const filePath of collectFiles(dir)) {
@@ -721,7 +683,7 @@ export function scanEventStores(opts: {
         const stat = safeStat(filePath);
         if (now - stat.mtimeMs > rule.ttlMs) {
           expired.push(filePath);
-          if (!opts.dryRun) {
+          if (!dryRun) {
             expireFilePerPolicy(filePath, rule.entry, outcome);
           }
         }
@@ -1301,6 +1263,13 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     errors.push(`event-stores: ${err?.message ?? String(err)}`);
   }
 
+  let storageFloorResult: ScanRuntimeResult = { expired: [], deleted: [], softDeleted: [] };
+  try {
+    storageFloorResult = scanStorageFloors({ dryRun: opts.dryRun, catalog });
+  } catch (err: any) {
+    errors.push(`storage-floors: ${err?.message ?? String(err)}`);
+  }
+
   let supervisorEventsResult: ScanRuntimeResult = { expired: [], deleted: [], softDeleted: [] };
   try {
     supervisorEventsResult = sweepSupervisorEventFiles({ dryRun: opts.dryRun, catalog });
@@ -1396,6 +1365,8 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     deletedRuntime: runtimeResult.deleted.length,
     expiredEventStores: eventStoreResult.expired.length,
     deletedEventStores: eventStoreResult.deleted.length,
+    expiredStorageFloors: storageFloorResult.expired.length,
+    deletedStorageFloors: storageFloorResult.deleted.length,
     expiredSupervisorEvents: supervisorEventsResult.expired.length,
     deletedSupervisorEvents: supervisorEventsResult.deleted.length,
     expiredStatusRules: statusRulesResult.expired.length,
@@ -1420,6 +1391,7 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
       logResult.softDeleted.length +
       runtimeResult.softDeleted.length +
       eventStoreResult.softDeleted.length +
+      storageFloorResult.softDeleted.length +
       supervisorEventsResult.softDeleted.length +
       statusRulesResult.softDeleted.length,
     expiredTrash: trashResult.expired.length,
