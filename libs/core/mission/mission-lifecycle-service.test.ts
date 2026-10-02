@@ -559,6 +559,42 @@ describe('mission-lifecycle-service — prerequisite gate on start', () => {
     expect(fs.existsSync(pathResolver.missionDir(archivedPre, 'public'))).toBe(false);
   });
 
+  it('propagates a start failure that happens before activation', async () => {
+    const { missionLifecycleService: realFacade } = await import('./mission-lifecycle-service.js');
+    // An invalid tenant slug fails inside createMission (after the gate).
+    await expect(
+      realFacade.start(
+        childBlocked,
+        'public',
+        'worker',
+        'default',
+        'development',
+        undefined,
+        {},
+        'Not A Slug',
+        {}
+      )
+    ).rejects.toThrow(/invalid tenant slug/i);
+  });
+
+  it('treats start on an already-active mission as a no-op', async () => {
+    const { missionLifecycleService: realFacade } = await import('./mission-lifecycle-service.js');
+    const args = [
+      'public',
+      'worker',
+      'default',
+      'development',
+      undefined,
+      {},
+      undefined,
+      {},
+    ] as const;
+    await realFacade.start(childOk, ...args);
+    await expect(realFacade.start(childOk, ...args)).resolves.toBeUndefined();
+    const { loadState } = await import('./mission-state.js');
+    expect(loadState(childOk)?.status).toBe('active');
+  });
+
   it('refuses to start with unmet prerequisites and creates nothing', async () => {
     const { missionLifecycleService: realFacade } = await import('./mission-lifecycle-service.js');
     await expect(

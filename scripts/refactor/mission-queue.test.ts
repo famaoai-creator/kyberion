@@ -173,6 +173,23 @@ describe('mission-queue', () => {
     expect(dispatched).toEqual(['MSN-NEXT']);
   });
 
+  it('parks an unreadable legacy entry instead of throwing on every dispatch', async () => {
+    safeWriteFile(QUEUE_PATH, [entry('ab', 9), entry('MSN-OK-2', 1)].join('\n') + '\n');
+    const dispatched: string[] = [];
+    await dispatchNextQueuedMission(
+      QUEUE_PATH,
+      (missionId) => {
+        if (missionId === 'ab') throw new Error("[path-resolver] invalid mission id 'ab'");
+        return { ok: true, missing: [] };
+      },
+      async (missionId) => {
+        dispatched.push(missionId);
+      }
+    );
+    expect(dispatched).toEqual(['MSN-OK-2']);
+    expect(statuses()).toEqual({ ab: 'failed', 'MSN-OK-2': 'dispatched' });
+  });
+
   it('keeps an entry pending when its start fails', async () => {
     safeWriteFile(QUEUE_PATH, entry('MSN-FAILS', 5) + '\n');
     await expect(
