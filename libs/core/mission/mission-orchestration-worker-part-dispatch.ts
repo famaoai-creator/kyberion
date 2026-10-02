@@ -1,5 +1,6 @@
 import { agentRegistry } from '../agent/agent-registry.js';
 import { deriveAgentNhiId } from '../agent/agent-identity.js';
+import { tryResolveOwnerScope } from '../owner-scope.js';
 import {
   appendDelegationLink,
   buildDelegationLink,
@@ -207,6 +208,8 @@ export interface GoalDrivenWorkItemSeams {
  */
 export function isGoalDrivenTaskResumable(missionId: string, task: PlannedNextTask): boolean {
   if (task.goal_driven !== true) return false;
+  // An unknown mission has nothing to resume (read path: no throw).
+  if (!tryResolveOwnerScope({ kind: 'mission', id: missionId })) return false;
   const journalPath = goalJournalPath(missionId, task.task_id);
   if (!safeExistsSync(journalPath)) return false;
   const restored = new WorkerStateJournal({ journalPath }).restore().goal;

@@ -11,7 +11,8 @@ import { evaluateMissionGate, writeMissionGateRecord } from './mission-gate-engi
 import { logger } from '../core.js';
 import { type DynamicInjectionProvider } from '../dynamic-injection.js';
 import { buildExecutionEnv } from '../authority.js';
-import { findMissionPath, missionDir, missionEvidenceDir } from '../path-resolver.js';
+import { missionEvidenceDir } from '../path-resolver.js';
+import { resolveMissionDir } from '../owner-scope.js';
 import { pathResolver } from '../path-resolver.js';
 import { type MissionContextPackPruningSummary } from './mission-context-pack.js';
 import { appendPromptVisibilityRecord } from '../reasoning/prompt-visibility-ledger.js';
@@ -68,16 +69,21 @@ import {
   type TaskResultBlock,
 } from './mission-orchestration-worker-contracts.js';
 
+/**
+ * Directory of an existing mission, derived from where it actually lives. An
+ * explicit tenant only narrows it (a contradiction throws
+ * SCOPE_CONTRADICTS_OWNER) and an unknown mission fails closed
+ * (OWNER_NOT_FOUND) — mission artifacts are never placed by a guessed tier.
+ * `_fallbackTier` is accepted for caller compatibility and no longer used.
+ */
 export function resolvedMissionDir(
   missionId: string,
-  fallbackTier: 'personal' | 'confidential' | 'public' = 'public',
+  _fallbackTier: 'personal' | 'confidential' | 'public' = 'public',
   tenantSlug?: string
 ): string {
   const explicitTenant = tenantSlug?.trim();
   return assertSafeRepositoryPath(
-    explicitTenant
-      ? missionDir(missionId, fallbackTier, explicitTenant)
-      : findMissionPath(missionId) || missionDir(missionId, fallbackTier),
+    resolveMissionDir(missionId, explicitTenant ? { tenant: explicitTenant } : undefined),
     { allowMissingLeaf: true }
   );
 }
@@ -93,11 +99,14 @@ export function recordMissionVisiblePrompt(input: {
   securityScope?: import('../context-security-scope.js').ContextSecurityScope;
 }): void {
   const tier = input.securityScope?.write_tier || 'public';
+  // The context pack marks an untenanted mission with the 'default' sentinel
+  // (mission-context-pack.ts); it is not a tenant and must not narrow.
+  const scopeTenant = input.securityScope?.tenant_slug || input.securityScope?.tenant_id;
   appendPromptVisibilityRecord({
     missionPath: resolvedMissionDir(
       input.missionId,
       tier,
-      input.securityScope?.tenant_slug || input.securityScope?.tenant_id
+      scopeTenant === 'default' ? undefined : scopeTenant
     ),
     missionId: input.missionId,
     source: 'mission-orchestration-worker',

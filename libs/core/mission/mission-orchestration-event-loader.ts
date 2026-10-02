@@ -1,7 +1,8 @@
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import * as path from 'node:path';
-import { findMissionPath, pathResolver } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { OwnerScopeError, tryResolveOwnerScope } from '../owner-scope.js';
+import { assertSafeRepositoryPath, safeLstat } from '../secure-io.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import {
   normalizeEventScope,
@@ -82,27 +83,33 @@ export function loadMissionOrchestrationPayloadEnvelopeAtPath<TPayload = Record<
   return envelope;
 }
 
+/**
+ * The mission's own location is authoritative. A supplied tier/tenant is only
+ * a selector among same-id missions; a contradiction is left to
+ * resolveEventScopeAgainstAuthority, which reports it as a lineage conflict.
+ */
+export function locateMissionForScope(
+  missionId: string,
+  supplied?: EventScopeInput
+): string | undefined {
+  const owner = { kind: 'mission', id: missionId } as const;
+  try {
+    return tryResolveOwnerScope(owner)?.dir;
+  } catch (error) {
+    if (!(error instanceof OwnerScopeError) || error.code !== 'OWNER_AMBIGUOUS') throw error;
+    const suppliedTenant = supplied?.tenant_slug ?? supplied?.tenant_id;
+    return tryResolveOwnerScope(owner, {
+      ...(supplied?.tier ? { tier: supplied.tier } : {}),
+      ...(suppliedTenant ? { tenant: suppliedTenant } : {}),
+    })?.dir;
+  }
+}
+
 function resolveMissionOrchestrationScope(
   missionId: string,
   supplied?: EventScopeInput
 ): EventScope {
-  const locatedMissionPath =
-    findMissionPath(missionId) ||
-    (supplied?.tenant_slug && supplied.tier
-      ? (() => {
-          const candidate = pathResolver.tenantMissionDir(
-            missionId,
-            supplied.tenant_slug,
-            supplied.tier!
-          );
-          try {
-            const safeCandidate = assertSafeRepositoryPath(candidate, { allowMissingLeaf: false });
-            return safeExistsSync(safeCandidate) ? safeCandidate : undefined;
-          } catch {
-            return undefined;
-          }
-        })()
-      : undefined);
+  const locatedMissionPath = locateMissionForScope(missionId, supplied);
   let statePath: string | undefined;
   try {
     statePath = locatedMissionPath

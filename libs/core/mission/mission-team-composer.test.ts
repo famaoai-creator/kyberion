@@ -20,6 +20,22 @@ import {
   setWorkCoordinationNamespace,
 } from '../workforce/work-coordination.js';
 import { loadAgentProfileIndex } from './mission-team-index.js';
+import { writeMissionStateAtPath } from './mission-state-reader.js';
+
+/** Receipts are read from the existing mission's own directory, so seed its state. */
+function seedPublicMissionState(missionPath: string, missionId: string): void {
+  writeMissionStateAtPath(`${missionPath}/mission-state.json`, {
+    mission_id: missionId,
+    tier: 'public',
+    status: 'active',
+    execution_mode: 'local',
+    priority: 1,
+    assigned_persona: 'worker',
+    confidence_score: 1,
+    git: { branch: `mission/${missionId}`, start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+    history: [],
+  } as never);
+}
 
 // selectAgentForTeamRole penalises candidates by the observed load index, which
 // reads the checkout's real work-item store. Isolate it so real active/ load
@@ -405,6 +421,7 @@ describe('mission-team-composer classification integration', () => {
     process.env.KYBERION_PERSONA = 'mission-controller-test';
     try {
       safeMkdir(missionPath, { recursive: true });
+      seedPublicMissionState(missionPath, missionId);
       const plan = composeMissionTeamPlan({
         missionId,
         missionType: 'product_development',
@@ -463,6 +480,7 @@ describe('mission-team-composer classification integration', () => {
     const missionPath = pathResolver.missionDir(missionId, 'public');
     withExecutionContext('mission_controller', () => {
       safeMkdir(missionPath, { recursive: true });
+      seedPublicMissionState(missionPath, missionId);
     });
     try {
       const brief = composeMissionTeamBrief({

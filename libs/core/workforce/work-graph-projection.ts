@@ -1,7 +1,8 @@
 import * as nodePath from 'node:path';
 import { withExecutionContext } from '../authority.js';
 import { loadMissionNextTaskObjectsAtPath } from '../mission/mission-next-task-reader.js';
-import { findMissionPath, pathResolver } from '../path-resolver.js';
+import { pathResolver } from '../path-resolver.js';
+import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
 import { listWorkItems, type WorkItem, type WorkItemStatus } from './work-coordination.js';
 import { buildWorkGraph, type WorkGraph } from './work-graph.js';
 import {
@@ -289,15 +290,18 @@ export function projectWorkGraphToNextTasks(
   const missionId = input.missionId.trim().toUpperCase();
   if (!missionId) throw new Error('missionId is required');
   const projectId = (input.projectId || missionId).trim();
-  // A mission's tier is canonical state, not a presentation default. Resolve
-  // an existing mission first so a confidential tenant mission is never
-  // projected into the public compatibility path. The confidential fallback
-  // is only used for a not-yet-created mission and preserves the secure
-  // default for an apply operation.
+  // A mission's tier is canonical state, not a presentation default: an
+  // existing mission is resolved where it actually lives (all tiers/tenants;
+  // the caller tenant only narrows it). An apply for an unknown mission fails
+  // closed (OwnerScopeError); a dry-run preview of a not-yet-created mission
+  // keeps the secure confidential default path, which it never writes.
+  const tenantHint = input.tenantSlug?.trim() ? { tenant: input.tenantSlug.trim() } : undefined;
   const missionPath =
     input.missionPath ||
-    findMissionPath(missionId) ||
-    pathResolver.missionDir(missionId, 'confidential', input.tenantSlug);
+    (input.apply
+      ? resolveMissionDir(missionId, tenantHint)
+      : tryResolveOwnerScope({ kind: 'mission', id: missionId }, tenantHint)?.dir ||
+        pathResolver.missionDir(missionId, 'confidential', input.tenantSlug));
   const safeMissionPath = assertMissionPathWithinRoot(missionPath);
   const nextTasksPath = assertSafeRepositoryPath(
     nodePath.join(safeMissionPath, 'NEXT_TASKS.json'),

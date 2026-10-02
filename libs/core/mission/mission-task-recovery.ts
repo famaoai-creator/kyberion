@@ -2,7 +2,7 @@ import * as nodePath from 'node:path';
 import { withExecutionContext } from '../authority.js';
 import { nowIso } from '../foundation/time.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
-import { pathResolver } from '../path-resolver.js';
+import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import {
   claimWorkItem,
@@ -34,15 +34,17 @@ export interface MissionRequestedTaskRecoverySummary {
   records: MissionRequestedTaskRecoveryRecord[];
 }
 
+/** NEXT_TASKS.json of the existing mission; an unknown mission fails closed (write path). */
 function nextTasksPath(missionId: string): string {
-  const missionPath =
-    pathResolver.findMissionPath(missionId) || pathResolver.missionDir(missionId, 'public');
+  const missionPath = resolveMissionDir(missionId);
   return assertSafeRepositoryPath(nodePath.join(missionPath, 'NEXT_TASKS.json'), {
     allowMissingLeaf: true,
   });
 }
 
 function readNextTasks(missionId: string): Array<Record<string, unknown>> {
+  // Read path: an unknown mission has no tasks to recover.
+  if (!tryResolveOwnerScope({ kind: 'mission', id: missionId })) return [];
   const filePath = nextTasksPath(missionId);
   if (!safeExistsSync(filePath)) return [];
   try {
