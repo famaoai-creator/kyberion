@@ -1,5 +1,6 @@
 import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
-import { missionDir, pathResolver } from '@agent/core/path-resolver';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveMissionDir } from '@agent/core/owner-scope';
 import {
   evaluateTaskPlanReadyGate,
   readDesignSpecAtPath,
@@ -109,7 +110,9 @@ export function taskPlanToNextTasks(input: { mission_id: string }) {
       ...(reviewTarget ? { review_target: reviewTarget } : {}),
     };
   });
-  const nextTasksPath = `${missionDir(input.mission_id, 'public')}/NEXT_TASKS.json`;
+  // NEXT_TASKS.json belongs to the existing mission wherever it lives; an
+  // unknown mission fails closed (OwnerScopeError) instead of landing in public.
+  const nextTasksPath = `${resolveMissionDir(input.mission_id)}/NEXT_TASKS.json`;
   safeWriteFile(nextTasksPath, JSON.stringify(nextTasks, null, 2));
   return {
     mission_id: input.mission_id,

@@ -11,6 +11,7 @@ import { dispatchWisdomOperation } from './decision-ops.js';
 const dispatchDecisionOp = dispatchWisdomOperation;
 import { handleAction, runWithOperationRetry } from './wisdom-pipeline-helpers.js';
 import { createWisdomDispatcher } from './wisdom-dispatcher.js';
+import { writeMissionStateAtPath } from '@agent/core/mission/mission-state-reader';
 
 function readJson<T>(relativePath: string): T {
   return JSON.parse(
@@ -61,6 +62,23 @@ describe('wisdom public contract boundaries', () => {
     process.env.MISSION_ROLE = 'mission_controller';
     try {
       safeRmSync(missionPath, { recursive: true, force: true });
+      // The visibility record lands in the existing mission's own directory.
+      writeMissionStateAtPath(`${missionPath}/mission-state.json`, {
+        mission_id: missionId,
+        tier: 'public',
+        status: 'active',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'worker',
+        confidence_score: 1,
+        git: {
+          branch: `mission/${missionId}`,
+          start_commit: 'a',
+          latest_commit: 'a',
+          checkpoints: [],
+        },
+        history: [],
+      } as never);
       const result = await handleAction({
         action: 'knowledge_read',
         params: {

@@ -36,6 +36,22 @@ import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRmSync } from '../secure-io.js';
 import { logger } from '../core.js';
 import { withExecutionContext } from '../authority.js';
+import { writeMissionStateAtPath } from './mission-state-reader.js';
+
+/** Mission paths are owner-derived: a mission exists once its state is recorded. */
+function seedPublicMissionState(missionId: string): void {
+  writeMissionStateAtPath(`${pathResolver.missionDir(missionId, 'public')}/mission-state.json`, {
+    mission_id: missionId,
+    tier: 'public',
+    status: 'active',
+    execution_mode: 'local',
+    priority: 1,
+    assigned_persona: 'worker',
+    confidence_score: 1,
+    git: { branch: `mission/${missionId}`, start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+    history: [],
+  } as never);
+}
 
 const knowledgeFeedbackTestRoot = pathResolver.sharedTmp(
   `goal-driven-tests/knowledge-feedback/${process.pid}`
@@ -347,6 +363,7 @@ describe('mission worker recovery target selection', () => {
       const taskId = 'TASK-PAUSED';
       const journalPath = `${pathResolver.missionDir(missionId, 'public')}/coordination/goal-journal-${taskId}.jsonl`;
       safeRmSync(pathResolver.missionDir(missionId, 'public'), { recursive: true, force: true });
+      seedPublicMissionState(missionId);
       try {
         const journal = new WorkerStateJournal({ journalPath });
         journal.recordGoal(
@@ -436,6 +453,7 @@ describe('KP-01: goal-driven dispatch context-pack provisioning', () => {
   it('provisions a systemPrompt whose first-turn prompt in the goal loop carries the context pack (knowledge hints + mission summary), as a stable prefix', async () => {
     const missionId = 'MSN-GD-KP01-TURN';
     kp01MissionIds.push(missionId);
+    seedPublicMissionState(missionId);
     const { pack, workItem } = buildGoalDrivenFixture({
       missionId,
       itemId: 'WIT-GD-KP01-TURN',
@@ -486,6 +504,7 @@ describe('KP-01: goal-driven dispatch context-pack provisioning', () => {
 
     it('persists the pack under the mission coordination dir, same as the single-shot path', async () => {
       kp01MissionIds.push(missionId);
+      seedPublicMissionState(missionId);
       const { pack, workItem } = buildGoalDrivenFixture({
         missionId,
         itemId: 'WIT-GD-KP01-SAVE',

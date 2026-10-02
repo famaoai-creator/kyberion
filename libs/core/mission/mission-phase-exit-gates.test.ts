@@ -33,6 +33,11 @@ describe('mission phase exit gates (MO-02)', () => {
     process.env.MISSION_ROLE = 'mission_controller';
     missionPath = missionDir(missionId, 'public');
     fs.mkdirSync(missionPath, { recursive: true });
+    // Gate paths are owner-derived: the mission exists once its state is recorded.
+    fs.writeFileSync(
+      path.join(missionPath, 'mission-state.json'),
+      JSON.stringify({ mission_id: missionId, tier: 'public' })
+    );
     delete process.env.KYBERION_PHASE_GATE_MODE;
   });
 
@@ -96,6 +101,10 @@ describe('mission phase exit gates (MO-02)', () => {
     const definitionsDir = path.join(confidentialMissionPath, 'gates', 'definitions');
     fs.mkdirSync(definitionsDir, { recursive: true });
     fs.writeFileSync(
+      path.join(confidentialMissionPath, 'mission-state.json'),
+      JSON.stringify({ mission_id: confidentialMissionId, tier: 'confidential' })
+    );
+    fs.writeFileSync(
       path.join(definitionsDir, 'CONFIDENTIAL_GATE.json'),
       JSON.stringify({
         mission_id: confidentialMissionId,
@@ -125,6 +134,10 @@ describe('mission phase exit gates (MO-02)', () => {
     );
     const externalDefinitions = path.join(externalMissionPath, 'gates', 'definitions');
     fs.mkdirSync(externalDefinitions, { recursive: true });
+    fs.writeFileSync(
+      path.join(externalMissionPath, 'mission-state.json'),
+      JSON.stringify({ mission_id: missionId, tier: 'public' })
+    );
     fs.writeFileSync(
       path.join(externalDefinitions, 'ESCAPED.json'),
       JSON.stringify({

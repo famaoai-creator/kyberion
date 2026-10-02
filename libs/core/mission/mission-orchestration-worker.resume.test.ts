@@ -20,6 +20,26 @@ vi.mock('../managed-process.js', () => ({
   spawnManagedProcess: mocks.spawnManagedProcess,
 }));
 
+/** Mission paths are owner-derived: a mission exists only once its state is recorded. */
+async function seedMissionState(
+  missionPath: string,
+  missionId: string,
+  tier: 'public' | 'confidential'
+): Promise<void> {
+  const { writeMissionStateAtPath } = await import('./mission-state-reader.js');
+  writeMissionStateAtPath(`${missionPath}/mission-state.json`, {
+    mission_id: missionId,
+    tier,
+    status: 'active',
+    execution_mode: 'local',
+    priority: 1,
+    assigned_persona: 'worker',
+    confidence_score: 1,
+    git: { branch: `mission/${missionId}`, start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+    history: [],
+  } as never);
+}
+
 describe('mission-orchestration-worker resume replay', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -36,6 +56,7 @@ describe('mission-orchestration-worker resume replay', () => {
 
     const { safeRmSync, safeReadFile } = await import('../secure-io.js');
     safeRmSync(coordinationPath, { recursive: true, force: true });
+    await seedMissionState(missionPath, missionId, 'public');
 
     const { enqueueMissionOrchestrationEvent } = await import('./mission-orchestration-events.js');
     const { appendMissionOrchestrationJournalEntry, loadMissionOrchestrationJournal } =
@@ -123,6 +144,7 @@ describe('mission-orchestration-worker resume replay', () => {
         safeReadFile(`${coordinationPath}/orchestration-journal.jsonl`, { encoding: 'utf8' }) || ''
       )
     ).toContain(controlEvent.event_id);
+    safeRmSync(missionPath, { recursive: true, force: true });
   });
 
   it('passes an explicit resume contract to the dedicated goal-worker recovery handler', async () => {
@@ -154,6 +176,7 @@ describe('mission-orchestration-worker resume replay', () => {
     const { safeMkdir, safeRmSync } = await import('../secure-io.js');
     safeRmSync(missionPath, { recursive: true, force: true });
     safeMkdir(missionPath, { recursive: true });
+    await seedMissionState(missionPath, missionId, 'confidential');
 
     try {
       const { taskResultFilePath, taskClarificationFilePath } =
@@ -175,6 +198,7 @@ describe('mission-orchestration-worker resume replay', () => {
     const { safeMkdir, safeRmSync } = await import('../secure-io.js');
     safeRmSync(missionPath, { recursive: true, force: true });
     safeMkdir(missionPath, { recursive: true });
+    await seedMissionState(missionPath, missionId, 'confidential');
 
     try {
       const { buildTaskExecutionPrompt } =

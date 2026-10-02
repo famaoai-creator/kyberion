@@ -7,7 +7,7 @@ import {
   type MissionTaskEventIdentity,
 } from './mission-task-events.js';
 import { ledger } from '../ledger.js';
-import { findMissionPath, missionDir } from '../path-resolver.js';
+import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
 import { readJsonLines } from '../foundation/json.js';
 import { readTextFile } from '../foundation/text.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
@@ -66,16 +66,24 @@ const TASK_EVENT_STATUS_MAP: Partial<
   accepted: 'task_accepted',
 };
 
+/**
+ * Artifact path inside the existing mission's own directory. Write paths use
+ * this: an unknown mission fails closed (OwnerScopeError).
+ */
 function safeMissionArtifactPath(missionId: string, relativePath: string): string {
-  const missionPath = assertSafeRepositoryPath(
-    findMissionPath(missionId) || missionDir(missionId, 'public'),
-    {
-      allowMissingLeaf: true,
-    }
-  );
+  const missionPath = assertSafeRepositoryPath(resolveMissionDir(missionId), {
+    allowMissingLeaf: true,
+  });
   return assertSafeRepositoryPath(path.join(missionPath, relativePath), {
     allowMissingLeaf: true,
   });
+}
+
+/** Read-path variant: null for an unknown mission (callers treat it as missing). */
+function existingMissionArtifactPath(missionId: string, relativePath: string): string | null {
+  return tryResolveOwnerScope({ kind: 'mission', id: missionId })
+    ? safeMissionArtifactPath(missionId, relativePath)
+    : null;
 }
 
 export function isRegularMissionProgressArtifactPath(filePath: string): boolean {
@@ -91,8 +99,8 @@ export function createMissionProgressController(
   dependencies: MissionProgressControllerDependencies
 ): MissionProgressController {
   function loadAllNextTasks(missionId: string): PlannedNextTask[] {
-    const nextTasksPath = safeMissionArtifactPath(missionId, 'NEXT_TASKS.json');
-    if (!safeExistsSync(nextTasksPath)) return [];
+    const nextTasksPath = existingMissionArtifactPath(missionId, 'NEXT_TASKS.json');
+    if (!nextTasksPath || !safeExistsSync(nextTasksPath)) return [];
     return dependencies.validatePlannedNextTasks(
       loadMissionNextTaskObjectsAtPath(nextTasksPath, path.basename(path.dirname(nextTasksPath))) ||
         [],
@@ -146,6 +154,7 @@ export function createMissionProgressController(
   }
 
   function syncPlanningArtifacts(missionId: string): void {
+    if (!tryResolveOwnerScope({ kind: 'mission', id: missionId })) return;
     const planPath = safeMissionArtifactPath(missionId, 'PLAN.md');
     const nextTasksPath = safeMissionArtifactPath(missionId, 'NEXT_TASKS.json');
     const taskBoardPath = safeMissionArtifactPath(missionId, 'TASK_BOARD.md');
@@ -373,6 +382,7 @@ export function createMissionProgressController(
   }
 
   function readExistingTaskEventKeys(missionId: string): Set<string> {
+    if (!tryResolveOwnerScope({ kind: 'mission', id: missionId })) return new Set();
     const taskEventsPath = assertSafeRepositoryPath(missionTaskEventsPath(missionId), {
       allowMissingLeaf: true,
     });
@@ -424,8 +434,8 @@ export function createMissionProgressController(
   }
 
   function reconcileMissionProgress(missionId: string): void {
-    const taskBoardPath = safeMissionArtifactPath(missionId, 'TASK_BOARD.md');
-    if (!isRegularMissionProgressArtifactPath(taskBoardPath)) return;
+    const taskBoardPath = existingMissionArtifactPath(missionId, 'TASK_BOARD.md');
+    if (!taskBoardPath || !isRegularMissionProgressArtifactPath(taskBoardPath)) return;
 
     const tasks = loadAllNextTasks(missionId);
     const acceptedCount = tasks.filter((task) => task.status === 'accepted').length;
@@ -495,8 +505,8 @@ export function createMissionProgressController(
   }
 
   function markTaskBoardInProgress(missionId: string): void {
-    const taskBoardPath = safeMissionArtifactPath(missionId, 'TASK_BOARD.md');
-    if (!isRegularMissionProgressArtifactPath(taskBoardPath)) return;
+    const taskBoardPath = existingMissionArtifactPath(missionId, 'TASK_BOARD.md');
+    if (!taskBoardPath || !isRegularMissionProgressArtifactPath(taskBoardPath)) return;
     const currentTaskBoard = readTextFile(taskBoardPath);
     const updatedTaskBoard = currentTaskBoard
       .replace('## Status: Planning Ready', '## Status: Execution Ready')

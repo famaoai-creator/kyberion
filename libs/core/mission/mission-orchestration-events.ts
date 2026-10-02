@@ -7,6 +7,7 @@ import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '../secure-io
 import { resolveSharedObservabilityDir } from '../analysis/observability-gate.js';
 import { spawnManagedProcess } from '../managed-process.js';
 import { appendMissionOrchestrationJournalEntry } from './mission-orchestration-journal.js';
+import { resolveMissionDir } from '../owner-scope.js';
 import { getDefaultWorkerEventStream } from '../workforce/worker-event-stream.js';
 import {
   redactEventScopeForShared,
@@ -84,11 +85,12 @@ function missionPayloadPath(
   eventId: string,
   scopeTenantSlug?: string
 ): string {
-  const missionPath =
-    pathResolver.findMissionPath(missionId) ||
-    (scopeTenantSlug
-      ? pathResolver.tenantMissionDir(missionId, scopeTenantSlug, tier)
-      : pathResolver.missionDir(missionId, tier));
+  // The payload lives beside the existing mission; the event scope only
+  // narrows that location and an unknown mission fails closed.
+  const missionPath = resolveMissionDir(missionId, {
+    tier,
+    ...(scopeTenantSlug ? { tenant: scopeTenantSlug } : {}),
+  });
   return assertSafeRepositoryPath(path.join(missionPath, PAYLOAD_SUBDIR, `${eventId}.json`), {
     allowMissingLeaf: true,
   });

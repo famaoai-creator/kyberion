@@ -33,6 +33,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import type { MissionState } from './mission-types.js';
+import { writeMissionStateAtPath } from './mission-state-reader.js';
 import { dispatchMissionTickets } from './mission-ticket-dispatch.js';
 import { dispatchMissionWorkItems } from './mission-workitem-dispatch.js';
 import {
@@ -264,6 +265,8 @@ beforeEach(() => {
   setWorkCoordinationNamespace(workCoordinationNamespace);
   clearWorkCoordinationStore();
   if (!safeExistsSync(missionPath)) safeMkdir(missionPath, { recursive: true });
+  // Mission-local reads/writes resolve the mission's own record (owner scope).
+  writeMissionStateAtPath(nodePath.join(missionPath, 'mission-state.json'), makeMissionState());
 });
 
 afterEach(() => {

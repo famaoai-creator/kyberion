@@ -12,7 +12,7 @@ import {
   safeMoveSync,
   safeRmSync,
 } from '../secure-io.js';
-import { findMissionPath, missionDir } from '../path-resolver.js';
+import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
 
 export type MissionCoordinationChannel = 'task_contract' | 'handoff' | 'review' | 'runtime_notice';
 
@@ -168,10 +168,11 @@ export class MissionCoordinationBus {
   }
 
   private busPath(missionId: string): string {
-    const missionPath = assertSafeRepositoryPath(
-      findMissionPath(missionId) || missionDir(missionId, 'public'),
-      { allowMissingLeaf: true }
-    );
+    // The bus lives in the existing mission's own directory; an unknown
+    // mission fails closed (OwnerScopeError) instead of landing in public.
+    const missionPath = assertSafeRepositoryPath(resolveMissionDir(missionId), {
+      allowMissingLeaf: true,
+    });
     return assertSafeRepositoryPath(`${missionPath}/coordination/bus.jsonl`, {
       allowMissingLeaf: true,
     });
@@ -192,8 +193,16 @@ export class MissionCoordinationBus {
   private ensureLoaded(missionId: string): void {
     const normalizedMissionId = missionId.toUpperCase();
     if (this.loadedMissions.has(normalizedMissionId)) return;
-    this.loadedMissions.add(normalizedMissionId);
     const messages = new Map<string, MissionCoordinationMessage>();
+    // Read path: an unknown mission has no bus yet (not cached, so a mission
+    // created later is still loaded from its own directory).
+    if (!tryResolveOwnerScope({ kind: 'mission', id: normalizedMissionId })) {
+      if (!this.messagesByMission.has(normalizedMissionId)) {
+        this.messagesByMission.set(normalizedMissionId, messages);
+      }
+      return;
+    }
+    this.loadedMissions.add(normalizedMissionId);
     withExecutionContext('mission_controller', () => {
       const filePaths: string[] = [];
       for (let index = this.maxArchiveCount; index >= 1; index -= 1) {
@@ -309,8 +318,9 @@ export class MissionCoordinationBus {
       created_at: nowIso(),
       acknowledged_by: [],
     };
-    messages.set(message.message_id, message);
+    // Persist first: an unknown mission fails closed without a phantom in-memory message.
     this.appendEvent(message.mission_id, { kind: 'message', message });
+    messages.set(message.message_id, message);
     return message;
   }
 

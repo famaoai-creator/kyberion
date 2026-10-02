@@ -10,7 +10,7 @@ import {
 } from '@agent/core/mission/mission-team-brief-composer';
 import { loadOrganizationProfile } from '@agent/core/organization/organization-profile';
 import { initializeMissionTeamBindings } from '@agent/core/mission/mission-team-binding';
-import { findMissionPath, missionDir } from '@agent/core/path-resolver';
+import { resolveMissionDir, tryResolveOwnerScope } from '@agent/core/owner-scope';
 import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeLstat } from '@agent/core/secure-io';
@@ -88,7 +88,8 @@ export async function main(args: string[] = []): Promise<unknown> {
     .parse();
 
   const missionId = String(argv['mission-id']).toUpperCase();
-  const missionPath = findMissionPath(missionId);
+  // The mission's own location (all tiers/tenants, independent of KYBERION_TENANT).
+  const missionPath = tryResolveOwnerScope({ kind: 'mission', id: missionId })?.dir ?? null;
 
   let tier = String(argv.tier || 'public') as 'personal' | 'confidential' | 'public';
   let assignedPersona = argv.persona ? String(argv.persona) : undefined;
@@ -172,7 +173,8 @@ export async function main(args: string[] = []): Promise<unknown> {
   });
 
   if (argv.write) {
-    const targetDir = missionPath || missionDir(missionId, tier);
+    // Writing a team plan needs an existing mission; an unknown one fails closed.
+    const targetDir = missionPath || resolveMissionDir(missionId);
     withMissionWriteContext(assignedPersona, () => {
       writeMissionTeamPlan(targetDir, plan);
       initializeMissionTeamBindings(targetDir, plan);

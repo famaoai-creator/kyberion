@@ -9,6 +9,7 @@ import { nowIso } from '../foundation/time.js';
  * process stops between node completion and NEXT_TASKS persistence.
  */
 import { pathResolver } from '../path-resolver.js';
+import { resolveMissionDir } from '../owner-scope.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
 import { withFencedWriterLeaseSync, writerLeaseResourceId } from '../writer-lease.js';
@@ -74,10 +75,10 @@ function safeSegment(value: string): string {
 }
 
 function journalPath(missionId: string, runId: string): string {
-  const missionPath = assertSafeRepositoryPath(
-    pathResolver.findMissionPath(missionId) || pathResolver.missionDir(missionId, 'public'),
-    { allowMissingLeaf: true }
-  );
+  // The existing mission's own directory; an unknown mission fails closed.
+  const missionPath = assertSafeRepositoryPath(resolveMissionDir(missionId), {
+    allowMissingLeaf: true,
+  });
   return assertSafeRepositoryPath(
     `${missionPath}/coordination/graph-run-${safeSegment(runId)}.jsonl`,
     { allowMissingLeaf: true }
@@ -122,10 +123,10 @@ function appendFencedEvent(
   event: MissionGraphRunEventType,
   payload: Record<string, unknown>
 ): MissionGraphRunJournalEvent {
-  const missionPath = assertSafeRepositoryPath(
-    pathResolver.findMissionPath(missionId) || pathResolver.missionDir(missionId, 'public'),
-    { allowMissingLeaf: true }
-  );
+  // The existing mission's own directory; an unknown mission fails closed.
+  const missionPath = assertSafeRepositoryPath(resolveMissionDir(missionId), {
+    allowMissingLeaf: true,
+  });
   const leasePath = assertSafeRepositoryPath(`${missionPath}/coordination/writer-lease.json`, {
     allowMissingLeaf: true,
   });

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { withExecutionContext } from '../authority.js';
 import {
   loadMissionGraphRunJournal,
@@ -12,14 +12,48 @@ import {
   safeSymlinkSync,
   safeWriteFile,
 } from '../secure-io.js';
+import { writeMissionStateAtPath } from './mission-state-reader.js';
+
+const seededMissionDirs: string[] = [];
+
+/** Graph journals live in the existing mission's own directory. */
+function seedMission(missionId: string, tier: 'public' | 'confidential' = 'public'): void {
+  withExecutionContext('mission_controller', () => {
+    const dir = pathResolver.missionDir(missionId, tier);
+    writeMissionStateAtPath(`${dir}/mission-state.json`, {
+      mission_id: missionId,
+      tier,
+      status: 'active',
+      execution_mode: 'local',
+      priority: 1,
+      assigned_persona: 'worker',
+      confidence_score: 1,
+      git: {
+        branch: `mission/${missionId}`,
+        start_commit: 'a',
+        latest_commit: 'a',
+        checkpoints: [],
+      },
+      history: [],
+    } as never);
+    seededMissionDirs.push(dir);
+  });
+}
 
 describe('mission-graph-run-journal', () => {
   beforeEach(() => {
     process.env.MISSION_ROLE = 'mission_controller';
   });
 
+  afterAll(() => {
+    withExecutionContext('mission_controller', () => {
+      for (const dir of seededMissionDirs) safeRmSync(dir, { recursive: true, force: true });
+    });
+  });
+
   it('persists the latest node snapshot and restores it after reopening', () => {
     const missionId = 'MSN-GRAPH-JOURNAL-1';
+    seedMission(missionId);
     const runId = 'ME-RESUME-1';
     const coordinationPath = `${pathResolver.missionDir(missionId, 'public')}/coordination`;
     withExecutionContext('mission_controller', () => {
@@ -73,6 +107,7 @@ describe('mission-graph-run-journal', () => {
 
   it('fails closed on a broken sequence instead of resuming partial state', () => {
     const missionId = 'MSN-GRAPH-JOURNAL-2';
+    seedMission(missionId);
     const runId = 'ME-BROKEN-1';
     const coordinationPath = `${pathResolver.missionDir(missionId, 'public')}/coordination`;
     withExecutionContext('mission_controller', () => {
@@ -101,6 +136,7 @@ describe('mission-graph-run-journal', () => {
 
   it('rejects a schema-invalid journal event before recovery', () => {
     const missionId = 'MSN-GRAPH-JOURNAL-SCHEMA';
+    seedMission(missionId);
     const runId = 'ME-SCHEMA-1';
     const coordinationPath = `${pathResolver.missionDir(missionId, 'public')}/coordination`;
     withExecutionContext('mission_controller', () => {
@@ -131,6 +167,7 @@ describe('mission-graph-run-journal', () => {
 
   it('re-reads the sequence under the fence when two handles append after a restart', () => {
     const missionId = 'MSN-GRAPH-JOURNAL-3';
+    seedMission(missionId);
     const runId = 'ME-STALE-HANDLES-1';
     const coordinationPath = `${pathResolver.missionDir(missionId, 'public')}/coordination`;
     withExecutionContext('mission_controller', () => {
@@ -158,6 +195,7 @@ describe('mission-graph-run-journal', () => {
 
   it('rejects a symlinked coordination directory before journal access', () => {
     const missionId = 'MSN-GRAPH-JOURNAL-SYMLINK';
+    seedMission(missionId);
     const missionPath = pathResolver.missionDir(missionId, 'public');
     const coordinationPath = `${missionPath}/coordination`;
     const externalPath = pathResolver.sharedTmp('graph-journal-external');
@@ -188,6 +226,7 @@ describe('mission-graph-run-journal', () => {
 
   it('rejects a journal file that is replaced by a symbolic link before append', () => {
     const missionId = 'MSN-GRAPH-JOURNAL-FILE-SYMLINK';
+    seedMission(missionId);
     const missionPath = pathResolver.missionDir(missionId, 'public');
     const externalPath = pathResolver.sharedTmp('graph-journal-file-external');
     const journal = withExecutionContext('mission_controller', () =>
@@ -224,6 +263,7 @@ describe('mission-graph-run-journal', () => {
       safeRmSync(missionPath, { recursive: true, force: true });
       safeMkdir(missionPath, { recursive: true });
     });
+    seedMission(missionId, 'confidential');
 
     try {
       const journal = withExecutionContext('mission_controller', () =>

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import AjvModule from 'ajv';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { compileSchemaFromPath } from '../schema-loader.js';
 
@@ -16,7 +16,31 @@ vi.mock('../managed-process.js', () => ({
   spawnManagedProcess: mocks.spawnManagedProcess,
 }));
 
+const QUEUE_MISSION_DIR = pathResolver.missionDir('MSN-QUEUE', 'public');
+
 describe('mission-orchestration-events', () => {
+  // Payloads land beside the existing mission (owner-derived), so seed it.
+  beforeAll(async () => {
+    process.env.MISSION_ROLE = 'mission_controller';
+    const { writeMissionStateAtPath } = await import('./mission-state-reader.js');
+    writeMissionStateAtPath(path.join(QUEUE_MISSION_DIR, 'mission-state.json'), {
+      mission_id: 'MSN-QUEUE',
+      tier: 'public',
+      status: 'active',
+      execution_mode: 'local',
+      priority: 1,
+      assigned_persona: 'worker',
+      confidence_score: 1,
+      git: { branch: 'mission/MSN-QUEUE', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+      history: [],
+    } as never);
+  });
+
+  afterAll(async () => {
+    const { safeRmSync } = await import('../secure-io.js');
+    safeRmSync(QUEUE_MISSION_DIR, { recursive: true, force: true });
+  });
+
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();

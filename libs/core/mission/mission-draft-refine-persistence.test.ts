@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as nodePath from 'node:path';
 import { withExecutionContext, withExecutionContextAsync } from '../authority.js';
 import { missionDir } from '../path-resolver.js';
@@ -8,9 +8,32 @@ const draftRefineMock = vi.hoisted(() => ({ draftRefine: vi.fn() }));
 vi.mock('../draft-refine.js', () => draftRefineMock);
 
 import { applyDraftRefineToDeliverable } from './mission-orchestration-worker-part-results.js';
+import { writeMissionStateAtPath } from './mission-state-reader.js';
 
 const missionId = `MSN-DRAFT-REFINE-${process.pid}`;
 const missionPath = missionDir(missionId, 'public');
+
+// Deliverables resolve against the existing mission's own directory.
+beforeEach(() => {
+  withExecutionContext('mission_controller', () => {
+    writeMissionStateAtPath(nodePath.join(missionPath, 'mission-state.json'), {
+      mission_id: missionId,
+      tier: 'public',
+      status: 'active',
+      execution_mode: 'local',
+      priority: 1,
+      assigned_persona: 'worker',
+      confidence_score: 1,
+      git: {
+        branch: `mission/${missionId}`,
+        start_commit: 'a',
+        latest_commit: 'a',
+        checkpoints: [],
+      },
+      history: [],
+    } as never);
+  });
+});
 
 afterEach(() => {
   withExecutionContext('mission_controller', () => {
