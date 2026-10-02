@@ -9,7 +9,7 @@ import {
   artifactOwnershipRegistryPath,
 } from '../workforce/artifact-registry.js';
 import { getProjectManagementView } from './project-management.js';
-import { deriveProjectMissionIndex } from './project-mission-index.js';
+import { deriveProjectMissionIndex, projectArtifactRecords } from './project-mission-index.js';
 import {
   loadProjectOperationalState,
   projectOperationalMissionLinkPath,
@@ -196,6 +196,36 @@ describe('project mission index (single source: relationships.project)', () => {
     expect(
       deriveProjectMissionIndex(PROJECT_ID, { tier: 'confidential', tenant: 'other-idx' }).linked
     ).toEqual([]);
+  });
+
+  it("excludes another tenant's artifact records", () => {
+    const registryPath = artifactOwnershipRegistryPath();
+    const original = safeExistsSync(registryPath)
+      ? (safeReadFile(registryPath, { encoding: 'utf8' }) as string)
+      : null;
+    try {
+      const base = {
+        kind: 'report' as const,
+        storage_class: 'artifact_store' as const,
+        project_id: PROJECT_ID,
+        created_at: new Date().toISOString(),
+        evidence_refs: [],
+      };
+      appendArtifactOwnershipRecord({ ...base, artifact_id: `ART-OWN-${suffix}` });
+      appendArtifactOwnershipRecord({
+        ...base,
+        artifact_id: `ART-OTHER-${suffix}`,
+        tenant_slug: 'other-tenant',
+      });
+      const ids = projectArtifactRecords(PROJECT_ID, { tier: 'public', tenant: 'shared' }, []).map(
+        (record) => record.artifact_id
+      );
+      expect(ids).toContain(`ART-OWN-${suffix}`);
+      expect(ids).not.toContain(`ART-OTHER-${suffix}`);
+    } finally {
+      if (original === null) safeRmSync(registryPath, { force: true });
+      else safeWriteFile(registryPath, original);
+    }
   });
 
   it('derives the index from mission state only, scoped by tier/tenant', () => {

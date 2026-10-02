@@ -520,7 +520,8 @@ export function syncProjectOperationalStateFromMission(
       (track) =>
         track.status === 'active' &&
         track.tier === input.tier &&
-        (track.tenant_slug || 'shared') === (tenantSlug || 'shared')
+        // A tenantless track belongs to its project's tenant (isTrackInProjectScope).
+        (track.tenant_slug || existingProject?.tenant_slug || 'shared') === (tenantSlug || 'shared')
     )
     .map((track) => track.track_id);
   // Rebuild every track this sync can affect: the mission's current track and
