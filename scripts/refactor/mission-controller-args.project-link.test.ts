@@ -45,6 +45,16 @@ describe('mission → project link validation', () => {
     );
   });
 
+  it('downgrades an unregistered project to a warning in --dry-run', () => {
+    // A dry-run plan may preview `project create --dry-run` and the linked
+    // mission together; only the real run requires the record to exist.
+    const input = validateMissionStartCreateInput('create', 'MSN-LINK-ARGS', argv('--dry-run'));
+    expect(input.projectLinkWarning).toContain(
+      `[PROJECT_LINK_INVALID] create MSN-LINK-ARGS: project not found: ${PROJECT_ID}`
+    );
+    expect(input.relationships?.project?.project_id).toBe(PROJECT_ID);
+  });
+
   it('inherits the project organization and rejects a conflicting one', () => {
     saveProjectRecord({
       project_id: PROJECT_ID,

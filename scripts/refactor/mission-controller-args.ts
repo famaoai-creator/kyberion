@@ -102,6 +102,12 @@ export interface ResolvedMissionCliInput {
     json: string;
   };
   routingDecision?: string;
+  /**
+   * Set only in --dry-run when the linked project is not registered yet (a
+   * dry-run plan may preview `project create` alongside); the real run fails
+   * closed with the same [PROJECT_LINK_INVALID] message.
+   */
+  projectLinkWarning?: string;
 }
 
 export function resolveMissionStartCreateInputFromArgv(
@@ -183,12 +189,13 @@ export function validateMissionStartCreateInput(
     // relationships.project is the single source of project membership: it
     // must name a managed project (create it with `pnpm project create`).
     if (!projectRecord) {
-      throw new Error(
+      const message =
         `[PROJECT_LINK_INVALID] ${actionName} ${missionId}: project not found: ${project.project_id}. ` +
-          'Create it with `pnpm project create` or fix --project-id.'
-      );
+        'Create it with `pnpm project create` or fix --project-id.';
+      if (!argv.includes('--dry-run')) throw new Error(message);
+      input.projectLinkWarning = `${message} (dry-run: the real run requires the project record)`;
     }
-    if (track?.track_id) {
+    if (projectRecord && track?.track_id) {
       const trackRecord = loadProjectTrackRecord(track.track_id);
       if (!trackRecord) {
         throw new Error(`${actionName} ${missionId}: project track not found: ${track.track_id}`);
