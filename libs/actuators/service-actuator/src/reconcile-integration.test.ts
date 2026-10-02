@@ -60,7 +60,27 @@ vi.mock('@agent/core/secure-io', () => ({
   safeExec: vi.fn(),
   safeOpenAppendFile: vi.fn(),
 }));
-vi.mock('@agent/core/async-utils', () => ({ retry: mocks.retry }));
+vi.mock('@agent/core/async-utils', () => {
+  const retryProfile = {
+    maxRetries: 2,
+    initialDelayMs: 0,
+    maxDelayMs: 1,
+    factor: 1,
+    jitter: false,
+  };
+  return {
+    retry: mocks.retry,
+    getRetryDefaults: () => ({ ...retryProfile }),
+    getRetryableCategories: () => [],
+    // resolveRetryProfile consults actuators[id] for any manifest retry_profile;
+    // a Proxy answers every key with the stub profile so no real catalog read happens.
+    loadRetryPolicy: () => ({
+      version: '1.0.0',
+      defaults: { ...retryProfile },
+      actuators: new Proxy({}, { get: () => ({ ...retryProfile }) }),
+    }),
+  };
+});
 vi.mock('@agent/core/tool/runtime-supervisor', () => ({
   runtimeSupervisor: mocks.runtimeSupervisor,
 }));

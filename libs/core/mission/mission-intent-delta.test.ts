@@ -11,12 +11,16 @@ vi.mock('../intent/intent-snapshot-store.js', () => ({
 vi.mock('../intent/intent-extractor.js', () => ({
   getIntentExtractor: vi.fn(),
 }));
+vi.mock('./mission-state.js', () => ({
+  loadState: vi.fn(() => null),
+}));
 vi.mock('../core.js', () => ({
   logger: { debug: vi.fn(), warn: vi.fn() },
 }));
 
 import { emitIntentSnapshot, evaluateIntentDriftGate } from '../intent/intent-snapshot-store.js';
 import { getIntentExtractor } from '../intent/intent-extractor.js';
+import { loadState } from './mission-state.js';
 import {
   emitMissionLifecycleIntentSnapshot,
   evaluateMissionIntentDrift,
@@ -73,6 +77,61 @@ describe('mission-intent-delta hooks', () => {
         stage: 'execution',
         source: 'mission_state',
         intent: { goal: '**goal**: Extended adaptive retry rollout' },
+      })
+    );
+  });
+
+  it('mission_state snapshots carry the canonical intent, not the caller note', async () => {
+    // Regression: a verify/finish note recorded as the snapshot goal was
+    // summarized to ~200 chars while the approved origin kept the full goal —
+    // the Jaccard mismatch re-blocked the finish gate after a legitimate
+    // scope-approve (MSN-RESIDENT-DOT-20261002, drift 0.753→0.813).
+    vi.mocked(loadState).mockReturnValue({
+      intent: {
+        goal_summary: 'Restore autonomous-ops alert paths and land the Dot charter foundation.',
+      },
+      outcome_contract: {
+        success_criteria: ['schedules pass', 'watchdog clean'],
+        expected_artifacts: [{ kind: 'doc' }],
+      },
+      relationships: { project: { project_id: 'PRJ-1' } },
+    } as any);
+
+    await emitMissionLifecycleIntentSnapshot({
+      missionId: 'MSN-T4',
+      stage: 'verification',
+      text: 'unrelated verification note that must not become the goal',
+      source: 'mission_state',
+    });
+
+    expect(emitIntentSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        missionId: 'MSN-T4',
+        source: 'mission_state',
+        intent: {
+          goal: 'Restore autonomous-ops alert paths and land the Dot charter foundation.',
+          constraints: ['schedules pass', 'watchdog clean'],
+          deliverables: ['doc'],
+          stakeholders: ['PRJ-1'],
+        },
+      })
+    );
+  });
+
+  it('falls back to the caller text when mission state is absent', async () => {
+    vi.mocked(loadState).mockReturnValue(null);
+
+    await emitMissionLifecycleIntentSnapshot({
+      missionId: 'MSN-T5',
+      stage: 'verification',
+      text: 'verify note',
+      source: 'mission_state',
+    });
+
+    expect(emitIntentSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        missionId: 'MSN-T5',
+        intent: { goal: 'verify note' },
       })
     );
   });

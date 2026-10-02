@@ -380,7 +380,20 @@ vi.mock('@agent/core/path-resolver', async () => {
 vi.mock('@agent/core/async-utils', async () => {
   const actual =
     await vi.importActual<typeof import('@agent/core/async-utils')>('@agent/core/async-utils');
-  return { ...actual, retry: mocks.retry, sleep: vi.fn(async () => undefined) };
+  return {
+    ...actual,
+    retry: mocks.retry,
+    sleep: vi.fn(async () => undefined),
+    // The real getRetryDefaults reads the governed retry-policy catalog via
+    // foundation io, which this file's secure-io mock does not serve — stub it.
+    getRetryDefaults: () => ({
+      maxRetries: 2,
+      initialDelayMs: 0,
+      maxDelayMs: 1,
+      factor: 1,
+      jitter: false,
+    }),
+  };
 });
 vi.mock('@agent/core/virtual/virtual-audio-output-playback-bridge', () => ({
   createVirtualAudioOutputPlaybackBridge: mocks.createVirtualAudioOutputPlaybackBridge,
