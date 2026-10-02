@@ -48,7 +48,9 @@
         "active/shared/observability/",
         "active/shared/runtime/",
         "presence/bridge/runtime/",
-        "../../../Library/LaunchAgents/"
+        "../../../Library/LaunchAgents/",
+        "dots/",
+        "active/shared/tmp/"
       ]
     },
     "slack_bridge": {

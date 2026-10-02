@@ -37,6 +37,10 @@ import {
   readTextFile,
   setRegisteredEnv,
 } from '@agent/core/foundation';
+import { withExecutionContextAsync } from '@agent/core/authority';
+import { createTriggerRunner, resolveCurrentTriggerAuthority } from '@agent/core/trigger-runner';
+import { listDotCharters } from '@agent/core/dot/dot-charter';
+import { evaluateDotTriggersDue, runDotWake } from '@agent/core/dot/dot-runtime';
 import { isRecord } from '@agent/core/foundation/text';
 import { logger } from '@agent/core/core';
 import { pathResolver, rootDir } from '@agent/core/path-resolver';
@@ -222,6 +226,74 @@ setInterval(
   },
   Number(registeredEnv('KYBERION_RUNTIME_SWEEP_INTERVAL_MS') || 30_000)
 ).unref?.();
+
+/**
+ * Resident-dot sweep: multiplexes active charters. Each tick evaluates every
+ * active charter's attention triggers and routes due wakes through the
+ * governed TriggerRunner (idempotency + audit + authority attribution), whose
+ * deliver handler runs one bounded goal turn via runDotWake. Malformed
+ * charters warn+continue — a bad charter file must never kill the daemon
+ * (MSN-RESIDENT-DOT-20261002's alert-path lesson). Exported for hermetic tests.
+ */
+const dotTriggerRunner = createTriggerRunner();
+
+export async function runDotSweepOnce(now: Date = new Date()): Promise<number> {
+  let active;
+  try {
+    active = listDotCharters(undefined, { status: 'active' });
+  } catch (error) {
+    logger.warn(
+      `[dot-sweep] charter scan failed: ${error instanceof Error ? error.message : error}`
+    );
+    return 0;
+  }
+  let delivered = 0;
+  for (const loaded of active) {
+    let due;
+    try {
+      due = evaluateDotTriggersDue(loaded.charter, { now: () => now });
+    } catch (error) {
+      logger.warn(
+        `[dot-sweep] trigger evaluation failed for ${loaded.charter.dot_id}: ${error instanceof Error ? error.message : error}`
+      );
+      continue;
+    }
+    for (const trigger of due) {
+      const role = loaded.charter.authority.authority_role;
+      try {
+        await withExecutionContextAsync(
+          role,
+          async () => {
+            const authority = resolveCurrentTriggerAuthority(loaded.charter.scope.tenant_slug);
+            await dotTriggerRunner.run(
+              {
+                idempotencyKey: `dot:${loaded.charter.dot_id}:${trigger.key}`,
+                source: trigger.trigger.kind,
+                createdBy: authority,
+                payload: { dot_id: loaded.charter.dot_id, trigger_key: trigger.key },
+              },
+              async () => {
+                const receipt = await runDotWake(loaded, { trigger });
+                if (receipt.outcome === 'failed') {
+                  throw new Error(receipt.reason ?? 'dot wake failed');
+                }
+                return `dot-wake:${receipt.outcome}`;
+              }
+            );
+          },
+          undefined,
+          loaded.charter.scope.tenant_slug
+        );
+        delivered += 1;
+      } catch (error) {
+        logger.warn(
+          `[dot-sweep] wake delivery failed for ${loaded.charter.dot_id} (${trigger.key}): ${error instanceof Error ? error.message : error}`
+        );
+      }
+    }
+  }
+  return delivered;
+}
 
 export interface AgentRuntimeSupervisorDaemonOptions {
   socketPath?: string;
@@ -1132,6 +1204,17 @@ async function main(_args: string[] = []) {
       status: 'running',
     });
   }, 30_000).unref?.();
+  // Resident-dot multiplex: evaluate active charters' triggers each sweep.
+  setInterval(
+    () => {
+      void runDotSweepOnce().catch((error) => {
+        logger.warn(
+          `[dot-sweep] suppressed sweep error: ${error instanceof Error ? error.message : error}`
+        );
+      });
+    },
+    Number(registeredEnv('KYBERION_DOT_SWEEP_INTERVAL_MS') || 30_000)
+  ).unref?.();
 }
 
 const isDirect =

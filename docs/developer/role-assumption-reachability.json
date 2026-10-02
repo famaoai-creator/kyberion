@@ -108,6 +108,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/dot/dot-lifecycle.ts#transitionDotCharterStatus",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/generation-scheduler.ts#runGenerationScheduleAction",
       "roles": ["generation_scheduler"],
       "unresolved": []
@@ -1445,6 +1450,13 @@
       "unresolved": []
     },
     {
+      "site": "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
+      "roles": [],
+      "unresolved": [
+        "role argument `loaded.charter.authority.authority_role` could not be resolved at scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce"
+      ]
+    },
+    {
       "site": "scripts/apply_dependency_patch.ts#main",
       "roles": ["ecosystem_architect"],
       "unresolved": []
@@ -2116,6 +2128,9 @@
     "satellites/shared/supervise-child.ts#spawnSupervisedChild": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
+    "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce": [
+      "role argument `loaded.charter.authority.authority_role` could not be resolved at scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce"
+    ],
     "scripts/backup.ts#runRequired": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
@@ -2602,6 +2617,7 @@
         "libs/core/virtual/virtual-camera-injection-bridge.ts#isAvailableCommand",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/windows-os-automation.ts#runWindowsPointerActions",
+        "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
@@ -2825,7 +2841,8 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsPointerActions"
+        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
+        "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce"
       ],
       "policy_roles_not_reachable": []
     },
@@ -3195,6 +3212,7 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
+        "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
@@ -3412,6 +3430,7 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
+        "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
@@ -3632,6 +3651,7 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
+        "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
@@ -3843,6 +3863,7 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
+        "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
@@ -4182,6 +4203,7 @@
         "libs/core/virtual/virtual-camera-injection-bridge.ts#isAvailableCommand",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/windows-os-automation.ts#runWindowsPointerActions",
+        "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
@@ -4502,7 +4524,8 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsPointerActions"
+        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
+        "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce"
       ],
       "policy_roles_not_reachable": []
     },
@@ -4707,6 +4730,7 @@
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/windows-os-automation.ts#runWindowsPointerActions",
+        "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
@@ -4904,6 +4928,7 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
+        "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
@@ -5163,6 +5188,7 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
+        "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
@@ -5379,6 +5405,7 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
+        "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
@@ -5577,7 +5604,8 @@
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "presence/displays/terminal-hud/src/actions/exec.ts#defaultExec",
-        "presence/displays/terminal-hud/src/actions/schedule-actions.ts#runScheduleNow"
+        "presence/displays/terminal-hud/src/actions/schedule-actions.ts#runScheduleNow",
+        "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce"
       ],
       "policy_roles_not_reachable": []
     },
@@ -5759,7 +5787,8 @@
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/virtual/virtual-audio-input-recording-bridge.ts#VirtualAudioInputRecordingBridgeImpl",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "satellites/shared/supervise-child.ts#spawnSupervisedChild"
+        "satellites/shared/supervise-child.ts#spawnSupervisedChild",
+        "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce"
       ],
       "policy_roles_not_reachable": []
     }
