@@ -3,7 +3,8 @@
   "services": {
     "stripe": {
       "base_url": "https://api.stripe.com/v1",
-      "preset_path": "knowledge/product/orchestration/service-presets/stripe.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/stripe.json",
+      "auth_strategy": "Bearer"
     }
   }
 }

@@ -63,6 +63,7 @@ import {
   windowTitleMatches,
   opControl,
   opCapture,
+  opProcedure,
 } from './system-pipeline-core-helpers.js';
 import type { PipelineStep } from './system-pipeline-core-helpers.js';
 
@@ -146,6 +147,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
     return opCapture(op === 'list' ? 'list_missions' : op, params, ctx, resolve);
   }
   switch (op) {
+    case 'standard_pr_lifecycle':
+    case 'provider_preflight':
+      return opProcedure(op, params, ctx, resolve);
     case 'keyboard':
       keystrokeText(String(resolve(params.text || '{{last_capture}}')));
       break;

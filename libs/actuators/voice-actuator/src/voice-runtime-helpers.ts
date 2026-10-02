@@ -20,7 +20,7 @@ import {
   safeLstat,
   safeStat,
 } from '@agent/core/secure-io';
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { VoiceGenerationRuntime } from '@agent/core/voice/voice-generation-runtime';
 import { waitForJob } from '@agent/core/job-lifecycle';
 import { getRegisteredEnvText, isRecord, parseSafeJsonInput } from '@agent/core/foundation';
@@ -33,13 +33,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 
 const VOICE_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/voice-actuator/manifest.json');
-const DEFAULT_VOICE_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 10000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_VOICE_RETRY = getRetryDefaults('voice-actuator:defaults');
 export const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: VOICE_MANIFEST_PATH,
   retryDefaults: DEFAULT_VOICE_RETRY,

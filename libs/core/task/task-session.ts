@@ -637,10 +637,39 @@ function deriveSlideCountHint(trimmed: string): number | undefined {
   return slideCount ? Number(slideCount[1] || 0) : undefined;
 }
 
+type PhrasePolicyEntry<TValue extends string> = {
+  phrase: string;
+  value: TValue;
+};
+
+function resolvePhrasePolicyValue<TValue extends string>(
+  trimmed: string,
+  table: ReadonlyArray<PhrasePolicyEntry<TValue>>,
+  defaultValue: TValue
+): TValue {
+  for (const entry of table) {
+    if (matchesIntentPhrase(trimmed, entry.phrase)) return entry.value;
+  }
+  return defaultValue;
+}
+
+// Derived-hint policy tables (inferPolicyPayload rules/when/value shape:
+// first match wins, otherwise the default). lifestyle-booking /
+// schedule-coordination currently carry only static payload in
+// knowledge/product/governance/task-session-policy.json, so the tables live
+// here until policy rules exist for these hints.
+const SCHEDULE_COORDINATION_MODE_TABLE: ReadonlyArray<PhrasePolicyEntry<string>> = [
+  { phrase: 'schedule_coordination.mode_reschedule', value: 'reschedule' },
+  { phrase: 'schedule_coordination.mode_adjust', value: 'adjust' },
+];
+
+const SCHEDULE_CALENDAR_HINT_TABLE: ReadonlyArray<PhrasePolicyEntry<string>> = [
+  { phrase: 'calendar_source.outlook', value: 'outlook_calendar' },
+  { phrase: 'calendar_source.google', value: 'google_calendar' },
+];
+
 function deriveScheduleCoordinationMode(trimmed: string): string {
-  if (matchesIntentPhrase(trimmed, 'schedule_coordination.mode_reschedule')) return 'reschedule';
-  if (matchesIntentPhrase(trimmed, 'schedule_coordination.mode_adjust')) return 'adjust';
-  return 'coordinate';
+  return resolvePhrasePolicyValue(trimmed, SCHEDULE_COORDINATION_MODE_TABLE, 'coordinate');
 }
 
 function isMeetingScheduleCoordination(trimmed: string): boolean {
@@ -656,9 +685,7 @@ function deriveScheduleCoordinationLeafIntent(trimmed: string): string | undefin
 }
 
 function deriveScheduleCalendarHint(trimmed: string): string {
-  if (matchesIntentPhrase(trimmed, 'calendar_source.outlook')) return 'outlook_calendar';
-  if (matchesIntentPhrase(trimmed, 'calendar_source.google')) return 'google_calendar';
-  return 'browser_calendar';
+  return resolvePhrasePolicyValue(trimmed, SCHEDULE_CALENDAR_HINT_TABLE, 'browser_calendar');
 }
 
 type BookingCategory =
@@ -673,17 +700,24 @@ type BookingCategory =
   | 'gifts'
   | 'package';
 
+const BOOKING_CATEGORY_TABLE: ReadonlyArray<PhrasePolicyEntry<BookingCategory>> = [
+  { phrase: 'booking_category.hotel', value: 'hotel' },
+  { phrase: 'booking_category.restaurant', value: 'restaurant' },
+  { phrase: 'booking_category.activity', value: 'activity' },
+  { phrase: 'booking_category.shopping', value: 'shopping' },
+  { phrase: 'booking_category.medical', value: 'medical' },
+  { phrase: 'booking_category.subscription', value: 'subscription' },
+  { phrase: 'booking_category.home_service', value: 'home_service' },
+  { phrase: 'booking_category.family', value: 'family' },
+  { phrase: 'booking_category.gifts', value: 'gifts' },
+];
+
 function deriveBookingCategory(trimmed: string): BookingCategory | 'default' {
-  if (matchesIntentPhrase(trimmed, 'booking_category.hotel')) return 'hotel';
-  if (matchesIntentPhrase(trimmed, 'booking_category.restaurant')) return 'restaurant';
-  if (matchesIntentPhrase(trimmed, 'booking_category.activity')) return 'activity';
-  if (matchesIntentPhrase(trimmed, 'booking_category.shopping')) return 'shopping';
-  if (matchesIntentPhrase(trimmed, 'booking_category.medical')) return 'medical';
-  if (matchesIntentPhrase(trimmed, 'booking_category.subscription')) return 'subscription';
-  if (matchesIntentPhrase(trimmed, 'booking_category.home_service')) return 'home_service';
-  if (matchesIntentPhrase(trimmed, 'booking_category.family')) return 'family';
-  if (matchesIntentPhrase(trimmed, 'booking_category.gifts')) return 'gifts';
-  return 'default';
+  return resolvePhrasePolicyValue<BookingCategory | 'default'>(
+    trimmed,
+    BOOKING_CATEGORY_TABLE,
+    'default'
+  );
 }
 
 // ─── Dynamic Task Intent Registry ──────────────────────────────────────────────
@@ -783,25 +817,32 @@ registerTaskIntentBuilder('inspect-service', (trimmed, resolvedPacket) => {
     payload: approvalApplied.payload,
   };
 });
-registerTaskIntentBuilder('stop-service', (trimmed, resolvedPacket) => {
-  const base = buildPolicyBackedIntent('stop-service', trimmed);
-  const serviceName = resolvedPacket?.selected_parameters?.service_name;
-  const activeServices = loadRunningServiceIds();
-  const intent: TaskSessionIntent = {
-    ...base,
-    requirements: {
-      missing: serviceName ? ['approval_confirmation'] : ['service_name', 'approval_confirmation'],
-      collected: {},
-    },
-    payload: {
-      ...(base.payload || {}),
-      operation: 'stop',
-      service_name: serviceName,
-      active_services: activeServices,
-      service_choices: activeServices,
-      approval_required: true,
-    },
-  };
+type ServiceLifecycleOperation = 'stop' | 'start' | 'restart';
+
+const SERVICE_LIFECYCLE_CONFIGS: ReadonlyArray<{
+  intentId: string;
+  operation: ServiceLifecycleOperation;
+}> = [
+  { intentId: 'stop-service', operation: 'stop' },
+  { intentId: 'start-service', operation: 'start' },
+  { intentId: 'restart-service', operation: 'restart' },
+];
+
+function resolveServiceLifecycleChoicePayload(
+  operation: ServiceLifecycleOperation
+): Record<string, unknown> {
+  if (operation === 'stop') {
+    const activeServices = loadRunningServiceIds();
+    return { active_services: activeServices, service_choices: activeServices };
+  }
+  if (operation === 'start') {
+    const startableServices = loadStartableServiceChoices();
+    return { startable_services: startableServices, service_choices: startableServices };
+  }
+  return {};
+}
+
+function applyServiceLifecycleApproval(intent: TaskSessionIntent): TaskSessionIntent {
   const approvalApplied = applyApprovalPolicy(
     intent.intentId!,
     intent.payload || {},
@@ -819,46 +860,15 @@ registerTaskIntentBuilder('stop-service', (trimmed, resolvedPacket) => {
     requirements: approvalApplied.requirements,
     payload: approvalApplied.payload,
   };
-});
-registerTaskIntentBuilder('start-service', (trimmed, resolvedPacket) => {
-  const base = buildPolicyBackedIntent('start-service', trimmed);
-  const serviceName = resolvedPacket?.selected_parameters?.service_name;
-  const startableServices = loadStartableServiceChoices();
-  const intent: TaskSessionIntent = {
-    ...base,
-    requirements: {
-      missing: serviceName ? ['approval_confirmation'] : ['service_name', 'approval_confirmation'],
-      collected: {},
-    },
-    payload: {
-      ...(base.payload || {}),
-      operation: 'start',
-      service_name: serviceName,
-      startable_services: startableServices,
-      service_choices: startableServices,
-      approval_required: true,
-    },
-  };
-  const approvalApplied = applyApprovalPolicy(
-    intent.intentId!,
-    intent.payload || {},
-    intent.requirements!
-  );
-  if (!approvalApplied.requirements.missing.includes('approval_confirmation')) {
-    approvalApplied.requirements.missing.push('approval_confirmation');
-  }
-  approvalApplied.payload = {
-    ...approvalApplied.payload,
-    approval_required: true,
-  };
-  return {
-    ...intent,
-    requirements: approvalApplied.requirements,
-    payload: approvalApplied.payload,
-  };
-});
-registerTaskIntentBuilder('restart-service', (trimmed, resolvedPacket) => {
-  const base = buildPolicyBackedIntent('restart-service', trimmed);
+}
+
+function buildServiceLifecycleIntent(
+  intentId: string,
+  operation: ServiceLifecycleOperation,
+  trimmed: string,
+  resolvedPacket?: IntentResolutionPacket
+): TaskSessionIntent {
+  const base = buildPolicyBackedIntent(intentId, trimmed);
   const serviceName = resolvedPacket?.selected_parameters?.service_name;
   const intent: TaskSessionIntent = {
     ...base,
@@ -868,29 +878,20 @@ registerTaskIntentBuilder('restart-service', (trimmed, resolvedPacket) => {
     },
     payload: {
       ...(base.payload || {}),
-      operation: 'restart',
+      operation,
       service_name: serviceName,
+      ...resolveServiceLifecycleChoicePayload(operation),
       approval_required: true,
     },
   };
-  const approvalApplied = applyApprovalPolicy(
-    intent.intentId!,
-    intent.payload || {},
-    intent.requirements!
+  return applyServiceLifecycleApproval(intent);
+}
+
+for (const config of SERVICE_LIFECYCLE_CONFIGS) {
+  registerTaskIntentBuilder(config.intentId, (trimmed, resolvedPacket) =>
+    buildServiceLifecycleIntent(config.intentId, config.operation, trimmed, resolvedPacket)
   );
-  if (!approvalApplied.requirements.missing.includes('approval_confirmation')) {
-    approvalApplied.requirements.missing.push('approval_confirmation');
-  }
-  approvalApplied.payload = {
-    ...approvalApplied.payload,
-    approval_required: true,
-  };
-  return {
-    ...intent,
-    requirements: approvalApplied.requirements,
-    payload: approvalApplied.payload,
-  };
-});
+}
 registerTaskIntentBuilder('generate-presentation', (trimmed) => {
   const base = buildPolicyBackedIntent('generate-presentation', trimmed);
   return {
@@ -928,6 +929,28 @@ registerTaskIntentBuilder('schedule-coordination', (trimmed) => {
   };
 });
 
+const APPROVAL_SYSTEM_PATTERN = /(Slack|Email|Mail|Teams|JXA)/i;
+const APPROVAL_SCOPE_PATTERN = /(production|staging|sandbox|release|mutation)/i;
+
+function extractApprovalChannelScope(trimmed: string): {
+  system?: string;
+  scope?: string;
+} {
+  const systemMatch = trimmed.match(APPROVAL_SYSTEM_PATTERN);
+  const scopeMatch = trimmed.match(APPROVAL_SCOPE_PATTERN);
+  return {
+    ...(systemMatch?.[1] ? { system: systemMatch[1] } : {}),
+    ...(scopeMatch?.[1] ? { scope: scopeMatch[1] } : {}),
+  };
+}
+
+function approvalChannelScopePayload(system?: string, scope?: string): Record<string, unknown> {
+  return {
+    ...(system ? { approval_system: system, channel: system.toLowerCase() } : {}),
+    ...(scope ? { approval_scope: scope } : {}),
+  };
+}
+
 registerTaskIntentBuilder('resolve-approval', (trimmed) => {
   const base = buildPolicyBackedIntent('resolve-approval', trimmed);
   const decisionWord = findIntentPhrase(trimmed, 'approval.decision_word');
@@ -940,11 +963,7 @@ registerTaskIntentBuilder('resolve-approval', (trimmed) => {
   const idMatch =
     trimmed.match(/(?:REQ|req|id|ID|案件|番号)-?(\d+)/i) || trimmed.match(/([A-Z0-9]{8,10})/i);
   const requestId = idMatch ? idMatch[1] : undefined;
-  const systemMatch = trimmed.match(/(Slack|Email|Mail|Teams|JXA)/i);
-  const system = systemMatch ? systemMatch[1] : undefined;
-
-  const scopeMatch = trimmed.match(/(production|staging|sandbox|release|mutation)/i);
-  const scope = scopeMatch ? scopeMatch[1] : undefined;
+  const { system, scope } = extractApprovalChannelScope(trimmed);
   const missing = [
     !system ? 'approval_system' : null,
     !scope ? 'approval_scope' : null,
@@ -960,8 +979,7 @@ registerTaskIntentBuilder('resolve-approval', (trimmed) => {
     },
     payload: {
       ...(base.payload || {}),
-      ...(system ? { approval_system: system, channel: system.toLowerCase() } : {}),
-      ...(scope ? { approval_scope: scope } : {}),
+      ...approvalChannelScopePayload(system, scope),
       requestId,
       decision,
       requestedBy: 'operator',
@@ -973,11 +991,7 @@ registerTaskIntentBuilder('resolve-approval', (trimmed) => {
 
 registerTaskIntentBuilder('request-approval', (trimmed) => {
   const base = buildPolicyBackedIntent('request-approval', trimmed);
-  const systemMatch = trimmed.match(/(Slack|Email|Mail|Teams|JXA)/i);
-  const system = systemMatch ? systemMatch[1] : undefined;
-
-  const scopeMatch = trimmed.match(/(production|staging|sandbox|release|mutation)/i);
-  const scope = scopeMatch ? scopeMatch[1] : undefined;
+  const { system, scope } = extractApprovalChannelScope(trimmed);
   const missing = [!system ? 'approval_system' : null, !scope ? 'approval_scope' : null].filter(
     (x): x is string => x !== null
   );
@@ -990,8 +1004,7 @@ registerTaskIntentBuilder('request-approval', (trimmed) => {
     },
     payload: {
       ...(base.payload || {}),
-      ...(system ? { approval_system: system, channel: system.toLowerCase() } : {}),
-      ...(scope ? { approval_scope: scope } : {}),
+      ...approvalChannelScopePayload(system, scope),
       requestedBy: 'operator',
       draft: {
         title: 'Operator request',

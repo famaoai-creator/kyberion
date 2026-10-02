@@ -82,7 +82,17 @@ vi.mock('@agent/core/recovery-policy', async (importOriginal) => {
 
 vi.mock('@agent/core/async-utils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/async-utils')>();
-  return { ...actual, retry: mocks.retry };
+  return {
+    ...actual,
+    retry: mocks.retry,
+    getRetryDefaults: vi.fn(() => ({
+      maxRetries: 2,
+      initialDelayMs: 250,
+      maxDelayMs: 2000,
+      factor: 2,
+      jitter: true,
+    })),
+  };
 });
 
 describe('service-actuator handleAction', () => {

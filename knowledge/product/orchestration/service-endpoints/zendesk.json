@@ -3,7 +3,8 @@
   "services": {
     "zendesk": {
       "base_url": "https://{{subdomain}}.zendesk.com/api/v2",
-      "preset_path": "knowledge/product/orchestration/service-presets/zendesk.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/zendesk.json",
+      "auth_strategy": "basic"
     }
   }
 }

@@ -319,6 +319,7 @@ Repository build, test, generator and gate scripts for contributors.
 | `pnpm kyberion eval model-role-fitness`           |                                  | Ask a model whether it can hold a team role before a mission relies on it. |
 | `pnpm kyberion examples discover`                 | `pnpm examples`                  | Discover actuator example catalogs                                         |
 | `pnpm kyberion format`                            | `pnpm format`                    | Format the repository with Prettier                                        |
+| `pnpm kyberion generate artifact-kinds`           |                                  | Generate schema-backed artifact, intent and work policy types              |
 | `pnpm kyberion generate capability-seams`         |                                  | Regenerate the capability seam graph                                       |
 | `pnpm kyberion generate cli-reference`            | `pnpm generate:cli-reference`    | Regenerate the CLI command reference page                                  |
 | `pnpm kyberion generate env-registry`             | `pnpm generate:env-registry`     | Regenerate the environment variable registry                               |

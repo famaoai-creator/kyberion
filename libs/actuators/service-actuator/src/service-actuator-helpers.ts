@@ -16,7 +16,7 @@ import {
   safeOpenAppendFile,
   assertSafeRepositoryPath,
 } from '@agent/core/secure-io';
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { runtimeSupervisor } from '@agent/core/tool/runtime-supervisor';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import { derivePipelineStatus } from '@agent/core/pipeline/pipeline-contract';
@@ -107,13 +107,7 @@ type RetryPolicy = {
 const SERVICE_ACTUATOR_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/service-actuator/manifest.json'
 );
-const DEFAULT_PIPELINE_RETRY: Required<RetryPolicy> = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 10000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_PIPELINE_RETRY: Required<RetryPolicy> = getRetryDefaults('service-actuator:defaults');
 const PID_FILE = pathResolver.shared('services-pids.json');
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 const SERVICE_MANIFEST_SCHEMA_PATH = pathResolver.knowledge(

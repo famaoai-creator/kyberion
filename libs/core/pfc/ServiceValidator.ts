@@ -1,3 +1,4 @@
+import { getCredentialSuffixSchemaDefaults } from '../service/service-endpoint-registry.js';
 import { createRequire } from 'node:module';
 import { validatePhysicalDependencies } from './PhysicalLayer.js';
 import { loadServiceEndpointsCatalog } from '../service/service-binding.js';
@@ -164,16 +165,12 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
         ? presetPolicy.setup_hint.trim()
         : undefined;
     const endpoint = loadServiceEndpointsCatalog().services[serviceId];
-    const suffixes = endpoint?.credential_suffixes || {};
+    const suffixes = endpoint?.credential_suffixes || getCredentialSuffixSchemaDefaults();
     const requiredSecretNames = unique(
       strategy === 'bearer'
-        ? [...(suffixes.accessToken || ['ACCESS_TOKEN', 'BOT_TOKEN', 'TOKEN'])]
+        ? [...suffixes.accessToken]
         : strategy === 'basic'
-          ? [
-              ...(suffixes.clientId || ['CLIENT_ID']),
-              ...(suffixes.clientSecret || ['CLIENT_SECRET']),
-              ...(suffixes.accessToken || ['ACCESS_TOKEN']),
-            ]
+          ? [...suffixes.clientId, ...suffixes.clientSecret, ...suffixes.accessToken]
           : [
               ...(suffixes.accessToken || []),
               ...(suffixes.appToken || []),

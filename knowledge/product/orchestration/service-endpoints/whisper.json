@@ -3,7 +3,8 @@
   "services": {
     "whisper": {
       "preset_path": "knowledge/product/orchestration/service-presets/whisper.json",
-      "intent_aliases": ["transcribe-audio", "live-voice"]
+      "intent_aliases": ["transcribe-audio", "live-voice"],
+      "auth_strategy": "none"
     }
   }
 }

@@ -12,7 +12,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { resolvePipelineContextValues } from '@agent/core/logic-utils';
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
 import type { MobileAppProfile } from '@agent/core/app-profiles';
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { isRecord, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 
 import { runAdfActuatorPipeline } from '../../../core/actuator/actuator-sdk.js';
@@ -26,13 +26,7 @@ import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 import * as path from 'node:path';
 
 const IOS_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/ios-actuator/manifest.json');
-export const DEFAULT_IOS_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 250,
-  maxDelayMs: 2000,
-  factor: 2,
-  jitter: true,
-};
+export const DEFAULT_IOS_RETRY = getRetryDefaults('ios-actuator:defaults');
 
 export const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: IOS_MANIFEST_PATH,

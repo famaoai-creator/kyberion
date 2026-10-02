@@ -181,6 +181,13 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => ({
 vi.mock('@agent/core/async-utils', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/async-utils')>()),
   retry: mocks.retry,
+  getRetryDefaults: vi.fn(() => ({
+    maxRetries: 2,
+    initialDelayMs: 250,
+    maxDelayMs: 2000,
+    factor: 2,
+    jitter: true,
+  })),
 }));
 vi.mock('@agent/core/path-resolver', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/path-resolver')>()),

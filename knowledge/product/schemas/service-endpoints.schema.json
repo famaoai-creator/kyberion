@@ -4,55 +4,136 @@
   "type": "object",
   "required": ["default_pattern", "services"],
   "properties": {
-    "default_pattern": { "type": "string" },
+    "default_pattern": {
+      "type": "string"
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "comfyui_base_url": {
+          "type": "string",
+          "minLength": 1,
+          "default": "http://127.0.0.1:8188"
+        },
+        "product_repository_url": {
+          "type": "string",
+          "minLength": 1,
+          "default": "https://github.com/famaoai-creator/kyberion"
+        }
+      },
+      "required": ["comfyui_base_url", "product_repository_url"]
+    },
     "services": {
       "type": "object",
       "additionalProperties": {
         "type": "object",
         "properties": {
-          "base_url": { "type": "string" },
-          "preset_path": { "type": "string" },
-          "allow_stream_ingress": { "type": "boolean" },
+          "base_url": {
+            "type": "string"
+          },
+          "preset_path": {
+            "type": "string"
+          },
+          "allow_stream_ingress": {
+            "type": "boolean"
+          },
+          "auth_strategy": {
+            "type": "string",
+            "enum": [
+              "none",
+              "bearer",
+              "Bearer",
+              "basic",
+              "Basic",
+              "Bot",
+              "session",
+              "api_key_query",
+              "AWS_SIGV4",
+              "host-managed"
+            ],
+            "description": "Catalog-governed HTTP auth strategy. The service engine compares this case-insensitively; the enum lists every spelling observed in service presets so validation never rejects a previously valid catalog."
+          },
           "credential_suffixes": {
             "type": "object",
+            "description": "Catalog-governed credential env suffixes. Omitted services fall back to the schema defaults below (mirror of the former TS literals in service-binding.ts); the endpoint registry applies them on load so ServiceBinding resolution never hardcodes auth knowledge.",
+            "default": {
+              "accessToken": ["ACCESS_TOKEN", "BOT_TOKEN", "TOKEN"],
+              "basicAuthToken": ["ACCESS_TOKEN"],
+              "refreshToken": ["REFRESH_TOKEN"],
+              "clientId": ["CLIENT_ID"],
+              "clientSecret": ["CLIENT_SECRET"],
+              "redirectUri": ["REDIRECT_URI"]
+            },
             "properties": {
               "accessToken": {
                 "type": "array",
-                "items": { "type": "string" }
+                "items": {
+                  "type": "string"
+                },
+                "default": ["ACCESS_TOKEN", "BOT_TOKEN", "TOKEN"]
+              },
+              "basicAuthToken": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": ["ACCESS_TOKEN"]
               },
               "appToken": {
                 "type": "array",
-                "items": { "type": "string" }
+                "items": {
+                  "type": "string"
+                }
               },
               "refreshToken": {
                 "type": "array",
-                "items": { "type": "string" }
+                "items": {
+                  "type": "string"
+                },
+                "default": ["REFRESH_TOKEN"]
               },
               "clientId": {
                 "type": "array",
-                "items": { "type": "string" }
+                "items": {
+                  "type": "string"
+                },
+                "default": ["CLIENT_ID"]
               },
               "clientSecret": {
                 "type": "array",
-                "items": { "type": "string" }
+                "items": {
+                  "type": "string"
+                },
+                "default": ["CLIENT_SECRET"]
               },
               "redirectUri": {
                 "type": "array",
-                "items": { "type": "string" }
+                "items": {
+                  "type": "string"
+                },
+                "default": ["REDIRECT_URI"]
               },
               "baseUrl": {
                 "type": "array",
-                "items": { "type": "string" }
+                "items": {
+                  "type": "string"
+                }
               }
             },
             "additionalProperties": false
           }
         },
         "anyOf": [
-          { "required": ["base_url"] },
-          { "required": ["preset_path"] }
+          {
+            "required": ["base_url"]
+          },
+          {
+            "required": ["preset_path"]
+          }
         ],
-        "additionalProperties": true
+        "additionalProperties": true,
+        "required": ["auth_strategy"]
       }
     }
   },

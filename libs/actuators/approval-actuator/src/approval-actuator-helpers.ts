@@ -1,5 +1,5 @@
 import { normalizeRejectionReasonCategory } from '@agent/core/rejection-reason';
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import {
   runAdfActuatorPipeline,
   defineActuatorPipelineBase,
@@ -31,13 +31,7 @@ import { evaluateDecisionRightsOp, requestReviewOp } from './approval-ops.js';
 const APPROVAL_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/approval-actuator/manifest.json'
 );
-const DEFAULT_APPROVAL_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 200,
-  maxDelayMs: 1500,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_APPROVAL_RETRY = getRetryDefaults('approval-actuator:defaults');
 
 const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: APPROVAL_MANIFEST_PATH,

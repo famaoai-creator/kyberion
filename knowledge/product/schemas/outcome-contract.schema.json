@@ -15,7 +15,7 @@
   "properties": {
     "outcome_id": { "type": "string", "minLength": 1 },
     "requested_result": { "type": "string", "minLength": 1 },
-    "deliverable_kind": { "type": "string", "minLength": 1 },
+    "deliverable_kind": { "$ref": "./artifact-kind.schema.json" },
     "success_criteria": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 },
@@ -28,7 +28,7 @@
         "type": "object",
         "required": ["kind", "storage_class"],
         "properties": {
-          "kind": { "type": "string", "minLength": 1 },
+          "kind": { "$ref": "./artifact-kind.schema.json" },
           "storage_class": {
             "type": "string",
             "enum": ["repo", "artifact_store", "vault", "tmp", "external_ref"]

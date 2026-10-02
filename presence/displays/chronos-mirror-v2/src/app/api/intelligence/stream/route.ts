@@ -1,3 +1,8 @@
+import { randomUUID } from 'node:crypto';
+import {
+  startBridgePollLoop,
+  type BridgePollLoopHandle,
+} from '../../../../../../../../satellites/shared/bridge-poll-loop';
 import { NextRequest } from 'next/server';
 import { nowIso } from '@agent/core/foundation';
 import { collectA2AHandoffs, collectAgentMessages } from '../../../../lib/agent-message-feed';
@@ -226,14 +231,14 @@ export async function GET(req: NextRequest) {
 
   const encoder = new TextEncoder();
   let previousPayload = '';
-  let interval: NodeJS.Timeout | null = null;
+  let interval: BridgePollLoopHandle | null = null;
   let closed = false;
 
   const closeStream = () => {
     if (closed) return;
     closed = true;
     if (interval) {
-      clearInterval(interval);
+      interval.stop();
       interval = null;
     }
   };
@@ -337,10 +342,13 @@ export async function GET(req: NextRequest) {
         closeStream();
         return;
       }
-      void push();
-      interval = setInterval(() => {
-        void push();
-      }, 2000);
+      if (closed) return;
+      interval = startBridgePollLoop({
+        name: 'intelligence-sse:' + randomUUID(),
+        intervalMs: 2000,
+        immediate: true,
+        poll: push,
+      });
     },
     cancel() {
       closeStream();

@@ -5,14 +5,7 @@
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "selector_retry",
-    "retry": {
-      "maxRetries": 2,
-      "initialDelayMs": 500,
-      "maxDelayMs": 10000,
-      "factor": 2,
-      "jitter": true
-    },
-    "retryable_categories": ["network", "timeout", "resource_unavailable"]
+    "retry_profile": "meeting-browser-driver"
   },
   "capabilities": [
     { "op": "join", "platforms": ["darwin", "linux"] },

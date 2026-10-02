@@ -3,7 +3,8 @@
   "services": {
     "canva": {
       "base_url": "https://api.canva.com/rest/v1",
-      "preset_path": "knowledge/product/orchestration/service-presets/canva.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/canva.json",
+      "auth_strategy": "Bearer"
     }
   }
 }

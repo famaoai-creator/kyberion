@@ -2,7 +2,8 @@
   "default_pattern": "https://api.{service_id}.com/v1",
   "services": {
     "moltbook": {
-      "base_url": "https://www.moltbook.com/api/v1"
+      "base_url": "https://www.moltbook.com/api/v1",
+      "auth_strategy": "none"
     }
   }
 }
