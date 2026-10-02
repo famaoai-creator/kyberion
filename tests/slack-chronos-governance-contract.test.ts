@@ -63,6 +63,8 @@ describe('Slack and Chronos governance contract', () => {
       'active/shared/observability/mission-control/',
       'active/shared/runtime/terminal/',
       'active/audit/',
+      'active/shared/observability/ops-alerts.jsonl',
+      'active/shared/observability/delegations.jsonl',
     ]);
     expect(securityPolicy.authority_role_permissions.chronos_operator.allow_write).toEqual([]);
     expect(securityPolicy.authority_role_permissions.chronos_operator.allow_read).toContain(

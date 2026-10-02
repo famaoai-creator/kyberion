@@ -53,14 +53,23 @@ export interface LaunchdDaemonSpec {
    * kept resident.
    */
   startIntervalSec?: number;
+  /**
+   * Emit KeepAlive as {SuccessfulExit: false} instead of a bare true. Use for
+   * daemons that exit cleanly when another instance already owns the role
+   * (e.g. a client-spawned supervisor holding the daemon lock) — otherwise
+   * launchd would respawn them in a loop.
+   */
+  keepAliveOnCrashOnly?: boolean;
 }
 
 /**
  * Daemons that get launchd persistence. Only daemons that record a heartbeat
  * (daemon_watchdog's DEFAULT_DAEMONS) belong here as KeepAlive residents —
  * anything else cannot be observed when it stops. The
- * agent-runtime-supervisor is deliberately absent: clients respawn it on
- * demand, so launchd would only add a second owner. `daemon-watchdog` runs
+ * agent-runtime-supervisor uses KeepAlive:SuccessfulExit=false rather than
+ * bare KeepAlive: it exits cleanly when a client-spawned instance holds the
+ * daemon lock, and an always-restart policy would respawn-loop every
+ * ThrottleInterval against that lock. `daemon-watchdog` runs
  * as a StartInterval one-shot: it must fire even when every watched daemon
  * is dead, which a chronos-scheduled pipeline can never guarantee.
  */
@@ -87,6 +96,15 @@ export const LAUNCHD_DAEMON_SPECS: Record<string, LaunchdDaemonSpec> = {
     verificationHint: 'ops alerts: active/shared/observability/ops-alerts.jsonl',
     startIntervalSec: 300,
   },
+  'agent-runtime-supervisor': {
+    id: 'agent-runtime-supervisor',
+    label: 'com.kyberion.agent-runtime-supervisor',
+    daemonScript: 'dist/scripts/agent_runtime_supervisor_daemon.js',
+    logBaseName: 'kyberion-agent-runtime-supervisor',
+    keepAliveOnCrashOnly: true,
+    verificationHint:
+      'heartbeat: active/shared/runtime/heartbeats/agent-runtime-supervisor-daemon.json',
+  },
 };
 
 export interface ChronosLaunchdPlistOptions {
@@ -109,6 +127,11 @@ export interface ChronosLaunchdPlistOptions {
   logBaseName?: string;
   /** StartInterval in seconds for periodic one-shot jobs (drops KeepAlive). */
   startIntervalSec?: number;
+  /**
+   * Emit KeepAlive as {SuccessfulExit: false} instead of a bare true — for
+   * daemons that exit cleanly when another instance already owns the role.
+   */
+  keepAliveOnCrashOnly?: boolean;
   /** Extra daemon environment (names must be in CHRONOS_FORWARDABLE_ENV). */
   env?: Record<string, string>;
 }
@@ -216,7 +239,16 @@ export function buildChronosLaunchdPlist(options: ChronosLaunchdPlistOptions): s
       ? `
   <key>StartInterval</key>
   <integer>${options.startIntervalSec}</integer>`
-      : `
+      : options.keepAliveOnCrashOnly
+        ? `
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>`
+        : `
   <key>KeepAlive</key>
   <true/>
   <key>ThrottleInterval</key>
@@ -340,6 +372,7 @@ export async function main(args: string[], print: (value: unknown) => void): Pro
     daemonArgs: spec.daemonArgs,
     logBaseName: spec.logBaseName,
     startIntervalSec: spec.startIntervalSec,
+    keepAliveOnCrashOnly: spec.keepAliveOnCrashOnly,
     env,
   });
 
