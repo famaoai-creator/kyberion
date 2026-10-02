@@ -87,13 +87,47 @@ function scanActualCallSites(): Map<string, number> {
   return actual;
 }
 
-function loadLedger(): LedgerEntry[] {
+function loadLedgerDocument(): {
+  entries?: LedgerEntry[];
+  pipeline_literals?: PipelineLiteralEntry[];
+} {
   const raw = safeReadFile(path.join(rootDir, LEDGER_REPO_PATH), { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw) as { entries?: LedgerEntry[] };
+  return JSON.parse(raw);
+}
+
+function loadLedger(): LedgerEntry[] {
+  const parsed = loadLedgerDocument();
   if (!Array.isArray(parsed.entries)) {
     throw new Error(`${LEDGER_REPO_PATH} must contain an "entries" array`);
   }
   return parsed.entries;
+}
+
+interface PipelineLiteralEntry {
+  file: string;
+  count: number;
+}
+
+/**
+ * Count unpartitioned `active/shared/tmp` literals in pipeline JSON. Paths on
+ * a storage-layout partition (`tmp/system/`, `tmp/<tier>/`) are placed by
+ * purpose and are not counted.
+ */
+export function countLegacyTmpLiterals(content: string): number {
+  return (
+    content.match(/active\/shared\/tmp(?!\/(?:system|personal|confidential|public)\/)/g) || []
+  ).length;
+}
+
+function scanPipelineLiterals(): Map<string, number> {
+  const actual = new Map<string, number>();
+  for (const filePath of getAllFiles(path.join(rootDir, 'pipelines'))) {
+    const relPath = normalize(path.relative(rootDir, filePath));
+    if (!relPath.endsWith('.json')) continue;
+    const count = countLegacyTmpLiterals(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+    if (count > 0) actual.set(relPath, count);
+  }
+  return actual;
 }
 
 describe('sharedTmp ratchet (AL-02 registration ceremony)', () => {
@@ -147,7 +181,44 @@ describe('sharedTmp ratchet (AL-02 registration ceremony)', () => {
     expect(problems, `${GUIDANCE}\n\n${problems.join('\n')}`).toEqual([]);
   });
 
+  it('every unpartitioned active/shared/tmp literal in pipelines/ matches the ledger exactly', () => {
+    const actual = scanPipelineLiterals();
+    const ledger = new Map(
+      (loadLedgerDocument().pipeline_literals || []).map((entry) => [entry.file, entry.count])
+    );
+    const problems: string[] = [];
+    for (const [file, count] of [...actual.entries()].sort()) {
+      const allowed = ledger.get(file);
+      if (allowed === undefined) {
+        problems.push(`UNREGISTERED pipeline with ${count} active/shared/tmp literal(s): ${file}`);
+      } else if (count > allowed) {
+        problems.push(`GREW: ${file} has ${count} literal(s), ledger allows ${allowed}`);
+      } else if (count < allowed) {
+        problems.push(
+          `STALE COUNT: ${file} has ${count} literal(s), ledger says ${allowed} — shrink the ledger`
+        );
+      }
+    }
+    for (const file of [...ledger.keys()].sort()) {
+      if (!actual.has(file)) problems.push(`STALE ENTRY: ${file} has no literals — remove it`);
+    }
+    expect(
+      problems,
+      `New pipeline output on the unpartitioned tmp floor. Place it by purpose ` +
+        `(knowledge/product/architecture/runtime-storage-layout.md): scratch under ` +
+        `active/shared/tmp/system/ or tmp/<tier>/<tenant|shared>/, inbound files under ` +
+        `active/shared/staging/, deliverables via writeScopedArtifact.\n\n${problems.join('\n')}`
+    ).toEqual([]);
+  });
+
   describe('call-site matcher', () => {
+    it('counts only unpartitioned tmp literals in pipelines', () => {
+      expect(countLegacyTmpLiterals('"active/shared/tmp/reports/a.md"')).toBe(1);
+      expect(countLegacyTmpLiterals('"active/shared/tmp"')).toBe(1);
+      expect(countLegacyTmpLiterals('"active/shared/tmp/system/ocr/a"')).toBe(0);
+      expect(countLegacyTmpLiterals('"active/shared/tmp/confidential/acme/x"')).toBe(0);
+    });
+
     it('catches a simulated new call site (including multiple calls per line)', () => {
       expect(
         countSharedTmpCallSites(`const p = pathResolver.sharedTmp('new-thing/file.json');`)

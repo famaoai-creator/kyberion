@@ -168,6 +168,7 @@ export {
   restoreFromTrash,
   listReviewRequiredDirs,
   scanEventStores,
+  scanStorageFloors,
   listUncoveredEventStoreDirs,
   DEFAULT_TMP_TTL_MS,
   DEFAULT_LOG_RETENTION_DAYS,
