@@ -13,6 +13,7 @@ import {
 import {
   resolveViewerContextForRequest,
   strictViewerTier,
+  strictViewerScopeOrganizationIds,
   strictViewerScopeTenantSlugs,
   ViewerContextError,
   viewerErrorResponse,
@@ -78,7 +79,22 @@ function toRepoRelative(rawPath: string): string | null {
 }
 
 function isAllowedRepoAssetPath(relativePath: string): boolean {
+  if (relativePath.startsWith('active/organizations/')) {
+    return organizationArtifactOwner(relativePath) !== null;
+  }
   return ALLOWED_REPO_PREFIXES.some((prefix) => relativePath.startsWith(prefix));
+}
+
+/**
+ * Organization id of a path under an organization's deliverables
+ * (`active/organizations/<tier>/<tenant>/<org>/artifacts/...`). Only that
+ * subtree is served; organization state stays unreachable from this route.
+ */
+function organizationArtifactOwner(relativePath: string): string | null {
+  const segments = relativePath.split('/');
+  if (segments[0] !== 'active' || segments[1] !== 'organizations') return null;
+  if (segments.length < 7 || segments[5] !== 'artifacts') return null;
+  return segments[4] || null;
 }
 
 function contentTypeFor(filePath: string): string {
@@ -200,6 +216,22 @@ export async function GET(req: NextRequest) {
         { error: 'Asset tenant binding does not match its path' },
         { status: 403 }
       );
+    }
+    const organizationOwner = missionId
+      ? null
+      : organizationArtifactOwner(toRepoRelative(relativePath) || '');
+    if (organizationOwner) {
+      try {
+        const organizationIds = strictViewerScopeOrganizationIds(resolvedViewer.context);
+        if (organizationIds !== 'all' && !organizationIds.includes(organizationOwner)) {
+          return NextResponse.json(
+            { error: 'Asset is outside the viewer organization scope' },
+            { status: 403 }
+          );
+        }
+      } catch (error) {
+        return viewerErrorResponse(error, 403);
+      }
     }
     const assetTenant = pathTenant || boundTenant;
     if (assetTenant && tenantSlugs !== 'all' && !tenantSlugs.includes(assetTenant)) {

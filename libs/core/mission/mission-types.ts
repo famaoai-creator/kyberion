@@ -283,6 +283,7 @@ export interface MissionState {
     /** Deliverables handed to the linked project at finish (mission-artifact-promotion). */
     mission_artifact_promotion?: {
       status: 'promoted' | 'nothing_to_promote' | 'skipped' | 'partial';
+      reason?: string;
       project_id?: string;
       promoted: Array<{ artifact_id: string; from: string; to: string }>;
       failed?: Array<{ path: string; error: string }>;
