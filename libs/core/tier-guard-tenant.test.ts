@@ -229,6 +229,48 @@ describe('tier-guard tenant scope (IP-1)', () => {
     }
   });
 
+  it.each(['tmp', 'staging', 'cache', 'artifacts'])(
+    'isolates tenant partitions of the %s storage floor',
+    (floor) => {
+      process.env.KYBERION_TENANT = 'acme-corp';
+      process.env.KYBERION_PERSONA = 'ecosystem_architect';
+      const own = path.join(ROOT, `active/shared/${floor}/confidential/acme-corp/d/x.json`);
+      const other = path.join(ROOT, `active/shared/${floor}/confidential/other-tenant/d/x.json`);
+      const untenanted = path.join(ROOT, `active/shared/${floor}/confidential/shared/d/x.json`);
+
+      expect(validateWritePermission(own).allowed).toBe(true);
+      expect(validateReadPermission(own).allowed).toBe(true);
+      const write = validateWritePermission(other);
+      expect(write.allowed).toBe(false);
+      expect(write.reason).toMatch(/tenant\.scope_violation/);
+      const read = validateReadPermission(other);
+      expect(read.allowed).toBe(false);
+      expect(read.reason).toMatch(/tenant\.scope_violation/);
+      // A tenant-bound persona never lands in the untenanted confidential partition.
+      expect(validateWritePermission(untenanted).allowed).toBe(false);
+    }
+  );
+
+  it('gates reads of confidential storage floors by tier, not system or legacy paths', () => {
+    delete process.env.KYBERION_TENANT;
+    process.env.MISSION_ROLE = 'worker';
+    process.env.KYBERION_PERSONA = 'worker';
+
+    expect(
+      validateReadPermission(path.join(ROOT, 'active/shared/cache/confidential/acme-corp/d/x'))
+        .allowed
+    ).toBe(false);
+    expect(validateReadPermission(path.join(ROOT, 'active/shared/cache/system/d/x')).allowed).toBe(
+      true
+    );
+    expect(validateReadPermission(path.join(ROOT, 'active/shared/cache/ki-x.json')).allowed).toBe(
+      true
+    );
+    expect(
+      validateReadPermission(path.join(ROOT, 'active/shared/artifacts/public/shared/r.md')).allowed
+    ).toBe(true);
+  });
+
   it('SUDO bypasses tenant scope (cross-tenant tooling)', () => {
     process.env.KYBERION_TENANT = 'acme-corp';
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
