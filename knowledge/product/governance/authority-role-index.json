@@ -115,6 +115,14 @@
       "allowed_actuators": ["file-actuator", "artifact-actuator"],
       "tier_access": ["public", "confidential"]
     },
+    "dot_lifecycle_writer": {
+      "description": "Writes dot charters (dots/) and the lifecycle audit ledger during governed status transitions (kyberion dot activate/pause/retire). Deliberately separate from any role a dot may bind at runtime, so an active dot can never rewrite the contract it runs under.",
+      "default_persona": "worker",
+      "write_scopes": ["dots/", "active/shared/runtime/", "active/shared/tmp/"],
+      "scope_classes": ["operations_runtime"],
+      "allowed_actuators": [],
+      "tier_access": ["public"]
+    },
     "ecosystem_architect": {
       "description": "Core architecture and repo evolution authority.",
       "default_persona": "ecosystem_architect",
@@ -163,7 +171,6 @@
         "active/shared/observability/",
         "active/shared/runtime/",
         "presence/bridge/runtime/",
-        "dots/",
         "active/shared/tmp/"
       ],
       "scope_classes": ["coordination_runtime", "operations_runtime", "observability"],

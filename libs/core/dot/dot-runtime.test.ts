@@ -5,6 +5,7 @@ import type { GoalDrivenLoopResult } from '../workforce/worker-goal-driver.js';
 import type { DotCharter } from './dot-charter.js';
 import {
   DOT_INBOX_PATH,
+  DOT_WAKE_RETRY_AFTER_MS,
   dotDailyTokenCapReached,
   dotTokensUsedToday,
   evaluateDotTriggersDue,
@@ -73,6 +74,7 @@ describe('evaluateDotTriggersDue', () => {
         now: () => dueAt,
         runLoop: async () => fakeResult(1, 10),
         trigger: due[0],
+        hasRole: () => true,
       }
     );
     expect(evaluateDotTriggersDue(CHARTER, { rootDir: TEST_ROOT, now: () => dueAt })).toHaveLength(
@@ -147,7 +149,7 @@ describe('runDotWake', () => {
     writeCharter({ ...CHARTER, status: 'paused' });
     const receipt = await runDotWake(
       { path: `${TEST_ROOT}/dots/dot.json`, charter: { ...CHARTER, status: 'active' } },
-      { rootDir: TEST_ROOT, runLoop: async () => fakeResult(1, 5) }
+      { rootDir: TEST_ROOT, runLoop: async () => fakeResult(1, 5), hasRole: () => true }
     );
     expect(receipt.outcome).toBe('skipped');
     expect(receipt.reason).toContain('paused');
@@ -155,7 +157,11 @@ describe('runDotWake', () => {
 
   it('enforces token_cap_per_day across wakes', async () => {
     writeCharter(CHARTER);
-    const deps = { rootDir: TEST_ROOT, runLoop: async () => fakeResult(1, 600) };
+    const deps = {
+      rootDir: TEST_ROOT,
+      runLoop: async () => fakeResult(1, 600),
+      hasRole: () => true,
+    };
     const loaded = { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER };
     const first = await runDotWake(loaded, deps);
     expect(first.outcome).toBe('delivered');
@@ -183,6 +189,7 @@ describe('runDotWake', () => {
         };
         return fakeResult(2, 42);
       },
+      hasRole: () => true,
     });
     expect(receipt.outcome).toBe('delivered');
     expect(seen.maxTurns).toBe(2);
@@ -210,6 +217,7 @@ describe('runDotWake', () => {
           return 'delegated report';
         },
       },
+      hasRole: () => true,
     });
     expect(receipt.outcome).toBe('delivered');
     expect(receipt.reason).toBe('delegated-turn');
@@ -220,25 +228,152 @@ describe('runDotWake', () => {
     expect(dotTokensUsedToday('repo-guardian', { rootDir: TEST_ROOT })).toBeGreaterThan(0);
   });
 
-  it('keeps a failed wake retryable (failed keys are not consumed)', async () => {
-    writeCharter(CHARTER);
+  it('retries a failed wake only after the backoff window', async () => {
+    // Watch keys (unlike cron minute-keys) stay evaluable, so a failed watch
+    // wake is the honest retry candidate.
+    const watchCharter = {
+      ...CHARTER,
+      attention: { triggers: [{ kind: 'watch', paths: ['watched.txt'] }] },
+    } as DotCharter;
+    writeCharter(watchCharter, 'watch.json');
+    safeWriteFile(`${TEST_ROOT}/watched.txt`, 'x\n');
     const dueAt = new Date('2026-10-02T10:15:00Z');
-    const due = evaluateDotTriggersDue(CHARTER, { rootDir: TEST_ROOT, now: () => dueAt });
+    const deps = { rootDir: TEST_ROOT, now: () => dueAt };
+    const due = evaluateDotTriggersDue(watchCharter, deps);
+    expect(due).toHaveLength(1);
     const receipt = await runDotWake(
-      { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+      { path: `${TEST_ROOT}/dots/watch.json`, charter: watchCharter },
       {
-        rootDir: TEST_ROOT,
-        now: () => dueAt,
+        ...deps,
         trigger: due[0],
         runLoop: async () => {
           throw new Error('backend down');
         },
+        hasRole: () => true,
       }
     );
     expect(receipt.outcome).toBe('failed');
+    // Inside the backoff window the failed row suppresses re-delivery…
+    expect(evaluateDotTriggersDue(watchCharter, deps)).toHaveLength(0);
+    // …and after it the same key is due again.
+    const afterBackoff = new Date(dueAt.getTime() + DOT_WAKE_RETRY_AFTER_MS + 1000);
+    expect(
+      evaluateDotTriggersDue(watchCharter, {
+        rootDir: TEST_ROOT,
+        now: () => afterBackoff,
+      })
+    ).toHaveLength(1);
+  });
+
+  it('does not let a skipped wake consume the trigger key', async () => {
+    // Capped dot: skipped leaves the key due so the event fires after reset.
+    writeCharter(CHARTER);
+    const loaded = { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER };
+    const trigger = {
+      trigger: CHARTER.attention.triggers[0],
+      key: 'cron:x@m',
+    };
+    const deps = {
+      rootDir: TEST_ROOT,
+      hasRole: () => true,
+      runLoop: async () => fakeResult(1, 1500),
+      trigger,
+    };
+    await runDotWake(loaded, deps); // 1500 > cap 1000 → capped
+    const capped = await runDotWake(loaded, deps);
+    expect(capped.outcome).toBe('skipped');
+    expect(capped.reason).toContain('token_cap_per_day');
+    // The skipped audit row is written once per key — retries don't flood.
+    const cappedAgain = await runDotWake(loaded, deps);
+    const skippedRows = readDotWakeLedger({ rootDir: TEST_ROOT }).filter(
+      (r) => r.outcome === 'skipped' && r.trigger_key === trigger.key
+    );
+    expect(skippedRows).toHaveLength(1);
+    expect(cappedAgain.outcome).toBe('skipped');
+  });
+
+  it('never runs two wakes concurrently for the same dot', async () => {
+    writeCharter(CHARTER);
+    const loaded = { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER };
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const slow = runDotWake(loaded, {
+      rootDir: TEST_ROOT,
+      hasRole: () => true,
+      runLoop: async () => {
+        await gate;
+        return fakeResult(1, 5);
+      },
+    });
+    const second = await runDotWake(loaded, {
+      rootDir: TEST_ROOT,
+      hasRole: () => true,
+      runLoop: async () => fakeResult(1, 5),
+    });
+    expect(second.outcome).toBe('skipped');
+    expect(second.reason).toContain('in progress');
+    release();
+    expect((await slow).outcome).toBe('delivered');
+  });
+
+  it('does not dedupe across dots (shared cron expr / broadcast inbox)', async () => {
+    const other = {
+      ...CHARTER,
+      dot_id: 'second-dot',
+      runtime: { heartbeat_id: 'dot-second' },
+    } as DotCharter;
+    writeCharter(CHARTER, 'a.json');
+    writeCharter(other, 'b.json');
+    const dueAt = new Date('2026-10-02T10:15:00Z');
+    // Both dots are due for the same cron minute.
     expect(evaluateDotTriggersDue(CHARTER, { rootDir: TEST_ROOT, now: () => dueAt })).toHaveLength(
       1
     );
+    expect(evaluateDotTriggersDue(other, { rootDir: TEST_ROOT, now: () => dueAt })).toHaveLength(1);
+    // Delivering one must not consume the other's key.
+    const deps = {
+      rootDir: TEST_ROOT,
+      now: () => dueAt,
+      hasRole: () => true,
+      runLoop: async () => fakeResult(1, 5),
+    };
+    const dueA = evaluateDotTriggersDue(CHARTER, { rootDir: TEST_ROOT, now: () => dueAt });
+    await runDotWake(
+      { path: `${TEST_ROOT}/dots/a.json`, charter: CHARTER },
+      {
+        ...deps,
+        trigger: dueA[0],
+      }
+    );
+    expect(evaluateDotTriggersDue(other, { rootDir: TEST_ROOT, now: () => dueAt })).toHaveLength(1);
+  });
+
+  it('records a wake outcome row for a delegated turn under the wall clock', async () => {
+    // delegated fallback path already covered above; this asserts the wake
+    // prompt carries the trigger detail so the agent sees why it woke.
+    writeCharter(CHARTER);
+    const loaded = { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER };
+    let prompt = '';
+    const trigger = {
+      trigger: CHARTER.attention.triggers[0],
+      key: 'cron:x@m',
+      detail: 'cron detail',
+    };
+    await runDotWake(loaded, {
+      rootDir: TEST_ROOT,
+      hasRole: () => true,
+      backend: {
+        delegateTask: async (instruction: string) => {
+          prompt = instruction;
+          return 'ok';
+        },
+      },
+      trigger,
+    });
+    expect(prompt).toContain('cron:x@m');
+    expect(prompt).toContain('cron detail');
   });
 });
 

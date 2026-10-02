@@ -7,7 +7,6 @@
     "active/shared/observability/",
     "active/shared/runtime/",
     "presence/bridge/runtime/",
-    "dots/",
     "active/shared/tmp/"
   ],
   "scope_classes": ["coordination_runtime", "operations_runtime", "observability"],

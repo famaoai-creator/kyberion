@@ -49,7 +49,6 @@
         "active/shared/runtime/",
         "presence/bridge/runtime/",
         "../../../Library/LaunchAgents/",
-        "dots/",
         "active/shared/tmp/"
       ]
     },
@@ -148,6 +147,9 @@
         "active/shared/observability/",
         "active/audit/"
       ]
+    },
+    "dot_lifecycle_writer": {
+      "allow": ["dots/", "active/shared/runtime/", "active/shared/tmp/"]
     }
   }
 }

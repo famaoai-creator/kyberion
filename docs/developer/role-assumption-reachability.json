@@ -109,7 +109,7 @@
     },
     {
       "site": "libs/core/dot/dot-lifecycle.ts#transitionDotCharterStatus",
-      "roles": ["infrastructure_sentinel"],
+      "roles": ["dot_lifecycle_writer"],
       "unresolved": []
     },
     {
@@ -1665,6 +1665,13 @@
       "site": "scripts/daemon_watchdog.ts#routeDaemonRecoveryDecision (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
+    },
+    {
+      "site": "scripts/dot_charters.ts#reportWake",
+      "roles": [],
+      "unresolved": [
+        "role argument `loaded.charter.authority.authority_role` could not be resolved at scripts/dot_charters.ts#reportWake"
+      ]
     },
     {
       "site": "scripts/encrypt_connection_documents.ts#main",

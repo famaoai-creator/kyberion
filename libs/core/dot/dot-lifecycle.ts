@@ -37,11 +37,13 @@ import {
 export const DOT_LIFECYCLE_AUDIT_PATH = 'active/shared/runtime/dot-lifecycle-audit.jsonl';
 
 /**
- * Charter files live at repo-root `dots/`; writes are made under the shared
- * coordination role (same pattern as mesh/peer-messaging store writers) so
- * the CLI process persona never needs direct `dots/` grants.
+ * Charter files live at repo-root `dots/`; writes are made under a dedicated
+ * lifecycle role (same pattern as mesh/peer-messaging store writers). The
+ * writer role is deliberately NOT one a dot may bind: a runtime role holding
+ * `dots/` write scope could rewrite the contract it runs under, and content
+ * edits to an already-active charter bypass the activation gate.
  */
-const CHARTER_WRITER_ROLE = 'infrastructure_sentinel';
+const CHARTER_WRITER_ROLE = 'dot_lifecycle_writer';
 
 const TERMINAL_STATUSES: readonly DotCharterStatus[] = ['retired'];
 const TRANSITIONS: Record<DotCharterStatus, readonly DotCharterStatus[]> = {

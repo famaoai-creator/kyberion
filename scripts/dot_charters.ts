@@ -25,6 +25,7 @@ import {
   checkDotActivationReadiness,
   transitionDotCharterStatus,
 } from '@agent/core/dot/dot-lifecycle';
+import { withExecutionContextAsync } from '@agent/core/authority';
 import { dotTokensUsedToday, readDotWakeLedger, runDotWake } from '@agent/core/dot/dot-runtime';
 import { DEFAULT_DAEMONS } from './daemon_watchdog.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -130,7 +131,14 @@ async function reportWake(argv: string[]) {
   const dotId = argv.find((arg) => !arg.startsWith('--'));
   if (!dotId) throw new Error('usage: pnpm kyberion dot wake <dot_id>');
   const loaded = findDot(dotId);
-  const receipt = await runDotWake(loaded, {});
+  // Same attribution as the daemon sweep: ledger/heartbeat writes and the
+  // turn all happen under the charter's declared role.
+  const receipt = await withExecutionContextAsync(
+    loaded.charter.authority.authority_role,
+    () => runDotWake(loaded, {}),
+    undefined,
+    loaded.charter.scope.tenant_slug
+  );
   return {
     ok: receipt.outcome !== 'failed',
     ...receipt,
@@ -160,6 +168,9 @@ function reportStatus(argv: string[]) {
           : null,
       };
     });
+  if (dotId && dots.length === 0) {
+    throw new Error(`[DOT_NOT_FOUND] no charter for dot_id '${dotId}' under dots/`);
+  }
   return { ok: true, dots };
 }
 

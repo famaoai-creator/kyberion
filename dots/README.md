@@ -49,6 +49,22 @@ Activation is gated — the authority role must exist in the canonical role
 registry and the `heartbeat_id` must be unique among supervised daemons and
 active dots.
 
+Charter writes are performed under the dedicated `dot_lifecycle_writer`
+role — never under the role a dot binds at runtime — so an active dot cannot
+rewrite the contract it runs under. Every wake re-validates that the bound
+role still exists before any work runs.
+
+## Wake semantics
+
+Each wake attempt lands in `active/shared/runtime/dot-wake-ledger.jsonl`
+keyed by a stable trigger key (`cron:<expr>@<minute>`, `watch:<path>@<stat>`,
+`wake:<inbox-row>`, `manual:<iso>`). Outcomes: `delivered` consumes the key;
+`rejected` consumes it (policy wedges must not hot-loop); `failed` retries
+after a 5-minute backoff; `skipped` (paused mid-flight or token cap) leaves
+the key due so the event survives the block. `dot status` summarizes wakes
+and today's token spend; `dot wake <id>` runs one manual wake under the
+charter's role.
+
 ## Adding a dot
 
 1. Copy an existing charter, keep `status: "draft"`.
