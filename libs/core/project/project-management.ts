@@ -749,10 +749,17 @@ export function getProjectManagementView(
   const archivedMissions = isWorkerProjectContext()
     ? []
     : projectArchivedMissions(project.project_id, scope, rootDir);
-  const artifacts = projectArtifactRecords(project.project_id, scope, [
+  const visibleMissionIds = [
     ...missions.map((mission) => mission.mission_id),
     ...archivedMissions.map((mission) => mission.mission_id),
-  ]);
+  ];
+  // A worker sees only its own mission, so it sees only that mission's
+  // artifacts — not project-wide records from sibling missions.
+  const artifacts = projectArtifactRecords(project.project_id, scope, visibleMissionIds).filter(
+    (record) =>
+      !isWorkerProjectContext() ||
+      Boolean(record.mission_id && visibleMissionIds.includes(record.mission_id))
+  );
   const projectTrackIds = new Set(tracks.map((track) => track.track_id));
   const pipelineRefs = Array.isArray(project.pipeline_refs)
     ? project.pipeline_refs

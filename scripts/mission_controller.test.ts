@@ -1289,7 +1289,9 @@ describe('mission_controller argument parsing', () => {
         ])
       ).not.toThrow();
 
-      expect(() =>
+      // An omitted tenant is inherited from the project (MSN-PROJECT-LINKAGE);
+      // a stated mismatching tenant is still rejected.
+      expect(
         validateMissionStartCreateInput('create', 'MSN-TEST-PUBLIC-TENANT-MISSING', [
           'node',
           'dist/scripts/mission_controller.js',
@@ -1300,8 +1302,23 @@ describe('mission_controller argument parsing', () => {
           projectId,
           '--project-path',
           'active/projects/public/tenant-a/project',
+        ]).tenantSlug
+      ).toBe('tenant-a');
+      expect(() =>
+        validateMissionStartCreateInput('create', 'MSN-TEST-PUBLIC-TENANT-OTHER', [
+          'node',
+          'dist/scripts/mission_controller.js',
+          'create',
+          '--tier',
+          'public',
+          '--tenant-slug',
+          'tenant-b',
+          '--project-id',
+          projectId,
+          '--project-path',
+          'active/projects/public/tenant-a/project',
         ])
-      ).toThrow("mission tenant 'shared' must match project tenant 'tenant-a'");
+      ).toThrow("mission tenant 'tenant-b' must match project tenant 'tenant-a'");
     });
   });
 
