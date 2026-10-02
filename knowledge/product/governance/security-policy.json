@@ -421,7 +421,6 @@
         "active/shared/observability/",
         "active/shared/runtime/",
         "presence/bridge/runtime/",
-        "dots/",
         "active/shared/tmp/"
       ],
       "allow_write": [
@@ -429,7 +428,6 @@
         "active/shared/observability/",
         "active/shared/runtime/",
         "presence/bridge/runtime/",
-        "dots/",
         "active/shared/tmp/"
       ]
     },
@@ -658,6 +656,10 @@
         "active/shared/observability/",
         "active/audit/"
       ]
+    },
+    "dot_lifecycle_writer": {
+      "allow_read": ["dots/", "active/shared/runtime/", "active/shared/tmp/"],
+      "allow_write": ["dots/", "active/shared/runtime/", "active/shared/tmp/"]
     }
   },
   "authority_permissions": {
