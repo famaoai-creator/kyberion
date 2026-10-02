@@ -226,27 +226,16 @@ vi.mock('@agent/core/voice/voice-engine-registry', () => ({
 vi.mock('@agent/core/voice/voice-tts-config', () => ({
   getVoiceTtsLanguageConfig: mocks.getVoiceTtsLanguageConfig,
 }));
-vi.mock('@agent/core/async-utils', () => {
-  const retryProfile = {
+vi.mock('@agent/core/async-utils', () => ({
+  retry: mocks.retry,
+  getRetryDefaults: vi.fn(() => ({
     maxRetries: 2,
-    initialDelayMs: 0,
-    maxDelayMs: 1,
-    factor: 1,
-    jitter: false,
-  };
-  return {
-    retry: mocks.retry,
-    getRetryDefaults: () => ({ ...retryProfile }),
-    getRetryableCategories: () => [],
-    // resolveRetryProfile consults actuators[id] for any manifest retry_profile;
-    // a Proxy answers every key with the stub profile so no real catalog read happens.
-    loadRetryPolicy: () => ({
-      version: '1.0.0',
-      defaults: { ...retryProfile },
-      actuators: new Proxy({}, { get: () => ({ ...retryProfile }) }),
-    }),
-  };
-});
+    initialDelayMs: 500,
+    maxDelayMs: 10000,
+    factor: 2,
+    jitter: true,
+  })),
+}));
 vi.mock('@agent/core/tool/tool-runtime-registry', () => ({
   resolveManagedToolPythonBin: mocks.resolveManagedToolPythonBin,
 }));
