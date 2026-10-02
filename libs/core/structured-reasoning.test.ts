@@ -25,17 +25,21 @@ describe('parseStructuredJson', () => {
 
   it('throws on empty or unparseable text', () => {
     expect(() => parseStructuredJson('   ', 'op1')).toThrow(/empty response/);
-    expect(() => parseStructuredJson('not json at all', 'op2')).toThrow(/failed to parse JSON for op "op2"/);
+    expect(() => parseStructuredJson('not json at all', 'op2')).toThrow(
+      /failed to parse JSON for op "op2"/
+    );
   });
 });
 
 describe('runStructuredReasoningOp', () => {
   it('divergePersonas extracts the hypotheses array', async () => {
-    const complete = vi.fn(async () => '{"hypotheses":[{"id":"h1","proposed_by":"cfo","content":"c"}]}');
+    const complete = vi.fn(
+      async () => '{"hypotheses":[{"id":"h1","proposed_by":"cfo","content":"c"}]}'
+    );
     const out = await runStructuredReasoningOp(
       structuredReasoningSpecs.divergePersonas,
       { topic: 'pricing', personas: ['cfo', 'cto'], minPerPersona: 2 } as any,
-      complete,
+      complete
     );
     expect(out).toEqual([{ id: 'h1', proposed_by: 'cfo', content: 'c' }]);
     // system prompt + a user prompt carrying the topic were passed
@@ -45,12 +49,13 @@ describe('runStructuredReasoningOp', () => {
 
   it('extractRequirements validates and returns the whole object (with defaults)', async () => {
     const complete = vi.fn(
-      async () => '```json\n{"functional_requirements":[{"id":"FR-1","description":"d","priority":"must"}]}\n```',
+      async () =>
+        '```json\n{"functional_requirements":[{"id":"FR-1","description":"d","priority":"must"}]}\n```'
     );
     const out: any = await runStructuredReasoningOp(
       structuredReasoningSpecs.extractRequirements,
       { sourceText: 'transcript' } as any,
-      complete,
+      complete
     );
     expect(out.functional_requirements[0].id).toBe('FR-1');
     expect(out.non_functional_requirements).toEqual([]); // schema default applied
@@ -62,8 +67,8 @@ describe('runStructuredReasoningOp', () => {
       runStructuredReasoningOp(
         structuredReasoningSpecs.divergePersonas,
         { topic: 't', personas: ['a'] } as any,
-        complete,
-      ),
+        complete
+      )
     ).rejects.toThrow(/schema validation failed for "divergePersonas"/);
   });
 });

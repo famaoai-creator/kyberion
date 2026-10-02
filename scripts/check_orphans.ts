@@ -108,6 +108,8 @@ const OP_CATALOG_FILES = new Set([
   OP_DISCOVERY_PATH,
   ORPHAN_BASELINE_PATH,
 ]);
+/** Ratchet inventories list paths to freeze them; a listing is not a caller. */
+const INVENTORY_LEDGER_FILES = new Set(['knowledge/product/governance/shared-tmp-allowlist.json']);
 const HARNESS_CAPABILITY_FILE =
   /^knowledge\/product\/governance\/harness-capabilities\/[^/]+\.json$/u;
 
@@ -364,7 +366,7 @@ export function findOrphans(snapshot: OrphanSnapshot): OrphanReport {
   //     (Markdown, including the pipelines README) are reported separately.
   const pipelineRefs = new TokenIndex();
   for (const [file, text] of entries) {
-    if (isTest(file)) continue;
+    if (isTest(file) || INVENTORY_LEDGER_FILES.has(file)) continue;
     if (!(
       isSource(file) ||
       DATA_EXT.test(file) ||

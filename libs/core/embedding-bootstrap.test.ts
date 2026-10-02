@@ -1,15 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import {
-  installEmbeddingBackendIfAvailable,
-} from './embedding-bootstrap.js';
-import {
-  getEmbeddingBackend,
-  resetEmbeddingBackend,
-} from './embedding-backend.js';
+import { installEmbeddingBackendIfAvailable } from './embedding-bootstrap.js';
+import { getEmbeddingBackend, resetEmbeddingBackend } from './embedding-backend.js';
 import { isMlxAvailable } from './mlx-embedding-backend.js';
 
 vi.mock('./mlx-embedding-backend.js', async () => {
-  const actual = await vi.importActual<typeof import('./mlx-embedding-backend.js')>('./mlx-embedding-backend.js');
+  const actual = await vi.importActual<typeof import('./mlx-embedding-backend.js')>(
+    './mlx-embedding-backend.js'
+  );
   return {
     ...actual,
     isMlxAvailable: vi.fn(),

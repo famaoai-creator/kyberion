@@ -7,6 +7,9 @@
     "active/missions/personal/${MISSION_ID}/",
     "active/missions/public/${MISSION_ID}/",
     "active/shared/tmp/",
+    "active/shared/staging/",
+    "active/shared/cache/",
+    "active/shared/artifacts/",
     "active/shared/exports/",
     "work/metrics/",
     "active/shared/runtime/",
@@ -45,7 +48,15 @@
       "active/organizations/personal/",
       "active/organizations/confidential/",
       "active/missions/confidential/",
-      "active/projects/confidential/"
+      "active/projects/confidential/",
+      "active/shared/tmp/personal/",
+      "active/shared/tmp/confidential/",
+      "active/shared/staging/personal/",
+      "active/shared/staging/confidential/",
+      "active/shared/cache/personal/",
+      "active/shared/cache/confidential/",
+      "active/shared/artifacts/personal/",
+      "active/shared/artifacts/confidential/"
     ],
     "shared_prefixes": [
       "knowledge/confidential/tenant-groups/",
@@ -489,6 +500,8 @@
       "allow_read": [
         "active/missions/",
         "active/projects/",
+        "active/shared/artifacts/personal/",
+        "active/shared/artifacts/confidential/",
         "active/shared/observability/",
         "active/shared/runtime/"
       ],
@@ -511,6 +524,8 @@
         "knowledge/personal/tenants/",
         "active/missions/",
         "active/projects/",
+        "active/shared/artifacts/personal/",
+        "active/shared/artifacts/confidential/",
         "active/shared/coordination/channels/",
         "active/shared/coordination/chronos/",
         "active/shared/coordination/orchestration/",

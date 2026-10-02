@@ -56,4 +56,25 @@ describe('mission-asset tier resolution', () => {
       })
     ).toBe('tenant-b');
   });
+
+  it('resolves tier and tenant from storage-layout artifact floor partitions', () => {
+    const tenantAsset = 'active/shared/artifacts/confidential/tenant-a/report/weekly.md';
+    expect(resolveMissionAssetTier({ assetPath: tenantAsset })).toBe('confidential');
+    expect(resolveMissionAssetTenant({ assetPath: tenantAsset })).toBe('tenant-a');
+
+    const systemAsset = 'active/shared/artifacts/system/report/HEALTH_REPORT.md';
+    expect(resolveMissionAssetTier({ assetPath: systemAsset })).toBe('public');
+    expect(resolveMissionAssetTenant({ assetPath: systemAsset })).toBeUndefined();
+
+    // A tmp tier partition binds its tenant too, so a multi-tenant viewer
+    // cannot borrow another tenant's artifact binding to read it.
+    const tmpAsset = 'active/shared/tmp/confidential/globex/secret.pdf';
+    expect(resolveMissionAssetTier({ assetPath: tmpAsset })).toBe('confidential');
+    expect(resolveMissionAssetTenant({ assetPath: tmpAsset })).toBe('globex');
+
+    // Unpartitioned legacy files on the floor carry no governing tier.
+    expect(
+      resolveMissionAssetTier({ assetPath: 'active/shared/artifacts/legacy.md' })
+    ).toBeUndefined();
+  });
 });

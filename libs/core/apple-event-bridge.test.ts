@@ -24,7 +24,9 @@ describe('apple-event-bridge', () => {
   it('detects the focused input as structured state', async () => {
     mockDarwinPlatform();
     const secureIo = await import('./secure-io.js');
-    vi.mocked(secureIo.safeExec).mockReturnValueOnce('Codex\nCurrent Chat\nAXTextArea\nChat Input\ntrue');
+    vi.mocked(secureIo.safeExec).mockReturnValueOnce(
+      'Codex\nCurrent Chat\nAXTextArea\nChat Input\ntrue'
+    );
     const bridge = await import('./apple-event-bridge.js');
 
     expect(bridge.detectFocusedInput()).toEqual({
@@ -45,7 +47,10 @@ describe('apple-event-bridge', () => {
 
     bridge.activateApplication('Safari');
 
-    expect(secureIo.safeExec).toHaveBeenCalledWith('osascript', ['-e', 'tell application "Safari" to activate']);
+    expect(secureIo.safeExec).toHaveBeenCalledWith('osascript', [
+      '-e',
+      'tell application "Safari" to activate',
+    ]);
 
     restorePlatform();
   });
@@ -57,7 +62,10 @@ describe('apple-event-bridge', () => {
 
     bridge.toggleDictation(176);
 
-    expect(secureIo.safeExec).toHaveBeenCalledWith('osascript', ['-e', 'tell application "System Events" to key code 176']);
+    expect(secureIo.safeExec).toHaveBeenCalledWith('osascript', [
+      '-e',
+      'tell application "System Events" to key code 176',
+    ]);
 
     restorePlatform();
   });
