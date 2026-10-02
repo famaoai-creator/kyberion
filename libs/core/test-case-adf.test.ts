@@ -11,7 +11,10 @@ describe('test-case-adf schema', () => {
   it('accepts valid test-case adf records', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/product/schemas/test-case-adf.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(process.cwd(), 'knowledge/product/schemas/test-case-adf.schema.json')
+    );
 
     expect(
       validate({
@@ -28,21 +31,24 @@ describe('test-case-adf schema', () => {
           },
         ],
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
   });
 
   it('rejects invalid test-case adf records', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'knowledge/product/schemas/test-case-adf.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(process.cwd(), 'knowledge/product/schemas/test-case-adf.schema.json')
+    );
 
     expect(
       validate({
         kind: 'test-case-adf',
         app_id: '',
         cases: [],
-      }),
+      })
     ).toBe(false);
   });
 });

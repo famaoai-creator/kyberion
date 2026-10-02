@@ -161,6 +161,23 @@ export function storageFloorTier(filePath: string): StorageDataTier | undefined 
   return classification?.partition.kind === 'tier' ? classification.partition.tier : undefined;
 }
 
+const FLOOR_TIER_SEGMENT = new RegExp(
+  `(?:^|/)(?:${Object.values(STORAGE_FLOOR_ROOTS)
+    .map((root) => root.replace(/\//gu, '\\/'))
+    .join('|')})/(personal|confidential|public)/`,
+  'u'
+);
+
+/**
+ * Tier of a floor partition found anywhere in a path, independent of the
+ * project root (mirrors how tier-guard's detectTier matches `/knowledge/<tier>/`
+ * by substring, so a path resolved against a different cwd still classifies).
+ */
+export function storageFloorTierInPath(filePath: string): StorageDataTier | undefined {
+  return filePath.replace(/\\/gu, '/').match(FLOOR_TIER_SEGMENT)?.[1] as
+    StorageDataTier | undefined;
+}
+
 /**
  * Repo-relative prefixes of the tenant-bearing floor partitions
  * (`<root>/<tier>/` for personal and confidential). Mirrored in

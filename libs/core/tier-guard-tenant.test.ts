@@ -269,6 +269,38 @@ describe('tier-guard tenant scope (IP-1)', () => {
     expect(
       validateReadPermission(path.join(ROOT, 'active/shared/artifacts/public/shared/r.md')).allowed
     ).toBe(true);
+    // The worker's pre-partition `active/shared/tmp/` grant still covers legacy
+    // tmp, but no longer reaches the protected tmp partitions.
+    expect(validateReadPermission(path.join(ROOT, 'active/shared/tmp/job/x.json')).allowed).toBe(
+      true
+    );
+    expect(
+      validateReadPermission(path.join(ROOT, 'active/shared/tmp/confidential/acme-corp/x.json'))
+        .allowed
+    ).toBe(false);
+    expect(
+      validateReadPermission(path.join(ROOT, 'active/shared/tmp/personal/shared/x.json')).allowed
+    ).toBe(false);
+  });
+
+  it('lets the Chronos operator read its tenant partition of the artifact floor only', () => {
+    process.env.KYBERION_TENANT = 'acme-corp';
+    withExecutionContext(
+      'chronos_operator',
+      () => {
+        expect(
+          validateReadPermission(
+            path.join(ROOT, 'active/shared/artifacts/confidential/acme-corp/report/w.md')
+          ).allowed
+        ).toBe(true);
+        expect(
+          validateReadPermission(
+            path.join(ROOT, 'active/shared/artifacts/confidential/other-tenant/report/w.md')
+          ).allowed
+        ).toBe(false);
+      },
+      'worker'
+    );
   });
 
   it('SUDO bypasses tenant scope (cross-tenant tooling)', () => {

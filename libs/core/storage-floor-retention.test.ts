@@ -28,10 +28,18 @@ describe('storage floor retention', () => {
     expect([...STORAGE_FLOOR_RETENTION_PREFIXES].sort()).toEqual([...floorRoots].sort());
   });
 
-  it('expires staging and cache but never the artifact floor', () => {
+  it('expires staging and cache partitions but never the artifact floor', () => {
     const dirs = storageFloorRetentionRules(catalog).map((rule) => rule.repoRelativeDir);
     expect(dirs).toContain('active/shared/staging');
-    expect(dirs).toContain('active/shared/cache');
+    for (const partition of ['system', 'public', 'confidential', 'personal']) {
+      expect(dirs).toContain(`active/shared/cache/${partition}`);
+    }
+    // Legacy root-level cache files (knowledge-index ki-*.json) are LRU-managed
+    // by their owner; mtime would evict an index that is read every day.
+    expect(dirs).not.toContain('active/shared/cache');
+    expect(
+      retentionEntryForPath(catalog, 'active/shared/cache/ki-abc.json')?.ttl_days
+    ).toBeUndefined();
     expect(dirs).not.toContain('active/shared/artifacts');
     expect(
       retentionEntryForPath(catalog, 'active/shared/artifacts/system/report/x.md')?.action

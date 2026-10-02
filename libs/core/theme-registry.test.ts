@@ -70,15 +70,26 @@ describe('theme registry', () => {
     expect(baseDesignSystemCatalog.systems?.[defaultDesignSystem.default_system]).toBeTruthy();
 
     for (const [systemId, system] of Object.entries(baseDesignSystemCatalog.systems || {})) {
-      assertThemeReference(`media-design-systems:${systemId}`, (system as { theme?: string }).theme);
-      const tenantOverrides = (system as { tenant_overrides?: Record<string, { theme?: string }> }).tenant_overrides || {};
+      assertThemeReference(
+        `media-design-systems:${systemId}`,
+        (system as { theme?: string }).theme
+      );
+      const tenantOverrides =
+        (system as { tenant_overrides?: Record<string, { theme?: string }> }).tenant_overrides ||
+        {};
       for (const [tenantId, tenantOverride] of Object.entries(tenantOverrides)) {
-        assertThemeReference(`media-design-systems:${systemId}:tenant:${tenantId}`, tenantOverride.theme);
+        assertThemeReference(
+          `media-design-systems:${systemId}:tenant:${tenantId}`,
+          tenantOverride.theme
+        );
       }
     }
 
     for (const [systemId, system] of Object.entries(importedDesignSystemCatalog.systems || {})) {
-      assertThemeReference(`media-design-systems/imports:${systemId}`, (system as { theme?: string }).theme);
+      assertThemeReference(
+        `media-design-systems/imports:${systemId}`,
+        (system as { theme?: string }).theme
+      );
     }
   });
 });
