@@ -36,7 +36,7 @@ function tierFromPath(value: string | undefined): AssetTier | undefined {
   const partition = floorPartition(normalized);
   if (partition) return partition.tier;
   const match = normalized?.match(
-    /(?:^|\/)active\/(?:missions|projects)\/(personal|confidential|public)(?:\/|$)/
+    /(?:^|\/)active\/(?:missions|projects|organizations)\/(personal|confidential|public)(?:\/|$)/
   );
   return match?.[1] as AssetTier | undefined;
 }
@@ -46,7 +46,7 @@ export function tenantFromPath(value: string | undefined): string | undefined {
   const partition = floorPartition(normalized);
   if (partition) return partition.tenant;
   const match = normalized?.match(
-    /^active\/(?:missions|projects)\/(?:personal|confidential|public)\/([^/]+)\//
+    /^active\/(?:missions|projects|organizations)\/(?:personal|confidential|public)\/([^/]+)\//
   );
   return match?.[1] && match[1] !== 'shared' ? match[1] : undefined;
 }

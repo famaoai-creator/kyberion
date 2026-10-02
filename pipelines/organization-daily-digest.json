@@ -21,7 +21,8 @@
       "op": "core:organization_digest",
       "params": {
         "timezone": "Asia/Tokyo",
-        "locale": "ja-JP"
+        "locale": "ja-JP",
+        "persist": true
       },
       "produces": {
         "channel": "organization_digest",

@@ -32,6 +32,7 @@ export * from './onboarding-flow-policy.js';
 export * from './onboarding-state.js';
 export * from './onboarding-summary-policy.js';
 export * from './organization-digest.js';
+export * from './organization-digest-artifacts.js';
 export * from './organization-interventions.js';
 export * from './organization-operating-model-management.js';
 export * from './organization-operating-model-operations.js';

@@ -39,6 +39,7 @@ import { runGenerateAvatar } from './generate_avatar.js';
 import { runRegisterAvatar } from './register_avatar.js';
 import { runOAuthSetupForService } from './setup_oauth.js';
 import { runOrganizationDigest } from '@agent/core/organization/organization-digest';
+import { persistOrganizationDigest } from '@agent/core/organization/organization-digest-artifacts';
 import { runAccountabilityDigest } from '@agent/core/governance/accountability-digest';
 import { normalizeLocale } from '@agent/core/locale-normalize';
 import {
@@ -827,7 +828,13 @@ export function runInlineOrganizationDigest(
     ...(timezone ? { timezone } : {}),
     ...(locale ? { locale } : {}),
   });
-  return exportValue(params, step, { ...result.digest, text: result.text }, ctx);
+  // `persist: true` also files each organization's entry as a published
+  // report in that organization's own scope (surfaces list it per tenant).
+  const persisted =
+    resolveVars(params.persist ?? false, ctx) === true
+      ? { persisted: persistOrganizationDigest(result.digest) }
+      : {};
+  return exportValue(params, step, { ...result.digest, text: result.text, ...persisted }, ctx);
 }
 
 /**
