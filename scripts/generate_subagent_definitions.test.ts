@@ -279,7 +279,7 @@ describe('generate_subagent_definitions', () => {
       expect(source).toContain(
         "Never touch `.git/` or repo config (`.gitignore`, workspace wiring, etc.) — that's the mission owner's, never a worker CLI's."
       );
-      expect(source).toContain('Temp files only under `active/shared/tmp/`');
+      expect(source).toContain('Place runtime data by purpose (runtime-storage-layout)');
       expect(source).toContain(
         'Do not create or hand-edit provider state directories (`.claude/`, `.codex/`, `.agy/`, `.gemini/`, …)'
       );

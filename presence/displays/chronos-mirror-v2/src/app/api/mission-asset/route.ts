@@ -31,6 +31,7 @@ import {
 const ALLOWED_PREFIXES = ['deliverables/', 'artifacts/', 'outputs/', 'evidence/'] as const;
 // Repo-relative mode (no missionId): where governed artifacts actually live.
 const ALLOWED_REPO_PREFIXES = [
+  'active/shared/artifacts/',
   'active/shared/exports/',
   'active/shared/tmp/',
   'active/missions/',
@@ -165,7 +166,7 @@ export async function GET(req: NextRequest) {
         })
       );
     } else {
-      // repo-relative artifact mode: deliverables live in exports/tmp/missions;
+      // repo-relative artifact mode: deliverables live in artifacts/exports/tmp/missions;
       // tier enforcement stays with secure-io on the actual read below.
       const repoRelative = toRepoRelative(relativePath);
       if (!repoRelative || !isAllowedRepoAssetPath(repoRelative)) {
