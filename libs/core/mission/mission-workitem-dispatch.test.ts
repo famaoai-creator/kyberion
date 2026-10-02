@@ -139,6 +139,14 @@ vi.mock('../workforce/artifact-registry.js', async () => {
     listArtifactOwnershipRecords: (): ArtifactOwnershipRecord[] => [
       ...artifactRegistryStore.records,
     ],
+    listLatestArtifactOwnershipRecords: (): ArtifactOwnershipRecord[] => {
+      const latest = new Map<string, ArtifactOwnershipRecord>();
+      for (const record of artifactRegistryStore.records) {
+        latest.delete(record.artifact_id);
+        latest.set(record.artifact_id, record);
+      }
+      return [...latest.values()];
+    },
     listArtifactOwnershipRecordsByQuery: listByQuery,
     listArtifactOwnershipRecordsForProject: (
       projectId: string,

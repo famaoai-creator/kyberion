@@ -55,6 +55,10 @@ import {
   type SweepWorkspacesResult,
 } from './workforce/workspace-sweep.js';
 import {
+  compactArtifactOwnershipRegistry,
+  type ArtifactOwnershipCompaction,
+} from './workforce/artifact-registry.js';
+import {
   listSupervisorEventFiles,
   SUPERVISOR_EVENTS_FILE_PATTERN,
   SUPERVISOR_EVENTS_LEGACY_FILE,
@@ -201,6 +205,12 @@ export interface JanitorReport {
   deletedStatusRules: number;
   staleDelegationChildren: number;
   killedDelegationChildren: number;
+  /**
+   * Artifact ownership registry rows that are superseded (an older row of an
+   * artifact re-registered since): reported in dry run, removed otherwise.
+   */
+  supersededArtifactOwnershipRows: number;
+  compactedArtifactOwnershipRows: number;
   /** WS-07: ledger-registered workspace sweep (orphans deleted only through the ledger). */
   workspaces: JanitorWorkspacesReport;
   /**
@@ -1354,6 +1364,18 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     errors.push(`mission-dirs: ${err instanceof Error ? err.message : String(err)}`);
   }
 
+  let ownershipCompaction: ArtifactOwnershipCompaction = {
+    total_rows: 0,
+    kept_rows: 0,
+    removed_rows: 0,
+    applied: false,
+  };
+  try {
+    ownershipCompaction = compactArtifactOwnershipRegistry({ dryRun: opts.dryRun });
+  } catch (err: unknown) {
+    errors.push(`artifact-ownership: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   const report: JanitorReport = {
     expiredTmp: tmpResult.expired.length,
     deletedTmp: tmpResult.deleted.length,
@@ -1373,6 +1395,10 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     deletedStatusRules: statusRulesResult.deleted.length,
     staleDelegationChildren: delegationChildrenResult.stale.length,
     killedDelegationChildren: delegationChildrenResult.killed.length,
+    supersededArtifactOwnershipRows: ownershipCompaction.removed_rows,
+    compactedArtifactOwnershipRows: ownershipCompaction.applied
+      ? ownershipCompaction.removed_rows
+      : 0,
     workspaces: {
       registered: workspacesResult.registered,
       orphaned: workspacesResult.orphaned.length,
