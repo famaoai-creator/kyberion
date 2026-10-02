@@ -57,7 +57,9 @@ function artifactOwnershipCatalog(filePath: string) {
 }
 
 function hasOwnership(record: ArtifactOwnershipRecord): boolean {
-  return Boolean(record.project_id || record.mission_id || record.task_session_id);
+  return Boolean(
+    record.project_id || record.mission_id || record.organization_id || record.task_session_id
+  );
 }
 
 function normalizeStorageClasses(
@@ -133,7 +135,7 @@ export function appendArtifactOwnershipRecord(
 ): string {
   if (!hasOwnership(record)) {
     throw new Error(
-      'Artifact ownership record requires at least one owner: project_id, mission_id, or task_session_id.'
+      'Artifact ownership record requires at least one owner: project_id, mission_id, organization_id, or task_session_id.'
     );
   }
   if (options.for_delivery && record.storage_class === 'tmp') {
