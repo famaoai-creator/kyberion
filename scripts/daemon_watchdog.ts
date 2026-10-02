@@ -21,6 +21,7 @@ import {
   isAutonomyDecisionRoutingEnabled,
   routeAutonomousDecision,
 } from '@agent/core/governance/approval-decision-routing';
+import { listActiveDotHeartbeatSpecs, type DotHeartbeatSpec } from '@agent/core/dot/dot-runtime';
 import { logger } from '@agent/core/core';
 
 /**
@@ -101,6 +102,11 @@ export interface DaemonWatchdogOptions {
   staleAfterMs?: number;
   alertLogPath?: string;
   webhookUrl?: string;
+  /**
+   * Dot heartbeat specs to union into the supervised set (tests inject; the
+   * default resolves live charters). Ignored when `daemons` is explicit.
+   */
+  dotHeartbeatSpecs?: DotHeartbeatSpec[];
 }
 
 function parseDaemons(value: unknown): string[] {
@@ -120,16 +126,35 @@ function formatAge(status: DaemonHeartbeatStatus): string {
 
 export function checkDaemonHeartbeats(options: DaemonWatchdogOptions = {}): DaemonWatchdogReport {
   const now = options.now ?? new Date();
-  const daemons = options.daemons ?? DEFAULT_DAEMONS;
-  const heartbeatOptions = {
+  // Active dot charters join the supervised set so a silent dot pages like any
+  // daemon; a paused/retired dot drops out automatically on the next run, and
+  // a dot's staleness is its own max_idle_wake_ms (dots heartbeat per wake,
+  // not per daemon tick). Charters always live at repo-root `dots/` —
+  // options.rootDir only overrides the heartbeat directory, not charters.
+  const dotSpecs = options.daemons
+    ? []
+    : (options.dotHeartbeatSpecs ?? listActiveDotHeartbeatSpecs());
+  const dotStaleAfter = new Map(
+    dotSpecs.map((spec) => [spec.heartbeat_id, spec.stale_after_ms] as const)
+  );
+  const daemons = options.daemons ?? [
+    ...DEFAULT_DAEMONS,
+    ...dotSpecs.map((spec) => spec.heartbeat_id).filter((id) => !DEFAULT_DAEMONS.includes(id)),
+  ];
+  const baseHeartbeatOptions = {
     rootDir: options.rootDir,
     now,
     staleAfterMs: options.staleAfterMs ?? DEFAULT_STALE_AFTER_MS,
   };
   const statuses =
     daemons.length > 0
-      ? daemons.map((daemonId) => readDaemonHeartbeat(daemonId, heartbeatOptions))
-      : listDaemonHeartbeatStatuses(heartbeatOptions);
+      ? daemons.map((daemonId) =>
+          readDaemonHeartbeat(daemonId, {
+            ...baseHeartbeatOptions,
+            staleAfterMs: dotStaleAfter.get(daemonId) ?? baseHeartbeatOptions.staleAfterMs,
+          })
+        )
+      : listDaemonHeartbeatStatuses(baseHeartbeatOptions);
   const failed = statuses.filter((status) => status.status !== 'healthy');
   const report: DaemonWatchdogReport = {
     ok: failed.length === 0,
@@ -149,7 +174,7 @@ export function checkDaemonHeartbeats(options: DaemonWatchdogOptions = {}): Daem
             age_ms: status.age_ms,
             reason: status.reason,
           })),
-          stale_after_ms: heartbeatOptions.staleAfterMs,
+          stale_after_ms: baseHeartbeatOptions.staleAfterMs,
         },
         recommendation:
           'Verify the launchd/systemd unit for each unhealthy daemon, restart the unit if needed, and inspect the daemon logs before resuming unattended operation.',
@@ -329,7 +354,7 @@ async function main(args: string[] = []) {
     .parseSync();
 
   const report = await checkDaemonHeartbeatsWithRecovery({
-    daemons: parseDaemons(argv.daemon),
+    daemons: argv.daemon !== undefined ? parseDaemons(argv.daemon) : undefined,
     rootDir: argv.rootDir,
     staleAfterMs: argv.staleAfterMs,
   });

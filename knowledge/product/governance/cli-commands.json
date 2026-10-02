@@ -3567,11 +3567,79 @@
       "id": "script.dot.list",
       "module": "scripts/dot_charters.ts",
       "command": "dot list",
+      "args": ["list"],
       "noun": "dot",
       "verb": "list",
       "audience": "operator",
       "description": "cli_cmd_script_dot_list",
       "group": "inspect"
+    },
+    {
+      "id": "script.dot.status",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot status",
+      "args": ["status"],
+      "noun": "dot",
+      "verb": "status",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_status",
+      "group": "inspect"
+    },
+    {
+      "id": "script.dot.validate",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot validate",
+      "args": ["validate"],
+      "noun": "dot",
+      "verb": "validate",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_validate",
+      "group": "inspect"
+    },
+    {
+      "id": "script.dot.activate",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot activate",
+      "args": ["activate"],
+      "noun": "dot",
+      "verb": "activate",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_activate",
+      "group": "operate"
+    },
+    {
+      "id": "script.dot.pause",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot pause",
+      "args": ["pause"],
+      "noun": "dot",
+      "verb": "pause",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_pause",
+      "group": "operate"
+    },
+    {
+      "id": "script.dot.retire",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot retire",
+      "args": ["retire"],
+      "noun": "dot",
+      "verb": "retire",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_retire",
+      "group": "operate"
+    },
+    {
+      "id": "script.dot.wake",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot wake",
+      "args": ["wake"],
+      "noun": "dot",
+      "verb": "wake",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_wake",
+      "group": "operate",
+      "long_running": true
     }
   ],
   "deprecated_script_aliases": [

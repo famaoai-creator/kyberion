@@ -43,6 +43,8 @@ describe('daemon_watchdog', () => {
       rootDir: ROOT,
       now: new Date('2026-07-04T00:01:00.000Z'),
       alertLogPath: ALERT_LOG,
+      // Hermetic: no live dot charters join the default set in tests.
+      dotHeartbeatSpecs: [],
     });
 
     expect(report.ok).toBe(true);
@@ -57,6 +59,34 @@ describe('daemon_watchdog', () => {
     // outages produced no signal at all — and with no cron catch-up at the time,
     // every firing during the outage was lost rather than late.
     expect(DEFAULT_DAEMONS).toContain('generation-schedule-daemon');
+  });
+
+  it('supervises active dot heartbeats with the charter staleness budget', () => {
+    safeRmSync(pathResolver.sharedTmp('daemon-watchdog-test'), { recursive: true, force: true });
+    const now = new Date('2026-07-04T00:00:00.000Z');
+    DEFAULT_DAEMONS.forEach((daemonId, index) => {
+      recordDaemonHeartbeat(
+        daemonId,
+        { pid: 100 + index, status: 'running' },
+        { rootDir: ROOT, now }
+      );
+    });
+    // Dot heartbeat is 10 minutes old — stale under the daemon default (3 min)
+    // but fresh under the charter's own max_idle_wake_ms.
+    recordDaemonHeartbeat(
+      'dot-repo-guardian',
+      { pid: 200, status: 'running' },
+      { rootDir: ROOT, now: new Date(now.getTime() - 10 * 60 * 1000) }
+    );
+
+    const report = checkDaemonHeartbeats({
+      rootDir: ROOT,
+      now: new Date(now.getTime() + 60_000),
+      alertLogPath: ALERT_LOG,
+      dotHeartbeatSpecs: [{ heartbeat_id: 'dot-repo-guardian', stale_after_ms: 15 * 60 * 1000 }],
+    });
+    expect(report.ok).toBe(true);
+    expect(report.statuses.map((status) => status.daemon_id)).toContain('dot-repo-guardian');
   });
 
   it('raises a governed recovery request per unhealthy daemon (EV-02)', async () => {

@@ -36,15 +36,33 @@ attention (trigger set), authority (an existing role — never new power),
 decision floor (ops-gate), and notification (deliver_to + digest). See
 [`dots/README.md`](../../../dots/README.md).
 
-## Runtime wiring (follow-on)
+## Runtime wiring (landed MSN-RESIDENT-DOT-RUNTIME-20261002)
 
-1. `agent-runtime-supervisor` multiplexes active charters: each wake runs a
-   bounded `worker-goal-driver` turn with the charter's budget and role.
-2. Chronos/`trigger-runner` translate `attention.triggers` into wake events.
-3. `autonomous-ops-gate` classifies every proposed action; `notify`/`approve`
-   outcomes produce decision cards on `notification.deliver_to`.
-4. The dot's heartbeat (`runtime.heartbeat_id`) joins `daemon_watchdog`'s
-   DEFAULT_DAEMONS so a silent dot pages, same as any daemon.
+1. `agent-runtime-supervisor` multiplexes active charters: a daemon sweep
+   (`KYBERION_DOT_SWEEP_INTERVAL_MS`, default 30 s) evaluates each active
+   charter's `attention.triggers` via `evaluateDotTriggersDue` and routes due
+   wakes through `TriggerRunner` (idempotency + audit + the charter's role as
+   the trigger authority, assumed via `withExecutionContextAsync`). The deliver
+   handler runs one bounded `worker-goal-driver` turn (`runDotWake`) with the
+   charter's budget and `toolRole`.
+2. Due-ness memory is `active/shared/runtime/dot-wake-ledger.jsonl`; cron keys
+   are `<expr>@<minute>` in the charter timezone, watch keys encode
+   `mtime:size` (snapshot in `dot-watch-state.json`), wake keys are inbox-line
+   hashes (`dot-inbox.jsonl`). Failed wakes stay retryable; cron does not
+   catch up on slept minutes.
+3. `goal.budget.token_cap_per_day` is enforced across processes via
+   `dot-token-usage.jsonl`; per-wake turns/wall-clock map to
+   `GoalBudgetLimits` (KD-02).
+4. Status transitions are governed (`libs/core/dot/dot-lifecycle.ts`,
+   `kyberion dot activate|pause|retire`): activation requires the authority
+   role in the canonical registry and a heartbeat_id that collides with
+   neither `DEFAULT_DAEMONS` nor another active dot.
+5. The dot's heartbeat (`runtime.heartbeat_id`) joins `daemon_watchdog`'s
+   supervised set while active (`listActiveDotHeartbeatIds`), so a silent dot
+   pages, same as any daemon.
+6. `autonomous-ops-gate` per-action floors (`decisions.*`) and
+   `notification.deliver_to` sends remain follow-on; the pilot stays
+   `default_decision: notify` and coordinates through its role scopes.
 
 ## Hard-won constraint from MSN-RESIDENT-DOT-20261002
 
@@ -53,8 +71,9 @@ The autonomy substrate only works if the _alert path itself_ is authorized:
 write scope, so the watchdog died exactly when it had something to report and
 the hourly health watch could not escalate. Any dot runtime must land its
 authority role in `security-policy.json` **before** activation — the schema
-cannot express that, so `status: active` transitions should validate role
-existence (see `dot-charter.ts` note in the test suite).
+cannot express that, so `status: active` transitions are gated by
+`dot-lifecycle.ts` (`transitionDotCharterStatus`), which validates role
+existence and heartbeat uniqueness.
 
 ## Locality caveat
 

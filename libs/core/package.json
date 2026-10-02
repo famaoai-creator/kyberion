@@ -7010,6 +7010,14 @@
     "./dot/dot-charter": {
       "types": "./dist/dot/dot-charter.d.ts",
       "default": "./dist/dot/dot-charter.js"
+    },
+    "./dot/dot-runtime": {
+      "types": "./dist/dot/dot-runtime.d.ts",
+      "default": "./dist/dot/dot-runtime.js"
+    },
+    "./dot/dot-lifecycle": {
+      "types": "./dist/dot/dot-lifecycle.d.ts",
+      "default": "./dist/dot/dot-lifecycle.js"
     }
   },
   "dependencies": {

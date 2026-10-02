@@ -1,0 +1,16 @@
+{
+  "role": "infrastructure_sentinel",
+  "description": "Shared core role assumed internally by coordination store writers (work coordination, peer messaging, mesh, the stimuli journal) and by resident dots whose charters bind it (e.g. repo-guardian). Narrow coordination/observability/runtime write scope only — it reports and delegates, it does not reconfigure.",
+  "default_persona": "worker",
+  "write_scopes": [
+    "active/shared/coordination/channels/",
+    "active/shared/observability/",
+    "active/shared/runtime/",
+    "presence/bridge/runtime/",
+    "dots/",
+    "active/shared/tmp/"
+  ],
+  "scope_classes": ["coordination_runtime", "operations_runtime", "observability"],
+  "allowed_actuators": ["process-actuator"],
+  "tier_access": ["public"]
+}
