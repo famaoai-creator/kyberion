@@ -21,7 +21,7 @@
  *   pnpm tsx scripts/dependency_resolver.ts --actuator voice --auto-install
  */
 
-import { execSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import {
   getActuatorDependencyBundle,
   loadActuatorDependencyBundles,
@@ -83,10 +83,25 @@ function assertSafeProbeBinary(binary: string): void {
   }
 }
 
-function tryExec(cmd: string): { ok: boolean; stdout: string } {
+/**
+ * Run a probe without a shell: the binary and its arguments are passed as an
+ * argv array, so nothing in them is ever interpreted by a shell. `npx` is a
+ * `.cmd` shim on Windows and needs the shell there; its arguments are fixed
+ * literals. `mergeStderr` replaces the former `2>&1`.
+ */
+function tryExec(
+  file: string,
+  args: string[],
+  options: { mergeStderr?: boolean } = {}
+): { ok: boolean; stdout: string } {
   try {
-    const stdout = execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    return { ok: true, stdout };
+    const result = spawnSync(file, args, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', options.mergeStderr ? 'pipe' : 'ignore'],
+      shell: isWindows() && file === 'npx',
+    });
+    const stdout = `${result.stdout ?? ''}${options.mergeStderr ? (result.stderr ?? '') : ''}`;
+    return { ok: !result.error && result.status === 0, stdout: stdout.trim() };
   } catch {
     return { ok: false, stdout: '' };
   }
@@ -94,9 +109,9 @@ function tryExec(cmd: string): { ok: boolean; stdout: string } {
 
 function checkBinary(binary: string): { ok: boolean; version?: string } {
   assertSafeProbeBinary(binary);
-  const result = tryExec(`${binary} --version`);
+  const result = tryExec(binary, ['--version']);
   if (result.ok) return { ok: true, version: result.stdout.split('\n')[0] };
-  const which = tryExec(`which ${binary}`);
+  const which = tryExec('which', [binary]);
   return { ok: which.ok };
 }
 
@@ -112,15 +127,21 @@ const PLAYWRIGHT_BROWSER: Dependency = {
   name: 'Playwright browser binaries',
   level: 'must',
   check: async () => {
-    const result = tryExec('npx playwright --version');
+    const result = tryExec('npx', ['playwright', '--version']);
     if (!result.ok) return { ok: false, detail: 'playwright CLI not found' };
     // Check if at least one browser binary exists
-    const chromiumResult = tryExec('npx playwright install --dry-run chromium 2>&1');
+    const chromiumResult = tryExec('npx', ['playwright', 'install', '--dry-run', 'chromium'], {
+      mergeStderr: true,
+    });
+    // The dry run prints the browser install location; it is installed when
+    // that path exists.
+    const chromiumLine = chromiumResult.stdout
+      .split('\n')
+      .find((line) => line.includes('chromium') && line.includes('/'));
+    const chromiumPath = chromiumLine?.slice(chromiumLine.indexOf('/')).trim();
     const alreadyInstalled =
       chromiumResult.stdout.includes('already installed') ||
-      tryExec(
-        'ls "$(npx playwright install --dry-run chromium 2>&1 | grep -o \'/.*chromium[^\\n]*\')" 2>/dev/null'
-      ).ok;
+      (chromiumPath ? tryExec('ls', [chromiumPath]).ok : false);
     return {
       ok: true,
       version: result.stdout,
@@ -137,7 +158,7 @@ const PYTHON3: Dependency = {
   name: 'Python 3.9+',
   level: 'must',
   check: async () => {
-    const result = tryExec('python3 --version');
+    const result = tryExec('python3', ['--version']);
     if (!result.ok) return { ok: false, detail: 'python3 not in PATH' };
     const version = result.stdout.replace('Python ', '').trim();
     const [major, minor] = version.split('.').map(Number);
@@ -228,7 +249,10 @@ const WHISPER: Dependency = {
     }
     const r1 = checkBinary('whisper');
     if (r1.ok) return { ok: true, version: r1.version };
-    const r2 = tryExec('python3 -c "import faster_whisper; print(faster_whisper.__version__)"');
+    const r2 = tryExec('python3', [
+      '-c',
+      'import faster_whisper; print(faster_whisper.__version__)',
+    ]);
     if (r2.ok) return { ok: true, version: `faster-whisper ${r2.stdout}` };
     return {
       ok: false,
@@ -245,12 +269,12 @@ const NATIVE_TTS: Dependency = {
   level: 'must',
   check: async () => {
     if (isMacOS()) {
-      const r = tryExec('which say');
+      const r = tryExec('which', ['say']);
       return { ok: r.ok, version: 'macOS say', detail: r.ok ? undefined : 'say not found' };
     } else if (isLinux()) {
-      const r = tryExec('which espeak');
+      const r = tryExec('which', ['espeak']);
       if (r.ok) return { ok: true, version: 'espeak' };
-      const r2 = tryExec('which espeak-ng');
+      const r2 = tryExec('which', ['espeak-ng']);
       return {
         ok: r2.ok,
         version: r2.ok ? 'espeak-ng' : undefined,

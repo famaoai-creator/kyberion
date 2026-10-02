@@ -271,12 +271,22 @@ export function ensureRegularScopedArtifactIndex(filePath: string): void {
   }
 }
 
+/** Strip leading/trailing `-` in linear time (a `^-+|-+$` regex is polynomial on long dash runs). */
+function trimDashes(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value[start] === '-') start += 1;
+  while (end > start && value[end - 1] === '-') end -= 1;
+  return value.slice(start, end);
+}
+
 function sanitizeScopeSegment(value: string, label: string): string {
-  const cleaned = String(value ?? '')
-    .trim()
-    .replace(/[\\/]+/g, '-')
-    .replace(/[^a-zA-Z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  const cleaned = trimDashes(
+    String(value ?? '')
+      .trim()
+      .replace(/[\\/]+/g, '-')
+      .replace(/[^a-zA-Z0-9._-]+/g, '-')
+  );
   if (!cleaned || cleaned === '.' || cleaned === '..') {
     throw new Error(`writeScopedArtifact: invalid ${label} reference: ${JSON.stringify(value)}`);
   }
@@ -298,10 +308,7 @@ function sanitizeArtifactName(name: string): string {
     .split('/')
     .filter((seg) => seg.length > 0)
     .map((seg) => {
-      const cleaned = seg
-        .trim()
-        .replace(/[^a-zA-Z0-9._-]+/g, '-')
-        .replace(/^-+|-+$/g, '');
+      const cleaned = trimDashes(seg.trim().replace(/[^a-zA-Z0-9._-]+/g, '-'));
       if (!cleaned || cleaned === '.' || cleaned === '..' || /^\.+$/.test(cleaned)) {
         throw new Error(
           `writeScopedArtifact: invalid artifact name segment: ${JSON.stringify(seg)}`
