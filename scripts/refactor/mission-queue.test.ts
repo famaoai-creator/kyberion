@@ -12,7 +12,11 @@ import {
   safeSymlinkSync,
   safeWriteFile,
 } from '@agent/core';
-import { dispatchNextQueuedMission, enqueueMission } from './mission-queue.js';
+import {
+  MAX_DISPATCH_ATTEMPTS,
+  dispatchNextQueuedMission,
+  enqueueMission,
+} from './mission-queue.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -125,6 +129,48 @@ describe('mission-queue', () => {
     expect(seen[0]).toEqual(['MSN-BLOCKED', ['MSN-PRE']]);
     expect(dispatched).toEqual(['MSN-READY']);
     expect(statuses()).toEqual({ 'MSN-BLOCKED': 'pending', 'MSN-READY': 'dispatched' });
+  });
+
+  it('rejects malformed mission or dependency ids at enqueue', async () => {
+    await expect(enqueueMission(QUEUE_PATH, 'ab', 'public')).rejects.toThrow(
+      '[MISSION_PREREQUISITES_INVALID]'
+    );
+    await expect(enqueueMission(QUEUE_PATH, 'MSN-OK-1', 'public', 5, ['ab'])).rejects.toThrow(
+      'Invalid mission id(s) in dependencies: AB'
+    );
+    expect(safeExistsSync(QUEUE_PATH)).toBe(false);
+  });
+
+  it('parks an entry as failed after repeated start failures so it stops blocking', async () => {
+    safeWriteFile(QUEUE_PATH, [entry('MSN-BROKEN', 9), entry('MSN-NEXT', 1)].join('\n') + '\n');
+    const failing = async (missionId: string) => {
+      if (missionId === 'MSN-BROKEN') throw new Error('start exploded');
+    };
+    for (let attempt = 1; attempt <= MAX_DISPATCH_ATTEMPTS; attempt += 1) {
+      await expect(
+        dispatchNextQueuedMission(QUEUE_PATH, () => ({ ok: true, missing: [] }), failing)
+      ).rejects.toThrow('start exploded');
+    }
+    expect(statuses()).toEqual({ 'MSN-BROKEN': 'failed', 'MSN-NEXT': 'pending' });
+    const broken = (safeReadFile(QUEUE_PATH, { encoding: 'utf8' }) as string)
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+      .find((value: { mission_id: string }) => value.mission_id === 'MSN-BROKEN');
+    expect(broken.metadata).toMatchObject({
+      dispatch_attempts: MAX_DISPATCH_ATTEMPTS,
+      last_error: 'start exploded',
+    });
+
+    const dispatched: string[] = [];
+    await dispatchNextQueuedMission(
+      QUEUE_PATH,
+      () => ({ ok: true, missing: [] }),
+      async (missionId) => {
+        dispatched.push(missionId);
+      }
+    );
+    expect(dispatched).toEqual(['MSN-NEXT']);
   });
 
   it('keeps an entry pending when its start fails', async () => {

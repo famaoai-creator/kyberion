@@ -346,7 +346,7 @@ async function finishMission(id: string, seal: boolean = false) {
   const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
   const result = await missionLifecycleService.finish(id, seal);
   const finalState = loadState(id.toUpperCase());
-  const archivedPath = path.join(pathResolver.active('archive/missions'), id.toUpperCase());
+  const archivedPath = pathResolver.archivedMissionDir(id.toUpperCase());
   const finishReason = String(
     (finalState?.context as Record<string, unknown> | undefined)?.mission_finish_gate_last_reason ||
       ''

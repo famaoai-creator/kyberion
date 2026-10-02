@@ -524,6 +524,41 @@ describe('mission-lifecycle-service — prerequisite gate on start', () => {
     expect(started?.relationships?.prerequisites).toEqual([archivedPre]);
   });
 
+  it('--force starts despite unmet prerequisites', async () => {
+    const { missionLifecycleService: realFacade } = await import('./mission-lifecycle-service.js');
+    await realFacade.start(
+      childBlocked,
+      'public',
+      'worker',
+      'default',
+      'development',
+      undefined,
+      { prerequisites: [missingPre] },
+      undefined,
+      { force: true }
+    );
+    const { loadState } = await import('./mission-state.js');
+    expect(loadState(childBlocked)?.status).toBe('active');
+  });
+
+  it('refuses to start an archived mission id instead of recreating it', async () => {
+    const { missionLifecycleService: realFacade } = await import('./mission-lifecycle-service.js');
+    await expect(
+      realFacade.start(
+        archivedPre,
+        'public',
+        'worker',
+        'default',
+        'development',
+        undefined,
+        {},
+        undefined,
+        {}
+      )
+    ).rejects.toThrow(`[MISSION_ARCHIVED] Mission ${archivedPre} is archived`);
+    expect(fs.existsSync(pathResolver.missionDir(archivedPre, 'public'))).toBe(false);
+  });
+
   it('refuses to start with unmet prerequisites and creates nothing', async () => {
     const { missionLifecycleService: realFacade } = await import('./mission-lifecycle-service.js');
     await expect(
