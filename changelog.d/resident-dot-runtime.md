@@ -1,0 +1,7 @@
+---
+category: Added
+---
+
+- **Resident dots actually run.** The `agent-runtime-supervisor` daemon sweep (`KYBERION_DOT_SWEEP_INTERVAL_MS`, default 30 s) now multiplexes active dot charters: declared `cron` / `watch` / `wake` triggers produce deduplicated wake events routed through `trigger-runner`, each wake runs one bounded goal turn under the charter's authority role and budget (or a wall-clock-bounded delegated turn on backends without tool use), and every wake lands in `active/shared/runtime/dot-wake-ledger.jsonl` with outcome semantics (`delivered`/`rejected` consume the trigger key, `failed` retries after a 5-minute backoff, `skipped` never consumes). Active dot heartbeats join `daemon_watchdog` supervision with per-charter `max_idle_wake_ms` staleness.
+- **New `dot` lifecycle commands** — `pnpm kyberion dot validate|activate|pause|retire|wake|status`. Activation is gated on the bound authority role existing in the canonical registry and the heartbeat id being unique; transitions are audited in `dot-lifecycle-audit.jsonl`. Charter writes run under the dedicated `dot_lifecycle_writer` role so a dot's own runtime role can never rewrite its contract, and every wake re-validates the bound role.
+- **The `repo-guardian` pilot is active**, holding standing responsibility for repository health (notify-oriented, `*/15 * * * *` Asia/Tokyo cron, ops-alerts watch, slack/inbox wake channels, 200k tokens/day cap).
