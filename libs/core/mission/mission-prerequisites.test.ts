@@ -76,6 +76,18 @@ describe('mission prerequisites', () => {
     expect(
       normalizeRelationships({ prerequisites: ['msn-x', 'MSN-X'], blockers: 'msn-y' })
     ).toMatchObject({ prerequisites: ['MSN-X'], blockers: ['MSN-Y'] });
+    // CLI overlays (--prerequisites / --relationships-json) merge with the
+    // legacy positional relationships instead of being dropped.
+    expect(
+      normalizeRelationships(
+        { prerequisites: ['msn-a'], successors: ['msn-s'] },
+        { prerequisites: ['msn-b', 'MSN-A'], blockers: ['msn-c'] }
+      )
+    ).toMatchObject({
+      prerequisites: ['MSN-A', 'MSN-B'],
+      successors: ['MSN-S'],
+      blockers: ['MSN-C'],
+    });
   });
 
   it('treats completed and archived prerequisites as satisfied, wherever they live', () => {

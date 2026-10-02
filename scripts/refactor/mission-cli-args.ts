@@ -176,6 +176,18 @@ export function extractTrackRelationshipOptionsFromArgv(
   };
 }
 
+/** Later sources win per key, except mission id lists, which are unioned. */
+function mergeRelationshipSources(
+  sources: Array<Partial<MissionRelationships>>
+): Partial<MissionRelationships> {
+  const merged: Partial<MissionRelationships> = Object.assign({}, ...sources);
+  for (const key of ['prerequisites', 'successors', 'blockers'] as const) {
+    const ids = normalizeMissionIdList(sources.flatMap((source) => source[key] || []));
+    if (ids.length > 0) merged[key] = ids;
+  }
+  return merged;
+}
+
 /** `--prerequisites MSN-A,MSN-B` → `relationships.prerequisites` (ids normalized). */
 export function extractPrerequisitesOptionFromArgv(argv: string[]): Partial<MissionRelationships> {
   const prerequisites = normalizeMissionIdList(getOptionValue('--prerequisites', argv));
@@ -223,12 +235,12 @@ export function extractMissionStartCreateOptionsFromArgv(
     visionRef: getOptionValue('--vision-ref', argv) || getOptionValue('--vision', argv),
     persona: getOptionValue('--persona', argv),
     routingDecision: getOptionValue('--routing-decision', argv),
-    relationships: {
-      ...extractJsonRelationshipsOption(argv),
-      ...extractFileRelationshipsOption(argv),
-      ...extractProjectRelationshipOptionsFromArgv(argv),
-      ...extractTrackRelationshipOptionsFromArgv(argv),
-      ...extractPrerequisitesOptionFromArgv(argv),
-    },
+    relationships: mergeRelationshipSources([
+      extractJsonRelationshipsOption(argv),
+      extractFileRelationshipsOption(argv),
+      extractProjectRelationshipOptionsFromArgv(argv),
+      extractTrackRelationshipOptionsFromArgv(argv),
+      extractPrerequisitesOptionFromArgv(argv),
+    ]),
   };
 }

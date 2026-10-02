@@ -71,10 +71,16 @@ export function normalizeRelationships(
   input: any = {},
   overlays: Partial<MissionRelationships> = {}
 ): MissionRelationships {
-  const relationships: MissionRelationships = { ...(input || {}) };
+  // project/track overlays merge field-by-field below; every other overlay key
+  // (e.g. --prerequisites, --relationships-json) used to be dropped here.
+  const { project: _project, track: _track, ...overlayRest } = overlays;
+  const relationships: MissionRelationships = { ...(input || {}), ...overlayRest };
   for (const key of ['prerequisites', 'successors', 'blockers'] as const) {
-    if (relationships[key] !== undefined) {
-      relationships[key] = normalizeMissionIdList(relationships[key]);
+    if (input?.[key] !== undefined || overlays[key] !== undefined) {
+      relationships[key] = normalizeMissionIdList([
+        ...normalizeMissionIdList(input?.[key]),
+        ...normalizeMissionIdList(overlays[key]),
+      ]);
     }
   }
 
