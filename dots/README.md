@@ -38,22 +38,45 @@ the responsibility itself.
 
 ## Status values
 
-- `draft` — declared but not driven (all charters ship as draft until the
-  resident runtime multiplexes them).
-- `active` — driven by the resident runtime.
+- `draft` — declared but not driven.
+- `active` — driven by the resident runtime (the agent-runtime-supervisor
+  sweep evaluates triggers and runs bounded goal turns).
 - `paused` — suspended; triggers are ignored.
 - `retired` — kept for audit; never driven.
+
+Status is never hand-edited: use `pnpm kyberion dot activate|pause|retire`.
+Activation is gated — the authority role must exist in the canonical role
+registry and the `heartbeat_id` must be unique among supervised daemons and
+active dots.
+
+Charter writes are performed under the dedicated `dot_lifecycle_writer`
+role — never under the role a dot binds at runtime — so an active dot cannot
+rewrite the contract it runs under. Every wake re-validates that the bound
+role still exists before any work runs.
+
+## Wake semantics
+
+Each wake attempt lands in `active/shared/runtime/dot-wake-ledger.jsonl`
+keyed by a stable trigger key (`cron:<expr>@<minute>`, `watch:<path>@<stat>`,
+`wake:<inbox-row>`, `manual:<iso>`). Outcomes: `delivered` consumes the key;
+`rejected` consumes it (policy wedges must not hot-loop); `failed` retries
+after a 5-minute backoff; `skipped` (paused mid-flight or token cap) leaves
+the key due so the event survives the block. `dot status` summarizes wakes
+and today's token spend; `dot wake <id>` runs one manual wake under the
+charter's role.
 
 ## Adding a dot
 
 1. Copy an existing charter, keep `status: "draft"`.
-2. Pick an `authority_role` that already exists in `security-policy.json`
-   (`authority_role_permissions`) — create it via `pnpm organization role …`
-   first if none fits.
-3. Validate: the schema is enforced by `validateDotCharter` —
-   `pnpm vitest run libs/core/dot/dot-charter.test.ts` covers the loader.
+2. Pick an `authority_role` that already exists in the canonical role
+   registry (`knowledge/product/governance/authority-roles/`) — create the
+   role card plus its `security-policy.json` / `role-write-access.json`
+   grants first (run `sync_authority_roles` to regenerate the index) if none
+   fits.
+3. Validate: `pnpm kyberion dot validate <dot_id>` checks the schema and the
+   activation gate; `pnpm kyberion dot activate <dot_id>` flips to active.
 4. Tenant-scoped dots live in `knowledge/confidential/{tenant}/dots/` and run
    under the tenant-bound runner, mirroring the scheduled-pipeline convention.
 
 See [resident-dot-model](../knowledge/product/architecture/resident-dot-model.md)
-for the mapping to OpenAI dots and the runtime wiring plan.
+for the mapping to OpenAI dots and the runtime wiring.
