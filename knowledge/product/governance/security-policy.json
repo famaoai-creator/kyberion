@@ -233,6 +233,7 @@
     "mission_controller": {
       "allow_read": [
         "active/missions/",
+        "active/projects/",
         "active/archive/missions/",
         "active/archive/failed_missions/",
         "active/audit/",
@@ -246,6 +247,7 @@
       ],
       "allow_write": [
         "active/missions/",
+        "active/projects/",
         "active/archive/missions/",
         "active/archive/failed_missions/",
         "active/audit/",

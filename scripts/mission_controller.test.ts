@@ -65,6 +65,30 @@ function cleanupPublicTenantFixture(): void {
   });
 }
 
+// Mission → project links must name a registered project (PROJECT_LINK_INVALID).
+const LINK_TEST_PROJECT_IDS = [
+  'PRJ-TEST-INTENT-DRY',
+  'PRJ-TEST-INTENT-LOW',
+  'PRJ-TEST-INTENT-CONFIRMED',
+  'PRJ-3',
+];
+
+function registerLinkTestProject(projectId: string): void {
+  saveProjectRecord({
+    project_id: projectId,
+    name: projectId,
+    summary: 'Registered so mission links validate.',
+    status: 'active',
+    tier: 'public',
+  });
+}
+
+function cleanupLinkTestProjects(): void {
+  for (const projectId of LINK_TEST_PROJECT_IDS) {
+    safeRmSync(pathResolver.shared(`runtime/projects/${projectId}.json`), { force: true });
+  }
+}
+
 function withProjectMissionController<T>(run: () => T): T {
   return withExecutionContext('mission_controller', run, 'ecosystem_architect');
 }
@@ -79,6 +103,7 @@ describe('mission_controller argument parsing', () => {
     cleanupAutoTrackFixture();
     cleanupScopeTrackFixture();
     cleanupPublicTenantFixture();
+    cleanupLinkTestProjects();
   });
 
   it('skips the reasoning bootstrap only for journal-only actions', () => {
@@ -1281,6 +1306,7 @@ describe('mission_controller argument parsing', () => {
   });
 
   it('emits a redacted intent-track gate summary for project-linked dry runs', async () => {
+    registerLinkTestProject('PRJ-TEST-INTENT-DRY');
     const originalArgv = process.argv;
     const output: unknown[] = [];
     process.argv = [
@@ -1339,6 +1365,7 @@ describe('mission_controller argument parsing', () => {
   });
 
   it('surfaces low-confidence intent-track gates unless explicitly confirmed', async () => {
+    registerLinkTestProject('PRJ-TEST-INTENT-LOW');
     const originalArgv = process.argv;
     const output: unknown[] = [];
     process.argv = [
@@ -1372,6 +1399,7 @@ describe('mission_controller argument parsing', () => {
   });
 
   it('allows low-confidence intent-track dry runs with explicit confirmation', async () => {
+    registerLinkTestProject('PRJ-TEST-INTENT-CONFIRMED');
     const originalArgv = process.argv;
     const output: unknown[] = [];
     process.argv = [
@@ -1407,6 +1435,7 @@ describe('mission_controller argument parsing', () => {
   });
 
   it('fails fast when a linked project path is not writable for the current authority', () => {
+    registerLinkTestProject('PRJ-3');
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.KYBERION_PERSONA = 'worker';
     process.env.KYBERION_SUDO = 'false';
