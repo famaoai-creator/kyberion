@@ -197,26 +197,25 @@ export function validateMissionStartCreateInput(
     }
     if (projectRecord) {
       const requestedTier = input.tier;
-      const requestedTenant = input.tenantSlug || input.tenantId || 'shared';
+      // An omitted tenant is inherited from the project below; a stated one
+      // must match it.
+      const statedTenant = input.tenantSlug || input.tenantId;
+      const requestedTenant = statedTenant || projectRecord.tenant_slug || 'shared';
       const projectTenant = projectRecord.tenant_slug || 'shared';
       if (requestedTier && requestedTier !== projectRecord.tier) {
         throw new Error(
           `${actionName} ${missionId}: mission tier '${requestedTier}' must match project tier '${projectRecord.tier}'.`
         );
       }
-      if (
-        (projectRecord.tier === 'confidential' ||
-          projectRecord.tenant_slug ||
-          input.tenantSlug ||
-          input.tenantId) &&
-        requestedTenant !== projectTenant
-      ) {
+      if (requestedTenant !== projectTenant) {
         throw new Error(
           `${actionName} ${missionId}: mission tenant '${requestedTenant}' must match project tenant '${projectTenant}'.`
         );
       }
       // Inherit the project's scope so the mission state carries it (a
-      // --tenant-id alone was never persisted as tenant_slug).
+      // --tenant-id alone was never persisted as tenant_slug, and a missing
+      // --tier fell back to confidential even for a public project).
+      if (!input.tier) input.tier = projectRecord.tier;
       if (projectRecord.tenant_slug && !input.tenantSlug) {
         input.tenantSlug = projectRecord.tenant_slug;
       }

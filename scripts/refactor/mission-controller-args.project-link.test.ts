@@ -66,4 +66,28 @@ describe('mission → project link validation', () => {
       )
     ).toThrow("organization 'ORG-OTHER' must match project organization 'ORG-LINK-ARGS'");
   });
+
+  it('inherits the project tier and tenant when they are not given', () => {
+    saveProjectRecord({
+      project_id: PROJECT_ID,
+      name: 'Link args test',
+      summary: 'Tier/tenant inheritance.',
+      status: 'active',
+      tier: 'public',
+      tenant_slug: 'tenant-link',
+    } as Parameters<typeof saveProjectRecord>[0]);
+    const withoutTier = [
+      'node',
+      'mission_controller.js',
+      'create',
+      'MSN-LINK-ARGS',
+      '--project-id',
+      PROJECT_ID,
+      '--project-path',
+      PROJECT_PATH,
+    ];
+    const input = validateMissionStartCreateInput('create', 'MSN-LINK-ARGS', withoutTier);
+    expect(input.tier).toBe('public');
+    expect(input.tenantSlug).toBe('tenant-link');
+  });
 });
