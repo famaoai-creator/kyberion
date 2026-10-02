@@ -24,6 +24,22 @@ let records: typeof import('../workforce/artifact-record.js');
 let promotion: typeof import('./mission-artifact-promotion.js');
 let digestArtifacts: typeof import('../organization/organization-digest-artifacts.js');
 let pathResolver: typeof import('../path-resolver.js');
+let projects: typeof import('../project/project-registry.js');
+
+function registerProject(
+  projectId: string,
+  tier: 'public' | 'confidential',
+  tenantSlug?: string
+): void {
+  projects.saveProjectRecord({
+    project_id: projectId,
+    name: projectId,
+    summary: 'Promotion test project.',
+    status: 'active',
+    tier,
+    ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+  } as Parameters<typeof projects.saveProjectRecord>[0]);
+}
 
 function missionState(missionId: string, projectId?: string): MissionState {
   return {
@@ -58,6 +74,9 @@ describe('mission artifact promotion', () => {
     promotion = await import('./mission-artifact-promotion.js');
     digestArtifacts = await import('../organization/organization-digest-artifacts.js');
     pathResolver = await import('../path-resolver.js');
+    projects = await import('../project/project-registry.js');
+    registerProject('proj-a', 'public');
+    registerProject('proj-conf', 'confidential', 'acme');
   });
 
   afterAll(() => {
@@ -105,7 +124,13 @@ describe('mission artifact promotion', () => {
       project_id: 'proj-a',
       mission_id: missionId,
       path: 'active/projects/public/shared/proj-a/artifacts/report/missions/MSN-PROMOTE-A/summary.md',
-      metadata: expect.objectContaining({ promoted_from: report.repo_relative_path }),
+      metadata: expect.objectContaining({
+        tier: 'public',
+        scope_kind: 'project',
+        promoted_from_mission: missionId,
+        // The mission tree moves to the archive right after promotion.
+        promoted_from: 'active/archive/missions/MSN-PROMOTE-A/artifacts/report/summary.md',
+      }),
     });
     expect(fs.readFileSync(path.join(tmpRoot, promotedReport?.path as string), 'utf8')).toBe(
       'report:summary.md'
@@ -124,6 +149,121 @@ describe('mission artifact promotion', () => {
       state: missionState(missionId, 'proj-a'),
     });
     expect(rerun).toMatchObject({ status: 'nothing_to_promote', promoted: [] });
+  });
+
+  it('places by the project record and refuses a mission outside its scope', () => {
+    const missionId = 'MSN-PROMOTE-SCOPE';
+    const report = store.writeScopedArtifact({
+      scope: { mission: missionId },
+      tier: 'public',
+      artifact_class: 'report',
+      name: 'public.md',
+      content: 'x',
+      publish: { kind: 'report' },
+    });
+    // A public mission linked to a confidential tenant project must not
+    // promote: the record would otherwise surface in another tier/tenant.
+    const result = promotion.promoteMissionArtifactsToProject({
+      missionId,
+      missionDir: pathResolver.missionDir(missionId, 'public'),
+      state: missionState(missionId, 'proj-conf'),
+    });
+    expect(result).toMatchObject({ status: 'skipped', reason: 'scope_mismatch', promoted: [] });
+    expect(records.loadArtifactRecord(report.artifact_id as string)?.path).toBe(
+      report.repo_relative_path
+    );
+    expect(
+      promotion.promoteMissionArtifactsToProject({
+        missionId,
+        missionDir: pathResolver.missionDir(missionId, 'public'),
+        state: missionState(missionId, 'proj-missing'),
+      })
+    ).toMatchObject({ status: 'skipped', reason: 'project_not_found' });
+  });
+
+  it('copies a re-published path once and re-points every record', () => {
+    const missionId = 'MSN-PROMOTE-REPUB';
+    const write = () =>
+      store.writeScopedArtifact({
+        scope: { mission: missionId },
+        tier: 'public',
+        artifact_class: 'report',
+        name: 'weekly.md',
+        content: 'v',
+        publish: { kind: 'report' },
+      });
+    const first = write();
+    const second = write();
+    const result = promotion.promoteMissionArtifactsToProject({
+      missionId,
+      missionDir: pathResolver.missionDir(missionId, 'public'),
+      state: missionState(missionId, 'proj-a'),
+    });
+    expect(result.status).toBe('promoted');
+    expect(new Set(result.promoted.map((entry) => entry.to)).size).toBe(1);
+    expect(result.promoted.map((entry) => entry.artifact_id).sort()).toEqual(
+      [first.artifact_id, second.artifact_id].sort()
+    );
+  });
+
+  it('never copies an index row that points outside the mission artifacts tree', () => {
+    const missionId = 'MSN-PROMOTE-FORGED';
+    const foreign = store.writeScopedArtifact({
+      scope: { project: 'proj-conf', tenant: 'acme' },
+      tier: 'confidential',
+      artifact_class: 'report',
+      name: 'secret.md',
+      content: 'secret',
+    });
+    // Seed the mission index with a forged row and a record for that path.
+    store.writeScopedArtifact({
+      scope: { mission: missionId },
+      tier: 'public',
+      artifact_class: 'report',
+      name: 'seed.md',
+      content: 'seed',
+    });
+    const indexPath = path.join(
+      pathResolver.missionDir(missionId, 'public'),
+      'artifacts',
+      'artifacts-index.jsonl'
+    );
+    fs.appendFileSync(
+      indexPath,
+      `${JSON.stringify({
+        name: 'secret.md',
+        artifact_class: 'report',
+        path: foreign.repo_relative_path,
+        scope: { mission: missionId },
+        scope_kind: 'mission',
+        written_at: new Date().toISOString(),
+      })}\n`
+    );
+    records.saveArtifactRecord(
+      records.createArtifactRecord({
+        kind: 'report',
+        storage_class: 'artifact_store',
+        path: foreign.repo_relative_path,
+        mission_id: missionId,
+      })
+    );
+    const result = promotion.promoteMissionArtifactsToProject({
+      missionId,
+      missionDir: pathResolver.missionDir(missionId, 'public'),
+      state: missionState(missionId, 'proj-a'),
+    });
+    expect(result.promoted).toEqual([]);
+    expect(result.failed[0]?.error).toMatch(/outside the mission artifacts tree/);
+    expect(
+      fs.existsSync(
+        path.join(
+          tmpRoot,
+          'active/projects/public/shared/proj-a/artifacts/report/missions',
+          missionId,
+          'secret.md'
+        )
+      )
+    ).toBe(false);
   });
 
   it('skips missions without a project link and never throws on a missing tree', () => {
@@ -166,6 +306,12 @@ describe('mission artifact promotion', () => {
     } as unknown as OrganizationDigest;
 
     const result = digestArtifacts.persistOrganizationDigest(digest);
+    // A same-day re-run updates the same record instead of adding one.
+    const rerun = digestArtifacts.persistOrganizationDigest(digest);
+    expect(rerun.persisted.map((item) => item.artifact_id)).toEqual(
+      result.persisted.map((item) => item.artifact_id)
+    );
+    expect(result.persisted[0]?.artifact_id).toBe('ART-ORGDIGEST-CONFIDENTIAL-ACME-ORG_A-20261002');
 
     expect(result.failed).toEqual([]);
     expect(result.persisted.map((item) => item.path)).toEqual([

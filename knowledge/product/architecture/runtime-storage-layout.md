@@ -102,7 +102,10 @@ When a mission linked to a project (`relationships.project`) finishes, its
 published `report` / `export` scoped artifacts are **copied** into the project
 (`<projectDir>/artifacts/<class>/missions/<MISSION_ID>/<name>`) and their
 ArtifactRecords re-pointed there (`metadata.promoted_from`, `promoted_at`), so
-the project keeps the deliverable after the mission is archived. The original
+the project keeps the deliverable after the mission is archived. Placement
+follows the **project record** (its tier and tenant), and only a mission inside
+that scope promotes (otherwise `reason: scope_mismatch`); the source must be a
+regular file inside the mission's own `artifacts/` tree. The original
 stays in the mission tree and moves to the archive with it; `evidence` stays
 with the mission. Promotion is best-effort and idempotent
 (`libs/core/mission/mission-artifact-promotion.ts`); the outcome is recorded in

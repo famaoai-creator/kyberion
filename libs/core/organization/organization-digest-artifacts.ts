@@ -34,10 +34,27 @@ function digestDateStamp(digest: OrganizationDigest): string {
 }
 
 /**
+ * One record per organization scope and local day, so a same-day re-run
+ * updates it. Tier and tenant are part of the id: organization ids are only
+ * unique within their tenant, and a shared id would let one tenant's digest
+ * overwrite another's record.
+ */
+function digestArtifactId(entry: OrganizationDigestEntry, stamp: string): string {
+  const segment = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]+/gu, '_');
+  return [
+    'ART-ORGDIGEST',
+    segment(entry.tier),
+    segment(entry.tenant_slug || 'shared'),
+    segment(entry.organization_id),
+    stamp.replace(/-/gu, ''),
+  ].join('-');
+}
+
+/**
  * Write one published report artifact per digest entry, scoped to the entry's
  * organization, tier and tenant. Best-effort per organization: a failed write
  * is reported and does not stop the others. Re-running on the same local day
- * overwrites that day's file and registers a new ArtifactRecord.
+ * overwrites that day's file and updates the same ArtifactRecord.
  */
 export function persistOrganizationDigest(
   digest: OrganizationDigest
@@ -62,6 +79,7 @@ export function persistOrganizationDigest(
         },
         format: 'json',
         publish: {
+          artifact_id: digestArtifactId(entry, stamp),
           kind: 'report',
           preview_text: `${entry.name} digest ${stamp}`,
           metadata: { digest_date: stamp },

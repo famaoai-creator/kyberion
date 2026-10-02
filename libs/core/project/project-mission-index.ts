@@ -122,7 +122,7 @@ export function projectArchivedMissions(
 /**
  * Artifact ownership records that belong to a project: recorded with its
  * project_id, or owned by one of its missions. Records carrying another
- * tenant are excluded (fail closed on tenant mismatch).
+ * tenant or tier are excluded (fail closed on scope mismatch).
  */
 export function projectArtifactRecords(
   projectId: string,
@@ -138,6 +138,10 @@ export function projectArtifactRecords(
   return [...latest.values()].filter((record) => {
     if (record.storage_class === 'tmp') return false;
     if (record.tenant_slug && record.tenant_slug !== scope.tenant) return false;
+    // Fail closed on a record carrying another tier (higher-tier data must
+    // never surface in a lower-tier project view).
+    const recordTier = (record.metadata as { tier?: unknown } | undefined)?.tier;
+    if (typeof recordTier === 'string' && recordTier !== scope.tier) return false;
     if (record.project_id) return record.project_id === projectId;
     return Boolean(record.mission_id && missions.has(record.mission_id));
   });

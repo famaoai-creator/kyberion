@@ -10,6 +10,10 @@
  * the mission tree and is archived with it (the archive remains the record of
  * what the mission produced).
  *
+ * Placement follows the PROJECT record (tier + tenant), and only a mission
+ * inside that scope may promote; the source must be a regular file inside the
+ * mission's own `artifacts/` tree.
+ *
  * Contract: idempotent and never throws — a promotion failure must never fail
  * a finish that already succeeded. A record already re-pointed no longer
  * matches the mission path, so a re-run promotes nothing twice.
@@ -20,7 +24,7 @@ import { nowIso } from '../foundation/time.js';
 import { readTextFile } from '../foundation/text.js';
 import { logger } from '../core.js';
 import * as pathResolver from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from '../secure-io.js';
 import type { RetentionArtifactClass } from '../storage-retention-catalog.js';
 import {
   ensureRegularScopedArtifactIndex,
@@ -33,6 +37,8 @@ import {
 } from '../workforce/artifact-store.js';
 import { listArtifactRecords, saveArtifactRecord } from '../workforce/artifact-record.js';
 import type { MissionState } from './mission-types.js';
+import { loadProjectRecord } from '../project/project-registry.js';
+import { isMissionInScope, projectScopeOf } from '../project/project-mission-index.js';
 
 /** Deliverable classes handed to the project. Evidence stays with the mission. */
 export const MISSION_PROMOTION_CLASSES: readonly RetentionArtifactClass[] = Object.freeze([
@@ -92,84 +98,144 @@ function promotedName(missionId: string, entry: ScopedArtifactIndexEntry): strin
   return `missions/${missionId}/${taskSegment}${entry.name}`;
 }
 
+/**
+ * Resolve a mission index row to its file, confined to the mission's own
+ * `artifacts/` tree: the index is writable by mission workers, so a row naming
+ * another scope's file (another tier or tenant) must never be copied.
+ */
+function confinedSource(missionDir: string, entryPath: string): string {
+  const source = pathResolver.rootResolve(entryPath);
+  const relative = path.relative(path.join(missionDir, 'artifacts'), source);
+  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error(`deliverable is outside the mission artifacts tree: ${entryPath}`);
+  }
+  const safe = assertSafeRepositoryPath(source);
+  if (!safeLstat(safe).isFile()) {
+    throw new Error(`deliverable is not a regular file: ${entryPath}`);
+  }
+  return safe;
+}
+
+function stringOrEmpty(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 export function promoteMissionArtifactsToProject(input: {
   missionId: string;
   missionDir: string;
   state: MissionState;
 }): MissionArtifactPromotionResult {
-  const missionId = input.missionId.toUpperCase();
-  const projectId = input.state.relationships?.project?.project_id?.trim();
-  if (!projectId) {
-    return { status: 'skipped', reason: 'no_project', promoted: [], failed: [] };
-  }
-  const tier = input.state.tier;
-  const tenant = (input.state.tenant_slug || input.state.tenant_id || '').trim() || undefined;
   const result: MissionArtifactPromotionResult = {
-    status: 'nothing_to_promote',
-    project_id: projectId,
+    status: 'skipped',
     promoted: [],
     failed: [],
   };
   try {
-    const deliverables = readMissionIndex(input.missionDir).filter(
-      (entry) =>
-        MISSION_PROMOTION_CLASSES.includes(entry.artifact_class) &&
-        (entry.scope_kind === 'mission' || entry.scope_kind === 'task')
-    );
-    if (deliverables.length === 0) return result;
-    const records = listArtifactRecords().filter(
-      (record) => record.mission_id?.toUpperCase() === missionId && record.path
-    );
-    // The index is append-only: the last row for a path is the current write.
-    const byPath = new Map(deliverables.map((entry) => [entry.path, entry]));
-    for (const record of records) {
-      const entry = byPath.get(record.path as string);
-      if (!entry) continue;
-      try {
-        const source = pathResolver.rootResolve(entry.path);
-        const content = safeReadFile(source, { encoding: null }) as Buffer;
-        const written = writeScopedArtifact({
-          scope: { project: projectId, ...(tenant ? { tenant } : {}) },
-          tier,
-          artifact_class: entry.artifact_class,
-          name: promotedName(missionId, entry),
-          content,
-          format: 'buffer',
-        });
-        saveArtifactRecord({
-          ...record,
-          path: written.repo_relative_path,
-          project_id: projectId,
-          metadata: {
-            ...(record.metadata || {}),
-            promoted_from: entry.path,
-            promoted_at: nowIso(),
-          },
-        });
-        result.promoted.push({
-          artifact_id: record.artifact_id,
-          from: entry.path,
-          to: written.repo_relative_path,
-        });
-      } catch (error) {
-        result.failed.push({
-          path: entry.path,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
+    return promote(input, result);
   } catch (error) {
+    // Never fail a finish that already succeeded.
+    result.status = result.promoted.length > 0 ? 'partial' : 'skipped';
+    result.reason = 'error';
     result.failed.push({
       path: path.join('artifacts', SCOPED_ARTIFACT_INDEX_FILENAME),
       error: error instanceof Error ? error.message : String(error),
     });
+    return result;
+  }
+}
+
+function promote(
+  input: { missionId: string; missionDir: string; state: MissionState },
+  result: MissionArtifactPromotionResult
+): MissionArtifactPromotionResult {
+  const missionId = stringOrEmpty(input.missionId).toUpperCase();
+  const projectId = stringOrEmpty(input.state.relationships?.project?.project_id);
+  if (!missionId || !projectId) return { ...result, reason: 'no_project' };
+  result.project_id = projectId;
+  // Placement comes from the project record (the owner), never from the
+  // mission: a deliverable promoted into a project lives in the project's
+  // tier and tenant, and only a mission inside that scope may promote.
+  const project = loadProjectRecord(projectId);
+  if (!project) return { ...result, reason: 'project_not_found' };
+  const scope = projectScopeOf(project);
+  if (!isMissionInScope(input.state, scope)) {
+    logger.warn(
+      `mission artifact promotion skipped — mission ${missionId} is outside project ${projectId}'s scope (${scope.tier}/${scope.tenant}) | deliverables stay in the mission archive | relink the mission to a project in its own tier/tenant`
+    );
+    return { ...result, reason: 'scope_mismatch' };
+  }
+  const tenant = scope.tenant === 'shared' ? undefined : scope.tenant;
+  result.status = 'nothing_to_promote';
+
+  const deliverables = readMissionIndex(input.missionDir).filter(
+    (entry) =>
+      MISSION_PROMOTION_CLASSES.includes(entry.artifact_class) &&
+      (entry.scope_kind === 'mission' || entry.scope_kind === 'task')
+  );
+  if (deliverables.length === 0) return result;
+  // The index is append-only: the last row for a path is the current write.
+  const byPath = new Map(deliverables.map((entry) => [entry.path, entry]));
+  // Several records may share one path (re-published): copy once, re-point all.
+  const recordsByPath = new Map<string, ReturnType<typeof listArtifactRecords>>();
+  for (const record of listArtifactRecords()) {
+    if (record.mission_id?.toUpperCase() !== missionId || !record.path) continue;
+    if (!byPath.has(record.path)) continue;
+    recordsByPath.set(record.path, [...(recordsByPath.get(record.path) || []), record]);
+  }
+  const archiveDir = pathResolver.toRepoRelative(pathResolver.archivedMissionDir(missionId));
+  for (const [entryPath, records] of recordsByPath) {
+    const entry = byPath.get(entryPath) as ScopedArtifactIndexEntry;
+    try {
+      const source = confinedSource(input.missionDir, entryPath);
+      const content = safeReadFile(source, { encoding: null }) as Buffer;
+      const written = writeScopedArtifact({
+        scope: { project: projectId, ...(tenant ? { tenant } : {}) },
+        tier: scope.tier,
+        artifact_class: entry.artifact_class,
+        name: promotedName(missionId, entry),
+        content,
+        format: 'buffer',
+      });
+      // The mission tree moves to the archive right after promotion.
+      const archivedFrom = path.posix.join(
+        archiveDir.split(path.sep).join('/'),
+        path.relative(input.missionDir, source).split(path.sep).join('/')
+      );
+      const promotedAt = nowIso();
+      for (const record of records) {
+        saveArtifactRecord({
+          ...record,
+          path: written.repo_relative_path,
+          project_id: projectId,
+          ...(tenant ? { tenant_slug: tenant } : {}),
+          metadata: {
+            ...(record.metadata || {}),
+            tier: scope.tier,
+            scope_kind: 'project',
+            promoted_from: archivedFrom,
+            promoted_from_mission: missionId,
+            promoted_at: promotedAt,
+          },
+        });
+        result.promoted.push({
+          artifact_id: record.artifact_id,
+          from: entryPath,
+          to: written.repo_relative_path,
+        });
+      }
+    } catch (error) {
+      result.failed.push({
+        path: entryPath,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
   if (result.failed.length > 0) {
     logger.warn(
       `mission artifact promotion incomplete — ${result.failed.length} deliverable(s) not copied to project ${projectId} | originals stay in the mission archive | mission=${missionId}`
     );
     result.status = result.promoted.length > 0 ? 'partial' : 'skipped';
-    if (!result.reason) result.reason = 'copy_failed';
+    result.reason = 'copy_failed';
   } else if (result.promoted.length > 0) {
     result.status = 'promoted';
   }

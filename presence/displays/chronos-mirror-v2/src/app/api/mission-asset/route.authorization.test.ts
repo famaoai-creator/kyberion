@@ -36,6 +36,7 @@ vi.mock('@agent/core/workforce/artifact-record', () => ({
 }));
 
 import { GET } from './route';
+import { resolveViewerContextForRequest } from '../../../lib/viewer-context';
 
 describe('mission-asset viewer tier authorization', () => {
   it('rejects a confidential asset for a public-only viewer before reading it', async () => {
@@ -57,5 +58,44 @@ describe('mission-asset viewer tier authorization', () => {
     );
 
     expect(response.status).toBe(403);
+  });
+
+  it('serves only organization artifacts, never organization state', async () => {
+    const response = await GET(
+      new NextRequest(
+        'http://localhost/api/mission-asset?path=active/organizations/public/shared/org-a/state/operational-state.json'
+      )
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects another organization's artifact for an organization-scoped viewer", async () => {
+    const scopedViewer = {
+      context: {
+        role: 'readonly',
+        tenantSlugs: 'all',
+        organizationIds: ['org-a'],
+        tierAccess: ['public'],
+        principalId: 'test-viewer',
+        source: 'loopback',
+      },
+    };
+    vi.mocked(resolveViewerContextForRequest).mockReturnValueOnce(scopedViewer as never);
+    const outside = await GET(
+      new NextRequest(
+        'http://localhost/api/mission-asset?path=active/organizations/public/shared/org-b/artifacts/report/d.json'
+      )
+    );
+    expect(outside.status).toBe(403);
+
+    vi.mocked(resolveViewerContextForRequest).mockReturnValueOnce(scopedViewer as never);
+    const own = await GET(
+      new NextRequest(
+        'http://localhost/api/mission-asset?path=active/organizations/public/shared/org-a/artifacts/report/missing.json'
+      )
+    );
+    // Within scope: authorization passes and the (absent) file is a 404.
+    expect(own.status).toBe(404);
   });
 });

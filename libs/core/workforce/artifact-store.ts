@@ -1,4 +1,4 @@
-import { appendJsonLine, readJson, readJsonLines } from '../foundation/json.js';
+import { appendJsonLine, readJson, readJsonIfPresent, readJsonLines } from '../foundation/json.js';
 import { isRecord } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import * as path from 'node:path';
@@ -191,6 +191,12 @@ export interface ScopedArtifactPublication {
    * tenant/system scoped artifacts name their task session here to be published.
    */
   task_session_id?: string;
+  /**
+   * Deterministic record id for a deliverable that is re-written in place
+   * (e.g. a daily digest): a re-run updates the same ArtifactRecord instead
+   * of registering a new one.
+   */
+  artifact_id?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -473,6 +479,33 @@ function resolveScopeArtifactsRoot(
   );
 }
 
+/**
+ * Tier of an existing mission owner, read from its own state: a mission/task
+ * write lands in that mission's directory, so its index entry and published
+ * record must carry the mission's tier instead of a default.
+ */
+function existingMissionTier(
+  scope: ScopedArtifactScope
+): 'personal' | 'confidential' | 'public' | undefined {
+  if (scope.system !== undefined || scope.mission === undefined) return undefined;
+  const missionPath = pathResolver.findMissionPath(sanitizeScopeSegment(scope.mission, 'mission'));
+  if (!missionPath) return undefined;
+  try {
+    const state = readJsonIfPresent<{ tier?: unknown }>(
+      path.join(missionPath, 'mission-state.json')
+    );
+    if (state?.tier === 'personal' || state?.tier === 'confidential' || state?.tier === 'public') {
+      return state.tier;
+    }
+  } catch {
+    // Unreadable state: fall back to the directory layout below.
+  }
+  const relative = pathResolver.toRepoRelative(missionPath).split(path.sep).join('/');
+  const match = relative.match(/^active\/missions\/(personal|confidential|public)\//u);
+  if (match) return match[1] as 'personal' | 'confidential' | 'public';
+  return relative.startsWith('knowledge/personal/') ? 'personal' : undefined;
+}
+
 function serializeScopedContent(content: unknown, format?: ScopedArtifactFormat): string | Buffer {
   const effective: ScopedArtifactFormat =
     format ??
@@ -518,7 +551,10 @@ export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScope
         `(expected one of ${RETENTION_ARTIFACT_CLASSES.join('/')})`
     );
   }
-  const tier = input.tier ?? (input.scope.system ? 'public' : 'confidential');
+  const tier =
+    input.tier ??
+    existingMissionTier(input.scope) ??
+    (input.scope.system ? 'public' : 'confidential');
   const { artifactsRoot, kind } = resolveScopeArtifactsRoot(input.scope, tier);
   const name = sanitizeArtifactName(input.name);
   const targetDir =
@@ -607,6 +643,7 @@ function publishScopedArtifact(
 ): string {
   const publication = input.publish as ScopedArtifactPublication;
   const record = createArtifactRecord({
+    ...(publication.artifact_id ? { artifact_id: publication.artifact_id } : {}),
     kind: publication.kind,
     storage_class: 'artifact_store',
     path: repoRelativePath,

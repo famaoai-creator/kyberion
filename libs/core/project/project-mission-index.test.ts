@@ -238,6 +238,18 @@ describe('project mission index (single source: relationships.project)', () => {
       expect(own.map((record) => record.path)).toEqual([
         'active/projects/public/shared/p/artifacts/report/missions/M/x.md',
       ]);
+
+      // A record carrying another tier never surfaces in this project's view.
+      appendArtifactOwnershipRecord({
+        ...base,
+        artifact_id: `ART-CONF-${suffix}`,
+        metadata: { tier: 'confidential' },
+      });
+      expect(
+        projectArtifactRecords(PROJECT_ID, { tier: 'public', tenant: 'shared' }, []).map(
+          (record) => record.artifact_id
+        )
+      ).not.toContain(`ART-CONF-${suffix}`);
     } finally {
       if (original === null) safeRmSync(registryPath, { force: true });
       else safeWriteFile(registryPath, original);
