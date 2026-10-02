@@ -5,7 +5,7 @@
     "id": "mesh-delivery-5min",
     "cron": "*/5 * * * *",
     "timezone": "Asia/Tokyo",
-    "enabled": true
+    "enabled": false
   },
   "steps": [
     {

@@ -1,0 +1,218 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/dot-charter.schema.json",
+  "title": "Dot Charter",
+  "description": "Standing charter for a resident agent ('dot'): a durable responsibility that persists across sessions. The charter declares what the dot cares about (goal), when it wakes (attention), what it may do alone (authority via an existing authority role + optional accountability charter), and how it reaches the accountable human (notification). It never grants authority — it references roles that already exist in security-policy.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "dot_id",
+    "version",
+    "title",
+    "purpose",
+    "status",
+    "scope",
+    "goal",
+    "attention",
+    "authority",
+    "notification",
+    "runtime"
+  ],
+  "properties": {
+    "kind": { "const": "dot-charter" },
+    "dot_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "minLength": 2,
+      "maxLength": 64
+    },
+    "version": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "purpose": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The standing responsibility this dot owns, in one or two sentences."
+    },
+    "status": { "enum": ["draft", "active", "paused", "retired"] },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tier"],
+      "properties": {
+        "tier": { "enum": ["public", "confidential", "personal"] },
+        "tenant_slug": { "type": "string" },
+        "organization_id": { "type": "string" },
+        "project_id": { "type": "string" }
+      }
+    },
+    "goal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statement"],
+      "properties": {
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The durable goal text handed to the worker-goal-driver each wake cycle."
+        },
+        "success_signals": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Observable conditions that mean the responsibility is healthy."
+        },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_turns_per_wake": { "type": "integer", "minimum": 1 },
+            "wall_clock_ms_per_wake": { "type": "integer", "minimum": 1000 },
+            "token_cap_per_day": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "attention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["triggers"],
+      "properties": {
+        "triggers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "cron"],
+                "properties": {
+                  "kind": { "const": "cron" },
+                  "cron": { "type": "string", "minLength": 9 },
+                  "timezone": { "type": "string" }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "paths"],
+                "properties": {
+                  "kind": { "const": "watch" },
+                  "paths": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": { "type": "string", "minLength": 1 }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "channels"],
+                "properties": {
+                  "kind": { "const": "wake" },
+                  "channels": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "enum": ["slack", "telegram", "discord", "imessage", "surface", "inbox"]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority_role"],
+      "properties": {
+        "authority_role": {
+          "type": "string",
+          "description": "Must be a role declared in security-policy.json authority_role_permissions."
+        },
+        "accountability_charter_ref": {
+          "type": "string",
+          "description": "Optional reference to a governance accountability-charter that bounds delegated authority."
+        },
+        "allowed_work_shapes": {
+          "type": "array",
+          "items": { "enum": ["mission", "task_session", "pipeline", "direct_reply"] },
+          "description": "Work shapes the dot may dispatch. The dot itself never writes outside its authority role's scopes; substantive work is delegated as WorkItems."
+        },
+        "max_concurrent_delegations": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "decisions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default_decision": {
+          "enum": ["auto", "notify", "approve"],
+          "description": "Floor for autonomous-ops-gate outcomes: an action scoring 'auto' may be raised to this level, never lowered."
+        },
+        "veto_window_minutes": { "type": "integer", "minimum": 0 },
+        "escalate_channel": {
+          "enum": ["slack", "telegram", "discord", "imessage", "surface"],
+          "description": "Channel used when the gate returns 'approve'."
+        }
+      }
+    },
+    "notification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deliver_to"],
+      "properties": {
+        "deliver_to": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["surface", "channel"],
+          "properties": {
+            "surface": { "enum": ["slack", "telegram", "discord", "imessage", "surface"] },
+            "channel": { "type": "string", "minLength": 1, "maxLength": 500 },
+            "thread_ts": { "type": "string", "maxLength": 500 },
+            "template": { "type": "string", "minLength": 1, "maxLength": 8000 }
+          }
+        },
+        "digest_cron": {
+          "type": "string",
+          "minLength": 9,
+          "description": "Optional cron for a periodic digest of what the dot did, is waiting on, and needs."
+        },
+        "quiet_hours": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "start": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$" },
+            "end": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$" },
+            "timezone": { "type": "string" }
+          }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["heartbeat_id"],
+      "properties": {
+        "heartbeat_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Daemon heartbeat id the resident runtime records under; watched by daemon-watchdog."
+        },
+        "reasoning_backend": {
+          "type": "string",
+          "description": "Optional reasoning-backend-policy allowed_modes entry; defaults to auto-discovery."
+        },
+        "max_idle_wake_ms": {
+          "type": "integer",
+          "minimum": 60000,
+          "description": "Upper bound between wakes even when no trigger fires (self-check cadence)."
+        }
+      }
+    }
+  }
+}

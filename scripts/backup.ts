@@ -530,12 +530,15 @@ function buildCleanCheckout(target: string): void {
   );
 }
 
-function tarExcludesFor(outPath: string): string[] {
+function tarExcludesFor(outPath: string, payloadPath?: string): string[] {
   const excludes = ['active/shared/exports/backups'];
   const rootDir = pathResolver.rootDir();
-  const outputRel = path.relative(rootDir, outPath).split(path.sep).join('/');
-  if (outputRel && !outputRel.startsWith('..') && !path.isAbsolute(outputRel)) {
-    excludes.push(outputRel);
+  for (const target of [outPath, payloadPath]) {
+    if (!target) continue;
+    const outputRel = path.relative(rootDir, target).split(path.sep).join('/');
+    if (outputRel && !outputRel.startsWith('..') && !path.isAbsolute(outputRel)) {
+      excludes.push(outputRel);
+    }
   }
   return [...new Set(excludes)].flatMap((entry) => ['--exclude', entry]);
 }
@@ -678,7 +681,7 @@ export function createBackup(options: BackupCliOptions): {
   runRequired(
     'tar',
     [
-      ...tarExcludesFor(archivePath),
+      ...tarExcludesFor(archivePath, plainArchivePath),
       ...missionGitExcludes(plan.missionGitRepos),
       '-czf',
       plainArchivePath,

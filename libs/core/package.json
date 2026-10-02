@@ -7006,6 +7006,10 @@
     "./governance/approval-decision-routing": {
       "types": "./dist/governance/approval-decision-routing.d.ts",
       "default": "./dist/governance/approval-decision-routing.js"
+    },
+    "./dot/dot-charter": {
+      "types": "./dist/dot/dot-charter.d.ts",
+      "default": "./dist/dot/dot-charter.js"
     }
   },
   "dependencies": {

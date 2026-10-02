@@ -1,0 +1,54 @@
+{
+  "$schema": "../knowledge/product/schemas/dot-charter.schema.json",
+  "kind": "dot-charter",
+  "dot_id": "repo-guardian",
+  "version": "1.0.0",
+  "title": "Repository guardian",
+  "purpose": "Hold standing responsibility for repository health: watch scheduled-pipeline and CI signals, classify failures, dispatch bounded repair work, and keep the operator informed through digests and approvals.",
+  "status": "draft",
+  "scope": {
+    "tier": "public"
+  },
+  "goal": {
+    "statement": "Keep this repository's autonomous operations healthy: scheduled pipelines run green, daemons heartbeat on time, and failures are classified and either repaired in scope or escalated with evidence.",
+    "success_signals": [
+      "Scheduled pipeline runs in the last 24h are predominantly 'succeeded'",
+      "daemon-watchdog reports ok=true on every 300s tick",
+      "No unacknowledged ops-alert older than 24h"
+    ],
+    "budget": {
+      "max_turns_per_wake": 6,
+      "wall_clock_ms_per_wake": 900000,
+      "token_cap_per_day": 200000
+    }
+  },
+  "attention": {
+    "triggers": [
+      { "kind": "cron", "cron": "*/15 * * * *", "timezone": "Asia/Tokyo" },
+      { "kind": "watch", "paths": ["active/shared/observability/ops-alerts.jsonl"] },
+      { "kind": "wake", "channels": ["slack", "inbox"] }
+    ]
+  },
+  "authority": {
+    "authority_role": "infrastructure_sentinel",
+    "allowed_work_shapes": ["mission", "pipeline", "task_session"],
+    "max_concurrent_delegations": 1
+  },
+  "decisions": {
+    "default_decision": "notify",
+    "veto_window_minutes": 60,
+    "escalate_channel": "slack"
+  },
+  "notification": {
+    "deliver_to": {
+      "surface": "slack",
+      "channel": "kyberion-ops"
+    },
+    "digest_cron": "0 9,18 * * *",
+    "quiet_hours": { "start": "23:00", "end": "07:00", "timezone": "Asia/Tokyo" }
+  },
+  "runtime": {
+    "heartbeat_id": "dot-repo-guardian",
+    "max_idle_wake_ms": 900000
+  }
+}
