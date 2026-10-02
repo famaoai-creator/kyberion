@@ -7,6 +7,7 @@
  * digests/<YYYY-MM-DD>.json`) and published, so a tenant viewer only ever sees
  * its own organizations' digests in surfaces.
  */
+import { createHash } from 'node:crypto';
 import { calendarDateInZone } from '../business-calendar.js';
 import { createLogger } from '../logger.js';
 import { writeScopedArtifact } from '../workforce/artifact-store.js';
@@ -35,19 +36,14 @@ function digestDateStamp(digest: OrganizationDigest): string {
 
 /**
  * One record per organization scope and local day, so a same-day re-run
- * updates it. Tier and tenant are part of the id: organization ids are only
- * unique within their tenant, and a shared id would let one tenant's digest
- * overwrite another's record.
+ * updates it. The id hashes the exact `tier/tenant/org` triple: organization
+ * ids are only unique within their tenant, and a lossy character mapping
+ * would let two organizations (or tenants) share a record.
  */
 function digestArtifactId(entry: OrganizationDigestEntry, stamp: string): string {
-  const segment = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]+/gu, '_');
-  return [
-    'ART-ORGDIGEST',
-    segment(entry.tier),
-    segment(entry.tenant_slug || 'shared'),
-    segment(entry.organization_id),
-    stamp.replace(/-/gu, ''),
-  ].join('-');
+  const scopeKey = `${entry.tier}/${entry.tenant_slug || 'shared'}/${entry.organization_id}`;
+  const digest = createHash('sha256').update(scopeKey).digest('hex').slice(0, 20).toUpperCase();
+  return `ART-ORGDIGEST-${stamp.replace(/-/gu, '')}-${digest}`;
 }
 
 /**
