@@ -58,8 +58,9 @@ Delegation Commands:
 
 Queue Commands:
   enqueue  <ID> <tier> [priority] [deps]
-                                 Add a mission to the dispatch queue
-  dispatch                       Start the next queued mission
+                                 Add a mission to the dispatch queue; deps = comma-separated
+                                 mission ids (case-insensitive) that must be completed/archived
+  dispatch                       Start the next ready queued mission (a start failing 3 times is parked as failed)
   memory-queue [status]          List memory promotion candidates
                                  Show readiness, blockers, and physical duplicate count
   memory-review <CANDIDATE_ID> [--tenant-slug <SLUG>] [--json]
@@ -185,6 +186,7 @@ Mission Input Contract:
     --dry-run
     --relationships <JSON>
     --relationships-file <PATH>
+    --prerequisites <ID,...>     Missions that must be completed/archived before start (--force bypasses)
     --mission-id <ID>            Explicit mission target for checkpoint
 
 Organization Selection:
