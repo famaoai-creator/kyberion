@@ -20,9 +20,36 @@
     {
       "path": "active/shared/cache",
       "artifact_class": "cache",
+      "action": "delete",
+      "note": "Storage-layout cache floor root. Unpartitioned legacy files here (knowledge-index ki-*.json) are self-managed: knowledge-index evicts them by its own ki-usage.json LRU, which mtime cannot see, so the root carries no directory TTL. Partitions below carry the TTL."
+    },
+    {
+      "path": "active/shared/cache/system",
+      "artifact_class": "cache",
       "ttl_days": 30,
       "action": "delete",
-      "note": "Storage-layout cache floor: derived, re-generable data (digest-keyed sidecars, model/build trees, knowledge-index ki-*.json). Deletion only costs a rebuild; anything that cannot be rebuilt belongs in runtime/ state instead."
+      "note": "Storage-layout cache partition (system): derived, re-generable data (digest-keyed sidecars, model/build trees). Deletion only costs a rebuild; anything that cannot be rebuilt belongs in runtime/ state instead."
+    },
+    {
+      "path": "active/shared/cache/public",
+      "artifact_class": "cache",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "Storage-layout cache partition (public): derived, re-generable data (digest-keyed sidecars, model/build trees). Deletion only costs a rebuild; anything that cannot be rebuilt belongs in runtime/ state instead."
+    },
+    {
+      "path": "active/shared/cache/confidential",
+      "artifact_class": "cache",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "Storage-layout cache partition (confidential): derived, re-generable data (digest-keyed sidecars, model/build trees). Deletion only costs a rebuild; anything that cannot be rebuilt belongs in runtime/ state instead."
+    },
+    {
+      "path": "active/shared/cache/personal",
+      "artifact_class": "cache",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "Storage-layout cache partition (personal): derived, re-generable data (digest-keyed sidecars, model/build trees). Deletion only costs a rebuild; anything that cannot be rebuilt belongs in runtime/ state instead."
     },
     {
       "path": "active/shared/artifacts",

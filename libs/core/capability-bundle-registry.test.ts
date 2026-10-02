@@ -49,9 +49,7 @@ describe('capability-bundle-registry', () => {
       'manim-video-recipes-governed'
     );
 
-    const asciiBundles = resolveCapabilityBundlesForUtterance(
-      '端末風のASCII動画を作って'
-    );
+    const asciiBundles = resolveCapabilityBundlesForUtterance('端末風のASCII動画を作って');
     expect(asciiBundles.map((bundle) => bundle.bundle_id)).toContain(
       'ascii-video-recipes-governed'
     );

@@ -306,6 +306,7 @@ function sanitizeArtifactName(name: string): string {
  * partition (system or tier/tenant) of the storage-layout artifact floor.
  */
 export function isScopedArtifactPath(logicalPath: string): boolean {
+  if (logicalPath.split(/[\\/]/u).includes('..')) return false;
   const floor = classifyStorageFloorPath(logicalPath);
   if (floor) {
     return (

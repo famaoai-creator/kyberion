@@ -66,6 +66,12 @@ describe('mission-asset tier resolution', () => {
     expect(resolveMissionAssetTier({ assetPath: systemAsset })).toBe('public');
     expect(resolveMissionAssetTenant({ assetPath: systemAsset })).toBeUndefined();
 
+    // A tmp tier partition binds its tenant too, so a multi-tenant viewer
+    // cannot borrow another tenant's artifact binding to read it.
+    const tmpAsset = 'active/shared/tmp/confidential/globex/secret.pdf';
+    expect(resolveMissionAssetTier({ assetPath: tmpAsset })).toBe('confidential');
+    expect(resolveMissionAssetTenant({ assetPath: tmpAsset })).toBe('globex');
+
     // Unpartitioned legacy files on the floor carry no governing tier.
     expect(
       resolveMissionAssetTier({ assetPath: 'active/shared/artifacts/legacy.md' })
