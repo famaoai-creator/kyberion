@@ -539,10 +539,13 @@ export function checkDependencies(
   extraPrerequisites: unknown = []
 ): { ok: boolean; missing: string[] } {
   const state = loadState(missionId);
-  const { ok, missing } = evaluateMissionPrerequisites([
-    ...normalizeMissionIdList(state?.relationships?.prerequisites),
-    ...normalizeMissionIdList(extraPrerequisites),
-  ]);
+  const { ok, missing } = evaluateMissionPrerequisites(
+    [
+      ...normalizeMissionIdList(state?.relationships?.prerequisites),
+      ...normalizeMissionIdList(extraPrerequisites),
+    ],
+    { tenantSlug: state?.tenant_slug }
+  );
   return { ok, missing: missing.map((entry) => entry.mission_id) };
 }
 
