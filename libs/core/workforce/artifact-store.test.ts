@@ -164,6 +164,33 @@ describe('writeScopedArtifact (AL-02)', () => {
     });
   });
 
+  it('rejects an explicit tier that contradicts the mission and a foreign artifact_id', () => {
+    expect(() =>
+      store.writeScopedArtifact({
+        scope: { mission: 'MSN-TIER-INFER' },
+        tier: 'confidential',
+        artifact_class: 'report',
+        name: 'third.md',
+        content: 'z',
+      })
+    ).toThrow(/contradicts mission MSN-TIER-INFER tier 'public'/);
+
+    const publish = (organization: string, tenant: string, content: string) =>
+      store.writeScopedArtifact({
+        scope: { organization, tenant },
+        tier: 'confidential',
+        artifact_class: 'report',
+        name: 'digest.json',
+        content,
+        publish: { kind: 'report', artifact_id: 'ART-FIXED-ID-1' },
+      });
+    publish('org-x', 'acme', 'v1');
+    // Same owner: a re-run updates the record.
+    expect(publish('org-x', 'acme', 'v2').artifact_id).toBe('ART-FIXED-ID-1');
+    // Another tenant cannot take over the record by choosing its id.
+    expect(() => publish('org-x', 'globex', 'evil')).toThrow(/belongs to another owner scope/);
+  });
+
   it('organization scope: places under the tier/tenant organization workspace', async () => {
     const result = store.writeScopedArtifact({
       scope: { organization: 'org-ops', tenant: 'acme' },

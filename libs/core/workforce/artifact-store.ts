@@ -24,7 +24,12 @@ import {
   storagePartitionSegments,
 } from '../storage-layout.js';
 import type { ArtifactKind } from './artifact-registry.js';
-import { createArtifactRecord, saveArtifactRecord } from './artifact-record.js';
+import {
+  createArtifactRecord,
+  loadArtifactRecord,
+  saveArtifactRecord,
+  type ArtifactRecord,
+} from './artifact-record.js';
 
 export type GovernedArtifactRole =
   | 'slack_bridge'
@@ -551,10 +556,15 @@ export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScope
         `(expected one of ${RETENTION_ARTIFACT_CLASSES.join('/')})`
     );
   }
-  const tier =
-    input.tier ??
-    existingMissionTier(input.scope) ??
-    (input.scope.system ? 'public' : 'confidential');
+  const missionTier = existingMissionTier(input.scope);
+  if (input.tier && missionTier && input.tier !== missionTier) {
+    // The file lands in the mission's own directory; a different label would
+    // make the index row and published record lie about its tier.
+    throw new Error(
+      `writeScopedArtifact: tier '${input.tier}' contradicts mission ${input.scope.mission} tier '${missionTier}'`
+    );
+  }
+  const tier = input.tier ?? missionTier ?? (input.scope.system ? 'public' : 'confidential');
   const { artifactsRoot, kind } = resolveScopeArtifactsRoot(input.scope, tier);
   const name = sanitizeArtifactName(input.name);
   const targetDir =
@@ -662,8 +672,37 @@ function publishScopedArtifact(
       scope_kind: kind,
     },
   });
-  saveArtifactRecord(record);
+  saveArtifactRecord(publication.artifact_id ? mergeIntoExistingRecord(record) : record);
   return record.artifact_id;
+}
+
+/**
+ * A caller-chosen record id may only update a record of the same owner:
+ * tenant, organization, project, mission, task session and tier must match,
+ * otherwise one scope could overwrite another's published record. Fields added
+ * to the existing record since (delivery, review) are kept.
+ */
+function mergeIntoExistingRecord(record: ArtifactRecord): ArtifactRecord {
+  const existing = loadArtifactRecord(record.artifact_id);
+  if (!existing) return record;
+  const owner = (value: ArtifactRecord) => ({
+    tenant_slug: value.tenant_slug,
+    organization_id: value.organization_id,
+    project_id: value.project_id,
+    mission_id: value.mission_id,
+    task_session_id: value.task_session_id,
+    tier: (value.metadata as { tier?: unknown } | undefined)?.tier,
+  });
+  if (JSON.stringify(owner(existing)) !== JSON.stringify(owner(record))) {
+    throw new Error(
+      `writeScopedArtifact: artifact_id ${record.artifact_id} belongs to another owner scope`
+    );
+  }
+  return {
+    ...existing,
+    ...record,
+    metadata: { ...(existing.metadata || {}), ...(record.metadata || {}) },
+  };
 }
 
 /** Read a scope-local artifacts index. Returns [] when the scope has no index yet. */

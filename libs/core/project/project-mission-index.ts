@@ -138,11 +138,24 @@ export function projectArtifactRecords(
   return [...latest.values()].filter((record) => {
     if (record.storage_class === 'tmp') return false;
     if (record.tenant_slug && record.tenant_slug !== scope.tenant) return false;
-    // Fail closed on a record carrying another tier (higher-tier data must
-    // never surface in a lower-tier project view).
-    const recordTier = (record.metadata as { tier?: unknown } | undefined)?.tier;
-    if (typeof recordTier === 'string' && recordTier !== scope.tier) return false;
+    // Exclude a record carrying another tier (higher-tier data must never
+    // surface in a lower-tier project view). Where the file lives is the
+    // ground truth; older records may carry a defaulted metadata tier.
+    const recordTier = recordTierOf(record);
+    if (recordTier && recordTier !== scope.tier) return false;
     if (record.project_id) return record.project_id === projectId;
     return Boolean(record.mission_id && missions.has(record.mission_id));
   });
+}
+
+const TIERED_PATH =
+  /^(?:active\/(?:missions|projects|organizations|shared\/(?:artifacts|tmp|staging|cache))\/)(personal|confidential|public)\//u;
+
+/** Tier of a record: from its tiered path when it has one, else metadata.tier. */
+function recordTierOf(record: ArtifactOwnershipRecord): string | undefined {
+  const fromPath = record.path?.replace(/\\/gu, '/').match(TIERED_PATH)?.[1];
+  if (fromPath) return fromPath;
+  if (record.path?.startsWith('knowledge/personal/')) return 'personal';
+  const fromMetadata = (record.metadata as { tier?: unknown } | undefined)?.tier;
+  return typeof fromMetadata === 'string' ? fromMetadata : undefined;
 }

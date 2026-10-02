@@ -311,7 +311,8 @@ describe('mission artifact promotion', () => {
     expect(rerun.persisted.map((item) => item.artifact_id)).toEqual(
       result.persisted.map((item) => item.artifact_id)
     );
-    expect(result.persisted[0]?.artifact_id).toBe('ART-ORGDIGEST-CONFIDENTIAL-ACME-ORG_A-20261002');
+    expect(result.persisted[0]?.artifact_id).toMatch(/^ART-ORGDIGEST-20261002-[0-9A-F]{20}$/);
+    expect(result.persisted[0]?.artifact_id).not.toBe(result.persisted[1]?.artifact_id);
 
     expect(result.failed).toEqual([]);
     expect(result.persisted.map((item) => item.path)).toEqual([
