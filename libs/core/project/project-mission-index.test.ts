@@ -222,6 +222,46 @@ describe('project mission index (single source: relationships.project)', () => {
       );
       expect(ids).toContain(`ART-OWN-${suffix}`);
       expect(ids).not.toContain(`ART-OTHER-${suffix}`);
+
+      // A re-registered artifact (mission deliverable promoted to the project)
+      // is listed once, at its latest path.
+      appendArtifactOwnershipRecord({
+        ...base,
+        artifact_id: `ART-OWN-${suffix}`,
+        path: 'active/projects/public/shared/p/artifacts/report/missions/M/x.md',
+      });
+      const own = projectArtifactRecords(
+        PROJECT_ID,
+        { tier: 'public', tenant: 'shared' },
+        []
+      ).filter((record) => record.artifact_id === `ART-OWN-${suffix}`);
+      expect(own.map((record) => record.path)).toEqual([
+        'active/projects/public/shared/p/artifacts/report/missions/M/x.md',
+      ]);
+
+      // A record carrying another tier never surfaces in this project's view.
+      appendArtifactOwnershipRecord({
+        ...base,
+        artifact_id: `ART-CONF-${suffix}`,
+        metadata: { tier: 'confidential' },
+      });
+      expect(
+        projectArtifactRecords(PROJECT_ID, { tier: 'public', tenant: 'shared' }, []).map(
+          (record) => record.artifact_id
+        )
+      ).not.toContain(`ART-CONF-${suffix}`);
+      // Where the file lives wins over an older defaulted metadata tier.
+      appendArtifactOwnershipRecord({
+        ...base,
+        artifact_id: `ART-LEGACY-${suffix}`,
+        path: 'active/missions/public/MSN-OLD/artifacts/report/x.md',
+        metadata: { tier: 'confidential' },
+      });
+      expect(
+        projectArtifactRecords(PROJECT_ID, { tier: 'public', tenant: 'shared' }, []).map(
+          (record) => record.artifact_id
+        )
+      ).toContain(`ART-LEGACY-${suffix}`);
     } finally {
       if (original === null) safeRmSync(registryPath, { force: true });
       else safeWriteFile(registryPath, original);

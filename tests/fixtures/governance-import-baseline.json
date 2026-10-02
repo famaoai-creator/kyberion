@@ -49,6 +49,7 @@
     "libs/core/metrics.test.ts",
     "libs/core/mission/delegation-concurrency.test.ts",
     "libs/core/mission/mission-artifact-closure.test.ts",
+    "libs/core/mission/mission-artifact-promotion.test.ts",
     "libs/core/mission/mission-context-pack.test.ts",
     "libs/core/mission/mission-evidence-doc.test.ts",
     "libs/core/mission/mission-governance.test.ts",
