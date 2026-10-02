@@ -40,7 +40,11 @@ import {
 import { withExecutionContextAsync } from '@agent/core/authority';
 import { createTriggerRunner, resolveCurrentTriggerAuthority } from '@agent/core/trigger-runner';
 import { listDotCharters } from '@agent/core/dot/dot-charter';
-import { evaluateDotTriggersDue, runDotWake } from '@agent/core/dot/dot-runtime';
+import {
+  evaluateDotTriggersDue,
+  recordDotWakeOutcome,
+  runDotWake,
+} from '@agent/core/dot/dot-runtime';
 import { isRecord } from '@agent/core/foundation/text';
 import { logger } from '@agent/core/core';
 import { pathResolver, rootDir } from '@agent/core/path-resolver';
@@ -236,63 +240,94 @@ setInterval(
  * (MSN-RESIDENT-DOT-20261002's alert-path lesson). Exported for hermetic tests.
  */
 const dotTriggerRunner = createTriggerRunner();
+let dotSweepInFlight = false;
 
 export async function runDotSweepOnce(now: Date = new Date()): Promise<number> {
-  let active;
+  // One sweep at a time: a slow wake (up to the charter's wall-clock budget)
+  // must not let the next tick pile a second sweep on top.
+  if (dotSweepInFlight) return 0;
+  dotSweepInFlight = true;
   try {
-    active = listDotCharters(undefined, { status: 'active' });
-  } catch (error) {
-    logger.warn(
-      `[dot-sweep] charter scan failed: ${error instanceof Error ? error.message : error}`
-    );
-    return 0;
-  }
-  let delivered = 0;
-  for (const loaded of active) {
-    let due;
-    try {
-      due = evaluateDotTriggersDue(loaded.charter, { now: () => now });
-    } catch (error) {
-      logger.warn(
-        `[dot-sweep] trigger evaluation failed for ${loaded.charter.dot_id}: ${error instanceof Error ? error.message : error}`
-      );
-      continue;
+    const charterErrors: Array<{ path: string; error: string }> = [];
+    const active = listDotCharters(undefined, { status: 'active', errors: charterErrors });
+    for (const error of charterErrors) {
+      logger.warn(`[dot-sweep] skipping malformed charter ${error.path}: ${error.error}`);
     }
-    for (const trigger of due) {
-      const role = loaded.charter.authority.authority_role;
+    let delivered = 0;
+    for (const loaded of active) {
+      let due;
       try {
-        await withExecutionContextAsync(
-          role,
-          async () => {
-            const authority = resolveCurrentTriggerAuthority(loaded.charter.scope.tenant_slug);
-            await dotTriggerRunner.run(
-              {
-                idempotencyKey: `dot:${loaded.charter.dot_id}:${trigger.key}`,
-                source: trigger.trigger.kind,
-                createdBy: authority,
-                payload: { dot_id: loaded.charter.dot_id, trigger_key: trigger.key },
-              },
-              async () => {
-                const receipt = await runDotWake(loaded, { trigger });
-                if (receipt.outcome === 'failed') {
-                  throw new Error(receipt.reason ?? 'dot wake failed');
-                }
-                return `dot-wake:${receipt.outcome}`;
-              }
-            );
-          },
-          undefined,
-          loaded.charter.scope.tenant_slug
-        );
-        delivered += 1;
+        due = evaluateDotTriggersDue(loaded.charter, { now: () => now });
       } catch (error) {
         logger.warn(
-          `[dot-sweep] wake delivery failed for ${loaded.charter.dot_id} (${trigger.key}): ${error instanceof Error ? error.message : error}`
+          `[dot-sweep] trigger evaluation failed for ${loaded.charter.dot_id}: ${error instanceof Error ? error.message : error}`
         );
+        continue;
+      }
+      for (const trigger of due) {
+        const role = loaded.charter.authority.authority_role;
+        // runDotWake writes its own ledger row on internal failure; only a
+        // failure before the deliver callback (authority/policy) needs one
+        // written here.
+        let deliverRan = false;
+        try {
+          const receipt = await withExecutionContextAsync(
+            role,
+            async () => {
+              const authority = resolveCurrentTriggerAuthority(loaded.charter.scope.tenant_slug);
+              return await dotTriggerRunner.run(
+                {
+                  idempotencyKey: `dot:${loaded.charter.dot_id}:${trigger.key}`,
+                  source: trigger.trigger.kind,
+                  createdBy: authority,
+                  payload: { dot_id: loaded.charter.dot_id, trigger_key: trigger.key },
+                },
+                async () => {
+                  deliverRan = true;
+                  const wake = await runDotWake(loaded, { trigger });
+                  if (wake.outcome === 'failed') {
+                    throw new Error(wake.reason ?? 'dot wake failed');
+                  }
+                  return `dot-wake:${wake.outcome}`;
+                }
+              );
+            },
+            undefined,
+            loaded.charter.scope.tenant_slug
+          );
+          if (receipt.status === 'delivered') {
+            delivered += 1;
+          } else if (receipt.status === 'rejected') {
+            // Terminal in the runner — mirror it into the dot ledger so
+            // due-ness and receipts converge instead of re-offering a wedged
+            // key every sweep.
+            recordDotWakeOutcome(loaded.charter, trigger, 'rejected', {
+              reason: receipt.reason ?? 'rejected by trigger-runner',
+            });
+            logger.warn(
+              `[dot-sweep] wake rejected for ${loaded.charter.dot_id} (${trigger.key}): ${receipt.reason ?? 'policy'}`
+            );
+          } else if (receipt.status === 'failed') {
+            if (!deliverRan) {
+              recordDotWakeOutcome(loaded.charter, trigger, 'failed', {
+                reason: receipt.reason ?? 'delivery failed',
+              });
+            }
+            logger.warn(
+              `[dot-sweep] wake failed for ${loaded.charter.dot_id} (${trigger.key}): ${receipt.reason ?? 'unknown'}`
+            );
+          }
+        } catch (error) {
+          logger.warn(
+            `[dot-sweep] wake delivery error for ${loaded.charter.dot_id} (${trigger.key}): ${error instanceof Error ? error.message : error}`
+          );
+        }
       }
     }
+    return delivered;
+  } finally {
+    dotSweepInFlight = false;
   }
-  return delivered;
 }
 
 export interface AgentRuntimeSupervisorDaemonOptions {

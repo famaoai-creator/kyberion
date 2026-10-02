@@ -132,13 +132,34 @@ export interface LoadedDotCharter {
   charter: DotCharter;
 }
 
+export interface DotCharterLoadError {
+  path: string;
+  error: string;
+}
+
+/**
+ * List charters under `dots/`. By default a malformed file throws (the CLI
+ * uses that for `dot validate`/`dot list` reporting). Pass `options.errors`
+ * to collect parse failures instead — resident consumers (the supervisor
+ * sweep, the watchdog union) must never let one bad charter starve the rest.
+ */
 export function listDotCharters(
   rootDir = pathResolver.rootDir(),
-  options: { status?: DotCharterStatus } = {}
+  options: { status?: DotCharterStatus; errors?: DotCharterLoadError[] } = {}
 ): LoadedDotCharter[] {
   const charters: LoadedDotCharter[] = [];
   for (const filePath of listDotCharterPaths(rootDir)) {
-    const charter = loadDotCharter(filePath);
+    let charter: DotCharter;
+    try {
+      charter = loadDotCharter(filePath);
+    } catch (error) {
+      if (!options.errors) throw error;
+      options.errors.push({
+        path: filePath,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      continue;
+    }
     if (options.status && charter.status !== options.status) continue;
     charters.push({ path: filePath, charter });
   }
