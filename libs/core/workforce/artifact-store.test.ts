@@ -135,6 +135,65 @@ describe('writeScopedArtifact (AL-02)', () => {
     });
   });
 
+  it('organization scope: places under the tier/tenant organization workspace', async () => {
+    const result = store.writeScopedArtifact({
+      scope: { organization: 'org-ops', tenant: 'acme' },
+      tier: 'confidential',
+      artifact_class: 'report',
+      name: 'digests/2026-10-02.json',
+      content: { ok: true },
+      publish: { kind: 'report', preview_text: 'org digest' },
+    });
+
+    expect(result.scope_kind).toBe('organization');
+    expect(result.repo_relative_path).toBe(
+      'active/organizations/confidential/acme/org-ops/artifacts/report/digests/2026-10-02.json'
+    );
+    expect(readIndex(result.index_path)[0]).toMatchObject({
+      scope: { organization: 'org-ops', tenant: 'acme' },
+      scope_kind: 'organization',
+    });
+    // The organization owns the published record — no task session needed.
+    const { loadArtifactRecord } = await import('./artifact-record.js');
+    expect(loadArtifactRecord(result.artifact_id as string)).toMatchObject({
+      organization_id: 'org-ops',
+      tenant_slug: 'acme',
+      metadata: expect.objectContaining({ scope_kind: 'organization', tier: 'confidential' }),
+    });
+    expect(
+      store.readScopedArtifactIndex({ organization: 'org-ops', tenant: 'acme' }, 'confidential')
+    ).toHaveLength(1);
+
+    // Untenanted organizations land in the `shared` partition; a mission or
+    // project ref outranks the organization (precedence).
+    expect(
+      store.writeScopedArtifact({
+        scope: { organization: 'org-pub' },
+        tier: 'public',
+        artifact_class: 'report',
+        name: 'a.md',
+        content: 'x',
+      }).repo_relative_path
+    ).toBe('active/organizations/public/shared/org-pub/artifacts/report/a.md');
+    expect(
+      store.writeScopedArtifact({
+        scope: { organization: 'org-pub', project: 'proj-y' },
+        tier: 'public',
+        artifact_class: 'report',
+        name: 'b.md',
+        content: 'x',
+      }).scope_kind
+    ).toBe('project');
+    expect(() =>
+      store.writeScopedArtifact({
+        scope: { system: true, organization: 'org-pub' },
+        artifact_class: 'report',
+        name: 'c.md',
+        content: 'x',
+      })
+    ).toThrow(/system scope is platform-wide/);
+  });
+
   it('session scope: places under active/shared/runtime/session/<session>/artifacts/', () => {
     const result = store.writeScopedArtifact({
       scope: { session: 'sess-42' },
@@ -284,7 +343,7 @@ describe('writeScopedArtifact (AL-02)', () => {
 
     expect(() =>
       store.writeScopedArtifact({ scope: {}, artifact_class: 'cache', name: 'x.txt', content: 'x' })
-    ).toThrow(/at least one of system\/tenant\/project\/mission\/task\/session/);
+    ).toThrow(/at least one of system\/tenant\/organization\/project\/mission\/task\/session/);
 
     expect(() =>
       store.writeScopedArtifact({
@@ -356,6 +415,12 @@ describe('writeScopedArtifact (AL-02)', () => {
     expect(
       store.isScopedArtifactPath('active/shared/runtime/session/s-1/artifacts/log/a.log')
     ).toBe(true);
+    expect(
+      store.isScopedArtifactPath('active/organizations/public/shared/o/artifacts/report/a.json')
+    ).toBe(true);
+    expect(store.isScopedArtifactPath('active/organizations/public/shared/o/state/a.json')).toBe(
+      false
+    );
     expect(store.isScopedArtifactPath('active/shared/tmp/tool-output/a.log')).toBe(false);
     expect(store.isScopedArtifactPath('active/missions/M-1/evidence/a.json')).toBe(false);
     expect(store.isScopedArtifactPath('knowledge/product/artifacts/a.json')).toBe(false);

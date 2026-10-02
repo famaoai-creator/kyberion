@@ -160,6 +160,12 @@ export interface ScopedArtifactScope {
    */
   system?: true;
   tenant?: string;
+  /**
+   * Organization-owned artifact (digests, org-wide reports). Lands under the
+   * organization workspace (`active/organizations/<tier>/<tenant|shared>/<org>/artifacts/`);
+   * `tenant` refines placement.
+   */
+  organization?: string;
   project?: string;
   mission?: string;
   /** Task scope nests under its mission — `mission` is required with `task`. */
@@ -168,7 +174,7 @@ export interface ScopedArtifactScope {
 }
 
 export type ScopedArtifactScopeKind =
-  'task' | 'mission' | 'project' | 'session' | 'tenant' | 'system';
+  'task' | 'mission' | 'project' | 'session' | 'organization' | 'tenant' | 'system';
 
 /**
  * Surface publication for a scoped artifact: also registers an ArtifactRecord
@@ -180,9 +186,9 @@ export interface ScopedArtifactPublication {
   preview_text?: string;
   organization_id?: string;
   /**
-   * Owning task session. ArtifactRecords must be owned by a project, mission
-   * or task session (artifact-ownership-record.schema.json); tenant/system
-   * scoped artifacts name their task session here to be published.
+   * Owning task session. ArtifactRecords must be owned by a project, mission,
+   * organization or task session (artifact-ownership-record.schema.json);
+   * tenant/system scoped artifacts name their task session here to be published.
    */
   task_session_id?: string;
   metadata?: Record<string, unknown>;
@@ -204,7 +210,7 @@ export interface WriteScopedArtifactInput {
   format?: ScopedArtifactFormat;
   /** Optional execution-context role, honored like writeGovernedArtifactJson. */
   role?: GovernedArtifactRole;
-  /** Data tier for project/tenant/mission placement. Defaults to 'confidential'. */
+  /** Data tier for project/organization/tenant/mission placement. Defaults to 'confidential'. */
   tier?: 'personal' | 'confidential' | 'public';
   /** Register the artifact for surfaces (deliverable inbox). Omit for internal artifacts. */
   publish?: ScopedArtifactPublication;
@@ -302,7 +308,7 @@ function sanitizeArtifactName(name: string): string {
  * Fail-closed predicate for the scope-aware artifact roots. Parallel to
  * `isGovernedArtifactPath` (which stays narrowed to coordination/observability
  * scopes): a scoped artifact may only land inside an `artifacts/` subtree of a
- * canonical mission, project, or runtime-session directory, or inside a
+ * canonical mission, project, organization, or runtime-session directory, or inside a
  * partition (system or tier/tenant) of the storage-layout artifact floor.
  */
 export function isScopedArtifactPath(logicalPath: string): boolean {
@@ -318,6 +324,8 @@ export function isScopedArtifactPath(logicalPath: string): boolean {
   if (logicalPath.startsWith('active/missions/') && logicalPath.includes('/artifacts/'))
     return true;
   if (logicalPath.startsWith('active/projects/') && logicalPath.includes('/artifacts/'))
+    return true;
+  if (logicalPath.startsWith('active/organizations/') && logicalPath.includes('/artifacts/'))
     return true;
   if (
     logicalPath.startsWith('active/shared/runtime/session/') &&
@@ -350,7 +358,7 @@ export function parseScopedArtifactIndexEntry(value: unknown): ScopedArtifactInd
   }
   const scope = value.scope;
   if (!isRecord(scope)) throw new Error('scoped artifact index scope is invalid');
-  const scopeKeys = ['tenant', 'project', 'mission', 'task', 'session'] as const;
+  const scopeKeys = ['tenant', 'organization', 'project', 'mission', 'task', 'session'] as const;
   if (scope.system !== undefined && scope.system !== true) {
     throw new Error('scoped artifact index scope.system is invalid');
   }
@@ -361,7 +369,11 @@ export function parseScopedArtifactIndexEntry(value: unknown): ScopedArtifactInd
     if (scope[key] !== undefined) persistedString(scope, key);
   }
   const scopeKind = persistedString(value, 'scope_kind');
-  if (!['task', 'mission', 'project', 'session', 'tenant', 'system'].includes(scopeKind)) {
+  if (
+    !['task', 'mission', 'project', 'session', 'organization', 'tenant', 'system'].includes(
+      scopeKind
+    )
+  ) {
     throw new Error('scoped artifact index scope_kind is invalid');
   }
   const writtenAt = persistedString(value, 'written_at');
@@ -377,7 +389,8 @@ function artifactFloorRoot(segments: string[]): string {
 
 /**
  * Resolve the `artifacts` root of a scope. Mission/project/session scopes own
- * an `artifacts/` subtree of their directory; tenant and system scopes own a
+ * an `artifacts/` subtree of their directory (an organization scope uses its
+ * organization workspace); tenant and system scopes own a
  * partition of the storage-layout artifact floor
  * (`active/shared/artifacts/<tier>/<tenant>/` and `active/shared/artifacts/system/`).
  */
@@ -386,12 +399,12 @@ function resolveScopeArtifactsRoot(
   tier: 'personal' | 'confidential' | 'public'
 ): { artifactsRoot: string; kind: ScopedArtifactScopeKind } {
   if (scope.system !== undefined) {
-    const others = (['tenant', 'project', 'mission', 'task', 'session'] as const).filter(
-      (key) => scope[key] !== undefined
-    );
+    const others = (
+      ['tenant', 'organization', 'project', 'mission', 'task', 'session'] as const
+    ).filter((key) => scope[key] !== undefined);
     if (scope.system !== true || others.length > 0) {
       throw new Error(
-        'writeScopedArtifact: system scope is platform-wide and cannot be combined with tenant/project/mission/task/session'
+        'writeScopedArtifact: system scope is platform-wide and cannot be combined with tenant/organization/project/mission/task/session'
       );
     }
     if (tier !== 'public') {
@@ -433,6 +446,17 @@ function resolveScopeArtifactsRoot(
       kind: 'session',
     };
   }
+  if (scope.organization !== undefined) {
+    const organization = sanitizeScopeSegment(scope.organization, 'organization');
+    const tenant = scope.tenant ? sanitizeScopeSegment(scope.tenant, 'tenant') : 'shared';
+    return {
+      artifactsRoot: path.join(
+        pathResolver.organizationWorkspaceDir(organization, tier, tenant),
+        'artifacts'
+      ),
+      kind: 'organization',
+    };
+  }
   if (scope.tenant !== undefined) {
     let segments: string[];
     try {
@@ -445,7 +469,7 @@ function resolveScopeArtifactsRoot(
     return { artifactsRoot: artifactFloorRoot(segments), kind: 'tenant' };
   }
   throw new Error(
-    'writeScopedArtifact: scope must name at least one of system/tenant/project/mission/task/session'
+    'writeScopedArtifact: scope must name at least one of system/tenant/organization/project/mission/task/session'
   );
 }
 
@@ -475,10 +499,12 @@ function serializeScopedContent(content: unknown, format?: ScopedArtifactFormat)
  * - mission: `<missionDir>/artifacts/<class>/<name>`
  * - project: `<projectWorkspaceDir>/artifacts/<class>/<name>` (tenant refines placement)
  * - session: `active/shared/runtime/session/<session>/artifacts/<class>/<name>`
+ * - organization: `active/organizations/<tier>/<tenant|shared>/<org>/artifacts/<class>/<name>`
  * - tenant:  `active/shared/artifacts/<tier>/<tenant>/<class>/<name>`
  * - system:  `active/shared/artifacts/system/<class>/<name>` (public tier only)
  *
- * Precedence when several refs are present: task > mission > project > session > tenant.
+ * Precedence when several refs are present:
+ * task > mission > project > session > organization > tenant.
  * `system` stands alone. With `publish`, an ArtifactRecord is also registered
  * so surfaces (Chronos deliverable inbox, mission-asset preview) can list it.
  * Every write is appended to the scope-local `artifacts-index.jsonl` so
@@ -525,10 +551,11 @@ export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScope
     input.publish &&
     !input.scope.project &&
     !input.scope.mission &&
+    !input.scope.organization &&
     !input.publish.task_session_id
   ) {
     throw new Error(
-      'writeScopedArtifact: publish requires an owning project, mission, or publish.task_session_id'
+      'writeScopedArtifact: publish requires an owning project, mission, organization, or publish.task_session_id'
     );
   }
 
@@ -584,7 +611,9 @@ function publishScopedArtifact(
     storage_class: 'artifact_store',
     path: repoRelativePath,
     ...(input.scope.tenant ? { tenant_slug: input.scope.tenant.trim().toLowerCase() } : {}),
-    ...(publication.organization_id ? { organization_id: publication.organization_id } : {}),
+    ...((input.scope.organization ?? publication.organization_id)
+      ? { organization_id: input.scope.organization ?? publication.organization_id }
+      : {}),
     ...(input.scope.project ? { project_id: input.scope.project } : {}),
     ...(input.scope.mission ? { mission_id: input.scope.mission } : {}),
     ...(publication.task_session_id ? { task_session_id: publication.task_session_id } : {}),

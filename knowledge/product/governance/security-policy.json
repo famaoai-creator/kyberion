@@ -502,6 +502,7 @@
       "allow_read": [
         "active/missions/",
         "active/projects/",
+        "active/organizations/",
         "active/shared/artifacts/personal/",
         "active/shared/artifacts/confidential/",
         "active/shared/observability/",
@@ -531,7 +532,7 @@
         "active/shared/coordination/channels/",
         "active/shared/coordination/chronos/",
         "active/shared/coordination/orchestration/",
-        "active/organizations/confidential/",
+        "active/organizations/",
         "active/shared/observability/",
         "active/shared/runtime/",
         "active/audit/"
