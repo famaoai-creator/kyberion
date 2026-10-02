@@ -1,9 +1,10 @@
 import { syncProjectOperationalStateFromMission } from './project-operational-state-registry.js';
-import { loadState } from '../mission/mission-state.js';
+import { loadMissionStateIncludingArchive } from '../mission/mission-state.js';
 import { logger } from '../core.js';
 
 export async function syncProjectOperationalStateIfLinked(missionId: string): Promise<void> {
-  const state = loadState(missionId.toUpperCase());
+  // finishMission moves the mission to the archive before this sync runs.
+  const state = loadMissionStateIncludingArchive(missionId);
   if (!state?.relationships?.project?.project_id) return;
   try {
     syncProjectOperationalStateFromMission({

@@ -16,8 +16,10 @@ vi.mock('./project-operational-state-registry.js', async () => {
   };
 });
 
+// The sync runs after finish has moved the mission to the archive, so it
+// reads through the archive-aware loader.
 vi.mock('../mission/mission-state.js', () => ({
-  loadState: mocks.loadState,
+  loadMissionStateIncludingArchive: mocks.loadState,
 }));
 
 describe('syncProjectOperationalStateIfLinked', () => {
