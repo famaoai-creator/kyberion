@@ -45,7 +45,7 @@ import {
   reconcileCompletion,
   reconcileCompletionStructurally,
 } from '../intent/intent-reconciliation.js';
-import { loadState, saveState } from './mission-state.js';
+import { loadMissionStateIncludingArchive, loadState, saveState } from './mission-state.js';
 import {
   buildMissionCompletionReconciliationInput,
   collectMissionEvidence,
@@ -662,6 +662,10 @@ export async function finishMission(
   const upperId = id.toUpperCase();
   const preState = loadState(upperId);
   if (!preState) {
+    if (loadMissionStateIncludingArchive(upperId)?.status === 'archived') {
+      logger.info(`Mission ${upperId} is already archived.`);
+      return;
+    }
     logger.error(`❌ Mission ${upperId} not found. Run "list" to see available missions.`);
     return;
   }

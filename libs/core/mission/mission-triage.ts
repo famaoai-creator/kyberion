@@ -14,9 +14,9 @@
  */
 
 import * as path from 'node:path';
-import { findMissionPath } from '../path-resolver.js';
+import { archivedMissionDir, findMissionPath } from '../path-resolver.js';
 import { safeExistsSync, safeReaddir } from '../secure-io.js';
-import { loadState } from './mission-state.js';
+import { loadMissionStateIncludingArchive, loadState } from './mission-state.js';
 import {
   readMissionNextTasks,
   MISSION_TASK_COMPLETED_STATUSES,
@@ -268,8 +268,16 @@ function classify(
 
 export function collectMissionTriageReport(missionId: string): MissionTriageReport {
   const upperId = String(missionId || '').toUpperCase();
-  const missionDir = findMissionPath(upperId);
-  const state = missionDir ? loadState(upperId) : null;
+  let missionDir = findMissionPath(upperId);
+  let state = missionDir ? loadState(upperId) : null;
+  if (!missionDir) {
+    // Finished missions live only in the archive (no active stub remains).
+    const archived = loadMissionStateIncludingArchive(upperId);
+    if (archived) {
+      state = archived;
+      missionDir = archivedMissionDir(upperId);
+    }
+  }
   const { classification, recommendation } = classify(upperId, state, missionDir);
 
   const drift = missionDir ? evaluateMissionIntentDrift(upperId) : null;

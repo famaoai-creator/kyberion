@@ -36,6 +36,7 @@ import { getCurrentBranch, getGitHash, initMissionRepo } from './mission-git.js'
 import { applyProcessTemplatePlan } from './mission-process-planning.js';
 import {
   calculateRequiredTier,
+  assertMissionNotArchived,
   checkPrerequisites,
   describeUnmetPrerequisites,
   evaluateMissionPrerequisites,
@@ -198,6 +199,7 @@ export async function createMission(args: {
 
   const upperId = id.toUpperCase();
   assertValidMissionId(upperId);
+  assertMissionNotArchived(upperId);
   const isEphemeral = ephemeral;
   // IL-01: the surface passes the interpreted intent (utterance + agreed goal)
   // via a governed tmp handoff file; consume (read + delete) it here so the
@@ -551,6 +553,7 @@ export async function startMission(args: {
   const normalizedRelationships = normalizeRelationships(relationships);
 
   let state = loadState(upperId);
+  if (!state) assertMissionNotArchived(upperId);
   const finalTier = state ? state.tier : tier;
   if (finalTier === 'confidential' && !(state?.tenant_slug?.trim() || tenantSlug)) {
     const policy = getRegisteredEnvText('KYBERION_TENANT_SCOPE_REQUIRED') || 'strict';
@@ -704,5 +707,7 @@ export async function startMission(args: {
     logger.success(`✅ Mission ${upperId} is now ACTIVE (Independent History).`);
   } catch (err: any) {
     logger.error(`Failed to start mission: ${err.message}`);
+    // Propagate: callers (CLI exit code, queue dispatch) must see the failure.
+    throw err;
   }
 }

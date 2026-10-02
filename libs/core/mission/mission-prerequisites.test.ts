@@ -5,6 +5,8 @@ import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeRmSync } from '../secure-io.js';
 import { writeMissionStateAtPath } from './mission-state-reader.js';
 import {
+  assertMissionNotArchived,
+  assertValidMissionIdList,
   checkDependencies,
   evaluateMissionPrerequisites,
   loadMissionStateIncludingArchive,
@@ -127,5 +129,47 @@ describe('mission prerequisites', () => {
     expect(safeExistsSync(path.join(archiveDir, 'mission-state.json'))).toBe(true);
     expect(safeExistsSync(pathResolver.missionDir(ids.archived, 'public'))).toBe(false);
     expect(loadMissionStateIncludingArchive(ids.archived)?.status).toBe('archived');
+  });
+
+  it('reports malformed ids as invalid instead of throwing', () => {
+    expect(evaluateMissionPrerequisites(['ab', 'MSN-BAD!ID'])).toEqual({
+      ok: false,
+      missing: [
+        { mission_id: 'AB', reason: 'invalid_id' },
+        { mission_id: 'MSN-BAD!ID', reason: 'invalid_id' },
+      ],
+    });
+    expect(() => assertValidMissionIdList(['MSN-OK-1', 'AB'], '--prerequisites')).toThrow(
+      '[MISSION_PREREQUISITES_INVALID] Invalid mission id(s) in --prerequisites: AB'
+    );
+  });
+
+  it("hides another tenant's archived mission (same visibility as active lookup)", () => {
+    const dir = pathResolver.archivedMissionDir(ids.archived);
+    created.push(dir);
+    writeMissionStateAtPath(path.join(dir, 'mission-state.json'), {
+      ...state(ids.archived, 'archived'),
+      tenant_slug: 'tenant-b',
+    } as MissionState);
+    const saved = process.env.KYBERION_TENANT;
+    try {
+      delete process.env.KYBERION_TENANT;
+      expect(loadMissionStateIncludingArchive(ids.archived)).toBeNull();
+      process.env.KYBERION_TENANT = 'tenant-a';
+      expect(evaluateMissionPrerequisites([ids.archived]).missing[0]?.reason).toBe('not_found');
+      process.env.KYBERION_TENANT = 'tenant-b';
+      expect(evaluateMissionPrerequisites([ids.archived]).ok).toBe(true);
+    } finally {
+      if (saved === undefined) delete process.env.KYBERION_TENANT;
+      else process.env.KYBERION_TENANT = saved;
+    }
+  });
+
+  it('refuses to recreate an archived mission id', () => {
+    writeArchived(ids.archived);
+    expect(() => assertMissionNotArchived(ids.archived.toLowerCase())).toThrow(
+      `[MISSION_ARCHIVED] Mission ${ids.archived} is archived`
+    );
+    expect(() => assertMissionNotArchived(ids.missing)).not.toThrow();
   });
 });
