@@ -184,6 +184,13 @@ vi.mock('@agent/core/recovery-policy', async (importOriginal) => {
 vi.mock('@agent/core/async-utils', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/async-utils')>()),
   retry: mocks.retry,
+  getRetryDefaults: vi.fn(() => ({
+    maxRetries: 2,
+    initialDelayMs: 500,
+    maxDelayMs: 10000,
+    factor: 2,
+    jitter: true,
+  })),
 }));
 
 vi.mock('@agent/core/foundation', async (importOriginal) => {

@@ -1,6 +1,17 @@
-import { isArtifactKind, type ArtifactKind } from './workforce/artifact-registry.js';
+import { compileSchema } from './foundation/ajv.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
+import type { ArtifactKind } from './workforce/artifact-registry.js';
+
+const ARTIFACT_KIND_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/artifact-kind.schema.json'
+);
+let artifactKindValidator: ((value: unknown) => boolean) | undefined;
+
+function isArtifactKind(value: unknown): value is ArtifactKind {
+  artifactKindValidator ??= compileSchema(ARTIFACT_KIND_SCHEMA_PATH);
+  return artifactKindValidator(value);
+}
 
 export type OutcomeVerificationMethod = 'self_check' | 'review_gate' | 'human_acceptance' | 'test';
 
