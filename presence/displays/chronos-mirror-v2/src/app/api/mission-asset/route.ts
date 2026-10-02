@@ -92,7 +92,13 @@ function isAllowedRepoAssetPath(relativePath: string): boolean {
  */
 function organizationArtifactOwner(relativePath: string): string | null {
   const segments = relativePath.split('/');
+  // Parse exactly what is served: no `.`/empty segments (the served path is
+  // normalized, so they would shift the owner/artifacts positions).
+  if (segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
+    return null;
+  }
   if (segments[0] !== 'active' || segments[1] !== 'organizations') return null;
+  if (!['personal', 'confidential', 'public'].includes(segments[2] ?? '')) return null;
   if (segments.length < 7 || segments[5] !== 'artifacts') return null;
   return segments[4] || null;
 }

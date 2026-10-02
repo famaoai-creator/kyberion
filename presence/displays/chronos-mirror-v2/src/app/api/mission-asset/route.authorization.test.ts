@@ -61,13 +61,18 @@ describe('mission-asset viewer tier authorization', () => {
   });
 
   it('serves only organization artifacts, never organization state', async () => {
-    const response = await GET(
-      new NextRequest(
-        'http://localhost/api/mission-asset?path=active/organizations/public/shared/org-a/state/operational-state.json'
-      )
-    );
-
-    expect(response.status).toBe(400);
+    for (const assetPath of [
+      'active/organizations/public/shared/org-a/state/operational-state.json',
+      // `.`/empty segments would shift the parsed owner after normalization.
+      'active/organizations/./public/shared/artifacts/state.json',
+      'active/organizations/public//shared/artifacts/x/state.json',
+      'active/organizations/bogus/shared/org-a/artifacts/report/d.json',
+    ]) {
+      const response = await GET(
+        new NextRequest(`http://localhost/api/mission-asset?path=${assetPath}`)
+      );
+      expect(response.status, assetPath).toBe(400);
+    }
   });
 
   it("rejects another organization's artifact for an organization-scoped viewer", async () => {

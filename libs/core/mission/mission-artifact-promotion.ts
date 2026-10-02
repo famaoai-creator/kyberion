@@ -110,8 +110,10 @@ function confinedSource(missionDir: string, entryPath: string): string {
     throw new Error(`deliverable is outside the mission artifacts tree: ${entryPath}`);
   }
   const safe = assertSafeRepositoryPath(source);
-  if (!safeLstat(safe).isFile()) {
-    throw new Error(`deliverable is not a regular file: ${entryPath}`);
+  const stats = safeLstat(safe);
+  // A hard link would let a file of another scope pass as a mission file.
+  if (!stats.isFile() || stats.nlink > 1) {
+    throw new Error(`deliverable is not a regular, unlinked file: ${entryPath}`);
   }
   return safe;
 }
@@ -203,8 +205,11 @@ function promote(
       );
       const promotedAt = nowIso();
       for (const record of records) {
+        // A shared project carries no tenant: drop any tenant the mission
+        // publish recorded, so the record matches its new scope.
+        const { tenant_slug: _previousTenant, ...rest } = record;
         saveArtifactRecord({
-          ...record,
+          ...rest,
           path: written.repo_relative_path,
           project_id: projectId,
           ...(tenant ? { tenant_slug: tenant } : {}),

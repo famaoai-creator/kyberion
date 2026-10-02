@@ -250,6 +250,18 @@ describe('project mission index (single source: relationships.project)', () => {
           (record) => record.artifact_id
         )
       ).not.toContain(`ART-CONF-${suffix}`);
+      // Where the file lives wins over an older defaulted metadata tier.
+      appendArtifactOwnershipRecord({
+        ...base,
+        artifact_id: `ART-LEGACY-${suffix}`,
+        path: 'active/missions/public/MSN-OLD/artifacts/report/x.md',
+        metadata: { tier: 'confidential' },
+      });
+      expect(
+        projectArtifactRecords(PROJECT_ID, { tier: 'public', tenant: 'shared' }, []).map(
+          (record) => record.artifact_id
+        )
+      ).toContain(`ART-LEGACY-${suffix}`);
     } finally {
       if (original === null) safeRmSync(registryPath, { force: true });
       else safeWriteFile(registryPath, original);
