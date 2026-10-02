@@ -58,6 +58,10 @@ import {
 
 const missionId = 'MSN-LIFECYCLE-GATE-001';
 const missionPath = pathResolver.missionDir(missionId, 'public');
+// finishMission persists the post-archive state in the archive copy and
+// leaves no stub at the active path.
+const archivedStatePath = () =>
+  pathResolver.rootResolve(`active/shared/tmp/mission-archives/${missionId}/mission-state.json`);
 const personalRepairMissionId = 'MSN-LIFECYCLE-REPAIR-PERSONAL-001';
 const personalRepairMissionPath = pathResolver.missionDir(personalRepairMissionId, 'personal');
 const promotionQueuePath = pathResolver.sharedTmp(
@@ -568,9 +572,8 @@ describe('mission lifecycle finish gate', () => {
 
     await finishMission(missionId, false, args);
 
-    const state = JSON.parse(
-      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
-    );
+    expect(safeExistsSync(`${missionPath}/mission-state.json`)).toBe(false);
+    const state = JSON.parse(safeReadFile(archivedStatePath(), { encoding: 'utf8' }) as string);
     expect(state.status).toBe('archived');
     expect(state.context.mission_completion_summary).toMatchObject({
       requested_result: 'The closeout note is saved',
@@ -663,7 +666,7 @@ describe('mission lifecycle finish gate', () => {
       await finishMission(missionId, false, args);
 
       const archived = JSON.parse(
-        safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+        safeReadFile(archivedStatePath(), { encoding: 'utf8' }) as string
       );
       expect(archived.status).toBe('archived');
       const after = listMemoryPromotionCandidates().filter(
@@ -809,7 +812,7 @@ describe('mission lifecycle finish gate', () => {
     });
 
     const archivedState = JSON.parse(
-      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+      safeReadFile(archivedStatePath(), { encoding: 'utf8' }) as string
     );
     expect(archivedState.status).toBe('archived');
     expect(
@@ -915,9 +918,7 @@ describe('mission lifecycle finish gate', () => {
     // Idempotency marker travels with the archive.
     expect(safeExistsSync(`${archivePath}/evidence/mission-closure.json`)).toBe(true);
 
-    const state = JSON.parse(
-      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
-    );
+    const state = JSON.parse(safeReadFile(archivedStatePath(), { encoding: 'utf8' }) as string);
     expect(state.status).toBe('archived');
     expect(state.context.mission_artifact_closure).toMatchObject({
       status: 'closed',

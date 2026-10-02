@@ -37,7 +37,10 @@ import { applyProcessTemplatePlan } from './mission-process-planning.js';
 import {
   calculateRequiredTier,
   checkPrerequisites,
+  describeUnmetPrerequisites,
+  evaluateMissionPrerequisites,
   loadState,
+  normalizeMissionIdList,
   normalizeRelationships,
   saveState,
   type KnowledgeInjectionDeclaration,
@@ -559,20 +562,17 @@ export async function startMission(args: {
     if (policy === 'warn') logger.warn(message);
   }
 
-  if (!force) {
-    const prereqs = state?.relationships?.prerequisites || normalizedRelationships?.prerequisites;
-    if (prereqs) {
-      const missing = prereqs.filter((pre) => {
-        const preState = loadState(pre);
-        return !preState || preState.status !== 'completed';
-      });
-      if (missing.length > 0) {
-        logger.error(
-          `🚨 Cannot start mission ${upperId}. Prerequisites not met: ${missing.join(', ')}`
-        );
-        logger.info('Use --force to bypass this check.');
-        return;
-      }
+  const prerequisites = normalizeMissionIdList([
+    ...normalizeMissionIdList(state?.relationships?.prerequisites),
+    ...normalizeMissionIdList(normalizedRelationships?.prerequisites),
+  ]);
+  if (!force && prerequisites.length > 0) {
+    const { ok, missing } = evaluateMissionPrerequisites(prerequisites);
+    if (!ok) {
+      throw new Error(
+        `[MISSION_PREREQUISITES_UNMET] Mission ${upperId} cannot start: ` +
+          `${describeUnmetPrerequisites(missing)}. Finish them first or rerun with --force.`
+      );
     }
   }
 
@@ -644,6 +644,9 @@ export async function startMission(args: {
           const message = err instanceof Error ? err.message : String(err);
           logger.warn(`[mission-creation] lazy classification failed for ${upperId}: ${message}`);
         }
+      }
+      if (prerequisites.length > 0) {
+        state.relationships = { ...(state.relationships || {}), prerequisites };
       }
       if (normalizedRelationships.project) {
         state.relationships = {
