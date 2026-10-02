@@ -16,6 +16,7 @@ import {
   safeMoveSync,
   safeRmSync,
 } from './secure-io.js';
+import { collectDirsPostOrder, collectFiles } from './storage-walk.js';
 import { logger } from './core.js';
 import { withExecutionContext } from './authority.js';
 import { loadVaultEntryAtPath } from './data-vault.js';
@@ -246,68 +247,6 @@ export interface LegacyJanitorReport {
   rotated_logs: unknown[];
   scanned_data_vault: unknown[];
   removed: number;
-}
-
-function collectFiles(dir: string): string[] {
-  if (!safeExistsSync(dir)) return [];
-  const results: string[] = [];
-  const walk = (current: string): void => {
-    let entries: string[];
-    try {
-      entries = safeReaddir(current);
-    } catch {
-      return;
-    }
-    for (const name of entries) {
-      const fullPath = nodePath.join(current, name);
-      try {
-        const stat = safeLstat(fullPath);
-        if (stat.isSymbolicLink()) {
-          continue;
-        }
-        if (stat.isDirectory()) {
-          walk(fullPath);
-        } else {
-          results.push(fullPath);
-        }
-      } catch {
-        // skip unreadable entries
-      }
-    }
-  };
-  walk(dir);
-  return results;
-}
-
-/** Directories under `dir` in post-order (deepest first); symlinks skipped. */
-function collectDirsPostOrder(dir: string): string[] {
-  if (!safeExistsSync(dir)) return [];
-  const results: string[] = [];
-  const walk = (current: string): void => {
-    let entries: string[];
-    try {
-      entries = safeReaddir(current);
-    } catch {
-      return;
-    }
-    for (const name of entries) {
-      const fullPath = nodePath.join(current, name);
-      try {
-        const stat = safeLstat(fullPath);
-        if (stat.isSymbolicLink()) {
-          continue;
-        }
-        if (stat.isDirectory()) {
-          walk(fullPath);
-          results.push(fullPath);
-        }
-      } catch {
-        // skip unreadable entries
-      }
-    }
-  };
-  walk(dir);
-  return results;
 }
 
 /** Repo-relative POSIX path under the (possibly test-overridden) root. */
