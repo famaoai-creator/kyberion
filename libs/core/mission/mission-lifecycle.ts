@@ -45,7 +45,7 @@ import {
   reconcileCompletion,
   reconcileCompletionStructurally,
 } from '../intent/intent-reconciliation.js';
-import { loadState, saveState } from './mission-state.js';
+import { loadMissionStateIncludingArchive, loadState, saveState } from './mission-state.js';
 import {
   buildMissionCompletionReconciliationInput,
   collectMissionEvidence,
@@ -662,6 +662,10 @@ export async function finishMission(
   const upperId = id.toUpperCase();
   const preState = loadState(upperId);
   if (!preState) {
+    if (loadMissionStateIncludingArchive(upperId)?.status === 'archived') {
+      logger.info(`Mission ${upperId} is already archived.`);
+      return;
+    }
     logger.error(`❌ Mission ${upperId} not found. Run "list" to see available missions.`);
     return;
   }
@@ -1200,7 +1204,9 @@ export async function finishMission(
     event: 'ARCHIVE',
     note: `Mission archived to ${archivePath}.`,
   });
-  await saveState(upperId, state);
+  // The active directory is gone: persist into the archive copy so no state
+  // stub is recreated at the active path (dependents read it from there).
+  await saveState(upperId, state, { missionDir: archivePath });
   traceCtx.endSpan('ok');
   const traceResult = finalizeActuatorTrace(traceCtx);
   state.context = {
@@ -1218,7 +1224,7 @@ export async function finishMission(
     mission_finish_trace_summary: traceResult.trace_summary,
     mission_finish_trace_persisted_path: traceResult.trace_persisted_path,
   };
-  await saveState(upperId, state);
+  await saveState(upperId, state, { missionDir: archivePath });
   logger.success(`📦 Mission ${upperId} archived and finalized.`);
 }
 

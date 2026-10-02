@@ -1,0 +1,46 @@
+---
+record_id: mem-MSN-MISSION-DEPS-20261002-2026_10_02
+kind: pattern
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-MISSION-DEPS-20261002-2026_10_02
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-10-02T11:45:22.356Z
+source_branch: claude/mission-dependencies
+source_commit: 248f4b03adae35285819dba776847634184b3bb7
+---
+
+# Mission dependency gates: finished means completed or archived, and moved state is written where it moved
+
+Mission prerequisites were unsatisfiable because finish ended in status archived while the gate required completed, and a resolve-by-search save after archiving recreated a stub at the active path. A start/queue gate must accept every terminal success status and read the archive; lifecycle code that moves a directory must write later state to the new location explicitly.
+
+## Applicability
+
+- mission
+- mission:MSN-MISSION-DEPS-20261002
+
+## Reusable Steps
+
+1. Mission prerequisites were unsatisfiable because finish ended in status archived while the gate required completed, and a resolve-by-search save after archiving recreated a stub at the active path
+2. A start/queue gate must accept every terminal success status and read the archive; lifecycle code that moves a directory must write later state to the new location explicitly
+
+## Expected Outcome
+
+- Terminal-status gates: list every success terminal status (completed, archived) in one constant and evaluate against active and archive locations, with the same tenant visibility as active lookup.
+- After moving a directory (finish -> archive), pass the destination explicitly (saveState missionDir); resolving by search falls back to the old default path and silently recreates a stub that changes later lookups.
+- Re-creating an id that exists only in the archive must be refused, or the new run overwrites archived history on its own finish.
+- Error handling: only failures before the durable state change should fail the command; post-activation steps are best-effort, otherwise retries hit invalid transitions (active -> active).
+- Queues: mark an entry consumed only after the action succeeds, bound retries and park as failed, and validate ids at enqueue.
+- Verify CLI flags end-to-end against the built CLI: unit tests passed while normalizeRelationships silently dropped every non-project/track overlay key on the real start path.
+
+## Evidence
+
+- active/missions/public/MSN-MISSION-DEPS-20261002/evidence/distillation.md
+
+## Artifacts

@@ -328,6 +328,7 @@ export const VALUE_FLAGS = new Set([
   '--relationships',
   '--relationships-json',
   '--relationships-file',
+  '--prerequisites',
   '--mission',
   '--mission-id',
   '--project-id',

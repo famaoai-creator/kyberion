@@ -36,8 +36,12 @@ import { getCurrentBranch, getGitHash, initMissionRepo } from './mission-git.js'
 import { applyProcessTemplatePlan } from './mission-process-planning.js';
 import {
   calculateRequiredTier,
+  assertMissionNotArchived,
   checkPrerequisites,
+  describeUnmetPrerequisites,
+  evaluateMissionPrerequisites,
   loadState,
+  normalizeMissionIdList,
   normalizeRelationships,
   saveState,
   type KnowledgeInjectionDeclaration,
@@ -195,6 +199,7 @@ export async function createMission(args: {
 
   const upperId = id.toUpperCase();
   assertValidMissionId(upperId);
+  assertMissionNotArchived(upperId, { tenantSlug });
   const isEphemeral = ephemeral;
   // IL-01: the surface passes the interpreted intent (utterance + agreed goal)
   // via a governed tmp handoff file; consume (read + delete) it here so the
@@ -548,6 +553,7 @@ export async function startMission(args: {
   const normalizedRelationships = normalizeRelationships(relationships);
 
   let state = loadState(upperId);
+  if (!state) assertMissionNotArchived(upperId, { tenantSlug });
   const finalTier = state ? state.tier : tier;
   if (finalTier === 'confidential' && !(state?.tenant_slug?.trim() || tenantSlug)) {
     const policy = getRegisteredEnvText('KYBERION_TENANT_SCOPE_REQUIRED') || 'strict';
@@ -559,25 +565,34 @@ export async function startMission(args: {
     if (policy === 'warn') logger.warn(message);
   }
 
-  if (!force) {
-    const prereqs = state?.relationships?.prerequisites || normalizedRelationships?.prerequisites;
-    if (prereqs) {
-      const missing = prereqs.filter((pre) => {
-        const preState = loadState(pre);
-        return !preState || preState.status !== 'completed';
-      });
-      if (missing.length > 0) {
-        logger.error(
-          `🚨 Cannot start mission ${upperId}. Prerequisites not met: ${missing.join(', ')}`
-        );
-        logger.info('Use --force to bypass this check.');
-        return;
-      }
+  if (state?.status === 'active') {
+    logger.info(`Mission ${upperId} is already active.`);
+    return;
+  }
+
+  const prerequisites = normalizeMissionIdList([
+    ...normalizeMissionIdList(state?.relationships?.prerequisites),
+    ...normalizeMissionIdList(normalizedRelationships?.prerequisites),
+  ]);
+  if (!force && prerequisites.length > 0) {
+    const { ok, missing } = evaluateMissionPrerequisites(prerequisites, {
+      tenantSlug: state?.tenant_slug || tenantSlug,
+    });
+    if (!ok) {
+      throw new Error(
+        `[MISSION_PREREQUISITES_UNMET] Mission ${upperId} cannot start: ` +
+          `${describeUnmetPrerequisites(missing)}. Finish them first or rerun with --force.`
+      );
     }
   }
 
   logger.info(`🚀 Activating Mission: ${upperId} (Tier: ${finalTier})...`);
 
+  // Failures before the active state is saved fail the start (non-zero exit,
+  // queue keeps the entry). After activation the remaining steps are
+  // best-effort: the mission is active, and a rethrow would leave it active
+  // while reporting failure — a retry would then hit `active → active`.
+  let activated = false;
   try {
     if (!state) {
       await createMission({
@@ -604,6 +619,7 @@ export async function startMission(args: {
           ...(decidedBy ? { decided_by: decidedBy } : {}),
         });
         await saveState(upperId, state);
+        activated = true;
       }
     } else {
       if (!state.outcome_contract) {
@@ -645,6 +661,9 @@ export async function startMission(args: {
           logger.warn(`[mission-creation] lazy classification failed for ${upperId}: ${message}`);
         }
       }
+      if (prerequisites.length > 0) {
+        state.relationships = { ...(state.relationships || {}), prerequisites };
+      }
       if (normalizedRelationships.project) {
         state.relationships = {
           ...(state.relationships || {}),
@@ -671,6 +690,7 @@ export async function startMission(args: {
         ...(decidedBy ? { decided_by: decidedBy } : {}),
       });
       await saveState(upperId, state);
+      activated = true;
     }
 
     await emitMissionLifecycleIntentSnapshot({
@@ -700,6 +720,15 @@ export async function startMission(args: {
 
     logger.success(`✅ Mission ${upperId} is now ACTIVE (Independent History).`);
   } catch (err: any) {
+    if (activated) {
+      logger.warn(
+        `Mission ${upperId} is active, but a post-activation step failed — ${err.message} ` +
+          `| next: fix the cause; the mission is already active, so 'start' is a no-op — redo that step by hand (e.g. 'git init' in the mission directory) | evidence: ${findMissionPath(upperId) || 'mission-state.json'}`
+      );
+      return;
+    }
     logger.error(`Failed to start mission: ${err.message}`);
+    // Propagate: callers (CLI exit code, queue dispatch) must see the failure.
+    throw err;
   }
 }
