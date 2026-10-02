@@ -199,7 +199,7 @@ export async function createMission(args: {
 
   const upperId = id.toUpperCase();
   assertValidMissionId(upperId);
-  assertMissionNotArchived(upperId);
+  assertMissionNotArchived(upperId, { tenantSlug });
   const isEphemeral = ephemeral;
   // IL-01: the surface passes the interpreted intent (utterance + agreed goal)
   // via a governed tmp handoff file; consume (read + delete) it here so the
@@ -553,7 +553,7 @@ export async function startMission(args: {
   const normalizedRelationships = normalizeRelationships(relationships);
 
   let state = loadState(upperId);
-  if (!state) assertMissionNotArchived(upperId);
+  if (!state) assertMissionNotArchived(upperId, { tenantSlug });
   const finalTier = state ? state.tier : tier;
   if (finalTier === 'confidential' && !(state?.tenant_slug?.trim() || tenantSlug)) {
     const policy = getRegisteredEnvText('KYBERION_TENANT_SCOPE_REQUIRED') || 'strict';
@@ -570,7 +570,9 @@ export async function startMission(args: {
     ...normalizeMissionIdList(normalizedRelationships?.prerequisites),
   ]);
   if (!force && prerequisites.length > 0) {
-    const { ok, missing } = evaluateMissionPrerequisites(prerequisites);
+    const { ok, missing } = evaluateMissionPrerequisites(prerequisites, {
+      tenantSlug: state?.tenant_slug || tenantSlug,
+    });
     if (!ok) {
       throw new Error(
         `[MISSION_PREREQUISITES_UNMET] Mission ${upperId} cannot start: ` +
@@ -581,6 +583,11 @@ export async function startMission(args: {
 
   logger.info(`🚀 Activating Mission: ${upperId} (Tier: ${finalTier})...`);
 
+  // Failures before the active state is saved fail the start (non-zero exit,
+  // queue keeps the entry). After activation the remaining steps are
+  // best-effort: the mission is active, and a rethrow would leave it active
+  // while reporting failure — a retry would then hit `active → active`.
+  let activated = false;
   try {
     if (!state) {
       await createMission({
@@ -607,8 +614,13 @@ export async function startMission(args: {
           ...(decidedBy ? { decided_by: decidedBy } : {}),
         });
         await saveState(upperId, state);
+        activated = true;
       }
     } else {
+      if (state.status === 'active') {
+        logger.info(`Mission ${upperId} is already active.`);
+        return;
+      }
       if (!state.outcome_contract) {
         state.outcome_contract = inferMissionOutcomeContract({
           missionId: upperId,
@@ -677,6 +689,7 @@ export async function startMission(args: {
         ...(decidedBy ? { decided_by: decidedBy } : {}),
       });
       await saveState(upperId, state);
+      activated = true;
     }
 
     await emitMissionLifecycleIntentSnapshot({
@@ -706,6 +719,13 @@ export async function startMission(args: {
 
     logger.success(`✅ Mission ${upperId} is now ACTIVE (Independent History).`);
   } catch (err: any) {
+    if (activated) {
+      logger.warn(
+        `Mission ${upperId} is active, but a post-activation step failed — ${err.message} ` +
+          `| next: rerun the failed step (repo init / role procedure) | evidence: mission-state.json`
+      );
+      return;
+    }
     logger.error(`Failed to start mission: ${err.message}`);
     // Propagate: callers (CLI exit code, queue dispatch) must see the failure.
     throw err;

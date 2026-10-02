@@ -140,7 +140,29 @@ export async function dispatchNextQueuedMission(
     pending.sort((a, b) => b.priority - a.priority || a.enqueued_at.localeCompare(b.enqueued_at));
 
     for (const mission of pending) {
-      const { ok, missing } = checkDependencies(mission.mission_id, mission.dependencies || []);
+      let readiness: { ok: boolean; missing: string[] };
+      try {
+        readiness = checkDependencies(mission.mission_id, mission.dependencies || []);
+      } catch (error) {
+        // e.g. an entry written before enqueue validated ids: park it instead
+        // of throwing on every dispatch.
+        mission.status = 'failed';
+        mission.metadata = {
+          ...(mission.metadata || {}),
+          last_error: error instanceof Error ? error.message : String(error),
+          last_attempt_at: nowIso(),
+        };
+        safeWriteFile(
+          resolvedQueuePath,
+          queue.map((entry) => JSON.stringify(entry)).join('\n') + '\n'
+        );
+        logger.warn(
+          `Queue entry ${mission.mission_id} is unreadable and was parked as failed — ${mission.metadata.last_error} ` +
+            `| next: re-enqueue with a valid id | evidence: ${resolvedQueuePath}`
+        );
+        continue;
+      }
+      const { ok, missing } = readiness;
       if (!ok) {
         logger.info(`⏳ Skipping ${mission.mission_id}: waiting for ${missing.join(', ')}`);
         continue;

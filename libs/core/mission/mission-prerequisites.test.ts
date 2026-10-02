@@ -159,6 +159,15 @@ describe('mission prerequisites', () => {
       expect(evaluateMissionPrerequisites([ids.archived]).missing[0]?.reason).toBe('not_found');
       process.env.KYBERION_TENANT = 'tenant-b';
       expect(evaluateMissionPrerequisites([ids.archived]).ok).toBe(true);
+      // An explicit tenant (start --tenant-slug) wins over the env binding.
+      process.env.KYBERION_TENANT = 'tenant-a';
+      expect(evaluateMissionPrerequisites([ids.archived], { tenantSlug: 'tenant-b' }).ok).toBe(
+        true
+      );
+      // The id stays blocked, but another tenant's archive is not disclosed.
+      expect(() => assertMissionNotArchived(ids.archived)).toThrow(
+        `[MISSION_ID_UNAVAILABLE] Mission id ${ids.archived} is unavailable`
+      );
     } finally {
       if (saved === undefined) delete process.env.KYBERION_TENANT;
       else process.env.KYBERION_TENANT = saved;

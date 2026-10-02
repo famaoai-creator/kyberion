@@ -399,20 +399,29 @@ export function normalizeMissionIdList(value: unknown): string[] {
  * Load a mission's state from the active tiers, falling back to the archive
  * (`finishMission` moves a mission there and ends it in status `archived`).
  */
-export function loadMissionStateIncludingArchive(id: string): MissionState | null {
+export function loadMissionStateIncludingArchive(
+  id: string,
+  options: { tenantSlug?: string } = {}
+): MissionState | null {
   const upperId = id.trim().toUpperCase();
   if (!isValidMissionId(upperId)) return null;
   const active = loadState(upperId);
   if (active) return active;
   const archived = loadArchivedMissionState(upperId);
-  // The archive is one flat directory for every tier and tenant: apply the
-  // same visibility as active lookup (findMissionPath) — a tenant mission is
-  // visible only to that tenant's binding.
-  if (!archived?.tenant_slug) return archived;
-  const boundTenant = String(getRegisteredEnvText('KYBERION_TENANT') || '')
+  return archived && isArchivedMissionVisible(archived, options.tenantSlug) ? archived : null;
+}
+
+/**
+ * The archive is one flat directory for every tier and tenant: apply the same
+ * visibility as active lookup (findMissionPath) — a tenant mission is visible
+ * only to that tenant (explicit `tenantSlug`, else the KYBERION_TENANT binding).
+ */
+function isArchivedMissionVisible(archived: MissionState, tenantSlug?: string): boolean {
+  if (!archived.tenant_slug) return true;
+  const boundTenant = String(tenantSlug || getRegisteredEnvText('KYBERION_TENANT') || '')
     .trim()
     .toLowerCase();
-  return archived.tenant_slug.toLowerCase() === boundTenant ? archived : null;
+  return archived.tenant_slug.toLowerCase() === boundTenant;
 }
 
 function loadArchivedMissionState(upperId: string): MissionState | null {
@@ -454,16 +463,26 @@ export function assertValidMissionIdList(ids: string[], label = 'prerequisites')
  * would shadow it for dependents and, on its own finish, overwrite the
  * archive copy — so create/start refuse it.
  */
-export function assertMissionNotArchived(missionId: string): void {
+export function assertMissionNotArchived(
+  missionId: string,
+  options: { tenantSlug?: string } = {}
+): void {
   const upperId = missionId.trim().toUpperCase();
   if (!isValidMissionId(upperId) || loadState(upperId)) return;
-  if (loadArchivedMissionState(upperId)) {
+  const archived = loadArchivedMissionState(upperId);
+  if (!archived) return;
+  // The id is blocked either way (one flat archive), but another tenant's
+  // archived mission must not be disclosed.
+  if (!isArchivedMissionVisible(archived, options.tenantSlug)) {
     throw new Error(
-      `[MISSION_ARCHIVED] Mission ${upperId} is archived at ` +
-        `${pathResolver.toRepoRelative(pathResolver.archivedMissionDir(upperId))}; archived missions ` +
-        'are read-only history. Start a new mission with a new id.'
+      `[MISSION_ID_UNAVAILABLE] Mission id ${upperId} is unavailable. Choose a new mission id.`
     );
   }
+  throw new Error(
+    `[MISSION_ARCHIVED] Mission ${upperId} is archived at ` +
+      `${pathResolver.toRepoRelative(pathResolver.archivedMissionDir(upperId))}; archived missions ` +
+      'are read-only history. Start a new mission with a new id.'
+  );
 }
 
 export interface UnmetMissionPrerequisite {
@@ -476,7 +495,10 @@ export interface UnmetMissionPrerequisite {
  * Evaluate mission prerequisites. A prerequisite is satisfied once its mission
  * is completed or archived, wherever its state lives (active tier or archive).
  */
-export function evaluateMissionPrerequisites(prerequisites: unknown): {
+export function evaluateMissionPrerequisites(
+  prerequisites: unknown,
+  options: { tenantSlug?: string } = {}
+): {
   ok: boolean;
   missing: UnmetMissionPrerequisite[];
 } {
@@ -486,7 +508,7 @@ export function evaluateMissionPrerequisites(prerequisites: unknown): {
       missing.push({ mission_id: missionId, reason: 'invalid_id' });
       continue;
     }
-    const preState = loadMissionStateIncludingArchive(missionId);
+    const preState = loadMissionStateIncludingArchive(missionId, options);
     if (!preState) missing.push({ mission_id: missionId, reason: 'not_found' });
     else if (!SATISFIED_PREREQUISITE_STATUSES.has(preState.status)) {
       missing.push({ mission_id: missionId, reason: 'not_finished', status: preState.status });
