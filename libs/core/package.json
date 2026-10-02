@@ -571,6 +571,10 @@
       "types": "./dist/organization/organization-digest.d.ts",
       "default": "./dist/organization/organization-digest.js"
     },
+    "./organization-digest-artifacts": {
+      "types": "./dist/organization/organization-digest-artifacts.d.ts",
+      "default": "./dist/organization/organization-digest-artifacts.js"
+    },
     "./business-calendar": {
       "types": "./dist/business-calendar.d.ts",
       "default": "./dist/business-calendar.js"
@@ -5018,6 +5022,10 @@
     "./organization/organization-digest": {
       "types": "./dist/organization/organization-digest.d.ts",
       "default": "./dist/organization/organization-digest.js"
+    },
+    "./organization/organization-digest-artifacts": {
+      "types": "./dist/organization/organization-digest-artifacts.d.ts",
+      "default": "./dist/organization/organization-digest-artifacts.js"
     },
     "./organization/organization-interventions": {
       "types": "./dist/organization/organization-interventions.d.ts",

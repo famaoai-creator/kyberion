@@ -130,7 +130,12 @@ export function projectArtifactRecords(
   missionIds: Iterable<string>
 ): ArtifactOwnershipRecord[] {
   const missions = new Set(missionIds);
-  return listArtifactOwnershipRecords().filter((record) => {
+  // The ownership registry is append-only: a re-registered artifact (e.g. a
+  // mission deliverable promoted to its project) appears once per write, and
+  // the last row is the current one.
+  const latest = new Map<string, ArtifactOwnershipRecord>();
+  for (const record of listArtifactOwnershipRecords()) latest.set(record.artifact_id, record);
+  return [...latest.values()].filter((record) => {
     if (record.storage_class === 'tmp') return false;
     if (record.tenant_slug && record.tenant_slug !== scope.tenant) return false;
     if (record.project_id) return record.project_id === projectId;

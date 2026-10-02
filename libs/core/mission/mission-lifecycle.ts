@@ -41,6 +41,7 @@ import {
 } from '../secure-io.js';
 import { recordMissionGateOverride, writeMissionGateRecord } from './mission-gate-engine.js';
 import { closeMissionArtifacts } from './mission-artifact-closure.js';
+import { promoteMissionArtifactsToProject } from './mission-artifact-promotion.js';
 import {
   reconcileCompletion,
   reconcileCompletionStructurally,
@@ -1177,6 +1178,25 @@ export async function finishMission(
     logger.warn(`⚠️ [ARTIFACT_CLOSURE] skipped for ${upperId}: ${err?.message || err}`);
     traceCtx.endSpan('error', err?.message || String(err));
   }
+
+  // Hand published deliverables (report/export) of a project-linked mission to
+  // the project before the archive move: copied into the project scope and
+  // the ArtifactRecord re-pointed; the original is archived with the mission.
+  // Best-effort like closure — never fails a finish that already succeeded.
+  traceCtx.startSpan('mission:artifact-promotion');
+  const promotion = promoteMissionArtifactsToProject({ missionId: upperId, missionDir, state });
+  if (promotion.status !== 'skipped' || promotion.failed.length > 0) {
+    state.context = {
+      ...(state.context || {}),
+      mission_artifact_promotion: {
+        status: promotion.status,
+        project_id: promotion.project_id,
+        promoted: promotion.promoted,
+        ...(promotion.failed.length > 0 ? { failed: promotion.failed } : {}),
+      },
+    };
+  }
+  traceCtx.endSpan(promotion.failed.length > 0 ? 'error' : 'ok');
 
   const missionTmpDir = pathResolver.sharedTmp(path.join('missions', upperId));
   const safeMissionTmpDir = assertSafeRepositoryPath(missionTmpDir, { allowMissingLeaf: true });

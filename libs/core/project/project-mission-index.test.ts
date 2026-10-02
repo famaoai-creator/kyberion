@@ -222,6 +222,22 @@ describe('project mission index (single source: relationships.project)', () => {
       );
       expect(ids).toContain(`ART-OWN-${suffix}`);
       expect(ids).not.toContain(`ART-OTHER-${suffix}`);
+
+      // A re-registered artifact (mission deliverable promoted to the project)
+      // is listed once, at its latest path.
+      appendArtifactOwnershipRecord({
+        ...base,
+        artifact_id: `ART-OWN-${suffix}`,
+        path: 'active/projects/public/shared/p/artifacts/report/missions/M/x.md',
+      });
+      const own = projectArtifactRecords(
+        PROJECT_ID,
+        { tier: 'public', tenant: 'shared' },
+        []
+      ).filter((record) => record.artifact_id === `ART-OWN-${suffix}`);
+      expect(own.map((record) => record.path)).toEqual([
+        'active/projects/public/shared/p/artifacts/report/missions/M/x.md',
+      ]);
     } finally {
       if (original === null) safeRmSync(registryPath, { force: true });
       else safeWriteFile(registryPath, original);

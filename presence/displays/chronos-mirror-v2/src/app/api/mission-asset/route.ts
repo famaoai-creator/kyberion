@@ -36,6 +36,7 @@ const ALLOWED_REPO_PREFIXES = [
   'active/shared/tmp/',
   'active/missions/',
   'active/projects/',
+  'active/organizations/',
 ] as const;
 
 function resolveMissionRoot(missionId: string): string | null {

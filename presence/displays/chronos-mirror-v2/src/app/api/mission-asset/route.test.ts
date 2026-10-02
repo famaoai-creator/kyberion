@@ -72,6 +72,11 @@ describe('mission-asset tier resolution', () => {
     expect(resolveMissionAssetTier({ assetPath: tmpAsset })).toBe('confidential');
     expect(resolveMissionAssetTenant({ assetPath: tmpAsset })).toBe('globex');
 
+    // Organization-scoped deliverables bind the organization's tier and tenant.
+    const orgAsset = 'active/organizations/confidential/acme/org-ops/artifacts/report/d.json';
+    expect(resolveMissionAssetTier({ assetPath: orgAsset })).toBe('confidential');
+    expect(resolveMissionAssetTenant({ assetPath: orgAsset })).toBe('acme');
+
     // Unpartitioned legacy files on the floor carry no governing tier.
     expect(
       resolveMissionAssetTier({ assetPath: 'active/shared/artifacts/legacy.md' })
