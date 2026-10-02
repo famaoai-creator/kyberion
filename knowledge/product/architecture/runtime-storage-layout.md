@@ -29,6 +29,7 @@ see it.
 | **cache**                    | Derived, re-generable data: digest-keyed sidecars, model / build trees, indexes    | `active/shared/cache/<partition>/<domain>/`                                                                                   | `resolveStorageFloor('cache', …)`                                 | 30 days per partition, delete (a miss only costs a rebuild) |
 | **workspace**                | Directories a worker operates in: clones, sandboxes, browser profiles, device runs | `active/shared/runtime/workspaces/<id>/`                                                                                      | `createScratchWorkspace` (workforce/workspace-ledger.ts)          | lease + ledger sweep                                        |
 | **artifact** (scope-owned)   | Deliverables, reports, evidence, exports of a mission / task / project / session   | `<missionDir>/artifacts/<class>/`, `<projectDir>/artifacts/<class>/`, `active/shared/runtime/session/<id>/artifacts/<class>/` | `writeScopedArtifact({ scope: { mission / project / … } })`       | closes with its scope (mission-artifact-closure)            |
+| **artifact** (organization)  | Deliverables owned by an organization (daily digests, org-wide reports)            | `active/organizations/<tier>/<tenant\|shared>/<org>/artifacts/<class>/`                                                       | `writeScopedArtifact({ scope: { organization, tenant? } })`       | review_required — never silently expired                    |
 | **artifact** (tenant/system) | Deliverables owned by a tenant or by the platform, with no narrower scope          | `active/shared/artifacts/<partition>/<class>/`                                                                                | `writeScopedArtifact({ scope: { tenant } })` / `{ system: true }` | review_required — never silently expired                    |
 | **state**                    | Durable registries, cursors, quotas, pending flows — anything that must survive    | `active/shared/runtime/<domain>/` (+ `physicalScopedPath` for tenant namespaces)                                              | governed catalogs / `writeGovernedArtifactJson`                   | per retention-catalog entry                                 |
 | **log**                      | Audit, process, surface, trace logs                                                | `active/shared/logs/`                                                                                                         | `logger`, audit chain                                             | 30 days                                                     |
@@ -90,8 +91,31 @@ writeScopedArtifact({
 refs and `metadata.tier`, so the viewer scope (tenant + tier) is resolved
 server-side. ArtifactRecords must have an owner (project, mission, or task
 session); tenant- or system-scoped artifacts name it with
-`publish.task_session_id`. Chronos `mission-asset` serves files under the
-artifact floor and derives tier / tenant from the partition (system → public).
+`publish.task_session_id`; an organization scope owns its record through
+`organization_id`. Chronos `mission-asset` serves files under the artifact
+floor, mission, project and organization trees, and derives tier / tenant from
+the partition (system → public) or the `<tier>/<tenant>/` path segments.
+
+### Mission → project promotion
+
+When a mission linked to a project (`relationships.project`) finishes, its
+published `report` / `export` scoped artifacts are **copied** into the project
+(`<projectDir>/artifacts/<class>/missions/<MISSION_ID>/<name>`) and their
+ArtifactRecords re-pointed there (`metadata.promoted_from`, `promoted_at`), so
+the project keeps the deliverable after the mission is archived. The original
+stays in the mission tree and moves to the archive with it; `evidence` stays
+with the mission. Promotion is best-effort and idempotent
+(`libs/core/mission/mission-artifact-promotion.ts`); the outcome is recorded in
+the mission state `context.mission_artifact_promotion`.
+
+### Organization digest
+
+`core:organization_digest` with `persist: true` (on in
+`pipelines/organization-daily-digest.json`) files each organization's entry as
+a published report in that organization's own scope
+(`…/<org>/artifacts/report/digests/<YYYY-MM-DD>.json`). The cross-tenant digest
+itself is never stored as one file, so a tenant viewer only sees its own
+organizations' digests.
 
 ## 4. Migration status
 

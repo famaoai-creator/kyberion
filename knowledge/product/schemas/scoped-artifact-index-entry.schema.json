@@ -17,18 +17,21 @@
     "scope": {
       "type": "object",
       "minProperties": 1,
-      "maxProperties": 6,
+      "maxProperties": 7,
       "additionalProperties": false,
       "properties": {
         "system": { "const": true },
         "tenant": { "type": "string", "minLength": 1 },
+        "organization": { "type": "string", "minLength": 1 },
         "project": { "type": "string", "minLength": 1 },
         "mission": { "type": "string", "minLength": 1 },
         "task": { "type": "string", "minLength": 1 },
         "session": { "type": "string", "minLength": 1 }
       }
     },
-    "scope_kind": { "enum": ["task", "mission", "project", "session", "tenant", "system"] },
+    "scope_kind": {
+      "enum": ["task", "mission", "project", "session", "organization", "tenant", "system"]
+    },
     "written_at": { "type": "string", "format": "date-time" }
   },
   "required": ["name", "artifact_class", "path", "scope", "scope_kind", "written_at"]
