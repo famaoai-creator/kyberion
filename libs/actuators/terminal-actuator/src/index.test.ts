@@ -96,7 +96,16 @@ vi.mock('@agent/core/recovery-policy', () => ({
       shouldRetry: vi.fn(() => true),
     }),
 }));
-vi.mock('@agent/core/async-utils', () => ({ retry: mocks.retry }));
+vi.mock('@agent/core/async-utils', () => ({
+  retry: mocks.retry,
+  getRetryDefaults: vi.fn(() => ({
+    maxRetries: 2,
+    initialDelayMs: 250,
+    maxDelayMs: 2000,
+    factor: 2,
+    jitter: true,
+  })),
+}));
 vi.mock('@agent/core/pipeline/op-preflight', () => ({ runOpPreflight: mocks.runOpPreflight }));
 vi.mock('@agent/core/pipeline/op-preflight-defaults', () => ({
   ensureDefaultOpPreflight: mocks.ensureDefaultOpPreflight,

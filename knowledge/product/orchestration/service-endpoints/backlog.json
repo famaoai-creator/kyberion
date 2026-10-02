@@ -5,10 +5,9 @@
       "base_url": "https://{{space}}.backlog.com/api/v2",
       "preset_path": "knowledge/product/orchestration/service-presets/backlog.json",
       "credential_suffixes": {
-        "accessToken": [
-          "API_KEY"
-        ]
-      }
+        "accessToken": ["API_KEY"]
+      },
+      "auth_strategy": "api_key_query"
     }
   }
 }

@@ -6,7 +6,8 @@
       "preset_path": "knowledge/product/orchestration/service-presets/box.json",
       "credential_suffixes": {
         "accessToken": ["ACCESS_TOKEN", "DEVELOPER_TOKEN", "TOKEN"]
-      }
+      },
+      "auth_strategy": "Bearer"
     }
   }
 }

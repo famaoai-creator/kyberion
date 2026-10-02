@@ -11,13 +11,14 @@ import {
   safeReaddir,
   safeWriteFile,
 } from '../secure-io.js';
+import type { ArtifactKind } from './artifact-registry.js';
 
 export type ArtifactBundleStatus =
   'assembling' | 'pending_review' | 'approved' | 'rejected' | 'superseded';
 
 export interface ArtifactBundleItem {
   artifact_id: string;
-  kind: string;
+  kind: ArtifactKind;
   storage_class: 'repo' | 'artifact_store' | 'vault' | 'tmp' | 'external_ref';
   path?: string;
   external_ref?: string;
@@ -287,7 +288,7 @@ export function applyBundleApproval(
 export function checkArtifactBundleFulfillment(
   bundle: ArtifactBundle
 ): ArtifactBundleFulfillmentReport {
-  const covered = new Set(bundle.items.map((item) => item.kind));
+  const covered = new Set<string>(bundle.items.map((item) => item.kind));
   const satisfied = bundle.required_artifact_kinds.filter((kind) => covered.has(kind));
   const missing = bundle.required_artifact_kinds.filter((kind) => !covered.has(kind));
   return { satisfied, missing, fulfilled: missing.length === 0 };

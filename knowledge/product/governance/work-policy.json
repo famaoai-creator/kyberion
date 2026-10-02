@@ -274,6 +274,9 @@
         "match": {},
         "label": "general_request"
       }
-    ]
+    ],
+    "defaults": {
+      "fallback_intent_label": "general_request"
+    }
   }
 }

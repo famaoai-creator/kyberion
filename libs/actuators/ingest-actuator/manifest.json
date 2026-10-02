@@ -5,14 +5,7 @@
   "resilience_tier": "fail_fast",
   "recovery_policy": {
     "fallback_strategy": "none",
-    "retry": {
-      "maxRetries": 0,
-      "initialDelayMs": 0,
-      "maxDelayMs": 0,
-      "factor": 1,
-      "jitter": false
-    },
-    "retryable_categories": []
+    "retry_profile": "ingest-actuator"
   },
   "capabilities": [
     {

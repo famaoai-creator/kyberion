@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/retry-policy.schema.json",
+  "title": "Retry Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "defaults"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "defaults": {
+      "$ref": "#/$defs/retryProfile"
+    },
+    "actuators": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/retryProfile"
+      }
+    }
+  },
+  "$defs": {
+    "retryProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxRetries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "initialDelayMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maxDelayMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "factor": {
+          "type": "number",
+          "minimum": 1
+        },
+        "jitter": {
+          "type": "boolean"
+        },
+        "retryable_categories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

@@ -126,3 +126,25 @@ describe('outcome-contract', () => {
     expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
   });
 });
+
+it('retains a schema-valid legacy development mission kind', async () => {
+  const { compileSchemaFromPath } = await import('./schema-loader.js');
+  const { pathResolver } = await import('./path-resolver.js');
+  const validate = compileSchemaFromPath(
+    new Ajv({ allErrors: true, strict: false }),
+    pathResolver.knowledge('product/schemas/outcome-contract.schema.json')
+  );
+  const contract = inferMissionOutcomeContract({
+    missionId: 'MSN-DEVELOPMENT',
+    missionType: 'development',
+    intentGoal: { summary: 'Implement feature', success_condition: 'Validated feature' },
+  });
+  expect(validate(contract)).toBe(true);
+});
+
+it('resolves unknown mission types to the governed fallback and preserves sanctioned legacy types', async () => {
+  const { resolveMissionDeliverableKind } = await import('./outcome-contract.js');
+  expect(resolveMissionDeliverableKind('unregistered-kind')).toBe('summary');
+  expect(resolveMissionDeliverableKind('operations_report')).toBe('operations_report');
+  expect(resolveMissionDeliverableKind('evaluation')).toBe('evaluation');
+});

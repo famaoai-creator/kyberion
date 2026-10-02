@@ -641,18 +641,17 @@ export function readManifest(missionPath: string): MissionWorkItemDispatchManife
   }
 }
 
+/** Dispatch restoration requires canonical context; legacy records use migrateLegacyWorkItemContexts. */
 export function getMissionLabel(item: WorkItem): string | undefined {
-  return (item.labels || [])
-    .find((label) => label.startsWith('mission:'))
-    ?.slice('mission:'.length);
+  const missionId = item.context?.mission_id;
+  return typeof missionId === 'string' && missionId.trim() ? missionId.trim() : undefined;
 }
 
 export function getTeamRole(item: WorkItem): string | undefined {
-  const label = (item.labels || []).find((entry) => entry.startsWith('team_role:'));
-  if (label) return label.slice('team_role:'.length);
   const metadata = item.metadata as Record<string, unknown> | undefined;
   const teamRole = metadata?.team_role;
-  return typeof teamRole === 'string' ? teamRole : undefined;
+  if (typeof teamRole === 'string' && teamRole.trim()) return teamRole.trim();
+  return undefined;
 }
 
 export function getTaskDescription(item: WorkItem): string {

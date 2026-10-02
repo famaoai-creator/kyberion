@@ -62,7 +62,8 @@ import {
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('imessage-bridge');
-import { scheduleBridgeProcessingNote } from '@agent/core/bridge-typing';
+// C7: shared poll-loop + working-note guards (behavior unchanged).
+import { scheduleBridgeWorkingNote, startBridgePollLoop } from '../../shared/bridge-poll-loop.js';
 
 interface BridgeInput {
   action?: string;
@@ -308,7 +309,7 @@ export function buildIMessageChannelAdapter(msg: IMessageStimulus): ChannelAdapt
     typing: () => {
       // Capture the turn's reply locale now: the note fires later, outside the turn's async context.
       const noteLocale = resolveOperatorLocale();
-      const processingNote = scheduleBridgeProcessingNote('imessage-bridge', () =>
+      const processingNote = scheduleBridgeWorkingNote('imessage-bridge', () =>
         sendIMessageText(
           buildIMessageReplyRequest(msg, t('bridge:processing_note', undefined, noteLocale))
         )
@@ -598,12 +599,22 @@ async function main(args: string[] = []) {
 
     if (argv.poll) {
       logger.info('🔍 [iMessageBridge] Starting background polling (every 5s)...');
-      setInterval(pollIMessages, 5000).unref();
+      // C7: shared poll loop (fixed 5s cadence preserved; duplicate starts no-op).
+      startBridgePollLoop({ name: 'imessage-poll', intervalMs: 5000, poll: pollIMessages });
     }
 
     // HA-07: drain mission/operator notifications queued for the iMessage
     // surface. Keep failed records for a later retry instead of dropping them.
-    setInterval(() => void runIMessageOutbox(drainIMessageOutbox), 15_000).unref();
+    // C7: shared poll loop (fixed 15s cadence + outbox drain guard preserved).
+    startBridgePollLoop({
+      name: 'imessage-outbox',
+      intervalMs: 15_000,
+      poll: () => runIMessageOutbox(drainIMessageOutbox),
+      onError: (error) =>
+        logger.error(
+          `❌ [iMessageBridge] Outbox poll failed: ${error instanceof Error ? error.message : String(error)}`
+        ),
+    });
     void runIMessageOutbox(drainIMessageOutbox);
   }
 

@@ -1,13 +1,8 @@
+import { getRetryDefaults } from '@agent/core/async-utils';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
 
-const DEFAULT_MEETING_BROWSER_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 10000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_MEETING_BROWSER_RETRY = getRetryDefaults('meeting-browser-driver:defaults');
 
 const { buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: pathResolver.rootResolve('libs/actuators/meeting-browser-driver/manifest.json'),

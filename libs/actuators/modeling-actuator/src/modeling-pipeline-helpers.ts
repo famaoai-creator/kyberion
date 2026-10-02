@@ -18,7 +18,7 @@ import {
 } from '@agent/core/execution-bounds';
 import { pathResolver } from '@agent/core/path-resolver';
 import { evaluateCondition, getPathValue, resolveWriteArtifactSpec } from '@agent/core/logic-utils';
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 
 import { runGovernedShellScript } from '@agent/core/command-runner';
 import {
@@ -64,13 +64,7 @@ import {
   extractTestPlan,
 } from './sdlc-ops.js';
 
-const DEFAULT_MODEL_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 150,
-  maxDelayMs: 1200,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_MODEL_RETRY = getRetryDefaults('modeling-actuator:defaults');
 
 const { buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: pathResolver.rootResolve('libs/actuators/modeling-actuator/manifest.json'),

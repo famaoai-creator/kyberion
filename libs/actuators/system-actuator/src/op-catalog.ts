@@ -24,6 +24,10 @@ export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
   'baseline_check',
   'exec',
   'shell',
+  'narrated_report_preflight',
+  'validate_audio_artifact',
+  'partition_surface_health',
+  'collect_surface_errors',
   'cli_health_check',
   'list_missions',
   'list_projects',
@@ -53,6 +57,8 @@ export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
 ] as const;
 
 export const SYSTEM_ACTUATOR_APPLY_OPS = [
+  'standard_pr_lifecycle',
+  'provider_preflight',
   'scroll',
   'drag',
   'clipboard_write',
@@ -149,6 +155,69 @@ const SYSTEM_EXTRA_CONTRACTS: Record<string, SystemOpSpec['input_schema']> = {
       pattern: { type: 'string' },
       recursive: { type: 'boolean' },
     },
+    additionalProperties: false,
+  },
+  standard_pr_lifecycle: {
+    type: 'object',
+    required: ['branch_name', 'commit_message', 'pr_title', 'pr_body'],
+    properties: {
+      branch_name: { type: 'string', minLength: 1 },
+      commit_message: { type: 'string', minLength: 1 },
+      pr_title: { type: 'string', minLength: 1 },
+      pr_body: { type: 'string' },
+      auto_merge: { type: 'boolean' },
+      export_as: { type: 'string' },
+    },
+    additionalProperties: false,
+  },
+  provider_preflight: {
+    type: 'object',
+    properties: {
+      providers: {
+        type: 'array',
+        items: {
+          type: 'object',
+          required: ['name', 'command'],
+          properties: {
+            name: { type: 'string' },
+            command: { type: 'string' },
+            version_args: { type: 'array', items: { type: 'string' } },
+            ping_args: { type: 'array', items: { type: 'string' } },
+            capability_marker: { type: 'string' },
+            capability_args: { type: 'array', items: { type: 'string' } },
+            fallback_command: { type: 'string' },
+            fallback_args: { type: 'array', items: { type: 'string' } },
+          },
+          additionalProperties: false,
+        },
+      },
+      export_as: { type: 'string' },
+    },
+    required: ['providers'],
+    additionalProperties: false,
+  },
+  narrated_report_preflight: {
+    type: 'object',
+    properties: { export_as: { type: 'string' } },
+    required: [],
+    additionalProperties: false,
+  },
+  validate_audio_artifact: {
+    type: 'object',
+    properties: { path: { type: 'string' }, export_as: { type: 'string' } },
+    required: ['path'],
+    additionalProperties: false,
+  },
+  partition_surface_health: {
+    type: 'object',
+    properties: { surfaces: { type: 'array' }, export_as: { type: 'string' } },
+    required: ['surfaces'],
+    additionalProperties: false,
+  },
+  collect_surface_errors: {
+    type: 'object',
+    properties: { export_as: { type: 'string' } },
+    required: [],
     additionalProperties: false,
   },
   cli_health_check: {

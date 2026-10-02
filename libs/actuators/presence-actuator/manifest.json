@@ -6,14 +6,7 @@
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "slack_then_log",
-    "retry": {
-      "maxRetries": 2,
-      "initialDelayMs": 500,
-      "maxDelayMs": 5000,
-      "factor": 2,
-      "jitter": true
-    },
-    "retryable_categories": ["network", "timeout", "resource_unavailable", "rate_limit"]
+    "retry_profile": "presence-actuator"
   },
   "capabilities": [
     { "op": "dispatch", "platforms": ["darwin", "linux", "win32"] },

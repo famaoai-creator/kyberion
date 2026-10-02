@@ -2,7 +2,8 @@
   "default_pattern": "https://api.{service_id}.com/v1",
   "services": {
     "github-mcp": {
-      "preset_path": "knowledge/product/orchestration/service-presets/github-mcp.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/github-mcp.json",
+      "auth_strategy": "none"
     }
   }
 }

@@ -11,6 +11,18 @@ interface SeamRoleEntry {
 }
 
 const SEAM_ROLES: Record<string, SeamRoleEntry> = {
+  'intent:param-extract': {
+    declaration: 'libs/core/intent/intent-resolution.ts',
+    consumers: ['libs/core/intent/intent-resolution.ts'],
+  },
+  'question-profile-provider': {
+    declaration: 'libs/core/question-resolver.ts',
+    consumers: ['libs/core/question-resolver.ts'],
+  },
+  'surface-task-reply-section': {
+    declaration: 'libs/core/surface/surface-runtime-helpers.ts',
+    consumers: ['libs/core/surface/surface-runtime-helpers.ts'],
+  },
   'a2a-route': {
     declaration: 'libs/core/mesh/a2a-route-port.ts',
     consumers: ['libs/core/mesh/a2a-bridge.ts'],

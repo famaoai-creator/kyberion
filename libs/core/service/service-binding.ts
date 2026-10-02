@@ -1,3 +1,4 @@
+import type { ServiceAuthMode, CredentialSuffixKey } from './service-endpoint-registry.js';
 export {
   getServiceEndpointRecord,
   getServiceEndpointRecordForIntent,
@@ -13,7 +14,7 @@ import type { SecretReference } from '../secret/secret-resolver.js';
 
 export interface ServiceBinding {
   serviceId: string;
-  authMode: 'none' | 'secret-guard' | 'session';
+  authMode: ServiceAuthMode;
   accessToken?: string;
   appToken?: string;
   refreshToken?: string;
@@ -21,12 +22,7 @@ export interface ServiceBinding {
   clientSecret?: string;
   redirectUri?: string;
   /** Non-sensitive env-name references retained for late-bound consumers. */
-  secretReferences?: Partial<
-    Record<
-      'accessToken' | 'appToken' | 'refreshToken' | 'clientId' | 'clientSecret' | 'redirectUri',
-      SecretReference[]
-    >
-  >;
+  secretReferences?: Partial<Record<CredentialSuffixKey, SecretReference[]>>;
   metadata?: Record<string, unknown>;
 }
 
@@ -48,6 +44,8 @@ export function resolveServiceBinding(
     };
   }
 
+  // Suffixes are catalog-governed (service-endpoints.schema.json defaults applied
+  // on load); no hardcoded fallback literals live here.
   const suffixes = getServiceCredentialSuffixes(serviceId);
   const referenceOperation = 'service.binding';
   const referenceEntry = (key: string, candidates: string[]) => {
@@ -55,25 +53,19 @@ export function resolveServiceBinding(
     return references.length > 0 ? { [key]: references } : {};
   };
   const secretReferences = {
-    ...referenceEntry(
-      'accessToken',
-      suffixes.accessToken || ['ACCESS_TOKEN', 'BOT_TOKEN', 'TOKEN']
-    ),
+    ...referenceEntry('accessToken', suffixes.accessToken || []),
     ...referenceEntry('appToken', suffixes.appToken || []),
-    ...referenceEntry('refreshToken', suffixes.refreshToken || ['REFRESH_TOKEN']),
-    ...referenceEntry('clientId', suffixes.clientId || ['CLIENT_ID']),
-    ...referenceEntry('clientSecret', suffixes.clientSecret || ['CLIENT_SECRET']),
+    ...referenceEntry('refreshToken', suffixes.refreshToken || []),
+    ...referenceEntry('clientId', suffixes.clientId || []),
+    ...referenceEntry('clientSecret', suffixes.clientSecret || []),
     ...referenceEntry('redirectUri', suffixes.redirectUri || []),
   };
-  const accessToken = resolveServiceSecret(
-    serviceId,
-    suffixes.accessToken || ['ACCESS_TOKEN', 'BOT_TOKEN', 'TOKEN']
-  );
+  const accessToken = resolveServiceSecret(serviceId, suffixes.accessToken || []);
   const appToken = resolveServiceSecret(serviceId, suffixes.appToken || []);
-  const refreshToken = resolveServiceSecret(serviceId, suffixes.refreshToken || ['REFRESH_TOKEN']);
-  const clientId = resolveServiceSecret(serviceId, suffixes.clientId || ['CLIENT_ID']);
-  const clientSecret = resolveServiceSecret(serviceId, suffixes.clientSecret || ['CLIENT_SECRET']);
-  const redirectUri = resolveServiceSecret(serviceId, suffixes.redirectUri || ['REDIRECT_URI']);
+  const refreshToken = resolveServiceSecret(serviceId, suffixes.refreshToken || []);
+  const clientId = resolveServiceSecret(serviceId, suffixes.clientId || []);
+  const clientSecret = resolveServiceSecret(serviceId, suffixes.clientSecret || []);
+  const redirectUri = resolveServiceSecret(serviceId, suffixes.redirectUri || []);
 
   if (!accessToken && !appToken && !refreshToken && !clientId && !clientSecret && !redirectUri) {
     throw new Error(`Access denied: no service binding secret found for "${serviceId}"`);

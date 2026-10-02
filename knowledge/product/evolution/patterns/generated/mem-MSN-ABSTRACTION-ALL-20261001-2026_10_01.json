@@ -1,0 +1,22 @@
+{
+  "record_id": "mem-MSN-ABSTRACTION-ALL-20261001-2026_10_01",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Keep service auth readiness suffixes strategy-specific",
+  "summary": "Catalog-driven auth readiness must preserve strategy-specific secret matching when credential suffixes move into shared schemas.",
+  "candidate_id": "mem-MSN-ABSTRACTION-ALL-20261001-2026_10_01",
+  "evidence_refs": [
+    "active/missions/public/MSN-ABSTRACTION-ALL-20261001/evidence/REVIEW-contract_authoring-ux-contract.md",
+    "active/missions/public/MSN-ABSTRACTION-ALL-20261001/evidence/test-report.md",
+    "active/missions/public/MSN-ABSTRACTION-ALL-20261001/evidence/implementation-report.md"
+  ],
+  "created_at": "2026-10-01T21:39:45.838Z",
+  "applicability": ["mission", "mission:MSN-ABSTRACTION-ALL-20261001"],
+  "reusable_steps": [
+    "Catalog-driven auth readiness must preserve strategy-specific secret matching when credential suffixes move into shared schemas"
+  ],
+  "expected_outcome": "When centralizing credential suffixes, model strategy-specific credentials separately from broad service-binding token aliases. Derive runtime readiness from schema-governed defaults and test the exact environment names accepted per auth strategy. Otherwise a generic token alias can incorrectly remove an operator-facing auth blocker, as observed for Jira and Zendesk Basic auth. Keep generated endpoint snapshots derived only from canonical per-service files so stale snapshot values cannot conceal missing catalog defaults.",
+  "source_branch": "feat/abstraction-all-20261001",
+  "source_commit": "3c9132d4c09fd377a5330f6b0522f8949a0da885"
+}

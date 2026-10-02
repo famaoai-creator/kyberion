@@ -1,19 +1,12 @@
 {
   "actuator_id": "system-actuator",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "OS-level control plane for diagnostics, input toggles, and short-lived OS actions",
   "contract_schema": "knowledge/product/schemas/system-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "os_action_retry",
-    "retry": {
-      "maxRetries": 2,
-      "initialDelayMs": 250,
-      "maxDelayMs": 2000,
-      "factor": 2,
-      "jitter": true
-    },
-    "retryable_categories": ["network", "timeout", "resource_unavailable"]
+    "retry_profile": "system-actuator"
   },
   "capabilities": [
     {
@@ -21,37 +14,142 @@
       "schema_ref": "knowledge/product/schemas/system-pipeline.schema.json",
       "platforms": ["darwin", "linux", "win32"]
     },
-    { "op": "reconcile", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "reconcile_config_fallbacks", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "reconcile_unclassified_errors", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "reconcile_unhandled_intents", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "baseline_check", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "cost_report", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "audit_verify", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "summarize_memory_promotion_queue", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "summarize_task_model_routing", "platforms": ["darwin", "linux", "win32"] },
+    {
+      "op": "reconcile",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "reconcile_config_fallbacks",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "reconcile_unclassified_errors",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "reconcile_unhandled_intents",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "baseline_check",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "cost_report",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "audit_verify",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "summarize_memory_promotion_queue",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "summarize_task_model_routing",
+      "platforms": ["darwin", "linux", "win32"]
+    },
     {
       "op": "computer_interaction",
       "schema_ref": "knowledge/product/schemas/computer-interaction.schema.json",
       "platforms": ["darwin", "linux", "win32"]
     },
-    { "op": "record_screen", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "record_audio", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "capture_photo", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "record_camera", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "list_input_devices", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "macos_automation_probe", "platforms": ["darwin"] },
-    { "op": "list_displays", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "list_media_devices", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "list_tool_runtimes", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "list_service_runtimes", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "control_media_devices", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "test_audio_outputs", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "test_audio_inputs", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "test_screen_stream", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "test_screen_mp4_roundtrip", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "test_camera_stream", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "test_camera_mp4_roundtrip", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "test_camera_injection", "platforms": ["darwin", "linux", "win32"] }
+    {
+      "op": "record_screen",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "record_audio",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "capture_photo",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "record_camera",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "list_input_devices",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "macos_automation_probe",
+      "platforms": ["darwin"]
+    },
+    {
+      "op": "list_displays",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "list_media_devices",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "list_tool_runtimes",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "list_service_runtimes",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "control_media_devices",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "test_audio_outputs",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "test_audio_inputs",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "test_screen_stream",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "test_screen_mp4_roundtrip",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "test_camera_stream",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "test_camera_mp4_roundtrip",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "test_camera_injection",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "provider_preflight",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "narrated_report_preflight",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "validate_audio_artifact",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "partition_surface_health",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "collect_surface_errors",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "standard_pr_lifecycle",
+      "platforms": ["darwin", "linux", "win32"]
+    }
   ]
 }

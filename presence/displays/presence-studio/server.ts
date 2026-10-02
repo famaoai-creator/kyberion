@@ -79,6 +79,8 @@ import {
   readEmailDraftArtifact as readSharedEmailDraftArtifact,
 } from '@agent/core/integrations/email-workflow';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
+// C7: shared poll loop (fixed cadence preserved; see tail).
+import { startBridgePollLoop } from '../../../satellites/shared/bridge-poll-loop.js';
 import { registerFrontDeskRoutes } from './front-desk-routes.js';
 import { registerHearingRoutes } from './hearing-routes.js';
 import { registerHearingMissionRoutes } from './hearing-mission-routes.js';
@@ -198,7 +200,7 @@ presenceStudioData.app.get('/api/email-auth-status', (_req, res) => {
 presenceStudioData.app.get('/api/standard-intents', (_req, res) => {
   try {
     const items = loadStandardIntentCatalog()
-      .filter((intent) => intent?.category === 'surface')
+      .filter((intent) => intent?.legacy_category === 'surface')
       .map((intent) => {
         const design = resolveWorkDesign({
           intentId: intent.id,
@@ -1561,6 +1563,9 @@ presenceStudioData.server.listen(presenceStudioData.PORT, presenceStudioData.HOS
   }
 });
 
-setInterval(() => {
-  void presenceStudioData.pollVoiceHubSpeechStateForSse();
-}, presenceStudioData.SPEECH_STATE_POLL_MS);
+// C7: shared poll loop (SPEECH_STATE_POLL_MS cadence + in-flight guard preserved).
+startBridgePollLoop({
+  name: 'presence-studio-speech-state',
+  intervalMs: presenceStudioData.SPEECH_STATE_POLL_MS,
+  poll: () => presenceStudioData.pollVoiceHubSpeechStateForSse(),
+});

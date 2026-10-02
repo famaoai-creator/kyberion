@@ -226,7 +226,16 @@ vi.mock('@agent/core/voice/voice-engine-registry', () => ({
 vi.mock('@agent/core/voice/voice-tts-config', () => ({
   getVoiceTtsLanguageConfig: mocks.getVoiceTtsLanguageConfig,
 }));
-vi.mock('@agent/core/async-utils', () => ({ retry: mocks.retry }));
+vi.mock('@agent/core/async-utils', () => ({
+  retry: mocks.retry,
+  getRetryDefaults: vi.fn(() => ({
+    maxRetries: 2,
+    initialDelayMs: 500,
+    maxDelayMs: 10000,
+    factor: 2,
+    jitter: true,
+  })),
+}));
 vi.mock('@agent/core/tool/tool-runtime-registry', () => ({
   resolveManagedToolPythonBin: mocks.resolveManagedToolPythonBin,
 }));

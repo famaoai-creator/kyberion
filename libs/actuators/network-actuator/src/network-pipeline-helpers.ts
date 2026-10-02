@@ -19,7 +19,7 @@ import {
   getPathValue,
   resolveWriteArtifactSpec,
 } from '@agent/core/logic-utils';
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { buildUnknownActuatorOpError } from '@agent/core/actuator/actuator-op-registry';
 import {
   runAdfActuatorPipeline,
@@ -39,13 +39,7 @@ import { sendA2AMessage, pollA2AInbox } from './a2a-transport.js';
 const { buildStepRetryOptions: buildRetryOptions, assertUnsafeShellAllowed } =
   defineActuatorPipelineBase({
     manifestPath: pathResolver.rootResolve('libs/actuators/network-actuator/manifest.json'),
-    retryDefaults: {
-      maxRetries: 3,
-      initialDelayMs: 1000,
-      maxDelayMs: 10000,
-      factor: 2,
-      jitter: true,
-    },
+    retryDefaults: getRetryDefaults('network-actuator:defaults'),
     retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
   });
 

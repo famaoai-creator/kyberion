@@ -1,0 +1,11 @@
+{
+  "$schema": "../schemas/tasktype-artifact-map.schema.json",
+  "version": "1.0.0",
+  "mappings": {
+    "presentation_deck": { "kind": "pptx", "storage_class": "artifact_store" },
+    "report_document": { "kind": "docx", "storage_class": "artifact_store" },
+    "workbook_wbs": { "kind": "xlsx", "storage_class": "artifact_store" },
+    "capture_photo": { "kind": "image", "storage_class": "artifact_store" }
+  },
+  "fallback": { "kind": "summary" }
+}

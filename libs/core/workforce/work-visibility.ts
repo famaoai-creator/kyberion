@@ -126,9 +126,61 @@ function firstString(...values: unknown[]): string | undefined {
   return undefined;
 }
 
-function missionFromLabel(labels: string[]): string | undefined {
+/**
+ * D2: legacy display-only reader for `mission:<id>` labels.
+ *
+ * Labels are display-only. Typed `WorkItemContext.mission_id` (canonical order:
+ * `tenant_slug → organization_id → project_id → mission_id → task_id`,
+ * see `libs/core/entity-scope.ts` ENTITY_SCOPE_HIERARCHY) is the source of truth
+ * for search and restoration. This helper exists solely as the last-resort
+ * backward-compatibility fallback inside {@link resolveMissionId}.
+ *
+ * @deprecated set typed `context.mission_id` on creation instead.
+ */
+function legacyMissionIdFromLabels(labels: string[]): string | undefined {
   const label = labels.find((entry) => entry.startsWith('mission:'));
   return label ? stringValue(label.slice('mission:'.length)) : undefined;
+}
+
+/** Primary mission-id source: typed context first, legacy metadata second. */
+function missionIdFromTypedContext(
+  explicit: Record<string, unknown>,
+  metadata: Record<string, unknown>
+): string | undefined {
+  return firstString(explicit.mission_id, metadata.mission_id);
+}
+
+/**
+ * D2: context-first mission resolution with labels as backward-compatible fallback.
+ *
+ * Resolution order is `context.mission_id → metadata.mission_id → mission:<id>`
+ * display label. Results are identical to the previous label-inclusive lookup
+ * for well-formed items (context and label agree) and for legacy label-only
+ * items (fallback still applies); context-only items now resolve where the old
+ * label-dependent search missed them.
+ */
+export function resolveMissionId(item: Pick<WorkItem, 'labels' | 'context' | 'metadata'>): {
+  missionId: string | undefined;
+  fromLegacyLabels: boolean;
+} {
+  const explicit = record(item.context);
+  const metadata = record(item.metadata);
+  const typed = missionIdFromTypedContext(explicit, metadata);
+  if (typed) return { missionId: typed, fromLegacyLabels: false };
+  const legacy = legacyMissionIdFromLabels(item.labels || []);
+  return { missionId: legacy, fromLegacyLabels: legacy !== undefined };
+}
+
+/**
+ * D2: context-mandatory mission match for search / restoration paths.
+ * Only the canonical typed context can establish mission membership.
+ * Legacy metadata and labels remain available for display migration warnings.
+ */
+export function matchesMissionId(
+  item: Pick<WorkItem, 'labels' | 'context' | 'metadata'>,
+  missionId: string
+): boolean {
+  return stringValue(record(item.context).mission_id) === missionId;
 }
 
 /** Resolve canonical context while making migration debt visible to callers. */
@@ -137,11 +189,10 @@ export function resolveWorkItemContext(item: WorkItem): ResolvedWorkItemContext 
   const metadata = record(item.metadata);
   const organizationId = firstString(explicit.organization_id, metadata.organization_id);
   const tenantSlug = firstString(explicit.tenant_slug, metadata.tenant_slug);
-  const missionId = firstString(
-    explicit.mission_id,
-    metadata.mission_id,
-    missionFromLabel(item.labels || [])
-  );
+  // D2: mission resolution is context-mandatory; `mission:<id>` labels are a
+  // display-only backward-compatibility fallback (see resolveMissionId).
+  const resolvedMission = resolveMissionId(item);
+  const missionId = resolvedMission.missionId;
   const projectId = firstString(explicit.project_id, item.project_id);
   const taskId = firstString(explicit.task_id, metadata.task_id);
   const workShape = firstString(
@@ -163,12 +214,20 @@ export function resolveWorkItemContext(item: WorkItem): ResolvedWorkItemContext 
     metadata.tenant_slug ||
     metadata.task_id ||
     metadata.work_shape ||
-    missionFromLabel(item.labels || [])
+    legacyMissionIdFromLabels(item.labels || [])
   );
   const warnings: string[] = [];
   if (!hasExplicitContext && hasLegacyContext) {
     warnings.push(
       '[DEPRECATED] work item context is carried by legacy metadata/labels; set typed context on creation'
+    );
+  }
+  // D2: keep the generic legacy warning above for backward compatibility, and
+  // additionally surface the label-only mission fallback so remaining
+  // `mission:<id>` display labels can be migrated toward typed context.
+  if (resolvedMission.fromLegacyLabels && resolvedMission.missionId) {
+    warnings.push(
+      `[DEPRECATED] mission_id '${resolvedMission.missionId}' resolved from display label; set context.mission_id on creation`
     );
   }
   if (!context.mission_id && !context.project_id)
@@ -180,6 +239,20 @@ export function resolveWorkItemContext(item: WorkItem): ResolvedWorkItemContext 
   };
 }
 
+/**
+ * D2: governance matching is context-mandatory first, labels second.
+ * `context.work_shape === 'governance_cadence'` is authoritative; the
+ * `governance` / `governance:*` display labels are a backward-compatible
+ * fallback (taxonomy: `knowledge/product/schemas/workitem-label-taxonomy.schema.json`).
+ * The `review` status clause is unchanged.
+ */
+function matchesGovernanceScope(item: VisibleWorkItem): boolean {
+  if (item.context.work_shape === 'governance_cadence') return true;
+  if (item.labels.some((label) => label === 'governance' || label.startsWith('governance:')))
+    return true;
+  return item.status === 'review';
+}
+
 function matchesScope(item: VisibleWorkItem, scope: WorkVisibilityScope): boolean {
   const context = item.context;
   switch (scope) {
@@ -189,11 +262,7 @@ function matchesScope(item: VisibleWorkItem, scope: WorkVisibilityScope): boolea
     case 'missions':
       return Boolean(context.mission_id);
     case 'governance':
-      return (
-        context.work_shape === 'governance_cadence' ||
-        item.labels.some((label) => label === 'governance' || label.startsWith('governance:')) ||
-        item.status === 'review'
-      );
+      return matchesGovernanceScope(item);
     case 'organization':
     case 'work_items':
     default:
@@ -297,6 +366,7 @@ export function buildWorkVisibilityProjection(input: {
     input.projectId
   );
   const projected = input.items
+    .filter((item) => !input.missionId || matchesMissionId(item, input.missionId))
     .map((item) => ({ ...item, context: resolveWorkItemContext(item) }))
     .filter((item) => matchesScope(item, scope) && matchesView(item, view))
     .filter((item) =>
@@ -311,7 +381,6 @@ export function buildWorkVisibilityProjection(input: {
           item.context.organization_id && organizationScope.includes(item.context.organization_id)
         )
     )
-    .filter((item) => !input.missionId || item.context.mission_id === input.missionId)
     .filter(
       (item) =>
         projectScope === 'all' ||

@@ -6,6 +6,7 @@ import { missionCoordinationBus } from './mission-coordination-bus.js';
 import {
   claimWorkItem,
   importExternalWorkItem,
+  listWorkItems,
   releaseWorkItem,
   updateWorkItem,
 } from '../workforce/work-coordination.js';
@@ -67,6 +68,12 @@ export async function dispatchPlannedMissionTaskCore(
   gapRecorder?: GapRecorder
 ): Promise<DispatchMissionTaskOutcome | null> {
   const workItemSourceRef = `mission:${input.missionId}:${input.task.task_id}`;
+  // D2: re-imports of the same sourceRef replace the stored context, so merge
+  // onto the already-normalized context instead of clobbering project_id /
+  // work_shape that createWorkItem filled in on first dispatch.
+  const previousWorkItem = listWorkItems({ source: 'local' }).find(
+    (entry) => entry.source_ref === workItemSourceRef
+  );
   const workItem = importExternalWorkItem({
     source: 'local',
     sourceRef: workItemSourceRef,
@@ -76,7 +83,16 @@ export async function dispatchPlannedMissionTaskCore(
     priority: 'normal',
     projectId: input.missionId,
     assigneePeerId: input.assignment.agent_id,
+    // D2: `mission:<id>` / `team_role:<role>` labels stay as display-only
+    // markers (taxonomy: knowledge/product/schemas/workitem-label-taxonomy.schema.json).
+    // Typed `context` is written alongside so search / restoration paths resolve
+    // via `context.mission_id` without depending on label strings.
     labels: [`mission:${input.missionId}`, `team_role:${input.teamRole}`],
+    context: {
+      ...(previousWorkItem?.context || {}),
+      mission_id: input.missionId,
+      task_id: input.task.task_id,
+    },
     dependencies: Array.isArray(input.task.dependencies) ? input.task.dependencies : [],
     metadata: {
       deliverable: input.task.deliverable,

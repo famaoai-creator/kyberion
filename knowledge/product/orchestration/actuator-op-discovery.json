@@ -28506,6 +28506,72 @@
           ]
         },
         {
+          "op": "narrated_report_preflight",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "validate_audio_artifact",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "required": ["path"],
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "partition_surface_health",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "surfaces": {
+                "type": "array"
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "required": ["surfaces"],
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "collect_surface_errors",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
           "op": "cli_health_check",
           "kind": "capture",
           "input_schema": {
@@ -29213,6 +29279,100 @@
               "instruction": "Choose the safest next step."
             }
           ]
+        },
+        {
+          "op": "standard_pr_lifecycle",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["branch_name", "commit_message", "pr_title", "pr_body"],
+            "properties": {
+              "branch_name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "commit_message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "pr_title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "pr_body": {
+                "type": "string"
+              },
+              "auto_merge": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "provider_preflight",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "providers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["name", "command"],
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "command": {
+                      "type": "string"
+                    },
+                    "version_args": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "ping_args": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "capability_marker": {
+                      "type": "string"
+                    },
+                    "capability_args": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "fallback_command": {
+                      "type": "string"
+                    },
+                    "fallback_args": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "required": ["providers"],
+            "additionalProperties": false
+          },
+          "examples": [{}]
         },
         {
           "op": "scroll",

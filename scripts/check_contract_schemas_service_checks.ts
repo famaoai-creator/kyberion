@@ -17,14 +17,17 @@ export function createServiceChecks(): ContractCheck[] {
           services: {
             moltbook: {
               base_url: 'https://www.moltbook.com/api/v1',
+              auth_strategy: 'bearer',
             },
             slack: {
               base_url: 'https://slack.com/api',
               preset_path: 'knowledge/product/orchestration/service-presets/slack.json',
+              auth_strategy: 'bearer',
             },
             github: {
               base_url: 'https://api.github.com',
               preset_path: 'knowledge/product/orchestration/service-presets/github.json',
+              auth_strategy: 'bearer',
             },
           },
         },

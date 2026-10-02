@@ -3,7 +3,8 @@
   "services": {
     "notion": {
       "base_url": "https://api.notion.com/v1",
-      "preset_path": "knowledge/product/orchestration/service-presets/notion.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/notion.json",
+      "auth_strategy": "Bearer"
     }
   }
 }

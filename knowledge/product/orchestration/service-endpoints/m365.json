@@ -4,7 +4,8 @@
     "m365": {
       "preset_path": "knowledge/product/orchestration/service-presets/m365.json",
       "allow_unsafe_cli": true,
-      "intent_aliases": ["outlook_calendar"]
+      "intent_aliases": ["outlook_calendar"],
+      "auth_strategy": "none"
     }
   }
 }

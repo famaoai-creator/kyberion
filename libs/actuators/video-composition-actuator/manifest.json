@@ -5,14 +5,7 @@
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "video_bundle_retry",
-    "retry": {
-      "maxRetries": 2,
-      "initialDelayMs": 250,
-      "maxDelayMs": 2000,
-      "factor": 2,
-      "jitter": true
-    },
-    "retryable_categories": ["resource_unavailable", "timeout"]
+    "retry_profile": "video-composition-actuator"
   },
   "capabilities": [
     { "op": "prepare_video_composition", "platforms": ["darwin", "linux", "win32"] },

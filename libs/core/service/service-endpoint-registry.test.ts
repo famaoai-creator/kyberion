@@ -20,7 +20,7 @@ describe('service-endpoint-registry', () => {
       snapshotPath,
       JSON.stringify({
         default_pattern: 'https://api.{service_id}.com/v1',
-        services: { slack: { base_url: 'https://slack.com/api' } },
+        services: { slack: { base_url: 'https://slack.com/api', auth_strategy: 'Bearer' } },
       })
     );
     process.env.KYBERION_SERVICE_ENDPOINTS_PATH = snapshotPath;
@@ -49,4 +49,13 @@ describe('service-endpoint-registry', () => {
 
     expect(() => loadServiceEndpointsCatalog()).toThrow('[RESOURCE_PATH_SCOPE]');
   });
+});
+
+it('keeps canonical endpoint auth strategies aligned with their service presets', async () => {
+  const { safeReadFile } = await import('../secure-io.js');
+  for (const endpoint of Object.values(loadServiceEndpointsCatalog().services)) {
+    if (!endpoint.preset_path) continue;
+    const preset = JSON.parse(safeReadFile(pathResolver.rootResolve(endpoint.preset_path), 'utf8'));
+    expect(endpoint.auth_strategy).toBe(preset.auth_strategy || 'none');
+  }
 });

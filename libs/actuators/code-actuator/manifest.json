@@ -6,14 +6,7 @@
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "code_io_retry",
-    "retry": {
-      "maxRetries": 2,
-      "initialDelayMs": 150,
-      "maxDelayMs": 1200,
-      "factor": 2,
-      "jitter": true
-    },
-    "retryable_categories": ["resource_unavailable", "timeout"]
+    "retry_profile": "code-actuator"
   },
   "capabilities": [
     {

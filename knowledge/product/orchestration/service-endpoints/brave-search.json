@@ -2,7 +2,8 @@
   "default_pattern": "https://api.{service_id}.com/v1",
   "services": {
     "brave-search": {
-      "preset_path": "knowledge/product/orchestration/service-presets/brave-search.json"
+      "preset_path": "knowledge/product/orchestration/service-presets/brave-search.json",
+      "auth_strategy": "none"
     }
   }
 }

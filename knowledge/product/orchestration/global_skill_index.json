@@ -215,8 +215,8 @@
       "path": "libs/actuators/system-actuator",
       "d": "OS-level control plane for diagnostics, input toggles, and short-lived OS actions",
       "s": "implemented",
-      "version": "1.10.0",
-      "capability_count": 29
+      "version": "1.11.0",
+      "capability_count": 35
     },
     {
       "n": "terminal-actuator",

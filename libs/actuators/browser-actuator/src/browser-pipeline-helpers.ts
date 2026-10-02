@@ -10,6 +10,7 @@ import { TraceContext, persistTrace } from '@agent/core/trace';
 import { pathResolver } from '@agent/core/path-resolver';
 
 import { decideFromObservation } from '@agent/core/semantic-decide';
+import { getRetryDefaults } from '@agent/core/async-utils';
 import { clamp, isRecord, nowIso } from '@agent/core/foundation';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { judgedFailureKindFields, saveBrowserFailureBundle } from './browser-failure-bundle.js';
@@ -76,13 +77,7 @@ const BROWSER_RUNTIME_DIR = pathResolver.shared('runtime/browser');
 const BROWSER_SESSION_DIR = path.join(BROWSER_RUNTIME_DIR, 'sessions');
 const EVIDENCE_DIR = pathResolver.rootResolve('evidence/browser');
 
-const DEFAULT_BROWSER_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 5000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_BROWSER_RETRY = getRetryDefaults('browser');
 
 const { buildStepRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
   manifestPath: pathResolver.rootResolve('libs/actuators/browser-actuator/manifest.json'),

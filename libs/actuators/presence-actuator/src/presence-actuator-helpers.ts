@@ -4,7 +4,7 @@ import { resolveServiceBinding } from '@agent/core/service/service-binding';
 import { validatePresenceTimeline } from '@agent/core/presence-surface';
 import * as pathResolver from '@agent/core/path-resolver';
 
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { secureFetch } from '@agent/core/network';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
@@ -20,13 +20,7 @@ import { WebClient } from '@slack/web-api';
 const PRESENCE_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/presence-actuator/manifest.json'
 );
-const DEFAULT_PRESENCE_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 5000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_PRESENCE_RETRY = getRetryDefaults('presence');
 
 /**
  * Helper to safely access global ptyEngine

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
 import { compileSchema } from '../foundation/ajv.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
+import type { ArtifactKind } from './artifact-registry.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -31,7 +32,7 @@ export interface ArtifactRecord {
   track_name?: string;
   mission_id?: string;
   task_session_id?: string;
-  kind: string;
+  kind: ArtifactKind;
   storage_class: 'repo' | 'artifact_store' | 'vault' | 'tmp' | 'external_ref';
   path?: string;
   external_ref?: string;

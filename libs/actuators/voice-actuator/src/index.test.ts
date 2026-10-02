@@ -380,7 +380,18 @@ vi.mock('@agent/core/path-resolver', async () => {
 vi.mock('@agent/core/async-utils', async () => {
   const actual =
     await vi.importActual<typeof import('@agent/core/async-utils')>('@agent/core/async-utils');
-  return { ...actual, retry: mocks.retry, sleep: vi.fn(async () => undefined) };
+  return {
+    ...actual,
+    retry: mocks.retry,
+    getRetryDefaults: vi.fn(() => ({
+      maxRetries: 2,
+      initialDelayMs: 500,
+      maxDelayMs: 10000,
+      factor: 2,
+      jitter: true,
+    })),
+    sleep: vi.fn(async () => undefined),
+  };
 });
 vi.mock('@agent/core/virtual/virtual-audio-output-playback-bridge', () => ({
   createVirtualAudioOutputPlaybackBridge: mocks.createVirtualAudioOutputPlaybackBridge,

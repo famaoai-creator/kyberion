@@ -10,7 +10,7 @@ import {
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveVars, evaluateCondition, getPathValue } from '@agent/core/logic-utils';
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 
 import { classifyError } from '@agent/core/error-classifier';
 import {
@@ -59,13 +59,7 @@ import {
 } from './wisdom-persisted-json.js';
 
 const KNOWLEDGE_TIER_PATTERN = /^(personal|confidential|public)$/;
-const DEFAULT_WISDOM_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 250,
-  maxDelayMs: 2000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_WISDOM_RETRY = getRetryDefaults('wisdom-actuator:defaults');
 const operationRetryState = new AsyncLocalStorage<Map<string, number>>();
 
 const RECONCILE_ALLOWED_OPS = new Set([

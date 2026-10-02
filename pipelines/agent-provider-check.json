@@ -1,90 +1,100 @@
 {
   "action": "pipeline",
   "name": "Agent Provider Availability Check",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Checks availability and version of all LLM agent providers dynamically using core:foreach.",
-  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used export_as without roles. Inner loop steps use legacy export_as as they are loop-local.",
   "context": {
     "providers": [
-      { "name": "Gemini", "bin": "gemini", "ping_args": "-p 'Reply with only the word PONG'" },
-      { "name": "Claude", "bin": "claude", "ping_args": "-p 'Reply with only the word PONG' --output-format text" },
-      { "name": "GitHub Copilot", "bin": "gh copilot --", "ping_args": "-p 'Reply with only the word PONG' --allow-all" }
+      {
+        "name": "Gemini",
+        "command": "gemini",
+        "version_args": ["--version"],
+        "ping_args": ["-p", "Reply with only the word PONG"],
+        "capability_marker": "--acp"
+      },
+      {
+        "name": "Claude",
+        "command": "claude",
+        "version_args": ["--version"],
+        "ping_args": ["-p", "Reply with only the word PONG", "--output-format", "text"],
+        "capability_marker": "stream-json"
+      },
+      {
+        "name": "GitHub Copilot",
+        "command": "gh",
+        "version_args": ["copilot", "--", "--version"],
+        "ping_args": ["copilot", "--", "-p", "Reply with only the word PONG", "--allow-all"],
+        "capability_marker": "--acp",
+        "capability_args": ["copilot", "--", "--help"]
+      },
+      {
+        "name": "Codex",
+        "command": "codex",
+        "fallback_command": "npx",
+        "fallback_args": ["codex", "--version"]
+      }
     ]
   },
   "steps": [
     {
       "role": "sink",
       "op": "system:log",
-      "params": { "message": "🔍 Checking Agent Provider Availability..." }
-    },
-    {
-      "role": "gate",
-      "op": "core:foreach",
       "params": {
-        "items": "{{providers}}",
-        "as": "p",
-        "do": [
-          { "role": "sink", "op": "system:log", "params": { "message": "\n=== {{p.name}} CLI ===" } },
-          { "role": "source", "op": "system:shell", "params": { "cmd": "which {{p.bin}} 2>/dev/null && echo 'INSTALLED' || echo 'NOT_FOUND'", "export_as": "status" } },
-          { "role": "source", "op": "system:shell", "params": { "cmd": "{{p.bin}} --version 2>/dev/null || echo 'N/A'", "export_as": "version" } },
-          { "role": "source", "op": "system:shell", "params": { "cmd": "echo 'ping' | {{p.bin}} {{p.ping_args}} 2>/dev/null | head -1 || echo 'FAILED'", "export_as": "ping" } },
-          { "role": "sink", "op": "system:log", "params": { "message": "  Install: {{status}}" } },
-          { "role": "sink", "op": "system:log", "params": { "message": "  Version: {{version}}" } },
-          { "role": "sink", "op": "system:log", "params": { "message": "  Ping:    {{ping}}" } }
-        ]
+        "message": "🔍 Checking Agent Provider Availability..."
       }
     },
-    { "role": "sink", "op": "system:log", "params": { "message": "\n=== OpenAI Codex CLI ===" } },
     {
-      "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "codex_installed", "type": "ShellResult" },
-      "params": { "cmd": "which codex 2>/dev/null && echo 'INSTALLED' || npx codex --version 2>/dev/null && echo 'INSTALLED (npx)' || echo 'NOT_FOUND'" }
-    },
-    { "role": "sink", "op": "system:log", "consumes": "codex_installed", "params": { "message": "  Install: {{codex_installed}}" } },
-
-    { "role": "sink", "op": "system:log", "params": { "message": "\n=== ACP Protocol Support ===" } },
-    {
-      "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "gemini_acp", "type": "ShellResult" },
-      "params": { "cmd": "gemini --help 2>&1 | grep -q '\\-\\-acp' && echo 'Gemini: ACP ✓' || echo 'Gemini: ACP ✗'" }
+      "id": "provider-preflight",
+      "role": "gate",
+      "op": "core:include",
+      "comment": "C1: full provider/codex/ACP preflight lives in the fragment; caller context `providers` supplies the loop items.",
+      "params": {
+        "fragment": "fragments/provider-preflight.json"
+      }
     },
     {
-      "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "copilot_acp", "type": "ShellResult" },
-      "params": { "cmd": "gh copilot -- --help 2>&1 | grep -q '\\-\\-acp' && echo 'Copilot: ACP ✓' || echo 'Copilot: ACP ✗'" }
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "\n=== Agent Manifest Definitions ==="
+      }
     },
     {
       "role": "source",
       "op": "system:shell",
-      "produces": { "channel": "claude_stream", "type": "ShellResult" },
-      "params": { "cmd": "claude --help 2>&1 | grep -q 'stream-json' && echo 'Claude: Stream-JSON ✓' || echo 'Claude: Stream-JSON ✗'" }
-    },
-    { "role": "sink", "op": "system:log", "consumes": "gemini_acp", "params": { "message": "  {{gemini_acp}}" } },
-    { "role": "sink", "op": "system:log", "consumes": "copilot_acp", "params": { "message": "  {{copilot_acp}}" } },
-    { "role": "sink", "op": "system:log", "consumes": "claude_stream", "params": { "message": "  {{claude_stream}}" } },
-
-    { "role": "sink", "op": "system:log", "params": { "message": "\n=== Agent Manifest Definitions ===" } },
-    {
-      "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "manifest_count", "type": "ShellResult" },
-      "params": { "cmd": "ls knowledge/product/agents/*.agent.md 2>/dev/null | wc -l | tr -d ' '" }
+      "produces": {
+        "channel": "manifest_count",
+        "type": "ShellResult"
+      },
+      "params": {
+        "cmd": "ls knowledge/product/agents/*.agent.md 2>/dev/null | wc -l | tr -d ' '"
+      }
     },
     {
       "role": "source",
       "op": "system:shell",
-      "produces": { "channel": "manifest_list", "type": "ShellResult" },
-      "params": { "cmd": "ls knowledge/product/agents/*.agent.md 2>/dev/null | xargs -I{} basename {} .agent.md | tr '\\n' ', '" }
+      "produces": {
+        "channel": "manifest_list",
+        "type": "ShellResult"
+      },
+      "params": {
+        "cmd": "ls knowledge/product/agents/*.agent.md 2>/dev/null | xargs -I{} basename {} .agent.md | tr '\\n' ', '"
+      }
     },
     {
       "role": "sink",
       "op": "system:log",
       "consumes": ["manifest_count", "manifest_list"],
-      "params": { "message": "  Manifests: {{manifest_count}} ({{manifest_list}})" }
+      "params": {
+        "message": "  Manifests: {{manifest_count}} ({{manifest_list}})"
+      }
     },
-    { "role": "sink", "op": "system:log", "params": { "message": "\n✅ Agent Provider Check Complete." } }
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "\n✅ Agent Provider Check Complete."
+      }
+    }
   ]
 }

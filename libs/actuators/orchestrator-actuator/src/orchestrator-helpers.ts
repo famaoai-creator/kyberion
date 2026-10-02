@@ -19,7 +19,7 @@ import {
   assertSafeRepositoryPath,
 } from '@agent/core/secure-io';
 import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 
 import { pathResolver } from '@agent/core/path-resolver';
 import { buildUnknownActuatorOpError } from '@agent/core/actuator/actuator-op-registry';
@@ -116,13 +116,7 @@ export type ExecutionPlanPreflightReport = {
 const ORCHESTRATOR_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/orchestrator-actuator/manifest.json'
 );
-const DEFAULT_ORCHESTRATOR_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 10000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_ORCHESTRATOR_RETRY = getRetryDefaults('orchestrator-actuator:defaults');
 
 function buildUnknownOrchestratorOpError(op: string): Error {
   return buildUnknownActuatorOpError('orchestrator', op);

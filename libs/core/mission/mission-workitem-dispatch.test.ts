@@ -15,7 +15,7 @@ import {
 import { AgyCliBackend, type AgyHarnessSession } from '../provider/agy-cli-backend.js';
 import {
   clearWorkCoordinationStore,
-  createWorkItem,
+  createWorkItem as createCanonicalWorkItem,
   getWorkItem,
   listWorkItems,
   setWorkCoordinationNamespace,
@@ -35,7 +35,11 @@ import {
 import type { MissionState } from './mission-types.js';
 import { dispatchMissionTickets } from './mission-ticket-dispatch.js';
 import { dispatchMissionWorkItems } from './mission-workitem-dispatch.js';
-import { parseIndependentReviewerVerdict } from './mission-workitem-dispatch-review.js';
+import {
+  getMissionLabel,
+  getTeamRole,
+  parseIndependentReviewerVerdict,
+} from './mission-workitem-dispatch-review.js';
 import { loadProvisionedEntryRecords } from './mission-orchestration-journal.js';
 import { buildMissionHandoffPacket } from '../mesh/handoff-packet.js';
 import { projectWorkGraphToNextTasks } from '../workforce/work-graph-projection.js';
@@ -45,6 +49,21 @@ import {
   listCoordinationEvents,
   releaseWorkItem,
 } from '../workforce/work-coordination.js';
+
+// Dispatch fixtures carry canonical scope and role metadata, matching mission creation.
+function createWorkItem(input: Parameters<typeof createCanonicalWorkItem>[0]) {
+  const missionId = input.labels
+    ?.find((label) => label.startsWith('mission:'))
+    ?.slice('mission:'.length);
+  const teamRole = input.labels
+    ?.find((label) => label.startsWith('team_role:'))
+    ?.slice('team_role:'.length);
+  return createCanonicalWorkItem({
+    ...input,
+    context: { ...(missionId ? { mission_id: missionId } : {}), ...input.context },
+    metadata: { ...(teamRole ? { team_role: teamRole } : {}), ...input.metadata },
+  });
+}
 
 // Artifact ownership lives in ONE process-global JSONL file
 // (`active/shared/runtime/artifacts/registry.jsonl`). CI runs this directory
@@ -2825,5 +2844,24 @@ describe('mission work item dispatch', () => {
         `${missionPath}/evidence/workitem-dispatch-${manifest.records[0].item_id}.json`
       )
     ).toBe(false);
+  });
+});
+
+describe('mission WorkItem canonical scope resolution', () => {
+  it('uses typed mission context even when stale metadata and labels disagree', () => {
+    const item = {
+      context: { mission_id: 'MSN-CANONICAL' },
+      metadata: { mission_id: 'MSN-METADATA' },
+      labels: ['mission:MSN-STALE'],
+    };
+    expect(getMissionLabel(item as Parameters<typeof getMissionLabel>[0])).toBe('MSN-CANONICAL');
+  });
+  it('requires migration before label-only mission records can dispatch', () => {
+    const item = { labels: ['mission:MSN-LEGACY'] };
+    expect(getMissionLabel(item as Parameters<typeof getMissionLabel>[0])).toBeUndefined();
+  });
+  it('resolves team role metadata before stale display labels', () => {
+    const item = { metadata: { team_role: 'reviewer' }, labels: ['team_role:implementer'] };
+    expect(getTeamRole(item as Parameters<typeof getTeamRole>[0])).toBe('reviewer');
   });
 });

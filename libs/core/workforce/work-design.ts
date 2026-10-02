@@ -1,7 +1,15 @@
+import type {
+  WorkPolicyFile,
+  RoutingMatch,
+  SpecialistRouting as SpecialistRoutingPolicyFile,
+  ProfileRouting as WorkDesignProfileRoutingFile,
+  DesignRules as WorkDesignRulesFile,
+} from './work-policy.generated.js';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from '../secure-io.js';
 import { DEFAULT_SPECIALIST_ID } from '../specialist-ids.js';
+import { memoryCandidateMatchesOutcomeId } from '../knowledge/memory-promotion-queue.js';
 import { listDistillCandidateRecords } from '../knowledge/distill-candidate-registry.js';
 import {
   loadStandardIntentCatalog,
@@ -17,6 +25,7 @@ import {
 } from '../execution-shape.js';
 import { resolveWorkScopeDecision, type WorkScopeDecision } from './work-scope-decision.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
+import type { ArtifactKind } from './artifact-registry.js';
 
 const WORK_POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/work-policy.schema.json');
 const DEFAULT_SPECIALIST_CATALOG_PATH = pathResolver.knowledge(
@@ -44,7 +53,7 @@ export interface OutcomeDefinition {
   id: string;
   label: string;
   description: string;
-  deliverable_kind: string;
+  deliverable_kind: ArtifactKind;
   downloadable: boolean;
   previewable: boolean;
 }
@@ -73,66 +82,6 @@ interface BoundaryProfileFile {
 
 interface RuntimeDesignProfileFile {
   profiles?: Record<string, OrganizationWorkLoopSummary['runtime_design']>;
-}
-
-interface RoutingMatch {
-  intent_ids?: string[];
-  task_types?: string[];
-  query_types?: string[];
-  shapes?: string[];
-  catalog_shapes?: string[];
-}
-
-interface SpecialistRoutingPolicyFile {
-  rules?: Array<{
-    id?: string;
-    match?: RoutingMatch;
-    specialist_id?: string;
-  }>;
-  fallback_specialist_id?: string;
-}
-
-interface WorkDesignProfileRoutingFile {
-  execution_boundary_rules?: Array<{
-    id?: string;
-    match?: RoutingMatch;
-    profile_id?: string;
-  }>;
-  runtime_design_rules?: Array<{
-    id?: string;
-    match?: RoutingMatch;
-    profile_id?: string;
-  }>;
-  defaults?: {
-    execution_boundary_profile_id?: string;
-    runtime_design_profile_id?: string;
-  };
-}
-
-interface WorkDesignRulesFile {
-  process_checklist_rules?: Array<{
-    id?: string;
-    match?: RoutingMatch;
-    items?: string[];
-  }>;
-  execution_shape_rules?: Array<{
-    id?: string;
-    match?: RoutingMatch;
-    shape?: OrganizationWorkLoopSummary['resolution']['execution_shape'];
-  }>;
-  intent_label_rules?: Array<{
-    id?: string;
-    match?: RoutingMatch;
-    label?: string;
-    label_from?: 'intentId' | 'taskType' | 'queryType';
-  }>;
-}
-
-interface WorkPolicyFile {
-  version: string;
-  specialist_routing: SpecialistRoutingPolicyFile;
-  profile_routing: WorkDesignProfileRoutingFile;
-  design_rules: WorkDesignRulesFile;
 }
 
 const workPolicyCatalog = defineCatalog<WorkPolicyFile>({
@@ -481,9 +430,9 @@ function buildExecutionBoundary(input: {
   const matched = (routing.execution_boundary_rules || []).find((rule) =>
     ruleMatches(input, rule.match)
   );
-  const defaultProfileId =
-    routing.defaults?.execution_boundary_profile_id || 'default_governed_execution';
-  return profiles[matched?.profile_id || defaultProfileId] || profiles.default_governed_execution;
+  const defaultProfileId = routing.defaults.execution_boundary_profile_id;
+  const profileId = matched?.profile_id || defaultProfileId;
+  return profiles[profileId] || profiles[defaultProfileId];
 }
 
 function buildRuntimeDesign(input: {
@@ -497,8 +446,9 @@ function buildRuntimeDesign(input: {
   const matched = (routing.runtime_design_rules || []).find((rule) =>
     ruleMatches(input, rule.match)
   );
-  const defaultProfileId = routing.defaults?.runtime_design_profile_id || 'single_actor_delivery';
-  return profiles[matched?.profile_id || defaultProfileId] || profiles.single_actor_delivery;
+  const defaultProfileId = routing.defaults.runtime_design_profile_id;
+  const profileId = matched?.profile_id || defaultProfileId;
+  return profiles[profileId] || profiles[defaultProfileId];
 }
 
 function inferExecutionShape(input: {
@@ -529,13 +479,14 @@ function inferIntentLabel(input: {
   queryType?: string;
 }): string {
   const rules = loadWorkDesignRules();
+  const fallbackLabel = rules.defaults.fallback_intent_label;
   const matchedRule = (rules.intent_label_rules || []).find((rule) =>
     ruleMatches(input, rule.match)
   );
-  if (!matchedRule) return 'general_request';
+  if (!matchedRule) return fallbackLabel;
   if (matchedRule.label) return matchedRule.label;
-  if (matchedRule.label_from) return input[matchedRule.label_from] || 'general_request';
-  return 'general_request';
+  if (matchedRule.label_from) return input[matchedRule.label_from] || fallbackLabel;
+  return fallbackLabel;
 }
 
 function specialistIdForIntent(input: {
@@ -587,10 +538,14 @@ export function resolveWorkDesign(input: {
       if (input.taskType && candidate.metadata?.task_type === input.taskType) return true;
       if (
         requestedOutcomeIds.length &&
-        requestedOutcomeIds.some(
-          (id) =>
-            candidate.summary.includes(id) ||
-            candidate.evidence_refs?.some((ref) => ref.includes(id))
+        requestedOutcomeIds.some((id) =>
+          memoryCandidateMatchesOutcomeId(
+            {
+              candidate_id: candidate.candidate_id,
+              evidence_refs: candidate.evidence_refs || [],
+            },
+            id
+          )
         )
       )
         return true;

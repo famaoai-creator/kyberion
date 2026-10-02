@@ -12,7 +12,7 @@ import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-pro
 import { stripAuthorityEnvOverrides } from '@agent/core/authority';
 import { loadSurfaceManifest, loadSurfaceState } from '@agent/core/surface/surface-runtime';
 
-import { retry } from '@agent/core/async-utils';
+import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
@@ -21,13 +21,7 @@ import { parseProcessAction, type ProcessAction } from './process-action-input.j
 const PROCESS_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/process-actuator/manifest.json'
 );
-const DEFAULT_PROCESS_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 250,
-  maxDelayMs: 2000,
-  factor: 2,
-  jitter: true,
-};
+const DEFAULT_PROCESS_RETRY = getRetryDefaults('process');
 
 function resolveProcessPath(ref: string, allowMissingLeaf = true): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf });

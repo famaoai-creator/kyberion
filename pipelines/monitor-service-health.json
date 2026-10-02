@@ -1,15 +1,17 @@
 {
   "pipeline_id": "monitor-service-health",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Dynamically verify the response health of all active ecosystem services.",
-  "_migration_note": "v3: Typed Flow format (role/produces/consumes). v2 used type + export_as.",
   "action": "pipeline",
   "steps": [
     {
       "id": "get-surfaces",
       "role": "source",
       "op": "process:list-surfaces",
-      "produces": { "channel": "ecosystem_surfaces", "type": "SurfaceList" },
+      "produces": {
+        "channel": "ecosystem_surfaces",
+        "type": "SurfaceList"
+      },
       "params": {}
     },
     {
@@ -22,68 +24,49 @@
       }
     },
     {
-      "id": "audit-loop",
-      "role": "gate",
-      "op": "core:foreach",
+      "id": "partition-health",
+      "role": "transform",
+      "op": "system:partition_surface_health",
       "consumes": "ecosystem_surfaces",
+      "produces": {
+        "channel": "surface_health",
+        "type": "SurfaceHealthPartition"
+      },
       "params": {
-        "items": "{{ecosystem_surfaces}}",
-        "as": "surface",
-        "do": [
-          {
-            "role": "gate",
-            "op": "core:if",
-            "params": {
-              "condition": "surface.running",
-              "then": [
-                {
-                  "role": "sink",
-                  "op": "system:log",
-                  "params": {
-                    "message": "  - [OK] {{surface.id}} ({{surface.kind}}) is running on port {{surface.port}}"
-                  }
-                }
-              ],
-              "else": [
-                {
-                  "role": "gate",
-                  "op": "core:if",
-                  "params": {
-                    "condition": "surface.enabled",
-                    "then": [
-                      {
-                        "role": "sink",
-                        "op": "system:log",
-                        "params": {
-                          "message": "  - [ALERT] {{surface.id}} is ENABLED but NOT RUNNING!"
-                        }
-                      }
-                    ]
-                  }
-                }
-              ]
-            }
-          }
-        ]
+        "surfaces": "{{ecosystem_surfaces}}"
+      }
+    },
+    {
+      "id": "log-health",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "surface_health",
+      "params": {
+        "message": "Surface health: {{surface_health}}"
       }
     },
     {
       "id": "check-recent-errors",
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "recent_service_errors", "type": "LogText" },
-      "params": {
-        "cmd": "grep -r 'ERROR' active/shared/logs/surfaces 2>/dev/null | tail -n 15 || echo 'No recent surface errors'"
-      }
+      "op": "system:collect_surface_errors",
+      "comment": "Declarative log harvesting (replaces `grep -r ERROR ... | tail`). ERROR classification moved into the reasoning instruction below; an empty collection means no artifacts matched, not success.",
+      "produces": {
+        "channel": "recent_service_errors",
+        "type": "LogText"
+      },
+      "params": {}
     },
     {
       "id": "analyze-reliability",
       "role": "transform",
       "op": "reasoning:analyze",
       "consumes": ["ecosystem_surfaces", "recent_service_errors"],
-      "produces": { "channel": "reliability_report", "type": "ReliabilityReport" },
+      "produces": {
+        "channel": "reliability_report",
+        "type": "ReliabilityReport"
+      },
       "params": {
-        "instruction": "Based on the dynamically discovered surface status list and recent log errors, evaluate the overall reliability of the ecosystem. Identify 'zombie' services (enabled but not running) or 'flapping' services with frequent errors. Propose specific recovery actions for the operator.",
+        "instruction": "Evaluate ecosystem reliability using surface statuses and the last 15 ERROR lines from surface logs. Identify enabled-but-stopped zombie services and frequent errors. Propose recovery actions.",
         "context": ["{{ecosystem_surfaces}}", "{{recent_service_errors}}"]
       }
     },
