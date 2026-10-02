@@ -420,13 +420,17 @@
         "active/shared/coordination/channels/",
         "active/shared/observability/",
         "active/shared/runtime/",
-        "presence/bridge/runtime/"
+        "presence/bridge/runtime/",
+        "dots/",
+        "active/shared/tmp/"
       ],
       "allow_write": [
         "active/shared/coordination/channels/",
         "active/shared/observability/",
         "active/shared/runtime/",
-        "presence/bridge/runtime/"
+        "presence/bridge/runtime/",
+        "dots/",
+        "active/shared/tmp/"
       ]
     },
     "slack_bridge": {
