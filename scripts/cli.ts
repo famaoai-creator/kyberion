@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { pathResolver } from '@agent/core/path-resolver';
+import { resolveMissionDir } from '@agent/core/owner-scope';
 import { resolveOperatorDisplayName } from '@agent/core/surface/operator-identity';
 import { resolveLocale as resolveUnifiedLocale, type SupportedLocale } from '@agent/core/locale';
 import {
@@ -261,8 +262,9 @@ export function extractBranchArg(args: string[]): { branchId?: string; args: str
 }
 
 export function resolveMissionStatePathForBanner(missionId: string): string {
-  const missionPath =
-    pathResolver.findMissionPath(missionId) || pathResolver.missionDir(missionId, 'public');
+  // The mission's own location; an unknown mission throws OWNER_NOT_FOUND,
+  // which the banner treats like a missing state file (no banner).
+  const missionPath = resolveMissionDir(missionId);
   return assertSafeRepositoryPath(path.join(missionPath, 'mission-state.json'));
 }
 

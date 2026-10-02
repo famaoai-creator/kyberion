@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { findMissionPath, pathResolver } from '../path-resolver.js';
+import { pathResolver } from '../path-resolver.js';
+import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
 import { compileSchema } from '../foundation/ajv.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
@@ -79,20 +80,17 @@ function normalizeMissionDir(
     }
     return null;
   }
-  const found = findMissionPath(missionId);
-  if (found) {
-    try {
-      return assertSafeRepositoryPath(found);
-    } catch {
-      return null;
-    }
+  // The existing mission's own directory (all tiers/tenants). A write for an
+  // unknown mission fails closed (OwnerScopeError); a read sees no bundles.
+  const found = options.createIfMissing
+    ? resolveMissionDir(missionId)
+    : tryResolveOwnerScope({ kind: 'mission', id: missionId })?.dir;
+  if (!found) return null;
+  try {
+    return assertSafeRepositoryPath(found);
+  } catch {
+    return null;
   }
-  if (options.createIfMissing) {
-    return assertSafeRepositoryPath(pathResolver.missionDir(missionId), {
-      allowMissingLeaf: true,
-    });
-  }
-  return null;
 }
 
 function bundleDir(
@@ -233,6 +231,8 @@ export function listArtifactBundlesForMission(
   missionId: string,
   missionPath?: string
 ): ArtifactBundle[] {
+  // Read path: an unknown mission has no bundles.
+  if (!missionPath && !tryResolveOwnerScope({ kind: 'mission', id: missionId })) return [];
   const dir = bundleDir(missionId, missionPath, { createIfMissing: true });
   if (!dir || !safeExistsSync(dir)) return [];
   const bundles = safeReaddir(dir)

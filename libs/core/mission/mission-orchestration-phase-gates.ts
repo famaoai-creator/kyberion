@@ -6,7 +6,8 @@ import {
 } from './mission-gate-engine.js';
 import { evaluateMissionIntentDrift } from './mission-intent-delta.js';
 import { latestSnapshot } from '../intent/intent-snapshot-store.js';
-import { findMissionPath, missionDir, pathResolver } from '../path-resolver.js';
+import { pathResolver } from '../path-resolver.js';
+import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from '../secure-io.js';
@@ -20,14 +21,22 @@ import {
   type MissionNextTaskRecord,
 } from './mission-next-task-reader.js';
 
+/**
+ * Path inside the existing mission's own directory. Write paths use this: an
+ * unknown mission fails closed (OwnerScopeError).
+ */
 function safeMissionPath(missionId: string, relativePath: string, allowMissingLeaf = true): string {
-  const missionPath = assertSafeRepositoryPath(
-    findMissionPath(missionId) || missionDir(missionId, 'public'),
-    { allowMissingLeaf }
-  );
+  const missionPath = assertSafeRepositoryPath(resolveMissionDir(missionId), { allowMissingLeaf });
   return assertSafeRepositoryPath(path.join(missionPath, relativePath), {
     allowMissingLeaf,
   });
+}
+
+/** Read-path variant: null for an unknown mission (callers treat it as missing). */
+function existingMissionPath(missionId: string, relativePath: string): string | null {
+  return tryResolveOwnerScope({ kind: 'mission', id: missionId })
+    ? safeMissionPath(missionId, relativePath)
+    : null;
 }
 
 export type MissionGateRecord = {
@@ -97,8 +106,8 @@ export interface PhaseExitGateOutcome {
 }
 
 export function loadMissionStateSnapshot(missionId: string): Record<string, unknown> | null {
-  const statePath = safeMissionPath(missionId, 'mission-state.json');
-  if (!safeExistsSync(statePath)) return null;
+  const statePath = existingMissionPath(missionId, 'mission-state.json');
+  if (!statePath || !safeExistsSync(statePath)) return null;
   return loadMissionStateAtPath(statePath) as unknown as Record<string, unknown> | null;
 }
 
@@ -119,8 +128,8 @@ export function missionRiskProfileOf(missionId: string): string | undefined {
 }
 
 function loadMissionGateRecords(missionId: string): MissionGateRecord[] {
-  const gateDir = safeMissionPath(missionId, 'gates');
-  if (!safeExistsSync(gateDir)) return [];
+  const gateDir = existingMissionPath(missionId, 'gates');
+  if (!gateDir || !safeExistsSync(gateDir)) return [];
   return safeReaddir(gateDir)
     .filter((entry) => entry.endsWith('.json'))
     .map((entry) => {
@@ -173,8 +182,8 @@ export function resolvePhaseGateMode(): 'off' | 'warn' | 'enforce' {
 }
 
 export function loadMissionPhaseGateDefinitions(missionId: string): PersistedPhaseGateDefinition[] {
-  const defsDir = safeMissionPath(missionId, path.join('gates', 'definitions'));
-  if (!safeExistsSync(defsDir)) return [];
+  const defsDir = existingMissionPath(missionId, path.join('gates', 'definitions'));
+  if (!defsDir || !safeExistsSync(defsDir)) return [];
   return safeReaddir(defsDir)
     .filter((entry) => entry.endsWith('.json'))
     .map((entry) => {
@@ -194,10 +203,10 @@ function enrichGateWithTaskOutcomes(
   missionId: string,
   gate: MissionGateDefinition
 ): MissionGateDefinition {
-  const nextTasksPath = safeMissionPath(missionId, 'NEXT_TASKS.json');
+  const nextTasksPath = existingMissionPath(missionId, 'NEXT_TASKS.json');
   let tasks: MissionNextTaskRecord[] = [];
   try {
-    if (safeExistsSync(nextTasksPath)) {
+    if (nextTasksPath && safeExistsSync(nextTasksPath)) {
       tasks = loadMissionNextTaskRecordsAtPath(nextTasksPath, missionId) || [];
     }
   } catch {

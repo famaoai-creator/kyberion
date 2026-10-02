@@ -4,7 +4,6 @@ import { type PlanningPacket } from '../surface/channel-surface.js';
 import { draftRefine } from '../draft-refine.js';
 import { logger } from '../core.js';
 import { missionEvidenceDir } from '../path-resolver.js';
-import { pathResolver } from '../path-resolver.js';
 import { type DeliveredKnowledgeRef } from '../knowledge/knowledge-feedback-loop.js';
 import { TraceContext, persistTrace } from '../analysis/trace.js';
 import * as path from 'node:path';
@@ -192,11 +191,13 @@ export async function applyDraftRefineToDeliverable(input: {
 }): Promise<void> {
   const deliverable = String(input.task.deliverable || '');
   if (!deliverable) return;
-  const missionPath = resolvedMissionDir(input.missionId);
-  const candidatePath = deliverable.startsWith('/')
-    ? deliverable
-    : path.join(missionPath, deliverable);
   try {
+    // Best-effort: an unknown mission (OwnerScopeError) is skipped with the
+    // warning below, never refined into a guessed directory.
+    const missionPath = resolvedMissionDir(input.missionId);
+    const candidatePath = deliverable.startsWith('/')
+      ? deliverable
+      : path.join(missionPath, deliverable);
     const safeMissionPath = assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
     const deliverablePath = assertSafeRepositoryPath(candidatePath, { allowMissingLeaf: true });
     const relativeDeliverablePath = path.relative(safeMissionPath, deliverablePath);
@@ -851,10 +852,8 @@ export async function processMissionOrchestrationEventPath(eventPath: string): P
       requestedBy: event.requested_by,
       causationId: event.causation_id,
       correlationId: event.correlation_id,
+      // The journal resolves the mission's own directory; scope only narrows it.
       scope: event.scope,
-      missionPathHint: event.scope?.tenant_slug
-        ? pathResolver.tenantMissionDir(event.mission_id, event.scope.tenant_slug, event.scope.tier)
-        : undefined,
     });
     emitMissionOrchestrationObservation({
       decision: 'mission_orchestration_event_completed',
@@ -864,20 +863,25 @@ export async function processMissionOrchestrationEventPath(eventPath: string): P
       scope: event.scope,
     });
   } catch (error) {
-    appendMissionOrchestrationJournalStatus({
-      missionId: event.mission_id,
-      eventId: event.event_id,
-      eventType: event.event_type,
-      status: 'failed',
-      payload: event.payload,
-      requestedBy: event.requested_by,
-      causationId: event.causation_id,
-      correlationId: event.correlation_id,
-      scope: event.scope,
-      missionPathHint: event.scope?.tenant_slug
-        ? pathResolver.tenantMissionDir(event.mission_id, event.scope.tenant_slug, event.scope.tier)
-        : undefined,
-    });
+    try {
+      appendMissionOrchestrationJournalStatus({
+        missionId: event.mission_id,
+        eventId: event.event_id,
+        eventType: event.event_type,
+        status: 'failed',
+        payload: event.payload,
+        requestedBy: event.requested_by,
+        causationId: event.causation_id,
+        correlationId: event.correlation_id,
+        scope: event.scope,
+      });
+    } catch (journalError) {
+      // Never mask the event failure with the journal failure (e.g. an
+      // unknown mission now fails closed instead of journaling to a guess).
+      logger.warn(
+        `[mission-orchestration] failed status for ${event.event_id} not journaled — ${journalError instanceof Error ? journalError.message : String(journalError)} | next: check that mission ${event.mission_id} exists in the event scope | evidence: ${event.event_id}`
+      );
+    }
     emitMissionOrchestrationObservation({
       decision: 'mission_orchestration_event_failed',
       event_id: event.event_id,

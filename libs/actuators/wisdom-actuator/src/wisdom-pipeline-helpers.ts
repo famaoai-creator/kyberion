@@ -9,6 +9,7 @@ import {
   assertSafeRepositoryPath,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
+import { resolveMissionDir } from '@agent/core/owner-scope';
 import { resolveVars, evaluateCondition, getPathValue } from '@agent/core/logic-utils';
 import { retry, getRetryDefaults } from '@agent/core/async-utils';
 
@@ -565,8 +566,6 @@ async function opCapture(
           : {}),
         ...(typeof securityScope?.task_id === 'string' ? { task_id: securityScope.task_id } : {}),
       };
-      const missionPath =
-        pathResolver.findMissionPath(missionId) || pathResolver.missionDir(missionId, tier);
       const descriptor = loadSkillResourceDescriptor(String(resolveVars(rawPath, ctx)), undefined, {
         trustResolved: ctx.trust_resolved === true,
       });
@@ -582,6 +581,10 @@ async function opCapture(
       if (descriptor.provenance.trust === 'untrusted') {
         throw new Error(`[KNOWLEDGE_READ_UNTRUSTED_RESOURCE] ${descriptor.path}`);
       }
+      // The prompt-visibility record belongs to the existing mission wherever
+      // it lives (read_tiers describe the reader, not the mission); an unknown
+      // mission fails closed instead of landing in a tier guessed from them.
+      const missionPath = resolveMissionDir(missionId);
       const result = readSkillResourceForModel(descriptor, {
         missionPath,
         missionId,

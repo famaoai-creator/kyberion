@@ -50,6 +50,21 @@ vi.mock('../path-resolver.js', async (importOriginal) => {
   };
 });
 
+// Owner-derived mission lookup must see the same per-process fixture id.
+vi.mock('../owner-scope.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../owner-scope.js')>();
+  const rewrite = (value: string) => value.replaceAll('MSN-FOLLOWUP', FOLLOWUP_MISSION_ID);
+  return {
+    ...actual,
+    resolveMissionDir: (missionId: string, hint?: Parameters<typeof actual.resolveMissionDir>[1]) =>
+      actual.resolveMissionDir(rewrite(missionId), hint),
+    resolveOwnerScope: (...args: Parameters<typeof actual.resolveOwnerScope>) =>
+      actual.resolveOwnerScope({ ...args[0], id: rewrite(args[0].id) }, args[1]),
+    tryResolveOwnerScope: (...args: Parameters<typeof actual.tryResolveOwnerScope>) =>
+      actual.tryResolveOwnerScope({ ...args[0], id: rewrite(args[0].id) }, args[1]),
+  };
+});
+
 function makeTaskResultText(input: {
   summary: string;
   artifacts?: Array<{ path: string; kind: string }>;

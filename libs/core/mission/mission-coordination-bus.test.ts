@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { withExecutionContext } from '../authority.js';
 import {
   safeExistsSync,
@@ -15,6 +15,39 @@ import {
   parseMissionCoordinationEvent,
   parseMissionCoordinationMessage,
 } from './mission-coordination-bus.js';
+import { writeMissionStateAtPath } from './mission-state-reader.js';
+
+const seededMissionDirs: string[] = [];
+
+/** The bus lives in the existing mission's own directory, so the mission must exist. */
+function seedMission(missionId: string, tier: 'public' | 'confidential' = 'public'): void {
+  withExecutionContext('mission_controller', () => {
+    const dir = pathResolver.missionDir(missionId, tier);
+    writeMissionStateAtPath(`${dir}/mission-state.json`, {
+      mission_id: missionId,
+      tier,
+      status: 'active',
+      execution_mode: 'local',
+      priority: 1,
+      assigned_persona: 'worker',
+      confidence_score: 1,
+      git: {
+        branch: `mission/${missionId}`,
+        start_commit: 'a',
+        latest_commit: 'a',
+        checkpoints: [],
+      },
+      history: [],
+    } as never);
+    seededMissionDirs.push(dir);
+  });
+}
+
+afterAll(() => {
+  withExecutionContext('mission_controller', () => {
+    for (const dir of seededMissionDirs) safeRmSync(dir, { recursive: true, force: true });
+  });
+});
 
 describe('mission-coordination-bus', () => {
   it('normalizes message and acknowledgement event shapes', () => {
@@ -60,9 +93,10 @@ describe('mission-coordination-bus', () => {
   });
 
   it('routes direct role-targeted messages and tracks acknowledgements', () => {
+    seedMission('MSN-BUS-ROUTE');
     const bus = new MissionCoordinationBus();
     const message = bus.send({
-      mission_id: 'MSN-1',
+      mission_id: 'MSN-BUS-ROUTE',
       channel: 'task_contract',
       from_agent: 'owner',
       from_role: 'owner',
@@ -71,7 +105,7 @@ describe('mission-coordination-bus', () => {
     });
 
     const inbox = bus.getInbox({
-      missionId: 'MSN-1',
+      missionId: 'MSN-BUS-ROUTE',
       role: 'reviewer',
       unreadOnly: true,
       agentId: 'reviewer-a',
@@ -80,7 +114,7 @@ describe('mission-coordination-bus', () => {
 
     bus.acknowledge({ messageId: message.message_id, agentId: 'reviewer-a' });
     const afterAck = bus.getInbox({
-      missionId: 'MSN-1',
+      missionId: 'MSN-BUS-ROUTE',
       role: 'reviewer',
       unreadOnly: true,
       agentId: 'reviewer-a',
@@ -97,6 +131,7 @@ describe('mission-coordination-bus', () => {
     withExecutionContext('mission_controller', () => {
       safeRmSync(missionPath, { recursive: true, force: true });
     });
+    seedMission(missionId);
 
     const bus = new MissionCoordinationBus();
     const message = bus.send({
@@ -150,6 +185,7 @@ describe('mission-coordination-bus', () => {
       safeRmSync(missionPath, { recursive: true, force: true });
       safeMkdir(missionPath, { recursive: true });
     });
+    seedMission(missionId, 'confidential');
 
     try {
       const bus = new MissionCoordinationBus();
@@ -178,6 +214,7 @@ describe('mission-coordination-bus', () => {
     withExecutionContext('mission_controller', () => {
       safeRmSync(missionPath, { recursive: true, force: true });
     });
+    seedMission(missionId);
 
     const bus = new MissionCoordinationBus({ maxLinesPerFile: 1, maxArchiveCount: 2 });
     const first = bus.send({
@@ -228,6 +265,7 @@ describe('mission-coordination-bus', () => {
       safeRmSync(coordinationPath, { recursive: true, force: true });
       safeSymlinkSync(externalPath, coordinationPath, 'dir');
     });
+    seedMission(missionId);
     try {
       expect(() => new MissionCoordinationBus().listMissionMessages(missionId)).toThrow(
         '[RESOURCE_PATH_SYMLINK]'
@@ -249,6 +287,7 @@ describe('mission-coordination-bus', () => {
       safeRmSync(missionPath, { recursive: true, force: true });
       safeMkdir(busPath, { recursive: true });
     });
+    seedMission(missionId);
     try {
       expect(() => new MissionCoordinationBus().listMissionMessages(missionId)).toThrow(
         'stream must be a regular file'
@@ -274,6 +313,7 @@ describe('mission-coordination-bus', () => {
       safeWriteFile(externalArchive, '{"kind":"message"}\n');
       safeSymlinkSync(externalArchive, `${coordinationPath}/bus.jsonl.1`);
     });
+    seedMission(missionId);
     try {
       expect(() =>
         new MissionCoordinationBus({ maxArchiveCount: 1 }).listMissionMessages(missionId)
