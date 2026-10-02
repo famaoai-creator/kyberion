@@ -6,7 +6,7 @@
 import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { BOOLEAN_FLAGS, VALUE_FLAGS, type MissionRelationships } from './mission-types.js';
-import { normalizeRelationships } from './mission-state.js';
+import { normalizeMissionIdList, normalizeRelationships } from './mission-state.js';
 import { currentProcessArgv } from '../lib/harness.js';
 import { parseSafeJsonObjectInput, readSafeJsonFile } from '../lib/json-input.js';
 
@@ -176,6 +176,12 @@ export function extractTrackRelationshipOptionsFromArgv(
   };
 }
 
+/** `--prerequisites MSN-A,MSN-B` → `relationships.prerequisites` (ids normalized). */
+export function extractPrerequisitesOptionFromArgv(argv: string[]): Partial<MissionRelationships> {
+  const prerequisites = normalizeMissionIdList(getOptionValue('--prerequisites', argv));
+  return prerequisites.length > 0 ? { prerequisites } : {};
+}
+
 export function extractProjectRelationshipOptions(): Partial<MissionRelationships> {
   return extractProjectRelationshipOptionsFromArgv(currentProcessArgv());
 }
@@ -222,6 +228,7 @@ export function extractMissionStartCreateOptionsFromArgv(
       ...extractFileRelationshipsOption(argv),
       ...extractProjectRelationshipOptionsFromArgv(argv),
       ...extractTrackRelationshipOptionsFromArgv(argv),
+      ...extractPrerequisitesOptionFromArgv(argv),
     },
   };
 }

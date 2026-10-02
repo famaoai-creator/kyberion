@@ -12,6 +12,7 @@ import {
 } from '@agent/core/secure-io';
 import { withLock } from '@agent/core/lock-utils';
 import { appendJsonLine, isRecord, nowIso, readJsonLines } from '@agent/core/foundation';
+import { normalizeMissionIdList } from './mission-state.js';
 
 export interface MissionQueueEntry {
   mission_id: string;
@@ -92,7 +93,7 @@ export async function enqueueMission(
     priority,
     status: 'pending',
     enqueued_at: nowIso(),
-    dependencies: deps,
+    dependencies: normalizeMissionIdList(deps),
   };
 
   await withLock('mission-queue', async () => {
@@ -103,7 +104,10 @@ export async function enqueueMission(
 
 export async function dispatchNextQueuedMission(
   queuePath: string,
-  checkDependencies: (missionId: string) => { ok: boolean; missing: string[] },
+  checkDependencies: (
+    missionId: string,
+    queueDependencies: string[]
+  ) => { ok: boolean; missing: string[] },
   onDispatch: (missionId: string, tier: MissionQueueEntry['tier']) => Promise<void>
 ): Promise<void> {
   await withLock('mission-queue', async () => {
@@ -129,19 +133,21 @@ export async function dispatchNextQueuedMission(
     pending.sort((a, b) => b.priority - a.priority || a.enqueued_at.localeCompare(b.enqueued_at));
 
     for (const mission of pending) {
-      const { ok, missing } = checkDependencies(mission.mission_id);
+      const { ok, missing } = checkDependencies(mission.mission_id, mission.dependencies || []);
       if (!ok) {
-        logger.info(`⏳ Skipping ${mission.mission_id}: Waiting for ${missing.join(', ')}`);
+        logger.info(`⏳ Skipping ${mission.mission_id}: waiting for ${missing.join(', ')}`);
         continue;
       }
 
       logger.info(`🚀 Dispatching Mission: ${mission.mission_id}...`);
+      // Mark dispatched only after start succeeded: a failed start must leave
+      // the entry pending so the next dispatch retries it instead of losing it.
+      await onDispatch(mission.mission_id, mission.tier);
       mission.status = 'dispatched';
       safeWriteFile(
         resolvedQueuePath,
         queue.map((entry) => JSON.stringify(entry)).join('\n') + '\n'
       );
-      await onDispatch(mission.mission_id, mission.tier);
       return;
     }
 

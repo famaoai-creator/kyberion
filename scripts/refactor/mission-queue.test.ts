@@ -75,6 +75,72 @@ describe('mission-queue', () => {
     expect(dispatched).toEqual(['MSN-GOOD']);
   });
 
+  function entry(missionId: string, priority: number, dependencies: string[] = []) {
+    return JSON.stringify({
+      mission_id: missionId,
+      tier: 'public',
+      priority,
+      status: 'pending',
+      enqueued_at: new Date().toISOString(),
+      dependencies,
+    });
+  }
+
+  function statuses(): Record<string, string> {
+    const raw = safeReadFile(QUEUE_PATH, { encoding: 'utf8' }) as string;
+    return Object.fromEntries(
+      raw
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line))
+        .map((value: { mission_id: string; status: string }) => [value.mission_id, value.status])
+    );
+  }
+
+  it('normalizes enqueued dependency ids', async () => {
+    await enqueueMission(QUEUE_PATH, 'msn-child', 'public', 5, [' msn-a ', 'MSN-A', '']);
+    const raw = safeReadFile(QUEUE_PATH, { encoding: 'utf8' }) as string;
+    expect(JSON.parse(raw.trim()).dependencies).toEqual(['MSN-A']);
+  });
+
+  it('passes queue-entry dependencies to the check and skips unready entries', async () => {
+    safeWriteFile(
+      QUEUE_PATH,
+      [entry('MSN-BLOCKED', 9, ['MSN-PRE']), entry('MSN-READY', 1)].join('\n') + '\n'
+    );
+    const seen: Array<[string, string[]]> = [];
+    const dispatched: string[] = [];
+    await dispatchNextQueuedMission(
+      QUEUE_PATH,
+      (missionId, queueDependencies) => {
+        seen.push([missionId, queueDependencies]);
+        return queueDependencies.length
+          ? { ok: false, missing: queueDependencies }
+          : { ok: true, missing: [] };
+      },
+      async (missionId) => {
+        dispatched.push(missionId);
+      }
+    );
+    expect(seen[0]).toEqual(['MSN-BLOCKED', ['MSN-PRE']]);
+    expect(dispatched).toEqual(['MSN-READY']);
+    expect(statuses()).toEqual({ 'MSN-BLOCKED': 'pending', 'MSN-READY': 'dispatched' });
+  });
+
+  it('keeps an entry pending when its start fails', async () => {
+    safeWriteFile(QUEUE_PATH, entry('MSN-FAILS', 5) + '\n');
+    await expect(
+      dispatchNextQueuedMission(
+        QUEUE_PATH,
+        () => ({ ok: true, missing: [] }),
+        async () => {
+          throw new Error('[MISSION_PREREQUISITES_UNMET] boom');
+        }
+      )
+    ).rejects.toThrow('MISSION_PREREQUISITES_UNMET');
+    expect(statuses()).toEqual({ 'MSN-FAILS': 'pending' });
+  });
+
   it('rejects a symlinked queue before reading or appending it', async () => {
     const targetPath = path.join(QUEUE_DIR, `mission-queue-target-${Date.now()}.jsonl`);
     const linkPath = path.join(QUEUE_DIR, `mission-queue-link-${Date.now()}.jsonl`);

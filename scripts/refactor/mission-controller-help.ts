@@ -185,6 +185,7 @@ Mission Input Contract:
     --dry-run
     --relationships <JSON>
     --relationships-file <PATH>
+    --prerequisites <ID,...>     Missions that must be completed/archived before start (--force bypasses)
     --mission-id <ID>            Explicit mission target for checkpoint
 
 Organization Selection:

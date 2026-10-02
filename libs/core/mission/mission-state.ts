@@ -72,6 +72,11 @@ export function normalizeRelationships(
   overlays: Partial<MissionRelationships> = {}
 ): MissionRelationships {
   const relationships: MissionRelationships = { ...(input || {}) };
+  for (const key of ['prerequisites', 'successors', 'blockers'] as const) {
+    if (relationships[key] !== undefined) {
+      relationships[key] = normalizeMissionIdList(relationships[key]);
+    }
+  }
 
   if (overlays.project) {
     relationships.project = {
@@ -311,13 +316,25 @@ export function loadStateForRepair(
 export async function saveState(
   id: string,
   state: MissionState,
-  { alreadyLocked = false } = {}
+  {
+    alreadyLocked = false,
+    missionDir,
+  }: {
+    alreadyLocked?: boolean;
+    /**
+     * Write to this mission directory instead of resolving it. finishMission
+     * passes the archive copy so the post-archive state never recreates a
+     * stub at the (deleted) active path.
+     */
+    missionDir?: string;
+  } = {}
 ): Promise<void> {
   assertMissionStateSchema(state);
   const tenantDir = state.tenant_slug
     ? tenantMissionDir(id, state.tenant_slug, state.tier)
     : undefined;
   const dir =
+    missionDir ||
     (tenantDir && safeExistsSync(tenantDir) ? tenantDir : undefined) ||
     findMissionPath(id) ||
     tenantDir ||
@@ -353,19 +370,93 @@ export async function saveState(
   }
 }
 
-export function checkDependencies(missionId: string): { ok: boolean; missing: string[] } {
-  const state = loadState(missionId);
-  if (!state || !state.relationships?.prerequisites) return { ok: true, missing: [] };
+/** Mission statuses that satisfy a dependent's prerequisite. */
+export const SATISFIED_PREREQUISITE_STATUSES: ReadonlySet<string> = new Set([
+  'completed',
+  'archived',
+]);
 
-  const missing: string[] = [];
-  for (const pre of state.relationships.prerequisites) {
-    const preState = loadState(pre);
-    if (!preState || preState.status !== 'completed') {
-      missing.push(pre);
+/**
+ * Normalize a mission id list (prerequisites / successors / blockers):
+ * trim, uppercase (mission ids are stored uppercase), drop empties, dedupe.
+ * Accepts an array or a comma-separated string.
+ */
+export function normalizeMissionIdList(value: unknown): string[] {
+  const raw = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : [];
+  const ids = raw
+    .map((entry) => (typeof entry === 'string' ? entry.trim().toUpperCase() : ''))
+    .filter(Boolean);
+  return [...new Set(ids)];
+}
+
+/**
+ * Load a mission's state from the active tiers, falling back to the archive
+ * (`finishMission` moves a mission there and ends it in status `archived`).
+ */
+export function loadMissionStateIncludingArchive(id: string): MissionState | null {
+  const upperId = id.trim().toUpperCase();
+  const active = loadState(upperId);
+  if (active) return active;
+  try {
+    const statePath = assertSafeRepositoryPath(
+      path.join(pathResolver.archivedMissionDir(upperId), 'mission-state.json')
+    );
+    return safeExistsSync(statePath) ? loadMissionStateAtPath(statePath) : null;
+  } catch {
+    return null;
+  }
+}
+
+export interface UnmetMissionPrerequisite {
+  mission_id: string;
+  reason: 'not_found' | 'not_finished';
+  status?: string;
+}
+
+/**
+ * Evaluate mission prerequisites. A prerequisite is satisfied once its mission
+ * is completed or archived, wherever its state lives (active tier or archive).
+ */
+export function evaluateMissionPrerequisites(prerequisites: unknown): {
+  ok: boolean;
+  missing: UnmetMissionPrerequisite[];
+} {
+  const missing: UnmetMissionPrerequisite[] = [];
+  for (const missionId of normalizeMissionIdList(prerequisites)) {
+    const preState = loadMissionStateIncludingArchive(missionId);
+    if (!preState) missing.push({ mission_id: missionId, reason: 'not_found' });
+    else if (!SATISFIED_PREREQUISITE_STATUSES.has(preState.status)) {
+      missing.push({ mission_id: missionId, reason: 'not_finished', status: preState.status });
     }
   }
-
   return { ok: missing.length === 0, missing };
+}
+
+/** Human-readable `<ID> (not found)` / `<ID> (status=active)` list. */
+export function describeUnmetPrerequisites(missing: UnmetMissionPrerequisite[]): string {
+  return missing
+    .map((entry) =>
+      entry.reason === 'not_found'
+        ? `${entry.mission_id} (not found)`
+        : `${entry.mission_id} (status=${entry.status})`
+    )
+    .join(', ');
+}
+
+/**
+ * Dependency check used by the mission queue: the mission's declared
+ * prerequisites plus any extra ids (e.g. a queue entry's `dependencies`).
+ */
+export function checkDependencies(
+  missionId: string,
+  extraPrerequisites: unknown = []
+): { ok: boolean; missing: string[] } {
+  const state = loadState(missionId);
+  const { ok, missing } = evaluateMissionPrerequisites([
+    ...normalizeMissionIdList(state?.relationships?.prerequisites),
+    ...normalizeMissionIdList(extraPrerequisites),
+  ]);
+  return { ok, missing: missing.map((entry) => entry.mission_id) };
 }
 
 export function getActiveMissionSearchDirs(rootDir = pathResolver.rootDir()): string[] {
