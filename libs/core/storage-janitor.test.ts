@@ -1441,6 +1441,8 @@ describe('storage-janitor', () => {
         deletedStatusRules: expect.any(Number),
         staleDelegationChildren: expect.any(Number),
         killedDelegationChildren: expect.any(Number),
+        supersededArtifactOwnershipRows: expect.any(Number),
+        compactedArtifactOwnershipRows: 0,
         errors: expect.any(Array),
         timestamp: expect.any(String),
         dryRun: true,

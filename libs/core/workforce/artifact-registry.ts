@@ -3,9 +3,18 @@ import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from '../secure-io.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 
 import { ARTIFACT_KINDS, type ArtifactKind } from './artifact-kind.generated.js';
+
+const ARTIFACT_REGISTRY_LOCK = 'artifact-ownership-registry';
 export { ARTIFACT_KINDS, type ArtifactKind } from './artifact-kind.generated.js';
 
 export interface ArtifactOwnershipRecord {
@@ -155,8 +164,12 @@ export function appendArtifactOwnershipRecord(
     allowMissingLeaf: true,
   });
   if (!safeExistsSync(registryDir)) safeMkdir(registryDir, { recursive: true });
-  ensureArtifactRegistryFile(registryPath);
-  appendJsonLine(registryPath, validated);
+  // Appends and compaction share one lock: a compaction rewrite never drops a
+  // row appended while it ran.
+  withLockSync(ARTIFACT_REGISTRY_LOCK, () => {
+    ensureArtifactRegistryFile(registryPath);
+    appendJsonLine(registryPath, validated);
+  });
   return registryPath;
 }
 
@@ -176,12 +189,66 @@ export function listArtifactOwnershipRecords(): ArtifactOwnershipRecord[] {
   }
 }
 
+/**
+ * The registry is append-only: re-registering an artifact (re-publish, mission
+ * → project promotion, a deterministic-id update) appends a new row. The
+ * current ownership of each artifact is its LAST row; keep it in the order of
+ * that last write. `listArtifactOwnershipRecords` stays the raw history.
+ */
+function latestByArtifactId(records: ArtifactOwnershipRecord[]): ArtifactOwnershipRecord[] {
+  const latest = new Map<string, ArtifactOwnershipRecord>();
+  for (const record of records) {
+    latest.delete(record.artifact_id);
+    latest.set(record.artifact_id, record);
+  }
+  return [...latest.values()];
+}
+
+/** Current ownership: one row per artifact_id (its latest). */
+export function listLatestArtifactOwnershipRecords(): ArtifactOwnershipRecord[] {
+  return latestByArtifactId(listArtifactOwnershipRecords());
+}
+
 export function listArtifactOwnershipRecordsByQuery(
   query: ArtifactOwnershipQuery = {}
 ): ArtifactOwnershipRecord[] {
-  return listArtifactOwnershipRecords()
+  // De-duplicate BEFORE filtering: a superseded row (e.g. the mission owner of
+  // a deliverable since promoted to its project) must not still match.
+  return listLatestArtifactOwnershipRecords()
     .filter((record) => matchesQuery(record, query))
     .sort(compareArtifactOwnershipRecords);
+}
+
+export interface ArtifactOwnershipCompaction {
+  total_rows: number;
+  kept_rows: number;
+  removed_rows: number;
+  applied: boolean;
+}
+
+/**
+ * Rewrite the registry to its latest row per artifact_id. Dry run by default
+ * (reports what would be removed). Runs under the append lock, so no row
+ * appended concurrently is lost.
+ */
+export function compactArtifactOwnershipRegistry(
+  options: { dryRun?: boolean } = {}
+): ArtifactOwnershipCompaction {
+  const dryRun = options.dryRun ?? true;
+  const registryPath = artifactRegistryPath();
+  return withLockSync(ARTIFACT_REGISTRY_LOCK, () => {
+    const rows = listArtifactOwnershipRecords();
+    const kept = latestByArtifactId(rows);
+    const result: ArtifactOwnershipCompaction = {
+      total_rows: rows.length,
+      kept_rows: kept.length,
+      removed_rows: rows.length - kept.length,
+      applied: false,
+    };
+    if (dryRun || result.removed_rows === 0) return result;
+    safeWriteFile(registryPath, `${kept.map((row) => JSON.stringify(row)).join('\n')}\n`);
+    return { ...result, applied: true };
+  });
 }
 
 export function listArtifactOwnershipRecordsForProject(
