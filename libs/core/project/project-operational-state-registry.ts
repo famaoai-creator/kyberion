@@ -20,8 +20,14 @@ import { readJson } from '../foundation/json.js';
 import {
   ACTIVE_PROJECT_MISSION_STATUSES,
   deriveProjectMissionIndex,
+  isMissionInScope,
+  projectScopeOf,
 } from './project-mission-index.js';
 import { isValidTenantSlug } from '../entity-scope.js';
+import { createLogger, formatDiagnostic } from '../logger.js';
+import type { MissionState } from '../mission/mission-types.js';
+
+const logger = createLogger('project-operational-state');
 
 export {
   projectOperationalMissionLinkPath,
@@ -476,6 +482,23 @@ export function syncProjectOperationalStateFromMission(
     );
   }
   const existingProject = loadProjectRecord(projectId);
+  // Project state is placed by the project record (its tier/tenant). A mission
+  // outside that scope (a legacy link) never writes project state into the
+  // wrong partition; links made since are validated against the record.
+  if (
+    existingProject &&
+    !isMissionInScope(input as unknown as MissionState, projectScopeOf(existingProject))
+  ) {
+    logger.warn(
+      formatDiagnostic({
+        component: 'project-operational-state',
+        what: `project state sync skipped for ${projectId}`,
+        why: `mission ${input.mission_id} (${input.tier}/${tenantSlug ?? 'shared'}) is outside the project's scope (${existingProject.tier}/${existingProject.tenant_slug || 'shared'})`,
+        next: 'relink the mission to a project in its own tier/tenant',
+      })
+    );
+    return null;
+  }
   const projectPath = input.relationships?.project?.project_path?.trim();
   const relationships = input.relationships || {};
 

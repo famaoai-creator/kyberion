@@ -1,5 +1,6 @@
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
+import { tryResolveOwnerScope } from './owner-scope.js';
 import { writeScopedArtifact } from './workforce/artifact-store.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeWriteFile } from './secure-io.js';
@@ -79,7 +80,9 @@ export function offloadLargeOutput(
   const fileName = `${stepNumber}-${step}-${id}.log`;
 
   let portablePath: string;
-  if (mission !== 'shared') {
+  // Mission-local only for a mission that exists (its own record places it);
+  // an unknown or stale mission id falls back to shared tmp, never a guessed dir.
+  if (mission !== 'shared' && tryResolveOwnerScope({ kind: 'mission', id: mission })) {
     const written = writeScopedArtifact({
       scope: { mission },
       artifact_class: 'cache',

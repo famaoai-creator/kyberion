@@ -1,4 +1,4 @@
-import { appendJsonLine, readJson, readJsonIfPresent, readJsonLines } from '../foundation/json.js';
+import { appendJsonLine, readJson, readJsonLines } from '../foundation/json.js';
 import { isRecord } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import * as path from 'node:path';
@@ -23,6 +23,7 @@ import {
   classifyStorageFloorPath,
   storagePartitionSegments,
 } from '../storage-layout.js';
+import { resolveOwnerScope, SHARED_TENANT, type OwnerRef } from '../owner-scope.js';
 import type { ArtifactKind } from './artifact-registry.js';
 import {
   createArtifactRecord,
@@ -405,17 +406,47 @@ function artifactFloorRoot(segments: string[]): string {
   return path.join(pathResolver.rootDir(), ...STORAGE_FLOOR_ROOTS.artifact.split('/'), ...segments);
 }
 
+interface ResolvedScopeRoot {
+  artifactsRoot: string;
+  kind: ScopedArtifactScopeKind;
+  tier: 'personal' | 'confidential' | 'public';
+  /** Owner tenant slug; undefined for untenanted (`shared`) and system scopes. */
+  tenant?: string;
+  organizationId?: string;
+}
+
+function ownedRoot(
+  owner: OwnerRef,
+  kind: ScopedArtifactScopeKind,
+  scope: ScopedArtifactScope,
+  requestedTier: 'personal' | 'confidential' | 'public' | undefined
+): ResolvedScopeRoot {
+  // The owner's record decides placement; the caller's tier/tenant only narrow.
+  const resolved = resolveOwnerScope(owner, {
+    ...(requestedTier ? { tier: requestedTier } : {}),
+    ...(scope.tenant !== undefined ? { tenant: scope.tenant } : {}),
+  });
+  return {
+    artifactsRoot: path.join(resolved.dir, 'artifacts'),
+    kind,
+    tier: resolved.tier,
+    ...(resolved.tenant !== SHARED_TENANT ? { tenant: resolved.tenant } : {}),
+    ...(resolved.organization_id ? { organizationId: resolved.organization_id } : {}),
+  };
+}
+
 /**
- * Resolve the `artifacts` root of a scope. Mission/project/session scopes own
- * an `artifacts/` subtree of their directory (an organization scope uses its
- * organization workspace); tenant and system scopes own a
+ * Resolve the `artifacts` root of a scope. Mission/project/organization scopes
+ * own an `artifacts/` subtree of their owner's directory, placed by the owner's
+ * own record (resolveOwnerScope) — an explicit tier/tenant must agree with it.
+ * Session scopes own a runtime-session subtree; tenant and system scopes own a
  * partition of the storage-layout artifact floor
  * (`active/shared/artifacts/<tier>/<tenant>/` and `active/shared/artifacts/system/`).
  */
 function resolveScopeArtifactsRoot(
   scope: ScopedArtifactScope,
-  tier: 'personal' | 'confidential' | 'public'
-): { artifactsRoot: string; kind: ScopedArtifactScopeKind } {
+  requestedTier?: 'personal' | 'confidential' | 'public'
+): ResolvedScopeRoot {
   if (scope.system !== undefined) {
     const others = (
       ['tenant', 'organization', 'project', 'mission', 'task', 'session'] as const
@@ -425,12 +456,13 @@ function resolveScopeArtifactsRoot(
         'writeScopedArtifact: system scope is platform-wide and cannot be combined with tenant/organization/project/mission/task/session'
       );
     }
-    if (tier !== 'public') {
+    if (requestedTier && requestedTier !== 'public') {
       throw new Error('writeScopedArtifact: system scope carries public-tier data only');
     }
     return {
       artifactsRoot: artifactFloorRoot(storagePartitionSegments(SYSTEM_PARTITION)),
       kind: 'system',
+      tier: 'public',
     };
   }
   if (scope.task !== undefined) {
@@ -438,42 +470,35 @@ function resolveScopeArtifactsRoot(
       throw new Error('writeScopedArtifact: task scope requires a mission reference');
     }
     const mission = sanitizeScopeSegment(scope.mission, 'mission');
-    const base = pathResolver.findMissionPath(mission) ?? pathResolver.missionDir(mission, tier);
-    return { artifactsRoot: path.join(base, 'artifacts'), kind: 'task' };
+    return ownedRoot({ kind: 'mission', id: mission }, 'task', scope, requestedTier);
   }
   if (scope.mission !== undefined) {
     const mission = sanitizeScopeSegment(scope.mission, 'mission');
-    const base = pathResolver.findMissionPath(mission) ?? pathResolver.missionDir(mission, tier);
-    return { artifactsRoot: path.join(base, 'artifacts'), kind: 'mission' };
+    return ownedRoot({ kind: 'mission', id: mission }, 'mission', scope, requestedTier);
   }
   if (scope.project !== undefined) {
     const project = sanitizeScopeSegment(scope.project, 'project');
-    const tenant = scope.tenant ? sanitizeScopeSegment(scope.tenant, 'tenant') : 'shared';
-    return {
-      artifactsRoot: path.join(
-        pathResolver.projectWorkspaceDir(project, tier, tenant),
-        'artifacts'
-      ),
-      kind: 'project',
-    };
+    return ownedRoot({ kind: 'project', id: project }, 'project', scope, requestedTier);
   }
+  const tier = requestedTier ?? 'confidential';
+  const tenant = scope.tenant?.trim().toLowerCase() || undefined;
   if (scope.session !== undefined) {
     const session = sanitizeScopeSegment(scope.session, 'session');
     return {
       artifactsRoot: path.join(pathResolver.volatile('session', session), 'artifacts'),
       kind: 'session',
+      tier,
+      ...(tenant ? { tenant } : {}),
     };
   }
   if (scope.organization !== undefined) {
     const organization = sanitizeScopeSegment(scope.organization, 'organization');
-    const tenant = scope.tenant ? sanitizeScopeSegment(scope.tenant, 'tenant') : 'shared';
-    return {
-      artifactsRoot: path.join(
-        pathResolver.organizationWorkspaceDir(organization, tier, tenant),
-        'artifacts'
-      ),
-      kind: 'organization',
-    };
+    return ownedRoot(
+      { kind: 'organization', id: organization },
+      'organization',
+      scope,
+      requestedTier
+    );
   }
   if (scope.tenant !== undefined) {
     let segments: string[];
@@ -484,38 +509,16 @@ function resolveScopeArtifactsRoot(
         `writeScopedArtifact: invalid tenant reference: ${JSON.stringify(scope.tenant)}`
       );
     }
-    return { artifactsRoot: artifactFloorRoot(segments), kind: 'tenant' };
+    return {
+      artifactsRoot: artifactFloorRoot(segments),
+      kind: 'tenant',
+      tier,
+      ...(tenant && tenant !== SHARED_TENANT ? { tenant } : {}),
+    };
   }
   throw new Error(
     'writeScopedArtifact: scope must name at least one of system/tenant/organization/project/mission/task/session'
   );
-}
-
-/**
- * Tier of an existing mission owner, read from its own state: a mission/task
- * write lands in that mission's directory, so its index entry and published
- * record must carry the mission's tier instead of a default.
- */
-function existingMissionTier(
-  scope: ScopedArtifactScope
-): 'personal' | 'confidential' | 'public' | undefined {
-  if (scope.system !== undefined || scope.mission === undefined) return undefined;
-  const missionPath = pathResolver.findMissionPath(sanitizeScopeSegment(scope.mission, 'mission'));
-  if (!missionPath) return undefined;
-  try {
-    const state = readJsonIfPresent<{ tier?: unknown }>(
-      path.join(missionPath, 'mission-state.json')
-    );
-    if (state?.tier === 'personal' || state?.tier === 'confidential' || state?.tier === 'public') {
-      return state.tier;
-    }
-  } catch {
-    // Unreadable state: fall back to the directory layout below.
-  }
-  const relative = pathResolver.toRepoRelative(missionPath).split(path.sep).join('/');
-  const match = relative.match(/^active\/missions\/(personal|confidential|public)\//u);
-  if (match) return match[1] as 'personal' | 'confidential' | 'public';
-  return relative.startsWith('knowledge/personal/') ? 'personal' : undefined;
 }
 
 function serializeScopedContent(content: unknown, format?: ScopedArtifactFormat): string | Buffer {
@@ -563,16 +566,8 @@ export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScope
         `(expected one of ${RETENTION_ARTIFACT_CLASSES.join('/')})`
     );
   }
-  const missionTier = existingMissionTier(input.scope);
-  if (input.tier && missionTier && input.tier !== missionTier) {
-    // The file lands in the mission's own directory; a different label would
-    // make the index row and published record lie about its tier.
-    throw new Error(
-      `writeScopedArtifact: tier '${input.tier}' contradicts mission ${input.scope.mission} tier '${missionTier}'`
-    );
-  }
-  const tier = input.tier ?? missionTier ?? (input.scope.system ? 'public' : 'confidential');
-  const { artifactsRoot, kind } = resolveScopeArtifactsRoot(input.scope, tier);
+  const root = resolveScopeArtifactsRoot(input.scope, input.tier);
+  const { artifactsRoot, kind } = root;
   const name = sanitizeArtifactName(input.name);
   const targetDir =
     kind === 'task'
@@ -631,7 +626,7 @@ export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScope
     safeWriteFile(absolutePath, data);
     appendJsonLine(indexPath, validatedEntry);
     if (input.publish) {
-      artifactId = publishScopedArtifact(input, repoRelative, kind, tier);
+      artifactId = publishScopedArtifact(input, repoRelative, root);
     }
   };
   if (input.role) withRole(input.role, performWrite);
@@ -655,19 +650,20 @@ export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScope
 function publishScopedArtifact(
   input: WriteScopedArtifactInput,
   repoRelativePath: string,
-  kind: ScopedArtifactScopeKind,
-  tier: 'personal' | 'confidential' | 'public'
+  root: ResolvedScopeRoot
 ): string {
+  const { kind, tier } = root;
   const publication = input.publish as ScopedArtifactPublication;
+  const organizationId =
+    input.scope.organization ?? publication.organization_id ?? root.organizationId;
   const record = createArtifactRecord({
     ...(publication.artifact_id ? { artifact_id: publication.artifact_id } : {}),
     kind: publication.kind,
     storage_class: 'artifact_store',
     path: repoRelativePath,
-    ...(input.scope.tenant ? { tenant_slug: input.scope.tenant.trim().toLowerCase() } : {}),
-    ...((input.scope.organization ?? publication.organization_id)
-      ? { organization_id: input.scope.organization ?? publication.organization_id }
-      : {}),
+    // The owner's tenant, not the caller's: surfaces scope viewers by it.
+    ...(root.tenant ? { tenant_slug: root.tenant } : {}),
+    ...(organizationId ? { organization_id: organizationId } : {}),
     ...(input.scope.project ? { project_id: input.scope.project } : {}),
     ...(input.scope.mission ? { mission_id: input.scope.mission } : {}),
     ...(publication.task_session_id ? { task_session_id: publication.task_session_id } : {}),
@@ -717,10 +713,7 @@ export function readScopedArtifactIndex(
   scope: ScopedArtifactScope,
   tier?: 'personal' | 'confidential' | 'public'
 ): ScopedArtifactIndexEntry[] {
-  const { artifactsRoot } = resolveScopeArtifactsRoot(
-    scope,
-    tier ?? (scope.system ? 'public' : 'confidential')
-  );
+  const { artifactsRoot } = resolveScopeArtifactsRoot(scope, tier);
   const indexPath = path.join(artifactsRoot, SCOPED_ARTIFACT_INDEX_FILENAME);
   const safeIndexPath = assertSafeRepositoryPath(indexPath, { allowMissingLeaf: true });
   ensureRegularScopedArtifactIndex(safeIndexPath);

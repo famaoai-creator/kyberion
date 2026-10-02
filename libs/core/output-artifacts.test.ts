@@ -41,6 +41,23 @@ describe('output-artifacts', () => {
     seedPolicyFile(tmpRoot);
     seedScopedArtifactIndexSchema(tmpRoot);
     process.env.KYBERION_ROOT = tmpRoot;
+    // A mission-local offload needs a real mission (its own record places it).
+    const missionDir = path.join(tmpRoot, 'active/missions/MISSION-OH04-TEST');
+    fs.mkdirSync(missionDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(missionDir, 'mission-state.json'),
+      JSON.stringify({
+        mission_id: 'MISSION-OH04-TEST',
+        tier: 'public',
+        status: 'active',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'worker',
+        confidence_score: 1,
+        git: { branch: 'm', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+        history: [],
+      })
+    );
     process.env.MISSION_ROLE = 'mission_controller';
     mod = await import('./output-artifacts.js');
   });
@@ -72,7 +89,7 @@ describe('output-artifacts', () => {
     });
     expect(reference?.preview.length).toBeLessThan(body.length);
     expect(reference?.artifact_path).toMatch(
-      /^active\/missions\/mission-oh04-test\/artifacts\/cache\/tool-output\/3-system-exec-/
+      /^active\/missions\/MISSION-OH04-TEST\/artifacts\/cache\/tool-output\/3-system-exec-/
     );
     const absolute = path.join(tmpRoot, reference!.artifact_path);
     expect(fs.readFileSync(absolute, 'utf8')).toBe(body);
@@ -85,7 +102,7 @@ describe('output-artifacts', () => {
     // so mission-finish GC (AL-03) can reclaim it without stat-walking.
     const indexPath = path.join(
       tmpRoot,
-      'active/missions/mission-oh04-test/artifacts/artifacts-index.jsonl'
+      'active/missions/MISSION-OH04-TEST/artifacts/artifacts-index.jsonl'
     );
     const entries = fs
       .readFileSync(indexPath, 'utf8')
@@ -106,6 +123,17 @@ describe('output-artifacts', () => {
 
     expect(reference?.artifact_path).toMatch(/^active\/shared\/tmp\/tool-output\/shared\//);
     expect(fs.readFileSync(path.join(tmpRoot, reference!.artifact_path), 'utf8')).toBe(body);
+  });
+
+  it('falls back to shared tmp for a mission id that has no mission (never a guessed dir)', () => {
+    const body = 'w'.repeat(300);
+    const reference = mod.offloadLargeOutput(body, {
+      maxInlineChars: 100,
+      missionId: 'msn-ghost',
+      stepOp: 'system:exec',
+    });
+    expect(reference?.artifact_path).toMatch(/^active\/shared\/tmp\/tool-output\/msn-ghost\//);
+    expect(fs.existsSync(path.join(tmpRoot, 'active/missions/msn-ghost'))).toBe(false);
   });
 
   it("treats the 'shared' mission slug as mission-unknown (run_pipeline default)", () => {

@@ -21,6 +21,12 @@ import {
 } from './mission-project-ledger.js';
 import type { MissionRelationships } from './mission-types.js';
 import { currentProcessArgv } from '../lib/harness.js';
+import {
+  OwnerScopeError,
+  SHARED_TENANT,
+  tryResolveOwnerScope,
+  type OwnerScope,
+} from '@agent/core/owner-scope';
 import { parseSafeJsonObjectInput } from '../lib/json-input.js';
 
 const MISSION_TIERS = ['personal', 'confidential', 'public'] as const;
@@ -185,10 +191,30 @@ export function validateMissionStartCreateInput(
     throw new Error(`${actionName} ${missionId}: --track-id requires --project-id`);
   }
   if (project?.project_id) {
-    const projectRecord = loadProjectRecord(project.project_id);
     // relationships.project is the single source of project membership: it
-    // must name a managed project (create it with `pnpm project create`).
-    if (!projectRecord) {
+    // must name a managed project (create it with `pnpm project create`), and
+    // the mission takes the project's scope from the project record. A stated
+    // tier/tenant may only narrow it (resolveOwnerScope).
+    const statedTenant = input.tenantSlug || input.tenantId;
+    let projectScope: OwnerScope | null = null;
+    try {
+      projectScope = tryResolveOwnerScope(
+        { kind: 'project', id: project.project_id },
+        {
+          ...(input.tier ? { tier: input.tier } : {}),
+          ...(statedTenant ? { tenant: statedTenant } : {}),
+        }
+      );
+    } catch (error) {
+      if (error instanceof OwnerScopeError) {
+        throw new Error(`[PROJECT_LINK_INVALID] ${actionName} ${missionId}: ${error.message}`, {
+          cause: error,
+        });
+      }
+      throw error;
+    }
+    const projectRecord = projectScope ? loadProjectRecord(project.project_id) : null;
+    if (!projectScope || !projectRecord) {
       const message =
         `[PROJECT_LINK_INVALID] ${actionName} ${missionId}: project not found: ${project.project_id}. ` +
         'Create it with `pnpm project create` or fix --project-id.';
@@ -202,31 +228,15 @@ export function validateMissionStartCreateInput(
       }
       assertManagedProjectTrackScope(projectRecord, trackRecord);
     }
-    if (projectRecord) {
-      const requestedTier = input.tier;
-      // An omitted tenant is inherited from the project below; a stated one
-      // must match it.
-      const statedTenant = input.tenantSlug || input.tenantId;
-      const requestedTenant = statedTenant || projectRecord.tenant_slug || 'shared';
-      const projectTenant = projectRecord.tenant_slug || 'shared';
-      if (requestedTier && requestedTier !== projectRecord.tier) {
-        throw new Error(
-          `${actionName} ${missionId}: mission tier '${requestedTier}' must match project tier '${projectRecord.tier}'.`
-        );
-      }
-      if (requestedTenant !== projectTenant) {
-        throw new Error(
-          `${actionName} ${missionId}: mission tenant '${requestedTenant}' must match project tenant '${projectTenant}'.`
-        );
-      }
+    if (projectScope) {
       // Inherit the project's scope so the mission state carries it (a
       // --tenant-id alone was never persisted as tenant_slug, and a missing
       // --tier fell back to confidential even for a public project).
-      if (!input.tier) input.tier = projectRecord.tier;
-      if (projectRecord.tenant_slug && !input.tenantSlug) {
-        input.tenantSlug = projectRecord.tenant_slug;
+      if (!input.tier) input.tier = projectScope.tier;
+      if (projectScope.tenant !== SHARED_TENANT && !input.tenantSlug) {
+        input.tenantSlug = projectScope.tenant;
       }
-      const projectOrganization = projectRecord.organization_id;
+      const projectOrganization = projectScope.organization_id;
       if (projectOrganization) {
         if (input.organizationId && input.organizationId !== projectOrganization) {
           throw new Error(
