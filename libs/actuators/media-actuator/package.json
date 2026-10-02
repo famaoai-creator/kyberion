@@ -17,12 +17,11 @@
     "exceljs": "^4.4.0",
     "html-to-docx": "^1.8.0",
     "jsdom": "^29.1.1",
-    "mammoth": "^1.12.2",
-    "marked": "^18.0.12",
+    "marked": "^18.0.14",
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^6.3.289",
-    "puppeteer": "^25.4.0",
+    "puppeteer": "^25.12.0",
     "tesseract.js": "^7.0.0",
-    "yargs": "^17.7.2"
+    "yargs": "^17.7.3"
   }
 }
