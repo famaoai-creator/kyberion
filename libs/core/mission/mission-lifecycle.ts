@@ -1200,7 +1200,9 @@ export async function finishMission(
     event: 'ARCHIVE',
     note: `Mission archived to ${archivePath}.`,
   });
-  await saveState(upperId, state);
+  // The active directory is gone: persist into the archive copy so no state
+  // stub is recreated at the active path (dependents read it from there).
+  await saveState(upperId, state, { missionDir: archivePath });
   traceCtx.endSpan('ok');
   const traceResult = finalizeActuatorTrace(traceCtx);
   state.context = {
@@ -1218,7 +1220,7 @@ export async function finishMission(
     mission_finish_trace_summary: traceResult.trace_summary,
     mission_finish_trace_persisted_path: traceResult.trace_persisted_path,
   };
-  await saveState(upperId, state);
+  await saveState(upperId, state, { missionDir: archivePath });
   logger.success(`📦 Mission ${upperId} archived and finalized.`);
 }
 

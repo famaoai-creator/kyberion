@@ -1,7 +1,7 @@
 ---
 title: 'Mission Kickoff Playbook — friction-free mission start for repo-internal work'
 tags: [orchestration, mission, lifecycle, kickoff, playbook]
-last_updated: 2026-10-01
+last_updated: 2026-10-02
 runtime_stages: [alignment, execution]
 ---
 
@@ -52,6 +52,18 @@ does **not** switch customer stance unless `customer/<org>/` exists.
 Learnings ship in the same PR as the code — see
 [execution.md step 5](../governance/phases/execution.md) and
 [review.md](../governance/phases/review.md#product-lessons-ship-inside-the-code-pr).
+
+### Mission dependencies
+
+Declare missions that must finish first with `--prerequisites MSN-A,MSN-B` on
+`create` / `kickoff` / `start` (ids are case-insensitive and stored uppercase in
+`relationships.prerequisites`). A prerequisite is satisfied once its mission is
+`completed` or `archived`; archived missions are found in the archive
+(`mission-management-config.json` `directories.archive`). An unmet prerequisite
+makes `start` fail with `[MISSION_PREREQUISITES_UNMET]` and a non-zero exit;
+`--force` bypasses it. `enqueue <ID> <tier> [priority] [deps]` adds queue-level
+dependencies, and `dispatch` starts the highest-priority entry whose queue and
+mission prerequisites are all met, keeping it pending if the start fails.
 
 ## 2. Pitfalls hit (and the fix)
 
