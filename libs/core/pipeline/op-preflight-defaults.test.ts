@@ -60,6 +60,15 @@ describe('default operation preflight waterfall', () => {
     expect(result.reason).toContain('graph-loop-without-bound');
   });
 
+  it('never reports preflight-internal stamps as a repair of the caller input', async () => {
+    ensureDefaultOpPreflight();
+    const params = { path: 'a.txt' };
+    const result = await runOpPreflight({ op: 'file:pipeline', params, source: 'actuator' });
+    expect(result.input).toEqual(params);
+    expect(result.repaired_input).toBeUndefined();
+    expect(Object.keys(result.input).some((key) => key.startsWith('_'))).toBe(false);
+  });
+
   it('stamps the declared manifest effect onto the input for downstream stages', async () => {
     ensureDefaultOpPreflight();
     const result = await runOpPreflight({

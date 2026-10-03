@@ -148,7 +148,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/held-approval-request.ts#fileHeldApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/governance/held-effect-request.ts#createHeldApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2693,6 +2693,7 @@
           "example_path": [
             "presence/displays/computer-surface/server.ts#<module>",
             "presence/displays/computer-surface/os-control-plane.ts#<module>",
+            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
             "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
@@ -2730,6 +2731,7 @@
           "example_path": [
             "presence/displays/computer-surface/server.ts#<module>",
             "presence/displays/computer-surface/os-control-plane.ts#<module>",
+            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
             "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
@@ -2762,6 +2764,7 @@
           "example_path": [
             "presence/displays/computer-surface/server.ts#<module>",
             "presence/displays/computer-surface/os-control-plane.ts#<module>",
+            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
             "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
@@ -2804,6 +2807,7 @@
           "example_path": [
             "presence/displays/computer-surface/server.ts#<module>",
             "presence/displays/computer-surface/os-control-plane.ts#<module>",
+            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
             "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
@@ -2829,6 +2833,7 @@
           "example_path": [
             "presence/displays/computer-surface/server.ts#<module>",
             "presence/displays/computer-surface/os-control-plane.ts#<module>",
+            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
             "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
@@ -4361,6 +4366,7 @@
         "chronos_gateway": {
           "example_path": [
             "presence/displays/operator-surface/src/lib/data.ts#getCloudflareOsSnapshot",
+            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
             "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
@@ -4404,6 +4410,7 @@
         "infrastructure_sentinel": {
           "example_path": [
             "presence/displays/operator-surface/src/lib/data.ts#getCloudflareOsSnapshot",
+            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
             "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
@@ -4437,6 +4444,7 @@
         "mission_controller": {
           "example_path": [
             "presence/displays/operator-surface/src/lib/data.ts#getCloudflareOsSnapshot",
+            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
             "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
@@ -4472,6 +4480,7 @@
         "slack_bridge": {
           "example_path": [
             "presence/displays/operator-surface/src/lib/data.ts#getCloudflareOsSnapshot",
+            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
             "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
@@ -4496,6 +4505,7 @@
         "surface_runtime": {
           "example_path": [
             "presence/displays/operator-surface/src/lib/data.ts#getCloudflareOsSnapshot",
+            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
             "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",

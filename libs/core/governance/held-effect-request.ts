@@ -1,27 +1,22 @@
 import { createApprovalRequest } from './approval-store.js';
-import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 import type { HeldActionApprovalLink, HeldActionSteeringSpec } from './held-effect-bridge.js';
+import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 
 /**
- * Minimal held-record shape the request builder needs — keeps this module
- * free of a static control-plane import.
+ * SC-04: file the linked approval-store request steering `held_effect`. The
+ * request — not the held record — becomes the decision of record; the held
+ * record keeps the link so every decision path converges.
  */
-export interface HeldApprovalRequestRecord {
-  id: string;
-  missionId: string;
-  taskId?: string;
-  tenantSlug?: string;
-  op: string;
-  effectBinding: string;
-  payloadHash: string;
-}
-
-/**
- * SC-04: file the linked approval-store request steering `held_effect`.
- * The request — not the held record — becomes the decision of record.
- */
-export function fileHeldApprovalRequest(
-  record: HeldApprovalRequestRecord,
+export function createHeldApprovalRequest(
+  record: {
+    id: string;
+    op: string;
+    missionId: string;
+    taskId?: string;
+    tenantSlug?: string;
+    effectBinding: string;
+    payloadHash: string;
+  },
   spec: HeldActionSteeringSpec
 ): HeldActionApprovalLink {
   const role: GovernedArtifactRole = 'mission_controller';
@@ -56,9 +51,5 @@ export function fileHeldApprovalRequest(
       correlationId: spec.correlationId,
     },
   });
-  return {
-    requestId: request.id,
-    storageChannel: request.storageChannel,
-    role,
-  };
+  return { requestId: request.id, storageChannel: request.storageChannel, role };
 }
