@@ -6,10 +6,22 @@ import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
+  applyControlPlaneJournalEvent,
   loadPersistedControlPlaneStateAtPath,
+  restoredHeldActionRecord,
+  serializableHeldActionRecord,
   validatePersistedControlPlaneStateAtPath,
+  type ControlPlaneJournalCollections,
   type PersistedControlPlaneState,
 } from './cloudflare-os-control-plane-state.js';
+import {
+  controlPlaneNamespaceFor,
+  foldObservationAggregate,
+  type ControlPlaneCollection,
+  type ControlPlaneJournalEvent,
+  type ObservationAggregate,
+} from './cloudflare-os-journal.js';
+import { ControlPlaneJournalStore } from './cloudflare-os-journal-store.js';
 import { isRecord } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import {
@@ -332,17 +344,38 @@ export class CloudflareOsControlPlane {
   private readonly persist: boolean;
   private readonly statePath: string;
   private readonly auditRestoreFailures: boolean;
+  /**
+   * SC-03: journal mode is the default persistence — tenant-namespaced
+   * append-only journals plus locked tail catch-up. An explicit `statePath`
+   * keeps the legacy single-file behavior for tests and pinned adapters.
+   */
+  private readonly journalMode: boolean;
+  private readonly observationAggregates = new Map<string, ObservationAggregate>();
+  private readonly journalStore = new ControlPlaneJournalStore({
+    applyJournalEvent: (event) => this.applyJournalEvent(event),
+    serializedJournalRecord: (kind, record) => this.serializedRecordFor(kind, record),
+    serializedState: () => this.buildPersistedState(),
+    observationAggregatesFor: (namespace) =>
+      [...this.observationAggregates.values()].filter(
+        (aggregate) =>
+          controlPlaneNamespaceFor('observation', aggregate as never).key === namespace.key
+      ),
+  });
 
   constructor(options: CloudflareOsControlPlaneOptions = {}) {
     this.persist = options.persist !== false;
     this.auditRestoreFailures = options.auditRestoreFailures !== false;
+    this.journalMode = this.persist && !options.statePath;
     this.statePath = this.persist
       ? assertSafeRepositoryPath(
           options.statePath || pathResolver.shared('runtime/cloudflare-os/control-plane.json'),
           { allowMissingLeaf: true }
         )
       : options.statePath || pathResolver.shared('runtime/cloudflare-os/control-plane.json');
-    if (this.persist) this.restoreState();
+    if (this.persist) {
+      if (this.journalMode) this.journalStore.restore(this.auditRestoreFailures);
+      else this.restoreState();
+    }
   }
 
   registerExecutor<T, R>(
@@ -376,7 +409,7 @@ export class CloudflareOsControlPlane {
       dependsOn: [...new Set(input.dependsOn || [])],
     } as HeldActionRecord<T, R>;
     this.held.set(record.id, record as HeldActionRecord);
-    this.persistState();
+    this.recordMutation('held', record as HeldActionRecord);
     audit('held_action', 'submit', 'completed', {
       heldActionId: record.id,
       op: record.op,
@@ -432,7 +465,7 @@ export class CloudflareOsControlPlane {
       autoApproved: false,
     });
     if (decision === 'rejected') this.cancelDependents(record);
-    this.persistState();
+    this.recordMutation('held', record);
     return record;
   }
 
@@ -445,7 +478,7 @@ export class CloudflareOsControlPlane {
       enabledAt: nowIso(),
     };
     this.autoRules.push(normalized);
-    this.persistState();
+    this.recordMutation('auto_rule', normalized);
     return normalized;
   }
 
@@ -514,7 +547,7 @@ export class CloudflareOsControlPlane {
       record.applyError = error instanceof Error ? error.message : String(error);
       audit('held_action', 'apply', 'failed', { heldActionId: id, error: record.applyError });
     }
-    this.persistState();
+    this.recordMutation('held', record);
     return record;
   }
 
@@ -526,7 +559,7 @@ export class CloudflareOsControlPlane {
     await record.revert(record.result, record.previousState);
     record.status = 'cancelled';
     audit('held_action', 'revert', 'completed', { heldActionId: id });
-    this.persistState();
+    this.recordMutation('held', record);
     return record;
   }
 
@@ -546,7 +579,7 @@ export class CloudflareOsControlPlane {
     const introduction = { ...input, id: randomUUID(), grantedAt: nowIso() };
     this.introductions.set(introduction.id, introduction);
     audit('resource_introduction', 'grant', 'completed', introduction);
-    this.persistState();
+    this.recordMutation('introduction', introduction);
     return introduction;
   }
 
@@ -577,7 +610,7 @@ export class CloudflareOsControlPlane {
     if (!entry) throw new Error(`Resource introduction not found: ${id}`);
     if (!entry.revokedAt) entry.revokedAt = nowIso();
     audit('resource_introduction', 'revoke', 'completed', { id, revokedBy });
-    this.persistState();
+    this.recordMutation('introduction', entry);
   }
 
   enforceIntroduction(input: {
@@ -614,8 +647,9 @@ export class CloudflareOsControlPlane {
   recordObservation(input: Omit<ObservationRecord, 'id' | 'observedAt'>): ObservationRecord {
     const record = { ...input, id: randomUUID(), observedAt: nowIso() };
     this.observations.push(record);
+    foldObservationAggregate(this.observationAggregates, record);
     audit('observation', 'read', 'completed', record);
-    this.persistState();
+    this.recordMutation('observation', record);
     return record;
   }
 
@@ -704,7 +738,7 @@ export class CloudflareOsControlPlane {
     const set = this.threadCapabilities.get(threadId) || new Set<string>();
     set.add(capabilityId);
     this.threadCapabilities.set(threadId, set);
-    this.persistState();
+    this.recordMutation('thread_capability', { threadId, capabilities: [...set] });
   }
 
   assertThreadCapability(threadId: string, capabilityId: string): void {
@@ -718,7 +752,7 @@ export class CloudflareOsControlPlane {
     if (!blueprint.id || !Array.isArray(blueprint.required_bindings))
       throw new Error('[POLICY_VIOLATION] Blueprint binding declaration is required');
     this.blueprints.set(blueprint.id, blueprint);
-    this.persistState();
+    this.recordMutation('blueprint', blueprint);
     return blueprint;
   }
 
@@ -767,7 +801,7 @@ export class CloudflareOsControlPlane {
     };
     this.capabilities.set(edge.id, edge);
     audit('capability', 'grant', 'completed', edge);
-    this.persistState();
+    this.recordMutation('capability', edge);
     return edge;
   }
 
@@ -776,7 +810,7 @@ export class CloudflareOsControlPlane {
     if (!edge) throw new Error(`Capability edge not found: ${id}`);
     edge.revokedAt ||= nowIso();
     audit('capability', 'revoke', 'completed', { id, revokedBy });
-    this.persistState();
+    this.recordMutation('capability', edge);
   }
 
   assertCapability(subject: string, resource: string, scope: ResourceScope): void {
@@ -874,7 +908,7 @@ export class CloudflareOsControlPlane {
       historyRef: `mission-git:${input.id}`,
     };
     this.gadgetManifests.set(input.id, manifest);
-    this.persistState();
+    this.recordMutation('gadget', this.serializedGadget(input.id));
     return manifest;
   }
 
@@ -1004,7 +1038,7 @@ export class CloudflareOsControlPlane {
 
   recordNetworkAttempt(entry: NetworkObservation): void {
     this.network.push(entry);
-    this.persistState();
+    this.recordMutation('network', entry);
     audit(
       'network',
       entry.allowed ? 'egress_allowed' : 'egress_denied',
@@ -1064,6 +1098,7 @@ export class CloudflareOsControlPlane {
 
   private cancelDependents(rejected: HeldActionRecord): void {
     const cancelled = new Set<string>([rejected.id]);
+    const cancelledRecords: HeldActionRecord[] = [];
     let changed = true;
     while (changed) {
       changed = false;
@@ -1078,6 +1113,7 @@ export class CloudflareOsControlPlane {
         if (dependsOnRejected || referencesRejectedProvisional) {
           entry.status = 'cancelled';
           cancelled.add(entry.id);
+          cancelledRecords.push(entry);
           changed = true;
           audit('held_action', 'cascade_cancel', 'completed', {
             heldActionId: entry.id,
@@ -1086,7 +1122,7 @@ export class CloudflareOsControlPlane {
         }
       }
     }
-    this.persistState();
+    this.recordMutation('held', ...cancelledRecords);
   }
 
   private decideAutoApproved(record: HeldActionRecord): HeldActionRecord {
@@ -1106,7 +1142,7 @@ export class CloudflareOsControlPlane {
       resolvedBy: record.resolvedBy,
       autoApproved: true,
     });
-    this.persistState();
+    this.recordMutation('held', record);
     return record;
   }
 
@@ -1122,11 +1158,98 @@ export class CloudflareOsControlPlane {
     }
   }
 
-  private persistState(): void {
-    if (!this.persist) return;
-    const directory = pathResolver.shared('runtime/cloudflare-os');
-    safeMkdir(directory, { recursive: true });
-    const state: PersistedControlPlaneState = {
+  /**
+   * SC-03: route a mutation to the tenant-namespaced journal. In legacy file
+   * mode (explicit statePath) it degrades to the single-file persist so
+   * existing adapters keep working unchanged.
+   */
+  private recordMutation(kind: ControlPlaneCollection, ...records: unknown[]): void {
+    if (records.length === 0 || !this.persist) return;
+    if (!this.journalMode) {
+      this.persistState();
+      return;
+    }
+    this.journalStore.recordMutation(kind, records);
+  }
+
+  /** Strip executable state the journal must never carry. */
+  private serializedRecordFor(
+    kind: ControlPlaneCollection,
+    record: unknown
+  ): Record<string, unknown> {
+    if (kind === 'held') {
+      return serializableHeldActionRecord(record as Record<string, unknown>);
+    }
+    return record as Record<string, unknown>;
+  }
+
+  private deserializeGadgetOperation(operation: Record<string, unknown>) {
+    return {
+      ...operation,
+      inputSchema: fromJSONSchema(operation.inputSchema as Parameters<typeof fromJSONSchema>[0]),
+      outputSchema: fromJSONSchema(operation.outputSchema as Parameters<typeof fromJSONSchema>[0]),
+    } as GadgetOperationDefinition<any, any>;
+  }
+
+  private journalCollections(): ControlPlaneJournalCollections {
+    return {
+      held: this.held,
+      introductions: this.introductions,
+      observations: this.observations,
+      autoRules: this.autoRules,
+      capabilities: this.capabilities,
+      threadCapabilities: this.threadCapabilities,
+      blueprints: this.blueprints,
+      network: this.network,
+      observationAggregates: this.observationAggregates,
+      gadgets: {
+        manifests: this.gadgetManifests,
+        capabilitySubjects: this.gadgetCapabilitySubjects,
+        operations: this.gadgetOperations,
+        deserializeOperation: (operation) => this.deserializeGadgetOperation(operation),
+      },
+    };
+  }
+
+  private serializedGadget(manifestId: string): Record<string, unknown> {
+    const manifest = this.gadgetManifests.get(manifestId);
+    const operations = this.gadgetOperations.get(manifestId);
+    return {
+      manifest,
+      operations: operations
+        ? [...operations.values()].map((operation) => ({
+            name: operation.name,
+            description: operation.description,
+            inputSchema: schemaToJsonSchema(operation.inputSchema),
+            outputSchema: schemaToJsonSchema(operation.outputSchema),
+            effect: operation.effect,
+            capabilityResource: operation.capabilityResource,
+            introduction: operation.introduction,
+            observation: operation.observation,
+            governedCode: operation.governedCode,
+          }))
+        : [],
+    };
+  }
+
+  /** Fold one journal event into the in-memory projection. */
+  private applyJournalEvent(event: ControlPlaneJournalEvent): void {
+    applyControlPlaneJournalEvent(this.journalCollections(), event);
+  }
+
+  /** SC-03: observation rollups by mission × resource_ref × tier. */
+  listObservationAggregates(missionId?: string): ObservationAggregate[] {
+    return [...this.observationAggregates.values()].filter(
+      (aggregate) => !missionId || aggregate.missionId === missionId
+    );
+  }
+
+  /**
+   * The fully serialized projection — shared by the legacy single-file
+   * persist and the per-namespace snapshot cache the journal store writes.
+   */
+  private buildPersistedState(): PersistedControlPlaneState {
+    return {
       version: 1,
       // Executor parameters may contain credentials or personal payloads. A
       // restored action is deliberately fail-closed until a governed adapter
@@ -1165,6 +1288,13 @@ export class CloudflareOsControlPlane {
         ];
       }),
     };
+  }
+
+  private persistState(): void {
+    if (!this.persist) return;
+    const directory = pathResolver.shared('runtime/cloudflare-os');
+    safeMkdir(directory, { recursive: true });
+    const state = this.buildPersistedState();
     validatePersistedControlPlaneStateAtPath(this.statePath, state);
     safeWriteFile(this.statePath, JSON.stringify(state, null, 2) + '\n', { encoding: 'utf8' });
   }
@@ -1176,16 +1306,7 @@ export class CloudflareOsControlPlane {
       if (!state) return;
       for (const raw of state.held || []) {
         const record = raw as unknown as HeldActionRecord;
-        record.apply = () => {
-          throw new Error(
-            `[CONTROL_PLANE] Executor for persisted op '${record.op}' must be registered after restart`
-          );
-        };
-        record.simulate = undefined;
-        record.revert = undefined;
-        record.dependsOn ||= [];
-        record.effectBinding ||= record.op;
-        record.params = undefined as never;
+        restoredHeldActionRecord(record);
         this.held.set(record.id, record);
       }
       for (const entry of state.introductions || []) this.introductions.set(entry.id, entry);
@@ -1197,22 +1318,10 @@ export class CloudflareOsControlPlane {
       }
       for (const blueprint of state.blueprints || []) this.blueprints.set(blueprint.id, blueprint);
       for (const gadget of state.gadgets || []) {
-        if (!gadget?.manifest?.id || !Array.isArray(gadget.operations)) continue;
-        const operations = gadget.operations.map((operation) => ({
-          ...operation,
-          inputSchema: fromJSONSchema(
-            operation.inputSchema as Parameters<typeof fromJSONSchema>[0]
-          ),
-          outputSchema: fromJSONSchema(
-            operation.outputSchema as Parameters<typeof fromJSONSchema>[0]
-          ),
-        })) as GadgetOperationDefinition<any, any>[];
-        this.gadgetManifests.set(gadget.manifest.id, gadget.manifest);
-        this.gadgetCapabilitySubjects.set(gadget.manifest.id, gadget.manifest.capabilitySubject);
-        this.gadgetOperations.set(
-          gadget.manifest.id,
-          new Map(operations.map((operation) => [operation.name, operation]))
-        );
+        applyControlPlaneJournalEvent(this.journalCollections(), {
+          kind: 'gadget',
+          records: [gadget as unknown as Record<string, unknown>],
+        });
       }
       this.network.push(...(state.network || []));
     } catch (error) {
@@ -1232,7 +1341,13 @@ export class CloudflareOsControlPlane {
    * keep using the constructor-time snapshot.
    */
   private refreshPersistedObservations(): void {
-    if (!this.persist || !safeExistsSync(this.statePath)) return;
+    if (!this.persist) return;
+    if (this.journalMode) {
+      // SC-03: catch up every journal so provenance reads see cross-process writes.
+      this.journalStore.refresh();
+      return;
+    }
+    if (!safeExistsSync(this.statePath)) return;
     try {
       const state = loadPersistedControlPlaneStateAtPath(this.statePath);
       if (!state) return;
