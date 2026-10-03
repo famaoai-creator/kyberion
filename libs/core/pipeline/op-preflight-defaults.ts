@@ -36,12 +36,15 @@ import {
   resolveCapabilityResourceRef,
 } from '../actuator/actuator-manifest-index.js';
 import type { TierLevel } from '../types.js';
+import { introductionResult, taintResult } from './op-preflight-stages.js';
 
 const TIER_VALUES = new Set<TierLevel>(['public', 'confidential', 'personal']);
 
 const DEFAULT_LISTENER_IDS = [
   'core:scope',
   'core:effect',
+  'core:introduction',
+  'core:taint',
   'core:adf-guardrails',
   'core:provider-egress',
 ] as const;
@@ -234,8 +237,10 @@ export function ensureDefaultOpPreflight(): void {
   const registrations: { id: string; order: number; run: typeof scopeResult }[] = [
     { id: DEFAULT_LISTENER_IDS[0], order: 100, run: scopeResult },
     { id: DEFAULT_LISTENER_IDS[1], order: 110, run: effectResult },
-    { id: DEFAULT_LISTENER_IDS[2], order: 120, run: adfResult },
-    { id: DEFAULT_LISTENER_IDS[3], order: 130, run: providerEgressResult },
+    { id: DEFAULT_LISTENER_IDS[2], order: 112, run: introductionResult },
+    { id: DEFAULT_LISTENER_IDS[3], order: 115, run: taintResult },
+    { id: DEFAULT_LISTENER_IDS[4], order: 120, run: adfResult },
+    { id: DEFAULT_LISTENER_IDS[5], order: 130, run: providerEgressResult },
   ];
   for (const registration of registrations) {
     if (!listenerIds.has(registration.id)) {

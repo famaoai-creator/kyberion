@@ -1340,6 +1340,18 @@ export class CloudflareOsControlPlane {
     applyControlPlaneJournalEvent(this.journalCollections(), event);
   }
 
+  /**
+   * SC-05: catch the in-memory projection up to persisted state — journal
+   * tail in journal mode, observation splice in legacy file mode.
+   */
+  refreshFromJournals(): void {
+    if (this.journalMode) {
+      this.journalStore.refresh();
+      return;
+    }
+    this.refreshPersistedObservations();
+  }
+
   /** SC-03: observation rollups by mission × resource_ref × tier. */
   listObservationAggregates(missionId?: string): ObservationAggregate[] {
     return [...this.observationAggregates.values()].filter(

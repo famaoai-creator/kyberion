@@ -18,6 +18,7 @@ import {
 import { resolveOpAccessClaims, type OpInputDomain } from './op-input-contracts.js';
 import type { ResourceClaim } from '../tool/tool-call-scheduler.js';
 import { runOpPreflight } from './op-preflight.js';
+import { recordOpObservation } from './op-preflight-stages.js';
 import { ensureDefaultOpPreflight } from './op-preflight-defaults.js';
 import {
   requireSandboxEnforcement,
@@ -468,6 +469,10 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
         }
       } else {
         throw new Error(`[UNKNOWN_TYPE] Unknown step type: ${step.type}`);
+      }
+      // SC-05: post-op observation aggregation for declared-read ops.
+      if (step.type === 'capture' || step.type === 'transform' || step.type === 'apply') {
+        recordOpObservation(step.op, executionParams as Record<string, unknown>, ctx);
       }
       results.push({ op: step.op, status: 'success' });
       ctx = ((await hooks?.afterStep?.(step, state.stepCount, ctx, { status: 'success' })) ||
