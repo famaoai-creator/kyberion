@@ -158,4 +158,16 @@ describe('logger', () => {
     expect(parsed.msg).toBe('structured');
     expect(parsed.n).toBe(1);
   });
+
+  it('keeps one process exit listener across module re-evaluation (vi.resetModules)', async () => {
+    emitConsoleLine('stdout', 'register', { key: 'register' });
+    const baseline = process.listenerCount('exit');
+    for (let i = 0; i < 12; i += 1) {
+      vi.resetModules();
+      const reloaded = await import('./logger.js');
+      reloaded.emitConsoleLine('stdout', 'reloaded', { key: 'reloaded' });
+      reloaded.flushRepeatMarkers();
+    }
+    expect(process.listenerCount('exit')).toBe(baseline);
+  });
 });
