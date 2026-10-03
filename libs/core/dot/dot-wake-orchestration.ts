@@ -25,8 +25,10 @@ export async function runDotWakeWithGoalDriver(
   loaded: LoadedDotCharter,
   deps: DotWakeOrchestrationDeps = {}
 ): Promise<DotWakeReceipt> {
+  const backend =
+    deps.backend ?? (await import('../reasoning/reasoning-backend.js')).getReasoningBackend();
   return runDotWake(loaded, {
     ...deps,
-    runLoop: (options) => runGoalDrivenLoop(options),
+    ...(backend.generateWithTools ? { runLoop: (options) => runGoalDrivenLoop(options) } : {}),
   });
 }
