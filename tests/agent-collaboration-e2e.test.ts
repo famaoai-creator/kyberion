@@ -92,6 +92,11 @@ describe('agent collaboration e2e', { concurrent: false }, () => {
     const missionPath = missionDir('MSN-E2E-03', 'public');
     safeMkdir(missionPath, { recursive: true });
     safeMkdir(`${missionPath}/deliverables`, { recursive: true });
+    // Mission placement resolves from the mission's own state.
+    safeWriteFile(
+      `${missionPath}/mission-state.json`,
+      JSON.stringify({ mission_id: 'MSN-E2E-03', tier: 'public', status: 'active' })
+    );
     safeWriteFile(`${missionPath}/deliverables/task-a.md`, '# task a');
     safeWriteFile(`${missionPath}/deliverables/REVIEW-task-1.md`, '# review');
     safeWriteFile(

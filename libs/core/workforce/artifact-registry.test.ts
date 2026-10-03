@@ -16,6 +16,10 @@ import {
   listArtifactOwnershipRecordsByQuery,
   listArtifactOwnershipRecordsForProject,
   listArtifactOwnershipRecords,
+  listArtifactOwnershipRecordsForMission,
+  listLatestArtifactOwnershipRecords,
+  compactArtifactOwnershipRegistry,
+  listArtifactOwnershipHistoryByQuery,
 } from './artifact-registry.js';
 
 describe('artifact-registry', () => {
@@ -158,6 +162,136 @@ describe('artifact-registry', () => {
       findReusableArtifactOwnershipRecord({ projectId: 'PRJ-TEST-PROJ', kind: 'markdown' })
         ?.artifact_id
     ).toBe('ART-PROJ-NEW');
+  });
+
+  it('queries current ownership only: a superseded row never matches its old owner', () => {
+    const row = (overrides: Record<string, string>) =>
+      appendArtifactOwnershipRecord(
+        createArtifactOwnershipRecord({
+          artifact_id: 'ART-TEST-MOVED',
+          kind: 'report',
+          storage_class: 'artifact_store',
+          ...overrides,
+        } as Parameters<typeof createArtifactOwnershipRecord>[0])
+      );
+    // Published under a mission, then promoted to its project.
+    row({ mission_id: 'MSN-TEST-MOVED', path: 'active/missions/public/MSN-TEST-MOVED/a.md' });
+    row({
+      mission_id: 'MSN-TEST-MOVED',
+      project_id: 'PRJ-TEST-MOVED',
+      path: 'active/projects/public/shared/PRJ-TEST-MOVED/artifacts/report/a.md',
+    });
+    appendArtifactOwnershipRecord(
+      createArtifactOwnershipRecord({
+        artifact_id: 'ART-TEST-OTHER',
+        mission_id: 'MSN-TEST-MOVED',
+        kind: 'report',
+        storage_class: 'artifact_store',
+        path: 'active/missions/public/MSN-TEST-MOVED/b.md',
+      })
+    );
+
+    expect(listArtifactOwnershipRecords()).toHaveLength(3);
+    expect(listLatestArtifactOwnershipRecords().map((record) => record.artifact_id)).toEqual([
+      'ART-TEST-MOVED',
+      'ART-TEST-OTHER',
+    ]);
+    const forMission = listArtifactOwnershipRecordsForMission('MSN-TEST-MOVED');
+    expect(forMission).toHaveLength(2);
+    expect(forMission.find((record) => record.artifact_id === 'ART-TEST-MOVED')?.path).toBe(
+      'active/projects/public/shared/PRJ-TEST-MOVED/artifacts/report/a.md'
+    );
+  });
+
+  it('history queries still find an artifact a scope owned before it was re-registered', () => {
+    const base = {
+      artifact_id: 'ART-TEST-HISTORY',
+      kind: 'report',
+      storage_class: 'artifact_store',
+    } as const;
+    appendArtifactOwnershipRecord(
+      createArtifactOwnershipRecord({
+        ...base,
+        mission_id: 'MSN-TEST-HISTORY',
+        tenant_slug: 'acme-history',
+        path: 'active/missions/confidential/acme-history/MSN-TEST-HISTORY/a.md',
+      })
+    );
+    appendArtifactOwnershipRecord(
+      createArtifactOwnershipRecord({
+        ...base,
+        project_id: 'PRJ-TEST-SHARED',
+        path: 'active/projects/public/shared/PRJ-TEST-SHARED/artifacts/report/a.md',
+      })
+    );
+    expect(listArtifactOwnershipRecordsByQuery({ tenantSlug: 'acme-history' })).toEqual([]);
+    expect(
+      listArtifactOwnershipHistoryByQuery({ tenantSlug: 'acme-history' }).map(
+        (record) => record.artifact_id
+      )
+    ).toEqual(['ART-TEST-HISTORY']);
+  });
+
+  it('compacts the registry to the latest row per artifact (dry run by default)', () => {
+    for (const path of ['a.md', 'b.md', 'c.md']) {
+      appendArtifactOwnershipRecord(
+        createArtifactOwnershipRecord({
+          artifact_id: 'ART-TEST-COMPACT',
+          project_id: 'PRJ-TEST',
+          kind: 'report',
+          storage_class: 'artifact_store',
+          path: `active/shared/exports/${path}`,
+        })
+      );
+    }
+    expect(compactArtifactOwnershipRegistry()).toEqual({
+      total_rows: 3,
+      kept_rows: 1,
+      removed_rows: 2,
+      applied: false,
+    });
+    expect(listArtifactOwnershipRecords()).toHaveLength(3);
+
+    expect(compactArtifactOwnershipRegistry({ dryRun: false })).toMatchObject({
+      removed_rows: 2,
+      applied: true,
+    });
+    expect(listArtifactOwnershipRecords()).toEqual([
+      expect.objectContaining({
+        artifact_id: 'ART-TEST-COMPACT',
+        path: 'active/shared/exports/c.md',
+      }),
+    ]);
+    // Idempotent.
+    expect(compactArtifactOwnershipRegistry({ dryRun: false })).toMatchObject({
+      removed_rows: 0,
+      applied: false,
+    });
+  });
+
+  it('keeps an earlier owner row through compaction (ownership history)', () => {
+    for (const tenant of ['acme-compact', 'acme-compact', 'globex-compact']) {
+      appendArtifactOwnershipRecord(
+        createArtifactOwnershipRecord({
+          artifact_id: 'ART-TEST-COMPACT-OWNER',
+          project_id: 'PRJ-TEST-OWNER',
+          tenant_slug: tenant,
+          kind: 'report',
+          storage_class: 'artifact_store',
+          path: 'active/shared/exports/owner.md',
+        })
+      );
+    }
+    expect(compactArtifactOwnershipRegistry({ dryRun: false })).toMatchObject({
+      kept_rows: 2,
+      removed_rows: 1,
+    });
+    expect(
+      listArtifactOwnershipHistoryByQuery({ tenantSlug: 'acme-compact' }).map(
+        (record) => record.tenant_slug
+      )
+    ).toEqual(['globex-compact']);
+    expect(listArtifactOwnershipRecordsByQuery({ tenantSlug: 'acme-compact' })).toEqual([]);
   });
 
   it('fails closed on malformed ownership registry JSONL', () => {

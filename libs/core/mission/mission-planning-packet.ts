@@ -6,16 +6,16 @@ import {
   renderStructuredOutputSchemaPrompt,
 } from '../structured-output-contracts.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
-import { findMissionPath, missionDir } from '../path-resolver.js';
+import { tryResolveOwnerScope } from '../owner-scope.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 
-function safeMissionArtifactPath(missionId: string, relativePath: string): string {
-  const missionPath = assertSafeRepositoryPath(
-    findMissionPath(missionId) || missionDir(missionId, 'public'),
-    { allowMissingLeaf: true }
-  );
+/** Artifact path inside the existing mission's own directory; null when the mission is unknown. */
+function safeMissionArtifactPath(missionId: string, relativePath: string): string | null {
+  const owner = tryResolveOwnerScope({ kind: 'mission', id: missionId });
+  if (!owner) return null;
+  const missionPath = assertSafeRepositoryPath(owner.dir, { allowMissingLeaf: true });
   return assertSafeRepositoryPath(nodePath.join(missionPath, relativePath), {
     allowMissingLeaf: true,
   });
@@ -67,16 +67,15 @@ export function readProcessTemplateSeededTasks(
  */
 export function renderProcessTemplateSkeleton(missionId: string): string {
   const statePath = safeMissionArtifactPath(missionId, 'mission-state.json');
-  if (!safeExistsSync(statePath)) return '';
+  if (!statePath || !safeExistsSync(statePath)) return '';
   const processTemplate = loadMissionStateAtPath(statePath)?.process_template;
   if (!processTemplate?.workflow_id) return '';
 
   const lines = [
     `Process template: ${processTemplate.workflow_id} — phases: ${(processTemplate.phases || []).join(' → ')}.`,
   ];
-  const seeded = readProcessTemplateSeededTasks(
-    safeMissionArtifactPath(missionId, 'NEXT_TASKS.json')
-  );
+  const nextTasksPath = safeMissionArtifactPath(missionId, 'NEXT_TASKS.json');
+  const seeded = nextTasksPath ? readProcessTemplateSeededTasks(nextTasksPath) : [];
   if (seeded.length > 0) {
     lines.push(
       'The following tasks were seeded from the process template and are FIXED — do not drop, rename, or restructure them. Plan additional tasks around them and reference their task_ids in dependencies where appropriate:'

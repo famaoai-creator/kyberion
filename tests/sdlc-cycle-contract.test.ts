@@ -43,6 +43,11 @@ describe('task_plan_to_next_tasks (deterministic transform)', () => {
     process.env.MISSION_ROLE = 'mission_controller';
     missionPath = missionDir(MISSION, 'public');
     fs.mkdirSync(path.join(missionPath, 'evidence'), { recursive: true });
+    // Mission placement resolves from the mission's own state.
+    fs.writeFileSync(
+      path.join(missionPath, 'mission-state.json'),
+      JSON.stringify({ mission_id: MISSION, tier: 'public', status: 'active' })
+    );
     fs.writeFileSync(
       path.join(missionPath, 'evidence', 'task-plan.json'),
       JSON.stringify({

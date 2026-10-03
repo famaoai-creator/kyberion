@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const findMissionPath = vi.hoisted(() => vi.fn());
+const resolveMissionDir = vi.hoisted(() => vi.fn());
 
-vi.mock('../path-resolver.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../path-resolver.js')>()),
-  findMissionPath,
+vi.mock('../owner-scope.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../owner-scope.js')>()),
+  resolveMissionDir,
 }));
 
 import { missionTaskEventsPath } from './mission-task-events.js';
@@ -17,7 +17,7 @@ const linkDir = `${rootDir}/mission-link`;
 
 afterEach(() => {
   safeRmSync(rootDir, { recursive: true, force: true });
-  findMissionPath.mockReset();
+  resolveMissionDir.mockReset();
 });
 
 describe('mission task event path boundary', () => {
@@ -25,7 +25,7 @@ describe('mission task event path boundary', () => {
     safeMkdir(targetDir, { recursive: true });
     safeWriteFile(`${targetDir}/marker`, 'target');
     safeSymlinkSync(targetDir, linkDir, 'dir');
-    findMissionPath.mockReturnValue(linkDir);
+    resolveMissionDir.mockReturnValue(linkDir);
 
     expect(() => missionTaskEventsPath('MSN-TASK-SYMLINK')).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
