@@ -227,7 +227,9 @@ function effectResult(call: OpPreflightCall, input: RecordLike): OpPreflightList
   return {
     repaired_input: {
       _effect: effect,
-      ...(resourceRef ? { _resource_ref: resourceRef } : {}),
+      // Always write the key — an unresolved ref clears any client-injected
+      // value so downstream stages only ever see the stage-resolved ref.
+      _resource_ref: resourceRef,
     },
   };
 }

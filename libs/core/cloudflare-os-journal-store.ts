@@ -229,6 +229,7 @@ export class ControlPlaneJournalStore {
         })),
       ],
       ['blueprint', (state.blueprints ?? []) as unknown as Record<string, unknown>[]],
+      ['declassification', (state.declassifications ?? []) as unknown as Record<string, unknown>[]],
       ['network', (state.network ?? []) as unknown as Record<string, unknown>[]],
       ['gadget', (state.gadgets ?? []) as unknown as Record<string, unknown>[]],
     ];
