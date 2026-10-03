@@ -12,144 +12,179 @@
     {
       "op": "pipeline",
       "schema_ref": "knowledge/product/schemas/system-pipeline.schema.json",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
     },
     {
       "op": "reconcile",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
     },
     {
       "op": "reconcile_config_fallbacks",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
     },
     {
       "op": "reconcile_unclassified_errors",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
     },
     {
       "op": "reconcile_unhandled_intents",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
     },
     {
       "op": "baseline_check",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "cost_report",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "audit_verify",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "summarize_memory_promotion_queue",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "summarize_task_model_routing",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "computer_interaction",
       "schema_ref": "knowledge/product/schemas/computer-interaction.schema.json",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
     },
     {
       "op": "record_screen",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
     },
     {
       "op": "record_audio",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
     },
     {
       "op": "capture_photo",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
     },
     {
       "op": "record_camera",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
     },
     {
       "op": "list_input_devices",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "macos_automation_probe",
-      "platforms": ["darwin"]
+      "platforms": ["darwin"],
+      "effect": "read"
     },
     {
       "op": "list_displays",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "list_media_devices",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "list_tool_runtimes",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "list_service_runtimes",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "control_media_devices",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
     },
     {
       "op": "test_audio_outputs",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "test_audio_inputs",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "test_screen_stream",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "test_screen_mp4_roundtrip",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "test_camera_stream",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "test_camera_mp4_roundtrip",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "test_camera_injection",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "provider_preflight",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "narrated_report_preflight",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "validate_audio_artifact",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "partition_surface_health",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "collect_surface_errors",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "standard_pr_lifecycle",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
     }
   ]
 }

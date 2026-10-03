@@ -18,21 +18,45 @@
     "gadgets"
   ],
   "properties": {
-    "version": { "type": "integer", "const": 1 },
-    "held": { "type": "array" },
-    "introductions": { "type": "array" },
-    "observations": { "type": "array" },
-    "autoRules": { "type": "array" },
-    "capabilities": { "type": "array" },
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "held": {
+      "type": "array"
+    },
+    "introductions": {
+      "type": "array"
+    },
+    "observations": {
+      "type": "array"
+    },
+    "autoRules": {
+      "type": "array"
+    },
+    "capabilities": {
+      "type": "array"
+    },
     "threadCapabilities": {
       "type": "object",
       "additionalProperties": {
         "type": "array",
-        "items": { "type": "string" }
+        "items": {
+          "type": "string"
+        }
       }
     },
-    "blueprints": { "type": "array" },
-    "network": { "type": "array" },
-    "gadgets": { "type": "array" }
+    "blueprints": {
+      "type": "array"
+    },
+    "network": {
+      "type": "array"
+    },
+    "gadgets": {
+      "type": "array"
+    },
+    "declassifications": {
+      "type": "array"
+    }
   }
 }

@@ -725,6 +725,14 @@
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_dependency_cycles.ts"],
       "owner": "architecture",
       "rationale": "Fails on runtime import cycles; type-only and intentional lazy-import edges are allowed. Keeps the domain split from regrowing load-order hazards."
+    },
+    {
+      "id": "op-effect-coverage",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_op_effect_coverage.ts"],
+      "owner": "quality",
+      "rationale": "SC-02: every manifest capability must declare its side-effect class (read/write/egress/none) so preflight can classify ops."
     }
   ],
   "workflow_exceptions": [

@@ -70,7 +70,7 @@ function nonEmpty(value: string | undefined): boolean {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function resolveTenantAlias(input: {
+export function resolveTenantAlias(input: {
   tenant_slug?: string;
   tenant_id?: string;
 }): string | undefined {

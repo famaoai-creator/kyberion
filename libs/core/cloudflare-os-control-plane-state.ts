@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { pathResolver } from './path-resolver.js';
@@ -7,8 +8,10 @@ import type {
   BlueprintContract,
   CapabilityEdge,
   GadgetManifest,
+  GadgetOperationDefinition,
   GadgetOperationDescriptor,
   GadgetOperationEffect,
+  HeldActionRecord,
   HeldActionStatus,
   NetworkObservation,
   ObservationRecord,
@@ -26,6 +29,7 @@ export interface PersistedControlPlaneState {
   capabilities: CapabilityEdge[];
   threadCapabilities: Record<string, string[]>;
   blueprints: BlueprintContract[];
+  declassifications?: DeclassificationGrant[];
   network: NetworkObservation[];
   gadgets: PersistedGadget[];
 }
@@ -84,6 +88,7 @@ const PERSISTED_STATE_ROOT_FIELDS = [
   'blueprints',
   'network',
   'gadgets',
+  'declassifications',
 ] as const;
 
 function persistedRecord(value: unknown, label: string): PersistedRecord {
@@ -170,6 +175,7 @@ function parsePersistedHeldAction(value: unknown, index: number): PersistedRecor
       'id',
       'missionId',
       'taskId',
+      'tenantSlug',
       'submittedBy',
       'op',
       'simulatable',
@@ -179,6 +185,10 @@ function parsePersistedHeldAction(value: unknown, index: number): PersistedRecor
       'previousState',
       'status',
       'submittedAt',
+      'params',
+      'persistParams',
+      'applyClaim',
+      'approvalRequest',
       'decidedAt',
       'resolvedBy',
       'autoApproved',
@@ -208,11 +218,34 @@ function parsePersistedHeldAction(value: unknown, index: number): PersistedRecor
       record.dependsOn === undefined
         ? []
         : persistedStringArray(record.dependsOn, `${label}.dependsOn`),
+    ...(record.params !== undefined ? { params: record.params } : {}),
+    ...(record.persistParams === true ? { persistParams: true } : {}),
   };
+  if (record.applyClaim !== undefined) {
+    const claim = persistedRecord(record.applyClaim, `${label}.applyClaim`);
+    assertPersistedFields(claim, ['by', 'at'], `${label}.applyClaim`);
+    normalized.applyClaim = {
+      by: persistedString(claim, 'by', `${label}.applyClaim`),
+      at: persistedString(claim, 'at', `${label}.applyClaim`),
+    };
+  }
+  if (record.approvalRequest !== undefined) {
+    const link = persistedRecord(record.approvalRequest, `${label}.approvalRequest`);
+    assertPersistedFields(
+      link,
+      ['requestId', 'storageChannel', 'role'],
+      `${label}.approvalRequest`
+    );
+    normalized.approvalRequest = {
+      requestId: persistedString(link, 'requestId', `${label}.approvalRequest`),
+      storageChannel: persistedString(link, 'storageChannel', `${label}.approvalRequest`),
+      role: persistedString(link, 'role', `${label}.approvalRequest`),
+    };
+  }
   if (typeof normalized.autoApproved !== 'boolean') {
     throw new Error(`${label} has invalid required fields`);
   }
-  for (const field of ['taskId', 'actionTag', 'resolvedBy', 'applyError'] as const) {
+  for (const field of ['taskId', 'tenantSlug', 'actionTag', 'resolvedBy', 'applyError'] as const) {
     const value = persistedOptionalString(record, field, label);
     if (value !== undefined) normalized[field] = value;
   }
@@ -598,5 +631,289 @@ export function parsePersistedControlPlaneState(value: unknown): PersistedContro
     blueprints: root.blueprints.map(parsePersistedBlueprint),
     network: root.network.map(parsePersistedNetwork),
     gadgets: root.gadgets.map(parsePersistedGadget),
+    ...(root.declassifications !== undefined
+      ? {
+          declassifications: (root.declassifications as unknown[]).map((entry, index) =>
+            persistedRecord(entry, `control-plane state declassifications[${index}]`)
+          ) as unknown as DeclassificationGrant[],
+        }
+      : {}),
+  };
+}
+
+// ---------- SC-03 journal serialization helpers ----------
+
+/**
+ * Marker on the executor stub a restored held action carries. A record whose
+ * `apply` is the stub has no live executor of its own: the plane resolves one
+ * from the executor registry at apply time, or defers.
+ */
+const RESTORED_EXECUTOR = Symbol.for('kyberion.control-plane.restored-executor');
+
+export function isRestoredExecutorStub(fn: unknown): boolean {
+  return (
+    typeof fn === 'function' &&
+    (fn as unknown as Record<symbol, unknown>)[RESTORED_EXECUTOR] === true
+  );
+}
+
+/**
+ * A restored held action is deliberately fail-closed: executor, simulator
+ * and reverter closures are never persisted. The plane re-binds them from the
+ * executor registry (`registerExecutor`) when the effect is applied.
+ */
+export function restoredHeldActionRecord(record: {
+  id: string;
+  op: string;
+  dependsOn?: string[];
+  effectBinding?: string;
+  apply?: unknown;
+  simulate?: unknown;
+  revert?: unknown;
+  params?: unknown;
+}): void {
+  const stub = () => {
+    throw new Error(
+      `[CONTROL_PLANE] Executor for persisted op '${record.op}' must be registered after restart`
+    );
+  };
+  (stub as unknown as Record<symbol, unknown>)[RESTORED_EXECUTOR] = true;
+  record.apply = stub;
+  record.simulate = undefined;
+  record.revert = undefined;
+  record.dependsOn ||= [];
+  record.effectBinding ||= record.op;
+}
+
+/**
+ * Strip executable state a journal or snapshot must never carry. `params`
+ * may hold credentials or personal payloads, so it persists only when the
+ * submitter declared `persistParams` (validated at submit): everything else
+ * stays in the submitting process's memory.
+ */
+export function serializableHeldActionRecord(
+  record: Record<string, unknown>
+): Record<string, unknown> {
+  const { apply, simulate, revert, steeringApproval, params, ...rest } = record;
+  return record.persistParams === true && params !== undefined ? { ...rest, params } : rest;
+}
+
+/**
+ * The in-memory collections a journal event folds into — the plane passes
+ * its own maps so replay, catch-up and restore share one code path.
+ */
+export interface DeclassificationGrant {
+  id: string;
+  missionId: string;
+  tenantSlug?: string;
+  artifactRef: string;
+  payloadHash: string;
+  targetAudience: string;
+  targetTenant?: string;
+  grantedBy: string;
+  grantedAt: string;
+}
+
+export function declassificationKeyOf(
+  grant: Pick<
+    DeclassificationGrant,
+    'missionId' | 'payloadHash' | 'targetAudience' | 'targetTenant'
+  >
+): string {
+  // The mission is part of the key: two missions granting the same artifact
+  // to the same audience must not overwrite each other's grant.
+  return `${grant.missionId}|${grant.payloadHash}|${grant.targetAudience}|${grant.targetTenant ?? ''}`;
+}
+
+export interface ControlPlaneJournalCollections {
+  held: Map<string, HeldActionRecord>;
+  introductions: Map<string, ResourceIntroduction>;
+  observations: ObservationRecord[];
+  autoRules: AutoApproveRule[];
+  capabilities: Map<string, CapabilityEdge>;
+  threadCapabilities: Map<string, Set<string>>;
+  blueprints: Map<string, BlueprintContract>;
+  declassifications: Map<string, DeclassificationGrant>;
+  network: NetworkObservation[];
+  observationAggregates: Map<
+    string,
+    {
+      missionId: string;
+      resourceRef: string;
+      tier: string;
+      tenantSlug?: string;
+      count: number;
+      firstObservedAt: string;
+      lastObservedAt: string;
+    }
+  >;
+  gadgets: {
+    manifests: Map<string, GadgetManifest>;
+    capabilitySubjects: Map<string, string>;
+    operations: Map<string, Map<string, GadgetOperationDefinition>>;
+    deserializeOperation: (operation: Record<string, unknown>) => GadgetOperationDefinition;
+  };
+}
+
+function observationAggregateKeyOf(record: Record<string, unknown>): string {
+  return `${record.missionId}|${record.resourceRef}|${record.tier}`;
+}
+
+/** Fold one journal event into the in-memory projection (SC-03). */
+export function applyControlPlaneJournalEvent(
+  collections: ControlPlaneJournalCollections,
+  event: { kind: string; records: Record<string, unknown>[] }
+): void {
+  for (const raw of event.records) {
+    switch (event.kind) {
+      case 'held': {
+        const record = raw as unknown as HeldActionRecord;
+        const previous = collections.held.get(record.id);
+        restoredHeldActionRecord(record);
+        // A catch-up event (e.g. another process's decision) replaces the
+        // record object. Carry over what only this process holds: the live
+        // executor closures and any params that were never persisted.
+        if (previous && !isRestoredExecutorStub(previous.apply)) {
+          record.apply = previous.apply;
+          record.simulate = previous.simulate;
+          record.revert = previous.revert;
+        }
+        if (previous && record.params === undefined && previous.params !== undefined) {
+          record.params = previous.params;
+        }
+        collections.held.set(record.id, record);
+        break;
+      }
+      case 'introduction':
+        collections.introductions.set(raw.id as string, raw as unknown as ResourceIntroduction);
+        break;
+      case 'observation': {
+        if (!raw.id || !collections.observations.some((entry) => entry.id === raw.id)) {
+          collections.observations.push(raw as unknown as ObservationRecord);
+          const key = observationAggregateKeyOf(raw);
+          const existing = collections.observationAggregates.get(key);
+          const observedAt = String(raw.observedAt ?? '');
+          if (existing) {
+            existing.count += 1;
+            if (observedAt < existing.firstObservedAt) existing.firstObservedAt = observedAt;
+            if (observedAt > existing.lastObservedAt) existing.lastObservedAt = observedAt;
+            if (!existing.tenantSlug && typeof raw.tenantSlug === 'string')
+              existing.tenantSlug = raw.tenantSlug;
+          } else {
+            collections.observationAggregates.set(key, {
+              missionId: String(raw.missionId ?? ''),
+              resourceRef: String(raw.resourceRef ?? ''),
+              tier: String(raw.tier ?? ''),
+              ...(typeof raw.tenantSlug === 'string' ? { tenantSlug: raw.tenantSlug } : {}),
+              count: 1,
+              firstObservedAt: observedAt,
+              lastObservedAt: observedAt,
+            });
+          }
+        }
+        break;
+      }
+      case 'auto_rule': {
+        const rule = raw as unknown as AutoApproveRule;
+        if (
+          !collections.autoRules.some(
+            (entry) =>
+              entry.op === rule.op &&
+              entry.actionTag === rule.actionTag &&
+              entry.enabledBy === rule.enabledBy
+          )
+        ) {
+          collections.autoRules.push(rule);
+        }
+        break;
+      }
+      case 'capability':
+        collections.capabilities.set(raw.id as string, raw as unknown as CapabilityEdge);
+        break;
+      case 'thread_capability': {
+        const entry = raw as { threadId: string; capabilities: string[] };
+        collections.threadCapabilities.set(entry.threadId, new Set(entry.capabilities));
+        break;
+      }
+      case 'blueprint':
+        collections.blueprints.set(raw.id as string, raw as unknown as BlueprintContract);
+        break;
+      case 'declassification':
+        collections.declassifications.set(
+          declassificationKeyOf(raw as never),
+          raw as unknown as DeclassificationGrant
+        );
+        break;
+      case 'network': {
+        const key = JSON.stringify(raw);
+        if (!collections.network.some((entry) => JSON.stringify(entry) === key)) {
+          collections.network.push(raw as unknown as NetworkObservation);
+        }
+        break;
+      }
+      case 'gadget': {
+        const gadget = raw as {
+          manifest?: GadgetManifest;
+          operations?: Array<Record<string, unknown>>;
+        };
+        if (!gadget?.manifest?.id || !Array.isArray(gadget.operations)) break;
+        const operations = gadget.operations.map((operation) =>
+          collections.gadgets.deserializeOperation(operation)
+        );
+        collections.gadgets.manifests.set(gadget.manifest.id, gadget.manifest);
+        collections.gadgets.capabilitySubjects.set(
+          gadget.manifest.id,
+          gadget.manifest.capabilitySubject
+        );
+        collections.gadgets.operations.set(
+          gadget.manifest.id,
+          new Map(operations.map((operation) => [operation.name, operation]))
+        );
+        break;
+      }
+    }
+  }
+}
+
+/** zod → persisted JSON schema (drops the $schema marker). */
+export function gadgetSchemaToJsonSchema(schema: z.ZodType): Record<string, unknown> {
+  const jsonSchema = z.toJSONSchema(schema) as Record<string, unknown>;
+  delete jsonSchema.$schema;
+  return jsonSchema;
+}
+
+/** Rehydrate a persisted gadget operation descriptor's schemas. */
+export function deserializeGadgetOperation(
+  operation: Record<string, unknown>
+): GadgetOperationDefinition {
+  return {
+    ...operation,
+    inputSchema: z.fromJSONSchema(operation.inputSchema as Parameters<typeof z.fromJSONSchema>[0]),
+    outputSchema: z.fromJSONSchema(
+      operation.outputSchema as Parameters<typeof z.fromJSONSchema>[0]
+    ),
+  } as GadgetOperationDefinition;
+}
+
+/** Serialize one gadget manifest + operations for journal/snapshot write. */
+export function serializeGadgetRecord(
+  manifest: GadgetManifest,
+  operations: Map<string, GadgetOperationDefinition> | undefined
+): PersistedGadget {
+  return {
+    manifest,
+    operations: operations
+      ? [...operations.values()].map((operation) => ({
+          name: operation.name,
+          description: operation.description,
+          inputSchema: gadgetSchemaToJsonSchema(operation.inputSchema),
+          outputSchema: gadgetSchemaToJsonSchema(operation.outputSchema),
+          effect: operation.effect,
+          capabilityResource: operation.capabilityResource,
+          introduction: operation.introduction,
+          observation: operation.observation,
+          governedCode: operation.governedCode,
+        }))
+      : [],
   };
 }

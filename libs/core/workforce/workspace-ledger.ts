@@ -22,14 +22,26 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
+import { tryResolveOwnerScope, type OwnerScope } from '../owner-scope.js';
+import type { ScopeContext } from '../scope-context-validation.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 
 export type WorkspaceKind = 'git-worktree' | 'scratch-dir' | 'git-index';
 
-export interface WorkspaceOwner {
-  mission_id?: string;
-  task_id?: string;
-  session_id?: string;
+/**
+ * SC-07: the workspace owner is the identity subset of the canonical scope
+ * context — one type, shared with the envelope hierarchy.
+ */
+export type WorkspaceOwner = Pick<ScopeContext, 'mission_id' | 'task_id' | 'session_id'>;
+
+/**
+ * SC-07: resolve the owner's scope through the shared owner-scope
+ * resolver. Owners without a mission anchor are unbound (system floor) —
+ * the caller decides what unbound means for its purpose.
+ */
+export function workspaceOwnerScope(owner: WorkspaceOwner): OwnerScope | null {
+  if (!owner.mission_id) return null;
+  return tryResolveOwnerScope({ kind: 'mission', id: owner.mission_id });
 }
 
 export interface WorkspaceRecord {
@@ -360,7 +372,20 @@ export function annotateWorkspace(
 }
 
 export function listWorkspaces(options: WorkspaceLedgerOptions = {}): WorkspaceRecord[] {
-  return readLedger(options);
+  const records = readLedger(options);
+  // SC-07: tenant-scoped visibility — a viewer tenant sees only workspaces
+  // whose owner resolves to it. Unbound owners (no mission anchor) stay
+  // visible: they are not tenant data.
+  const viewerTenant = getRegisteredEnvText('KYBERION_TENANT')?.trim();
+  if (!viewerTenant) return records;
+  return records.filter((record) => {
+    // Owners with no mission anchor are unbound (system floor) — not tenant
+    // data. A mission-owned workspace whose scope will not resolve for this
+    // bound process cannot be proven to belong to the viewer — hide it.
+    if (!record.owner.mission_id) return true;
+    const scope = workspaceOwnerScope(record.owner);
+    return Boolean(scope) && (scope!.tenant === 'shared' || scope!.tenant === viewerTenant);
+  });
 }
 
 /** Snapshot of the fields `deleteRegisteredWorkspace`'s `guard.expect` re-checks under the lock. */

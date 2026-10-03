@@ -5,6 +5,10 @@ import type { RetryOptions } from '../pipeline/retry-utils.js';
 import { getRegisteredEnv } from '../foundation/env.js';
 import { isRecord } from '../foundation/primitives.js';
 import { ensureDefaultOpPreflight } from '../pipeline/op-preflight-defaults.js';
+import {
+  recordOpObservation,
+  stripGovernanceInputStamps,
+} from '../pipeline/op-preflight-stages.js';
 import { runOpPreflight } from '../pipeline/op-preflight.js';
 import { resolvePipelineInputPlaceholders } from '../pipeline/pipeline-input-contract.js';
 import {
@@ -150,7 +154,18 @@ export async function runActuatorPipeline<
           `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation ${options.actuatorId}:${step.op} was not admitted.`}`
         );
       }
-      context = await options.execute(step.op, preflight.input as Params, context, step);
+      context = await options.execute(
+        step.op,
+        stripGovernanceInputStamps(preflight.input) as Params,
+        context,
+        step
+      );
+      // SC-05: post-op observation aggregation for declared-read ops.
+      recordOpObservation(
+        `${options.actuatorId}:${step.op}`,
+        { ...preflight.input, ...preflight.governance_stamps },
+        context
+      );
     }
     return context;
   };

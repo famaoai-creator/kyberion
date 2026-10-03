@@ -9,14 +9,31 @@
     "retry_profile": "terminal-actuator"
   },
   "capabilities": [
-    { "op": "spawn", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "poll", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "write", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "kill", "platforms": ["darwin", "linux", "win32"] },
+    {
+      "op": "spawn",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "poll",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "write",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "kill",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
     {
       "op": "computer_interaction",
       "schema_ref": "knowledge/product/schemas/computer-interaction.schema.json",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
     }
   ]
 }

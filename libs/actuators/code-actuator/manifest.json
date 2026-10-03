@@ -12,7 +12,8 @@
     {
       "op": "pipeline",
       "schema_ref": "knowledge/product/schemas/code-pipeline.schema.json",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
     },
     {
       "op": "semgrep_scan",
@@ -24,13 +25,19 @@
           "darwin": "brew install semgrep",
           "linux": "python -m pip install semgrep"
         }
-      }
+      },
+      "effect": "read"
     },
-    { "op": "reconcile", "platforms": ["darwin", "linux", "win32"] },
+    {
+      "op": "reconcile",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
     {
       "op": "impact_analysis",
       "schema_ref": "knowledge/product/schemas/impact-analysis.schema.json",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     }
   ]
 }

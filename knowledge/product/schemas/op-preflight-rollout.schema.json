@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Op preflight stage rollout modes",
+  "type": "object",
+  "required": ["stages"],
+  "additionalProperties": true,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "integer" },
+    "description": { "type": "string" },
+    "stages": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["default"],
+        "properties": {
+          "default": { "enum": ["off", "warn", "enforce"] },
+          "families": {
+            "type": "object",
+            "additionalProperties": { "enum": ["off", "warn", "enforce"] }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}
