@@ -87,10 +87,11 @@ function missionPayloadPath(
 ): string {
   // The payload lives beside the existing mission; the event scope only
   // narrows that location and an unknown mission fails closed.
-  const missionPath = resolveMissionDir(missionId, {
-    tier,
-    ...(scopeTenantSlug ? { tenant: scopeTenantSlug } : {}),
-  });
+  // Tenant only: the mission's tier can be raised after the event was scoped.
+  const missionPath = resolveMissionDir(
+    missionId,
+    scopeTenantSlug ? { tenant: scopeTenantSlug } : undefined
+  );
   return assertSafeRepositoryPath(path.join(missionPath, PAYLOAD_SUBDIR, `${eventId}.json`), {
     allowMissingLeaf: true,
   });

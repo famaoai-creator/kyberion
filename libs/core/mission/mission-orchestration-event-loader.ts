@@ -1,7 +1,7 @@
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
-import { OwnerScopeError, tryResolveOwnerScope } from '../owner-scope.js';
+import { OwnerScopeError, resolveOwnerScope, tryResolveOwnerScope } from '../owner-scope.js';
 import { assertSafeRepositoryPath, safeLstat } from '../secure-io.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import {
@@ -94,14 +94,17 @@ export function locateMissionForScope(
 ): string | undefined {
   const owner = { kind: 'mission', id: missionId } as const;
   try {
-    return tryResolveOwnerScope(owner)?.dir;
+    return resolveOwnerScope(owner).dir;
   } catch (error) {
-    if (!(error instanceof OwnerScopeError) || error.code !== 'OWNER_AMBIGUOUS') throw error;
+    if (!(error instanceof OwnerScopeError)) throw error;
+    if (error.code === 'OWNER_NOT_FOUND') return undefined;
+    if (error.code !== 'OWNER_AMBIGUOUS') throw error;
+    // Same id in several tenants: the supplied tenant selects one. Tier is not
+    // a selector (a mission's tier can be raised after an event was scoped).
     const suppliedTenant = supplied?.tenant_slug ?? supplied?.tenant_id;
-    return tryResolveOwnerScope(owner, {
-      ...(supplied?.tier ? { tier: supplied.tier } : {}),
-      ...(suppliedTenant ? { tenant: suppliedTenant } : {}),
-    })?.dir;
+    return suppliedTenant
+      ? tryResolveOwnerScope(owner, { tenant: suppliedTenant })?.dir
+      : undefined;
   }
 }
 

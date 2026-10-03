@@ -245,6 +245,43 @@ describe('writeScopedArtifact (AL-02)', () => {
     expect(() => publish('org-x', 'globex', 'evil')).toThrow(/belongs to another owner scope/);
   });
 
+  it("attributes a published record to the owner's organization, never the caller's", async () => {
+    const dir = path.join(tmpRoot, 'active/missions/M-AL02-ORG');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'mission-state.json'),
+      JSON.stringify({
+        mission_id: 'M-AL02-ORG',
+        tier: 'confidential',
+        organization_id: 'org-ops',
+        status: 'active',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'worker',
+        confidence_score: 1,
+        git: { branch: 'm', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+        history: [],
+      })
+    );
+    const write = (extra: Record<string, unknown>) =>
+      store.writeScopedArtifact({
+        artifact_class: 'report',
+        name: 'org.md',
+        content: 'x',
+        scope: { mission: 'M-AL02-ORG' },
+        publish: { kind: 'report' },
+        ...extra,
+      } as Parameters<typeof store.writeScopedArtifact>[0]);
+    expect(() => write({ scope: { mission: 'M-AL02-ORG', organization: 'org-other' } })).toThrow(
+      /\[SCOPE_CONTRADICTS_OWNER\] mission M-AL02-ORG belongs to organization 'org-ops'/u
+    );
+    expect(() => write({ publish: { kind: 'report', organization_id: 'org-other' } })).toThrow(
+      /\[SCOPE_CONTRADICTS_OWNER\] publish.organization_id 'org-other'/u
+    );
+    const { loadArtifactRecord } = await import('./artifact-record.js');
+    expect(loadArtifactRecord(write({}).artifact_id as string)?.organization_id).toBe('org-ops');
+  });
+
   it('organization scope: places under the tier/tenant organization workspace', async () => {
     const result = store.writeScopedArtifact({
       scope: { organization: 'org-ops', tenant: 'acme' },

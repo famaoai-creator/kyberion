@@ -125,15 +125,18 @@ describe('output-artifacts', () => {
     expect(fs.readFileSync(path.join(tmpRoot, reference!.artifact_path), 'utf8')).toBe(body);
   });
 
-  it('falls back to shared tmp for a mission id that has no mission (never a guessed dir)', () => {
+  it('keeps output inline for a mission id it cannot resolve (never an untiered floor)', () => {
     const body = 'w'.repeat(300);
     const reference = mod.offloadLargeOutput(body, {
       maxInlineChars: 100,
       missionId: 'msn-ghost',
       stepOp: 'system:exec',
     });
-    expect(reference?.artifact_path).toMatch(/^active\/shared\/tmp\/tool-output\/msn-ghost\//);
+    expect(reference).toBeNull();
     expect(fs.existsSync(path.join(tmpRoot, 'active/missions/msn-ghost'))).toBe(false);
+    expect(fs.existsSync(path.join(tmpRoot, 'active/shared/tmp/tool-output/msn-ghost'))).toBe(
+      false
+    );
   });
 
   it("treats the 'shared' mission slug as mission-unknown (run_pipeline default)", () => {
