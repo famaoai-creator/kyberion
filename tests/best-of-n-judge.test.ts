@@ -59,6 +59,11 @@ async function seedMission(risk: string): Promise<void> {
   const missionPath = missionDir(MISSION, 'public');
   safeMkdir(missionPath, { recursive: true });
   safeMkdir(`${missionPath}/deliverables`, { recursive: true });
+  // Mission placement resolves from the mission's own state.
+  safeWriteFile(
+    `${missionPath}/mission-state.json`,
+    JSON.stringify({ mission_id: MISSION, tier: 'public', status: 'active' })
+  );
   safeWriteFile(`${missionPath}/deliverables/out.md`, '# out');
   safeWriteFile(
     `${missionPath}/TASK_BOARD.md`,
