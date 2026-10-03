@@ -40,7 +40,11 @@ import {
 import { withExecutionContextAsync } from '@agent/core/authority';
 import { createTriggerRunner, resolveCurrentTriggerAuthority } from '@agent/core/trigger-runner';
 import { listDotCharters } from '@agent/core/dot/dot-charter';
-import { evaluateDotTriggersDue, recordDotWakeOutcome } from '@agent/core/dot/dot-runtime';
+import {
+  dotDailyTokenCapReached,
+  evaluateDotTriggersDue,
+  recordDotWakeOutcome,
+} from '@agent/core/dot/dot-runtime';
 import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
 import { isRecord } from '@agent/core/foundation/text';
 import { logger } from '@agent/core/core';
@@ -253,6 +257,16 @@ export async function runDotSweepOnce(now: Date = new Date()): Promise<number> {
     }
     let delivered = 0;
     for (const loaded of active) {
+      // Budget-capped dots skip before the runner layer so a pending trigger
+      // doesn't burn a warn + 'failed' receipt every tick — but they still
+      // heartbeat, or the watchdog would page a dot that is healthy-but-capped.
+      if (dotDailyTokenCapReached(loaded.charter, { now: () => now })) {
+        recordDaemonHeartbeat(loaded.charter.runtime.heartbeat_id, {
+          status: 'running',
+          details: { dot_id: loaded.charter.dot_id, trigger: 'token-cap' },
+        });
+        continue;
+      }
       let due;
       try {
         due = evaluateDotTriggersDue(loaded.charter, { now: () => now });
@@ -283,8 +297,13 @@ export async function runDotSweepOnce(now: Date = new Date()): Promise<number> {
                 async () => {
                   deliverRan = true;
                   const wake = await runDotWakeWithGoalDriver(loaded, { trigger });
-                  if (wake.outcome === 'failed') {
-                    throw new Error(wake.reason ?? 'dot wake failed');
+                  // Only a real delivery may close the runner's idempotency
+                  // key — 'delivered' is terminal there, so throwing on
+                  // skipped/failed keeps the key retryable and lets the dot
+                  // ledger's pending event survive the block (a content-
+                  // addressed wake:<hash> key can never regenerate).
+                  if (wake.outcome === 'failed' || wake.outcome === 'skipped') {
+                    throw new Error(wake.reason ?? `dot wake ${wake.outcome}`);
                   }
                   return `dot-wake:${wake.outcome}`;
                 }
