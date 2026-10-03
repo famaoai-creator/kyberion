@@ -146,6 +146,51 @@
       "fallback_engine_id": "local_say",
       "notes": "CPU streaming TTS and consent-gated voice cloning. Current upstream language packs do not include Japanese.",
       "language_notes": "Bridge rejects Japanese; upstream packs for fr/de/pt/it/es exist but the bridge does not select a language pack, so only en is declared."
+    },
+    {
+      "engine_id": "irodori_tts",
+      "display_name": "Irodori-TTS v4.1 Small (MLX 8-bit)",
+      "kind": "native_local",
+      "provider": "mlx_audio",
+      "status": "active",
+      "platforms": ["darwin"],
+      "languages": ["ja"],
+      "language_notes": "Japanese only: the registered model and its local runtime path were exercised for Japanese.",
+      "model_id": "mlx-community/Irodori-TTS-v4.1-Small-8bit",
+      "bridge_script": "libs/actuators/voice-actuator/scripts/irodori_tts_bridge.py",
+      "tts_adapter_id": "python_bridge",
+      "runtime_id": "mlx_audio",
+      "live_presence": true,
+      "supports": {
+        "list_voices": false,
+        "playback": true,
+        "artifact_formats": ["wav"]
+      },
+      "fallback_engine_id": "local_say",
+      "notes": "Local Irodori-TTS v4.1 Small 8-bit through governed mlx-audio runtime. Generates completed sentence artifacts with num_steps=8; upstream streaming is not implemented."
+    },
+    {
+      "engine_id": "qwen3_tts_06b_custom_voice",
+      "display_name": "Qwen3-TTS 0.6B CustomVoice (MLX 8-bit)",
+      "kind": "native_local",
+      "provider": "mlx_audio",
+      "status": "active",
+      "platforms": ["darwin"],
+      "languages": ["ja"],
+      "language_notes": "Japanese preset voice path; streaming output is exposed through the managed mlx_audio bridge on Apple Silicon.",
+      "model_id": "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit",
+      "bridge_script": "libs/actuators/voice-actuator/scripts/qwen3_tts_stream_bridge.py",
+      "tts_adapter_id": "python_bridge",
+      "runtime_id": "mlx_audio",
+      "live_presence": true,
+      "supports": {
+        "list_voices": false,
+        "playback": true,
+        "artifact_formats": ["wav"],
+        "streaming": true
+      },
+      "fallback_engine_id": "local_say",
+      "notes": "Apple Silicon only. 8-bit 0.6B preset Japanese voice (Ono_Anna). Install the managed mlx_audio runtime with `pnpm kyberion voice setup --tool mlx_audio --apply`; model weights are not downloaded by setup and must already be present in the managed Hugging Face cache. For real-time PCM streaming use this bridge in --stream mode."
     }
   ]
 }

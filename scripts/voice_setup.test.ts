@@ -24,11 +24,11 @@ describe('voice setup report', () => {
   it('emits valid JSON through the canonical voice setup entrypoint', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    await runVoiceSetupScript(['--json']);
+    await runVoiceSetupScript(['--json', '--tool', 'mlx_audio']);
 
     const output = logSpy.mock.calls.flat().join('');
     const parsed = JSON.parse(output) as { status: string; rows: unknown[] };
     expect(['ready', 'needs_install']).toContain(parsed.status);
-    expect(parsed.rows.length).toBeGreaterThan(0);
+    expect(parsed.rows).toHaveLength(1);
   });
 });

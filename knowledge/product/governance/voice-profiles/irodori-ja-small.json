@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "default_profile_id": "operator-ja-default",
+  "profiles": [
+    {
+      "profile_id": "irodori-ja-small",
+      "display_name": "Irodori Japanese Small",
+      "tier": "public",
+      "languages": ["ja"],
+      "sample_refs": [],
+      "default_engine_id": "irodori_tts",
+      "status": "active",
+      "notes": "Stock Japanese voice from Irodori-TTS v4.1 Small 8-bit on Apple Silicon. Select explicitly for local MLX synthesis; this is not a personal voice clone."
+    }
+  ]
+}

@@ -124,6 +124,7 @@ export function playPcmAudioStream(
 ): PausablePlaybackHandle {
   const gate = createPlaybackPauseGate();
   let child: ChildProcessWithoutNullStreams | null = null;
+  let stderrTail = '';
   let iterator: AsyncIterator<AudioChunk> | null = null;
   let settled = false;
   let interrupted = false;
@@ -178,6 +179,10 @@ export function playPcmAudioStream(
           child = spawn(command[0], command.slice(1), {
             stdio: ['pipe', 'ignore', 'pipe'],
           });
+          child.stderr.on('data', (data: Buffer) => {
+            stderrTail += data.toString('utf8');
+            if (stderrTail.length > 1_024) stderrTail = stderrTail.slice(-1_024);
+          });
           child.once('error', (error) => settle({ ok: false, interrupted, error: error.message }));
           child.once('close', (code) => {
             if (interrupted) settle({ ok: true, interrupted: true });
@@ -185,7 +190,11 @@ export function playPcmAudioStream(
               settle(
                 code === 0
                   ? { ok: true, interrupted: false }
-                  : { ok: false, interrupted: false, error: `ffplay exited with code ${code}` }
+                  : {
+                      ok: false,
+                      interrupted: false,
+                      error: `ffplay exited with code ${code}${stderrTail.trim() ? `: ${stderrTail.trim()}` : ''}`,
+                    }
               );
           });
         }
@@ -460,7 +469,14 @@ export function streamTtsAudioPlayback(
 
   const run = async (): Promise<StreamingVoicePlaybackResult> => {
     try {
-      const audio = gateAudioStream(options.synthesizeStream(text, options.voiceProfileId), gate);
+      const source = options.synthesizeStream(text, options.voiceProfileId);
+      const observedAudio = (async function* (): AsyncGenerator<AudioChunk> {
+        for await (const chunk of source) {
+          if (firstAudioMs === null) firstAudioMs = Date.now() - startedAt;
+          yield chunk;
+        }
+      })();
+      const audio = gateAudioStream(observedAudio, gate);
       const startPlayback = (): PlaybackHandle => {
         stoppedForPause.current = false;
         return (

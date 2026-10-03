@@ -55,6 +55,40 @@ describe('GeminiStreamingTextToSpeechBridge', () => {
       expect.objectContaining({
         text: 'Hello world',
         voice: 'Kore',
+        model: 'gemini-3.8-flash-tts',
+      }),
+      'secret-guard'
+    );
+  });
+
+  it('allows model override via constructor option or env', async () => {
+    process.env.GEMINI_API_KEY = 'mock-gemini-key';
+    mocks.executeServicePreset.mockResolvedValue({
+      audioData: Buffer.from('pcm-audio-lite', 'utf8').toString('base64'),
+    });
+
+    const bridge = new GeminiStreamingTextToSpeechBridge({
+      voice: 'Puck',
+      model: 'gemini-3.8-flash-lite-tts',
+    });
+    const chunks = bridge.synthesizeStream(
+      (async function* () {
+        yield 'Fast reply';
+      })(),
+      'voice-profile'
+    );
+
+    const yielded = [];
+    for await (const chunk of chunks) yielded.push(chunk);
+
+    expect(yielded).toHaveLength(1);
+    expect(mocks.executeServicePreset).toHaveBeenCalledWith(
+      'gemini',
+      'generate_tts',
+      expect.objectContaining({
+        text: 'Fast reply',
+        voice: 'Puck',
+        model: 'gemini-3.8-flash-lite-tts',
       }),
       'secret-guard'
     );
