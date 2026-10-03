@@ -106,7 +106,7 @@
       "role": "sink",
       "op": "system:log",
       "params": {
-        "message": "✅ [COWORK] Integration review complete. Next: reusable runs → `pnpm pipeline:promote --input active/shared/tmp/<run>.json` (ADF) — browser recordings → `promote-procedure` pipeline. Cowork sync is knowledge-only; execution stays in ADF/mission_controller."
+        "message": "✅ [COWORK] Integration review complete. Next: reusable runs → `pnpm pipeline:promote` (ADF; see actuator-to-pipeline-flow §4) — browser recordings → `promote-procedure` pipeline. Cowork sync is knowledge-only; execution stays in ADF/mission_controller."
       }
     }
   ]
