@@ -14,6 +14,7 @@ import {
 } from '@agent/core/actuator/actuator-op-registry';
 import type { AdfStep, AdfSkippedStep } from '@agent/core/pipeline/adf-engine';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
+import { stripGovernanceInputStamps } from '@agent/core/pipeline/op-preflight-stages';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
@@ -797,7 +798,11 @@ export async function dispatchLeafOp(
       `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation ${normalizedOp} was not admitted.`}`
     );
   }
-  params = preflight.input;
+  // Governance stamps (_effect/_resource_ref/_egress_taint) are stage
+  // metadata — strip them before the op contract sees the input; keep the
+  // stamped copy for the post-op observation stage.
+  const governedParams = preflight.input;
+  params = stripGovernanceInputStamps(governedParams);
   // Pipeline params may contain typed whole-value templates (for example
   // `{{items}}` or `{{dry_run}}`). Resolve them before applying the op
   // contract so the validator sees the value the actuator will receive.

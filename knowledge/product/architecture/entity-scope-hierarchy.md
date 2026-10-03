@@ -14,7 +14,9 @@ tenant_slug → organization_id → project_id → mission_id → task_id → se
 
 The executable declaration is `libs/core/entity-scope.ts`
 (`ENTITY_SCOPE_HIERARCHY`); this document is the human-facing explanation and
-storage mapping.
+storage mapping. The chain is the identity layer of the runtime scope
+envelope — see [scope-governance-plane](./scope-governance-plane.md) for how
+workspace isolation and the control plane project onto it.
 
 `organization_id` may be omitted for shared/public records, but when it is
 present it is always inside the tenant boundary. A `WorkItemContext` carries

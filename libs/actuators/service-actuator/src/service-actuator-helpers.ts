@@ -33,12 +33,7 @@ import { validateServiceAuth } from '@agent/core/service/service-validator';
 
 import { loadServiceEndpointsCatalog } from '@agent/core/service/service-endpoint-registry';
 import { getServicePresetRecord } from '@agent/core/service/service-preset-registry';
-import {
-  CloudflareOsControlPlane,
-  type IntroductionMode,
-  type OsKnowledgeTier,
-  type ResourceScope,
-} from '@agent/core/cloudflare-os-control-plane';
+
 import { withEgressPayloadContext, type EgressPayloadContext } from '@agent/core/egress-policy';
 import {
   describeServiceHarness,
@@ -49,7 +44,14 @@ import {
   type ServiceExecutionReceipt,
 } from '@agent/core/service/service-harness';
 import { recordServiceCall } from '@agent/core/service/service-recording-session';
+import { sharedControlPlane } from '@agent/core/cloudflare-os-shared';
+import type {
+  IntroductionMode,
+  OsKnowledgeTier,
+  ResourceScope,
+} from '@agent/core/cloudflare-os-control-plane';
 import {
+  resolveTenantAlias,
   validateContextSecurityScope,
   type ContextSecurityScope,
 } from '@agent/core/context-security-scope';
@@ -114,7 +116,7 @@ const SERVICE_MANIFEST_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/service-manifest.schema.json'
 );
 const serviceManifestCatalogs = new Map<string, GovernedCatalog<ServiceManifest>>();
-const cloudflareOsControlPlane = new CloudflareOsControlPlane();
+const controlPlane = () => sharedControlPlane();
 const DANGEROUS_DYNAMIC_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 function serviceManifestCatalogAtPath(manifestPath: string): GovernedCatalog<ServiceManifest> {
@@ -648,7 +650,7 @@ function enforceResourceIntroduction(input: ServiceAction): void {
   if (resourceScope !== 'read' && resourceScope !== 'write') {
     throw new Error(`[POLICY_VIOLATION] Invalid resource scope: ${String(resourceScope)}`);
   }
-  cloudflareOsControlPlane.enforceIntroduction({
+  controlPlane().enforceIntroduction({
     missionId,
     taskId: String(context.task_id || context.taskId || '').trim() || undefined,
     service: input.service_id,
@@ -684,13 +686,17 @@ function prepareServiceObservation(input: ServiceAction): PreparedObservation | 
   const summary = String(
     (observation as Record<string, unknown>).summary || `${input.service_id}:${input.action}`
   ).slice(0, 240);
+  const tenantSlug = resolveTenantAlias(scope);
+  if (!tenantSlug) {
+    throw new Error('[POLICY_VIOLATION] Service security_scope resolved no tenant');
+  }
   return {
     missionId: scope.mission_id,
     taskId: String(context.task_id || context.taskId || '').trim() || undefined,
     service: input.service_id,
     resourceRef,
     tier,
-    tenantSlug: scope.tenant_id,
+    tenantSlug,
     purpose: scope.purpose,
     summary,
   };
@@ -706,10 +712,10 @@ function prepareServiceEgressContext(input: ServiceAction): EgressPayloadContext
     (context.observation ? 'read' : input.method === 'GET' ? 'read' : 'write')) as ResourceScope;
   if (resourceScope !== 'write') return undefined;
 
-  const provenance = cloudflareOsControlPlane.projectTaint(scope.mission_id);
+  const provenance = controlPlane().projectTaint(scope.mission_id);
   return {
     tier: provenance.highestTier,
-    tenant_slug: scope.tenant_id,
+    tenant_slug: resolveTenantAlias(scope),
     purpose: scope.purpose,
     provenance,
   };
@@ -718,7 +724,7 @@ function prepareServiceEgressContext(input: ServiceAction): EgressPayloadContext
 function recordServiceObservation(observation: PreparedObservation | null, _result: unknown): void {
   if (!observation) return;
   try {
-    cloudflareOsControlPlane.recordObservation({ ...observation });
+    controlPlane().recordObservation({ ...observation });
   } catch (error) {
     // The external operation has already completed. Do not throw into the
     // governed retry loop and duplicate a side effect; preserve the failure

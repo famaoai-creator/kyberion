@@ -24,6 +24,8 @@ export interface ScopeContextValidationOptions {
   requireTenant?: boolean;
   requireMission?: boolean;
   allowShared?: boolean;
+  /** Mission-less work shapes (task_session / pipeline) anchor on the session itself. */
+  allowSessionRoot?: boolean;
 }
 
 const NON_EMPTY_ID = /^[^\s/]+$/;
@@ -85,7 +87,8 @@ export function validateScopeContext(
   if (context.project_id && !context.organization_id)
     errors.push('project_id requires an organization_id');
   if (context.task_id && !context.mission_id) errors.push('task_id requires a mission_id');
-  if (context.session_id && !context.task_id) errors.push('session_id requires a task_id');
+  if (context.session_id && !context.task_id && !options.allowSessionRoot)
+    errors.push('session_id requires a task_id');
   if (options.requireMission && !context.mission_id) errors.push('mission_id is required');
   for (const [key, value] of Object.entries(context)) {
     if (key === 'tier' || key === 'customer_stance' || key === 'tenant_slug') continue;

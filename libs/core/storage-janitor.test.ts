@@ -92,6 +92,9 @@ vi.mock('./path-resolver.js', () => ({
     // imported by storage-janitor.ts), so the mocked `pathResolver` object
     // needs the same `shared` the module-level named export below provides.
     shared: mockShared,
+    // owner-scope → project-registry → vocabulary-catalog resolve paths
+    // through the `pathResolver` object (not the named export).
+    knowledge: (sub = '') => path.join(pathResolverMock.repoRoot, 'knowledge', sub),
   },
   sharedTmp: (sub = '') => path.join(tmpDir, sub),
   shared: mockShared,

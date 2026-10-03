@@ -21,9 +21,23 @@ vi.mock('./secure-io.js', () => ({
   safeExecResult: vi.fn(() => execResult.value),
   safeExistsSync: vi.fn(() => false),
   safeLstat: vi.fn(() => ({ isSymbolicLink: () => false })),
+  safeStat: vi.fn(() => ({ isDirectory: () => false })),
+  safeReaddir: vi.fn(() => []),
   safeReadFile: vi.fn(() => '{}'),
   safeAppendFileSync: vi.fn(),
   safeMkdir: vi.fn(),
+}));
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJsonIfPresent: () => null,
+    loadJson: () => null,
+    appendFile: vi.fn(),
+    exists: () => false,
+    readFile: () => '{}',
+    stat: () => ({ mtimeMs: 0, size: 0 }),
+    writeFile: vi.fn(),
+  }),
+  registerFoundationIo: vi.fn(),
 }));
 
 import { executeAdfSteps } from './pipeline/adf-engine.js';

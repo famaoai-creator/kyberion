@@ -12,8 +12,19 @@ import type {
   AgentTaskEnvelope,
 } from './agent/agent-execution-port.js';
 import type { ContextSecurityScope } from './context-security-scope.js';
+import { resolveTenantAlias } from './context-security-scope.js';
 import { getAgentExecutionPort } from './agent/agent-execution-port.js';
 import { logger } from './core.js';
+import {
+  clampPolicyToRuntimeTier,
+  currentScopeEnvelope,
+  mintScopeEnvelope,
+  narrowScopeEnvelope,
+  runtimeScopeIdentity,
+  withScopeEnvelope,
+  type ScopeEnvelope,
+  type ScopeNarrowRequest,
+} from './scope-envelope.js';
 
 export interface CoordinatedAgentTaskEnvelope extends AgentTaskEnvelope {
   work_item_id: string;
@@ -23,6 +34,84 @@ export interface CoordinatedAgentTaskEnvelope extends AgentTaskEnvelope {
 export interface CoordinatedAgentExecutionReceipt extends AgentExecutionReceipt {
   work_item_id: string;
   attempt_id?: string;
+}
+
+/**
+ * SC-01: the delegation dispatch boundary mints/narrows a scope envelope for
+ * the child execution. With an active envelope the request's security_scope
+ * is a narrow request; without one, the boundary mints from the runtime
+ * scope plus the stamped dispatch contract. Delegations that cannot mint yet
+ * run unenveloped (measured by the op-preflight scope stage).
+ */
+function delegationScopeEnvelope(request: CoordinatedAgentTaskEnvelope): ScopeEnvelope | null {
+  const scope: ContextSecurityScope | undefined = request.security_scope;
+  const narrowRequest: ScopeNarrowRequest = scope
+    ? {
+        identity: {
+          tenant_slug: resolveTenantAlias(scope),
+          organization_id: scope.organization_id,
+          project_id: scope.project_id,
+          mission_id: request.mission_id ?? scope.mission_id,
+          task_id: request.task_id ?? scope.task_id,
+          session_id: scope.session_id,
+        },
+        policy: {
+          read_tiers: [...scope.read_tiers],
+          write_tier: scope.write_tier,
+          purpose: scope.purpose,
+          external_egress: scope.external_egress,
+          allowed_reasoning_backends: scope.allowed_reasoning_backends,
+        },
+      }
+    : {};
+  const active = currentScopeEnvelope();
+  if (active) return narrowScopeEnvelope(active, narrowRequest);
+  if (!scope) return null;
+  // No active envelope: the request's security_scope is caller input, so it
+  // can only ever shrink what the process itself is bound to. It may name
+  // the mission/task/session the process is running, never a different
+  // mission, and its policy is clamped to the process tier (no egress from
+  // a request).
+  const runtime = runtimeScopeIdentity();
+  const declared = narrowRequest.identity ?? {};
+  if (!runtime.mission_id || declared.mission_id !== runtime.mission_id) {
+    logger.warn(
+      `[coordinated-agent-execution-port] delegation scope is not bound to the process mission for work_item_id=${request.work_item_id} — delegation runs unenveloped | dispatch from the mission process (MISSION_ID) so the boundary can mint | requested mission=${declared.mission_id ?? 'none'} process mission=${runtime.mission_id ?? 'none'}`
+    );
+    return null;
+  }
+  const clamped = clampPolicyToRuntimeTier(
+    {
+      purpose: narrowRequest.policy?.purpose?.trim() || `delegate ${request.work_item_id}`,
+      read_tiers: narrowRequest.policy?.read_tiers,
+      write_tier: narrowRequest.policy?.write_tier,
+      allowed_reasoning_backends: narrowRequest.policy?.allowed_reasoning_backends,
+    },
+    runtime.tier ?? 'public'
+  );
+  if (!clamped) {
+    logger.warn(
+      `[coordinated-agent-execution-port] delegation policy is above the process tier for work_item_id=${request.work_item_id} — delegation runs unenveloped | request a tier the mission process holds | process tier=${runtime.tier ?? 'public'}`
+    );
+    return null;
+  }
+  try {
+    return mintScopeEnvelope({
+      // Tenant/org/project come from the process scope and the mission
+      // record inside mint — never from the request.
+      identity: {
+        mission_id: declared.mission_id,
+        task_id: declared.task_id,
+        session_id: declared.session_id,
+      },
+      policy: clamped,
+    });
+  } catch (error) {
+    logger.warn(
+      `[coordinated-agent-execution-port] scope envelope mint failed for work_item_id=${request.work_item_id} — delegation runs unenveloped | wire the dispatch boundary to mint first | ${error instanceof Error ? error.message : String(error)}`
+    );
+    return null;
+  }
 }
 
 /**
@@ -39,6 +128,9 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
   ) {}
 
   async delegate(request: CoordinatedAgentTaskEnvelope): Promise<CoordinatedAgentExecutionReceipt> {
+    // Envelope mint/narrow runs before the work-item claim: a scope
+    // contradiction rejects the delegation without leaving a claim open.
+    const envelope = delegationScopeEnvelope(request);
     const item = getWorkItem(request.work_item_id);
     if (!item) {
       throw new Error(`[WORK_ITEM_NOT_FOUND] ${request.work_item_id}`);
@@ -61,7 +153,9 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
     const attemptId = claimed.item.current_attempt_id;
     let receipt: AgentExecutionReceipt;
     try {
-      receipt = await this.delegatePort.delegate(request);
+      receipt = envelope
+        ? await withScopeEnvelope(envelope, () => this.delegatePort.delegate(request))
+        : await this.delegatePort.delegate(request);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error(

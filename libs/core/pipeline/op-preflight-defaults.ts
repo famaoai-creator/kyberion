@@ -23,12 +23,32 @@ import {
   validateContextSecurityScope,
   type ContextSecurityScope,
 } from '../context-security-scope.js';
+import {
+  currentScopeEnvelope,
+  envelopeNarrowRequestErrors,
+  noteMissingScopeEnvelope,
+  securityScopeNarrowErrors,
+} from '../scope-envelope.js';
 import { validateScopeContext, type ScopeContextInput } from '../scope-context.js';
+import {
+  lookupOpCapability,
+  resolveCapabilityEffect,
+  resolveCapabilityResourceRef,
+} from '../actuator/actuator-manifest-index.js';
 import type { TierLevel } from '../types.js';
+import { introductionResult, provenanceEgressResult, taintResult } from './op-preflight-stages.js';
 
 const TIER_VALUES = new Set<TierLevel>(['public', 'confidential', 'personal']);
 
-const DEFAULT_LISTENER_IDS = ['core:scope', 'core:adf-guardrails', 'core:provider-egress'] as const;
+const DEFAULT_LISTENER_IDS = [
+  'core:scope',
+  'core:effect',
+  'core:introduction',
+  'core:taint',
+  'core:provenance-egress',
+  'core:adf-guardrails',
+  'core:provider-egress',
+] as const;
 const DEFAULT_GUARD_IDS = ['core:spend'] as const;
 
 type RecordLike = Record<string, unknown>;
@@ -62,6 +82,22 @@ function tierValue(recordsToSearch: RecordLike[]): TierLevel | undefined {
 
 function scopeResult(call: OpPreflightCall, input: RecordLike): OpPreflightListenerResult | void {
   const search = records(call, input);
+  const activeEnvelope = currentScopeEnvelope();
+
+  // SC-01: an input scope_envelope is a narrow request — it must reference a
+  // runtime-minted envelope and may only narrow it, never enlarge it.
+  const inputEnvelope = firstValue(search, 'scope_envelope', 'scopeEnvelope');
+  if (inputEnvelope !== undefined) {
+    const errors = envelopeNarrowRequestErrors(inputEnvelope, activeEnvelope);
+    if (errors.length > 0) {
+      return {
+        decision: 'block',
+        reason: `[OP_SCOPE_DENIED] ${errors.join('; ')}`,
+        terminate: true,
+      };
+    }
+  }
+
   const explicitSecurityScope = firstValue(search, 'security_scope', 'securityScope');
   if (explicitSecurityScope && typeof explicitSecurityScope === 'object') {
     const errors = validateContextSecurityScope(explicitSecurityScope as ContextSecurityScope);
@@ -71,6 +107,21 @@ function scopeResult(call: OpPreflightCall, input: RecordLike): OpPreflightListe
         reason: `[OP_SCOPE_DENIED] ${errors.join('; ')}`,
         terminate: true,
       };
+    }
+    // SC-01: with a minted envelope active, a caller-provided security_scope
+    // may only narrow it — identity contradictions or policy enlargement deny.
+    if (activeEnvelope) {
+      const narrowErrors = securityScopeNarrowErrors(
+        explicitSecurityScope as ContextSecurityScope,
+        activeEnvelope
+      );
+      if (narrowErrors.length > 0) {
+        return {
+          decision: 'block',
+          reason: `[OP_SCOPE_DENIED] ${narrowErrors.join('; ')}`,
+          terminate: true,
+        };
+      }
     }
   }
 
@@ -109,6 +160,10 @@ function scopeResult(call: OpPreflightCall, input: RecordLike): OpPreflightListe
       };
     }
   }
+
+  // SC-01 rollout: governed ops without a minted envelope are allowed but
+  // measured, so the enforce rollout has counts before it tightens.
+  if (!activeEnvelope && inputEnvelope === undefined) noteMissingScopeEnvelope(call.op);
 }
 
 function adfResult(call: OpPreflightCall, input: RecordLike): OpPreflightListenerResult | void {
@@ -160,21 +215,41 @@ function isReasoningCall(call: OpPreflightCall): boolean {
   );
 }
 
+/**
+ * SC-02: resolve the op's declared effect class and stamp it onto the input
+ * so downstream stages (introduction, observation, egress) and the executing
+ * op can read it. Undeclared ops resolve to 'write' — the fail-safe class.
+ */
+function effectResult(call: OpPreflightCall, input: RecordLike): OpPreflightListenerResult | void {
+  const capability = lookupOpCapability(call.op);
+  const effect = capability ? resolveCapabilityEffect(capability, input) : 'write';
+  const resourceRef = capability ? resolveCapabilityResourceRef(capability, input) : undefined;
+  return {
+    repaired_input: {
+      _effect: effect,
+      // Always write the key — an unresolved ref clears any client-injected
+      // value so downstream stages only ever see the stage-resolved ref.
+      _resource_ref: resourceRef,
+    },
+  };
+}
+
 /** Install the standard listeners after a test/worker reset or during boot. */
 export function ensureDefaultOpPreflight(): void {
   const listenerIds = new Set(listOpPreflightListeners().map((listener) => listener.id));
-  if (!listenerIds.has(DEFAULT_LISTENER_IDS[0])) {
-    registerOpPreflightListener({ id: DEFAULT_LISTENER_IDS[0], order: 100, run: scopeResult });
-  }
-  if (!listenerIds.has(DEFAULT_LISTENER_IDS[1])) {
-    registerOpPreflightListener({ id: DEFAULT_LISTENER_IDS[1], order: 110, run: adfResult });
-  }
-  if (!listenerIds.has(DEFAULT_LISTENER_IDS[2])) {
-    registerOpPreflightListener({
-      id: DEFAULT_LISTENER_IDS[2],
-      order: 120,
-      run: providerEgressResult,
-    });
+  const registrations: { id: string; order: number; run: typeof scopeResult }[] = [
+    { id: DEFAULT_LISTENER_IDS[0], order: 100, run: scopeResult },
+    { id: DEFAULT_LISTENER_IDS[1], order: 110, run: effectResult },
+    { id: DEFAULT_LISTENER_IDS[2], order: 112, run: introductionResult },
+    { id: DEFAULT_LISTENER_IDS[3], order: 115, run: taintResult },
+    { id: DEFAULT_LISTENER_IDS[4], order: 118, run: provenanceEgressResult },
+    { id: DEFAULT_LISTENER_IDS[5], order: 120, run: adfResult },
+    { id: DEFAULT_LISTENER_IDS[6], order: 130, run: providerEgressResult },
+  ];
+  for (const registration of registrations) {
+    if (!listenerIds.has(registration.id)) {
+      registerOpPreflightListener(registration);
+    }
   }
 
   const guardIds = new Set(listOpGuards().map((guard) => guard.id));

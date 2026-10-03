@@ -19,7 +19,8 @@
         "install": {
           "darwin": "Xcode を App Store から導入し、`sudo xcode-select -s /Applications/Xcode.app` を実行"
         }
-      }
+      },
+      "effect": "write"
     }
   ]
 }

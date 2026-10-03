@@ -15,6 +15,10 @@ describe('default operation preflight waterfall', () => {
     ensureDefaultOpPreflight();
     expect(listOpPreflightListeners().map((entry) => entry.id)).toEqual([
       'core:scope',
+      'core:effect',
+      'core:introduction',
+      'core:taint',
+      'core:provenance-egress',
       'core:adf-guardrails',
       'core:provider-egress',
     ]);
@@ -54,5 +58,50 @@ describe('default operation preflight waterfall', () => {
     });
     expect(result.decision).toBe('block');
     expect(result.reason).toContain('graph-loop-without-bound');
+  });
+
+  it('never reports preflight-internal stamps as a repair of the caller input', async () => {
+    ensureDefaultOpPreflight();
+    const params = { path: 'a.txt' };
+    const result = await runOpPreflight({ op: 'file:pipeline', params, source: 'actuator' });
+    expect(result.input).toEqual(params);
+    expect(result.repaired_input).toBeUndefined();
+    expect(Object.keys(result.input).some((key) => key.startsWith('_'))).toBe(false);
+  });
+
+  it('stamps the declared manifest effect onto the input for downstream stages', async () => {
+    ensureDefaultOpPreflight();
+    const result = await runOpPreflight({
+      op: 'file:pipeline',
+      params: {},
+      source: 'actuator',
+    });
+    expect(result.decision).toBe('allow');
+    expect(result.listener_ids).toContain('core:effect');
+    expect(result.governance_stamps?._effect).toBe('write');
+    expect(result.input._effect).toBeUndefined();
+  });
+
+  it('refines egress declarations to read for read verbs via effect_from', async () => {
+    ensureDefaultOpPreflight();
+    const result = await runOpPreflight({
+      op: 'service:api',
+      params: { method: 'GET' },
+      source: 'actuator',
+    });
+    expect(result.decision).toBe('allow');
+    expect(result.governance_stamps?._effect).toBe('read');
+  });
+
+  it('keeps the fail-safe write class for unknown ops', async () => {
+    ensureDefaultOpPreflight();
+    const result = await runOpPreflight({
+      op: 'custom:undeclared',
+      params: {},
+      source: 'actuator',
+    });
+    expect(result.decision).toBe('allow');
+    expect(result.governance_stamps?._effect).toBe('write');
+    expect(result.input._effect).toBeUndefined();
   });
 });

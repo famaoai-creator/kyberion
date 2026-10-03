@@ -9,17 +9,65 @@
     "retry_profile": "voice-actuator"
   },
   "capabilities": [
-    { "op": "health", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "speak_local", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "list_voices", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "generate_voice", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "register_voice_profile", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "collect_voice_samples", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "collect_and_register_voice_profile", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "record_voice_sample", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "record_verify_repair_voice_sample", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "list_audio_routes", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "probe_audio_route", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "verify_tts_loopback", "platforms": ["darwin", "linux", "win32"] }
+    {
+      "op": "health",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "speak_local",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "list_voices",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "generate_voice",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "egress"
+    },
+    {
+      "op": "register_voice_profile",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "collect_voice_samples",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "collect_and_register_voice_profile",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "record_voice_sample",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "record_verify_repair_voice_sample",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "list_audio_routes",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "probe_audio_route",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "verify_tts_loopback",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    }
   ]
 }

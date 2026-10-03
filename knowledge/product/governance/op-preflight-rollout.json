@@ -1,0 +1,29 @@
+{
+  "$schema": "../schemas/op-preflight-rollout.schema.json",
+  "version": 1,
+  "description": "SC-05 rollout modes for the standard preflight/post-op governance stages. Modes: off (stage skips the family), warn (evaluate + audit, never block), enforce (block on violation). service family stays off for introduction/observation because service-actuator keeps the richer context-declared path.",
+  "stages": {
+    "introduction": {
+      "default": "warn",
+      "families": {
+        "service": "off"
+      }
+    },
+    "taint": {
+      "default": "warn",
+      "families": {}
+    },
+    "observation": {
+      "default": "warn",
+      "families": {
+        "service": "off"
+      }
+    },
+    "egress": {
+      "default": "warn",
+      "families": {
+        "service": "off"
+      }
+    }
+  }
+}

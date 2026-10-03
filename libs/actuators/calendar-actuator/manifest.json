@@ -12,37 +12,44 @@
     {
       "op": "list_calendars",
       "description": "Lists calendars through the selected backend (JXA on macOS or authenticated gws)",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "list_events",
       "description": "Lists events for specific calendars within a date range",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "query_freebusy",
       "description": "Queries busy windows for one or more calendars",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "find_slots",
       "description": "Derives available slots from free/busy windows, timezone, working hours, and business calendar",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     },
     {
       "op": "create_event",
       "description": "Creates a new event through the selected calendar backend",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "egress"
     },
     {
       "op": "update_event",
       "description": "Reschedules or updates an event, including its reminder, through an adapter capability",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "egress"
     },
     {
       "op": "delete_event",
       "description": "Deletes an event through an adapter capability",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "egress"
     }
   ]
 }

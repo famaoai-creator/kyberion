@@ -164,7 +164,10 @@ describe('service-actuator: RECONCILE with auth check', () => {
         params: { manifest_path: '../../external-services.json' },
       })
     ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
-    expect(mocks.safeReadFile).not.toHaveBeenCalled();
+    // The governance preflight may read its own policy files (e.g. the op
+    // rollout policy); what must never be read is the external manifest.
+    const readPaths = mocks.safeReadFile.mock.calls.map(([target]: unknown[]) => String(target));
+    expect(readPaths.some((target) => target.includes('external-services.json'))).toBe(false);
   });
 
   it('should skip starting a service if validation fails', async () => {

@@ -1211,6 +1211,14 @@
       "types": "./dist/cloudflare-os-control-plane.d.ts",
       "default": "./dist/cloudflare-os-control-plane.js"
     },
+    "./cloudflare-os-shared": {
+      "types": "./dist/cloudflare-os-shared.d.ts",
+      "default": "./dist/cloudflare-os-shared.js"
+    },
+    "./cloudflare-os-journal": {
+      "types": "./dist/cloudflare-os-journal.d.ts",
+      "default": "./dist/cloudflare-os-journal.js"
+    },
     "./provenance-taint": {
       "types": "./dist/provenance-taint.d.ts",
       "default": "./dist/provenance-taint.js"
@@ -4986,6 +4994,10 @@
     "./pipeline/op-preflight": {
       "types": "./dist/pipeline/op-preflight.d.ts",
       "default": "./dist/pipeline/op-preflight.js"
+    },
+    "./pipeline/op-preflight-stages": {
+      "types": "./dist/pipeline/op-preflight-stages.d.ts",
+      "default": "./dist/pipeline/op-preflight-stages.js"
     },
     "./pipeline/op-suggestions": {
       "types": "./dist/pipeline/op-suggestions.d.ts",

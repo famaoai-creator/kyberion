@@ -1,4 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { auditChain } from './audit-chain.js';
+import type { HeldEffectSteeringAction } from './held-effect-bridge.js';
 import {
   appendGovernedArtifactJsonl,
   ensureGovernedArtifactDir,
@@ -160,16 +162,18 @@ export interface ApprovalApplyResult {
  * steering exists — see `scheduleSteeringApprovalExecution` below and
  * `libs/core/surface/surface-mission-steering.ts`.
  */
-export interface ApprovalSteeringAction {
-  kind: 'mission_lifecycle_verb';
-  verb: 'verify' | 'finish';
-  missionId: string;
-  note?: string;
-  surface: SurfaceAsyncChannel;
-  channel: string;
-  threadTs: string;
-  correlationId: string;
-}
+export type ApprovalSteeringAction =
+  | {
+      kind: 'mission_lifecycle_verb';
+      verb: 'verify' | 'finish';
+      missionId: string;
+      note?: string;
+      surface: SurfaceAsyncChannel;
+      channel: string;
+      threadTs: string;
+      correlationId: string;
+    }
+  | HeldEffectSteeringAction;
 
 export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   id: string;
@@ -1100,6 +1104,11 @@ export function decideApprovalRequest(
   if (updated.status === 'approved' && updated.steering) {
     scheduleSteeringApprovalExecution(role, storageChannel, updated);
   }
+  // SC-04: a rejected held-effect request must settle the held action too —
+  // rejections do not run the steering-apply pipeline, so they bridge here.
+  if (updated.status === 'rejected' && updated.steering?.kind === 'held_effect') {
+    scheduleHeldEffectRejection(updated);
+  }
   if (
     updated.status === 'approved' &&
     updated.kind === 'mission_gate' &&
@@ -1218,6 +1227,33 @@ function scheduleSteeringApprovalExecution(
       // Best-effort persistence of the outcome — the verb itself already
       // ran (or failed) above; a failure to record that outcome must not
       // surface as an unhandled rejection.
+    }
+  })();
+  pendingSteeringApprovalExecutions.add(task);
+  void task.finally(() => pendingSteeringApprovalExecutions.delete(task));
+}
+
+/**
+ * SC-04: fire-and-forget rejection bridge for held-effect steering records.
+ * The decision record already settled above; this propagates the rejection
+ * to the control-plane journal so the owner process sees it on catch-up.
+ */
+function scheduleHeldEffectRejection(record: ApprovalRequestRecord): void {
+  const task = (async () => {
+    try {
+      const { settleHeldEffectDecision } = await import('./held-effect-bridge.js');
+      await settleHeldEffectDecision(record, 'rejected');
+    } catch (error) {
+      auditChain.record({
+        agentId: 'approval-store',
+        action: 'held_effect',
+        operation: 'reject_bridge',
+        result: 'failed',
+        metadata: {
+          requestId: record.id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
     }
   })();
   pendingSteeringApprovalExecutions.add(task);
