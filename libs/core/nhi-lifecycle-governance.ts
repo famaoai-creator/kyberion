@@ -36,6 +36,7 @@
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
+import { missionPathOrNull } from './mission-lookup.js';
 import { safeExistsSync } from './secure-io.js';
 import { readTenantProfile } from './organization/tenant-registry.js';
 import { HUMAN_ACTOR_PREFIX } from './actor.js';
@@ -291,7 +292,9 @@ export function listOrphanNhiIdentities(): NhiOrphanIdentity[] {
         });
         continue;
       }
-      if (missionId && !findMissionPath(missionId)) {
+      // An ambiguous or hidden mission id is reported like a missing one: one
+      // such record must not abort the whole lifecycle report.
+      if (missionId && !missionPathOrNull(findMissionPath, missionId)) {
         orphans.push({
           nhi_id: record.nhi_id,
           lifecycle_status: record.lifecycle_status,

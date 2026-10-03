@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import { rawExistsSync, rawLstatSync, rawReaddir, rawReadTextFile } from './fs-primitives.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import * as pathResolver from './path-resolver.js';
+import { missionPathOrNull } from './mission-lookup.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { resolveProjectScope } from './foundation/project-scope-env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
@@ -899,16 +900,10 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
   // (covers active/missions/{personal,confidential,public}/{id}/...).
   if (missionId) {
     const candidates: string[] = [pathResolver.active(`missions/${missionId}/mission-state.json`)];
-    let tierPath: string | null = null;
-    try {
-      tierPath = pathResolver.findMissionPath(missionId);
-    } catch (error) {
-      // An id that is ambiguous across tenants or not visible to this process
-      // contributes no mission identity; permission checks then deny cleanly
-      // instead of throwing. Any other error still propagates.
-      const code = (error as { code?: unknown } | null)?.code;
-      if (code !== 'OWNER_AMBIGUOUS' && code !== 'OWNER_NOT_VISIBLE') throw error;
-    }
+    // An id that is ambiguous across tenants or not visible to this process
+    // contributes no mission identity (the persona stays 'unknown'), so
+    // permission checks deny cleanly instead of throwing.
+    const tierPath = missionPathOrNull(pathResolver.findMissionPath, missionId);
     if (tierPath) candidates.push(`${tierPath}/mission-state.json`);
     for (const statePath of candidates) {
       try {

@@ -13,6 +13,7 @@ import {
   safeExistsSync,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
+import { missionPathOrNull } from '@agent/core/mission-lookup';
 import {
   detectRasterCapabilities,
   rasterizeDocument,
@@ -845,7 +846,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         logger.info(`🔍 [MEDIA]\n${formatVisualReviewReport(report)}`);
       }
       if (missionId !== 'none') {
-        const missionPath = pathResolver.findMissionPath(missionId);
+        // Best-effort evidence write: an ambiguous or hidden mission skips it.
+        const missionPath = missionPathOrNull(pathResolver.findMissionPath, missionId);
         if (missionPath) {
           try {
             const evidenceDir = path.join(missionPath, 'evidence');
