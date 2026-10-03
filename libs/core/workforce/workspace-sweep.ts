@@ -6,6 +6,7 @@
 
 import * as nodePath from 'node:path';
 import { loadMissionStateAtPath } from '../mission/mission-state-reader.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
 import { rootDir } from '../path-resolver.js';
 import {
   retryPendingSharedIndexReconcile,
@@ -41,6 +42,20 @@ export interface SweepWorkspacesOptions extends Omit<WorkspaceLedgerOptions, 'no
    * owners are never treated as terminal (conservative).
    */
   isOwnerTerminal?: (owner: WorkspaceOwner) => boolean;
+  /**
+   * Whether the owning mission can still be resolved. Default: mission owners
+   * resolve through the shared owner-scope resolver; session-only owners count
+   * as resolvable (conservative).
+   */
+  isOwnerResolvable?: (owner: WorkspaceOwner) => boolean;
+  /**
+   * Opt-in: reclaim live workspaces whose mission owner can no longer be
+   * resolved, after 3x the orphan TTL. Refused from a tenant-bound process,
+   * where "missing" and "invisible to this tenant" look the same.
+   */
+  sweepUnresolvableOwners?: boolean;
+  /** Tenant the sweeping process is bound to; defaults to KYBERION_TENANT. */
+  processTenant?: string;
   /** Deletion audit sink (the janitor wires its retention audit log here). */
   audit?: (record: Record<string, unknown>) => void;
   /** Test seam: process liveness probes for pid-tracked git-index records. */
@@ -57,6 +72,8 @@ export interface SweepWorkspacesResult {
   deleted: WorkspaceRecord[];
   /** Repo-relative directories under the workspace roots with no ledger record (never deleted). */
   unregisteredDirs: string[];
+  /** Live workspaces past 1x TTL whose mission owner can no longer be resolved (reported, not deleted by default). */
+  unresolvedOwners: WorkspaceRecord[];
   errors: string[];
 }
 
@@ -85,6 +102,15 @@ function missionOwnerTerminal(owner: WorkspaceOwner): boolean {
   }
 }
 
+function missionOwnerResolvable(owner: WorkspaceOwner): boolean {
+  if (!owner.mission_id) return true;
+  try {
+    return tryResolveOwnerScope({ kind: 'mission', id: owner.mission_id }) !== null;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * WS-07 workspace sweep. A registered workspace is an orphan when it was
  * released and `releasedAt + TTL` has passed, or when it is still marked live
@@ -106,6 +132,7 @@ function missionOwnerTerminal(owner: WorkspaceOwner): boolean {
 export function sweepRegisteredWorkspaces(opts: SweepWorkspacesOptions): SweepWorkspacesResult {
   const now = opts.now ?? Date.now;
   const isOwnerTerminal = opts.isOwnerTerminal ?? missionOwnerTerminal;
+  const isOwnerResolvable = opts.isOwnerResolvable ?? missionOwnerResolvable;
   const ledger: WorkspaceLedgerOptions = {
     ledgerPath: opts.ledgerPath,
     allowedRoots: opts.allowedRoots,
@@ -116,6 +143,7 @@ export function sweepRegisteredWorkspaces(opts: SweepWorkspacesOptions): SweepWo
     orphaned: [],
     deleted: [],
     unregisteredDirs: [],
+    unresolvedOwners: [],
     errors,
   });
 
@@ -181,6 +209,18 @@ export function sweepRegisteredWorkspaces(opts: SweepWorkspacesOptions): SweepWo
       return { ...empty(), registered: records.length };
     }
   }
+  const processTenant = (
+    opts.processTenant ??
+    getRegisteredEnvText('KYBERION_TENANT') ??
+    ''
+  ).trim();
+  const reclaimUnresolvable = opts.sweepUnresolvableOwners === true && !processTenant;
+  if (opts.sweepUnresolvableOwners && processTenant) {
+    errors.push(
+      'sweepUnresolvableOwners refused: tenant-bound process cannot tell a missing owner from one hidden by tenant scope'
+    );
+  }
+  const unresolvedOwners: WorkspaceRecord[] = [];
   const orphanReason = (record: WorkspaceRecord): string | null => {
     if (stillPending.has(record.id)) return null;
     if (record.kind === 'git-index' && isRecordedChildAlive(record, probe)) return null;
@@ -193,9 +233,14 @@ export function sweepRegisteredWorkspaces(opts: SweepWorkspacesOptions): SweepWo
       }
       return expired(record.createdAt) ? 'live git index without a process past orphan TTL' : null;
     }
-    return expired(record.createdAt) && isOwnerTerminal(record.owner)
-      ? 'owner terminal past orphan TTL'
-      : null;
+    if (!expired(record.createdAt)) return null;
+    if (isOwnerTerminal(record.owner)) return 'owner terminal past orphan TTL';
+    if (record.owner.mission_id && !isOwnerResolvable(record.owner)) {
+      unresolvedOwners.push(record);
+      const longExpired = Date.parse(record.createdAt) + ttlMs * 3 <= nowMs;
+      if (reclaimUnresolvable && longExpired) return 'owner unresolvable past 3x orphan TTL';
+    }
+    return null;
   };
   const reasons = new Map<string, string>();
   for (const record of records) {
@@ -250,5 +295,12 @@ export function sweepRegisteredWorkspaces(opts: SweepWorkspacesOptions): SweepWo
     errors.push(`unregistered: ${errorMessage(err)}`);
   }
 
-  return { registered: records.length, orphaned, deleted, unregisteredDirs, errors };
+  return {
+    registered: records.length,
+    orphaned,
+    deleted,
+    unregisteredDirs,
+    unresolvedOwners,
+    errors,
+  };
 }
