@@ -12,6 +12,7 @@ import type { ArtifactBundle } from '../workforce/artifact-bundle.js';
 import { checkArtifactBundleFulfillment } from '../workforce/artifact-bundle.js';
 import { evaluateDeliverableQuality, type DeliverableKind } from '../deliverable-quality.js';
 import { evaluateIntentDriftGate } from '../intent/intent-snapshot-store.js';
+import { missionCanonicalIntent } from './mission-intent-delta.js';
 
 export type MissionReviewMode = 'lean' | 'standard' | 'strict';
 export type ReviewGateVerdict = 'ready' | 'concerns' | 'blocked';
@@ -313,7 +314,7 @@ export function evaluateArtifactBundleGate(
 }
 
 export function evaluateIntentDriftReviewGate(missionId: string): ReviewGateResult {
-  const gate = evaluateIntentDriftGate(missionId);
+  const gate = evaluateIntentDriftGate(missionId, undefined, missionCanonicalIntent(missionId));
   return {
     gate_id: 'INTENT_DRIFT',
     verdict: gate.passed ? 'ready' : 'blocked',

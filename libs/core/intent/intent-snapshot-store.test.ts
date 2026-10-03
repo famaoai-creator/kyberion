@@ -222,6 +222,56 @@ describe('intent-snapshot-store', () => {
       expect(gate.verdict).toBe('blocking');
     });
 
+    it('compares the origin against supplied canonical intent, not the latest activity line', () => {
+      // The snapshot stream is an activity log: checkpoint notes and worker
+      // stage markers land in `goal`. When the caller supplies the mission's
+      // canonical current intent, that noise must not manufacture a block.
+      emitIntentSnapshot({
+        missionId: 'MSN-7',
+        stage: 'intake',
+        source: 'user_prompt',
+        intent: { goal: 'ship release 1.0' },
+      });
+      emitIntentSnapshot({
+        missionId: 'MSN-7',
+        stage: 'execution',
+        source: 'worker_transition',
+        intent: { goal: 'auto-checkpoint status=active tasks=0' },
+      });
+
+      const noisy = evaluateIntentDriftGate('MSN-7');
+      expect(noisy.passed).toBe(false);
+
+      const gated = evaluateIntentDriftGate('MSN-7', undefined, {
+        goal: 'ship release 1.0',
+      });
+      expect(gated.passed).toBe(true);
+      expect(gated.verdict).toBe('none');
+    });
+
+    it('still blocks real drift through the canonical path', () => {
+      // Detection direction must survive the noise-suppression fix: when the
+      // canonical current intent differs from the origin, the gate blocks.
+      emitIntentSnapshot({
+        missionId: 'MSN-8',
+        stage: 'intake',
+        source: 'user_prompt',
+        intent: { goal: 'wire trigger delivery to job queues' },
+      });
+      emitIntentSnapshot({
+        missionId: 'MSN-8',
+        stage: 'execution',
+        source: 'mission_state',
+        intent: { goal: 'wire trigger delivery to job queues' },
+      });
+
+      const gated = evaluateIntentDriftGate('MSN-8', undefined, {
+        goal: 'redesign the entire billing platform',
+      });
+      expect(gated.passed).toBe(false);
+      expect(gated.verdict).toBe('blocking');
+    });
+
     it('rebaselines from the latest approved origin scope change', () => {
       emitIntentSnapshot({
         missionId: 'MSN-6',

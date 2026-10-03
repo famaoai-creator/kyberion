@@ -241,10 +241,18 @@ export interface IntentDriftGateResult {
  * Evaluate the INTENT_DRIFT review gate for a mission. Compares the
  * origin snapshot against the latest snapshot so the gate measures drift
  * from the original user intent, not just the last step.
+ *
+ * `currentIntent` (optional): the mission's canonical current intent. When
+ * supplied, it replaces the latest emitted snapshot as the comparison
+ * target — the snapshot stream is an append-only activity log, so its last
+ * line may be a checkpoint note or a worker stage marker whose `goal` field
+ * is activity text, not intent. Comparing the origin against canonical
+ * current intent measures actual drift instead of log noise.
  */
 export function evaluateIntentDriftGate(
   missionId: string,
-  thresholds: DriftThresholds = DEFAULT_THRESHOLDS
+  thresholds: DriftThresholds = DEFAULT_THRESHOLDS,
+  currentIntent?: IntentBody | null
 ): IntentDriftGateResult {
   const snapshots = listSnapshots(missionId);
   if (snapshots.length < 2) {
@@ -262,9 +270,12 @@ export function evaluateIntentDriftGate(
 
   // Drift is measured against USER intent. A mission started without one
   // (bare CLI start, fixtures) only accumulates machine-generated
-  // 'mission_state' placeholders whose wording differs per stage — comparing
-  // those produces phantom drift and bricks verify. No user intent → no drift.
-  const hasUserIntent = snapshots.some((snapshot) => snapshot.source !== 'mission_state');
+  // 'mission_state' placeholders and 'worker_transition' stage markers whose
+  // wording differs per stage — comparing those produces phantom drift and
+  // bricks verify. No user intent → no drift.
+  const hasUserIntent = snapshots.some(
+    (snapshot) => snapshot.source !== 'mission_state' && snapshot.source !== 'worker_transition'
+  );
   if (!hasUserIntent) {
     return {
       passed: true,
@@ -278,7 +289,8 @@ export function evaluateIntentDriftGate(
   const originSnapshots = snapshots.filter((snapshot) => snapshot.kind === 'origin');
   const from =
     originSnapshots.length > 0 ? originSnapshots[originSnapshots.length - 1] : snapshots[0];
-  const to = snapshots[snapshots.length - 1];
+  const latest = snapshots[snapshots.length - 1];
+  const to = currentIntent ? { ...latest, intent: currentIntent } : latest;
   const delta = computeIntentDelta(from, to, thresholds);
   const passed = delta.drift_verdict !== 'blocking';
 
