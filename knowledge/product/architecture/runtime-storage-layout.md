@@ -115,7 +115,8 @@ is placed by the **owner's own record**, never by the caller's guess
   is derived from the mission, and "absent" would be a looser default, so it
   must fail closed) and _placement_ ("absent" would mean another location or a
   second copy). Only a path where absent is a conservative no-op — an optional
-  evidence write, a report row, "no mission identity" for a permission check —
+  evidence write, a report row, a list/feed filter that already denies a
+  tenant-less item, "no mission identity" for a permission check —
   uses `missionPathOrNull(findMissionPath, id)` from `@agent/core/mission-lookup`,
   which treats `OWNER_AMBIGUOUS` / `OWNER_NOT_VISIBLE` as absent. A new direct
   caller fails the boundary test until it is registered with its category.

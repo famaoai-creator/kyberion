@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { OwnerScopeError } from './owner-scope.js';
 import { isMissionLookupRefusal, missionPathOrNull } from './mission-lookup.js';
 
 const refusal = (code: string) => Object.assign(new Error(`[${code}] refused`), { code });
@@ -42,6 +43,29 @@ describe('missionPathOrNull', () => {
         throw new TypeError('boom');
       }, 'MSN-A')
     ).toThrow(TypeError);
+  });
+
+  it('rethrows an invalid-id error that carries no refusal code', () => {
+    expect(() =>
+      missionPathOrNull(() => {
+        throw new Error('[path-resolver] invalid mission id');
+      }, 'bad id')
+    ).toThrow(/invalid mission id/);
+  });
+
+  it('agrees with the real OwnerScopeError codes', () => {
+    const make = (code: ConstructorParameters<typeof OwnerScopeError>[0]['code']) =>
+      new OwnerScopeError({
+        code,
+        owner: { kind: 'mission', id: 'MSN-A' },
+        what: 'x',
+        why: 'y',
+        remedy: 'z',
+      });
+    expect(isMissionLookupRefusal(make('OWNER_NOT_FOUND'))).toBe(true);
+    expect(isMissionLookupRefusal(make('OWNER_AMBIGUOUS'))).toBe(true);
+    expect(isMissionLookupRefusal(make('OWNER_ID_INVALID'))).toBe(false);
+    expect(isMissionLookupRefusal(make('SCOPE_CONTRADICTS_OWNER'))).toBe(false);
   });
 
   it('recognizes only the lookup refusal codes', () => {

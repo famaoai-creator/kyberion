@@ -21,7 +21,9 @@ import { getAllFiles } from '@agent/core/fs-utils';
  * report row, "no mission identity" for a permission check) uses
  * `missionPathOrNull(findMissionPath, id)` from `@agent/core/mission-lookup`
  * instead and does not appear here. Adding a direct caller is a deliberate
- * choice: register it below with its category.
+ * choice: register it below with its category. The scan matches direct calls
+ * (`findMissionPath(` / `x.findMissionPath(`); passing the function as an
+ * argument, as `missionPathOrNull` callers do, is deliberately not a call.
  */
 type LookupCategory = 'lifecycle' | 'scope-derivation' | 'placement';
 
@@ -65,9 +67,7 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'presence/displays/chronos-mirror-v2/src/app/api/deliverable-preview/route.ts':
     'scope-derivation',
   'presence/displays/chronos-mirror-v2/src/app/api/mission-asset/helpers.ts': 'scope-derivation',
-  'presence/displays/chronos-mirror-v2/src/lib/knowledge-scope.ts': 'scope-derivation',
   'presence/displays/chronos-mirror-v2/src/lib/su-surface-data.ts': 'scope-derivation',
-  'presence/displays/chronos-mirror-v2/src/lib/trace-feed.ts': 'scope-derivation',
   'presence/displays/presence-studio/hearing-mission-routes.ts': 'scope-derivation',
   // placement
   'libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts': 'placement',
@@ -83,7 +83,6 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'libs/core/path-resolver.ts': 'placement',
   'libs/core/pipeline/pipeline-run-journal.ts': 'placement',
   'libs/core/video/ingest/video-brief.ts': 'placement',
-  'libs/core/workforce/workspace-sweep.ts': 'placement',
 };
 
 const rootDir = process.cwd();
