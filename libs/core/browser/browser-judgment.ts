@@ -79,10 +79,19 @@ export function classifyBrowserFailureByRules(text: string): BrowserFailureKind 
   if (/\b(captcha|recaptcha|are you a robot|consent|accept cookies)\b/.test(value)) {
     return 'consent_or_captcha';
   }
-  if (/waiting for selector|no element matches|selector .* not found/.test(value)) {
+  if (/waiting for selector|no element matches/.test(value) || selectorNotFound(value)) {
     return 'element_missing';
   }
   return 'unknown';
+}
+
+/**
+ * `selector .* not found` as a linear scan: the unanchored regex is
+ * polynomial on repeated `selector ` input (CodeQL js/polynomial-redos).
+ */
+function selectorNotFound(value: string): boolean {
+  const start = value.indexOf('selector ');
+  return start >= 0 && value.indexOf('not found', start + 'selector '.length) >= 0;
 }
 
 export function browserFailureQuestion(): JudgmentQuestion {

@@ -223,6 +223,38 @@ export function appendJournalEventLocked(
   });
 }
 
+/**
+ * Compare-and-append: under the same journal lock, catch the caller up to the
+ * tail first, then let `build` inspect the caught-up state and decide whether
+ * to append. Returns whether an event was appended and the journal's last seq.
+ * This is the primitive for decisions that must not race across processes
+ * (e.g. claiming the single execution of an approved effect).
+ */
+export function appendJournalEventLockedIf(
+  namespace: ControlPlaneNamespace,
+  afterSeq: number,
+  applyTail: (events: ControlPlaneJournalEvent[]) => void,
+  build: () => { kind: ControlPlaneCollection; records: Record<string, unknown>[] } | null
+): { appended: boolean; seq: number } {
+  return withLockSync(`cloudflare-os-journal:${namespace.key}`, () => {
+    safeMkdir(namespace.dir, { recursive: true });
+    const { events: tail, lastSeq } = readJournalTail(namespace.dir, afterSeq);
+    if (tail.length > 0) applyTail(tail);
+    const event = build();
+    if (!event) return { appended: false, seq: lastSeq };
+    const seq = lastSeq + 1;
+    const line: ControlPlaneJournalEvent = {
+      seq,
+      ts: nowIso(),
+      kind: event.kind,
+      op: APPEND_COLLECTIONS.has(event.kind) ? 'append' : 'upsert',
+      records: event.records,
+    };
+    appendJsonLine(controlPlaneJournalPath(namespace.dir), line);
+    return { appended: true, seq };
+  });
+}
+
 /** Discover every existing cloudflare-os namespace dir under runtime/. */
 export function listControlPlaneNamespaceDirs(runtimeRoot?: string): string[] {
   const root = runtimeRoot ?? controlPlaneRuntimeRoot();

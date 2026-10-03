@@ -521,3 +521,105 @@ describe('review fixes: executors, params at rest, tenant namespaces', () => {
     expect(controlPlaneNamespaceFor('held', { tenantSlug: 'tenant-a' }).quarantined).toBe(false);
   });
 });
+
+describe('review fixes: exactly-once apply across processes', () => {
+  const base = {
+    missionId: 'mission-once',
+    tenantSlug: 'tenant-a',
+    submittedBy: 'agent:x',
+    op: 'demo:pay',
+    params: { amount: 1 },
+    persistParams: true,
+  };
+  const approve = (
+    cp: CloudflareOsControlPlane,
+    r: { id: string; payloadHash: string; effectBinding: string }
+  ) =>
+    cp.decideHeldAction(r.id, 'approved', {
+      resolvedBy: 'human:famao',
+      decidedByType: 'human',
+      authenticated: true,
+      payloadHash: r.payloadHash,
+      effectBinding: r.effectBinding,
+    });
+
+  it('runs an approved effect once when two processes apply it concurrently', async () => {
+    let runs = 0;
+    const slow = async () => {
+      runs += 1;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return 'paid';
+    };
+    const owner = new CloudflareOsControlPlane();
+    const record = owner.submitHeldAction({ ...base, apply: slow });
+    approve(owner, record);
+    const other = new CloudflareOsControlPlane();
+    other.registerExecutor('demo:pay', slow);
+
+    const [a, b] = await Promise.all([
+      owner.applyHeldAction(record.id),
+      other.applyHeldAction(record.id),
+    ]);
+    expect(runs).toBe(1);
+    expect([a.status, b.status].filter((status) => status === 'applied')).toHaveLength(1);
+    // The loser did not run and did not mark anything failed.
+    expect([a.status, b.status]).not.toContain('failed');
+    expect(new CloudflareOsControlPlane().getHeldAction(record.id)?.status).toBe('applied');
+  });
+
+  it('never re-runs an effect whose claim has no recorded outcome (crash after claim)', async () => {
+    let runs = 0;
+    const owner = new CloudflareOsControlPlane();
+    const record = owner.submitHeldAction({ ...base, apply: async () => 'unused' });
+    approve(owner, record);
+    // A process wins the claim and dies before recording an outcome.
+    const crashed = new CloudflareOsControlPlane();
+    expect(
+      (
+        crashed as unknown as { journalStore: { claimHeldApply(id: string, by: string): boolean } }
+      ).journalStore.claimHeldApply(record.id, 'ghost:1')
+    ).toBe(true);
+
+    const later = new CloudflareOsControlPlane();
+    later.registerExecutor('demo:pay', async () => {
+      runs += 1;
+      return 'again';
+    });
+    const result = await later.applyHeldAction(record.id);
+    expect(runs).toBe(0);
+    expect(result.status).toBe('approved');
+    expect(result.applyClaim?.by).toBe('ghost:1');
+  });
+});
+
+describe('review fixes: declassify grants are mission-scoped', () => {
+  it('does not let one mission grant overwrite or satisfy another mission', async () => {
+    const cp = new CloudflareOsControlPlane();
+    const grant = async (missionId: string) => {
+      const held = cp.requestDeclassify({
+        missionId,
+        tenantSlug: 'tenant-a',
+        artifactRef: 'report:v1',
+        payloadHash: 'same-hash',
+        targetAudience: 'public',
+        targetTenant: 'tenant-a',
+        requestedBy: 'agent:x',
+      });
+      cp.decideHeldAction(held.id, 'approved', {
+        resolvedBy: 'human:famao',
+        decidedByType: 'human',
+        authenticated: true,
+        payloadHash: held.payloadHash,
+        effectBinding: held.effectBinding,
+      });
+      await cp.applyHeldAction(held.id);
+    };
+    await grant('mission-a');
+    expect(cp.isDeclassified('mission-a', 'same-hash', 'public', 'tenant-a')).toBe(true);
+    expect(cp.isDeclassified('mission-b', 'same-hash', 'public', 'tenant-a')).toBe(false);
+    await grant('mission-b');
+    // B's grant must not erase A's.
+    expect(cp.isDeclassified('mission-a', 'same-hash', 'public', 'tenant-a')).toBe(true);
+    expect(cp.isDeclassified('mission-b', 'same-hash', 'public', 'tenant-a')).toBe(true);
+  });
+});
