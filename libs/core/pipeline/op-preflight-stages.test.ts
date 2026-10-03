@@ -1,10 +1,12 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
-import { safeMkdir } from '../secure-io.js';
+import { safeMkdir, safeWriteFile } from '../secure-io.js';
 import { auditChain } from '../governance/audit-chain.js';
+import { _resetEgressPolicyCacheForTests } from '../egress-policy.js';
 import {
   introductionResult,
+  opPreflightStageCounts,
   egressPayloadHash,
   provenanceEgressResult,
   recordOpObservation,
@@ -149,6 +151,11 @@ describe('taintResult', () => {
 });
 
 describe('provenanceEgressResult (SC-06)', () => {
+  const PUBLIC_HOST = 'https://public.example/upload';
+  const TENANT_HOST = 'https://review.tenant-a.example/upload';
+  const OTHER_TENANT_HOST = 'https://review.tenant-b.example/upload';
+  const UNLISTED_HOST = 'https://unlisted.example/upload';
+
   const observe = (tier: 'public' | 'confidential' | 'personal', tenantSlug = 'tenant-a') =>
     sharedControlPlane().recordObservation({
       missionId: 'mission-s5',
@@ -162,110 +169,87 @@ describe('provenanceEgressResult (SC-06)', () => {
 
   const egressInput = (overrides: Record<string, unknown> = {}) => ({
     _effect: 'egress',
+    _egress_destination: PUBLIC_HOST,
     ...overrides,
   });
+  const guard = (input: Record<string, unknown>) =>
+    inScope(() => provenanceEgressResult(call('export:publish'), input));
 
   beforeEach(() => {
+    const dir = pathResolver.sharedTmp(`egress-dest-${process.pid}`);
+    safeMkdir(dir, { recursive: true });
+    const policyPath = path.join(dir, 'egress-policy.json');
+    safeWriteFile(
+      policyPath,
+      JSON.stringify({
+        version: '1',
+        mode: 'enforce',
+        manual_allowed_domains: ['public.example'],
+        blocked_domains: ['evil.example'],
+        tenant_allowed_domains: {
+          'tenant-a': ['review.tenant-a.example'],
+          'tenant-b': ['review.tenant-b.example'],
+        },
+      })
+    );
+    process.env.KYBERION_EGRESS_POLICY_PATH = policyPath;
+    _resetEgressPolicyCacheForTests();
     setOpPreflightRolloutForTests({ stages: { egress: { default: 'enforce' } } });
   });
 
-  it('denies a public-audience egress after a confidential observation', () => {
-    observe('confidential');
-    const result = inScope(() =>
-      provenanceEgressResult(
-        call('export:publish'),
-        egressInput({ target_audience: 'public', target_tenant: 'tenant-a' })
-      )
-    );
-    expect(result?.decision).toBe('block');
+  afterEach(() => {
+    delete process.env.KYBERION_EGRESS_POLICY_PATH;
+    _resetEgressPolicyCacheForTests();
   });
 
-  it('denies egress to an unobserved tenant', () => {
+  it('denies a public destination after a confidential observation', () => {
     observe('confidential');
-    const result = inScope(() =>
-      provenanceEgressResult(
-        call('export:publish'),
-        egressInput({ target_audience: 'confidential', target_tenant: 'tenant-b' })
-      )
-    );
-    expect(result?.decision).toBe('block');
+    expect(guard(egressInput())?.decision).toBe('block');
   });
 
-  it('denies the external audience outright', () => {
+  it('allows a destination the policy approves for the mission tenant', () => {
+    observe('confidential');
+    expect(guard(egressInput({ _egress_destination: TENANT_HOST }))).toBeUndefined();
+  });
+
+  it('denies a host that is only approved for a different tenant', () => {
+    observe('confidential');
+    expect(guard(egressInput({ _egress_destination: OTHER_TENANT_HOST }))?.decision).toBe('block');
+  });
+
+  it('denies unlisted and blocked destinations (external audience)', () => {
     observe('public');
-    const result = inScope(() =>
-      provenanceEgressResult(
-        call('export:publish'),
-        egressInput({ target_audience: 'external', target_tenant: 'tenant-a' })
-      )
-    );
-    expect(result?.decision).toBe('block');
-  });
-
-  it('passes an untainted mission', () => {
-    expect(
-      inScope(() =>
-        provenanceEgressResult(
-          call('export:publish'),
-          egressInput({ target_audience: 'confidential', target_tenant: 'tenant-a' })
-        )
-      )
-    ).toBeUndefined();
-  });
-
-  it('fails closed when a tainted mission declares no target audience', () => {
-    observe('confidential');
-    const result = inScope(() =>
-      provenanceEgressResult(call('export:publish'), egressInput({ body: 'quarterly numbers' }))
-    );
-    expect(result?.decision).toBe('block');
-  });
-
-  it('binds a declassify grant to the content actually sent, not to a claimed hash', async () => {
-    observe('confidential');
-    const approved = egressInput({
-      target_audience: 'public',
-      target_tenant: 'tenant-a',
-      body: 'the approved report',
-    });
-    const held = sharedControlPlane().requestDeclassify({
-      missionId: 'mission-s5',
-      tenantSlug: 'tenant-a',
-      artifactRef: 'report:v1',
-      payloadHash: egressPayloadHash(approved),
-      targetAudience: 'public',
-      targetTenant: 'tenant-a',
-      requestedBy: 'agent:x',
-    });
-    sharedControlPlane().decideHeldAction(held.id, 'approved', {
-      resolvedBy: 'human:famao',
-      decidedByType: 'human',
-      authenticated: true,
-      payloadHash: held.payloadHash,
-      effectBinding: held.effectBinding,
-    });
-    await sharedControlPlane().applyHeldAction(held.id);
-
-    expect(inScope(() => provenanceEgressResult(call('export:publish'), approved))).toBeUndefined();
-    // Different content that merely *claims* the approved hash is still denied.
-    const forged = egressInput({
-      target_audience: 'public',
-      target_tenant: 'tenant-a',
-      body: 'the confidential appendix',
-      payload_hash: egressPayloadHash(approved),
-    });
-    expect(inScope(() => provenanceEgressResult(call('export:publish'), forged))?.decision).toBe(
+    expect(guard(egressInput({ _egress_destination: UNLISTED_HOST }))?.decision).toBe('block');
+    expect(guard(egressInput({ _egress_destination: 'https://evil.example/x' }))?.decision).toBe(
       'block'
     );
   });
 
+  it('ignores an audience, tenant or hash the caller claims about the payload', () => {
+    observe('confidential');
+    const forged = egressInput({
+      _egress_destination: UNLISTED_HOST,
+      target_audience: 'personal',
+      audience: 'personal',
+      target_tenant: 'tenant-a',
+      tenant_slug: 'tenant-a',
+    });
+    expect(guard(forged)?.decision).toBe('block');
+  });
+
+  it('passes an untainted mission', () => {
+    expect(guard(egressInput({ _egress_destination: UNLISTED_HOST }))).toBeUndefined();
+  });
+
+  it('fails closed when a tainted mission has no declared destination', () => {
+    observe('confidential');
+    const { _egress_destination: _omitted, ...undeclared } = egressInput();
+    expect(guard({ ...undeclared, body: 'quarterly numbers' })?.decision).toBe('block');
+  });
+
   it('lets a declassified artifact through — and only that content', async () => {
     observe('confidential');
-    const bound = egressInput({
-      target_audience: 'public',
-      target_tenant: 'tenant-a',
-      body: 'report v1',
-    });
+    const bound = egressInput({ body: 'report v1' });
     const held = sharedControlPlane().requestDeclassify({
       missionId: 'mission-s5',
       tenantSlug: 'tenant-a',
@@ -283,58 +267,32 @@ describe('provenanceEgressResult (SC-06)', () => {
       effectBinding: held.effectBinding,
     });
     await sharedControlPlane().applyHeldAction(held.id);
-    expect(
-      sharedControlPlane().isDeclassified(
-        'mission-s5',
-        egressPayloadHash(bound),
-        'public',
-        'tenant-a'
-      )
-    ).toBe(true);
 
-    // The bound artifact passes…
-    expect(inScope(() => provenanceEgressResult(call('export:publish'), bound))).toBeUndefined();
-    // …but changed content is denied again.
+    expect(guard(bound)).toBeUndefined();
+    // Changed content is denied again, even when it claims the approved hash.
     expect(
-      inScope(() => provenanceEgressResult(call('export:publish'), { ...bound, body: 'report v2' }))
+      guard({ ...bound, body: 'confidential appendix', payload_hash: egressPayloadHash(bound) })
         ?.decision
     ).toBe('block');
   });
 
   it('never trusts an input-carried _egress_taint', () => {
     observe('confidential');
-    const result = inScope(() =>
-      provenanceEgressResult(
-        call('export:publish'),
-        egressInput({
-          target_audience: 'public',
-          target_tenant: 'tenant-a',
-          // A client-injected clean projection must not launder the mission's
-          // real confidential taint.
-          _egress_taint: {
-            missionId: 'mission-s5',
-            highestTier: 'public',
-            tenants: ['tenant-a'],
-            prohibitExternal: false,
-            observationIds: [],
-          },
-        })
-      )
-    );
-    expect(result?.decision).toBe('block');
+    const fakeTaint = {
+      missionId: 'mission-s5',
+      highestTier: 'public',
+      tenants: [],
+      prohibitExternal: false,
+      observationIds: [],
+    };
+    expect(guard(egressInput({ _egress_taint: fakeTaint }))?.decision).toBe('block');
   });
 
   it('warns without blocking in warn rollout mode', () => {
     setOpPreflightRolloutForTests({ stages: { egress: { default: 'warn' } } });
-    observe('personal');
-    expect(
-      inScope(() =>
-        provenanceEgressResult(
-          call('export:publish'),
-          egressInput({ target_audience: 'public', target_tenant: 'tenant-a' })
-        )
-      )
-    ).toBeUndefined();
+    observe('confidential');
+    expect(guard(egressInput())).toBeUndefined();
+    expect(opPreflightStageCounts()['egress:denied']).toBe(1);
   });
 });
 
@@ -359,5 +317,38 @@ describe('recordOpObservation', () => {
     inScope(() => recordOpObservation('service:api', { _effect: 'read', _resource_ref: 'x' }));
     inScope(() => recordOpObservation('file:pipeline', { _effect: 'write' }));
     expect(sharedControlPlane().listObservationAggregates('mission-s5')).toHaveLength(0);
+  });
+});
+
+describe('observation tier follows the resource, never below the mission', () => {
+  const publicScope = <T>(fn: () => T): T =>
+    withScopeEnvelope(
+      mintScopeEnvelope({
+        identity: { tenant_slug: 'tenant-a', mission_id: 'mission-s5', tier: 'public' },
+        policy: { purpose: 'stage test' },
+      }),
+      fn
+    );
+
+  it('records a confidential resource read in a public-tier mission as confidential', () => {
+    publicScope(() =>
+      recordOpObservation('file:pipeline', {
+        _effect: 'read',
+        _resource_ref: 'knowledge/confidential/tenant-a/secret.md',
+      })
+    );
+    const [aggregate] = sharedControlPlane().listObservationAggregates('mission-s5');
+    expect(aggregate?.tier).toBe('confidential');
+  });
+
+  it('never lowers the mission tier for a public-looking resource', () => {
+    inScope(() =>
+      recordOpObservation('file:pipeline', {
+        _effect: 'read',
+        _resource_ref: 'knowledge/public/notes.md',
+      })
+    );
+    const [aggregate] = sharedControlPlane().listObservationAggregates('mission-s5');
+    expect(aggregate?.tier).toBe('confidential');
   });
 });
