@@ -197,6 +197,11 @@ function noteJournalState(journalPath: string, lastSeq: number): void {
   }
 }
 
+/** Append one event, starting with a newline so a crash-truncated last line cannot swallow it. */
+function appendJournalLine(journalPath: string, event: ControlPlaneJournalEvent): void {
+  appendJsonLine(journalPath, event, { leadingNewline: true });
+}
+
 /** Read journal events with seq > afterSeq; also returns the max seq seen. */
 export function readJournalTail(
   dir: string,
@@ -253,7 +258,7 @@ export function appendJournalEventLocked(
       op: APPEND_COLLECTIONS.has(event.kind) ? 'append' : 'upsert',
       records: event.records,
     };
-    appendJsonLine(controlPlaneJournalPath(namespace.dir), line);
+    appendJournalLine(controlPlaneJournalPath(namespace.dir), line);
     noteJournalState(controlPlaneJournalPath(namespace.dir), seq);
     return seq;
   });
@@ -286,7 +291,7 @@ export function appendJournalEventLockedIf(
       op: APPEND_COLLECTIONS.has(event.kind) ? 'append' : 'upsert',
       records: event.records,
     };
-    appendJsonLine(controlPlaneJournalPath(namespace.dir), line);
+    appendJournalLine(controlPlaneJournalPath(namespace.dir), line);
     noteJournalState(controlPlaneJournalPath(namespace.dir), seq);
     return { appended: true, seq };
   });
