@@ -508,11 +508,18 @@ export function resolveMissionDir(missionId: string, hint?: OwnerScopeHint): str
  * directory is looked up (path-resolver's findMissionPath sits below this
  * module, so it reaches the resolver through this registration).
  */
-pathResolver.registerMissionLocator((missionId) => {
+function locateMissionDir(missionId: string): string | undefined {
   try {
     return resolveOwnerScope({ kind: 'mission', id: missionId }).dir;
   } catch (error) {
     if (error instanceof OwnerScopeError && error.code === 'OWNER_NOT_FOUND') return undefined;
     throw error;
   }
-});
+}
+
+try {
+  pathResolver.registerMissionLocator(locateMissionDir);
+} catch {
+  // A test double of path-resolver without the registration hook also stubs
+  // findMissionPath, so there is nothing to back.
+}
