@@ -502,3 +502,24 @@ export function tryResolveOwnerScope(owner: OwnerRef, hint?: OwnerScopeHint): Ow
 export function resolveMissionDir(missionId: string, hint?: OwnerScopeHint): string {
   return resolveOwnerScope({ kind: 'mission', id: missionId }, hint).dir;
 }
+
+/**
+ * Existing missions are found from their own record everywhere a mission
+ * directory is looked up (path-resolver's findMissionPath sits below this
+ * module, so it reaches the resolver through this registration).
+ */
+function locateMissionDir(missionId: string): string | undefined {
+  try {
+    return resolveOwnerScope({ kind: 'mission', id: missionId }).dir;
+  } catch (error) {
+    if (error instanceof OwnerScopeError && error.code === 'OWNER_NOT_FOUND') return undefined;
+    throw error;
+  }
+}
+
+try {
+  pathResolver.registerMissionLocator(locateMissionDir);
+} catch {
+  // A test double of path-resolver without the registration hook also stubs
+  // findMissionPath, so there is nothing to back.
+}
