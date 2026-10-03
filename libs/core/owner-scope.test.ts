@@ -315,6 +315,21 @@ describe('resolveOwnerScope', () => {
     );
   });
 
+  it('lets a listing skip a mission this process cannot resolve instead of aborting', async () => {
+    const { listMissionSummaries } = await import('./mission/mission-read-model.js');
+    const { listActiveMissions } = await import('./mission/mission-state.js');
+    // MSN-OWN-BROKEN: a canonical flat directory whose state is unreadable, so
+    // a tenant-bound identity gets OWNER_NOT_VISIBLE from a per-id lookup.
+    process.env.KYBERION_TENANT = 'globex';
+    try {
+      expect(() => listMissionSummaries()).not.toThrow();
+      expect(listMissionSummaries().map((mission) => mission.id)).not.toContain('MSN-OWN-BROKEN');
+      expect(() => listActiveMissions()).not.toThrow();
+    } finally {
+      delete process.env.KYBERION_TENANT;
+    }
+  });
+
   it('answers a lookup nested inside the locator with the plain scan, not recursion', async () => {
     const resolver = await import('./path-resolver.js');
     const key = Symbol.for('kyberion.pathResolver.missionLocator');
