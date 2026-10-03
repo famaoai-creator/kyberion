@@ -16,11 +16,19 @@ import {
   delegateCoordinatedCliSubagentTask,
   delegateCoordinatedAgentTask,
 } from './coordinated-agent-execution-port.js';
+import {
+  currentScopeEnvelope,
+  mintScopeEnvelope,
+  resetScopeEnvelopeState,
+  withScopeEnvelope,
+  type ScopeEnvelope,
+} from './scope-envelope.js';
 
 describe('CoordinatedAgentExecutionPort', () => {
   beforeEach(() => {
     setWorkCoordinationNamespace(`coordinated-agent-execution-port-test-${process.pid}`);
     clearWorkCoordinationStore();
+    resetScopeEnvelopeState();
   });
 
   afterEach(() => {
@@ -83,6 +91,105 @@ describe('CoordinatedAgentExecutionPort', () => {
     expect(stored?.status).toBe('done');
     expect(listActiveWorkLeases()).toHaveLength(0);
     expect(delegatePort.delegate).toHaveBeenCalledTimes(1);
+  });
+
+  it('narrows the active scope envelope and exposes it inside the delegation', async () => {
+    clearWorkCoordinationStore();
+    const item = createWorkItem({
+      itemId: 'WI-COORDINATED-ENV-001',
+      title: 'envelope narrowing task',
+      description: 'child runs under a narrowed scope envelope',
+      projectId: 'MSN-COORDINATED-ENV',
+      status: 'ready',
+    });
+    let envelopeInDelegate: ScopeEnvelope | undefined;
+    const delegatePort: AgentExecutionPort = {
+      delegate: vi.fn(async () => {
+        envelopeInDelegate = currentScopeEnvelope();
+        return {
+          execution_kind: 'agent_delegation' as const,
+          task_id: 'task-env',
+          agent_id: 'agent-1',
+          status: 'succeeded' as const,
+          output: 'done',
+        };
+      }),
+    };
+    const port = new CoordinatedAgentExecutionPort(delegatePort);
+    const parent = mintScopeEnvelope({
+      env: {
+        KYBERION_TIER: 'confidential',
+        KYBERION_TENANT: 'default',
+        MISSION_ID: 'MSN-COORDINATED-ENV',
+      } as NodeJS.ProcessEnv,
+      policy: { purpose: 'parent dispatch' },
+    });
+
+    await withScopeEnvelope(parent, () =>
+      port.delegate({
+        work_item_id: item.item_id,
+        task_id: 'task-env',
+        mission_id: 'MSN-COORDINATED-ENV',
+        agent_id: 'agent-1',
+        security_scope: {
+          tenant_slug: 'default',
+          mission_id: 'MSN-COORDINATED-ENV',
+          read_tiers: ['public'],
+          write_tier: 'public',
+          purpose: 'narrowed delegation',
+        },
+        instruction: 'execute the task',
+        idempotency_key: 'coord-env-1',
+      })
+    );
+
+    expect(envelopeInDelegate?.mint_ref).not.toBe(parent.mint_ref);
+    expect(envelopeInDelegate?.policy.read_tiers).toEqual(['public']);
+    expect(envelopeInDelegate?.identity.mission_id).toBe('MSN-COORDINATED-ENV');
+    expect(currentScopeEnvelope()).toBeUndefined();
+  });
+
+  it('rejects a delegation whose scope widens the active envelope before claiming', async () => {
+    clearWorkCoordinationStore();
+    const item = createWorkItem({
+      itemId: 'WI-COORDINATED-ENV-002',
+      title: 'widening attempt',
+      description: 'must be denied before any claim',
+      projectId: 'MSN-COORDINATED-ENV',
+      status: 'ready',
+    });
+    const delegatePort: AgentExecutionPort = { delegate: vi.fn() };
+    const port = new CoordinatedAgentExecutionPort(delegatePort);
+    const parent = mintScopeEnvelope({
+      env: {
+        KYBERION_TIER: 'confidential',
+        KYBERION_TENANT: 'default',
+        MISSION_ID: 'MSN-COORDINATED-ENV',
+      } as NodeJS.ProcessEnv,
+      policy: { purpose: 'parent dispatch', read_tiers: ['public'], write_tier: 'public' },
+    });
+
+    await expect(
+      withScopeEnvelope(parent, () =>
+        port.delegate({
+          work_item_id: item.item_id,
+          task_id: 'task-env-2',
+          mission_id: 'MSN-COORDINATED-ENV',
+          agent_id: 'agent-1',
+          security_scope: {
+            tenant_slug: 'default',
+            mission_id: 'MSN-COORDINATED-ENV',
+            read_tiers: ['public', 'confidential'],
+            write_tier: 'confidential',
+            purpose: 'widening delegation',
+          },
+          instruction: 'execute the task',
+          idempotency_key: 'coord-env-2',
+        })
+      )
+    ).rejects.toThrow('[OP_SCOPE_DENIED]');
+    expect(delegatePort.delegate).not.toHaveBeenCalled();
+    expect(getWorkItem(item.item_id)?.attempts ?? []).toHaveLength(0);
   });
 
   it('offers a convenience entry point that keeps WorkItem coordination enabled', async () => {
