@@ -52,11 +52,17 @@ import {
   type DotTrigger,
   type LoadedDotCharter,
 } from './dot-charter.js';
+import { evaluateStateProbe, probeSpecId, type StateProbeDeps } from '../state-probe.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('dot-runtime');
 
 export const DOT_WAKE_LEDGER_PATH = 'active/shared/runtime/dot-wake-ledger.jsonl';
 export const DOT_TOKEN_USAGE_PATH = 'active/shared/runtime/dot-token-usage.jsonl';
-export const DOT_INBOX_PATH = 'active/shared/runtime/dot-inbox.jsonl';
 export const DOT_WATCH_STATE_PATH = 'active/shared/runtime/dot-watch-state.json';
+export const DOT_PROBE_STATE_PATH = 'active/shared/runtime/dot-probe-state.json';
+export { DOT_INBOX_PATH } from './dot-inbox.js';
+import { DOT_INBOX_PATH } from './dot-inbox.js';
 
 /** A failed wake is retried no sooner than this (per trigger key). */
 export const DOT_WAKE_RETRY_AFTER_MS = 5 * 60 * 1000;
@@ -370,17 +376,12 @@ function wakeTriggerKeys(
 }
 
 /**
- * Triggers due right now for THIS dot. A key is consumed only by a delivered
- * or rejected ledger row owned by this dot_id; failed keys become due again
- * after DOT_WAKE_RETRY_AFTER_MS; skipped keys stay due immediately (the skip
- * path is cheap — no model call — and the event must survive a pause/cap
- * window).
+ * Ledger-backed due-ness for one dot's trigger keys. A key is consumed only
+ * by a delivered or rejected ledger row owned by this dot_id; failed keys
+ * become due again after DOT_WAKE_RETRY_AFTER_MS; skipped keys stay due
+ * immediately (the event must survive a pause/cap window).
  */
-export function evaluateDotTriggersDue(
-  charter: DotCharter,
-  deps: DotRuntimeDeps = {}
-): DueDotTrigger[] {
-  const now = deps.now?.() ?? new Date();
+function buildDotDueChecker(charter: DotCharter, now: Date, deps: DotRuntimeDeps) {
   const consumed = new Set<string>();
   const lastFailedAt = new Map<string, number>();
   for (const row of readDotWakeLedger(deps)) {
@@ -394,11 +395,24 @@ export function evaluateDotTriggersDue(
       }
     }
   }
-  const isDue = (key: string): boolean => {
+  return (key: string): boolean => {
     if (consumed.has(key)) return false;
     const failedAt = lastFailedAt.get(key);
     return failedAt === undefined || now.getTime() - failedAt >= DOT_WAKE_RETRY_AFTER_MS;
   };
+}
+
+/**
+ * Triggers due right now for THIS dot — the synchronous kinds
+ * (cron/watch/wake). Async probe triggers are evaluated separately by
+ * {@link evaluateDotProbeTriggers}.
+ */
+export function evaluateDotTriggersDue(
+  charter: DotCharter,
+  deps: DotRuntimeDeps = {}
+): DueDotTrigger[] {
+  const now = deps.now?.() ?? new Date();
+  const isDue = buildDotDueChecker(charter, now, deps);
   const due: DueDotTrigger[] = [];
   for (const trigger of charter.attention.triggers) {
     if (trigger.kind === 'cron') {
@@ -420,6 +434,150 @@ export function evaluateDotTriggersDue(
       }
     }
   }
+  return due;
+}
+
+// ---------------------------------------------------------------------------
+// probe triggers — declarative external-state watches (async evaluation)
+// ---------------------------------------------------------------------------
+
+export interface DotProbeDeps extends DotRuntimeDeps {
+  /** Injectable service-preset port for `service_preset` probes. */
+  serviceCall?: StateProbeDeps['serviceCall'];
+}
+
+type ProbeState = Record<
+  string,
+  Record<
+    string,
+    {
+      /** Write-once first observation — the fallback comparison baseline. */
+      baseline_fingerprint?: string;
+      /** Last evaluated fingerprint (bookkeeping only — never the 'changed' source). */
+      fingerprint: string;
+      evaluated_at: string;
+    }
+  >
+>;
+
+function readProbeState(deps: DotRuntimeDeps): ProbeState {
+  const filePath = runtimePath(deps.rootDir, DOT_PROBE_STATE_PATH);
+  if (!safeExistsSync(filePath)) return {};
+  try {
+    return parseSafeJsonObjectInput(
+      safeReadFile(filePath, { encoding: 'utf8' }) as string,
+      filePath
+    ) as ProbeState;
+  } catch {
+    return {};
+  }
+}
+
+function writeProbeState(state: ProbeState, deps: DotRuntimeDeps): void {
+  const statePath = runtimePath(deps.rootDir, DOT_PROBE_STATE_PATH);
+  safeMkdir(path.dirname(statePath), { recursive: true });
+  writeJson(statePath, state);
+}
+
+/**
+ * Fingerprint of the last DELIVERED/REJECTED wake for one probe spec — the
+ * at-least-once comparison point for 'changed'. Trigger keys embed the
+ * fingerprint (`probe:<specId>:<fp>`), so the ledger itself records which
+ * observation the dot was last woken for; a crash between evaluation and
+ * delivery can never hide a change, it just re-fires the same key.
+ */
+function lastDeliveredProbeFingerprint(
+  charter: DotCharter,
+  specId: string,
+  deps: DotRuntimeDeps
+): string | undefined {
+  const prefix = `probe:${specId}:`;
+  const rows = readDotWakeLedger(deps);
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    const row = rows[index];
+    if (row.dot_id !== charter.dot_id) continue;
+    if (row.outcome !== 'delivered' && row.outcome !== 'rejected') continue;
+    if (row.trigger_key.startsWith(prefix)) return row.trigger_key.slice(prefix.length);
+  }
+  return undefined;
+}
+
+/** Per-probe evaluation ceiling — a wedged service must not stall the sweep. */
+const PROBE_EVAL_TIMEOUT_MS = 15_000;
+
+/**
+ * Async counterpart of {@link evaluateDotTriggersDue} for `probe` triggers.
+ *
+ * Per (dot, probe-spec) the state file keeps a write-once `baseline` plus the
+ * last evaluated fingerprint (bookkeeping for `every_s`). A `changed`
+ * expectation compares the current fingerprint against the last DELIVERED
+ * fingerprint falling back to that baseline — never against the last
+ * evaluation — so the gap between "observed" and "delivered" can only
+ * re-fire, never lose a wake. Probe evaluation failure advances
+ * `evaluated_at` but keeps the previous fingerprint, retrying next sweep
+ * without burning a wake key.
+ */
+export async function evaluateDotProbeTriggers(
+  charter: DotCharter,
+  deps: DotProbeDeps = {}
+): Promise<DueDotTrigger[]> {
+  const now = deps.now?.() ?? new Date();
+  const probes = charter.attention.triggers.filter(
+    (t): t is Extract<DotTrigger, { kind: 'probe' }> => t.kind === 'probe'
+  );
+  if (probes.length === 0) return [];
+  const isDue = buildDotDueChecker(charter, now, deps);
+  const all = readProbeState(deps);
+  const dotState = { ...(all[charter.dot_id] ?? {}) };
+  const due: DueDotTrigger[] = [];
+  let stateDirty = false;
+  for (const trigger of probes) {
+    const specId = probeSpecId(trigger.probe);
+    const prior = dotState[specId];
+    if (
+      prior &&
+      typeof trigger.every_s === 'number' &&
+      now.getTime() - Date.parse(prior.evaluated_at) < trigger.every_s * 1000
+    ) {
+      continue;
+    }
+    const previousFingerprint =
+      lastDeliveredProbeFingerprint(charter, specId, deps) ?? prior?.baseline_fingerprint;
+    let result;
+    try {
+      result = await Promise.race([
+        evaluateStateProbe(trigger.probe, {
+          rootDir: deps.rootDir,
+          serviceCall: deps.serviceCall,
+          previousFingerprint,
+        }),
+        new Promise<undefined>((resolve) => setTimeout(resolve, PROBE_EVAL_TIMEOUT_MS)),
+      ]);
+    } catch (error) {
+      logger.warn(
+        `[dot-probe] evaluation failed for ${charter.dot_id} (${specId}): ${error instanceof Error ? error.message : error}`
+      );
+      result = undefined;
+    }
+    dotState[specId] = {
+      // Write-once: a failed evaluation must not seed the baseline, or the
+      // first successful observation would fire as a spurious "change".
+      baseline_fingerprint: prior?.baseline_fingerprint ?? result?.fingerprint,
+      fingerprint: result?.fingerprint ?? prior?.fingerprint ?? '',
+      evaluated_at: now.toISOString(),
+    };
+    stateDirty = true;
+    if (!result?.matched) continue;
+    const key = `probe:${specId}:${result.fingerprint}`;
+    if (isDue(key)) {
+      due.push({
+        trigger,
+        key,
+        detail: `probe ${trigger.probe.type} matched${result.detail ? ` (${result.detail})` : ''}`,
+      });
+    }
+  }
+  if (stateDirty) writeProbeState({ ...all, [charter.dot_id]: dotState }, deps);
   return due;
 }
 

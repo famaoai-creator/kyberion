@@ -1,4 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({ appendDotInboxEntry: vi.fn() }));
+// The wake lane is a durable runtime file — runChannelTurn's emit is asserted
+// through the mock instead of leaking rows into the real inbox during tests.
+vi.mock('../dot/dot-inbox.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../dot/dot-inbox.js')>()),
+  appendDotInboxEntry: mocks.appendDotInboxEntry,
+}));
+
 import {
   formatChannelTurnText,
   formatChannelThreadContext,
@@ -281,6 +290,49 @@ describe('runChannelTurn', () => {
       'send:reply',
       'typing:stop',
     ]);
+  });
+
+  it('emits a dot-inbox wake row before the conversation on wake channels', async () => {
+    mocks.appendDotInboxEntry.mockClear();
+    const adapter: ChannelAdapter = {
+      channel: 'slack',
+      actorId: 'operator-9',
+      send: () => undefined,
+    };
+    await runChannelTurn(adapter, { text: 'ping', channel: 'C123', threadTs: 'ts-1' }, () => ({
+      text: 'ok',
+      a2uiMessages: [],
+      a2aMessages: [],
+      delegationResults: [],
+      approvalRequests: [],
+    }));
+    expect(mocks.appendDotInboxEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: 'slack',
+        source: 'channel-turn',
+        text: 'ping',
+        payload: { channel: 'C123', thread_ts: 'ts-1', actor_id: 'operator-9' },
+      })
+    );
+  });
+
+  it('turn succeeds even when the inbox append throws', async () => {
+    mocks.appendDotInboxEntry.mockClear();
+    mocks.appendDotInboxEntry.mockImplementationOnce(() => {
+      throw new Error('lane full');
+    });
+    const result = await runChannelTurn(
+      { channel: 'slack', actorId: 'op', send: () => undefined },
+      { text: 'ping', channel: 'c', threadTs: 't' },
+      () => ({
+        text: 'ok',
+        a2uiMessages: [],
+        a2aMessages: [],
+        delegationResults: [],
+        approvalRequests: [],
+      })
+    );
+    expect(result.text).toBe('ok');
   });
 
   it('stops typing even when conversation fails', async () => {

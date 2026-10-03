@@ -303,6 +303,9 @@ function describeStep(step: any): string {
     case 'await_decision':
     case 'core:await_decision':
       return `Await human decision: ${step.params?.approval?.summary || step.params?.summary || '?'}`;
+    case 'await_state':
+    case 'core:await_state':
+      return `Await external state (${(step.params?.probe as { type?: string } | undefined)?.type || '?'} probe)`;
     case 'goto':
       return `Navigate to ${step.params?.url || '?'}`;
     case 'click':

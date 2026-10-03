@@ -10,16 +10,16 @@ and loaded via `@agent/core/dot/dot-charter`.
 
 ## What a charter declares
 
-| Section        | Meaning                                                                                            |
-| -------------- | -------------------------------------------------------------------------------------------------- |
-| `purpose`      | The standing responsibility (what this dot owns, continuously)                                     |
-| `scope`        | Data tier + optional tenant/org/project — the context chain it operates inside                     |
-| `goal`         | Durable goal text + optional per-wake budgets (turns, wall-clock, tokens)                          |
-| `attention`    | Triggers: `cron` (scheduled wake), `watch` (file/event), `wake` (inbound channel/surface signals)  |
-| `authority`    | An **existing** authority role from `security-policy.json` — a charter never grants authority      |
-| `decisions`    | Floor for `autonomous-ops-gate` outcomes (`auto`/`notify`/`approve`) + veto window + escalate chan |
-| `notification` | `deliver_to` (slack/telegram/discord/imessage) + optional digest cron + quiet hours                |
-| `runtime`      | `heartbeat_id` watched by `daemon-watchdog`, optional reasoning backend                            |
+| Section        | Meaning                                                                                                                                                                                                                                                                                                   |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `purpose`      | The standing responsibility (what this dot owns, continuously)                                                                                                                                                                                                                                            |
+| `scope`        | Data tier + optional tenant/org/project — the context chain it operates inside                                                                                                                                                                                                                            |
+| `goal`         | Durable goal text + optional per-wake budgets (turns, wall-clock, tokens)                                                                                                                                                                                                                                 |
+| `attention`    | Triggers: `cron` (scheduled wake), `watch` (file/event), `wake` (inbound channel/surface signals), `probe` (declarative external-state watch: `file` or `service_preset`, evaluated each sweep against `dot-probe-state.json` fingerprints — `changed` expectations fire only after the baseline differs) |
+| `authority`    | An **existing** authority role from `security-policy.json` — a charter never grants authority                                                                                                                                                                                                             |
+| `decisions`    | Floor for `autonomous-ops-gate` outcomes (`auto`/`notify`/`approve`) + veto window + escalate chan                                                                                                                                                                                                        |
+| `notification` | `deliver_to` (slack/telegram/discord/imessage) + optional digest cron + quiet hours                                                                                                                                                                                                                       |
+| `runtime`      | `heartbeat_id` watched by `daemon-watchdog`, optional reasoning backend                                                                                                                                                                                                                                   |
 
 ## Execution model (target)
 
@@ -58,12 +58,32 @@ role still exists before any work runs.
 
 Each wake attempt lands in `active/shared/runtime/dot-wake-ledger.jsonl`
 keyed by a stable trigger key (`cron:<expr>@<minute>`, `watch:<path>@<stat>`,
-`wake:<inbox-row>`, `manual:<iso>`). Outcomes: `delivered` consumes the key;
+`wake:<inbox-row>`, `probe:<spec>:<fingerprint>`, `manual:<iso>`). Outcomes:
+`delivered` consumes the key;
 `rejected` consumes it (policy wedges must not hot-loop); `failed` retries
 after a 5-minute backoff; `skipped` (paused mid-flight or token cap) leaves
 the key due so the event survives the block. `dot status` summarizes wakes
 and today's token spend; `dot wake <id>` runs one manual wake under the
-charter's role.
+charter's role. `pnpm kyberion dot inbox append --channel <ch> [--dot-id <id>]`
+appends a wake-lane row by hand — the same row shape channel bridges emit
+through `runChannelTurn` (`libs/core/dot/dot-inbox.ts`), so an operator can
+fire a wake without a real message.
+
+A `probe` trigger example — wake when a GitHub PR leaves `open`:
+
+```json
+{
+  "kind": "probe",
+  "every_s": 300,
+  "probe": {
+    "type": "service_preset",
+    "service_id": "github",
+    "action": "get_pull",
+    "params": { "owner": "me", "repo": "kyberion", "pull_number": 123 },
+    "expect": { "json_path": "state", "not_equals": "open" }
+  }
+}
+```
 
 ## Adding a dot
 

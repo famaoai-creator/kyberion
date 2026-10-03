@@ -27,7 +27,14 @@ export type DotCharterStatus = 'draft' | 'active' | 'paused' | 'retired';
 export type DotTrigger =
   | { kind: 'cron'; cron: string; timezone?: string }
   | { kind: 'watch'; paths: string[] }
-  | { kind: 'wake'; channels: string[] };
+  | { kind: 'wake'; channels: string[] }
+  | {
+      kind: 'probe';
+      /** Declarative external-state spec; evaluated by libs/core/state-probe. */
+      probe: import('../state-probe.js').StateProbeSpec;
+      /** Minimum seconds between evaluations (default: one per sweep). */
+      every_s?: number;
+    };
 
 export interface DotCharter {
   kind: 'dot-charter';

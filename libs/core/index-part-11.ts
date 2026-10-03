@@ -150,3 +150,4 @@ export * from './dot/dot-charter.js';
 export * from './dot/dot-runtime.js';
 export * from './dot/dot-wake-orchestration.js';
 export * from './dot/dot-lifecycle.js';
+export * from './dot/dot-inbox.js';
