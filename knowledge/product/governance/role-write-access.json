@@ -153,6 +153,14 @@
     },
     "dot_lifecycle_writer": {
       "allow": ["dots/", "active/shared/runtime/", "active/shared/tmp/"]
+    },
+    "organization_operator": {
+      "allow": [
+        "active/organizations/confidential/${KYBERION_TENANT}/",
+        "active/organizations/public/${KYBERION_TENANT}/",
+        "active/shared/runtime/",
+        "active/shared/observability/"
+      ]
     }
   }
 }

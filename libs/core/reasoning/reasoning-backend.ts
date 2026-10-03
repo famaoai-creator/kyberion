@@ -309,6 +309,10 @@ export class FailoverReasoningBackend implements ReasoningBackend {
       on_unsupported_parameter: failoverPolicy?.on_unsupported_parameter ?? 'reject',
     };
     this.name = this.candidates[0]?.backend.name || 'failover';
+    if (this.candidates.some((candidate) => Boolean(candidate.backend.generateWithTools))) {
+      this.generateWithTools = (prompt, tools, options) =>
+        this.generateWithToolsAcrossCandidates(prompt, tools, options);
+    }
     if (this.candidates.some((candidate) => candidate.backend.promptWithImages)) {
       this.promptWithImages = (prompt, images, options) =>
         this.promptWithImagesAcrossCandidates(prompt, images, options);
@@ -743,7 +747,18 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     if (completed) yield completed;
   }
 
-  async generateWithTools(
+  /**
+   * Assigned in the constructor, and only when a candidate actually supports
+   * tool use, so `backend.generateWithTools` on the wrapper answers truthfully
+   * instead of promising a capability none of the candidates has.
+   */
+  generateWithTools?: (
+    prompt: string,
+    tools: ToolDefinition[],
+    options?: ReasoningCallOptions
+  ) => Promise<GenerateWithToolsResult>;
+
+  private async generateWithToolsAcrossCandidates(
     prompt: string,
     tools: ToolDefinition[],
     options?: ReasoningCallOptions
@@ -885,6 +900,29 @@ export class RoleAwareReasoningBackend implements ReasoningBackend {
     // Preserve the legacy observable backend name for existing diagnostics and
     // consumers; role dispatch is an internal routing concern.
     this.name = defaultBackend.name;
+
+    const allBackends = [defaultBackend, ...roleBackends.values(), ...profileBackends.values()];
+    if (allBackends.some((b) => Boolean(b.generateWithTools))) {
+      this.generateWithTools = (prompt, tools, options) => {
+        const backend = this.pick(options);
+        return backend.generateWithTools
+          ? backend.generateWithTools(prompt, tools, options)
+          : Promise.reject(
+              new Error(`Role ${options?.role || 'default'} has no tool-capable backend`)
+            );
+      };
+    }
+    if (allBackends.some((b) => Boolean(b.promptWithImages))) {
+      this.promptWithImages = (prompt, images, options) => {
+        const backend = this.pick(options);
+        if (!backend.promptWithImages) {
+          return Promise.reject(
+            new Error(`Role ${options?.role || 'default'} does not support vision`)
+          );
+        }
+        return backend.promptWithImages(prompt, images, options);
+      };
+    }
   }
 
   private pick(options?: ReasoningCallOptions): ReasoningBackend {
@@ -984,24 +1022,17 @@ export class RoleAwareReasoningBackend implements ReasoningBackend {
       if (text) yield text;
     })();
   }
-  generateWithTools(prompt: string, tools: ToolDefinition[], options?: ReasoningCallOptions) {
-    const backend = this.pick(options);
-    return backend.generateWithTools
-      ? backend.generateWithTools(prompt, tools, options)
-      : Promise.reject(new Error(`Role ${options?.role || 'default'} has no tool-capable backend`));
-  }
-  promptWithImages(
+  generateWithTools?: (
+    prompt: string,
+    tools: ToolDefinition[],
+    options?: ReasoningCallOptions
+  ) => Promise<GenerateWithToolsResult>;
+
+  promptWithImages?: (
     prompt: string,
     images: ReasoningImageAttachment[],
     options?: ReasoningCallOptions
-  ) {
-    const backend = this.pick(options);
-    if (!backend.promptWithImages)
-      return Promise.reject(
-        new Error(`Role ${options?.role || 'default'} does not support vision`)
-      );
-    return backend.promptWithImages(prompt, images, options);
-  }
+  ) => Promise<string>;
 }
 
 export function buildFailoverReasoningBackend(
