@@ -269,6 +269,31 @@ describe('artifact-registry', () => {
     });
   });
 
+  it('keeps an earlier owner row through compaction (ownership history)', () => {
+    for (const tenant of ['acme-compact', 'acme-compact', 'globex-compact']) {
+      appendArtifactOwnershipRecord(
+        createArtifactOwnershipRecord({
+          artifact_id: 'ART-TEST-COMPACT-OWNER',
+          project_id: 'PRJ-TEST-OWNER',
+          tenant_slug: tenant,
+          kind: 'report',
+          storage_class: 'artifact_store',
+          path: 'active/shared/exports/owner.md',
+        })
+      );
+    }
+    expect(compactArtifactOwnershipRegistry({ dryRun: false })).toMatchObject({
+      kept_rows: 2,
+      removed_rows: 1,
+    });
+    expect(
+      listArtifactOwnershipHistoryByQuery({ tenantSlug: 'acme-compact' }).map(
+        (record) => record.tenant_slug
+      )
+    ).toEqual(['globex-compact']);
+    expect(listArtifactOwnershipRecordsByQuery({ tenantSlug: 'acme-compact' })).toEqual([]);
+  });
+
   it('fails closed on malformed ownership registry JSONL', () => {
     safeWriteFile(registryPath, '{not-json}\n');
 

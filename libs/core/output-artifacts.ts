@@ -51,6 +51,15 @@ function serializeOutput(value: unknown): {
   }
 }
 
+/** A mission id that is malformed, unknown, foreign or ambiguous does not resolve. */
+function resolvesToMission(missionId: string): boolean {
+  try {
+    return tryResolveOwnerScope({ kind: 'mission', id: missionId }) !== null;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Persist an oversized step result and return a bounded reference suitable
  * for carrying through later steps.
@@ -84,9 +93,7 @@ export function offloadLargeOutput(
   // cannot be resolved (unknown, another tenant's, ambiguous), keep the output
   // inline: shared tmp has no tier/tenant partition, so it is only for steps
   // that run under no mission at all.
-  if (mission !== 'shared' && !tryResolveOwnerScope({ kind: 'mission', id: mission })) {
-    return null;
-  }
+  if (mission !== 'shared' && !resolvesToMission(mission)) return null;
   if (mission !== 'shared') {
     const written = writeScopedArtifact({
       scope: { mission },

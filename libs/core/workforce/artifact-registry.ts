@@ -210,6 +210,28 @@ function latestByArtifactId(records: ArtifactOwnershipRecord[]): ArtifactOwnersh
   return [...latest.values()];
 }
 
+/**
+ * Latest row per (artifact_id, owner). Keeps every distinct owner an artifact
+ * ever had — offboarding counts that history — while the artifact's overall
+ * latest row stays last among its rows, so latestByArtifactId is unchanged.
+ */
+function latestByArtifactOwner(records: ArtifactOwnershipRecord[]): ArtifactOwnershipRecord[] {
+  const latest = new Map<string, ArtifactOwnershipRecord>();
+  for (const record of records) {
+    const key = JSON.stringify([
+      record.artifact_id,
+      record.tenant_slug ?? '',
+      record.organization_id ?? '',
+      record.project_id ?? '',
+      record.mission_id ?? '',
+      record.task_session_id ?? '',
+    ]);
+    latest.delete(key);
+    latest.set(key, record);
+  }
+  return [...latest.values()];
+}
+
 /** Current ownership: one row per artifact_id (its latest). */
 export function listLatestArtifactOwnershipRecords(): ArtifactOwnershipRecord[] {
   return latestByArtifactId(listArtifactOwnershipRecords());
@@ -250,7 +272,9 @@ export interface ArtifactOwnershipCompaction {
 }
 
 /**
- * Rewrite the registry to its latest row per artifact_id. Dry run by default
+ * Rewrite the registry to its latest row per artifact_id and owner: repeated
+ * re-registrations collapse, an earlier owner's row survives so ownership
+ * history (offboarding) is not lost. Dry run by default
  * (reports what would be removed). Runs under the append lock, so no row
  * appended concurrently is lost.
  */
@@ -261,7 +285,7 @@ export function compactArtifactOwnershipRegistry(
   const registryPath = artifactRegistryPath();
   const plan = (): { rows: number; kept: ArtifactOwnershipRecord[] } => {
     const rows = listArtifactOwnershipRecords();
-    return { rows: rows.length, kept: latestByArtifactId(rows) };
+    return { rows: rows.length, kept: latestByArtifactOwner(rows) };
   };
   const summarize = (
     { rows, kept }: { rows: number; kept: ArtifactOwnershipRecord[] },

@@ -110,6 +110,12 @@ describe('resolveOwnerScope', () => {
       tier: 'confidential',
       tenant_slug: 'globex',
     });
+    // A recorded tenant that is not a slug: unknown, never shared.
+    writeMission('active/missions/public/MSN-OWN-BADTENANT', {
+      mission_id: 'MSN-OWN-BADTENANT',
+      tier: 'public',
+      tenant_id: '9f1c2d3e-uuid_like',
+    });
     // Legacy `default` tenant sentinel = untenanted.
     writeMission('active/missions/public/MSN-OWN-DEFAULT', {
       mission_id: 'MSN-OWN-DEFAULT',
@@ -237,6 +243,7 @@ describe('resolveOwnerScope', () => {
     );
     process.env.KYBERION_TENANT = 'globex';
     expect(scope.tryResolveOwnerScope({ kind: 'mission', id: 'MSN-OWN-BROKEN' })).toBeNull();
+    expect(scope.tryResolveOwnerScope({ kind: 'mission', id: 'MSN-OWN-BADTENANT' })).toBeNull();
     delete process.env.KYBERION_TENANT;
     // State tenant disagreeing with its tenant directory resolves nowhere.
     expect(scope.tryResolveOwnerScope({ kind: 'mission', id: 'MSN-OWN-MISPLACED' })).toBeNull();
