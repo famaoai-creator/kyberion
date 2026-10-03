@@ -148,6 +148,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/governance/held-effect-request.ts#createHeldApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/history-search-index.ts#rebuildMissionHistorySearchIndex",
       "roles": ["mission_controller"],
       "unresolved": []

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  clampPolicyToRuntimeTier,
   contextSecurityScopeFromEnvelope,
   currentScopeEnvelope,
   envelopeNarrowRequestErrors,
@@ -149,6 +150,63 @@ describe('narrowScopeEnvelope', () => {
   ])('denies enlargement via %j', (request, field) => {
     const parent = mint();
     expect(() => narrowScopeEnvelope(parent, request as never)).toThrow('[OP_SCOPE_DENIED]');
+  });
+});
+
+describe('narrowScopeEnvelope identity anchoring', () => {
+  const unbound = () =>
+    mintScopeEnvelope({
+      env: env({
+        MISSION_ID: '',
+        KYBERION_TASK_ID: '',
+        KYBERION_TENANT: '',
+        KYBERION_TIER: 'public',
+      }),
+      identity: { session_id: 'session-1' },
+      policy: policy(),
+    });
+
+  it('does not let a child introduce a tenant the parent was never bound to', () => {
+    expect(() => narrowScopeEnvelope(unbound(), { identity: { tenant_slug: 'victim' } })).toThrow(
+      '[OP_SCOPE_DENIED]'
+    );
+  });
+
+  it('does not let a child introduce a mission that no mission record anchors', () => {
+    expect(() =>
+      narrowScopeEnvelope(unbound(), {
+        identity: { mission_id: 'mission-not-on-record', task_id: 'task-1' },
+      })
+    ).toThrow(/not anchored/);
+  });
+});
+
+describe('clampPolicyToRuntimeTier', () => {
+  it('intersects a dispatch request with what the process itself may read', () => {
+    expect(
+      clampPolicyToRuntimeTier(
+        {
+          purpose: 'p',
+          read_tiers: ['public', 'confidential', 'personal'],
+          write_tier: 'personal',
+          external_egress: 'allow',
+        },
+        'confidential'
+      )
+    ).toEqual({
+      purpose: 'p',
+      read_tiers: ['public', 'confidential'],
+      write_tier: 'confidential',
+    });
+  });
+
+  it('returns null when nothing of the request is inside the runtime tier', () => {
+    expect(
+      clampPolicyToRuntimeTier(
+        { purpose: 'p', read_tiers: ['personal'], write_tier: 'personal' },
+        'public'
+      )
+    ).toBeNull();
   });
 });
 

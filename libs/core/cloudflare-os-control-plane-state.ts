@@ -183,6 +183,7 @@ function parsePersistedHeldAction(value: unknown, index: number): PersistedRecor
       'status',
       'submittedAt',
       'params',
+      'persistParams',
       'approvalRequest',
       'decidedAt',
       'resolvedBy',
@@ -214,6 +215,7 @@ function parsePersistedHeldAction(value: unknown, index: number): PersistedRecor
         ? []
         : persistedStringArray(record.dependsOn, `${label}.dependsOn`),
     ...(record.params !== undefined ? { params: record.params } : {}),
+    ...(record.persistParams === true ? { persistParams: true } : {}),
   };
   if (record.approvalRequest !== undefined) {
     const link = persistedRecord(record.approvalRequest, `${label}.approvalRequest`);
@@ -623,9 +625,23 @@ export function parsePersistedControlPlaneState(value: unknown): PersistedContro
 // ---------- SC-03 journal serialization helpers ----------
 
 /**
+ * Marker on the executor stub a restored held action carries. A record whose
+ * `apply` is the stub has no live executor of its own: the plane resolves one
+ * from its executor registry at apply time, or fails closed.
+ */
+const RESTORED_EXECUTOR = Symbol.for('kyberion.control-plane.restored-executor');
+
+export function isRestoredExecutorStub(fn: unknown): boolean {
+  return (
+    typeof fn === 'function' &&
+    (fn as unknown as Record<symbol, unknown>)[RESTORED_EXECUTOR] === true
+  );
+}
+
+/**
  * A restored held action is deliberately fail-closed: executor, simulator
- * and reverter closures must be rehydrated via `registerExecutor` (SC-04)
- * before it can run again. Serializable params are preserved.
+ * and reverter closures are never persisted. The plane re-binds them from its
+ * executor registry (`registerExecutor`) when the effect is applied.
  */
 export function restoredHeldActionRecord(record: {
   id: string;
@@ -637,11 +653,13 @@ export function restoredHeldActionRecord(record: {
   revert?: unknown;
   params?: unknown;
 }): void {
-  record.apply = () => {
+  const stub = () => {
     throw new Error(
       `[CONTROL_PLANE] Executor for persisted op '${record.op}' must be registered after restart`
     );
   };
+  (stub as unknown as Record<symbol, unknown>)[RESTORED_EXECUTOR] = true;
+  record.apply = stub;
   record.simulate = undefined;
   record.revert = undefined;
   record.dependsOn ||= [];
@@ -649,14 +667,16 @@ export function restoredHeldActionRecord(record: {
 }
 
 /**
- * Strip executable state a journal or snapshot must never carry — the same
- * projection the legacy persist writes.
+ * Strip executable state a journal or snapshot must never carry. `params`
+ * may hold credentials or personal payloads, so it is persisted only when the
+ * submitter declared `persistParams` (validated at submit): everything else
+ * stays in the submitting process's memory.
  */
 export function serializableHeldActionRecord(
   record: Record<string, unknown>
 ): Record<string, unknown> {
-  const { apply, simulate, revert, steeringApproval, ...rest } = record;
-  return rest;
+  const { apply, simulate, revert, steeringApproval, params, ...rest } = record;
+  return record.persistParams === true && params !== undefined ? { ...rest, params } : rest;
 }
 
 /**
@@ -705,7 +725,19 @@ export function applyControlPlaneJournalEvent(
     switch (event.kind) {
       case 'held': {
         const record = raw as unknown as HeldActionRecord;
+        const previous = collections.held.get(record.id);
         restoredHeldActionRecord(record);
+        // A catch-up event (e.g. another process's decision) replaces the
+        // record object. Carry over what only this process holds: the live
+        // executor closures and any params that were never persisted.
+        if (previous && !isRestoredExecutorStub(previous.apply)) {
+          record.apply = previous.apply;
+          record.simulate = previous.simulate;
+          record.revert = previous.revert;
+        }
+        if (previous && record.params === undefined && previous.params !== undefined) {
+          record.params = previous.params;
+        }
         collections.held.set(record.id, record);
         break;
       }

@@ -7,7 +7,7 @@ import {
   type ScopeContext,
   type ScopeContextInput,
 } from './scope-context-validation.js';
-import { resolveScopeContext } from './scope-context.js';
+import { resolveScopeContext, resolveScopeResolution } from './scope-context.js';
 import { tryResolveOwnerScope, SHARED_TENANT, type OwnerRef } from './owner-scope.js';
 import type { ContextSecurityScope } from './context-security-scope.js';
 
@@ -162,6 +162,70 @@ export function identityNarrowErrors(parent: ScopeContext, child: ScopeContext):
     errors.push(`identity.tier '${child.tier}' is above minted '${parent.tier}'`);
   }
   return errors;
+}
+
+const ANCHORED_FIELDS = ['tenant_slug', 'organization_id', 'project_id', 'mission_id'] as const;
+
+/**
+ * The top of the chain is never caller-declared. A child may deepen an
+ * envelope (add task/session), but a tenant/org/project/mission the parent
+ * lacks must be anchored by a mission record: otherwise a mission-less or
+ * tenant-unbound parent could be narrowed into any tenant's identity.
+ */
+export function identityAnchorErrors(parent: ScopeContext, child: ScopeContext): string[] {
+  const added = ANCHORED_FIELDS.filter(
+    (field) => !identityValue(parent, field) && identityValue(child, field)
+  );
+  if (added.length === 0) return [];
+  if (!child.mission_id) {
+    return [`identity.${added[0]} cannot be added without a mission record anchor`];
+  }
+  const owner = tryResolveOwnerScope({ kind: 'mission', id: child.mission_id } as OwnerRef);
+  if (!owner) {
+    return [`identity.mission_id '${child.mission_id}' is not anchored to a mission record`];
+  }
+  const derived: Partial<Record<(typeof ANCHORED_FIELDS)[number], string | undefined>> = {
+    tenant_slug: owner.tenant === SHARED_TENANT ? undefined : owner.tenant,
+    organization_id: owner.organization_id,
+    project_id: owner.project_id,
+    mission_id: child.mission_id,
+  };
+  const errors: string[] = [];
+  for (const field of added) {
+    if (identityValue(child, field) !== derived[field]) {
+      errors.push(
+        `identity.${field} '${identityValue(child, field)}' contradicts the mission record`
+      );
+    }
+  }
+  return errors;
+}
+
+/**
+ * Clamp a dispatch request's policy to what the process itself is authorized
+ * for: tiers above the runtime tier are dropped and external egress is never
+ * granted from a request. Returns null when nothing of the request survives.
+ */
+export function clampPolicyToRuntimeTier(
+  policy: ScopePolicyInput,
+  runtimeTier: TierLevel
+): ScopePolicyInput | null {
+  const ceiling = TIER_RANK[runtimeTier];
+  const requested = policy.read_tiers ?? TIERS_BY_RANK.filter((tier) => TIER_RANK[tier] <= ceiling);
+  const readTiers = requested.filter((tier) => TIER_RANK[tier] <= ceiling);
+  if (readTiers.length === 0) return null;
+  const requestedWrite = policy.write_tier ?? readTiers[readTiers.length - 1];
+  const writeTier = readTiers.includes(requestedWrite)
+    ? requestedWrite
+    : readTiers[readTiers.length - 1];
+  return {
+    purpose: policy.purpose,
+    read_tiers: readTiers,
+    write_tier: writeTier,
+    ...(policy.allowed_reasoning_backends
+      ? { allowed_reasoning_backends: [...policy.allowed_reasoning_backends] }
+      : {}),
+  };
 }
 
 /**
@@ -324,6 +388,29 @@ export function mintScopeEnvelope(input: ScopeMintInput): ScopeEnvelope {
   return freezeEnvelope(identity, policy);
 }
 
+/**
+ * The process-bound identity for ops that run without a minted envelope:
+ * the registered scope env only (no persisted file, git or cwd inference, so
+ * it is cheap enough for per-op stages), with tenant/org/project derived from
+ * the mission record by the owner-scope resolver. Caller input never feeds it.
+ */
+export function runtimeScopeIdentity(env: NodeJS.ProcessEnv = process.env): ScopeContext {
+  const { scope } = resolveScopeResolution({}, env, {
+    includePersisted: false,
+    inferFromMission: false,
+    inferFromCwd: false,
+  });
+  if (!scope.mission_id) return scope;
+  const owner = tryResolveOwnerScope({ kind: 'mission', id: scope.mission_id } as OwnerRef);
+  if (!owner) return scope;
+  return normalizeScopeContext({
+    ...scope,
+    tenant_slug: owner.tenant === SHARED_TENANT ? undefined : owner.tenant,
+    organization_id: owner.organization_id,
+    project_id: owner.project_id,
+  });
+}
+
 /** The envelope active in the current async context, set by withScopeEnvelope. */
 export function currentScopeEnvelope(): ScopeEnvelope | undefined {
   return envelopeStorage.getStore();
@@ -366,6 +453,7 @@ export function narrowScopeEnvelope(
   });
   const errors = [
     ...identityNarrowErrors(parent.identity, requestedIdentity),
+    ...identityAnchorErrors(parent.identity, requestedIdentity),
     ...policyNarrowErrors(parent.policy, request.policy ?? {}),
   ];
   if (errors.length > 0) {
@@ -417,6 +505,7 @@ export function envelopeNarrowRequestErrors(
     return errors;
   }
   errors.push(...identityNarrowErrors(reference.identity, input.identity));
+  errors.push(...identityAnchorErrors(reference.identity, input.identity));
   errors.push(...policyNarrowErrors(reference.policy, input.policy));
   return errors;
 }
@@ -440,7 +529,10 @@ export function securityScopeNarrowErrors(
     tier: active.identity.tier,
   };
   const identity = normalizeScopeContext({ ...requestIdentity, tier: active.identity.tier });
-  const errors = identityNarrowErrors(active.identity, identity);
+  const errors = [
+    ...identityNarrowErrors(active.identity, identity),
+    ...identityAnchorErrors(active.identity, identity),
+  ];
   const requestedReadTiers = scope.read_tiers;
   if (
     Array.isArray(requestedReadTiers) &&

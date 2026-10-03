@@ -9,13 +9,13 @@
  * - `recordOpObservation` (post-op): read ops aggregate into the
  *   control-plane observation journal.
  *
- * Identity comes from the active scope envelope first, then the op's
- * trusted scope input — never from client-supplied tenant fields.
+ * Identity comes from the active scope envelope first, then the process
+ * scope — never from the call's own input.
  */
 
 import { pathResolver } from '../path-resolver.js';
 import { readJsonIfPresent } from '../foundation/json.js';
-import { currentScopeEnvelope } from '../scope-envelope.js';
+import { currentScopeEnvelope, runtimeScopeIdentity } from '../scope-envelope.js';
 import { sharedControlPlane } from '../cloudflare-os-shared.js';
 import type { OsKnowledgeTier } from '../cloudflare-os-control-plane.js';
 import type { OpPreflightCall, OpPreflightListenerResult } from './op-preflight.js';
@@ -58,7 +58,7 @@ function stageMode(stage: StageName, family: string): StageMode {
   return STAGE_MODES.has(candidate) ? candidate : 'warn';
 }
 
-function noteStage(stage: StageName, outcome: 'warn' | 'denied' | 'skipped'): void {
+function noteStage(stage: StageName, outcome: 'allowed' | 'warn' | 'denied' | 'skipped'): void {
   const key = `${stage}:${outcome}`;
   stageModeCounts.set(key, (stageModeCounts.get(key) ?? 0) + 1);
 }
@@ -81,39 +81,21 @@ interface StageIdentity {
 }
 
 /**
- * Scope identity for stage evaluation: minted envelope first, then the
- * input's trusted security_scope — matching the scope stage's contract.
+ * Scope identity for stage evaluation: the minted envelope, else the process
+ * scope (registered env + mission record). Never the call's own input — a
+ * caller-supplied `mission_id` / `security_scope` / tier would let it file
+ * observations against another mission or under-report a read's tier, and the
+ * stages' whole purpose is to measure what the caller did not declare.
  */
-function stageIdentity(call: OpPreflightCall, input: Record<string, unknown>): StageIdentity {
+function stageIdentity(call: OpPreflightCall): StageIdentity {
   const envelope = currentScopeEnvelope();
-  const scope = (input.security_scope ?? call.context?.security_scope) as
-    Record<string, unknown> | undefined;
-  const readTiers = Array.isArray(scope?.read_tiers) ? (scope.read_tiers as string[]) : [];
-  const tier = (envelope?.identity.tier ??
-    (readTiers.includes('personal')
-      ? 'personal'
-      : readTiers.includes('confidential')
-        ? 'confidential'
-        : 'public')) as OsKnowledgeTier;
+  const identity = envelope?.identity ?? runtimeScopeIdentity();
   return {
-    missionId:
-      envelope?.identity.mission_id ??
-      (typeof scope?.mission_id === 'string' ? scope.mission_id : undefined) ??
-      (typeof input.mission_id === 'string' ? input.mission_id : undefined),
-    taskId:
-      envelope?.identity.task_id ??
-      (typeof scope?.task_id === 'string' ? scope.task_id : undefined) ??
-      (typeof input.task_id === 'string' ? input.task_id : undefined),
-    tenantSlug:
-      envelope?.identity.tenant_slug ??
-      (typeof scope?.tenant_slug === 'string'
-        ? scope.tenant_slug
-        : typeof scope?.tenant_id === 'string'
-          ? scope.tenant_id
-          : undefined),
-    tier,
-    purpose:
-      envelope?.policy.purpose ?? (typeof scope?.purpose === 'string' ? scope.purpose : undefined),
+    missionId: identity.mission_id,
+    taskId: identity.task_id,
+    tenantSlug: identity.tenant_slug,
+    tier: (identity.tier ?? 'public') as OsKnowledgeTier,
+    purpose: envelope?.policy.purpose ?? `op:${call.op}`,
   };
 }
 
@@ -132,22 +114,30 @@ export function introductionResult(
   if (mode === 'off') return;
   const resourceRef = typeof input._resource_ref === 'string' ? input._resource_ref : undefined;
   if (!resourceRef) return;
-  const identity = stageIdentity(call, input);
+  const identity = stageIdentity(call);
   if (!identity.missionId) {
     noteStage('introduction', 'skipped');
     return;
   }
   const service =
     (typeof input.service_id === 'string' && input.service_id.trim()) || opFamily(call.op);
-  const introduced = sharedControlPlane().enforceIntroduction({
-    missionId: identity.missionId,
-    taskId: identity.taskId,
-    service,
-    resourceRef,
-    scope: 'write',
-    mode,
-  });
-  noteStage('introduction', introduced ? 'warn' : 'denied');
+  let introduced: boolean;
+  try {
+    introduced = sharedControlPlane().enforceIntroduction({
+      missionId: identity.missionId,
+      taskId: identity.taskId,
+      service,
+      resourceRef,
+      scope: 'write',
+      mode,
+    });
+  } catch (error) {
+    noteStage('introduction', 'denied');
+    throw error;
+  }
+  // allowed = introduced; warn = missing but not blocking (promotion review
+  // reads the warn count); denied = blocked in enforce mode.
+  noteStage('introduction', introduced ? 'allowed' : 'warn');
 }
 
 /**
@@ -161,12 +151,13 @@ export function taintResult(
   if (input._effect !== 'egress') return;
   const mode = stageMode('taint', opFamily(call.op));
   if (mode === 'off') return;
-  const identity = stageIdentity(call, input);
+  const identity = stageIdentity(call);
   if (!identity.missionId) {
     noteStage('taint', 'skipped');
     return;
   }
   const taint = sharedControlPlane().projectTaint(identity.missionId);
+  noteStage('taint', 'allowed');
   return {
     repaired_input: {
       _egress_taint: taint,
@@ -189,7 +180,7 @@ export function recordOpObservation(
   if (mode === 'off') return;
   const resourceRef = typeof input._resource_ref === 'string' ? input._resource_ref : undefined;
   if (!resourceRef) return;
-  const identity = stageIdentity({ op, params: {}, context, source: 'pipeline' }, input);
+  const identity = stageIdentity({ op, params: {}, context, source: 'pipeline' });
   if (!identity.missionId || !identity.tenantSlug) {
     noteStage('observation', 'skipped');
     return;
@@ -210,5 +201,5 @@ export function recordOpObservation(
     noteStage('observation', 'warn');
     return;
   }
-  noteStage('observation', 'warn');
+  noteStage('observation', 'allowed');
 }

@@ -59,7 +59,16 @@ describe('default operation preflight waterfall', () => {
     expect(result.reason).toContain('graph-loop-without-bound');
   });
 
-  it('stamps the declared manifest effect onto the input for downstream stages', async () => {
+  it('never reports preflight-internal stamps as a repair of the caller input', async () => {
+    ensureDefaultOpPreflight();
+    const params = { path: 'a.txt' };
+    const result = await runOpPreflight({ op: 'file:pipeline', params, source: 'actuator' });
+    expect(result.input).toEqual(params);
+    expect(result.repaired_input).toBeUndefined();
+    expect(Object.keys(result.input).some((key) => key.startsWith('_'))).toBe(false);
+  });
+
+  it('stamps the declared manifest effect for downstream stages without leaking it into the op input', async () => {
     ensureDefaultOpPreflight();
     const result = await runOpPreflight({
       op: 'file:pipeline',
@@ -68,7 +77,8 @@ describe('default operation preflight waterfall', () => {
     });
     expect(result.decision).toBe('allow');
     expect(result.listener_ids).toContain('core:effect');
-    expect((result as { input?: { _effect?: string } }).input?._effect).toBe('write');
+    expect((result as { stamps?: { _effect?: string } }).stamps?._effect).toBe('write');
+    expect((result as { input?: { _effect?: string } }).input?._effect).toBeUndefined();
   });
 
   it('refines egress declarations to read for read verbs via effect_from', async () => {
@@ -79,7 +89,8 @@ describe('default operation preflight waterfall', () => {
       source: 'actuator',
     });
     expect(result.decision).toBe('allow');
-    expect((result as { input?: { _effect?: string } }).input?._effect).toBe('read');
+    expect((result as { stamps?: { _effect?: string } }).stamps?._effect).toBe('read');
+    expect((result as { input?: { _effect?: string } }).input?._effect).toBeUndefined();
   });
 
   it('keeps the fail-safe write class for unknown ops', async () => {
@@ -90,6 +101,7 @@ describe('default operation preflight waterfall', () => {
       source: 'actuator',
     });
     expect(result.decision).toBe('allow');
-    expect((result as { input?: { _effect?: string } }).input?._effect).toBe('write');
+    expect((result as { stamps?: { _effect?: string } }).stamps?._effect).toBe('write');
+    expect((result as { input?: { _effect?: string } }).input?._effect).toBeUndefined();
   });
 });

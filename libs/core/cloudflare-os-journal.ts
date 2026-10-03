@@ -13,6 +13,7 @@ import {
 } from './secure-io.js';
 import type { TierLevel } from './types.js';
 import { currentScopeEnvelope, type ScopeEnvelope } from './scope-envelope.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import type { ObservationRecord } from './cloudflare-os-control-plane.js';
 
 /**
@@ -129,13 +130,15 @@ export function controlPlaneNamespaceFor(
   const recordTier = tierOf(record.tier, activeEnvelope?.identity.tier ?? 'confidential');
   // A record claiming a different tenant than the minted envelope cannot be
   // routed safely — quarantine it rather than misfile under either tenant.
-  const tenant =
-    recordTenant && envelopeTenant && recordTenant !== envelopeTenant
-      ? undefined
-      : (envelopeTenant ?? recordTenant);
-  const contradicted = recordTenant && envelopeTenant && recordTenant !== envelopeTenant;
+  const contradicted = Boolean(recordTenant && envelopeTenant && recordTenant !== envelopeTenant);
+  const candidate = contradicted ? undefined : (envelopeTenant ?? recordTenant);
+  // Tier and partition names (`shared`, `system`, `public`, …) are never
+  // tenants, and a slug is a path segment: anything that is not a valid tenant
+  // slug is unresolvable, never filed under a directory of that name.
+  const invalidTenant = Boolean(candidate && !isValidTenantSlug(candidate));
+  const tenant = invalidTenant ? undefined : candidate;
 
-  if (!tenant || contradicted) {
+  if (!tenant || contradicted || invalidTenant) {
     if (TENANT_SCOPED_COLLECTIONS.has(kind)) {
       return {
         key: QUARANTINE_KEY,

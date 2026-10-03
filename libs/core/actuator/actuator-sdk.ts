@@ -153,7 +153,11 @@ export async function runActuatorPipeline<
       }
       context = await options.execute(step.op, preflight.input as Params, context, step);
       // SC-05: post-op observation aggregation for declared-read ops.
-      recordOpObservation(`${options.actuatorId}:${step.op}`, preflight.input, context);
+      recordOpObservation(
+        `${options.actuatorId}:${step.op}`,
+        { ...preflight.input, ...(preflight.stamps ?? {}) },
+        context
+      );
     }
     return context;
   };

@@ -16,9 +16,11 @@ import { resolveTenantAlias } from './context-security-scope.js';
 import { getAgentExecutionPort } from './agent/agent-execution-port.js';
 import { logger } from './core.js';
 import {
+  clampPolicyToRuntimeTier,
   currentScopeEnvelope,
   mintScopeEnvelope,
   narrowScopeEnvelope,
+  runtimeScopeIdentity,
   withScopeEnvelope,
   type ScopeEnvelope,
   type ScopeNarrowRequest,
@@ -65,16 +67,43 @@ function delegationScopeEnvelope(request: CoordinatedAgentTaskEnvelope): ScopeEn
   const active = currentScopeEnvelope();
   if (active) return narrowScopeEnvelope(active, narrowRequest);
   if (!scope) return null;
+  // No active envelope: the request's security_scope is caller input, so it
+  // can only ever shrink what the process itself is bound to. It may name the
+  // mission/task/session the process is running, never a different mission,
+  // and its policy is clamped to the process tier (no egress from a request).
+  const runtime = runtimeScopeIdentity();
+  const declared = narrowRequest.identity ?? {};
+  if (!runtime.mission_id || declared.mission_id !== runtime.mission_id) {
+    logger.warn(
+      `[coordinated-agent-execution-port] delegation scope is not bound to the process mission for work_item_id=${request.work_item_id} — delegation runs unenveloped | dispatch from the mission process (MISSION_ID) so the boundary can mint | requested mission=${declared.mission_id ?? 'none'} process mission=${runtime.mission_id ?? 'none'}`
+    );
+    return null;
+  }
+  const clamped = clampPolicyToRuntimeTier(
+    {
+      purpose: narrowRequest.policy?.purpose?.trim() || `delegate ${request.work_item_id}`,
+      read_tiers: narrowRequest.policy?.read_tiers,
+      write_tier: narrowRequest.policy?.write_tier,
+      allowed_reasoning_backends: narrowRequest.policy?.allowed_reasoning_backends,
+    },
+    runtime.tier ?? 'public'
+  );
+  if (!clamped) {
+    logger.warn(
+      `[coordinated-agent-execution-port] delegation policy is above the process tier for work_item_id=${request.work_item_id} — delegation runs unenveloped | request a tier the mission process holds | process tier=${runtime.tier ?? 'public'}`
+    );
+    return null;
+  }
   try {
     return mintScopeEnvelope({
-      identity: { ...(narrowRequest.identity ?? {}) },
-      policy: {
-        read_tiers: narrowRequest.policy?.read_tiers,
-        write_tier: narrowRequest.policy?.write_tier,
-        purpose: narrowRequest.policy?.purpose?.trim() || `delegate ${request.work_item_id}`,
-        external_egress: narrowRequest.policy?.external_egress,
-        allowed_reasoning_backends: narrowRequest.policy?.allowed_reasoning_backends,
+      // Tenant/org/project come from the process scope and the mission
+      // record inside mint — never from the request.
+      identity: {
+        mission_id: declared.mission_id,
+        task_id: declared.task_id,
+        session_id: declared.session_id,
       },
+      policy: clamped,
     });
   } catch (error) {
     logger.warn(

@@ -1,22 +1,24 @@
 import { timingSafeEqual, randomUUID } from 'node:crypto';
 import { fromJSONSchema, z } from 'zod';
 import { auditChain } from './governance/audit-chain.js';
-import {
-  computeApprovalPayloadHash,
-  createApprovalRequest,
-  decideApprovalRequest,
-} from './governance/approval-store.js';
-import type { GovernedArtifactRole } from './workforce/artifact-store.js';
+import { computeApprovalPayloadHash, decideApprovalRequest } from './governance/approval-store.js';
+import { createHeldApprovalRequest } from './governance/held-effect-request.js';
 import type {
   HeldActionApprovalLink,
   HeldActionSteeringSpec,
 } from './governance/held-effect-bridge.js';
+import {
+  assertPersistableParams,
+  lookupHeldExecutor,
+  registerHeldExecutor,
+} from './cloudflare-os-held-executors.js';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
   applyControlPlaneJournalEvent,
   loadPersistedControlPlaneStateAtPath,
+  isRestoredExecutorStub,
   restoredHeldActionRecord,
   serializableHeldActionRecord,
   validatePersistedControlPlaneStateAtPath,
@@ -101,6 +103,13 @@ export interface HeldActionInput<T = unknown, R = unknown> extends HeldActionCon
    * `kind: 'held_effect'` — the shared store becomes the decision of record.
    */
   steeringApproval?: HeldActionSteeringSpec;
+  /**
+   * Opt in to persisting `params` so a registered executor can run the effect
+   * after a restart. Default off: params may hold credentials or personal
+   * payloads and otherwise live only in the submitting process's memory.
+   * Rejected at submit when params carry secret-like keys.
+   */
+  persistParams?: boolean;
   /** Set by the plane when a steering approval request exists. */
   approvalRequest?: HeldActionApprovalLink;
 }
@@ -408,14 +417,12 @@ export class CloudflareOsControlPlane {
     apply: (params: T, resolvedProvisionalRefs: Map<string, unknown>) => R | Promise<R>,
     revert?: (result: R, previousState: unknown) => void | Promise<void>
   ): void {
-    for (const record of this.held.values()) {
-      if (record.op !== op) continue;
-      record.apply = apply as HeldActionRecord['apply'];
-      record.revert = revert as HeldActionRecord['revert'];
-    }
+    // Bound at apply/revert time (see performApplyHeldAction), never on records.
+    registerHeldExecutor(op, { apply: apply as never, revert: revert as never });
   }
 
   submitHeldAction<T, R>(input: HeldActionInput<T, R>): HeldActionRecord<T, R> {
+    if (input.persistParams) assertPersistableParams(input.params);
     const record = {
       ...input,
       id: input.id || randomUUID(),
@@ -434,7 +441,7 @@ export class CloudflareOsControlPlane {
       dependsOn: [...new Set(input.dependsOn || [])],
     } as HeldActionRecord<T, R>;
     if (input.steeringApproval) {
-      record.approvalRequest = this.createHeldApprovalRequest(record, input.steeringApproval);
+      record.approvalRequest = createHeldApprovalRequest(record, input.steeringApproval);
     }
     this.held.set(record.id, record as HeldActionRecord);
     this.recordMutation('held', record as HeldActionRecord);
@@ -465,54 +472,6 @@ export class CloudflareOsControlPlane {
     return [...this.held.values()]
       .filter((entry) => !missionId || entry.missionId === missionId)
       .sort((left, right) => left.submittedAt.localeCompare(right.submittedAt));
-  }
-
-  /**
-   * SC-04: file the linked approval-store request steering `held_effect`.
-   * The request — not the held record — becomes the decision of record;
-   * the held record keeps the link so every decision path converges.
-   */
-  private createHeldApprovalRequest(
-    record: HeldActionRecord,
-    spec: HeldActionSteeringSpec
-  ): HeldActionApprovalLink {
-    const role: GovernedArtifactRole = 'mission_controller';
-    const request = createApprovalRequest(role, {
-      channel: spec.channel,
-      storageChannel: spec.storageChannel || spec.channel,
-      threadTs: spec.threadTs,
-      correlationId: spec.correlationId,
-      requestedBy: spec.requestedBy,
-      draft: {
-        title: spec.title,
-        summary: spec.summary,
-        details: `held_effect ${record.op} (${record.id})`,
-        severity: 'medium',
-      },
-      scope: {
-        mission_id: record.missionId,
-        ...(record.taskId ? { task_id: record.taskId } : {}),
-        ...(record.tenantSlug ? { tenant_slug: record.tenantSlug } : {}),
-      },
-      steering: {
-        kind: 'held_effect',
-        heldActionId: record.id,
-        op: record.op,
-        effectBinding: record.effectBinding,
-        payloadHash: record.payloadHash,
-        missionId: record.missionId,
-        tenantSlug: record.tenantSlug,
-        surface: spec.surface,
-        channel: spec.channel,
-        threadTs: spec.threadTs,
-        correlationId: spec.correlationId,
-      },
-    });
-    return {
-      requestId: request.id,
-      storageChannel: request.storageChannel,
-      role,
-    };
   }
 
   decideHeldAction(
@@ -632,6 +591,24 @@ export class CloudflareOsControlPlane {
       throw new Error(`[POLICY_VIOLATION] Held action ${id} is not approved`);
     const by = assertNonEmpty(record.resolvedBy || '', 'resolvedBy');
     record.resolvedBy = by;
+    // A restored record carries only an executor stub. Bind the registered
+    // executor now; a process that cannot run the effect (no executor, or the
+    // params were never persisted and live only in the submitter's memory)
+    // defers without writing — marking it failed here would poison the
+    // approval for the process that can.
+    if (isRestoredExecutorStub(record.apply)) {
+      const executor = lookupHeldExecutor(record.op);
+      if (!executor || record.params === undefined) {
+        audit('held_action', 'apply', 'denied', {
+          heldActionId: id,
+          deferred: true,
+          reason: !executor ? 'executor_not_registered' : 'params_not_persisted',
+        });
+        return record;
+      }
+      record.apply = executor.apply as HeldActionRecord['apply'];
+      record.revert = executor.revert as HeldActionRecord['revert'];
+    }
     try {
       const refs = this.resolvedProvisionalRefs(record.missionId);
       record.result = await record.apply(
@@ -657,9 +634,11 @@ export class CloudflareOsControlPlane {
   async revertHeldAction(id: string): Promise<HeldActionRecord> {
     const record = this.held.get(id);
     if (!record) throw new Error(`Held action not found: ${id}`);
-    if (record.status !== 'applied' || !record.revert)
+    const revert =
+      record.revert ?? (lookupHeldExecutor(record.op)?.revert as HeldActionRecord['revert']);
+    if (record.status !== 'applied' || !revert)
       throw new Error(`[POLICY_VIOLATION] Held action ${id} is not revertible`);
-    await record.revert(record.result, record.previousState);
+    await revert(record.result, record.previousState);
     record.status = 'cancelled';
     audit('held_action', 'revert', 'completed', { heldActionId: id });
     this.recordMutation('held', record);
@@ -1368,7 +1347,10 @@ export class CloudflareOsControlPlane {
       version: 1,
       // Executor closures are stripped; serializable params persist so a
       // registered executor can run the effect after restart (SC-04).
-      held: [...this.held.values()].map(({ apply, simulate, revert, ...record }) => record),
+      held: [...this.held.values()].map(
+        (record) =>
+          serializableHeldActionRecord(record as unknown as Record<string, unknown>) as never
+      ),
       introductions: [...this.introductions.values()],
       observations: [...this.observations],
       autoRules: [...this.autoRules],

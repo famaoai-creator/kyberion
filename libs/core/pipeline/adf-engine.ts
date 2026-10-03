@@ -348,6 +348,7 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
     assertExecutionBounds(state, { maxSteps, timeoutMs });
 
     let executionParams = step.params;
+    let opStamps: Record<string, unknown> | undefined;
     if (step.type !== 'control') {
       // Signature over *resolved* params: template steps inside foreach resolve
       // to different values per item and must not count as repeats.
@@ -416,6 +417,7 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
         throw error;
       }
       executionParams = preflight.input;
+      opStamps = preflight.stamps;
     }
 
     hooks?.beforeStep?.(step, state.stepCount, ctx);
@@ -472,7 +474,11 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
       }
       // SC-05: post-op observation aggregation for declared-read ops.
       if (step.type === 'capture' || step.type === 'transform' || step.type === 'apply') {
-        recordOpObservation(step.op, executionParams as Record<string, unknown>, ctx);
+        recordOpObservation(
+          step.op,
+          { ...(executionParams as Record<string, unknown>), ...(opStamps ?? {}) },
+          ctx
+        );
       }
       results.push({ op: step.op, status: 'success' });
       ctx = ((await hooks?.afterStep?.(step, state.stepCount, ctx, { status: 'success' })) ||

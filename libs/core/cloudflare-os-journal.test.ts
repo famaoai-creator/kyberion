@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
@@ -22,6 +23,8 @@ import {
   drainPendingSteeringApprovalExecutions,
   loadApprovalRequest,
 } from './governance/approval-store.js';
+
+const readFileUtf8 = (file: string): string => fs.readFileSync(file, 'utf8');
 
 let testRoot: string;
 let counter = 0;
@@ -166,6 +169,7 @@ describe('control-plane journal persistence', () => {
       submittedBy: 'agent:x',
       op: 'service:create_issue',
       params: { title: 'x' },
+      persistParams: true,
       apply: async () => ({ ok: true }),
       ...overrides,
     });
@@ -304,6 +308,7 @@ describe('control-plane journal persistence', () => {
       submittedBy: 'agent:x',
       op: 'service:create_issue',
       params: { title: 'x' },
+      persistParams: true,
       apply: async () => ({ ok: true }),
       steeringApproval: {
         surface: 'cli',
@@ -388,5 +393,133 @@ describe('control-plane journal persistence', () => {
     const quarantineDir = path.join(testRoot, 'system', 'quarantine', 'cloudflare-os');
     const { events } = readJournalTail(quarantineDir, 0);
     expect(events.some((e) => e.kind === 'held')).toBe(true);
+  });
+});
+
+describe('review fixes: executors, params at rest, tenant namespaces', () => {
+  const approve = (
+    cp: CloudflareOsControlPlane,
+    record: { id: string; payloadHash: string; effectBinding: string }
+  ) =>
+    cp.decideHeldAction(record.id, 'approved', {
+      resolvedBy: 'human:famao',
+      decidedByType: 'human',
+      authenticated: true,
+      payloadHash: record.payloadHash,
+      effectBinding: record.effectBinding,
+    });
+  const base = {
+    missionId: 'mission-r',
+    tenantSlug: 'tenant-a',
+    submittedBy: 'agent:x',
+    op: 'demo:write',
+  };
+
+  it('keeps the live executor and params when another process decides the same action', async () => {
+    const owner = new CloudflareOsControlPlane();
+    const surface = new CloudflareOsControlPlane();
+    let runs = 0;
+    let seen: unknown;
+    const record = owner.submitHeldAction({
+      ...base,
+      params: { title: 'in-memory only' },
+      apply: async (params) => {
+        runs += 1;
+        seen = params;
+        return 'ok';
+      },
+    });
+    surface.refreshFromJournals();
+    approve(surface, record);
+    owner.refreshFromJournals();
+    const applied = await owner.applyHeldAction(record.id);
+    expect(applied.status).toBe('applied');
+    expect(runs).toBe(1);
+    expect(seen).toEqual({ title: 'in-memory only' });
+  });
+
+  it('resolves a restored executor from the registry at apply time, even after a later catch-up', async () => {
+    const owner = new CloudflareOsControlPlane();
+    const surface = new CloudflareOsControlPlane();
+    const record = owner.submitHeldAction({
+      ...base,
+      params: { n: 1 },
+      persistParams: true,
+      apply: async () => 'unused',
+    });
+    surface.refreshFromJournals();
+    approve(surface, record);
+    const restarted = new CloudflareOsControlPlane();
+    let executed: unknown;
+    restarted.registerExecutor('demo:write', async (params) => {
+      executed = params;
+      return 'ok';
+    });
+    // A catch-up replaces the record object; the registry must still win.
+    restarted.refreshFromJournals();
+    const applied = await restarted.applyHeldAction(record.id);
+    expect(applied.status).toBe('applied');
+    expect(executed).toEqual({ n: 1 });
+  });
+
+  it('does not persist params unless the submitter opts in', () => {
+    const cp = new CloudflareOsControlPlane();
+    cp.submitHeldAction({
+      ...base,
+      params: { body: 'sk-SECRET-123' },
+      apply: async () => 'ok',
+    });
+    const dir = path.join(testRoot, 'confidential', 'tenant-a', 'cloudflare-os');
+    const journal = readFileUtf8(path.join(dir, 'journal.jsonl'));
+    expect(journal).not.toContain('sk-SECRET-123');
+    expect(readFileUtf8(path.join(dir, 'snapshot.json'))).not.toContain('sk-SECRET-123');
+  });
+
+  it('defers (never runs, never poisons) when params were not persisted', async () => {
+    const owner = new CloudflareOsControlPlane();
+    let ownerRuns = 0;
+    const record = owner.submitHeldAction({
+      ...base,
+      params: { body: 'x' },
+      apply: async () => {
+        ownerRuns += 1;
+        return 'ok';
+      },
+    });
+    approve(owner, record);
+    const restarted = new CloudflareOsControlPlane();
+    let restartedRuns = 0;
+    restarted.registerExecutor('demo:write', async () => {
+      restartedRuns += 1;
+      return 'ran';
+    });
+    // The restarted process has an executor but no params: it must not run
+    // the effect and must not mark the approval failed for the owner.
+    expect((await restarted.applyHeldAction(record.id)).status).toBe('approved');
+    expect(restartedRuns).toBe(0);
+    // The owner process still holds the params in memory and can apply.
+    owner.refreshFromJournals();
+    expect((await owner.applyHeldAction(record.id)).status).toBe('applied');
+    expect(ownerRuns).toBe(1);
+  });
+
+  it('rejects persistParams when params carry secret-like keys', () => {
+    const cp = new CloudflareOsControlPlane();
+    expect(() =>
+      cp.submitHeldAction({
+        ...base,
+        params: { nested: { apiKey: 'k' } },
+        persistParams: true,
+        apply: async () => 'ok',
+      })
+    ).toThrow(/POLICY_VIOLATION.*persistParams/);
+  });
+
+  it('quarantines records whose tenant is a reserved or invalid scope name', () => {
+    for (const tenantSlug of ['shared', 'public', 'confidential', '../x']) {
+      const namespace = controlPlaneNamespaceFor('held', { tenantSlug });
+      expect(namespace.quarantined).toBe(true);
+    }
+    expect(controlPlaneNamespaceFor('held', { tenantSlug: 'tenant-a' }).quarantined).toBe(false);
   });
 });

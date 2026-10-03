@@ -22,10 +22,21 @@ export interface OpPreflightCall {
   hasHuman?: boolean;
 }
 
+/**
+ * Preflight-internal stamps (SC-02/05): listeners hand each other the op's
+ * declared effect, resource ref and egress taint through the input during the
+ * waterfall, but these are governance metadata, not op parameters. They are
+ * split off the final `input` into `stamps` so an actuator whose contract
+ * forbids additional properties never sees them.
+ */
+export const OP_PREFLIGHT_STAMP_KEYS = ['_effect', '_resource_ref', '_egress_taint'] as const;
+
 export interface OpPreflightResult {
   decision: OpPreflightDecision;
   reason?: string;
   repaired_input?: Record<string, unknown>;
+  /** Internal stamps for post-op stages; never part of the executed input. */
+  stamps?: Record<string, unknown>;
   terminate?: boolean;
   listener_ids: string[];
   guard_ids: string[];
@@ -355,10 +366,33 @@ function assertPreflightResult(
  * outcome observers exactly once with the now-final decision. Observers run
  * after the fact and cannot influence what is returned.
  */
+function splitInternalStamps(input: Record<string, unknown>): {
+  input: Record<string, unknown>;
+  stamps?: Record<string, unknown>;
+} {
+  const stamps: Record<string, unknown> = {};
+  const clean: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if ((OP_PREFLIGHT_STAMP_KEYS as readonly string[]).includes(key)) stamps[key] = value;
+    else clean[key] = value;
+  }
+  return Object.keys(stamps).length > 0 ? { input: clean, stamps } : { input };
+}
+
 function finalizePreflightResult(
   call: OpPreflightCall,
-  result: OpPreflightResult & { input: Record<string, unknown> }
+  rawResult: OpPreflightResult & { input: Record<string, unknown> }
 ): OpPreflightResult & { input: Record<string, unknown> } {
+  const split = splitInternalStamps(rawResult.input);
+  const { repaired_input: rawRepaired, ...rest } = rawResult;
+  const repaired = rawRepaired ? splitInternalStamps(rawRepaired).input : undefined;
+  const result: OpPreflightResult & { input: Record<string, unknown> } = {
+    ...rest,
+    input: split.input,
+    ...(split.stamps ? { stamps: split.stamps } : {}),
+    // Stamps alone are not a repair of the caller's input.
+    ...(repaired && inputChanged(call.params, repaired) ? { repaired_input: repaired } : {}),
+  };
   const asserted = assertPreflightResult(result);
   if (outcomeObservers.size > 0) {
     // Observers see a deep-frozen detached snapshot of the result and the
