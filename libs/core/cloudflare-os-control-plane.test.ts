@@ -596,16 +596,18 @@ describe('Cloudflare OS adoption control plane', () => {
         action({ id: 'durable-test-action', params: { token: secret } })
       );
       first.decideHeldAction(record.id, 'approved', approval(record));
-      // SC-04: serializable params persist (effects must reference secrets,
-      // never embed them); executable closures never reach the file.
+      // Params persist only when the submitter opts in (persistParams); the
+      // default keeps secrets out of the file, and closures never reach it.
+      expect(String(safeReadFile(statePath, { encoding: 'utf8' }))).not.toContain(secret);
       const persisted = loadPersistedControlPlaneStateAtPath(statePath);
       expect(persisted?.held[0]?.apply).toBeUndefined();
-      expect(persisted?.held[0]?.params).toEqual({ token: secret });
+      expect(persisted?.held[0]?.params).toBeUndefined();
       const restored = new CloudflareOsControlPlane({ statePath });
       expect(restored.getHeldAction(record.id)?.status).toBe('approved');
+      // No executor / no persisted params in this process: the effect is
+      // deferred (never run, never marked failed for a process that can).
       const result = await restored.applyHeldAction(record.id);
-      expect(result.status).toBe('failed');
-      expect(result.applyError).toContain('must be registered');
+      expect(result.status).toBe('approved');
     } finally {
       safeUnlinkSync(statePath);
     }

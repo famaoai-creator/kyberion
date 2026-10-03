@@ -370,18 +370,26 @@ function finalizePreflightResult(
   result: OpPreflightResult & { input: Record<string, unknown> }
 ): OpPreflightResult & { input: Record<string, unknown> } {
   const governanceStamps: Record<string, unknown> = {};
-  const cleanedInput = { ...result.input };
-  for (const key of OP_GOVERNANCE_STAMP_KEYS) {
-    if (key in cleanedInput) {
-      governanceStamps[key] = cleanedInput[key];
-      delete cleanedInput[key];
+  const stripStamps = (source: Record<string, unknown>): Record<string, unknown> => {
+    const cleaned = { ...source };
+    for (const key of OP_GOVERNANCE_STAMP_KEYS) {
+      if (key in cleaned) {
+        governanceStamps[key] = cleaned[key];
+        delete cleaned[key];
+      }
     }
-  }
-  const asserted = assertPreflightResult(
-    Object.keys(governanceStamps).length > 0
-      ? { ...result, input: cleanedInput, governance_stamps: governanceStamps }
-      : { ...result, input: cleanedInput }
-  );
+    return cleaned;
+  };
+  const cleanedInput = stripStamps(result.input);
+  const { repaired_input: rawRepaired, ...rest } = result;
+  const repaired = rawRepaired ? stripStamps(rawRepaired) : undefined;
+  const asserted = assertPreflightResult({
+    ...rest,
+    input: cleanedInput,
+    ...(Object.keys(governanceStamps).length > 0 ? { governance_stamps: governanceStamps } : {}),
+    // Stamps alone are not a repair of the caller's input.
+    ...(repaired && inputChanged(call.params, repaired) ? { repaired_input: repaired } : {}),
+  });
   if (outcomeObservers.size > 0) {
     // Observers see a deep-frozen detached snapshot of the result and the
     // call, never the objects the caller or the dispatcher keep, so a
