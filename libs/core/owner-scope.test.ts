@@ -302,8 +302,12 @@ describe('resolveOwnerScope', () => {
       mission_id: 'msn-own-lower',
       tier: 'public',
     });
-    expect(findMissionPath('msn-own-lower')).toBe(
-      path.join(tmpRoot, 'active/missions/public/msn-own-lower')
+    // On a case-insensitive filesystem (macOS) the resolver itself finds it
+    // under the canonical spelling, so compare the directory, not the string.
+    const lower = findMissionPath('msn-own-lower');
+    expect(lower).not.toBeNull();
+    expect(fs.statSync(lower as string).ino).toBe(
+      fs.statSync(path.join(tmpRoot, 'active/missions/public/msn-own-lower')).ino
     );
   });
 
