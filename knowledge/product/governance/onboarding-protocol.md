@@ -4,7 +4,15 @@ category: Orchestration
 tags: [onboarding, setup, concierge, identity]
 importance: 8
 related_roles: [Sovereign Concierge, Ecosystem Architect]
-last_updated: 2026-08-15
+last_updated: 2026-10-04
+kind: playbook
+scope: global
+authority: recipe
+phase: [onboarding]
+role_affinity: [sovereign_concierge, ecosystem_architect]
+applies_to: [onboarding, identity, setup]
+owner: sovereign_concierge
+status: active
 ---
 
 # 主権者オンボーディング・プロトコル (Sovereign Onboarding Protocol)
@@ -36,6 +44,36 @@ last_updated: 2026-08-15
 - **役割**: 主権者のロールに応じたツールを準備する。
 - **アクション**: **Sovereign Concierge** が主権者との対話を通じて最適なロールを選択し、`active/shared/governance/session.json` を生成する。また、mission / role / phase に応じた capability overlay を確立する。
 - **成果物**: `session.json`, capability overlay。
+
+### Stage 3a: First-Run Wizard (初回導線の固定)
+
+- **役割**: 最初に何を設定すべきかを一つの入口にまとめる。
+- **アクション**: `launch-first-run-onboarding` intent を使い、workspace の前提、主要目的、必要な統合、資料テーマの初期値をまとめて案内する。
+- **UX**: ユーザーは「何を決めれば先に進めるか」を一度で理解できる。
+- **成果物**: 初回セットアップ計画。
+
+### Stage 3b: Integrate (組織ツールの接続)
+
+- **役割**: 組織固有の CI/CD、通知、監査、配備フックを接続する。
+- **アクション**: `configure-organization-toolchain` intent を使い、必要な連携先を棚卸ししたうえで、認証・承認・監査の境界を明示して登録する。
+- **UX**: ここで何が自動化され、何が承認待ちになるかを先に見せると、初回体験の不安が減る。
+- **成果物**: 組織ツール連携の登録レポート。
+
+### Stage 3c: Bind Operating Context (顧客・テナント・組織の関連付け)
+
+- **役割**: オンボーディング後の実行が、正しい customer overlay、tenant scope、organization operating model を使うようにする。
+- **アクション**: `pnpm onboarding:context bind --customer-slug <customer> --tenant-slug <tenant> --dry-run` で書き込み範囲を確認し、承認後に `--apply` する。
+- **UX**: `onboarding:context show --json` が返す `customer_slug`、`tenant_slug`、`organization_id`、tier、owner、first-work link を context card の入力として表示する。未解決または不一致の場合は実行を止める。各 surface のカード表示はこの stable JSON を投影し、表示文言を判定ロジックへ埋め込まない。
+- **成果物**: `customer/{slug}/onboarding/organization-context.json` と tenant-scoped organization state。
+
+binding は activation ではない。最初の仕事の apply 前に、[オンボーディング標準フロー](./onboarding-flow.md) の tenant activation gate（viewer scope、NHI、service readiness、isolation probe、人間の受け入れ）を通過させる。
+
+### Stage 3d: Style Sync (資料の見た目を先に覚える)
+
+- **役割**: 最初の資料作成で迷わないように、テーマと質問セットを先に保存する。
+- **アクション**: `register-presentation-preference-profile` intent を使い、デッキ用途ごとの初動質問とテーマヒントを `presentation-preference-registry` に保存する。
+- **UX**: 初回から「何を聞かれるか」と「どう見えるか」が揃うので、以後の資料生成が一貫する。
+- **成果物**: `presentation-preference-profile` の登録。
 
 ### Stage 4: Navigate & Execute (ナビゲーションと最初の任務)
 

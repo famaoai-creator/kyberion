@@ -101,14 +101,14 @@ Implementation targets:
 
 ## 4. Current Kyberion mapping
 
-| External pattern | Kyberion surface |
-|---|---|
-| Voice-first entry | `presence/displays/presence-studio/` + `satellites/voice-hub/` |
-| Multimodal desktop | Presence Studio + browser bridge + media workflows |
-| Shared skills | `knowledge/product/governance/harness-capability-registry.json` + capability bundles |
-| Durable work board | mission/task-session plus a board-like collaboration layer |
-| Control plane | mission governance + runtime observability + policy engine |
-| Browser attach | browser actuator / browser-interactive bridge |
+| External pattern   | Kyberion surface                                                          |
+| ------------------ | ------------------------------------------------------------------------- |
+| Voice-first entry  | `presence/displays/presence-studio/` + `satellites/voice-hub/`            |
+| Multimodal desktop | Presence Studio + browser bridge + media workflows                        |
+| Shared skills      | `knowledge/product/governance/harness-capabilities/` + capability bundles |
+| Durable work board | mission/task-session plus a board-like collaboration layer                |
+| Control plane      | mission governance + runtime observability + policy engine                |
+| Browser attach     | browser actuator / browser-interactive bridge                             |
 
 ## 5. Security review using OWASP
 

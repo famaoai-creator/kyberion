@@ -234,5 +234,5 @@ This document consolidates 26 conceptual frameworks that inform the Kyberion eco
 
 **Capabilities:**
 
-- **Dynamic Roleplay**: Adopts the tone, bias, and priorities of a specific persona defined in `knowledge/personalities/matrix.md`.
+- **Dynamic Roleplay**: Adopts the tone, bias, and priorities of a specific persona defined in `knowledge/product/personalities/matrix.md`.
 - **Debate Simulation**: Simulates conversations between conflicting personas and synthesizes "Dialectical Conclusions."

@@ -48,5 +48,5 @@ Path handling follows [`schedule-delivery-protocol.md`](../../../product/orchest
 ## 6. Expected Output
 
 - runtime ownership under `active/shared/runtime/surfaces/state.json`
-- logs under `active/shared/logs/generation-schedule.log`
+- logs under `active/shared/logs/process/`
 - recurring updates under `active/shared/runtime/media-generation/`

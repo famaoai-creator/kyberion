@@ -347,7 +347,7 @@ A predefined automatic response, often expressed declaratively in ADF instead of
 
 ### Pulse
 
-A shared runtime health/state signal, commonly surfaced through files like `active/shared/runtime/pulse.json`.
+A shared runtime health/state signal, surfaced through per-daemon heartbeat files under `active/shared/runtime/heartbeats/<daemon-id>.json`.
 
 ### Coordination Store
 

@@ -22,7 +22,7 @@ operator's behalf, take action items, execute the operator's slice, and
 remind others of theirs."
 
 This file is intentionally generic. Per-operator instances live under
-[`knowledge/personal/agents/`](../../personal/agents/) (or
+`knowledge/personal/agents/` (or
 `knowledge/confidential/{tenant}/agents/` for tenant-bound instances)
 and override `agentId`, the identity profile path, and the voice
 profile reference.
@@ -78,7 +78,7 @@ operator's voice and identity are personal data.
 
 - [`libs/actuators/meeting-actuator/`](../../../libs/actuators/meeting-actuator/)
 - [`pipelines/meeting-proxy-workflow.json`](../../../pipelines/meeting-proxy-workflow.json)
-- [`pipelines/voice-recording-session.json`](../../../knowledge/product/pipeline-templates/voice-recording-session.json)
-- [`pipelines/voice-learning-setup.json`](../../../knowledge/product/pipeline-templates/voice-learning-setup.json)
-- [`pipelines/voice-instant-clone.json`](../../../knowledge/product/pipeline-templates/voice-instant-clone.json)
+- [`knowledge/product/pipeline-templates/voice-recording-session.json`](../../../knowledge/product/pipeline-templates/voice-recording-session.json)
+- [`knowledge/product/pipeline-templates/voice-learning-setup.json`](../../../knowledge/product/pipeline-templates/voice-learning-setup.json)
+- [`knowledge/product/pipeline-templates/voice-instant-clone.json`](../../../knowledge/product/pipeline-templates/voice-instant-clone.json)
 - [`knowledge/product/governance/voice-profile-registry.json`](../governance/voice-profile-registry.json)

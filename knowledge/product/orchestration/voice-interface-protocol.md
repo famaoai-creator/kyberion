@@ -39,7 +39,7 @@ last_updated: 2026-03-06
 | **VirtualCameraInjectionBridge**      | mp4/frame replay or OS-backed virtual camera sink                        | Owns the upstream path that accepts mp4 or frame streams and either replays them through the archive boundary or injects them into a concrete virtual camera sink. |
 | **VirtualMediaDeviceControlBridge**   | inventory bridge + audio/camera bridge composition                       | Selects existing devices at runtime and returns host provisioning plans for add/remove flows.                                                                      |
 
-詳細セットアップ: `knowledge/product/voice/meeting-voice-proxy-setup.md`
+詳細セットアップ: `knowledge/product/agents/meeting-proxy.agent.md`（オペレーター別インスタンスは `knowledge/personal/agents/` 配下）
 
 Boundary note: microphone capture, voice playback, speaker routing, camera frame
 transport, and meeting entry are separate concerns. `voice-actuator`

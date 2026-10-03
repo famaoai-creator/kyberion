@@ -27,7 +27,7 @@ This workflow is split into two surfaces:
 
 ## 3. Recommended Flow
 
-1. Run `pipelines/email-triage-and-reply-draft.json`.
+1. Run `knowledge/product/pipeline-templates/email-triage-and-reply-draft.json`.
 2. Review the generated artifact at `active/shared/tmp/email-inbox-triage.md`.
 3. Open `Presence Studio`, use `Create Reply Draft`, and confirm the generated reply body.
 4. If you want a Gmail draft, click `Create Gmail Draft`.

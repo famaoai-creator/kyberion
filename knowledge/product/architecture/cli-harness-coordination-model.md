@@ -190,7 +190,7 @@ That policy declares the profile, command, and adapter that should be used for m
 
 Suggested artifact:
 
-- `knowledge/product/governance/harness-capability-registry.json`
+- `knowledge/product/governance/harness-capabilities/`
 
 Purpose:
 
@@ -200,7 +200,7 @@ Purpose:
 
 Suggested artifact:
 
-- `knowledge/product/governance/harness-adapter-registry.json`
+- `knowledge/product/governance/harness-adapters/`
 
 Purpose:
 
@@ -291,7 +291,7 @@ If Kyberion cannot explain which path executed, it has lost operational clarity.
 
 ## Track A. Registry And Schemas
 
-- define `harness-capability-registry.json`
+- define `harness-capabilities/` catalog entries
 - define `harness-adapter-profile.schema.json`
 - define `integration-decision.schema.json`
 - define capability classes and risk classes

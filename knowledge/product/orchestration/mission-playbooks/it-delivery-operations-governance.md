@@ -33,7 +33,7 @@ workflow_ids: [feature-expansion-delivery, incident-response, gate-review-sessio
 共通基盤:
 
 - ゲート定義: `knowledge/product/governance/gate-profiles/gate-profile-registry.json`(SDLC 7ゲート + インシデント4ゲート。`sdlc-gating-model.md` が参照)
-- 会議体カタログ: `knowledge/product/governance/governance-body-registry.json`(開催事前条件・アジェンダ・入口/出口クライテリア・決裁者・定足数)
+- 会議体カタログ: `knowledge/product/governance/governance-bodies/`(開催事前条件・アジェンダ・入口/出口クライテリア・決裁者・定足数)
 - スキーマ: `schemas/gate-profile.schema.json`, `schemas/governance-body-registry.schema.json`
 - 重大度モデル: `knowledge/product/operations/incident-severity-model.md`(SEV0–SEV3)
 
@@ -83,7 +83,7 @@ workflow_ids: [feature-expansion-delivery, incident-response, gate-review-sessio
 
 ## C. ゲーティング会議体 (`gate-review-session` + レジストリ)
 
-「ゲーティングの会議体の設定」= `governance-body-registry.json` に標準会議体を定義し、`gate-review-session` ワークフローで各判定会を運用する。
+「ゲーティングの会議体の設定」= `governance-bodies/` カタログに標準会議体を定義し、`gate-review-session` ワークフローで各判定会を運用する。
 
 各会議体は次を保持する(ユーザー要望の「アジェンダ・クライテリア・開催事前条件」):
 
@@ -129,4 +129,4 @@ node dist/scripts/mission_controller.js create MSN-INC-<slug> --tier confidentia
 - 顧客個別の SLA・連絡先・会議体メンバー・システム名・チケット体系は **confidential ティア** (`knowledge/confidential/{tenant}/`) に上書き定義。
 - private/prepared 相当の物理名・内部見積り・顧客議事録は confidential のミッション証跡に取り込み、public へは昇格しない。
 
-→ 関連: [security-audit-service.md](./security-audit-service.md) · `sdlc-gating-model.md` · `incident-management-excellence.md` · `governance-body-registry.json`
+→ 関連: [security-audit-service.md](./security-audit-service.md) · `sdlc-gating-model.md` · `incident-management-excellence.md` · `governance-bodies/` カタログ
