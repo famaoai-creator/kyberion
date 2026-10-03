@@ -55,7 +55,7 @@ describe('ClaudeAgentReasoningBackend', () => {
     expect(hypotheses[1].status).toBe('survived');
   });
 
-  it('defaults the model to opus and passes crossCritique hypotheses through', async () => {
+  it('defaults the model to the governed anthropic default and passes crossCritique hypotheses through', async () => {
     const critique = {
       hypotheses: [{ id: 'H-1', proposed_by: 'ceo', content: 'x', survived: true }],
     };
@@ -68,7 +68,7 @@ describe('ClaudeAgentReasoningBackend', () => {
       hypotheses: [{ id: 'H-1', proposed_by: 'ceo', content: 'x', status: 'pending' }],
     });
 
-    expect(mocks.runClaudeAgentQuery.mock.calls[0][0].model).toBe('opus');
+    expect(mocks.runClaudeAgentQuery.mock.calls[0][0].model).toBe('claude-opus-5-5');
     expect(result).toEqual(critique);
   });
 

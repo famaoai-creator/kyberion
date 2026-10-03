@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { nowIso } from '../foundation/time.js';
 import { runClaudeAgentQuery } from './claude-agent-query.js';
+import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import type {
   OneOnOneSessionInput,
   OneOnOneSessionResult,
@@ -50,7 +51,7 @@ export class ClaudeAgentVoiceBridge implements VoiceBridge {
   private readonly model: string;
 
   constructor(options: ClaudeAgentVoiceBridgeOptions = {}) {
-    this.model = options.model ?? 'opus';
+    this.model = options.model ?? resolveRuntimeModelId('anthropic-default');
   }
 
   async runRoleplaySession(input: RoleplaySessionInput): Promise<RoleplaySessionResult> {

@@ -24,6 +24,7 @@
 import { spawn } from 'node:child_process';
 import { memoizedCliSpawnSync } from './provider-discovery.js';
 import { logger } from '../core.js';
+import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import {
   buildDelegationSpawnEnv,
@@ -85,7 +86,7 @@ function normalizePermissionProfile(
   throw new Error(`[devin-cli] unsupported permission profile: ${value}`);
 }
 
-const DEFAULT_MODEL = 'swe';
+const DEFAULT_MODEL = resolveRuntimeModelId('devin-default');
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_BIN = 'devin';
 const GOVERNED_ARGUMENTS = new Set([
@@ -124,7 +125,7 @@ function validateExtraArgs(args: readonly string[]): string[] {
 export interface DevinCliReasoningBackendOptions {
   /** CLI binary. Defaults to `devin` (resolved via PATH). */
   bin?: string;
-  /** Model ID or family alias (`swe`, `opus`, `gpt`, …). Defaults to `swe`. */
+  /** Model ID or family alias (`swe`, `opus`, `gpt`, …). Defaults to runtime_defaults['devin-default']. */
   model?: string;
   /** Per-call timeout. Defaults to 5 min. */
   timeoutMs?: number;
