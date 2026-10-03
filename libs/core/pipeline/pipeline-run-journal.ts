@@ -73,6 +73,15 @@ export interface PipelineRunSuspendedPayload {
   on_timeout: 'abort' | 'deny' | 'escalate';
   timeout_at?: string;
   reason?: string;
+  /**
+   * What the run is waiting on. Absent/'approval' is the original
+   * await_decision suspend; 'state' is a `core:await_state` suspend whose
+   * condition lives in {@link state_probe} and is re-evaluated by the
+   * await-state resume scanner.
+   */
+  await_kind?: 'approval' | 'state';
+  /** StateProbeSpec captured at suspend time (await_kind === 'state'). */
+  state_probe?: Record<string, unknown>;
 }
 
 export interface PipelineRunJournalState {
@@ -156,6 +165,8 @@ pipelineJournalKernel.defineOp('pipeline.run_suspended', {
     on_timeout: z.enum(['abort', 'deny', 'escalate']),
     timeout_at: z.string().optional(),
     reason: z.string().optional(),
+    await_kind: z.enum(['approval', 'state']).optional(),
+    state_probe: z.record(z.string(), z.unknown()).optional(),
   }),
   apply: (state, payload) => ({ ...state, suspended: payload }),
 });

@@ -832,6 +832,7 @@ const BARE_OP_ALIASES: Record<string, string> = {
   accumulate: 'core:accumulate',
   judge_route: 'core:judge_route',
   await_decision: 'core:await_decision',
+  await_state: 'core:await_state',
 };
 
 export function normalizePipelineOp(op: string): string {
@@ -1274,6 +1275,7 @@ export const CONTROL_ACTIONS = new Set([
   'accumulate',
   'judge_route',
   'await_decision',
+  'await_state',
   'include',
 ]);
 

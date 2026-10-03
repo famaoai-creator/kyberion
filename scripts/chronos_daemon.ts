@@ -36,6 +36,8 @@ import {
   validateChronosDeliveryTarget,
 } from '@agent/core/chronos-delivery';
 import { createTriggerRunner, withTriggerLeaderLease } from '@agent/core/trigger-runner';
+import { sweepAwaitStateRuns } from '@agent/core/pipeline/pipeline-await-resume';
+import { executeServicePreset } from '@agent/core/service/service-engine';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import { listTenantProfileSlugs, resolveTenant } from '@agent/core/organization/tenant-registry';
 import { isValidTenantSlug } from '@agent/core/entity-scope';
@@ -520,6 +522,26 @@ async function tickAsLeader(): Promise<void> {
     status: 'running',
     details: { phase: 'tick' },
   });
+  // Await-state resume scan runs on every tick — a suspended pipeline has no
+  // writer event to hook, so this sweep is its alarm clock. A scanner failure
+  // warns but never stops the schedule work below.
+  try {
+    const outcomes = await sweepAwaitStateRuns({
+      serviceCall: (input) =>
+        executeServicePreset(input.service_id, input.action, input.params ?? {}, 'secret-guard'),
+    });
+    for (const outcome of outcomes) {
+      if (outcome.status === 'resumed') {
+        logger.info(`[CHRONOS] await-state resume spawned: ${outcome.runId} (${outcome.reason})`);
+      } else if (outcome.status === 'error') {
+        logger.warn(`[CHRONOS] await-state scan error for ${outcome.runId}: ${outcome.reason}`);
+      }
+    }
+  } catch (error) {
+    logger.warn(
+      `[CHRONOS] await-state sweep failed: ${error instanceof Error ? error.message : error}`
+    );
+  }
   const due = getSchedulesDueNow(undefined, now);
   if (due.length === 0) return;
 

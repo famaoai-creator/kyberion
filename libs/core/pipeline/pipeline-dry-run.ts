@@ -51,6 +51,8 @@ const CONTROL_OPS = new Set([
   'core:judge_route',
   'await_decision',
   'core:await_decision',
+  'await_state',
+  'core:await_state',
 ]);
 
 function collectSteps(steps: PipelineAdfStep[], output: PipelineAdfStep[] = []): PipelineAdfStep[] {
