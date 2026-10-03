@@ -91,5 +91,6 @@ export * from './voice-transcript-alignment.js';
 export * from './voice-tts-config.js';
 export * from './voice-turn-cancellation.js';
 export * from './voice-turn-taking-lexicon.js';
+export * from './gemini-live-client.js';
 export * from './voice-turn-taking.js';
 export * from './voice-workbench.js';

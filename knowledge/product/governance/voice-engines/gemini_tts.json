@@ -15,9 +15,11 @@
       "supports": {
         "list_voices": false,
         "playback": true,
+        "voice_clone": true,
+        "icl_ref_audio": true,
         "artifact_formats": ["wav"]
       },
-      "notes": "Gemini 3.1 Flash TTS preview through Google AI Studio / Gemini API using GEMINI_API_KEY.",
+      "notes": "Gemini 3.8 Flash TTS / Flash-Lite TTS through Google AI Studio / Gemini API using GEMINI_API_KEY.",
       "language_notes": "Upstream Gemini TTS auto-detects many languages; only en/ja are exercised in this repository, so only those are declared."
     }
   ]

@@ -41,6 +41,7 @@ export interface VoiceEngineRecord {
     playback: boolean;
     voice_clone?: boolean;
     icl_ref_audio?: boolean;
+    streaming?: boolean;
     artifact_formats: VoiceEngineArtifactFormat[];
   };
   fallback_engine_id?: string;

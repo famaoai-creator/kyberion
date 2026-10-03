@@ -44,16 +44,16 @@ CLI に移すだけになる。
 
 ## 2. 取り込む ↔ 出す
 
-| 方向                | 統合 op                                 | 動詞                   | 状態                              |
-| ------------------- | --------------------------------------- | ---------------------- | --------------------------------- |
-| 文書 → テキスト     | `media:document_digest`                 | `pnpm kyberion read`   | 統合済み                          |
-| ブリーフ → 文書     | `media:generate_document`               | `pnpm kyberion write`  | 統合済み                          |
-| 画像 → テキスト     | `vision:ocr_image` / `describe_image`   | `pnpm kyberion see`    | 統合済み                          |
-| 指示 → 画像         | `media-generation:generate_image`       | `pnpm kyberion draw`   | 統合済み                          |
-| 音声 → テキスト     | `voice:transcribe`                      | `pnpm kyberion listen` | 統合済み                          |
-| テキスト → 音声     | `voice:generate_voice` / `speak_local`  | `pnpm kyberion speak`  | 統合済み                          |
-| 動画 → タイムライン | フレーム＋書き起こしの合成              | `pnpm kyberion watch`  | 統合済み                          |
-| ブリーフ → 動画     | `video-composition:*`, `generate_video` | —                      | **動詞がなく、エンジンが 2 系統** |
+| 方向                | 統合 op                                 | 動詞                                                                   | 状態                              |
+| ------------------- | --------------------------------------- | ---------------------------------------------------------------------- | --------------------------------- |
+| 文書 → テキスト     | `media:document_digest`                 | `pnpm kyberion read`                                                   | 統合済み                          |
+| ブリーフ → 文書     | `media:generate_document`               | `pnpm kyberion write`                                                  | 統合済み                          |
+| 画像 → テキスト     | `vision:ocr_image` / `describe_image`   | `pnpm kyberion see`                                                    | 統合済み                          |
+| 指示 → 画像         | `media-generation:generate_image`       | `pnpm kyberion draw`                                                   | 統合済み                          |
+| 音声 → テキスト     | `voice:transcribe`                      | `pnpm kyberion listen`                                                 | 統合済み                          |
+| テキスト → 音声     | `voice:generate_voice` / `speak_local`  | `pnpm kyberion speak`。`--stream --segment` でローカル Qwen の逐次再生 | 統合済み                          |
+| 動画 → タイムライン | フレーム＋書き起こしの合成              | `pnpm kyberion watch`                                                  | 統合済み                          |
+| ブリーフ → 動画     | `video-composition:*`, `generate_video` | —                                                                      | **動詞がなく、エンジンが 2 系統** |
 
 `write` は §1 の実例。`media:generate_document` は既に `render_target`
 （pptx / docx / xlsx / pdf）で分岐しており、形式ごとの `pptx_render` / `docx_render` /
@@ -103,19 +103,16 @@ CLI に移すだけになる。
 どちらも現状 2 段で、1 動詞（`read <url>`、`see --screen`）に畳むのは容易。論点は
 エンジンの有無ではなく、外部通信・遮蔽のゲートをどこで評価するか。
 
-## 4. ライブ vs 録ったもの — 唯一の語の衝突
+## 4. バッチ、ストリーミング再生、リアルタイム対話
 
-`listen` と `speak` はそれぞれ 2 つの異なるものを指している。
+`speak` には2種類の再生方法があり、`voice conversation-turn` は対話全体を扱う。
 
-| 語       | ファイル／バッチの意味                                | ライブ／ストリームの意味                                               |
-| -------- | ----------------------------------------------------- | ---------------------------------------------------------------------- |
-| `listen` | `pnpm kyberion listen <audio>`（録音の書き起こし）    | `meeting:listen`（capture op）、`pnpm minutes:record`（マイク実時間）  |
-| `speak`  | `pnpm kyberion speak "<text>"`（TTS、ファイル出力可） | `meeting:speak`、`pnpm kyberion voice conversation-turn`（実時間対話） |
+| 語       | ファイル／バッチ                                      | ストリーミング再生                                                                                 | リアルタイム対話                                                                     |
+| -------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `listen` | `pnpm kyberion listen <audio>`（録音の書き起こし）    | —                                                                                                  | `meeting:listen`（capture op）、`pnpm minutes:record`（マイク実時間）                |
+| `speak`  | `pnpm kyberion speak "<text>"`（TTS、ファイル出力可） | `pnpm kyberion speak --stream --engine qwen3_tts_06b_custom_voice --segment "..." --segment "..."` | `meeting:speak`、`pnpm kyberion voice conversation-turn`（聞き取りを含む実時間対話） |
 
-これは統合すべき重複ではない。録音とライブストリームは失敗モードが異なり、同意要件も
-異なる（`meeting:check_consent`）。両方が現れる場所では **2 つの軸として明示**し、
-「listen」を選ぶエージェントが自分が扱うのはファイルかセッションかを判別できるように
-する必要がある。
+ストリーミング再生は複数のテキスト片をローカル Qwen エンジンに渡し、生成された音声を届き次第再生する。マイク入力や対話セッションは扱わない。対話には `voice conversation-turn` を使う。録音とマイクのライブセッションも失敗モードや同意要件（`meeting:check_consent`）が異なるため、両方を説明するときはモードを明示する。
 
 ## 5. 第 3 の軸：記憶
 

@@ -48,7 +48,6 @@ export class CoreAudioOutputBridge implements AudioOutputPort {
     underrun_count: 0,
     resampled: false,
   };
-  private readonly writtenChunks: AudioChunk[] = [];
 
   constructor(private readonly options: CoreAudioOutputBridgeOptions = {}) {}
 
@@ -173,8 +172,7 @@ export class CoreAudioOutputBridge implements AudioOutputPort {
     }
     this.metricsValue.audio_chunks_out += 1;
     this.lastOutputAt = Date.now();
-    this.writtenChunks.push(chunk);
-    const signal = pcmSignalMetrics(this.writtenChunks.slice(-1));
+    const signal = pcmSignalMetrics([chunk]);
     this.metricsValue.output_peak_rms = Math.max(
       this.metricsValue.output_peak_rms || 0,
       signal.input_peak_rms || 0

@@ -8,6 +8,8 @@ Each file must contain exactly one `engines` entry and must match the file name:
 - `espeak_ng.json`
 - `open_voice_clone.json`
 - `mlx_audio_qwen3.json`
+- `qwen3_tts_06b_custom_voice.json`
+- `irodori_tts.json`
 - `kokoro.json`
 - `pocket_tts.json`
 
@@ -22,15 +24,17 @@ deliberately conservative: the TypeScript runtime passes only `ja`/`en` as
 `lang_code` to the Python bridges, so bridge engines declare at most those two
 even when the upstream model covers more.
 
-| engine             | languages  | basis                                                                     |
-| ------------------ | ---------- | ------------------------------------------------------------------------- |
-| `local_say`        | `*`        | OS voices (macOS `say`, Linux `espeak`, Windows SAPI); voice per language |
-| `espeak_ng`        | `en`, `ja` | bridge receives only `ja`/`en`                                            |
-| `kokoro`           | `ja`, `en` | bridge maps `ja` → `j` pipeline, everything else → American English       |
-| `mlx_audio_qwen3`  | `ja`, `en` | bridge receives only `ja`/`en` (upstream Qwen3-TTS covers more)           |
-| `pocket_tts`       | `en`       | bridge rejects `ja`; no language-pack selection for fr/de/pt/it/es        |
-| `gemini_tts`       | `en`, `ja` | only en/ja exercised here (upstream auto-detects more)                    |
-| `open_voice_clone` | `en`       | shadow placeholder, coverage unknown                                      |
+| engine                       | languages  | basis                                                                     |
+| ---------------------------- | ---------- | ------------------------------------------------------------------------- |
+| `local_say`                  | `*`        | OS voices (macOS `say`, Linux `espeak`, Windows SAPI); voice per language |
+| `espeak_ng`                  | `en`, `ja` | bridge receives only `ja`/`en`                                            |
+| `kokoro`                     | `ja`, `en` | bridge maps `ja` → `j` pipeline, everything else → American English       |
+| `mlx_audio_qwen3`            | `ja`, `en` | bridge receives only `ja`/`en` (upstream Qwen3-TTS covers more)           |
+| `irodori_tts`                | `ja`       | Irodori v4.1 Small bridge; complete WAV sentences (no streaming)          |
+| `qwen3_tts_06b_custom_voice` | `ja`       | 0.6B 8-bit preset voice; MLX chunked stream on macOS only                 |
+| `pocket_tts`                 | `en`       | bridge rejects `ja`; no language-pack selection for fr/de/pt/it/es        |
+| `gemini_tts`                 | `en`, `ja` | only en/ja exercised here (upstream auto-detects more)                    |
+| `open_voice_clone`           | `en`       | shadow placeholder, coverage unknown                                      |
 
 Engines behind `tts_adapter_id: external_provider` (`gemini_tts`,
 `open_voice_clone`) have no Kyberion TTS runtime adapter yet, so governed
@@ -65,3 +69,7 @@ Calibrate by listening: put `{"text": "...", "language": "ja"}` in a JSON file
 and run `pnpm kyberion seam select calibrate --seam voice-tts-engine --input
 <file>`; the report lists each engine's `artifact_path`. Engines that leave the
 machine run only when listed in `--providers`.
+
+Irodori-TTS uses the dedicated irodori_tts bridge, defaults to num_steps=8, and emits complete WAV sentence artifacts; upstream streaming is unavailable.
+
+Qwen3-TTS 0.6B is available as a selectable stock voice profile (`qwen3-ja-06b-onoanna`). Install only the managed runtime with `pnpm kyberion voice setup --tool mlx_audio --apply`; this does not fetch model weights. For live streaming, use `qwen3_tts_stream_bridge.py --stream` as the command for the shell streaming TTS seam. The model must already be present in the managed Hugging Face cache; the bridge never downloads it implicitly.

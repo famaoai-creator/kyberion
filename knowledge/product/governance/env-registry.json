@@ -1454,11 +1454,27 @@
       "documented": true
     },
     {
+      "name": "KYBERION_GEMINI_LIVE_MODEL",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Optional Gemini Multimodal Live API model override (defaults to gemini-2.5-flash or gemini-3.8-flash for live websocket sessions).",
+      "documented": true
+    },
+    {
       "name": "KYBERION_GEMINI_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
       "description": "Model identifier used by the Gemini API and routing fallback.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_GEMINI_TTS_MODEL",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Optional Gemini TTS model override (defaults to gemini-3.8-flash-tts; supports gemini-3.8-flash-lite-tts).",
       "documented": true
     },
     {

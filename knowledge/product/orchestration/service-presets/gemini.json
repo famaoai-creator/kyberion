@@ -61,7 +61,7 @@
       "path": "interactions",
       "method": "POST",
       "payload_template": {
-        "model": "gemini-3.1-flash-tts-preview",
+        "model": "{{model:-gemini-3.8-flash-tts}}",
         "input": "{{text}}",
         "response_format": {
           "type": "audio"
@@ -76,6 +76,41 @@
       },
       "output_mapping": {
         "audioData": "output_audio.data"
+      }
+    },
+    "design_voice": {
+      "type": "api",
+      "path": "v1beta/voices",
+      "method": "POST",
+      "payload_template": {
+        "model": "{{model:-gemini-3.8-flash-tts}}",
+        "voice_design": {
+          "prompt": "{{prompt}}",
+          "name": "{{name}}"
+        },
+        "store": true
+      },
+      "output_mapping": {
+        "voiceId": "name",
+        "voiceName": "voice_design.name"
+      }
+    },
+    "clone_voice": {
+      "type": "api",
+      "path": "v1beta/voices",
+      "method": "POST",
+      "payload_template": {
+        "model": "{{model:-gemini-3.8-flash-tts}}",
+        "voice_replication": {
+          "reference_audio": "{{reference_audio_base64}}",
+          "consent_audio": "{{consent_audio_base64}}",
+          "name": "{{name}}"
+        },
+        "store": true
+      },
+      "output_mapping": {
+        "voiceId": "name",
+        "voiceName": "voice_replication.name"
       }
     }
   }
