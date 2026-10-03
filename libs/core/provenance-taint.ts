@@ -80,3 +80,46 @@ export function assertProvenanceShareAllowed(check: ProvenanceShareCheck): void 
     }
   }
 }
+
+export interface ProvenanceEgressVerdict {
+  allowed: boolean;
+  reason?: string;
+}
+
+/**
+ * SC-06: the single provenance-egress decision — control-plane
+ * `assertEgressAllowed` and the op-level egress guard share this so the
+ * tier/tenant rules are never implemented twice.
+ *
+ * Rules (all deny-driven):
+ * - `external` audience is always denied — brokered service egress
+ *   declares a concrete target, never the raw external audience.
+ * - a tainted mission cannot egress to a tenant outside its observed set.
+ * - a tainted mission cannot egress to a tier below its highest observed.
+ */
+export function evaluateProvenanceEgress(
+  taint: ProvenanceTaint,
+  targetAudience: OsKnowledgeTier | 'external',
+  targetTenant?: string
+): ProvenanceEgressVerdict {
+  if (targetAudience === 'external') {
+    return { allowed: false, reason: 'external audience is always denied' };
+  }
+  const missingTenant = taint.tenants.length > 0 && !targetTenant;
+  const wrongTenant = Boolean(
+    targetTenant && taint.tenants.length > 0 && !taint.tenants.includes(targetTenant)
+  );
+  if (missingTenant || wrongTenant) {
+    return {
+      allowed: false,
+      reason: `tenant ${targetTenant ?? '(none)'} outside observed tenants [${taint.tenants.join(',')}]`,
+    };
+  }
+  if (TIER_RANK[targetAudience] < TIER_RANK[taint.highestTier]) {
+    return {
+      allowed: false,
+      reason: `audience ${targetAudience} below taint tier ${taint.highestTier}`,
+    };
+  }
+  return { allowed: true };
+}

@@ -17,6 +17,12 @@
       "families": {
         "service": "off"
       }
+    },
+    "egress": {
+      "default": "warn",
+      "families": {
+        "service": "off"
+      }
     }
   }
 }
