@@ -31,6 +31,7 @@ import { withExecutionContextAsync } from '@agent/core/authority';
 import { dotTokensUsedToday, readDotWakeLedger } from '@agent/core/dot/dot-runtime';
 import { appendDotInboxEntry } from '@agent/core/dot/dot-inbox';
 import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
+import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
 import { DEFAULT_DAEMONS } from './daemon_watchdog.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -144,6 +145,7 @@ async function reportWake(argv: string[]) {
   const dotId = argv.find((arg) => !arg.startsWith('--'));
   if (!dotId) throw new Error('usage: pnpm kyberion dot wake <dot_id>');
   const loaded = findDot(dotId);
+  installReasoningBackends();
   // Same attribution as the daemon sweep: ledger/heartbeat writes and the
   // turn all happen under the charter's declared role.
   const receipt = await withExecutionContextAsync(

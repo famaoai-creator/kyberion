@@ -728,6 +728,44 @@ describe('reasoning-backend', () => {
     expect(advice.follow_up_questions).toEqual(['what is the invalidation rule?']);
   });
 
+  it('omits generateWithTools when no candidate supports tool calling (capability honesty)', () => {
+    const plainBackend: ReasoningBackend = {
+      ...stubReasoningBackend,
+      generateWithTools: undefined,
+      promptWithImages: undefined,
+    };
+
+    const failoverWithoutTools = buildFailoverReasoningBackend([
+      { label: 'plain-1', backend: plainBackend },
+      { label: 'plain-2', backend: plainBackend },
+    ]);
+    expect(failoverWithoutTools.generateWithTools).toBeUndefined();
+    expect(failoverWithoutTools.promptWithImages).toBeUndefined();
+
+    const roleAwareWithoutTools = buildRoleAwareReasoningBackend(
+      plainBackend,
+      new Map([['operator', plainBackend]])
+    );
+    expect(roleAwareWithoutTools.generateWithTools).toBeUndefined();
+    expect(roleAwareWithoutTools.promptWithImages).toBeUndefined();
+
+    const capableBackend: ReasoningBackend = {
+      ...stubReasoningBackend,
+      generateWithTools: async () => ({ text: 'ok' }),
+    };
+    const failoverWithTools = buildFailoverReasoningBackend([
+      { label: 'plain', backend: plainBackend },
+      { label: 'capable', backend: capableBackend },
+    ]);
+    expect(failoverWithTools.generateWithTools).toBeDefined();
+
+    const roleAwareWithTools = buildRoleAwareReasoningBackend(
+      plainBackend,
+      new Map([['operator', capableBackend]])
+    );
+    expect(roleAwareWithTools.generateWithTools).toBeDefined();
+  });
+
   describe('stub backend', () => {
     it('diverges personas into hypotheses', async () => {
       const result = await stubReasoningBackend.divergePersonas({

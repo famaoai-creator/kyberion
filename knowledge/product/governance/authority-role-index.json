@@ -234,6 +234,19 @@
       "allowed_actuators": ["artifact-actuator"],
       "tier_access": ["personal", "confidential", "public"]
     },
+    "organization_operator": {
+      "description": "Tenant-scoped organization operator role assumed by organization management scripts and resident dots overseeing organization operations, services, and cadences.",
+      "default_persona": "worker",
+      "write_scopes": [
+        "active/organizations/confidential/${KYBERION_TENANT}/",
+        "active/organizations/public/${KYBERION_TENANT}/",
+        "active/shared/runtime/",
+        "active/shared/observability/"
+      ],
+      "scope_classes": ["organization_operating_model", "operations_runtime", "observability"],
+      "allowed_actuators": ["process-actuator"],
+      "tier_access": ["confidential", "public"]
+    },
     "qa_lead": {
       "description": "Quality assurance authority for test strategy, coverage validation, and regression evidence.",
       "default_persona": "qa_lead",
