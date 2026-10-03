@@ -9,7 +9,6 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -35,8 +34,7 @@ function seedScopedArtifactIndexSchema(root: string): void {
 
 describe('output-artifacts', () => {
   beforeAll(async () => {
-    tmpRoot = path.join(os.tmpdir(), `kyb-output-artifacts-${randomUUID()}`);
-    fs.mkdirSync(tmpRoot, { recursive: true });
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kyb-output-artifacts-'));
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
     seedPolicyFile(tmpRoot);
     seedScopedArtifactIndexSchema(tmpRoot);
