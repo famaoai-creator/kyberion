@@ -41,6 +41,22 @@ function resolveManagedPythonPath(managedEnvPath: string): string {
   return path.join(managedEnvPath, 'bin', 'python');
 }
 
+function voiceRuntimeInstallEnv(): Record<string, string> {
+  const cacheRoot = pathResolver.rootResolve('active/shared/cache/system/tool-runtimes/mlx-audio');
+  const uvCache = path.join(cacheRoot, 'uv');
+  const xdgCache = path.join(cacheRoot, 'xdg');
+  const huggingFaceCache = path.join(cacheRoot, 'huggingface');
+  for (const cachePath of [uvCache, xdgCache, huggingFaceCache]) {
+    safeMkdir(cachePath, { recursive: true });
+  }
+  return {
+    UV_CACHE_DIR: uvCache,
+    PIP_CACHE_DIR: path.join(cacheRoot, 'pip'),
+    XDG_CACHE_HOME: xdgCache,
+    HF_HOME: huggingFaceCache,
+  };
+}
+
 function resolveManagedPythonCandidates(managedEnvPath: string): string[] {
   if (isWindows()) {
     return [
@@ -90,6 +106,7 @@ function isManagedVoiceRuntimeHealthy(toolId: VoiceToolId, pythonBin: string | n
 function installManagedVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
   const resolution = probeToolRuntime(toolId, 'approved_install');
   const backend = resolution.install_backend;
+  const installEnv = voiceRuntimeInstallEnv();
   if (!backend) {
     return {
       toolId,
@@ -114,6 +131,7 @@ function installManagedVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
     venvArgs.push(resolution.managed_env_path);
     const venvResult = safeExecResult('uv', venvArgs, {
       cwd: rootDir,
+      env: installEnv,
       timeoutMs: 120_000,
       maxOutputMB: 8,
     });
@@ -127,6 +145,7 @@ function installManagedVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
     const installArgs = ['pip', 'install', '--python', pythonBin, ...backend.args.slice(2)];
     const installResult = safeExecResult('uv', installArgs, {
       cwd: rootDir,
+      env: installEnv,
       timeoutMs: 300_000,
       maxOutputMB: 32,
     });
@@ -258,9 +277,12 @@ export function formatVoiceSetupReport(rows: VoiceSetupRow[], apply: boolean): s
   return lines;
 }
 
-export async function runVoiceSetup(options: { apply: boolean }): Promise<VoiceSetupRow[]> {
+export async function runVoiceSetup(options: {
+  apply: boolean;
+  toolIds?: readonly VoiceToolId[];
+}): Promise<VoiceSetupRow[]> {
   const rows: VoiceSetupRow[] = [];
-  for (const toolId of VOICE_TOOL_IDS) {
+  for (const toolId of options.toolIds ?? VOICE_TOOL_IDS) {
     const current = inspectVoiceRuntime(toolId);
     if (options.apply && current.status === 'needs_install') {
       rows.push(installManagedVoiceRuntime(toolId));
@@ -278,9 +300,16 @@ export async function main(args: string[] = []): Promise<{
 }> {
   const argv = await createStandardYargs(['node', 'voice_setup', ...args])
     .option('apply', { type: 'boolean', default: false })
+    .option('tool', {
+      type: 'array',
+      string: true,
+      choices: [...VOICE_TOOL_IDS],
+      describe: 'Inspect or install only the selected voice runtime (repeatable)',
+    })
     .parseSync();
 
-  const rows = await runVoiceSetup({ apply: Boolean(argv.apply) });
+  const selectedTools = (argv.tool as VoiceToolId[] | undefined) ?? [...VOICE_TOOL_IDS];
+  const rows = await runVoiceSetup({ apply: Boolean(argv.apply), toolIds: selectedTools });
   return { rows, apply: Boolean(argv.apply), localStt: discoverLocalSttBackends() };
 }
 

@@ -83,15 +83,25 @@ executor: `browser:goto` (a page), `system` `activate_application` / `open_path`
 
 ## 4. Converse (会話する)
 
-| Need                                     | Use                                                                                                                                                                                                                                                                          |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Answer a person on any text channel      | the surface conversation seam `runSurfaceMessageConversation` (`libs/core/surface/surface-runtime-orchestrator.ts`) — already used by `ask`, Slack / Telegram / Discord / iMessage satellites, voice-hub, concierge, Chronos                                                 |
-| Ask Kyberion from the terminal           | `pnpm kyberion ask "<text>"`                                                                                                                                                                                                                                                 |
-| Send a message out                       | `presence:dispatch` with a channel prefix (`slack:`, `telegram:` …)                                                                                                                                                                                                          |
-| Say something aloud / make an audio file | `pnpm kyberion speak "<text>" [--out <file>]` (inverse of `listen`); in pipelines `voice:generate_voice` / `voice:speak_local`                                                                                                                                               |
-| Make an image from a prompt              | `pnpm kyberion draw "<prompt>" --out <image>` (inverse of `see`): local providers only by default; `--allow-cloud` / `--allow-handoff` opt in, `--ref` needs per-run consent for those, `--dry-run` shows the provider first; in pipelines `media-generation:generate_image` |
-| Real-time voice dialogue                 | `pnpm kyberion voice conversation-turn` — see [voice-interface-protocol.md](./voice-interface-protocol.md)                                                                                                                                                                   |
-| Agent ↔ agent                            | Co-Session / Peer Messaging — [agent-communication-layer-model.md](../architecture/agent-communication-layer-model.md)                                                                                                                                                       |
+| Need                                     | Use                                                                                                                                                                                                                                                                                                                                              |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Answer a person on any text channel      | the surface conversation seam `runSurfaceMessageConversation` (`libs/core/surface/surface-runtime-orchestrator.ts`) — already used by `ask`, Slack / Telegram / Discord / iMessage satellites, voice-hub, concierge, Chronos                                                                                                                     |
+| Ask Kyberion from the terminal           | `pnpm kyberion ask "<text>"`                                                                                                                                                                                                                                                                                                                     |
+| Send a message out                       | `presence:dispatch` with a channel prefix (`slack:`, `telegram:` …)                                                                                                                                                                                                                                                                              |
+| Say something aloud / make an audio file | `pnpm kyberion speak "<text>" [--out <file>]`; stream incremental text with `--stream --segment "..."` (repeat `--segment`) and choose a CoreAudio output with `--device "<exact name>"`. A sole output is selected automatically; with multiple outputs, `--device` is required. In pipelines use `voice:generate_voice` / `voice:speak_local`. |
+
+For example, stream two Japanese segments to a named output device:
+
+```sh
+pnpm kyberion speak --stream --engine qwen3_tts_06b_custom_voice \
+  --segment "こんにちは。" --segment "ストリーム再生のテストです。" \
+  --device "Mac miniのスピーカー"
+```
+
+The streaming path currently requires the local `qwen3_tts_06b_custom_voice` engine and Japanese text. Pass 2–5 non-empty `--segment` values, up to 500 characters total. `--file`, `--out`, `--voice`, and `--rate` are not supported in streaming mode. If only one CoreAudio output is available, `--device` may be omitted; if there are several, use the exact device name shown by the error message. This streams generated audio during playback; it does not read new text from stdin or provide a full listen-and-reply conversation. Use `pnpm kyberion voice conversation-turn` for that conversation workflow.
+| Make an image from a prompt | `pnpm kyberion draw "<prompt>" --out <image>` (inverse of `see`): local providers only by default; `--allow-cloud` / `--allow-handoff` opt in, `--ref` needs per-run consent for those, `--dry-run` shows the provider first; in pipelines `media-generation:generate_image` |
+| Real-time voice dialogue | `pnpm kyberion voice conversation-turn` — see [voice-interface-protocol.md](./voice-interface-protocol.md) |
+| Agent ↔ agent | Co-Session / Peer Messaging — [agent-communication-layer-model.md](../architecture/agent-communication-layer-model.md) |
 
 Do not add a new channel by wiring a reasoning backend directly — register it
 behind the surface seam so tenant scope, audit and approval apply.

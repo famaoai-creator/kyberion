@@ -59,6 +59,26 @@
       "default_effects_preset_id": "clean-voice",
       "status": "shadow",
       "notes": "Shadow-only profile for future governed voice-clone evaluation."
+    },
+    {
+      "profile_id": "irodori-ja-small",
+      "display_name": "Irodori Japanese Small",
+      "tier": "public",
+      "languages": ["ja"],
+      "sample_refs": [],
+      "default_engine_id": "irodori_tts",
+      "status": "active",
+      "notes": "Stock Japanese voice from Irodori-TTS v4.1 Small 8-bit on Apple Silicon. Select explicitly for local MLX synthesis; this is not a personal voice clone."
+    },
+    {
+      "profile_id": "qwen3-ja-06b-onoanna",
+      "display_name": "Qwen3 Japanese 0.6B Ono Anna",
+      "tier": "public",
+      "languages": ["ja"],
+      "sample_refs": [],
+      "default_engine_id": "qwen3_tts_06b_custom_voice",
+      "status": "active",
+      "notes": "Stock Japanese preset voice for Qwen3-TTS 0.6B CustomVoice 8-bit on Apple Silicon; this is not a personal voice clone."
     }
   ]
 }
