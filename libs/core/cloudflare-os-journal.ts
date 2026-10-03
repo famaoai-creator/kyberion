@@ -9,6 +9,7 @@ import {
   safeLstat,
   safeMkdir,
   safeReaddir,
+  safeStat,
   safeWriteFile,
 } from './secure-io.js';
 import type { TierLevel } from './types.js';
@@ -172,6 +173,30 @@ export function controlPlaneAggregatesPath(dir: string): string {
   return path.join(dir, CONTROL_PLANE_AGGREGATES_FILE);
 }
 
+/**
+ * What this process last saw of each journal file. A journal that has not
+ * changed since (same size and mtime — i.e. only this process's own appends,
+ * which refresh the entry) has nothing new to catch up on, so the whole-file
+ * parse is skipped. Without this every append re-parsed the entire journal and
+ * the cost of recording an observation grew with the journal.
+ */
+const tailCache = new Map<string, { size: number; mtimeMs: number; lastSeq: number }>();
+let fullParseCount = 0;
+
+/** Test seam: how many whole-journal parses this process has done. */
+export function journalFullParseCountForTests(): number {
+  return fullParseCount;
+}
+
+function noteJournalState(journalPath: string, lastSeq: number): void {
+  try {
+    const stat = safeStat(journalPath);
+    tailCache.set(journalPath, { size: stat.size, mtimeMs: stat.mtimeMs, lastSeq });
+  } catch {
+    tailCache.delete(journalPath);
+  }
+}
+
 /** Read journal events with seq > afterSeq; also returns the max seq seen. */
 export function readJournalTail(
   dir: string,
@@ -179,8 +204,17 @@ export function readJournalTail(
 ): { events: ControlPlaneJournalEvent[]; lastSeq: number } {
   const journalPath = controlPlaneJournalPath(dir);
   if (!safeExistsSync(journalPath) || !safeLstat(journalPath).isFile()) {
+    tailCache.delete(journalPath);
     return { events: [], lastSeq: 0 };
   }
+  const known = tailCache.get(journalPath);
+  if (known && afterSeq >= known.lastSeq) {
+    const stat = safeStat(journalPath);
+    if (stat.size === known.size && stat.mtimeMs === known.mtimeMs) {
+      return { events: [], lastSeq: known.lastSeq };
+    }
+  }
+  fullParseCount += 1;
   const lines = readJsonLines<ControlPlaneJournalEvent>(journalPath, {
     onMalformed: 'skip',
   });
@@ -191,6 +225,7 @@ export function readJournalTail(
     if (typeof event.seq === 'number') lastSeq = Math.max(lastSeq, event.seq);
     if (typeof event.seq === 'number' && event.seq > afterSeq) events.push(event);
   }
+  noteJournalState(journalPath, lastSeq);
   return { events, lastSeq };
 }
 
@@ -219,6 +254,7 @@ export function appendJournalEventLocked(
       records: event.records,
     };
     appendJsonLine(controlPlaneJournalPath(namespace.dir), line);
+    noteJournalState(controlPlaneJournalPath(namespace.dir), seq);
     return seq;
   });
 }
@@ -251,6 +287,7 @@ export function appendJournalEventLockedIf(
       records: event.records,
     };
     appendJsonLine(controlPlaneJournalPath(namespace.dir), line);
+    noteJournalState(controlPlaneJournalPath(namespace.dir), seq);
     return { appended: true, seq };
   });
 }

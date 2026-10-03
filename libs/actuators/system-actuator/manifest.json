@@ -13,7 +13,49 @@
       "op": "pipeline",
       "schema_ref": "knowledge/product/schemas/system-pipeline.schema.json",
       "platforms": ["darwin", "linux", "win32"],
-      "effect": "write"
+      "effect": "write",
+      "step_ops": {
+        "read_file": {
+          "effect": "read",
+          "resource_ref_from": "path"
+        },
+        "read_json": {
+          "effect": "read",
+          "resource_ref_from": "path"
+        },
+        "write_file": {
+          "effect": "write",
+          "resource_ref_from": "path"
+        },
+        "write_artifact": {
+          "effect": "write",
+          "resource_ref_from": "path"
+        },
+        "write_json": {
+          "effect": "write",
+          "resource_ref_from": "path"
+        },
+        "mkdir": {
+          "effect": "write",
+          "resource_ref_from": "path"
+        },
+        "open_url": {
+          "effect": "egress",
+          "egress_destination_from": "url"
+        },
+        "log": {
+          "effect": "none"
+        },
+        "notify": {
+          "effect": "none"
+        },
+        "system_notify": {
+          "effect": "none"
+        },
+        "assert": {
+          "effect": "none"
+        }
+      }
     },
     {
       "op": "reconcile",

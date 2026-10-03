@@ -18,6 +18,7 @@ import { readJsonIfPresent } from '../foundation/json.js';
 import { currentScopeEnvelope, runtimeScopeIdentity } from '../scope-envelope.js';
 import { sharedControlPlane } from '../cloudflare-os-shared.js';
 import { computeApprovalPayloadHash } from '../governance/approval-store.js';
+import { classifyEgressDestination } from '../egress-policy.js';
 import { evaluateProvenanceEgress } from '../provenance-taint.js';
 import type { OsKnowledgeTier } from '../cloudflare-os-control-plane.js';
 import { OP_GOVERNANCE_STAMP_KEYS } from './op-preflight.js';
@@ -186,7 +187,7 @@ export function taintResult(
   };
 }
 
-/** Input keys that describe the destination or carry a claim — not the content. */
+/** Input keys that carry a claim about the payload, never part of its content. */
 const EGRESS_NON_CONTENT_KEYS = new Set([
   'target_audience',
   'audience',
@@ -213,9 +214,9 @@ export function egressPayloadHash(input: Record<string, unknown>): string {
 
 /**
  * SC-06: monotonic provenance-egress guard for `effect = egress` ops.
- * Consumes the `_egress_taint` stamped by `taintResult`; a declared target
- * audience/tenant is evaluated against the shared rule, and a declassified
- * payloadHash bypasses exactly one artifact's destination.
+ * The destination (stamped from the manifest's `egress_destination_from`) is
+ * classified through the egress policy and evaluated against the shared rule;
+ * a declassified payload hash bypasses exactly one artifact's destination.
  */
 export function provenanceEgressResult(
   call: OpPreflightCall,
@@ -229,13 +230,15 @@ export function provenanceEgressResult(
     noteStage('egress', 'skipped');
     return;
   }
-  const targetAudience = readAudience(input);
-  const targetTenant =
-    typeof input.target_tenant === 'string'
-      ? input.target_tenant
-      : typeof input.tenant_slug === 'string'
-        ? input.tenant_slug
-        : undefined;
+  // Where the payload goes is classified from policy (the destination the
+  // manifest says the op connects to), never from an audience/tenant/hash the
+  // caller states about it. The tenant is the mission's own.
+  const destination =
+    typeof input._egress_destination === 'string' ? input._egress_destination : undefined;
+  const targetTenant = identity.tenantSlug;
+  const targetAudience = destination
+    ? classifyEgressDestination(destination, targetTenant).audience
+    : undefined;
   const controlPlane = sharedControlPlane();
   if (
     targetAudience &&
@@ -252,22 +255,20 @@ export function provenanceEgressResult(
   // could inject `_egress_taint` params. Recompute from the plane; the
   // taint stage's stamp exists for observability, not authority.
   const taint = controlPlane.projectTaint(identity.missionId);
-  const tainted = taint.highestTier !== 'public' || taint.tenants.length > 0;
+  if (taint.highestTier === 'public' && taint.tenants.length === 0) {
+    noteStage('egress', 'skipped'); // nothing observed, nothing to protect
+    return;
+  }
   if (!targetAudience) {
-    // A tainted mission that does not say where the payload goes cannot be
-    // evaluated, so it is denied rather than skipped; an untainted mission has
-    // nothing to protect.
-    if (!tainted) {
-      noteStage('egress', 'skipped');
-      return;
-    }
+    // A tainted mission whose destination the manifest does not declare
+    // cannot be evaluated, so it is denied rather than skipped.
     if (mode === 'warn') {
       noteStage('egress', 'denied');
       return;
     }
     return {
       decision: 'block',
-      reason: '[OP_EGRESS_DENIED] egress target audience is undeclared for a tainted mission',
+      reason: '[OP_EGRESS_DENIED] egress destination is undeclared for a tainted mission',
       terminate: true,
     };
   }
@@ -282,18 +283,6 @@ export function provenanceEgressResult(
     reason: `[OP_EGRESS_DENIED] ${verdict.reason}`,
     terminate: true,
   };
-}
-
-function readAudience(input: Record<string, unknown>): OsKnowledgeTier | 'external' | undefined {
-  const candidate =
-    (typeof input.target_audience === 'string' && input.target_audience) ||
-    (typeof input.audience === 'string' && input.audience) ||
-    undefined;
-  if (candidate === 'external') return 'external';
-  if (candidate === 'public' || candidate === 'confidential' || candidate === 'personal') {
-    return candidate;
-  }
-  return undefined;
 }
 
 /**

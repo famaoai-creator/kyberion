@@ -2,6 +2,7 @@ import { timingSafeEqual, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { auditChain } from './governance/audit-chain.js';
 import { computeApprovalPayloadHash, decideApprovalRequest } from './governance/approval-store.js';
+import { resolveProvisionalReferences, summarizeHeldAction } from './cloudflare-os-held-support.js';
 import { createHeldApprovalRequest } from './governance/held-effect-request.js';
 import {
   assertPersistableParams,
@@ -160,6 +161,8 @@ export interface HeldActionSummary {
   provisionalRefs: string[];
   /** SC-04: linked approval-store request when the decision is unified. */
   approvalRequestId?: string;
+  /** Set when an apply was claimed; with no outcome it needs an operator (releaseApplyClaim). */
+  applyClaim?: { by: string; at: string };
 }
 
 export interface HeldActionDecision {
@@ -618,6 +621,29 @@ export class CloudflareOsControlPlane {
     }
     this.recordMutation('held', record);
     return record;
+  }
+
+  /**
+   * Operator escape hatch for a claim whose outcome was never recorded (the
+   * claiming process died). Only an authenticated human bound to this exact
+   * payload can release it, with a reason; the plane never releases on its
+   * own because the effect may already have run.
+   */
+  releaseApplyClaim(
+    id: string,
+    approval: HeldActionDecision & { reason: string }
+  ): HeldActionRecord {
+    const record = this.held.get(id);
+    if (!record) throw new Error(`Held action not found: ${id}`);
+    this.assertHumanDecision(record, approval);
+    const by = assertNonEmpty(approval.resolvedBy, 'resolvedBy');
+    const reason = assertNonEmpty(approval.reason, 'reason');
+    const claim = record.applyClaim;
+    if (!this.journalMode || !this.journalStore.releaseHeldApplyClaim(id)) {
+      throw new Error(`[POLICY_VIOLATION] Held action ${id} has no releasable apply claim`);
+    }
+    audit('held_action', 'release_claim', 'completed', { heldActionId: id, by, reason, claim });
+    return this.held.get(id) ?? record;
   }
 
   /** Not-run outcome: nothing is written, so a process that can run it still can. */
@@ -1475,53 +1501,6 @@ export class CloudflareOsControlPlane {
       }
     }
   }
-}
-
-function resolveProvisionalReferences(value: unknown, refs: Map<string, unknown>): unknown {
-  if (typeof value === 'string') {
-    let resolved = value;
-    for (const [provisional, actual] of refs) {
-      if (resolved === provisional) return actual;
-      resolved = resolved.replaceAll(provisional, String(actual));
-    }
-    return resolved;
-  }
-  if (Array.isArray(value)) return value.map((entry) => resolveProvisionalReferences(entry, refs));
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
-        key,
-        resolveProvisionalReferences(entry, refs),
-      ])
-    );
-  }
-  return value;
-}
-
-function summarizeHeldAction(record: HeldActionRecord): HeldActionSummary {
-  return {
-    id: record.id,
-    missionId: record.missionId,
-    taskId: record.taskId,
-    tenantSlug: record.tenantSlug,
-    submittedBy: record.submittedBy,
-    op: record.op,
-    status: record.status,
-    submittedAt: record.submittedAt,
-    decidedAt: record.decidedAt,
-    resolvedBy: record.resolvedBy,
-    autoApproved: record.autoApproved,
-    appliedAt: record.appliedAt,
-    failureRecorded: Boolean(record.applyError),
-    effectBinding: record.effectBinding,
-    payloadHash: record.payloadHash,
-    dependsOn: [...record.dependsOn],
-    actionTag: record.actionTag,
-    irreversible: record.irreversible,
-    simulatable: Boolean(record.simulation || record.simulatable),
-    provisionalRefs: [...(record.simulation?.provisionalRefs || [])],
-    approvalRequestId: record.approvalRequest?.requestId,
-  };
 }
 
 export function assertImmutableAuthConfig(
