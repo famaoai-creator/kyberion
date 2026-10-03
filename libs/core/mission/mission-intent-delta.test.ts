@@ -18,7 +18,13 @@ vi.mock('../core.js', () => ({
   logger: { debug: vi.fn(), warn: vi.fn() },
 }));
 
-import { emitIntentSnapshot, evaluateIntentDriftGate } from '../intent/intent-snapshot-store.js';
+import {
+  emitIntentSnapshot,
+  evaluateIntentDriftGate,
+  type IntentDriftGateResult,
+} from '../intent/intent-snapshot-store.js';
+import type { IntentExtractor } from '../intent/intent-extractor.js';
+import type { MissionState } from './mission-types.js';
 import { getIntentExtractor } from '../intent/intent-extractor.js';
 import { loadState } from './mission-state.js';
 import {
@@ -35,7 +41,7 @@ describe('mission-intent-delta hooks', () => {
     vi.mocked(getIntentExtractor).mockReturnValue({
       name: 'fake',
       extract: vi.fn(async () => ({ goal: 'parsed goal' })),
-    } as any);
+    } as unknown as IntentExtractor);
 
     await emitMissionLifecycleIntentSnapshot({
       missionId: 'MSN-T1',
@@ -61,7 +67,7 @@ describe('mission-intent-delta hooks', () => {
     vi.mocked(getIntentExtractor).mockReturnValue({
       name: 'fake',
       extract,
-    } as any);
+    } as unknown as IntentExtractor);
 
     await emitMissionLifecycleIntentSnapshot({
       missionId: 'MSN-T3',
@@ -95,7 +101,7 @@ describe('mission-intent-delta hooks', () => {
         expected_artifacts: [{ kind: 'doc' }],
       },
       relationships: { project: { project_id: 'PRJ-1' } },
-    } as any);
+    } as unknown as MissionState);
 
     await emitMissionLifecycleIntentSnapshot({
       missionId: 'MSN-T4',
@@ -143,11 +149,91 @@ describe('mission-intent-delta hooks', () => {
       driftScore: 0.2,
       delta: null,
       message: 'ok',
-    } as any);
+    } as unknown as IntentDriftGateResult);
 
     const summary = evaluateMissionIntentDrift('MSN-T2');
     expect(summary?.passed).toBe(true);
     expect(summary?.verdict).toBe('minor');
     expect(summary?.drift_score).toBe(0.2);
+  });
+
+  it('canonicalizes user_prompt snapshots when mission state carries intent', async () => {
+    // Regression: origin snapshots were LLM-extracted (paraphrased goal +
+    // invented constraints/deliverables) while later mission_state snapshots
+    // used the verbatim canonical goal — same intent, different text, so the
+    // gate manufactured a blocking delta on every mission (0.9+).
+    const extract = vi.fn(async () => ({ goal: 'paraphrased goal' }));
+    vi.mocked(getIntentExtractor).mockReturnValue({
+      name: 'fake',
+      extract,
+    } as unknown as IntentExtractor);
+    vi.mocked(loadState).mockReturnValue({
+      intent: { goal_summary: 'Wire the trigger flow end to end.' },
+    } as unknown as MissionState);
+
+    await emitMissionLifecycleIntentSnapshot({
+      missionId: 'MSN-T6',
+      stage: 'intake',
+      text: 'Wire the trigger flow end to end.',
+      source: 'user_prompt',
+    });
+
+    expect(extract).not.toHaveBeenCalled();
+    expect(emitIntentSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        missionId: 'MSN-T6',
+        source: 'user_prompt',
+        intent: expect.objectContaining({ goal: 'Wire the trigger flow end to end.' }),
+      })
+    );
+  });
+
+  it('falls back to intent.source_text when goal_summary is empty', async () => {
+    // Missions created without --goal (handoffs, vision refs) leave
+    // goal_summary empty; without the source_text fallback every later
+    // snapshot recorded checkpoint/commit text as its "goal".
+    vi.mocked(loadState).mockReturnValue({
+      intent: { source_text: 'presence board drawn by voice' },
+    } as unknown as MissionState);
+
+    await emitMissionLifecycleIntentSnapshot({
+      missionId: 'MSN-T7',
+      stage: 'execution',
+      text: 'auto-checkpoint status=active tasks=0',
+      source: 'mission_state',
+    });
+
+    expect(emitIntentSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        intent: expect.objectContaining({ goal: 'presence board drawn by voice' }),
+      })
+    );
+  });
+
+  it('passes canonical current intent to the drift gate', () => {
+    // The snapshot stream is an activity log — the gate must compare the
+    // origin against the canonical current intent, not the last emitted line.
+    vi.mocked(loadState).mockReturnValue({
+      intent: { goal_summary: 'stable mission goal' },
+      outcome_contract: { success_criteria: ['tests green'] },
+    } as unknown as MissionState);
+    vi.mocked(evaluateIntentDriftGate).mockReturnValue({
+      passed: true,
+      verdict: 'none',
+      driftScore: 0,
+      delta: null,
+      message: 'ok',
+    } as unknown as IntentDriftGateResult);
+
+    evaluateMissionIntentDrift('MSN-T8');
+
+    expect(evaluateIntentDriftGate).toHaveBeenCalledWith(
+      'MSN-T8',
+      undefined,
+      expect.objectContaining({
+        goal: 'stable mission goal',
+        constraints: ['tests green'],
+      })
+    );
   });
 });
