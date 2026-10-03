@@ -4,6 +4,7 @@ import {
   safeExec,
   safeLstat,
   safeReaddir,
+  safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
 import {
@@ -79,6 +80,93 @@ export function buildPlaygroundPayload(
     op: operation,
     params,
   };
+}
+
+/**
+ * Merge manifest capabilities with fine-grained describeOps from the
+ * generated discovery index. Pipeline-style actuators (file/browser/media)
+ * expose only `pipeline` in manifest.json while describeOps lists the real
+ * single-op surface (e.g. file:read). Without this merge the playground
+ * rejects valid ops with "Machine mode requires --op".
+ */
+export function loadDiscoveryOpsForActuator(actuatorId: string, dirId = ''): string[] {
+  return loadDiscoveryOpDetailsForActuator(actuatorId, dirId).map((entry) => entry.op);
+}
+
+export function loadDiscoveryOpDetailsForActuator(
+  actuatorId: string,
+  dirId = ''
+): Array<{ op: string; kind: string }> {
+  try {
+    const discoveryPath = pathResolver.rootResolve(
+      'knowledge/product/orchestration/actuator-op-discovery.json'
+    );
+    if (!safeExistsSync(discoveryPath)) return [];
+    const raw = String(safeReadFile(discoveryPath, { encoding: 'utf8' }));
+    const parsed = JSON.parse(raw) as {
+      actuators?: Array<{ n?: string; path?: string; ops?: Array<{ op?: string; kind?: string }> }>;
+    };
+    const entries = Array.isArray(parsed.actuators) ? parsed.actuators : [];
+    const match = entries.find(
+      (entry) =>
+        entry?.n === actuatorId ||
+        (dirId !== '' && (entry?.n === dirId || entry?.path?.endsWith(`/${dirId}`)))
+    );
+    if (!match || !Array.isArray(match.ops)) return [];
+    return match.ops
+      .map((op) => ({
+        op: typeof op?.op === 'string' ? op.op.trim() : '',
+        kind: typeof op?.kind === 'string' ? op.kind.trim() : 'capture',
+      }))
+      .filter((entry) => entry.op !== '');
+  } catch {
+    return [];
+  }
+}
+
+export function lookupDiscoveryOpKind(actuatorId: string, op: string, dirId = ''): string | null {
+  const details = loadDiscoveryOpDetailsForActuator(actuatorId, dirId);
+  return details.find((entry) => entry.op === op)?.kind ?? null;
+}
+
+/**
+ * Actuators whose CLI boundary accepts `{action:"pipeline", steps:[...]}`
+ * (pure pipeline-driven like file/network/media, or mixed like browser/code).
+ * A bare `{action:"read"}` fails there with "pure pipeline-driven" — wrap a
+ * single describeOps selection into a one-step pipeline so playground try-out
+ * matches the real ADF step shape. Actuators without a `pipeline` entry
+ * (agent/secret/…) dispatch single actions directly and must NOT be wrapped.
+ */
+export function actuatorAcceptsPipeline(manifest: ActuatorManifestFile): boolean {
+  return (manifest.capabilities || []).some((entry) => entry.op === 'pipeline');
+}
+export function buildPipelineWrappedPayload(
+  op: string,
+  params: Record<string, unknown>,
+  kind: string
+): Record<string, unknown> {
+  const type = ['capture', 'transform', 'apply', 'control'].includes(kind) ? kind : 'capture';
+  return {
+    action: 'pipeline',
+    op: 'pipeline',
+    steps: [{ type, op, params }],
+    context: {},
+    options: {},
+  };
+}
+
+export function resolvePlaygroundCapabilities(
+  manifest: ActuatorManifestFile,
+  dirId = ''
+): ActuatorManifestFile['capabilities'] {
+  const base = Array.isArray(manifest.capabilities) ? [...manifest.capabilities] : [];
+  const seen = new Set(base.map((capability) => capability.op));
+  for (const op of loadDiscoveryOpsForActuator(manifest.actuator_id, dirId)) {
+    if (seen.has(op)) continue;
+    seen.add(op);
+    base.push({ op, platforms: [] });
+  }
+  return base;
 }
 
 /**
@@ -267,7 +355,9 @@ export async function runPlayground(
   log(chalk.green(`\n✓ Selected Actuator: ${chalk.bold(manifest.actuator_id)}`));
 
   // 4. Operation Selection Wizard
-  const ops = manifest.capabilities || [];
+  // Manifest is coarse (pipeline-style actuators list only `pipeline`);
+  // union with describeOps from the discovery index so single ops work.
+  const ops = resolvePlaygroundCapabilities(manifest, selectedActuator.id);
   let selectedOpObj = ops.find((o) => o.op === targetOp);
 
   if (!selectedOpObj) {
@@ -278,7 +368,15 @@ export async function runPlayground(
     }
     if (machineOutput) {
       rl.close();
-      throw new ScriptExitError(1, 'Machine mode requires --op for the selected actuator.');
+      if (!targetOp) {
+        throw new ScriptExitError(1, 'Machine mode requires --op for the selected actuator.');
+      }
+      throw new ScriptExitError(
+        1,
+        `Unknown --op '${targetOp}' for '${manifest.actuator_id}'. ` +
+          `Available: ${ops.map((o) => o.op).join(', ')}. ` +
+          `Fine-grained ops come from knowledge/product/orchestration/actuator-op-discovery.json.`
+      );
     }
 
     log(chalk.white('\nAvailable Operations (ops):'));
@@ -348,8 +446,26 @@ export async function runPlayground(
   }
 
   // 6. Construct Payload
-  // Include both 'op' and 'action' for seamless compatibility across different actuator conventions
-  const payload = buildPlaygroundPayload(op, paramsObject);
+  // Include both 'op' and 'action' for seamless compatibility across different actuator conventions.
+  // Discovery-only ops on actuators that accept `pipeline` are wrapped into
+  // the same one-step pipeline ADF the runtime executes, so playground
+  // try-out matches production. Actuators without a `pipeline` entry
+  // (agent/secret/…) dispatch single actions directly and stay bare.
+  const isManifestOp = (manifest.capabilities || []).some((entry) => entry.op === op);
+  const discoveryKind = isManifestOp
+    ? null
+    : lookupDiscoveryOpKind(manifest.actuator_id, op, selectedActuator.id);
+  const isPipelineWrapped = discoveryKind !== null && actuatorAcceptsPipeline(manifest);
+  const payload = isPipelineWrapped
+    ? buildPipelineWrappedPayload(op, paramsObject, discoveryKind as string)
+    : buildPlaygroundPayload(op, paramsObject);
+  if (isPipelineWrapped && !machineOutput) {
+    log(
+      chalk.gray(
+        `  Wrapped '${op}' into a one-step ${manifest.actuator_id} pipeline (same shape as ADF).`
+      )
+    );
+  }
 
   try {
     assertPlaygroundSecretMutationAllowed({
@@ -367,11 +483,13 @@ export async function runPlayground(
   }
 
   if (options.check === true || options.dryRun === true) {
+    // Manifest contract_schema describes the coarse `pipeline` shape only.
+    // Single ops merged from describeOps must not be validated against it.
     const plan = evaluatePlaygroundDryRun({
       actuatorId: manifest.actuator_id,
       operation: op,
       payload,
-      contractSchemaPath: manifest.contract_schema,
+      contractSchemaPath: isManifestOp ? manifest.contract_schema : undefined,
       mode: options.check === true ? 'check' : 'dry-run',
     });
     // `--check` is schema/plan only. Apply/transform/control `--dry-run` also
