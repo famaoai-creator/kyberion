@@ -14,9 +14,15 @@ const REFRESH_MIN_INTERVAL_MS = 250;
 let shared: CloudflareOsControlPlane | undefined;
 let lastRefreshAt = 0;
 
-export function sharedControlPlane(): CloudflareOsControlPlane {
+/**
+ * `options` apply at first construction only — the instance is shared, so
+ * a later caller cannot retune it (and must not assume its flag won).
+ */
+export function sharedControlPlane(options?: {
+  auditRestoreFailures?: boolean;
+}): CloudflareOsControlPlane {
   if (!shared) {
-    shared = new CloudflareOsControlPlane();
+    shared = new CloudflareOsControlPlane(options);
     lastRefreshAt = Date.now();
     return shared;
   }
@@ -43,12 +49,15 @@ export function resetSharedControlPlaneForTests(): void {
  * Fail-closed: an explicit tenant slug must be valid; a tenantless scope
  * gets the same shared instance (records carry their own namespace).
  */
-export function getControlPlaneForScope(scope?: { tenantSlug?: string }): CloudflareOsControlPlane {
+export function getControlPlaneForScope(
+  scope?: { tenantSlug?: string },
+  options?: { auditRestoreFailures?: boolean }
+): CloudflareOsControlPlane {
   const tenant = scope?.tenantSlug?.trim();
   if (tenant && !isValidTenantSlug(tenant)) {
     throw new Error(`[POLICY_VIOLATION] Control-plane tenant scope is invalid: ${tenant}`);
   }
-  return sharedControlPlane();
+  return sharedControlPlane(options);
 }
 
 /**

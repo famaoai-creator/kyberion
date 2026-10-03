@@ -3,6 +3,7 @@ import { pathResolver } from '../path-resolver.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from '../secure-io.js';
+import { logger } from '../core.js';
 
 export interface ActuatorManifestCapabilityRequirements {
   bin?: string[];
@@ -107,7 +108,8 @@ function listOps(manifest: ActuatorManifestFile): string[] {
 }
 
 export function loadActuatorManifestCatalog(
-  actuatorsDir = DEFAULT_ACTUATORS_DIR
+  actuatorsDir = DEFAULT_ACTUATORS_DIR,
+  options: { lenient?: boolean } = {}
 ): ActuatorCatalogEntry[] {
   const dir = assertSafeRepositoryPath(pathResolver.rootResolve(actuatorsDir), {
     allowMissingLeaf: true,
@@ -135,7 +137,18 @@ export function loadActuatorManifestCatalog(
       continue;
     }
 
-    const manifest = readManifest(manifestPath);
+    let manifest;
+    try {
+      manifest = readManifest(manifestPath);
+    } catch (error) {
+      // lenient (op->capability lookup): one corrupt manifest must not take
+      // down every other op's preflight — skip it, never fail the read.
+      if (!options.lenient) throw error;
+      logger.warn(
+        `[actuator-manifest-index] skipping unreadable manifest ${manifestPath}: ${error instanceof Error ? error.message : String(error)}`
+      );
+      continue;
+    }
     if (!manifest.actuator_id) {
       continue;
     }
@@ -234,7 +247,7 @@ export function resetOpCapabilityIndex(): void {
 export function lookupOpCapability(op: string): ActuatorManifestCapability | undefined {
   if (!opCapabilityIndex) {
     opCapabilityIndex = new Map();
-    for (const entry of loadActuatorManifestCatalog()) {
+    for (const entry of loadActuatorManifestCatalog(DEFAULT_ACTUATORS_DIR, { lenient: true })) {
       const prefix = entry.n.replace(/-actuator$/u, '');
       const manifest = readManifest(pathResolver.rootResolve(entry.manifest_path));
       for (const capability of manifest.capabilities ?? []) {
