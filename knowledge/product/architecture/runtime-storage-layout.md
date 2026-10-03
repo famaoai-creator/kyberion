@@ -104,7 +104,10 @@ is placed by the **owner's own record**, never by the caller's guess
   mission (owner-scope registers itself as path-resolver's mission locator);
   their directory scan only finds a pre-materialized mission that has no
   `mission-state.json` yet. An id in several tenants fails closed
-  (`OWNER_AMBIGUOUS`) instead of returning the first match.
+  (`OWNER_AMBIGUOUS`) instead of returning the first match, and a mission
+  directory whose state this process may not see fails with
+  `OWNER_NOT_VISIBLE` rather than reading as absent (which would invite a
+  second copy). Identity resolution treats both as "no mission identity".
 - Agent input (surface `steer:` / `follow-up:`, `enqueueMissionAgentInput`) is
   queued beside the existing mission only; input for an unknown mission is
   refused with `OWNER_NOT_FOUND` rather than parked where it would never be read.
