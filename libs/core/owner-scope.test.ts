@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -294,6 +294,25 @@ describe('resolveOwnerScope', () => {
       path.join(tmpRoot, 'active/missions/public/MSN-OWN-PREMAT')
     );
     expect(loadState('MSN-OWN-PREMAT')).toBeNull();
+  });
+
+  it('answers a lookup nested inside the locator with the plain scan, not recursion', async () => {
+    const resolver = await import('./path-resolver.js');
+    const nested: Array<string | null> = [];
+    resolver.registerMissionLocator((missionId) => {
+      // e.g. secure-io's permission check resolving identity mid-lookup
+      nested.push(resolver.findMissionPath(missionId));
+      return undefined;
+    });
+    try {
+      // Outer call: the locator found nothing, so a directory holding a state
+      // is not accepted from the scan; the nested call took the plain scan.
+      expect(resolver.findMissionPath('MSN-OWN-PUB')).toBeNull();
+      expect(nested).toEqual([path.join(tmpRoot, 'active/missions/public/MSN-OWN-PUB')]);
+    } finally {
+      vi.resetModules();
+      await import('./owner-scope.js');
+    }
   });
 
   it('rejects ids that are not a single safe segment', () => {
