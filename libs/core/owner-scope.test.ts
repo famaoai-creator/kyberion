@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -285,7 +285,9 @@ describe('resolveOwnerScope', () => {
     // the legacy directory scan (a flat dir holding another tenant's state).
     process.env.KYBERION_TENANT = 'globex';
     expect(findMissionPath('MSN-OWN-ACME')).toBeNull();
-    expect(findMissionPath('MSN-OWN-BROKEN')).toBeNull();
+    // A canonical directory whose state the resolver will not hand to this
+    // identity fails closed (a null would let a caller create a second copy).
+    expect(() => findMissionPath('MSN-OWN-BROKEN')).toThrow(/\[OWNER_NOT_VISIBLE\]/);
     expect(loadState('MSN-OWN-ACME')).toBeNull();
     delete process.env.KYBERION_TENANT;
     // A pre-materialized mission (directory, no state yet) is still found.
@@ -294,10 +296,21 @@ describe('resolveOwnerScope', () => {
       path.join(tmpRoot, 'active/missions/public/MSN-OWN-PREMAT')
     );
     expect(loadState('MSN-OWN-PREMAT')).toBeNull();
+    // A non-canonical (lower-case) directory is outside the resolver's search
+    // and keeps the plain-scan behavior.
+    writeMission('active/missions/public/msn-own-lower', {
+      mission_id: 'msn-own-lower',
+      tier: 'public',
+    });
+    expect(findMissionPath('msn-own-lower')).toBe(
+      path.join(tmpRoot, 'active/missions/public/msn-own-lower')
+    );
   });
 
   it('answers a lookup nested inside the locator with the plain scan, not recursion', async () => {
     const resolver = await import('./path-resolver.js');
+    const key = Symbol.for('kyberion.pathResolver.missionLocator');
+    const previous = (globalThis as Record<symbol, unknown>)[key];
     const nested: Array<string | null> = [];
     resolver.registerMissionLocator((missionId) => {
       // e.g. secure-io's permission check resolving identity mid-lookup
@@ -305,13 +318,12 @@ describe('resolveOwnerScope', () => {
       return undefined;
     });
     try {
-      // Outer call: the locator found nothing, so a directory holding a state
-      // is not accepted from the scan; the nested call took the plain scan.
-      expect(resolver.findMissionPath('MSN-OWN-PUB')).toBeNull();
+      // Outer call: the locator found nothing for a canonical directory that
+      // holds a state, so it fails closed; the nested call took the plain scan.
+      expect(() => resolver.findMissionPath('MSN-OWN-PUB')).toThrow(/\[OWNER_NOT_VISIBLE\]/);
       expect(nested).toEqual([path.join(tmpRoot, 'active/missions/public/MSN-OWN-PUB')]);
     } finally {
-      vi.resetModules();
-      await import('./owner-scope.js');
+      (globalThis as Record<symbol, unknown>)[key] = previous;
     }
   });
 

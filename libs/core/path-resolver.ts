@@ -574,6 +574,17 @@ function registeredMissionLocator(): MissionLocator | undefined {
  */
 let locatingMission = false;
 
+/** Same `[CODE] what — why | next: remedy` shape as OwnerScopeError. */
+function missionNotVisibleError(missionId: string): Error {
+  const error = new Error(
+    `[OWNER_NOT_VISIBLE] mission ${missionId} exists but is not resolvable by this process — ` +
+      'its state belongs to another tenant or disagrees with its directory | ' +
+      'next: run under the owning tenant, or repair the mission state'
+  );
+  (error as Error & { code: string }).code = 'OWNER_NOT_VISIBLE';
+  return error;
+}
+
 export function findMissionPath(missionId: string): string | null {
   assertMissionIdArgument(missionId);
   // The locator reads through secure-io, whose permission check resolves the
@@ -591,11 +602,19 @@ export function findMissionPath(missionId: string): string | null {
     }
     if (located) return located;
   }
-  // With a locator, a directory holding a state it did not resolve belongs to
-  // a scope this process may not see; only a stateless directory is accepted.
-  const accept = (candidate: string): boolean =>
-    isMissionDirectory(candidate) &&
-    (!locator || !rawExistsSync(path.join(candidate, 'mission-state.json')));
+  // With a locator, a canonical (upper-case) directory holding a state the
+  // locator did not resolve belongs to a scope this process may not see, or is
+  // inconsistent. Returning null would let a caller create a second copy, so
+  // it fails closed. A stateless (pre-materialized) directory, a non-canonical
+  // (lower-case) name the locator does not search, and the legacy unpartitioned
+  // root keep the plain-scan behavior.
+  const canonical = missionId.toUpperCase();
+  const accept = (candidate: string, legacy = false): boolean => {
+    if (!isMissionDirectory(candidate)) return false;
+    if (!locator || legacy || path.basename(candidate) !== canonical) return true;
+    if (!rawExistsSync(path.join(candidate, 'mission-state.json'))) return true;
+    throw missionNotVisibleError(missionId);
+  };
   const tiers: MissionTier[] = ['personal', 'confidential', 'public'];
 
   for (const tier of tiers) {
@@ -613,7 +632,7 @@ export function findMissionPath(missionId: string): string | null {
 
   // Legacy fallback
   const legacyPath = path.join(ACTIVE_ROOT, 'missions', missionId);
-  if (accept(legacyPath)) return legacyPath;
+  if (accept(legacyPath, true)) return legacyPath;
 
   return null;
 }

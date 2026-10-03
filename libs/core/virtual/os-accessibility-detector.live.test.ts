@@ -167,13 +167,14 @@ try {
 } catch { $failure = $_.Exception.Message }
 [Console]::Out.WriteLine((@{ width = $w; height = $h; saved = $saved; error = $failure } | ConvertTo-Json -Compress))`;
 
-// Waits up to 5 s for a top-level window titled UIA_SMOKE_TITLE and reports the
+// Waits up to 15 s (a deadline, not an iteration count) for a top-level window titled UIA_SMOKE_TITLE and reports the
 // DPI of the window handle in UIA_SMOKE_HWND and of the system.
 const WAIT_TITLE_SCRIPT = `$ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 ${WIN32_TYPE}
 $found = [IntPtr]::Zero
-for ($i = 0; $i -lt 25 -and $found -eq [IntPtr]::Zero; $i++) {
+$watch = [System.Diagnostics.Stopwatch]::StartNew()
+while ($found -eq [IntPtr]::Zero -and $watch.ElapsedMilliseconds -lt 15000) {
   $found = [KyberionUiaSmoke]::FindWindow([NullString]::Value, $env:UIA_SMOKE_TITLE)
   if ($found -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 200 }
 }
@@ -381,11 +382,19 @@ function launchWithRetry(
   for (let attempt = 1; ; attempt += 1) {
     const waitMs = Math.min(LAUNCH_ATTEMPT_WAIT_MS, LAUNCH_DEADLINE_MS - (Date.now() - started));
     if (waitMs < 5_000) break;
-    launch = runPowerShell(
-      script,
-      { ...env, UIA_SMOKE_WAIT_MS: String(waitMs) },
-      waitMs + LAUNCH_SCRIPT_OVERHEAD_MS
-    );
+    try {
+      launch = runPowerShell(
+        script,
+        { ...env, UIA_SMOKE_WAIT_MS: String(waitMs) },
+        waitMs + LAUNCH_SCRIPT_OVERHEAD_MS
+      );
+    } catch (error) {
+      // A launcher that timed out reports no pids; retry within the deadline
+      // instead of abandoning the remaining attempts.
+      console.log(`[uia-smoke:${label}] launch attempt ${attempt} failed`, String(error));
+      launch = {};
+      continue;
+    }
     const attemptPids = pidsOf(launch);
     pids.push(...attemptPids);
     console.log(`[uia-smoke:${label}] launch attempt ${attempt}`, JSON.stringify(launch));
@@ -421,7 +430,7 @@ describe.skipIf(!LIVE)('os_accessibility live smoke on Windows (UI Automation)',
       killAll(pids);
       if (safeExistsSync(shotDir)) safeRmSync(shotDir);
     }
-  }, 240_000);
+  }, 300_000);
 
   it('finds the button, checkbox and text box of a WPF window', async () => {
     safeMkdir(shotDir, { recursive: true });
@@ -457,7 +466,7 @@ describe.skipIf(!LIVE)('os_accessibility live smoke on Windows (UI Automation)',
       killAll(pids);
       if (safeExistsSync(shotDir)) safeRmSync(shotDir);
     }
-  }, 240_000);
+  }, 300_000);
   it('clicks the WPF OK button through its mark with the DPI-aware pointer path', async () => {
     safeMkdir(shotDir, { recursive: true });
     const title = `Kyberion UIA click smoke ${process.pid}`;
@@ -551,5 +560,5 @@ describe.skipIf(!LIVE)('os_accessibility live smoke on Windows (UI Automation)',
       killAll(pids);
       if (safeExistsSync(shotDir)) safeRmSync(shotDir);
     }
-  }, 240_000);
+  }, 300_000);
 });
