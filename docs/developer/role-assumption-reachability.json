@@ -88,6 +88,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/co-session.ts#withCoSessionWrite",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
@@ -2664,26 +2669,37 @@
         {
           "site": "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
           "targets": ["scripts/mission_controller.ts"]
+        },
+        {
+          "site": "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+          "targets": ["scripts/run_pipeline.ts"]
+        },
+        {
+          "site": "scripts/setup_oauth.ts#main",
+          "targets": ["scripts/oauth_callback_surface.ts"]
+        },
+        {
+          "site": "scripts/soak_restart_e2e.ts#spawnWorker",
+          "targets": ["scripts/soak_restart_e2e.ts"]
         }
       ],
       "reachable_roles": {
         "chronos_gateway": {
           "example_path": [
-            "scripts/mission_controller.ts#handoffMission [child process]",
-            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
-            "libs/core/mission/mission-system.ts#buildMissionSystem",
-            "libs/core/mission/mission-maintenance.ts#resumeMission",
-            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
-            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
-            "libs/core/mission/mission-orchestration-worker.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
-            "scripts/mission_controller.ts#main [child process]",
-            "scripts/mission_controller.ts#mainImpl",
-            "scripts/mission_controller.ts#memoryCommands",
-            "scripts/refactor/mission-memory-commands.ts#promoteMemoryCandidate",
-            "libs/core/knowledge/memory-promotion-workflow.ts#promoteMemoryCandidateToKnowledge",
-            "libs/core/promoted-memory.ts#savePromotedMemoryRecord"
+            "presence/displays/computer-surface/server.ts#<module>",
+            "presence/displays/computer-surface/os-control-plane.ts#<module>",
+            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
+            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
+            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
+            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
+            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
           ]
         },
         "ecosystem_architect": {
@@ -2707,21 +2723,20 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "libs/core/mission/mission-orchestration-worker.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
-            "scripts/mission_controller.ts#handoffMission [child process]",
-            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
-            "libs/core/mission/mission-system.ts#buildMissionSystem",
-            "libs/core/mission/mission-maintenance.ts#resumeMission",
-            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
-            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
-            "scripts/run_mission_orchestration_event_worker.ts#main",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
-            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
-            "scripts/surface_runtime.ts#startSurfaceById [child process]",
-            "scripts/surface_runtime.ts#recordProtocolSurfaceLifecycle",
-            "libs/core/protocol-service-lifecycle.ts#recordProtocolServiceLifecycle"
+            "presence/displays/computer-surface/server.ts#<module>",
+            "presence/displays/computer-surface/os-control-plane.ts#<module>",
+            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
+            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
+            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
+            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
+            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
           ]
         },
         "knowledge_steward": {
@@ -2740,17 +2755,14 @@
         },
         "mission_controller": {
           "example_path": [
-            "scripts/mission_controller.ts#handoffMission [child process]",
-            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
-            "libs/core/mission/mission-system.ts#buildMissionSystem",
-            "libs/core/mission/mission-maintenance.ts#resumeMission",
-            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
-            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
-            "libs/core/mission/mission-orchestration-worker.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
-            "scripts/mission_controller.ts#<module> [child process]",
-            "libs/core/governance/kill-switch.ts#<module>",
+            "presence/displays/computer-surface/server.ts#<module>",
+            "presence/displays/computer-surface/os-control-plane.ts#<module>",
+            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
@@ -2785,16 +2797,20 @@
         },
         "slack_bridge": {
           "example_path": [
-            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
-            "scripts/mission_controller.ts#handoffMission [child process]",
-            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
-            "libs/core/mission/mission-system.ts#buildMissionSystem",
-            "libs/core/mission/mission-maintenance.ts#resumeMission",
-            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
-            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
-            "libs/core/mission/mission-orchestration-worker.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
-            "libs/core/mission/mission-orchestration-planning.ts#emitSlackMissionEvent"
+            "presence/displays/computer-surface/server.ts#<module>",
+            "presence/displays/computer-surface/os-control-plane.ts#<module>",
+            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
+            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
+            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
+            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
+            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
           ]
         },
         "sovereign_concierge": {
@@ -2806,18 +2822,20 @@
         },
         "surface_runtime": {
           "example_path": [
-            "libs/core/mission/mission-orchestration-worker.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
-            "scripts/mission_controller.ts#handoffMission [child process]",
-            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
-            "libs/core/mission/mission-system.ts#buildMissionSystem",
-            "libs/core/mission/mission-maintenance.ts#resumeMission",
-            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
-            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
-            "scripts/run_mission_orchestration_event_worker.ts#main",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
-            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested"
+            "presence/displays/computer-surface/server.ts#<module>",
+            "presence/displays/computer-surface/os-control-plane.ts#<module>",
+            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
+            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
+            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
+            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
+            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
           ]
         }
       },
@@ -2827,6 +2845,7 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -2849,7 +2868,14 @@
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
         "libs/core/windows-os-automation.ts#runWindowsPointerActions",
-        "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce"
+        "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
+        "scripts/backup.ts#runRequired",
+        "scripts/check_doc_examples.ts#runBashCheck",
+        "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
+        "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
+        "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/refactor/adf-input.ts#readWorkflowModuleInput"
       ],
       "policy_roles_not_reachable": []
     },
@@ -4292,8 +4318,58 @@
         "presence/displays/operator-surface/src/middleware.ts"
       ],
       "reviewed_infeasible": [],
-      "child_process_entries": [],
+      "child_process_entries": [
+        {
+          "site": "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+          "targets": ["scripts/agent_runtime_supervisor_daemon.ts"]
+        },
+        {
+          "site": "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+          "targets": ["scripts/run_agent_runtime_supervisor.ts"]
+        },
+        {
+          "site": "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+          "targets": ["scripts/run_mission_orchestration_event_worker.ts"]
+        },
+        {
+          "site": "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
+          "targets": ["scripts/surface_runtime.ts"]
+        },
+        {
+          "site": "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+          "targets": ["scripts/mission_controller.ts"]
+        },
+        {
+          "site": "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+          "targets": ["scripts/run_pipeline.ts"]
+        },
+        {
+          "site": "scripts/setup_oauth.ts#main",
+          "targets": ["scripts/oauth_callback_surface.ts"]
+        },
+        {
+          "site": "scripts/soak_restart_e2e.ts#spawnWorker",
+          "targets": ["scripts/soak_restart_e2e.ts"]
+        }
+      ],
       "reachable_roles": {
+        "chronos_gateway": {
+          "example_path": [
+            "presence/displays/operator-surface/src/lib/data.ts#getCloudflareOsSnapshot",
+            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
+            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
+            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
+            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
+            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+          ]
+        },
         "chronos_token_registry_reader": {
           "example_path": [
             "presence/displays/operator-surface/src/lib/viewer-context.ts#<module>",
@@ -4302,15 +4378,107 @@
             "libs/core/authn-providers.ts#loadRegistrations"
           ]
         },
+        "ecosystem_architect": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
+            "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
+            "libs/core/actuator/deployment-adapter.ts#installShellDeploymentAdapterFromConfigIfAvailable",
+            "libs/core/actuator/deployment-adapter.ts#loadShellDeploymentAdapterConfig"
+          ]
+        },
+        "infrastructure_sentinel": {
+          "example_path": [
+            "presence/displays/operator-surface/src/lib/data.ts#getCloudflareOsSnapshot",
+            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
+            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
+            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
+            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
+            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+          ]
+        },
+        "knowledge_steward": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-creation.ts#createMission"
+          ]
+        },
+        "mission_controller": {
+          "example_path": [
+            "presence/displays/operator-surface/src/lib/data.ts#getCloudflareOsSnapshot",
+            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/agent/agent-runtime-supervisor.ts#<module>",
+            "libs/core/agent/agent-lifecycle.ts#<module>",
+            "libs/core/agent/agent-lifecycle.ts#AgentLifecycleManagerImpl",
+            "libs/core/agent/agent-identity.ts#bindAgentRuntimeInstanceBestEffort",
+            "libs/core/agent/agent-identity.ts#bindRuntimeInstance",
+            "libs/core/agent/agent-identity.ts#appendGoverned"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
-            "presence/displays/operator-surface/src/app/intent-snapshots/page.tsx#IntentSnapshotsPage",
-            "presence/displays/operator-surface/src/app/intent-snapshots/page.tsx#IntentResolutionSummary",
-            "libs/core/intent/intent-resolution-contract.ts#resolveIntentResolutionContract",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleSurfaceControlRequested",
+            "scripts/surface_runtime.ts#buildDisabledSurfaceReconcileRow [child process]",
             "libs/core/t.ts#t",
             "libs/core/locale.ts#resolveLocale",
             "libs/core/locale.ts#resolveWithoutExplicit",
             "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
+        "slack_bridge": {
+          "example_path": [
+            "presence/displays/operator-surface/src/lib/data.ts#getCloudflareOsSnapshot",
+            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
+            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
+            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
+            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
+            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
           ]
         },
         "sovereign_concierge": {
@@ -4319,11 +4487,60 @@
             "libs/core/surface/surface-authn.ts#<module>",
             "libs/core/authn-providers.ts#<module>"
           ]
+        },
+        "surface_runtime": {
+          "example_path": [
+            "presence/displays/operator-surface/src/lib/data.ts#getCloudflareOsSnapshot",
+            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
+            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
+            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
+            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
+            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+          ]
         }
       },
       "unresolved_sites": [
+        "libs/core/actuator/deployment-adapter.ts#ShellDeploymentAdapter",
+        "libs/core/agent/agent-adapter.ts#BaseACPAdapter",
+        "libs/core/agent/agent-adapter.ts#runCliProcess",
+        "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
+        "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
+        "libs/core/mesh/acp-mediator.ts#<module>",
+        "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
+        "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend",
+        "libs/core/opencode-cli-reasoning-backend.ts#OpencodeCliReasoningBackend",
+        "libs/core/provider/agy-cli-backend.ts#AgyCliBackend",
+        "libs/core/provider/codex-cli-query.ts#CodexCliQuery",
+        "libs/core/provider/codex-cli-query.ts#resolveCodexBinary",
+        "libs/core/provider/cursor-cli-reasoning-backend.ts#CursorCliReasoningBackend",
+        "libs/core/provider/devin-cli-reasoning-backend.ts#DevinCliReasoningBackend",
+        "libs/core/provider/gemini-cli-backend.ts#GeminiCliBackend",
+        "libs/core/provider/gemini-cli-backend.ts#runGeminiCliQuery",
         "libs/core/provider/provider-discovery.ts#memoizedCliSpawnSync",
-        "presence/displays/operator-surface/src/lib/view.ts#<module>"
+        "libs/core/python-voice-bridge.ts#PythonVoiceBridge",
+        "libs/core/secret/secret-resolver.ts#ShellSecretResolver",
+        "libs/core/shell/pty-engine.ts#PtyRegistry",
+        "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
+        "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
+        "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
+        "presence/displays/operator-surface/src/lib/view.ts#<module>",
+        "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
+        "scripts/backup.ts#runRequired",
+        "scripts/check_doc_examples.ts#runBashCheck",
+        "scripts/check_doc_examples.ts#runBashSyntax",
+        "scripts/pipeline-execution-part-bootstrap.ts#loadActuatorDispatch",
+        "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemExec",
+        "scripts/pipeline-execution-part-bootstrap.ts#runInlineSystemShell",
+        "scripts/refactor/adf-input.ts#readWorkflowModuleInput"
       ],
       "policy_roles_not_reachable": []
     },

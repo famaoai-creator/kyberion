@@ -17,6 +17,11 @@ import {
 } from './cloudflare-os-journal.js';
 import { CloudflareOsControlPlane } from './cloudflare-os-control-plane.js';
 import { mintScopeEnvelope, withScopeEnvelope } from './scope-envelope.js';
+import {
+  decideApprovalRequest,
+  drainPendingSteeringApprovalExecutions,
+  loadApprovalRequest,
+} from './governance/approval-store.js';
 
 let testRoot: string;
 let counter = 0;
@@ -289,6 +294,92 @@ describe('control-plane journal persistence', () => {
     const applied = await cp2.applyHeldAction(record.id);
     expect(applied.status).toBe('applied');
     expect(executed).toEqual({ title: 'x' });
+  });
+
+  it('settles a held decision via the shared approval store (SC-04)', async () => {
+    const cp = new CloudflareOsControlPlane();
+    const record = cp.submitHeldAction({
+      missionId: 'mission-j',
+      tenantSlug: 'tenant-a',
+      submittedBy: 'agent:x',
+      op: 'service:create_issue',
+      params: { title: 'x' },
+      apply: async () => ({ ok: true }),
+      steeringApproval: {
+        surface: 'cli',
+        channel: 'ops-channel',
+        threadTs: 'thread-1',
+        correlationId: 'corr-1',
+        requestedBy: 'agent:x',
+        title: 'Approve create_issue',
+        summary: 'held effect decision',
+      },
+    });
+    expect(record.approvalRequest?.requestId).toBeTruthy();
+    const request = loadApprovalRequest(
+      record.approvalRequest!.storageChannel,
+      record.approvalRequest!.requestId
+    );
+    expect(request?.status).toBe('pending');
+    expect(request?.steering?.kind).toBe('held_effect');
+
+    // Path B: a human decides via the shared store — the bridge settles held.
+    decideApprovalRequest('mission_controller', {
+      channel: record.approvalRequest!.storageChannel,
+      requestId: record.approvalRequest!.requestId,
+      decision: 'approved',
+      decidedBy: 'human:famao',
+      decidedByType: 'human',
+      authenticated: true,
+      payloadHash: record.payloadHash,
+      effectBinding: record.effectBinding,
+    });
+    await drainPendingSteeringApprovalExecutions();
+
+    const cp2 = new CloudflareOsControlPlane();
+    expect(cp2.getHeldAction(record.id)?.status).toBe('approved');
+    let executed: unknown;
+    cp2.registerExecutor('service:create_issue', async (params) => {
+      executed = params;
+      return { id: 'real-1' };
+    });
+    const applied = await cp2.applyHeldAction(record.id);
+    expect(applied.status).toBe('applied');
+    expect(executed).toEqual({ title: 'x' });
+  });
+
+  it('routes a linked decideHeldAction through the shared store first', () => {
+    const cp = new CloudflareOsControlPlane();
+    const record = cp.submitHeldAction({
+      missionId: 'mission-j',
+      tenantSlug: 'tenant-a',
+      submittedBy: 'agent:x',
+      op: 'service:create_issue',
+      params: { title: 'x' },
+      apply: async () => ({ ok: true }),
+      steeringApproval: {
+        surface: 'cli',
+        channel: 'ops-channel',
+        threadTs: 'thread-2',
+        correlationId: 'corr-2',
+        requestedBy: 'agent:x',
+        title: 'Approve create_issue',
+        summary: 'held effect decision',
+      },
+    });
+    cp.decideHeldAction(record.id, 'rejected', {
+      resolvedBy: 'human:famao',
+      decidedByType: 'human',
+      authenticated: true,
+      payloadHash: record.payloadHash,
+      effectBinding: record.effectBinding,
+    });
+    const request = loadApprovalRequest(
+      record.approvalRequest!.storageChannel,
+      record.approvalRequest!.requestId
+    );
+    expect(request?.status).toBe('rejected');
+    expect(cp.getHeldAction(record.id)?.status).toBe('rejected');
   });
 
   it('quarantines tenant-scoped records with no resolvable tenant', () => {

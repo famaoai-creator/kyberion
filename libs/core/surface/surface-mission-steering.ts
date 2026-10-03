@@ -486,7 +486,7 @@ function buildApprovalPendingText(params: {
 function buildSteeringApprovalRequest(params: {
   missionId: string;
   key: SteeringThreadKey;
-  verb: ApprovalSteeringAction['verb'];
+  verb: Extract<ApprovalSteeringAction, { kind: 'mission_lifecycle_verb' }>['verb'];
   note: string | undefined;
   title: string;
   summary: string;
@@ -639,6 +639,15 @@ export async function executeApprovedMissionSteeringApproval(
     throw new Error(
       `[surface-mission-steering] approval ${record.id} has no steering action to execute`
     );
+  }
+  if (steering.kind === 'held_effect') {
+    // SC-04: the decision is the effect's authorization — the bridge mirrors
+    // it into the control-plane journal; the owner process applies via its
+    // executor registry. Surface authority is not required here because the
+    // hash-bound decision itself is the authority being propagated.
+    const { settleHeldEffectDecision } = await import('../governance/held-effect-bridge.js');
+    await settleHeldEffectDecision(record, 'approved');
+    return `held_effect ${steering.op} (${steering.heldActionId}) approved`;
   }
   // Re-assert steering authority AT EXECUTION TIME, not just when the
   // approval request was created: a human decision can arrive minutes or
