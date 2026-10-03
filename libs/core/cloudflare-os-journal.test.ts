@@ -9,6 +9,7 @@ import {
   controlPlaneRuntimeRoot,
   controlPlaneJournalPath,
   foldObservationAggregate,
+  journalFullParseCountForTests,
   listControlPlaneNamespaceDirs,
   readJournalTail,
   setControlPlaneRuntimeRootForTests,
@@ -621,5 +622,127 @@ describe('review fixes: declassify grants are mission-scoped', () => {
     // B's grant must not erase A's.
     expect(cp.isDeclassified('mission-a', 'same-hash', 'public', 'tenant-a')).toBe(true);
     expect(cp.isDeclassified('mission-b', 'same-hash', 'public', 'tenant-a')).toBe(true);
+  });
+});
+
+describe('releasing an unresolved apply claim', () => {
+  const base = {
+    missionId: 'mission-rel',
+    tenantSlug: 'tenant-a',
+    submittedBy: 'agent:x',
+    op: 'demo:pay',
+    params: { amount: 1 },
+    persistParams: true,
+  };
+  const human = (r: { payloadHash: string; effectBinding: string }) => ({
+    resolvedBy: 'human:famao',
+    decidedByType: 'human' as const,
+    authenticated: true,
+    payloadHash: r.payloadHash,
+    effectBinding: r.effectBinding,
+  });
+  const claimedRecord = () => {
+    const owner = new CloudflareOsControlPlane();
+    const record = owner.submitHeldAction({ ...base, apply: async () => 'unused' });
+    owner.decideHeldAction(record.id, 'approved', human(record));
+    // A process wins the claim and dies before recording an outcome.
+    const crashed = new CloudflareOsControlPlane() as unknown as {
+      journalStore: { claimHeldApply(id: string, by: string): boolean };
+    };
+    expect(crashed.journalStore.claimHeldApply(record.id, 'ghost:1')).toBe(true);
+    return record;
+  };
+
+  it('lets an authenticated human release the claim so another process can apply once', async () => {
+    const record = claimedRecord();
+    let runs = 0;
+    const next = new CloudflareOsControlPlane();
+    next.registerExecutor('demo:pay', async () => {
+      runs += 1;
+      return 'paid';
+    });
+    expect((await next.applyHeldAction(record.id)).status).toBe('approved'); // still claimed
+    const released = next.releaseApplyClaim(record.id, {
+      ...human(record),
+      reason: 'ghost process crashed; payment provider shows no charge',
+    });
+    expect(released.applyClaim).toBeUndefined();
+    expect((await next.applyHeldAction(record.id)).status).toBe('applied');
+    expect(runs).toBe(1);
+  });
+
+  it('refuses a release without an authenticated human, a reason, or a live claim', () => {
+    const record = claimedRecord();
+    const cp = new CloudflareOsControlPlane();
+    expect(() =>
+      cp.releaseApplyClaim(record.id, {
+        ...human(record),
+        decidedByType: 'ai_agent',
+        reason: 'because',
+      })
+    ).toThrow(/authenticated human/);
+    expect(() => cp.releaseApplyClaim(record.id, { ...human(record), reason: ' ' })).toThrow();
+    cp.releaseApplyClaim(record.id, { ...human(record), reason: 'verified no side effect' });
+    expect(() => cp.releaseApplyClaim(record.id, { ...human(record), reason: 'again' })).toThrow(
+      /no releasable apply claim/
+    );
+  });
+
+  it('shows the claim on the operator summary so a stuck action is visible', () => {
+    const record = claimedRecord();
+    const summary = new CloudflareOsControlPlane().getHeldActionSummary(record.id);
+    expect(summary?.applyClaim?.by).toBe('ghost:1');
+  });
+});
+
+describe('observation write cost', () => {
+  const observe = (cp: CloudflareOsControlPlane, i: number) =>
+    cp.recordObservation({
+      missionId: 'mission-perf',
+      service: 'file',
+      resourceRef: `file:in/${i}.json`,
+      tier: 'confidential',
+      tenantSlug: 'tenant-a',
+      purpose: 'p',
+      summary: 's',
+    });
+
+  it('does not re-parse the whole journal for every append by the same process', () => {
+    const cp = new CloudflareOsControlPlane();
+    observe(cp, 0);
+    const before = journalFullParseCountForTests();
+    for (let i = 1; i <= 40; i += 1) observe(cp, i);
+    // The journal only changes by this process's own appends: no re-parse.
+    expect(journalFullParseCountForTests() - before).toBeLessThanOrEqual(1);
+  });
+
+  it('still catches up on appends made by another process', () => {
+    const mine = new CloudflareOsControlPlane();
+    observe(mine, 0);
+    const other = new CloudflareOsControlPlane();
+    observe(other, 1);
+    observe(mine, 2); // must see `other`'s event before appending
+    const aggregates = new CloudflareOsControlPlane().listObservationAggregates('mission-perf');
+    expect(aggregates.map((entry) => entry.resourceRef).sort()).toEqual([
+      'file:in/0.json',
+      'file:in/1.json',
+      'file:in/2.json',
+    ]);
+    expect(mine.listObservationAggregates('mission-perf')).toHaveLength(3);
+  });
+
+  it('refreshes the derived snapshot and rollup lazily, never losing the journal', () => {
+    const cp = new CloudflareOsControlPlane();
+    for (let i = 0; i < 5; i += 1) observe(cp, i);
+    const dir = path.join(testRoot, 'confidential', 'tenant-a', 'cloudflare-os');
+    const snapshot = JSON.parse(
+      String(safeReadFile(path.join(dir, 'snapshot.json'), { encoding: 'utf8' }))
+    );
+    // Derived caches are not rewritten per observation…
+    expect(snapshot.observations.length).toBeLessThan(5);
+    // …but the journal (the source of truth) has every one, and a restart replays it.
+    expect(new CloudflareOsControlPlane().listObservationAggregates('mission-perf')).toHaveLength(
+      5
+    );
   });
 });
