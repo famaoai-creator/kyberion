@@ -7,6 +7,7 @@ import {
   saveBrowserOnboardingVoiceSample,
 } from '@agent/core/browser/browser-onboarding';
 import { getInstalledReasoningMode } from '@agent/core/reasoning/reasoning-bootstrap';
+import { resolveRuntimeModelId } from '@agent/core/tool/runtime-model-defaults';
 import { listAgentIdentities } from '@agent/core/agent/agent-identity';
 import {
   listTenantProfileSlugs,
@@ -198,7 +199,11 @@ export function GET(req: NextRequest) {
           enabled: entry.enabled !== false,
         })),
         reasoning_mode: reasoning,
-        model_tiers: { fast: 'haiku', standard: 'sonnet', deep: 'opus' },
+        model_tiers: {
+          fast: resolveRuntimeModelId('anthropic-fast'),
+          standard: resolveRuntimeModelId('anthropic-standard'),
+          deep: resolveRuntimeModelId('anthropic-default'),
+        },
         profile: {
           name: String(identity.name || ''),
           language: String(identity.language || 'ja'),

@@ -11,6 +11,7 @@ const RUNTIME_MODEL_ENV_OVERRIDES: Readonly<Record<RuntimeModelRole, readonly st
     'KYBERION_CLAUDE_MODEL',
     'KYBERION_REASONING_MODEL',
   ],
+  'anthropic-standard': ['KYBERION_ANTHROPIC_STANDARD_MODEL', 'KYBERION_CLAUDE_STANDARD_MODEL'],
   'anthropic-fast': ['KYBERION_ANTHROPIC_FAST_MODEL', 'KYBERION_CLAUDE_FAST_MODEL'],
   'gemini-default': ['KYBERION_GEMINI_MODEL'],
   'gemini-fast': ['KYBERION_GEMINI_FAST_MODEL'],

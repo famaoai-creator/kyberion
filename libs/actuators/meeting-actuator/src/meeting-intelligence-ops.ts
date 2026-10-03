@@ -35,6 +35,7 @@ import { z } from 'zod';
 import { getWorkItem } from '@agent/core/workforce/work-coordination';
 import { delegateWorkItemWithReasoningBackend } from '@agent/core/reasoning/reasoning-backend-execution-adapter';
 import { getRegisteredEnvText, isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { resolveRuntimeModelId } from '@agent/core/tool/runtime-model-defaults';
 import type { MeetingFacilitatorPolicy } from '@agent/core/meeting/meeting-facilitator-policy';
 
 function writeJSON(rel: string, data: unknown): string {
@@ -360,7 +361,9 @@ export async function extractActionItemsOp(input: {
         : {}),
       extractor: {
         backend: backend.name,
-        model: getRegisteredEnvText('KYBERION_CLAUDE_CLI_MODEL') || 'opus',
+        model:
+          getRegisteredEnvText('KYBERION_CLAUDE_CLI_MODEL') ||
+          resolveRuntimeModelId('anthropic-default'),
         extracted_at: extractedAt,
       },
     };
