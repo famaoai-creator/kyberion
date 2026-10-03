@@ -17,6 +17,7 @@
   },
   "runtime_defaults": {
     "anthropic-default": "claude-opus-5-5",
+    "anthropic-standard": "claude-sonnet-5",
     "anthropic-fast": "claude-haiku-4-5-20251001",
     "gemini-default": "gemini-3.8-flash",
     "gemini-fast": "gemini-3.1-flash-lite",

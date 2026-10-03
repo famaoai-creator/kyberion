@@ -322,7 +322,7 @@ describe('shell-claude-cli-backend', () => {
           'stream-json',
           '--include-partial-messages',
           '--model',
-          'haiku',
+          'claude-haiku-4-5-20251001',
           '--effort',
           'low',
         ])

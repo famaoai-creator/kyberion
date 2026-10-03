@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { runClaudeAgentQuery } from './claude-agent-query.js';
 import type { IntentBody } from '../intent/intent-delta.js';
 import type { ExtractIntentInput, IntentExtractor } from '../intent/intent-extractor.js';
+import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 
 const SYSTEM_PROMPT = `You extract structured intent from a user utterance in a CEO work-automation platform.
 
@@ -39,7 +40,7 @@ export class ClaudeAgentIntentExtractor implements IntentExtractor {
   private readonly model: string;
 
   constructor(options: ClaudeAgentIntentExtractorOptions = {}) {
-    this.model = options.model ?? 'haiku';
+    this.model = options.model ?? resolveRuntimeModelId('anthropic-fast');
   }
 
   async extract(input: ExtractIntentInput): Promise<IntentBody> {
