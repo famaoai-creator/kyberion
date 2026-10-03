@@ -50,6 +50,7 @@ import {
 } from './claude-native-subagent.js';
 import type { ObservedNativeSubagent } from './claude-agent-query.js';
 import type { ProviderPermissionProfileName } from './provider-permission-profiles.js';
+import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 
 const SYSTEM_PROMPT = `You are a judgment-support reasoning engine for a CEO work-automation platform.
 
@@ -313,7 +314,7 @@ const SimulationResultSchema = z.object({
 });
 
 export interface ClaudeAgentReasoningBackendOptions {
-  /** Model alias ('opus' / 'sonnet' / 'haiku') or full id. Defaults to 'opus'. */
+  /** Model alias ('opus' / 'sonnet' / 'haiku') or full id. Defaults to runtime_defaults['anthropic-default']. */
   model?: string;
   /**
    * CN-05: run delegations as real SDK sub-agents (`Options.agents` + the
@@ -332,7 +333,7 @@ export class ClaudeAgentReasoningBackend implements ReasoningBackend {
   private readonly nativeSubagentAdopter: NativeSubagentAdopter;
 
   constructor(options: ClaudeAgentReasoningBackendOptions = {}) {
-    this.model = options.model ?? 'opus';
+    this.model = options.model ?? resolveRuntimeModelId('anthropic-default');
     this.nativeSubagentEnabled = resolveNativeSubagentEnabled(options.nativeSubagent);
     this.nativeSubagentAdopter = {
       id: 'claude-agent-sdk',

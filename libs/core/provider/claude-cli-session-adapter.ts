@@ -46,11 +46,12 @@ import {
   claudeNativeAgentName,
   resolveClaudeNativeSessionPermission,
 } from './claude-native-subagent.js';
+import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 
 export interface ClaudeCliSessionAdapterOptions {
   /** CLI binary. Defaults to `claude`. */
   bin?: string;
-  /** Model alias or full id. Defaults to `opus`. */
+  /** Model alias or full id. Defaults to runtime_defaults['anthropic-default']. */
   model?: string;
   /** KD-05 tier this session is provisioned for. Defaults to `implementer`. */
   profile?: ProviderPermissionProfileName;
@@ -239,7 +240,7 @@ export class ClaudeCliSessionAdapter {
 
   constructor(options: ClaudeCliSessionAdapterOptions = {}) {
     this.bin = options.bin ?? 'claude';
-    this.model = options.model ?? 'opus';
+    this.model = options.model ?? resolveRuntimeModelId('anthropic-default');
     this.profile = options.profile ?? 'implementer';
     if (options.effort) this.effort = options.effort;
     this.cwd = options.cwd ?? pathResolver.rootDir();

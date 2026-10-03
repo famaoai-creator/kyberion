@@ -652,11 +652,15 @@
         "active/organizations/public/${KYBERION_TENANT}/",
         "knowledge/personal/tenants/${KYBERION_TENANT}.json",
         "knowledge/confidential/${KYBERION_TENANT}/",
-        "knowledge/confidential/shared/"
+        "knowledge/confidential/shared/",
+        "active/shared/runtime/",
+        "active/shared/observability/"
       ],
       "allow_write": [
         "active/organizations/confidential/${KYBERION_TENANT}/",
-        "active/organizations/public/${KYBERION_TENANT}/"
+        "active/organizations/public/${KYBERION_TENANT}/",
+        "active/shared/runtime/",
+        "active/shared/observability/"
       ]
     },
     "daemon_watchdog": {

@@ -364,6 +364,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_ANTHROPIC_STANDARD_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Standard-tier model override for the Anthropic API route.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_ANTIGRAVITY_CLI_BIN",
       "category": "path",
       "type": "path",
@@ -738,6 +746,14 @@
       "description": "Set to 1 to delegate through Claude's provider-native sub-agents (one shared stream-json CLI session / SDK `agents`) instead of spawning `claude -p` per task. Fails closed with subagent_unavailable when a delegation cannot be observed.",
       "documented": true,
       "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_CLAUDE_STANDARD_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Compatibility-alias standard-tier model override for Claude routes.",
+      "documented": true
     },
     {
       "name": "KYBERION_CODEX_APPROVAL",

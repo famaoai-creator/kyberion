@@ -40,6 +40,7 @@ import {
 } from '../mission/delegation-concurrency.js';
 import { z, type ZodType } from 'zod';
 import { logger } from '../core.js';
+import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { resolveProviderCliCommand } from '../provider/provider-managed-env.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
@@ -89,23 +90,24 @@ function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
 }
 
 /**
- * Task-weight → claude model mapping (①モデル振り分け): fast tasks run on
- * haiku, standard on sonnet, deep on the backend's configured heavy model.
+ * Task-weight → claude model mapping (①モデル振り分け): fast tasks run on the
+ * governed fast model, standard on the governed standard model, deep on the
+ * backend's configured heavy model (provider-config.json runtime_defaults).
  */
 export function resolveClaudeModelForTier(
   tier: 'fast' | 'standard' | 'deep' | undefined,
   defaultModel: string
 ): string {
-  if (tier === 'fast') return 'haiku';
-  if (tier === 'standard') return 'sonnet';
-  if (tier === 'deep') return defaultModel || 'opus';
+  if (tier === 'fast') return resolveRuntimeModelId('anthropic-fast');
+  if (tier === 'standard') return resolveRuntimeModelId('anthropic-standard');
+  if (tier === 'deep') return defaultModel || resolveRuntimeModelId('anthropic-default');
   return defaultModel;
 }
 
 export interface ShellClaudeCliBackendOptions {
   /** CLI binary. Defaults to `claude` (resolved via PATH). */
   bin?: string;
-  /** Model alias. Defaults to 'opus'. */
+  /** Model alias or governed id. Defaults to runtime_defaults['anthropic-default']. */
   model?: string;
   /** Per-call timeout. Defaults to 5 min. */
   timeoutMs?: number;
@@ -181,7 +183,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
 
   constructor(options: ShellClaudeCliBackendOptions = {}) {
     this.bin = options.bin ?? 'claude';
-    this.model = options.model ?? 'opus';
+    this.model = options.model ?? resolveRuntimeModelId('anthropic-default');
     this.timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
     this.extraArgs = options.extraArgs ?? [];
     this.nativeSubagentEnabled =
@@ -1147,7 +1149,7 @@ export function buildShellClaudeCliBackendFromEnv(
     ...(envText(env, 'KYBERION_CLAUDE_NATIVE_SUBAGENT') === '1' ? { nativeSubagent: true } : {}),
   });
   logger.debug(
-    `[shell-claude-cli] backend ready (bin=${bin ?? 'claude'}, model=${model ?? 'opus'})`
+    `[shell-claude-cli] backend ready (bin=${bin ?? 'claude'}, model=${model ?? resolveRuntimeModelId('anthropic-default')})`
   );
   return backend;
 }

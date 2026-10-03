@@ -67,6 +67,12 @@ describe('tier-guard organization_operator authority role (R8)', () => {
       allowed: true,
     });
     expect(validateWritePermission(orgPath('public', 'acme-corp'))).toEqual({ allowed: true });
+    expect(
+      validateWritePermission(path.join(ROOT, 'active/shared/runtime/heartbeats/dot.json'))
+    ).toEqual({ allowed: true });
+    expect(
+      validateWritePermission(path.join(ROOT, 'active/shared/observability/delegations.jsonl'))
+    ).toEqual({ allowed: true });
     expect(validateReadPermission(orgPath('confidential', 'acme-corp'))).toEqual({
       allowed: true,
     });
