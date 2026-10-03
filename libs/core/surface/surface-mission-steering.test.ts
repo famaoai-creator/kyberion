@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeReadFile, safeRmSync } from '../secure-io.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { clearOwnerScopeCache } from '../owner-scope.js';
 import {
   clearWorkCoordinationNamespace,
   clearWorkCoordinationStore,
@@ -315,6 +316,23 @@ describe('surface-mission-steering route handler (SO-04)', () => {
 
   it('enqueues explicit steer and follow-up messages for the session-owned mission', async () => {
     const missionId = 'MSN-SO04-QUEUE';
+    // Steering input is queued beside the mission's own directory, so the
+    // session-owned mission must exist (its state is the only real I/O here).
+    const missionDir = pathResolver.missionDir(missionId, 'public');
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(missionDir, { recursive: true });
+      safeWriteFile(
+        `${missionDir}/mission-state.json`,
+        JSON.stringify({ mission_id: missionId, tier: 'public', status: 'active' })
+      );
+    });
+    clearOwnerScopeCache();
+    onTestFinished(() => {
+      withExecutionContext('mission_controller', () =>
+        safeRmSync(missionDir, { recursive: true, force: true })
+      );
+      clearOwnerScopeCache();
+    });
     createSession({ missionId, channel: 'C-queue', threadTs: 'T-queue' });
     const handler = buildMissionSteeringRouteHandler();
     const at = (text: string) => buildContext(text, { channel: 'C-queue', threadTs: 'T-queue' });
