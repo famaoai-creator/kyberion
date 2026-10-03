@@ -33,6 +33,7 @@ import { validateScopeContext, type ScopeContextInput } from '../scope-context.j
 import {
   lookupOpCapability,
   resolveCapabilityEffect,
+  resolveCapabilityEgressDestination,
   resolveCapabilityResourceRef,
 } from '../actuator/actuator-manifest-index.js';
 import type { TierLevel } from '../types.js';
@@ -224,12 +225,17 @@ function effectResult(call: OpPreflightCall, input: RecordLike): OpPreflightList
   const capability = lookupOpCapability(call.op);
   const effect = capability ? resolveCapabilityEffect(capability, input) : 'write';
   const resourceRef = capability ? resolveCapabilityResourceRef(capability, input) : undefined;
+  const destination = capability
+    ? resolveCapabilityEgressDestination(capability, input)
+    : undefined;
   return {
     repaired_input: {
       _effect: effect,
       // Always write the key — an unresolved ref clears any client-injected
       // value so downstream stages only ever see the stage-resolved ref.
       _resource_ref: resourceRef,
+      // Same hygiene: always written, so a caller-injected destination never survives.
+      _egress_destination: destination,
     },
   };
 }

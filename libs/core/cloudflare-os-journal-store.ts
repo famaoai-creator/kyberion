@@ -62,8 +62,35 @@ function audit(
   });
 }
 
+/** Derived caches are refreshed at most every N observations or this long. */
+const DERIVED_REFRESH_EVERY = 100;
+const DERIVED_REFRESH_MS = 2000;
+
 export class ControlPlaneJournalStore {
   private readonly appliedSeq = new Map<string, number>();
+  private readonly derivedRefresh = new Map<string, { count: number; at: number }>();
+
+  /**
+   * Observations are by far the most frequent mutation, and the snapshot and
+   * rollup are derived caches (the journal is the source of truth and restore
+   * replays it), so rewriting the whole state for each one made recording cost
+   * grow with the journal. Other kinds always refresh immediately.
+   */
+  private shouldRefreshDerived(namespaceDir: string, kind: ControlPlaneCollection): boolean {
+    if (kind !== 'observation') return true;
+    const now = Date.now();
+    const state = this.derivedRefresh.get(namespaceDir);
+    if (
+      !state ||
+      state.count + 1 >= DERIVED_REFRESH_EVERY ||
+      now - state.at >= DERIVED_REFRESH_MS
+    ) {
+      this.derivedRefresh.set(namespaceDir, { count: 0, at: now });
+      return true;
+    }
+    state.count += 1;
+    return false;
+  }
 
   constructor(private readonly host: ControlPlaneJournalHost) {}
 
@@ -99,6 +126,7 @@ export class ControlPlaneJournalStore {
         }
       );
       this.appliedSeq.set(group.namespace.dir, seq);
+      if (!this.shouldRefreshDerived(group.namespace.dir, kind)) continue;
       this.writeNamespaceSnapshot(group.namespace);
       if (kind === 'observation') {
         writeObservationAggregates(
@@ -144,6 +172,38 @@ export class ControlPlaneJournalStore {
     this.appliedSeq.set(namespace.dir, seq);
     if (won) this.writeNamespaceSnapshot(namespace);
     return won;
+  }
+
+  /**
+   * Drop an apply claim that has no outcome (record still `approved`), under
+   * the same journal lock as the claim itself. Returns whether one was dropped.
+   */
+  releaseHeldApplyClaim(id: string): boolean {
+    const initial = this.host.heldRecord(id);
+    if (!initial) return false;
+    const namespace = controlPlaneNamespaceFor(
+      'held',
+      this.host.serializedJournalRecord('held', initial),
+      currentScopeEnvelope()
+    );
+    let released = false;
+    const { seq } = appendJournalEventLockedIf(
+      namespace,
+      this.appliedSeq.get(namespace.dir) ?? 0,
+      (tail) => {
+        for (const event of tail) this.host.applyJournalEvent(event);
+      },
+      () => {
+        const current = this.host.heldRecord(id);
+        if (!current || current.status !== 'approved' || !current.applyClaim) return null;
+        delete current.applyClaim;
+        released = true;
+        return { kind: 'held', records: [this.host.serializedJournalRecord('held', current)] };
+      }
+    );
+    this.appliedSeq.set(namespace.dir, seq);
+    if (released) this.writeNamespaceSnapshot(namespace);
+    return released;
   }
 
   /** Rebuild state from every namespace journal after legacy migration. */

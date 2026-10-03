@@ -40,7 +40,7 @@ dispatch boundary (delegation, actuator, pipeline)
              core:effect       110  manifest effect -> governance stamp
              core:introduction 112  write/egress need resource intro
              core:taint        115  egress gets mission taint stamp
-             core:provenance-egress 118  taint vs declared target
+             core:provenance-egress 118  taint vs the policy-classified destination
              core:adf-guardrails / provider-egress  120/130
         └─ execute (stamps stripped; they never reach the op schema)
         └─ post-op recordOpObservation              SC-05
@@ -49,7 +49,26 @@ dispatch boundary (delegation, actuator, pipeline)
 ```
 
 Every op's effect class (`none|read|write|egress`) is declared in its
-manifest capability (SC-02; `op-effect-coverage` gate enforces 100%).
+manifest capability (SC-02; `op-effect-coverage` gate enforces 100%). A
+pipeline-style capability declares the ops it dispatches internally in
+`step_ops` (`system:write_file`, `browser:goto`, …), each with its own
+`effect` / `resource_ref_from` / `egress_destination_from`; a step inherits the
+capability's declarations, never shadows a declared capability, and an
+undeclared step stays `write` (fail-safe).
+
+**Egress destination, not audience claims.** The guard never reads an audience,
+tenant or hash the caller states about a payload. It classifies the host the
+op actually connects to (`egress_destination_from`) through the egress policy
+(`classifyEgressDestination`: tenant-approved host = `personal` for that tenant,
+allowlisted = `public`, anything else = `external`), takes the tenant from the
+mission, and hashes the content actually sent (`egressPayloadHash`). A tainted
+mission whose destination is undeclared is denied.
+
+**Exactly-once apply.** An approved held effect is executed by the one process
+that wins `applyClaim` under the journal lock. A claim with no recorded outcome
+is never retried; an authenticated human releases it with
+`releaseApplyClaim(id, { …decision, reason })` after verifying the side effect
+did not happen. Operator summaries expose the claim.
 Stage modes roll out per op family via
 `knowledge/product/governance/op-preflight-rollout.json` — `warn` audits
 before `enforce` blocks.

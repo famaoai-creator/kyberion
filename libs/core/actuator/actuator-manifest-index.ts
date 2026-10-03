@@ -44,7 +44,20 @@ export interface ActuatorManifestCapability {
   effect_from?: string;
   /** Input path resolving the governed resource ref for intro/observation stages. */
   resource_ref_from?: string;
+  /** Input path holding the URL/host the op sends to; the egress guard classifies it by policy. */
+  egress_destination_from?: string;
+  /**
+   * Per-step declarations for ops a pipeline-style capability dispatches
+   * internally (`system:write_file`, `browser:goto`, …). A step inherits the
+   * capability's declarations and overrides what it states.
+   */
+  step_ops?: Record<string, ActuatorStepOp>;
 }
+
+export type ActuatorStepOp = Pick<
+  ActuatorManifestCapability,
+  'effect' | 'effect_from' | 'resource_ref_from' | 'egress_destination_from'
+>;
 
 export interface ActuatorManifestFile {
   actuator_id: string;
@@ -230,6 +243,20 @@ export function resolveCapabilityResourceRef(
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
+/**
+ * The URL/host an op sends to, when the manifest declares where it lives in
+ * the input. The destination is what the actuator connects to, so unlike an
+ * audience claim it cannot be stated independently of the real send.
+ */
+export function resolveCapabilityEgressDestination(
+  capability: ActuatorManifestCapability,
+  input?: Record<string, unknown>
+): string | undefined {
+  if (!capability.egress_destination_from || !input) return undefined;
+  const value = readInputPath(input, capability.egress_destination_from);
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
 let opCapabilityIndex: Map<string, ActuatorManifestCapability> | null = null;
 
 /** Test seam: drop the cached op → capability index after manifest changes. */
@@ -271,6 +298,15 @@ export function lookupOpCapability(op: string): ActuatorManifestCapability | und
       }
       for (const capability of manifest.capabilities ?? []) {
         opCapabilityIndex.set(`${prefix}:${capability.op}`, capability);
+      }
+      // Step ops never shadow a declared capability of the same name.
+      for (const capability of manifest.capabilities ?? []) {
+        for (const [stepOp, declaration] of Object.entries(capability.step_ops ?? {})) {
+          const key = `${prefix}:${stepOp}`;
+          if (opCapabilityIndex.has(key)) continue;
+          const { step_ops: _steps, ...inherited } = capability;
+          opCapabilityIndex.set(key, { ...inherited, op: stepOp, ...declaration });
+        }
       }
     }
   }
