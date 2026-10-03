@@ -66,8 +66,10 @@ export async function settleHeldEffectDecision(
       `[held-effect-bridge] approval ${record.id} is not a held-effect steering request`
     );
   }
-  const { CloudflareOsControlPlane } = await import('../cloudflare-os-control-plane.js');
-  const controlPlane = new CloudflareOsControlPlane();
+  // The shared instance keeps the bridge aligned with the caller's plane
+  // and picks up journal catch-up for cross-process decisions.
+  const { sharedControlPlane } = await import('../cloudflare-os-shared.js');
+  const controlPlane = sharedControlPlane();
   controlPlane.decideHeldAction(steering.heldActionId, decision, {
     resolvedBy: record.decidedBy || 'human:approval-store',
     decidedByType: record.decidedByType === 'human' ? 'human' : 'service',
