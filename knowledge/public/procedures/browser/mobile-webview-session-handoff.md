@@ -37,9 +37,9 @@
 共通 orchestration pipeline:
 
 - Android:
-  [`mobile-webview-handoff-runner-android.json`](/Users/famao/kyberion/pipelines/mobile-webview-handoff-runner-android.json)
+  [`mobile-webview-handoff-runner-android.json`](../../../product/pipeline-templates/mobile-webview-handoff-runner-android.json)
 - iOS:
-  [`mobile-webview-handoff-runner-ios.json`](/Users/famao/kyberion/pipelines/mobile-webview-handoff-runner-ios.json)
+  [`mobile-webview-handoff-runner-ios.json`](../../../product/pipeline-templates/mobile-webview-handoff-runner-ios.json)
 
 ## Notes
 

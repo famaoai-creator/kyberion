@@ -16,9 +16,9 @@ famaoai によって独自に構築・構造化されたナレッジ、プロン
 
 以下のディレクトリに含まれる情報の「事実」「引用基準」「規格名」等は、それぞれの権利者に基づきます。
 
-- **`fisc-compliance/`**: 公益財団法人 金融情報システムセンター (FISC) の基準を参照。
-- **`sdlc/`**: 独立行政法人 情報処理推進機構 (IPA) 等の業界標準を参照。
-- **`tech-stack/`**: 各ソフトウェアベンダー（AWS, Google, Box, Atlassian等）の公式仕様を参照。
+- **`public/standards/`**: 公益財団法人 金融情報システムセンター (FISC) の基準を参照（`aws_fisc_standard.md`、`blea_fisc_reference.md` 等）。
+- **`public/standards/sdlc/`**: 独立行政法人 情報処理推進機構 (IPA) 等の業界標準を参照。
+- **`public/tech-stack/`**: 各ソフトウェアベンダー（AWS, Google, Box, Atlassian等）の公式仕様を参照。
 
 これらの外部情報は、エンジニアリングの自動化および品質向上のための「リファレンス」として利用されており、情報の正確性や最新性については各公式サイトを確認してください。
 
@@ -26,13 +26,13 @@ famaoai によって独自に構築・構造化されたナレッジ、プロン
 
 ### Security
 
-- **`security/scan-patterns.yaml`**: Secret detection patterns and dangerous code pattern definitions for the security-scanner skill.
-- **`security/security-best-practices.md`**: OWASP Top 10 overview, secure coding patterns for Node.js/JavaScript, common vulnerability detection, security scanning tools, and input validation guidelines.
+- **`product/capability-assets/security-scanner/`**: Secret / vulnerability detection pattern definitions (`vulnerability-patterns.json`, `compliance-mapping.json`) for the security-scanner capability.
+- **`public/standards/security/`**: OWASP LLM Top 10 等のセキュリティ標準リファレンス。
 
-### DevOps
+### Operations / DevOps
 
-- **`devops/ci-cd-patterns.md`**: CI/CD pipeline design patterns, GitHub Actions best practices, testing strategies, deployment strategies (blue-green, canary, rolling), and monitoring/alerting in CI/CD.
+- **`product/operations/`**: SRE・運用の定石（`runbook_best_practices.md`、`modern_sre_best_practices.md`、`incident-management-excellence.md` 等）。
 
 ### Architecture
 
-- **`architecture/microservices-patterns.md`**: Microservices design patterns (saga, circuit breaker, API gateway, strangler fig), service communication patterns, data management (CQRS, event sourcing), service discovery, load balancing, and observability patterns.
+- **`product/architecture/microservices-patterns.md`**: Microservices design patterns (saga, circuit breaker, API gateway, strangler fig), service communication patterns, data management (CQRS, event sourcing), service discovery, load balancing, and observability patterns.

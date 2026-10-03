@@ -27,4 +27,4 @@ last_updated: 2026-03-06
 
 ## 4. 特殊タスク：指示書のドラフト作成
 
-経営陣や各ロールリーダーの意図を汲み取り、`knowledge/orchestration/directives-protocol.md` に基づいた「ロール間指示書」のドラフトを迅速に作成する。これにより、組織全体の作業委譲をスムーズにする。
+経営陣や各ロールリーダーの意図を汲み取り、`knowledge/product/orchestration/directives-protocol.md` に基づいた「ロール間指示書」のドラフトを迅速に作成する。これにより、組織全体の作業委譲をスムーズにする。

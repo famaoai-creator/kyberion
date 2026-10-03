@@ -339,7 +339,7 @@ template 方針:
 
 変更対象:
 
-- `pipelines/kyberion-howto-narrated-demo.json`
+- `knowledge/product/pipeline-templates/kyberion-howto-narrated-demo.json`
 - `docs/PRODUCTIZATION_ROADMAP.md`
 - optional: `docs/demos/`
 
@@ -410,7 +410,7 @@ pnpm exec vitest run \
   libs/core/video/narrated-video-brief-compiler.test.ts \
   libs/core/video/video-composition-compiler.test.ts \
   libs/actuators/video-composition-actuator/src/index.test.ts
-pnpm pipeline --input pipelines/kyberion-howto-narrated-demo.json
+pnpm pipeline --input knowledge/product/pipeline-templates/kyberion-howto-narrated-demo.json
 ffprobe -hide_banner active/missions/confidential/MSN-KYBERION-HOWTO-VIDEO/evidence/kyberion-howto-demo.mp4
 ```
 

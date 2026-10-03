@@ -44,7 +44,7 @@ denied_actuators: [blockchain-actuator]
 ### Knowledge & Governance
 
 - `ls knowledge/product/agents/` — 登録エージェント一覧
-- `cat knowledge/governance/agent-policies.yaml` — ポリシー定義
+- `cat knowledge/product/governance/agent-policies.yaml` — ポリシー定義
 - `ls knowledge/product/governance/` — ガバナンスドキュメント
 - `find knowledge/ -name "*.md" | wc -l` — ナレッジドキュメント数
 
@@ -77,7 +77,7 @@ denied_actuators: [blockchain-actuator]
 
 **GitHub 連携:**
 
-- `pipelines/github-issue-ingest.json` — GitHub issues → ミッション変換
+- `knowledge/product/pipeline-templates/github-issue-ingest.json` — GitHub issues → ミッション変換
 
 ## A2UI Components
 

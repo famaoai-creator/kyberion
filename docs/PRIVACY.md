@@ -95,4 +95,4 @@ Kyberion is a software toolkit, not a service. Compliance posture (GDPR, FISC, S
 - FDE / customer deployment: the customer's compliance posture applies; configure tier scope and egress redaction accordingly.
 - Future Kyberion-managed offering: the eventual privacy notice will be specific to that offering and not implied here.
 
-For deeper compliance work in customer engagements, see `knowledge/public/fisc-compliance/` and the customer aggregation guide.
+For deeper compliance work in customer engagements, see `knowledge/public/standards/`（FISC: `aws_fisc_standard.md` / `blea_fisc_reference.md`） and the customer aggregation guide.

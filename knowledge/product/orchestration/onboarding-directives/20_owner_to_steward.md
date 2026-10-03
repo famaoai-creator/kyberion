@@ -29,4 +29,4 @@ last_updated: 2026-03-06
 
 ## 5. アウトプット形式
 
-- 保存先: `knowledge/roles/business_owner/market_analysis.md`
+- 保存先: `knowledge/product/roles/business_owner/market_analysis.md`

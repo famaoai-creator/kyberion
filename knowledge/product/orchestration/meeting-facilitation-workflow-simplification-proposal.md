@@ -25,8 +25,8 @@ The pipeline is useful, but the responsibility boundary is wider than necessary.
 
 The repository already contains separate follow-up pipelines:
 
-- `pipelines/action-item-execute-self.json`
-- `pipelines/action-item-tracking.json`
+- `knowledge/product/pipeline-templates/action-item-execute-self.json`
+- `knowledge/product/pipeline-templates/action-item-tracking.json`
 
 This means the meeting flow does not need to own follow-up execution or reminder loops.
 
@@ -113,4 +113,5 @@ Optional downstream follow-up:
 3. keep action-item follow-up in the dedicated pipelines
 
 ---
-*Proposal distilled on 2026-05-04*
+
+_Proposal distilled on 2026-05-04_

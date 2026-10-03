@@ -32,11 +32,11 @@ Do **not** use a handoff when:
 
 ## 2. Pipelines
 
-| Pipeline                                               | Direction                         |
-| ------------------------------------------------------ | --------------------------------- |
-| `pipelines/web-session-handoff-runner.json`            | web → web (round-trip / template) |
-| `pipelines/mobile-webview-handoff-runner-ios.json`     | iOS WebView → web                 |
-| `pipelines/mobile-webview-handoff-runner-android.json` | Android WebView → web             |
+| Pipeline                                                                          | Direction                         |
+| --------------------------------------------------------------------------------- | --------------------------------- |
+| `knowledge/product/pipeline-templates/web-session-handoff-runner.json`            | web → web (round-trip / template) |
+| `knowledge/product/pipeline-templates/mobile-webview-handoff-runner-ios.json`     | iOS WebView → web                 |
+| `knowledge/product/pipeline-templates/mobile-webview-handoff-runner-android.json` | Android WebView → web             |
 
 Each pipeline calls the source actuator's `export_session_handoff` followed
 by the target actuator's `import_session_handoff`. The envelope written
@@ -120,16 +120,16 @@ To wire a new surface for handoff:
    `../../../product/schemas/cross-device-handoff.schema.json`, look up `contract_ref`,
    apply state.
 4. Add an example to `libs/actuators/<surface>/examples/` and reference the
-   pipeline from `pipelines/`.
+   pipeline from `knowledge/product/pipeline-templates/`.
 5. Add a contract test under `libs/actuators/<surface>/src/index.test.ts`
    that validates a representative envelope.
 
 ## 8. Reference
 
 - [`schemas/cross-device-handoff.schema.json`](../../../product/schemas/cross-device-handoff.schema.json)
-- [`pipelines/web-session-handoff-runner.json`](../../../product/pipeline-templates/web-session-handoff-runner.json)
-- [`pipelines/mobile-webview-handoff-runner-ios.json`](../../../product/pipeline-templates/mobile-webview-handoff-runner-ios.json)
-- [`pipelines/mobile-webview-handoff-runner-android.json`](../../../product/pipeline-templates/mobile-webview-handoff-runner-android.json)
+- [`web-session-handoff-runner.json`](../../../product/pipeline-templates/web-session-handoff-runner.json)
+- [`mobile-webview-handoff-runner-ios.json`](../../../product/pipeline-templates/mobile-webview-handoff-runner-ios.json)
+- [`mobile-webview-handoff-runner-android.json`](../../../product/pipeline-templates/mobile-webview-handoff-runner-android.json)
 - [`libs/actuators/browser-actuator/examples/web-runtime-session-handoff-export-template.json`](../../../../libs/actuators/browser-actuator/examples/web-runtime-session-handoff-export-template.json)
 - Audit-chain integration: [`libs/core/governance/audit-chain.ts`](../../../../libs/core/governance/audit-chain.ts)
 - Secret resolution contract: [`libs/core/secret/secret-resolver.ts`](../../../../libs/core/secret/secret-resolver.ts)

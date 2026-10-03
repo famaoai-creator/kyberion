@@ -19,7 +19,7 @@ last_updated: 2026-03-06
 
 ## 2. コンテキスト & リソース
 
-- `knowledge/connections/setup_guide.md`
+- `knowledge/public/connections/setup_guide.md`
 - `knowledge/personal/` (秘密情報の所在確認)
 
 ## 3. 勝利条件

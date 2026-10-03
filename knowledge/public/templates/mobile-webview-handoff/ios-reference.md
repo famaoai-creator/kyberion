@@ -28,4 +28,4 @@ debug scheme または internal simulator build で、authenticated WebView stat
 - browser import:
   [`ios-runtime-session-handoff-import.json`](../../../../libs/actuators/browser-actuator/examples/ios-runtime-session-handoff-import.json)
 - end-to-end runner:
-  [`mobile-webview-handoff-runner-ios.json`](/Users/famao/kyberion/pipelines/mobile-webview-handoff-runner-ios.json)
+  [`mobile-webview-handoff-runner-ios.json`](../../../product/pipeline-templates/mobile-webview-handoff-runner-ios.json)

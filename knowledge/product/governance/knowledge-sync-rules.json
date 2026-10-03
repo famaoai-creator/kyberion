@@ -18,7 +18,7 @@
   "indexing": {
     "knowledge_dir": "knowledge",
     "capabilities_dir": "libs/actuators",
-    "output_json": "knowledge/orchestration/knowledge_index.json",
+    "output_json": "knowledge/product/orchestration/knowledge_index.json",
     "output_md": "knowledge/_index.md",
     "exclude": [".*", "node_modules", "incidents"]
   },

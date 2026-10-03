@@ -15,14 +15,14 @@ last_updated: 2026-03-06
 
 ### 1.1. Phases & Artifacts
 
-| Phase               | Traditional Artifact           | Kyberion ADF Equivalent         |
-| :------------------ | :----------------------------- | :---------------------------- |
-| **Requirements**    | 要件定義書 (PRD), WBS          | `requirements.adf.json`       |
-| **External Design** | 基本設計書, システム構成図     | `design.adf.json`             |
-| **Internal Design** | 詳細設計書, DB定義書           | `schema.adf.json`             |
-| **Implementation**  | ソースコード, 単体テスト仕様書 | `src/`, `tests/unit.test.cjs` |
-| **Testing**         | テスト結果報告書, エビデンス   | `test-results.adf.json`       |
-| **Delivery**        | 納品報告書, ユーザーマニュアル | `delivery.adf.json`           |
+| Phase               | Traditional Artifact           | Kyberion ADF Equivalent   |
+| :------------------ | :----------------------------- | :------------------------ |
+| **Requirements**    | 要件定義書 (PRD), WBS          | `requirements.adf.json`   |
+| **External Design** | 基本設計書, システム構成図     | `design.adf.json`         |
+| **Internal Design** | 詳細設計書, DB定義書           | `schema.adf.json`         |
+| **Implementation**  | ソースコード, 単体テスト仕様書 | `src/`, `tests/*.test.ts` |
+| **Testing**         | テスト結果報告書, エビデンス   | `test-results.adf.json`   |
+| **Delivery**        | 納品報告書, ユーザーマニュアル | `delivery.adf.json`       |
 
 ---
 

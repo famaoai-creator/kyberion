@@ -2,7 +2,7 @@
   "$schema": "../schemas/maintenance-schedule.schema.json",
   "documentation_only": true,
   "schedule": "daily",
-  "policy_path": "knowledge/governance/package-policy.json",
+  "policy_path": "knowledge/product/governance/package-policy.json",
   "default_tasks": [
     "fix_shebangs",
     "thin_dependencies",
