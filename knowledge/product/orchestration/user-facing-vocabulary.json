@@ -8717,6 +8717,11 @@
         "en": "Run one bounded wake for a dot immediately",
         "ja": "dot の wake を1回だけ即時実行",
         "qps-ploc": "⟦Řůñ őñė ƀőůñḓėḓ ẇȧķė ƒőř ȧ ḓőŧ ïɱɱėḓïȧŧėŀẏ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_script_dot_inbox": {
+        "en": "Append a wake-lane row to a resident dot's inbox",
+        "ja": "dot の wake レーン（inbox）に手動で行を追加",
+        "qps-ploc": "⟦Ȧṗṗėñḓ ȧ ẇȧķė-ŀȧñė řőẇ ŧő ȧ řėşïḓėñŧ ḓőŧ'ş ïñƀőẋ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
       }
     },
     "recorder": {

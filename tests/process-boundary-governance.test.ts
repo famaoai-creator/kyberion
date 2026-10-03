@@ -43,6 +43,12 @@ const allowedManagedProcessConsumers = [
   // Test of the owner above; mocks the managed-process module so approval
   // resume logic is exercised without spawning a real process.
   'libs/core/pipeline/pipeline-approval-resume.test.ts',
+  // The await-state resume scanner owns `run_pipeline --resume` spawns on the
+  // same governed re-entry pattern, scoped to the external-state wait path.
+  'libs/core/pipeline/pipeline-await-resume.ts',
+  // Test of the owner above; mocks the managed-process module so the scanner
+  // is exercised without spawning a real process.
+  'libs/core/pipeline/pipeline-await-resume.test.ts',
   // Terminal HUD schedule actions launch detached pipelines through the
   // managed-process owner so the UI loop remains responsive and the child
   // process has an explicit surface owner.

@@ -11,6 +11,10 @@ import type {
   SurfaceConversationAttachment,
   SurfaceConversationResult,
 } from './channel-surface-types.js';
+import { appendDotInboxEntry, isDotWakeChannel } from '../dot/dot-inbox.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('channel-adapter');
 
 export interface ChannelTurnInput {
   text: string;
@@ -166,6 +170,28 @@ export async function runChannelTurn(
 ): Promise<SurfaceConversationResult> {
   let typing: ChannelTypingHandle | undefined;
   try {
+    // Wake-lane producer for resident dots: an inbound channel turn is the
+    // surface signal `wake` triggers wait on. Emitted before the conversation
+    // so an attentive dot does not wait for the turn to finish, and bounded
+    // by the append itself — a wake-lane failure must never break the turn.
+    if (isDotWakeChannel(adapter.channel)) {
+      try {
+        appendDotInboxEntry({
+          channel: adapter.channel,
+          source: 'channel-turn',
+          text: input.text,
+          payload: {
+            channel: input.channel,
+            thread_ts: input.threadTs,
+            actor_id: adapter.actorId,
+          },
+        });
+      } catch (error) {
+        logger.warn(
+          `[channel-adapter] dot-inbox append failed (${adapter.channel}): ${error instanceof Error ? error.message : error}`
+        );
+      }
+    }
     const threadContext = adapter.threadContext ? await adapter.threadContext(input) : undefined;
     typing = adapter.typing ? await adapter.typing(input) : undefined;
     const result = await conversation({

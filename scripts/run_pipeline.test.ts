@@ -382,6 +382,61 @@ describe('run_pipeline compatibility', () => {
     });
   });
 
+  it('suspends at core:await_state until the probed state is satisfied', async () => {
+    const runId = `await-state-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const markerRel = `active/shared/tmp/await-state-marker-${runId}.txt`;
+    const journal = createPipelineRunJournal(runId, {
+      pipeline_id: 'await-state-test',
+      input_path: 'pipelines/example.json',
+      step_ids: ['before', 'wait', 'after'],
+    });
+    const steps = [
+      { id: 'before', op: 'log', params: { message: 'before' } },
+      {
+        id: 'wait',
+        op: 'core:await_state',
+        params: {
+          probe: { type: 'file', path: markerRel, expect: 'exists' },
+          timeout_ms: 60_000,
+          export_as: 'gate',
+        },
+      },
+      { id: 'after', op: 'log', params: { message: 'after' } },
+    ];
+    let suspension: TestSuspension | undefined;
+    try {
+      await runSteps(steps, {}, { runJournal: journal, runId, quiet: true });
+      throw new Error('expected await_state to suspend');
+    } catch (error) {
+      if (!error || typeof error !== 'object' || !('suspension' in error)) throw error;
+      suspension = (error as { suspension: TestSuspension }).suspension;
+    }
+    expect(suspension).toMatchObject({
+      step_id: 'wait',
+      await_kind: 'state',
+      storage_channel: 'pipeline-await-state',
+    });
+    journal.append('run_suspended', { ...suspension });
+    const suspendedState = loadPipelineRunJournal(runId);
+    journal.append('run_resumed', { resumed_at: new Date().toISOString() });
+
+    // While the marker is absent the resumed run re-suspends; once it exists
+    // the step reports satisfied and the run completes.
+    safeWriteFile(markerRel, 'ready');
+    const resumed = await runSteps(
+      steps,
+      {},
+      { runJournal: journal, resumeState: suspendedState, runId, quiet: true }
+    );
+    expect(resumed.status).toBe('succeeded');
+    expect(resumed.context.gate).toMatchObject({ status: 'satisfied' });
+
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(journal.path);
+      safeRmSync(markerRel);
+    });
+  });
+
   it('accepts short-form log ops with template params', async () => {
     const result = await runSteps(
       [
