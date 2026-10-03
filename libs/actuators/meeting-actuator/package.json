@@ -12,11 +12,11 @@
   },
   "dependencies": {
     "@agent/core": "workspace:*",
-    "yargs": "^17.7.2"
+    "yargs": "^17.7.3"
   },
   "devDependencies": {
-    "ajv": "^8.18.0",
+    "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.3"
   }
 }
