@@ -27,6 +27,21 @@ export function isMissionLookupRefusal(error: unknown): boolean {
   return typeof code === 'string' && REFUSAL_CODES.has(code);
 }
 
+/**
+ * Run a per-mission read (`loadState(id)` and the like) inside a LIST loop: an
+ * ambiguous or not-visible mission is skipped instead of aborting the whole
+ * listing. A list shows what this process may see, so skipping is the
+ * conservative answer; a single-item read keeps the strict lookup.
+ */
+export function readOrNullOnMissionRefusal<T>(read: () => T): T | null {
+  try {
+    return read();
+  } catch (error) {
+    if (isMissionLookupRefusal(error)) return null;
+    throw error;
+  }
+}
+
 /** The mission directory, or null when it is absent, ambiguous or not visible. */
 export function missionPathOrNull(find: MissionPathFinder, missionId: string): string | null {
   try {
