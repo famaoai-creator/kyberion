@@ -31,6 +31,7 @@ import {
   hashPipelineOutput,
   pipelineJournalChannelSnapshot,
 } from '@agent/core/pipeline/pipeline-run-journal';
+import { evaluateStateProbe, type StateProbeSpec } from '@agent/core/state-probe';
 import { deriveExecutionGraph } from '@agent/core/graph-scheduler';
 import type { ResourceClaim } from '@agent/core/tool/tool-call-scheduler';
 import {
@@ -639,6 +640,75 @@ export async function runStepsInternal(
           on_timeout: onTimeout,
           timeout_at: timeoutAt,
           reason: String(approval.summary || params.summary || 'human decision required'),
+        });
+      },
+      await_state: async (dctx) => {
+        const { params, ctx, currentStep } = dctx;
+        const stepId = currentStep?.id;
+        if (!stepId) throw new Error('core:await_state requires a step id for durable resume');
+        const probeSpec = params.probe as StateProbeSpec | undefined;
+        if (!probeSpec || typeof probeSpec !== 'object' || typeof probeSpec.type !== 'string') {
+          throw new Error('core:await_state requires params.probe (a StateProbeSpec)');
+        }
+        const exportKey = String(params.export_as || 'await_state');
+        const onTimeout = params.on_timeout === 'deny' ? ('deny' as const) : ('abort' as const);
+        const timeoutMs = coercePositiveInt(params.timeout_ms ?? params.timeout, 86_400_000);
+        const evaluate = () =>
+          evaluateStateProbe(probeSpec, {
+            serviceCall: async (input) => {
+              const { executeServicePreset } = await import('@agent/core/service/service-engine');
+              return executeServicePreset(
+                input.service_id,
+                input.action,
+                input.params ?? {},
+                'secret-guard'
+              );
+            },
+          });
+        const suspended = opts.resumeState?.suspended;
+        const isResume =
+          suspended?.step_id === stepId && (suspended.await_kind ?? 'approval') === 'state';
+        const result = await evaluate();
+        if (result.matched) {
+          return {
+            ...ctx,
+            [exportKey]: {
+              status: 'satisfied',
+              value: result.value,
+              fingerprint: result.fingerprint,
+              step_id: stepId,
+            },
+          };
+        }
+        const expired =
+          isResume && suspended.timeout_at !== undefined
+            ? Date.parse(suspended.timeout_at) <= Date.now()
+            : false;
+        if (expired) {
+          if (onTimeout === 'deny') {
+            return {
+              ...ctx,
+              [exportKey]: { status: 'denied', timed_out: true, step_id: stepId },
+            };
+          }
+          throw new Error(`[AWAIT_STATE_TIMEOUT] on_timeout=${onTimeout}`);
+        }
+        // First sight: suspend with a fresh deadline. Resumed but still
+        // unmatched: re-suspend keeping the ORIGINAL deadline — the scanner's
+        // timeout must not silently extend just because a resume ran.
+        const timeoutAt =
+          isResume && suspended.timeout_at
+            ? suspended.timeout_at
+            : new Date(Date.now() + timeoutMs).toISOString();
+        throw new PipelineSuspendedError({
+          step_id: stepId,
+          approval_request_id: `await-state:${opts.runId || 'pending'}:${stepId}`,
+          storage_channel: 'pipeline-await-state',
+          on_timeout: onTimeout,
+          timeout_at: timeoutAt,
+          reason: `await_state on ${probeSpec.type} probe`,
+          await_kind: 'state',
+          state_probe: probeSpec as unknown as Record<string, unknown>,
         });
       },
       if: async (dctx) => {

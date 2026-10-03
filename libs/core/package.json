@@ -5103,6 +5103,10 @@
       "types": "./dist/pipeline/pipeline-approval-resume.d.ts",
       "default": "./dist/pipeline/pipeline-approval-resume.js"
     },
+    "./pipeline/pipeline-await-resume": {
+      "types": "./dist/pipeline/pipeline-await-resume.d.ts",
+      "default": "./dist/pipeline/pipeline-await-resume.js"
+    },
     "./pipeline/pipeline-contract": {
       "types": "./dist/pipeline/pipeline-contract.d.ts",
       "default": "./dist/pipeline/pipeline-contract.js"
@@ -7038,6 +7042,14 @@
     "./dot/dot-lifecycle": {
       "types": "./dist/dot/dot-lifecycle.d.ts",
       "default": "./dist/dot/dot-lifecycle.js"
+    },
+    "./dot/dot-inbox": {
+      "types": "./dist/dot/dot-inbox.d.ts",
+      "default": "./dist/dot/dot-inbox.js"
+    },
+    "./state-probe": {
+      "types": "./dist/state-probe.d.ts",
+      "default": "./dist/state-probe.js"
     }
   },
   "dependencies": {

@@ -25,6 +25,8 @@ export * from './mission/mission-graph-run-journal.js';
 export * from './pipeline/pipeline-run-journal.js';
 
 export * from './pipeline/pipeline-approval-resume.js';
+export * from './pipeline/pipeline-await-resume.js';
+export * from './state-probe.js';
 
 export * from './graph-run-artifact.js';
 
