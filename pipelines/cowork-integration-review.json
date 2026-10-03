@@ -62,7 +62,9 @@
       "role": "sink",
       "op": "system:log",
       "consumes": "p_mcp_script",
-      "params": { "message": "🔧 MCP Server (built):    {{p_mcp_script.exists}} ({{p_mcp_script.kind}})" }
+      "params": {
+        "message": "🔧 MCP Server (built):    {{p_mcp_script.exists}} ({{p_mcp_script.kind}})"
+      }
     },
     {
       "role": "sink",
@@ -103,7 +105,9 @@
     {
       "role": "sink",
       "op": "system:log",
-      "params": { "message": "✅ [COWORK] Integration review complete." }
+      "params": {
+        "message": "✅ [COWORK] Integration review complete. Next: reusable runs → `pnpm pipeline:promote --input active/shared/tmp/<run>.json` (ADF) — browser recordings → `promote-procedure` pipeline. Cowork sync is knowledge-only; execution stays in ADF/mission_controller."
+      }
     }
   ]
 }

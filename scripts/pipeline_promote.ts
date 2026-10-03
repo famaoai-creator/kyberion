@@ -9,6 +9,10 @@
  *   pnpm pipeline:promote --input active/shared/tmp/my-run.json \
  *     [--name <slug>] [--trace <traceId>] [--dry-run] [--no-llm] [--force]
  *
+ * Scope: successful one-off ADF pipeline runs → reusable pipelines/*.json.
+ * For browser recordings (Pattern A→B into ProcedureCatalog), use the
+ * `promote-procedure` pipeline instead — different input, different catalog.
+ *
  * What it does:
  *   1. validate the source ADF (schema + guardrails — same preflight as run)
  *   2. optionally ask the reasoning backend ONE advisory question: which
@@ -243,7 +247,8 @@ async function main(args: string[] = []): Promise<void> {
   const inputPath = getFlag(argv, '--input');
   if (!inputPath) {
     fail(
-      'Usage: pipeline_promote --input <adf.json> [--name <slug>] [--trace <traceId>] [--dry-run] [--no-llm] [--force]'
+      'Usage: pipeline_promote --input <adf.json> [--name <slug>] [--trace <traceId>] [--dry-run] [--no-llm] [--force]\n' +
+        'Scope: ADF pipeline runs only. For browser recordings use the promote-procedure pipeline.'
     );
   }
   const dryRun = argv.includes('--dry-run');

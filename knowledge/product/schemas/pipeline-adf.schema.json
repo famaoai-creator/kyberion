@@ -23,6 +23,18 @@
     "variables": {},
     "inputs": {},
     "fallback_pipeline": { "type": "string" },
+    "promotion": {
+      "type": "object",
+      "description": "LC-02 provenance stamped by pnpm pipeline:promote (promoted_from, promoted_at, trace_id, rationale). Ignored by the runtime.",
+      "properties": {
+        "promoted_from": { "type": "string" },
+        "promoted_at": { "type": "string" },
+        "trace_id": { "type": "string" },
+        "rationale": { "type": "string" },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
     "knowledge_scope": {},
     "env": { "type": "object" },
     "session_id": { "type": "string" },
