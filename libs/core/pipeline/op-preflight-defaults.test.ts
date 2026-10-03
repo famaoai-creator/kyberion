@@ -16,6 +16,8 @@ describe('default operation preflight waterfall', () => {
     expect(listOpPreflightListeners().map((entry) => entry.id)).toEqual([
       'core:scope',
       'core:effect',
+      'core:introduction',
+      'core:taint',
       'core:adf-guardrails',
       'core:provider-egress',
     ]);
