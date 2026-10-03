@@ -4,6 +4,7 @@ import { auditChain } from './governance/audit-chain.js';
 import { computeApprovalPayloadHash, decideApprovalRequest } from './governance/approval-store.js';
 import {
   collectCascadeCancellations,
+  assertAdoptable,
   dependencyReadiness,
   drainApprovable,
   persistWithRetry,
@@ -28,11 +29,11 @@ import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
   applyControlPlaneJournalEvent,
+  foldPersistedState,
   declassificationKeyOf,
   deserializeGadgetOperation,
   gadgetSchemaToJsonSchema,
   loadPersistedControlPlaneStateAtPath,
-  restoredHeldActionRecord,
   serializableHeldActionRecord,
   serializeGadgetRecord,
   validatePersistedControlPlaneStateAtPath,
@@ -43,6 +44,7 @@ import {
 import {
   controlPlaneNamespaceFor,
   foldObservationAggregate,
+  observationAggregateKey,
   type ControlPlaneCollection,
   type ControlPlaneJournalEvent,
   type ObservationAggregate,
@@ -670,6 +672,32 @@ export class CloudflareOsControlPlane {
     return this.settleCancelled(record, reason, by);
   }
 
+  /** Re-home a tenantless (quarantined) held action into its tenant. Authenticated human + reason. */
+  adoptQuarantinedHeldAction(
+    id: string,
+    tenantSlug: string,
+    approval: HeldActionDecision & { reason: string }
+  ): HeldActionRecord {
+    const record = this.held.get(id);
+    if (!record) throw new Error(`Held action not found: ${id}`);
+    this.assertHumanDecision(record, approval);
+    const by = assertNonEmpty(approval.resolvedBy, 'resolvedBy');
+    const reason = assertNonEmpty(approval.reason, 'reason');
+    if (!this.journalMode)
+      throw new Error('[POLICY_VIOLATION] Quarantine exists only in journal mode');
+    assertAdoptable(record, tenantSlug);
+    record.tenantSlug = tenantSlug;
+    this.recordMutation('held', record); // routes into the tenant's journal
+    this.journalStore.tombstoneUnscoped('held', id);
+    audit('held_action', 'adopt_quarantined', 'completed', {
+      heldActionId: id,
+      tenantSlug,
+      by,
+      reason,
+    });
+    return record;
+  }
+
   /**
    * Operator escape hatch for a claim whose outcome was never recorded (the
    * claiming process died). Only an authenticated human bound to this exact
@@ -831,8 +859,10 @@ export class CloudflareOsControlPlane {
   recordObservation(input: Omit<ObservationRecord, 'id' | 'observedAt'>): ObservationRecord {
     const record = { ...input, id: randomUUID(), observedAt: nowIso() };
     this.observations.push(record);
+    // Audit the first sight of a resource; repeats are in the journal and the rollup count.
+    const firstSight = !this.observationAggregates.has(observationAggregateKey(record));
     foldObservationAggregate(this.observationAggregates, record);
-    audit('observation', 'read', 'completed', record);
+    if (firstSight) audit('observation', 'read', 'completed', record);
     this.recordMutation('observation', record);
     return record;
   }
@@ -1457,30 +1487,7 @@ export class CloudflareOsControlPlane {
     if (!safeExistsSync(this.statePath)) return;
     try {
       const state = loadPersistedControlPlaneStateAtPath(this.statePath);
-      if (!state) return;
-      for (const raw of state.held || []) {
-        const record = raw as unknown as HeldActionRecord;
-        restoredHeldActionRecord(record);
-        this.held.set(record.id, record);
-      }
-      for (const entry of state.introductions || []) this.introductions.set(entry.id, entry);
-      this.observations.push(...(state.observations || []));
-      this.autoRules.push(...(state.autoRules || []));
-      for (const edge of state.capabilities || []) this.capabilities.set(edge.id, edge);
-      for (const [threadId, capabilities] of Object.entries(state.threadCapabilities || {})) {
-        this.threadCapabilities.set(threadId, new Set(capabilities));
-      }
-      for (const blueprint of state.blueprints || []) this.blueprints.set(blueprint.id, blueprint);
-      for (const grant of state.declassifications || []) {
-        this.declassifications.set(declassificationKeyOf(grant), grant);
-      }
-      for (const gadget of state.gadgets || []) {
-        applyControlPlaneJournalEvent(this.journalCollections(), {
-          kind: 'gadget',
-          records: [gadget as unknown as Record<string, unknown>],
-        });
-      }
-      this.network.push(...(state.network || []));
+      if (state) foldPersistedState(this.journalCollections(), state);
     } catch (error) {
       if (this.auditRestoreFailures) {
         audit('control_plane', 'restore', 'failed', {
@@ -1491,12 +1498,6 @@ export class CloudflareOsControlPlane {
     }
   }
 
-  /**
-   * Observation writers and readers may live in separate long-running
-   * processes (for example service-actuator and Chronos). Refresh only the
-   * observation projection before provenance reads so a resolver does not
-   * keep using the constructor-time snapshot.
-   */
   private refreshPersistedObservations(): void {
     if (!this.persist) return;
     if (this.journalMode) {
