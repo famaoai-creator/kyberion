@@ -187,6 +187,7 @@ function parsePersistedHeldAction(value: unknown, index: number): PersistedRecor
       'submittedAt',
       'params',
       'persistParams',
+      'applyClaim',
       'approvalRequest',
       'decidedAt',
       'resolvedBy',
@@ -220,6 +221,14 @@ function parsePersistedHeldAction(value: unknown, index: number): PersistedRecor
     ...(record.params !== undefined ? { params: record.params } : {}),
     ...(record.persistParams === true ? { persistParams: true } : {}),
   };
+  if (record.applyClaim !== undefined) {
+    const claim = persistedRecord(record.applyClaim, `${label}.applyClaim`);
+    assertPersistedFields(claim, ['by', 'at'], `${label}.applyClaim`);
+    normalized.applyClaim = {
+      by: persistedString(claim, 'by', `${label}.applyClaim`),
+      at: persistedString(claim, 'at', `${label}.applyClaim`),
+    };
+  }
   if (record.approvalRequest !== undefined) {
     const link = persistedRecord(record.approvalRequest, `${label}.approvalRequest`);
     assertPersistedFields(
@@ -706,9 +715,14 @@ export interface DeclassificationGrant {
 }
 
 export function declassificationKeyOf(
-  grant: Pick<DeclassificationGrant, 'payloadHash' | 'targetAudience' | 'targetTenant'>
+  grant: Pick<
+    DeclassificationGrant,
+    'missionId' | 'payloadHash' | 'targetAudience' | 'targetTenant'
+  >
 ): string {
-  return `${grant.payloadHash}|${grant.targetAudience}|${grant.targetTenant ?? ''}`;
+  // The mission is part of the key: two missions granting the same artifact
+  // to the same audience must not overwrite each other's grant.
+  return `${grant.missionId}|${grant.payloadHash}|${grant.targetAudience}|${grant.targetTenant ?? ''}`;
 }
 
 export interface ControlPlaneJournalCollections {

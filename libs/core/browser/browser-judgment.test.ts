@@ -218,3 +218,23 @@ describe('judgeBrowserFailureKind (browser-actuator failure path)', () => {
     expect(asked).toBe(0);
   });
 });
+
+describe('classifyBrowserFailureByRules selector pattern', () => {
+  it('keeps the existing classification of selector phrases', () => {
+    // `not found` is matched by an earlier rule, so this phrase has always
+    // classified as not_found; the selector rule only ever added the others.
+    expect(classifyBrowserFailureByRules('Error: selector "#login" not found on page')).toBe(
+      'not_found'
+    );
+    expect(classifyBrowserFailureByRules('waiting for selector #x')).toBe('element_missing');
+    expect(classifyBrowserFailureByRules('no element matches #x')).toBe('element_missing');
+    expect(classifyBrowserFailureByRules('selector "#x" is visible')).toBe('unknown');
+  });
+
+  it('is linear on repeated "selector " input (CodeQL js/polynomial-redos)', () => {
+    const hostile = 'selector '.repeat(60000);
+    const started = Date.now();
+    expect(classifyBrowserFailureByRules(hostile)).toBe('unknown');
+    expect(Date.now() - started).toBeLessThan(500);
+  });
+});
