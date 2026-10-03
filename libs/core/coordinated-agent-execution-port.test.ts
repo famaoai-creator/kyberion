@@ -192,6 +192,74 @@ describe('CoordinatedAgentExecutionPort', () => {
     expect(getWorkItem(item.item_id)?.attempts ?? []).toHaveLength(0);
   });
 
+  describe('minting without an active envelope', () => {
+    const delegateAndObserve = async (
+      scope: Record<string, unknown>,
+      itemId: string
+    ): Promise<ScopeEnvelope | undefined> => {
+      clearWorkCoordinationStore();
+      createWorkItem({
+        itemId,
+        title: 'mint boundary',
+        description: 'request scope is caller input',
+        projectId: 'MSN-C',
+        status: 'ready',
+      });
+      let seen: ScopeEnvelope | undefined;
+      const port = new CoordinatedAgentExecutionPort({
+        delegate: vi.fn(async () => {
+          seen = currentScopeEnvelope();
+          return {
+            execution_kind: 'agent_delegation' as const,
+            task_id: 't',
+            agent_id: 'a',
+            status: 'succeeded' as const,
+            output: 'done',
+          };
+        }),
+      });
+      await port.delegate({
+        work_item_id: itemId,
+        task_id: 't',
+        mission_id: 'MSN-C',
+        agent_id: 'a',
+        security_scope: scope as never,
+        instruction: 'go',
+        idempotency_key: `idem-${itemId}`,
+      });
+      return seen;
+    };
+    const requested = {
+      tenant_slug: 'victim',
+      mission_id: 'MSN-C',
+      read_tiers: ['public', 'confidential', 'personal'],
+      write_tier: 'personal',
+      external_egress: 'allow',
+      purpose: 'caller-declared',
+    };
+
+    afterEach(() => vi.unstubAllEnvs());
+
+    it('runs unenveloped when the process is not bound to the requested mission', async () => {
+      vi.stubEnv('MISSION_ID', '');
+      expect(await delegateAndObserve(requested, 'WI-MINT-001')).toBeUndefined();
+      vi.stubEnv('MISSION_ID', 'MSN-OTHER');
+      expect(await delegateAndObserve(requested, 'WI-MINT-002')).toBeUndefined();
+    });
+
+    it('clamps a minted policy to the process tier and ignores request tenant and egress', async () => {
+      vi.stubEnv('MISSION_ID', 'MSN-C');
+      vi.stubEnv('KYBERION_TIER', 'confidential');
+      vi.stubEnv('KYBERION_TENANT', 'default');
+      vi.stubEnv('KYBERION_SCOPE_ENV_PATH', 'active/shared/tmp/coordinated-missing-scope.env');
+      const envelope = await delegateAndObserve(requested, 'WI-MINT-003');
+      expect(envelope?.policy.read_tiers).toEqual(['public', 'confidential']);
+      expect(envelope?.policy.write_tier).toBe('confidential');
+      expect(envelope?.policy.external_egress).toBeUndefined();
+      expect(envelope?.identity.tenant_slug).toBe('default');
+    });
+  });
+
   it('offers a convenience entry point that keeps WorkItem coordination enabled', async () => {
     clearWorkCoordinationStore();
     const item = createWorkItem({

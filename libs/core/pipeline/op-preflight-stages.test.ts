@@ -13,7 +13,11 @@ import {
 } from './op-preflight-stages.js';
 import { setControlPlaneRuntimeRootForTests, readJournalTail } from '../cloudflare-os-journal.js';
 import { resetSharedControlPlaneForTests, sharedControlPlane } from '../cloudflare-os-shared.js';
-import { resetScopeEnvelopeState } from '../scope-envelope.js';
+import {
+  mintScopeEnvelope,
+  resetScopeEnvelopeState,
+  withScopeEnvelope,
+} from '../scope-envelope.js';
 import type { OpPreflightCall } from './op-preflight.js';
 
 let testRoot: string;
@@ -43,31 +47,38 @@ const call = (op: string, context?: Record<string, unknown>): OpPreflightCall =>
   source: 'pipeline',
 });
 
-const scoped = {
-  mission_id: 'mission-s5',
-  task_id: 'task-s5',
-  tenant_slug: 'tenant-a',
-  read_tiers: ['confidential'],
-  purpose: 'stage test',
-};
+/** Run `fn` under a runtime-minted envelope — the only identity the stages trust. */
+const inScope = <T>(fn: () => T): T =>
+  withScopeEnvelope(
+    mintScopeEnvelope({
+      identity: {
+        tenant_slug: 'tenant-a',
+        mission_id: 'mission-s5',
+        task_id: 'task-s5',
+        tier: 'confidential',
+      },
+      policy: { purpose: 'stage test' },
+    }),
+    fn
+  );
 
 describe('introductionResult', () => {
-  const writeInput = {
-    _effect: 'write',
-    _resource_ref: 'file:out/report.md',
-    security_scope: scoped,
-  };
+  const writeInput = { _effect: 'write', _resource_ref: 'file:out/report.md' };
 
   it('warns without blocking when introduction is missing (warn mode)', () => {
-    expect(() => introductionResult(call('file:pipeline'), writeInput)).not.toThrow();
+    inScope(() =>
+      expect(() => introductionResult(call('file:pipeline'), writeInput)).not.toThrow()
+    );
   });
 
   it('blocks unintroduced writes in enforce mode', () => {
     setOpPreflightRolloutForTests({
       stages: { introduction: { default: 'enforce' } },
     });
-    expect(() => introductionResult(call('file:pipeline'), writeInput)).toThrow(
-      '[POLICY_VIOLATION]'
+    inScope(() =>
+      expect(() => introductionResult(call('file:pipeline'), writeInput)).toThrow(
+        '[POLICY_VIOLATION]'
+      )
     );
   });
 
@@ -75,7 +86,7 @@ describe('introductionResult', () => {
     setOpPreflightRolloutForTests({
       stages: { introduction: { default: 'enforce', families: { service: 'off' } } },
     });
-    expect(() => introductionResult(call('service:api'), writeInput)).not.toThrow();
+    inScope(() => expect(() => introductionResult(call('service:api'), writeInput)).not.toThrow());
   });
 
   it('passes when a matching introduction exists', async () => {
@@ -99,16 +110,18 @@ describe('introductionResult', () => {
       effectBinding: held.effectBinding,
     });
     await sharedControlPlane().applyHeldAction(held.id);
-    expect(() => introductionResult(call('file:pipeline'), writeInput)).not.toThrow();
+    inScope(() =>
+      expect(() => introductionResult(call('file:pipeline'), writeInput)).not.toThrow()
+    );
   });
 
   it('ignores read effects and ops without resource refs', () => {
-    expect(() =>
-      introductionResult(call('file:pipeline'), { _effect: 'read', security_scope: scoped })
-    ).not.toThrow();
-    expect(() =>
-      introductionResult(call('file:pipeline'), { _effect: 'write', security_scope: scoped })
-    ).not.toThrow();
+    inScope(() =>
+      expect(() => introductionResult(call('file:pipeline'), { _effect: 'read' })).not.toThrow()
+    );
+    inScope(() =>
+      expect(() => introductionResult(call('file:pipeline'), { _effect: 'write' })).not.toThrow()
+    );
   });
 });
 
@@ -123,10 +136,7 @@ describe('taintResult', () => {
       purpose: 'p',
       summary: 's',
     });
-    const result = taintResult(call('service:api'), {
-      _effect: 'egress',
-      security_scope: scoped,
-    });
+    const result = inScope(() => taintResult(call('service:api'), { _effect: 'egress' }));
     expect(result?.repaired_input?._egress_taint).toMatchObject({
       highestTier: 'confidential',
     });
@@ -151,7 +161,6 @@ describe('provenanceEgressResult (SC-06)', () => {
 
   const egressInput = (overrides: Record<string, unknown> = {}) => ({
     _effect: 'egress',
-    security_scope: scoped,
     ...overrides,
   });
 
@@ -161,36 +170,44 @@ describe('provenanceEgressResult (SC-06)', () => {
 
   it('denies a public-audience egress after a confidential observation', () => {
     observe('confidential');
-    const result = provenanceEgressResult(
-      call('export:publish'),
-      egressInput({ target_audience: 'public', target_tenant: 'tenant-a' })
+    const result = inScope(() =>
+      provenanceEgressResult(
+        call('export:publish'),
+        egressInput({ target_audience: 'public', target_tenant: 'tenant-a' })
+      )
     );
     expect(result?.decision).toBe('block');
   });
 
   it('denies egress to an unobserved tenant', () => {
     observe('confidential');
-    const result = provenanceEgressResult(
-      call('export:publish'),
-      egressInput({ target_audience: 'confidential', target_tenant: 'tenant-b' })
+    const result = inScope(() =>
+      provenanceEgressResult(
+        call('export:publish'),
+        egressInput({ target_audience: 'confidential', target_tenant: 'tenant-b' })
+      )
     );
     expect(result?.decision).toBe('block');
   });
 
   it('denies the external audience outright', () => {
     observe('public');
-    const result = provenanceEgressResult(
-      call('export:publish'),
-      egressInput({ target_audience: 'external', target_tenant: 'tenant-a' })
+    const result = inScope(() =>
+      provenanceEgressResult(
+        call('export:publish'),
+        egressInput({ target_audience: 'external', target_tenant: 'tenant-a' })
+      )
     );
     expect(result?.decision).toBe('block');
   });
 
   it('passes an untainted mission', () => {
     expect(
-      provenanceEgressResult(
-        call('export:publish'),
-        egressInput({ target_audience: 'confidential', target_tenant: 'tenant-a' })
+      inScope(() =>
+        provenanceEgressResult(
+          call('export:publish'),
+          egressInput({ target_audience: 'confidential', target_tenant: 'tenant-a' })
+        )
       )
     ).toBeUndefined();
   });
@@ -220,45 +237,51 @@ describe('provenanceEgressResult (SC-06)', () => {
 
     // The bound artifact passes…
     expect(
-      provenanceEgressResult(
-        call('export:publish'),
-        egressInput({
-          target_audience: 'public',
-          target_tenant: 'tenant-a',
-          payload_hash: 'hash-report-v1',
-        })
+      inScope(() =>
+        provenanceEgressResult(
+          call('export:publish'),
+          egressInput({
+            target_audience: 'public',
+            target_tenant: 'tenant-a',
+            payload_hash: 'hash-report-v1',
+          })
+        )
       )
     ).toBeUndefined();
     // …but a changed payload (different hash) is denied again.
     expect(
-      provenanceEgressResult(
-        call('export:publish'),
-        egressInput({
-          target_audience: 'public',
-          target_tenant: 'tenant-a',
-          payload_hash: 'hash-report-v2',
-        })
+      inScope(() =>
+        provenanceEgressResult(
+          call('export:publish'),
+          egressInput({
+            target_audience: 'public',
+            target_tenant: 'tenant-a',
+            payload_hash: 'hash-report-v2',
+          })
+        )
       )?.decision
     ).toBe('block');
   });
 
   it('never trusts an input-carried _egress_taint', () => {
     observe('confidential');
-    const result = provenanceEgressResult(
-      call('export:publish'),
-      egressInput({
-        target_audience: 'public',
-        target_tenant: 'tenant-a',
-        // A client-injected clean projection must not launder the mission's
-        // real confidential taint.
-        _egress_taint: {
-          missionId: 'mission-s5',
-          highestTier: 'public',
-          tenants: ['tenant-a'],
-          prohibitExternal: false,
-          observationIds: [],
-        },
-      })
+    const result = inScope(() =>
+      provenanceEgressResult(
+        call('export:publish'),
+        egressInput({
+          target_audience: 'public',
+          target_tenant: 'tenant-a',
+          // A client-injected clean projection must not launder the mission's
+          // real confidential taint.
+          _egress_taint: {
+            missionId: 'mission-s5',
+            highestTier: 'public',
+            tenants: ['tenant-a'],
+            prohibitExternal: false,
+            observationIds: [],
+          },
+        })
+      )
     );
     expect(result?.decision).toBe('block');
   });
@@ -267,9 +290,11 @@ describe('provenanceEgressResult (SC-06)', () => {
     setOpPreflightRolloutForTests({ stages: { egress: { default: 'warn' } } });
     observe('personal');
     expect(
-      provenanceEgressResult(
-        call('export:publish'),
-        egressInput({ target_audience: 'public', target_tenant: 'tenant-a' })
+      inScope(() =>
+        provenanceEgressResult(
+          call('export:publish'),
+          egressInput({ target_audience: 'public', target_tenant: 'tenant-a' })
+        )
       )
     ).toBeUndefined();
   });
@@ -277,11 +302,12 @@ describe('provenanceEgressResult (SC-06)', () => {
 
 describe('recordOpObservation', () => {
   it('aggregates a read op into the observation journal', () => {
-    recordOpObservation('file:pipeline', {
-      _effect: 'read',
-      _resource_ref: 'file:in/data.json',
-      security_scope: scoped,
-    });
+    inScope(() =>
+      recordOpObservation('file:pipeline', {
+        _effect: 'read',
+        _resource_ref: 'file:in/data.json',
+      })
+    );
     const nsDir = path.join(testRoot, 'confidential', 'tenant-a', 'cloudflare-os');
     const { events } = readJournalTail(nsDir, 0);
     expect(events.some((e) => e.kind === 'observation')).toBe(true);
@@ -292,12 +318,8 @@ describe('recordOpObservation', () => {
   });
 
   it('skips non-read ops and service family (actuator-owned path)', () => {
-    recordOpObservation('service:api', {
-      _effect: 'read',
-      _resource_ref: 'x',
-      security_scope: scoped,
-    });
-    recordOpObservation('file:pipeline', { _effect: 'write', security_scope: scoped });
+    inScope(() => recordOpObservation('service:api', { _effect: 'read', _resource_ref: 'x' }));
+    inScope(() => recordOpObservation('file:pipeline', { _effect: 'write' }));
     expect(sharedControlPlane().listObservationAggregates('mission-s5')).toHaveLength(0);
   });
 });
