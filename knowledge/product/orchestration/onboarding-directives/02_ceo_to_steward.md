@@ -19,7 +19,7 @@ AIエージェントが経営者の視点で判断を下せるよう、組織の
 
 ## 2. コンテキスト & リソース
 
-- `knowledge/roles/ceo/mission/` の既存ファイル
+- `knowledge/product/roles/ceo/mission/` の既存ファイル
 - 直近1年の全社総会資料
 
 ## 3. 勝利条件
@@ -29,4 +29,4 @@ AIエージェントが経営者の視点で判断を下せるよう、組織の
 
 ## 5. アウトプット形式
 
-- 保存先: `knowledge/roles/ceo/mission/corporate_purpose.md`
+- 保存先: `knowledge/product/roles/ceo/mission/corporate_purpose.md`

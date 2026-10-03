@@ -76,7 +76,7 @@
         "asset-token-economist",
         "capability-evolution-engine"
       ],
-      "playbook": "knowledge/orchestration/mission-playbooks/ceo-strategy.md",
+      "playbook": "knowledge/product/orchestration/mission-playbooks/ceo-strategy.md",
       "description": "Strategy, Finance, Org, and Ecosystem Stewardship"
     },
     "Business Owner": {
@@ -89,7 +89,7 @@
         "budget-variance-tracker",
         "competitive-intel-strategist"
       ],
-      "playbook": "knowledge/orchestration/mission-playbooks/ceo-strategy.md",
+      "playbook": "knowledge/product/orchestration/mission-playbooks/ceo-strategy.md",
       "description": "P&L Responsibility, Strategic Alignment, and Market Success"
     },
     "Product Manager": {
@@ -102,7 +102,7 @@
         "doc-sync-sentinel",
         "stakeholder-communicator"
       ],
-      "playbook": "knowledge/orchestration/mission-playbooks/product-audit.md",
+      "playbook": "knowledge/product/orchestration/mission-playbooks/product-audit.md",
       "description": "Product Vision, Roadmap, and Requirement Definition"
     },
     "Software Engineer": {
@@ -343,11 +343,7 @@
       "description": "P&L & Unit Economics"
     },
     "Talent & Culture": {
-      "capabilities": [
-        "onboarding-wizard",
-        "auto-context-mapper",
-        "ai-ethics-auditor"
-      ],
+      "capabilities": ["onboarding-wizard", "auto-context-mapper", "ai-ethics-auditor"],
       "description": "Hiring & Culture"
     }
   }

@@ -59,7 +59,7 @@ listenToNerve('my-nerve-id', (msg) => {
 
 すべての神経活動は以下のパスに集約されます。
 
-- **統合パルス**: `active/shared/runtime/pulse.json`
+- **統合パルス**: `active/shared/runtime/heartbeats/<daemon-id>.json`（デーモン毎のハートビート）
 - **生シグナル**: `presence/bridge/runtime/stimuli.jsonl`
 - **サーフェスログ**: `active/shared/logs/surfaces/<surface-id>.log`
 

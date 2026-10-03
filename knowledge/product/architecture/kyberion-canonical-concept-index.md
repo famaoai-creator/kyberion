@@ -52,28 +52,25 @@ Loop closure may not.
 
 Use each document for a distinct purpose:
 
-| Document | Canonical Role |
-| --- | --- |
-| `docs/USER_EXPERIENCE_CONTRACT.md` | user-facing language contract |
-| `knowledge/product/architecture/organization-work-loop.md` | full organization loop model |
-| `knowledge/product/architecture/enterprise-operating-kernel.md` | enterprise authority/accountability model |
-| `knowledge/product/architecture/organization-profile-model.md` | organization defaults and policy profile model |
-| `knowledge/product/architecture/mission-team-composition-model.md` | mission team template and staffing binding model |
-| `knowledge/product/orchestration/organization-selection-guide.md` | operator-facing organization switching guide |
-| `knowledge/product/orchestration/README.md` | orchestration directory index |
-| `knowledge/product/orchestration/organization-discovery-reports.md` | machine-readable organization discovery report index |
-| `knowledge/product/governance/organization-team-template-catalogs/README.md` | organization-specific team template overlay guide |
-| `knowledge/product/schemas/organization-profile-report.schema.json` | organization profile JSON output contract |
-| `knowledge/product/schemas/organization-catalog-report.schema.json` | organization catalog JSON output contract |
-| `knowledge/product/schemas/organization-profiles-report.schema.json` | organization profiles inventory JSON output contract |
-| `knowledge/product/architecture/kyberion-concept-map.md` | layer mapping and concept placement |
-| `docs/INTENT_LOOP_CONCEPT.md` | non-replaceable intent-loop closure model |
-| `knowledge/product/orchestration/guided-coordination-protocol.md` | shared repeated-work coordination flow |
-| `knowledge/product/schemas/guided-coordination-brief.schema.json` | shared intake brief for repeated coordination |
-| `knowledge/product/architecture/sdlc-gating-model.md` | gate-driven lifecycle governance model |
-| `knowledge/product/architecture/ai-agent-track-patterns.md` | AI agent業務のTrack/Gateパターンカタログ（8プロファイル・3パターン） |
-| `knowledge/product/architecture/actuator-external-dependency-pattern.md` | 外部依存 Actuator の Provision→Verify→Bind→Run パターン（Service/Voice/Meeting 共通） |
-| `knowledge/product/voice/meeting-voice-proxy-setup.md` | Google Meet クローン音声代理プロキシのセットアップ手順 |
+| Document                                                                     | Canonical Role                                       |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `docs/USER_EXPERIENCE_CONTRACT.md`                                           | user-facing language contract                        |
+| `knowledge/product/architecture/organization-work-loop.md`                   | full organization loop model                         |
+| `knowledge/product/architecture/enterprise-operating-kernel.md`              | enterprise authority/accountability model            |
+| `knowledge/product/architecture/organization-profile-model.md`               | organization defaults and policy profile model       |
+| `knowledge/product/architecture/mission-team-composition-model.md`           | mission team template and staffing binding model     |
+| `knowledge/product/orchestration/organization-selection-guide.md`            | operator-facing organization switching guide         |
+| `knowledge/product/orchestration/README.md`                                  | orchestration directory index                        |
+| `knowledge/product/orchestration/organization-discovery-reports.md`          | machine-readable organization discovery report index |
+| `knowledge/product/governance/organization-team-template-catalogs/README.md` | organization-specific team template overlay guide    |
+| `knowledge/product/schemas/organization-profile-report.schema.json`          | organization profile JSON output contract            |
+| `knowledge/product/schemas/organization-catalog-report.schema.json`          | organization catalog JSON output contract            |
+| `knowledge/product/schemas/organization-profiles-report.schema.json`         | organization profiles inventory JSON output contract |
+| `knowledge/product/architecture/kyberion-concept-map.md`                     | layer mapping and concept placement                  |
+| `docs/INTENT_LOOP_CONCEPT.md`                                                | non-replaceable intent-loop closure model            |
+| `knowledge/product/orchestration/guided-coordination-protocol.md`            | shared repeated-work coordination flow               |
+| `knowledge/product/schemas/guided-coordination-brief.schema.json`            | shared intake brief for repeated coordination        |
+| `knowledge/product/architecture/sdlc-gating-model.md`                        | gate-driven lifecycle governance model               |
 
 ## 6. Reading Order
 

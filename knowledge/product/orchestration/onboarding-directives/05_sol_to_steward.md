@@ -21,7 +21,7 @@ last_updated: 2026-03-06
 
 - 営業資料アーカイブ
 - 競合他社の公開リリースノート
-- `knowledge/architecture/distributed-systems.md` (分散システム設計標準)
+- `knowledge/product/architecture/distributed-systems.md` (分散システム設計標準)
 
 ## 3. 勝利条件
 
@@ -30,4 +30,4 @@ last_updated: 2026-03-06
 
 ## 5. アウトプット形式
 
-- 保存先: `knowledge/roles/solution_architect/case_studies.md`
+- 保存先: `knowledge/product/roles/solution_architect/case_studies.md`

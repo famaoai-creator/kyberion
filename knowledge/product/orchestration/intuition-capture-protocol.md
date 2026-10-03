@@ -57,7 +57,7 @@ CEO / 主権者の判断は多くの場合、明示的な論理よりも累積�
 ## 6. 関連
 
 - スキーマ: [schemas/heuristic-entry.schema.json](../schemas/heuristic-entry.schema.json)
-- 格納先: [knowledge/confidential/heuristics/](knowledge/confidential/heuristics)
+- 格納先: `knowledge/confidential/heuristics/`（実行時に作成される confidential tier ディレクトリ）
 - スコープ定義: [path-scope-policy.json#confidential_heuristics](../governance/path-scope-policy.json)
 - 上位概念: Distillation (mission-execution-protocol.md)
 

@@ -29,4 +29,4 @@ last_updated: 2026-03-06
 
 ## 5. アウトプット形式
 
-- 保存先: `knowledge/testing/test_scenarios.md`
+- 保存先: `knowledge/public/quality-management/test_scenarios.md`

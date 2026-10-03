@@ -29,4 +29,4 @@ CI/CDの高速化と環境構築の再現性を担保するため、現行のイ
 
 ## 5. アウトプット形式
 
-- 保存先: `knowledge/devops/`
+- 保存先: `knowledge/product/operations/`

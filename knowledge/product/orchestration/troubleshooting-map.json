@@ -1,10 +1,10 @@
 {
-  "EXECUTION_ERROR": "knowledge/orchestration/autonomous-debug-loop.md",
-  "TIMEOUT": "knowledge/nonfunctional/ipa-grade-2018/performance.yaml",
-  "PERFORMANCE_REGRESSION": "knowledge/orchestration/optimization-standards.md",
-  "SECURITY_VULNERABILITY": "knowledge/security/security-best-practices.md",
-  "GOVERNANCE_VIOLATION": "knowledge/orchestration/directives-protocol.md",
-  "MISSING_DEPENDENCY": "knowledge/orchestration/corporate-env-guide.md",
+  "EXECUTION_ERROR": "knowledge/product/orchestration/autonomous-debug-loop.md",
+  "TIMEOUT": "knowledge/public/nonfunctional/ipa-grade-2018/performance.yaml",
+  "PERFORMANCE_REGRESSION": "knowledge/product/orchestration/optimization-standards.md",
+  "SECURITY_VULNERABILITY": "knowledge/public/standards/security/owasp_llm_top10.md",
+  "GOVERNANCE_VIOLATION": "knowledge/product/orchestration/directives-protocol.md",
+  "MISSING_DEPENDENCY": "knowledge/product/orchestration/corporate-env-guide.md",
   "INVALID_INPUT": "schemas/capability-input.schema.json",
-  "SLO_BREACH": "knowledge/quality-management/metrics_standards.md"
+  "SLO_BREACH": "knowledge/public/quality-management/metrics_standards.md"
 }
