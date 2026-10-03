@@ -97,7 +97,7 @@ export class GeminiStreamingTextToSpeechBridge implements StreamingTextToSpeechB
     local_only: false,
   };
 
-  constructor(private readonly opts: { voice?: string } = {}) {}
+  constructor(private readonly opts: { voice?: string; model?: string } = {}) {}
 
   async *synthesizeStream(
     text: AsyncIterable<string>,
@@ -108,12 +108,17 @@ export class GeminiStreamingTextToSpeechBridge implements StreamingTextToSpeechB
       prompt += segment;
     }
     const voice = this.opts.voice || getRegisteredEnvText('KYBERION_GEMINI_TTS_VOICE') || 'Kore';
+    const model =
+      this.opts.model ||
+      getRegisteredEnvText('KYBERION_GEMINI_TTS_MODEL') ||
+      'gemini-3.8-flash-tts';
     const result = await executeServicePreset(
       'gemini',
       'generate_tts',
       {
         text: prompt.trim(),
         voice,
+        model,
       },
       'secret-guard'
     );

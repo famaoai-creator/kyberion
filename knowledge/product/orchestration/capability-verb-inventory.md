@@ -45,17 +45,17 @@ moves the branching into the CLI.
 
 ## 2. Taking in ↔ putting out
 
-| Direction           | Unifying op                             | Verb                   | State                    |
-| ------------------- | --------------------------------------- | ---------------------- | ------------------------ |
-| Document → text     | `media:document_digest`                 | `pnpm kyberion read`   | unified                  |
-| Brief → document    | `media:generate_document`               | `pnpm kyberion write`  | unified                  |
-| Document ↔ document | `media:*_extract` design distillers     | `pnpm kyberion diff`   | unified                  |
-| Image → text        | `vision:ocr_image` / `describe_image`   | `pnpm kyberion see`    | unified                  |
-| Prompt → image      | `media-generation:generate_image`       | `pnpm kyberion draw`   | unified                  |
-| Audio → text        | `voice:transcribe`                      | `pnpm kyberion listen` | unified                  |
-| Text → audio        | `voice:generate_voice` / `speak_local`  | `pnpm kyberion speak`  | unified                  |
-| Video → timeline    | frames + transcript composition         | `pnpm kyberion watch`  | unified                  |
-| Brief → video       | `video-composition:*`, `generate_video` | —                      | **no verb, two engines** |
+| Direction           | Unifying op                             | Verb                                                                  | State                    |
+| ------------------- | --------------------------------------- | --------------------------------------------------------------------- | ------------------------ |
+| Document → text     | `media:document_digest`                 | `pnpm kyberion read`                                                  | unified                  |
+| Brief → document    | `media:generate_document`               | `pnpm kyberion write`                                                 | unified                  |
+| Document ↔ document | `media:*_extract` design distillers     | `pnpm kyberion diff`                                                  | unified                  |
+| Image → text        | `vision:ocr_image` / `describe_image`   | `pnpm kyberion see`                                                   | unified                  |
+| Prompt → image      | `media-generation:generate_image`       | `pnpm kyberion draw`                                                  | unified                  |
+| Audio → text        | `voice:transcribe`                      | `pnpm kyberion listen`                                                | unified                  |
+| Text → audio        | `voice:generate_voice` / `speak_local`  | `pnpm kyberion speak`; `--stream --segment` streams local Qwen speech | unified                  |
+| Video → timeline    | frames + transcript composition         | `pnpm kyberion watch`                                                 | unified                  |
+| Brief → video       | `video-composition:*`, `generate_video` | —                                                                     | **no verb, two engines** |
 
 `write` is the worked example of §1. `media:generate_document` already dispatched on
 `render_target` (pptx / docx / xlsx / pdf) and the per-format `pptx_render` /
@@ -119,19 +119,16 @@ Both are two-step today, and both are cheap to fold into one verb (`read <url>`,
 `see --screen`) — the open question is where the egress and redaction gate is
 evaluated, not whether the engine exists.
 
-## 4. Live vs recorded — the one naming collision
+## 4. Batch, streaming playback, and live dialogue
 
-`listen` and `speak` each name two different things:
+`speak` now covers two playback modes, while `voice conversation-turn` is a complete dialogue workflow:
 
-| Word     | File / batch meaning                                       | Live / stream meaning                                                         |
-| -------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `listen` | `pnpm kyberion listen <audio>` (transcribe a recording)    | `meeting:listen` (capture ops), `pnpm minutes:record` (live mic)              |
-| `speak`  | `pnpm kyberion speak "<text>"` (TTS, optionally to a file) | `meeting:speak`, `pnpm kyberion voice conversation-turn` (real-time dialogue) |
+| Word     | File / batch meaning                                       | Streaming playback                                                                                 | Live dialogue                                                                      |
+| -------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `listen` | `pnpm kyberion listen <audio>` (transcribe a recording)    | —                                                                                                  | `meeting:listen` (capture ops), `pnpm minutes:record` (live mic)                   |
+| `speak`  | `pnpm kyberion speak "<text>"` (TTS, optionally to a file) | `pnpm kyberion speak --stream --engine qwen3_tts_06b_custom_voice --segment "..." --segment "..."` | `meeting:speak`; `pnpm kyberion voice conversation-turn` (full real-time dialogue) |
 
-These are not duplicates to be merged — a recording and a live stream have different
-failure modes and different consent requirements (`meeting:check_consent`). They need
-to be **labelled** as two axes wherever both appear, so an agent choosing "listen"
-knows whether it is handling a file or a session.
+Streaming playback sends multiple text segments to the local Qwen engine and plays generated audio as it arrives. It does not capture a microphone or manage a back-and-forth session. `voice conversation-turn` is the dialogue workflow. A recording and a live microphone session also have different failure modes and consent requirements (`meeting:check_consent`); label the mode explicitly wherever both appear.
 
 ## 5. The third axis: memory
 
