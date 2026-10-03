@@ -1251,10 +1251,9 @@ export class CloudflareOsControlPlane {
   private buildPersistedState(): PersistedControlPlaneState {
     return {
       version: 1,
-      // Executor parameters may contain credentials or personal payloads. A
-      // restored action is deliberately fail-closed until a governed adapter
-      // rehydrates its executor and parameters.
-      held: [...this.held.values()].map(({ apply, simulate, revert, params, ...record }) => record),
+      // Executor closures are stripped; serializable params persist so a
+      // registered executor can run the effect after restart (SC-04).
+      held: [...this.held.values()].map(({ apply, simulate, revert, ...record }) => record),
       introductions: [...this.introductions.values()],
       observations: [...this.observations],
       autoRules: [...this.autoRules],

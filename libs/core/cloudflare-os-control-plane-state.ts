@@ -182,6 +182,7 @@ function parsePersistedHeldAction(value: unknown, index: number): PersistedRecor
       'previousState',
       'status',
       'submittedAt',
+      'params',
       'decidedAt',
       'resolvedBy',
       'autoApproved',
@@ -211,6 +212,7 @@ function parsePersistedHeldAction(value: unknown, index: number): PersistedRecor
       record.dependsOn === undefined
         ? []
         : persistedStringArray(record.dependsOn, `${label}.dependsOn`),
+    ...(record.params !== undefined ? { params: record.params } : {}),
   };
   if (typeof normalized.autoApproved !== 'boolean') {
     throw new Error(`${label} has invalid required fields`);
@@ -607,9 +609,9 @@ export function parsePersistedControlPlaneState(value: unknown): PersistedContro
 // ---------- SC-03 journal serialization helpers ----------
 
 /**
- * A restored held action is deliberately fail-closed: its executor,
- * simulator, reverter and parameters must be rehydrated by a governed
- * adapter (SC-04) before it can run again.
+ * A restored held action is deliberately fail-closed: executor, simulator
+ * and reverter closures must be rehydrated via `registerExecutor` (SC-04)
+ * before it can run again. Serializable params are preserved.
  */
 export function restoredHeldActionRecord(record: {
   id: string;
@@ -630,7 +632,6 @@ export function restoredHeldActionRecord(record: {
   record.revert = undefined;
   record.dependsOn ||= [];
   record.effectBinding ||= record.op;
-  record.params = undefined;
 }
 
 /**
@@ -640,7 +641,7 @@ export function restoredHeldActionRecord(record: {
 export function serializableHeldActionRecord(
   record: Record<string, unknown>
 ): Record<string, unknown> {
-  const { apply, simulate, revert, params, ...rest } = record;
+  const { apply, simulate, revert, ...rest } = record;
   return rest;
 }
 

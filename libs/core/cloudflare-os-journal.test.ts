@@ -270,6 +270,27 @@ describe('control-plane journal persistence', () => {
     );
   });
 
+  it('executes a held action after restart once its executor is registered', async () => {
+    const cp1 = new CloudflareOsControlPlane();
+    const record = submit(cp1);
+    cp1.decideHeldAction(record.id, 'approved', {
+      resolvedBy: 'human:famao',
+      decidedByType: 'human',
+      authenticated: true,
+      payloadHash: record.payloadHash,
+      effectBinding: record.effectBinding,
+    });
+    const cp2 = new CloudflareOsControlPlane();
+    let executed: unknown;
+    cp2.registerExecutor('service:create_issue', async (params) => {
+      executed = params;
+      return { id: 'real-1' };
+    });
+    const applied = await cp2.applyHeldAction(record.id);
+    expect(applied.status).toBe('applied');
+    expect(executed).toEqual({ title: 'x' });
+  });
+
   it('quarantines tenant-scoped records with no resolvable tenant', () => {
     const cp = new CloudflareOsControlPlane();
     submit(cp, { tenantSlug: undefined });

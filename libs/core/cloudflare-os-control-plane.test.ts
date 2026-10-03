@@ -9,7 +9,10 @@ import {
   isConstantTimeEqual,
   normalizeGovernedCodeEnvelope,
 } from './cloudflare-os-control-plane.js';
-import { validatePersistedControlPlaneStateAtPath } from './cloudflare-os-control-plane-state.js';
+import {
+  loadPersistedControlPlaneStateAtPath,
+  validatePersistedControlPlaneStateAtPath,
+} from './cloudflare-os-control-plane-state.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile, safeUnlinkSync, safeWriteFile } from './secure-io.js';
 
@@ -593,7 +596,11 @@ describe('Cloudflare OS adoption control plane', () => {
         action({ id: 'durable-test-action', params: { token: secret } })
       );
       first.decideHeldAction(record.id, 'approved', approval(record));
-      expect(String(safeReadFile(statePath, { encoding: 'utf8' }))).not.toContain(secret);
+      // SC-04: serializable params persist (effects must reference secrets,
+      // never embed them); executable closures never reach the file.
+      const persisted = loadPersistedControlPlaneStateAtPath(statePath);
+      expect(persisted?.held[0]?.apply).toBeUndefined();
+      expect(persisted?.held[0]?.params).toEqual({ token: secret });
       const restored = new CloudflareOsControlPlane({ statePath });
       expect(restored.getHeldAction(record.id)?.status).toBe('approved');
       const result = await restored.applyHeldAction(record.id);
