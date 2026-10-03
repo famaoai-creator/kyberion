@@ -19,7 +19,7 @@ last_updated: 2026-03-06
 
 ## 2. コンテキスト & リソース
 
-- `knowledge/templates/themes/proposer/`
+- `knowledge/public/templates/themes/proposer/`
 - Google Trends / SNS メンションデータ
 
 ## 3. 勝利条件
@@ -29,4 +29,4 @@ last_updated: 2026-03-06
 
 ## 5. アウトプット形式
 
-- 保存先: `knowledge/roles/marketing_growth/brand_guidelines.md`
+- 保存先: `knowledge/product/roles/marketing_growth/brand_guidelines.md`

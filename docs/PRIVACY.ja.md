@@ -96,4 +96,4 @@ Kyberion はソフトウェアツールキットで、サービスではない�
 - FDE / 顧客導入: 顧客のコンプライアンス姿勢が適用される。tier スコープと egress redaction を適切に設定
 - 将来の Kyberion 管理オファリング: その時点の固有プライバシー通知に従う（本書はそれを暗示しない）
 
-顧客案件での深いコンプライアンス対応は `knowledge/public/fisc-compliance/` および customer aggregation ガイドを参照。
+顧客案件での深いコンプライアンス対応は `knowledge/public/standards/`（FISC: `aws_fisc_standard.md` / `blea_fisc_reference.md`） および customer aggregation ガイドを参照。

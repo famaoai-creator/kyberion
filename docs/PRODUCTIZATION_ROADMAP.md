@@ -188,7 +188,7 @@ Phase A〜D' は OSS / self-hosted / FDE の基盤レーンであり、SaaS の�
 
 2026-05-31 に、Kyberion の使い方を音声付き動画に落とす最小パスを試した。
 
-- 試行パイプライン: `pipelines/kyberion-howto-narrated-demo.json`
+- 試行パイプライン: `knowledge/product/pipeline-templates/kyberion-howto-narrated-demo.json`
 - 最小成果物の置き場: `active/missions/confidential/MSN-KYBERION-HOWTO-VIDEO/evidence/`
 - 生成対象: 固定された audience / message / use case を受け取り、content brief に落としてから narrated video brief と render bundle を作る流れ
 - 実際の動画: 3-step の製品紹介ではなく、`brief intake → content plan → render package` のプロセス説明に寄せた

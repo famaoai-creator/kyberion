@@ -18,7 +18,6 @@ Kyberion の gate は、`文書を増やすこと` ではなく、`次の phase 
 - Gate Profile スキーマ: `schemas/gate-profile.schema.json`
 - Gate 状態マシン: 本番の呼び出し元が無いため 2026-10-01 に `retired/libs-core/gate-status.ts` へ退避（`retired/README.md` 参照）
 - Track 作成基準: `knowledge/product/governance/track-creation-policy.json`
-- AIエージェント業務の Track パターン: `knowledge/product/architecture/ai-agent-track-patterns.md`
 
 `Project` と Gate は 1:1 とは限りません。  
 Kyberion では、gate は通常 `Project` ではなく `Track` にぶら下がります。

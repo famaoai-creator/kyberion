@@ -51,7 +51,7 @@ Good fits for this preflight include technical posts, product updates, thought p
 The `media-actuator` document-outline flow and document-generation flow are the closest existing building blocks.
 For blog work, treat them as the default implementation path unless a dedicated blog renderer is introduced later.
 
-The current reference implementation is the shell-free pipeline at [`pipelines/blog-article-from-brief.json`](/Users/famao/kyberion/pipelines/blog-article-from-brief.json). It demonstrates the intended blog contract shape: brief first, then outline, then draft artifact.
+The current reference implementation is the shell-free pipeline template at [`knowledge/product/pipeline-templates/blog-article-from-brief.json`](../pipeline-templates/blog-article-from-brief.json). It demonstrates the intended blog contract shape: brief first, then outline, then draft artifact.
 
 ## Publish Boundary
 

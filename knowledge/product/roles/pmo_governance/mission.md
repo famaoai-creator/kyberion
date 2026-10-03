@@ -16,7 +16,7 @@ last_updated: 2026-03-06
 ## 2. 核心的 capability set
 
 - **ゲーティング**: `pmo-governance-lead`, `project-health-check`
-- **整合性管理**: `knowledge-auditor`, `actuator-quality-auditor`, `knowledge/confidential/projects/data_source_map.md` (情報所在マップ)
+- **整合性管理**: `knowledge-auditor`, `actuator-quality-auditor`, `knowledge/confidential/{tenant}/projects/data_source_map.md` (情報所在マップ)
 - **ステークホルダー報告**: `executive-reporting-maestro`, `budget-variance-tracker`
 
 ## 3. 行動原則
