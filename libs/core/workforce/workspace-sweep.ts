@@ -7,6 +7,7 @@
 import * as nodePath from 'node:path';
 import { loadMissionStateAtPath } from '../mission/mission-state-reader.js';
 import { findMissionPath, rootDir } from '../path-resolver.js';
+import { missionPathOrNull } from '../mission-lookup.js';
 import {
   retryPendingSharedIndexReconcile,
   type RunReconcileOptions,
@@ -72,7 +73,8 @@ const TERMINAL_MISSION_STATUSES = new Set(['completed', 'failed', 'archived']);
 function missionOwnerTerminal(owner: WorkspaceOwner): boolean {
   if (!owner.mission_id) return false;
   try {
-    const missionPath = findMissionPath(owner.mission_id);
+    // A sweep must not abort on one ambiguous or hidden mission: not terminal, not swept.
+    const missionPath = missionPathOrNull(findMissionPath, owner.mission_id);
     if (!missionPath) return false;
     const state = loadMissionStateAtPath(nodePath.join(missionPath, 'mission-state.json'));
     return state ? TERMINAL_MISSION_STATUSES.has(state.status) : false;

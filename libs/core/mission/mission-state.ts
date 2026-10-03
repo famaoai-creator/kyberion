@@ -33,6 +33,7 @@ import { loadMissionManagementConfig } from './mission-management-config.js';
 // Registers the owner-scope mission locator behind findMissionPath, so every
 // state lookup here resolves an existing mission from its own record.
 import '../owner-scope.js';
+import { readOrNullOnMissionRefusal } from '../mission-lookup.js';
 import { loadMissionStateAtPath, writeMissionStateAtPath } from './mission-state-reader.js';
 let missionStateValidate: ReturnType<typeof compileSchema> | undefined;
 const MISSION_FOCUS_SCHEMA_PATH = pathResolver.knowledge(
@@ -613,6 +614,7 @@ export function listActiveMissions(
   options: { rootDir?: string } = {}
 ): Array<{ missionId: string; missionPath: string }> {
   return listMissionsInSearchDirs(options).filter(
-    ({ missionId }) => loadState(missionId, options)?.status === 'active'
+    ({ missionId }) =>
+      readOrNullOnMissionRefusal(() => loadState(missionId, options))?.status === 'active'
   );
 }

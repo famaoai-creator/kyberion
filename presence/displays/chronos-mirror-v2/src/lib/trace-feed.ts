@@ -4,6 +4,7 @@ import { customerIsConfigured, customerRoot } from '@agent/core/customer-resolve
 import { nowIso, readJsonLines } from '@agent/core/foundation';
 import { loadStateAtPath } from '@agent/core/mission/mission-state';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
+import { missionPathOrNull } from '@agent/core/mission-lookup';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -362,7 +363,10 @@ function resolveMissionScope(missionId?: string): {
   projectId?: string;
 } {
   if (!missionId) return {};
-  const missionPath = findMissionPath(missionId.toUpperCase());
+  // Per-record scope in a feed: an ambiguous or hidden mission yields no tenant,
+  // which tenant-scoped viewers are denied (unscoped traces fail closed), and
+  // one such trace must not abort the whole feed.
+  const missionPath = missionPathOrNull(findMissionPath, missionId.toUpperCase());
   if (!missionPath) return {};
   const statePath = path.join(missionPath, 'mission-state.json');
   try {
