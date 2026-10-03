@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as pathResolver from '../path-resolver.js';
+import { clearOwnerScopeCache } from '../owner-scope.js';
+import { withExecutionContextAsync } from '../authority.js';
 import {
   safeExecResult,
   safeExistsSync,
@@ -401,5 +403,60 @@ describe('describePendingReconcileAbandon', () => {
     expect(
       describePendingReconcileAbandon(pendingRecord, { maxAgeMs: 1, now: () => Date.now() + 1e9 })
     ).toBeNull();
+  });
+});
+
+describe('tenant-scoped visibility (SC-07)', () => {
+  const missionId = `MSN-WS-VIS-${randomUUID().slice(0, 8).toUpperCase()}`;
+  let missionDir: string;
+
+  beforeEach(async () => {
+    // A real tenant-partitioned mission dir so owner-scope resolves it;
+    // mission dirs need the controller role to write.
+    missionDir = pathResolver.missionDir(missionId, 'confidential', 'tenant-a');
+    await withExecutionContextAsync('mission_controller', async () => {
+      safeMkdir(missionDir, { recursive: true });
+      safeWriteFile(
+        path.join(missionDir, 'mission-state.json'),
+        JSON.stringify({ mission_id: missionId, status: 'ACTIVE', tenant_slug: 'tenant-a' })
+      );
+    });
+    clearOwnerScopeCache();
+  });
+
+  afterEach(async () => {
+    clearOwnerScopeCache();
+    await withExecutionContextAsync('mission_controller', async () => {
+      if (safeExistsSync(missionDir)) {
+        safeRmSync(missionDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  it("hides another tenant's mission-owned workspace from a bound viewer", () => {
+    const dir = path.join(base, 'workspaces', 'mission-owned');
+    safeMkdir(dir, { recursive: true });
+    registerWorkspace(
+      { path: dir, kind: 'scratch-dir', owner: { mission_id: missionId } },
+      options
+    );
+    const unboundDir = path.join(base, 'workspaces', 'unbound');
+    safeMkdir(unboundDir, { recursive: true });
+    const unbound = registerWorkspace(
+      { path: unboundDir, kind: 'scratch-dir', owner: {} },
+      options
+    );
+
+    // Viewer bound to tenant-b: tenant-a's mission workspace is hidden,
+    // unbound workspaces stay visible (system floor — not tenant data).
+    vi.stubEnv('KYBERION_TENANT', 'tenant-b');
+    let ids = listWorkspaces(options).map((r) => r.id);
+    expect(ids).toEqual([unbound.id]);
+
+    // Viewer bound to tenant-a sees both.
+    vi.stubEnv('KYBERION_TENANT', 'tenant-a');
+    clearOwnerScopeCache();
+    ids = listWorkspaces(options).map((r) => r.id);
+    expect(ids).toHaveLength(2);
   });
 });
