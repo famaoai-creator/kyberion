@@ -104,13 +104,24 @@ function assertOwnerId(owner: OwnerRef): void {
   }
 }
 
-/** Tenant segment of a directory under a tier root (`shared` and reserved names are untenanted). */
+/**
+ * Tenant value as recorded or hinted: a valid slug, else untenanted (`shared`).
+ * Empty, reserved names and the legacy `default` sentinel (positional
+ * `tenantId` / untenanted context packs) are untenanted, never a tenant.
+ */
 function normalizeTenant(value: unknown): string {
   const tenant = String(value ?? '')
     .trim()
     .toLowerCase();
-  if (!tenant || tenant === SHARED_TENANT || isReservedScopeName(tenant)) return SHARED_TENANT;
-  return tenant;
+  if (!tenant || tenant === SHARED_TENANT || tenant === 'default' || isReservedScopeName(tenant)) {
+    return SHARED_TENANT;
+  }
+  return isValidTenantSlug(tenant) ? tenant : SHARED_TENANT;
+}
+
+/** A directory under a tier root is a tenant partition only if its name is a tenant slug. */
+function isTenantDirectoryName(name: string): boolean {
+  return name === SHARED_TENANT || (isValidTenantSlug(name) && !isReservedScopeName(name));
 }
 
 /**
@@ -212,9 +223,12 @@ function missionCandidates(missionId: string): MissionCandidate[] {
     };
     try {
       consider(path.join(tierRoot, missionId), SHARED_TENANT);
-      for (const tenantDir of childDirectories(tierRoot)) {
-        if (tenantDir === missionId) continue;
-        consider(path.join(tierRoot, tenantDir, missionId), normalizeTenant(tenantDir));
+      if (!isDirectory(tierRoot)) continue;
+      // Only tenant-slug names are tenant partitions: mission ids (uppercase)
+      // are skipped by name, without a stat per mission directory.
+      for (const entry of safeReaddir(tierRoot)) {
+        if (entry === missionId || !isTenantDirectoryName(entry)) continue;
+        consider(path.join(tierRoot, entry, missionId), normalizeTenant(entry));
       }
     } catch {
       // An unreadable tier root is not searched.
@@ -223,25 +237,115 @@ function missionCandidates(missionId: string): MissionCandidate[] {
   return found;
 }
 
+/** Where a mission sits, read from disk; visibility and hints are applied per call. */
+interface MissionLocation {
+  dir: string;
+  /** mtime of mission-state.json when read; a rewrite invalidates the memo. */
+  stateMtimeMs: number;
+  tier: OwnerTier;
+  /** null when the tenant cannot be established (unreadable state outside a tenant dir). */
+  tenant: string | null;
+  organization_id?: string;
+  project_id?: string;
+}
+
+/**
+ * The tenant directory a mission sits in is authoritative; the state's tenant
+ * must agree with it. A flat (untenanted-dir) mission takes the state's tenant,
+ * and an unreadable state there leaves the tenant unknown — never `shared`.
+ */
+function locateMission(candidate: MissionCandidate): MissionLocation | undefined {
+  const state = loadMissionStateAtPath(path.join(candidate.dir, 'mission-state.json'));
+  const stateTenant = state
+    ? normalizeTenant(state.tenant_slug || state.tenant_id || SHARED_TENANT)
+    : undefined;
+  let tenant: string | null;
+  if (candidate.dirTenant !== SHARED_TENANT) {
+    if (stateTenant && stateTenant !== SHARED_TENANT && stateTenant !== candidate.dirTenant) {
+      // A state naming another tenant than its directory is inconsistent:
+      // never resolve it into either tenant.
+      return undefined;
+    }
+    tenant = candidate.dirTenant;
+  } else {
+    tenant = stateTenant ?? null;
+  }
+  const tier = OWNER_TIERS.includes(state?.tier as OwnerTier)
+    ? (state?.tier as OwnerTier)
+    : candidate.tier;
+  const organizationId =
+    state?.organization_id || state?.relationships?.organization?.organization_id;
+  const projectId = state?.relationships?.project?.project_id;
+  return {
+    dir: candidate.dir,
+    stateMtimeMs: stateMtime(candidate.dir),
+    tier,
+    tenant,
+    ...(organizationId ? { organization_id: organizationId } : {}),
+    ...(projectId ? { project_id: projectId } : {}),
+  };
+}
+
+/**
+ * Per-process memo of mission locations. Hot paths (task events, the
+ * coordination bus, dispatch loops) resolve the same mission many times; a
+ * short-lived entry whose directories still hold their state skips the scan.
+ * Visibility and hints are applied per call (the bound tenant can change per
+ * execution scope), never cached.
+ */
+const MISSION_LOCATION_TTL_MS = 2_000;
+
+function stateMtime(dir: string): number {
+  try {
+    return safeLstat(path.join(dir, 'mission-state.json')).mtimeMs;
+  } catch {
+    return -1;
+  }
+}
+const missionLocationCache = new Map<string, { at: number; locations: MissionLocation[] }>();
+
+function missionLocations(missionId: string): MissionLocation[] {
+  const cached = missionLocationCache.get(missionId);
+  if (
+    cached &&
+    Date.now() - cached.at < MISSION_LOCATION_TTL_MS &&
+    cached.locations.every((location) => stateMtime(location.dir) === location.stateMtimeMs)
+  ) {
+    return cached.locations;
+  }
+  const locations = missionCandidates(missionId)
+    .map(locateMission)
+    .filter((location): location is MissionLocation => Boolean(location));
+  // Never memoize "not found": a mission created right after must resolve.
+  if (locations.length > 0) {
+    missionLocationCache.set(missionId, { at: Date.now(), locations });
+  } else {
+    missionLocationCache.delete(missionId);
+  }
+  return locations;
+}
+
+/** Drop memoized mission locations (tests, or after moving a mission). */
+export function clearOwnerScopeCache(): void {
+  missionLocationCache.clear();
+}
+
 function resolveMission(owner: OwnerRef, hint?: OwnerScopeHint): OwnerScope {
+  const bound = boundTenant();
   const scopes: OwnerScope[] = [];
-  for (const candidate of missionCandidates(owner.id)) {
-    const state = loadMissionStateAtPath(path.join(candidate.dir, 'mission-state.json'));
-    const tier = OWNER_TIERS.includes(state?.tier as OwnerTier)
-      ? (state?.tier as OwnerTier)
-      : candidate.tier;
-    const tenant = normalizeTenant(state?.tenant_slug || state?.tenant_id || candidate.dirTenant);
+  for (const location of missionLocations(owner.id)) {
+    // A tenant that cannot be established is visible only to an unbound
+    // identity, and then as untenanted: a bound identity fails closed.
+    if (location.tenant === null && bound) continue;
+    const tenant = location.tenant ?? SHARED_TENANT;
     if (!visibleToProcess(tenant)) continue;
-    const organizationId =
-      state?.organization_id || state?.relationships?.organization?.organization_id;
-    const projectId = state?.relationships?.project?.project_id;
     scopes.push({
       owner,
-      tier,
+      tier: location.tier,
       tenant,
-      ...(organizationId ? { organization_id: organizationId } : {}),
-      ...(projectId ? { project_id: projectId } : {}),
-      dir: candidate.dir,
+      ...(location.organization_id ? { organization_id: location.organization_id } : {}),
+      ...(location.project_id ? { project_id: location.project_id } : {}),
+      dir: location.dir,
     });
   }
   return pickOne(owner, scopes, hint, 'start the mission first or check the mission id');
@@ -254,6 +358,9 @@ function resolveProject(owner: OwnerRef, hint?: OwnerScopeHint): OwnerScope {
   const tenant = normalizeTenant(record?.tenant_slug);
   if (!record || !visibleToProcess(tenant)) {
     throw notFound(owner, 'create it with `pnpm project create` or check the project id');
+  }
+  if (!OWNER_TIERS.includes(record.tier as OwnerTier)) {
+    throw notFound(owner, `fix the project record's tier ('${String(record.tier)}')`);
   }
   const tier = record.tier as OwnerTier;
   return applyHint(
@@ -277,7 +384,9 @@ function resolveOrganization(owner: OwnerRef, hint?: OwnerScopeHint): OwnerScope
   for (const tier of tiers) {
     const tierRoot = path.join(pathResolver.rootDir(), 'active', 'organizations', tier);
     const tenants =
-      hint?.tenant !== undefined ? [normalizeTenant(hint.tenant)] : childDirectories(tierRoot);
+      hint?.tenant !== undefined
+        ? [normalizeTenant(hint.tenant)]
+        : childDirectories(tierRoot).filter(isTenantDirectoryName);
     for (const tenantDir of tenants) {
       const tenant = normalizeTenant(tenantDir);
       if (!visibleToProcess(tenant)) continue;
@@ -349,12 +458,22 @@ export function resolveOwnerScope(owner: OwnerRef, hint?: OwnerScopeHint): Owner
   }
 }
 
-/** Like resolveOwnerScope, but returns null when the owner does not exist (other errors propagate). */
+/**
+ * For read paths: the owner's scope, or null when it cannot be determined
+ * (not found, or the id is ambiguous across scopes). A contradicting hint and
+ * an invalid id still throw. Writes use resolveOwnerScope / resolveMissionDir,
+ * which fail closed on every case.
+ */
 export function tryResolveOwnerScope(owner: OwnerRef, hint?: OwnerScopeHint): OwnerScope | null {
   try {
     return resolveOwnerScope(owner, hint);
   } catch (error) {
-    if (error instanceof OwnerScopeError && error.code === 'OWNER_NOT_FOUND') return null;
+    if (
+      error instanceof OwnerScopeError &&
+      (error.code === 'OWNER_NOT_FOUND' || error.code === 'OWNER_AMBIGUOUS')
+    ) {
+      return null;
+    }
     throw error;
   }
 }

@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { loadProjectRecord } from '@agent/core/project/project-registry';
+import { isValidTenantSlug } from '@agent/core/entity-scope';
 import { loadProjectTrackRecord } from '@agent/core/project/project-track-registry';
 import { assertManagedProjectTrackScope } from '@agent/core/project/project-track-scope';
 import {
@@ -195,7 +196,13 @@ export function validateMissionStartCreateInput(
     // must name a managed project (create it with `pnpm project create`), and
     // the mission takes the project's scope from the project record. A stated
     // tier/tenant may only narrow it (resolveOwnerScope).
-    const statedTenant = input.tenantSlug || input.tenantId;
+    // tenantId is the legacy positional value (default 'default'): only a real
+    // tenant slug states a tenant.
+    const legacyTenant =
+      input.tenantId && input.tenantId !== 'default' && isValidTenantSlug(input.tenantId)
+        ? input.tenantId
+        : undefined;
+    const statedTenant = input.tenantSlug || legacyTenant;
     let projectScope: OwnerScope | null = null;
     try {
       projectScope = tryResolveOwnerScope(

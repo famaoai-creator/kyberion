@@ -110,12 +110,9 @@ export function missionTaskEventsPath(
   tenantSlug?: string
 ): string {
   pathResolver.assertMissionIdArgument(missionId);
-  // Task events live beside the existing mission. An explicit tenant (with its
-  // tier) only narrows that location; an unknown mission fails closed.
-  const missionPath = resolveMissionDir(
-    missionId,
-    tenantSlug ? { tier: fallbackTier, tenant: tenantSlug } : undefined
-  );
+  // Task events live beside the existing mission. An explicit tenant only
+  // selects among same-id missions; an unknown mission fails closed.
+  const missionPath = resolveMissionDir(missionId, tenantSlug ? { tenant: tenantSlug } : undefined);
   return assertSafeRepositoryPath(`${missionPath}/coordination/events/task-events.jsonl`, {
     allowMissingLeaf: true,
   });

@@ -19,6 +19,7 @@ import {
   listArtifactOwnershipRecordsForMission,
   listLatestArtifactOwnershipRecords,
   compactArtifactOwnershipRegistry,
+  listArtifactOwnershipHistoryByQuery,
 } from './artifact-registry.js';
 
 describe('artifact-registry', () => {
@@ -200,6 +201,35 @@ describe('artifact-registry', () => {
     expect(forMission.find((record) => record.artifact_id === 'ART-TEST-MOVED')?.path).toBe(
       'active/projects/public/shared/PRJ-TEST-MOVED/artifacts/report/a.md'
     );
+  });
+
+  it('history queries still find an artifact a scope owned before it was re-registered', () => {
+    const base = {
+      artifact_id: 'ART-TEST-HISTORY',
+      kind: 'report',
+      storage_class: 'artifact_store',
+    } as const;
+    appendArtifactOwnershipRecord(
+      createArtifactOwnershipRecord({
+        ...base,
+        mission_id: 'MSN-TEST-HISTORY',
+        tenant_slug: 'acme-history',
+        path: 'active/missions/confidential/acme-history/MSN-TEST-HISTORY/a.md',
+      })
+    );
+    appendArtifactOwnershipRecord(
+      createArtifactOwnershipRecord({
+        ...base,
+        project_id: 'PRJ-TEST-SHARED',
+        path: 'active/projects/public/shared/PRJ-TEST-SHARED/artifacts/report/a.md',
+      })
+    );
+    expect(listArtifactOwnershipRecordsByQuery({ tenantSlug: 'acme-history' })).toEqual([]);
+    expect(
+      listArtifactOwnershipHistoryByQuery({ tenantSlug: 'acme-history' }).map(
+        (record) => record.artifact_id
+      )
+    ).toEqual(['ART-TEST-HISTORY']);
   });
 
   it('compacts the registry to the latest row per artifact (dry run by default)', () => {

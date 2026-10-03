@@ -98,6 +98,20 @@ describe('mission → project link validation', () => {
     ];
     const input = validateMissionStartCreateInput('create', 'MSN-LINK-ARGS', withoutTier);
     expect(input.tier).toBe('public');
+    // The legacy positional tenantId ('default') is not a stated tenant.
+    const withLegacyDefault = validateMissionStartCreateInput('create', 'MSN-LINK-ARGS', [
+      'node',
+      'mission_controller.js',
+      'create',
+      'MSN-LINK-ARGS',
+      'public',
+      'default',
+      '--project-id',
+      PROJECT_ID,
+      '--project-path',
+      PROJECT_PATH,
+    ]);
+    expect(withLegacyDefault.tenantSlug).toBe('tenant-link');
     expect(input.tenantSlug).toBe('tenant-link');
   });
 });
