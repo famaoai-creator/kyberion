@@ -25,7 +25,9 @@ const USAGE =
   'Usage: kyberion workspace <list|gc> [--json]\n' +
   '  list                 show registered workspaces and unregistered directories\n' +
   '  gc [--dry-run]       report orphaned workspaces (default)\n' +
-  '  gc --apply           delete orphaned registered workspaces';
+  '  gc --apply           delete orphaned registered workspaces\n' +
+  '  gc --apply --include-unresolvable-owners\n' +
+  '                       also reclaim workspaces whose mission owner no longer resolves (3x TTL; not from a tenant-bound process)';
 
 export interface WorkspaceListResult {
   workspaces: WorkspaceRecord[];
@@ -38,6 +40,7 @@ export interface WorkspaceGcResult {
   orphaned: string[];
   deleted: string[];
   unregisteredDirs: string[];
+  unresolvedOwners: string[];
   errors: string[];
 }
 
@@ -59,6 +62,7 @@ function summarizeGc(dryRun: boolean, result: SweepWorkspacesResult): WorkspaceG
     orphaned: result.orphaned.map((record) => record.id),
     deleted: result.deleted.map((record) => record.id),
     unregisteredDirs: result.unregisteredDirs,
+    unresolvedOwners: result.unresolvedOwners.map((record) => record.id),
     errors: result.errors,
   };
 }
@@ -68,6 +72,7 @@ function renderGc(result: WorkspaceGcResult): string {
     `${result.dryRun ? '[dry-run] ' : ''}registered=${result.registered} orphaned=${result.orphaned.length} deleted=${result.deleted.length}`,
     ...result.orphaned.map((id) => `orphan  ${id}`),
     ...result.unregisteredDirs.map((dir) => `unregistered  ${dir}`),
+    ...result.unresolvedOwners.map((id) => `owner-unresolvable  ${id}`),
     ...result.errors.map((error) => `error  ${error}`),
   ];
   if (result.dryRun && result.orphaned.length > 0) lines.push('re-run with --apply to delete');
@@ -97,12 +102,22 @@ export function runWorkspaceLedgerCli(
   }
   if (verb === 'gc') {
     const apply = rest.includes('--apply');
-    const unknown = rest.filter((arg) => arg !== '--apply' && arg !== '--');
+    const includeUnresolvable = rest.includes('--include-unresolvable-owners');
+    const unknown = rest.filter(
+      (arg) => arg !== '--apply' && arg !== '--include-unresolvable-owners' && arg !== '--'
+    );
     if (unknown.length > 0)
       throw new ScriptExitError(2, `unknown arguments: ${unknown.join(' ')}\n${USAGE}`);
     if (apply && args.dryRun) throw new ScriptExitError(2, '--apply and --dry-run are exclusive');
     const dryRun = !apply;
-    const result = summarizeGc(dryRun, sweepWorkspaces({ ...options, dryRun }));
+    const result = summarizeGc(
+      dryRun,
+      sweepWorkspaces({
+        ...options,
+        dryRun,
+        sweepUnresolvableOwners: options.sweepUnresolvableOwners ?? includeUnresolvable,
+      })
+    );
     print(args.json ? result : renderGc(result));
     if (result.errors.length > 0) throw new ScriptExitError(1, '', true, result);
     return result;

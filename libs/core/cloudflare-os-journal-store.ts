@@ -69,6 +69,7 @@ const DERIVED_REFRESH_MS = 2000;
 export class ControlPlaneJournalStore {
   private readonly appliedSeq = new Map<string, number>();
   private readonly derivedRefresh = new Map<string, { count: number; at: number }>();
+  private lastRefreshError: string | undefined;
 
   /**
    * Observations are by far the most frequent mutation, and the snapshot and
@@ -289,7 +290,12 @@ export class ControlPlaneJournalStore {
     }
   }
 
-  /** Catch every journal up — the read path for cross-process freshness. */
+  /**
+   * Catch every journal up — the read path for cross-process freshness. A
+   * failure is best effort (the write path stays fail-closed) but never silent:
+   * each distinct failure is audited once, so a plane that has gone stale
+   * because a journal became unreadable can be noticed.
+   */
   refresh(): void {
     try {
       for (const dir of listControlPlaneNamespaceDirs()) {
@@ -297,9 +303,33 @@ export class ControlPlaneJournalStore {
         for (const event of events) this.host.applyJournalEvent(event);
         this.appliedSeq.set(dir, lastSeq);
       }
-    } catch {
-      // Read-path refresh is best effort; the write path remains fail-closed.
+      this.lastRefreshError = undefined;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message !== this.lastRefreshError) {
+        this.lastRefreshError = message;
+        audit('refresh', 'failed', { error: message });
+      }
     }
+  }
+
+  /**
+   * Remove a record from the quarantine journal after it was re-homed into a
+   * tenant. Appends a tombstone that only applies while the record is still
+   * unscoped, so replay order can never remove the tenant's copy.
+   */
+  tombstoneUnscoped(kind: ControlPlaneCollection, id: string): void {
+    const namespace = controlPlaneNamespaceFor(kind, {}, currentScopeEnvelope());
+    const seq = appendJournalEventLocked(
+      namespace,
+      this.appliedSeq.get(namespace.dir) ?? 0,
+      { kind, records: [{ id }], op: 'delete' },
+      (tail) => {
+        for (const event of tail) this.host.applyJournalEvent(event);
+      }
+    );
+    this.appliedSeq.set(namespace.dir, seq);
+    this.writeNamespaceSnapshot(namespace);
   }
 
   /**

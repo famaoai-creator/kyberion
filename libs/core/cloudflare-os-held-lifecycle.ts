@@ -6,6 +6,8 @@ import {
   loadApprovalRequest,
 } from './governance/approval-store.js';
 import type { HeldActionDecision, HeldActionRecord } from './cloudflare-os-control-plane.js';
+import { isValidTenantSlug } from './entity-scope.js';
+import { SHARED_TENANT, tryResolveOwnerScope } from './owner-scope.js';
 import {
   declassificationKeyOf,
   type DeclassificationGrant,
@@ -253,6 +255,27 @@ export function prepareCancellation(record: HeldActionRecord, by: string, reason
     cancelledBy: by,
     reason,
   });
+}
+
+/**
+ * A quarantined (tenantless) record may be adopted into a tenant only if the
+ * tenant is a valid one and does not contradict the mission's own record.
+ */
+export function assertAdoptable(record: HeldActionRecord, tenantSlug: string): void {
+  if (record.tenantSlug) {
+    throw new Error(
+      `[POLICY_VIOLATION] Held action ${record.id} already has a tenant (${record.tenantSlug})`
+    );
+  }
+  if (!isValidTenantSlug(tenantSlug)) {
+    throw new Error(`[POLICY_VIOLATION] '${tenantSlug}' is not a valid tenant for adoption`);
+  }
+  const owner = tryResolveOwnerScope({ kind: 'mission', id: record.missionId });
+  if (owner && owner.tenant !== SHARED_TENANT && owner.tenant !== tenantSlug) {
+    throw new Error(
+      `[POLICY_VIOLATION] tenant '${tenantSlug}' contradicts the mission record (${owner.tenant})`
+    );
+  }
 }
 
 export interface DeclassifyHost {

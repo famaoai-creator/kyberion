@@ -215,3 +215,99 @@ describe('recording the outcome of an applied effect', () => {
     expect(new CloudflareOsControlPlane().getHeldAction(record.id)?.status).toBe('applied');
   });
 });
+
+describe('recording observations', () => {
+  const observe = (cp: CloudflareOsControlPlane, resourceRef: string) =>
+    cp.recordObservation({
+      missionId: 'mission-l',
+      service: 'file',
+      resourceRef,
+      tier: 'confidential',
+      tenantSlug: 'tenant-a',
+      purpose: 'p',
+      summary: 's',
+    });
+  const observationAudits = () =>
+    (
+      auditChain.record as unknown as { mock: { calls: Array<[{ action: string }]> } }
+    ).mock.calls.filter(([entry]) => entry.action === 'observation').length;
+
+  it('audits the first sight of a resource, not every repeat (the journal keeps each one)', () => {
+    const cp = new CloudflareOsControlPlane();
+    for (let i = 0; i < 5; i += 1) observe(cp, 'file:in/a.json');
+    observe(cp, 'file:in/b.json');
+    expect(observationAudits()).toBe(2);
+    const [a] = cp
+      .listObservationAggregates('mission-l')
+      .filter((e) => e.resourceRef === 'file:in/a.json');
+    expect(a?.count).toBe(5);
+  });
+});
+
+describe('a journal that cannot be read', () => {
+  it('is reported once per distinct failure instead of silently leaving the plane stale', () => {
+    const writer = new CloudflareOsControlPlane();
+    const reader = new CloudflareOsControlPlane();
+    submit(writer, 'demo:a');
+    vi.spyOn(
+      reader as unknown as { applyJournalEvent(event: unknown): void },
+      'applyJournalEvent'
+    ).mockImplementation(() => {
+      throw new Error('unreadable event');
+    });
+    const failures = () =>
+      (
+        auditChain.record as unknown as {
+          mock: { calls: Array<[{ operation: string; result: string }]> };
+        }
+      ).mock.calls.filter(([e]) => e.operation === 'refresh' && e.result === 'failed').length;
+    reader.refreshFromJournals();
+    reader.refreshFromJournals();
+    expect(failures()).toBe(1);
+  });
+});
+
+describe('adopting a record that was quarantined without a tenant', () => {
+  const unscoped = { missionId: 'mission-q', submittedBy: 'agent:x', params: { n: 1 } };
+  const quarantined = (cp: CloudflareOsControlPlane) =>
+    cp.submitHeldAction({ ...unscoped, op: 'demo:q', apply: async () => 'ok' });
+  const decision = (r: { payloadHash: string; effectBinding: string }, extra = {}) => ({
+    ...human(r),
+    reason: 'verified owner tenant',
+    ...extra,
+  });
+
+  it('moves it into the tenant, where it can be decided and applied, and does not resurrect the copy', async () => {
+    const cp = new CloudflareOsControlPlane();
+    const record = quarantined(cp);
+    expect(record.tenantSlug).toBeUndefined();
+    const adopted = cp.adoptQuarantinedHeldAction(record.id, 'tenant-a', decision(record));
+    expect(adopted.tenantSlug).toBe('tenant-a');
+
+    const restarted = new CloudflareOsControlPlane();
+    expect(restarted.getHeldAction(record.id)?.tenantSlug).toBe('tenant-a');
+    expect(restarted.listHeldActions('mission-q')).toHaveLength(1);
+  });
+
+  it('refuses a reserved tenant, a record that already has one, and a non-human or reasonless call', () => {
+    const cp = new CloudflareOsControlPlane();
+    const record = quarantined(cp);
+    expect(() => cp.adoptQuarantinedHeldAction(record.id, 'shared', decision(record))).toThrow(
+      /tenant/
+    );
+    expect(() =>
+      cp.adoptQuarantinedHeldAction(record.id, 'tenant-a', decision(record, { reason: ' ' }))
+    ).toThrow();
+    expect(() =>
+      cp.adoptQuarantinedHeldAction(
+        record.id,
+        'tenant-a',
+        decision(record, { decidedByType: 'ai_agent' })
+      )
+    ).toThrow(/authenticated human/);
+    const scoped = submit(cp, 'demo:scoped');
+    expect(() => cp.adoptQuarantinedHeldAction(scoped.id, 'tenant-a', decision(scoped))).toThrow(
+      /already has a tenant/
+    );
+  });
+});

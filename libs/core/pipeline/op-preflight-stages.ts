@@ -14,6 +14,7 @@
  */
 
 import { pathResolver } from '../path-resolver.js';
+import { detectTier } from '../tier-guard.js';
 import { readJsonIfPresent } from '../foundation/json.js';
 import { currentScopeEnvelope, runtimeScopeIdentity } from '../scope-envelope.js';
 import { sharedControlPlane } from '../cloudflare-os-shared.js';
@@ -94,6 +95,23 @@ function noteStage(stage: StageName, outcome: 'warn' | 'denied' | 'skipped' | 'a
 /** Rollout visibility for the warn → enforce promotion review. */
 export function opPreflightStageCounts(): Record<string, number> {
   return Object.fromEntries(stageModeCounts);
+}
+
+const TIER_RANK: Record<OsKnowledgeTier, number> = { public: 0, confidential: 1, personal: 2 };
+
+/**
+ * The tier an observation is recorded at: the resource's own tier when its
+ * path says so, but never below the mission's tier (an unrecognised path is
+ * only ever treated as the mission's tier, so this can only raise taint).
+ */
+function observedTier(missionTier: OsKnowledgeTier, resourceRef: string): OsKnowledgeTier {
+  let resourceTier: OsKnowledgeTier = 'public';
+  try {
+    resourceTier = detectTier(pathResolver.rootResolve(resourceRef));
+  } catch {
+    // not a repository path: the mission's tier stands
+  }
+  return TIER_RANK[resourceTier] > TIER_RANK[missionTier] ? resourceTier : missionTier;
 }
 
 function opFamily(op: string): string {
@@ -312,7 +330,7 @@ export function recordOpObservation(
       taskId: identity.taskId,
       service,
       resourceRef,
-      tier: identity.tier,
+      tier: observedTier(identity.tier, resourceRef),
       tenantSlug: identity.tenantSlug,
       purpose: identity.purpose || op,
       summary: `${op} -> ${resourceRef}`,

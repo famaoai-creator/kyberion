@@ -762,8 +762,17 @@ function observationAggregateKeyOf(record: Record<string, unknown>): string {
 /** Fold one journal event into the in-memory projection (SC-03). */
 export function applyControlPlaneJournalEvent(
   collections: ControlPlaneJournalCollections,
-  event: { kind: string; records: Record<string, unknown>[] }
+  event: { kind: string; records: Record<string, unknown>[]; op?: string }
 ): void {
+  if (event.op === 'delete') {
+    // A tombstone only removes the record while it is still unscoped: once it
+    // was adopted into a tenant the tenant's copy must survive any replay order.
+    for (const raw of event.records) {
+      const existing = event.kind === 'held' ? collections.held.get(raw.id as string) : undefined;
+      if (existing && !existing.tenantSlug) collections.held.delete(existing.id);
+    }
+    return;
+  }
   for (const raw of event.records) {
     switch (event.kind) {
       case 'held': {
@@ -916,4 +925,37 @@ export function serializeGadgetRecord(
         }))
       : [],
   };
+}
+
+/**
+ * Fold a whole persisted state (the legacy single-file layout) into the
+ * in-memory collections through the same per-kind code path a journal replay
+ * uses, so the two persistence modes cannot drift apart.
+ */
+export function foldPersistedState(
+  collections: ControlPlaneJournalCollections,
+  state: PersistedControlPlaneState
+): void {
+  const as = (value: unknown) => (value ?? []) as Record<string, unknown>[];
+  const batches: Array<[string, Record<string, unknown>[]]> = [
+    ['held', as(state.held)],
+    ['introduction', as(state.introductions)],
+    ['observation', as(state.observations)],
+    ['auto_rule', as(state.autoRules)],
+    ['capability', as(state.capabilities)],
+    [
+      'thread_capability',
+      Object.entries(state.threadCapabilities ?? {}).map(([threadId, capabilities]) => ({
+        threadId,
+        capabilities,
+      })),
+    ],
+    ['blueprint', as(state.blueprints)],
+    ['declassification', as(state.declassifications)],
+    ['gadget', as(state.gadgets)],
+    ['network', as(state.network)],
+  ];
+  for (const [kind, records] of batches) {
+    if (records.length > 0) applyControlPlaneJournalEvent(collections, { kind, records });
+  }
 }

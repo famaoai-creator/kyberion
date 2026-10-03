@@ -63,7 +63,8 @@ export interface ControlPlaneJournalEvent {
   seq: number;
   ts: string;
   kind: ControlPlaneCollection;
-  op: 'upsert' | 'append';
+  /** `delete` is a tombstone: it removes a still-unscoped record that was re-homed elsewhere. */
+  op: 'upsert' | 'append' | 'delete';
   records: Record<string, unknown>[];
 }
 
@@ -243,7 +244,11 @@ export function readJournalTail(
 export function appendJournalEventLocked(
   namespace: ControlPlaneNamespace,
   afterSeq: number,
-  event: { kind: ControlPlaneCollection; records: Record<string, unknown>[] },
+  event: {
+    kind: ControlPlaneCollection;
+    records: Record<string, unknown>[];
+    op?: ControlPlaneJournalEvent['op'];
+  },
   applyTail: (events: ControlPlaneJournalEvent[]) => void
 ): number {
   return withLockSync(`cloudflare-os-journal:${namespace.key}`, () => {
@@ -255,7 +260,7 @@ export function appendJournalEventLocked(
       seq,
       ts: nowIso(),
       kind: event.kind,
-      op: APPEND_COLLECTIONS.has(event.kind) ? 'append' : 'upsert',
+      op: event.op ?? (APPEND_COLLECTIONS.has(event.kind) ? 'append' : 'upsert'),
       records: event.records,
     };
     appendJournalLine(controlPlaneJournalPath(namespace.dir), line);

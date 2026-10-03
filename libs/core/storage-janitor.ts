@@ -1339,6 +1339,7 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     orphaned: [],
     deleted: [],
     unregisteredDirs: [],
+    unresolvedOwners: [],
     errors: [],
   };
   try {

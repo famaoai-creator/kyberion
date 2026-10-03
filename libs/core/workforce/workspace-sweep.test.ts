@@ -241,4 +241,55 @@ describe('sweepRegisteredWorkspaces', () => {
     sweepRegisteredWorkspaces(sweepOptions({ measure: () => 123 }));
     expect(listWorkspaces(ledger).find((r) => r.id === live.id)?.bytes).toBe(123);
   });
+
+  describe('workspaces whose owning mission can no longer be resolved', () => {
+    const missionOwned = (name: string) => {
+      const dir = path.join(base, 'workspaces', name);
+      safeWriteFile(path.join(dir, 'f.txt'), 'x');
+      return registerWorkspace(
+        { path: dir, kind: 'scratch-dir', owner: { mission_id: 'MSN-GONE-0001' } },
+        ledger
+      );
+    };
+    const unresolvable = { isOwnerResolvable: () => false } as Partial<SweepWorkspacesOptions>;
+
+    it('reports them without deleting by default', () => {
+      const record = missionOwned('leak');
+      clock = T0 + 100 * HOUR;
+      const result = sweepRegisteredWorkspaces(sweepOptions(unresolvable));
+      expect(result.unresolvedOwners.map((r) => r.id)).toEqual([record.id]);
+      expect(result.deleted).toHaveLength(0);
+      expect(listWorkspaces(ledger)).toHaveLength(1);
+    });
+
+    it('reclaims them only on an explicit opt-in, after a longer grace than a terminal owner', () => {
+      const record = missionOwned('leak');
+      const optIn = { ...unresolvable, sweepUnresolvableOwners: true };
+      clock = T0 + 30 * HOUR; // past 1x TTL (24h) but inside the 3x grace
+      expect(sweepRegisteredWorkspaces(sweepOptions(optIn)).deleted).toHaveLength(0);
+      clock = T0 + 100 * HOUR;
+      const result = sweepRegisteredWorkspaces(sweepOptions(optIn));
+      expect(result.deleted.map((r) => r.id)).toEqual([record.id]);
+    });
+
+    it('never reclaims on opt-in from a tenant-bound process (it cannot see other tenants)', () => {
+      missionOwned('leak');
+      clock = T0 + 100 * HOUR;
+      const result = sweepRegisteredWorkspaces(
+        sweepOptions({ ...unresolvable, sweepUnresolvableOwners: true, processTenant: 'tenant-a' })
+      );
+      expect(result.deleted).toHaveLength(0);
+      expect(result.errors.join(' ')).toMatch(/tenant-bound/);
+    });
+
+    it('leaves a resolvable live owner alone', () => {
+      missionOwned('fine');
+      clock = T0 + 100 * HOUR;
+      const result = sweepRegisteredWorkspaces(
+        sweepOptions({ isOwnerResolvable: () => true, sweepUnresolvableOwners: true })
+      );
+      expect(result.unresolvedOwners).toHaveLength(0);
+      expect(result.deleted).toHaveLength(0);
+    });
+  });
 });

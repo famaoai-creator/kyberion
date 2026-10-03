@@ -319,3 +319,36 @@ describe('recordOpObservation', () => {
     expect(sharedControlPlane().listObservationAggregates('mission-s5')).toHaveLength(0);
   });
 });
+
+describe('observation tier follows the resource, never below the mission', () => {
+  const publicScope = <T>(fn: () => T): T =>
+    withScopeEnvelope(
+      mintScopeEnvelope({
+        identity: { tenant_slug: 'tenant-a', mission_id: 'mission-s5', tier: 'public' },
+        policy: { purpose: 'stage test' },
+      }),
+      fn
+    );
+
+  it('records a confidential resource read in a public-tier mission as confidential', () => {
+    publicScope(() =>
+      recordOpObservation('file:pipeline', {
+        _effect: 'read',
+        _resource_ref: 'knowledge/confidential/tenant-a/secret.md',
+      })
+    );
+    const [aggregate] = sharedControlPlane().listObservationAggregates('mission-s5');
+    expect(aggregate?.tier).toBe('confidential');
+  });
+
+  it('never lowers the mission tier for a public-looking resource', () => {
+    inScope(() =>
+      recordOpObservation('file:pipeline', {
+        _effect: 'read',
+        _resource_ref: 'knowledge/public/notes.md',
+      })
+    );
+    const [aggregate] = sharedControlPlane().listObservationAggregates('mission-s5');
+    expect(aggregate?.tier).toBe('confidential');
+  });
+});
