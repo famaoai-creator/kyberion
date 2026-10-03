@@ -879,6 +879,10 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
           } catch (error: any) {
             logger.warn('[MEDIA] visual review evidence could not be persisted: ' + error?.message);
           }
+        } else {
+          logger.warn(
+            `⚠️ [MEDIA] visual review evidence not recorded — mission ${missionId} is ambiguous or not visible to this process | next: run under the owning tenant or pass a tier/tenant selector`
+          );
         }
       }
 

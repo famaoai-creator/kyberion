@@ -141,6 +141,25 @@ describe('authority branch coverage', () => {
     expect(ctx.role).toBe('chronos_gateway');
   });
 
+  it('treats an ambiguous mission id as no mission identity instead of throwing', async () => {
+    process.env.MISSION_ID = 'MSN-TWIN';
+    process.env.MISSION_ROLE = 'chronos_gateway';
+    process.env.KYBERION_PERSONA = 'mystery';
+    mocks.findMissionPath.mockImplementation(() => {
+      throw Object.assign(new Error('[OWNER_AMBIGUOUS] mission MSN-TWIN exists in 2 scopes'), {
+        code: 'OWNER_AMBIGUOUS',
+      });
+    });
+
+    const { resolveIdentityContext } = await import('./authority.js');
+    const ctx = resolveIdentityContext();
+    // No mission state is consulted: the persona is not taken from either twin
+    // (an unrecognized env persona keeps the default, as with no mission state).
+    expect(ctx.persona).toBe('worker');
+    expect(ctx.role).toBe('chronos_gateway');
+    expect(mocks.findMissionPath).toHaveBeenCalledWith('MSN-TWIN');
+  });
+
   it('does not derive execution persona or intrinsic authority from persisted onboarding identity', async () => {
     delete process.env.MISSION_ROLE;
     mocks.rawExistsSync.mockImplementation((p: string) =>
