@@ -1,4 +1,5 @@
 import { findMissionPath } from '@agent/core/path-resolver';
+import { missionPathOrNull } from '@agent/core/mission-lookup';
 import { loadState } from '@agent/core/mission/mission-state';
 import { loadArtifactRecord } from '@agent/core/workforce/artifact-record';
 import type { MemoryCandidate } from '@agent/core/knowledge/memory-promotion-queue';
@@ -21,7 +22,9 @@ export function resolveMemoryCandidateTenant(candidate: MemoryCandidate): string
   }
   if (candidate.source_type === 'mission') {
     const missionId = rawRef || sourceRef;
-    if (!findMissionPath(missionId)) return undefined;
+    // A list filter: an ambiguous or hidden mission has no tenant here, which a
+    // tenant-scoped viewer is denied (Boolean(tenant && allowed.includes(tenant))).
+    if (!missionPathOrNull(findMissionPath, missionId)) return undefined;
     return readTenantState(missionId);
   }
   return undefined;
