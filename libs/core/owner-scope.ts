@@ -119,6 +119,21 @@ function normalizeTenant(value: unknown): string {
   return isValidTenantSlug(tenant) ? tenant : SHARED_TENANT;
 }
 
+/**
+ * Tenant recorded in a mission state. Unlike a hint, a non-empty value that is
+ * neither untenanted nor a valid slug is unknown (null), never `shared`: a
+ * malformed record must not become visible to every tenant.
+ */
+function normalizeStateTenant(value: unknown): string | null {
+  const tenant = String(value ?? '')
+    .trim()
+    .toLowerCase();
+  if (!tenant || tenant === SHARED_TENANT || tenant === 'default' || isReservedScopeName(tenant)) {
+    return SHARED_TENANT;
+  }
+  return isValidTenantSlug(tenant) ? tenant : null;
+}
+
 /** A directory under a tier root is a tenant partition only if its name is a tenant slug. */
 function isTenantDirectoryName(name: string): boolean {
   return name === SHARED_TENANT || (isValidTenantSlug(name) && !isReservedScopeName(name));
@@ -256,8 +271,9 @@ interface MissionLocation {
  */
 function locateMission(candidate: MissionCandidate): MissionLocation | undefined {
   const state = loadMissionStateAtPath(path.join(candidate.dir, 'mission-state.json'));
+  // undefined: no readable state; null: a recorded tenant that is not a slug.
   const stateTenant = state
-    ? normalizeTenant(state.tenant_slug || state.tenant_id || SHARED_TENANT)
+    ? normalizeStateTenant(state.tenant_slug || state.tenant_id || SHARED_TENANT)
     : undefined;
   let tenant: string | null;
   if (candidate.dirTenant !== SHARED_TENANT) {
@@ -268,7 +284,7 @@ function locateMission(candidate: MissionCandidate): MissionLocation | undefined
     }
     tenant = candidate.dirTenant;
   } else {
-    tenant = stateTenant ?? null;
+    tenant = stateTenant === undefined ? null : stateTenant;
   }
   const tier = OWNER_TIERS.includes(state?.tier as OwnerTier)
     ? (state?.tier as OwnerTier)
