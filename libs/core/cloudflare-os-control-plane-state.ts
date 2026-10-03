@@ -183,6 +183,7 @@ function parsePersistedHeldAction(value: unknown, index: number): PersistedRecor
       'status',
       'submittedAt',
       'params',
+      'approvalRequest',
       'decidedAt',
       'resolvedBy',
       'autoApproved',
@@ -214,6 +215,19 @@ function parsePersistedHeldAction(value: unknown, index: number): PersistedRecor
         : persistedStringArray(record.dependsOn, `${label}.dependsOn`),
     ...(record.params !== undefined ? { params: record.params } : {}),
   };
+  if (record.approvalRequest !== undefined) {
+    const link = persistedRecord(record.approvalRequest, `${label}.approvalRequest`);
+    assertPersistedFields(
+      link,
+      ['requestId', 'storageChannel', 'role'],
+      `${label}.approvalRequest`
+    );
+    normalized.approvalRequest = {
+      requestId: persistedString(link, 'requestId', `${label}.approvalRequest`),
+      storageChannel: persistedString(link, 'storageChannel', `${label}.approvalRequest`),
+      role: persistedString(link, 'role', `${label}.approvalRequest`),
+    };
+  }
   if (typeof normalized.autoApproved !== 'boolean') {
     throw new Error(`${label} has invalid required fields`);
   }
@@ -641,7 +655,7 @@ export function restoredHeldActionRecord(record: {
 export function serializableHeldActionRecord(
   record: Record<string, unknown>
 ): Record<string, unknown> {
-  const { apply, simulate, revert, ...rest } = record;
+  const { apply, simulate, revert, steeringApproval, ...rest } = record;
   return rest;
 }
 
