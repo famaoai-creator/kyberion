@@ -1,7 +1,6 @@
-import * as fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir } from './secure-io.js';
+import { safeAppendFileSync, safeMkdir, safeRmSync } from './secure-io.js';
 import { auditChain } from './governance/audit-chain.js';
 import { CloudflareOsControlPlane } from './cloudflare-os-control-plane.js';
 import { setControlPlaneRuntimeRootForTests } from './cloudflare-os-journal.js';
@@ -35,7 +34,7 @@ beforeEach(() => {
 afterEach(() => {
   setControlPlaneRuntimeRootForTests(undefined);
   vi.restoreAllMocks();
-  fs.rmSync(root, { recursive: true, force: true });
+  safeRmSync(root, { recursive: true, force: true });
 });
 
 const submitLinked = (cp: CloudflareOsControlPlane, op = 'demo:x') =>

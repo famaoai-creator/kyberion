@@ -1,8 +1,7 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir } from './secure-io.js';
+import { safeAppendFileSync, safeMkdir, safeRmSync } from './secure-io.js';
 import { auditChain } from './governance/audit-chain.js';
 import { CloudflareOsControlPlane } from './cloudflare-os-control-plane.js';
 import {
@@ -24,7 +23,7 @@ beforeEach(() => {
 afterEach(() => {
   setControlPlaneRuntimeRootForTests(undefined);
   vi.restoreAllMocks();
-  fs.rmSync(root, { recursive: true, force: true });
+  safeRmSync(root, { recursive: true, force: true });
 });
 
 const human = (r: { payloadHash: string; effectBinding: string }) => ({
@@ -49,7 +48,7 @@ describe('a journal line cut short by a crash', () => {
     submit(first, 'demo:a');
     const dir = path.join(root, 'confidential', 'tenant-a', 'cloudflare-os');
     // The process died mid-append: a partial line with no trailing newline.
-    fs.appendFileSync(
+    safeAppendFileSync(
       controlPlaneJournalPath(dir),
       '{"seq":2,"ts":"2026-10-03T00:00:00Z","kind":"held","op":"upsert","recor'
     );
