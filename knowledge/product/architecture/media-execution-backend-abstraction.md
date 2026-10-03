@@ -46,7 +46,7 @@ Screen capture and recording remain compatibility actions, but their implementat
 
 The shared registry lives at:
 
-- [`knowledge/product/governance/media-backend-registry.json`](/Users/famao/kyberion/knowledge/product/governance/media-backend-registry.json)
+- [`knowledge/product/governance/media-backends/`](../governance/media-backends/)
 
 It provides a small, governed list of backends for:
 
@@ -73,14 +73,14 @@ The backend launch command itself is now resolved through the governed tool runt
 - `libs/core/tool/tool-runtime-policy.ts`
 - `libs/core/tool/tool-runtime-registry.ts`
 - `knowledge/product/governance/tool-runtime-policy.json`
-- `knowledge/product/governance/tool-runtime-registry.json`
+- `knowledge/product/governance/tool-runtimes/`
 
 For long-lived services such as ComfyUI, the same idea applies one layer up via the service runtime abstraction:
 
 - `libs/core/service/service-runtime-policy.ts`
 - `libs/core/service/service-runtime-registry.ts`
 - `knowledge/product/governance/service-runtime-policy.json`
-- `knowledge/product/governance/service-runtime-registry.json`
+- `knowledge/product/governance/service-runtimes/`
 
 ## Design Rule
 

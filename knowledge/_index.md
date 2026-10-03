@@ -208,7 +208,6 @@
 - [Fail-closed workflow policy](./product/facets/policies/fail-closed.md) (public | Unknown)
 
 ## 📁 product/governance
-- [Active Inquiry Protocol: The Power of Questioning](./product/governance/active-inquiry-protocol.md) (public | Ecosystem Architect)
 - [Adapter-First Extension Policy](./product/governance/adapter-first-extension-policy.md) (public | Unknown)
 - [Approval Gate Design: Store First, Surface as Renderer](./product/governance/approval-gate-design.md) (public | Unknown)
 - [Audio Route Resource Lifecycle and Configuration Abstraction](./product/governance/audio-route-resource-lifecycle.md) (public | ecosystem_architect)
@@ -224,7 +223,6 @@
 - [Governance: Tiered Consensus & Experimental Branches](./product/governance/tiered-consensus-and-experimental-branches.md) (public | Unknown)
 - [Independent Validation Evidence Package](./product/governance/independent-validation-evidence-package.md) (public | Unknown)
 - [Kyberion Development Practices — Hard-Won Rules for Changing This Repo](./product/governance/kyberion-development-practices.md) (public | Unknown)
-- [Kyberion Sovereign Consensus Protocol](./product/governance/consensus-protocol.md) (public | Ecosystem Architect)
 - [LLM Invocation Rubric — どのポイントで LLM に頼むか](./product/governance/llm-invocation-rubric.md) (public | Unknown)
 - [Logging Policy: console and file logs humans and LLMs can act on](./product/governance/logging-policy.md) (public | Unknown)
 - [Mission Distillation Prompt](./product/governance/distill-prompt.md) (public | Unknown)
@@ -237,7 +235,7 @@
 - [SOP: Multi-Agent Software Development & Review](./product/governance/multi-agent-development-sop.md) (public | Ecosystem Architect)
 - [SOP: TypeScript Core Base Stabilization](./product/governance/ts-base-stabilization-sop.md) (public | Ecosystem Architect)
 - [SOP: Unit Test Modernization & Alias Integrity](./product/governance/test-modernization-sop.md) (public | Ecosystem Architect)
-- [Sovereign Onboarding Protocol](./product/governance/onboarding-protocol.md) (public | Unknown)
+- [Sovereign Onboarding Protocol](./product/governance/onboarding-protocol.md) (public | sovereign_concierge)
 - [Wisdom Policy Adapter Guide](./product/governance/wisdom-policy-guide.md) (public | Ecosystem Architect)
 - [Working Philosophy — Frontier-Model Operating Rules for Every Tier](./product/governance/working-philosophy.md) (public | Unknown)
 - [portfolio-status](./product/governance/portfolio-status.md) (public | Unknown)
@@ -423,7 +421,7 @@
 - [Scratch-to-Pipeline Video Promotion](./product/orchestration/scratch-to-pipeline-video-promotion.md) (public | ecosystem_architect)
 - [Self-Refinement Protocol: The Path to Perpetual Growth](./product/orchestration/self-refinement-protocol.md) (public | Ecosystem Architect)
 - [Sovereign Autonomous Agent Protocol (SAAP)](./product/orchestration/autonomous-agent-protocol.md) (public | Ecosystem Architect)
-- [Sovereign Onboarding Protocol](./product/orchestration/onboarding-protocol.md) (public | sovereign_concierge)
+- [Sovereign Onboarding Protocol (moved)](./product/orchestration/onboarding-protocol.md) (public | Unknown)
 - [Stakeholder Consensus Protocol](./product/orchestration/stakeholder-consensus-protocol.md) (public | Ecosystem Architect)
 - [Standard SDLC Loop Fragment Proposal](./product/orchestration/standard-sdlc-loop-fragment-proposal.md) (public | Unknown)
 - [Standard SDLC Loop Fragment Spec](./product/orchestration/standard-sdlc-loop-fragment-spec.md) (public | Unknown)
@@ -441,7 +439,6 @@
 - [スキル間データ受け渡し仕様 (Data Handover Specs)](./product/orchestration/data-handover-specs.md) (public | Ecosystem Architect)
 - [トークン・エコノミー ＆ 高密度コンテキスト・プロトコル (MSC Protocol)](./product/orchestration/token-economy-protocol.md) (public | Ecosystem Architect)
 - [ドキュメントファイル読み取りプレイブック（PDF / PPTX / XLSX / DOCX → テキスト・表・OCR）](./product/orchestration/document-file-reading-playbook.ja.md) (public | Ecosystem Architect)
-- [ハイブリッド・ナレッジ・プロトコル (3-Tier Sovereign Model)](./product/orchestration/knowledge-protocol.md) (public | Ecosystem Architect)
 - [ハイブリッド型AIネイティブ開発フロー (Hybrid AI-Native Flow)](./product/orchestration/hybrid-development-flow.md) (public | Ecosystem Architect)
 - [パイプライン結晶化ループ設計メモ](./product/orchestration/pipeline-crystallization-memo.md) (public | Kyberion)
 - [ミッション実行規程 (Mission Execution Protocol v2.0)](./product/orchestration/mission-execution-protocol.md) (public | Kyberion Sovereign Entity)
@@ -695,15 +692,6 @@
 - [Corporate Legal & Tax Essentials (Japan context)](./public/ceo/legal-tax-essentials-jp.md) (public | Ecosystem Architect)
 - [Executive Briefing Standards](./public/ceo/executive_briefing_standards.md) (public | Ecosystem Architect)
 
-## 📁 public/ceo/finance
-- [財務KPI標準基準 (Financial KPI Standards)](./public/ceo/finance/kpi_standards.md) (public | Ecosystem Architect)
-
-## 📁 public/ceo/investment
-- [技術デューデリジェンス (Tech DD) 標準基準](./public/ceo/investment/tech_dd_standard.md) (public | Ecosystem Architect)
-
-## 📁 public/ceo/planning
-- [事業計画 ＆ 戦略フレームワーク (Planning Frameworks)](./public/ceo/planning/frameworks.md) (public | Ecosystem Architect)
-
 ## 📁 public/common/operations
 - [勤怠承認 標準運用手順書 (Attendance Approval SOP)](./public/common/operations/attendance-approval-sop.md) (public | Ecosystem Architect)
 - [稟議承認 標準運用手順書 (Ringi Approval SOP)](./public/common/operations/ringi-approval-sop.md) (public | Ecosystem Architect)
@@ -804,10 +792,6 @@
 
 ## 📁 public/finops
 - [finops/](./public/finops/README.md) (public | Unknown)
-
-## 📁 public/fisc-compliance
-- [AWS FISC (金融機関向け安全対策基準) 準拠ガイド](./public/fisc-compliance/aws_fisc_standard.md) (public | Ecosystem Architect)
-- [AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド](./public/fisc-compliance/blea_fisc_reference.md) (public | Ecosystem Architect)
 
 ## 📁 public/frameworks
 - [Conceptual Frameworks](./public/frameworks/README.md) (public | Unknown)

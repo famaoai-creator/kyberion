@@ -126,7 +126,7 @@ last_updated: 2026-07-13
 - Repeat-run behavior: 保存済み profile の割引・サポート・為替前提を使って同じ構成の見積りを再生成する
 - Output artifacts: `aws-cost-estimate.html`, `cost-buildup-summary.md`
 - Approval boundary: `external_delivery` と `customer_signoff` は要承認、既定は `draft-only`
-- Existing pipeline-template: `knowledge/product/pipeline-templates/aws-cost-estimate-from-vendor-docs.json`(未実装)
+- Existing task-scenario: `knowledge/product/task-scenarios/aws-cost-estimate-from-vendor-docs.json`
 - Implementation status: TaskScenario定義+contract testを追加済み。pipeline-templateと反復実行の自動化は未実装(現状はチャットセッション内での手動実行のみ)。対外提示を伴う場合はCLAUDE.mdのdog-food ruleに従いミッション化・`CUSTOMER_SIGNOFF`ゲートの適用を検討すること。
 
 ## 次の実装順

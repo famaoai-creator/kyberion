@@ -21,7 +21,7 @@ last_updated: 2026-03-06
 
 - PagerDuty/Slack 障害報告スレッド
 - Prometheus/Datadog アラート定義
-- `knowledge/devops/cloud-native.md` (クラウドネイティブ設計指針)
+- `knowledge/product/operations/modern_sre_best_practices.md` (クラウドネイティブ設計指針)
 
 ## 3. 勝利条件
 
@@ -30,4 +30,4 @@ last_updated: 2026-03-06
 
 ## 5. アウトプット形式
 
-- 保存先: `knowledge/operations/incident_history.md`
+- 保存先: `knowledge/product/operations/incident_history.md`

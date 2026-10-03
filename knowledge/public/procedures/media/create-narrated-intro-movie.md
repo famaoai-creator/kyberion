@@ -15,7 +15,7 @@ Execute a single top-level scenario that:
 - **Schemas**:
   - [`narrated-video-brief.schema.json`](../../../product/schemas/narrated-video-brief.schema.json)
   - [`video-content-brief.schema.json`](../../../product/schemas/video-content-brief.schema.json)
-  - [`video-composition-action.schema.json`](/Users/famao/kyberion/schemas/video-composition-action.schema.json)
+  - [`video-composition-action.schema.json`](../../../product/schemas/video-composition-action.schema.json)
 - **Procedure**:
   - [`compose-video-from-adf.md`](compose-video-from-adf.md)
 

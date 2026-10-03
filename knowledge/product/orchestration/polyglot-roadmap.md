@@ -9,6 +9,8 @@ last_updated: 2026-03-06
 
 # Polyglot Core Transformation Roadmap (Sidecar Architecture)
 
+> **注記（2026-10 確認）**: 本文書は 2026-03 時点の構想メモであり、現状を反映していません。`scripts/lib/` は現在すべて TypeScript（`scripts/lib/*.ts`）で、`scripts/lib/core.js` や `gemini-core` バイナリは存在しません。sidecar 方式は採用されておらず、共有ユーティリティの正本は `@agent/core`（`libs/core/foundation/` 等、`docs/developer/EXTENSION_POINTS.md` §8 参照）です。履歴として保持しています。
+
 To support Python, Go, and Rust skills natively without Node.js dependencies, we will transition the Shared Utility Core to a Sidecar model.
 
 ## Phase 1: Current State (Node.js Monolith)

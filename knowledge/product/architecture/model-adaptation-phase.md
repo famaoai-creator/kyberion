@@ -369,7 +369,7 @@ Add a governed registry for host-native capabilities that Kyberion may use throu
 
 Suggested artifact:
 
-- `knowledge/product/governance/harness-capability-registry.json`
+- `knowledge/product/governance/harness-capabilities/`
 
 Suggested fields:
 
@@ -465,7 +465,7 @@ then require an explicit architecture review and a linked concept update documen
 
 - define `model-registry.json`
 - define `model-adaptation-policy.json`
-- define `harness-capability-registry.json`
+- define `harness-capabilities/` catalog entries
 - define `model-adaptation-plan.schema.json`
 - define `model-profile.schema.json`
 - define `capability-drift-report.schema.json`

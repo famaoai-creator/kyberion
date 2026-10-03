@@ -25,7 +25,7 @@ But `themes.json` is not the full design-system story.
 ## Where Things Live
 
 - Base themes: `knowledge/public/design-patterns/media-templates/themes.json`
-- Core theme subset: `knowledge/public/design-patterns/media-templates/themes/themes-core.json`
+- Core theme subset: `knowledge/public/design-patterns/media-templates/themes/themes.json`
 - Imported DESIGN.md themes: `knowledge/public/design-patterns/media-templates/themes/design-md-imports.json`
 - Default theme pointer: `knowledge/public/design-patterns/media-templates/themes/default-theme.json`
 - Media design systems: `knowledge/public/design-patterns/media-templates/media-design-systems.json`

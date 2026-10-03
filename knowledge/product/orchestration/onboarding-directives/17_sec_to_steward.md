@@ -29,4 +29,4 @@ last_updated: 2026-03-06
 
 ## 5. アウトプット形式
 
-- 保存先: `knowledge/roles/cyber_security/security_posture.md`
+- 保存先: `knowledge/product/roles/cyber_security/security_posture.md`

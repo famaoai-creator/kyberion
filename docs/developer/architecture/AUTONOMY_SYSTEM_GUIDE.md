@@ -73,7 +73,7 @@ pnpm surfaces status
 
 「異常事態」や「特定のミッション中」のみ、安全に権限を一時開放する仕組みです。
 
-#### ポリシーの定義 (`knowledge/governance/dynamic-policies.json`)
+#### ポリシーの定義 (`knowledge/product/governance/dynamic-policies.json`)
 
 ```json
 {

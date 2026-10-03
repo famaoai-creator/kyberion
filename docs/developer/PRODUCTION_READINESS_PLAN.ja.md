@@ -51,7 +51,7 @@ last_updated: 2026-05-30
 | ---- | -------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | P1-1 | Error classifier の適用範囲拡大        | unknown error を減らす                         | `libs/core/error-classifier.ts`, CLI scripts                                                 | provider timeout、capability missing、policy violation、schema invalid が分類される |
 | P1-2 | Runtime capability receipts            | bootstrap 結果を後続実行が信頼できるようにする | `libs/core/environment-capability.ts`, `knowledge/product/governance/environment-manifests/` | receipt の期限、環境 fingerprint、missing capability が検証される                   |
-| P1-3 | Action item lifecycle の整合性         | meeting 後の follow-up を実用にする            | `libs/core/action-item-store.ts`, `pipelines/action-item-*.json`                             | duplicate reminder、status transition、blocked reason、owner kind がテストされる    |
+| P1-3 | Action item lifecycle の整合性         | meeting 後の follow-up を実用にする            | `libs/core/action-item-store.ts`, `knowledge/product/pipeline-templates/action-item-*.json`  | duplicate reminder、status transition、blocked reason、owner kind がテストされる    |
 | P1-4 | Browser participation runtime の安全性 | Zoom/browser 操作を誤作動させない              | `libs/actuators/meeting-browser-driver`, `scripts/meeting_participate.ts`                    | join target redaction、domain allowlist、recording/voice の consent gate がある     |
 | P1-5 | Cross-OS CI の代表シナリオ化           | Mac 固有の成功を防ぐ                           | `.github/workflows/cross-os.yml`, `tests/golden/`                                            | Ubuntu / macOS で schema、core test、pipeline preview、meeting dry-run が通る       |
 | P1-6 | Release / migration workflow           | OSS で破壊的変更を追えるようにする             | `CHANGELOG.md`, `migration/`, `scripts/generate_changelog.ts`                                | release prep 手順で contract baseline と migration note が更新される                |
@@ -180,12 +180,12 @@ last_updated: 2026-05-30
 
 確認内容:
 
-| 項目            | 内容                                                                                       |
-| --------------- | ------------------------------------------------------------------------------------------ |
-| Setup           | deterministic transcript fixture、attendees fixture                                        |
-| Command         | `pipelines/meeting-facilitation-postprocess.json` または orchestrator の postprocess stage |
-| Expected        | `action-items.jsonl` に owner、deadline、source utterance、confidence が残る               |
-| Failure variant | transcript empty、ambiguous owner、deadline missing、duplicate action item                 |
+| 項目            | 内容                                                                                                                  |
+| --------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Setup           | deterministic transcript fixture、attendees fixture                                                                   |
+| Command         | `knowledge/product/pipeline-templates/meeting-facilitation-postprocess.json` または orchestrator の postprocess stage |
+| Expected        | `action-items.jsonl` に owner、deadline、source utterance、confidence が残る                                          |
+| Failure variant | transcript empty、ambiguous owner、deadline missing、duplicate action item                                            |
 
 ### S7: Action item tracking follow-up
 
@@ -196,7 +196,7 @@ last_updated: 2026-05-30
 | 項目            | 内容                                                                                      |
 | --------------- | ----------------------------------------------------------------------------------------- |
 | Setup           | pending / completed / blocked の action item fixture                                      |
-| Command         | `pipelines/action-item-tracking.json`                                                     |
+| Command         | `knowledge/product/pipeline-templates/action-item-tracking.json`                          |
 | Expected        | pending team_member だけに reminder が生成され、同一 channel / sent_at の重複が抑止される |
 | Failure variant | owner contact missing、reminder channel unavailable、blocked item                         |
 
@@ -206,12 +206,12 @@ last_updated: 2026-05-30
 
 確認内容:
 
-| 項目            | 内容                                                            |
-| --------------- | --------------------------------------------------------------- |
-| Setup           | operator_self pending item、権限あり / なしの task              |
-| Command         | `pipelines/action-item-execute-self.json`                       |
-| Expected        | allowed task は completed、authority 不足は blocked with reason |
-| Failure variant | delegateTask timeout、policy violation、missing artifact        |
+| 項目            | 内容                                                                 |
+| --------------- | -------------------------------------------------------------------- |
+| Setup           | operator_self pending item、権限あり / なしの task                   |
+| Command         | `knowledge/product/pipeline-templates/action-item-execute-self.json` |
+| Expected        | allowed task は completed、authority 不足は blocked with reason      |
+| Failure variant | delegateTask timeout、policy violation、missing artifact             |
 
 ### S9: Cross-OS contract smoke
 

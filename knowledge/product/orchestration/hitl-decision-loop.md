@@ -17,7 +17,7 @@ Plan and status: `docs/developer/improvement-plans-2026-09/AUTONOMOUS_OPERATION_
 
 ## 1. Four intervention levels
 
-`resolveInterventionLevel()` in `libs/core/approval-decision-card.ts` maps the gate result:
+`resolveInterventionLevel()` in `libs/core/governance/approval-decision-card.ts` maps the gate result:
 
 | Level    | Gate                                  | Agent                       | Operator                             | Phone rings?                       |
 | -------- | ------------------------------------- | --------------------------- | ------------------------------------ | ---------------------------------- |
@@ -31,9 +31,9 @@ that parks one action picks up other work and resumes when the approval-store re
 
 ## 2. The decision card
 
-One stored type (`DecisionCard` in `libs/core/decision-card.ts`, validated on create: text
+One stored type (`DecisionCard` in `libs/core/governance/decision-card.ts`, validated on create: text
 limits, evidence only as `https://` URLs or repository-relative paths) on the approval record
-(`decisionCard`). `libs/core/approval-decision-card.ts` renders it identically on every surface,
+(`decisionCard`). `libs/core/governance/approval-decision-card.ts` renders it identically on every surface,
 in a fixed order so the operator learns where to look:
 
 1. level badge (🔴 decide / 🟡 veto / 🔵 fyi / ⚪ none) and a trial-mode marker for shadow actions
@@ -64,7 +64,7 @@ the card was delivered to (`decisionCard.deliveredVia`). The bridges still autho
 
 ## 3. Veto windows — silence counts only if it was heard
 
-`libs/core/approval-veto-window.ts`:
+`libs/core/governance/approval-veto-window.ts`:
 
 - The clock starts when a bridge **delivers** the card (`drainSurfaceOutbox` → `recordApprovalDeliveryReceipt`), not when it is queued. iMessage sends synchronously and counts as delivered on hand-off.
 - Only minutes inside `active_hours` of `autonomous-ops-policy.json` count.

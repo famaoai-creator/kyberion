@@ -2379,7 +2379,7 @@
         {
           "op": "wisdom:reconcile",
           "params": {
-            "strategy_path": "knowledge/governance/wisdom-reconcile-strategy.json"
+            "strategy_path": "knowledge/product/governance/wisdom-reconcile-strategy.json"
           }
         },
         {
@@ -2468,7 +2468,7 @@
         {
           "op": "modeling:reconcile",
           "params": {
-            "strategy_path": "knowledge/governance/modeling-strategy.json"
+            "strategy_path": "knowledge/product/governance/modeling-strategy.json"
           }
         },
         {
@@ -2497,7 +2497,7 @@
         {
           "op": "code:reconcile",
           "params": {
-            "strategy_path": "knowledge/governance/code-strategy.json"
+            "strategy_path": "knowledge/product/governance/code-strategy.json"
           }
         },
         {
