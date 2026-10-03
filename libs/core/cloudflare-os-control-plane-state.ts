@@ -7,8 +7,10 @@ import type {
   BlueprintContract,
   CapabilityEdge,
   GadgetManifest,
+  GadgetOperationDefinition,
   GadgetOperationDescriptor,
   GadgetOperationEffect,
+  HeldActionRecord,
   HeldActionStatus,
   NetworkObservation,
   ObservationRecord,
@@ -170,6 +172,7 @@ function parsePersistedHeldAction(value: unknown, index: number): PersistedRecor
       'id',
       'missionId',
       'taskId',
+      'tenantSlug',
       'submittedBy',
       'op',
       'simulatable',
@@ -212,7 +215,7 @@ function parsePersistedHeldAction(value: unknown, index: number): PersistedRecor
   if (typeof normalized.autoApproved !== 'boolean') {
     throw new Error(`${label} has invalid required fields`);
   }
-  for (const field of ['taskId', 'actionTag', 'resolvedBy', 'applyError'] as const) {
+  for (const field of ['taskId', 'tenantSlug', 'actionTag', 'resolvedBy', 'applyError'] as const) {
     const value = persistedOptionalString(record, field, label);
     if (value !== undefined) normalized[field] = value;
   }
@@ -599,4 +602,179 @@ export function parsePersistedControlPlaneState(value: unknown): PersistedContro
     network: root.network.map(parsePersistedNetwork),
     gadgets: root.gadgets.map(parsePersistedGadget),
   };
+}
+
+// ---------- SC-03 journal serialization helpers ----------
+
+/**
+ * A restored held action is deliberately fail-closed: its executor,
+ * simulator, reverter and parameters must be rehydrated by a governed
+ * adapter (SC-04) before it can run again.
+ */
+export function restoredHeldActionRecord(record: {
+  id: string;
+  op: string;
+  dependsOn?: string[];
+  effectBinding?: string;
+  apply?: unknown;
+  simulate?: unknown;
+  revert?: unknown;
+  params?: unknown;
+}): void {
+  record.apply = () => {
+    throw new Error(
+      `[CONTROL_PLANE] Executor for persisted op '${record.op}' must be registered after restart`
+    );
+  };
+  record.simulate = undefined;
+  record.revert = undefined;
+  record.dependsOn ||= [];
+  record.effectBinding ||= record.op;
+  record.params = undefined;
+}
+
+/**
+ * Strip executable state a journal or snapshot must never carry — the same
+ * projection the legacy persist writes.
+ */
+export function serializableHeldActionRecord(
+  record: Record<string, unknown>
+): Record<string, unknown> {
+  const { apply, simulate, revert, params, ...rest } = record;
+  return rest;
+}
+
+/**
+ * The in-memory collections a journal event folds into — the plane passes
+ * its own maps so replay, catch-up and restore share one code path.
+ */
+export interface ControlPlaneJournalCollections {
+  held: Map<string, HeldActionRecord>;
+  introductions: Map<string, ResourceIntroduction>;
+  observations: ObservationRecord[];
+  autoRules: AutoApproveRule[];
+  capabilities: Map<string, CapabilityEdge>;
+  threadCapabilities: Map<string, Set<string>>;
+  blueprints: Map<string, BlueprintContract>;
+  network: NetworkObservation[];
+  observationAggregates: Map<
+    string,
+    {
+      missionId: string;
+      resourceRef: string;
+      tier: string;
+      tenantSlug?: string;
+      count: number;
+      firstObservedAt: string;
+      lastObservedAt: string;
+    }
+  >;
+  gadgets: {
+    manifests: Map<string, GadgetManifest>;
+    capabilitySubjects: Map<string, string>;
+    operations: Map<string, Map<string, GadgetOperationDefinition>>;
+    deserializeOperation: (operation: Record<string, unknown>) => GadgetOperationDefinition;
+  };
+}
+
+function observationAggregateKeyOf(record: Record<string, unknown>): string {
+  return `${record.missionId}|${record.resourceRef}|${record.tier}`;
+}
+
+/** Fold one journal event into the in-memory projection (SC-03). */
+export function applyControlPlaneJournalEvent(
+  collections: ControlPlaneJournalCollections,
+  event: { kind: string; records: Record<string, unknown>[] }
+): void {
+  for (const raw of event.records) {
+    switch (event.kind) {
+      case 'held': {
+        const record = raw as unknown as HeldActionRecord;
+        restoredHeldActionRecord(record);
+        collections.held.set(record.id, record);
+        break;
+      }
+      case 'introduction':
+        collections.introductions.set(raw.id as string, raw as unknown as ResourceIntroduction);
+        break;
+      case 'observation': {
+        if (!raw.id || !collections.observations.some((entry) => entry.id === raw.id)) {
+          collections.observations.push(raw as unknown as ObservationRecord);
+          const key = observationAggregateKeyOf(raw);
+          const existing = collections.observationAggregates.get(key);
+          const observedAt = String(raw.observedAt ?? '');
+          if (existing) {
+            existing.count += 1;
+            if (observedAt < existing.firstObservedAt) existing.firstObservedAt = observedAt;
+            if (observedAt > existing.lastObservedAt) existing.lastObservedAt = observedAt;
+            if (!existing.tenantSlug && typeof raw.tenantSlug === 'string')
+              existing.tenantSlug = raw.tenantSlug;
+          } else {
+            collections.observationAggregates.set(key, {
+              missionId: String(raw.missionId ?? ''),
+              resourceRef: String(raw.resourceRef ?? ''),
+              tier: String(raw.tier ?? ''),
+              ...(typeof raw.tenantSlug === 'string' ? { tenantSlug: raw.tenantSlug } : {}),
+              count: 1,
+              firstObservedAt: observedAt,
+              lastObservedAt: observedAt,
+            });
+          }
+        }
+        break;
+      }
+      case 'auto_rule': {
+        const rule = raw as unknown as AutoApproveRule;
+        if (
+          !collections.autoRules.some(
+            (entry) =>
+              entry.op === rule.op &&
+              entry.actionTag === rule.actionTag &&
+              entry.enabledBy === rule.enabledBy
+          )
+        ) {
+          collections.autoRules.push(rule);
+        }
+        break;
+      }
+      case 'capability':
+        collections.capabilities.set(raw.id as string, raw as unknown as CapabilityEdge);
+        break;
+      case 'thread_capability': {
+        const entry = raw as { threadId: string; capabilities: string[] };
+        collections.threadCapabilities.set(entry.threadId, new Set(entry.capabilities));
+        break;
+      }
+      case 'blueprint':
+        collections.blueprints.set(raw.id as string, raw as unknown as BlueprintContract);
+        break;
+      case 'network': {
+        const key = JSON.stringify(raw);
+        if (!collections.network.some((entry) => JSON.stringify(entry) === key)) {
+          collections.network.push(raw as unknown as NetworkObservation);
+        }
+        break;
+      }
+      case 'gadget': {
+        const gadget = raw as {
+          manifest?: GadgetManifest;
+          operations?: Array<Record<string, unknown>>;
+        };
+        if (!gadget?.manifest?.id || !Array.isArray(gadget.operations)) break;
+        const operations = gadget.operations.map((operation) =>
+          collections.gadgets.deserializeOperation(operation)
+        );
+        collections.gadgets.manifests.set(gadget.manifest.id, gadget.manifest);
+        collections.gadgets.capabilitySubjects.set(
+          gadget.manifest.id,
+          gadget.manifest.capabilitySubject
+        );
+        collections.gadgets.operations.set(
+          gadget.manifest.id,
+          new Map(operations.map((operation) => [operation.name, operation]))
+        );
+        break;
+      }
+    }
+  }
 }
