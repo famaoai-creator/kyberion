@@ -11,6 +11,6 @@
   },
   "dependencies": {
     "@agent/core": "workspace:*",
-    "yargs": "^17.7.2"
+    "yargs": "^17.7.3"
   }
 }

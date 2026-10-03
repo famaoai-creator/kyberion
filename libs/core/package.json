@@ -7041,10 +7041,10 @@
     "chalk": "^6.0.0",
     "fontkit": "^2.0.4",
     "js-yaml": "^5.4.2",
-    "marked": "^18.0.12",
-    "openai": "^7.12.1",
+    "marked": "^18.0.14",
+    "openai": "^7.25.0",
     "web-push": "3.6.7",
-    "yargs": "^18.0.0"
+    "yargs": "^18.2.0"
   },
   "devDependencies": {
     "@types/web-push": "^3.6.4"
