@@ -43,7 +43,7 @@ export {
   resolvePhaseGateMode,
 } from './mission-orchestration-phase-gates.js';
 import { emitIntentSnapshot, mapStageToLoopPhase } from '../intent/intent-snapshot-store.js';
-import { evaluateMissionIntentDrift } from './mission-intent-delta.js';
+import { evaluateMissionIntentDrift, missionCanonicalIntent } from './mission-intent-delta.js';
 import { getIntentExtractor } from '../intent/intent-extractor.js';
 import { installAnthropicBackendsIfAvailable } from '../reasoning/reasoning-bootstrap.js';
 import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
@@ -182,11 +182,15 @@ export function emitWorkerTransitionSnapshot(
 ): void {
   if (!missionId) return;
   try {
+    // A stage transition is activity, not intent: when the mission carries a
+    // canonical intent record it is the snapshot's content, so a transition
+    // marker ('Mission X reconciling outcomes') can never sit in `goal` and
+    // manufacture drift against the origin baseline.
     emitIntentSnapshot({
       missionId,
       stage: stageKey,
       source: 'worker_transition',
-      intent: {
+      intent: missionCanonicalIntent(missionId) ?? {
         goal:
           goalHint ?? `Mission ${missionId} progressing through ${mapStageToLoopPhase(stageKey)}`,
       },
@@ -246,6 +250,24 @@ export async function emitWorkerKickoffSnapshot(
   payload: SlackPayload
 ): Promise<void> {
   if (!missionId) return;
+  // When mission state already carries the canonical intent (goal_summary or
+  // source_text), the kickoff origin must record THAT — not an LLM-extracted
+  // paraphrase — or every later canonical snapshot compares asymmetrically
+  // against the origin and the drift gate manufactures a block.
+  const canonical = missionCanonicalIntent(missionId);
+  if (canonical) {
+    try {
+      emitIntentSnapshot({
+        missionId,
+        stage: 'intake',
+        source: 'user_prompt',
+        intent: canonical,
+      });
+    } catch (err: any) {
+      logger.warn(`[worker] kickoff snapshot skipped for ${missionId}: ${err?.message ?? err}`);
+    }
+    return;
+  }
   const text = (payload as any)?.text;
   if (!text || typeof text !== 'string' || !text.trim()) {
     emitWorkerTransitionSnapshot(missionId, 'intake', `Mission ${missionId} kickoff requested`);

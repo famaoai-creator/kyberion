@@ -55,7 +55,10 @@ import {
   loadState,
   saveState,
 } from './mission-state.js';
-import { emitMissionLifecycleIntentSnapshot } from './mission-intent-delta.js';
+import {
+  buildCanonicalIntentBody,
+  emitMissionLifecycleIntentSnapshot,
+} from './mission-intent-delta.js';
 import {
   MISSION_TASK_COMPLETED_STATUSES,
   readMissionNextTasks,
@@ -478,15 +481,7 @@ export async function approveScopeChange(args: {
       throw new Error(`Mission ${missionId} not found.`);
     }
 
-    const intent = {
-      goal: goalSummary,
-      constraints: state.outcome_contract?.success_criteria || [],
-      deliverables:
-        state.outcome_contract?.expected_artifacts?.map((artifact) => artifact.kind) || [],
-      stakeholders: state.relationships?.project?.project_id
-        ? [state.relationships.project.project_id]
-        : [],
-    };
+    const intent = buildCanonicalIntentBody(state, goalSummary) ?? { goal: goalSummary };
 
     const change = recordApprovedIntentScopeChange({
       missionId,
