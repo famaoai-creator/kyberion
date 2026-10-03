@@ -572,11 +572,23 @@ function registeredMissionLocator(): MissionLocator | undefined {
  * below then only finds a pre-materialized mission (no state yet), searching
  * personal -> confidential -> public.
  */
+let locatingMission = false;
+
 export function findMissionPath(missionId: string): string | null {
   assertMissionIdArgument(missionId);
-  const locator = registeredMissionLocator();
+  // The locator reads through secure-io, whose permission check resolves the
+  // caller identity, which may look a mission up again. That nested lookup
+  // takes the plain scan (the behavior before the locator existed) instead
+  // of re-entering the locator, which would recurse without bound.
+  const locator = locatingMission ? undefined : registeredMissionLocator();
   if (locator) {
-    const located = locator(missionId);
+    locatingMission = true;
+    let located: string | undefined;
+    try {
+      located = locator(missionId);
+    } finally {
+      locatingMission = false;
+    }
     if (located) return located;
   }
   // With a locator, a directory holding a state it did not resolve belongs to
