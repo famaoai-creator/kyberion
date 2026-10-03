@@ -549,11 +549,72 @@ function isMissionDirectory(candidate: string): boolean {
 }
 
 /**
- * Searches for a mission directory across all available tiers.
- * Priority: personal -> confidential -> public
+ * Locates an existing mission from its own record (registered by owner-scope,
+ * which sits above this module). Returns the mission directory, or undefined
+ * when no mission state is visible; throws when the id is ambiguous.
  */
+export type MissionLocator = (missionId: string) => string | undefined;
+
+const MISSION_LOCATOR = Symbol.for('kyberion.pathResolver.missionLocator');
+
+export function registerMissionLocator(locator: MissionLocator): void {
+  (globalThis as Record<symbol, unknown>)[MISSION_LOCATOR] = locator;
+}
+
+function registeredMissionLocator(): MissionLocator | undefined {
+  return (globalThis as Record<symbol, unknown>)[MISSION_LOCATOR] as MissionLocator | undefined;
+}
+
+/**
+ * Finds a mission directory. An existing mission (one with mission-state.json)
+ * is located from its own record via the registered locator: the same answer
+ * as resolveOwnerScope, across tiers and tenant partitions. The directory scan
+ * below then only finds a pre-materialized mission (no state yet), searching
+ * personal -> confidential -> public.
+ */
+let locatingMission = false;
+
+/** Same `[CODE] what — why | next: remedy` shape as OwnerScopeError. */
+function missionNotVisibleError(missionId: string): Error {
+  const error = new Error(
+    `[OWNER_NOT_VISIBLE] mission ${missionId} exists but is not resolvable by this process — ` +
+      'its state belongs to another tenant or disagrees with its directory | ' +
+      'next: run under the owning tenant, or repair the mission state'
+  );
+  (error as Error & { code: string }).code = 'OWNER_NOT_VISIBLE';
+  return error;
+}
+
 export function findMissionPath(missionId: string): string | null {
   assertMissionIdArgument(missionId);
+  // The locator reads through secure-io, whose permission check resolves the
+  // caller identity, which may look a mission up again. That nested lookup
+  // takes the plain scan (the behavior before the locator existed) instead
+  // of re-entering the locator, which would recurse without bound.
+  const locator = locatingMission ? undefined : registeredMissionLocator();
+  if (locator) {
+    locatingMission = true;
+    let located: string | undefined;
+    try {
+      located = locator(missionId);
+    } finally {
+      locatingMission = false;
+    }
+    if (located) return located;
+  }
+  // With a locator, a canonical (upper-case) directory holding a state the
+  // locator did not resolve belongs to a scope this process may not see, or is
+  // inconsistent. Returning null would let a caller create a second copy, so
+  // it fails closed. A stateless (pre-materialized) directory, a non-canonical
+  // (lower-case) name the locator does not search, and the legacy unpartitioned
+  // root keep the plain-scan behavior.
+  const canonical = missionId.toUpperCase();
+  const accept = (candidate: string, legacy = false): boolean => {
+    if (!isMissionDirectory(candidate)) return false;
+    if (!locator || legacy || path.basename(candidate) !== canonical) return true;
+    if (!rawExistsSync(path.join(candidate, 'mission-state.json'))) return true;
+    throw missionNotVisibleError(missionId);
+  };
   const tiers: MissionTier[] = ['personal', 'confidential', 'public'];
 
   for (const tier of tiers) {
@@ -562,16 +623,16 @@ export function findMissionPath(missionId: string): string | null {
       const tenant = currentTenantSlug();
       if (tenant) {
         const scopedPath = path.join(PROJECT_ROOT_DIR, subPath, tenant, missionId);
-        if (isMissionDirectory(scopedPath)) return scopedPath;
+        if (accept(scopedPath)) return scopedPath;
       }
       const fullPath = path.join(PROJECT_ROOT_DIR, subPath, missionId);
-      if (isMissionDirectory(fullPath)) return fullPath;
+      if (accept(fullPath)) return fullPath;
     }
   }
 
   // Legacy fallback
   const legacyPath = path.join(ACTIVE_ROOT, 'missions', missionId);
-  if (isMissionDirectory(legacyPath)) return legacyPath;
+  if (accept(legacyPath, true)) return legacyPath;
 
   return null;
 }

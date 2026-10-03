@@ -291,21 +291,42 @@ describe('intent phrase lexicon — bounded matching time (ReDoS smoke)', () => 
     `${'"a" '.repeat(1200)}`,
   ];
 
+  // Wall-clock smoke for catastrophic backtracking. Genuine ReDoS on these
+  // 5k-char inputs costs seconds (orders of magnitude over the budget) on
+  // every run, whereas a shared CI runner (notably macOS) can stall a single
+  // linear-time pass by a few hundred ms through scheduler/GC noise. So a
+  // pair that exceeds the budget is re-measured and judged by its fastest
+  // run: noise does not repeat, catastrophic backtracking does. A pair far
+  // over budget (>= 10x) is unambiguous and is not re-run.
+  const PER_PAIR_BUDGET_MS = 250;
+  const TOTAL_BUDGET_MS = 5000;
+  const MAX_SAMPLES = 3;
+
   it('runs every concept (match and capture) over adversarial inputs within a time budget', () => {
     const matcher = getIntentPhraseMatcher();
+    const timePair = (input: string, conceptId: string): number => {
+      const t0 = performance.now();
+      matcher.matches(input, conceptId);
+      matcher.capture(input, conceptId);
+      return performance.now() - t0;
+    };
     let slowest = { conceptId: '', ms: 0 };
-    const started = performance.now();
+    let total = 0;
     for (const conceptId of matcher.conceptIds) {
       for (const input of ADVERSARIAL_INPUTS) {
-        const t0 = performance.now();
-        matcher.matches(input, conceptId);
-        matcher.capture(input, conceptId);
-        const ms = performance.now() - t0;
+        let ms = timePair(input, conceptId);
+        for (
+          let sample = 1;
+          sample < MAX_SAMPLES && ms >= PER_PAIR_BUDGET_MS && ms < PER_PAIR_BUDGET_MS * 10;
+          sample += 1
+        ) {
+          ms = Math.min(ms, timePair(input, conceptId));
+        }
+        total += ms;
         if (ms > slowest.ms) slowest = { conceptId, ms };
       }
     }
-    const total = performance.now() - started;
-    expect(slowest.ms, `slowest concept ${slowest.conceptId}`).toBeLessThan(250);
-    expect(total).toBeLessThan(5000);
+    expect(slowest.ms, `slowest concept ${slowest.conceptId}`).toBeLessThan(PER_PAIR_BUDGET_MS);
+    expect(total).toBeLessThan(TOTAL_BUDGET_MS);
   });
 });

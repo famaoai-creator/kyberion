@@ -13,8 +13,8 @@ import { nowIso } from '../foundation/time.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
-import { missionDir, pathResolver } from '../path-resolver.js';
-import { tryResolveOwnerScope } from '../owner-scope.js';
+import { pathResolver } from '../path-resolver.js';
+import { resolveMissionDir } from '../owner-scope.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
 import { escapeXml } from '../text-escaping.js';
 import { withLock } from '../foundation/lock-utils.js';
@@ -488,17 +488,17 @@ function resolveMissionAgentInputQueuePath(options: AgentInputQueueOptions): str
 }
 
 /**
- * Resolve the queue beside the authoritative mission directory. An existing
- * mission is found where it actually lives (all tiers and tenants, independent
- * of the process-global current tenant); an explicit tier or tenant only
- * narrows that lookup, and a contradiction throws SCOPE_CONTRADICTS_OWNER.
- * A not-yet-created mission keeps the previous placement: the explicit
- * tier/tenant, else missionDir's canonical confidential default.
+ * Resolve the queue beside the authoritative mission directory. A mission is
+ * found where it actually lives (all tiers and tenants, independent of the
+ * process-global current tenant); an explicit tier or tenant only narrows that
+ * lookup, and a contradiction throws SCOPE_CONTRADICTS_OWNER. Input for a
+ * mission that does not exist (or is ambiguous) is refused instead of queued at
+ * a guessed location the mission would never read once created.
  */
 function resolveMissionQueueDir(missionId: string, options: AgentInputQueueOptions): string {
   const explicit = options.tier !== undefined || options.tenantSlug !== undefined;
-  const owner = tryResolveOwnerScope(
-    { kind: 'mission', id: missionId },
+  return resolveMissionDir(
+    missionId,
     explicit
       ? {
           ...(options.tier !== undefined ? { tier: options.tier } : {}),
@@ -506,10 +506,6 @@ function resolveMissionQueueDir(missionId: string, options: AgentInputQueueOptio
         }
       : undefined
   );
-  if (owner) return owner.dir;
-  return explicit
-    ? missionDir(missionId, options.tier ?? 'confidential', options.tenantSlug)
-    : missionDir(missionId);
 }
 
 const MISSION_QUEUE_REGISTRY = Symbol.for('kyberion.agentInputQueueRegistry');
