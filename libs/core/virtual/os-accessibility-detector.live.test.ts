@@ -61,20 +61,22 @@ public static class KyberionUiaSmoke {
 }
 '@`;
 
-// Starts a new Notepad and prints its pid and main window handle.
+// Starts a new Notepad and prints its pid and main window handle, polling for
+// the window until the UIA_SMOKE_WAIT_MS deadline (not a fixed iteration count).
 const LAUNCH_SCRIPT = `$ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+$watch = [System.Diagnostics.Stopwatch]::StartNew()
 $before = @(Get-Process -Name notepad -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
 $started = Start-Process -FilePath notepad.exe -PassThru
 $target = $null
-for ($i = 0; $i -lt 75 -and $null -eq $target; $i++) {
+while ($null -eq $target -and $watch.ElapsedMilliseconds -lt [int]$env:UIA_SMOKE_WAIT_MS) {
   Start-Sleep -Milliseconds 200
   $target = Get-Process -Name notepad -ErrorAction SilentlyContinue | Where-Object { $before -notcontains $_.Id -and $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
 }
 $pids = @($started.Id)
 $hwnd = 0
 if ($null -ne $target) { $pids += $target.Id; $hwnd = $target.MainWindowHandle.ToInt64() }
-[Console]::Out.WriteLine((@{ pids = $pids; hwnd = $hwnd } | ConvertTo-Json -Compress))`;
+[Console]::Out.WriteLine((@{ pids = $pids; hwnd = $hwnd; elapsed_ms = $watch.ElapsedMilliseconds } | ConvertTo-Json -Compress))`;
 
 // Opens a WPF window titled UIA_SMOKE_TITLE (Button "OK", CheckBox, TextBox) in
 // a separate STA powershell.exe that stays open until killed; WPF has native UIA
@@ -107,9 +109,10 @@ $window.Content = $panel
 [void]$window.ShowDialog()
 '@
 $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($wpf))
+$watch = [System.Diagnostics.Stopwatch]::StartNew()
 $process = Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile', '-NonInteractive', '-STA', '-EncodedCommand', $encoded) -PassThru
 $hwnd = [IntPtr]::Zero
-for ($i = 0; $i -lt 150 -and $hwnd -eq [IntPtr]::Zero -and -not $process.HasExited; $i++) {
+while ($hwnd -eq [IntPtr]::Zero -and -not $process.HasExited -and $watch.ElapsedMilliseconds -lt [int]$env:UIA_SMOKE_WAIT_MS) {
   Start-Sleep -Milliseconds 200
   $hwnd = [KyberionUiaSmoke]::FindWindow([NullString]::Value, $env:UIA_SMOKE_TITLE)
 }
@@ -117,7 +120,7 @@ for ($i = 0; $i -lt 150 -and $hwnd -eq [IntPtr]::Zero -and -not $process.HasExit
 if ($hwnd -ne [IntPtr]::Zero) { [void][KyberionUiaSmoke]::GetWindowThreadProcessId($hwnd, [ref]$ownerPid) }
 $childExited = $process.HasExited
 $childExitCode = if ($childExited) { $process.ExitCode } else { $null }
-[Console]::Out.WriteLine((@{ pids = @($process.Id, [int]$ownerPid); hwnd = $hwnd.ToInt64(); child_exited = $childExited; child_exit_code = $childExitCode } | ConvertTo-Json -Compress))`;
+[Console]::Out.WriteLine((@{ pids = @($process.Id, [int]$ownerPid); hwnd = $hwnd.ToInt64(); child_exited = $childExited; child_exit_code = $childExitCode; elapsed_ms = $watch.ElapsedMilliseconds } | ConvertTo-Json -Compress))`;
 
 // Brings the window (handle in UIA_SMOKE_HWND) to the foreground; the ALT tap
 // lifts the foreground lock when a plain SetForegroundWindow is refused.
@@ -180,9 +183,9 @@ try { $windowDpi = [int][KyberionUiaSmoke]::GetDpiForWindow([IntPtr]::new([long]
 try { $systemDpi = [int][KyberionUiaSmoke]::GetDpiForSystem() } catch { }
 [Console]::Out.WriteLine((@{ found = ($found -ne [IntPtr]::Zero); window_dpi = $windowDpi; system_dpi = $systemDpi } | ConvertTo-Json -Compress))`;
 
-function runPowerShell(script: string, env: Record<string, string> = {}) {
+function runPowerShell(script: string, env: Record<string, string> = {}, timeoutMs = 60_000) {
   const result = safeExecResult('powershell.exe', powerShellStdinArgs(), {
-    timeoutMs: 60_000,
+    timeoutMs,
     maxOutputMB: 1,
     env: { ...windowsPowerShellEnv(), ...env },
     input: script,
@@ -223,6 +226,34 @@ interface LiveResult {
   image: { width: number; height: number };
 }
 
+/** Total time one detectLive round may spend re-probing UIA availability. */
+const AVAILABILITY_DEADLINE_MS = 30_000;
+
+/**
+ * The Windows availability probe is a cold powershell.exe that loads UI
+ * Automation within a 6 s budget, which a loaded runner can miss, and a
+ * detector caches a denial for 5 s. Re-probe on a fresh detector (no cached
+ * denial) until the deadline. A host where UIA is genuinely unavailable still
+ * reports false on every probe, so the caller's failure stays meaningful.
+ */
+async function waitForAvailability(
+  request: Parameters<OsAccessibilityDetector['isAvailable']>[0],
+  label: string
+): Promise<boolean> {
+  const started = Date.now();
+  for (let probe = 1; ; probe += 1) {
+    const probeStarted = Date.now();
+    const available = await new OsAccessibilityDetector().isAvailable(request);
+    console.log(
+      `[uia-smoke:${label}] availability probe ${probe}`,
+      JSON.stringify({ available, ms: Date.now() - probeStarted })
+    );
+    if (available) return true;
+    if (Date.now() - started >= AVAILABILITY_DEADLINE_MS) return false;
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+}
+
 /**
  * Focuses the target window, captures the primary screen and runs the detector;
  * retries up to three times when the window is not frontmost or yields no
@@ -242,8 +273,8 @@ async function detectLive(target: LiveTarget): Promise<LiveResult> {
       live_screen: true,
       application: target.application,
     };
-    if (!(await detector.isAvailable(request))) {
-      outcome = 'os_accessibility detector unavailable';
+    if (!(await waitForAvailability(request, target.label))) {
+      outcome = `os_accessibility detector unavailable after ${AVAILABILITY_DEADLINE_MS} ms of probes`;
       continue;
     }
     const started = Date.now();
@@ -324,22 +355,37 @@ function pidsOf(launch: Record<string, unknown>): number[] {
   return (Array.isArray(launch.pids) ? launch.pids : [launch.pids]).map(Number);
 }
 
+/** Total wall-clock budget for bringing up a target window, across attempts. */
+const LAUNCH_DEADLINE_MS = 90_000;
+/** Per-attempt window wait; a cold STA/WPF start on a loaded runner can take >30 s. */
+const LAUNCH_ATTEMPT_WAIT_MS = 45_000;
+/** powershell.exe start-up and Add-Type compile on top of the in-script wait. */
+const LAUNCH_SCRIPT_OVERHEAD_MS = 30_000;
+
 /**
- * Runs a launch script until it reports a real window handle, retrying on a
- * fresh process when the window never appears (slow STA/WPF startup on loaded
- * runners is the dominant flake mode). All spawned pids are returned so the
- * caller can clean up every attempt, including failed ones.
+ * Runs a launch script until it reports a real window handle. Each attempt
+ * polls for the window up to a deadline inside the script; a fresh process is
+ * started only when the window did not appear in time (slow STA/WPF startup on
+ * loaded runners is the dominant flake mode), and attempts stop at the overall
+ * deadline. All spawned pids are returned so the caller can clean up every
+ * attempt, including failed ones.
  */
 function launchWithRetry(
   script: string,
   env: Record<string, string>,
-  label: string,
-  attempts = 3
+  label: string
 ): { launch: Record<string, unknown>; pids: number[] } {
   const pids: number[] = [];
+  const started = Date.now();
   let launch: Record<string, unknown> = {};
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    launch = runPowerShell(script, env);
+  for (let attempt = 1; ; attempt += 1) {
+    const waitMs = Math.min(LAUNCH_ATTEMPT_WAIT_MS, LAUNCH_DEADLINE_MS - (Date.now() - started));
+    if (waitMs < 5_000) break;
+    launch = runPowerShell(
+      script,
+      { ...env, UIA_SMOKE_WAIT_MS: String(waitMs) },
+      waitMs + LAUNCH_SCRIPT_OVERHEAD_MS
+    );
     const attemptPids = pidsOf(launch);
     pids.push(...attemptPids);
     console.log(`[uia-smoke:${label}] launch attempt ${attempt}`, JSON.stringify(launch));
@@ -375,7 +421,7 @@ describe.skipIf(!LIVE)('os_accessibility live smoke on Windows (UI Automation)',
       killAll(pids);
       if (safeExistsSync(shotDir)) safeRmSync(shotDir);
     }
-  }, 180_000);
+  }, 240_000);
 
   it('finds the button, checkbox and text box of a WPF window', async () => {
     safeMkdir(shotDir, { recursive: true });
@@ -411,7 +457,7 @@ describe.skipIf(!LIVE)('os_accessibility live smoke on Windows (UI Automation)',
       killAll(pids);
       if (safeExistsSync(shotDir)) safeRmSync(shotDir);
     }
-  }, 180_000);
+  }, 240_000);
   it('clicks the WPF OK button through its mark with the DPI-aware pointer path', async () => {
     safeMkdir(shotDir, { recursive: true });
     const title = `Kyberion UIA click smoke ${process.pid}`;
@@ -505,5 +551,5 @@ describe.skipIf(!LIVE)('os_accessibility live smoke on Windows (UI Automation)',
       killAll(pids);
       if (safeExistsSync(shotDir)) safeRmSync(shotDir);
     }
-  }, 180_000);
+  }, 240_000);
 });
