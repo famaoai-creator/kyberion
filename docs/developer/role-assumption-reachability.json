@@ -93,6 +93,16 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/cloudflare-os-held-lifecycle.ts#prepareCancellation (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/cloudflare-os-held-lifecycle.ts#reconcileLinkedApprovals (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/co-session.ts#withCoSessionWrite",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
