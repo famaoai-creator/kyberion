@@ -15,7 +15,8 @@
       "requirements": {
         "env": ["KYBERION_ALLOW_FILE_SECRETS"],
         "env_platforms": ["linux"]
-      }
+      },
+      "effect": "read"
     },
     {
       "op": "set",
@@ -23,7 +24,8 @@
       "requirements": {
         "env": ["KYBERION_ALLOW_FILE_SECRETS"],
         "env_platforms": ["linux"]
-      }
+      },
+      "effect": "write"
     },
     {
       "op": "delete",
@@ -31,7 +33,8 @@
       "requirements": {
         "env": ["KYBERION_ALLOW_FILE_SECRETS"],
         "env_platforms": ["linux"]
-      }
+      },
+      "effect": "write"
     },
     {
       "op": "list",
@@ -39,7 +42,8 @@
       "requirements": {
         "env": ["KYBERION_ALLOW_FILE_SECRETS"],
         "env_platforms": ["linux"]
-      }
+      },
+      "effect": "read"
     }
   ]
 }

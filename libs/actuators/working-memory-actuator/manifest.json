@@ -12,77 +12,92 @@
     {
       "op": "note",
       "platforms": ["darwin", "linux", "win32"],
-      "description": "Append a note to a MEMORY.md face"
+      "description": "Append a note to a MEMORY.md face",
+      "effect": "write"
     },
     {
       "op": "set-now",
       "platforms": ["darwin", "linux", "win32"],
-      "description": "Overwrite the NOW section in a NOW.md face"
+      "description": "Overwrite the NOW section in a NOW.md face",
+      "effect": "write"
     },
     {
       "op": "add-action-item",
       "platforms": ["darwin", "linux", "win32"],
-      "description": "Add an action item to the ## Action Items section"
+      "description": "Add an action item to the ## Action Items section",
+      "effect": "write"
     },
     {
       "op": "complete-action-item",
       "platforms": ["darwin", "linux", "win32"],
-      "description": "Mark an action item as done (exact-match, end-anchored)"
+      "description": "Mark an action item as done (exact-match, end-anchored)",
+      "effect": "write"
     },
     {
       "op": "daily-open",
       "platforms": ["darwin", "linux", "win32"],
-      "description": "Initialize today's journal + today/TODO.md (personal/daily)"
+      "description": "Initialize today's journal + today/TODO.md (personal/daily)",
+      "effect": "write"
     },
     {
       "op": "todo-add",
       "platforms": ["darwin", "linux", "win32"],
-      "description": "Add a TODO item to today's personal TODO face"
+      "description": "Add a TODO item to today's personal TODO face",
+      "effect": "write"
     },
     {
       "op": "todo-done",
       "platforms": ["darwin", "linux", "win32"],
-      "description": "Mark a personal TODO item as done and sync to journal"
+      "description": "Mark a personal TODO item as done and sync to journal",
+      "effect": "write"
     },
     {
       "op": "todo-rollover",
       "platforms": ["darwin", "linux", "win32"],
-      "description": "Roll pending TODO items from current face into tomorrow"
+      "description": "Roll pending TODO items from current face into tomorrow",
+      "effect": "write"
     },
     {
       "op": "weekly-open",
       "platforms": ["darwin", "linux", "win32"],
-      "description": "Initialize the current week's weekly-review face"
+      "description": "Initialize the current week's weekly-review face",
+      "effect": "write"
     },
     {
       "op": "nominate-promotion",
       "platforms": ["darwin", "linux", "win32"],
-      "description": "Nominate a volatile face to the memory-promotion-queue"
+      "description": "Nominate a volatile face to the memory-promotion-queue",
+      "effect": "write"
     },
     {
       "op": "consolidation-status",
       "platforms": ["darwin", "linux", "win32"],
-      "description": "Report whether a volatile MEMORY.md has reached the consolidation threshold"
+      "description": "Report whether a volatile MEMORY.md has reached the consolidation threshold",
+      "effect": "read"
     },
     {
       "op": "run-gc",
       "platforms": ["darwin", "linux", "win32"],
-      "description": "Full GC pass: expire TTL faces, rollover daily TODO"
+      "description": "Full GC pass: expire TTL faces, rollover daily TODO",
+      "effect": "write"
     },
     {
       "op": "build-index",
       "platforms": ["darwin", "linux", "win32"],
-      "description": "Regenerate active/INDEX.volatile.{md,json}"
+      "description": "Regenerate active/INDEX.volatile.{md,json}",
+      "effect": "write"
     },
     {
       "op": "read",
       "platforms": ["darwin", "linux", "win32"],
-      "description": "Read a volatile face (Markdown + sidecar)"
+      "description": "Read a volatile face (Markdown + sidecar)",
+      "effect": "read"
     },
     {
       "op": "list",
       "platforms": ["darwin", "linux", "win32"],
-      "description": "List volatile faces from active/INDEX.volatile.json"
+      "description": "List volatile faces from active/INDEX.volatile.json",
+      "effect": "read"
     }
   ]
 }

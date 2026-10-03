@@ -9,8 +9,20 @@
     "retry_profile": "presence-actuator"
   },
   "capabilities": [
-    { "op": "dispatch", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "receive_event", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "dispatch_timeline", "platforms": ["darwin", "linux", "win32"] }
+    {
+      "op": "dispatch",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "receive_event",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "dispatch_timeline",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    }
   ]
 }

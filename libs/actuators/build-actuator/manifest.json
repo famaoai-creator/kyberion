@@ -12,7 +12,8 @@
     {
       "op": "scaffold_app",
       "schema_ref": "knowledge/product/schemas/build-pipeline.schema.json",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
     },
     {
       "op": "ios_generate_project",
@@ -21,8 +22,11 @@
       "prerequisites": {
         "binaries": ["xcodegen"],
         "platforms": ["darwin"],
-        "install": { "darwin": "brew install xcodegen" }
-      }
+        "install": {
+          "darwin": "brew install xcodegen"
+        }
+      },
+      "effect": "write"
     },
     {
       "op": "ios_build",
@@ -31,8 +35,11 @@
       "prerequisites": {
         "binaries": ["xcodebuild"],
         "platforms": ["darwin"],
-        "install": { "darwin": "Xcode を App Store から導入し xcode-select を設定" }
-      }
+        "install": {
+          "darwin": "Xcode を App Store から導入し xcode-select を設定"
+        }
+      },
+      "effect": "write"
     },
     {
       "op": "ios_test",
@@ -41,8 +48,11 @@
       "prerequisites": {
         "binaries": ["xcodebuild", "xcrun"],
         "platforms": ["darwin"],
-        "install": { "darwin": "Xcode を App Store から導入し xcode-select を設定" }
-      }
+        "install": {
+          "darwin": "Xcode を App Store から導入し xcode-select を設定"
+        }
+      },
+      "effect": "write"
     },
     {
       "op": "ios_archive",
@@ -51,8 +61,11 @@
       "prerequisites": {
         "binaries": ["xcodebuild"],
         "platforms": ["darwin"],
-        "install": { "darwin": "Xcode を App Store から導入し xcode-select を設定" }
-      }
+        "install": {
+          "darwin": "Xcode を App Store から導入し xcode-select を設定"
+        }
+      },
+      "effect": "write"
     },
     {
       "op": "android_build",
@@ -61,8 +74,11 @@
       "prerequisites": {
         "env": ["ANDROID_HOME"],
         "platforms": ["darwin", "linux", "win32"],
-        "install": { "darwin": "Android Studio / cmdline-tools を導入し ANDROID_HOME を設定" }
-      }
+        "install": {
+          "darwin": "Android Studio / cmdline-tools を導入し ANDROID_HOME を設定"
+        }
+      },
+      "effect": "write"
     },
     {
       "op": "android_test",
@@ -71,8 +87,11 @@
       "prerequisites": {
         "env": ["ANDROID_HOME"],
         "platforms": ["darwin", "linux", "win32"],
-        "install": { "darwin": "Android Studio / cmdline-tools を導入し ANDROID_HOME を設定" }
-      }
+        "install": {
+          "darwin": "Android Studio / cmdline-tools を導入し ANDROID_HOME を設定"
+        }
+      },
+      "effect": "write"
     },
     {
       "op": "android_bundle",
@@ -81,8 +100,11 @@
       "prerequisites": {
         "env": ["ANDROID_HOME"],
         "platforms": ["darwin", "linux", "win32"],
-        "install": { "darwin": "Android Studio / cmdline-tools を導入し ANDROID_HOME を設定" }
-      }
+        "install": {
+          "darwin": "Android Studio / cmdline-tools を導入し ANDROID_HOME を設定"
+        }
+      },
+      "effect": "write"
     }
   ]
 }

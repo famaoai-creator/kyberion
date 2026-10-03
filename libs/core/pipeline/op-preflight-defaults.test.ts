@@ -15,6 +15,7 @@ describe('default operation preflight waterfall', () => {
     ensureDefaultOpPreflight();
     expect(listOpPreflightListeners().map((entry) => entry.id)).toEqual([
       'core:scope',
+      'core:effect',
       'core:adf-guardrails',
       'core:provider-egress',
     ]);
@@ -54,5 +55,39 @@ describe('default operation preflight waterfall', () => {
     });
     expect(result.decision).toBe('block');
     expect(result.reason).toContain('graph-loop-without-bound');
+  });
+
+  it('stamps the declared manifest effect onto the input for downstream stages', async () => {
+    ensureDefaultOpPreflight();
+    const result = await runOpPreflight({
+      op: 'file:pipeline',
+      params: {},
+      source: 'actuator',
+    });
+    expect(result.decision).toBe('allow');
+    expect(result.listener_ids).toContain('core:effect');
+    expect((result as { input?: { _effect?: string } }).input?._effect).toBe('write');
+  });
+
+  it('refines egress declarations to read for read verbs via effect_from', async () => {
+    ensureDefaultOpPreflight();
+    const result = await runOpPreflight({
+      op: 'service:api',
+      params: { method: 'GET' },
+      source: 'actuator',
+    });
+    expect(result.decision).toBe('allow');
+    expect((result as { input?: { _effect?: string } }).input?._effect).toBe('read');
+  });
+
+  it('keeps the fail-safe write class for unknown ops', async () => {
+    ensureDefaultOpPreflight();
+    const result = await runOpPreflight({
+      op: 'custom:undeclared',
+      params: {},
+      source: 'actuator',
+    });
+    expect(result.decision).toBe('allow');
+    expect((result as { input?: { _effect?: string } }).input?._effect).toBe('write');
   });
 });

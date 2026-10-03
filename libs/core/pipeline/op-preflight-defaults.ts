@@ -30,11 +30,21 @@ import {
   securityScopeNarrowErrors,
 } from '../scope-envelope.js';
 import { validateScopeContext, type ScopeContextInput } from '../scope-context.js';
+import {
+  lookupOpCapability,
+  resolveCapabilityEffect,
+  resolveCapabilityResourceRef,
+} from '../actuator/actuator-manifest-index.js';
 import type { TierLevel } from '../types.js';
 
 const TIER_VALUES = new Set<TierLevel>(['public', 'confidential', 'personal']);
 
-const DEFAULT_LISTENER_IDS = ['core:scope', 'core:adf-guardrails', 'core:provider-egress'] as const;
+const DEFAULT_LISTENER_IDS = [
+  'core:scope',
+  'core:effect',
+  'core:adf-guardrails',
+  'core:provider-egress',
+] as const;
 const DEFAULT_GUARD_IDS = ['core:spend'] as const;
 
 type RecordLike = Record<string, unknown>;
@@ -201,21 +211,36 @@ function isReasoningCall(call: OpPreflightCall): boolean {
   );
 }
 
+/**
+ * SC-02: resolve the op's declared effect class and stamp it onto the input
+ * so downstream stages (introduction, observation, egress) and the executing
+ * op can read it. Undeclared ops resolve to 'write' — the fail-safe class.
+ */
+function effectResult(call: OpPreflightCall, input: RecordLike): OpPreflightListenerResult | void {
+  const capability = lookupOpCapability(call.op);
+  const effect = capability ? resolveCapabilityEffect(capability, input) : 'write';
+  const resourceRef = capability ? resolveCapabilityResourceRef(capability, input) : undefined;
+  return {
+    repaired_input: {
+      _effect: effect,
+      ...(resourceRef ? { _resource_ref: resourceRef } : {}),
+    },
+  };
+}
+
 /** Install the standard listeners after a test/worker reset or during boot. */
 export function ensureDefaultOpPreflight(): void {
   const listenerIds = new Set(listOpPreflightListeners().map((listener) => listener.id));
-  if (!listenerIds.has(DEFAULT_LISTENER_IDS[0])) {
-    registerOpPreflightListener({ id: DEFAULT_LISTENER_IDS[0], order: 100, run: scopeResult });
-  }
-  if (!listenerIds.has(DEFAULT_LISTENER_IDS[1])) {
-    registerOpPreflightListener({ id: DEFAULT_LISTENER_IDS[1], order: 110, run: adfResult });
-  }
-  if (!listenerIds.has(DEFAULT_LISTENER_IDS[2])) {
-    registerOpPreflightListener({
-      id: DEFAULT_LISTENER_IDS[2],
-      order: 120,
-      run: providerEgressResult,
-    });
+  const registrations: { id: string; order: number; run: typeof scopeResult }[] = [
+    { id: DEFAULT_LISTENER_IDS[0], order: 100, run: scopeResult },
+    { id: DEFAULT_LISTENER_IDS[1], order: 110, run: effectResult },
+    { id: DEFAULT_LISTENER_IDS[2], order: 120, run: adfResult },
+    { id: DEFAULT_LISTENER_IDS[3], order: 130, run: providerEgressResult },
+  ];
+  for (const registration of registrations) {
+    if (!listenerIds.has(registration.id)) {
+      registerOpPreflightListener(registration);
+    }
   }
 
   const guardIds = new Set(listOpGuards().map((guard) => guard.id));

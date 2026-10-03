@@ -11,22 +11,26 @@
     {
       "op": "submit_job",
       "description": "Submits a compute contract (job specification, entry script/notebook, input payloads) to the resolved compute execution provider (local or colab).",
-      "platforms": ["darwin", "linux"]
+      "platforms": ["darwin", "linux"],
+      "effect": "egress"
     },
     {
       "op": "poll_status",
       "description": "Checks execution status, duration, and output telemetry of an active or finished compute job.",
-      "platforms": ["darwin", "linux"]
+      "platforms": ["darwin", "linux"],
+      "effect": "read"
     },
     {
       "op": "collect_artifact",
       "description": "Reconciles and lands generated artifacts from the compute scratch location into governed tenant storage paths.",
-      "platforms": ["darwin", "linux"]
+      "platforms": ["darwin", "linux"],
+      "effect": "read"
     },
     {
       "op": "cancel_job",
       "description": "Cancels an in-flight compute job to conserve resources and compute units.",
-      "platforms": ["darwin", "linux"]
+      "platforms": ["darwin", "linux"],
+      "effect": "egress"
     }
   ]
 }
