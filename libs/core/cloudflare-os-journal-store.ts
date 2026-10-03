@@ -3,6 +3,7 @@ import { auditChain } from './governance/audit-chain.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import {
   appendJournalEventLocked,
+  appendJournalEventLockedIf,
   controlPlaneNamespaceFor,
   controlPlaneRuntimeRoot,
   controlPlaneSnapshotPath,
@@ -35,6 +36,8 @@ import {
  * grouping, locked appends, migration, and replay — never the record shapes.
  */
 export interface ControlPlaneJournalHost {
+  /** The held record for an id in the in-memory projection. */
+  heldRecord(id: string): Record<string, unknown> | undefined;
   /** Fold one journal event into the in-memory projection. */
   applyJournalEvent(event: ControlPlaneJournalEvent): void;
   /** Serializable record for a collection entry (strips executors). */
@@ -104,6 +107,43 @@ export class ControlPlaneJournalStore {
         );
       }
     }
+  }
+
+  /**
+   * Claim the single execution of an approved held action. Under the
+   * namespace journal lock the projection is caught up first, then the claim
+   * is appended only if the record is still `approved` and unclaimed — so of
+   * any number of processes racing to apply, exactly one wins. A claim is
+   * never released automatically: a crash after the claim leaves the effect's
+   * outcome unknown, and re-running it could duplicate a side effect.
+   */
+  claimHeldApply(id: string, by: string): boolean {
+    const initial = this.host.heldRecord(id);
+    if (!initial) return false;
+    const envelope = currentScopeEnvelope();
+    const namespace = controlPlaneNamespaceFor(
+      'held',
+      this.host.serializedJournalRecord('held', initial),
+      envelope
+    );
+    let won = false;
+    const { seq } = appendJournalEventLockedIf(
+      namespace,
+      this.appliedSeq.get(namespace.dir) ?? 0,
+      (tail) => {
+        for (const event of tail) this.host.applyJournalEvent(event);
+      },
+      () => {
+        const current = this.host.heldRecord(id);
+        if (!current || current.status !== 'approved' || current.applyClaim) return null;
+        current.applyClaim = { by, at: new Date().toISOString() };
+        won = true;
+        return { kind: 'held', records: [this.host.serializedJournalRecord('held', current)] };
+      }
+    );
+    this.appliedSeq.set(namespace.dir, seq);
+    if (won) this.writeNamespaceSnapshot(namespace);
+    return won;
   }
 
   /** Rebuild state from every namespace journal after legacy migration. */
