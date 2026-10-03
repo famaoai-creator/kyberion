@@ -6456,7 +6456,7 @@
       "cli_help_speak": {
         "en": "  speak <text>         Speak text locally or write audio; --stream accepts repeated --segment and --device selects CoreAudio output (--out, --voice, --engine, --lang, --rate, --json)",
         "ja": "  speak <text>         ローカルで読み上げるか音声ファイルに出力。--stream は --segment を複数指定し、--device で CoreAudio 出力先を選択(--out, --voice, --engine, --lang, --rate, --json)",
-        "qps-ploc": "⟦  şṗėȧķ <ŧėẋŧ>         Şṗėȧķ ŧėẋŧ ŀőƈȧŀŀẏ őř ẇřïŧė ȧůḓïő; --şŧřėȧɱ ȧƈƈėṗŧş řėṗėȧŧėḓ --şėɠɱėñŧ ȧñḓ --ḓėṽïƈė şėŀėƈŧş ƇőřėȦůḓïő őůŧṗůŧ (--őůŧ, --ṽőïƈė, --ėñɠïñė, --ŀȧñɠ, --řȧŧė, --ĵşőñ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+        "qps-ploc": "⟦  şṗėȧķ <ŧėẋŧ>         Şṗėȧķ ŧėẋŧ ŀőƈȧŀŀẏ őř ẇřïŧė ȧůḓïő; --şŧřėȧɱ ȧƈƈėṗŧş řėṗėȧŧėḓ --şėɠɱėñŧ ȧñḓ --ḓėṽïƈė şėŀėƈŧş ƇőřėȦůḓïő őůŧṗůŧ (--őůŧ, --ṽőïƈė, --ėñɠïñė, --ŀȧñɠ, --řȧŧė, --ĵşőñ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
       "cli_help_draw": {
         "en": "  draw <prompt>        Generate an image, local providers by default (--out, --ref, --allow-cloud, --allow-handoff, --dry-run)",
