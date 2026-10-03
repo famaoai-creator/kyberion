@@ -85,7 +85,7 @@ export function getOsSurfaceAccess(): CloudflareOsSurfaceAccess {
 
 export function getCloudflareOsSnapshot(missionId?: string): CloudflareOsSurfaceSnapshot {
   return new CloudflareOsReadOnlySurface(
-    new CloudflareOsSurface(getControlPlaneForScope())
+    new CloudflareOsSurface(getControlPlaneForScope(undefined, { auditRestoreFailures: false }))
   ).snapshot(missionId, getOsSurfaceAccess());
 }
 
