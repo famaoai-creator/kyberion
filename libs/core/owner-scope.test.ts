@@ -15,6 +15,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 let tmpRoot: string;
+let missionPathOrNull: typeof import('./mission-lookup.js').missionPathOrNull;
 let scope: typeof import('./owner-scope.js');
 let projects: typeof import('./project/project-registry.js');
 let executionScope: typeof import('./foundation/execution-scope.js');
@@ -274,6 +275,7 @@ describe('resolveOwnerScope', () => {
   it('backs findMissionPath and loadState with the resolver (S7)', async () => {
     const { findMissionPath } = await import('./path-resolver.js');
     const { loadState } = await import('./mission/mission-state.js');
+    ({ missionPathOrNull } = await import('./mission-lookup.js'));
     // A tenant-partitioned mission is found without the process tenant set.
     expect(findMissionPath('MSN-OWN-ACME')).toBe(
       path.join(tmpRoot, 'active/missions/confidential/acme/MSN-OWN-ACME')
@@ -288,6 +290,8 @@ describe('resolveOwnerScope', () => {
     // A canonical directory whose state the resolver will not hand to this
     // identity fails closed (a null would let a caller create a second copy).
     expect(() => findMissionPath('MSN-OWN-BROKEN')).toThrow(/\[OWNER_NOT_VISIBLE\]/);
+    expect(() => missionPathOrNull(findMissionPath, 'MSN-OWN-BROKEN')).not.toThrow();
+    expect(missionPathOrNull(findMissionPath, 'MSN-OWN-BROKEN')).toBeNull();
     expect(loadState('MSN-OWN-ACME')).toBeNull();
     delete process.env.KYBERION_TENANT;
     // A pre-materialized mission (directory, no state yet) is still found.
