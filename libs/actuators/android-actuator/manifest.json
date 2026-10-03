@@ -21,7 +21,8 @@
           "darwin": "Android Studio または cmdline-tools を導入し ANDROID_HOME を設定",
           "linux": "Android cmdline-tools を導入し ANDROID_HOME を設定"
         }
-      }
+      },
+      "effect": "write"
     }
   ]
 }

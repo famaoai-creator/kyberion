@@ -154,6 +154,19 @@
           "implemented": {
             "type": "boolean",
             "description": "Set false when the op is declared but not implemented yet (AC-01/AC-06). Probes report available:false with reason not_implemented."
+          },
+          "effect": {
+            "type": "string",
+            "enum": ["read", "write", "egress", "none"],
+            "description": "SC-02: declared side-effect class of the op. read = observation only; write = local mutation; egress = data leaves the trust boundary; none = pure control. Undeclared defaults to write (fail-safe)."
+          },
+          "effect_from": {
+            "type": "string",
+            "description": "Input path (e.g. \"method\" or \"params.method\") whose value refines the declared effect. GET/list/read verbs downgrade egress-capable calls to read; everything else keeps the declared effect."
+          },
+          "resource_ref_from": {
+            "type": "string",
+            "description": "Input path identifying the governed resource ref for introduction/observation stages (e.g. \"params.path\", \"target.url\")."
           }
         }
       }

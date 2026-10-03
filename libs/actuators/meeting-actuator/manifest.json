@@ -9,11 +9,35 @@
     "retry_profile": "meeting-actuator"
   },
   "capabilities": [
-    { "op": "join", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "leave", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "speak", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "listen", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "chat", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "status", "platforms": ["darwin", "linux", "win32"] }
+    {
+      "op": "join",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "leave",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "speak",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "listen",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "chat",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "status",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    }
   ]
 }

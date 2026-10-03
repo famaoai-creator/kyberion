@@ -13,18 +13,21 @@
     {
       "op": "anchor_mission",
       "platforms": ["darwin", "linux", "win32"],
-      "requirements": {}
+      "requirements": {},
+      "effect": "write"
     },
     {
       "op": "anchor_trust",
       "platforms": ["darwin", "linux", "win32"],
-      "requirements": {}
+      "requirements": {},
+      "effect": "write"
     },
     {
       "op": "verify_anchor",
       "platforms": ["darwin", "linux", "win32"],
       "requirements": {},
-      "implemented": false
+      "implemented": false,
+      "effect": "read"
     }
   ]
 }

@@ -9,11 +9,35 @@
     "retry_profile": "approval-actuator"
   },
   "capabilities": [
-    { "op": "create", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "load", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "decide", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "list_pending", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "evaluate_decision_rights", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "request_review", "platforms": ["darwin", "linux", "win32"] }
+    {
+      "op": "create",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "load",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "decide",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "list_pending",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "evaluate_decision_rights",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "request_review",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    }
   ]
 }
