@@ -1,12 +1,8 @@
 import { timingSafeEqual, randomUUID } from 'node:crypto';
-import { fromJSONSchema, z } from 'zod';
+import { z } from 'zod';
 import { auditChain } from './governance/audit-chain.js';
-import {
-  computeApprovalPayloadHash,
-  createApprovalRequest,
-  decideApprovalRequest,
-} from './governance/approval-store.js';
-import type { GovernedArtifactRole } from './workforce/artifact-store.js';
+import { computeApprovalPayloadHash, decideApprovalRequest } from './governance/approval-store.js';
+import { fileHeldApprovalRequest } from './governance/held-approval-request.js';
 import type {
   HeldActionApprovalLink,
   HeldActionSteeringSpec,
@@ -16,11 +12,16 @@ import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
   applyControlPlaneJournalEvent,
+  declassificationKeyOf,
+  deserializeGadgetOperation,
+  gadgetSchemaToJsonSchema,
   loadPersistedControlPlaneStateAtPath,
   restoredHeldActionRecord,
   serializableHeldActionRecord,
+  serializeGadgetRecord,
   validatePersistedControlPlaneStateAtPath,
   type ControlPlaneJournalCollections,
+  type DeclassificationGrant,
   type PersistedControlPlaneState,
 } from './cloudflare-os-control-plane-state.js';
 import {
@@ -40,7 +41,7 @@ import {
   safeWriteFile,
   safeExecResult,
 } from './secure-io.js';
-import { projectProvenanceTaint } from './provenance-taint.js';
+import { evaluateProvenanceEgress, projectProvenanceTaint } from './provenance-taint.js';
 
 /**
  * Kyberion's portable control-plane contracts adopted from the Cloudflare OS
@@ -305,8 +306,6 @@ export interface CloudflareOsControlPlaneOptions {
   auditRestoreFailures?: boolean;
 }
 
-const TIER_RANK: Record<OsKnowledgeTier, number> = { public: 0, confidential: 1, personal: 2 };
-
 function actor(input?: string): string {
   return input?.trim() || getRegisteredEnvText('KYBERION_PERSONA') || 'cloudflare-os-control-plane';
 }
@@ -324,12 +323,6 @@ function assertNonEmpty(value: string, label: string): string {
   const normalized = String(value || '').trim();
   if (!normalized) throw new Error(`[POLICY_VIOLATION] ${label} is required`);
   return normalized;
-}
-
-function schemaToJsonSchema(schema: z.ZodType): Record<string, unknown> {
-  const jsonSchema = z.toJSONSchema(schema) as Record<string, unknown>;
-  delete jsonSchema.$schema;
-  return jsonSchema;
 }
 
 function assertHumanActor(value: string): string {
@@ -358,6 +351,7 @@ export class CloudflareOsControlPlane {
   private readonly capabilities = new Map<string, CapabilityEdge>();
   private readonly threadCapabilities = new Map<string, Set<string>>();
   private readonly blueprints = new Map<string, BlueprintContract>();
+  private readonly declassifications = new Map<string, DeclassificationGrant>();
   private readonly gadgetOperations = new Map<
     string,
     Map<string, GadgetOperationDefinition<any, any>>
@@ -469,50 +463,13 @@ export class CloudflareOsControlPlane {
 
   /**
    * SC-04: file the linked approval-store request steering `held_effect`.
-   * The request — not the held record — becomes the decision of record;
-   * the held record keeps the link so every decision path converges.
+   * The request — not the held record — becomes the decision of record.
    */
   private createHeldApprovalRequest(
     record: HeldActionRecord,
     spec: HeldActionSteeringSpec
   ): HeldActionApprovalLink {
-    const role: GovernedArtifactRole = 'mission_controller';
-    const request = createApprovalRequest(role, {
-      channel: spec.channel,
-      storageChannel: spec.storageChannel || spec.channel,
-      threadTs: spec.threadTs,
-      correlationId: spec.correlationId,
-      requestedBy: spec.requestedBy,
-      draft: {
-        title: spec.title,
-        summary: spec.summary,
-        details: `held_effect ${record.op} (${record.id})`,
-        severity: 'medium',
-      },
-      scope: {
-        mission_id: record.missionId,
-        ...(record.taskId ? { task_id: record.taskId } : {}),
-        ...(record.tenantSlug ? { tenant_slug: record.tenantSlug } : {}),
-      },
-      steering: {
-        kind: 'held_effect',
-        heldActionId: record.id,
-        op: record.op,
-        effectBinding: record.effectBinding,
-        payloadHash: record.payloadHash,
-        missionId: record.missionId,
-        tenantSlug: record.tenantSlug,
-        surface: spec.surface,
-        channel: spec.channel,
-        threadTs: spec.threadTs,
-        correlationId: spec.correlationId,
-      },
-    });
-    return {
-      requestId: request.id,
-      storageChannel: request.storageChannel,
-      role,
-    };
+    return fileHeldApprovalRequest(record, spec);
   }
 
   decideHeldAction(
@@ -708,6 +665,61 @@ export class CloudflareOsControlPlane {
     return record;
   }
 
+  /**
+   * SC-06: hash-bound declassify — a held effect that, once approved and
+   * applied, lets exactly one artifact (payloadHash) egress to a declared
+   * audience/tenant despite mission taint. The mission's taint itself is
+   * never lowered.
+   */
+  requestDeclassify(
+    input: Omit<DeclassificationGrant, 'id' | 'grantedAt' | 'grantedBy'> & {
+      requestedBy: string;
+    }
+  ): HeldActionRecord {
+    let record!: HeldActionRecord;
+    record = this.submitHeldAction({
+      missionId: input.missionId,
+      tenantSlug: input.tenantSlug,
+      submittedBy: input.requestedBy,
+      op: 'control_plane:declassify',
+      params: input,
+      simulatable: false,
+      apply: () => {
+        const grant: DeclassificationGrant = {
+          ...input,
+          id: randomUUID(),
+          grantedBy: assertHumanActor(record.resolvedBy || ''),
+          grantedAt: nowIso(),
+        };
+        this.declassifications.set(declassificationKeyOf(grant), grant);
+        audit(
+          'declassification',
+          'grant',
+          'completed',
+          grant as unknown as Record<string, unknown>
+        );
+        this.recordMutation('declassification', grant as unknown as Record<string, unknown>);
+        return grant;
+      },
+    });
+    return record;
+  }
+
+  /**
+   * SC-06: does an applied declassify grant cover this exact artifact +
+   * destination? Hash-bound — any content change re-denies.
+   */
+  isDeclassified(
+    missionId: string,
+    payloadHash: string,
+    targetAudience: string,
+    targetTenant?: string
+  ): boolean {
+    const key = declassificationKeyOf({ payloadHash, targetAudience, targetTenant });
+    const grant = this.declassifications.get(key);
+    return Boolean(grant && grant.missionId === missionId);
+  }
+
   revokeIntroduction(id: string, revokedBy: string): void {
     const entry = this.introductions.get(id);
     if (!entry) throw new Error(`Resource introduction not found: ${id}`);
@@ -772,18 +784,15 @@ export class CloudflareOsControlPlane {
     targetTenant?: string
   ): void {
     const taint = this.projectTaint(missionId);
-    const missingTenant = taint.tenants.length > 0 && !targetTenant;
-    const wrongTenant = Boolean(
-      targetTenant && taint.tenants.length > 0 && !taint.tenants.includes(targetTenant)
-    );
-    const denied =
-      targetAudience === 'external'
-        ? true
-        : Boolean(
-            missingTenant || wrongTenant || TIER_RANK[targetAudience] < TIER_RANK[taint.highestTier]
-          );
-    if (denied) {
-      audit('provenance', 'egress', 'denied', { missionId, targetAudience, targetTenant, taint });
+    const verdict = evaluateProvenanceEgress(taint, targetAudience, targetTenant);
+    if (!verdict.allowed) {
+      audit('provenance', 'egress', 'denied', {
+        missionId,
+        targetAudience,
+        targetTenant,
+        taint,
+        reason: verdict.reason,
+      });
       throw new Error(
         `[POLICY_VIOLATION] Egress denied by provenance taint for mission ${missionId}`
       );
@@ -987,8 +996,8 @@ export class CloudflareOsControlPlane {
       return {
         name,
         description: operation.description,
-        inputSchema: schemaToJsonSchema(operation.inputSchema),
-        outputSchema: schemaToJsonSchema(operation.outputSchema),
+        inputSchema: gadgetSchemaToJsonSchema(operation.inputSchema),
+        outputSchema: gadgetSchemaToJsonSchema(operation.outputSchema),
         effect: operation.effect,
         capabilityResource: operation.capabilityResource,
         introduction: operation.introduction,
@@ -1011,7 +1020,13 @@ export class CloudflareOsControlPlane {
       historyRef: `mission-git:${input.id}`,
     };
     this.gadgetManifests.set(input.id, manifest);
-    this.recordMutation('gadget', this.serializedGadget(input.id));
+    this.recordMutation(
+      'gadget',
+      serializeGadgetRecord(
+        this.gadgetManifests.get(input.id) as GadgetManifest,
+        this.gadgetOperations.get(input.id)
+      )
+    );
     return manifest;
   }
 
@@ -1052,8 +1067,8 @@ export class CloudflareOsControlPlane {
       .map((operation) => ({
         name: operation.name,
         description: operation.description,
-        inputSchema: schemaToJsonSchema(operation.inputSchema),
-        outputSchema: schemaToJsonSchema(operation.outputSchema),
+        inputSchema: gadgetSchemaToJsonSchema(operation.inputSchema),
+        outputSchema: gadgetSchemaToJsonSchema(operation.outputSchema),
         effect: operation.effect,
         capabilityResource: operation.capabilityResource,
         introduction: operation.introduction,
@@ -1287,11 +1302,7 @@ export class CloudflareOsControlPlane {
   }
 
   private deserializeGadgetOperation(operation: Record<string, unknown>) {
-    return {
-      ...operation,
-      inputSchema: fromJSONSchema(operation.inputSchema as Parameters<typeof fromJSONSchema>[0]),
-      outputSchema: fromJSONSchema(operation.outputSchema as Parameters<typeof fromJSONSchema>[0]),
-    } as GadgetOperationDefinition<any, any>;
+    return deserializeGadgetOperation(operation);
   }
 
   private journalCollections(): ControlPlaneJournalCollections {
@@ -1303,35 +1314,15 @@ export class CloudflareOsControlPlane {
       capabilities: this.capabilities,
       threadCapabilities: this.threadCapabilities,
       blueprints: this.blueprints,
+      declassifications: this.declassifications,
       network: this.network,
       observationAggregates: this.observationAggregates,
       gadgets: {
         manifests: this.gadgetManifests,
         capabilitySubjects: this.gadgetCapabilitySubjects,
         operations: this.gadgetOperations,
-        deserializeOperation: (operation) => this.deserializeGadgetOperation(operation),
+        deserializeOperation: (operation) => deserializeGadgetOperation(operation),
       },
-    };
-  }
-
-  private serializedGadget(manifestId: string): Record<string, unknown> {
-    const manifest = this.gadgetManifests.get(manifestId);
-    const operations = this.gadgetOperations.get(manifestId);
-    return {
-      manifest,
-      operations: operations
-        ? [...operations.values()].map((operation) => ({
-            name: operation.name,
-            description: operation.description,
-            inputSchema: schemaToJsonSchema(operation.inputSchema),
-            outputSchema: schemaToJsonSchema(operation.outputSchema),
-            effect: operation.effect,
-            capabilityResource: operation.capabilityResource,
-            introduction: operation.introduction,
-            observation: operation.observation,
-            governedCode: operation.governedCode,
-          }))
-        : [],
     };
   }
 
@@ -1380,26 +1371,12 @@ export class CloudflareOsControlPlane {
         ])
       ),
       blueprints: [...this.blueprints.values()],
+      declassifications: [...this.declassifications.values()],
       network: [...this.network],
       gadgets: [...this.gadgetManifests.values()].flatMap((manifest) => {
         const operations = this.gadgetOperations.get(manifest.id);
         if (!operations) return [];
-        return [
-          {
-            manifest,
-            operations: [...operations.values()].map((operation) => ({
-              name: operation.name,
-              description: operation.description,
-              inputSchema: schemaToJsonSchema(operation.inputSchema),
-              outputSchema: schemaToJsonSchema(operation.outputSchema),
-              effect: operation.effect,
-              capabilityResource: operation.capabilityResource,
-              introduction: operation.introduction,
-              observation: operation.observation,
-              governedCode: operation.governedCode,
-            })),
-          },
-        ];
+        return [serializeGadgetRecord(manifest, operations)];
       }),
     };
   }
@@ -1431,6 +1408,9 @@ export class CloudflareOsControlPlane {
         this.threadCapabilities.set(threadId, new Set(capabilities));
       }
       for (const blueprint of state.blueprints || []) this.blueprints.set(blueprint.id, blueprint);
+      for (const grant of state.declassifications || []) {
+        this.declassifications.set(declassificationKeyOf(grant), grant);
+      }
       for (const gadget of state.gadgets || []) {
         applyControlPlaneJournalEvent(this.journalCollections(), {
           kind: 'gadget',

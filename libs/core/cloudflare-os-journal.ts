@@ -40,7 +40,8 @@ export type ControlPlaneCollection =
   | 'thread_capability'
   | 'blueprint'
   | 'network'
-  | 'gadget';
+  | 'gadget'
+  | 'declassification';
 
 /** Collections that grow by appending rather than keyed upsert. */
 export const APPEND_COLLECTIONS: ReadonlySet<ControlPlaneCollection> = new Set([

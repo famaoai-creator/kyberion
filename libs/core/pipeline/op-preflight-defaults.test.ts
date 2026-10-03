@@ -18,6 +18,7 @@ describe('default operation preflight waterfall', () => {
       'core:effect',
       'core:introduction',
       'core:taint',
+      'core:provenance-egress',
       'core:adf-guardrails',
       'core:provider-egress',
     ]);

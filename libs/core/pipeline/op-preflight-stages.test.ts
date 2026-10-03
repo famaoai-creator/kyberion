@@ -5,6 +5,7 @@ import { safeMkdir } from '../secure-io.js';
 import { auditChain } from '../governance/audit-chain.js';
 import {
   introductionResult,
+  provenanceEgressResult,
   recordOpObservation,
   resetOpPreflightStagesForTests,
   setOpPreflightRolloutForTests,
@@ -133,6 +134,123 @@ describe('taintResult', () => {
 
   it('ignores non-egress ops', () => {
     expect(taintResult(call('file:pipeline'), { _effect: 'read' })).toBeUndefined();
+  });
+});
+
+describe('provenanceEgressResult (SC-06)', () => {
+  const observe = (tier: 'public' | 'confidential' | 'personal', tenantSlug = 'tenant-a') =>
+    sharedControlPlane().recordObservation({
+      missionId: 'mission-s5',
+      service: 'github',
+      resourceRef: 'repo:x',
+      tier,
+      tenantSlug,
+      purpose: 'p',
+      summary: 's',
+    });
+
+  const egressInput = (overrides: Record<string, unknown> = {}) => ({
+    _effect: 'egress',
+    security_scope: scoped,
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    setOpPreflightRolloutForTests({ stages: { egress: { default: 'enforce' } } });
+  });
+
+  it('denies a public-audience egress after a confidential observation', () => {
+    observe('confidential');
+    const result = provenanceEgressResult(
+      call('export:publish'),
+      egressInput({ target_audience: 'public', target_tenant: 'tenant-a' })
+    );
+    expect(result?.decision).toBe('block');
+  });
+
+  it('denies egress to an unobserved tenant', () => {
+    observe('confidential');
+    const result = provenanceEgressResult(
+      call('export:publish'),
+      egressInput({ target_audience: 'confidential', target_tenant: 'tenant-b' })
+    );
+    expect(result?.decision).toBe('block');
+  });
+
+  it('denies the external audience outright', () => {
+    observe('public');
+    const result = provenanceEgressResult(
+      call('export:publish'),
+      egressInput({ target_audience: 'external', target_tenant: 'tenant-a' })
+    );
+    expect(result?.decision).toBe('block');
+  });
+
+  it('passes an untainted mission', () => {
+    expect(
+      provenanceEgressResult(
+        call('export:publish'),
+        egressInput({ target_audience: 'confidential', target_tenant: 'tenant-a' })
+      )
+    ).toBeUndefined();
+  });
+
+  it('lets a declassified payloadHash through — and only that hash', async () => {
+    observe('confidential');
+    const held = sharedControlPlane().requestDeclassify({
+      missionId: 'mission-s5',
+      tenantSlug: 'tenant-a',
+      artifactRef: 'report:v1',
+      payloadHash: 'hash-report-v1',
+      targetAudience: 'public',
+      targetTenant: 'tenant-a',
+      requestedBy: 'agent:x',
+    });
+    sharedControlPlane().decideHeldAction(held.id, 'approved', {
+      resolvedBy: 'human:famao',
+      decidedByType: 'human',
+      authenticated: true,
+      payloadHash: held.payloadHash,
+      effectBinding: held.effectBinding,
+    });
+    await sharedControlPlane().applyHeldAction(held.id);
+    expect(
+      sharedControlPlane().isDeclassified('mission-s5', 'hash-report-v1', 'public', 'tenant-a')
+    ).toBe(true);
+
+    // The bound artifact passes…
+    expect(
+      provenanceEgressResult(
+        call('export:publish'),
+        egressInput({
+          target_audience: 'public',
+          target_tenant: 'tenant-a',
+          payload_hash: 'hash-report-v1',
+        })
+      )
+    ).toBeUndefined();
+    // …but a changed payload (different hash) is denied again.
+    expect(
+      provenanceEgressResult(
+        call('export:publish'),
+        egressInput({
+          target_audience: 'public',
+          target_tenant: 'tenant-a',
+          payload_hash: 'hash-report-v2',
+        })
+      )?.decision
+    ).toBe('block');
+  });
+
+  it('warns without blocking in warn rollout mode', () => {
+    setOpPreflightRolloutForTests({ stages: { egress: { default: 'warn' } } });
+    observe('personal');
+    expect(
+      provenanceEgressResult(
+        call('export:publish'),
+        egressInput({ target_audience: 'public', target_tenant: 'tenant-a' })
+      )
+    ).toBeUndefined();
   });
 });
 
