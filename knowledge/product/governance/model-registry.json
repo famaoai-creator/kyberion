@@ -32,6 +32,34 @@
       "notes": "GPT-6 Astra is available in Codex for complex end-to-end work; flagship model for highest-complexity reasoning and coding."
     },
     {
+      "model_id": "openai:gpt-6.1-sol",
+      "provider": "openai",
+      "family": "gpt-6.1",
+      "status": "approved",
+      "tier": "large",
+      "execution_tier": "deep",
+      "role_fit": {
+        "intent_compiler": "primary",
+        "surface_agent": "primary",
+        "analysis": "primary",
+        "coding": "primary"
+      },
+      "cost_band": "high",
+      "latency_band": "medium",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": [
+        "agentic_coding",
+        "tool_use",
+        "computer_use",
+        "multi_step_reasoning",
+        "ultra_reasoning"
+      ],
+      "notes": "GPT-6.1 Sol; available in Codex and API. Near-Astra performance for complex coding and computer-use work at Sol pricing."
+    },
+    {
       "model_id": "openai:gpt-6-sol",
       "provider": "openai",
       "family": "gpt-6",
@@ -250,6 +278,33 @@
       "reasoning_confidence": "high",
       "capability_tags": ["agentic_coding", "tool_use", "multi_step_reasoning", "deep_reasoning"],
       "notes": "Previous-generation Opus, still served. Retained as the pin/fallback target for claude-opus-5 (including refusal fallbacks)."
+    },
+    {
+      "model_id": "anthropic:claude-sonnet-5-5",
+      "provider": "anthropic",
+      "family": "claude-sonnet",
+      "status": "approved",
+      "tier": "standard",
+      "execution_tier": "standard",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "primary",
+        "analysis": "primary",
+        "coding": "primary"
+      },
+      "cost_band": "medium",
+      "latency_band": "low",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": [
+        "agentic_coding",
+        "balanced_reasoning",
+        "tool_use",
+        "image_understanding"
+      ],
+      "notes": "Claude Sonnet 5.5 (claude-sonnet-5-5); faster and more cost-efficient than Sonnet 5 for everyday work, coding, and document creation."
     },
     {
       "model_id": "anthropic:claude-sonnet-5",
