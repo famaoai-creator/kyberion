@@ -2,6 +2,15 @@ import { timingSafeEqual, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { auditChain } from './governance/audit-chain.js';
 import { computeApprovalPayloadHash, decideApprovalRequest } from './governance/approval-store.js';
+import {
+  collectCascadeCancellations,
+  dependencyReadiness,
+  drainApprovable,
+  persistWithRetry,
+  prepareCancellation,
+  reconcilePlane,
+  requestDeclassify as requestDeclassifyGrant,
+} from './cloudflare-os-held-lifecycle.js';
 import { resolveProvisionalReferences, summarizeHeldAction } from './cloudflare-os-held-support.js';
 import { createHeldApprovalRequest } from './governance/held-effect-request.js';
 import {
@@ -466,6 +475,7 @@ export class CloudflareOsControlPlane {
   }
 
   listHeldActionSummaries(missionId?: string): HeldActionSummary[] {
+    this.reconcileLinkedApprovals();
     return this.listHeldActions(missionId).map(summarizeHeldAction);
   }
 
@@ -556,15 +566,12 @@ export class CloudflareOsControlPlane {
   }
 
   async drainHeldActions(missionId: string): Promise<HeldActionRecord[]> {
+    this.reconcileLinkedApprovals();
     this.approveEligibleHeldActions(missionId);
-    const applied: HeldActionRecord[] = [];
-    for (const record of this.listHeldActions(missionId)) {
-      if (record.status !== 'approved') continue;
-      const appliedRecord = await this.applyHeldAction(record.id);
-      applied.push(appliedRecord);
-      if (appliedRecord.status === 'failed') break;
-    }
-    return applied;
+    return drainApprovable({
+      list: () => this.listHeldActions(missionId),
+      apply: (id) => this.applyHeldAction(id),
+    });
   }
 
   async applyHeldAction(id: string): Promise<HeldActionRecord> {
@@ -592,6 +599,11 @@ export class CloudflareOsControlPlane {
       throw new Error(`[POLICY_VIOLATION] Held action ${id} is not approved`);
     const by = assertNonEmpty(record.resolvedBy || '', 'resolvedBy');
     record.resolvedBy = by;
+    // A dependent runs only after its dependencies were applied; one whose
+    // dependency can never be applied is cancelled instead of waiting forever.
+    const dependencies = dependencyReadiness(record, (depId) => this.held.get(depId));
+    if (dependencies === 'dead') return this.settleCancelled(record, 'dependency_not_applied');
+    if (dependencies === 'wait') return this.deferApply(record, 'dependency_pending');
     const readiness = bindRestoredExecutor(record);
     if (readiness !== 'ready') return this.deferApply(record, readiness);
     // Exactly-once: claim under the journal lock; a claim is never retried.
@@ -618,9 +630,44 @@ export class CloudflareOsControlPlane {
       record.status = 'failed';
       record.applyError = error instanceof Error ? error.message : String(error);
       audit('held_action', 'apply', 'failed', { heldActionId: id, error: record.applyError });
+      this.cancelDependents(record);
     }
-    this.recordMutation('held', record);
+    this.persistOutcome(record);
     return record;
+  }
+
+  private persistOutcome(record: HeldActionRecord): void {
+    persistWithRetry(
+      () => this.recordMutation('held', record),
+      () => audit('held_action', 'persist_outcome', 'failed', { heldActionId: record.id })
+    );
+  }
+
+  /** Bring held actions in line with the approval requests they are linked to. Idempotent. */
+  reconcileLinkedApprovals(): number {
+    return reconcilePlane({
+      listHeldActions: () => this.listHeldActions(),
+      decideHeldAction: (id, decision, approval) => this.decideHeldAction(id, decision, approval),
+      settleCancelled: (record, reason) => this.settleCancelled(record, reason),
+      audit: (operation, metadata) => audit('held_action', operation, 'failed', metadata),
+    });
+  }
+
+  /**
+   * Operator way out for a held action that can no longer proceed (its op was
+   * retired, the executor is gone, the request is moot).
+   */
+  cancelHeldAction(
+    id: string,
+    approval: HeldActionDecision & { reason: string }
+  ): HeldActionRecord {
+    const record = this.held.get(id);
+    if (!record) throw new Error(`Held action not found: ${id}`);
+    this.assertHumanDecision(record, approval);
+    const by = assertNonEmpty(approval.resolvedBy, 'resolvedBy');
+    const reason = assertNonEmpty(approval.reason, 'reason');
+    prepareCancellation(record, by, reason);
+    return this.settleCancelled(record, reason, by);
   }
 
   /**
@@ -708,44 +755,23 @@ export class CloudflareOsControlPlane {
     return record;
   }
 
-  /**
-   * SC-06: hash-bound declassify — a held effect that, once approved and
-   * applied, lets exactly one artifact (payloadHash) egress to a declared
-   * audience/tenant despite mission taint. The mission's taint itself is
-   * never lowered.
-   */
+  /** SC-06: hash-bound declassify grant (see cloudflare-os-held-lifecycle.ts). */
   requestDeclassify(
     input: Omit<DeclassificationGrant, 'id' | 'grantedAt' | 'grantedBy'> & {
       requestedBy: string;
     }
   ): HeldActionRecord {
-    let record!: HeldActionRecord;
-    record = this.submitHeldAction({
-      missionId: input.missionId,
-      tenantSlug: input.tenantSlug,
-      submittedBy: input.requestedBy,
-      op: 'control_plane:declassify',
-      params: input,
-      simulatable: false,
-      apply: () => {
-        const grant: DeclassificationGrant = {
-          ...input,
-          id: randomUUID(),
-          grantedBy: assertHumanActor(record.resolvedBy || ''),
-          grantedAt: nowIso(),
-        };
-        this.declassifications.set(declassificationKeyOf(grant), grant);
-        audit(
-          'declassification',
-          'grant',
-          'completed',
-          grant as unknown as Record<string, unknown>
-        );
-        this.recordMutation('declassification', grant as unknown as Record<string, unknown>);
-        return grant;
+    return requestDeclassifyGrant(
+      {
+        submit: (held) => this.submitHeldAction(held as unknown as HeldActionInput),
+        grants: this.declassifications,
+        audit: (operation, metadata) => audit('declassification', operation, 'completed', metadata),
+        persist: (grant) =>
+          this.recordMutation('declassification', grant as unknown as Record<string, unknown>),
+        assertHuman: assertHumanActor,
       },
-    });
-    return record;
+      input
+    );
   }
 
   /**
@@ -1257,33 +1283,26 @@ export class CloudflareOsControlPlane {
     return Boolean(parent && this.isCapabilityActive(parent, seen));
   }
 
-  private cancelDependents(rejected: HeldActionRecord): void {
-    const cancelled = new Set<string>([rejected.id]);
-    const cancelledRecords: HeldActionRecord[] = [];
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (const entry of this.listHeldActions(rejected.missionId)) {
-        if (entry.id === rejected.id || entry.status !== 'pending') continue;
-        const dependsOnRejected = entry.dependsOn.some((dependency) => cancelled.has(dependency));
-        const referencesRejectedProvisional =
-          (entry.params as unknown) &&
-          rejected.simulation?.provisionalRefs.some((ref) =>
-            JSON.stringify(entry.params).includes(ref)
-          );
-        if (dependsOnRejected || referencesRejectedProvisional) {
-          entry.status = 'cancelled';
-          cancelled.add(entry.id);
-          cancelledRecords.push(entry);
-          changed = true;
-          audit('held_action', 'cascade_cancel', 'completed', {
-            heldActionId: entry.id,
-            dependsOn: rejected.id,
-          });
-        }
-      }
+  private cancelDependents(root: HeldActionRecord): void {
+    const dependents = collectCascadeCancellations(root, this.listHeldActions(root.missionId));
+    for (const entry of dependents) {
+      entry.status = 'cancelled';
+      audit('held_action', 'cascade_cancel', 'completed', {
+        heldActionId: entry.id,
+        dependsOn: root.id,
+      });
     }
-    this.recordMutation('held', ...cancelledRecords);
+    this.recordMutation('held', ...dependents);
+  }
+
+  /** End a held action that can no longer proceed, taking its dependents with it. */
+  private settleCancelled(record: HeldActionRecord, reason: string, by?: string): HeldActionRecord {
+    record.status = 'cancelled';
+    record.decidedAt = nowIso();
+    audit('held_action', 'cancel', 'completed', { heldActionId: record.id, reason, by });
+    this.cancelDependents(record);
+    this.recordMutation('held', record);
+    return record;
   }
 
   private decideAutoApproved(record: HeldActionRecord): HeldActionRecord {
@@ -1379,11 +1398,9 @@ export class CloudflareOsControlPlane {
    * tail in journal mode, observation splice in legacy file mode.
    */
   refreshFromJournals(): void {
-    if (this.journalMode) {
-      this.journalStore.refresh();
-      return;
-    }
-    this.refreshPersistedObservations();
+    if (this.journalMode) this.journalStore.refresh();
+    else this.refreshPersistedObservations();
+    this.reconcileLinkedApprovals();
   }
 
   /** SC-03: observation rollups by mission × resource_ref × tier. */

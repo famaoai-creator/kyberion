@@ -38,8 +38,24 @@ export function writeJson<T>(filePath: string, value: T): void {
   getFoundationIo().writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-export function appendJsonLine<T>(filePath: string, value: T): void {
-  getFoundationIo().appendFile(filePath, `${JSON.stringify(value)}\n`);
+export interface AppendJsonLineOptions {
+  /**
+   * Start with a newline. A writer that died mid-append leaves a partial last
+   * line with no terminator; appending straight after it would merge the new
+   * record into the garbage. Readers skip blank lines, so the byte is free.
+   */
+  leadingNewline?: boolean;
+}
+
+export function appendJsonLine<T>(
+  filePath: string,
+  value: T,
+  options: AppendJsonLineOptions = {}
+): void {
+  getFoundationIo().appendFile(
+    filePath,
+    `${options.leadingNewline ? '\n' : ''}${JSON.stringify(value)}\n`
+  );
 }
 
 export interface ReadJsonLinesOptions<T> {
