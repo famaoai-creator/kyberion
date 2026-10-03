@@ -3,6 +3,7 @@ import { defineCatalog, type GovernedCatalog } from '../foundation/governed-cata
 
 export type ProviderConfigRuntimeRole =
   | 'anthropic-default'
+  | 'anthropic-standard'
   | 'anthropic-fast'
   | 'gemini-default'
   | 'gemini-fast'
@@ -57,6 +58,7 @@ export function isObsoleteAgentRuntimeProvider(provider: string | undefined): bo
 
 const RUNTIME_ROLE_PROVIDER_FALLBACK: Partial<Record<ProviderConfigRuntimeRole, string>> = {
   'anthropic-default': 'claude',
+  'anthropic-standard': 'claude',
   'anthropic-fast': 'claude',
   'gemini-default': 'gemini',
   'gemini-fast': 'gemini',

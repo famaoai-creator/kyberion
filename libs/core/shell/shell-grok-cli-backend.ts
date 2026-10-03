@@ -105,7 +105,7 @@ export function resolveGrokModelForTier(
 export interface ShellGrokCliBackendOptions {
   /** CLI binary. Defaults to `grok` (resolved via PATH). */
   bin?: string;
-  /** Model ID. Defaults to `grok-4.7`. */
+  /** Model ID. Defaults to runtime_defaults['grok-default']. */
   model?: string;
   /** Per-call timeout. Defaults to 5 min. */
   timeoutMs?: number;

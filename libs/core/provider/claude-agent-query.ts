@@ -26,6 +26,7 @@ import { z } from 'zod';
 import { CLAUDE_NATIVE_SUBAGENT_TOOL_NAMES } from './claude-native-subagent.js';
 import { metrics } from '../metrics.js';
 import { assertReasoningEgressAllowed } from '../reasoning/reasoning-egress-scope.js';
+import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 
 /** Pull billable token counts from a result message's `usage` block (defensive). */
 function extractUsageTokens(message: unknown): {
@@ -77,7 +78,7 @@ export interface ClaudeAgentQueryParams<T> {
   systemPrompt: string;
   userPrompt: string;
   schema: z.ZodType<T>;
-  /** Model alias: 'opus' | 'sonnet' | 'haiku' | explicit id. Defaults to 'opus'. */
+  /** Model alias or explicit id. Defaults to runtime_defaults['anthropic-default']. */
   model?: string;
   /** Abort controller for cancelling long-running queries. */
   abortController?: AbortController;
@@ -160,7 +161,7 @@ export async function runClaudeAgentQuery<T>(
   const options: Options = {
     ...sanitizeClaudeAgentExtraOptions(params.extraOptions),
     systemPrompt: params.systemPrompt,
-    model: params.model ?? 'opus',
+    model: params.model ?? resolveRuntimeModelId('anthropic-default'),
     tools: [],
     // Structured output is delivered via a StructuredOutput TOOL call, which
     // consumes a turn — maxTurns:1 made every structured query die with
@@ -201,7 +202,7 @@ export async function runClaudeAgentQuery<T>(
 
   recordClaudeAgentMetrics(
     params.metricsLabel ?? 'reasoning:claude-agent',
-    String(options.model ?? 'opus'),
+    String(options.model ?? resolveRuntimeModelId('anthropic-default')),
     Date.now() - startedAt,
     lastError ? 'error' : 'success',
     resultMessage,
@@ -302,7 +303,7 @@ export async function runClaudeAgentTask(
   const options: Options = {
     ...sanitizeClaudeAgentExtraOptions(params.extraOptions),
     systemPrompt: params.systemPrompt,
-    model: params.model ?? 'opus',
+    model: params.model ?? resolveRuntimeModelId('anthropic-default'),
     maxTurns: params.maxTurns ?? 8,
     permissionMode: 'default',
     ...(params.mcpServers ? { mcpServers: params.mcpServers } : {}),
@@ -344,7 +345,7 @@ export async function runClaudeAgentTask(
 
   recordClaudeAgentMetrics(
     params.metricsLabel ?? 'reasoning:claude-agent-task',
-    String(options.model ?? 'opus'),
+    String(options.model ?? resolveRuntimeModelId('anthropic-default')),
     Date.now() - startedAt,
     lastError ? 'error' : 'success',
     resultMessage,
