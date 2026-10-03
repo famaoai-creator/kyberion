@@ -5,6 +5,7 @@ import type { RetryOptions } from '../pipeline/retry-utils.js';
 import { getRegisteredEnv } from '../foundation/env.js';
 import { isRecord } from '../foundation/primitives.js';
 import { ensureDefaultOpPreflight } from '../pipeline/op-preflight-defaults.js';
+import { recordOpObservation } from '../pipeline/op-preflight-stages.js';
 import { runOpPreflight } from '../pipeline/op-preflight.js';
 import { resolvePipelineInputPlaceholders } from '../pipeline/pipeline-input-contract.js';
 import {
@@ -151,6 +152,8 @@ export async function runActuatorPipeline<
         );
       }
       context = await options.execute(step.op, preflight.input as Params, context, step);
+      // SC-05: post-op observation aggregation for declared-read ops.
+      recordOpObservation(`${options.actuatorId}:${step.op}`, preflight.input, context);
     }
     return context;
   };
