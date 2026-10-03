@@ -1,8 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import { OwnerScopeError } from './owner-scope.js';
-import { isMissionLookupRefusal, missionPathOrNull } from './mission-lookup.js';
+import {
+  isMissionLookupRefusal,
+  missionPathOrNull,
+  readOrNullOnMissionRefusal,
+} from './mission-lookup.js';
 
 const refusal = (code: string) => Object.assign(new Error(`[${code}] refused`), { code });
+
+describe('readOrNullOnMissionRefusal', () => {
+  it('returns the read value, or null when the mission is ambiguous or not visible', () => {
+    expect(readOrNullOnMissionRefusal(() => ({ status: 'active' }))).toEqual({ status: 'active' });
+    for (const code of ['OWNER_AMBIGUOUS', 'OWNER_NOT_VISIBLE']) {
+      expect(
+        readOrNullOnMissionRefusal(() => {
+          throw refusal(code);
+        })
+      ).toBeNull();
+    }
+  });
+
+  it('rethrows other errors', () => {
+    expect(() =>
+      readOrNullOnMissionRefusal(() => {
+        throw new TypeError('boom');
+      })
+    ).toThrow(TypeError);
+  });
+});
 
 describe('missionPathOrNull', () => {
   it('returns the path of a mission that resolves', () => {
