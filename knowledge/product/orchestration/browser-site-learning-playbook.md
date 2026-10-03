@@ -12,7 +12,7 @@ last_updated: 2026-10-03
 新規サイトの使い方を学習し、リプレイ可能な ADF に落とすための正規フロー。
 `browser-discovery-playbook.md`（Inspect 手順）と `adf-pipeline-learning-playbook.md`（学習ループ）、
 `pipeline-crystallization-loop.md`（Explore→Freeze）、`scratch-to-pipeline-video-promotion.md`（昇格の形）を
-ブラウザ用に統合したもの。AGENTS.md の「discovery は scratch/semantic-brief first」の実装でもある。
+ブラウザ用に統合したもの。AGENTS.md の「discovery は scratch-first（semantic-brief-first）」の実装でもある。
 
 ## 0. 3経路の使い分け（最初に決める）
 
