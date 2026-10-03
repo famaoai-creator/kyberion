@@ -29,7 +29,17 @@ export interface OpPreflightResult {
   terminate?: boolean;
   listener_ids: string[];
   guard_ids: string[];
+  /**
+   * Governance stage metadata stamped during the waterfall. Extracted out
+   * of `input` before it reaches the caller — `input` stays the op's
+   * schema-cleaned params while these keys travel alongside for post-op
+   * stages (observation, taint consumption).
+   */
+  governance_stamps?: Record<string, unknown>;
 }
+
+/** Stamp keys the governance stages set on the waterfall input. */
+export const OP_GOVERNANCE_STAMP_KEYS = ['_effect', '_resource_ref', '_egress_taint'] as const;
 
 export interface OpPreflightListenerResult {
   decision?: OpPreflightDecision;
@@ -359,7 +369,19 @@ function finalizePreflightResult(
   call: OpPreflightCall,
   result: OpPreflightResult & { input: Record<string, unknown> }
 ): OpPreflightResult & { input: Record<string, unknown> } {
-  const asserted = assertPreflightResult(result);
+  const governanceStamps: Record<string, unknown> = {};
+  const cleanedInput = { ...result.input };
+  for (const key of OP_GOVERNANCE_STAMP_KEYS) {
+    if (key in cleanedInput) {
+      governanceStamps[key] = cleanedInput[key];
+      delete cleanedInput[key];
+    }
+  }
+  const asserted = assertPreflightResult(
+    Object.keys(governanceStamps).length > 0
+      ? { ...result, input: cleanedInput, governance_stamps: governanceStamps }
+      : { ...result, input: cleanedInput }
+  );
   if (outcomeObservers.size > 0) {
     // Observers see a deep-frozen detached snapshot of the result and the
     // call, never the objects the caller or the dispatcher keep, so a

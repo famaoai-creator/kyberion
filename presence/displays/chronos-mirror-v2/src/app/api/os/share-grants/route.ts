@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { CloudflareOsControlPlane } from '@agent/core/cloudflare-os-control-plane';
+import { getControlPlaneForScope } from '@agent/core/cloudflare-os-shared';
 import {
   createShareGrantRegistryAuthorizer,
   shareGrantActorFromViewer,
@@ -21,7 +21,7 @@ import {
 import { readChronosJsonObject } from '../../../../lib/request-input';
 import { parseShareGrantInput } from './share-grant-input';
 
-const cloudflareOsControlPlane = new CloudflareOsControlPlane();
+const controlPlane = () => getControlPlaneForScope();
 const shareGrantLiveSessions = new ShareGrantLiveSessionRegistry({ persist: true });
 
 const shareGrantGraph = new ShareGrantGraph({
@@ -33,7 +33,7 @@ const shareGrantGraph = new ShareGrantGraph({
       return null;
     }
   },
-  resolveProvenance: (missionId) => cloudflareOsControlPlane.projectTaint(missionId),
+  resolveProvenance: (missionId) => controlPlane().projectTaint(missionId),
   liveSessionEvictor: shareGrantLiveSessions,
 });
 

@@ -69,7 +69,8 @@ describe('default operation preflight waterfall', () => {
     });
     expect(result.decision).toBe('allow');
     expect(result.listener_ids).toContain('core:effect');
-    expect((result as { input?: { _effect?: string } }).input?._effect).toBe('write');
+    expect(result.governance_stamps?._effect).toBe('write');
+    expect(result.input._effect).toBeUndefined();
   });
 
   it('refines egress declarations to read for read verbs via effect_from', async () => {
@@ -80,7 +81,7 @@ describe('default operation preflight waterfall', () => {
       source: 'actuator',
     });
     expect(result.decision).toBe('allow');
-    expect((result as { input?: { _effect?: string } }).input?._effect).toBe('read');
+    expect(result.governance_stamps?._effect).toBe('read');
   });
 
   it('keeps the fail-safe write class for unknown ops', async () => {
@@ -91,6 +92,7 @@ describe('default operation preflight waterfall', () => {
       source: 'actuator',
     });
     expect(result.decision).toBe('allow');
-    expect((result as { input?: { _effect?: string } }).input?._effect).toBe('write');
+    expect(result.governance_stamps?._effect).toBe('write');
+    expect(result.input._effect).toBeUndefined();
   });
 });
