@@ -72,6 +72,8 @@ describe('voice engine registry', () => {
     expect(engine.engine_id).toBe('gemini_tts');
     expect(engine.provider).toBe('gemini_api');
     expect(engine.supports.artifact_formats).toEqual(['wav']);
+    expect(engine.supports.voice_clone).toBe(true);
+    expect(engine.supports.icl_ref_audio).toBe(true);
   });
 
   it('falls back to default when unknown engine id is requested', () => {

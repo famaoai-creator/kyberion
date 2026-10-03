@@ -279,7 +279,7 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
     '| GUI action by target (`computer_interaction`) | web page: `browser-actuator`; desktop app / OS: `system-actuator`; PTY: `terminal-actuator`; device: `android-actuator` / `ios-actuator` | Split by target on purpose (same schema, non-overlapping action sets) — not duplicates. Navigation (`goto`, `activate_application`, `open_deep_link`) belongs to the same executors. See action-playbook. |'
   );
   lines.push(
-    '| Speech output (TTS: speak or write an audio file) | `voice-actuator` (`generate_voice`, `speak_local`); CLI `pnpm kyberion speak` | Inverse of `pnpm kyberion listen`. Streaming TTS for meetings / realtime voice lives in the streaming-tts bridges, not here. |'
+    '| Speech output (TTS: speak or write an audio file) | `voice-actuator` (`generate_voice`, `speak_local`); CLI `pnpm kyberion speak` (`--stream --segment` for incremental text; `--device` selects CoreAudio output) | Inverse of `pnpm kyberion listen`. The CLI streaming path currently uses the local Qwen engine; meeting / realtime voice bridges remain separate. |'
   );
   lines.push(
     '| Image generation (prompt → image) | `media-generation-actuator` (`generate_image`); CLI `pnpm kyberion draw` | Inverse of `pnpm kyberion see`. Local, unattended providers by default; `--allow-cloud` / `--allow-handoff` opt in and `--ref` needs per-run consent for them. |'

@@ -40,6 +40,10 @@
       "reason": "EV-07 regression harness: replays tests/fixtures/voice-workbench/*.json through VoiceTurnTakingMachine on a fake clock; its designed consumer is the fixture-replay test (ORPHAN_DECISIONS OW-02: keep)."
     },
     {
+      "id": "libs/core/voice/gemini-live-client.ts",
+      "reason": "Multimodal Live API WebSocket client for real-time bidirectional audio/video interaction through Google AI Studio Gemini Live; unit-tested in gemini-live-client.test.ts, entry point exported for live conversation bridges."
+    },
+    {
       "id": "libs/core/windows-local-assist-bridge.ts",
       "reason": "Windows (Foundry Local) counterpart of apple-intelligence-bridge, unit-tested. Its natural call site is the doctor local-capability section next to probeAppleIntelligence in scripts/run_doctor.ts, which is owned by another branch; wire it there (opt-in probe, silent off Windows) when that branch lands."
     }

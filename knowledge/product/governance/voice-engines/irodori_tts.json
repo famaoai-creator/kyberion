@@ -1,0 +1,28 @@
+{
+  "version": "1.0.0",
+  "default_engine_id": "local_say",
+  "engines": [
+    {
+      "engine_id": "irodori_tts",
+      "display_name": "Irodori-TTS v4.1 Small (MLX 8-bit)",
+      "kind": "native_local",
+      "provider": "mlx_audio",
+      "status": "active",
+      "platforms": ["darwin"],
+      "languages": ["ja"],
+      "language_notes": "Japanese only: the registered model and its local runtime path were exercised for Japanese.",
+      "model_id": "mlx-community/Irodori-TTS-v4.1-Small-8bit",
+      "bridge_script": "libs/actuators/voice-actuator/scripts/irodori_tts_bridge.py",
+      "tts_adapter_id": "python_bridge",
+      "runtime_id": "mlx_audio",
+      "live_presence": true,
+      "supports": {
+        "list_voices": false,
+        "playback": true,
+        "artifact_formats": ["wav"]
+      },
+      "fallback_engine_id": "local_say",
+      "notes": "Local Irodori-TTS v4.1 Small 8-bit through governed mlx-audio runtime. Generates completed sentence artifacts with num_steps=8; upstream streaming is not implemented."
+    }
+  ]
+}
