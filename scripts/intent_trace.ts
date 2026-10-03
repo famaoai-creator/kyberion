@@ -6,6 +6,7 @@ import {
 import { listTaskSessions, type TaskSession } from '@agent/core/task/task-session';
 import { currentScope } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
+import { readOrNullOnMissionRefusal } from '@agent/core/mission-lookup';
 import { renderStatus } from '@agent/core/ux-vocabulary';
 import {
   assertSafeRepositoryPath,
@@ -326,7 +327,8 @@ function collectMissionEvidence(
   });
   return missions
     .map(({ missionId, missionPath }) => {
-      const state = loadState(missionId);
+      // A trace over many missions skips one that is ambiguous or not visible.
+      const state = readOrNullOnMissionRefusal(() => loadState(missionId));
       const evidenceDir = path.join(missionPath, 'evidence');
       const snapshotFile = path.join(evidenceDir, 'intent-snapshots.jsonl');
       const snapshots = readJsonlRecords(snapshotFile, normalizeSnapshotRecord).filter(

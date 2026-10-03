@@ -5,6 +5,7 @@
 
 import { findMissionPath } from '../path-resolver.js';
 import { listMissionsInSearchDirs, loadState } from './mission-state.js';
+import { readOrNullOnMissionRefusal } from '../mission-lookup.js';
 import type { MissionState } from './mission-types.js';
 
 export interface MissionSummary {
@@ -41,7 +42,9 @@ export function listMissionSummaries(
   const missions: MissionSummary[] = [];
 
   for (const { missionId } of listMissionsInSearchDirs()) {
-    const state = loadState(missionId);
+    // A listing skips a mission this process cannot resolve (ambiguous or not
+    // visible) instead of failing the whole list.
+    const state = readOrNullOnMissionRefusal(() => loadState(missionId));
     if (!state) continue;
     if (filterStatus && state.status !== filterStatus) continue;
     if (scope) {
