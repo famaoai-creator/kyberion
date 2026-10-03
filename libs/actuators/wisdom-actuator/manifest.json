@@ -13,287 +13,489 @@
       "op": "history_search",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "Zero-LLM search over the public history index; optional refresh scans public runtime sources only."
+      "note": "Zero-LLM search over the public history index; optional refresh scans public runtime sources only.",
+      "effect": "read"
     },
-    { "op": "knowledge_search", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "knowledge_read", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "knowledge_inject", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "knowledge_export", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "knowledge_import", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "array_count", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "audit_speaker_fairness", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "distill", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "escalate_for_review", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "evaluate_decision_rights_approval", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "evaluate_ensemble_convergence", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "evaluate_simulation_quality", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "execute_self_action_items", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "extract_action_items", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "generate_facilitation_script", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "generate_reminder_message", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "glob_files", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "if", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "inject_prior_knowledge", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "json_query", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "log", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "query", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "react_loop", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "reasoning_loop", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "read_file", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "read_json", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "reasoning", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "regex_extract", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "regex_replace", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "render_hypothesis_report", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "resolve_hypothesis_conflict", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "shell", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "simulate_all_ensemble", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "task_plan_to_next_tasks", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "tool_use", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "propose_tool_calls", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "track_pending_action_items", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "uncertainty_gate", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "while", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "write_artifact", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "write_file", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "yaml_update", "platforms": ["darwin", "linux", "win32"] },
-
+    {
+      "op": "knowledge_search",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "knowledge_read",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "knowledge_inject",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "knowledge_export",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "egress"
+    },
+    {
+      "op": "knowledge_import",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "array_count",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "audit_speaker_fairness",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "distill",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "escalate_for_review",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "evaluate_decision_rights_approval",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "evaluate_ensemble_convergence",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "evaluate_simulation_quality",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "execute_self_action_items",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "extract_action_items",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "generate_facilitation_script",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "generate_reminder_message",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "glob_files",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "if",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "none"
+    },
+    {
+      "op": "inject_prior_knowledge",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "json_query",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "log",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "query",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "react_loop",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "none"
+    },
+    {
+      "op": "reasoning_loop",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "none"
+    },
+    {
+      "op": "read_file",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "read_json",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "reasoning",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "none"
+    },
+    {
+      "op": "regex_extract",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "none"
+    },
+    {
+      "op": "regex_replace",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "render_hypothesis_report",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "resolve_hypothesis_conflict",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "shell",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "simulate_all_ensemble",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "task_plan_to_next_tasks",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "tool_use",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "propose_tool_calls",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "track_pending_action_items",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "uncertainty_gate",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "none"
+    },
+    {
+      "op": "while",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "none"
+    },
+    {
+      "op": "write_artifact",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "write_file",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "yaml_update",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
     {
       "op": "stakeholder_grid_sort",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "protocol_ref": "knowledge/product/orchestration/stakeholder-consensus-protocol.md"
+      "protocol_ref": "knowledge/product/orchestration/stakeholder-consensus-protocol.md",
+      "effect": "read"
     },
     {
       "op": "find_slides_by_owner",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "Select slides owned by label (footer/footer-text). Use with media-actuator pptx_slide_text + pptx_filter_slides."
+      "note": "Select slides owned by label (footer/footer-text). Use with media-actuator pptx_slide_text + pptx_filter_slides.",
+      "effect": "read"
     },
     {
       "op": "pptx_diff",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "Structured diff between two pptx_slide_text outputs."
+      "note": "Structured diff between two pptx_slide_text outputs.",
+      "effect": "read"
     },
     {
       "op": "emit_dissent_log",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "protocol_ref": "knowledge/product/orchestration/hypothesis-tree-protocol.md"
+      "protocol_ref": "knowledge/product/orchestration/hypothesis-tree-protocol.md",
+      "effect": "write"
     },
     {
       "op": "compute_readiness_matrix",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "protocol_ref": "knowledge/product/orchestration/stakeholder-consensus-protocol.md"
+      "protocol_ref": "knowledge/product/orchestration/stakeholder-consensus-protocol.md",
+      "effect": "read"
     },
     {
       "op": "recommend",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "protocol_ref": "knowledge/product/orchestration/stakeholder-consensus-protocol.md"
+      "protocol_ref": "knowledge/product/orchestration/stakeholder-consensus-protocol.md",
+      "effect": "read"
     },
     {
       "op": "adjust_proposal",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "partial",
-      "note": "Append-only — semantic rewrite requires LLM integration."
+      "note": "Append-only — semantic rewrite requires LLM integration.",
+      "effect": "write"
     },
     {
       "op": "peer_advice",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "Structured second opinion from another reasoning backend when available; falls back to the active backend if no peer exists."
+      "note": "Structured second opinion from another reasoning backend when available; falls back to the active backend if no peer exists.",
+      "effect": "egress"
     },
-
     {
       "op": "a2a_fanout",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "stub",
       "protocol_ref": "knowledge/product/orchestration/hypothesis-tree-protocol.md",
-      "note": "Deprecated compatibility path for unscoped persona labels. Use perspective_fanout."
+      "note": "Deprecated compatibility path for unscoped persona labels. Use perspective_fanout.",
+      "effect": "egress"
     },
     {
       "op": "perspective_fanout",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
       "protocol_ref": "knowledge/product/orchestration/hypothesis-tree-protocol.md",
-      "note": "Typed participant fanout with per-participant security-scope context compilation and egress/output-tier guards."
+      "note": "Typed participant fanout with per-participant security-scope context compilation and egress/output-tier guards.",
+      "effect": "read"
     },
     {
       "op": "counterparty_roleplay",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "stub",
       "protocol_ref": "knowledge/product/orchestration/rehearsal-protocol.md",
-      "note": "Canonical synthetic-counterparty roleplay; a2a_roleplay remains a deprecated alias."
+      "note": "Canonical synthetic-counterparty roleplay; a2a_roleplay remains a deprecated alias.",
+      "effect": "read"
     },
     {
       "op": "cross_critique",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "stub",
-      "protocol_ref": "knowledge/product/orchestration/hypothesis-tree-protocol.md"
+      "protocol_ref": "knowledge/product/orchestration/hypothesis-tree-protocol.md",
+      "effect": "read"
     },
     {
       "op": "typed_cross_critique",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
       "protocol_ref": "knowledge/product/orchestration/hypothesis-tree-protocol.md",
-      "note": "Cross-critique over typed fanout receipts; rejects cross-tenant/project/mission projection."
+      "note": "Cross-critique over typed fanout receipts; rejects cross-tenant/project/mission projection.",
+      "effect": "read"
     },
     {
       "op": "synthesize_counterparty_persona",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "stub",
-      "protocol_ref": "knowledge/product/orchestration/rehearsal-protocol.md"
+      "protocol_ref": "knowledge/product/orchestration/rehearsal-protocol.md",
+      "effect": "read"
     },
     {
       "op": "a2a_roleplay",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "stub",
-      "protocol_ref": "knowledge/product/orchestration/rehearsal-protocol.md"
+      "protocol_ref": "knowledge/product/orchestration/rehearsal-protocol.md",
+      "effect": "egress"
     },
     {
       "op": "conduct_1on1",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "stub",
-      "protocol_ref": "knowledge/product/orchestration/stakeholder-consensus-protocol.md"
+      "protocol_ref": "knowledge/product/orchestration/stakeholder-consensus-protocol.md",
+      "effect": "read"
     },
     {
       "op": "conduct_1on_1",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "compatibility",
       "protocol_ref": "knowledge/product/orchestration/stakeholder-consensus-protocol.md",
-      "note": "Canonical meeting actuator op; conduct_1on1 remains a deprecated Wisdom alias."
+      "note": "Canonical meeting actuator op; conduct_1on1 remains a deprecated Wisdom alias.",
+      "effect": "read"
     },
     {
       "op": "extract_dissent_signals",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "stub",
-      "protocol_ref": "knowledge/product/orchestration/stakeholder-consensus-protocol.md"
+      "protocol_ref": "knowledge/product/orchestration/stakeholder-consensus-protocol.md",
+      "effect": "read"
     },
     {
       "op": "fork_branches",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "stub",
-      "protocol_ref": "knowledge/product/orchestration/counterfactual-simulation-protocol.md"
+      "protocol_ref": "knowledge/product/orchestration/counterfactual-simulation-protocol.md",
+      "effect": "read"
     },
     {
       "op": "simulate_all",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "stub",
-      "protocol_ref": "knowledge/product/orchestration/counterfactual-simulation-protocol.md"
+      "protocol_ref": "knowledge/product/orchestration/counterfactual-simulation-protocol.md",
+      "effect": "read"
     },
-
     {
       "op": "capture_intuition",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "protocol_ref": "knowledge/product/orchestration/intuition-capture-protocol.md"
+      "protocol_ref": "knowledge/product/orchestration/intuition-capture-protocol.md",
+      "effect": "read"
     },
     {
       "op": "extract_requirements",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "Customer_engagement missions: transcript → ExtractedRequirements → requirements-draft.json. Runs through the registered ReasoningBackend."
+      "note": "Customer_engagement missions: transcript → ExtractedRequirements → requirements-draft.json. Runs through the registered ReasoningBackend.",
+      "effect": "write"
     },
     {
       "op": "evaluate_requirements_completeness",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "REQUIREMENTS_COMPLETENESS gate evaluator."
+      "note": "REQUIREMENTS_COMPLETENESS gate evaluator.",
+      "effect": "read"
     },
     {
       "op": "evaluate_customer_signoff",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "CUSTOMER_SIGNOFF gate evaluator."
+      "note": "CUSTOMER_SIGNOFF gate evaluator.",
+      "effect": "read"
     },
-
     {
       "op": "extract_design_spec",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "SDLC design phase: requirements-draft.json → design-spec.json via the registered ReasoningBackend."
+      "note": "SDLC design phase: requirements-draft.json → design-spec.json via the registered ReasoningBackend.",
+      "effect": "write"
     },
     {
       "op": "register_presentation_preference_profile",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "Compatibility forwarder to media-actuator for presentation/design preference registry writes."
+      "note": "Compatibility forwarder to media-actuator for presentation/design preference registry writes.",
+      "effect": "write"
     },
     {
       "op": "evaluate_architecture_ready",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "ARCHITECTURE_READY gate evaluator — checks design spec completeness and blocking open_decisions."
+      "note": "ARCHITECTURE_READY gate evaluator — checks design spec completeness and blocking open_decisions.",
+      "effect": "read"
     },
     {
       "op": "extract_test_plan",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "SDLC test phase: requirements (+ optional design) → test-plan.json (test-case-adf-compatible)."
+      "note": "SDLC test phase: requirements (+ optional design) → test-plan.json (test-case-adf-compatible).",
+      "effect": "write"
     },
     {
       "op": "derive_test_inventory",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "QA-01: retain deterministic test viewpoints and use the reasoning backend only to add novel coverage candidates."
+      "note": "QA-01: retain deterministic test viewpoints and use the reasoning backend only to add novel coverage candidates.",
+      "effect": "read"
     },
     {
       "op": "evaluate_qa_ready",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "QA_READY gate evaluator — verifies test coverage of must-have FRs."
+      "note": "QA_READY gate evaluator — verifies test coverage of must-have FRs.",
+      "effect": "read"
     },
     {
       "op": "decompose_into_tasks",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "SDLC implementation-planning phase: requirements (+ optional design) → task-plan.json."
+      "note": "SDLC implementation-planning phase: requirements (+ optional design) → task-plan.json.",
+      "effect": "read"
     },
     {
       "op": "evaluate_task_plan_ready",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "Task plan validator: dependency integrity, cycle check, must-priority tasks have test_criteria."
+      "note": "Task plan validator: dependency integrity, cycle check, must-priority tasks have test_criteria.",
+      "effect": "read"
     },
-
     {
       "op": "transcribe_audio",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "Drives the SpeechToTextBridge. Stub falls back to a <audio>.transcript.txt sidecar; register ShellSpeechToTextBridge (via KYBERION_STT_COMMAND) for real decoding."
+      "note": "Drives the SpeechToTextBridge. Stub falls back to a <audio>.transcript.txt sidecar; register ShellSpeechToTextBridge (via KYBERION_STT_COMMAND) for real decoding.",
+      "effect": "read"
     },
     {
       "op": "execute_task_plan",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "Compatibility forwarder for the orchestrator-owned task-plan coordinator. The orchestrator validates and orders the DAG; each runnable task is delegated through the AgentExecutionPort and recorded to task-execution-log.jsonl."
+      "note": "Compatibility forwarder for the orchestrator-owned task-plan coordinator. The orchestrator validates and orders the DAG; each runnable task is delegated through the AgentExecutionPort and recorded to task-execution-log.jsonl.",
+      "effect": "write"
     },
     {
       "op": "deploy_release",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "Drives DeploymentAdapter under the config:update approval gate. Stub=dry-run; register ShellDeploymentAdapter via KYBERION_DEPLOY_COMMAND for real CI/CD dispatch."
+      "note": "Drives DeploymentAdapter under the config:update approval gate. Stub=dry-run; register ShellDeploymentAdapter via KYBERION_DEPLOY_COMMAND for real CI/CD dispatch.",
+      "effect": "egress"
     },
     {
       "op": "curate_background_review",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "Archive-only curator for stale background-review proposals; bundled and manually authored records are protected by provenance."
+      "note": "Archive-only curator for stale background-review proposals; bundled and manually authored records are protected by provenance.",
+      "effect": "read"
     },
     {
       "op": "curation_report",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "KP-06: deterministic weekly report of low-yield knowledge hints (KP-05 usage aggregate) and freshness SLO breaches (knowledge-curation-slo.json); writes CURATION_REPORT.md. Candidates only — no automatic demotion, steward approval required."
+      "note": "KP-06: deterministic weekly report of low-yield knowledge hints (KP-05 usage aggregate) and freshness SLO breaches (knowledge-curation-slo.json); writes CURATION_REPORT.md. Candidates only — no automatic demotion, steward approval required.",
+      "effect": "read"
     },
     {
       "op": "knowledge_validation_sweep",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "KO-17/19: read-only validation sweep for heuristic feedback and scope-bound promotion candidates; reports attention without changing queue status or knowledge tiers."
+      "note": "KO-17/19: read-only validation sweep for heuristic feedback and scope-bound promotion candidates; reports attention without changing queue status or knowledge tiers.",
+      "effect": "write"
     }
   ]
 }

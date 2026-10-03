@@ -12,8 +12,13 @@
     {
       "op": "pipeline",
       "schema_ref": "knowledge/product/schemas/orchestrator-pipeline.schema.json",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
     },
-    { "op": "reconcile", "platforms": ["darwin", "linux", "win32"] }
+    {
+      "op": "reconcile",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    }
   ]
 }

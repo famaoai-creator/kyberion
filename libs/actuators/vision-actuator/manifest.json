@@ -9,12 +9,40 @@
     "retry_profile": "vision-actuator"
   },
   "capabilities": [
-    { "op": "inspect_image", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "ocr_image", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "describe_image", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "fetch_video", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "build_video_brief", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "mark_elements", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "describe_screen_delta", "platforms": ["darwin", "linux", "win32"] }
+    {
+      "op": "inspect_image",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "ocr_image",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "describe_image",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "egress"
+    },
+    {
+      "op": "fetch_video",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "egress"
+    },
+    {
+      "op": "build_video_brief",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "mark_elements",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "describe_screen_delta",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "egress"
+    }
   ]
 }

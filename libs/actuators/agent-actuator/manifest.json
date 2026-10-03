@@ -9,12 +9,40 @@
     "retry_profile": "agent-actuator"
   },
   "capabilities": [
-    { "op": "spawn", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "ask", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "delegate", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "list", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "health", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "a2a", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "team_plan", "platforms": ["darwin", "linux", "win32"] }
+    {
+      "op": "spawn",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "ask",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "delegate",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "list",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "health",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "a2a",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "egress"
+    },
+    {
+      "op": "team_plan",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    }
   ]
 }

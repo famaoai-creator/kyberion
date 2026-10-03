@@ -8,7 +8,15 @@
     "retry_profile": "meeting-browser-driver"
   },
   "capabilities": [
-    { "op": "join", "platforms": ["darwin", "linux"] },
-    { "op": "leave", "platforms": ["darwin", "linux"] }
+    {
+      "op": "join",
+      "platforms": ["darwin", "linux"],
+      "effect": "egress"
+    },
+    {
+      "op": "leave",
+      "platforms": ["darwin", "linux"],
+      "effect": "egress"
+    }
   ]
 }

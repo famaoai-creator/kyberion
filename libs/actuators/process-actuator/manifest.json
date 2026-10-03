@@ -9,9 +9,25 @@
     "retry_profile": "process-actuator"
   },
   "capabilities": [
-    { "op": "spawn", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "stop", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "list", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "status", "platforms": ["darwin", "linux", "win32"] }
+    {
+      "op": "spawn",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "stop",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "list",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "status",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    }
   ]
 }
