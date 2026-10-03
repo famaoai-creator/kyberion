@@ -271,6 +271,66 @@ describe('resolveOwnerScope', () => {
     expect(() => scope.resolveMissionDir('MSN-OWN-TWIN')).toThrow(/\[OWNER_AMBIGUOUS\]/u);
   });
 
+  it('backs findMissionPath and loadState with the resolver (S7)', async () => {
+    const { findMissionPath } = await import('./path-resolver.js');
+    const { loadState } = await import('./mission/mission-state.js');
+    // A tenant-partitioned mission is found without the process tenant set.
+    expect(findMissionPath('MSN-OWN-ACME')).toBe(
+      path.join(tmpRoot, 'active/missions/confidential/acme/MSN-OWN-ACME')
+    );
+    expect(loadState('MSN-OWN-ACME')?.tenant_slug).toBe('acme');
+    // Ambiguous ids fail closed instead of picking one.
+    expect(() => findMissionPath('MSN-OWN-TWIN')).toThrow(/\[OWNER_AMBIGUOUS\]/);
+    // A bound identity never reaches another tenant's mission, even through
+    // the legacy directory scan (a flat dir holding another tenant's state).
+    process.env.KYBERION_TENANT = 'globex';
+    expect(findMissionPath('MSN-OWN-ACME')).toBeNull();
+    // A canonical directory whose state the resolver will not hand to this
+    // identity fails closed (a null would let a caller create a second copy).
+    expect(() => findMissionPath('MSN-OWN-BROKEN')).toThrow(/\[OWNER_NOT_VISIBLE\]/);
+    expect(loadState('MSN-OWN-ACME')).toBeNull();
+    delete process.env.KYBERION_TENANT;
+    // A pre-materialized mission (directory, no state yet) is still found.
+    fs.mkdirSync(path.join(tmpRoot, 'active/missions/public/MSN-OWN-PREMAT'), { recursive: true });
+    expect(findMissionPath('MSN-OWN-PREMAT')).toBe(
+      path.join(tmpRoot, 'active/missions/public/MSN-OWN-PREMAT')
+    );
+    expect(loadState('MSN-OWN-PREMAT')).toBeNull();
+    // A non-canonical (lower-case) directory is outside the resolver's search
+    // and keeps the plain-scan behavior.
+    writeMission('active/missions/public/msn-own-lower', {
+      mission_id: 'msn-own-lower',
+      tier: 'public',
+    });
+    // On a case-insensitive filesystem (macOS) the resolver itself finds it
+    // under the canonical spelling, so compare the directory, not the string.
+    const lower = findMissionPath('msn-own-lower');
+    expect(lower).not.toBeNull();
+    expect(fs.statSync(lower as string).ino).toBe(
+      fs.statSync(path.join(tmpRoot, 'active/missions/public/msn-own-lower')).ino
+    );
+  });
+
+  it('answers a lookup nested inside the locator with the plain scan, not recursion', async () => {
+    const resolver = await import('./path-resolver.js');
+    const key = Symbol.for('kyberion.pathResolver.missionLocator');
+    const previous = (globalThis as Record<symbol, unknown>)[key];
+    const nested: Array<string | null> = [];
+    resolver.registerMissionLocator((missionId) => {
+      // e.g. secure-io's permission check resolving identity mid-lookup
+      nested.push(resolver.findMissionPath(missionId));
+      return undefined;
+    });
+    try {
+      // Outer call: the locator found nothing for a canonical directory that
+      // holds a state, so it fails closed; the nested call took the plain scan.
+      expect(() => resolver.findMissionPath('MSN-OWN-PUB')).toThrow(/\[OWNER_NOT_VISIBLE\]/);
+      expect(nested).toEqual([path.join(tmpRoot, 'active/missions/public/MSN-OWN-PUB')]);
+    } finally {
+      (globalThis as Record<symbol, unknown>)[key] = previous;
+    }
+  });
+
   it('rejects ids that are not a single safe segment', () => {
     for (const id of ['../x', 'a/b', '..', '']) {
       expect(() => scope.resolveOwnerScope({ kind: 'mission', id })).toThrow(

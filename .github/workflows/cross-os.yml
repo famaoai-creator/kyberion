@@ -134,7 +134,8 @@ jobs:
       # DPI-aware Windows pointer path and checks the click registered.
       - name: UI Automation live smoke (Windows)
         if: runner.os == 'Windows'
-        timeout-minutes: 8
+        # Three cases with bounded launch/availability deadlines (240 s each worst case).
+        timeout-minutes: 18
         env:
           KYBERION_UIA_LIVE_SMOKE: '1'
           KYBERION_PERSONA: worker

@@ -8,27 +8,67 @@ import {
   registerMissionAgentInputWorker,
   renderAgentInputQueueEntries,
 } from './agent-input-queue.js';
-import { safeAppendFileSync, safeMkdir, safeRmSync } from '../secure-io.js';
+import {
+  safeAppendFileSync,
+  safeExistsSync,
+  safeMkdir,
+  safeRmSync,
+  safeWriteFile,
+} from '../secure-io.js';
+import { clearOwnerScopeCache } from '../owner-scope.js';
+import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 
 const tempRoot = pathResolver.rootResolve(`active/shared/tmp/agent-input-queue-${process.pid}`);
 const queuePath = path.join(tempRoot, 'queue.jsonl');
 
+const seededMissionDirs: string[] = [];
+
+/** Queues live beside an existing mission; seed its state where it would live. */
+function seedMission(missionDir: string, state: Record<string, unknown>): void {
+  withExecutionContext('mission_controller', () => {
+    safeMkdir(missionDir, { recursive: true });
+    safeWriteFile(path.join(missionDir, 'mission-state.json'), JSON.stringify(state));
+  });
+  seededMissionDirs.push(missionDir);
+  clearOwnerScopeCache();
+}
+
 afterEach(() => {
   safeRmSync(tempRoot, { recursive: true, force: true });
+  withExecutionContext('mission_controller', () => {
+    for (const dir of seededMissionDirs.splice(0))
+      safeRmSync(dir, { recursive: true, force: true });
+  });
+  clearOwnerScopeCache();
 });
 
 describe('AgentInputQueue', () => {
-  it('resolves the default queue beside the canonical mission scope', () => {
+  it('resolves the default queue beside the existing mission', () => {
     const missionId = 'PI15-SCOPE-DEFAULT';
+    const dir = pathResolver.missionDir(missionId, 'public');
+    seedMission(dir, { mission_id: missionId, tier: 'public', status: 'active' });
     const queue = new AgentInputQueue({ missionId });
-    expect(queue.durablePath).toBe(
-      path.join(pathResolver.missionDir(missionId), 'coordination', 'agent-input-queue.jsonl')
-    );
+    expect(queue.durablePath).toBe(path.join(dir, 'coordination', 'agent-input-queue.jsonl'));
+  });
+
+  it('refuses input for a mission that does not exist instead of queuing it', async () => {
+    const missionId = 'PI15-SCOPE-UNKNOWN';
+    expect(() => new AgentInputQueue({ missionId })).toThrow(/\[OWNER_NOT_FOUND\]/);
+    await expect(
+      enqueueMissionAgentInput({ missionId, delivery: 'follow_up', text: 'hello' })
+    ).rejects.toThrow(/\[OWNER_NOT_FOUND\]/);
+    expect(safeExistsSync(pathResolver.missionDir(missionId))).toBe(false);
   });
 
   it('keeps an explicit tenant and tier on the durable queue path', () => {
     const missionId = 'PI15-SCOPE-EXPLICIT';
+    seedMission(pathResolver.missionDir(missionId, 'confidential', 'acme'), {
+      mission_id: missionId,
+      tier: 'confidential',
+      tenant_slug: 'acme',
+      status: 'active',
+    });
     const queue = new AgentInputQueue({
       missionId,
       tier: 'confidential',

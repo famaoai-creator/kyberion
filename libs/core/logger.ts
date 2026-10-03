@@ -76,10 +76,32 @@ export function flushRepeatMarkers(): void {
   flushRepeat('stderr');
 }
 
+// One process-wide 'exit' listener shared by every evaluation of this module.
+// Re-evaluating it (vi.resetModules, bundler duplicates) previously added a
+// fresh listener per instance — 11 instances tripped MaxListenersExceeded on
+// `process`. Each instance now enrolls its flusher in a global set instead.
+const EXIT_FLUSH_KEY = Symbol.for('@kyberion/logger-exit-flush');
+
 function registerExitFlush(): void {
   if (exitFlushRegistered) return;
   exitFlushRegistered = true;
-  process.once('exit', flushRepeatMarkers);
+  const scope = globalThis as { [EXIT_FLUSH_KEY]?: Set<() => void> };
+  let flushers = scope[EXIT_FLUSH_KEY];
+  if (!flushers) {
+    const created = new Set<() => void>();
+    flushers = created;
+    scope[EXIT_FLUSH_KEY] = created;
+    process.once('exit', () => {
+      for (const flush of created) {
+        try {
+          flush();
+        } catch {
+          // One instance failing to flush must not drop the others' markers.
+        }
+      }
+    });
+  }
+  flushers.add(flushRepeatMarkers);
 }
 
 export interface EmitOptions {
