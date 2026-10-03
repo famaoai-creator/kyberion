@@ -65,8 +65,15 @@ export function setOpPreflightRolloutForTests(policy: RolloutPolicy | undefined)
 
 function rolloutPolicy(): RolloutPolicy {
   if (rolloutCache === undefined) {
-    rolloutCache =
-      readJsonIfPresent<RolloutPolicy>(pathResolver.rootResolve(ROLLOUT_POLICY_PATH)) ?? {};
+    try {
+      rolloutCache =
+        readJsonIfPresent<RolloutPolicy>(pathResolver.rootResolve(ROLLOUT_POLICY_PATH)) ?? {};
+    } catch {
+      // The rollout file is an optional overlay — an unreadable file (or an
+      // io layer that is not registered yet) resolves to the same 'warn'
+      // default as a missing file, never to a silent 'enforce'.
+      rolloutCache = {};
+    }
   }
   return rolloutCache;
 }

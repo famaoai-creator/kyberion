@@ -30,6 +30,7 @@ const secureIo = vi.hoisted(() => {
     },
     safeExistsSync: (filePath: string) => fs.existsSync(abs(filePath)),
     safeLstat: (filePath: string) => fs.lstatSync(abs(filePath)),
+    safeStat: (filePath: string) => fs.statSync(abs(filePath)),
     safeReaddir: (dirPath: string) => fs.readdirSync(abs(dirPath)).map(String),
   };
 });
