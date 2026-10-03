@@ -48,8 +48,7 @@ function readIndex(indexAbsPath: string): Array<Record<string, unknown>> {
 
 describe('writeScopedArtifact (AL-02)', () => {
   beforeAll(async () => {
-    tmpRoot = path.join(os.tmpdir(), `kyb-scoped-artifact-${randomUUID()}`);
-    fs.mkdirSync(tmpRoot, { recursive: true });
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kyb-scoped-artifact-'));
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
     seedPolicyFile(tmpRoot);
     process.env.KYBERION_ROOT = tmpRoot;
