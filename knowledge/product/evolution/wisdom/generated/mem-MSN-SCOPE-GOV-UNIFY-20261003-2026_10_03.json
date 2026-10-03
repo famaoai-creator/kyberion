@@ -1,0 +1,24 @@
+{
+  "record_id": "mem-MSN-SCOPE-GOV-UNIFY-20261003-2026_10_03",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Scope governance envelopes separate identity from attenuable policy",
+  "summary": "Governance scope must be minted by the runtime as an immutable identity snapshot (tenant→org→project→mission→task→session) plus an attenuable policy layer; delegation narrows pre-claim and caller metadata is never trusted.",
+  "candidate_id": "mem-MSN-SCOPE-GOV-UNIFY-20261003-2026_10_03",
+  "evidence_refs": [
+    "active/missions/public/MSN-SCOPE-GOV-UNIFY-20261003/evidence/design-spec.json",
+    "active/missions/public/MSN-SCOPE-GOV-UNIFY-20261003/evidence/distillation.md"
+  ],
+  "created_at": "2026-10-03T10:28:50.279Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "When unifying scope across systems, mint a two-layer envelope at dispatch boundaries: an immutable identity snapshot resolved from trusted sources, and a policy layer (read_tiers/write_tier/purpose/egress/reasoning_backends) that may only narrow. Persisted control-plane state should be tenant-namespaced append-only journals with locked appends and tail catch-up; snapshots are caches, journals are truth, and tenantless or envelope-contradicting records quarantine with audit. Held effects persist serializable params and rehydrate executors via a registry."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-SCOPE-GOV-UNIFY-20261003/evidence/design-spec.json",
+    "active/missions/public/MSN-SCOPE-GOV-UNIFY-20261003/evidence/distillation.md"
+  ],
+  "source_branch": "feat/scope-envelope-sc01",
+  "source_commit": "b5814a05c5e67419eb0bab65efe9276c1b9060a4"
+}
