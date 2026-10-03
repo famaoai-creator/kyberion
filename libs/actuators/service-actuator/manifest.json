@@ -12,37 +12,48 @@
     {
       "op": "pipeline",
       "schema_ref": "knowledge/product/schemas/service-action.schema.json",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
     },
     {
       "op": "api",
       "schema_ref": "knowledge/product/schemas/service-action.schema.json",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "egress",
+      "effect_from": "method",
+      "resource_ref_from": "resource_ref"
     },
     {
       "op": "cli",
       "schema_ref": "knowledge/product/schemas/service-action.schema.json",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "egress",
+      "resource_ref_from": "resource_ref"
     },
     {
       "op": "preset",
       "schema_ref": "knowledge/product/schemas/service-action.schema.json",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "egress",
+      "resource_ref_from": "resource_ref"
     },
     {
       "op": "mcp",
       "schema_ref": "knowledge/product/schemas/service-action.schema.json",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "egress"
     },
     {
       "op": "reconcile",
       "schema_ref": "knowledge/product/schemas/service-action.schema.json",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
     },
     {
       "op": "oauth",
       "schema_ref": "knowledge/product/schemas/service-action.schema.json",
-      "platforms": ["darwin", "linux", "win32"]
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "egress"
     }
   ]
 }

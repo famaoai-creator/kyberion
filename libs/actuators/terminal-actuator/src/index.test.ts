@@ -106,7 +106,10 @@ vi.mock('@agent/core/async-utils', () => ({
     jitter: true,
   })),
 }));
-vi.mock('@agent/core/pipeline/op-preflight', () => ({ runOpPreflight: mocks.runOpPreflight }));
+vi.mock('@agent/core/pipeline/op-preflight', () => ({
+  runOpPreflight: mocks.runOpPreflight,
+  OP_GOVERNANCE_STAMP_KEYS: ['_effect', '_resource_ref', '_egress_taint'],
+}));
 vi.mock('@agent/core/pipeline/op-preflight-defaults', () => ({
   ensureDefaultOpPreflight: mocks.ensureDefaultOpPreflight,
 }));

@@ -9,9 +9,29 @@
     "retry_profile": "artifact-actuator"
   },
   "capabilities": [
-    { "op": "write_json", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "read_json", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "append_event", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "write_delivery_pack", "platforms": ["darwin", "linux", "win32"] }
+    {
+      "op": "write_json",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write",
+      "resource_ref_from": "path"
+    },
+    {
+      "op": "read_json",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read",
+      "resource_ref_from": "path"
+    },
+    {
+      "op": "append_event",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write",
+      "resource_ref_from": "path"
+    },
+    {
+      "op": "write_delivery_pack",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write",
+      "resource_ref_from": "path"
+    }
   ]
 }

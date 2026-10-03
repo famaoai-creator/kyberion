@@ -26,7 +26,7 @@ import {
   type CapabilityBundleEntry,
 } from '@agent/core/capability-bundle-registry';
 import { scanProviderCapabilities } from '@agent/core/provider/provider-capability-scanner';
-import { CloudflareOsControlPlane } from '@agent/core/cloudflare-os-control-plane';
+import { getControlPlaneForScope, resolveOsSurfaceAccess } from '@agent/core/cloudflare-os-shared';
 import {
   CloudflareOsSurface,
   CloudflareOsReadOnlySurface,
@@ -77,25 +77,15 @@ export function getTenantScope(): string | undefined {
  * actions belonging to an unknown tenant.
  */
 export function getOsSurfaceAccess(): CloudflareOsSurfaceAccess {
-  const tenant = getTenantScope();
-  const configuredPrincipal = (getRegisteredEnvText('KYBERION_MOS_PRINCIPAL') || '').trim();
-  if (tenant && !configuredPrincipal) {
-    throw new Error(
-      '[POLICY_VIOLATION] KYBERION_MOS_PRINCIPAL is required for tenant-scoped OS projection'
-    );
-  }
-  if (configuredPrincipal && !configuredPrincipal.startsWith('human:')) {
-    throw new Error('[POLICY_VIOLATION] KYBERION_MOS_PRINCIPAL must identify a human viewer');
-  }
-  return {
-    principalId: configuredPrincipal || 'human:operator-surface-local',
-    tenantSlugs: tenant ? [tenant] : [],
-  };
+  return resolveOsSurfaceAccess({
+    principalEnv: 'KYBERION_MOS_PRINCIPAL',
+    defaultPrincipal: 'human:operator-surface-local',
+  });
 }
 
 export function getCloudflareOsSnapshot(missionId?: string): CloudflareOsSurfaceSnapshot {
   return new CloudflareOsReadOnlySurface(
-    new CloudflareOsSurface(new CloudflareOsControlPlane({ auditRestoreFailures: false }))
+    new CloudflareOsSurface(getControlPlaneForScope(undefined, { auditRestoreFailures: false }))
   ).snapshot(missionId, getOsSurfaceAccess());
 }
 

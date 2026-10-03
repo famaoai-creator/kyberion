@@ -432,6 +432,35 @@ describe('service-actuator handleAction', () => {
     );
   });
 
+  it('records the canonical tenant_slug when the scope has no tenant_id alias', async () => {
+    process.env.MISSION_ID = 'mission-observation-tenant-slug-test';
+    mocks.executeServicePreset.mockResolvedValue({ issues: [] });
+    const { handleAction } = await import('./index.js');
+
+    await handleAction({
+      service_id: 'github',
+      mode: 'PRESET',
+      action: 'list_issues',
+      params: {},
+      context: {
+        mission_id: 'mission-observation-tenant-slug-test',
+        resource_ref: 'repo:famaoai/kyberion',
+        observation: { summary: 'issue list' },
+        security_scope: {
+          tenant_slug: 'tenant-a',
+          mission_id: 'mission-observation-tenant-slug-test',
+          read_tiers: ['public'],
+          write_tier: 'public',
+          purpose: 'review backlog',
+        },
+      },
+    });
+
+    expect(mocks.controlPlane.recordObservation).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantSlug: 'tenant-a' })
+    );
+  });
+
   it('derives observation sensitivity from the security scope, not caller claims', async () => {
     process.env.MISSION_ID = 'mission-observation-taint-test';
     mocks.executeServicePreset.mockResolvedValue({ issues: [] });

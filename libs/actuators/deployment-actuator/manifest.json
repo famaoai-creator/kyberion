@@ -8,5 +8,11 @@
     "fallback_strategy": "approval_then_adapter",
     "retry_profile": "deployment-actuator"
   },
-  "capabilities": [{ "op": "deploy_release", "platforms": ["darwin", "linux", "win32"] }]
+  "capabilities": [
+    {
+      "op": "deploy_release",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "egress"
+    }
+  ]
 }

@@ -72,8 +72,13 @@
       "rationale": "scripts/oauth_callback_surface.ts. sovereign_concierge: completeOAuthCallback resolves tool binaries through libs/core tool-runtime-policy (getToolRuntimePolicy). RN-03 removed ecosystem_architect and mission_controller: docs/developer/role-assumption-reachability.json proves neither reachable (no unresolved sites, no child processes that inherit SYSTEM_ROLE) and RN-01 traces (hermetic smoke of the built surface, oauth_callback_surface vitest suites under SYSTEM_ROLE) only observed surface_runtime (the surface's own callback write, a shared core role)."
     },
     "operator_surface": {
-      "may_assume": ["chronos_token_registry_reader", "sovereign_concierge"],
-      "rationale": "Read-only audit monitor (presence/displays/operator-surface), operator-launched through surface_runtime with SYSTEM_ROLE=operator_surface. sovereign_concierge and chronos_token_registry_reader: reachable per docs/developer/role-assumption-reachability.json via libs/core surface-authn -> authn-providers (module providers and loadRegistrations). The surface also has unresolved sites (provider-discovery memoized CLI spawn, a computed import in src/lib/view.ts), so the analysis treats every role as reachable and nothing here is removable."
+      "may_assume": [
+        "chronos_token_registry_reader",
+        "sovereign_concierge",
+        "mission_controller",
+        "ecosystem_architect"
+      ],
+      "rationale": "Read-only audit monitor (presence/displays/operator-surface), operator-launched through surface_runtime with SYSTEM_ROLE=operator_surface. sovereign_concierge and chronos_token_registry_reader: reachable per docs/developer/role-assumption-reachability.json via libs/core surface-authn -> authn-providers (module providers and loadRegistrations). mission_controller is reachable via data.ts#getCloudflareOsSnapshot -> CloudflareOsSurface -> CloudflareOsControlPlane -> decideApprovalRequest (held_effect settlement is always filed under mission_controller). ecosystem_architect is reachable via a spawned orchestration worker's deployment-adapter config load. The surface also has unresolved sites (provider-discovery memoized CLI spawn, a computed import in src/lib/view.ts), so the analysis treats every role as reachable and nothing here is removable."
     },
     "personal_pads": {
       "may_assume": [

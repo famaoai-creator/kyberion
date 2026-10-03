@@ -223,6 +223,8 @@ export * from './context-security-scope.js';
 
 export * from './scope-context.js';
 
+export * from './scope-envelope.js';
+
 export * from './event-scope.js';
 
 export * from './tool/runtime-scope.js';
