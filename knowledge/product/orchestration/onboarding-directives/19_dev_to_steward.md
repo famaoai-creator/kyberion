@@ -21,7 +21,7 @@ last_updated: 2026-03-06
 
 - 社内GitHubリポジトリ（スター数上位）
 - 過去の技術負債レビュー資料
-- `knowledge/software-design/patterns.md` (デザインパターン & クリーンコード)
+- `knowledge/public/software-design/patterns.md` (デザインパターン & クリーンコード)
 
 ## 3. 勝利条件
 
@@ -30,5 +30,5 @@ last_updated: 2026-03-06
 
 ## 5. アウトプット形式
 
-- 保存先: `knowledge/tech-stack/` 配下の各ファイル
+- 保存先: `knowledge/public/tech-stack/` 配下の各ファイル
 - 形式: Markdown

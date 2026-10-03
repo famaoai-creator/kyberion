@@ -86,5 +86,5 @@ last_updated: 2026-03-06
 
 - **オンボーディング指示書 (Onboarding Directives)**:
   - 各ロールが初回起動時に実行すべき、自己の専門性を確立するための情報収集指示。
-  - 配置場所: `knowledge/orchestration/onboarding-directives/`
+  - 配置場所: `knowledge/product/orchestration/onboarding-directives/`
   - 特徴: 恒久的なナレッジ資産であり、全ロールの「初期化プロセス」の核となる。

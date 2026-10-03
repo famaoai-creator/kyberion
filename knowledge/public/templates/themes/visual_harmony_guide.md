@@ -11,7 +11,7 @@ last_updated: 2026-03-06
 
 ## 1. 提案者ブランドの定義
 
-`knowledge/templates/themes/proposer/palettes/<proposer-name>.json` に提案者側のアイデンティティを定義する。
+`knowledge/public/templates/themes/proposer/palettes/<proposer-name>.json` に提案者側のアイデンティティを定義する。
 
 ## 2. ブランド適用ロジック
 
@@ -25,7 +25,7 @@ last_updated: 2026-03-06
 
 `AGENTS.md` または実行時の命令で `proposer_context` を指定する。
 例：「提案者：Kyberion-Lab として資料を作成せよ」
--> `knowledge/templates/themes/proposer/palettes/kyberion-lab.json` をロード。
+-> `knowledge/public/templates/themes/proposer/palettes/kyberion-lab.json` をロード。
 
 ## 4. Marp-to-PPTX Engineering (Strategic Standards)
 

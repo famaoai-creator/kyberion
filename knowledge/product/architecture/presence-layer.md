@@ -52,7 +52,7 @@ Channel events should also be mirrored into explainable observability streams un
 
 ### 3.1. Physical Intervention Protocol (Multi-Terminal)
 
-The **Nexus Daemon** (`presence/bridge/nexus-daemon.js`) can physically inject stimuli into an idle terminal session using the **Terminal Bridge**.
+The **Nexus Daemon** (`presence/bridge/nexus-daemon.ts`) can physically inject stimuli into an idle terminal session using the **Terminal Bridge**.
 
 - **Supported Terminals**: iTerm2 (Primary), VS Code Integrated Terminal (Fallback).
 - **Trigger**: New `PENDING` stimulus detected + Terminal state is IDLE.

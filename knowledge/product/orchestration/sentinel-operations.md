@@ -15,8 +15,8 @@ The Sentinel is a proactive agent component that monitors repository health, sec
 
 ## Components
 
-- **Script**: `scripts/sentinel_check.js`
-- **Output**: `active/shared/sentinel-report.json`
+- **Script**: `scripts/run_baseline_check.ts`（`pnpm pipeline --input pipelines/baseline-check.json` 経由で `SovereignSentinel` が各レイヤを評価）
+- **Output**: `active/shared/runtime/state/pfc-state.json`（Sentinel 状態）+ baseline-check レポート（`active/shared/runtime/baseline-check-cache/`）
 
 ## Routine Check Procedures
 

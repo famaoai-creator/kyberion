@@ -28,4 +28,4 @@ debug build または internal QA build で、authenticated WebView state を `w
 - browser import:
   [`android-runtime-session-handoff-import.json`](../../../../libs/actuators/browser-actuator/examples/android-runtime-session-handoff-import.json)
 - end-to-end runner:
-  [`mobile-webview-handoff-runner-android.json`](/Users/famao/kyberion/pipelines/mobile-webview-handoff-runner-android.json)
+  [`mobile-webview-handoff-runner-android.json`](../../../product/pipeline-templates/mobile-webview-handoff-runner-android.json)

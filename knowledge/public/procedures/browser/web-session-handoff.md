@@ -31,7 +31,7 @@ Web アプリが debug-only hook を使って browser session を export し、B
 
 ## Orchestration
 
-- [`web-session-handoff-runner.json`](/Users/famao/kyberion/pipelines/web-session-handoff-runner.json)
+- [`web-session-handoff-runner.json`](../../../product/pipeline-templates/web-session-handoff-runner.json)
 
 ## Route And Test Modeling
 
