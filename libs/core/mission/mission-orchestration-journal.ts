@@ -25,6 +25,7 @@ import {
   type EventScopeInput,
 } from '../event-scope.js';
 import { withFencedWriterLeaseSync, writerLeaseResourceId } from '../writer-lease.js';
+import { resolveMissionDir, tryResolveOwnerScope, type OwnerScopeHint } from '../owner-scope.js';
 
 export type MissionOrchestrationJournalStatus = 'enqueued' | 'completed' | 'failed';
 
@@ -140,12 +141,30 @@ export interface MissionOrchestrationReplayPlan {
   missing_provisioned_entries: ProvisionedEntryRecord[];
 }
 
+/** An event scope only narrows the mission's own location (owner-scope hint). */
+function ownerHintForScope(scope?: EventScope): OwnerScopeHint | undefined {
+  if (!scope) return undefined;
+  return {
+    tier: scope.tier,
+    ...(scope.tenant_slug ? { tenant: scope.tenant_slug } : {}),
+  };
+}
+
+/**
+ * Directory of the existing mission, derived from where it actually lives.
+ * Fails closed (OwnerScopeError) when the mission is unknown or the event
+ * scope contradicts it — a journal write is never placed by a guessed tier.
+ */
 function missionPathForScope(missionId: string, scope?: EventScope): string {
-  const candidate = scope?.tenant_slug
-    ? pathResolver.tenantMissionDir(missionId, scope.tenant_slug, scope.tier)
-    : pathResolver.findMissionPath(missionId) ||
-      pathResolver.missionDir(missionId, scope?.tier || 'public');
-  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
+  return assertSafeRepositoryPath(resolveMissionDir(missionId, ownerHintForScope(scope)), {
+    allowMissingLeaf: true,
+  });
+}
+
+/** Like missionPathForScope, but null for an unknown mission (read paths). */
+function existingMissionPathForScope(missionId: string, scope?: EventScope): string | null {
+  const owner = tryResolveOwnerScope({ kind: 'mission', id: missionId }, ownerHintForScope(scope));
+  return owner ? assertSafeRepositoryPath(owner.dir, { allowMissingLeaf: true }) : null;
 }
 
 function journalDir(missionId: string, scope?: EventScope): string {
@@ -155,21 +174,40 @@ function journalDir(missionId: string, scope?: EventScope): string {
   );
 }
 
-function journalPath(missionId: string, scope?: EventScope, missionPathHint?: string): string {
-  return assertSafeRepositoryPath(
-    nodePath.join(
-      writeJournalDir(missionId, scope, missionPathHint),
-      'orchestration-journal.jsonl'
-    ),
-    { allowMissingLeaf: true }
-  );
+function readJournalDir(
+  missionId: string,
+  scope?: EventScope,
+  missionPathHint?: string
+): string | null {
+  if (missionPathHint) return writeJournalDir(missionId, scope, missionPathHint);
+  const missionPath = existingMissionPathForScope(missionId, scope);
+  return missionPath
+    ? assertSafeRepositoryPath(nodePath.join(missionPath, 'coordination'), {
+        allowMissingLeaf: true,
+      })
+    : null;
 }
 
-function provisionedEntriesPath(missionId: string, scope?: EventScope): string {
-  return assertSafeRepositoryPath(
-    nodePath.join(journalDir(missionId, scope), 'provisioned-entries.jsonl'),
-    { allowMissingLeaf: true }
-  );
+function journalPath(
+  missionId: string,
+  scope?: EventScope,
+  missionPathHint?: string
+): string | null {
+  const dir = readJournalDir(missionId, scope, missionPathHint);
+  return dir
+    ? assertSafeRepositoryPath(nodePath.join(dir, 'orchestration-journal.jsonl'), {
+        allowMissingLeaf: true,
+      })
+    : null;
+}
+
+function provisionedEntriesPath(missionId: string, scope?: EventScope): string | null {
+  const dir = readJournalDir(missionId, scope);
+  return dir
+    ? assertSafeRepositoryPath(nodePath.join(dir, 'provisioned-entries.jsonl'), {
+        allowMissingLeaf: true,
+      })
+    : null;
 }
 
 function writeJournalDir(missionId: string, scope?: EventScope, missionPathHint?: string): string {
@@ -357,7 +395,7 @@ export function loadProvisionedEntryRecords(
   scope?: EventScope
 ): ProvisionedEntryRecord[] {
   const filePath = provisionedEntriesPath(missionId, scope);
-  if (!safeExistsSync(filePath)) return [];
+  if (!filePath || !safeExistsSync(filePath)) return [];
   if (!safeLstat(filePath).isFile()) {
     throw new Error(`MISSION_LOG_CORRUPT:provisioned_entry_record_file`);
   }
@@ -775,7 +813,7 @@ export function loadMissionOrchestrationJournal(
   missionPathHint?: string
 ): MissionOrchestrationJournalEntry[] {
   const filePath = journalPath(missionId, scope, missionPathHint);
-  if (!safeExistsSync(filePath)) return [];
+  if (!filePath || !safeExistsSync(filePath)) return [];
   if (!safeLstat(filePath).isFile()) {
     throw new Error('MISSION_LOG_CORRUPT:journal_file_not_regular');
   }

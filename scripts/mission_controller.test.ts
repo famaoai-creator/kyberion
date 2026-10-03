@@ -1318,7 +1318,9 @@ describe('mission_controller argument parsing', () => {
           '--project-path',
           'active/projects/public/tenant-a/project',
         ])
-      ).toThrow("mission tenant 'tenant-b' must match project tenant 'tenant-a'");
+      ).toThrow(
+        /\[PROJECT_LINK_INVALID\] create MSN-TEST-PUBLIC-TENANT-OTHER: \[SCOPE_CONTRADICTS_OWNER\] project .+ is public\/tenant-a, not public\/tenant-b .*next: .*tenant 'tenant-a'/u
+      );
     });
   });
 

@@ -58,6 +58,9 @@ import {
 
 const missionId = 'MSN-LIFECYCLE-GATE-001';
 const missionPath = pathResolver.missionDir(missionId, 'public');
+// saveState places a tenant-bound state under its tenant directory; remove it
+// too so a left-over copy never makes the mission id ambiguous for the next test.
+const demoTenantMissionPath = pathResolver.missionDir(missionId, 'public', 'demo');
 // finishMission persists the post-archive state in the archive copy and
 // leaves no stub at the active path.
 const archivedStatePath = () =>
@@ -152,6 +155,7 @@ afterEach(() => {
   safeRmSync(pathResolver.rootResolve(`active/shared/tmp/mission-archives/${missionId}`));
   safeRmSync(pathResolver.rootResolve('customer/demo'), { recursive: true, force: true });
   safeRmSync(missionPath, { recursive: true, force: true });
+  safeRmSync(demoTenantMissionPath, { recursive: true, force: true });
   safeRmSync(personalRepairMissionPath, { recursive: true, force: true });
 });
 

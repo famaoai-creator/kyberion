@@ -4,6 +4,7 @@ import { nowIso } from '../foundation/time.js';
 import * as path from 'node:path';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import * as pathResolver from '../path-resolver.js';
+import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import {
   deriveAgentNhiId,
@@ -169,16 +170,30 @@ function normalizeMissionId(missionId: string): string {
   return missionId.trim().toUpperCase();
 }
 
+/** Read-path variant: null when no hint is given and the mission is unknown. */
+function resolveExistingMissionBindingPaths(
+  missionId: string,
+  missionPathHint?: string
+): MissionBindingPaths | null {
+  if (!missionPathHint) {
+    const normalizedMissionId = normalizeMissionId(missionId);
+    pathResolver.assertMissionIdArgument(normalizedMissionId);
+    if (!tryResolveOwnerScope({ kind: 'mission', id: normalizedMissionId })) return null;
+  }
+  return resolveMissionBindingPaths(missionId, missionPathHint);
+}
+
+/**
+ * Binding paths inside the existing mission's own directory (or the caller's
+ * already-resolved mission path). An unknown mission fails closed.
+ */
 function resolveMissionBindingPaths(
   missionId: string,
   missionPathHint?: string
 ): MissionBindingPaths {
   const normalizedMissionId = normalizeMissionId(missionId);
   pathResolver.assertMissionIdArgument(normalizedMissionId);
-  const missionPath =
-    missionPathHint ||
-    pathResolver.findMissionPath(normalizedMissionId) ||
-    pathResolver.missionDir(normalizedMissionId, 'public');
+  const missionPath = missionPathHint || resolveMissionDir(normalizedMissionId);
   const safeMissionPath = assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
   return {
     missionPath: safeMissionPath,
@@ -587,8 +602,8 @@ export function loadMissionStaffingAssignments(
   missionId: string,
   missionPathHint?: string
 ): MissionStaffingAssignments | null {
-  const paths = resolveMissionBindingPaths(missionId, missionPathHint);
-  if (!safeExistsSync(paths.staffingAssignmentsPath)) return null;
+  const paths = resolveExistingMissionBindingPaths(missionId, missionPathHint);
+  if (!paths || !safeExistsSync(paths.staffingAssignmentsPath)) return null;
   const parsed = staffingAssignmentsCatalog(paths.staffingAssignmentsPath).load() as Omit<
     MissionStaffingAssignments,
     'assignments'
@@ -713,8 +728,8 @@ export function readMissionExecutionLedger(
   missionId: string,
   missionPathHint?: string
 ): MissionExecutionLedgerEntry[] {
-  const paths = resolveMissionBindingPaths(normalizeMissionId(missionId), missionPathHint);
-  if (!safeExistsSync(paths.executionLedgerPath)) return [];
+  const paths = resolveExistingMissionBindingPaths(normalizeMissionId(missionId), missionPathHint);
+  if (!paths || !safeExistsSync(paths.executionLedgerPath)) return [];
   const entries: MissionExecutionLedgerEntry[] = [];
   for (const line of readTextFile(paths.executionLedgerPath).split('\n')) {
     const trimmed = line.trim();

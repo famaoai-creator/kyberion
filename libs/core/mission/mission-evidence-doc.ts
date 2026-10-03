@@ -18,6 +18,7 @@ import { nowIso } from '../foundation/time.js';
 import * as path from 'node:path';
 import { logger } from '../core.js';
 import * as pathResolver from '../path-resolver.js';
+import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
 import { auditChain } from '../governance/audit-chain.js';
@@ -50,9 +51,17 @@ export class MissionEvidenceDoc<T> {
 
   /** Absolute path to the document. */
   get filePath(): string {
-    const evidenceDir =
-      pathResolver.missionEvidenceDir(this.options.mission_id) ??
-      pathResolver.rootResolve(`active/missions/confidential/${this.options.mission_id}/evidence`);
+    // The existing mission's own evidence dir. For an unknown mission this is
+    // only a read-side path (nothing exists there); write() fails closed first.
+    const ownMissionDir = tryResolveOwnerScope({
+      kind: 'mission',
+      id: this.options.mission_id,
+    })?.dir;
+    const evidenceDir = ownMissionDir
+      ? path.join(ownMissionDir, 'evidence')
+      : pathResolver.rootResolve(
+          `active/missions/confidential/${this.options.mission_id}/evidence`
+        );
     const safeEvidenceDir = assertSafeRepositoryPath(evidenceDir, { allowMissingLeaf: true });
     const candidate = path.resolve(safeEvidenceDir, this.options.filename);
     const relative = path.relative(safeEvidenceDir, candidate);
@@ -106,7 +115,7 @@ export class MissionEvidenceDoc<T> {
    * Write the document and optionally emit one audit-chain entry. The
    * `auditAction` is the load-bearing label (e.g. `voice_consent.grant`).
    * When `missionAudit` is true, a copy of the audit entry is also written
-   * to the mission-local audit directory (active/missions/{tier}/{id}/audit/).
+   * to the mission-local audit directory (`<mission dir>/audit/`).
    * Returns the audit event id when one was recorded, or empty string.
    */
   write(
@@ -116,15 +125,16 @@ export class MissionEvidenceDoc<T> {
       reason?: string;
       metadata?: Record<string, unknown>;
       missionAudit?: boolean;
+      /** Accepted for compatibility; the audit copy follows the mission's own location. */
       tier?: 'personal' | 'confidential' | 'public';
     }
   ): { audit_event_id: string } {
+    // A write needs the existing mission: an unknown one fails closed
+    // (OwnerScopeError) instead of landing in a guessed confidential tree.
+    const missionPath = assertSafeRepositoryPath(resolveMissionDir(this.options.mission_id), {
+      allowMissingLeaf: true,
+    });
     const filePath = this.filePath;
-    const missionPath = assertSafeRepositoryPath(
-      pathResolver.findMissionPath(this.options.mission_id) ||
-        pathResolver.missionDir(this.options.mission_id, 'confidential'),
-      { allowMissingLeaf: true }
-    );
     safeMkdir(path.dirname(filePath), { recursive: true });
     writeProvisionedJson({
       missionId: this.options.mission_id,
@@ -148,8 +158,9 @@ export class MissionEvidenceDoc<T> {
       // Mission-local audit copy
       if (audit.missionAudit) {
         try {
-          const tier = audit.tier ?? 'confidential';
-          const auditDir = pathResolver.missionAuditDir(this.options.mission_id, tier);
+          // `audit.tier` is no longer a placement input: the copy lands beside
+          // the mission's own record.
+          const auditDir = path.join(missionPath, 'audit');
           const date = nowIso().slice(0, 10);
           const auditPath = assertSafeRepositoryPath(path.join(auditDir, `audit-${date}.jsonl`), {
             allowMissingLeaf: true,

@@ -71,6 +71,42 @@ The floors (`tmp`, `staging`, `cache`, `artifacts`) share one partition rule
 - A path directly under a floor root without a partition segment is
   **legacy**: it predates this layout and carries no governing tier.
 
+### Owner scope (deterministic placement)
+
+A write that belongs to an owner — a mission, task, project or organization —
+is placed by the **owner's own record**, never by the caller's guess
+(`libs/core/owner-scope.ts`):
+
+| Owner        | Source of tier / tenant / organization                                                               |
+| ------------ | ---------------------------------------------------------------------------------------------------- |
+| mission      | `mission-state.json` where the mission actually lives (any tier, tenant-nested or not)               |
+| project      | the project record (`tier`, `tenant_slug`, `organization_id`)                                        |
+| organization | its directory `active/organizations/<tier>/<tenant\|shared>/<org>/` (ids are unique per tenant only) |
+
+- `resolveOwnerScope(owner, hint?)` / `resolveMissionDir(id, hint?)`. A caller
+  tier/tenant is a **hint that may only narrow**: it may select among same-id
+  owners, and it must agree with the owner it resolves to.
+- Lookup does not depend on `KYBERION_TENANT`, but visibility does: an identity
+  bound to tenant T never resolves another tenant's owner (it reads as not
+  found — nothing is disclosed).
+- Failures are `OwnerScopeError` with a code and a remedy, rendered
+  `[CODE] what — why | next: remedy`:
+  `OWNER_NOT_FOUND` (no guessed directory is ever created),
+  `OWNER_AMBIGUOUS` (same id in several tenants — pass tier/tenant),
+  `SCOPE_CONTRADICTS_OWNER` (with `expected` / `actual`),
+  `OWNER_ID_INVALID`.
+- `writeScopedArtifact` and `readScopedArtifactIndex` (mission, task, project,
+  organization scopes), mission → project links, project operational state and
+  the orchestration / task-event / journal mission directories all resolve
+  through it. Session, tenant and system scopes have no owner record and keep
+  their explicit (or default) tier.
+
+The artifact ownership registry (`active/shared/runtime/artifacts/registry.jsonl`)
+is append-only; its current state is the **latest row per `artifact_id`**.
+Queries de-duplicate before filtering, so a superseded row (e.g. a mission
+deliverable since promoted to its project) never matches its old owner, and
+the storage janitor compacts the file to those rows.
+
 ## 3. Surface visibility
 
 Surfaces (Chronos deliverable inbox, mission-asset preview) list
@@ -137,6 +173,7 @@ organizations' digests.
 ## References
 
 - `libs/core/storage-layout.ts` — floor resolver and classifier
+- `libs/core/owner-scope.ts` — owner-derived scope (`resolveOwnerScope`, `resolveMissionDir`)
 - `libs/core/workforce/artifact-store.ts` — `writeScopedArtifact`
 - `knowledge/product/governance/storage-retention-catalog.json` — TTLs
 - `knowledge/product/governance/security-policy.json` — `tenant_scope`

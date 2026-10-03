@@ -17,6 +17,7 @@ import {
   DEFAULT_PIPELINE_TIMEOUT_MS,
 } from '@agent/core/execution-bounds';
 import { pathResolver } from '@agent/core/path-resolver';
+import { resolveMissionDir } from '@agent/core/owner-scope';
 import { evaluateCondition, getPathValue, resolveWriteArtifactSpec } from '@agent/core/logic-utils';
 import { retry, getRetryDefaults } from '@agent/core/async-utils';
 
@@ -1141,10 +1142,17 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
         '[AGENTIC_SOURCE_REVIEW_MISSION_OUTPUT_REQUIRED] approved review artifacts require tenant_slug and mission_id'
       );
     }
-    const evidenceRoot = path.resolve(
-      pathResolver.missionDir(missionId, 'confidential', tenantSlug),
-      'evidence'
-    );
+    // The mission's own evidence directory; the tenant only narrows it
+    // (a contradiction or an unknown mission fails closed).
+    let ownMissionDir: string;
+    try {
+      ownMissionDir = resolveMissionDir(missionId, { tenant: tenantSlug });
+    } catch (error) {
+      throw new Error(
+        `[AGENTIC_SOURCE_REVIEW_MISSION_OUTPUT_REQUIRED] approved review artifacts require an existing mission in tenant ${tenantSlug}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+    const evidenceRoot = path.resolve(ownMissionDir, 'evidence');
     const outputPath = resolveModelingRepositoryPath(rootDir, outputDir, 'mission_evidence');
     const relativeToEvidence = path.relative(evidenceRoot, outputPath);
     if (relativeToEvidence.startsWith(`..${path.sep}`) || path.isAbsolute(relativeToEvidence)) {

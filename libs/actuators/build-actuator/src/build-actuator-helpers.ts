@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { logger } from '@agent/core/core';
 import { nowIso } from '@agent/core/foundation';
-import { missionDir } from '@agent/core/path-resolver';
+import { resolveMissionDir } from '@agent/core/owner-scope';
 import * as pathResolver from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -163,7 +163,9 @@ export function buildCommandForOp(input: BuildActuatorInput): {
 function buildLogPath(op: BuildOp, missionId?: string): string {
   const stamp = nowIso().replace(/[:.]/g, '-');
   if (missionId) {
-    const dir = path.join(missionDir(missionId, 'public'), 'evidence', 'build');
+    // Build evidence lands in the existing mission's own directory; an unknown
+    // mission fails closed (OwnerScopeError) instead of landing in public.
+    const dir = path.join(resolveMissionDir(missionId), 'evidence', 'build');
     safeMkdir(dir, { recursive: true });
     return assertSafeRepositoryPath(path.join(dir, `${op}-${stamp}.log`), {
       allowMissingLeaf: true,

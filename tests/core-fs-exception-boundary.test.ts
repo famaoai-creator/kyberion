@@ -47,6 +47,8 @@ const allowedCoreFsImports = [
   'libs/core/workforce/artifact-store.test.ts',
   // Hermetic mission→project promotion / org digest artifact tests (temp KYBERION_ROOT).
   'libs/core/mission/mission-artifact-promotion.test.ts',
+  // Hermetic owner-scope resolution tests (temp KYBERION_ROOT).
+  'libs/core/owner-scope.test.ts',
   'libs/core/mission/mission-seal.test.ts',
   'libs/core/output-artifacts.test.ts',
   // AL-01 hermetic purge test: raw fs to seed/inspect a temp KYBERION_ROOT.

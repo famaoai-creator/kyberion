@@ -15,6 +15,7 @@ import {
   type ArtifactOwnershipRecord,
 } from '../workforce/artifact-registry.js';
 import { findMissionPath, pathResolver } from '../path-resolver.js';
+import { tryResolveOwnerScope } from '../owner-scope.js';
 import {
   loadProjectOperationalState,
   projectOperationalStatePath,
@@ -515,12 +516,31 @@ function buildContextPackId(input: {
   return parts.join('-');
 }
 
+/**
+ * Existing mission directory from its own record (all tiers/tenants). The
+ * caller tier is only a fallback for a descriptive source ref of a mission
+ * that is not on disk — context-pack paths are read, never written, here.
+ */
+function existingOrDescriptiveMissionDir(
+  missionId: string,
+  tier: MissionTier,
+  tenantSlug?: string
+): string {
+  return (
+    tryResolveOwnerScope(
+      { kind: 'mission', id: missionId },
+      tenantSlug ? { tenant: tenantSlug } : undefined
+    )?.dir || pathResolver.missionDir(missionId, tier)
+  );
+}
+
 function missionStatePath(missionId: string, tier: MissionTier): string {
-  const missionPath = findMissionPath(missionId) || pathResolver.missionDir(missionId, tier);
+  const missionPath = existingOrDescriptiveMissionDir(missionId, tier);
   return safeMissionArtifactPath(missionPath, 'mission-state.json');
 }
 
 function loadMissionState(missionId: string, tier: MissionTier): MissionStateSummary | null {
+  if (!tryResolveOwnerScope({ kind: 'mission', id: missionId })) return null;
   const filePath = missionStatePath(missionId, tier);
   return loadMissionStateAtPath(filePath) as MissionStateSummary | null;
 }
@@ -1321,7 +1341,11 @@ export async function resolveMissionContextPack(
 
   return buildMissionContextPack({
     missionState,
-    missionPath: findMissionPath(input.missionId) || pathResolver.missionDir(input.missionId, tier),
+    missionPath: existingOrDescriptiveMissionDir(
+      input.missionId,
+      tier,
+      missionState.tenant_slug || undefined
+    ),
     recipientKind: input.recipientKind || (input.assigneePeerId ? 'agent' : 'subagent'),
     teamRole: input.teamRole,
     assigneePeerId: input.assigneePeerId,

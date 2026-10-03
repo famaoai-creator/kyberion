@@ -33,6 +33,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import type { MissionState } from './mission-types.js';
+import { writeMissionStateAtPath } from './mission-state-reader.js';
 import { dispatchMissionTickets } from './mission-ticket-dispatch.js';
 import { dispatchMissionWorkItems } from './mission-workitem-dispatch.js';
 import {
@@ -139,6 +140,14 @@ vi.mock('../workforce/artifact-registry.js', async () => {
     listArtifactOwnershipRecords: (): ArtifactOwnershipRecord[] => [
       ...artifactRegistryStore.records,
     ],
+    listLatestArtifactOwnershipRecords: (): ArtifactOwnershipRecord[] => {
+      const latest = new Map<string, ArtifactOwnershipRecord>();
+      for (const record of artifactRegistryStore.records) {
+        latest.delete(record.artifact_id);
+        latest.set(record.artifact_id, record);
+      }
+      return [...latest.values()];
+    },
     listArtifactOwnershipRecordsByQuery: listByQuery,
     listArtifactOwnershipRecordsForProject: (
       projectId: string,
@@ -256,6 +265,8 @@ beforeEach(() => {
   setWorkCoordinationNamespace(workCoordinationNamespace);
   clearWorkCoordinationStore();
   if (!safeExistsSync(missionPath)) safeMkdir(missionPath, { recursive: true });
+  // Mission-local reads/writes resolve the mission's own record (owner scope).
+  writeMissionStateAtPath(nodePath.join(missionPath, 'mission-state.json'), makeMissionState());
 });
 
 afterEach(() => {

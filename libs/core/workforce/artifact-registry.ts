@@ -3,9 +3,20 @@ import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from '../secure-io.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 
 import { ARTIFACT_KINDS, type ArtifactKind } from './artifact-kind.generated.js';
+
+const ARTIFACT_REGISTRY_LOCK = 'artifact-ownership-registry';
+/** Generous: a concurrent compaction rewrite must never fail a publication. */
+const APPEND_LOCK_TIMEOUT_MS = 30_000;
 export { ARTIFACT_KINDS, type ArtifactKind } from './artifact-kind.generated.js';
 
 export interface ArtifactOwnershipRecord {
@@ -155,8 +166,16 @@ export function appendArtifactOwnershipRecord(
     allowMissingLeaf: true,
   });
   if (!safeExistsSync(registryDir)) safeMkdir(registryDir, { recursive: true });
-  ensureArtifactRegistryFile(registryPath);
-  appendJsonLine(registryPath, validated);
+  // Appends and compaction share one lock: a compaction rewrite never drops a
+  // row appended while it ran.
+  withLockSync(
+    ARTIFACT_REGISTRY_LOCK,
+    () => {
+      ensureArtifactRegistryFile(registryPath);
+      appendJsonLine(registryPath, validated);
+    },
+    APPEND_LOCK_TIMEOUT_MS
+  );
   return registryPath;
 }
 
@@ -176,12 +195,117 @@ export function listArtifactOwnershipRecords(): ArtifactOwnershipRecord[] {
   }
 }
 
+/**
+ * The registry is append-only: re-registering an artifact (re-publish, mission
+ * → project promotion, a deterministic-id update) appends a new row. The
+ * current ownership of each artifact is its LAST row; keep it in the order of
+ * that last write. `listArtifactOwnershipRecords` stays the raw history.
+ */
+function latestByArtifactId(records: ArtifactOwnershipRecord[]): ArtifactOwnershipRecord[] {
+  const latest = new Map<string, ArtifactOwnershipRecord>();
+  for (const record of records) {
+    latest.delete(record.artifact_id);
+    latest.set(record.artifact_id, record);
+  }
+  return [...latest.values()];
+}
+
+/**
+ * Latest row per (artifact_id, owner). Keeps every distinct owner an artifact
+ * ever had — offboarding counts that history — while the artifact's overall
+ * latest row stays last among its rows, so latestByArtifactId is unchanged.
+ */
+function latestByArtifactOwner(records: ArtifactOwnershipRecord[]): ArtifactOwnershipRecord[] {
+  const latest = new Map<string, ArtifactOwnershipRecord>();
+  for (const record of records) {
+    const key = JSON.stringify([
+      record.artifact_id,
+      record.tenant_slug ?? '',
+      record.organization_id ?? '',
+      record.project_id ?? '',
+      record.mission_id ?? '',
+      record.task_session_id ?? '',
+    ]);
+    latest.delete(key);
+    latest.set(key, record);
+  }
+  return [...latest.values()];
+}
+
+/** Current ownership: one row per artifact_id (its latest). */
+export function listLatestArtifactOwnershipRecords(): ArtifactOwnershipRecord[] {
+  return latestByArtifactId(listArtifactOwnershipRecords());
+}
+
 export function listArtifactOwnershipRecordsByQuery(
   query: ArtifactOwnershipQuery = {}
 ): ArtifactOwnershipRecord[] {
-  return listArtifactOwnershipRecords()
+  // De-duplicate BEFORE filtering: a superseded row (e.g. the mission owner of
+  // a deliverable since promoted to its project) must not still match.
+  return listLatestArtifactOwnershipRecords()
     .filter((record) => matchesQuery(record, query))
     .sort(compareArtifactOwnershipRecords);
+}
+
+/**
+ * Every artifact any row of the history attributes to the query (current or
+ * superseded owner), latest row per artifact. For offboarding / audit, where an
+ * artifact once owned by a tenant still counts after it was re-registered.
+ */
+export function listArtifactOwnershipHistoryByQuery(
+  query: ArtifactOwnershipQuery = {}
+): ArtifactOwnershipRecord[] {
+  const rows = listArtifactOwnershipRecords();
+  const matchedIds = new Set(
+    rows.filter((record) => matchesQuery(record, query)).map((record) => record.artifact_id)
+  );
+  return latestByArtifactId(rows)
+    .filter((record) => matchedIds.has(record.artifact_id))
+    .sort(compareArtifactOwnershipRecords);
+}
+
+export interface ArtifactOwnershipCompaction {
+  total_rows: number;
+  kept_rows: number;
+  removed_rows: number;
+  applied: boolean;
+}
+
+/**
+ * Rewrite the registry to its latest row per artifact_id and owner: repeated
+ * re-registrations collapse, an earlier owner's row survives so ownership
+ * history (offboarding) is not lost. Dry run by default
+ * (reports what would be removed). Runs under the append lock, so no row
+ * appended concurrently is lost.
+ */
+export function compactArtifactOwnershipRegistry(
+  options: { dryRun?: boolean } = {}
+): ArtifactOwnershipCompaction {
+  const dryRun = options.dryRun ?? true;
+  const registryPath = artifactRegistryPath();
+  const plan = (): { rows: number; kept: ArtifactOwnershipRecord[] } => {
+    const rows = listArtifactOwnershipRecords();
+    return { rows: rows.length, kept: latestByArtifactOwner(rows) };
+  };
+  const summarize = (
+    { rows, kept }: { rows: number; kept: ArtifactOwnershipRecord[] },
+    applied: boolean
+  ): ArtifactOwnershipCompaction => ({
+    total_rows: rows,
+    kept_rows: kept.length,
+    removed_rows: rows - kept.length,
+    applied,
+  });
+  // A dry run only reads: it never blocks publications.
+  const preview = plan();
+  if (dryRun || preview.rows === preview.kept.length) return summarize(preview, false);
+  return withLockSync(ARTIFACT_REGISTRY_LOCK, () => {
+    // Re-read under the lock: rows appended since the preview are kept.
+    const current = plan();
+    if (current.rows === current.kept.length) return summarize(current, false);
+    safeWriteFile(registryPath, `${current.kept.map((row) => JSON.stringify(row)).join('\n')}\n`);
+    return summarize(current, true);
+  });
 }
 
 export function listArtifactOwnershipRecordsForProject(

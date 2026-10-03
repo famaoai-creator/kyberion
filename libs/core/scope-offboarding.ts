@@ -43,7 +43,7 @@ import {
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
-import { listArtifactOwnershipRecordsByQuery } from './workforce/artifact-registry.js';
+import { listArtifactOwnershipHistoryByQuery } from './workforce/artifact-registry.js';
 import {
   appendRetentionAudit,
   repoRelativePosix,
@@ -974,7 +974,9 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
   try {
     const physicalFilter = { tenantSlug, organizationId };
     result.targets = collectScopeTargets(scopeType, scopeId, physicalFilter);
-    const ownedArtifacts = listArtifactOwnershipRecordsByQuery(
+    // Ownership history, not only current owners: an artifact this scope
+    // owned before it was re-registered (e.g. promoted) still counts.
+    const ownedArtifacts = listArtifactOwnershipHistoryByQuery(
       scopeType === 'tenant' ? { tenantSlug: scopeId } : { projectId: scopeId }
     );
     if (ownedArtifacts.length > 0) {

@@ -3,7 +3,7 @@ import { listMissionsInSearchDirs, loadStateAtPath } from '../mission/mission-st
 import type { MissionState } from '../mission/mission-types.js';
 import { pathResolver } from '../path-resolver.js';
 import {
-  listArtifactOwnershipRecords,
+  listLatestArtifactOwnershipRecords,
   type ArtifactOwnershipRecord,
 } from '../workforce/artifact-registry.js';
 
@@ -130,12 +130,9 @@ export function projectArtifactRecords(
   missionIds: Iterable<string>
 ): ArtifactOwnershipRecord[] {
   const missions = new Set(missionIds);
-  // The ownership registry is append-only: a re-registered artifact (e.g. a
-  // mission deliverable promoted to its project) appears once per write, and
-  // the last row is the current one.
-  const latest = new Map<string, ArtifactOwnershipRecord>();
-  for (const record of listArtifactOwnershipRecords()) latest.set(record.artifact_id, record);
-  return [...latest.values()].filter((record) => {
+  // One row per artifact (its latest): a re-registered artifact, e.g. a
+  // mission deliverable promoted to its project, is listed once.
+  return listLatestArtifactOwnershipRecords().filter((record) => {
     if (record.storage_class === 'tmp') return false;
     if (record.tenant_slug && record.tenant_slug !== scope.tenant) return false;
     // Exclude a record carrying another tier (higher-tier data must never

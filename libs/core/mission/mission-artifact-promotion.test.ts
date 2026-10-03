@@ -76,6 +76,39 @@ describe('mission artifact promotion', () => {
     projects = await import('../project/project-registry.js');
     registerProject('proj-a', 'public');
     registerProject('proj-conf', 'confidential', 'acme');
+    // Owned writes are placed by the owner's record: the missions and the
+    // digest's organizations exist.
+    for (const missionId of [
+      'MSN-PROMOTE-A',
+      'MSN-PROMOTE-SCOPE',
+      'MSN-PROMOTE-REPUB',
+      'MSN-PROMOTE-FORGED',
+    ]) {
+      const dir = path.join(tmpRoot, 'active/missions', missionId);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, 'mission-state.json'),
+        JSON.stringify({
+          mission_id: missionId,
+          tier: 'public',
+          status: 'completed',
+          execution_mode: 'local',
+          priority: 1,
+          assigned_persona: 'worker',
+          confidence_score: 1,
+          git: { branch: 'm', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+          history: [],
+        })
+      );
+    }
+    for (const [tier, tenant, org] of [
+      ['confidential', 'acme', 'org-a'],
+      ['public', 'shared', 'org-b'],
+    ]) {
+      fs.mkdirSync(path.join(tmpRoot, 'active/organizations', tier, tenant, org, 'state'), {
+        recursive: true,
+      });
+    }
   });
 
   afterAll(() => {

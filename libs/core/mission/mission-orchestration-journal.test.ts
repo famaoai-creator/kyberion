@@ -1,19 +1,65 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '../secure-io.js';
+import { writeMissionStateAtPath } from './mission-state-reader.js';
+import type { MissionState } from './mission-types.js';
+
+const seededMissionDirs: string[] = [];
+
+/** Journal writes resolve the mission's own location, so the mission must exist. */
+function seedMission(
+  missionId: string,
+  tier: 'public' | 'confidential' = 'public',
+  tenantSlug?: string
+): string {
+  return withExecutionContext('mission_controller', () => {
+    const dir = pathResolver.missionDir(missionId, tier, tenantSlug);
+    writeMissionStateAtPath(path.join(dir, 'mission-state.json'), {
+      mission_id: missionId,
+      tier,
+      ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+      status: 'active',
+      execution_mode: 'local',
+      priority: 1,
+      assigned_persona: 'worker',
+      confidence_score: 1,
+      git: {
+        branch: `mission/${missionId}`,
+        start_commit: 'a',
+        latest_commit: 'a',
+        checkpoints: [],
+      },
+      history: [],
+    } as unknown as MissionState);
+    seededMissionDirs.push(dir);
+    return dir;
+  });
+}
 
 describe('mission-orchestration-journal', () => {
   beforeEach(() => {
     process.env.MISSION_ROLE = 'mission_controller';
   });
 
+  afterAll(() => {
+    withExecutionContext('mission_controller', () => {
+      for (const dir of seededMissionDirs) {
+        if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
+      }
+    });
+  });
+
   it('tracks enqueued/completed events and resolves the next replay candidate', async () => {
     const missionId = 'MSN-JOURNAL-1';
-    const missionPath = withExecutionContext('mission_controller', () =>
-      pathResolver.missionDir(missionId, 'public')
-    );
+    const missionPath = seedMission(missionId);
     withExecutionContext('mission_controller', () => {
       safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
     });
@@ -70,9 +116,7 @@ describe('mission-orchestration-journal', () => {
 
   it('counts all pending events in the replay plan', async () => {
     const missionId = 'MSN-JOURNAL-2';
-    const missionPath = withExecutionContext('mission_controller', () =>
-      pathResolver.missionDir(missionId, 'public')
-    );
+    const missionPath = seedMission(missionId);
     withExecutionContext('mission_controller', () => {
       safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
     });
@@ -123,9 +167,7 @@ describe('mission-orchestration-journal', () => {
       await import('./mission-orchestration-journal.js');
 
     const missionId = `MSN-JOURNAL-OP-${process.pid}`;
-    const missionPath = withExecutionContext('mission_controller', () =>
-      pathResolver.missionDir(missionId, 'public')
-    );
+    const missionPath = seedMission(missionId);
     withExecutionContext('mission_controller', () => {
       safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
     });
@@ -209,9 +251,7 @@ describe('mission-orchestration-journal', () => {
       reduceMissionState,
     } = await import('./mission-orchestration-journal.js');
     const missionId = `MSN-JOURNAL-CORRUPT-${process.pid}`;
-    const missionPath = withExecutionContext('mission_controller', () =>
-      pathResolver.missionDir(missionId, 'public')
-    );
+    const missionPath = seedMission(missionId);
     withExecutionContext('mission_controller', () => {
       safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
       safeMkdir(`${missionPath}/coordination`, { recursive: true });
@@ -278,9 +318,7 @@ describe('mission-orchestration-journal', () => {
   it('rejects a journal stream replaced by a directory', async () => {
     const { loadMissionOrchestrationJournal } = await import('./mission-orchestration-journal.js');
     const missionId = `MSN-JOURNAL-DIRECTORY-${process.pid}`;
-    const missionPath = withExecutionContext('mission_controller', () =>
-      pathResolver.missionDir(missionId, 'public')
-    );
+    const missionPath = seedMission(missionId);
     const journalPath = `${missionPath}/coordination/orchestration-journal.jsonl`;
     withExecutionContext('mission_controller', () => {
       safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
@@ -302,9 +340,7 @@ describe('mission-orchestration-journal', () => {
     const { loadProvisionedEntryRecords, provisionMissionEntry, writeProvisionedJson } =
       await import('./mission-orchestration-journal.js');
     const missionId = `MSN-JOURNAL-PROVISION-${process.pid}`;
-    const missionPath = withExecutionContext('mission_controller', () =>
-      pathResolver.missionDir(missionId, 'public')
-    );
+    const missionPath = seedMission(missionId);
     const dir = pathResolver.shared(`tmp/pi-provisioned-json-${process.pid}`);
     const filePath = `${dir}/NEXT_TASKS.json`;
     withExecutionContext('mission_controller', () => {
@@ -338,9 +374,7 @@ describe('mission-orchestration-journal', () => {
     const { loadProvisionedEntryRecords, provisionMissionEntry, writeProvisionedText } =
       await import('./mission-orchestration-journal.js');
     const missionId = `MSN-JOURNAL-TEXT-${process.pid}`;
-    const missionPath = withExecutionContext('mission_controller', () =>
-      pathResolver.missionDir(missionId, 'public')
-    );
+    const missionPath = seedMission(missionId);
     const dir = pathResolver.shared(`tmp/pi-provisioned-text-${process.pid}`);
     const filePath = `${dir}/PLAN.md`;
     withExecutionContext('mission_controller', () => {
@@ -396,9 +430,7 @@ describe('mission-orchestration-journal', () => {
 
   it('blocks orchestration replay while a provisioned receipt is unverified', async () => {
     const missionId = `MSN-JOURNAL-RECOVERY-${process.pid}`;
-    const missionPath = withExecutionContext('mission_controller', () =>
-      pathResolver.missionDir(missionId, 'public')
-    );
+    const missionPath = seedMission(missionId);
     withExecutionContext('mission_controller', () => {
       safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
     });
@@ -448,9 +480,7 @@ describe('mission-orchestration-journal', () => {
 
   it('blocks replay when a verified artifact is missing or has been changed', async () => {
     const missionId = `MSN-JOURNAL-TARGET-${process.pid}`;
-    const missionPath = withExecutionContext('mission_controller', () =>
-      pathResolver.missionDir(missionId, 'public')
-    );
+    const missionPath = seedMission(missionId);
     const artifactPath = `${missionPath}/PLAN.md`;
     withExecutionContext('mission_controller', () => {
       safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
@@ -510,9 +540,7 @@ describe('mission-orchestration-journal', () => {
 
   it('rejects a verified provisioned artifact replaced by a directory', async () => {
     const missionId = `MSN-JOURNAL-TARGET-DIRECTORY-${process.pid}`;
-    const missionPath = withExecutionContext('mission_controller', () =>
-      pathResolver.missionDir(missionId, 'public')
-    );
+    const missionPath = seedMission(missionId);
     const artifactPath = `${missionPath}/PLAN.md`;
     withExecutionContext('mission_controller', () => {
       safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
@@ -549,9 +577,7 @@ describe('mission-orchestration-journal', () => {
   it('rejects malformed provisioned-entry records through the schema boundary', async () => {
     const { loadProvisionedEntryRecords } = await import('./mission-orchestration-journal.js');
     const missionId = `MSN-JOURNAL-RECORD-SCHEMA-${process.pid}`;
-    const missionPath = withExecutionContext('mission_controller', () =>
-      pathResolver.missionDir(missionId, 'public')
-    );
+    const missionPath = seedMission(missionId);
     const recordPath = `${missionPath}/coordination/provisioned-entries.jsonl`;
     withExecutionContext('mission_controller', () => {
       safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
@@ -565,5 +591,71 @@ describe('mission-orchestration-journal', () => {
     withExecutionContext('mission_controller', () =>
       safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true })
     );
+  });
+
+  it('writes a confidential tenant mission journal into its own tenant directory', async () => {
+    const { appendMissionOrchestrationJournalEntry, loadMissionOrchestrationJournal } =
+      await import('./mission-orchestration-journal.js');
+    const missionId = `MSN-JOURNAL-TENANT-${process.pid}`;
+    const tenantPath = seedMission(missionId, 'confidential', 'acme');
+    const publicPath = pathResolver.missionDir(missionId, 'public');
+
+    // No scope at all: the mission's own record places the write.
+    appendMissionOrchestrationJournalEntry({
+      missionId,
+      eventId: 'ME-TENANT-1',
+      eventType: 'mission_issue_requested',
+      status: 'completed',
+      payload: {},
+    });
+
+    const journalFile = `${tenantPath}/coordination/orchestration-journal.jsonl`;
+    expect(tenantPath).toContain(`${path.sep}acme${path.sep}`);
+    expect(withExecutionContext('mission_controller', () => safeExistsSync(journalFile))).toBe(
+      true
+    );
+    expect(withExecutionContext('mission_controller', () => safeExistsSync(publicPath))).toBe(
+      false
+    );
+    expect(loadMissionOrchestrationJournal(missionId).map((entry) => entry.event_id)).toEqual([
+      'ME-TENANT-1',
+    ]);
+  });
+
+  it('fails closed when an explicit tenant contradicts the mission or the mission is unknown', async () => {
+    const { appendMissionOrchestrationJournalEntry, loadMissionOrchestrationJournal } =
+      await import('./mission-orchestration-journal.js');
+    const { normalizeEventScope } = await import('../event-scope.js');
+    const missionId = `MSN-JOURNAL-CONTRA-${process.pid}`;
+    seedMission(missionId, 'confidential', 'acme');
+    const append = (id: string, tenantSlug: string) =>
+      appendMissionOrchestrationJournalEntry({
+        missionId: id,
+        eventId: 'ME-CONTRA-1',
+        eventType: 'mission_issue_requested',
+        status: 'completed',
+        payload: {},
+        scope: normalizeEventScope({
+          mission_id: id,
+          tier: 'confidential',
+          tenant_slug: tenantSlug,
+        }),
+      });
+
+    expect(() => append(missionId, 'globex')).toThrow(
+      expect.objectContaining({ code: 'SCOPE_CONTRADICTS_OWNER' })
+    );
+    expect(
+      withExecutionContext('mission_controller', () =>
+        safeExistsSync(pathResolver.missionDir(missionId, 'confidential', 'globex'))
+      )
+    ).toBe(false);
+
+    const unknownId = `MSN-JOURNAL-UNKNOWN-${process.pid}`;
+    expect(() => append(unknownId, 'acme')).toThrow(
+      expect.objectContaining({ code: 'OWNER_NOT_FOUND' })
+    );
+    // Reads keep their not-found contract: an unknown mission has no journal.
+    expect(loadMissionOrchestrationJournal(unknownId)).toEqual([]);
   });
 });

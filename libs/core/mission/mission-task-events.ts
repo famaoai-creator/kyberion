@@ -2,15 +2,12 @@ import { appendJsonLine } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
 import { randomUUID } from 'node:crypto';
 import * as nodePath from 'node:path';
-import { findMissionPath, missionDir, pathResolver } from '../path-resolver.js';
+import { pathResolver } from '../path-resolver.js';
+import { resolveMissionDir } from '../owner-scope.js';
+import { locateMissionForScope } from './mission-orchestration-event-loader.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { resolveSharedObservabilityDir } from '../analysis/observability-gate.js';
-import {
-  assertSafeRepositoryPath,
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-} from '../secure-io.js';
+import { assertSafeRepositoryPath, safeAppendFileSync, safeMkdir } from '../secure-io.js';
 import { appendMissionExecutionLedgerEntry } from './mission-team-binding.js';
 import { redactCollaborationSummary } from '../agent/agent-collaboration-events.js';
 import {
@@ -113,11 +110,9 @@ export function missionTaskEventsPath(
   tenantSlug?: string
 ): string {
   pathResolver.assertMissionIdArgument(missionId);
-  const missionPath =
-    findMissionPath(missionId) ||
-    (tenantSlug
-      ? pathResolver.tenantMissionDir(missionId, tenantSlug, fallbackTier)
-      : missionDir(missionId, fallbackTier));
+  // Task events live beside the existing mission. An explicit tenant only
+  // selects among same-id missions; an unknown mission fails closed.
+  const missionPath = resolveMissionDir(missionId, tenantSlug ? { tenant: tenantSlug } : undefined);
   return assertSafeRepositoryPath(`${missionPath}/coordination/events/task-events.jsonl`, {
     allowMissingLeaf: true,
   });
@@ -185,23 +180,18 @@ export function emitMissionTaskEvent(input: MissionTaskEventInput): void {
 }
 
 function resolveTaskEventScope(input: MissionTaskEventInput): EventScope {
-  const suppliedTenant = input.scope?.tenant_slug || input.scope?.tenant_id;
-  const suppliedTier = input.scope?.tier;
-  const tenantMissionPath =
-    suppliedTenant && suppliedTier
-      ? pathResolver.tenantMissionDir(input.mission_id, suppliedTenant, suppliedTier)
-      : undefined;
-  const missionPath =
-    findMissionPath(input.mission_id) ||
-    (tenantMissionPath && safeExistsSync(tenantMissionPath)
-      ? tenantMissionPath
-      : missionDir(input.mission_id, 'public'));
+  // The mission's own record is the authority; the supplied scope only
+  // selects among same-id missions (a contradiction is a lineage conflict).
+  const missionPath = locateMissionForScope(input.mission_id, input.scope);
   let authority: EventScope;
   try {
-    const statePath = assertSafeRepositoryPath(`${missionPath}/mission-state.json`, {
-      allowMissingLeaf: true,
-    });
-    const state = loadMissionStateAtPath(statePath);
+    const state = missionPath
+      ? loadMissionStateAtPath(
+          assertSafeRepositoryPath(`${missionPath}/mission-state.json`, {
+            allowMissingLeaf: true,
+          })
+        )
+      : null;
     authority = normalizeEventScope({
       mission_id: input.mission_id,
       tier: state?.tier || 'public',

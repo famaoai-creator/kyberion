@@ -4,7 +4,8 @@ import {
   hashArtifactForReview,
   inferArtifactReviewKind,
 } from '../workforce/artifact-review.js';
-import { missionDir, pathResolver } from '../path-resolver.js';
+import { pathResolver } from '../path-resolver.js';
+import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
 import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import { resolveArtifactReviewerProfile } from './mission-review-gates.js';
 import { missionClassOf, missionRiskProfileOf } from './mission-orchestration-phase-gates.js';
@@ -37,8 +38,12 @@ export function resolveReviewArtifact(input: {
   if (!reviewTarget) return null;
   const targetTask = input.tasks.find((task) => task.task_id === reviewTarget);
   if (!targetTask) return null;
-  const missionPath = missionDir(input.missionId, 'public');
-  const diffPath = nodePath.join(missionPath, 'evidence', 'prs', reviewTarget, 'diff.patch');
+  // Read path: the mission's own directory; an unknown mission only has
+  // repository-relative candidates left (no guessed public tree).
+  const missionPath = tryResolveOwnerScope({ kind: 'mission', id: input.missionId })?.dir;
+  const diffPath = missionPath
+    ? nodePath.join(missionPath, 'evidence', 'prs', reviewTarget, 'diff.patch')
+    : '';
   const resultArtifacts = (targetTask.last_result?.artifacts || [])
     .map((artifact) => String(artifact?.path || '').trim())
     .filter(Boolean);
@@ -57,7 +62,10 @@ export function resolveReviewArtifact(input: {
   for (const candidate of candidates) {
     const possiblePaths = nodePath.isAbsolute(candidate)
       ? [candidate]
-      : [nodePath.join(missionPath, candidate), pathResolver.rootResolve(candidate)];
+      : [
+          ...(missionPath ? [nodePath.join(missionPath, candidate)] : []),
+          pathResolver.rootResolve(candidate),
+        ];
     absolutePath = possiblePaths.find((possible) => safeExistsSync(possible));
     if (absolutePath) break;
   }
@@ -145,7 +153,8 @@ export function persistArtifactReviewReceipt(input: {
 }): string | null {
   const profile = input.reviewTask.artifact_review_profile;
   if (!profile || !input.artifact.repositoryPath || !input.artifact.sha256) return null;
-  const missionPath = missionDir(input.missionId, 'public');
+  // The receipt is a mission write: an unknown mission fails closed.
+  const missionPath = resolveMissionDir(input.missionId);
   const relativePath = `evidence/reviews/${input.reviewTask.task_id}-r${input.reviewRound}.json`;
   const receiptPath = nodePath.join(missionPath, relativePath);
   const receipt = buildArtifactReviewReceipt({

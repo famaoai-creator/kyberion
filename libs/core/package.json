@@ -575,6 +575,10 @@
       "types": "./dist/organization/organization-digest-artifacts.d.ts",
       "default": "./dist/organization/organization-digest-artifacts.js"
     },
+    "./owner-scope": {
+      "types": "./dist/owner-scope.d.ts",
+      "default": "./dist/owner-scope.js"
+    },
     "./business-calendar": {
       "types": "./dist/business-calendar.d.ts",
       "default": "./dist/business-calendar.js"
