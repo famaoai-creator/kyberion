@@ -1,7 +1,16 @@
 import { timingSafeEqual, randomUUID } from 'node:crypto';
 import { fromJSONSchema, z } from 'zod';
 import { auditChain } from './governance/audit-chain.js';
-import { computeApprovalPayloadHash } from './governance/approval-store.js';
+import {
+  computeApprovalPayloadHash,
+  createApprovalRequest,
+  decideApprovalRequest,
+} from './governance/approval-store.js';
+import type { GovernedArtifactRole } from './workforce/artifact-store.js';
+import type {
+  HeldActionApprovalLink,
+  HeldActionSteeringSpec,
+} from './governance/held-effect-bridge.js';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
@@ -70,6 +79,8 @@ export interface HeldActionContext {
   correlationId?: string;
 }
 
+export type { HeldActionSteeringSpec, HeldActionApprovalLink };
+
 export interface HeldActionInput<T = unknown, R = unknown> extends HeldActionContext {
   id?: string;
   op: string;
@@ -85,6 +96,13 @@ export interface HeldActionInput<T = unknown, R = unknown> extends HeldActionCon
   effectBinding?: string;
   payloadHash?: string;
   dependsOn?: string[];
+  /**
+   * SC-04: when set, submitHeldAction files an approval request steering
+   * `kind: 'held_effect'` — the shared store becomes the decision of record.
+   */
+  steeringApproval?: HeldActionSteeringSpec;
+  /** Set by the plane when a steering approval request exists. */
+  approvalRequest?: HeldActionApprovalLink;
 }
 
 export interface HeldActionRecord<T = unknown, R = unknown> extends HeldActionInput<T, R> {
@@ -129,6 +147,8 @@ export interface HeldActionSummary {
   irreversible?: boolean;
   simulatable: boolean;
   provisionalRefs: string[];
+  /** SC-04: linked approval-store request when the decision is unified. */
+  approvalRequestId?: string;
 }
 
 export interface HeldActionDecision {
@@ -137,6 +157,11 @@ export interface HeldActionDecision {
   authenticated: boolean;
   payloadHash: string;
   effectBinding: string;
+  /**
+   * SC-04: set when the decision arrives from the held-effect bridge — the
+   * linked approval request already settled, so the plane only mirrors it.
+   */
+  viaApprovalRequest?: boolean;
 }
 
 export interface ResourceIntroduction {
@@ -408,6 +433,9 @@ export class CloudflareOsControlPlane {
         ),
       dependsOn: [...new Set(input.dependsOn || [])],
     } as HeldActionRecord<T, R>;
+    if (input.steeringApproval) {
+      record.approvalRequest = this.createHeldApprovalRequest(record, input.steeringApproval);
+    }
     this.held.set(record.id, record as HeldActionRecord);
     this.recordMutation('held', record as HeldActionRecord);
     audit('held_action', 'submit', 'completed', {
@@ -439,6 +467,54 @@ export class CloudflareOsControlPlane {
       .sort((left, right) => left.submittedAt.localeCompare(right.submittedAt));
   }
 
+  /**
+   * SC-04: file the linked approval-store request steering `held_effect`.
+   * The request — not the held record — becomes the decision of record;
+   * the held record keeps the link so every decision path converges.
+   */
+  private createHeldApprovalRequest(
+    record: HeldActionRecord,
+    spec: HeldActionSteeringSpec
+  ): HeldActionApprovalLink {
+    const role: GovernedArtifactRole = 'mission_controller';
+    const request = createApprovalRequest(role, {
+      channel: spec.channel,
+      storageChannel: spec.storageChannel || spec.channel,
+      threadTs: spec.threadTs,
+      correlationId: spec.correlationId,
+      requestedBy: spec.requestedBy,
+      draft: {
+        title: spec.title,
+        summary: spec.summary,
+        details: `held_effect ${record.op} (${record.id})`,
+        severity: 'medium',
+      },
+      scope: {
+        mission_id: record.missionId,
+        ...(record.taskId ? { task_id: record.taskId } : {}),
+        ...(record.tenantSlug ? { tenant_slug: record.tenantSlug } : {}),
+      },
+      steering: {
+        kind: 'held_effect',
+        heldActionId: record.id,
+        op: record.op,
+        effectBinding: record.effectBinding,
+        payloadHash: record.payloadHash,
+        missionId: record.missionId,
+        tenantSlug: record.tenantSlug,
+        surface: spec.surface,
+        channel: spec.channel,
+        threadTs: spec.threadTs,
+        correlationId: spec.correlationId,
+      },
+    });
+    return {
+      requestId: request.id,
+      storageChannel: request.storageChannel,
+      role,
+    };
+  }
+
   decideHeldAction(
     id: string,
     decision: 'approved' | 'rejected',
@@ -446,7 +522,10 @@ export class CloudflareOsControlPlane {
   ): HeldActionRecord {
     const record = this.held.get(id);
     if (!record) throw new Error(`Held action not found: ${id}`);
+    // SC-04: first decision wins — a decided record is audit evidence and
+    // must not be silently re-decided (same rule as the approval store).
     if (
+      record.status === 'approved' ||
       record.status === 'applied' ||
       record.status === 'rejected' ||
       record.status === 'cancelled'
@@ -454,6 +533,30 @@ export class CloudflareOsControlPlane {
       return record;
     this.assertHumanDecision(record, approval);
     const by = assertNonEmpty(approval.resolvedBy, 'resolvedBy');
+    // SC-04: a linked request settles in the shared store FIRST — one
+    // approval path. The held-effect bridge mirrors the decision back via
+    // `viaApprovalRequest`; settling locally here too keeps the call
+    // synchronous and is idempotent under either ordering.
+    if (record.approvalRequest && !approval.viaApprovalRequest) {
+      // Held links are minted under mission_controller only — a tampered or
+      // migrated record claiming another role fails closed before any write.
+      if (record.approvalRequest.role !== 'mission_controller') {
+        throw new Error(
+          `[POLICY_VIOLATION] Held approval request role '${record.approvalRequest.role}' is not mission_controller`
+        );
+      }
+      decideApprovalRequest('mission_controller', {
+        channel: record.approvalRequest.storageChannel,
+        storageChannel: record.approvalRequest.storageChannel,
+        requestId: record.approvalRequest.requestId,
+        decision,
+        decidedBy: by,
+        decidedByType: approval.decidedByType,
+        authenticated: approval.authenticated,
+        payloadHash: approval.payloadHash,
+        effectBinding: approval.effectBinding,
+      });
+    }
     record.status = decision === 'approved' ? 'approved' : 'rejected';
     record.resolvedBy = by;
     record.autoApproved = false;
@@ -1405,6 +1508,7 @@ function summarizeHeldAction(record: HeldActionRecord): HeldActionSummary {
     irreversible: record.irreversible,
     simulatable: Boolean(record.simulation || record.simulatable),
     provisionalRefs: [...(record.simulation?.provisionalRefs || [])],
+    approvalRequestId: record.approvalRequest?.requestId,
   };
 }
 
