@@ -148,7 +148,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/held-effect-bridge.ts#fileHeldApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/governance/held-approval-request.ts#fileHeldApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
