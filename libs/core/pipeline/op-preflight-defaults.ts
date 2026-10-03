@@ -23,6 +23,12 @@ import {
   validateContextSecurityScope,
   type ContextSecurityScope,
 } from '../context-security-scope.js';
+import {
+  currentScopeEnvelope,
+  envelopeNarrowRequestErrors,
+  noteMissingScopeEnvelope,
+  securityScopeNarrowErrors,
+} from '../scope-envelope.js';
 import { validateScopeContext, type ScopeContextInput } from '../scope-context.js';
 import type { TierLevel } from '../types.js';
 
@@ -62,6 +68,22 @@ function tierValue(recordsToSearch: RecordLike[]): TierLevel | undefined {
 
 function scopeResult(call: OpPreflightCall, input: RecordLike): OpPreflightListenerResult | void {
   const search = records(call, input);
+  const activeEnvelope = currentScopeEnvelope();
+
+  // SC-01: an input scope_envelope is a narrow request — it must reference a
+  // runtime-minted envelope and may only narrow it, never enlarge it.
+  const inputEnvelope = firstValue(search, 'scope_envelope', 'scopeEnvelope');
+  if (inputEnvelope !== undefined) {
+    const errors = envelopeNarrowRequestErrors(inputEnvelope, activeEnvelope);
+    if (errors.length > 0) {
+      return {
+        decision: 'block',
+        reason: `[OP_SCOPE_DENIED] ${errors.join('; ')}`,
+        terminate: true,
+      };
+    }
+  }
+
   const explicitSecurityScope = firstValue(search, 'security_scope', 'securityScope');
   if (explicitSecurityScope && typeof explicitSecurityScope === 'object') {
     const errors = validateContextSecurityScope(explicitSecurityScope as ContextSecurityScope);
@@ -71,6 +93,21 @@ function scopeResult(call: OpPreflightCall, input: RecordLike): OpPreflightListe
         reason: `[OP_SCOPE_DENIED] ${errors.join('; ')}`,
         terminate: true,
       };
+    }
+    // SC-01: with a minted envelope active, a caller-provided security_scope
+    // may only narrow it — identity contradictions or policy enlargement deny.
+    if (activeEnvelope) {
+      const narrowErrors = securityScopeNarrowErrors(
+        explicitSecurityScope as ContextSecurityScope,
+        activeEnvelope
+      );
+      if (narrowErrors.length > 0) {
+        return {
+          decision: 'block',
+          reason: `[OP_SCOPE_DENIED] ${narrowErrors.join('; ')}`,
+          terminate: true,
+        };
+      }
     }
   }
 
@@ -109,6 +146,10 @@ function scopeResult(call: OpPreflightCall, input: RecordLike): OpPreflightListe
       };
     }
   }
+
+  // SC-01 rollout: governed ops without a minted envelope are allowed but
+  // measured, so the enforce rollout has counts before it tightens.
+  if (!activeEnvelope && inputEnvelope === undefined) noteMissingScopeEnvelope(call.op);
 }
 
 function adfResult(call: OpPreflightCall, input: RecordLike): OpPreflightListenerResult | void {
