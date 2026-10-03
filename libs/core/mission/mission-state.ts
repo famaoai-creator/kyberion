@@ -30,6 +30,9 @@ import { resolveActiveProfileRoot } from '../profile-root.js';
 import { hasAuthority } from '../authority.js';
 import { type MissionState, type MissionRelationships, ACTIVE_TIERS } from './mission-types.js';
 import { loadMissionManagementConfig } from './mission-management-config.js';
+// Registers the owner-scope mission locator behind findMissionPath, so every
+// state lookup here resolves an existing mission from its own record.
+import '../owner-scope.js';
 import { loadMissionStateAtPath, writeMissionStateAtPath } from './mission-state-reader.js';
 let missionStateValidate: ReturnType<typeof compileSchema> | undefined;
 const MISSION_FOCUS_SCHEMA_PATH = pathResolver.knowledge(
