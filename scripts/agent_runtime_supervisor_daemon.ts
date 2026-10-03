@@ -42,9 +42,11 @@ import { createTriggerRunner, resolveCurrentTriggerAuthority } from '@agent/core
 import { listDotCharters } from '@agent/core/dot/dot-charter';
 import {
   dotDailyTokenCapReached,
+  evaluateDotProbeTriggers,
   evaluateDotTriggersDue,
   recordDotWakeOutcome,
 } from '@agent/core/dot/dot-runtime';
+import { executeServicePreset } from '@agent/core/service/service-engine';
 import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
 import { isRecord } from '@agent/core/foundation/text';
 import { logger } from '@agent/core/core';
@@ -270,6 +272,18 @@ export async function runDotSweepOnce(now: Date = new Date()): Promise<number> {
       let due;
       try {
         due = evaluateDotTriggersDue(loaded.charter, { now: () => now });
+        due = due.concat(
+          await evaluateDotProbeTriggers(loaded.charter, {
+            now: () => now,
+            serviceCall: (input) =>
+              executeServicePreset(
+                input.service_id,
+                input.action,
+                input.params ?? {},
+                'secret-guard'
+              ),
+          })
+        );
       } catch (error) {
         logger.warn(
           `[dot-sweep] trigger evaluation failed for ${loaded.charter.dot_id}: ${error instanceof Error ? error.message : error}`
@@ -290,7 +304,9 @@ export async function runDotSweepOnce(now: Date = new Date()): Promise<number> {
               return await dotTriggerRunner.run(
                 {
                   idempotencyKey: `dot:${loaded.charter.dot_id}:${trigger.key}`,
-                  source: trigger.trigger.kind,
+                  // 'probe' is a dot-level kind; at the runner it is a wake
+                  // (an external-state observation), same as an inbox row.
+                  source: trigger.trigger.kind === 'probe' ? 'wake' : trigger.trigger.kind,
                   createdBy: authority,
                   payload: { dot_id: loaded.charter.dot_id, trigger_key: trigger.key },
                 },

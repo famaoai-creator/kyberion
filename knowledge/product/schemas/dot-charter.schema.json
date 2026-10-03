@@ -119,6 +119,51 @@
                     }
                   }
                 }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "probe"],
+                "properties": {
+                  "kind": { "const": "probe" },
+                  "probe": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["type", "path", "expect"],
+                        "properties": {
+                          "type": { "const": "file" },
+                          "path": { "type": "string", "minLength": 1 },
+                          "expect": { "enum": ["exists", "changed", "matches"] },
+                          "regex": { "type": "string" }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["type", "service_id", "action"],
+                        "properties": {
+                          "type": { "const": "service_preset" },
+                          "service_id": { "type": "string", "minLength": 1 },
+                          "action": { "type": "string", "minLength": 1 },
+                          "params": { "type": "object" },
+                          "expect": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "json_path": { "type": "string" },
+                              "equals": {},
+                              "not_equals": {},
+                              "changed": { "type": "boolean" }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "every_s": { "type": "integer", "minimum": 10 }
+                }
               }
             ]
           }
