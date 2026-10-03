@@ -3,7 +3,7 @@ title: Runtime Storage Layout
 category: Architecture
 tags: [storage, artifacts, workspace, tmp, cache, staging, tier, multi-tenant, retention]
 importance: 8
-last_updated: 2026-10-02
+last_updated: 2026-10-03
 runtime_stages: [alignment, execution, review]
 ---
 
@@ -100,12 +100,21 @@ is placed by the **owner's own record**, never by the caller's guess
   the orchestration / task-event / journal mission directories all resolve
   through it. Session, tenant and system scopes have no owner record and keep
   their explicit (or default) tier.
+- `findMissionPath` / `loadState` answer from the same resolver for an existing
+  mission (owner-scope registers itself as path-resolver's mission locator);
+  their directory scan only finds a pre-materialized mission that has no
+  `mission-state.json` yet. An id in several tenants fails closed
+  (`OWNER_AMBIGUOUS`) instead of returning the first match.
+- Agent input (surface `steer:` / `follow-up:`, `enqueueMissionAgentInput`) is
+  queued beside the existing mission only; input for an unknown mission is
+  refused with `OWNER_NOT_FOUND` rather than parked where it would never be read.
 
 The artifact ownership registry (`active/shared/runtime/artifacts/registry.jsonl`)
 is append-only; its current state is the **latest row per `artifact_id`**.
 Queries de-duplicate before filtering, so a superseded row (e.g. a mission
-deliverable since promoted to its project) never matches its old owner, and
-the storage janitor compacts the file to those rows.
+deliverable since promoted to its project) never matches its old owner. The
+storage janitor compacts the file to the latest row per artifact **and owner**,
+so offboarding still sees every scope that ever owned an artifact.
 
 ## 3. Surface visibility
 

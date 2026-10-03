@@ -549,11 +549,41 @@ function isMissionDirectory(candidate: string): boolean {
 }
 
 /**
- * Searches for a mission directory across all available tiers.
- * Priority: personal -> confidential -> public
+ * Locates an existing mission from its own record (registered by owner-scope,
+ * which sits above this module). Returns the mission directory, or undefined
+ * when no mission state is visible; throws when the id is ambiguous.
+ */
+export type MissionLocator = (missionId: string) => string | undefined;
+
+const MISSION_LOCATOR = Symbol.for('kyberion.pathResolver.missionLocator');
+
+export function registerMissionLocator(locator: MissionLocator): void {
+  (globalThis as Record<symbol, unknown>)[MISSION_LOCATOR] = locator;
+}
+
+function registeredMissionLocator(): MissionLocator | undefined {
+  return (globalThis as Record<symbol, unknown>)[MISSION_LOCATOR] as MissionLocator | undefined;
+}
+
+/**
+ * Finds a mission directory. An existing mission (one with mission-state.json)
+ * is located from its own record via the registered locator: the same answer
+ * as resolveOwnerScope, across tiers and tenant partitions. The directory scan
+ * below then only finds a pre-materialized mission (no state yet), searching
+ * personal -> confidential -> public.
  */
 export function findMissionPath(missionId: string): string | null {
   assertMissionIdArgument(missionId);
+  const locator = registeredMissionLocator();
+  if (locator) {
+    const located = locator(missionId);
+    if (located) return located;
+  }
+  // With a locator, a directory holding a state it did not resolve belongs to
+  // a scope this process may not see; only a stateless directory is accepted.
+  const accept = (candidate: string): boolean =>
+    isMissionDirectory(candidate) &&
+    (!locator || !rawExistsSync(path.join(candidate, 'mission-state.json')));
   const tiers: MissionTier[] = ['personal', 'confidential', 'public'];
 
   for (const tier of tiers) {
@@ -562,16 +592,16 @@ export function findMissionPath(missionId: string): string | null {
       const tenant = currentTenantSlug();
       if (tenant) {
         const scopedPath = path.join(PROJECT_ROOT_DIR, subPath, tenant, missionId);
-        if (isMissionDirectory(scopedPath)) return scopedPath;
+        if (accept(scopedPath)) return scopedPath;
       }
       const fullPath = path.join(PROJECT_ROOT_DIR, subPath, missionId);
-      if (isMissionDirectory(fullPath)) return fullPath;
+      if (accept(fullPath)) return fullPath;
     }
   }
 
   // Legacy fallback
   const legacyPath = path.join(ACTIVE_ROOT, 'missions', missionId);
-  if (isMissionDirectory(legacyPath)) return legacyPath;
+  if (accept(legacyPath)) return legacyPath;
 
   return null;
 }

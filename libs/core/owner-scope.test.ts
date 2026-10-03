@@ -271,6 +271,31 @@ describe('resolveOwnerScope', () => {
     expect(() => scope.resolveMissionDir('MSN-OWN-TWIN')).toThrow(/\[OWNER_AMBIGUOUS\]/u);
   });
 
+  it('backs findMissionPath and loadState with the resolver (S7)', async () => {
+    const { findMissionPath } = await import('./path-resolver.js');
+    const { loadState } = await import('./mission/mission-state.js');
+    // A tenant-partitioned mission is found without the process tenant set.
+    expect(findMissionPath('MSN-OWN-ACME')).toBe(
+      path.join(tmpRoot, 'active/missions/confidential/acme/MSN-OWN-ACME')
+    );
+    expect(loadState('MSN-OWN-ACME')?.tenant_slug).toBe('acme');
+    // Ambiguous ids fail closed instead of picking one.
+    expect(() => findMissionPath('MSN-OWN-TWIN')).toThrow(/\[OWNER_AMBIGUOUS\]/);
+    // A bound identity never reaches another tenant's mission, even through
+    // the legacy directory scan (a flat dir holding another tenant's state).
+    process.env.KYBERION_TENANT = 'globex';
+    expect(findMissionPath('MSN-OWN-ACME')).toBeNull();
+    expect(findMissionPath('MSN-OWN-BROKEN')).toBeNull();
+    expect(loadState('MSN-OWN-ACME')).toBeNull();
+    delete process.env.KYBERION_TENANT;
+    // A pre-materialized mission (directory, no state yet) is still found.
+    fs.mkdirSync(path.join(tmpRoot, 'active/missions/public/MSN-OWN-PREMAT'), { recursive: true });
+    expect(findMissionPath('MSN-OWN-PREMAT')).toBe(
+      path.join(tmpRoot, 'active/missions/public/MSN-OWN-PREMAT')
+    );
+    expect(loadState('MSN-OWN-PREMAT')).toBeNull();
+  });
+
   it('rejects ids that are not a single safe segment', () => {
     for (const id of ['../x', 'a/b', '..', '']) {
       expect(() => scope.resolveOwnerScope({ kind: 'mission', id })).toThrow(
