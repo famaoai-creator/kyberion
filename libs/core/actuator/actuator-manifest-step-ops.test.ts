@@ -31,6 +31,19 @@ describe('manifest step_ops', () => {
     expect(resolve('system:log')).toMatchObject({ effect: 'none' });
   });
 
+  it('resolves verified read-only media and modeling steps, and keeps the rest write', () => {
+    expect(resolve('modeling:read_json', { path: 'package.json' })).toMatchObject({
+      effect: 'read',
+      ref: 'package.json',
+    });
+    expect(resolve('media:document_digest', { path: 'in/a.pdf' })).toMatchObject({
+      effect: 'read',
+      ref: 'in/a.pdf',
+    });
+    // pptx_extract writes its assets to scratch: not declared read.
+    expect(resolve('media:pptx_extract', { path: 'in/a.pptx' }).effect).toBe('write');
+  });
+
   it('declares the destination of a navigating step as egress', () => {
     expect(resolve('browser:goto', { url: 'https://example.com/a' })).toMatchObject({
       effect: 'egress',
