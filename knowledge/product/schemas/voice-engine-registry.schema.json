@@ -40,6 +40,7 @@
               "playback": { "type": "boolean" },
               "voice_clone": { "type": "boolean" },
               "icl_ref_audio": { "type": "boolean" },
+              "streaming": { "type": "boolean" },
               "artifact_formats": {
                 "type": "array",
                 "items": { "type": "string", "enum": ["wav", "mp3", "ogg", "aiff"] }

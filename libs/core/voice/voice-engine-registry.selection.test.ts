@@ -92,7 +92,14 @@ describe('voice-tts-engine selection', () => {
       purpose: 'naturalness',
       requires: { language: 'ja', platform: 'darwin' },
     });
-    expect(ids(engines)).toEqual(['mlx_audio_qwen3', 'kokoro', 'local_say', 'espeak_ng']);
+    expect(ids(engines)).toEqual([
+      'mlx_audio_qwen3',
+      'kokoro',
+      'local_say',
+      'espeak_ng',
+      'irodori_tts',
+      'qwen3_tts_06b_custom_voice',
+    ]);
     expect(decision.strategy).toBe('purpose');
     expect(decision.context).toEqual({ language: 'ja' });
     expect(decision.excluded.find((entry) => entry.id === 'pocket_tts')?.unmet).toEqual([
@@ -106,7 +113,13 @@ describe('voice-tts-engine selection', () => {
       purpose: 'naturalness',
       requires: { language: 'ja', platform: 'darwin', identity: 'stock' },
     });
-    expect(ids(engines)).toEqual(['kokoro', 'local_say', 'espeak_ng']);
+    expect(ids(engines)).toEqual([
+      'kokoro',
+      'local_say',
+      'espeak_ng',
+      'irodori_tts',
+      'qwen3_tts_06b_custom_voice',
+    ]);
   });
 
   it('uses the seam default without a purpose and the fallback purpose when it cannot run', () => {
