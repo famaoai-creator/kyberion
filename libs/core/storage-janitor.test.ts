@@ -1021,6 +1021,7 @@ describe('storage-janitor', () => {
         orphaned: [],
         deleted: [],
         unregisteredDirs: [],
+        unresolvedOwners: [],
         errors: [],
       });
     });

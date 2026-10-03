@@ -13,7 +13,20 @@
       "op": "pipeline",
       "schema_ref": "knowledge/product/schemas/browser-automation-pipeline.schema.json",
       "platforms": ["darwin", "linux", "win32"],
-      "effect": "egress"
+      "effect": "egress",
+      "step_ops": {
+        "goto": {
+          "effect": "egress",
+          "egress_destination_from": "url"
+        },
+        "open_tab": {
+          "effect": "egress",
+          "egress_destination_from": "url"
+        },
+        "snapshot": {
+          "effect": "read"
+        }
+      }
     },
     {
       "op": "computer_interaction",

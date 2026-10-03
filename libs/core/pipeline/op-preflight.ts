@@ -39,7 +39,12 @@ export interface OpPreflightResult {
 }
 
 /** Stamp keys the governance stages set on the waterfall input. */
-export const OP_GOVERNANCE_STAMP_KEYS = ['_effect', '_resource_ref', '_egress_taint'] as const;
+export const OP_GOVERNANCE_STAMP_KEYS = [
+  '_effect',
+  '_resource_ref',
+  '_egress_destination',
+  '_egress_taint',
+] as const;
 
 export interface OpPreflightListenerResult {
   decision?: OpPreflightDecision;

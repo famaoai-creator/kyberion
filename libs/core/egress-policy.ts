@@ -590,6 +590,35 @@ export function evaluateEgressPolicy(
   };
 }
 
+export type EgressAudience = 'public' | 'confidential' | 'personal' | 'external';
+
+/**
+ * Classify where a payload is actually going, from policy rather than from any
+ * claim the caller makes about it: a host approved for the tenant's
+ * confidential/personal material is a `personal` audience, an allowlisted host
+ * is `public`, and everything else (unlisted, blocked, sandbox-denied,
+ * unparsable) is `external`. Accepts a URL or a bare host.
+ */
+export function classifyEgressDestination(
+  destination: string,
+  tenantSlug?: string
+): { hostname: string; audience: EgressAudience } {
+  const raw = String(destination || '').trim();
+  const url = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
+  const hostname = safeHostname(url);
+  if (!hostname) return { hostname: '', audience: 'external' };
+  if (
+    tenantSlug &&
+    evaluateEgressPolicy(url, { tier: 'confidential', tenant_slug: tenantSlug }).verdict === 'allow'
+  ) {
+    return { hostname, audience: 'personal' };
+  }
+  return {
+    hostname,
+    audience: evaluateEgressPolicy(url).verdict === 'allow' ? 'public' : 'external',
+  };
+}
+
 /**
  * Destinations approved for a tenant's confidential material.
  *

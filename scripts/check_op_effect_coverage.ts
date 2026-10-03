@@ -37,7 +37,22 @@ export function findOpEffectViolations(): OpEffectViolation[] {
       } else if (!VALID_EFFECTS.has(effect as string)) {
         violations.push({ manifest: rel, op, issue: `invalid effect '${String(effect)}'` });
       }
-      for (const key of ['effect_from', 'resource_ref_from'] as const) {
+      const stepOps = record.step_ops;
+      if (stepOps !== undefined && (typeof stepOps !== 'object' || stepOps === null)) {
+        violations.push({ manifest: rel, op, issue: 'step_ops must be an object' });
+      } else if (stepOps) {
+        for (const [stepName, declaration] of Object.entries(stepOps as Record<string, unknown>)) {
+          const stepEffect = (declaration as Record<string, unknown> | null)?.effect;
+          if (stepEffect !== undefined && !VALID_EFFECTS.has(stepEffect as string)) {
+            violations.push({
+              manifest: rel,
+              op: `${op}:${stepName}`,
+              issue: `invalid effect '${String(stepEffect)}'`,
+            });
+          }
+        }
+      }
+      for (const key of ['effect_from', 'resource_ref_from', 'egress_destination_from'] as const) {
         const value = record[key];
         if (value !== undefined && (typeof value !== 'string' || !value.trim())) {
           violations.push({ manifest: rel, op, issue: `${key} must be a non-empty string` });
