@@ -108,6 +108,18 @@ is placed by the **owner's own record**, never by the caller's guess
   directory whose state this process may not see fails with
   `OWNER_NOT_VISIBLE` rather than reading as absent (which would invite a
   second copy). Identity resolution treats both as "no mission identity".
+- **Strict vs lenient lookup.** `findMissionPath` is the _strict_ lookup and
+  every caller is pinned to a reason in `tests/mission-lookup-boundary.test.ts`:
+  _lifecycle_ (mutation / governance / operator tooling: the structured refusal
+  is reported), _scope-derivation_ (tier, tenant, visibility or classification
+  is derived from the mission, and "absent" would be a looser default, so it
+  must fail closed) and _placement_ ("absent" would mean another location or a
+  second copy). Only a path where absent is a conservative no-op — an optional
+  evidence write, a report row, a list/feed filter that already denies a
+  tenant-less item, "no mission identity" for a permission check —
+  uses `missionPathOrNull(findMissionPath, id)` from `@agent/core/mission-lookup`,
+  which treats `OWNER_AMBIGUOUS` / `OWNER_NOT_VISIBLE` as absent. A new direct
+  caller fails the boundary test until it is registered with its category.
 - Agent input (surface `steer:` / `follow-up:`, `enqueueMissionAgentInput`) is
   queued beside the existing mission only; input for an unknown mission is
   refused with `OWNER_NOT_FOUND` rather than parked where it would never be read.
