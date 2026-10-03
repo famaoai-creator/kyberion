@@ -11,7 +11,6 @@ import {
   getMissionDynamicInjectionRegistry,
   renderInjectionsAsSystemReminders,
 } from '../dynamic-injection.js';
-import { findMissionPath, missionDir } from '../path-resolver.js';
 import { pathResolver } from '../path-resolver.js';
 import { type MissionContextPackPruningSummary } from './mission-context-pack.js';
 import { provisionTaskKnowledge } from '../task/task-knowledge-provisioning.js';
@@ -51,18 +50,9 @@ import {
   buildAuthorityRoleProcedureInjectionProvider,
   buildTaskExecutionPrompt,
   buildReviewDiffLines,
+  resolvedMissionDir,
 } from './mission-orchestration-worker-part-context.js';
 import type { DispatchMissionTaskOutcome } from './mission-orchestration-worker-part-context.js';
-
-function resolvedMissionDir(
-  missionId: string,
-  fallbackTier: 'personal' | 'confidential' | 'public' = 'public',
-  tenantSlug?: string
-): string {
-  return tenantSlug?.trim()
-    ? missionDir(missionId, fallbackTier, tenantSlug.trim())
-    : findMissionPath(missionId) || missionDir(missionId, fallbackTier);
-}
 
 export interface DispatchPlannedMissionTaskInput {
   missionId: string;

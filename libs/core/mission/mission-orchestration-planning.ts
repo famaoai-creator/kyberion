@@ -3,7 +3,8 @@ import { a2aBridge } from '../mesh/a2a-bridge.js';
 import { logger } from '../core.js';
 import { emitChannelSurfaceEvent } from '../surface/surface-artifact-store.js';
 import { emitMissionOrchestrationObservation } from './mission-orchestration-events.js';
-import { missionDir, rootDir } from '../path-resolver.js';
+import { rootDir } from '../path-resolver.js';
+import { resolveMissionDir } from '../owner-scope.js';
 import { nowIso } from '../foundation/time.js';
 import { reportProviderTemporarilyUnhealthy } from '../provider/provider-health-registry.js';
 import { agentRegistry } from '../agent/agent-registry.js';
@@ -72,6 +73,9 @@ async function recordPlanningPacketGate(input: {
   reviewRound: 0 | 1 | 2;
 }): Promise<void> {
   const requiresIndependentReview = packetRequiresIndependentReview(input.packet);
+  // Gate evidence is a mission write: the mission's own directory, never a
+  // guessed public tree (an unknown mission fails closed).
+  const missionPath = resolveMissionDir(input.missionId);
   const reviewApproved =
     !requiresIndependentReview || input.reviewVerdict?.approve === true || input.verdict === 'fail';
   const evaluation = await evaluateMissionGate({
@@ -104,7 +108,7 @@ async function recordPlanningPacketGate(input: {
         },
       ],
     },
-    evidenceDir: `${missionDir(input.missionId, 'public')}/gates`,
+    evidenceDir: `${missionPath}/gates`,
   });
   if (evaluation.evidence_path) {
     const current = loadMissionGateRecordAtPath(evaluation.evidence_path, input.missionId);
@@ -112,7 +116,7 @@ async function recordPlanningPacketGate(input: {
       missionId: input.missionId,
       filePath: evaluation.evidence_path,
       targetPath: nodePath
-        .relative(missionDir(input.missionId, 'public'), evaluation.evidence_path)
+        .relative(missionPath, evaluation.evidence_path)
         .replaceAll(nodePath.sep, '/'),
       provisioned: provisionMissionEntry({
         ...current,
@@ -188,8 +192,9 @@ export function resolveMissionRelativeTargetPath(
   const normalized = trimmed.replace(/\\/g, '/');
   if (normalized.startsWith('/') || /^[A-Za-z]:\//.test(normalized)) return normalized;
   if (REPO_RELATIVE_TARGET_ROOTS.test(normalized)) return normalized;
+  // Anchored to the mission's own directory; an unknown mission fails closed.
   const missionRepoRelative = nodePath
-    .relative(rootDir(), missionDir(missionId, 'public'))
+    .relative(rootDir(), resolveMissionDir(missionId))
     .replace(/\\/g, '/');
   return `${missionRepoRelative}/${normalized.replace(/^\.\/+/, '')}`;
 }

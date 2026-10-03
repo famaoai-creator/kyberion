@@ -1,5 +1,6 @@
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
+import { tryResolveOwnerScope } from './owner-scope.js';
 import { writeScopedArtifact } from './workforce/artifact-store.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeWriteFile } from './secure-io.js';
@@ -50,6 +51,15 @@ function serializeOutput(value: unknown): {
   }
 }
 
+/** A mission id that is malformed, unknown, foreign or ambiguous does not resolve. */
+function resolvesToMission(missionId: string): boolean {
+  try {
+    return tryResolveOwnerScope({ kind: 'mission', id: missionId }) !== null;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Persist an oversized step result and return a bounded reference suitable
  * for carrying through later steps.
@@ -79,6 +89,11 @@ export function offloadLargeOutput(
   const fileName = `${stepNumber}-${step}-${id}.log`;
 
   let portablePath: string;
+  // A named mission's output is placed by that mission's own record. If it
+  // cannot be resolved (unknown, another tenant's, ambiguous), keep the output
+  // inline: shared tmp has no tier/tenant partition, so it is only for steps
+  // that run under no mission at all.
+  if (mission !== 'shared' && !resolvesToMission(mission)) return null;
   if (mission !== 'shared') {
     const written = writeScopedArtifact({
       scope: { mission },

@@ -1,5 +1,5 @@
 import { buildExecutionEnv } from '../authority.js';
-import { findMissionPath, missionDir } from '../path-resolver.js';
+import { tryResolveOwnerScope } from '../owner-scope.js';
 import { safeExistsSync } from '../secure-io.js';
 import { logger } from '../core.js';
 import { ensureMissionTeamRuntimeViaSupervisor } from '../agent/agent-runtime-supervisor.js';
@@ -67,7 +67,9 @@ export async function dispatchMissionNextTasksCore(
   // recovery ceremony must inspect the same resolved mission root as the
   // progress controller; a public-only probe would silently turn a valid
   // paused goal into a no-op.
-  const resolvedMissionPath = findMissionPath(missionId) || missionDir(missionId, 'public');
+  // An unknown mission has nothing to dispatch (read path: no throw).
+  const resolvedMissionPath = tryResolveOwnerScope({ kind: 'mission', id: missionId })?.dir;
+  if (!resolvedMissionPath) return [];
   const nextTasksPath = `${resolvedMissionPath}/NEXT_TASKS.json`;
   if (!safeExistsSync(nextTasksPath)) return [];
   const allTasks = deps.loadAllNextTasks(missionId);

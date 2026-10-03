@@ -268,6 +268,27 @@ describe('project mission index (single source: relationships.project)', () => {
     }
   });
 
+  it("never writes project state from a mission outside the project's scope", () => {
+    // PROJECT_ID is public/shared; a confidential tenant mission linked to it
+    // (a legacy link) must not create project state in its own partition.
+    const foreignState = {
+      ...mission(M1, 'active'),
+      tier: 'confidential',
+      tenant_slug: 'acme-scope',
+    } as MissionState;
+    const result = syncProjectOperationalStateFromMission({
+      mission_id: foreignState.mission_id,
+      tier: foreignState.tier,
+      tenant_slug: 'acme-scope',
+      status: foreignState.status,
+      relationships: foreignState.relationships,
+    } as Parameters<typeof syncProjectOperationalStateFromMission>[0]);
+    expect(result).toBeNull();
+    expect(
+      safeExistsSync(pathResolver.projectWorkspaceDir(PROJECT_ID, 'confidential', 'acme-scope'))
+    ).toBe(false);
+  });
+
   it('derives the index from mission state only, scoped by tier/tenant', () => {
     writeAt(pathResolver.missionDir(M1, 'public'), mission(M1, 'paused'));
     writeAt(pathResolver.missionDir(M2, 'public'), mission(M2, 'completed'));

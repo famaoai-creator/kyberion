@@ -48,13 +48,62 @@ function readIndex(indexAbsPath: string): Array<Record<string, unknown>> {
 
 describe('writeScopedArtifact (AL-02)', () => {
   beforeAll(async () => {
-    tmpRoot = path.join(os.tmpdir(), `kyb-scoped-artifact-${randomUUID()}`);
-    fs.mkdirSync(tmpRoot, { recursive: true });
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kyb-scoped-artifact-'));
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
     seedPolicyFile(tmpRoot);
     process.env.KYBERION_ROOT = tmpRoot;
     process.env.MISSION_ROLE = 'mission_controller';
     store = await import('./artifact-store.js');
+    // Owned scopes are placed by their owner's record, so the owners exist.
+    const missionState = (missionId: string, tier: string) =>
+      JSON.stringify({
+        mission_id: missionId,
+        tier,
+        status: 'active',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'worker',
+        confidence_score: 1,
+        git: { branch: 'm', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+        history: [],
+      });
+    for (const [missionId, tier] of [
+      ['M-AL02-A', 'confidential'],
+      ['M-AL02-B', 'confidential'],
+      ['M-AL02-C', 'confidential'],
+      ['M-AL02-D', 'confidential'],
+      ['M-AL02-E', 'confidential'],
+      ['M-AL02-SYMLINK', 'confidential'],
+      ['MSN-TIER-INFER', 'public'],
+    ]) {
+      const dir = path.join(tmpRoot, 'active/missions', missionId);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, 'mission-state.json'), missionState(missionId, tier));
+    }
+    const { saveProjectRecord } = await import('../project/project-registry.js');
+    for (const [projectId, tier, tenant] of [
+      ['proj-x', 'confidential', 'acme'],
+      ['proj-y', 'public', undefined],
+    ] as const) {
+      saveProjectRecord({
+        project_id: projectId,
+        name: projectId,
+        summary: 'artifact-store test project',
+        status: 'active',
+        tier,
+        ...(tenant ? { tenant_slug: tenant } : {}),
+      } as Parameters<typeof saveProjectRecord>[0]);
+    }
+    for (const [tier, tenant, org] of [
+      ['confidential', 'acme', 'org-ops'],
+      ['public', 'shared', 'org-pub'],
+      ['confidential', 'acme', 'org-x'],
+      ['confidential', 'globex', 'org-x'],
+    ]) {
+      fs.mkdirSync(path.join(tmpRoot, 'active/organizations', tier, tenant, org, 'state'), {
+        recursive: true,
+      });
+    }
   });
 
   afterAll(() => {
@@ -143,11 +192,6 @@ describe('writeScopedArtifact (AL-02)', () => {
       name: 'first.md',
       content: 'x',
     });
-    const missionDir = path.dirname(path.dirname(path.dirname(first.absolute_path)));
-    fs.writeFileSync(
-      path.join(missionDir, 'mission-state.json'),
-      JSON.stringify({ mission_id: 'MSN-TIER-INFER', tier: 'public' })
-    );
     const result = store.writeScopedArtifact({
       scope: { mission: 'MSN-TIER-INFER' },
       artifact_class: 'report',
@@ -173,7 +217,16 @@ describe('writeScopedArtifact (AL-02)', () => {
         name: 'third.md',
         content: 'z',
       })
-    ).toThrow(/contradicts mission MSN-TIER-INFER tier 'public'/);
+    ).toThrow(/\[SCOPE_CONTRADICTS_OWNER\] mission MSN-TIER-INFER is public\/shared/);
+    // An owned write for an owner that does not exist is refused, not guessed.
+    expect(() =>
+      store.writeScopedArtifact({
+        scope: { project: 'proj-missing' },
+        artifact_class: 'report',
+        name: 'x.md',
+        content: 'x',
+      })
+    ).toThrow(/\[OWNER_NOT_FOUND\] project proj-missing/);
 
     const publish = (organization: string, tenant: string, content: string) =>
       store.writeScopedArtifact({
@@ -189,6 +242,43 @@ describe('writeScopedArtifact (AL-02)', () => {
     expect(publish('org-x', 'acme', 'v2').artifact_id).toBe('ART-FIXED-ID-1');
     // Another tenant cannot take over the record by choosing its id.
     expect(() => publish('org-x', 'globex', 'evil')).toThrow(/belongs to another owner scope/);
+  });
+
+  it("attributes a published record to the owner's organization, never the caller's", async () => {
+    const dir = path.join(tmpRoot, 'active/missions/M-AL02-ORG');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'mission-state.json'),
+      JSON.stringify({
+        mission_id: 'M-AL02-ORG',
+        tier: 'confidential',
+        organization_id: 'org-ops',
+        status: 'active',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'worker',
+        confidence_score: 1,
+        git: { branch: 'm', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+        history: [],
+      })
+    );
+    const write = (extra: Record<string, unknown>) =>
+      store.writeScopedArtifact({
+        artifact_class: 'report',
+        name: 'org.md',
+        content: 'x',
+        scope: { mission: 'M-AL02-ORG' },
+        publish: { kind: 'report' },
+        ...extra,
+      } as Parameters<typeof store.writeScopedArtifact>[0]);
+    expect(() => write({ scope: { mission: 'M-AL02-ORG', organization: 'org-other' } })).toThrow(
+      /\[SCOPE_CONTRADICTS_OWNER\] mission M-AL02-ORG belongs to organization 'org-ops'/u
+    );
+    expect(() => write({ publish: { kind: 'report', organization_id: 'org-other' } })).toThrow(
+      /\[SCOPE_CONTRADICTS_OWNER\] publish.organization_id 'org-other'/u
+    );
+    const { loadArtifactRecord } = await import('./artifact-record.js');
+    expect(loadArtifactRecord(write({}).artifact_id as string)?.organization_id).toBe('org-ops');
   });
 
   it('organization scope: places under the tier/tenant organization workspace', async () => {

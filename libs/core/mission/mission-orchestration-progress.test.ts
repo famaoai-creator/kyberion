@@ -60,6 +60,11 @@ describe('mission orchestration progress path boundaries', () => {
 
   it('loads NEXT_TASKS from an existing confidential mission root', () => {
     fs.mkdirSync(confidentialMissionPath, { recursive: true });
+    // Mission paths are owner-derived: the mission exists once its state is recorded.
+    fs.writeFileSync(
+      path.join(confidentialMissionPath, 'mission-state.json'),
+      JSON.stringify({ mission_id: confidentialMissionId, tier: 'confidential' })
+    );
     fs.writeFileSync(
       path.join(confidentialMissionPath, 'NEXT_TASKS.json'),
       JSON.stringify([{ task_id: 'confidential-task', status: 'planned' }])
@@ -78,6 +83,10 @@ describe('mission orchestration progress path boundaries', () => {
     fs.writeFileSync(
       path.join(externalMissionPath, 'NEXT_TASKS.json'),
       JSON.stringify([{ task_id: 'escaped-task' }])
+    );
+    fs.writeFileSync(
+      path.join(externalMissionPath, 'mission-state.json'),
+      JSON.stringify({ mission_id: missionId, tier: 'public' })
     );
     removeTestPath(missionPath);
     fs.symlinkSync(externalMissionPath, missionPath, 'dir');
