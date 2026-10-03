@@ -17,6 +17,7 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 let tmpRoot: string;
 let scope: typeof import('./owner-scope.js');
 let projects: typeof import('./project/project-registry.js');
+let executionScope: typeof import('./foundation/execution-scope.js');
 
 function seed(relative: string, from = relative): void {
   const target = path.join(tmpRoot, relative);
@@ -62,6 +63,7 @@ describe('resolveOwnerScope', () => {
     delete process.env.KYBERION_TENANT;
     scope = await import('./owner-scope.js');
     projects = await import('./project/project-registry.js');
+    executionScope = await import('./foundation/execution-scope.js');
 
     writeMission('active/missions/public/MSN-OWN-PUB', {
       mission_id: 'MSN-OWN-PUB',
@@ -94,6 +96,26 @@ describe('resolveOwnerScope', () => {
       tenant_slug: 'acme',
       organization_id: 'org-acme',
     } as Parameters<typeof projects.saveProjectRecord>[0]);
+    // Unreadable (schema-invalid) state in a flat directory: tenant unknown.
+    fs.mkdirSync(path.join(tmpRoot, 'active/missions/confidential/MSN-OWN-BROKEN'), {
+      recursive: true,
+    });
+    fs.writeFileSync(
+      path.join(tmpRoot, 'active/missions/confidential/MSN-OWN-BROKEN/mission-state.json'),
+      JSON.stringify({ mission_id: 'MSN-OWN-BROKEN', tenant_slug: 'acme' })
+    );
+    // A state naming another tenant than the directory it sits in.
+    writeMission('active/missions/confidential/acme/MSN-OWN-MISPLACED', {
+      mission_id: 'MSN-OWN-MISPLACED',
+      tier: 'confidential',
+      tenant_slug: 'globex',
+    });
+    // Legacy `default` tenant sentinel = untenanted.
+    writeMission('active/missions/public/MSN-OWN-DEFAULT', {
+      mission_id: 'MSN-OWN-DEFAULT',
+      tier: 'public',
+      tenant_id: 'default',
+    });
     writeOrganization('public', 'shared', 'org-solo');
     writeOrganization('confidential', 'acme', 'org-dup');
     writeOrganization('confidential', 'globex', 'org-dup');
@@ -206,6 +228,40 @@ describe('resolveOwnerScope', () => {
     ).toBe('acme');
     process.env.KYBERION_TENANT = 'acme';
     expect(scope.resolveOwnerScope({ kind: 'organization', id: 'org-dup' }).tenant).toBe('acme');
+  });
+
+  it('fails closed when a mission tenant cannot be established or is inconsistent', () => {
+    // Unreadable state: an unbound identity sees it untenanted, a bound one never.
+    expect(scope.resolveOwnerScope({ kind: 'mission', id: 'MSN-OWN-BROKEN' }).tenant).toBe(
+      'shared'
+    );
+    process.env.KYBERION_TENANT = 'globex';
+    expect(scope.tryResolveOwnerScope({ kind: 'mission', id: 'MSN-OWN-BROKEN' })).toBeNull();
+    delete process.env.KYBERION_TENANT;
+    // State tenant disagreeing with its tenant directory resolves nowhere.
+    expect(scope.tryResolveOwnerScope({ kind: 'mission', id: 'MSN-OWN-MISPLACED' })).toBeNull();
+    // `default` is untenanted, never a tenant.
+    expect(scope.resolveOwnerScope({ kind: 'mission', id: 'MSN-OWN-DEFAULT' }).tenant).toBe(
+      'shared'
+    );
+    expect(
+      scope.resolveOwnerScope({ kind: 'mission', id: 'MSN-OWN-DEFAULT' }, { tenant: 'default' })
+        .tier
+    ).toBe('public');
+  });
+
+  it('honours a tenant bound through the execution scope, like identity resolution', () => {
+    executionScope.runInExecutionScope({ tenantBound: true, tenantSlug: 'globex' }, () => {
+      expect(scope.tryResolveOwnerScope({ kind: 'mission', id: 'MSN-OWN-ACME' })).toBeNull();
+      expect(scope.resolveOwnerScope({ kind: 'mission', id: 'MSN-OWN-TWIN' }).tenant).toBe(
+        'globex'
+      );
+    });
+  });
+
+  it('reads treat an ambiguous id as unknown; writes still fail closed', () => {
+    expect(scope.tryResolveOwnerScope({ kind: 'mission', id: 'MSN-OWN-TWIN' })).toBeNull();
+    expect(() => scope.resolveMissionDir('MSN-OWN-TWIN')).toThrow(/\[OWNER_AMBIGUOUS\]/u);
   });
 
   it('rejects ids that are not a single safe segment', () => {

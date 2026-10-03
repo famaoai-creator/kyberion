@@ -80,9 +80,14 @@ export function offloadLargeOutput(
   const fileName = `${stepNumber}-${step}-${id}.log`;
 
   let portablePath: string;
-  // Mission-local only for a mission that exists (its own record places it);
-  // an unknown or stale mission id falls back to shared tmp, never a guessed dir.
-  if (mission !== 'shared' && tryResolveOwnerScope({ kind: 'mission', id: mission })) {
+  // A named mission's output is placed by that mission's own record. If it
+  // cannot be resolved (unknown, another tenant's, ambiguous), keep the output
+  // inline: shared tmp has no tier/tenant partition, so it is only for steps
+  // that run under no mission at all.
+  if (mission !== 'shared' && !tryResolveOwnerScope({ kind: 'mission', id: mission })) {
+    return null;
+  }
+  if (mission !== 'shared') {
     const written = writeScopedArtifact({
       scope: { mission },
       artifact_class: 'cache',

@@ -15,6 +15,8 @@ import { withLockSync } from '../foundation/lock-utils.js';
 import { ARTIFACT_KINDS, type ArtifactKind } from './artifact-kind.generated.js';
 
 const ARTIFACT_REGISTRY_LOCK = 'artifact-ownership-registry';
+/** Generous: a concurrent compaction rewrite must never fail a publication. */
+const APPEND_LOCK_TIMEOUT_MS = 30_000;
 export { ARTIFACT_KINDS, type ArtifactKind } from './artifact-kind.generated.js';
 
 export interface ArtifactOwnershipRecord {
@@ -166,10 +168,14 @@ export function appendArtifactOwnershipRecord(
   if (!safeExistsSync(registryDir)) safeMkdir(registryDir, { recursive: true });
   // Appends and compaction share one lock: a compaction rewrite never drops a
   // row appended while it ran.
-  withLockSync(ARTIFACT_REGISTRY_LOCK, () => {
-    ensureArtifactRegistryFile(registryPath);
-    appendJsonLine(registryPath, validated);
-  });
+  withLockSync(
+    ARTIFACT_REGISTRY_LOCK,
+    () => {
+      ensureArtifactRegistryFile(registryPath);
+      appendJsonLine(registryPath, validated);
+    },
+    APPEND_LOCK_TIMEOUT_MS
+  );
   return registryPath;
 }
 
@@ -219,6 +225,23 @@ export function listArtifactOwnershipRecordsByQuery(
     .sort(compareArtifactOwnershipRecords);
 }
 
+/**
+ * Every artifact any row of the history attributes to the query (current or
+ * superseded owner), latest row per artifact. For offboarding / audit, where an
+ * artifact once owned by a tenant still counts after it was re-registered.
+ */
+export function listArtifactOwnershipHistoryByQuery(
+  query: ArtifactOwnershipQuery = {}
+): ArtifactOwnershipRecord[] {
+  const rows = listArtifactOwnershipRecords();
+  const matchedIds = new Set(
+    rows.filter((record) => matchesQuery(record, query)).map((record) => record.artifact_id)
+  );
+  return latestByArtifactId(rows)
+    .filter((record) => matchedIds.has(record.artifact_id))
+    .sort(compareArtifactOwnershipRecords);
+}
+
 export interface ArtifactOwnershipCompaction {
   total_rows: number;
   kept_rows: number;
@@ -236,18 +259,28 @@ export function compactArtifactOwnershipRegistry(
 ): ArtifactOwnershipCompaction {
   const dryRun = options.dryRun ?? true;
   const registryPath = artifactRegistryPath();
-  return withLockSync(ARTIFACT_REGISTRY_LOCK, () => {
+  const plan = (): { rows: number; kept: ArtifactOwnershipRecord[] } => {
     const rows = listArtifactOwnershipRecords();
-    const kept = latestByArtifactId(rows);
-    const result: ArtifactOwnershipCompaction = {
-      total_rows: rows.length,
-      kept_rows: kept.length,
-      removed_rows: rows.length - kept.length,
-      applied: false,
-    };
-    if (dryRun || result.removed_rows === 0) return result;
-    safeWriteFile(registryPath, `${kept.map((row) => JSON.stringify(row)).join('\n')}\n`);
-    return { ...result, applied: true };
+    return { rows: rows.length, kept: latestByArtifactId(rows) };
+  };
+  const summarize = (
+    { rows, kept }: { rows: number; kept: ArtifactOwnershipRecord[] },
+    applied: boolean
+  ): ArtifactOwnershipCompaction => ({
+    total_rows: rows,
+    kept_rows: kept.length,
+    removed_rows: rows - kept.length,
+    applied,
+  });
+  // A dry run only reads: it never blocks publications.
+  const preview = plan();
+  if (dryRun || preview.rows === preview.kept.length) return summarize(preview, false);
+  return withLockSync(ARTIFACT_REGISTRY_LOCK, () => {
+    // Re-read under the lock: rows appended since the preview are kept.
+    const current = plan();
+    if (current.rows === current.kept.length) return summarize(current, false);
+    safeWriteFile(registryPath, `${current.kept.map((row) => JSON.stringify(row)).join('\n')}\n`);
+    return summarize(current, true);
   });
 }
 

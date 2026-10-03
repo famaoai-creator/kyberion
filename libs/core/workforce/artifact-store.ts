@@ -23,7 +23,12 @@ import {
   classifyStorageFloorPath,
   storagePartitionSegments,
 } from '../storage-layout.js';
-import { resolveOwnerScope, SHARED_TENANT, type OwnerRef } from '../owner-scope.js';
+import {
+  OwnerScopeError,
+  resolveOwnerScope,
+  SHARED_TENANT,
+  type OwnerRef,
+} from '../owner-scope.js';
 import type { ArtifactKind } from './artifact-registry.js';
 import {
   createArtifactRecord,
@@ -413,6 +418,7 @@ interface ResolvedScopeRoot {
   /** Owner tenant slug; undefined for untenanted (`shared`) and system scopes. */
   tenant?: string;
   organizationId?: string;
+  projectId?: string;
 }
 
 function ownedRoot(
@@ -426,12 +432,40 @@ function ownedRoot(
     ...(requestedTier ? { tier: requestedTier } : {}),
     ...(scope.tenant !== undefined ? { tenant: scope.tenant } : {}),
   });
+  // The owner's organization / project are the record's too: a caller value
+  // that names another one is a contradiction, like a tier or tenant.
+  const contradictions: string[] = [];
+  if (
+    scope.organization !== undefined &&
+    resolved.organization_id &&
+    scope.organization !== resolved.organization_id
+  ) {
+    contradictions.push(`organization '${resolved.organization_id}'`);
+  }
+  if (
+    owner.kind === 'mission' &&
+    scope.project !== undefined &&
+    resolved.project_id &&
+    scope.project !== resolved.project_id
+  ) {
+    contradictions.push(`project '${resolved.project_id}'`);
+  }
+  if (contradictions.length > 0) {
+    throw new OwnerScopeError({
+      code: 'SCOPE_CONTRADICTS_OWNER',
+      owner,
+      what: `${owner.kind} ${owner.id} belongs to ${contradictions.join(' and ')}`,
+      why: "an owned write is attributed by the owner's own record",
+      remedy: "drop the explicit organization/project or pass the owner's own",
+    });
+  }
   return {
     artifactsRoot: path.join(resolved.dir, 'artifacts'),
     kind,
     tier: resolved.tier,
     ...(resolved.tenant !== SHARED_TENANT ? { tenant: resolved.tenant } : {}),
     ...(resolved.organization_id ? { organizationId: resolved.organization_id } : {}),
+    ...(resolved.project_id ? { projectId: resolved.project_id } : {}),
   };
 }
 
@@ -654,8 +688,18 @@ function publishScopedArtifact(
 ): string {
   const { kind, tier } = root;
   const publication = input.publish as ScopedArtifactPublication;
+  if (
+    publication.organization_id &&
+    root.organizationId &&
+    publication.organization_id !== root.organizationId
+  ) {
+    throw new Error(
+      `[SCOPE_CONTRADICTS_OWNER] publish.organization_id '${publication.organization_id}' — the owner belongs to organization '${root.organizationId}' | next: drop publish.organization_id`
+    );
+  }
+  // The owner's organization wins over any caller-supplied one.
   const organizationId =
-    input.scope.organization ?? publication.organization_id ?? root.organizationId;
+    root.organizationId ?? input.scope.organization ?? publication.organization_id;
   const record = createArtifactRecord({
     ...(publication.artifact_id ? { artifact_id: publication.artifact_id } : {}),
     kind: publication.kind,
