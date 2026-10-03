@@ -244,12 +244,31 @@ export function resetOpCapabilityIndex(): void {
  * sub-ops ("system:computer_interaction:keyboard") resolve to their parent
  * capability.
  */
+
+/**
+ * Map a call op name (continued): catalog entries for op lookup — an unreadable catalog resolves to no
+ * entries (every op then falls back to the fail-safe 'write' effect class
+ * rather than aborting preflight).
+ */
+function manifestCatalogForLookup(): ActuatorCatalogEntry[] {
+  try {
+    return loadActuatorManifestCatalog(DEFAULT_ACTUATORS_DIR, { lenient: true });
+  } catch {
+    return [];
+  }
+}
+
 export function lookupOpCapability(op: string): ActuatorManifestCapability | undefined {
   if (!opCapabilityIndex) {
     opCapabilityIndex = new Map();
-    for (const entry of loadActuatorManifestCatalog(DEFAULT_ACTUATORS_DIR, { lenient: true })) {
+    for (const entry of manifestCatalogForLookup()) {
       const prefix = entry.n.replace(/-actuator$/u, '');
-      const manifest = readManifest(pathResolver.rootResolve(entry.manifest_path));
+      let manifest: ActuatorManifestFile;
+      try {
+        manifest = readManifest(pathResolver.rootResolve(entry.manifest_path));
+      } catch {
+        continue;
+      }
       for (const capability of manifest.capabilities ?? []) {
         opCapabilityIndex.set(`${prefix}:${capability.op}`, capability);
       }
