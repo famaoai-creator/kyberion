@@ -2,9 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { safeReadFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
+  actuatorAcceptsPipeline,
+  buildPipelineWrappedPayload,
   buildPlaygroundPayload,
   evaluatePlaygroundDryRun,
+  lookupDiscoveryOpKind,
   parsePlaygroundParams,
+  resolvePlaygroundCapabilities,
   runPlayground,
 } from './actuator_playground.js';
 
@@ -128,5 +132,56 @@ describe('actuator playground JSON input boundary', () => {
         }
       )
     ).rejects.toThrow(/PLAYGROUND_SECRET_SET_BLOCKED/);
+  });
+});
+
+describe('actuator playground discovery merge and pipeline wrap', () => {
+  it('merges describeOps step ops into manifest capabilities', () => {
+    const caps = resolvePlaygroundCapabilities(
+      {
+        actuator_id: 'file-actuator',
+        version: '1.1.0',
+        capabilities: [{ op: 'pipeline', platforms: [] }],
+      },
+      'file-actuator'
+    );
+    const ops = (caps || []).map((capability) => capability.op);
+    expect(ops).toContain('pipeline');
+    expect(ops).toContain('read');
+  });
+
+  it('wraps a single discovery op into the ADF one-step pipeline shape', () => {
+    expect(buildPipelineWrappedPayload('read', { path: 'package.json' }, 'capture')).toEqual({
+      action: 'pipeline',
+      op: 'pipeline',
+      steps: [{ type: 'capture', op: 'read', params: { path: 'package.json' } }],
+      context: {},
+      options: {},
+    });
+  });
+
+  it('only wraps actuators that accept pipeline payloads', () => {
+    expect(
+      actuatorAcceptsPipeline({
+        actuator_id: 'file-actuator',
+        version: '1.1.0',
+        capabilities: [{ op: 'pipeline', platforms: [] }],
+      })
+    ).toBe(true);
+    expect(
+      actuatorAcceptsPipeline({
+        actuator_id: 'secret-actuator',
+        version: '1.2.0',
+        capabilities: [
+          { op: 'get', platforms: [] },
+          { op: 'set', platforms: [] },
+        ],
+      })
+    ).toBe(false);
+  });
+
+  it('resolves discovery op kinds for wrapped payload typing', () => {
+    expect(lookupDiscoveryOpKind('file-actuator', 'read', 'file-actuator')).toBe('capture');
+    expect(lookupDiscoveryOpKind('file-actuator', 'no-such-op', 'file-actuator')).toBeNull();
   });
 });

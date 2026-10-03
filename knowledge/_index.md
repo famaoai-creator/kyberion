@@ -356,6 +356,8 @@
 - [Active Inquiry Protocol: The Power of Questioning](./product/orchestration/active_inquiry_protocol.md) (public | Ecosystem Architect)
 - [Actuator Discovery Registry](./product/orchestration/actuator-discovery-registry.md) (public | Ecosystem Architect)
 - [Actuator Intent Normalization](./product/orchestration/actuator-intent-normalization.md) (public | Unknown)
+- [Actuator to Pipeline Flow (use → collaborate → register)](./product/orchestration/actuator-to-pipeline-flow.md) (public | Kyberion)
+- [Actuatorからパイプライン登録までの流れ（利用→提携→登録）](./product/orchestration/actuator-to-pipeline-flow.ja.md) (public | Kyberion)
 - [Antigravity CLI Multi-Account Profile Operations](./product/orchestration/antigravity-multi-account-operations.md) (public | Unknown)
 - [Autonomous Sentinel Operations](./product/orchestration/sentinel-operations.md) (public | Ecosystem Architect)
 - [Blog Authoring Playbook](./product/orchestration/blog-authoring-playbook.md) (public | Unknown)

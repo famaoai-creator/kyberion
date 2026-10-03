@@ -175,6 +175,8 @@ export interface PipelineAdf {
   };
   steps: PipelineAdfStep[];
   schedule?: PipelineSchedule;
+  /** LC-02 provenance stamped by pipeline:promote. Ignored by the runtime. */
+  promotion?: Record<string, unknown>;
 }
 
 const PIPELINE_ADF_SCHEMA_PATH = pathResolver.knowledge('product/schemas/pipeline-adf.schema.json');

@@ -86,7 +86,23 @@ function discoverCapabilities(platform = process.platform) {
   return { platform, rootDir: ROOT, actuators, errors };
 }
 
+function loadDiscoveryOpCounts() {
+  try {
+    const discoveryPath = join(ROOT, 'knowledge/product/orchestration/actuator-op-discovery.json');
+    if (!existsSync(discoveryPath)) return new Map();
+    const parsed = JSON.parse(readFileSync(discoveryPath, 'utf8'));
+    const map = new Map();
+    for (const entry of parsed?.actuators || []) {
+      if (entry?.n && Array.isArray(entry.ops)) map.set(entry.n, entry.ops.length);
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
 function formatReport(report) {
+  const discoveryCounts = loadDiscoveryOpCounts();
   const lines = [
     '',
     '🔍 [KYBERION] Dynamic Capability Discovery',
@@ -94,10 +110,18 @@ function formatReport(report) {
     `Current Platform: ${report.platform}`,
     `Environment Root: ${report.rootDir}`,
     'Entry: manifest-scan (no dist/ required)',
+    'Note: manifest lists coarse entry points (often just `pipeline`).',
+    'Fine-grained step ops live in knowledge/product/orchestration/actuator-op-discovery.json',
+    'and CAPABILITIES_GUIDE.md — `pnpm playground --actuator <id> --op <op>` now accepts both.',
     '',
   ];
   for (const actuator of report.actuators) {
-    lines.push(`${actuator.actuatorId} (${actuator.version})`);
+    const detailed = discoveryCounts.get(actuator.actuatorId);
+    const suffix =
+      typeof detailed === 'number' && detailed > actuator.capabilities.length
+        ? ` (+${detailed - actuator.capabilities.length} step ops in discovery)`
+        : '';
+    lines.push(`${actuator.actuatorId} (${actuator.version})${suffix}`);
     lines.push(actuator.description);
     for (const capability of actuator.capabilities) {
       const icon = capability.available ? '✅' : '❌';

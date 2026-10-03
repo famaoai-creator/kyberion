@@ -1,7 +1,7 @@
 {
   "pipeline_id": "promote-procedure",
   "version": "2.0.0",
-  "description": "Pattern A → B 昇格: 記録した手順を ProcedureCatalog に登録し、次回から Pattern B で自動実行できるようにする。入力は scripts/promote_procedure.ts 内部で検証・secure-io 経由で書き込み（shell へ untrusted 値を展開しない）。",
+  "description": "Pattern A → B 昇格: 記録した手順を ProcedureCatalog に登録し、次回から Pattern B で自動実行できるようにする。入力は scripts/promote_procedure.ts 内部で検証・secure-io 経由で書き込み（shell へ untrusted 値を展開しない）。Scope: browser recordings only — ADF pipeline runs は pnpm pipeline:promote を使うこと.",
   "action": "pipeline",
   "parameters": {
     "recording_ref": {
