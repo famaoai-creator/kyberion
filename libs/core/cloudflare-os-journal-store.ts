@@ -62,8 +62,36 @@ function audit(
   });
 }
 
+/** Derived caches are refreshed at most every N observations or this long. */
+const DERIVED_REFRESH_EVERY = 100;
+const DERIVED_REFRESH_MS = 2000;
+
 export class ControlPlaneJournalStore {
   private readonly appliedSeq = new Map<string, number>();
+  private readonly derivedRefresh = new Map<string, { count: number; at: number }>();
+  private lastRefreshError: string | undefined;
+
+  /**
+   * Observations are by far the most frequent mutation, and the snapshot and
+   * rollup are derived caches (the journal is the source of truth and restore
+   * replays it), so rewriting the whole state for each one made recording cost
+   * grow with the journal. Other kinds always refresh immediately.
+   */
+  private shouldRefreshDerived(namespaceDir: string, kind: ControlPlaneCollection): boolean {
+    if (kind !== 'observation') return true;
+    const now = Date.now();
+    const state = this.derivedRefresh.get(namespaceDir);
+    if (
+      !state ||
+      state.count + 1 >= DERIVED_REFRESH_EVERY ||
+      now - state.at >= DERIVED_REFRESH_MS
+    ) {
+      this.derivedRefresh.set(namespaceDir, { count: 0, at: now });
+      return true;
+    }
+    state.count += 1;
+    return false;
+  }
 
   constructor(private readonly host: ControlPlaneJournalHost) {}
 
@@ -99,6 +127,7 @@ export class ControlPlaneJournalStore {
         }
       );
       this.appliedSeq.set(group.namespace.dir, seq);
+      if (!this.shouldRefreshDerived(group.namespace.dir, kind)) continue;
       this.writeNamespaceSnapshot(group.namespace);
       if (kind === 'observation') {
         writeObservationAggregates(
@@ -144,6 +173,38 @@ export class ControlPlaneJournalStore {
     this.appliedSeq.set(namespace.dir, seq);
     if (won) this.writeNamespaceSnapshot(namespace);
     return won;
+  }
+
+  /**
+   * Drop an apply claim that has no outcome (record still `approved`), under
+   * the same journal lock as the claim itself. Returns whether one was dropped.
+   */
+  releaseHeldApplyClaim(id: string): boolean {
+    const initial = this.host.heldRecord(id);
+    if (!initial) return false;
+    const namespace = controlPlaneNamespaceFor(
+      'held',
+      this.host.serializedJournalRecord('held', initial),
+      currentScopeEnvelope()
+    );
+    let released = false;
+    const { seq } = appendJournalEventLockedIf(
+      namespace,
+      this.appliedSeq.get(namespace.dir) ?? 0,
+      (tail) => {
+        for (const event of tail) this.host.applyJournalEvent(event);
+      },
+      () => {
+        const current = this.host.heldRecord(id);
+        if (!current || current.status !== 'approved' || !current.applyClaim) return null;
+        delete current.applyClaim;
+        released = true;
+        return { kind: 'held', records: [this.host.serializedJournalRecord('held', current)] };
+      }
+    );
+    this.appliedSeq.set(namespace.dir, seq);
+    if (released) this.writeNamespaceSnapshot(namespace);
+    return released;
   }
 
   /** Rebuild state from every namespace journal after legacy migration. */
@@ -229,7 +290,12 @@ export class ControlPlaneJournalStore {
     }
   }
 
-  /** Catch every journal up — the read path for cross-process freshness. */
+  /**
+   * Catch every journal up — the read path for cross-process freshness. A
+   * failure is best effort (the write path stays fail-closed) but never silent:
+   * each distinct failure is audited once, so a plane that has gone stale
+   * because a journal became unreadable can be noticed.
+   */
   refresh(): void {
     try {
       for (const dir of listControlPlaneNamespaceDirs()) {
@@ -237,9 +303,33 @@ export class ControlPlaneJournalStore {
         for (const event of events) this.host.applyJournalEvent(event);
         this.appliedSeq.set(dir, lastSeq);
       }
-    } catch {
-      // Read-path refresh is best effort; the write path remains fail-closed.
+      this.lastRefreshError = undefined;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message !== this.lastRefreshError) {
+        this.lastRefreshError = message;
+        audit('refresh', 'failed', { error: message });
+      }
     }
+  }
+
+  /**
+   * Remove a record from the quarantine journal after it was re-homed into a
+   * tenant. Appends a tombstone that only applies while the record is still
+   * unscoped, so replay order can never remove the tenant's copy.
+   */
+  tombstoneUnscoped(kind: ControlPlaneCollection, id: string): void {
+    const namespace = controlPlaneNamespaceFor(kind, {}, currentScopeEnvelope());
+    const seq = appendJournalEventLocked(
+      namespace,
+      this.appliedSeq.get(namespace.dir) ?? 0,
+      { kind, records: [{ id }], op: 'delete' },
+      (tail) => {
+        for (const event of tail) this.host.applyJournalEvent(event);
+      }
+    );
+    this.appliedSeq.set(namespace.dir, seq);
+    this.writeNamespaceSnapshot(namespace);
   }
 
   /**

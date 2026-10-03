@@ -167,6 +167,24 @@
           "resource_ref_from": {
             "type": "string",
             "description": "Input path identifying the governed resource ref for introduction/observation stages (e.g. \"params.path\", \"target.url\")."
+          },
+          "egress_destination_from": {
+            "type": "string",
+            "description": "Input path holding the URL or host the op sends to. The egress guard classifies that destination through the egress policy; a caller-supplied audience is never trusted."
+          },
+          "step_ops": {
+            "type": "object",
+            "description": "Per-step declarations for ops this capability dispatches internally (for example system:write_file or browser:goto). A step inherits the capability's declarations and overrides what it states.",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "effect": { "type": "string", "enum": ["read", "write", "egress", "none"] },
+                "effect_from": { "type": "string" },
+                "resource_ref_from": { "type": "string" },
+                "egress_destination_from": { "type": "string" }
+              }
+            }
           }
         }
       }
