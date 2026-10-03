@@ -5,6 +5,7 @@ import { computeApprovalPayloadHash, decideApprovalRequest } from './governance/
 import { createHeldApprovalRequest } from './governance/held-effect-request.js';
 import {
   assertPersistableParams,
+  bindRestoredExecutor,
   lookupHeldExecutor,
   registerHeldExecutor,
 } from './cloudflare-os-held-executors.js';
@@ -18,7 +19,6 @@ import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
   applyControlPlaneJournalEvent,
   declassificationKeyOf,
-  isRestoredExecutorStub,
   deserializeGadgetOperation,
   gadgetSchemaToJsonSchema,
   loadPersistedControlPlaneStateAtPath,
@@ -112,6 +112,8 @@ export interface HeldActionInput<T = unknown, R = unknown> extends HeldActionCon
   persistParams?: boolean;
   /** Set by the plane when a steering approval request exists. */
   approvalRequest?: HeldActionApprovalLink;
+  /** Exactly-once guard set under the journal lock; never cleared by the plane. */
+  applyClaim?: { by: string; at: string };
 }
 
 export interface HeldActionRecord<T = unknown, R = unknown> extends HeldActionInput<T, R> {
@@ -378,7 +380,9 @@ export class CloudflareOsControlPlane {
    */
   private readonly journalMode: boolean;
   private readonly observationAggregates = new Map<string, ObservationAggregate>();
+  private readonly instanceId = randomUUID();
   private readonly journalStore = new ControlPlaneJournalStore({
+    heldRecord: (id) => this.held.get(id) as unknown as Record<string, unknown> | undefined,
     applyJournalEvent: (event) => this.applyJournalEvent(event),
     serializedJournalRecord: (kind, record) => this.serializedRecordFor(kind, record),
     serializedState: () => this.buildPersistedState(),
@@ -573,7 +577,7 @@ export class CloudflareOsControlPlane {
   }
 
   private async performApplyHeldAction(id: string): Promise<HeldActionRecord> {
-    const record = this.held.get(id);
+    let record = this.held.get(id);
     if (!record) throw new Error(`Held action not found: ${id}`);
     if (
       record.status === 'applied' ||
@@ -585,21 +589,14 @@ export class CloudflareOsControlPlane {
       throw new Error(`[POLICY_VIOLATION] Held action ${id} is not approved`);
     const by = assertNonEmpty(record.resolvedBy || '', 'resolvedBy');
     record.resolvedBy = by;
-    // A restored record carries only an executor stub: bind the registered
-    // executor now. A process that cannot run the effect defers rather than
-    // poisoning the approval for the process that can.
-    if (isRestoredExecutorStub(record.apply)) {
-      const executor = lookupHeldExecutor(record.op);
-      if (!executor || record.params === undefined) {
-        audit('held_action', 'apply', 'denied', {
-          heldActionId: id,
-          deferred: true,
-          reason: !executor ? 'executor_not_registered' : 'params_not_persisted',
-        });
-        return record;
+    const readiness = bindRestoredExecutor(record);
+    if (readiness !== 'ready') return this.deferApply(record, readiness);
+    // Exactly-once: claim under the journal lock; a claim is never retried.
+    if (this.journalMode) {
+      if (!this.journalStore.claimHeldApply(id, `${process.pid}:${this.instanceId}`)) {
+        return this.deferApply(record, 'claimed');
       }
-      record.apply = executor.apply as HeldActionRecord['apply'];
-      record.revert = executor.revert as HeldActionRecord['revert'];
+      record = this.held.get(id) ?? record;
     }
     try {
       const refs = this.resolvedProvisionalRefs(record.missionId);
@@ -621,6 +618,12 @@ export class CloudflareOsControlPlane {
     }
     this.recordMutation('held', record);
     return record;
+  }
+
+  /** Not-run outcome: nothing is written, so a process that can run it still can. */
+  private deferApply(record: HeldActionRecord, reason: string): HeldActionRecord {
+    audit('held_action', 'apply', 'denied', { heldActionId: record.id, deferred: true, reason });
+    return this.held.get(record.id) ?? record;
   }
 
   async revertHeldAction(id: string): Promise<HeldActionRecord> {
@@ -729,9 +732,9 @@ export class CloudflareOsControlPlane {
     targetAudience: string,
     targetTenant?: string
   ): boolean {
-    const key = declassificationKeyOf({ payloadHash, targetAudience, targetTenant });
-    const grant = this.declassifications.get(key);
-    return Boolean(grant && grant.missionId === missionId);
+    return this.declassifications.has(
+      declassificationKeyOf({ missionId, payloadHash, targetAudience, targetTenant })
+    );
   }
 
   revokeIntroduction(id: string, revokedBy: string): void {

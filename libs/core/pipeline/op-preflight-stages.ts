@@ -17,6 +17,7 @@ import { pathResolver } from '../path-resolver.js';
 import { readJsonIfPresent } from '../foundation/json.js';
 import { currentScopeEnvelope, runtimeScopeIdentity } from '../scope-envelope.js';
 import { sharedControlPlane } from '../cloudflare-os-shared.js';
+import { computeApprovalPayloadHash } from '../governance/approval-store.js';
 import { evaluateProvenanceEgress } from '../provenance-taint.js';
 import type { OsKnowledgeTier } from '../cloudflare-os-control-plane.js';
 import { OP_GOVERNANCE_STAMP_KEYS } from './op-preflight.js';
@@ -185,6 +186,31 @@ export function taintResult(
   };
 }
 
+/** Input keys that describe the destination or carry a claim — not the content. */
+const EGRESS_NON_CONTENT_KEYS = new Set([
+  'target_audience',
+  'audience',
+  'target_tenant',
+  'payload_hash',
+  'payloadHash',
+]);
+
+/**
+ * The hash a declassify grant binds to: computed from the content the op will
+ * actually send (its input minus governance stamps, the declared destination,
+ * and any claimed hash). Declassify requesters and the egress guard use this
+ * one function — a hash carried in the input is never trusted, so an approved
+ * hash cannot be attached to different content.
+ */
+export function egressPayloadHash(input: Record<string, unknown>): string {
+  const content = Object.fromEntries(
+    Object.entries(input).filter(
+      ([key]) => !key.startsWith('_') && !EGRESS_NON_CONTENT_KEYS.has(key)
+    )
+  );
+  return computeApprovalPayloadHash(content);
+}
+
 /**
  * SC-06: monotonic provenance-egress guard for `effect = egress` ops.
  * Consumes the `_egress_taint` stamped by `taintResult`; a declared target
@@ -210,17 +236,15 @@ export function provenanceEgressResult(
       : typeof input.tenant_slug === 'string'
         ? input.tenant_slug
         : undefined;
-  const payloadHash =
-    typeof input.payload_hash === 'string'
-      ? input.payload_hash
-      : typeof input.payloadHash === 'string'
-        ? input.payloadHash
-        : undefined;
   const controlPlane = sharedControlPlane();
   if (
-    payloadHash &&
     targetAudience &&
-    controlPlane.isDeclassified(identity.missionId, payloadHash, targetAudience, targetTenant)
+    controlPlane.isDeclassified(
+      identity.missionId,
+      egressPayloadHash(input),
+      targetAudience,
+      targetTenant
+    )
   ) {
     return;
   }
@@ -228,9 +252,24 @@ export function provenanceEgressResult(
   // could inject `_egress_taint` params. Recompute from the plane; the
   // taint stage's stamp exists for observability, not authority.
   const taint = controlPlane.projectTaint(identity.missionId);
+  const tainted = taint.highestTier !== 'public' || taint.tenants.length > 0;
   if (!targetAudience) {
-    noteStage('egress', 'skipped');
-    return;
+    // A tainted mission that does not say where the payload goes cannot be
+    // evaluated, so it is denied rather than skipped; an untainted mission has
+    // nothing to protect.
+    if (!tainted) {
+      noteStage('egress', 'skipped');
+      return;
+    }
+    if (mode === 'warn') {
+      noteStage('egress', 'denied');
+      return;
+    }
+    return {
+      decision: 'block',
+      reason: '[OP_EGRESS_DENIED] egress target audience is undeclared for a tainted mission',
+      terminate: true,
+    };
   }
   const verdict = evaluateProvenanceEgress(taint, targetAudience, targetTenant);
   if (verdict.allowed) return;
@@ -293,5 +332,5 @@ export function recordOpObservation(
     noteStage('observation', 'warn');
     return;
   }
-  noteStage('observation', 'warn');
+  noteStage('observation', 'allowed');
 }

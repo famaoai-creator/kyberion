@@ -7,6 +7,8 @@
  * the process restarts (the plane resolves one at apply time).
  */
 
+import { isRestoredExecutorStub } from './cloudflare-os-control-plane-state.js';
+
 export interface HeldExecutor {
   apply: (params: never, resolvedProvisionalRefs: Map<string, unknown>) => unknown;
   revert?: (result: never, previousState: unknown) => void | Promise<void>;
@@ -47,4 +49,26 @@ export function assertPersistableParams(params: unknown): void {
       `[POLICY_VIOLATION] persistParams requires params without secret-like keys (${secretPath}); pass credentials by reference`
     );
   }
+}
+
+/**
+ * A restored record carries only an executor stub. Bind the registered
+ * executor onto it, or say why this process cannot run the effect (no
+ * executor, or the params were never persisted and live only in the
+ * submitter's memory) — the plane then defers without writing, because
+ * marking it failed would poison the approval for the process that can.
+ */
+export function bindRestoredExecutor(record: {
+  op: string;
+  params?: unknown;
+  apply: unknown;
+  revert?: unknown;
+}): 'ready' | 'executor_not_registered' | 'params_not_persisted' {
+  if (!isRestoredExecutorStub(record.apply)) return 'ready';
+  const executor = heldExecutors.get(record.op);
+  if (!executor) return 'executor_not_registered';
+  if (record.params === undefined) return 'params_not_persisted';
+  record.apply = executor.apply;
+  record.revert = executor.revert;
+  return 'ready';
 }

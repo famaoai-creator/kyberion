@@ -5,6 +5,7 @@ import { safeMkdir } from '../secure-io.js';
 import { auditChain } from '../governance/audit-chain.js';
 import {
   introductionResult,
+  egressPayloadHash,
   provenanceEgressResult,
   recordOpObservation,
   resetOpPreflightStagesForTests,
@@ -212,13 +213,64 @@ describe('provenanceEgressResult (SC-06)', () => {
     ).toBeUndefined();
   });
 
-  it('lets a declassified payloadHash through — and only that hash', async () => {
+  it('fails closed when a tainted mission declares no target audience', () => {
     observe('confidential');
+    const result = inScope(() =>
+      provenanceEgressResult(call('export:publish'), egressInput({ body: 'quarterly numbers' }))
+    );
+    expect(result?.decision).toBe('block');
+  });
+
+  it('binds a declassify grant to the content actually sent, not to a claimed hash', async () => {
+    observe('confidential');
+    const approved = egressInput({
+      target_audience: 'public',
+      target_tenant: 'tenant-a',
+      body: 'the approved report',
+    });
     const held = sharedControlPlane().requestDeclassify({
       missionId: 'mission-s5',
       tenantSlug: 'tenant-a',
       artifactRef: 'report:v1',
-      payloadHash: 'hash-report-v1',
+      payloadHash: egressPayloadHash(approved),
+      targetAudience: 'public',
+      targetTenant: 'tenant-a',
+      requestedBy: 'agent:x',
+    });
+    sharedControlPlane().decideHeldAction(held.id, 'approved', {
+      resolvedBy: 'human:famao',
+      decidedByType: 'human',
+      authenticated: true,
+      payloadHash: held.payloadHash,
+      effectBinding: held.effectBinding,
+    });
+    await sharedControlPlane().applyHeldAction(held.id);
+
+    expect(inScope(() => provenanceEgressResult(call('export:publish'), approved))).toBeUndefined();
+    // Different content that merely *claims* the approved hash is still denied.
+    const forged = egressInput({
+      target_audience: 'public',
+      target_tenant: 'tenant-a',
+      body: 'the confidential appendix',
+      payload_hash: egressPayloadHash(approved),
+    });
+    expect(inScope(() => provenanceEgressResult(call('export:publish'), forged))?.decision).toBe(
+      'block'
+    );
+  });
+
+  it('lets a declassified artifact through — and only that content', async () => {
+    observe('confidential');
+    const bound = egressInput({
+      target_audience: 'public',
+      target_tenant: 'tenant-a',
+      body: 'report v1',
+    });
+    const held = sharedControlPlane().requestDeclassify({
+      missionId: 'mission-s5',
+      tenantSlug: 'tenant-a',
+      artifactRef: 'report:v1',
+      payloadHash: egressPayloadHash(bound),
       targetAudience: 'public',
       targetTenant: 'tenant-a',
       requestedBy: 'agent:x',
@@ -232,34 +284,20 @@ describe('provenanceEgressResult (SC-06)', () => {
     });
     await sharedControlPlane().applyHeldAction(held.id);
     expect(
-      sharedControlPlane().isDeclassified('mission-s5', 'hash-report-v1', 'public', 'tenant-a')
+      sharedControlPlane().isDeclassified(
+        'mission-s5',
+        egressPayloadHash(bound),
+        'public',
+        'tenant-a'
+      )
     ).toBe(true);
 
     // The bound artifact passes…
+    expect(inScope(() => provenanceEgressResult(call('export:publish'), bound))).toBeUndefined();
+    // …but changed content is denied again.
     expect(
-      inScope(() =>
-        provenanceEgressResult(
-          call('export:publish'),
-          egressInput({
-            target_audience: 'public',
-            target_tenant: 'tenant-a',
-            payload_hash: 'hash-report-v1',
-          })
-        )
-      )
-    ).toBeUndefined();
-    // …but a changed payload (different hash) is denied again.
-    expect(
-      inScope(() =>
-        provenanceEgressResult(
-          call('export:publish'),
-          egressInput({
-            target_audience: 'public',
-            target_tenant: 'tenant-a',
-            payload_hash: 'hash-report-v2',
-          })
-        )
-      )?.decision
+      inScope(() => provenanceEgressResult(call('export:publish'), { ...bound, body: 'report v2' }))
+        ?.decision
     ).toBe('block');
   });
 
