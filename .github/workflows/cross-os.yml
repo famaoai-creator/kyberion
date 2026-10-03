@@ -135,7 +135,7 @@ jobs:
       - name: UI Automation live smoke (Windows)
         if: runner.os == 'Windows'
         # Three cases with bounded launch/availability deadlines (240 s each worst case).
-        timeout-minutes: 13
+        timeout-minutes: 18
         env:
           KYBERION_UIA_LIVE_SMOKE: '1'
           KYBERION_PERSONA: worker

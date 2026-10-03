@@ -92,7 +92,13 @@ function registerExitFlush(): void {
     flushers = created;
     scope[EXIT_FLUSH_KEY] = created;
     process.once('exit', () => {
-      for (const flush of created) flush();
+      for (const flush of created) {
+        try {
+          flush();
+        } catch {
+          // One instance failing to flush must not drop the others' markers.
+        }
+      }
     });
   }
   flushers.add(flushRepeatMarkers);

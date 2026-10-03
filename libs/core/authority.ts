@@ -899,7 +899,16 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
   // (covers active/missions/{personal,confidential,public}/{id}/...).
   if (missionId) {
     const candidates: string[] = [pathResolver.active(`missions/${missionId}/mission-state.json`)];
-    const tierPath = pathResolver.findMissionPath(missionId);
+    let tierPath: string | null = null;
+    try {
+      tierPath = pathResolver.findMissionPath(missionId);
+    } catch (error) {
+      // An id that is ambiguous across tenants or not visible to this process
+      // contributes no mission identity; permission checks then deny cleanly
+      // instead of throwing. Any other error still propagates.
+      const code = (error as { code?: unknown } | null)?.code;
+      if (code !== 'OWNER_AMBIGUOUS' && code !== 'OWNER_NOT_VISIBLE') throw error;
+    }
     if (tierPath) candidates.push(`${tierPath}/mission-state.json`);
     for (const statePath of candidates) {
       try {
