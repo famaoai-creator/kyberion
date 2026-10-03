@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { pathResolver } from './path-resolver.js';
@@ -28,6 +29,7 @@ export interface PersistedControlPlaneState {
   capabilities: CapabilityEdge[];
   threadCapabilities: Record<string, string[]>;
   blueprints: BlueprintContract[];
+  declassifications?: DeclassificationGrant[];
   network: NetworkObservation[];
   gadgets: PersistedGadget[];
 }
@@ -86,6 +88,7 @@ const PERSISTED_STATE_ROOT_FIELDS = [
   'blueprints',
   'network',
   'gadgets',
+  'declassifications',
 ] as const;
 
 function persistedRecord(value: unknown, label: string): PersistedRecord {
@@ -617,6 +620,13 @@ export function parsePersistedControlPlaneState(value: unknown): PersistedContro
     blueprints: root.blueprints.map(parsePersistedBlueprint),
     network: root.network.map(parsePersistedNetwork),
     gadgets: root.gadgets.map(parsePersistedGadget),
+    ...(root.declassifications !== undefined
+      ? {
+          declassifications: (root.declassifications as unknown[]).map((entry, index) =>
+            persistedRecord(entry, `control-plane state declassifications[${index}]`)
+          ) as unknown as DeclassificationGrant[],
+        }
+      : {}),
   };
 }
 
@@ -663,6 +673,24 @@ export function serializableHeldActionRecord(
  * The in-memory collections a journal event folds into — the plane passes
  * its own maps so replay, catch-up and restore share one code path.
  */
+export interface DeclassificationGrant {
+  id: string;
+  missionId: string;
+  tenantSlug?: string;
+  artifactRef: string;
+  payloadHash: string;
+  targetAudience: string;
+  targetTenant?: string;
+  grantedBy: string;
+  grantedAt: string;
+}
+
+export function declassificationKeyOf(
+  grant: Pick<DeclassificationGrant, 'payloadHash' | 'targetAudience' | 'targetTenant'>
+): string {
+  return `${grant.payloadHash}|${grant.targetAudience}|${grant.targetTenant ?? ''}`;
+}
+
 export interface ControlPlaneJournalCollections {
   held: Map<string, HeldActionRecord>;
   introductions: Map<string, ResourceIntroduction>;
@@ -671,6 +699,7 @@ export interface ControlPlaneJournalCollections {
   capabilities: Map<string, CapabilityEdge>;
   threadCapabilities: Map<string, Set<string>>;
   blueprints: Map<string, BlueprintContract>;
+  declassifications: Map<string, DeclassificationGrant>;
   network: NetworkObservation[];
   observationAggregates: Map<
     string,
@@ -763,6 +792,12 @@ export function applyControlPlaneJournalEvent(
       case 'blueprint':
         collections.blueprints.set(raw.id as string, raw as unknown as BlueprintContract);
         break;
+      case 'declassification':
+        collections.declassifications.set(
+          declassificationKeyOf(raw as never),
+          raw as unknown as DeclassificationGrant
+        );
+        break;
       case 'network': {
         const key = JSON.stringify(raw);
         if (!collections.network.some((entry) => JSON.stringify(entry) === key)) {
@@ -792,4 +827,47 @@ export function applyControlPlaneJournalEvent(
       }
     }
   }
+}
+
+/** zod → persisted JSON schema (drops the $schema marker). */
+export function gadgetSchemaToJsonSchema(schema: z.ZodType): Record<string, unknown> {
+  const jsonSchema = z.toJSONSchema(schema) as Record<string, unknown>;
+  delete jsonSchema.$schema;
+  return jsonSchema;
+}
+
+/** Rehydrate a persisted gadget operation descriptor's schemas. */
+export function deserializeGadgetOperation(
+  operation: Record<string, unknown>
+): GadgetOperationDefinition {
+  return {
+    ...operation,
+    inputSchema: z.fromJSONSchema(operation.inputSchema as Parameters<typeof z.fromJSONSchema>[0]),
+    outputSchema: z.fromJSONSchema(
+      operation.outputSchema as Parameters<typeof z.fromJSONSchema>[0]
+    ),
+  } as GadgetOperationDefinition;
+}
+
+/** Serialize one gadget manifest + operations for journal/snapshot write. */
+export function serializeGadgetRecord(
+  manifest: GadgetManifest,
+  operations: Map<string, GadgetOperationDefinition> | undefined
+): PersistedGadget {
+  return {
+    manifest,
+    operations: operations
+      ? [...operations.values()].map((operation) => ({
+          name: operation.name,
+          description: operation.description,
+          inputSchema: gadgetSchemaToJsonSchema(operation.inputSchema),
+          outputSchema: gadgetSchemaToJsonSchema(operation.outputSchema),
+          effect: operation.effect,
+          capabilityResource: operation.capabilityResource,
+          introduction: operation.introduction,
+          observation: operation.observation,
+          governedCode: operation.governedCode,
+        }))
+      : [],
+  };
 }

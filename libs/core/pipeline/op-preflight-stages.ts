@@ -17,10 +17,11 @@ import { pathResolver } from '../path-resolver.js';
 import { readJsonIfPresent } from '../foundation/json.js';
 import { currentScopeEnvelope } from '../scope-envelope.js';
 import { sharedControlPlane } from '../cloudflare-os-shared.js';
-import type { OsKnowledgeTier } from '../cloudflare-os-control-plane.js';
+import { evaluateProvenanceEgress } from '../provenance-taint.js';
+import type { OsKnowledgeTier, ProvenanceTaint } from '../cloudflare-os-control-plane.js';
 import type { OpPreflightCall, OpPreflightListenerResult } from './op-preflight.js';
 
-type StageName = 'introduction' | 'taint' | 'observation';
+type StageName = 'introduction' | 'taint' | 'observation' | 'egress';
 type StageMode = 'off' | 'warn' | 'enforce';
 
 interface RolloutPolicy {
@@ -172,6 +173,77 @@ export function taintResult(
       _egress_taint: taint,
     },
   };
+}
+
+/**
+ * SC-06: monotonic provenance-egress guard for `effect = egress` ops.
+ * Consumes the `_egress_taint` stamped by `taintResult`; a declared target
+ * audience/tenant is evaluated against the shared rule, and a declassified
+ * payloadHash bypasses exactly one artifact's destination.
+ */
+export function provenanceEgressResult(
+  call: OpPreflightCall,
+  input: Record<string, unknown>
+): OpPreflightListenerResult | void {
+  if (input._effect !== 'egress') return;
+  const mode = stageMode('egress', opFamily(call.op));
+  if (mode === 'off') return;
+  const identity = stageIdentity(call, input);
+  if (!identity.missionId) {
+    noteStage('egress', 'skipped');
+    return;
+  }
+  const targetAudience = readAudience(input);
+  const targetTenant =
+    typeof input.target_tenant === 'string'
+      ? input.target_tenant
+      : typeof input.tenant_slug === 'string'
+        ? input.tenant_slug
+        : undefined;
+  const payloadHash =
+    typeof input.payload_hash === 'string'
+      ? input.payload_hash
+      : typeof input.payloadHash === 'string'
+        ? input.payloadHash
+        : undefined;
+  const controlPlane = sharedControlPlane();
+  if (
+    payloadHash &&
+    targetAudience &&
+    controlPlane.isDeclassified(identity.missionId, payloadHash, targetAudience, targetTenant)
+  ) {
+    return;
+  }
+  const taint =
+    (input._egress_taint as ProvenanceTaint | undefined) ??
+    controlPlane.projectTaint(identity.missionId);
+  if (!targetAudience) {
+    noteStage('egress', 'skipped');
+    return;
+  }
+  const verdict = evaluateProvenanceEgress(taint, targetAudience, targetTenant);
+  if (verdict.allowed) return;
+  if (mode === 'warn') {
+    noteStage('egress', 'denied');
+    return;
+  }
+  return {
+    decision: 'block',
+    reason: `[OP_EGRESS_DENIED] ${verdict.reason}`,
+    terminate: true,
+  };
+}
+
+function readAudience(input: Record<string, unknown>): OsKnowledgeTier | 'external' | undefined {
+  const candidate =
+    (typeof input.target_audience === 'string' && input.target_audience) ||
+    (typeof input.audience === 'string' && input.audience) ||
+    undefined;
+  if (candidate === 'external') return 'external';
+  if (candidate === 'public' || candidate === 'confidential' || candidate === 'personal') {
+    return candidate;
+  }
+  return undefined;
 }
 
 /**

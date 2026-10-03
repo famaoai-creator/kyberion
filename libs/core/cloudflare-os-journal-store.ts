@@ -166,6 +166,13 @@ export class ControlPlaneJournalStore {
             .map((entry) => [entry.threadId, entry.capabilities])
         ),
         blueprints: state.blueprints.filter((record) => inNamespace('blueprint', record)),
+        ...(state.declassifications
+          ? {
+              declassifications: state.declassifications.filter((record) =>
+                inNamespace('declassification', record)
+              ),
+            }
+          : {}),
         network: state.network.filter((record) => inNamespace('network', record)),
         gadgets: state.gadgets.filter((record) => inNamespace('gadget', record)),
       };
