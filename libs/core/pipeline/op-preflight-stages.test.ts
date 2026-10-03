@@ -242,6 +242,27 @@ describe('provenanceEgressResult (SC-06)', () => {
     ).toBe('block');
   });
 
+  it('never trusts an input-carried _egress_taint', () => {
+    observe('confidential');
+    const result = provenanceEgressResult(
+      call('export:publish'),
+      egressInput({
+        target_audience: 'public',
+        target_tenant: 'tenant-a',
+        // A client-injected clean projection must not launder the mission's
+        // real confidential taint.
+        _egress_taint: {
+          missionId: 'mission-s5',
+          highestTier: 'public',
+          tenants: ['tenant-a'],
+          prohibitExternal: false,
+          observationIds: [],
+        },
+      })
+    );
+    expect(result?.decision).toBe('block');
+  });
+
   it('warns without blocking in warn rollout mode', () => {
     setOpPreflightRolloutForTests({ stages: { egress: { default: 'warn' } } });
     observe('personal');

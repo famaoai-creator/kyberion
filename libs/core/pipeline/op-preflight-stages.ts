@@ -17,8 +17,9 @@ import { pathResolver } from '../path-resolver.js';
 import { readJsonIfPresent } from '../foundation/json.js';
 import { currentScopeEnvelope } from '../scope-envelope.js';
 import { sharedControlPlane } from '../cloudflare-os-shared.js';
+import { resolveTenantAlias } from '../context-security-scope.js';
 import { evaluateProvenanceEgress } from '../provenance-taint.js';
-import type { OsKnowledgeTier, ProvenanceTaint } from '../cloudflare-os-control-plane.js';
+import type { OsKnowledgeTier } from '../cloudflare-os-control-plane.js';
 import { OP_GOVERNANCE_STAMP_KEYS } from './op-preflight.js';
 import type { OpPreflightCall, OpPreflightListenerResult } from './op-preflight.js';
 
@@ -77,7 +78,7 @@ function stageMode(stage: StageName, family: string): StageMode {
   return STAGE_MODES.has(candidate) ? candidate : 'warn';
 }
 
-function noteStage(stage: StageName, outcome: 'warn' | 'denied' | 'skipped'): void {
+function noteStage(stage: StageName, outcome: 'warn' | 'denied' | 'skipped' | 'allowed'): void {
   const key = `${stage}:${outcome}`;
   stageModeCounts.set(key, (stageModeCounts.get(key) ?? 0) + 1);
 }
@@ -125,11 +126,10 @@ function stageIdentity(call: OpPreflightCall, input: Record<string, unknown>): S
       (typeof input.task_id === 'string' ? input.task_id : undefined),
     tenantSlug:
       envelope?.identity.tenant_slug ??
-      (typeof scope?.tenant_slug === 'string'
-        ? scope.tenant_slug
-        : typeof scope?.tenant_id === 'string'
-          ? scope.tenant_id
-          : undefined),
+      resolveTenantAlias({
+        tenant_slug: typeof scope?.tenant_slug === 'string' ? scope.tenant_slug : undefined,
+        tenant_id: typeof scope?.tenant_id === 'string' ? scope.tenant_id : undefined,
+      }),
     tier,
     purpose:
       envelope?.policy.purpose ?? (typeof scope?.purpose === 'string' ? scope.purpose : undefined),
@@ -166,7 +166,7 @@ export function introductionResult(
     scope: 'write',
     mode,
   });
-  noteStage('introduction', introduced ? 'warn' : 'denied');
+  noteStage('introduction', introduced ? 'allowed' : 'denied');
 }
 
 /**
@@ -179,16 +179,18 @@ export function taintResult(
 ): OpPreflightListenerResult | void {
   if (input._effect !== 'egress') return;
   const mode = stageMode('taint', opFamily(call.op));
-  if (mode === 'off') return;
   const identity = stageIdentity(call, input);
+  // Always write the key — `undefined` clears any client-injected taint so
+  // a fake projection can never flow through governance_stamps.
+  const clearTaint = { repaired_input: { _egress_taint: undefined } };
+  if (mode === 'off') return clearTaint;
   if (!identity.missionId) {
     noteStage('taint', 'skipped');
-    return;
+    return clearTaint;
   }
-  const taint = sharedControlPlane().projectTaint(identity.missionId);
   return {
     repaired_input: {
-      _egress_taint: taint,
+      _egress_taint: sharedControlPlane().projectTaint(identity.missionId),
     },
   };
 }
@@ -232,9 +234,10 @@ export function provenanceEgressResult(
   ) {
     return;
   }
-  const taint =
-    (input._egress_taint as ProvenanceTaint | undefined) ??
-    controlPlane.projectTaint(identity.missionId);
+  // The security decision never trusts an input-carried stamp — a client
+  // could inject `_egress_taint` params. Recompute from the plane; the
+  // taint stage's stamp exists for observability, not authority.
+  const taint = controlPlane.projectTaint(identity.missionId);
   if (!targetAudience) {
     noteStage('egress', 'skipped');
     return;
