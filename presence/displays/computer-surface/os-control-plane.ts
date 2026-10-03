@@ -1,4 +1,4 @@
-import { CloudflareOsControlPlane } from '@agent/core/cloudflare-os-control-plane';
+import { getControlPlaneForScope, resolveOsSurfaceAccess } from '@agent/core/cloudflare-os-shared';
 import {
   CloudflareOsReadOnlySurface,
   CloudflareOsSurface,
@@ -12,25 +12,11 @@ import { getRegisteredEnvText } from '@agent/core/foundation';
 export function getComputerSurfaceAccess(
   env: NodeJS.ProcessEnv = process.env
 ): CloudflareOsSurfaceAccess {
-  const rawTenant = getRegisteredEnvText('KYBERION_TENANT', { env })?.trim() || '';
-  const tenant = isValidTenantSlug(rawTenant) ? rawTenant : undefined;
-  const configuredPrincipal =
-    getRegisteredEnvText('KYBERION_COMPUTER_SURFACE_PRINCIPAL', { env })?.trim() || '';
-  if (tenant && !configuredPrincipal) {
-    throw new Error(
-      '[POLICY_VIOLATION] KYBERION_COMPUTER_SURFACE_PRINCIPAL is required for tenant-scoped OS projection'
-    );
-  }
-  const principalId = configuredPrincipal || 'human:computer-surface-localadmin';
-  if (!principalId.startsWith('human:')) {
-    throw new Error(
-      '[POLICY_VIOLATION] Computer Surface OS principal must identify a human viewer'
-    );
-  }
-  return {
-    principalId,
-    tenantSlugs: tenant ? [tenant] : [],
-  };
+  return resolveOsSurfaceAccess({
+    principalEnv: 'KYBERION_COMPUTER_SURFACE_PRINCIPAL',
+    defaultPrincipal: 'human:computer-surface-localadmin',
+    env,
+  });
 }
 
 export function getComputerSurfaceTenantScope(
@@ -54,7 +40,7 @@ export function getComputerSurfaceGuardedSurfaceUrl(
 }
 
 const readOnlySurface = new CloudflareOsReadOnlySurface(
-  new CloudflareOsSurface(new CloudflareOsControlPlane({ auditRestoreFailures: false }))
+  new CloudflareOsSurface(getControlPlaneForScope())
 );
 
 export function getComputerSurfaceOsSnapshot(

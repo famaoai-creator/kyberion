@@ -19,7 +19,25 @@ import { currentScopeEnvelope } from '../scope-envelope.js';
 import { sharedControlPlane } from '../cloudflare-os-shared.js';
 import { evaluateProvenanceEgress } from '../provenance-taint.js';
 import type { OsKnowledgeTier, ProvenanceTaint } from '../cloudflare-os-control-plane.js';
+import { OP_GOVERNANCE_STAMP_KEYS } from './op-preflight.js';
 import type { OpPreflightCall, OpPreflightListenerResult } from './op-preflight.js';
+
+/**
+ * Keys the governance stages stamp onto the repaired preflight input.
+ * They carry stage metadata between the waterfall and the execute choke
+ * points — never the op's validated input, so they are stripped before
+ * `options.execute`/`handlers.*` runs.
+ */
+export const GOVERNANCE_STAMP_KEYS = OP_GOVERNANCE_STAMP_KEYS;
+
+/** Input minus the governance stamps — safe to hand to the op schema. */
+export function stripGovernanceInputStamps(
+  input: Record<string, unknown>
+): Record<string, unknown> {
+  const cleaned = { ...input };
+  for (const key of GOVERNANCE_STAMP_KEYS) delete cleaned[key];
+  return cleaned;
+}
 
 type StageName = 'introduction' | 'taint' | 'observation' | 'egress';
 type StageMode = 'off' | 'warn' | 'enforce';

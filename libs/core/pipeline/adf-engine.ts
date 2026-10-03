@@ -18,7 +18,7 @@ import {
 import { resolveOpAccessClaims, type OpInputDomain } from './op-input-contracts.js';
 import type { ResourceClaim } from '../tool/tool-call-scheduler.js';
 import { runOpPreflight } from './op-preflight.js';
-import { recordOpObservation } from './op-preflight-stages.js';
+import { recordOpObservation, stripGovernanceInputStamps } from './op-preflight-stages.js';
 import { ensureDefaultOpPreflight } from './op-preflight-defaults.js';
 import {
   requireSandboxEnforcement,
@@ -348,6 +348,8 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
     assertExecutionBounds(state, { maxSteps, timeoutMs });
 
     let executionParams = step.params;
+    // Stamped input (with governance keys) for the post-op observation stage.
+    let governedParams: Record<string, unknown> = step.params as Record<string, unknown>;
     if (step.type !== 'control') {
       // Signature over *resolved* params: template steps inside foreach resolve
       // to different values per item and must not count as repeats.
@@ -415,7 +417,10 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
         (error as Error & { adfControlFlow?: string }).adfControlFlow = 'preflight';
         throw error;
       }
-      executionParams = preflight.input;
+      // Governance stamps (_effect/_resource_ref/_egress_taint) carry stage
+      // metadata only — strip them before the op schema sees the input.
+      executionParams = stripGovernanceInputStamps(preflight.input);
+      governedParams = { ...preflight.input, ...preflight.governance_stamps };
     }
 
     hooks?.beforeStep?.(step, state.stepCount, ctx);
@@ -472,7 +477,7 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
       }
       // SC-05: post-op observation aggregation for declared-read ops.
       if (step.type === 'capture' || step.type === 'transform' || step.type === 'apply') {
-        recordOpObservation(step.op, executionParams as Record<string, unknown>, ctx);
+        recordOpObservation(step.op, governedParams, ctx);
       }
       results.push({ op: step.op, status: 'success' });
       ctx = ((await hooks?.afterStep?.(step, state.stepCount, ctx, { status: 'success' })) ||

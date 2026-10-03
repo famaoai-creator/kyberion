@@ -1,5 +1,5 @@
+import { sharedControlPlane } from './cloudflare-os-shared.js';
 import {
-  CloudflareOsControlPlane,
   type OsKnowledgeTier,
   type HeldActionSummary,
   type ObservationRecord,
@@ -36,7 +36,7 @@ type TenantScopedItem = { tenantSlug?: string };
  * executor parameters/results inside the control plane.
  */
 export class CloudflareOsSurface {
-  constructor(private readonly controlPlane = new CloudflareOsControlPlane()) {}
+  constructor(private readonly controlPlane = sharedControlPlane()) {}
 
   snapshot(
     missionId: string | undefined,

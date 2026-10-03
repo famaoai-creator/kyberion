@@ -268,6 +268,7 @@ export * from './service/service-binding.js';
 export * from './oauth-broker.js';
 
 export * from './cloudflare-os-control-plane.js';
+export * from './cloudflare-os-shared.js';
 
 export * from './cloudflare-os-surface.js';
 
