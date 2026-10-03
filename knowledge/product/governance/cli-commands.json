@@ -3640,6 +3640,17 @@
       "description": "cli_cmd_script_dot_wake",
       "group": "operate",
       "long_running": true
+    },
+    {
+      "id": "script.dot.inbox",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot inbox",
+      "args": ["inbox"],
+      "noun": "dot",
+      "verb": "inbox",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_inbox",
+      "group": "operate"
     }
   ],
   "deprecated_script_aliases": [

@@ -9,6 +9,8 @@
  *   pnpm kyberion dot retire <dot_id>            # any non-retired → retired
  *   pnpm kyberion dot wake <dot_id>              # run one bounded wake now
  *   pnpm kyberion dot status [<dot_id>]          # last wake + token usage per dot
+ *   pnpm kyberion dot inbox append --channel <ch> [--dot-id <id>] [--text <s>]
+ *                                                # append a wake-lane row (manual/testing)
  *
  * Charters are the declarative contract for resident agents; see dots/README.md
  * and knowledge/product/architecture/resident-dot-model.md. Status changes are
@@ -27,12 +29,22 @@ import {
 } from '@agent/core/dot/dot-lifecycle';
 import { withExecutionContextAsync } from '@agent/core/authority';
 import { dotTokensUsedToday, readDotWakeLedger } from '@agent/core/dot/dot-runtime';
+import { appendDotInboxEntry } from '@agent/core/dot/dot-inbox';
 import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
 import { DEFAULT_DAEMONS } from './daemon_watchdog.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const STATUSES: DotCharterStatus[] = ['draft', 'active', 'paused', 'retired'];
-const SUBCOMMANDS = ['list', 'validate', 'activate', 'pause', 'retire', 'wake', 'status'] as const;
+const SUBCOMMANDS = [
+  'list',
+  'validate',
+  'activate',
+  'pause',
+  'retire',
+  'wake',
+  'status',
+  'inbox',
+] as const;
 type Subcommand = (typeof SUBCOMMANDS)[number];
 
 function loadAll() {
@@ -149,6 +161,36 @@ async function reportWake(argv: string[]) {
   };
 }
 
+/**
+ * `dot inbox append` — manual wake-lane producer. Writes the same row shape
+ * channel bridges and state probes emit, so an operator can fire a wake
+ * without waiting on a real channel message.
+ */
+function reportInbox(argv: string[]) {
+  const [action, ...rest] = argv;
+  if (action !== 'append') {
+    throw new Error(
+      'usage: pnpm kyberion dot inbox append --channel <ch> [--dot-id <id>] [--text <s>]'
+    );
+  }
+  const flag = (name: string): string | undefined => {
+    const index = rest.indexOf(`--${name}`);
+    return index >= 0 ? rest[index + 1] : undefined;
+  };
+  const channel = flag('channel');
+  if (!channel)
+    throw new Error(
+      'dot inbox append requires --channel <slack|telegram|discord|imessage|surface|inbox>'
+    );
+  const entry = appendDotInboxEntry({
+    channel,
+    ...(flag('dot-id') ? { dot_id: flag('dot-id') } : {}),
+    ...(flag('text') ? { text: flag('text') } : {}),
+    source: 'cli',
+  });
+  return { ok: true, appended: entry };
+}
+
 function reportStatus(argv: string[]) {
   const dotId = argv.find((arg) => !arg.startsWith('--'));
   const ledger = readDotWakeLedger({});
@@ -190,6 +232,8 @@ async function main(argv: string[]): Promise<Record<string, unknown>> {
       return reportTransition(subcommand, args);
     case 'wake':
       return reportWake(args);
+    case 'inbox':
+      return reportInbox(args);
     case 'status':
       return reportStatus(args);
     case 'list':
