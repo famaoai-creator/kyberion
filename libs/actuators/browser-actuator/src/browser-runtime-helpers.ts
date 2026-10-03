@@ -1200,6 +1200,7 @@ function renderSecretFillStep(
 
 function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: string): BrowserAction {
   const steps: PipelineStep[] = [];
+  const skipped: string[] = [];
   let refsEstablished = false;
 
   const ensureSnapshot = () => {
@@ -1228,9 +1229,24 @@ function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: string): Br
         : action;
     const validation = validateOpInput('browser', op, input);
     if (!validation.valid) {
-      throw new Error(
-        `[INVALID_OP_INPUT] browser:${op}: ${'errors' in validation ? validation.errors.join('; ') : ''}`
+      // Secret fills stay fail-fast: silently dropping an auth step would
+      // produce a replay that fails at login with no obvious cause.
+      const isSecret =
+        op === 'fill_secret_ref' ||
+        (action as BrowserRecordedAction).classification === 'secret_ref' ||
+        Boolean((action as BrowserRecordedAction).secret_ref);
+      if (isSecret) {
+        throw new Error(
+          `[INVALID_OP_INPUT] browser:${op}: ${'errors' in validation ? validation.errors.join('; ') : ''}`
+        );
+      }
+      // Non-secret unreplayable entries are skipped so one bad entry does not
+      // abort the whole export. Each skip is logged; the total is logged below.
+      skipped.push(op);
+      logger.warn(
+        `[BROWSER] renderBrowserAdf skips invalid trail entry browser:${op}: ${'errors' in validation ? validation.errors.join('; ') : 'invalid input'}`
       );
+      continue;
     }
     switch (op) {
       case 'goto':
@@ -1244,6 +1260,43 @@ function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: string): Br
         steps.push({ type: 'capture', op: 'snapshot', params: {} });
         refsEstablished = true;
         break;
+      case 'screenshot':
+        // Keep the visual-evidence step so replay retains its shape. The trail
+        // records no output path, so replay takes a fresh screenshot.
+        steps.push({ type: 'capture', op: 'screenshot', params: {} });
+        break;
+      case 'scroll':
+        // The scroll executor only honors wheel delta (params.x/y/delta), not a
+        // selector, and the recorded trail stores only content_excerpt=delta(x,y).
+        // Emitting a selector-based scroll would replay as a (0,0) no-op, so the
+        // step is intentionally dropped (logged) instead of pretending replayability.
+        skipped.push('scroll');
+        logger.warn(
+          '[BROWSER] renderBrowserAdf drops scroll: wheel-delta replay is timing-dependent; re-add a wait/snapshot anchor instead'
+        );
+        break;
+      case 'select_tab':
+        // tab_id (e.g. tab-1) is ephemeral and not durable across sessions.
+        // The trail carries no url/title to synthesize select_tab_matching, so
+        // drop with a hint instead of emitting a replay that mis-selects.
+        skipped.push('select_tab');
+        logger.warn(
+          '[BROWSER] renderBrowserAdf drops select_tab: ephemeral tab_id is not replayable; record url/title and use select_tab_matching'
+        );
+        break;
+      case 'select_tab_matching': {
+        const rec = action as unknown as Record<string, string | undefined>;
+        const urlIncludes = rec.url_includes ?? rec.url;
+        const titleIncludes = rec.title_includes ?? rec.title;
+        const params: Record<string, string> = {};
+        if (typeof urlIncludes === 'string' && urlIncludes.trim())
+          params.url_includes = urlIncludes.trim();
+        if (typeof titleIncludes === 'string' && titleIncludes.trim())
+          params.title_includes = titleIncludes.trim();
+        if (Object.keys(params).length > 0)
+          steps.push({ type: 'control', op: 'select_tab_matching', params });
+        break;
+      }
       case 'click':
         pushApply(renderDurableApplyStep('click', action));
         break;
@@ -1266,6 +1319,12 @@ function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: string): Br
       default:
         break;
     }
+  }
+
+  if (skipped.length > 0) {
+    logger.warn(
+      `[BROWSER] renderBrowserAdf skipped ${skipped.length} unreplayable entr${skipped.length === 1 ? 'y' : 'ies'}: ${skipped.join(', ')}`
+    );
   }
 
   return {
