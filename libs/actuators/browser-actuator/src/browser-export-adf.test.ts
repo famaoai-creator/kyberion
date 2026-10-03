@@ -368,4 +368,59 @@ describe('renderBrowserAdf durable export', () => {
     expect(resolved.selector).toBe('input#key');
     expect(resolved.ctx.ref_map).toMatchObject({ '@e1': 'input#key' });
   });
+
+  it('preserves screenshot evidence but drops non-replayable scroll/select_tab with a warning', () => {
+    const adf = browserRuntimeHelpers.renderBrowserAdf(
+      [
+        { kind: 'apply', op: 'goto', url: 'https://example.com', ts: TS },
+        { kind: 'apply', op: 'scroll', content_excerpt: 'delta(0,300)', ts: TS },
+        {
+          kind: 'capture',
+          op: 'screenshot',
+          ts: TS,
+        },
+        { kind: 'control', op: 'select_tab', tab_id: 'tab-1', ts: TS },
+      ],
+      'resilient-export'
+    );
+    // scroll executor ignores selectors (wheel delta only) and tab_id is
+    // ephemeral, so both are dropped rather than emitted as false replay.
+    expect(adf.steps.some((s) => s.op === 'scroll')).toBe(false);
+    expect(adf.steps.some((s) => s.op === 'screenshot')).toBe(true);
+    expect(adf.steps.some((s) => s.op === 'select_tab')).toBe(false);
+  });
+
+  it('skips invalid non-secret entries but still throws for secret fills (fail-closed)', () => {
+    const adf = browserRuntimeHelpers.renderBrowserAdf(
+      [
+        { kind: 'apply', op: 'goto', url: 'https://example.com', ts: TS },
+        {
+          kind: 'apply',
+          op: 'click_ref',
+          ref: '@e1',
+          selector: 'a.more',
+          element_name: 'More',
+          element_role: 'link',
+          ts: TS,
+        },
+      ],
+      'skip-invalid'
+    );
+    expect(adf.steps.some((s) => s.op === 'click')).toBe(true);
+    expect(() =>
+      browserRuntimeHelpers.renderBrowserAdf(
+        [
+          {
+            kind: 'apply',
+            op: 'fill_secret_ref',
+            ref: '@e9',
+            secret_ref: '',
+            classification: 'secret_ref',
+            ts: TS,
+          },
+        ],
+        'secret-invalid'
+      )
+    ).toThrow(/INVALID_OP_INPUT/);
+  });
 });
