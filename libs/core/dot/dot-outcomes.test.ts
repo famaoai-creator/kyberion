@@ -15,7 +15,12 @@ import {
   type DotOutcomeDeps,
 } from './dot-outcomes.js';
 import { DOT_SIGNAL_LEDGER_PATH } from './dot-feedback.js';
-import { DOT_WORK_RESULTS_FILE, dotStatePath, type DotWorkResultRow } from './dot-state-paths.js';
+import {
+  DOT_KR_LEDGER_FILE,
+  DOT_WORK_RESULTS_FILE,
+  dotStatePath,
+  type DotWorkResultRow,
+} from './dot-state-paths.js';
 
 const TEST_ROOT = `active/shared/tmp/dot-outcomes-tests-${randomUUID()}`;
 const T0 = new Date('2026-10-04T10:00:00Z');
@@ -242,5 +247,81 @@ describe('dot outcomes', () => {
       base(at(70), { measureKrs: async () => ({ errors: 4, cov: 50 }) })
     );
     expect(recovered).toEqual([expect.objectContaining({ action_ref: 'a1', verdict: 'improved' })]);
+  });
+
+  it.each(['expected KR', 'largest KR delta'] as const)(
+    'waits for settled evidence with a long KR cadence (%s)',
+    async (mode) => {
+      const c = charter();
+      c.goal.key_results!.forEach((spec) => {
+        spec.every_s = 7200;
+      });
+      seed(c, [result('a1')]);
+      const deps = base(at(60), {
+        expectedEffectOf: () =>
+          mode === 'expected KR' ? { kr_id: 'errors', direction: 'decrease' } : undefined,
+      });
+      scheduleDotOutcomeChecks(c, deps);
+      const ledger = path.join(TEST_ROOT, dotStatePath(c, DOT_KR_LEDGER_FILE));
+      const measure = (minutes: number, errors: number) => {
+        for (const [kr_id, value] of Object.entries({ errors, cov: 50 })) {
+          appendJsonLine(ledger, {
+            scope: 'dot',
+            dot_id: c.dot_id,
+            kr_id,
+            value,
+            progress: 0,
+            measured_at: at(minutes).toISOString(),
+          });
+        }
+      };
+      // The native cadence skips a re-measure at 60, leaving an intermediate
+      // improvement in the ledger. That must not finalize the action.
+      measure(15, 2);
+      expect(await evaluateDueDotOutcomes(c, deps)).toEqual([]);
+      expect(readDotOutcomes(c, { rootDir: TEST_ROOT })).toEqual([]);
+      measure(120, 20);
+      expect(await evaluateDueDotOutcomes(c, { ...deps, now: () => at(120) })).toEqual([
+        expect.objectContaining({ action_ref: 'a1', verdict: 'regressed', before: 10, after: 20 }),
+      ]);
+    }
+  );
+
+  it('requires settled signal evidence and accepts a measurement exactly at due_at', async () => {
+    const c = charter();
+    const deps = base(at(60), {
+      readResults: () => [result('s1', { signal_snapshot: { api: 1 } })],
+      expectedEffectOf: () => ({ signal: 'api', direction: 'increase' }),
+    });
+    scheduleDotOutcomeChecks(c, deps);
+    const ledger = path.join(TEST_ROOT, DOT_SIGNAL_LEDGER_PATH);
+    safeMkdir(path.dirname(ledger), { recursive: true });
+    appendJsonLine(ledger, {
+      dot_id: c.dot_id,
+      signal: 'api',
+      healthy: true,
+      measured_at: at(59).toISOString(),
+    });
+    expect(await evaluateDueDotOutcomes(c, deps)).toEqual([]);
+    appendJsonLine(ledger, {
+      dot_id: c.dot_id,
+      signal: 'api',
+      healthy: false,
+      measured_at: at(60).toISOString(),
+    });
+    expect(await evaluateDueDotOutcomes(c, deps)).toEqual([
+      expect.objectContaining({ verdict: 'regressed', before: 1, after: 0 }),
+    ]);
+  });
+
+  it('still requires strictly post-completion evidence when settlement is zero', async () => {
+    const c = charter({ outcome_settle_minutes: 0 });
+    seed(c, [result('a1')]);
+    const deps = base(T0, { measureKrs: async () => ({ errors: 1 }) });
+    scheduleDotOutcomeChecks(c, deps);
+    expect(await evaluateDueDotOutcomes(c, deps)).toEqual([]);
+    expect(await evaluateDueDotOutcomes(c, { ...deps, now: () => at(1) })).toEqual([
+      expect.objectContaining({ verdict: 'improved' }),
+    ]);
   });
 });

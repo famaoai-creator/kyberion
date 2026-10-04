@@ -1,4 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getUsageAttribution } from '../usage-accounting.js';
+import { getFoundationIo } from '../foundation/io.js';
+import * as secureIo from '../secure-io.js';
+import { readJsonLines } from '../foundation/json.js';
 
 import {
   safeExistsSync,
@@ -10,6 +14,8 @@ import {
 import type { DotCharter } from './dot-charter.js';
 import {
   DOT_INBOX_PATH,
+  DOT_WAKE_LEDGER_PATH,
+  DOT_TOKEN_USAGE_PATH,
   DOT_WAKE_RETRY_AFTER_MS,
   dotDailyTokenCapReached,
   dotTokensUsedToday,
@@ -30,10 +36,17 @@ import {
   dotWakeErrorsPath,
   DOT_WAKE_FAILURE_CATEGORY,
   isDotWakeProcessFailure,
+  type DotWakeLoopOptions,
   type DotWakeLoopResult,
 } from './dot-runtime.js';
 import { DOT_PROMPT_SECTIONS, DOT_WAKE_TOOLS } from './dot-extension-registry.js';
 import type { DotWakeTool } from './dot-extensions.js';
+import { DOT_FOLLOWUPS_FILE, dotStatePath } from './dot-state-paths.js';
+import {
+  dotScheduleFollowupTool,
+  evaluateDotFollowupsDue,
+  listPendingDotFollowups,
+} from './dot-followups.js';
 
 const TEST_ROOT = 'active/shared/tmp/dot-runtime-tests';
 
@@ -526,6 +539,142 @@ describe('runtime reliability (DL-02)', () => {
     vi.unstubAllEnvs();
   });
 
+  it.each(['native', 'fenced'] as const)(
+    'replaces the current follow-up at capacity one through a %s wake',
+    async (mode) => {
+      DOT_WAKE_TOOLS.push(dotScheduleFollowupTool);
+      const charter = { ...CHARTER, followups: { max_pending: 1 } };
+      writeCharter(charter);
+      const scheduledAt = new Date('2026-10-04T10:00:00Z');
+      const now = new Date('2026-10-04T10:06:00Z');
+      dotScheduleFollowupTool.apply(charter, [{ delay_minutes: 5, reason: 'original check' }], {
+        rootDir: TEST_ROOT,
+        now: () => scheduledAt,
+      });
+      const [trigger] = evaluateDotFollowupsDue(charter, { rootDir: TEST_ROOT, now: () => now });
+      const replacement = { delay_minutes: 10, reason: 'check the still-running operation again' };
+      const receipt = await runDotWake(
+        { path: `${TEST_ROOT}/dots/dot.json`, charter },
+        {
+          rootDir: TEST_ROOT,
+          now: () => now,
+          hasRole: () => true,
+          trigger,
+          ...(mode === 'native'
+            ? {
+                runLoop: async (options: DotWakeLoopOptions) => {
+                  options.executeTool!({ name: 'dot_schedule_followup', input: replacement });
+                  return fakeResult(1, 5);
+                },
+              }
+            : {
+                backend: {
+                  delegateTask: async () =>
+                    `\`\`\`dot-followup\n${JSON.stringify(replacement)}\n\`\`\``,
+                },
+              }),
+        }
+      );
+      expect(receipt.outcome).toBe('delivered');
+      expect(receipt.tool_errors).toBeUndefined();
+      expect(readDotWakeLedger({ rootDir: TEST_ROOT })).toMatchObject([
+        { trigger_key: trigger.key, outcome: 'delivered' },
+      ]);
+      expect(listPendingDotFollowups(charter, { rootDir: TEST_ROOT })).toMatchObject([
+        { reason: replacement.reason, due_at: '2026-10-04T10:16:00.000Z' },
+      ]);
+      expect(evaluateDotFollowupsDue(charter, { rootDir: TEST_ROOT, now: () => now })).toEqual([]);
+    }
+  );
+
+  it.each([
+    ['native', 'replacement'],
+    ['fenced', 'replacement'],
+    ['native', 'delivery'],
+    ['fenced', 'delivery'],
+  ] as const)('recovers a %s follow-up when %s persistence fails', async (mode, failure) => {
+    DOT_WAKE_TOOLS.push(dotScheduleFollowupTool);
+    const charter: DotCharter = {
+      ...CHARTER,
+      followups: { max_pending: 1 },
+      goal: { ...CHARTER.goal, budget: { ...CHARTER.goal.budget, token_cap_per_day: 1_000_000 } },
+    };
+    writeCharter(charter);
+    const t0 = new Date('2026-10-04T10:00:00Z');
+    let now = new Date('2026-10-04T10:06:00Z');
+    const deps = { rootDir: TEST_ROOT, now: () => now };
+    dotScheduleFollowupTool.apply(charter, [{ delay_minutes: 5, reason: 'original' }], {
+      ...deps,
+      now: () => t0,
+    });
+    const [trigger] = evaluateDotFollowupsDue(charter, deps);
+    const followupsFile = `${TEST_ROOT}/${dotStatePath(charter, DOT_FOLLOWUPS_FILE)}`;
+    const originalBytes = safeReadFile(followupsFile);
+    const replacement = { delay_minutes: 10, reason: 'successor' };
+    const originalWrite = secureIo.safeWriteFile;
+    const io = getFoundationIo();
+    const originalAppend = io.appendFile;
+    const write = vi.spyOn(secureIo, 'safeWriteFile').mockImplementation((file, data, options) => {
+      if (failure === 'replacement' && file.endsWith(DOT_FOLLOWUPS_FILE))
+        throw new Error('followup store unavailable');
+      return originalWrite(file, data, options);
+    });
+    const append = vi.spyOn(io, 'appendFile').mockImplementation((file, text) => {
+      if (
+        failure === 'delivery' &&
+        file.endsWith(DOT_WAKE_LEDGER_PATH) &&
+        text.includes('"outcome":"delivered"')
+      ) {
+        throw new Error('wake delivery ledger unavailable');
+      }
+      return originalAppend(file, text);
+    });
+    const run = () =>
+      runDotWake(
+        { path: `${TEST_ROOT}/dots/dot.json`, charter },
+        {
+          ...deps,
+          trigger,
+          hasRole: () => true,
+          ...(mode === 'native'
+            ? {
+                runLoop: async (options: DotWakeLoopOptions) => {
+                  options.executeTool!({ name: 'dot_schedule_followup', input: replacement });
+                  return fakeResult(1, 5);
+                },
+              }
+            : {
+                backend: {
+                  delegateTask: async () =>
+                    `\`\`\`dot-followup\n${JSON.stringify(replacement)}\n\`\`\``,
+                },
+              }),
+        }
+      );
+    try {
+      expect((await run()).outcome).toBe('failed');
+      expect(readDotWakeLedger(deps).some((row) => row.outcome === 'delivered')).toBe(false);
+      const pending = listPendingDotFollowups(charter, deps);
+      expect(pending).toHaveLength(1);
+      expect(pending[0].reason).toBe(failure === 'replacement' ? 'original' : 'successor');
+      if (failure === 'replacement') expect(safeReadFile(followupsFile)).toBe(originalBytes);
+      now = new Date('2026-10-04T10:12:00Z');
+      const due = evaluateDotFollowupsDue(charter, deps);
+      expect(due.some((row) => row.key === trigger.key)).toBe(failure === 'replacement');
+      write.mockRestore();
+      append.mockRestore();
+      // Also test a stale queued retry after successor commitment: it cannot re-arm.
+      expect((await run()).outcome).toBe('delivered');
+      const after = listPendingDotFollowups(charter, deps);
+      expect(after).toHaveLength(1);
+      expect(after[0].reason).toBe('successor');
+      if (failure === 'delivery') expect(after).toEqual(pending);
+    } finally {
+      write.mockRestore();
+      append.mockRestore();
+    }
+  });
+
   it('re-reads only its own charter file: a malformed sibling does not block the wake', async () => {
     writeCharter(CHARTER, 'dot.json');
     safeWriteFile(`${TEST_ROOT}/dots/broken.json`, '{ "kind": "dot-charter", ');
@@ -1003,4 +1152,146 @@ describe('runtime reliability (DL-02)', () => {
     expect(readDotWakeLedger({ rootDir: TEST_ROOT }).at(-1)?.summary).toBe('Done.');
     expect(applyDotWakeOutputs(CHARTER, {}, { now: () => new Date() })).toEqual([]);
   });
+});
+
+describe('dot wake usage attribution', () => {
+  it('counts late SDK usage from a timed-out attempt separately from a successful wake', async () => {
+    const { AnthropicReasoningBackend } =
+      await import('../provider/anthropic-reasoning-backend.js');
+    const { metrics, MetricsCollector } = await import('../metrics.js');
+    const { computeBudgetUsage } = await import('../governance/org-budget-governor.js');
+    const now = new Date('2026-10-04T10:00:00Z');
+    const current: DotCharter = {
+      ...CHARTER,
+      scope: { tier: 'public', tenant_slug: 'acme', organization_id: 'o1' },
+      goal: {
+        ...CHARTER.goal,
+        budget: { wall_clock_ms_per_wake: 1000, token_cap_per_day: 1_000_000 },
+      },
+    };
+    writeCharter(current);
+    const response = {
+      content: [{ type: 'text', text: 'ok' }],
+      usage: { input_tokens: 50, output_tokens: 20 },
+    };
+    let release!: (value: typeof response) => void;
+    const late = new Promise<typeof response>((resolve) => {
+      release = resolve;
+    });
+    const backend = new AnthropicReasoningBackend({
+      client: {
+        messages: {
+          create: vi.fn().mockResolvedValueOnce(response).mockReturnValueOnce(late),
+          parse: vi.fn(),
+        },
+      } as unknown as import('@anthropic-ai/sdk').default,
+    });
+    const rows: Array<Record<string, unknown>> = [];
+    const collector = new MetricsCollector({ persist: false });
+    let recorded!: () => void;
+    const lateRecorded = new Promise<void>((resolve) => {
+      recorded = resolve;
+    });
+    const record = vi
+      .spyOn(metrics, 'record')
+      .mockImplementation((component, duration, status, extra) => {
+        collector.record(component, duration, status, extra);
+        rows.push({ timestamp: now.toISOString(), component, ...extra });
+        if (rows.length === 2) recorded();
+      });
+    const loaded = { path: `${TEST_ROOT}/dots/dot.json`, charter: current };
+    const deps = {
+      rootDir: TEST_ROOT,
+      now: () => now,
+      hasRole: () => true,
+      dispatch: () => [],
+      backend,
+    };
+    const usage = () =>
+      computeBudgetUsage(current.scope, {
+        rootDir: TEST_ROOT,
+        now: () => now,
+        listCharters: () => [loaded],
+        readMetricsHistory: () => rows,
+        readGenerationUnits: () => 0,
+      });
+    vi.useFakeTimers();
+    try {
+      expect((await runDotWake(loaded, deps)).outcome).toBe('delivered');
+      const before = usage().tokens;
+      const timedOut = runDotWake(loaded, deps);
+      await vi.advanceTimersByTimeAsync(1001);
+      expect((await timedOut).outcome).toBe('failed');
+      expect(usage().tokens).toBe(before);
+      release(response);
+      await lateRecorded;
+      expect(usage().tokens).toBe(before + 70);
+      expect(rows[0].accounting_id).toEqual(expect.any(String));
+      expect(rows[1].accounting_id).not.toBe(rows[0].accounting_id);
+      expect(readJsonLines(`${TEST_ROOT}/${DOT_TOKEN_USAGE_PATH}`)).toHaveLength(1);
+      expect(getUsageAttribution()).toBeUndefined();
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+      record.mockRestore();
+    }
+  });
+
+  it.each(['loop', 'delegated', 'degraded'] as const)(
+    'binds the reread charter in the %s path and clears it afterward',
+    async (mode) => {
+      const current: DotCharter = {
+        ...CHARTER,
+        scope: {
+          tier: 'public',
+          tenant_slug: 'acme',
+          organization_id: 'o1',
+        },
+      };
+      writeCharter(current);
+      const observed: ReturnType<typeof getUsageAttribution>[] = [];
+      const receipt = await runDotWake(
+        { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+        {
+          rootDir: TEST_ROOT,
+          hasRole: () => true,
+          dispatch: () => [],
+          backend: {
+            delegateTask: async () => {
+              await Promise.resolve();
+              observed.push(getUsageAttribution());
+              return 'ok';
+            },
+          },
+          ...(mode === 'delegated'
+            ? {}
+            : {
+                runLoop: async () => {
+                  await Promise.resolve();
+                  observed.push(getUsageAttribution());
+                  if (mode === 'degraded') throw new Error('backend lacks generateWithTools');
+                  return fakeResult(1, 5);
+                },
+              }),
+        }
+      );
+      expect(receipt.outcome).toBe('delivered');
+      expect(observed).toHaveLength(mode === 'degraded' ? 2 : 1);
+      for (const attribution of observed)
+        expect(attribution).toEqual({
+          actor_id: `dot:${current.dot_id}`,
+          accounting_id: expect.any(String),
+          scope: { ...current.scope, scope_kind: 'organization' },
+        });
+      const charges = readJsonLines<{ accounting_id?: string }>(
+        `${TEST_ROOT}/${DOT_TOKEN_USAGE_PATH}`
+      );
+      expect(charges.length).toBeGreaterThan(0);
+      expect(charges.every((charge) => charge.accounting_id === observed[0]?.accounting_id)).toBe(
+        true
+      );
+      expect(new Set(observed.map((row) => row?.accounting_id)).size).toBe(1);
+      expect(getUsageAttribution()).toBeUndefined();
+    }
+  );
 });

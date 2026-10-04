@@ -27,7 +27,7 @@
  */
 
 import * as path from 'node:path';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -61,6 +61,7 @@ import {
 } from './dot-charter.js';
 import { evaluateStateProbe, probeSpecId, type StateProbeDeps } from '../state-probe.js';
 import { createLogger } from '../logger.js';
+import { getUsageAttribution, withUsageAttribution } from '../usage-accounting.js';
 import {
   buildDotProposeToolDefinition,
   collectDotProposals,
@@ -200,6 +201,7 @@ export function dotWakeSummary(text: string | undefined): string | undefined {
 
 export interface DotTokenUsageEntry {
   dot_id: string;
+  accounting_id?: string;
   /** UTC day bucket (YYYY-MM-DD) the tokens accrue to. */
   day: string;
   tokens: number;
@@ -311,14 +313,19 @@ export function recordDotWakeOutcome(
 export function recordDotTokenUsage(
   dotId: string,
   tokens: number,
-  deps: DotRuntimeDeps = {}
+  deps: DotRuntimeDeps & { accounting_id?: string } = {}
 ): void {
   if (!Number.isFinite(tokens) || tokens <= 0) return;
   const now = deps.now?.() ?? new Date();
+  const attribution = getUsageAttribution();
+  const accounting_id =
+    deps.accounting_id ??
+    (attribution?.actor_id === `dot:${dotId}` ? attribution.accounting_id : undefined);
   appendJsonlEnsured(
     DOT_TOKEN_USAGE_PATH,
     {
       dot_id: dotId,
+      ...(accounting_id ? { accounting_id } : {}),
       day: now.toISOString().slice(0, 10),
       tokens,
       recorded_at: now.toISOString(),
@@ -981,8 +988,14 @@ export interface DotWakeReceipt {
   tool_errors?: string[];
 }
 
-function dotExtCtx(deps: DotRuntimeDeps): DotExtCtx {
-  return { rootDir: deps.rootDir, now: deps.now ?? (() => new Date()) };
+function dotExtCtx(deps: DotRuntimeDeps, completingTrigger?: DueDotTrigger): DotExtCtx {
+  return {
+    rootDir: deps.rootDir,
+    now: deps.now ?? (() => new Date()),
+    ...(completingTrigger?.trigger.kind === 'followup'
+      ? { completingFollowupKey: completingTrigger.key }
+      : {}),
+  };
 }
 
 function extensionFailure(kind: string, id: string, dotId: string, error: unknown): void {
@@ -1126,8 +1139,8 @@ export function parseDotWakeToolFences(text: string): {
 
 /**
  * Apply the values each registered wake tool collected during one wake.
- * Returns the error strings (prefixed by tool name); a throwing tool never
- * fails the wake.
+ * Returns error strings for optional outputs. A durable output's persistence
+ * failure propagates, so the wake cannot consume its trigger without saving it.
  */
 export function applyDotWakeOutputs(
   charter: DotCharter,
@@ -1141,6 +1154,7 @@ export function applyDotWakeOutputs(
     try {
       errors.push(...tool.apply(charter, values, ctx).map((error) => `${tool.name}: ${error}`));
     } catch (error) {
+      if (tool.failWakeOnApplyError) throw error;
       extensionFailure('wake tool', tool.name, charter.dot_id, error);
       errors.push(
         `${tool.name}: apply failed (${error instanceof Error ? error.message : String(error)})`
@@ -1208,7 +1222,7 @@ async function runFencedWake(
   const actions = governProposals(current, parsed.proposals, deps);
   const toolErrors = [
     ...wakeTools.errors,
-    ...applyDotWakeOutputs(current, wakeTools.outputs, dotExtCtx(deps)),
+    ...applyDotWakeOutputs(current, wakeTools.outputs, dotExtCtx(deps, deps.trigger)),
   ];
   if (deps.trigger?.trigger.kind === 'watch') {
     recordWatchSnapshotFromKey(current, deps.trigger, deps);
@@ -1329,16 +1343,25 @@ export async function runDotWake(
     try {
       if (deps.backendUnavailable) throw new Error(deps.backendUnavailable);
       const backend = deps.backend ?? getReasoningBackend();
+      const accounting_id = randomUUID();
+      // Meter from the validated charter, never provider/model-supplied labels.
+      const withWakeUsage = <T>(fn: () => T): T =>
+        withUsageAttribution(
+          { actor_id: `dot:${current.dot_id}`, accounting_id, scope: current.scope },
+          fn
+        );
       // Only a caller-injected backend may be the stub (tests, explicit
       // `KYBERION_REASONING_BACKEND=stub`); the process-default stub would
       // record fabricated `[STUB]` text as a delivered wake.
       const realBackend = deps.backend !== undefined || !dotBackendIsUnconfiguredStub(backend);
       if (!deps.runLoop) {
         if (!realBackend) throw new Error(DOT_WAKE_BACKEND_UNAVAILABLE);
-        return await runFencedWake(current, backend, deps, {
-          ledgerReason: 'delegated-turn (backend lacks generateWithTools)',
-          receiptReason: 'delegated-turn',
-        });
+        return await withWakeUsage(() =>
+          runFencedWake(current, backend, deps, {
+            ledgerReason: 'delegated-turn (backend lacks generateWithTools)',
+            receiptReason: 'delegated-turn',
+          })
+        );
       }
       const runLoop = deps.runLoop;
       const proposalInputs: unknown[] = [];
@@ -1354,66 +1377,70 @@ export async function runDotWake(
       let lastPromptTokens = 0;
       let result: DotWakeLoopResult;
       try {
-        result = await runLoop({
-          onPromptVisible: (content) => {
-            // A new prompt means the previous turn completed.
-            if (promptsSent > 0) completedPromptTokens += lastPromptTokens;
-            promptsSent += 1;
-            lastPromptTokens = estimateTokens(content);
-          },
-          estimateTurnTokens: (input) => {
-            const tokens = estimateWakeTokensFromText(input);
-            estimatorCalls += 1;
-            estimatedTokens += tokens;
-            return tokens;
-          },
-          objective: wakePrompt(current, 'tool', deps.trigger, deps),
-          goalId: `dot-${current.dot_id}`,
-          systemPrompt: dotSystemPrompt(current, 'tool', deps),
-          toolRole: current.authority.authority_role,
-          extraTools: [
-            buildDotProposeToolDefinition(),
-            ...DOT_WAKE_TOOLS.map((tool) => tool.definition),
-          ],
-          executeTool: (call) => {
-            toolCallsSeen += 1;
-            if (call.name === DOT_PROPOSE_TOOL_NAME) {
-              if (proposalInputs.length >= MAX_DOT_PROPOSALS_PER_WAKE) {
+        result = await withWakeUsage(() =>
+          runLoop({
+            onPromptVisible: (content) => {
+              // A new prompt means the previous turn completed.
+              if (promptsSent > 0) completedPromptTokens += lastPromptTokens;
+              promptsSent += 1;
+              lastPromptTokens = estimateTokens(content);
+            },
+            estimateTurnTokens: (input) => {
+              const tokens = estimateWakeTokensFromText(input);
+              estimatorCalls += 1;
+              estimatedTokens += tokens;
+              return tokens;
+            },
+            objective: wakePrompt(current, 'tool', deps.trigger, deps),
+            goalId: `dot-${current.dot_id}`,
+            systemPrompt: dotSystemPrompt(current, 'tool', deps),
+            toolRole: current.authority.authority_role,
+            extraTools: [
+              buildDotProposeToolDefinition(),
+              ...DOT_WAKE_TOOLS.map((tool) => tool.definition),
+            ],
+            executeTool: (call) => {
+              toolCallsSeen += 1;
+              if (call.name === DOT_PROPOSE_TOOL_NAME) {
+                if (proposalInputs.length >= MAX_DOT_PROPOSALS_PER_WAKE) {
+                  return {
+                    resultText: `Proposal limit (${MAX_DOT_PROPOSALS_PER_WAKE}) reached for this wake.`,
+                  };
+                }
+                proposalInputs.push(call.input);
                 return {
-                  resultText: `Proposal limit (${MAX_DOT_PROPOSALS_PER_WAKE}) reached for this wake.`,
+                  resultText: 'Proposal recorded; the runtime governs it after this wake.',
                 };
               }
-              proposalInputs.push(call.input);
-              return {
-                resultText: 'Proposal recorded; the runtime governs it after this wake.',
-              };
-            }
-            const tool = DOT_WAKE_TOOLS.find((entry) => entry.name === call.name);
-            if (tool) {
-              return {
-                resultText: collectWakeToolValue(tool, call.input, toolOutputs, toolErrors),
-              };
-            }
-            return { resultText: `Tool ${call.name} is not available to a dot; propose instead.` };
-          },
-          ...(deps.backend?.generateWithTools ? { backend: deps.backend } : {}),
-          ...(budget?.max_turns_per_wake !== undefined
-            ? { maxTurns: budget.max_turns_per_wake }
-            : {}),
-          ...(budget?.wall_clock_ms_per_wake !== undefined ||
-          budget?.max_turns_per_wake !== undefined
-            ? {
-                budget: {
-                  ...(budget?.wall_clock_ms_per_wake !== undefined
-                    ? { wallClockBudgetMs: budget.wall_clock_ms_per_wake }
-                    : {}),
-                  ...(budget?.max_turns_per_wake !== undefined
-                    ? { turnBudget: budget.max_turns_per_wake }
-                    : {}),
-                },
+              const tool = DOT_WAKE_TOOLS.find((entry) => entry.name === call.name);
+              if (tool) {
+                return {
+                  resultText: collectWakeToolValue(tool, call.input, toolOutputs, toolErrors),
+                };
               }
-            : {}),
-        });
+              return {
+                resultText: `Tool ${call.name} is not available to a dot; propose instead.`,
+              };
+            },
+            ...(deps.backend?.generateWithTools ? { backend: deps.backend } : {}),
+            ...(budget?.max_turns_per_wake !== undefined
+              ? { maxTurns: budget.max_turns_per_wake }
+              : {}),
+            ...(budget?.wall_clock_ms_per_wake !== undefined ||
+            budget?.max_turns_per_wake !== undefined
+              ? {
+                  budget: {
+                    ...(budget?.wall_clock_ms_per_wake !== undefined
+                      ? { wallClockBudgetMs: budget.wall_clock_ms_per_wake }
+                      : {}),
+                    ...(budget?.max_turns_per_wake !== undefined
+                      ? { turnBudget: budget.max_turns_per_wake }
+                      : {}),
+                  },
+                }
+              : {}),
+          })
+        );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         // Turns that got a backend response: every prompt but the one that
@@ -1423,7 +1450,7 @@ export async function runDotWake(
           estimatorCalls > 0
             ? estimatedTokens
             : completedPromptTokens + (toolCallsSeen > 0 ? lastPromptTokens : 0);
-        recordDotTokenUsage(current.dot_id, partialTokens, deps);
+        recordDotTokenUsage(current.dot_id, partialTokens, { ...deps, accounting_id });
         const nothingCollected =
           proposalInputs.length === 0 && Object.keys(toolOutputs).length === 0;
         if (
@@ -1435,20 +1462,22 @@ export async function runDotWake(
           logger.warn(
             `tool loop unavailable for ${current.dot_id} — ${message} | next: serving this wake as a fenced delegated turn | evidence: ${DOT_WAKE_LEDGER_PATH}`
           );
-          return await runFencedWake(current, backend, deps, {
-            ledgerReason: 'degraded: tool backend unavailable → fenced proposals',
-            receiptReason: 'degraded-fenced',
-          });
+          return await withWakeUsage(() =>
+            runFencedWake(current, backend, deps, {
+              ledgerReason: 'degraded: tool backend unavailable → fenced proposals',
+              receiptReason: 'degraded-fenced',
+            })
+          );
         }
         throw Object.assign(error instanceof Error ? error : new Error(message), {
           dotPartial: { turns_run: turnsCompleted, tokens_used: partialTokens },
         });
       }
       const tokens = result.goal.budgetStats?.tokensUsed ?? 0;
-      recordDotTokenUsage(current.dot_id, tokens, deps);
+      recordDotTokenUsage(current.dot_id, tokens, { ...deps, accounting_id });
       const collected = collectDotProposals(proposalInputs);
       const actions = governProposals(current, collected.proposals, deps);
-      toolErrors.push(...applyDotWakeOutputs(current, toolOutputs, dotExtCtx(deps)));
+      toolErrors.push(...applyDotWakeOutputs(current, toolOutputs, dotExtCtx(deps, deps.trigger)));
       if (deps.trigger?.trigger.kind === 'watch') {
         recordWatchSnapshotFromKey(current, deps.trigger, deps);
       }

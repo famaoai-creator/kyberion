@@ -15,7 +15,9 @@
  */
 
 import * as path from 'node:path';
-import { appendJsonLine, readJsonLines } from '../foundation/json.js';
+import { createHash } from 'node:crypto';
+import { readJsonLines } from '../foundation/json.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { pathResolver } from '../path-resolver.js';
 import { getZonedDateParts, matchesCron } from '../pipeline/cron-utils.js';
 import { safeMkdir, safeWriteFile } from '../secure-io.js';
@@ -83,10 +85,23 @@ function followupsFile(c: DotCharter, deps: { rootDir?: string }): string {
   return path.join(root(deps), dotStatePath(c, DOT_FOLLOWUPS_FILE));
 }
 
+function validFollowup(row: DotFollowupRow): boolean {
+  return Boolean(
+    row &&
+    typeof row.followup_id === 'string' &&
+    row.followup_id &&
+    typeof row.due_at === 'string' &&
+    Number.isFinite(Date.parse(row.due_at)) &&
+    typeof row.created_at === 'string' &&
+    Number.isFinite(Date.parse(row.created_at)) &&
+    typeof row.reason === 'string' &&
+    row.reason.trim()
+  );
+}
+
 function readFollowups(c: DotCharter, deps: { rootDir?: string }): DotFollowupRow[] {
   return readJsonLines<DotFollowupRow>(followupsFile(c, deps), { onMalformed: 'skip' }).filter(
-    (r) =>
-      r?.dot_id === c.dot_id && typeof r.followup_id === 'string' && typeof r.due_at === 'string'
+    (r) => r?.dot_id === c.dot_id && validFollowup(r)
   );
 }
 
@@ -100,7 +115,19 @@ export function listPendingDotFollowups(
       .filter((r) => r.outcome === 'delivered' || r.outcome === 'rejected')
       .map((r) => r.trigger_key)
   );
-  return readFollowups(c, deps).filter((r) => !consumed.has(followupKey(r.followup_id)));
+  const rows = readFollowups(c, deps);
+  const replaced = new Set(
+    rows
+      .filter(
+        (row) =>
+          typeof row.replaces_followup_id === 'string' &&
+          row.replaces_followup_id !== row.followup_id
+      )
+      .map((row) => row.replaces_followup_id)
+  );
+  return rows.filter(
+    (r) => !consumed.has(followupKey(r.followup_id)) && !replaced.has(r.followup_id)
+  );
 }
 
 export interface DotFollowupInput {
@@ -136,6 +163,7 @@ export const dotScheduleFollowupTool: DotWakeTool = {
   name: 'dot_schedule_followup',
   fence: 'dot-followup',
   maxPerWake: DOT_FOLLOWUPS_PER_WAKE,
+  failWakeOnApplyError: true,
   definition: {
     name: 'dot_schedule_followup',
     description:
@@ -154,35 +182,60 @@ export const dotScheduleFollowupTool: DotWakeTool = {
   },
   parse: (input) => parseDotFollowup(input),
   apply(c, values, ctx) {
-    const errors: string[] = [];
-    const now = ctx.now();
-    const deps = { rootDir: ctx.rootDir, now: ctx.now };
-    const pending = listPendingDotFollowups(c, deps);
-    const capacity =
-      (c.followups?.max_pending ?? DOT_FOLLOWUP_DEFAULT_MAX_PENDING) - pending.length;
-    const accepted = (values as DotFollowupInput[]).slice(0, Math.max(0, capacity));
-    if (accepted.length < values.length) {
-      errors.push(
-        `dropped ${values.length - accepted.length} follow-up(s) (${pending.length} pending, max ${c.followups?.max_pending ?? DOT_FOLLOWUP_DEFAULT_MAX_PENDING})`
+    const file = followupsFile(c, ctx);
+    const lock = `dot-followups-${createHash('sha256').update(path.resolve(file)).digest('hex').slice(0, 24)}`;
+    return withLockSync(lock, () => {
+      const errors: string[] = [];
+      const now = ctx.now();
+      const deps = { rootDir: ctx.rootDir, now: ctx.now };
+      // Strict read before rewriting: a damaged store is not evidence that a
+      // previous replacement was absent. Keep other dots' legacy shared rows.
+      const stored = readJsonLines<DotFollowupRow>(file);
+      const parent = ctx.completingFollowupKey?.startsWith('followup:')
+        ? ctx.completingFollowupKey.slice('followup:'.length)
+        : undefined;
+      if (
+        parent &&
+        stored.some(
+          (row) =>
+            row?.dot_id === c.dot_id &&
+            validFollowup(row) &&
+            row.replaces_followup_id === parent &&
+            row.followup_id !== parent
+        )
+      ) {
+        return []; // A retry after commit must not re-arm a second successor.
+      }
+      const pending = listPendingDotFollowups(c, deps);
+      // The parent and its successors change together in one atomic replacement.
+      const occupying = pending.filter(
+        (row) => followupKey(row.followup_id) !== ctx.completingFollowupKey
       );
-    }
-    if (accepted.length === 0) return errors;
-    const file = followupsFile(c, deps);
-    safeMkdir(path.dirname(file), { recursive: true });
-    // Compact: keep only pending rows, then append the new ones.
-    const keep = new Set(pending.map((r) => r.followup_id));
-    const kept = readFollowups(c, deps).filter((r) => keep.has(r.followup_id));
-    safeWriteFile(file, kept.map((r) => `${JSON.stringify(r)}\n`).join(''));
-    accepted.forEach((value, index) => {
-      appendJsonLine(file, {
-        followup_id: `fu-${now.getTime().toString(36)}-${index}`,
+      const capacity =
+        (c.followups?.max_pending ?? DOT_FOLLOWUP_DEFAULT_MAX_PENDING) - occupying.length;
+      const accepted = (values as DotFollowupInput[]).slice(0, Math.max(0, capacity));
+      if (accepted.length < values.length) {
+        errors.push(
+          `dropped ${values.length - accepted.length} follow-up(s) (${occupying.length} pending, max ${c.followups?.max_pending ?? DOT_FOLLOWUP_DEFAULT_MAX_PENDING})`
+        );
+      }
+      if (accepted.length === 0) return errors;
+      safeMkdir(path.dirname(file), { recursive: true });
+      const keep = new Set(occupying.map((r) => r.followup_id));
+      const kept = stored.filter((r) => r.dot_id !== c.dot_id || keep.has(r.followup_id));
+      const successors = accepted.map((value, index): DotFollowupRow => ({
+        followup_id: parent
+          ? `fu-replacement-${createHash('sha256').update(`${c.dot_id}\0${parent}\0${index}`).digest('hex').slice(0, 24)}`
+          : `fu-${now.getTime().toString(36)}-${index}`,
         dot_id: c.dot_id,
         due_at: new Date(now.getTime() + value.delay_minutes * 60_000).toISOString(),
         reason: value.reason,
         created_at: now.toISOString(),
-      } satisfies DotFollowupRow);
+        ...(parent ? { replaces_followup_id: parent } : {}),
+      }));
+      safeWriteFile(file, [...kept, ...successors].map((r) => `${JSON.stringify(r)}\n`).join(''));
+      return errors;
     });
-    return errors;
   },
 };
 
@@ -205,7 +258,7 @@ export function evaluateDotFollowupsDue(
   deps: DotFollowupDeps = {}
 ): DueDotTrigger[] {
   const now = deps.now?.() ?? new Date();
-  const rows = readFollowups(c, deps);
+  const rows = listPendingDotFollowups(c, deps);
   if (rows.length === 0) return [];
   const isDue = dueChecker(readLedger(c, deps), now);
   return rows

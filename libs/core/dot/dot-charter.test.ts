@@ -150,6 +150,71 @@ describe('tenant dot charters', () => {
   });
 });
 
+describe('dot charter identity collisions', () => {
+  it.each([
+    { locations: [undefined, 'acme'], label: 'repo and tenant directories' },
+    { locations: ['acme', 'globex'], label: 'two tenant directories' },
+    { locations: [undefined, 'acme', 'globex'], label: 'all three directories' },
+    { locations: [undefined, undefined], label: 'two repo files' },
+  ])('rejects every colliding charter across $label', ({ locations }) => {
+    const paths = locations.map((slug, index) => {
+      if (slug) {
+        seedTenant(slug);
+        return writeTenantCharter(slug, `${index}.json`, tenantCharter(slug, 'collision'));
+      }
+      return writeCharter(TEST_ROOT, `${index}.json`, { ...VALID_CHARTER, dot_id: 'collision' });
+    });
+    writeCharter(TEST_ROOT, 'unique.json', { ...VALID_CHARTER, dot_id: 'unique-dot' });
+    const errors: DotCharterLoadError[] = [];
+    const loaded = listDotCharters(TEST_ROOT, { errors });
+    expect(loaded.map((entry) => entry.charter.dot_id)).toEqual(['unique-dot']);
+    expect(errors.map((entry) => entry.path).sort()).toEqual(paths.sort());
+    for (const entry of errors) {
+      expect(entry.error).toMatch(/Duplicate dot_id 'collision'/);
+      for (const filePath of paths) expect(entry.error).toContain(filePath);
+    }
+    expect(() => listDotCharters(TEST_ROOT)).toThrow(/Duplicate dot_id 'collision'/);
+  });
+
+  it.each(['draft', 'paused', 'retired'] as const)(
+    'checks collisions before status filtering when the tenant charter is %s',
+    (status) => {
+      seedTenant('acme');
+      const activePath = writeCharter(TEST_ROOT, 'active.json', VALID_CHARTER);
+      const inactivePath = writeTenantCharter('acme', 'inactive.json', {
+        ...tenantCharter('acme', VALID_CHARTER.dot_id),
+        status,
+      });
+      writeCharter(TEST_ROOT, 'unique-active.json', { ...VALID_CHARTER, dot_id: 'unique-active' });
+      writeCharter(TEST_ROOT, 'unique-inactive.json', {
+        ...VALID_CHARTER,
+        dot_id: 'unique-inactive',
+        status,
+      });
+      const errors: DotCharterLoadError[] = [];
+      expect(
+        listDotCharters(TEST_ROOT, { status: 'active', errors }).map((e) => e.charter.dot_id)
+      ).toEqual(['unique-active']);
+      expect(errors.map((entry) => entry.path).sort()).toEqual([activePath, inactivePath].sort());
+      expect(() => listDotCharters(TEST_ROOT, { status: 'active' })).toThrow(
+        /Duplicate dot_id 'repo-guardian'/
+      );
+    }
+  );
+
+  it('does not treat an invalid charter as a loaded identity collision', () => {
+    writeCharter(TEST_ROOT, 'valid.json', VALID_CHARTER);
+    const invalidPath = writeCharter(TEST_ROOT, 'invalid.json', { ...VALID_CHARTER, bogus: true });
+    const errors: DotCharterLoadError[] = [];
+    expect(listDotCharters(TEST_ROOT, { errors }).map((entry) => entry.charter.dot_id)).toEqual([
+      VALID_CHARTER.dot_id,
+    ]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].path).toBe(invalidPath);
+    expect(errors[0].error).toMatch(/Invalid dot charter/);
+  });
+});
+
 describe('dot charter', () => {
   it('validates a well-formed charter', () => {
     expect(validateDotCharter(VALID_CHARTER).dot_id).toBe('repo-guardian');

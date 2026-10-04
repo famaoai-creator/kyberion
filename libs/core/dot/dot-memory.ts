@@ -57,6 +57,7 @@ export function emptyDotMemory(dotId: string, now: Date): DotMemoryDoc {
     dot_id: dotId,
     version: 1,
     updated_at: now.toISOString(),
+    last_ids: { n: 0, i: 0, h: 0 },
     notes: [],
     open_items: [],
     hypotheses: [],
@@ -72,22 +73,36 @@ export function readDotMemory(
   ctx: { rootDir?: string; now?: () => Date }
 ): DotMemoryDoc {
   const fresh = emptyDotMemory(c.dot_id, ctx.now?.() ?? new Date());
+  let doc: DotMemoryDoc | null;
   try {
-    const doc = readJsonIfPresent<DotMemoryDoc>(absolute(dotMemoryPath(c), ctx));
-    if (!doc || doc.version !== 1) return fresh;
-    return {
-      ...fresh,
-      updated_at: typeof doc.updated_at === 'string' ? doc.updated_at : fresh.updated_at,
-      notes: Array.isArray(doc.notes) ? doc.notes : [],
-      open_items: Array.isArray(doc.open_items) ? doc.open_items : [],
-      hypotheses: Array.isArray(doc.hypotheses) ? doc.hypotheses : [],
-    };
+    doc = readJsonIfPresent<DotMemoryDoc>(absolute(dotMemoryPath(c), ctx));
   } catch (error) {
     logger.warn(
       `memory unreadable for ${c.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: starting from an empty memory | evidence: ${dotMemoryPath(c)}`
     );
-    return fresh;
+    doc = null;
   }
+  const next: DotMemoryDoc =
+    doc?.version === 1
+      ? {
+          ...fresh,
+          updated_at: typeof doc.updated_at === 'string' ? doc.updated_at : fresh.updated_at,
+          last_ids: doc.last_ids,
+          notes: Array.isArray(doc.notes) ? doc.notes : [],
+          open_items: Array.isArray(doc.open_items) ? doc.open_items : [],
+          hypotheses: Array.isArray(doc.hypotheses) ? doc.hypotheses : [],
+        }
+      : fresh;
+  // Legacy memories had no high-water marks. A removed, already-distilled
+  // hypothesis can survive only in history, so seed from that ledger too.
+  // An unreadable ledger must fail this migration rather than reuse an ID.
+  const historicalIds = !doc?.last_ids
+    ? readJsonLines<DotMemoryDistillRow>(absolute(dotStatePath(c, DOT_MEMORY_DISTILL_FILE), ctx))
+        .filter((row) => row.dot_id === c.dot_id)
+        .flatMap((row) => row.hypothesis_ids ?? [])
+    : [];
+  next.last_ids = memoryIdHighWater(next, historicalIds);
+  return next;
 }
 
 const sizeOf = (doc: DotMemoryDoc): number => Buffer.byteLength(JSON.stringify(doc), 'utf8');
@@ -109,6 +124,7 @@ const isResolved = (h: DotMemoryDoc['hypotheses'][number]): boolean => h.status 
 export function boundDotMemory(doc: DotMemoryDoc, maxBytes: number): DotMemoryDoc {
   const next: DotMemoryDoc = {
     ...doc,
+    last_ids: memoryIdHighWater(doc),
     notes: [...doc.notes],
     open_items: [...doc.open_items],
     hypotheses: [...doc.hypotheses],
@@ -213,13 +229,38 @@ export function parseDotMemoryOp(
   }
 }
 
-function nextId(prefix: string, ids: string[]): string {
-  let max = 0;
+function maxId(prefix: string, ids: string[], previous = 0): number {
+  let max = Number.isSafeInteger(previous) && previous >= 0 ? previous : 0;
   for (const id of ids) {
     const m = new RegExp(`^${prefix}-(\\d+)$`).exec(id);
-    if (m) max = Math.max(max, Number(m[1]));
+    if (m && Number.isSafeInteger(Number(m[1]))) max = Math.max(max, Number(m[1]));
   }
-  return `${prefix}-${max + 1}`;
+  return max;
+}
+
+function memoryIdHighWater(
+  doc: DotMemoryDoc,
+  historicalIds: string[] = []
+): NonNullable<DotMemoryDoc['last_ids']> {
+  return {
+    n: maxId(
+      'n',
+      doc.notes.map((entry) => entry.id),
+      doc.last_ids?.n
+    ),
+    i: maxId(
+      'i',
+      doc.open_items.map((entry) => entry.id),
+      doc.last_ids?.i
+    ),
+    h: maxId('h', [...doc.hypotheses.map((entry) => entry.id), ...historicalIds], doc.last_ids?.h),
+  };
+}
+
+function nextId(prefix: 'n' | 'i' | 'h', ids: NonNullable<DotMemoryDoc['last_ids']>): string {
+  if (ids[prefix] >= Number.MAX_SAFE_INTEGER) throw new Error('dot memory ID sequence exhausted');
+  ids[prefix] += 1;
+  return `${prefix}-${ids[prefix]}`;
 }
 
 /** Apply ops (at most {@link DOT_MEMORY_OPS_PER_WAKE}) to a document; returns the bounded result and errors. */
@@ -233,6 +274,7 @@ export function applyDotMemoryOps(
   const at = now.toISOString();
   let next: DotMemoryDoc = {
     ...doc,
+    last_ids: memoryIdHighWater(doc),
     notes: [...doc.notes],
     open_items: [...doc.open_items],
     hypotheses: [...doc.hypotheses],
@@ -241,20 +283,14 @@ export function applyDotMemoryOps(
     switch (op.op) {
       case 'add_note':
         next.notes.push({
-          id: nextId(
-            'n',
-            next.notes.map((n) => n.id)
-          ),
+          id: nextId('n', next.last_ids!),
           text: op.text,
           at,
         });
         break;
       case 'add_item':
         next.open_items.push({
-          id: nextId(
-            'i',
-            next.open_items.map((i) => i.id)
-          ),
+          id: nextId('i', next.last_ids!),
           text: op.text,
           status: 'open',
           ...(op.due ? { due: op.due } : {}),
@@ -263,10 +299,7 @@ export function applyDotMemoryOps(
         break;
       case 'add_hypothesis':
         next.hypotheses.push({
-          id: nextId(
-            'h',
-            next.hypotheses.map((h) => h.id)
-          ),
+          id: nextId('h', next.last_ids!),
           text: op.text,
           confidence: Math.min(1, Math.max(0, op.confidence ?? 0.5)),
           status: 'open',

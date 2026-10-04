@@ -538,13 +538,22 @@ export class MetricsCollector {
     return this._aggregates.get(capabilityName) || null;
   }
 
-  loadHistory() {
+  /** Strict consumers distinguish missing history from unreadable/corrupt evidence. */
+  loadHistory(options: { strict?: boolean } = {}) {
     try {
       const filePath = this._metricsPath(this._metricsFile);
-      if (!safeExistsSync(filePath)) return [];
+      if (options.strict) {
+        try {
+          safeLstat(filePath);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+          throw error;
+        }
+      } else if (!safeExistsSync(filePath)) return [];
       this._ensureRegularMetricsFile(filePath);
       return readJsonLines<Record<string, any>>(assertSafeRepositoryPath(filePath));
-    } catch (_) {
+    } catch (error) {
+      if (options.strict) throw error;
       return [];
     }
   }

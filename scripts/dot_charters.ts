@@ -21,8 +21,9 @@
  */
 
 import {
-  listDotCharterSources,
-  loadDotCharterSource,
+  findDotCharter,
+  listDotCharters,
+  type DotCharterLoadError,
   type DotCharter,
   type DotCharterStatus,
 } from '@agent/core/dot/dot-charter';
@@ -76,27 +77,13 @@ const SUBCOMMANDS = [
 type Subcommand = (typeof SUBCOMMANDS)[number];
 
 function loadAll() {
-  const loaded = [];
-  const errors = [];
-  for (const source of listDotCharterSources()) {
-    try {
-      loaded.push({
-        path: source.path,
-        charter: loadDotCharterSource(source),
-        ...(source.tenant_slug ? { tenant_slug: source.tenant_slug } : {}),
-      });
-    } catch (error) {
-      errors.push({
-        path: source.path,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
+  const errors: DotCharterLoadError[] = [];
+  const loaded = listDotCharters(undefined, { errors });
   return { loaded, errors };
 }
 
 function findDot(dotId: string) {
-  const found = loadAll().loaded.find((entry) => entry.charter.dot_id === dotId);
+  const found = findDotCharter(dotId);
   if (!found) throw new Error(`[DOT_NOT_FOUND] no charter for dot_id '${dotId}' under dots/`);
   return found;
 }
@@ -215,9 +202,11 @@ function reportInbox(argv: string[]) {
     throw new Error(
       'dot inbox append requires --channel <slack|telegram|discord|imessage|surface|inbox>'
     );
+  const dotId = flag('dot-id');
+  if (dotId) findDotCharter(dotId);
   const entry = appendDotInboxEntry({
     channel,
-    ...(flag('dot-id') ? { dot_id: flag('dot-id') } : {}),
+    ...(dotId ? { dot_id: dotId } : {}),
     ...(flag('text') ? { text: flag('text') } : {}),
     source: 'cli',
   });
