@@ -330,6 +330,11 @@
         "wait"
       ]
     },
+    "data": {
+      "capture": ["query"],
+      "transform": ["aggregate", "filter", "join"],
+      "apply": []
+    },
     "deployment": {
       "capture": [],
       "transform": [],
@@ -561,6 +566,16 @@
       "transform": ["analyze", "synthesize", "transform"],
       "apply": []
     },
+    "scheduler": {
+      "capture": ["list"],
+      "transform": [],
+      "apply": ["cancel", "fire", "schedule"]
+    },
+    "search": {
+      "capture": ["fetch_reader", "web_search"],
+      "transform": [],
+      "apply": []
+    },
     "secret": {
       "capture": ["get", "list"],
       "transform": ["set"],
@@ -678,6 +693,11 @@
         "write",
         "write_terminal"
       ]
+    },
+    "vcs": {
+      "capture": ["diff", "log", "status"],
+      "transform": [],
+      "apply": ["branch", "commit", "pr_create"]
     },
     "video-composition": {
       "capture": [

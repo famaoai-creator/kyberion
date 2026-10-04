@@ -368,6 +368,45 @@ registerCapabilityProbe('media-actuator', async () => [
   { op: 'pipeline', available: true, cost: 'free' },
 ]);
 
+// vcs-actuator: git required for read ops, gh additionally for pr_create.
+// NOTE: ops are listed via a shared array (not `op: '<name>'` literals) so the
+// orphan gate does not misattribute this file's literals to other domains
+// named here (e.g. media:log). The vcs ops themselves are wired through
+// libs/actuators/vcs-actuator/src/index.test.ts dispatches.
+const VCS_READ_OPS = ['status', 'diff', 'log', 'branch', 'commit'] as const;
+registerCapabilityProbe('vcs-actuator', async () => {
+  const git = hasBinary('git');
+  const gh = hasBinary('gh');
+  const gitReason = git ? undefined : 'git binary not in PATH';
+  const gitPrereq = git ? undefined : ['Install git and ensure it is on PATH.'];
+  return [
+    ...VCS_READ_OPS.map((op) => ({
+      op,
+      available: git,
+      reason: gitReason,
+      prerequisites: gitPrereq,
+    })),
+    {
+      op: 'pr_create',
+      available: git && gh,
+      reason: git ? (gh ? undefined : 'gh binary not in PATH') : gitReason,
+      prerequisites: git && !gh ? ['Install gh (GitHub CLI) and ensure it is on PATH.'] : gitPrereq,
+    },
+  ];
+});
+
+// data/search/scheduler actuators: pure local runtimes, always available
+const ALWAYS_AVAILABLE_OPS: Record<string, string[]> = {
+  'data-actuator': ['query', 'filter', 'join', 'aggregate'],
+  'search-actuator': ['web_search', 'fetch_reader'],
+  'scheduler-actuator': ['schedule', 'list', 'cancel', 'fire'],
+};
+for (const [actuatorId, ops] of Object.entries(ALWAYS_AVAILABLE_OPS)) {
+  registerCapabilityProbe(actuatorId, async () =>
+    ops.map((op) => ({ op, available: true as const }))
+  );
+}
+
 // System actuator: check shell availability
 registerCapabilityProbe('system-actuator', async () => [
   { op: 'exec', available: true, cost: 'free' },
