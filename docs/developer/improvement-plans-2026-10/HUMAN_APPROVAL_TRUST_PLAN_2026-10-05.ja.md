@@ -141,15 +141,41 @@ status: planned
   - 決定済みのものは遡及しない。
 - dot の隔離解除の再検査(`applyApprovedDotReleases`)は、`decidedAuthMethod` の assurance も見るようにする。
 
-## 5. 決めてほしいこと
+## 5. 決定事項(2026-10-05 レビュー)
 
-1. **CLI の端末アテステーション**は、TTY チャレンジで A2 とみなしてよいか(提案: はい)。それとも CLI の human_only は passkey のみにするか。
-2. **localadmin bearer token**を human_only で使えなくしてよいか(提案: はい。運用は cookie セッションか passkey にする)。
-3. **WebAuthn の依存**: 最小実装を自作するか、既存ライブラリ(例: `@simplewebauthn/server`)を入れるか(提案: ライブラリ + lockfile review)。
-4. **強制までの期間**: warn で 2 週間(提案)。
+1. **CLI の端末アテステーション** — 方式を説明したうえで判断待ち(下記 5.1)。
+2. **localadmin bearer token** — human_only では使えなくする。**決定: はい**(HA-05)。
+3. **WebAuthn の依存** — どちらでもよい。**決定: `@simplewebauthn/server` を採用し、lockfile review を行う**(自作の CBOR/COSE 実装は保守の負担になるため)。
+4. **強制までの期間** — 変更してよい。**決定: warn で 1 週間 → enforce**。ただし HA-02(エージェント経路の遮断)は最初から enforce にする。warn のあいだに `assurance_shortfall` が残っている経路が出たら延長する。
+
+### 5.1 端末アテステーション(提案方式)
+
+`pnpm kyberion approve <id>` が human_only の決定に対して行う処理は次のとおり。
+
+1. **エージェント実行コンテキストなら拒否する。**
+   `detectAgentExecutionContext()` が真のときは `[APPROVAL_HUMAN_PROOF_REQUIRED]` で止める。判定材料は次のとおり。
+   - プロバイダ CLI の環境マーカー(`CLAUDECODE`、`CODEX_*` など)
+   - agent principal
+   - 親プロセスの系譜(プロバイダ CLI の子孫か)
+2. **TTY であることを要求する。** stdin と stdout がともに TTY でなければ拒否する。パイプ、CI、バックグラウンド実行は対象外になる。
+3. **内容に束縛したチャレンジを出す。** 次の 3 つを表示する。
+   - 決定内容の要約(action、target、tenant、effect)
+   - 提示ダイジェスト(HA-06)
+   - 提示ダイジェストと nonce から作った **ランダムな 6 文字の確認コード**
+
+   人間はそのコードを打ち返す。コードは 60 秒で失効し、1 回だけ使える。
+   - コードを毎回変えるので、決まった文字列をパイプで流し込む操作はできない。
+   - 表示された内容を読まずに承認することも防げる。
+
+4. **成功したら記録する。** `authMethod: 'terminal_attested'`(A2)と、`decidedBy` = OS ユーザー + onboarding の operator id を記録する。端末の情報(tty 名、親プロセスの系譜)は監査用の証跡に残す。
+
+限界:
+
+- 同じ OS ユーザー権限を持つ悪意あるプロセスは、疑似端末(pty)を作って画面を読み、コードを入力できる。したがって A2 は「誤操作とエージェントの自走を防ぐ」強度であり、「侵害された端末に耐える」強度ではない。
+- 侵害に耐える必要がある決定(dual-key、policy の変更など)は、A3(passkey)だけにする。
 
 ## 6. 状況
 
-| ID        | 状態             |
-| --------- | ---------------- |
-| HA-01〜08 | 未着手(ドラフト) |
+| ID        | 状態                                       |
+| --------- | ------------------------------------------ |
+| HA-01〜08 | 未着手(5.1 の判断待ち。それ以外は決定済み) |
