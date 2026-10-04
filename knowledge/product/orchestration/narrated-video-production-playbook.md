@@ -6,7 +6,7 @@ authority: reference
 phase: [alignment, execution]
 tags: [video, narrated, scratch-first, pipeline, orchestration]
 owner: ecosystem_architect
-last_updated: 2026-09-13
+last_updated: 2026-10-04
 ---
 
 # Narrated Video Production Playbook
@@ -23,6 +23,8 @@ It specializes the shared [Guided Coordination Protocol](guided-coordination-pro
 3. **Pipeline promote** — only after acceptance, encode the winning brief / storyboard / theme into a governed pipeline (or catalog procedure) for replay, validation, and publish gates.
 
 Do **not** start a first draft inside `create_narrated_intro_movie` / `video-content-brief` when the visual language is still unknown. Those paths optimize for reuse and governance, not for discovery.
+
+Designed promo / product film: author `timeline-html` scenes and render them with `video-composition:create_timeline_video`. Scene timing follows the narration and HyperFrames seeks each scene. → [`timeline-video-authoring-playbook.md`](./timeline-video-authoring-playbook.md)
 
 Reference scratch entry point: [`scripts/kyberion_intro_scratch.ts`](../../../scripts/kyberion_intro_scratch.ts)  
 Promotion checklist: [`scratch-to-pipeline-video-promotion.md`](./scratch-to-pipeline-video-promotion.md)
@@ -90,6 +92,7 @@ Good fits for this preflight include tutorial videos, product intros, onboarding
 ## Nearby Media Surfaces
 
 - [`scratch-to-pipeline-video-promotion.md`](./scratch-to-pipeline-video-promotion.md)
+- [`timeline-video-authoring-playbook.md`](./timeline-video-authoring-playbook.md)
 - [`generate-video-from-adf.md`](../../public/procedures/media/generate-video-from-adf.md)
 - [`transcribe-audio-from-asset.md`](../../public/procedures/media/transcribe-audio-from-asset.md)
 - [`realtime-voice-conversation.md`](../../public/procedures/media/realtime-voice-conversation.md)

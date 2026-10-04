@@ -9,7 +9,7 @@
  * and never invents data the server did not send.
  *
  * INTERIM (FD-03): "ひとこと伝える" (progress_action_note) hands off to
- * `/work?ask=...#conversation-panel` (the pre-FD-03 workbench) because there
+ * `/ask?ask=...` (the request composer) because there
  * is no endpoint on this surface that accepts a note/message for an existing
  * task session yet. Replace this once FD-03 or a task-session note endpoint
  * ships. "止める" (stop) is intentionally never rendered — this surface has
@@ -26,7 +26,7 @@
   // `/api/progress-vocabulary`'s `texts` object is keyed by the fully
   // qualified `namespace:key` form (same as `/api/home-vocabulary`).
   function vt(vocab, key) {
-    return (vocab && vocab['front_desk:' + key]) || '';
+    return (vocab && vocab[key.indexOf(':') >= 0 ? key : 'front_desk:' + key]) || '';
   }
 
   function escapeHtml(value) {
@@ -51,8 +51,14 @@
     });
   }
 
+  function scopedUrl(path) {
+    return window.KyberionPrefs && window.KyberionPrefs.scopedUrl
+      ? window.KyberionPrefs.scopedUrl(path)
+      : path;
+  }
+
   function fetchJson(url, options) {
-    return fetch(url, options).then(function (response) {
+    return fetch(scopedUrl(url), options).then(function (response) {
       return response.json().then(function (body) {
         return { ok: response.ok, status: response.status, body: body };
       });
@@ -84,11 +90,24 @@
   var ROW_STATUS = {
     active: { status: 'active', labelKey: 'tag_in_progress' },
     delivered: { status: 'pending', labelKey: 'tag_delivered' },
-    done: { status: 'done', labelKey: 'progress_filter_done' },
+    done: { status: 'idle', labelKey: 'progress_history' },
   };
 
-  function statusPillHtml(filter) {
-    var def = ROW_STATUS[filter];
+  var OUTCOME_STATUS = {
+    completed: { status: 'completed', labelKey: 'ui:status_completed' },
+    failed: { status: 'failed', labelKey: 'ui:status_failed' },
+    released: { status: 'idle', labelKey: 'progress_status_released' },
+    accepted: { status: 'completed', labelKey: 'concierge:home.status.accepted' },
+    rejected: { status: 'failed', labelKey: 'concierge:home.status.rejected' },
+    changes_requested: { status: 'pending', labelKey: 'concierge:home.status.changes_requested' },
+  };
+
+  function needsRecovery(item) {
+    return ['failed', 'released', 'rejected', 'changes_requested'].indexOf(item.status) >= 0;
+  }
+
+  function statusPillHtml(filter, item) {
+    var def = (item && OUTCOME_STATUS[item.status]) || ROW_STATUS[filter];
     if (!def) return '';
     return (
       '<span class="kb-status-pill" data-status="' +
@@ -102,10 +121,20 @@
 
   var state = {
     vocab: {},
+    vocabularyReady: false,
+    loaded: false,
+    noticeKey: null,
     payload: { counts: {}, active: [], delivered: [], done: [], mirror_href: '' },
     filter: 'active',
     selectedId: null,
     selectedTitle: '',
+    detailSequence: 0,
+    loadSequence: 0,
+    verdictGeneration: 1,
+    verdictStorageKey: null,
+    verdictStorageVerified: false,
+    pendingVerdicts: Object.create(null),
+    uncertainVerdicts: Object.create(null),
   };
 
   // WI-11: the "業務の自動化候補" panel's own vocab + read model, fetched and
@@ -133,7 +162,11 @@
 
   function readHashId() {
     var raw = String(window.location.hash || '').replace(/^#/, '');
-    return raw ? decodeURIComponent(raw) : null;
+    try {
+      return raw ? decodeURIComponent(raw) : null;
+    } catch (err) {
+      return null;
+    }
   }
 
   function writeHashId(id) {
@@ -163,7 +196,7 @@
       });
     }
     if (buttons.done) {
-      buttons.done.textContent = vt(vocab, 'progress_filter_done');
+      buttons.done.textContent = vt(vocab, 'progress_history');
     }
     FILTERS.forEach(function (name) {
       var button = buttons[name];
@@ -176,6 +209,7 @@
   function selectItem(id, title) {
     state.selectedId = id;
     state.selectedTitle = title || '';
+    if (state.noticeKey === 'progress_request_pending') showNotice(null);
     writeHashId(id);
     renderList();
     loadDetail();
@@ -184,8 +218,14 @@
   function renderActiveRow(item) {
     var selected = item.id === state.selectedId;
     var bar =
-      typeof item.percent === 'number'
-        ? '<div class="progress-row-progress"><div class="progress-row-progress-fill" style="width:' +
+      item.progress_basis === 'phase_estimate' &&
+      typeof item.percent === 'number' &&
+      isFinite(item.percent)
+        ? '<p class="progress-row-now">' +
+          escapeHtml(vt(state.vocab, 'progress_phase_estimate')) +
+          '</p><div class="progress-row-progress" aria-label="' +
+          escapeHtml(vt(state.vocab, 'progress_phase_estimate')) +
+          '"><div class="progress-row-progress-fill" style="width:' +
           Math.max(0, Math.min(100, item.percent)) +
           '%"></div></div>'
         : '';
@@ -199,7 +239,7 @@
       '<span class="progress-row-title">' +
       escapeHtml(item.title) +
       '</span>' +
-      statusPillHtml('active') +
+      statusPillHtml('active', item) +
       svgIcon('chevron', 'progress-row-chevron') +
       '</div>' +
       '<p class="progress-row-now">' +
@@ -223,7 +263,11 @@
     return fetchJson('/api/outcomes/' + encodeURIComponent(entryId) + '/verdict', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(note ? { status: status, note: note } : { status: status }),
+      body: JSON.stringify({
+        status: status,
+        viewer_scope_id: state.payload.viewer_scope_id,
+        ...(note ? { note: note } : {}),
+      }),
     });
   }
 
@@ -238,13 +282,13 @@
     var actionsHtml = '';
     if (item.downloadable) {
       actionsHtml +=
-        '<a class="kb-btn kb-btn--secondary progress-row-action" data-action="open" href="/api/artifacts/' +
-        encodeURIComponent(item.id) +
+        '<a class="kb-btn kb-btn--secondary progress-row-action" data-action="open" href="' +
+        escapeHtml(scopedUrl('/api/artifacts/' + encodeURIComponent(item.id))) +
         '">' +
         escapeHtml(vt(vocab, 'action_open')) +
         '</a>';
     }
-    if (item.can_verdict) {
+    if (item.can_verdict && item.entry_id) {
       actionsHtml +=
         '<button type="button" class="kb-btn kb-btn--primary progress-row-action" data-action="receive">' +
         escapeHtml(vt(vocab, 'action_receive')) +
@@ -260,7 +304,7 @@
       '<span class="progress-row-title">' +
       escapeHtml(item.title) +
       '</span>' +
-      statusPillHtml('delivered') +
+      statusPillHtml('delivered', item) +
       svgIcon('chevron', 'progress-row-chevron') +
       '</div>' +
       (actionsHtml ? '<div class="progress-row-actions">' + actionsHtml + '</div>' : '');
@@ -272,7 +316,11 @@
       selectItem(item.id, item.title);
     });
     row.addEventListener('keydown', function (event) {
-      if ((event.key === 'Enter' || event.key === ' ') && !event.target.closest('[data-action]')) {
+      if (
+        (event.key === 'Enter' || event.key === ' ') &&
+        !event.target.closest('[data-action]') &&
+        !event.target.closest('.progress-revise-form')
+      ) {
         event.preventDefault();
         selectItem(item.id, item.title);
       }
@@ -284,14 +332,17 @@
         event.stopPropagation();
       });
     }
+    row.querySelectorAll('button').forEach(function (button) {
+      button.disabled =
+        !state.verdictStorageKey ||
+        !state.verdictStorageVerified ||
+        Boolean(state.pendingVerdicts[item.entry_id] || state.uncertainVerdicts[item.entry_id]);
+    });
     var receiveButton = row.querySelector('[data-action="receive"]');
     if (receiveButton && item.entry_id) {
       receiveButton.addEventListener('click', function (event) {
         event.stopPropagation();
-        receiveButton.disabled = true;
-        postVerdict(item.entry_id, 'accepted').then(function () {
-          reload();
-        });
+        submitVerdict(item, 'accepted', undefined, row);
       });
     }
     var reviseButton = row.querySelector('[data-action="revise"]');
@@ -306,14 +357,12 @@
         var submit = document.createElement('button');
         submit.type = 'button';
         submit.className = 'kb-btn kb-btn--primary progress-row-action';
-        submit.textContent = escapeHtml(vt(vocab, 'action_revise'));
+        submit.textContent = vt(vocab, 'action_revise');
+        textarea.setAttribute('aria-label', vt(vocab, 'action_revise'));
         submit.addEventListener('click', function (innerEvent) {
           innerEvent.stopPropagation();
-          submit.disabled = true;
           var note = textarea.value.trim() || undefined;
-          postVerdict(item.entry_id, 'rejected', note).then(function () {
-            reload();
-          });
+          submitVerdict(item, 'rejected', note, row);
         });
         form.appendChild(textarea);
         form.appendChild(submit);
@@ -334,8 +383,8 @@
     row.setAttribute('tabindex', '0');
     var actionsHtml =
       item.kind === 'artifact' && item.downloadable
-        ? '<div class="progress-row-actions"><a class="kb-btn kb-btn--secondary progress-row-action" href="/api/artifacts/' +
-          encodeURIComponent(item.id) +
+        ? '<div class="progress-row-actions"><a class="kb-btn kb-btn--secondary progress-row-action" href="' +
+          escapeHtml(scopedUrl('/api/artifacts/' + encodeURIComponent(item.id))) +
           '">' +
           escapeHtml(vt(state.vocab, 'action_open')) +
           '</a></div>'
@@ -346,10 +395,23 @@
       '<span class="progress-row-title">' +
       escapeHtml(item.title) +
       '</span>' +
-      statusPillHtml('done') +
+      statusPillHtml('done', item) +
       svgIcon('chevron', 'progress-row-chevron') +
       '</div>' +
-      actionsHtml;
+      actionsHtml +
+      (needsRecovery(item)
+        ? '<a class="kb-btn kb-btn--secondary progress-row-action" href="' +
+          escapeHtml(askHref(item.title)) +
+          '">' +
+          escapeHtml(vt(state.vocab, 'progress_recovery')) +
+          '</a>'
+        : '');
+    row.addEventListener('keydown', function (event) {
+      if ((event.key === 'Enter' || event.key === ' ') && !event.target.closest('[href]')) {
+        event.preventDefault();
+        selectItem(item.id, item.title);
+      }
+    });
     row.addEventListener('click', function (event) {
       if (event.target.closest('[href]')) return;
       selectItem(item.id, item.title);
@@ -423,7 +485,7 @@
     var text = title
       ? renderTemplate(vt(state.vocab, 'progress_ask_about') || '{title}', { title: title })
       : '';
-    return '/work?ask=' + encodeURIComponent(text) + '#conversation-panel';
+    return scopedUrl('/ask?ask=' + encodeURIComponent(text));
   }
 
   function renderDetail(detail) {
@@ -431,7 +493,8 @@
     var detailEl = document.getElementById('progress-detail');
     if (!detailEl) return;
 
-    var blocks = '';
+    var found = findSection(state.selectedId);
+    var blocks = found ? statusPillHtml(found.filter, found.item) : '';
     blocks +=
       '<div class="progress-detail-block">' +
       '<p class="progress-detail-label">' +
@@ -493,10 +556,12 @@
       '<a class="kb-btn kb-btn--secondary progress-detail-action" href="' +
       escapeHtml(askHref(state.selectedTitle)) +
       '">' +
-      escapeHtml(vt(vocab, 'progress_action_note')) +
+      escapeHtml(
+        vt(vocab, found && needsRecovery(found.item) ? 'progress_recovery' : 'progress_action_note')
+      ) +
       '</a>' +
       '<a class="kb-btn kb-btn--secondary progress-detail-action" href="' +
-      escapeHtml(state.payload.mirror_href || '') +
+      escapeHtml(scopedUrl(state.payload.mirror_href || '/progress')) +
       '">' +
       escapeHtml(vt(vocab, 'progress_open_mirror')) +
       '</a>' +
@@ -505,45 +570,173 @@
     detailEl.innerHTML = blocks;
   }
 
-  function loadDetail() {
-    if (!state.selectedId) {
-      renderDetailHint();
+  function showNotice(key) {
+    state.noticeKey = key;
+    if (key === 'progress_load_failed' && !state.loaded) {
+      var list = document.getElementById('progress-list');
+      if (list) list.innerHTML = '';
+    }
+    var notice = document.getElementById('progress-notice');
+    if (!notice) return;
+    notice.hidden = !key;
+    if (!key) return;
+    var text = notice.querySelector('[data-notice-text]');
+    if (text) text.textContent = vt(state.vocab, key) || notice.getAttribute('data-' + key) || '';
+    var button = notice.querySelector('button');
+    if (button) button.textContent = vt(state.vocab, 'progress_refresh') || button.textContent;
+  }
+
+  function restoreVerdictLocks(viewerScopeId, readGeneration) {
+    // The server binds this opaque identifier to the authenticated principal
+    // and narrowed viewer scope. Client-selected tenant text is not identity.
+    var storageKey =
+      typeof viewerScopeId === 'string' && viewerScopeId
+        ? 'front-desk.progress.uncertain.' + encodeURIComponent(viewerScopeId)
+        : null;
+    if (state.verdictStorageKey !== storageKey) {
+      state.verdictStorageKey = storageKey;
+      state.verdictStorageVerified = false;
+      state.pendingVerdicts = Object.create(null);
+      state.uncertainVerdicts = Object.create(null);
+    }
+    if (!storageKey) return false;
+    if (state.verdictStorageVerified) return true;
+    try {
+      var raw = window.sessionStorage.getItem(storageKey);
+      var ids = raw === null ? [] : JSON.parse(raw);
+      if (
+        !Array.isArray(ids) ||
+        ids.some(function (id) {
+          return typeof id !== 'string' || !id;
+        })
+      ) {
+        throw new Error('invalid-verdict-locks');
+      }
+      ids.forEach(function (id) {
+        // Keep a newer in-memory uncertainty generation when restoring after
+        // an I/O failure. A pending older read must not lower that fence.
+        state.uncertainVerdicts[id] = state.uncertainVerdicts[id] || readGeneration;
+      });
+      state.verdictStorageVerified = true;
+    } catch (err) {
+      // Do not replace or delete storage we could not verify. Only a later
+      // successful restore may re-enable decisions for this scope.
+      state.verdictStorageVerified = false;
+    }
+    return true;
+  }
+
+  function persistVerdictLocks() {
+    if (!state.verdictStorageKey || !state.verdictStorageVerified) return false;
+    try {
+      var ids = Object.keys(state.uncertainVerdicts).concat(Object.keys(state.pendingVerdicts));
+      if (ids.length) window.sessionStorage.setItem(state.verdictStorageKey, JSON.stringify(ids));
+      else window.sessionStorage.removeItem(state.verdictStorageKey);
+      return true;
+    } catch (err) {
+      state.verdictStorageVerified = false;
+      return false;
+    }
+  }
+
+  function submitVerdict(item, status, note, row) {
+    if (!state.verdictStorageKey) {
+      showNotice('progress_scope_required');
       return;
     }
-    fetchJson('/api/progress/' + encodeURIComponent(state.selectedId))
+    if (!state.verdictStorageVerified) {
+      showNotice('progress_storage_required');
+      return;
+    }
+    var writeScopeKey = state.verdictStorageKey;
+    if (state.pendingVerdicts[item.entry_id] || state.uncertainVerdicts[item.entry_id]) return;
+    state.pendingVerdicts[item.entry_id] = ++state.verdictGeneration;
+    // Persist only identifiers, before the request can reach the server. A reload
+    // during an outstanding request must restore an unknown-outcome lock.
+    if (!persistVerdictLocks()) {
+      delete state.pendingVerdicts[item.entry_id];
+      var list = document.getElementById('progress-list');
+      if (list)
+        list.querySelectorAll('button').forEach(function (button) {
+          button.disabled = true;
+        });
+      showNotice('progress_storage_required');
+      return;
+    }
+    row.querySelectorAll('button').forEach(function (button) {
+      button.disabled = true;
+    });
+    postVerdict(item.entry_id, status, note)
       .then(function (result) {
+        if (writeScopeKey !== state.verdictStorageKey) return;
+        delete state.pendingVerdicts[item.entry_id];
+        if (!result.ok || !result.body || !result.body.ok) throw new Error('verdict-unconfirmed');
+        // The write was confirmed, but actions remain locked until a fresh read.
+        state.uncertainVerdicts[item.entry_id] = ++state.verdictGeneration;
+        persistVerdictLocks();
+        return reload();
+      })
+      .catch(function () {
+        if (writeScopeKey !== state.verdictStorageKey) return;
+        delete state.pendingVerdicts[item.entry_id];
+        state.uncertainVerdicts[item.entry_id] = ++state.verdictGeneration;
+        persistVerdictLocks();
+        showNotice(
+          state.verdictStorageVerified ? 'progress_action_failed' : 'progress_storage_required'
+        );
+      });
+  }
+
+  function loadDetail() {
+    var sequence = ++state.detailSequence;
+    var selectedId = state.selectedId;
+    renderDetailHint();
+    if (!selectedId) return Promise.resolve();
+    return fetchJson('/api/progress/' + encodeURIComponent(selectedId))
+      .then(function (result) {
+        if (sequence !== state.detailSequence || selectedId !== state.selectedId) return;
         if (!result.ok || !result.body || !result.body.ok) {
-          state.selectedId = null;
-          writeHashId(null);
-          renderDetailHint();
+          showNotice('progress_load_failed');
           return;
         }
+        if (state.noticeKey === 'progress_load_failed') showNotice(null);
         renderDetail(result.body.item);
       })
       .catch(function () {
-        renderDetailHint();
+        if (sequence === state.detailSequence && selectedId === state.selectedId)
+          showNotice('progress_load_failed');
       });
   }
 
   function applyHashOrDefault() {
-    var hashId = readHashId();
-    if (hashId) {
-      var found = findSection(hashId);
-      if (found) {
-        state.filter = found.filter;
-        state.selectedId = found.item.id;
-        state.selectedTitle = found.item.title;
+    var found = findSection(readHashId());
+    var request = new URLSearchParams(window.location.search).get('request');
+    if (!found && request) {
+      FILTERS.some(function (filter) {
+        var match = itemsForFilter(filter).find(function (item) {
+          return item.correlation_id === request;
+        });
+        if (match) found = { filter: filter, item: match };
+        return Boolean(match);
+      });
+      if (!found) {
+        state.selectedId = null;
+        state.selectedTitle = '';
+        showNotice('progress_request_pending');
         return;
       }
     }
-    var defaultActive = (state.payload.active || []).find(function (item) {
-      return item.selected_default;
-    });
-    if (defaultActive) {
-      state.filter = 'active';
-      state.selectedId = defaultActive.id;
-      state.selectedTitle = defaultActive.title;
-      writeHashId(defaultActive.id);
+    if (!found && !request) {
+      var defaultActive = (state.payload.active || []).find(function (item) {
+        return item.selected_default;
+      });
+      if (defaultActive) found = { filter: 'active', item: defaultActive };
+    }
+    if (found) {
+      state.filter = found.filter;
+      state.selectedId = found.item.id;
+      state.selectedTitle = found.item.title;
+      writeHashId(found.item.id);
     }
   }
 
@@ -560,18 +753,55 @@
   }
 
   function reload() {
-    return fetchJson('/api/progress').then(function (result) {
-      if (result.ok && result.body && result.body.ok) {
+    var sequence = ++state.loadSequence;
+    // A read can reconcile only decisions already uncertain when that read began.
+    // An in-flight older snapshot must never unlock a later uncertain write.
+    var reconciliationGeneration = state.verdictGeneration;
+    return fetchJson('/api/progress')
+      .then(function (result) {
+        if (sequence !== state.loadSequence) return;
+        if (!result.ok || !result.body || !result.body.ok) throw new Error('progress-unavailable');
         state.payload = result.body;
+        state.loaded = true;
+        var scopeReady = restoreVerdictLocks(
+          state.payload.viewer_scope_id,
+          reconciliationGeneration
+        );
+        Object.keys(state.uncertainVerdicts).forEach(function (entryId) {
+          var terminalOutcome = (state.payload.done || []).some(function (item) {
+            return (
+              item.entry_id === entryId &&
+              ['accepted', 'rejected', 'changes_requested'].indexOf(item.status) >= 0
+            );
+          });
+          // Even a newer successful read can race a delayed commit. Only the
+          // exact inbox entry's recorded verdict resolves the unknown outcome.
+          if (state.uncertainVerdicts[entryId] <= reconciliationGeneration && terminalOutcome) {
+            delete state.uncertainVerdicts[entryId];
+          }
+        });
+        persistVerdictLocks();
+        showNotice(
+          !scopeReady
+            ? 'progress_scope_required'
+            : !state.verdictStorageVerified
+              ? 'progress_storage_required'
+              : Object.keys(state.uncertainVerdicts).length
+                ? 'progress_action_failed'
+                : null
+        );
         if (state.selectedId && !findSection(state.selectedId)) {
           state.selectedId = null;
           writeHashId(null);
         }
+        applyHashOrDefault();
         renderFilters();
         renderList();
-        loadDetail();
-      }
-    });
+        return loadDetail();
+      })
+      .catch(function () {
+        if (sequence === state.loadSequence) showNotice('progress_load_failed');
+      });
   }
 
   // WI-11: work-inventory automation-candidate panel.
@@ -690,7 +920,10 @@
     renderWorkInventoryConsent(vocab, payload.consent);
 
     var startEl = document.getElementById('wi-start');
-    if (startEl) startEl.textContent = vt(vocab, 'progress_work_inventory_start');
+    if (startEl) {
+      startEl.textContent = vt(vocab, 'progress_work_inventory_start');
+      startEl.href = scopedUrl('/ask?mode=hearing&scenario=work_inventory');
+    }
 
     var hintEl = document.getElementById('wi-hint');
     if (hintEl) hintEl.textContent = vt(vocab, 'progress_work_inventory_operator_hint');
@@ -716,29 +949,48 @@
       });
   }
 
+  function refreshProgress() {
+    return Promise.resolve(window.FrontDeskRail && window.FrontDeskRail.ready)
+      .then(function () {
+        if (state.vocabularyReady) return reload();
+        return fetchJson(
+          '/api/progress-vocabulary?locale=' + encodeURIComponent(normalizeLocale())
+        ).then(function (result) {
+          if (!result.ok || !result.body || !result.body.ok)
+            throw new Error('vocabulary-unavailable');
+          state.vocab = result.body.texts || {};
+          state.vocabularyReady = true;
+          return reload();
+        });
+      })
+      .catch(function () {
+        showNotice('progress_load_failed');
+      });
+  }
+
   function mount() {
     var locale = normalizeLocale();
     wireFilters();
-    loadWorkInventoryPanel(locale);
-    Promise.all([
-      fetchJson('/api/progress-vocabulary?locale=' + encodeURIComponent(locale)),
-      fetchJson('/api/progress'),
-    ])
-      .then(function (pair) {
-        var vocabResult = pair[0];
-        var progressResult = pair[1];
-        if (!vocabResult.ok || !vocabResult.body || !vocabResult.body.ok) return;
-        if (!progressResult.ok || !progressResult.body || !progressResult.body.ok) return;
-        state.vocab = vocabResult.body.texts || {};
-        state.payload = progressResult.body;
-        applyHashOrDefault();
-        renderFilters();
-        renderList();
-        loadDetail();
+    var notice = document.getElementById('progress-notice');
+    var refresh = notice && notice.querySelector('button');
+    if (refresh)
+      refresh.addEventListener('click', function () {
+        refreshProgress();
+      });
+    window.addEventListener('hashchange', function () {
+      applyHashOrDefault();
+      renderFilters();
+      renderList();
+      loadDetail();
+    });
+    // The shared rail validates the selected scope before any tenant read.
+    return Promise.resolve(window.FrontDeskRail && window.FrontDeskRail.ready)
+      .then(function () {
+        loadWorkInventoryPanel(locale);
+        return refreshProgress();
       })
       .catch(function () {
-        // The progress page is additive chrome around the rail — a fetch
-        // failure must never throw and break the rest of the page.
+        showNotice('progress_load_failed');
       });
   }
 

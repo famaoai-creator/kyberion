@@ -4,7 +4,7 @@ import {
   resolveFrontDeskNavLocale,
 } from '../../../../lib/front-desk-nav';
 import { resolveConciergeFrontDeskRole } from '../../../../lib/front-desk-member';
-import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
+import { conciergeErrorResponse, resolveConciergeViewer, narrowConciergeScope } from '../../../../lib/viewer-context';
 
 /**
  * FD-00c: `GET /api/front-desk/nav` — renders the shared front-desk rail
@@ -24,7 +24,8 @@ export function GET(req: NextRequest) {
     // Membership-aware role (B1): a mapped member's viewed-tenant role gates
     // nav items — the flat viewer role alone would show owner menus to an
     // operator whose memberships happen to be localadmin-class elsewhere.
-    const role = resolveConciergeFrontDeskRole(resolved.context);
+    const viewer = {...resolved.context,...narrowConciergeScope(resolved.context,{tenant:req.nextUrl.searchParams.get('tenant')})};
+    const role = resolveConciergeFrontDeskRole(viewer);
     const payload = buildFrontDeskNavPayload({ locale, role });
     return NextResponse.json(payload, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {

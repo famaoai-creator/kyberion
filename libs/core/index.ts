@@ -18,3 +18,29 @@ export * from './index-part-11.js';
 // Preserve the original explicit export precedence for names also surfaced by
 // broad compatibility barrels.
 export type { NextActionType } from './next-action.js';
+
+export {
+  completedConversationContext,
+  narrowFrontDeskConversationViewer,
+  frontDeskRuntimeScope,
+  markConversationTurnNotStarted,
+  conversationRef,
+  reserveConversationTurn,
+  beginConversationTurn,
+  completeConversationTurn,
+  markConversationTurnUncertain,
+  frontDeskConversationScope,
+  presenceFrontDeskConversationViewer,
+  ConversationStoreError,
+  readConversationHistory as readFrontDeskConversationHistory,
+} from './surface/front-desk-conversation-store.js';
+export type {
+  FrontDeskConversationViewer,
+  ReservedConversationTurn,
+} from './surface/front-desk-conversation-store.js';
+export * from './surface/front-desk-conversation-history.js';
+
+export {
+  SurfaceConversationAdmissionError,
+  SurfaceConversationCapabilityError,
+} from './surface/surface-conversation-runtime-context.js';

@@ -61,6 +61,8 @@ const TOOL_LOCKDOWN_PROVIDERS: ReadonlySet<string> = new Set(['claude']);
 
 export interface SpawnOptions {
   agentId?: string;
+  /** Server-owned scoped surface instance; its base manifest remains authoritative. */
+  manifestAgentId?: string;
   provider: AgentProvider;
   modelId?: string;
   systemPrompt?: string;
@@ -95,6 +97,37 @@ export interface SpawnOptions {
    * may be used; any other provider or a pane backend fails closed.
    */
   toolAccess?: 'default' | 'none';
+}
+
+/** A policy alias is only valid for a new, principal-bound surface turn instance. */
+function resolveRuntimeManifestAgentId(agentId: string, options: SpawnOptions): string {
+  const base = options.manifestAgentId;
+  if (base === undefined) {
+    if (agentId.includes('--conversation-') && agentId.includes('--turn-')) {
+      throw new Error(
+        '[AGENT_MANIFEST_ALIAS_REQUIRED] Scoped surface instances require their base manifest'
+      );
+    }
+    return agentId;
+  }
+  const prefix = base + '--conversation-';
+  const suffix = agentId.startsWith(prefix) ? agentId.slice(prefix.length) : '';
+  if (
+    !/^[a-z][a-z0-9-]*$/.test(base) ||
+    !/^[a-f0-9]{64}--turn-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(
+      suffix
+    ) ||
+    options.runtimeOwnerId !== prefix + suffix.slice(0, 64) ||
+    options.runtimeOwnerType !== 'surface' ||
+    options.runtimeMetadata?.lease_kind !== 'surface-conversation-turn' ||
+    options.runtimeMetadata?.surface_agent_id !== base ||
+    !options.scope?.viewer_principal?.trim()
+  ) {
+    throw new Error(
+      '[AGENT_MANIFEST_ALIAS_INVALID] Only server-owned scoped surface turn instances may bind a base manifest'
+    );
+  }
+  return base;
 }
 
 export interface AgentHandleAskOptions {
@@ -202,6 +235,11 @@ class AgentLifecycleManagerImpl {
   private execAdapters: Map<string, AgentAdapter> = new Map();
   private handles: Map<string, AgentHandle> = new Map();
   private pendingSpawns: Map<string, Promise<AgentHandle>> = new Map();
+  // Canonical supervisor-side admission survives surface-process restarts.
+  // Failed stops retain reservations even if an idle sweep forgets its resource.
+  private scopedSurfaceReservations = new Map<string, string>();
+  private stoppingScopedRuntimes = new Set<string>();
+  private pendingScopedStops = new Map<string, Promise<void>>();
   private healthInterval: ReturnType<typeof setInterval> | null = null;
   private spawnOptions: Map<string, SpawnOptions> = new Map();
   private runtimeMetrics: Map<string, AgentRuntimeMetrics> = new Map();
@@ -314,6 +352,33 @@ class AgentLifecycleManagerImpl {
 
   async spawn(options: SpawnOptions): Promise<AgentHandle> {
     const agentId = options.agentId || `${options.provider}-${crypto.randomUUID().slice(0, 8)}`;
+    const manifestAgentId = resolveRuntimeManifestAgentId(agentId, options);
+    if (this.stoppingScopedRuntimes.has(agentId)) {
+      throw new Error(
+        '[AGENT_SURFACE_RUNTIME_STOPPING] Scoped runtime shutdown is pending or uncertain'
+      );
+    }
+    if (options.manifestAgentId) {
+      const ownerId = options.runtimeOwnerId!;
+      const reserved = this.scopedSurfaceReservations.get(ownerId);
+      if (reserved && reserved !== agentId) {
+        throw new Error(
+          '[AGENT_SURFACE_RUNTIME_BUSY] Another scoped runtime owns this conversation'
+        );
+      }
+      if (!reserved && this.scopedSurfaceReservations.size >= 8) {
+        throw new Error(
+          '[AGENT_SURFACE_RUNTIME_CAPACITY] Supervised scoped runtime capacity is occupied'
+        );
+      }
+      this.scopedSurfaceReservations.set(ownerId, agentId);
+    }
+    const existingBinding = agentRegistry.get(agentId)?.metadata?.manifest_agent_id || agentId;
+    if (agentRegistry.get(agentId) && existingBinding !== manifestAgentId) {
+      throw new Error(
+        '[AGENT_MANIFEST_ALIAS_MISMATCH] A live runtime cannot change its base manifest'
+      );
+    }
     const existingHandle = this.handles.get(agentId);
     const existingRecord = agentRegistry.get(agentId);
     const requestedRuntimeBackend = resolveAgentRuntimeLaunchMode({
@@ -360,6 +425,22 @@ class AgentLifecycleManagerImpl {
   }
 
   private async spawnInternal(agentId: string, options: SpawnOptions): Promise<AgentHandle> {
+    const manifestAgentId = resolveRuntimeManifestAgentId(agentId, options);
+    const manifest = getAgentManifest(manifestAgentId);
+    if (options.manifestAgentId) {
+      if (!manifest)
+        throw new Error(
+          '[AGENT_MANIFEST_ALIAS_MISSING] Base surface manifest not found: ' + manifestAgentId
+        );
+      // Callers may tighten the trust floor but cannot substitute the base
+      // prompt/capabilities, remove prerequisites, or lower its trust floor.
+      options = {
+        ...options,
+        systemPrompt: manifest.systemPrompt,
+        capabilities: manifest.capabilities,
+        trustRequired: Math.max(options.trustRequired ?? 0, manifest.trustRequired),
+      };
+    }
     const runtimeMetadata = options.runtimeMetadata || {};
     const resolvedModelId = resolveAgentLifecycleModelId(
       { modelId: options.modelId, runtimeMetadata },
@@ -422,7 +503,6 @@ class AgentLifecycleManagerImpl {
     this.ensureMetrics(agentId);
 
     // Requirements gate: check manifest prerequisites
-    const manifest = getAgentManifest(agentId);
     if (manifest) {
       const { ok, reasons } = validateRequirements(manifest);
       if (!ok) {
@@ -430,8 +510,8 @@ class AgentLifecycleManagerImpl {
       }
     }
 
-    const existingTrustScore = agentRegistry.get(agentId)?.trustScore;
-    const resolvedTrustScore = resolveAgentTrustScore(agentId, existingTrustScore);
+    const existingTrustScore = agentRegistry.get(manifestAgentId)?.trustScore;
+    const resolvedTrustScore = resolveAgentTrustScore(manifestAgentId, existingTrustScore);
 
     // Trust gate
     const trustRequired = resolvedOptions.trustRequired ?? manifest?.trustRequired ?? 0;
@@ -459,6 +539,7 @@ class AgentLifecycleManagerImpl {
       missionId: resolvedOptions.missionId,
       scope: resolvedScope,
       metadata: {
+        ...(resolvedOptions.manifestAgentId ? { manifest_agent_id: manifestAgentId } : {}),
         runtime_backend: runtimeBackend,
         provider_resolution: {
           preferredProvider: options.provider,
@@ -482,9 +563,9 @@ class AgentLifecycleManagerImpl {
     // warning inside the best-effort helpers. The identity survives shutdown;
     // only the *instance* binding is released then (retire is explicit).
     const identityResult = ensureAgentIdentityBestEffort({
-      slug: agentId,
+      slug: manifestAgentId,
       kind: 'agent',
-      displayName: agentId,
+      displayName: manifestAgentId,
       affiliation: resolvedOptions.missionId
         ? { mission_id: resolvedOptions.missionId }
         : undefined,
@@ -524,6 +605,7 @@ class AgentLifecycleManagerImpl {
         systemPrompt: resolvedOptions.systemPrompt,
         turnTimeoutMs: resolvedOptions.turnTimeoutMs,
       });
+      if (resolvedOptions.manifestAgentId) this.execAdapters.set(agentId, paneBackend);
       await paneBackend.boot();
       this.execAdapters.set(agentId, paneBackend);
       runtimeSupervisor.register({
@@ -566,6 +648,7 @@ class AgentLifecycleManagerImpl {
           }
         },
         shutdown: async () => {
+          if (resolvedOptions.manifestAgentId) return this.shutdown(agentId);
           await paneBackend.shutdown();
           this.execAdapters.delete(agentId);
           this.handles.delete(agentId);
@@ -596,6 +679,10 @@ class AgentLifecycleManagerImpl {
         ...(resolvedOptions.toolAccess === 'none' ? { toolsDisabled: true } : {}),
       });
 
+      // A failed/slow boot still belongs to the scoped stop request. Keep the
+      // adapter reachable before awaiting boot, so cleanup cannot acknowledge
+      // a stop while abandoning the partially created provider resource.
+      if (resolvedOptions.manifestAgentId) this.execAdapters.set(agentId, adapter);
       await adapter.boot();
       this.execAdapters.set(agentId, adapter);
       runtimeSupervisor.register({
@@ -640,6 +727,7 @@ class AgentLifecycleManagerImpl {
           }
         },
         shutdown: async () => {
+          if (resolvedOptions.manifestAgentId) return this.shutdown(agentId);
           await adapter.shutdown();
           this.execAdapters.delete(agentId);
           this.handles.delete(agentId);
@@ -734,7 +822,7 @@ class AgentLifecycleManagerImpl {
       );
     } catch (e: unknown) {
       agentRegistry.updateStatus(agentId, 'error');
-      this.mediators.delete(agentId);
+      if (!resolvedOptions.manifestAgentId) this.mediators.delete(agentId);
       throw new Error(`Failed to boot ${agentId}: ${errorMessage(e)}`);
     }
 
@@ -782,6 +870,32 @@ class AgentLifecycleManagerImpl {
   }
 
   async shutdown(agentId: string): Promise<void> {
+    const reservation = [...this.scopedSurfaceReservations.entries()].find(
+      ([, runtimeId]) => runtimeId === agentId
+    );
+    if (!reservation) return this.shutdownRuntime(agentId);
+    const existingStop = this.pendingScopedStops.get(agentId);
+    if (existingStop) return existingStop;
+    this.stoppingScopedRuntimes.add(agentId);
+    const pendingSpawn = this.pendingSpawns.get(agentId);
+    const stop = (async () => {
+      // Ensure publication settles BEFORE acknowledging stop. In particular,
+      // a timed-out daemon ensure may still be waiting in adapter.boot().
+      // A boot rejection is not itself successful cleanup of the adapter.
+      if (pendingSpawn) await pendingSpawn.catch(() => undefined);
+      await this.shutdownRuntime(agentId);
+      this.scopedSurfaceReservations.delete(reservation[0]);
+      this.stoppingScopedRuntimes.delete(agentId);
+    })();
+    this.pendingScopedStops.set(agentId, stop);
+    try {
+      await stop;
+    } finally {
+      this.pendingScopedStops.delete(agentId);
+    }
+  }
+
+  private async shutdownRuntime(agentId: string): Promise<void> {
     const mediator = this.mediators.get(agentId);
     if (mediator) {
       await mediator.shutdown();

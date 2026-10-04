@@ -720,6 +720,7 @@
         "cancel_video_composition_job",
         "create_narrated_intro_movie",
         "create_narrated_video_from_content_brief",
+        "create_timeline_video",
         "prepare_video_composition",
         "validate_narrated_video_artifact",
         "verify_rendered_video_artifact"

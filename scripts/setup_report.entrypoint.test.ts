@@ -16,7 +16,7 @@ describe('setup report entrypoint', () => {
     expect(source).toContain("? { status: 'ok', report: result.report }");
     expect(source).toContain("const normalizedArgs = args.filter((arg) => arg !== '--');");
     expect(source).toContain('runReasoningSetup({ quiet })');
-    expect(source).toContain('const quiet = options.quiet ?? options.persona ===');
+    expect(source).toContain('const quiet = options.quiet || options.persona ===');
     expect(source).toContain('main(argv, quiet || json)');
     expect(source).not.toContain('console.log(');
     expect(source).not.toContain('logger.info(');

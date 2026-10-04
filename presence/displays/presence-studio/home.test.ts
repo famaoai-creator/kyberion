@@ -156,6 +156,12 @@ describe('buildHomePayload', () => {
     });
 
     expect(payload.progress.find((item) => item.id === 'ts-known')?.percent).toBe(65);
+    expect(payload.progress.find((item) => item.id === 'ts-known')?.progress_basis).toBe(
+      'phase_estimate'
+    );
+    expect(
+      payload.progress.find((item) => item.id === 'ts-unknown')?.progress_basis
+    ).toBeUndefined();
     expect(payload.progress.find((item) => item.id === 'ts-unknown')?.percent).toBeUndefined();
   });
 });

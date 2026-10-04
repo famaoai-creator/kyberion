@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-04T05:57:55.996Z",
+  "generated_at": "2026-10-04T15:00:21.435Z",
   "generator_note": "Baseline of actuator extension-point surfaces for semver enforcement. See docs/developer/EXTENSION_POINTS.md. Update via `pnpm check:contract-semver -- --rebaseline`.",
   "actuators": [
     {
@@ -309,13 +309,14 @@
     },
     {
       "actuator_id": "video-composition-actuator",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "ops": [
         "await_video_composition_job",
         "compile_narrated_video_brief",
         "compile_video_content_brief",
         "create_narrated_intro_movie",
         "create_narrated_video_from_content_brief",
+        "create_timeline_video",
         "list_video_composition_templates",
         "pipeline",
         "prepare_video_composition",

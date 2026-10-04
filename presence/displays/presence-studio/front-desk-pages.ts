@@ -11,7 +11,7 @@
 import type express from 'express';
 import * as path from 'node:path';
 import { safeReadFile } from '@agent/core';
-import { readFrontDeskSurfacePorts } from '@agent/core/front-desk-nav';
+import { readFrontDeskSurfaceUrls } from '@agent/core/front-desk-nav';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 
 export const PRESENCE_STUDIO_VOCABULARY_KEYS = [
@@ -119,6 +119,7 @@ export const PRESENCE_STUDIO_VOCABULARY_KEYS = [
 // `PRESENCE_STUDIO_VOCABULARY_KEYS` above / `/api/ui-vocabulary` — see
 // `GET /api/home-vocabulary` in `front-desk-routes.ts`.
 export const HOME_VOCABULARY_KEYS = [
+  'front_desk:progress_phase_estimate',
   'front_desk:home_briefing',
   'front_desk:home_briefing_clear',
   'front_desk:home_recommend',
@@ -153,6 +154,21 @@ export const HOME_VOCABULARY_KEYS = [
 // `HOME_VOCABULARY_KEYS` above — see `GET /api/progress-vocabulary` in
 // `front-desk-routes.ts`.
 export const PROGRESS_VOCABULARY_KEYS = [
+  'front_desk:progress_scope_required',
+  'front_desk:progress_storage_required',
+  'front_desk:progress_phase_estimate',
+  'front_desk:progress_history',
+  'front_desk:progress_status_released',
+  'front_desk:progress_recovery',
+  'front_desk:progress_load_failed',
+  'front_desk:progress_action_failed',
+  'front_desk:progress_request_pending',
+  'front_desk:progress_refresh',
+  'ui:status_completed',
+  'ui:status_failed',
+  'concierge:home.status.accepted',
+  'concierge:home.status.rejected',
+  'concierge:home.status.changes_requested',
   'front_desk:progress_filter_active',
   'front_desk:progress_filter_delivered',
   'front_desk:progress_filter_done',
@@ -185,6 +201,21 @@ export const PROGRESS_VOCABULARY_KEYS = [
 // `PRESENCE_STUDIO_VOCABULARY_KEYS` above already uses for `index.html`'s own
 // intent-resolution rendering).
 export const ASK_VOCABULARY_KEYS = [
+  'front_desk:conversation_access_required',
+  'front_desk:conversation_storage_required',
+  'front_desk:conversation_scope_selection_required',
+  'front_desk:conversation_not_started',
+  'front_desk:conversation_capability_unsupported',
+  'concierge:dock.history.loading',
+  'concierge:dock.history.failed',
+  'concierge:dock.history.retry',
+  'concierge:dock.history.pending',
+  'concierge:dock.history.unsaved',
+  'concierge:api.history_unavailable',
+  'front_desk:nav_settings',
+  'front_desk:nav_progress',
+  'front_desk:conversation_legacy_history',
+  'front_desk:conversation_legacy_notice',
   'front_desk:home_ask_placeholder',
   'front_desk:home_ask_send',
   'front_desk:home_ask_voice',
@@ -463,8 +494,10 @@ export function registerFrontDeskAuxPages(app: express.Express, staticDir: strin
   // concierge port comes from the surface manifest (never a literal). FD-08
   // deleted the static onboarding.html/.css/.js — this redirect is now the
   // entire route.
-  app.get('/onboarding', (_req, res) => {
-    res.redirect(302, `http://127.0.0.1:${readFrontDeskSurfacePorts().concierge}/settings`);
+  app.get('/onboarding', (req, res) => {
+    const tenant = typeof req.query.tenant === 'string' ? req.query.tenant : undefined;
+    const suffix = tenant ? '?tenant=' + encodeURIComponent(tenant) : '';
+    res.redirect(302, readFrontDeskSurfaceUrls().concierge + '/settings' + suffix);
   });
 
   // FD-03: the dedicated "頼む" page, replacing the interim `/work` redirect.
