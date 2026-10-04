@@ -7,7 +7,7 @@ status: planned
 
 # 人間承認の信頼性 改善計画 (HA-01〜08)
 
-- 状態: **ドラフト(レビュー待ち)**
+- 状態: **計画確定(実装待ち)**
 - 発端: PR #915 のレビューで「`pnpm kyberion approve` は端末上の任意の呼び出し元を認証済みの人間として記録する」ことが残課題になった。調査の結果、問題は CLI だけではなく承認経路全体に共通していると分かった。
 - 関連:
   - [AUTONOMOUS_OPERATION_MOBILE_DECISION_PLAN](../improvement-plans-2026-09/AUTONOMOUS_OPERATION_MOBILE_DECISION_PLAN_2026-09-27.ja.md) の P5(passkey 承認)
@@ -143,7 +143,7 @@ status: planned
 
 ## 5. 決定事項(2026-10-05 レビュー)
 
-1. **CLI の端末アテステーション** — 方式を説明したうえで判断待ち(下記 5.1)。
+1. **CLI の端末アテステーション** — 5.1 の方式を A2 とする。**決定: OK**(限界: 同じ OS ユーザーで動く悪意あるプロセスには耐えないため、侵害耐性が必要な決定は A3 のみとする)。
 2. **localadmin bearer token** — human_only では使えなくする。**決定: はい**(HA-05)。
 3. **WebAuthn の依存** — どちらでもよい。**決定: `@simplewebauthn/server` を採用し、lockfile review を行う**(自作の CBOR/COSE 実装は保守の負担になるため)。
 4. **強制までの期間** — 変更してよい。**決定: warn で 1 週間 → enforce**。ただし HA-02(エージェント経路の遮断)は最初から enforce にする。warn のあいだに `assurance_shortfall` が残っている経路が出たら延長する。
@@ -178,4 +178,4 @@ status: planned
 
 | ID        | 状態                                       |
 | --------- | ------------------------------------------ |
-| HA-01〜08 | 未着手(5.1 の判断待ち。それ以外は決定済み) |
+| HA-01〜08 | 未着手(すべて決定済み。実装待ち) |
