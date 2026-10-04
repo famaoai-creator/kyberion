@@ -1399,6 +1399,10 @@
       "types": "./dist/outcome-contract.d.ts",
       "default": "./dist/outcome-contract.js"
     },
+    "./key-result-spec": {
+      "types": "./dist/key-result-spec.d.ts",
+      "default": "./dist/key-result-spec.js"
+    },
     "./intent-reconciliation": {
       "types": "./dist/intent/intent-reconciliation.d.ts",
       "default": "./dist/intent/intent-reconciliation.js"
@@ -5095,6 +5099,22 @@
       "types": "./dist/organization/organization-digest-artifacts.d.ts",
       "default": "./dist/organization/organization-digest-artifacts.js"
     },
+    "./organization/organization-operation-tick": {
+      "types": "./dist/organization/organization-operation-tick.d.ts",
+      "default": "./dist/organization/organization-operation-tick.js"
+    },
+    "./organization/organization-retro": {
+      "types": "./dist/organization/organization-retro.d.ts",
+      "default": "./dist/organization/organization-retro.js"
+    },
+    "./organization/organization-standup": {
+      "types": "./dist/organization/organization-standup.d.ts",
+      "default": "./dist/organization/organization-standup.js"
+    },
+    "./organization/organization-cadence": {
+      "types": "./dist/organization/organization-cadence.d.ts",
+      "default": "./dist/organization/organization-cadence.js"
+    },
     "./organization/organization-interventions": {
       "types": "./dist/organization/organization-interventions.d.ts",
       "default": "./dist/organization/organization-interventions.js"
@@ -5410,6 +5430,10 @@
     "./reasoning/reasoning-backend": {
       "types": "./dist/reasoning/reasoning-backend.d.ts",
       "default": "./dist/reasoning/reasoning-backend.js"
+    },
+    "./reasoning/reasoning-live-capabilities": {
+      "types": "./dist/reasoning/reasoning-live-capabilities.d.ts",
+      "default": "./dist/reasoning/reasoning-live-capabilities.js"
     },
     "./reasoning/reasoning-bootstrap": {
       "types": "./dist/reasoning/reasoning-bootstrap.d.ts",
@@ -7122,6 +7146,66 @@
     "./dot/dot-feedback": {
       "types": "./dist/dot/dot-feedback.d.ts",
       "default": "./dist/dot/dot-feedback.js"
+    },
+    "./dot/dot-state-paths": {
+      "types": "./dist/dot/dot-state-paths.d.ts",
+      "default": "./dist/dot/dot-state-paths.js"
+    },
+    "./dot/dot-extensions": {
+      "types": "./dist/dot/dot-extensions.d.ts",
+      "default": "./dist/dot/dot-extensions.js"
+    },
+    "./dot/dot-memory": {
+      "types": "./dist/dot/dot-memory.d.ts",
+      "default": "./dist/dot/dot-memory.js"
+    },
+    "./dot/dot-followups": {
+      "types": "./dist/dot/dot-followups.d.ts",
+      "default": "./dist/dot/dot-followups.js"
+    },
+    "./dot/dot-extension-registry": {
+      "types": "./dist/dot/dot-extension-registry.d.ts",
+      "default": "./dist/dot/dot-extension-registry.js"
+    },
+    "./dot/dot-extension-bootstrap": {
+      "types": "./dist/dot/dot-extension-bootstrap.d.ts",
+      "default": "./dist/dot/dot-extension-bootstrap.js"
+    },
+    "./dot/dot-wake-backend": {
+      "types": "./dist/dot/dot-wake-backend.d.ts",
+      "default": "./dist/dot/dot-wake-backend.js"
+    },
+    "./dot/dot-key-results": {
+      "types": "./dist/dot/dot-key-results.d.ts",
+      "default": "./dist/dot/dot-key-results.js"
+    },
+    "./dot/dot-event-intake": {
+      "types": "./dist/dot/dot-event-intake.d.ts",
+      "default": "./dist/dot/dot-event-intake.js"
+    },
+    "./dot/dot-budget": {
+      "types": "./dist/dot/dot-budget.d.ts",
+      "default": "./dist/dot/dot-budget.js"
+    },
+    "./dot/dot-executor": {
+      "types": "./dist/dot/dot-executor.d.ts",
+      "default": "./dist/dot/dot-executor.js"
+    },
+    "./dot/dot-arbitration": {
+      "types": "./dist/dot/dot-arbitration.d.ts",
+      "default": "./dist/dot/dot-arbitration.js"
+    },
+    "./dot/dot-outcomes": {
+      "types": "./dist/dot/dot-outcomes.d.ts",
+      "default": "./dist/dot/dot-outcomes.js"
+    },
+    "./dot/dot-autonomy": {
+      "types": "./dist/dot/dot-autonomy.d.ts",
+      "default": "./dist/dot/dot-autonomy.js"
+    },
+    "./governance/org-budget-governor": {
+      "types": "./dist/governance/org-budget-governor.d.ts",
+      "default": "./dist/governance/org-budget-governor.js"
     },
     "./state-probe": {
       "types": "./dist/state-probe.d.ts",

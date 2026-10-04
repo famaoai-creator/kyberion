@@ -254,6 +254,14 @@
     },
     {
       "layer": "orchestration",
+      "pattern": "scripts/dot_executor_step.ts"
+    },
+    {
+      "layer": "orchestration",
+      "pattern": "scripts/dot_supervisor_extensions.ts"
+    },
+    {
+      "layer": "orchestration",
       "pattern": "scripts/check_seam_multiplicity.ts"
     },
     {

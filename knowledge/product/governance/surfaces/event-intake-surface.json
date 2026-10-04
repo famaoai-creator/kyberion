@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "surfaces": [
+    {
+      "id": "event-intake-surface",
+      "kind": "service",
+      "description": "Loopback-only HMAC-authenticated inbound event intake (POST /events/<source>) that wakes resident dots. Every source is disabled in event-intake-policy.json until an operator enables it and stores its secret. Operator-launched; not started by reconcile.",
+      "command": "node",
+      "args": ["dist/scripts/event_intake_surface.js"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
+      "port": 8791,
+      "healthPath": "/health",
+      "enabled": false
+    }
+  ]
+}

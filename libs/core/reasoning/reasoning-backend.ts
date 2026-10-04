@@ -31,6 +31,7 @@ import {
   type StructuredOutputSchemaRef,
 } from '../structured-output-contracts.js';
 import {
+  healthyInstances,
   listDemotedProviders,
   reportProviderHealthy,
   getProviderHealthDemotionTtlMs,
@@ -113,6 +114,12 @@ import type {
   ReasoningFailoverPolicy,
 } from './reasoning-backend-contracts.js';
 export * from './reasoning-backend-contracts.js';
+import {
+  backendHasLiveToolCandidate,
+  type LiveCapabilityReporter,
+  type ReasoningLiveCapabilities,
+} from './reasoning-live-capabilities.js';
+export * from './reasoning-live-capabilities.js';
 
 function shouldRetryShortDelegationSummary(input: {
   instruction: string;
@@ -317,6 +324,28 @@ export class FailoverReasoningBackend implements ReasoningBackend {
       this.promptWithImages = (prompt, images, options) =>
         this.promptWithImagesAcrossCandidates(prompt, images, options);
     }
+  }
+
+  /**
+   * Candidates that can serve right now (providers whose every instance is
+   * demoted in the health registry are filtered out) and whether any of them
+   * can drive a tool loop. `generateWithTools` is fixed at construction, so a
+   * caller that must not start a tool loop doomed to "failed across 0
+   * candidate(s)" asks this instead.
+   */
+  liveCapabilities(): ReasoningLiveCapabilities {
+    // Ask the health registry per candidate provider: the argument-less
+    // `listDemotedProviders()` has no provider list to filter, so it cannot
+    // see a demotion on its own.
+    const now = Date.now();
+    const live = this.candidates.filter((candidate) => {
+      const provider = normalizeProviderName(candidate.provider);
+      return !provider || healthyInstances(provider, now).length > 0;
+    });
+    return {
+      tools: live.some((candidate) => backendHasLiveToolCandidate(candidate.backend)),
+      candidates: live.map(candidateLabel),
+    };
   }
 
   getRuntimeInstructions(options?: ReasoningCallOptions): string[] {
@@ -933,6 +962,14 @@ export class RoleAwareReasoningBackend implements ReasoningBackend {
       .toLowerCase()
       .replace(/[-\s]+/g, '_');
     return (role && this.roleBackends.get(role)) || this.defaultBackend;
+  }
+
+  /** Live capabilities of the chain `role` routes to (default chain without a role). */
+  liveCapabilities(role?: string): ReasoningLiveCapabilities {
+    const backend = this.pick(role ? { role } : undefined) as ReasoningBackend &
+      LiveCapabilityReporter;
+    if (typeof backend.liveCapabilities === 'function') return backend.liveCapabilities(role);
+    return { tools: Boolean(backend.generateWithTools), candidates: [backend.name] };
   }
 
   getRuntimeInstructions(options?: ReasoningCallOptions): string[] {
