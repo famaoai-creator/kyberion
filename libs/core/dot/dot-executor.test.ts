@@ -33,6 +33,7 @@ import {
   dotStatePath,
   type DotWorkResultRow,
 } from './dot-state-paths.js';
+import './dot-extension-bootstrap.js';
 
 const TEST_ROOT = 'active/shared/tmp/dot-executor-tests';
 const NOW = new Date('2026-10-04T10:00:00Z');
@@ -82,12 +83,15 @@ function item(id: string, metadata: Record<string, unknown>, extra: Partial<Work
   } as unknown as WorkItem;
 }
 
+type Dep<K extends keyof DotExecutorDeps> = NonNullable<DotExecutorDeps[K]>;
+type ReapOptions = Parameters<Dep<'reap'>>[0];
+
 interface Harness {
   deps: DotExecutorDeps;
   claims: ClaimWorkItemInput[];
   releases: ReleaseWorkItemInput[];
   inbox: DotInboxEntryInput[];
-  audits: Array<Record<string, any>>;
+  audits: Array<Record<string, unknown>>;
   tokens: Array<[string, number]>;
 }
 
@@ -107,19 +111,19 @@ function harness(items: WorkItem[] = [], attempts = 1): Harness {
           current_attempt_id: 'run-1',
           attempts: Array.from({ length: attempts }, (_, i) => ({ run_id: `run-${i}` })),
         } as unknown as WorkItem,
-        lease: { lease_id: 'lease-1' } as any,
+        lease: { lease_id: 'lease-1' } as unknown as ReturnType<Dep<'claim'>>['lease'],
       };
     },
     release: (input) => {
       h.releases.push(input);
-      return { item: {} as WorkItem, lease: {} as any };
+      return { item: {} as WorkItem, lease: {} as ReturnType<Dep<'release'>>['lease'] };
     },
-    renew: vi.fn() as any,
+    renew: vi.fn() as unknown as Dep<'renew'>,
     throttle: () => 'normal',
     tokenCapReached: () => false,
     reap: () => ({ expired: [], recovered: [], parked: [], replayed: [] }),
     appendInbox: (input) => void h.inbox.push(input),
-    audit: (entry) => void h.audits.push(entry as Record<string, any>),
+    audit: (entry) => void h.audits.push(entry as Record<string, unknown>),
     recordTokens: (dotId, tokens) => void h.tokens.push([dotId, tokens]),
   };
   return h;
@@ -494,7 +498,7 @@ describe('executor bounds and escalation', () => {
     const target = item('w1', {});
     const h = harness([target]);
     const renew = vi.fn();
-    h.deps.renew = renew as any;
+    h.deps.renew = renew as unknown as Dep<'renew'>;
     h.deps.renewIntervalMs = 10;
     let clock = 0;
     h.deps.clock = () => clock;
@@ -576,10 +580,12 @@ describe('executor bounds and escalation', () => {
     const update = vi.fn();
     const h = harness([]);
     h.deps.reap = reap;
-    h.deps.update = update as any;
+    h.deps.update = update as unknown as Dep<'update'>;
     await runDotExecutorSweep([{ path: 'dots/ops.json', charter: charter() }], ports(), h.deps);
     expect(reap).toHaveBeenCalledWith(expect.objectContaining({ maxErrorAttempts: 3 }));
-    const filter = (reap.mock.calls[0] as any)[0].itemFilter as (i: WorkItem) => boolean;
+    const filter = (reap.mock.calls[0] as unknown as [ReapOptions])[0].itemFilter as (
+      i: WorkItem
+    ) => boolean;
     expect(filter(item('x', {}))).toBe(true);
     expect(filter({ ...item('y', {}), metadata: {} } as WorkItem)).toBe(false);
     expect(update).toHaveBeenCalledWith(

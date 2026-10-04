@@ -36,6 +36,7 @@ import { listClaimableDotWorkItems } from './dot-executor.js';
 import type { DotInboxEntryInput } from './dot-inbox.js';
 import { learnedDotDecisionFloor, readDotFeedback } from './dot-feedback.js';
 import type { DotProposal } from './dot-proposals.js';
+import './dot-extension-bootstrap.js';
 
 const TEST_ROOT = `active/shared/tmp/dot-arbitration-tests-${randomUUID()}`;
 const NOW = new Date('2026-10-04T09:00:00Z');

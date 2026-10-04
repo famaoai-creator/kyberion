@@ -18,6 +18,7 @@ import {
   DOT_STATUS_SECTIONS,
 } from './dot-extension-registry.js';
 import type { DotProposal } from './dot-proposals.js';
+import './dot-extension-bootstrap.js';
 
 const CHARTER: DotCharter = {
   kind: 'dot-charter',

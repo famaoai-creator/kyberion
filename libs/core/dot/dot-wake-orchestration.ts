@@ -21,6 +21,9 @@ import {
   type DueDotTrigger,
 } from './dot-runtime.js';
 import { resolveDotWakeBackend, type ResolveDotWakeBackendOptions } from './dot-wake-backend.js';
+// Wakes need the registered prompt sections / wake tools; the registry is a
+// leaf, so the orchestration entry populates it.
+import './dot-extension-bootstrap.js';
 
 export type DotWakeOrchestrationDeps = Omit<DotRuntimeDeps, 'runLoop' | 'backendUnavailable'> & {
   trigger?: DueDotTrigger;

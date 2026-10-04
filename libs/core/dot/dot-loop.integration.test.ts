@@ -37,6 +37,7 @@ import {
 } from './dot-outcomes.js';
 import { evaluateDotTriggersDue, runDotWake } from './dot-runtime.js';
 import { DOT_WORK_RESULTS_FILE, dotStatePath, type DotWorkResultRow } from './dot-state-paths.js';
+import './dot-extension-bootstrap.js';
 
 const TEST_ROOT = 'active/shared/tmp/dot-loop-integration-tests';
 const DOT_ID = 'loop-it';

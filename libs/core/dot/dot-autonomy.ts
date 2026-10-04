@@ -34,9 +34,9 @@
  * card (gate forced to approve) that is applied only after a HUMAN approval
  * has settled in a later sweep.
  *
- * Import-cycle note: dot-extension-registry imports this module, and
- * dot-dispatch imports the registry, so registrations are hoisted factory
- * functions and dot-dispatch is only reached through call-time functions.
+ * Registration lives in dot-extension-bootstrap (the registry is a leaf the
+ * cores read), so registrations are factory functions and dot-dispatch is
+ * only reached through call-time functions.
  */
 
 import * as path from 'node:path';

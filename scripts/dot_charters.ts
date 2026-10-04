@@ -27,6 +27,7 @@ import {
   type DotCharterStatus,
 } from '@agent/core/dot/dot-charter';
 import { DOT_STATUS_SECTIONS } from '@agent/core/dot/dot-extension-registry';
+import '@agent/core/dot/dot-extension-bootstrap';
 import { readDotMemory } from '@agent/core/dot/dot-memory';
 import { listPendingDotFollowups } from '@agent/core/dot/dot-followups';
 import { dotGoalGaps, readLatestDotKeyResults } from '@agent/core/dot/dot-key-results';

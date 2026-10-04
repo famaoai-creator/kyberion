@@ -21,7 +21,7 @@ import type {
   OrganizationOperationRun,
   OrganizationOperationState,
 } from '@agent/core/organization/organization-operating-model';
-import { executePipelineFile } from './run_pipeline.js';
+import { pipelineFileRunner } from './lib/pipeline-file-runner.js';
 import * as path from 'node:path';
 import { withLock } from '@agent/core/lock-utils';
 import { resolveScopeResolution } from '@agent/core/scope-context';
@@ -175,7 +175,7 @@ async function executeOrganizationOperationLocked(input: {
   let evidenceRefs: string[] = [];
   try {
     const runPipeline = () =>
-      executePipelineFile(ref, {
+      pipelineFileRunner()(ref, {
         payloadScope: {
           tier,
           tenant_slug: tenantSlug,

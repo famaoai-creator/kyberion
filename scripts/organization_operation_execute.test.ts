@@ -50,7 +50,7 @@ vi.mock('@agent/core/lock-utils', () => ({
 vi.mock('@agent/core/scope-context', () => ({
   resolveScopeResolution: () => ({ scope: { tier: 'public' } }),
 }));
-vi.mock('./run_pipeline.js', () => ({ executePipelineFile: mocks.pipeline }));
+vi.mock('./lib/pipeline-file-runner.js', () => ({ pipelineFileRunner: () => mocks.pipeline }));
 
 import { currentExecutionScope } from '@agent/core/foundation';
 import {

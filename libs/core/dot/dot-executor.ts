@@ -278,9 +278,7 @@ export function dotWorkResultsPromptLines(c: DotCharter, ctx: DotExtCtx): string
 }
 
 /**
- * Prompt section factory. A hoisted function (not a const) so the extension
- * registry can register it while this module is still mid-evaluation in an
- * import cycle (registry → executor → runtime → registry).
+ * Prompt section factory, registered by `dot-extension-bootstrap.ts`.
  */
 export function dotWorkResultsPromptSection(): DotPromptSection {
   return {

@@ -14,6 +14,7 @@ import {
   parseDotFollowup,
 } from './dot-followups.js';
 import { DOT_WAKE_LEDGER_PATH, evaluateDotTriggersDue } from './dot-runtime.js';
+import './dot-extension-bootstrap.js';
 
 const TEST_ROOT = 'active/shared/tmp/dot-followups-tests';
 const T0 = new Date('2026-10-05T10:00:00Z');

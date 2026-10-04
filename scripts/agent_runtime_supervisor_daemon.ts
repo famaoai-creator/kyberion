@@ -64,6 +64,7 @@ import { runDotSupervisorExtensions } from './dot_supervisor_extensions.js';
 import { executeServicePreset } from '@agent/core/service/service-engine';
 import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
 import { runDotHousekeeping } from '@agent/core/dot/dot-dispatch';
+import '@agent/core/dot/dot-extension-bootstrap';
 import { dotBudgetThrottle, type DotBudgetThrottle } from '@agent/core/dot/dot-budget';
 import { tickVetoWindows } from '@agent/core/governance/approval-veto-window';
 import { AUTONOMY_APPROVAL_CHANNEL } from '@agent/core/governance/approval-decision-card';

@@ -15,6 +15,7 @@ import { measureActiveDotKeyResults, runAsDotCharter } from '@agent/core/dot/dot
 import { evaluateDueDotOutcomes, scheduleDotOutcomeChecks } from '@agent/core/dot/dot-outcomes';
 import { settleDotArbitration } from '@agent/core/dot/dot-arbitration';
 import { runDotAutonomyStep } from '@agent/core/dot/dot-autonomy';
+import '@agent/core/dot/dot-extension-bootstrap';
 import { DOT_EXECUTOR_SUPERVISOR_STEP } from './dot_executor_step.js';
 
 const logger = createLogger('dot-supervisor');

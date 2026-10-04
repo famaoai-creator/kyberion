@@ -158,6 +158,7 @@ export * from './dot/dot-state-paths.js';
 export * from './key-result-spec.js';
 export * from './dot/dot-extensions.js';
 export * from './dot/dot-extension-registry.js';
+export * from './dot/dot-extension-bootstrap.js';
 export * from './dot/dot-wake-backend.js';
 export * from './dot/dot-key-results.js';
 export * from './dot/dot-memory.js';
