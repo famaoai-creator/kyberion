@@ -50,6 +50,7 @@ import type { DelegationHandle } from '../delegated-task-observability.js';
 import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
 import { estimateTokens } from '../workforce/worker-context-compaction.js';
 import {
+  dotGoalRefLabel,
   listDotCharters,
   type DotCharter,
   type DotCharterLoadError,
@@ -699,7 +700,9 @@ function dotSystemPrompt(charter: DotCharter, mode: 'tool' | 'fence', rootDir?: 
   return [
     `You are the resident dot "${charter.dot_id}" (actor id dot:${charter.dot_id}).`,
     `Standing purpose: ${charter.purpose}`,
-    charter.team?.goal_ref ? `Organization goal you contribute to: ${charter.team.goal_ref}` : '',
+    dotGoalRefLabel(charter)
+      ? `Organization goal you contribute to: ${dotGoalRefLabel(charter)}`
+      : '',
     charter.goal.success_signals?.length
       ? `Success signals: ${charter.goal.success_signals.join('; ')}`
       : '',

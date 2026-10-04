@@ -32,7 +32,39 @@ export interface DotProposal {
   /** Hand the work to another dot instead of the worker pool. */
   handoff_to?: string;
   priority?: 'low' | 'normal' | 'high' | 'urgent';
+  /** pipeline-shaped work: repo-relative pipeline, must be in charter authority.allowed_pipelines to execute. */
+  pipeline_ref?: string;
+  /** What this action should move; the outcome check measures it after the settle window. */
+  expected_effect?: DotExpectedEffect;
+  /** Normalized target: path:<glob>, service:<id>, pr:<owner>/<repo>#<n>, work_item:<id>, org_operation:<id>. */
+  target?: string;
+  intent?: DotProposalIntent;
 }
+
+export interface DotExpectedEffect {
+  kr_id?: string;
+  signal?: string;
+  direction: 'increase' | 'decrease' | 'maintain';
+}
+
+export const DOT_PROPOSAL_INTENTS = [
+  'create',
+  'remove',
+  'enable',
+  'disable',
+  'increase',
+  'decrease',
+  'apply',
+  'revert',
+  'merge',
+  'close',
+  'update',
+] as const;
+export type DotProposalIntent = (typeof DOT_PROPOSAL_INTENTS)[number];
+
+const EFFECT_DIRECTIONS = ['increase', 'decrease', 'maintain'] as const;
+const TARGET_PATTERN =
+  /^(path:\S.*|service:[A-Za-z0-9][A-Za-z0-9._-]*|pr:[\w.-]+\/[\w.-]+#\d+|work_item:\S+|org_operation:\S+)$/;
 
 export const DOT_PROPOSE_TOOL_NAME = 'dot_propose_action';
 export const DOT_PROPOSALS_FENCE = 'dot-proposals';
@@ -72,6 +104,27 @@ export function buildDotProposeToolDefinition(): ToolDefinition {
         requested_decision: { type: 'string', enum: [...DECISIONS] },
         handoff_to: { type: 'string', description: 'dot_id to hand this work to.' },
         priority: { type: 'string', enum: [...PRIORITIES] },
+        pipeline_ref: {
+          type: 'string',
+          description:
+            'Repo-relative pipeline to run (pipeline work_shape; must be allowed by your charter).',
+        },
+        expected_effect: {
+          type: 'object',
+          description: 'The key result or signal this action should move, and in which direction.',
+          properties: {
+            kr_id: { type: 'string' },
+            signal: { type: 'string' },
+            direction: { type: 'string', enum: [...EFFECT_DIRECTIONS] },
+          },
+          required: ['direction'],
+        },
+        target: {
+          type: 'string',
+          description:
+            'What the action touches: path:<glob>, service:<id>, pr:<owner>/<repo>#<n>, work_item:<id>, or org_operation:<id>.',
+        },
+        intent: { type: 'string', enum: [...DOT_PROPOSAL_INTENTS] },
       },
       required: ['title', 'objective', 'work_shape'],
     },
@@ -109,6 +162,35 @@ export function normalizeDotProposal(value: unknown): DotProposal {
   if (priority !== undefined && !PRIORITIES.includes(priority as (typeof PRIORITIES)[number])) {
     throw new Error(`priority must be one of ${PRIORITIES.join(', ')}`);
   }
+  const pipelineRef = optionalText(raw.pipeline_ref, 300);
+  let expectedEffect: DotExpectedEffect | undefined;
+  if (raw.expected_effect !== undefined) {
+    const effect = raw.expected_effect as Record<string, unknown> | null;
+    if (!effect || typeof effect !== 'object' || Array.isArray(effect)) {
+      throw new Error('expected_effect must be an object');
+    }
+    if (!EFFECT_DIRECTIONS.includes(effect.direction as (typeof EFFECT_DIRECTIONS)[number])) {
+      throw new Error(`expected_effect.direction must be one of ${EFFECT_DIRECTIONS.join(', ')}`);
+    }
+    const krId = optionalText(effect.kr_id, 64);
+    const signal = optionalText(effect.signal, 300);
+    if (!krId && !signal) throw new Error('expected_effect needs kr_id or signal');
+    expectedEffect = {
+      ...(krId ? { kr_id: krId } : {}),
+      ...(signal ? { signal } : {}),
+      direction: effect.direction as DotExpectedEffect['direction'],
+    };
+  }
+  const target = optionalText(raw.target, 300);
+  if (target !== undefined && !TARGET_PATTERN.test(target)) {
+    throw new Error(
+      `target '${target}' must be path:<glob>, service:<id>, pr:<owner>/<repo>#<n>, work_item:<id>, or org_operation:<id>`
+    );
+  }
+  const intent = raw.intent;
+  if (intent !== undefined && !DOT_PROPOSAL_INTENTS.includes(intent as DotProposalIntent)) {
+    throw new Error(`intent must be one of ${DOT_PROPOSAL_INTENTS.join(', ')}`);
+  }
   const changedPaths = Array.isArray(raw.changed_paths)
     ? raw.changed_paths
         .filter((entry): entry is string => typeof entry === 'string' && entry.trim() !== '')
@@ -124,6 +206,10 @@ export function normalizeDotProposal(value: unknown): DotProposal {
     ...(requested ? { requested_decision: requested as DotDecisionLevel } : {}),
     ...(handoffTo ? { handoff_to: handoffTo } : {}),
     ...(priority ? { priority: priority as DotProposal['priority'] } : {}),
+    ...(pipelineRef ? { pipeline_ref: pipelineRef } : {}),
+    ...(expectedEffect ? { expected_effect: expectedEffect } : {}),
+    ...(target ? { target } : {}),
+    ...(intent ? { intent: intent as DotProposalIntent } : {}),
   };
 }
 
@@ -181,5 +267,6 @@ export function dotProposalInstructions(mode: 'tool' | 'fence'): string {
     'delegated as a WorkItem, sent to the operator for a decision, or refused.',
     how,
     'Use handoff_to to give work to another dot that accepts your handoffs.',
+    'For pipeline work set pipeline_ref (it must be one your charter allows). Set expected_effect (kr_id or signal, direction) so the outcome is measured, and target + intent so conflicting proposals from other dots are arbitrated.',
   ].join('\n');
 }
