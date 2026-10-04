@@ -33,12 +33,19 @@ modules ship.
   `KYBERION_INGRESS_PROVIDER` that is not ready fails with its reason; without
   one, the first ready live provider is used and the route is printed.
 
-## One-time setup: Tailscale Funnel (macOS)
+## One-time setup: Tailscale Funnel
 
-1. Install Tailscale: `brew install --cask tailscale-app` (or
-   <https://tailscale.com/download>), open it and sign in to your tailnet.
-2. Make the CLI reachable: Tailscale menu > Settings > **Install CLI**, or set
-   `KYBERION_TAILSCALE_BIN=/Applications/Tailscale.app/Contents/MacOS/Tailscale`.
+The install method is declared in the `tailscale` tool runtime
+(`knowledge/product/governance/tool-runtimes/tailscale.json`), per platform:
+
+| Platform | Install                                                              | Notes                                                                                                                                                                         |
+| -------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| macOS    | `brew install --cask tailscale-app` (the cask is macOS-only)         | Kyberion finds the CLI on its own: `/usr/local/bin/tailscale` (Settings > Install CLI), `/opt/homebrew/bin/tailscale`, or the binary inside `/Applications/Tailscale.app`.    |
+| Windows  | `winget install --id Tailscale.Tailscale --exact`                    | Log in from the tray app or `tailscale up`.                                                                                                                                   |
+| Linux    | Upstream package repository (<https://tailscale.com/download/linux>) | `tailscaled` is a root service, so there is no unattended install. Run `sudo tailscale up`, then `sudo tailscale set --operator=$USER` so Funnel can be managed without root. |
+
+1. Install Tailscale for your platform (table above), open it and sign in to your tailnet.
+2. Optional: set `KYBERION_TAILSCALE_BIN` if the CLI lives somewhere unusual.
 3. In the admin console **DNS** page (<https://login.tailscale.com/admin/dns>)
    enable **MagicDNS** and **HTTPS Certificates**.
 4. In **Access controls**, grant this device the `funnel` node attribute, e.g.

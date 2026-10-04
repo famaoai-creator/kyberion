@@ -7,7 +7,7 @@
       "display_name": "Tailscale CLI",
       "ecosystem": "system",
       "status": "active",
-      "platforms": ["any"],
+      "platforms": ["darwin", "linux", "win32"],
       "supported_modes": ["trial", "approved_install", "installed", "pinned"],
       "trial_backend": {
         "kind": "system",
@@ -19,14 +19,29 @@
         "kind": "brew",
         "command": "brew",
         "args": ["install", "--cask", "tailscale-app"],
-        "description": "Install the Tailscale macOS app through Homebrew, then enable its CLI (Settings > Install CLI) and log in."
+        "description": "macOS: install the Tailscale app through Homebrew (cask tailscale-app, macOS only), open it and log in. Kyberion uses the CLI inside the app bundle automatically; Settings > Install CLI is optional."
       },
       "install_backend_platform_overrides": {
+        "win32": {
+          "kind": "winget",
+          "command": "winget",
+          "args": [
+            "install",
+            "--id",
+            "Tailscale.Tailscale",
+            "--exact",
+            "--source",
+            "winget",
+            "--accept-source-agreements",
+            "--accept-package-agreements"
+          ],
+          "description": "Windows: install Tailscale through WinGet, then log in from the tray app or `tailscale up`."
+        },
         "linux": {
           "kind": "system",
           "command": "tailscale",
           "args": ["version"],
-          "description": "Linux hosts install Tailscale from the upstream package repository (https://tailscale.com/download/linux), then run `sudo tailscale up`."
+          "description": "Linux: no unattended install — tailscaled is a root system service. Install from the upstream package repository (https://tailscale.com/download/linux), then `sudo tailscale up` and `sudo tailscale set --operator=$USER` so Kyberion can manage Funnel without root. This backend only re-checks the CLI."
         }
       },
       "installed_backend": {
@@ -36,7 +51,7 @@
         "description": "Re-check the installed Tailscale CLI."
       },
       "managed_env_subpath": "tool-runtimes/tailscale",
-      "notes": "Runtime for the public-ingress provider `tailscale-funnel`. Override the binary with KYBERION_TAILSCALE_BIN (for example /Applications/Tailscale.app/Contents/MacOS/Tailscale when the app's CLI is not on PATH)."
+      "notes": "Runtime for the public-ingress provider `tailscale-funnel`. macOS: the resolver finds /usr/local/bin/tailscale, /opt/homebrew/bin/tailscale or the app-bundle binary (/Applications/Tailscale.app/Contents/MacOS/Tailscale) on its own. Override with KYBERION_TAILSCALE_BIN."
     }
   ]
 }
