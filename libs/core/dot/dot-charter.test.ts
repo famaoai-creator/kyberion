@@ -369,6 +369,56 @@ describe('dot charter', () => {
     );
   });
 
+  describe('operations_cadence', () => {
+    const orgCharter = {
+      ...VALID_CHARTER,
+      scope: { tier: 'confidential' as const, tenant_slug: 'acme', organization_id: 'org-a' },
+      authority: { ...VALID_CHARTER.authority, authority_role: 'organization_operator' },
+    };
+    const cadence = {
+      tick_every_minutes: 15,
+      standup: { cron: '45 8 * * 1-5', timezone: 'Asia/Tokyo' },
+      retro: { cron: '0 17 * * 5' },
+    };
+
+    it('accepts an organization-scoped organization_operator charter', () => {
+      expect(
+        validateDotCharter({ ...orgCharter, operations_cadence: cadence }).operations_cadence
+      ).toEqual(cadence);
+    });
+
+    it('requires scope.organization_id', () => {
+      expect(() =>
+        validateDotCharter({
+          ...orgCharter,
+          scope: { tier: 'confidential', tenant_slug: 'acme' },
+          operations_cadence: cadence,
+        })
+      ).toThrow(/organization_id/);
+    });
+
+    it('requires the organization_operator authority role', () => {
+      expect(() =>
+        validateDotCharter({
+          ...orgCharter,
+          authority: { ...orgCharter.authority, authority_role: 'infrastructure_sentinel' },
+          operations_cadence: cadence,
+        })
+      ).toThrow(/Invalid dot charter/);
+    });
+
+    it.each([
+      [{ tick_every_minutes: 4 }],
+      [{ standup: { cron: '45 8 * *' } }],
+      [{ retro: { cron: '0 17 * * 5', extra: true } }],
+      [{ standup: { cron: '45 8 * * 1-5', timezone: 'Mars/Olympus' } }],
+    ])('rejects a malformed cadence %j', (patch) => {
+      expect(() => validateDotCharter({ ...orgCharter, operations_cadence: patch })).toThrow(
+        /Invalid dot charter/
+      );
+    });
+  });
+
   it('rejects an authority role that is not declared in security-policy when checked', () => {
     // The schema cannot cross-reference security-policy.json; the loader only
     // validates shape. Role existence is enforced where charters are consumed.
