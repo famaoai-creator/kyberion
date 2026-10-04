@@ -1,10 +1,12 @@
 import type { GeneratedArtifact, GenerationModality } from './media-generation-helpers.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '@agent/core/seam';
 
 export type ProviderHistory = Record<string, unknown>;
 export type ArtifactPathResolver = (item: Record<string, unknown>) => string;
 
 export interface GenerationHistoryAdapter {
   modality: GenerationModality;
+  select_job_history(history: unknown, providerJobId: string): ProviderHistory | undefined;
   accepted_formats: readonly string[];
   is_failed(history: unknown): boolean;
   is_complete(history: unknown): boolean;
@@ -129,6 +131,7 @@ function createAdapter(
   return {
     modality,
     accepted_formats,
+    select_job_history: (history, providerJobId) => asRecord(asRecord(history)?.[providerJobId]),
     is_failed: isFailedHistory,
     is_complete: isCompleteHistory,
     extract_artifacts: (history, resolvePath) =>
@@ -145,10 +148,91 @@ const ADAPTERS: Record<GenerationModality, GenerationHistoryAdapter> = {
   workflow: createAdapter('workflow', WORKFLOW_FORMATS),
 };
 
+const generationHistoryAdapterSeam = createSeam<GenerationHistoryAdapter>({
+  key: 'media-generation-history-adapter',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+
+function normalizeProviderId(provider: string): string {
+  const id = typeof provider === 'string' ? provider.trim().toLowerCase() : '';
+  if (!/^[a-z][a-z0-9._-]*$/.test(id)) {
+    throw new Error('Invalid media generation history adapter provider: ' + String(provider));
+  }
+  return id;
+}
+
+function historyAdapterKey(provider: string, modality: GenerationModality): string {
+  return normalizeProviderId(provider) + '::' + modality;
+}
+
+function assertGenerationHistoryAdapter(
+  provider: string,
+  modality: GenerationModality,
+  candidate: unknown
+): asserts candidate is GenerationHistoryAdapter {
+  const adapter = asRecord(candidate);
+  if (
+    !adapter ||
+    adapter.modality !== modality ||
+    !Array.isArray(adapter.accepted_formats) ||
+    adapter.accepted_formats.some((format) => typeof format !== 'string' || !format.trim()) ||
+    typeof adapter.select_job_history !== 'function' ||
+    typeof adapter.is_failed !== 'function' ||
+    typeof adapter.is_complete !== 'function' ||
+    typeof adapter.extract_artifacts !== 'function' ||
+    typeof adapter.select_primary !== 'function'
+  ) {
+    throw new Error(
+      'Generation history adapter for ' + provider + '/' + modality + ' violates its contract'
+    );
+  }
+}
+
+export function registerGenerationHistoryAdapter(
+  provider: string,
+  modality: GenerationModality,
+  adapter: GenerationHistoryAdapter,
+  metadata: SeamProviderMetadata = {
+    provenance: 'plugin',
+    source: 'media-generation-history-adapter-extension',
+  }
+): () => void {
+  const id = historyAdapterKey(provider, modality);
+  assertGenerationHistoryAdapter(provider, modality, adapter);
+  return generationHistoryAdapterSeam.register(id, adapter, metadata);
+}
+
+function resolveRegisteredHistoryAdapter(
+  provider: string,
+  modality: GenerationModality
+): GenerationHistoryAdapter | undefined {
+  const id = historyAdapterKey(provider, modality).toLowerCase();
+  const matches = generationHistoryAdapterSeam
+    .list()
+    .filter((entry) => entry.id.trim().toLowerCase() === id);
+  if (matches.length > 1) {
+    throw new Error('Generation history adapter ' + provider + '/' + modality + ' is ambiguous');
+  }
+  const candidate: unknown = matches[0]?.implementation;
+  if (candidate === undefined) return undefined;
+  assertGenerationHistoryAdapter(provider, modality, candidate);
+  return candidate;
+}
+
 export function getGenerationHistoryAdapter(
-  modality: GenerationModality = 'workflow'
+  modality: GenerationModality = 'workflow',
+  provider = 'comfyui'
 ): GenerationHistoryAdapter {
-  return ADAPTERS[modality];
+  const registered = resolveRegisteredHistoryAdapter(provider, modality);
+  if (registered) return registered;
+  if (normalizeProviderId(provider) === 'comfyui') return ADAPTERS[modality];
+  throw new Error(
+    'No generation history adapter registered for provider ' +
+      provider +
+      ' and modality ' +
+      modality
+  );
 }
 
 export function modalityForGenerationAction(action: string): GenerationModality {
@@ -158,6 +242,9 @@ export function modalityForGenerationAction(action: string): GenerationModality 
   return 'workflow';
 }
 
-export function getGenerationHistoryAdapterForAction(action: string): GenerationHistoryAdapter {
-  return getGenerationHistoryAdapter(modalityForGenerationAction(action));
+export function getGenerationHistoryAdapterForAction(
+  action: string,
+  provider = 'comfyui'
+): GenerationHistoryAdapter {
+  return getGenerationHistoryAdapter(modalityForGenerationAction(action), provider);
 }

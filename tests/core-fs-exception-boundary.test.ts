@@ -65,6 +65,7 @@ const allowedCoreFsImports = [
   'libs/core/promoted-memory.test.ts',
   'libs/core/python-voice-bridge.test.ts',
   'libs/core/relationship-graph-store.test.ts',
+  'libs/core/repository-path-boundary.mjs',
   'libs/core/requirements-draft-store.test.ts',
   'libs/core/sdlc-artifact-store.test.ts',
   // Fixture setup needs raw fs to create symlinks and verify 0600/0700 modes.

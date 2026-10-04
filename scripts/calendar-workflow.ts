@@ -3,8 +3,8 @@ import {
   listCalendarAgenda,
   listCalendars,
   queryCalendarFreeBusy,
-  readGwsAuthStatus,
-  readM365AuthStatus,
+  normalizeCalendarProviderId,
+  readCalendarProviderAuthStatus,
 } from '@agent/core/meeting/calendar-workflow';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -49,10 +49,8 @@ function getStringList(args: ArgMap, key: string): string[] {
     .filter(Boolean);
 }
 
-function getProvider(args: ArgMap): 'google-workspace' | 'm365' {
-  const provider = getString(args, '--provider', 'google-workspace');
-  if (provider === 'google-workspace' || provider === 'm365') return provider;
-  throw new Error(`Unsupported calendar provider: ${provider}`);
+function getProvider(args: ArgMap): string {
+  return normalizeCalendarProviderId(getString(args, '--provider', 'google-workspace'));
 }
 
 function helpText(): string {
@@ -85,7 +83,7 @@ async function main(argv: string[], dryRun = false) {
 
   if (command === 'status') {
     const provider = getProvider(args);
-    const result = provider === 'm365' ? await readM365AuthStatus() : readGwsAuthStatus();
+    const result = await readCalendarProviderAuthStatus(provider);
     return result;
   }
 

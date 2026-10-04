@@ -1,7 +1,7 @@
 ---
 title: SIMPLICITY ABSTRACTION PLAN 2026 08 25
 tags: [improvement-plan, 2026-08]
-last_updated: 2026-09-07
+last_updated: 2026-10-04
 status: active
 ---
 
@@ -24125,3 +24125,198 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Android／iOS actuator の runtime session handoff reader、SX-03／SX-10
 - **変更**: actuator自身が repository artifact として保存した session handoff JSONの再読込を、`safeReadFile → parseSafeJsonInput` から foundation `readJson`へ統一した。ADB／simctl の外部出力、artifact path 境界、retry、invalid JSON時の失敗 semanticsは変更せず、foundation adoption checker の既存 allowlistを2件削除した。
 - **検証**: Android／iOS actuator／foundation adoption **3 files／63 tests passed**、checker OK、root `pnpm run typecheck`、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-10-04 capability discovery の評価契約統一
+
+- **対象**: actuator manifest discovery の build-free fallback、SX-03／SX-04／SX-10
+- **発見**: `scripts/capability_discovery.ts` と `scripts/capability_discovery_entry.mjs` が同じ `manifest.json` 群を独立評価していた。platform 未指定時の判定が異なり、build-free 側は canonical `actuator-manifest.schema.json` を適用せず、不正 manifest も capability として表示し得た。
+- **変更**: platform・binary・environment requirement 判定を `scripts/capability-discovery-contract.mjs` に一本化した。root package の private import から参照し、compiled 側と build-free 側で同じ ESM 実装を使用する。build-free 側にも既存 Ajv と canonical actuator manifest schema を接続し、manifest を増やすだけで同一契約の検証・発見が行われるようにした。
+- **検証**: root `tsc --noEmit` と root TypeScript build、対象 ESLint、private package import を実行した。通常 scanner と build-free scanner の実行結果を比較し、**33 actuators、両方 errors 0、差分 0**。`git diff --check` も成功。テスト suite は未実行。
+- **残件**: secure full scanner と build-free fallback の filesystem traversal / path containment は別実装のまま。schema と評価の共通化とは分け、build-free 実行条件を保ったまま secure-io 境界へ統合できるかを次の監査対象とする。
+
+## 2026-10-04 capability discovery の traversal 契約統一
+
+- **対象**: compiled scanner と build-free fallback の manifest traversal、SX-03／SX-04／SX-10
+- **変更**: actuator directory・子 directory・manifest leaf の path containment、symlink／file-type判定、順序決定、parse error の集約を scripts/capability-discovery-manifest-scan.mjs に統一した。通常経路は secure-io の adapter、fallback は build-free filesystem adapter を渡す。両経路が同じ traversal 契約で manifest を列挙し、canonical schema validation と capability 評価を適用する。Ajv の build-free factory は foundation 配下へ集約し、adoption gate の例外もその単一 factory に限定した。
+- **検証**: 両 scanner の runtime 結果が 33 actuators／errors 0／完全一致。build-free entrypoint、foundation adoption gate、対象 scanner の TypeScript 型検査、Prettier、git diff --check が成功。root 全体 tsc --noEmit は既存の scripts/meeting_participate.ts:127 platform 型エラーで停止。test suite は未実行。
+
+## 2026-10-04 voice STT adapter capability routing
+
+- **対象**: voice STT adapter availability と利用者向け setup guidance、SX-03／SX-04
+- **変更**: availability 判定の adapter-ID 列挙を削除し、adapter descriptor の availability_key から共通解決する。backend ごとの setup guidance も descriptor へ移し、voice-selection UI は共通 adapter resolver を利用する。既存の動的 SpeechToTextBridge 登録はそのまま自動列挙し、未知 bridge を unsupported と誤判定しない。
+- **検証**: core TypeScript typecheck、対象 ESLint、Prettier が成功。テスト suite は未実行。
+
+## 2026-10-04 meeting platform type extension
+
+- **対象**: meeting participation CLI と platform registry の型接続、SX-03／SX-04
+- **発見・変更**: CLI が platform の戻り値を meet／zoom／teams／in_room の独自 union に固定し、registry が許す追加 platform と型契約が乖離していた。返却型を core の MeetingJoinPlatform に接続し、platform registry を拡張しても CLI 側の重複 union を修正せずに済むようにした。
+- **検証**: root TypeScript typecheck、core typecheck、対象 ESLint／Prettier が成功。
+
+## 2026-10-04 location provider response mapping
+
+- **対象**: Presence location fallback provider decoding、SX-03／SX-04
+- **変更**: ipwho 名に結び付いていた response-shape 分岐を provider catalog の response_fields へ移した。canonical city／region／country／coordinates は configured JSON paths から解決し、URL／field map と schema を追加すれば compatible endpoint を登録できる。architecture knowledge に extension contract を追記した。
+- **検証**: catalogs gate、core typecheck、対象 ESLint／Prettier が成功。ipapi-shaped と ipwho-shaped の注入 fetcher runtime probe で summary・fallback coordinates が期待どおりに解決した。テスト suite は未実行。
+
+## 2026-10-04 meeting join driver module registry
+
+- **対象**: meeting participation CLI の driver module loading、SX-03／SX-04
+- **発見・変更**: meeting_participate.ts は in-room／Chrome extension／Playwright の driver ID ごとに module installer と options mapping を分岐していた。governance catalog meeting-join-driver-modules.json、schema-backed loader、共通 installMeetingParticipationDriver(options) module contract を追加し、CLI の ID 分岐を data resolution に置換した。core driver の public module wrappers は固有 installer を共通名で公開し、core barrel の名前衝突を避ける。Playwright の compiled fallback は repository-contained path と regular-file check を維持する。
+- **拡張方法**: 新 driver package は共通 installer export を実装し、catalog に driver_id／workspace module を登録する。optional build fallback は repository-relative path で宣言する。
+- **検証**: core/root typecheck と catalogs gate passed。Prettier と git diff --check passed。3つの driver module が catalog 経由で package import／共通 installer／registry 登録まで runtime 確認できた。compiled fallback branch は未実行。テスト suite は未実行。
+
+## 2026-10-04: Terraform proposal provider presets
+
+Source analysis の Terraform proposal 生成に AWS／Azure／GCP／Kubernetes 固有の分岐が残っていたため、必須 provider block、初期 provider 設定、resource starter を schema-backed governance catalog terraform-provider-proposal-presets.json へ移した。provider の追加や starter の拡張は catalog のみで行え、未知 provider はレビュー可能な generic proposal として出力する。出力コメントへ provider 名を埋め込む際は制御文字等を除去する。
+
+検証: root typecheck、catalog gate、対象 ESLint／Prettier、git diff --check。tests は未実行。
+
+## 2026-10-04: Embedding backend quality metadata
+
+run_doctor.ts が local-hash-embedding の ID を直接判定して degraded 表示していたため、EmbeddingBackend に quality / qualityNote metadata を追加し、fallback が approximate 状態を宣言する形に変更した。doctor は backend 名ではなく capability metadata を描画するため、新しい近似 backend も同じ運用表示へ接続できる。
+
+検証: root typecheck、対象 ESLint／Prettier、git diff --check、core build 後の doctor runtime probe（hash fallback が DEGRADED と理由付きで表示）。tests は未実行。
+
+## 2026-10-04: Configurable surface web search provider
+
+surface web search は DuckDuckGo の endpoint、query key、HTML response parser に固定されていた。provider catalog と schema に endpoint、query key/value、response format、JSON field paths、max results を追加し、JSON API provider を resolver 分岐なしで接続可能にした。既定の DuckDuckGo HTML path は維持する。
+
+検証: baseline pipeline、core typecheck、catalog gate、対象 ESLint／Prettier、git diff --check。tests は未実行。
+
+## 2026-10-04: Ingest document parser extension catalog
+
+ingest source walker に対して document format dispatch が parseDocument の固定 switch と IngestFormat union に孤立していた。追加形式用の schema-backed parser module catalog と共通 parseIngestDocument contract を作り、既存 format の後段へ plugin parser resolution を接続した。登録 module は指定 format にだけロードされ、未知 format は従来どおり明示エラーになる。built-in format の shadowing と任意 package import は schema で拒否する。
+
+検証: baseline pipeline、catalog gate、actuator typecheck、対象 ESLint／Prettier、git diff --check。tests は未実行。
+
+## 2026-10-04: Video renderer invocation contract
+
+Video backend selection was registry-driven only for the launcher; render gating, CLI arguments, preload, and fallback attribution still assumed HyperFrames. Added a schema-backed `video_render` contract with safe named argument placeholders and optional repository preload script. Renderer dispatch now resolves any registered video backend that declares the contract, checks advertised output formats, and reports the selected backend in fallback metadata. HyperFrames keeps its existing command and preload through catalog data.
+
+検証: baseline pipeline、video actuator TypeScript typecheck、対象 Prettier／catalog gate／git diff --check。tests は未実行。
+
+## 2026-10-04: Calendar provider event normalization
+
+calendar-workflow selected its event response decoder by checking provider_id for m365, so registering a new CalendarProviderBridge was insufficient when its wire shape differed. Added the optional normalizeEvent capability to the provider bridge and moved the Microsoft Graph event mapping beside its built-in adapter. Agenda listing and create/update responses now resolve normalization through the bridge capability, with the existing Google-compatible decoder retained as the fallback for extensions that already return the canonical common shape.
+
+検証: root TypeScript typecheck、対象 ESLint／Prettier、governance gate、git diff --check。tests は未実行。
+
+## 2026-10-04: Provider viseme mapping catalog
+
+realtime-media-session encoded Azure viseme IDs in the normalizer, leaving every new provider without canonical mouth cues unless runtime code changed. Moved provider ID to canonical-viseme mappings into a schema-backed governance catalog and connected normalizeProviderViseme to the shared resolver. New provider mappings can now be registered as data while unknown providers retain their original provider_viseme_id without an invented canonical value.
+
+検証: baseline pipeline、root TypeScript typecheck、governance gate、対象 ESLint／Prettier、git diff --check。tests は未実行。
+
+## 2026-10-04: Calendar free/busy normalization capability
+
+The same calendar extension seam still decoded Microsoft Graph scheduleItems in the shared workflow. Added an optional normalizeFreeBusy capability to CalendarProviderBridge and moved the Graph mapping beside the M365 adapter; the workflow keeps a provider-neutral canonical-shape fallback for existing bridges.
+
+検証: root TypeScript typecheck、対象 ESLint／Prettier、governance gate、git diff --check。tests は未実行。
+
+## 2026-10-04: Voice engine bridge adapter fallback
+
+resolveVoiceTtsAdapter treated every declared adapter id outside its three built-ins as unsupported, even when the voice engine supplied a bridge_script and therefore already satisfied the generic Python bridge contract. Unknown adapter ids now resolve through python_bridge when bridge_script is present; engines without that executable contract remain unsupported. This lets a new engine declare provider-specific metadata without duplicating the generic runtime adapter.
+
+検証: baseline pipeline、root TypeScript typecheck、対象 ESLint／Prettier、governance gate、generic bridge runtime resolution probe、git diff --check。tests は未実行。
+
+## 2026-10-04: Virtual camera backend auto-selection policy
+
+Virtual camera backend selection special-cased the ffmpeg ID to gate the first probe on Linux/Windows device hints, then used a second ffmpeg-only fallback pass. Moved both choices into backend descriptor capabilities: backends can declare first-pass selection constraints and opt into last-resort fallback. The shared selector now applies the same contract to any registered backend.
+
+検証: baseline pipeline、root TypeScript typecheck、対象 ESLint／Prettier、governance gate、git diff --check。tests は未実行。
+
+## 2026-10-04: Calendar collection response normalization
+
+Provider-specific calendar integrations could normalize individual events and free/busy, but event-list envelopes and calendar-list entries were still decoded by shared workflow assumptions (items/value and common fields). Added normalizeEvents and normalizeCalendarList bridge capabilities and wired them into agenda and calendar-list flows. M365 now owns its event-array envelope and calendar property mapping in its adapter; extensions with a different wire format can implement these capabilities locally.
+
+検証: baseline pipeline、root TypeScript typecheck、対象 ESLint／Prettier、governance gate、git diff --check。tests は未実行。
+
+## 2026-10-04: Calendar provider registry reaches user entry points
+
+The CalendarProviderBridge accepted custom provider IDs, but both calendar CLIs rejected all IDs except Google Workspace and M365, while personal-workbench silently rewrote every non-M365 provider to Google. Added one registry-backed provider ID normalizer and provider auth-status capability, then connected both CLI routes and workbench event creation to the registered bridge. Unknown provider IDs now fail at the registry boundary instead of silently selecting another account.
+
+検証: baseline pipeline、root TypeScript typecheck、対象 ESLint／Prettier、governance gate、git diff --check。tests は未実行。
+
+## 2026-10-04: Meeting captions-first driver capability routing
+
+meeting_participate rejected captions_first unless driver_id was chrome-extension even though the coordinator already validates the actual transcriptInput() capability. Removed the ID-only precheck so any registered participation driver that provides transcriptInput() can use native captions; unsupported drivers still fail at the coordinator capability boundary.
+
+検証: baseline pipeline、root TypeScript typecheck、対象 ESLint／Prettier、governance gate、git diff --check。tests は未実行。
+
+## 2026-10-04: Browser profile provider registry
+
+発見: BrowserProvider は firefox／edge まで宣言している一方、発見・起動の実体は Chrome／Playwright 固定で、CLI と browser pipeline にも個別分岐があった。Playwright profile は作成時に engine を保存しても、再発見後の起動で chromium 固定だった。
+
+変更: schema-backed browser-profile-providers catalog と共通 listProfiles／openProfile module contract を追加。CLI と pipeline の列挙・検索・起動を同じ非同期 registry に接続し、未登録 provider と provider ID 不一致を明示拒否する。Chrome／Playwright を built-in provider module へ移し、Chrome の userDataDir と Playwright manifest の engine を実際の起動へ引き継ぐ。拡張は provider module package と catalog entry の追加で済み、manager／CLI／pipeline の provider 分岐を変更しない。browser-discovery-playbook に追加手順を記載。
+
+検証: root TypeScript typecheck、actuator build、baseline pipeline、governance rules gate、git diff --check が成功。runtime discovery で chrome／playwright の module 読込と4 profile列挙、および未登録 provider の拒否を確認。テスト suite は未実行。
+
+## 2026-10-04: Local audio playback adapter seam
+
+発見: OS 別 player は AudioPlaybackAdapter 形になっていたが、選択 table と probe 表示が afplay／aplay／PowerShell の ID に固定されており、追加 backend は共通 runtime を編集しないと登録できなかった。
+
+変更: voice.audio-playback core seam と registerAudioPlaybackAdapter を追加。adapter が backend_id／対応 platform／availability probe／argv builder／priority を提供し、既定選択と probe が registry を参照する。KYBERION_AUDIO_PLAYBACK_BACKEND による明示選択を env-registry に追加し、従来の afplay／aplay／PowerShell backend を built-in registration に移した。lifecycle governance doc に provider contract を追記。
+
+検証: root TypeScript typecheck、actuator build、baseline pipeline、governance rules gate、git diff --check が成功。runtime probe で動的 backend 登録、priority による選択、KYBERION_AUDIO_PLAYBACK_BACKEND による選択を確認。テスト suite は未実行。
+
+## 2026-10-04: Virtual camera injection backend catalog
+
+発見: native injection の選択条件と ffmpeg argv が bridge 内で Linux／v4l2 固定だった。
+
+変更: backend catalog/schema に platform、device path 要件、priority、timeout、argv template、host plan を移し、選択・起動を descriptor 駆動にした。未知の backend ID は拒否し、非対応 platform や sink がない場合は replay 用 stub に留める。actuator contract map に追加手順と argv 境界を記載。
+
+検証: root TypeScript typecheck、actuator build、governance rules gate、baseline pipeline、runtime probe（darwin で stub/replay fallback）、git diff --check が成功。テスト suite は未実行。
+
+## 2026-10-04: Compute provider selection schema consistency
+
+発見: compute driver の provider 選択は任意拡張を受け付け、handler も全 action で `provider` を解釈する一方、catalog schema は `cancel_job` と `collect_artifact` で同項目を拒否していた。provider 所有判定が曖昧な driver を明示選択できず、CLI／ADF の契約と handler が不一致だった。
+
+変更: 両 operation の input schema に `provider` を追加し、submit／poll／cancel／artifact collection すべてで任意 provider ID を明示できるようにした。既定の job ownership 解決はそのまま維持。
+
+検証: root TypeScript typecheck、actuator build、governance rules、baseline pipeline、operation catalog runtime probe、git diff --check が成功。テスト suite は未実行。
+
+## 2026-10-04: Screen capture backend adapter seam
+
+発見: `ScreenCaptureBridge` の probe と screenshot dispatch は `platform`／`os-automation`／`stub` を bridge 内で直接分岐し、新しい capture runtime を bridge 自体へ追記する必要があった。
+
+変更: `ScreenCaptureBackendAdapter` と `registerScreenCaptureBackend` を追加し、platform、request support、availability、priority による共通選択へ移行。既存の platform、macOS display capture、stub を built-in adapter として維持し、未知 backend と明示指定時の非対応 backend は診断付きで拒否する。契約と追加手順を actuator contract map に記載。
+
+検証: root TypeScript typecheck、actuator build、governance rules、baseline pipeline、Prettier、git diff --check が成功。runtime probe で既定の platform backend と追加登録 adapter の選択を確認。実 capture は実行していない。テスト suite は未実行。
+
+## 2026-10-04: Monthly improvement-plan discovery and metadata ratchet
+
+発見: improvement-plan metadata checker の探索対象が 2026-07／2026-08 と固定されており、後から追加された 2026-09／2026-10 計画を検査していなかった。実際に新しい月の文書には欠落 frontmatter と旧 status 値（proposal、draft、implemented）が残っていた。
+
+変更: docs/developer/improvement-plans-* の月別ディレクトリと archive root を安全に自動発見し、検査・--fix の対象へ追加した。status を現行 enum へ正規化し、欠落 frontmatter を補完した。catalog gate が検出した viseme mapping の schema 欠落と、env registry の生成物 drift も修正した。
+
+検証: 227 文書の improvement-plan metadata gate、catalog／env／foundation／CI parity／channel adapter／op-input contract／script integrity／UX contract の full gate 9件、core typecheck、actuator build、baseline pipeline、focused 19 tests、git diff --check が成功。外部 provider 実機受入と全 test suite は未実行。
+
+## 2026-10-04: Virtual audio input recording backend seam
+
+発見: virtual audio input recording bridge は Darwin／Windows の backend ID、input format、デバイス指定、録音 argv を bridge 内の platform 分岐で固定しており、provider 固有の録音方式を追加するには既存の分岐を編集する必要があった。
+
+変更: `AudioInputRecordingBackendAdapter` と `registerAudioInputRecordingBackend` を追加し、backend ID、対応 platform、input specification、録音 argv を登録可能な契約へ移した。既存の AVFoundation／DirectShow 実装は built-in adapter として保持し、録音結果の selected backend と probe の対応判定を registry から解決する。未知 provider は共通 bridge を変更せず登録できる。
+
+検証: core typecheck、対象 virtual audio input bridge の 5 tests、git diff --check が成功。実デバイス録音は実行していない。
+
+## 2026-10-04: Virtual audio output playback backend seam
+
+発見: virtual audio output playback bridge は macOS／Windows backend の選択と platform 判定を bridge 内の条件分岐で固定しており、provider 固有の出力経路を追加するには既存コードを編集する必要があった。
+
+変更: `AudioPlaybackBackendAdapter` と `registerAudioPlaybackBackend` を追加し、backend ID、対応 platform、再生処理、警告を登録可能な契約へ移した。既存の Swift／PowerShell 実装は built-in adapter として保持し、probe・再生結果・失敗結果の backend 解決を registry に統一した。
+
+検証: core typecheck、対象 virtual audio output bridge の 6 tests、git diff --check が成功。実デバイス再生は実行していない。
+
+## 2026-10-04: Virtual camera input adapter seam
+
+発見: virtual camera bridge の ffmpeg capture は Windows の dshow とその他 platform の video4linux2 を `resolveCameraCaptureAdapter` 内の条件分岐で固定していた。capture backend registry は存在しても、provider 固有の camera input format と device specification を登録できなかった。
+
+変更: `CameraCaptureAdapter`、`registerCameraCaptureAdapter`、`listCameraCaptureAdapters` を追加し、platform、input format、device argument を登録可能にした。既存の dshow／video4linux2 adapter は built-in として維持し、ffmpeg capture は registry 解決を利用する。
+
+検証: core typecheck、virtual camera bridge の 7 tests、git diff --check が成功。実カメラ capture は実行していない。
+
+## 2026-10-04: Media inventory modality isolation
+
+実機検証で BlackHole が virtual camera として誤表示されることを確認した。macOS camera discovery の ffmpeg fallback は audio section を camera reader の配列へ混在させ、名前だけから virtual camera を生成していた。video section だけを camera candidate に採用し、virtual camera 分類は camera kind に限定した。複数の virtual camera もすべて列挙する。
+
+検証: inventory の 5 tests、core typecheck が成功。実機 probe で camera 4件、virtual camera 0件、virtual audio の BlackHole 1件を確認した。

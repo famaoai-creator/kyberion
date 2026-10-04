@@ -1318,7 +1318,10 @@ export function registerBuiltinAuthnProviders(): void {
     oidcJwtProvider,
     browserSessionProvider,
   ]) {
-    registerAuthnProvider(provider);
+    registerAuthnProvider(provider, {
+      provenance: 'builtin',
+      source: 'authn-providers',
+    });
   }
 }
 
