@@ -446,6 +446,43 @@ export function resolveCliActionKind(
   return CAPTURE_ACTION_NAMES.has(name) ? 'capture' : 'apply';
 }
 
+export const ACTUATOR_PIPELINE_STEP_TYPES = ['capture', 'transform', 'apply', 'control'] as const;
+
+export type ActuatorPipelineStepType = (typeof ACTUATOR_PIPELINE_STEP_TYPES)[number];
+
+/**
+ * IMP-SINGLEOP: one shared single-op → one-step-pipeline normalizer.
+ * Pipeline-style actuators expose only `pipeline` in manifest.json while
+ * describeOps lists the real single-op surface (e.g. file:read). Wrapping a
+ * discovery-only op into the same one-step pipeline ADF the runtime executes
+ * keeps playground try-out, dry-run, and production the same shape.
+ */
+export function buildSingleOpPipelinePayload(
+  op: string,
+  params: Record<string, unknown>,
+  kind: string
+): Record<string, unknown> {
+  const type: ActuatorPipelineStepType = (
+    ACTUATOR_PIPELINE_STEP_TYPES as readonly string[]
+  ).includes(kind)
+    ? (kind as ActuatorPipelineStepType)
+    : 'capture';
+  return {
+    action: 'pipeline',
+    op: 'pipeline',
+    steps: [{ type, op, params }],
+    context: {},
+    options: {},
+  };
+}
+
+/** True when the actuator's manifest boundary accepts `{action:"pipeline", steps:[...]}`. */
+export function actuatorManifestAcceptsPipeline(manifest: {
+  capabilities?: Array<{ op: string }>;
+}): boolean {
+  return (manifest.capabilities || []).some((entry) => entry.op === 'pipeline');
+}
+
 export interface ActuatorDefinition<
   Ops extends Record<string, ActuatorOpDefinition> = Record<string, ActuatorOpDefinition>,
 > {

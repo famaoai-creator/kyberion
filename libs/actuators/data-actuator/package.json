@@ -1,0 +1,15 @@
+{
+  "name": "@actuator/data",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Offline deterministic tabular data ops over local JSON/CSV files",
+  "main": "../../../dist/libs/actuators/data-actuator/src/index.js",
+  "types": "../../../dist/libs/actuators/data-actuator/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -p ../../../tsconfig.actuators.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*"
+  }
+}

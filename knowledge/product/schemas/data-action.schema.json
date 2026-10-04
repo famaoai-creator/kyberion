@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Data Actuator Action",
+  "type": "object",
+  "required": ["op"],
+  "additionalProperties": false,
+  "properties": {
+    "op": {
+      "enum": ["query", "filter", "join", "aggregate"]
+    },
+    "params": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "file": { "type": "string", "minLength": 1 },
+        "file_a": { "type": "string", "minLength": 1 },
+        "file_b": { "type": "string", "minLength": 1 },
+        "key": { "type": "string", "minLength": 1 },
+        "left_key": { "type": "string", "minLength": 1 },
+        "right_key": { "type": "string", "minLength": 1 },
+        "how": { "enum": ["inner", "left"] },
+        "where": { "type": "object" },
+        "select": { "type": "array", "items": { "type": "string" } },
+        "sort_by": { "type": "string" },
+        "limit": { "type": "integer", "minimum": 1 },
+        "group_by": { "type": "string" },
+        "aggregations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["func"],
+            "additionalProperties": false,
+            "properties": {
+              "func": { "enum": ["count", "sum", "avg", "min", "max"] },
+              "field": { "type": "string" },
+              "as": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

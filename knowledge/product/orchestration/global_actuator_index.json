@@ -1,6 +1,6 @@
 {
   "v": "2.0.0",
-  "t": 33,
+  "t": 37,
   "actuators": [
     {
       "n": "agent-actuator",
@@ -133,6 +133,17 @@
       "version": "1.0.0",
       "capability_count": 4,
       "ops": ["cancel_job", "collect_artifact", "poll_status", "submit_job"],
+      "prerequisites_summary": "-"
+    },
+    {
+      "n": "data-actuator",
+      "path": "libs/actuators/data-actuator",
+      "d": "Offline deterministic tabular data ops over local JSON/CSV files (query, filter, join, aggregate)",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 4,
+      "ops": ["aggregate", "filter", "join", "query"],
+      "contract_schema": "knowledge/product/schemas/data-action.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -309,6 +320,28 @@
       "prerequisites_summary": "-"
     },
     {
+      "n": "scheduler-actuator",
+      "path": "libs/actuators/scheduler-actuator",
+      "d": "Declaration-only schedule store: persists cron declarations as JSON under active/shared/runtime/scheduler/ for later execution by a runner. No daemonization — this actuator only declares, lists, cancels, and manually fires stored payloads.",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 4,
+      "ops": ["cancel", "fire", "list", "schedule"],
+      "contract_schema": "knowledge/product/schemas/scheduler-action.schema.json",
+      "prerequisites_summary": "-"
+    },
+    {
+      "n": "search-actuator",
+      "path": "libs/actuators/search-actuator",
+      "d": "Query-origin web search stub and plain-text URL reader. Owns the search query starting point; network-actuator owns fetch transport pipelines.",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 2,
+      "ops": ["fetch_reader", "web_search"],
+      "contract_schema": "knowledge/product/schemas/search-action.schema.json",
+      "prerequisites_summary": "-"
+    },
+    {
       "n": "secret-actuator",
       "path": "libs/actuators/secret-actuator",
       "d": "OS Native Secret Manager Bridge. Prefer kyberion secret introduce / Concierge for value collection.",
@@ -387,6 +420,17 @@
       "ops": ["computer_interaction", "kill", "poll", "spawn", "write"],
       "contract_schema": "knowledge/product/schemas/terminal-action.schema.json",
       "prerequisites_summary": "-"
+    },
+    {
+      "n": "vcs-actuator",
+      "path": "libs/actuators/vcs-actuator",
+      "d": "Git version-control operations (status, diff, log, branch, commit) plus GitHub PR creation via the gh CLI",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 6,
+      "ops": ["branch", "commit", "diff", "log", "pr_create", "status"],
+      "contract_schema": "knowledge/product/schemas/vcs-action.schema.json",
+      "prerequisites_summary": "bin:gh, bin:git"
     },
     {
       "n": "video-composition-actuator",

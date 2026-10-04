@@ -1,6 +1,6 @@
 {
   "v": "3.0.0",
-  "t": 33,
+  "t": 37,
   "s": [
     {
       "n": "agent-actuator",
@@ -78,6 +78,14 @@
       "n": "compute-actuator",
       "path": "libs/actuators/compute-actuator",
       "d": "Remote and local compute orchestration actuator for heavy batch workloads, fine-tuning, and model execution across local and ephemeral substrates (such as Google Colab).",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 4
+    },
+    {
+      "n": "data-actuator",
+      "path": "libs/actuators/data-actuator",
+      "d": "Offline deterministic tabular data ops over local JSON/CSV files (query, filter, join, aggregate)",
       "s": "implemented",
       "version": "1.0.0",
       "capability_count": 4
@@ -195,6 +203,22 @@
       "capability_count": 4
     },
     {
+      "n": "scheduler-actuator",
+      "path": "libs/actuators/scheduler-actuator",
+      "d": "Declaration-only schedule store: persists cron declarations as JSON under active/shared/runtime/scheduler/ for later execution by a runner. No daemonization — this actuator only declares, lists, cancels, and manually fires stored payloads.",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 4
+    },
+    {
+      "n": "search-actuator",
+      "path": "libs/actuators/search-actuator",
+      "d": "Query-origin web search stub and plain-text URL reader. Owns the search query starting point; network-actuator owns fetch transport pipelines.",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 2
+    },
+    {
       "n": "secret-actuator",
       "path": "libs/actuators/secret-actuator",
       "d": "OS Native Secret Manager Bridge. Prefer kyberion secret introduce / Concierge for value collection.",
@@ -225,6 +249,14 @@
       "s": "implemented",
       "version": "1.0.0",
       "capability_count": 5
+    },
+    {
+      "n": "vcs-actuator",
+      "path": "libs/actuators/vcs-actuator",
+      "d": "Git version-control operations (status, diff, log, branch, commit) plus GitHub PR creation via the gh CLI",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 6
     },
     {
       "n": "video-composition-actuator",

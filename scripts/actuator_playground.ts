@@ -11,7 +11,12 @@ import {
   loadActuatorManifest,
   type ActuatorManifestFile,
 } from '@agent/core/actuator-manifest-index';
-import { planActuatorDryRun, resolveCliActionKind } from '@agent/core/actuator/actuator-sdk';
+import {
+  actuatorManifestAcceptsPipeline,
+  buildSingleOpPipelinePayload,
+  planActuatorDryRun,
+  resolveCliActionKind,
+} from '@agent/core/actuator/actuator-sdk';
 import { createAjv } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
@@ -138,21 +143,14 @@ export function lookupDiscoveryOpKind(actuatorId: string, op: string, dirId = ''
  * (agent/secret/…) dispatch single actions directly and must NOT be wrapped.
  */
 export function actuatorAcceptsPipeline(manifest: ActuatorManifestFile): boolean {
-  return (manifest.capabilities || []).some((entry) => entry.op === 'pipeline');
+  return actuatorManifestAcceptsPipeline(manifest);
 }
 export function buildPipelineWrappedPayload(
   op: string,
   params: Record<string, unknown>,
   kind: string
 ): Record<string, unknown> {
-  const type = ['capture', 'transform', 'apply', 'control'].includes(kind) ? kind : 'capture';
-  return {
-    action: 'pipeline',
-    op: 'pipeline',
-    steps: [{ type, op, params }],
-    context: {},
-    options: {},
-  };
+  return buildSingleOpPipelinePayload(op, params, kind);
 }
 
 export function resolvePlaygroundCapabilities(

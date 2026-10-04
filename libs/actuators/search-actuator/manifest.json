@@ -1,0 +1,25 @@
+{
+  "actuator_id": "search-actuator",
+  "version": "1.0.0",
+  "description": "Query-origin web search stub and plain-text URL reader. Owns the search query starting point; network-actuator owns fetch transport pipelines.",
+  "contract_schema": "knowledge/product/schemas/search-action.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "stub_then_read",
+    "retry_profile": "search-actuator"
+  },
+  "capabilities": [
+    {
+      "op": "web_search",
+      "description": "Validates a search query and returns a structured offline stub until a service binding is configured",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "fetch_reader",
+      "description": "Fetches a URL with timeout and size cap and returns plain-text extraction (tags stripped)",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    }
+  ]
+}
