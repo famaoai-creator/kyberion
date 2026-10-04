@@ -163,7 +163,7 @@ afterEach(() => {
 });
 
 describe('public ingress service — expose', () => {
-  it('refuses surfaces that do not opt in, before any provider or approval call', async () => {
+  it('refuses surfaces that do not opt in, before a provider or approval call', async () => {
     expect(() => planSurfaceIngress(PRIVATE_SURFACE)).toThrow(/INGRESS_SURFACE_NOT_ALLOWED/);
     await expect(exposeSurface({ surfaceId: 'operator-surface' }, deps)).rejects.toThrow(
       /INGRESS_SURFACE_NOT_ALLOWED/
