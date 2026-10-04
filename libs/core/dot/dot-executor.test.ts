@@ -24,6 +24,7 @@ import {
   type DotExecutorPorts,
 } from './dot-executor.js';
 import { DOT_PROMPT_SECTIONS, DOT_STATUS_SECTIONS } from './dot-extension-registry.js';
+import { DOT_SIGNAL_LEDGER_PATH } from './dot-feedback.js';
 import type { DotInboxEntryInput } from './dot-inbox.js';
 import { DOT_EXECUTOR_REPORT_SOURCE } from './dot-runtime.js';
 import {
@@ -172,6 +173,33 @@ describe('listClaimableDotWorkItems', () => {
 });
 
 describe('executeDotWorkItem', () => {
+  it('snapshots signal health at claim time, before the action can change it', async () => {
+    const c = charter();
+    const ledger = path.join(TEST_ROOT, DOT_SIGNAL_LEDGER_PATH);
+    safeMkdir(path.dirname(ledger), { recursive: true });
+    const signal = (healthy: boolean, measured_at: string, dot_id = 'ops') =>
+      appendJsonLine(ledger, { dot_id, signal: 'api', healthy, measured_at });
+    signal(true, '2026-10-04T08:00:00Z');
+    signal(false, '2026-10-04T09:00:00Z');
+    signal(true, '2026-10-04T09:30:00Z', 'other');
+    const target = item('w1', {});
+    const h = harness([target]);
+    const p = ports({
+      runGoalTurn: vi.fn(async () => {
+        // The action fixes the signal while it runs.
+        signal(true, '2026-10-04T10:00:00Z');
+        return {
+          turnsRun: 1,
+          finalState: 'complete',
+          goal: { budgetStats: { tokensUsed: 10 } },
+          finalText: 'Fixed the api.',
+        };
+      }) as unknown as DotExecutorPorts['runGoalTurn'],
+    });
+    const row = await executeDotWorkItem(c, target, p, h.deps);
+    expect(row).toMatchObject({ status: 'done', signal_snapshot: { api: 0 } });
+  });
+
   it('runs task_session work as a bounded goal turn under the charter role and closes it', async () => {
     const c = charter();
     const file = path.join(TEST_ROOT, dotStatePath(c, DOT_KR_LEDGER_FILE));

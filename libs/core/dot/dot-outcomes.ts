@@ -5,8 +5,13 @@
  * `due_at = completed_at + settle` (the expected KR's `settle_minutes`, else
  * `goal.outcome_settle_minutes`, else 60). `evaluateDueDotOutcomes` re-measures
  * after the window and appends a direction-aware verdict to `outcomes.jsonl`.
- * `before` is the executor's `kr_snapshot`; without an `expected_effect` every
- * KR is compared and the largest |Δ| decides.
+ * `before` is the executor's claim-time `kr_snapshot` / `signal_snapshot` (no
+ * pre-action snapshot → unmeasurable); without an `expected_effect` every KR is
+ * compared and the largest |Δ| decides. `after` must be measured after the
+ * action completed: a stale or failed re-measure keeps the check pending and is
+ * retried each sweep until {@link DOT_OUTCOME_MAX_WAIT_MS} past due, then it is
+ * recorded unmeasurable. Read-only `delegated` results (advice, no effect) are
+ * never scheduled.
  *
  * Import-cycle note: registry → this module → dot-executor → dot-runtime →
  * registry, so sections are hoisted functions (like the executor's) and
@@ -43,6 +48,8 @@ const logger = createLogger('dot-outcomes');
 
 export const DOT_OUTCOME_DEFAULT_SETTLE_MINUTES = 60;
 export const DOT_OUTCOME_PROMPT_LIMIT = 5;
+/** How long past due a check waits for a fresh "after" before it is unmeasurable. */
+export const DOT_OUTCOME_MAX_WAIT_MS = 24 * 60 * 60 * 1000;
 const MIN_TOLERANCE = 1e-9;
 
 export type DotOutcomeVerdict = DotOutcomeRow['verdict'];
@@ -57,7 +64,7 @@ export interface DotOutcomePendingRow {
   scheduled_at: string;
   expected_effect?: DotExpectedEffect;
   kr_snapshot?: Record<string, number>;
-  /** Signal health (1/0) captured at schedule time, the "before" of a signal effect. */
+  /** Signal health (1/0) from the executor's claim-time snapshot, the "before" of a signal effect. */
   signal_before?: number;
 }
 
@@ -68,9 +75,12 @@ export interface DotOutcomeDeps {
   readResults?: (c: DotCharter) => DotWorkResultRow[];
   /** The expected effect the dot declared for a work item; defaults to WorkItem metadata. */
   expectedEffectOf?: (workItemId: string) => DotExpectedEffect | undefined;
-  /** Current KR values by kr_id; defaults to measuring due KRs then reading the latest ledger values. */
+  /**
+   * Current KR values by kr_id (treated as measured now); defaults to measuring
+   * due KRs then reading the latest ledger values with their measured_at.
+   */
   measureKrs?: (c: DotCharter) => Promise<Record<string, number>>;
-  /** Current health of a signal as 1 (healthy) / 0; undefined when unknown. */
+  /** Current health of a signal as 1 (healthy) / 0 (treated as measured now); undefined when unknown. */
   measureSignal?: (c: DotCharter, signal: string) => number | undefined;
   /** Feedback sink for regressed verdicts; defaults to execution feedback. */
   recordRegression?: (c: DotCharter, row: DotOutcomeRow) => Promise<void> | void;
@@ -124,16 +134,27 @@ function krSpec(c: DotCharter, krId: string): KeyResultSpec | undefined {
   return (c.goal.key_results ?? []).find((spec) => spec.kr_id === krId);
 }
 
-function defaultSignal(
-  deps: DotOutcomeDeps
-): (c: DotCharter, signal: string) => number | undefined {
-  return (c, signal) => {
-    const rows = readDotSignals(c.dot_id, { rootDir: deps.rootDir }).filter(
-      (row) => row.signal === signal
-    );
-    const last = rows.sort((a, b) => (a.measured_at < b.measured_at ? -1 : 1)).at(-1);
-    return last ? (last.healthy ? 1 : 0) : undefined;
-  };
+/** A re-measured value and when it was measured. */
+interface Reading {
+  value: number;
+  at: string;
+}
+
+function signalReading(
+  c: DotCharter,
+  signal: string,
+  deps: DotOutcomeDeps,
+  now: Date
+): Reading | undefined {
+  if (deps.measureSignal) {
+    const value = deps.measureSignal(c, signal);
+    return value === undefined ? undefined : { value, at: now.toISOString() };
+  }
+  const rows = readDotSignals(c.dot_id, { rootDir: deps.rootDir }).filter(
+    (row) => row.signal === signal
+  );
+  const last = rows.sort((a, b) => (a.measured_at < b.measured_at ? -1 : 1)).at(-1);
+  return last ? { value: last.healthy ? 1 : 0, at: last.measured_at } : undefined;
 }
 
 /** Queue outcome checks for `done` work results not yet pending (dedupe by action_ref). */
@@ -150,10 +171,11 @@ export function scheduleDotOutcomeChecks(
     ? deps.readResults(c)
     : readRows<DotWorkResultRow>(c, file(deps, c, DOT_WORK_RESULTS_FILE));
   const effectOf = deps.expectedEffectOf ?? defaultExpectedEffect(deps);
-  const signalOf = deps.measureSignal ?? defaultSignal(deps);
   const scheduled: DotOutcomePendingRow[] = [];
   for (const result of results) {
     if (result.status !== 'done' || !result.action_ref || known.has(result.action_ref)) continue;
+    // A delegated turn is read-only advice: it cannot have moved anything.
+    if (result.mode === 'delegated') continue;
     const completed = Date.parse(result.completed_at);
     if (!Number.isFinite(completed)) continue;
     const effect = effectOf(result.work_item_id);
@@ -167,14 +189,11 @@ export function scheduleDotOutcomeChecks(
       ...(effect ? { expected_effect: effect } : {}),
       ...(result.kr_snapshot ? { kr_snapshot: result.kr_snapshot } : {}),
     };
-    if (effect?.signal && !effect.kr_id) {
-      try {
-        const before = signalOf(c, effect.signal);
-        if (before !== undefined) pending.signal_before = before;
-      } catch {
-        // before stays unknown -> unmeasurable
-      }
-    }
+    // The "before" is the claim-time snapshot; measuring now would see the
+    // action's own effect. No snapshot -> unmeasurable.
+    const before =
+      effect?.signal && !effect.kr_id ? result.signal_snapshot?.[effect.signal] : undefined;
+    if (before !== undefined) pending.signal_before = before;
     appendRow(pendingFile, pending);
     known.add(result.action_ref);
     scheduled.push(pending);
@@ -214,53 +233,73 @@ interface Judged {
   verdict: DotOutcomeVerdict;
 }
 
+/** `retry`: no fresh "after" yet (stale or failed re-measure) — keep the check pending. */
+type Judgement = Judged | { retry: string };
+
+type KrReadings = Record<string, Reading>;
+
+/** A reading counts as "after" only when it was taken after the action completed. */
+function fresh(reading: Reading | undefined, completedAt: string): reading is Reading {
+  return reading !== undefined && Date.parse(reading.at) > Date.parse(completedAt);
+}
+
 async function judge(
   c: DotCharter,
   pending: DotOutcomePendingRow,
   deps: DotOutcomeDeps,
-  krNow: () => Promise<Record<string, number>>
-): Promise<Judged> {
+  krNow: () => Promise<KrReadings | undefined>,
+  now: Date
+): Promise<Judgement> {
   const effect = pending.expected_effect;
   if (effect?.kr_id) {
     const ref = { kr_id: effect.kr_id };
     const spec = krSpec(c, effect.kr_id);
     const before = pending.kr_snapshot?.[effect.kr_id];
-    const after = (await krNow())[effect.kr_id];
-    if (before === undefined || after === undefined)
-      return { ref, before, after, verdict: 'unmeasurable' };
+    if (before === undefined) return { ref, verdict: 'unmeasurable' };
+    const readings = await krNow();
+    if (!readings) return { retry: 'KR re-measure failed' };
+    const after = readings[effect.kr_id];
+    if (!fresh(after, pending.completed_at))
+      return { retry: `no ${effect.kr_id} measurement after completion` };
     const direction = effect.direction ?? spec?.direction ?? 'increase';
     return {
       ref,
       before,
-      after,
-      verdict: dotOutcomeVerdict(direction, before, after, spec?.target, tolerance(spec)),
+      after: after.value,
+      verdict: dotOutcomeVerdict(direction, before, after.value, spec?.target, tolerance(spec)),
     };
   }
   if (effect?.signal) {
     const ref = { signal: effect.signal };
     const before = pending.signal_before;
-    const after = (deps.measureSignal ?? defaultSignal(deps))(c, effect.signal);
-    if (before === undefined || after === undefined)
-      return { ref, before, after, verdict: 'unmeasurable' };
+    if (before === undefined) return { ref, verdict: 'unmeasurable' };
+    const after = signalReading(c, effect.signal, deps, now);
+    if (!fresh(after, pending.completed_at))
+      return { retry: `no ${effect.signal} measurement after completion` };
     return {
       ref,
       before,
-      after,
-      verdict: dotOutcomeVerdict(effect.direction, before, after, 1, 0.5),
+      after: after.value,
+      verdict: dotOutcomeVerdict(effect.direction, before, after.value, 1, 0.5),
     };
   }
   // No declared effect: the KR with the largest |Δ| speaks for the action.
-  const now = await krNow();
+  const candidates = (c.goal.key_results ?? []).filter(
+    (spec) => pending.kr_snapshot?.[spec.kr_id] !== undefined
+  );
+  if (candidates.length === 0) return { ref: {}, verdict: 'unmeasurable' };
+  const readings = await krNow();
+  if (!readings) return { retry: 'KR re-measure failed' };
   let best: { id: string; before: number; after: number } | undefined;
-  for (const spec of c.goal.key_results ?? []) {
-    const before = pending.kr_snapshot?.[spec.kr_id];
-    const after = now[spec.kr_id];
-    if (before === undefined || after === undefined) continue;
-    if (!best || Math.abs(after - before) > Math.abs(best.after - best.before)) {
-      best = { id: spec.kr_id, before, after };
+  for (const spec of candidates) {
+    const before = pending.kr_snapshot![spec.kr_id];
+    const after = readings[spec.kr_id];
+    if (!fresh(after, pending.completed_at)) continue;
+    if (!best || Math.abs(after.value - before) > Math.abs(best.after - best.before)) {
+      best = { id: spec.kr_id, before, after: after.value };
     }
   }
-  if (!best) return { ref: {}, verdict: 'unmeasurable' };
+  if (!best) return { retry: 'no KR measurement after completion' };
   const spec = krSpec(c, best.id);
   return {
     ref: { kr_id: best.id },
@@ -276,14 +315,20 @@ async function judge(
   };
 }
 
-async function defaultMeasureKrs(
+async function measureKrReadings(
   c: DotCharter,
-  deps: DotOutcomeDeps
-): Promise<Record<string, number>> {
+  deps: DotOutcomeDeps,
+  now: Date
+): Promise<KrReadings> {
+  const out: KrReadings = {};
+  if (deps.measureKrs) {
+    for (const [id, value] of Object.entries(await deps.measureKrs(c)))
+      out[id] = { value, at: now.toISOString() };
+    return out;
+  }
   await measureDotKeyResults(c, { rootDir: deps.rootDir, now: deps.now });
-  const out: Record<string, number> = {};
   for (const [id, row] of readLatestDotKeyResults(c, { rootDir: deps.rootDir }))
-    out[id] = row.value;
+    out[id] = { value: row.value, at: row.measured_at };
   return out;
 }
 
@@ -316,33 +361,50 @@ export async function evaluateDueDotOutcomes(
     (row) => !done.has(row.action_ref) && Date.parse(row.due_at) <= now.getTime()
   );
   if (due.length === 0) return [];
-  let cached: Promise<Record<string, number>> | undefined;
+  let cached: Promise<KrReadings | undefined> | undefined;
   const krNow = () =>
-    (cached ??= (deps.measureKrs ?? ((ch) => defaultMeasureKrs(ch, deps)))(c).catch((error) => {
+    (cached ??= measureKrReadings(c, deps, now).catch((error) => {
       logger.warn(
         diag(
           `KR re-measure failed for ${c.dot_id}`,
           error,
-          'outcomes become unmeasurable',
+          'checks stay pending and retry next sweep',
           DOT_OUTCOMES_FILE
         )
       );
-      return {};
+      return undefined;
     }));
   const rows: DotOutcomeRow[] = [];
   for (const pending of due) {
+    const expired = now.getTime() > Date.parse(pending.due_at) + DOT_OUTCOME_MAX_WAIT_MS;
     let judged: Judged;
     try {
-      judged = await judge(c, pending, deps, krNow);
+      const judgement = await judge(c, pending, deps, krNow, now);
+      if ('retry' in judgement) {
+        if (!expired) continue; // retried next sweep
+        judged = {
+          ref: pending.expected_effect?.kr_id
+            ? { kr_id: pending.expected_effect.kr_id }
+            : pending.expected_effect?.signal
+              ? { signal: pending.expected_effect.signal }
+              : {},
+          verdict: 'unmeasurable',
+        };
+      } else {
+        judged = judgement;
+      }
     } catch (error) {
-      logger.warn(
-        diag(
-          `outcome judge failed for ${pending.action_ref}`,
-          error,
-          'recorded as unmeasurable',
-          DOT_OUTCOMES_FILE
-        )
-      );
+      if (!expired) {
+        logger.warn(
+          diag(
+            `outcome judge failed for ${pending.action_ref}`,
+            error,
+            'retried next sweep',
+            DOT_OUTCOMES_FILE
+          )
+        );
+        continue;
+      }
       judged = { ref: {}, verdict: 'unmeasurable' };
     }
     const row: DotOutcomeRow = {

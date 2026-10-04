@@ -2,7 +2,7 @@
   "action": "pipeline",
   "name": "organization-standup",
   "version": "1.0.0",
-  "description": "Sovereign-only weekday standup per organization: operation runs, dot work, parked actions, pending decisions, blocked work and objective movement since the previous day. Filed in each organization's scope and delivered to the operator inbox.",
+  "description": "Sovereign-only weekday standup per organization: operation runs, dot work, parked actions, pending decisions, blocked work and objective movement since the previous weekday standup (72h on Monday). Filed in each organization's scope and delivered to the operator inbox.",
   "schedule": {
     "id": "organization-standup",
     "cron": "45 8 * * 1-5",
@@ -17,7 +17,6 @@
       "params": {
         "timezone": "Asia/Tokyo",
         "locale": "ja-JP",
-        "since_hours": 24,
         "persist": true
       },
       "produces": {

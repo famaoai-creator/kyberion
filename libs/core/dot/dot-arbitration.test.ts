@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -32,10 +32,12 @@ import {
   type DotDispatchDeps,
 } from './dot-dispatch.js';
 import { DOT_PRE_GATE_CHECKS } from './dot-extension-registry.js';
+import { listClaimableDotWorkItems } from './dot-executor.js';
+import type { DotInboxEntryInput } from './dot-inbox.js';
 import { learnedDotDecisionFloor, readDotFeedback } from './dot-feedback.js';
 import type { DotProposal } from './dot-proposals.js';
 
-const TEST_ROOT = 'active/shared/tmp/dot-arbitration-tests';
+const TEST_ROOT = `active/shared/tmp/dot-arbitration-tests-${randomUUID()}`;
 const NOW = new Date('2026-10-04T09:00:00Z');
 const ctx = { rootDir: TEST_ROOT, now: () => NOW };
 
@@ -361,7 +363,12 @@ describe('dot arbitration — escalation and settlement', () => {
       NOW,
       deps([charter('older')], {
         getWorkItem: (id) =>
-          ({ item_id: id, status: 'ready', metadata: { dot_id: 'older' } }) as unknown as WorkItem,
+          ({
+            item_id: id,
+            status: 'ready',
+            version: 3,
+            metadata: { dot_id: 'older' },
+          }) as unknown as WorkItem,
         updateWorkItem: (input) => {
           updates.push(input);
           return { item_id: input.itemId } as WorkItem;
@@ -371,12 +378,116 @@ describe('dot arbitration — escalation and settlement', () => {
     expect(result[0]).toMatchObject({ effect: 'blocked_work_item' });
     expect(updates[0]).toMatchObject({
       itemId: 'w-older',
+      expectedVersion: 3,
       status: 'blocked',
       metadata: {
         dot_id: 'older',
         superseded_by: { dot_id: 'newcomer', action_ref: 'dact-new-1' },
       },
     });
+  });
+
+  it('approved in the same sweep the older WorkItem is ready: it is blocked and never claimable', () => {
+    seedOlder({ status: 'dispatched', work_item_id: 'w-older' });
+    seedNewcomer('dispatched');
+    const store = new Map<string, WorkItem>([
+      [
+        'w-older',
+        {
+          item_id: 'w-older',
+          status: 'ready',
+          version: 1,
+          created_at: NOW.toISOString(),
+          metadata: { dot_id: 'older' },
+        } as unknown as WorkItem,
+      ],
+    ]);
+    const older = charter('older');
+    expect(listClaimableDotWorkItems(older, { listItems: () => [...store.values()] })).toHaveLength(
+      1
+    );
+    settleDotArbitration(
+      charter('newcomer'),
+      NOW,
+      deps([older], {
+        getWorkItem: (id) => store.get(id) ?? null,
+        updateWorkItem: (input) => {
+          const current = store.get(input.itemId)!;
+          if (input.expectedVersion !== current.version) throw new Error('version conflict');
+          const next = {
+            ...current,
+            status: input.status ?? current.status,
+            metadata: input.metadata ?? current.metadata,
+            version: current.version + 1,
+          } as WorkItem;
+          store.set(input.itemId, next);
+          return next;
+        },
+      })
+    );
+    // The settle step runs before the executor: nothing is left to claim.
+    expect(store.get('w-older')?.status).toBe('blocked');
+    expect(listClaimableDotWorkItems(older, { listItems: () => [...store.values()] })).toEqual([]);
+  });
+
+  it('approved: never overwrites a claimed in-progress WorkItem — flags it and notes both inboxes', () => {
+    seedOlder({ status: 'dispatched', work_item_id: 'w-older' });
+    seedNewcomer('dispatched');
+    const updates: UpdateWorkItemInput[] = [];
+    const notes: DotInboxEntryInput[] = [];
+    const result = settleDotArbitration(
+      charter('newcomer'),
+      NOW,
+      deps([charter('older')], {
+        getWorkItem: (id) =>
+          ({
+            item_id: id,
+            status: 'in_progress',
+            version: 4,
+            lease_id: 'lease-1',
+            metadata: { dot_id: 'older' },
+          }) as unknown as WorkItem,
+        updateWorkItem: (input) => {
+          updates.push(input);
+          return { item_id: input.itemId } as WorkItem;
+        },
+        appendInbox: (input) => notes.push(input),
+      })
+    );
+    expect(result[0]).toMatchObject({ resolution: 'superseded', effect: 'flagged_claimed' });
+    expect(updates).toEqual([]);
+    expect(notes.map((note) => note.dot_id).sort()).toEqual(['newcomer', 'older']);
+    expect(notes[0]).toMatchObject({
+      channel: 'inbox',
+      source: 'dot-arbitration',
+      payload: { work_item_id: 'w-older' },
+    });
+    expect(
+      readDotArbitrationRows(charter('newcomer'), { rootDir: TEST_ROOT }).at(-1)
+    ).toMatchObject({
+      resolution: 'superseded',
+      reason: expect.stringContaining('already claimed'),
+    });
+    // Recorded once: the next sweep does not re-flag it.
+    expect(settleDotArbitration(charter('newcomer'), NOW, deps([charter('older')]))).toEqual([]);
+  });
+
+  it('a version conflict leaves the settlement for the next sweep', () => {
+    seedOlder({ status: 'dispatched', work_item_id: 'w-older' });
+    seedNewcomer('dispatched');
+    const result = settleDotArbitration(
+      charter('newcomer'),
+      NOW,
+      deps([charter('older')], {
+        getWorkItem: (id) =>
+          ({ item_id: id, status: 'ready', version: 1, metadata: {} }) as unknown as WorkItem,
+        updateWorkItem: () => {
+          throw new Error('[VERSION_CONFLICT] expected 1, found 2');
+        },
+      })
+    );
+    expect(result).toEqual([]);
+    expect(readDotArbitrationRows(charter('newcomer'), { rootDir: TEST_ROOT })).toEqual([]);
   });
 
   it('rejected: the newcomer stays declined and the older action continues', () => {

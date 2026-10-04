@@ -41,7 +41,10 @@ import { runOAuthSetupForService } from './setup_oauth.js';
 import { runOrganizationDigest } from '@agent/core/organization/organization-digest';
 import { persistOrganizationDigest } from '@agent/core/organization/organization-digest-artifacts';
 import { runOrganizationOperationTick } from '@agent/core/organization/organization-cadence';
-import { runOrganizationStandup } from '@agent/core/organization/organization-standup';
+import {
+  runOrganizationStandup,
+  type CadencePersistence,
+} from '@agent/core/organization/organization-standup';
 import { runOrganizationRetro } from '@agent/core/organization/organization-retro';
 import { runAccountabilityDigest } from '@agent/core/governance/accountability-digest';
 import { normalizeLocale } from '@agent/core/locale-normalize';
@@ -851,6 +854,27 @@ function cadenceLocale(
   return locale;
 }
 
+/**
+ * Pipeline-context view of a cross-tenant cadence run: counts and artifact
+ * paths only. The rendered all-tenant text stays in the per-organization
+ * artifacts and the operator inbox, never in the shared context or trace.
+ */
+function cadenceExport(
+  entries: Array<{ persistence?: CadencePersistence }>
+): Record<string, unknown> {
+  const persisted = entries.flatMap((entry) => (entry.persistence ? [entry.persistence] : []));
+  return {
+    reported_count: entries.length,
+    notified_count: persisted.filter((entry) => entry.notified).length,
+    error_count: persisted.filter((entry) => entry.error).length,
+    artifacts: persisted.flatMap((entry) =>
+      entry.path
+        ? [{ path: entry.path, ...(entry.artifact_id ? { artifact_id: entry.artifact_id } : {}) }]
+        : []
+    ),
+  };
+}
+
 function cadenceNumber(value: unknown, ctx: Record<string, unknown>): number | undefined {
   const parsed = Number(resolveVars(value ?? '', ctx));
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
@@ -900,10 +924,8 @@ export function runInlineOrganizationStandup(
     params,
     step,
     {
+      ...cadenceExport(result.standups),
       organization_count: result.organization_count,
-      reported_count: result.reported_count,
-      text: result.text,
-      persisted: result.standups.flatMap((entry) => (entry.persistence ? [entry.persistence] : [])),
     },
     ctx
   );
@@ -927,10 +949,8 @@ export function runInlineOrganizationRetro(
     params,
     step,
     {
+      ...cadenceExport(result.retros),
       organization_count: result.organization_count,
-      reported_count: result.reported_count,
-      text: result.text,
-      persisted: result.retros.flatMap((entry) => (entry.persistence ? [entry.persistence] : [])),
     },
     ctx
   );

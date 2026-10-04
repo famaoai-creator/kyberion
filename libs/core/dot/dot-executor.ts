@@ -9,8 +9,8 @@
  *   1. claim the oldest ready item addressed to the dot (`claimWorkItem`,
  *      actor `dot:<id>`, idempotency key = the action_ref, lease = the
  *      charter's wall-clock budget + 60 s, renewed during long turns);
- *   2. snapshot the dot's latest key-result values (`kr_snapshot`, the
- *      "before" of the DL-04 outcome check);
+ *   2. snapshot the dot's latest key-result values (`kr_snapshot`) and signal
+ *      health (`signal_snapshot`) — the "before" of the DL-04 outcome check;
  *   3. route by `requested_work_shape`:
  *      - `pipeline` → runs only a `pipeline_ref` listed in
  *        `charter.authority.allowed_pipelines`, otherwise blocked;
@@ -62,6 +62,7 @@ import type { WorkItem, WorkItemStatus } from '../workforce/work-coordination-ty
 import { dotBudgetThrottle } from './dot-budget.js';
 import type { DotCharter, LoadedDotCharter } from './dot-charter.js';
 import type { DotPromptSection, DotStatusSection } from './dot-extensions.js';
+import { readDotSignals } from './dot-feedback.js';
 import type { DotExtCtx } from './dot-extensions.js';
 import { appendDotInboxEntry, type DotInboxEntryInput } from './dot-inbox.js';
 import type { DotWorkShape } from './dot-proposals.js';
@@ -223,6 +224,29 @@ export function readDotKrSnapshot(
   }
   if (latest.size === 0) return undefined;
   return Object.fromEntries([...latest].map(([kr, entry]) => [kr, entry.value]));
+}
+
+/** Latest health (1 healthy / 0) per signal this dot measured; absent ledger → undefined. */
+export function readDotSignalSnapshot(
+  c: DotCharter,
+  deps: DotExecutorDeps = {}
+): Record<string, 0 | 1> | undefined {
+  let rows: ReturnType<typeof readDotSignals>;
+  try {
+    rows = readDotSignals(c.dot_id, { rootDir: deps.rootDir });
+  } catch {
+    return undefined;
+  }
+  const latest = new Map<string, { at: string; healthy: boolean }>();
+  for (const row of rows) {
+    const at = String(row.measured_at ?? '');
+    const prev = latest.get(row.signal);
+    if (!prev || at >= prev.at) latest.set(row.signal, { at, healthy: Boolean(row.healthy) });
+  }
+  if (latest.size === 0) return undefined;
+  return Object.fromEntries(
+    [...latest].map(([signal, entry]) => [signal, entry.healthy ? 1 : 0] as const)
+  );
 }
 
 /** This dot's recorded work results, oldest first. */
@@ -504,6 +528,7 @@ export async function executeDotWorkItem(
     return skippedRow(c, item, startedAt, `no backend: ${goalMode.unavailable}`, deps);
   }
   const krSnapshot = readDotKrSnapshot(c, deps);
+  const signalSnapshot = readDotSignalSnapshot(c, deps);
   const ttlMs = wallClockMs(c) + DOT_EXECUTOR_LEASE_SLACK_MS;
   let claimed: ReturnType<typeof claimWorkItem>;
   try {
@@ -621,6 +646,7 @@ export async function executeDotWorkItem(
     completed_at: completedAt,
     ...(outcome.tokens !== undefined && outcome.tokens > 0 ? { tokens_used: outcome.tokens } : {}),
     ...(krSnapshot ? { kr_snapshot: krSnapshot } : {}),
+    ...(signalSnapshot ? { signal_snapshot: signalSnapshot } : {}),
   };
   appendWorkResult(c, row, deps);
   if (row.tokens_used) {

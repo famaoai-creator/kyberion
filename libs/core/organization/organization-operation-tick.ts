@@ -27,7 +27,7 @@ import type { OrganizationTier } from './organization-operating-model.js';
 export interface OrganizationScopeRef {
   organizationId: string;
   tier: OrganizationTier;
-  /** Directory-level tenant (`shared` for untenanted organizations), as the digest queries it. */
+  /** Tenant of the organization; absent for untenanted organizations (never a reserved scope name). */
   tenantSlug?: string;
   /** Display name, when discovery knew it. */
   name?: string;

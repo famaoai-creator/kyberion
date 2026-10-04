@@ -14,7 +14,7 @@ import { distillDotMemory } from '@agent/core/dot/dot-memory';
 import { measureActiveDotKeyResults, runAsDotCharter } from '@agent/core/dot/dot-key-results';
 import { evaluateDueDotOutcomes, scheduleDotOutcomeChecks } from '@agent/core/dot/dot-outcomes';
 import { settleDotArbitration } from '@agent/core/dot/dot-arbitration';
-import { runDotAutonomySweep } from '@agent/core/dot/dot-autonomy';
+import { runDotAutonomyStep } from '@agent/core/dot/dot-autonomy';
 import { DOT_EXECUTOR_SUPERVISOR_STEP } from './dot_executor_step.js';
 
 const logger = createLogger('dot-supervisor');
@@ -73,6 +73,26 @@ DOT_SUPERVISOR_STEPS.push({
   },
 });
 
+// DL-11 settle combined arbitration cards (after housekeeping settled the newcomer).
+// Registered BEFORE the executor: a WorkItem the approved newcomer supersedes
+// is blocked in the same sweep, before the executor could claim it.
+DOT_SUPERVISOR_STEPS.push({
+  id: 'dot-arbitration-settle',
+  async run(now, active) {
+    for (const loaded of active) {
+      try {
+        await runAsDotCharter(loaded.charter, async () =>
+          settleDotArbitration(loaded.charter, now)
+        );
+      } catch (error) {
+        logger.warn(
+          `arbitration settlement failed for ${loaded.charter.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: libs/core/dot/dot-arbitration.ts`
+        );
+      }
+    }
+  },
+});
+
 // DL-01 executor: closes at most one delegated WorkItem per dot per sweep
 DOT_SUPERVISOR_STEPS.push(DOT_EXECUTOR_SUPERVISOR_STEP);
 
@@ -82,27 +102,13 @@ DOT_SUPERVISOR_STEPS.push({
   async run(now, active) {
     for (const loaded of active) {
       try {
-        scheduleDotOutcomeChecks(loaded.charter, { now: () => now });
-        await evaluateDueDotOutcomes(loaded.charter, { now: () => now });
+        await runAsDotCharter(loaded.charter, async () => {
+          scheduleDotOutcomeChecks(loaded.charter, { now: () => now });
+          await evaluateDueDotOutcomes(loaded.charter, { now: () => now });
+        });
       } catch (error) {
         logger.warn(
           `outcome check failed for ${loaded.charter.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: libs/core/dot/dot-outcomes.ts`
-        );
-      }
-    }
-  },
-});
-
-// DL-11 settle combined arbitration cards (after housekeeping settled the newcomer)
-DOT_SUPERVISOR_STEPS.push({
-  id: 'dot-arbitration-settle',
-  async run(now, active) {
-    for (const loaded of active) {
-      try {
-        settleDotArbitration(loaded.charter, now);
-      } catch (error) {
-        logger.warn(
-          `arbitration settlement failed for ${loaded.charter.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: libs/core/dot/dot-arbitration.ts`
         );
       }
     }
@@ -114,9 +120,16 @@ DOT_SUPERVISOR_STEPS.push({
 DOT_SUPERVISOR_STEPS.push({
   id: 'dot-autonomy',
   async run(now, active) {
-    runDotAutonomySweep(
-      active.map((loaded) => loaded.charter),
-      { now: () => now }
-    );
+    for (const loaded of active) {
+      try {
+        await runAsDotCharter(loaded.charter, async () =>
+          runDotAutonomyStep(loaded.charter, { now: () => now })
+        );
+      } catch (error) {
+        logger.warn(
+          `autonomy step failed for ${loaded.charter.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep; the level is unchanged | evidence: libs/core/dot/dot-autonomy.ts`
+        );
+      }
+    }
   },
 });

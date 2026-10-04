@@ -23,7 +23,11 @@ import { t } from '../t.js';
 import { notifyOperatorSync } from '../surface/operator-notifications.js';
 import { listWorkItems, type WorkItem } from '../workforce/work-coordination.js';
 import { writeScopedArtifact } from '../workforce/artifact-store.js';
-import { assertSovereignCadencePersona, listOrganizationScopes } from './organization-cadence.js';
+import {
+  assertSovereignCadencePersona,
+  listOrganizationScopes,
+  normalizeCadenceTenant,
+} from './organization-cadence.js';
 import { listOrganizationDecisions } from './organization-operating-model-management.js';
 import { listOrganizationOperationRuns } from './organization-operating-model-operations.js';
 import type {
@@ -71,7 +75,7 @@ export function truncateText(value: string, max = MAX_TEXT_CHARS): string {
 
 /** Directory-level tenant (`shared`) normalised to the tenant a record carries. */
 export function cadenceTenant(scope: OrganizationScopeRef): string | undefined {
-  return !scope.tenantSlug || scope.tenantSlug === 'shared' ? undefined : scope.tenantSlug;
+  return normalizeCadenceTenant(scope.tenantSlug);
 }
 
 export function objectiveScope(scope: OrganizationScopeRef): ObjectiveProgressScope {
@@ -490,8 +494,18 @@ export function persistOrganizationCadenceReport(input: {
   return result;
 }
 
+/**
+ * Hours since the previous weekday standup (the schedule runs Monday–Friday):
+ * 72 on Monday (covers the weekend), 48 on Sunday, otherwise 24.
+ */
+export function defaultStandupWindowHours(now: Date, timezone: string): number {
+  const date = calendarDateInZone(now, timezone);
+  const weekday = new Date(Date.UTC(date.year, date.month - 1, date.day)).getUTCDay();
+  return weekday === 1 ? 72 : weekday === 0 ? 48 : 24;
+}
+
 export interface RunOrganizationStandupOptions {
-  /** Hours of history to report (default 24). */
+  /** Hours of history to report (default: since the previous weekday standup). */
   sinceHours?: number;
   timezone?: string;
   locale?: SupportedLocale;
@@ -522,7 +536,10 @@ export function runOrganizationStandup(
   const now = deps.now?.() ?? new Date();
   const timezone = options.timezone ?? ORGANIZATION_CADENCE_DEFAULT_TIMEZONE;
   const locale = options.locale ?? ORGANIZATION_CADENCE_DEFAULT_LOCALE;
-  const hours = options.sinceHours && options.sinceHours > 0 ? options.sinceHours : 24;
+  const hours =
+    options.sinceHours && options.sinceHours > 0
+      ? options.sinceHours
+      : defaultStandupWindowHours(now, timezone);
   const since = new Date(now.getTime() - hours * HOUR_MS);
   const tiers = options.tiers ?? ['confidential', 'public'];
   const standups: OrganizationStandupRun['standups'] = [];

@@ -21,7 +21,10 @@
  * Settlement (supervisor step `dot-arbitration-settle`, after housekeeping
  * settled the newcomer's card): approved → the older action is declined as
  * `superseded` (no feedback, so no learned-floor raise) or its open WorkItem
- * is blocked; rejected → the newcomer stays declined and the older continues.
+ * is blocked (version-checked; a WorkItem an executor already claimed is never
+ * overwritten — the settlement records `flagged_claimed` and notes both dots'
+ * inboxes); rejected → the newcomer stays declined and the older continues.
+ * The step runs BEFORE the executor in the supervisor sweep.
  *
  * Ledger: `dotStatePath(newcomer, 'arbitration.jsonl')` — tenant-scoped for
  * tenant dots, so another tenant's titles never land in a shared file.
@@ -49,6 +52,7 @@ import {
   type DotDispatchDeps,
 } from './dot-dispatch.js';
 import type { DotExtCtx, DotPreGateCheck } from './dot-extensions.js';
+import { appendDotInboxEntry, type DotInboxEntryInput } from './dot-inbox.js';
 import type { DotProposal, DotProposalIntent } from './dot-proposals.js';
 import { DOT_ARBITRATION_FILE, dotStatePath, type DotArbitrationRow } from './dot-state-paths.js';
 
@@ -83,6 +87,8 @@ export interface DotArbitrationDeps {
   updateWorkItem?: (input: UpdateWorkItemInput) => WorkItem;
   /** Passed to dot-dispatch when superseding a parked action (approval store seams). */
   dispatch?: Omit<DotDispatchDeps, 'rootDir' | 'now'>;
+  /** Dot inbox port (claimed-WorkItem notes); defaults to {@link appendDotInboxEntry}. */
+  appendInbox?: (input: DotInboxEntryInput) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -381,22 +387,38 @@ export interface DotArbitrationSettlement {
   action_ref: string;
   resolution: 'superseded' | 'declined';
   older: { dot_id: string; action_ref: string };
-  effect: 'declined_parked' | 'blocked_work_item' | 'none';
+  /**
+   * `flagged_claimed`: the older WorkItem was already claimed (in progress) by
+   * an executor — it is not interrupted; both dots get an inbox note instead.
+   */
+  effect: 'declined_parked' | 'blocked_work_item' | 'flagged_claimed' | 'none';
 }
 
+/** Source tag of the inbox notes arbitration settlement writes. */
+export const DOT_ARBITRATION_INBOX_SOURCE = 'dot-arbitration';
+
+/**
+ * Block the older action's open WorkItem. Never overwrites a claimed item (an
+ * executor holds its lease and will release it with its own version check):
+ * returns `claimed` instead. The update carries `expectedVersion`, so an item
+ * claimed between the read and the write fails the update (retried next sweep)
+ * rather than clobbering the executor's release.
+ */
 function blockLiveWorkItem(
   older: DotActionRecord,
   supersededBy: { dot_id: string; action_ref: string },
   deps: DotArbitrationDeps,
   rootDir: string | undefined
-): boolean {
+): 'blocked' | 'claimed' | false {
   if (!older.work_item_id) return false;
   const item = (deps.getWorkItem ?? ((id: string) => getWorkItem(id, rootDir ? { rootDir } : {})))(
     older.work_item_id
   );
   if (!item || !LIVE_WORK_ITEM_STATUSES.includes(item.status)) return false;
+  if (item.status === 'in_progress' || item.lease_id) return 'claimed';
   (deps.updateWorkItem ?? updateWorkItem)({
     itemId: item.item_id,
+    expectedVersion: item.version,
     status: 'blocked',
     metadata: {
       ...(item.metadata ?? {}),
@@ -405,7 +427,40 @@ function blockLiveWorkItem(
     },
     ...(rootDir ? { rootDir } : {}),
   });
-  return true;
+  return 'blocked';
+}
+
+/** Tell both dots that the superseded WorkItem was claimed and kept running. */
+function noteClaimedWorkItem(
+  older: DotActionRecord,
+  supersededBy: { dot_id: string; action_ref: string },
+  deps: DotArbitrationDeps,
+  now: Date
+): void {
+  const append =
+    deps.appendInbox ??
+    ((input: DotInboxEntryInput) =>
+      void appendDotInboxEntry(input, { rootDir: deps.rootDir, now: () => now }));
+  const payload = {
+    work_item_id: older.work_item_id,
+    older_action_ref: older.action_ref,
+    superseded_by: supersededBy,
+  };
+  for (const dotId of [older.dot_id, supersededBy.dot_id]) {
+    try {
+      append({
+        dot_id: dotId,
+        channel: 'inbox',
+        source: DOT_ARBITRATION_INBOX_SOURCE,
+        text: `WorkItem ${older.work_item_id} (${older.action_ref}) was already in progress when ${supersededBy.action_ref} was approved to supersede it — not interrupted; reconcile once it finishes`,
+        payload,
+      });
+    } catch (error) {
+      logger.warn(
+        `arbitration inbox note for ${dotId} not written — ${error instanceof Error ? error.message : String(error)} | next: the ledger row still records the claimed WorkItem | evidence: libs/core/dot/dot-inbox.ts`
+      );
+    }
+  }
 }
 
 /**
@@ -472,7 +527,12 @@ export function settleDotArbitration(
         }
       } else if (older?.status === 'dispatched') {
         try {
-          if (blockLiveWorkItem(older, supersededBy, deps, rootDir)) effect = 'blocked_work_item';
+          const blocked = blockLiveWorkItem(older, supersededBy, deps, rootDir);
+          if (blocked === 'blocked') effect = 'blocked_work_item';
+          else if (blocked === 'claimed') {
+            effect = 'flagged_claimed';
+            noteClaimedWorkItem(older, supersededBy, deps, now);
+          }
         } catch (error) {
           logger.warn(
             `could not block WorkItem ${older.work_item_id} superseded by ${row.action_ref} — ${error instanceof Error ? error.message : String(error)} | next: retried on the next sweep | evidence: ${dotStatePath(charter, DOT_ARBITRATION_FILE)}`
@@ -495,7 +555,9 @@ export function settleDotArbitration(
             ? `approved; ${link.action_ref} declined as superseded`
             : effect === 'blocked_work_item'
               ? `approved; WorkItem of ${link.action_ref} blocked`
-              : `approved; ${link.action_ref} was no longer live`,
+              : effect === 'flagged_claimed'
+                ? `approved; WorkItem of ${link.action_ref} was already claimed (in progress) — not interrupted, both dots notified`
+                : `approved; ${link.action_ref} was no longer live`,
       },
       rootDir
     );

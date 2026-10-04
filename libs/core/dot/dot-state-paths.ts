@@ -52,6 +52,8 @@ export interface DotWorkResultRow {
   completed_at: string;
   tokens_used?: number;
   kr_snapshot?: Record<string, number>;
+  /** Latest health (1 healthy / 0) per signal, captured at claim time — the "before" of a signal effect. */
+  signal_snapshot?: Record<string, 0 | 1>;
 }
 
 /** DL-03: one key-result measurement. */
