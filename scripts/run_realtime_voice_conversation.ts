@@ -136,6 +136,8 @@ export interface RealtimeVoiceConversationCliOptions {
   backchannel?: boolean;
   /** Instant reaction for pure hold requests and drop for pure user backchannels. */
   intentShortcuts?: boolean;
+  /** CE instant reaction on commit, ahead of the reasoning reply (CE-06). */
+  instantReaction?: boolean;
   /** Adapt timing constants to the user's conversational rhythm. */
   rhythm?: boolean;
   /** VAD backend id ('energy' | 'silero' | registered custom). */
@@ -770,11 +772,13 @@ export async function runRealtimeVoiceConversationLoop(
       ...(options.conversationEngine ||
       options.backchannel ||
       options.intentShortcuts ||
+      options.instantReaction ||
       options.rhythm
         ? {
             interaction: {
               ...(options.backchannel ? { backchannel: true } : {}),
               intentShortcuts: Boolean(options.conversationEngine || options.intentShortcuts),
+              instantReaction: Boolean(options.conversationEngine || options.instantReaction),
               rhythm: Boolean(options.conversationEngine || options.rhythm),
             },
           }
@@ -998,6 +1002,8 @@ export function parseRealtimeVoiceConversationCli(
     backchannel: Boolean(argv['backchannel']),
     intentShortcuts:
       argv['intent-shortcuts'] === undefined ? undefined : Boolean(argv['intent-shortcuts']),
+    instantReaction:
+      argv['instant-reaction'] === undefined ? undefined : Boolean(argv['instant-reaction']),
     rhythm: argv['rhythm'] === undefined ? undefined : Boolean(argv['rhythm']),
     ...(argv['vad-backend'] ? { vadBackend: String(argv['vad-backend']) } : {}),
     ...(argv['vad-purpose'] ? { vadPurpose: String(argv['vad-purpose']) } : {}),
@@ -1168,6 +1174,11 @@ export async function main(
       describe:
         // i18n-exempt: JA voice demo script output
         'Answer pure hold requests (「ちょっと待って」) with an instant reaction and drop pure user backchannels (「うん」) without a reasoning call',
+    })
+    .option('instant-reaction', {
+      type: 'boolean',
+      describe:
+        'Emit a Conversation-Engine-supplied instant reaction on commit, ahead of the slower reasoning reply (CE-06 reaction slot)',
     })
     .option('rhythm', {
       type: 'boolean',

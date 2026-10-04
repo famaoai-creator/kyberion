@@ -38,6 +38,8 @@ export interface LanguagePack {
   agentBackchannels: readonly string[];
   /** Suffixes that mark a question in this language (beyond '?'). */
   questionEndings: readonly string[];
+  /** Openers marking a "next step / wrap-up" reply segment (CE-06). */
+  nextStepMarkers: readonly string[];
 }
 
 /** Minimal shape a lexicon language entry must satisfy to become a pack. */
@@ -54,6 +56,8 @@ export interface LanguagePackSource {
   agent_backchannels?: readonly string[];
   /** Suffixes that mark a question in this language (beyond '?'). */
   question_endings?: readonly string[];
+  /** Openers marking a "next step / wrap-up" reply segment (CE-06). */
+  next_step_markers?: readonly string[];
 }
 
 /** Charset hints keyed by language id — script detection, not linguistic data. */
@@ -80,6 +84,7 @@ export function languagePackFromSource(id: string, source: LanguagePackSource): 
     holdMarkers: readonlyList(source.hold_markers),
     agentBackchannels: readonlyList(source.agent_backchannels),
     questionEndings: readonlyList(source.question_endings),
+    nextStepMarkers: readonlyList(source.next_step_markers),
   };
 }
 

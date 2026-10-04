@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { nowIso } from '../foundation/time.js';
 import { safeExistsSync } from '../secure-io.js';
+import type { KeyResultSpec } from '../key-result-spec.js';
 
 import {
   validatorFor,
@@ -650,6 +651,104 @@ export function buildOrganizationObjectiveAddition(
     );
   }
   return record;
+}
+
+export interface BuildOrganizationKeyResultInput {
+  organizationId: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  objectiveId: string;
+  keyResult: KeyResultSpec;
+  rootDir?: string;
+}
+
+function loadPurposeWithObjective(input: {
+  organizationId: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  objectiveId: string;
+  rootDir?: string;
+}): { existing: OrganizationPurposeRecord; objective: OrganizationPurposeObjective } {
+  const existing = loadOrganizationPurpose(input.organizationId, {
+    tier: input.tier,
+    tenantSlug: input.tenantSlug,
+    rootDir: input.rootDir,
+  });
+  if (!existing) {
+    throw new Error(
+      `Organization purpose not found for '${input.organizationId}'. Run 'purpose set' (or 'init --purpose') first.`
+    );
+  }
+  const objective = (existing.objectives || []).find(
+    (entry) => entry.objective_id === input.objectiveId
+  );
+  if (!objective) {
+    throw new Error(`Objective '${input.objectiveId}' not found for '${input.organizationId}'.`);
+  }
+  return { existing, objective };
+}
+
+function replaceObjective(
+  existing: OrganizationPurposeRecord,
+  objectiveId: string,
+  keyResults: KeyResultSpec[],
+  now: string
+): OrganizationPurposeRecord {
+  const record: OrganizationPurposeRecord = {
+    ...existing,
+    objectives: (existing.objectives || []).map((entry) => {
+      if (entry.objective_id !== objectiveId) return entry;
+      const { key_results: _drop, ...rest } = entry;
+      return keyResults.length ? { ...rest, key_results: keyResults } : rest;
+    }),
+    updated_at: now,
+  };
+  if (!validateOrganizationPurpose(record)) {
+    throw new Error(
+      `Invalid organization purpose: ${validationErrors(validatorFor(PURPOSE_SCHEMA_PATH))}`
+    );
+  }
+  return record;
+}
+
+export function buildOrganizationKeyResultAddition(
+  input: BuildOrganizationKeyResultInput,
+  now = nowIso()
+): OrganizationPurposeRecord {
+  const { existing, objective } = loadPurposeWithObjective(input);
+  const current = objective.key_results || [];
+  if (current.some((kr) => kr.kr_id === input.keyResult.kr_id)) {
+    throw new Error(
+      `Key result '${input.keyResult.kr_id}' already exists on objective '${input.objectiveId}'.`
+    );
+  }
+  return replaceObjective(existing, input.objectiveId, [...current, input.keyResult], now);
+}
+
+export interface RemoveOrganizationKeyResultInput {
+  organizationId: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  objectiveId: string;
+  krId: string;
+  rootDir?: string;
+}
+
+export function buildOrganizationKeyResultRemoval(
+  input: RemoveOrganizationKeyResultInput,
+  now = nowIso()
+): OrganizationPurposeRecord {
+  const { existing, objective } = loadPurposeWithObjective(input);
+  const current = objective.key_results || [];
+  if (!current.some((kr) => kr.kr_id === input.krId)) {
+    throw new Error(`Key result '${input.krId}' not found on objective '${input.objectiveId}'.`);
+  }
+  return replaceObjective(
+    existing,
+    input.objectiveId,
+    current.filter((kr) => kr.kr_id !== input.krId),
+    now
+  );
 }
 
 export interface BuildOrganizationDomainInput {

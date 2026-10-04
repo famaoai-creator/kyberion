@@ -97,7 +97,12 @@ function summaryPath(): string {
 }
 
 export function ensureDir(p: string) {
-  if (!safeExistsSync(p)) safeMkdir(p, { recursive: true });
+  // The selected persona is the default for subsequent work, not the writer
+  // of its own onboarding profile. Use the same bounded context as the
+  // identity writes, including when creating a fresh profile directory.
+  withExecutionContext('sovereign_concierge', () => {
+    if (!safeExistsSync(p)) safeMkdir(p, { recursive: true });
+  });
 }
 
 export function resolveOnboardingInputPath(filePath: string): string {

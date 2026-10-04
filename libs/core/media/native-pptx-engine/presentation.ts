@@ -3,7 +3,8 @@ export function generatePresentation(
   masterCount: number,
   widthEmu: number = 12192000,
   heightEmu: number = 6858000,
-  extensions?: string
+  extensions?: string,
+  hasNotesMaster = false
 ): string {
   let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
@@ -14,7 +15,13 @@ export function generatePresentation(
     xml += `\n    <p:sldMasterId id="${2147483648 + i}" r:id="rId${rId++}"/>`;
   }
 
-  xml += `\n  </p:sldMasterIdLst>
+  xml += `\n  </p:sldMasterIdLst>`;
+  if (hasNotesMaster) {
+    // Matches generatePresentationRels: masters, slides, presProps, viewProps,
+    // theme, tableStyles, then the notes master.
+    xml += `\n  <p:notesMasterIdLst><p:notesMasterId r:id="rId${masterCount + slideCount + 5}"/></p:notesMasterIdLst>`;
+  }
+  xml += `
   <p:sldIdLst>`;
 
   // Slides follow after masters

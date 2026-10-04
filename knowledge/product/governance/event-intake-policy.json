@@ -1,0 +1,47 @@
+{
+  "$schema": "../schemas/event-intake-policy.schema.json",
+  "version": "1.0.0",
+  "description": "DL-08 inbound event sources for scripts/event_intake_surface.ts. Every source is disabled by default; enabling one requires the HMAC secret under secret_key in the secret store. tenant_slug binds a source to one tenant (events land under the tenant namespace and only that tenant's dots see them). Replay dedupe: a same-source event whose raw-body digest matches one seen within replay_window_hours (default 24) is dropped as a duplicate, even when its event type differs, because type and delivery headers are unsigned. A source whose sender legitimately repeats identical bodies under different event types must set replay_window_hours lower, or 0 to disable payload-digest dedupe (delivery-id dedupe still applies).",
+  "sources": {
+    "github": {
+      "enabled": false,
+      "description": "GitHub webhooks (X-Hub-Signature-256).",
+      "signature_header": "x-hub-signature-256",
+      "prefix": "sha256=",
+      "secret_key": "EVENT_INTAKE_GITHUB_SECRET",
+      "event_type_header": "x-github-event",
+      "delivery_id_header": "x-github-delivery",
+      "max_body_bytes": 262144
+    },
+    "ci": {
+      "enabled": false,
+      "description": "Generic CI notifier signing the raw body with HMAC-SHA256.",
+      "signature_header": "x-kyberion-signature",
+      "prefix": "sha256=",
+      "secret_key": "EVENT_INTAKE_CI_SECRET",
+      "event_type_header": "x-kyberion-event",
+      "delivery_id_header": "x-kyberion-delivery",
+      "max_body_bytes": 65536
+    },
+    "email": {
+      "enabled": false,
+      "description": "Inbound-mail relay webhook (parsed message JSON).",
+      "signature_header": "x-kyberion-signature",
+      "prefix": "sha256=",
+      "secret_key": "EVENT_INTAKE_EMAIL_SECRET",
+      "event_type_header": "x-kyberion-event",
+      "delivery_id_header": "x-kyberion-delivery",
+      "max_body_bytes": 131072
+    },
+    "custom": {
+      "enabled": false,
+      "description": "Operator-defined sender using the Kyberion signature headers.",
+      "signature_header": "x-kyberion-signature",
+      "prefix": "sha256=",
+      "secret_key": "EVENT_INTAKE_CUSTOM_SECRET",
+      "event_type_header": "x-kyberion-event",
+      "delivery_id_header": "x-kyberion-delivery",
+      "max_body_bytes": 65536
+    }
+  }
+}

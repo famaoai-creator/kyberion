@@ -14,7 +14,6 @@ import {
 } from '../service/service-endpoint-registry.js';
 
 const SERVICE_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
-const SECRET_KEY_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/;
 
 export interface SecretIdentity {
   serviceId: string;
@@ -36,14 +35,34 @@ export function normalizeServiceId(serviceId: string): string {
 }
 
 export function normalizeSecretKey(secretKey: string): string {
-  const normalized = String(secretKey || '')
+  const source = String(secretKey || '')
     .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9_]+/g, '_')
-    // Anchored one-end trims avoid the ambiguous alternation polynomial regex.
-    .replace(/^_+/, '')
-    .replace(/_+$/, '');
-  if (!SECRET_KEY_PATTERN.test(normalized)) {
+    .toUpperCase();
+  const normalizedChars: string[] = [];
+  let previousWasInvalid = false;
+  for (const character of source) {
+    const code = character.codePointAt(0) ?? 0;
+    const valid = (code >= 65 && code <= 90) || (code >= 48 && code <= 57) || code === 95;
+    if (valid) {
+      normalizedChars.push(character);
+      previousWasInvalid = false;
+    } else if (!previousWasInvalid) {
+      normalizedChars.push('_');
+      previousWasInvalid = true;
+    }
+  }
+  let start = 0;
+  let end = normalizedChars.length;
+  while (start < end && normalizedChars[start] === '_') start += 1;
+  while (end > start && normalizedChars[end - 1] === '_') end -= 1;
+  const normalized = normalizedChars.slice(start, end).join('');
+  const first = normalized.charCodeAt(0);
+  const hasValidStart = first >= 65 && first <= 90;
+  const hasValidCharacters = [...normalized].every((character) => {
+    const code = character.charCodeAt(0);
+    return (code >= 65 && code <= 90) || (code >= 48 && code <= 57) || code === 95;
+  });
+  if (!hasValidStart || normalized.length > 64 || !hasValidCharacters) {
     throw new Error(`[SECRET_IDENTITY_INVALID] secretKey is invalid: ${secretKey}`);
   }
   return normalized;

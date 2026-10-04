@@ -53,6 +53,7 @@ import {
 import {
   getReasoningProviderDescriptor,
   listReasoningProviderDescriptors,
+  resolveReasoningProviderEnvironment,
 } from './reasoning/reasoning-provider-registry.js';
 import {
   normalizeReasoningBackendMode,
@@ -143,7 +144,9 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
   const configured = descriptors.filter(
     (descriptor) =>
       !LOCAL_RUNTIME_ADAPTERS.has(descriptor.adapter) &&
-      descriptor.env_keys.some((key) => Boolean(kyberionEnv(key)))
+      descriptor.env_keys.some((key) =>
+        Boolean(kyberionEnv(key) || resolveReasoningProviderEnvironment(descriptor)[key])
+      )
   );
   for (const descriptor of [...local, ...configured]) {
     if ((await probeReasoningProviderReadiness(descriptor, process.env, deps)).available) {

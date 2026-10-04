@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "event-intake-policy.schema.json",
+  "title": "Event intake policy",
+  "description": "DL-08: authenticated inbound event sources that may wake resident dots. Every source is HMAC-authenticated; tenant binding comes only from this policy, never from the payload.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "sources"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "sources": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z0-9][a-z0-9_-]*$", "maxLength": 64 },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled",
+          "signature_header",
+          "secret_key",
+          "event_type_header",
+          "delivery_id_header",
+          "max_body_bytes"
+        ],
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "description": { "type": "string" },
+          "signature_header": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "description": "Lower-case HTTP header carrying the HMAC-SHA256 hex digest of the raw body."
+          },
+          "prefix": {
+            "type": "string",
+            "maxLength": 32,
+            "description": "Literal prefix before the hex digest (for example 'sha256='). Empty when the header carries the bare digest."
+          },
+          "secret_key": {
+            "type": "string",
+            "pattern": "^EVENT_INTAKE_[A-Z0-9_]+$",
+            "description": "Secret-store key holding the shared HMAC secret. Restricted to the EVENT_INTAKE_ namespace so the policy cannot point verification at unrelated secrets."
+          },
+          "event_type_header": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "delivery_id_header": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "tenant_slug": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{1,30}$",
+            "description": "Binds every event of this source to one tenant; omitted means the system floor."
+          },
+          "max_body_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "replay_window_hours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 720,
+            "description": "Payload-digest replay window in hours (default 24). Within it, a same-source event whose raw-body digest matches an earlier one is a duplicate regardless of its (unsigned) event type or delivery id. Senders that legitimately repeat identical bodies under different event types must lower it; 0 disables payload-digest dedupe, leaving only (source, delivery_id) dedupe."
+          }
+        }
+      }
+    }
+  }
+}

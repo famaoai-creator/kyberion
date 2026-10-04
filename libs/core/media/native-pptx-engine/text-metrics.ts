@@ -13,6 +13,10 @@
  * output stays byte-reproducible and the fit is testable hermetically.
  */
 
+import { chooseJaLineCut } from './ja-line-break.js';
+
+export { balanceJaHeading } from './ja-line-break.js';
+
 /** Character class widths as a multiple of font size (em). */
 interface AdvanceWidths {
   /** CJK ideographs, kana, fullwidth forms — square by design. */
@@ -104,9 +108,9 @@ export function measureTextWidthPt(
 /**
  * Break one logical line into rendered lines at the given width.
  *
- * Japanese wraps between any two characters; latin wraps at spaces, falling
- * back to mid-word breaks only when a single word exceeds the measure (which
- * is what PowerPoint does too).
+ * Japanese wraps on phrase boundaries with kinsoku (never starting a line with
+ * 。、」 or small kana); latin wraps at spaces, falling back to mid-word breaks
+ * only when a single word exceeds the measure (which is what PowerPoint does too).
  */
 export function wrapLine(
   line: string,
@@ -133,6 +137,15 @@ export function wrapLine(
         out.push(current.slice(0, lastBreak).trimEnd());
         current = current.slice(lastBreak).trimStart();
         currentWidth = measureTextWidthPt(current, fontSizePt, widths);
+      } else if (isFullwidthChar(ch) || isFullwidthChar(current.slice(-1))) {
+        // Japanese: end the line on a phrase boundary and never start one with
+        // 。、」 or small kana (kinsoku), as PowerPoint's East Asian breaking does.
+        const chars = Array.from(current + ch);
+        const cut = chooseJaLineCut(chars, Array.from(current).length);
+        out.push(chars.slice(0, cut).join(''));
+        const carried = chars.slice(cut, -1).join('');
+        current = carried;
+        currentWidth = measureTextWidthPt(carried, fontSizePt, widths);
       } else {
         out.push(current);
         current = '';

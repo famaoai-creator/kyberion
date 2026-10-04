@@ -606,6 +606,21 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
 
     return (await domainOps()).runInlineOrganizationDigest(step, params, ctx);
   },
+  'core:organization_operation_tick': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return (await domainOps()).runInlineOrganizationOperationTick(step, params, ctx);
+  },
+  'core:organization_standup': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return (await domainOps()).runInlineOrganizationStandup(step, params, ctx);
+  },
+  'core:organization_retro': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return (await domainOps()).runInlineOrganizationRetro(step, params, ctx);
+  },
   'core:accountability_report': async (dctx) => {
     const { step, params, ctx } = dctx;
 

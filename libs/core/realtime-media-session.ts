@@ -133,6 +133,8 @@ export interface AssistantTextDeltaEvent extends MediaEventBase {
   text: string;
   is_final?: boolean;
   turn_id?: string;
+  /** Semantic segment kind (CE-06: reaction/claim/explanation/next). */
+  segment?: string;
 }
 
 export const ANIMATION_CUE_KINDS = [

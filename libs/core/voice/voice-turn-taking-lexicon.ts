@@ -31,6 +31,8 @@ export interface TurnTakingLanguageEntry {
   agent_backchannels?: readonly string[];
   /** Suffixes that mark a question in this language (beyond '?'). */
   question_endings?: readonly string[];
+  /** Openers marking a "next step / wrap-up" reply segment (CE-06). */
+  next_step_markers?: readonly string[];
 }
 
 export interface VoiceTurnTakingLexicon {
@@ -86,6 +88,7 @@ function languageEntry(raw: Record<string, unknown>, lang: string): TurnTakingLa
     hold_markers: optionalStringList(raw.hold_markers, `${lang}.hold_markers`),
     agent_backchannels: optionalStringList(raw.agent_backchannels, `${lang}.agent_backchannels`),
     question_endings: optionalStringList(raw.question_endings, `${lang}.question_endings`),
+    next_step_markers: optionalStringList(raw.next_step_markers, `${lang}.next_step_markers`),
   };
 }
 
