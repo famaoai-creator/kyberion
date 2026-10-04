@@ -13,7 +13,7 @@ export function describeOps(): ActuatorOpDescription[] {
         type: 'object',
         properties: {
           job_id: { type: 'string' },
-          provider: { type: 'string', enum: ['local', 'colab'] },
+          provider: { type: 'string' },
           notebook_path: { type: 'string' },
           entrypoint: { type: 'string' },
           hardware: {
@@ -45,7 +45,7 @@ export function describeOps(): ActuatorOpDescription[] {
         type: 'object',
         properties: {
           job_id: { type: 'string' },
-          provider: { type: 'string', enum: ['local', 'colab'] },
+          provider: { type: 'string' },
         },
         required: ['job_id'],
         additionalProperties: false,
@@ -59,6 +59,7 @@ export function describeOps(): ActuatorOpDescription[] {
         type: 'object',
         properties: {
           job_id: { type: 'string' },
+          provider: { type: 'string' },
           target_path: {
             type: 'string',
             description:
@@ -78,6 +79,7 @@ export function describeOps(): ActuatorOpDescription[] {
         type: 'object',
         properties: {
           job_id: { type: 'string' },
+          provider: { type: 'string' },
         },
         required: ['job_id'],
         additionalProperties: false,

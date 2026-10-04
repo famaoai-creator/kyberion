@@ -52,7 +52,7 @@
           "items": { "type": "string", "enum": ["mp4", "mov", "webm"] }
         },
         "enable_backend_rendering": { "type": "boolean" },
-        "backend": { "type": "string", "enum": ["none", "hyperframes_cli"] },
+        "backend": { "type": "string", "minLength": 1 },
         "quality": { "type": "string", "enum": ["draft", "standard", "high"] },
         "command_timeout_ms": { "type": "integer", "minimum": 1000, "maximum": 3600000 }
       }

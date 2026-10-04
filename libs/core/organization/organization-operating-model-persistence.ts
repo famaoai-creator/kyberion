@@ -1305,27 +1305,30 @@ export function operationDirectory(
 export const ORGANIZATION_WORK_SHAPE_QUESTION = 'organization.work_shape';
 
 export function registerOrganizationWorkJudgment(): () => void {
-  return registerJudgmentBackend({
-    judgment_id: BUILTIN_JUDGMENT_PROVIDER,
-    egress: 'local-only',
-    supports(question) {
-      return question.kind === 'choice' && question.id === ORGANIZATION_WORK_SHAPE_QUESTION;
+  return registerJudgmentBackend(
+    {
+      judgment_id: BUILTIN_JUDGMENT_PROVIDER,
+      egress: 'local-only',
+      supports(question) {
+        return question.kind === 'choice' && question.id === ORGANIZATION_WORK_SHAPE_QUESTION;
+      },
+      async judge(request) {
+        return request.questions.map((question) => {
+          // Text-only by construction; `acceptsImages` is absent so the seam
+          // never routes an image here.
+          const result = classifyOrganizationWork(stateText(request.state));
+          return {
+            id: question.id,
+            value: result.workShape,
+            confidence: result.confidence,
+            // Overwritten by the seam from the calibration registry; the value
+            // here is only the honest default.
+            calibrated: false,
+            signals: { ...(result.signals || {}), reason_key: result.reasonKey },
+          };
+        });
+      },
     },
-    async judge(request) {
-      return request.questions.map((question) => {
-        // Text-only by construction; `acceptsImages` is absent so the seam
-        // never routes an image here.
-        const result = classifyOrganizationWork(stateText(request.state));
-        return {
-          id: question.id,
-          value: result.workShape,
-          confidence: result.confidence,
-          // Overwritten by the seam from the calibration registry; the value
-          // here is only the honest default.
-          calibrated: false,
-          signals: { ...(result.signals || {}), reason_key: result.reasonKey },
-        };
-      });
-    },
-  });
+    { provenance: 'builtin', source: 'organization-operating-model-persistence' }
+  );
 }

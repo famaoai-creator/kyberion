@@ -50,12 +50,18 @@ const registeredDisposers = new Map<string, () => void>();
 
 export function registerKnowledgeAdapter(
   adapter: KnowledgeAdapter,
-  metadata: SeamProviderMetadata = { provenance: 'builtin', source: 'knowledge-adapter' }
+  metadata: SeamProviderMetadata = {
+    provenance: 'plugin',
+    source: 'knowledge-adapter-extension',
+  }
 ): () => void {
   const id = adapter.id.trim();
   if (!id) throw new Error('KnowledgeAdapter.id is required');
-  registeredDisposers.get(id)?.();
-  const dispose = knowledgeAdapterSeam.register(id, adapter, metadata);
+  const disposeFromSeam = knowledgeAdapterSeam.register(id, adapter, metadata);
+  const dispose = () => {
+    disposeFromSeam();
+    if (registeredDisposers.get(id) === dispose) registeredDisposers.delete(id);
+  };
   registeredDisposers.set(id, dispose);
   return () => {
     dispose();

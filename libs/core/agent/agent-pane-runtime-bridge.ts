@@ -11,7 +11,7 @@
 
 import type { AgentAdapter } from './agent-adapter.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 export const AGENT_RUNTIME_LAUNCH_MODES = ['pipe', 'pane'] as const;
 export type AgentRuntimeLaunchMode = (typeof AGENT_RUNTIME_LAUNCH_MODES)[number];
@@ -46,16 +46,22 @@ const paneRuntimeSeam = createSeam<AgentPaneRuntimeBridge>({
 
 const registeredDisposers = new Map<string, () => void>();
 
-export function registerAgentPaneRuntimeBridge(bridge: AgentPaneRuntimeBridge): () => void {
+export function registerAgentPaneRuntimeBridge(
+  bridge: AgentPaneRuntimeBridge,
+  metadata: SeamProviderMetadata = {
+    provenance: 'plugin',
+    source: 'agent-pane-runtime-extension',
+  }
+): () => void {
   const id = String(bridge.bridge_id || '').trim();
   if (!id) throw new Error('AgentPaneRuntimeBridge.bridge_id is required');
-  registeredDisposers.get(id)?.();
-  const disposer = paneRuntimeSeam.register(id, bridge, {
-    provenance: 'builtin',
-    source: 'agent-pane-runtime-bridge',
-  });
-  registeredDisposers.set(id, disposer);
-  return disposer;
+  const disposeFromSeam = paneRuntimeSeam.register(id, bridge, metadata);
+  const dispose = () => {
+    disposeFromSeam();
+    if (registeredDisposers.get(id) === dispose) registeredDisposers.delete(id);
+  };
+  registeredDisposers.set(id, dispose);
+  return dispose;
 }
 
 export function resetAgentPaneRuntimeBridges(): void {

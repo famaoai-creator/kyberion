@@ -2,6 +2,7 @@ import {
   computeApprovalPayloadHash,
   createApprovalRequest,
   createCalendarEvent,
+  normalizeCalendarProviderId,
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
   loadApprovalRequest,
@@ -129,7 +130,7 @@ export function parseCalendarEventPayload(
     throw new Error('calendar event requires summary, start, and end');
   }
   return {
-    provider: payload.provider === 'm365' ? 'm365' : 'google-workspace',
+    provider: normalizeCalendarProviderId(payload.provider),
     calendar_id: payload.calendar_id ? String(payload.calendar_id) : undefined,
     summary,
     start,

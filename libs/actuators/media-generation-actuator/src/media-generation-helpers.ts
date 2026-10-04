@@ -14,8 +14,11 @@ import {
 } from '@agent/core/visual-workflow-compiler';
 import {
   getMediaBackendRecord,
+  listMediaBackends,
   resolveMediaBackendForPlatform,
 } from '@agent/core/media/media-backend-registry';
+import { listImageGenerationProviders } from '@agent/core/media/image-generation-bridge';
+import { listMusicGenerationProviders } from '@agent/core/media/music-generation-bridge';
 import {
   resolveCreativeDesign,
   renderPromptStyleBlock,
@@ -36,7 +39,7 @@ import {
   modalityForGenerationAction,
   type ProviderHistory,
 } from './generation-artifact-adapters.js';
-import { createComfyUiProviderClient } from './comfyui-provider-client.js';
+import { createGenerationProviderHistoryClient } from './generation-provider-clients.js';
 import {
   executeDirectVideoGeneration,
   isDirectVideoGenerationBackend,
@@ -250,9 +253,10 @@ function resolveArtifactPath(item: Record<string, any>): string {
 
 function extractArtifacts(
   history: unknown,
-  modality: GenerationModality = 'workflow'
+  modality: GenerationModality = 'workflow',
+  provider = 'comfyui'
 ): GeneratedArtifact[] {
-  return getGenerationHistoryAdapter(modality).extract_artifacts(history, (item) =>
+  return getGenerationHistoryAdapter(modality, provider).extract_artifacts(history, (item) =>
     resolveArtifactPath(item)
   );
 }
@@ -276,25 +280,100 @@ function resolveImageArtifactFormat(sourcePath: string): string {
   return ext || 'jpg';
 }
 
+type GenerationProviderBinding = { id: string; backendIds?: readonly string[] };
+
+function resolveGenerationProviderPreference(
+  explicitBackendId: string,
+  modality: 'image' | 'music',
+  providers: readonly GenerationProviderBinding[],
+  followFallbacks = false
+): string[] {
+  const backends = listMediaBackends(modality);
+  const resolveBackend = (backendId: string) => {
+    const matches = backends.filter(
+      (backend) => backend.backend_id === backendId || backend.aliases?.includes(backendId)
+    );
+    if (matches.length > 1) {
+      throw new Error(
+        'Ambiguous ' +
+          modality +
+          " backend id '" +
+          backendId +
+          "': " +
+          matches.map((backend) => backend.backend_id).join(', ')
+      );
+    }
+    return matches[0];
+  };
+  const resolveProvider = (backend: (typeof backends)[number] | undefined, ids: string[]) => {
+    const matches = providers.filter(
+      (provider) =>
+        (backend &&
+          (backend.provider === provider.id ||
+            provider.backendIds?.includes(backend.backend_id))) ||
+        ids.includes(provider.id) ||
+        provider.backendIds?.some((backendId) => ids.includes(backendId))
+    );
+    if (matches.length > 1) {
+      throw new Error(
+        'Ambiguous ' +
+          modality +
+          " provider for backend_id '" +
+          explicitBackendId +
+          "': " +
+          matches.map((provider) => provider.id).join(', ')
+      );
+    }
+    return matches[0]?.id;
+  };
+  const tail = explicitBackendId.split('.').filter(Boolean).at(-1) || explicitBackendId;
+  const requestedIds = [...new Set([explicitBackendId, tail])];
+  let backend = resolveBackend(explicitBackendId) || resolveBackend(tail);
+  const firstProvider = resolveProvider(backend, requestedIds);
+  if (!backend) return firstProvider ? [firstProvider] : [];
+  const providerIds: string[] = [];
+  const visited = new Set<string>();
+  while (!visited.has(backend.backend_id)) {
+    visited.add(backend.backend_id);
+    const providerId = resolveProvider(backend, [backend.backend_id]);
+    if (providerId && !providerIds.includes(providerId)) providerIds.push(providerId);
+    if (!followFallbacks || !backend.fallback_backend_id) break;
+    const next = resolveBackend(backend.fallback_backend_id);
+    if (!next) {
+      throw new Error(
+        'Unknown ' +
+          modality +
+          " fallback backend '" +
+          backend.fallback_backend_id +
+          "' from '" +
+          backend.backend_id +
+          "'"
+      );
+    }
+    backend = next;
+  }
+  return providerIds.length > 0 ? providerIds : firstProvider ? [firstProvider] : [];
+}
+
 function resolveImageProviderPreference(params: any): string[] | undefined {
   const explicitBackendId = String(
     params?.backend_id || params?.image_adf?.engine?.backend_id || ''
   ).trim();
   if (explicitBackendId) {
-    const backendTokens = explicitBackendId.split('.').filter(Boolean);
-    const tail = backendTokens[backendTokens.length - 1] || explicitBackendId;
-    if (tail === 'local_flux' || explicitBackendId === 'local_flux') return ['local_flux'];
-    if (tail === 'apple_playground' || explicitBackendId === 'apple_playground') {
-      return ['apple_playground', 'local_flux', 'comfyui'];
-    }
-    if (tail === 'comfyui' || explicitBackendId === 'media-generation.comfyui') return ['comfyui'];
-    if (tail === 'llm_api') return ['llm_api'];
+    const providers = resolveGenerationProviderPreference(
+      explicitBackendId,
+      'image',
+      listImageGenerationProviders(),
+      true
+    );
+    if (providers.length > 0) return providers;
+    throw new Error(
+      "No registered image-generation provider matches backend_id '" + explicitBackendId + "'"
+    );
   }
-
   const preference = params?.provider_preference || params?.providerPreference;
   return Array.isArray(preference) && preference.length > 0 ? preference : undefined;
 }
-
 /**
  * Purpose-driven image provider choice (seam `image-generation-provider`).
  * Ignored by the bridge whenever a provider preference / backend_id is given.
@@ -412,24 +491,21 @@ function resolveMusicProviderPreference(params: Record<string, unknown>): string
       ''
   ).trim();
   if (explicitBackendId) {
-    const backendTokens = explicitBackendId.split('.').filter(Boolean);
-    const tail = backendTokens[backendTokens.length - 1] || explicitBackendId;
-    if (tail === 'musicgen_mlx' || explicitBackendId === 'musicgen_mlx') return ['musicgen_mlx'];
-    if (
-      tail === 'stable_audio_3_small_music' ||
-      tail === 'stable_audio_3' ||
-      explicitBackendId.includes('stable_audio_3')
-    ) {
-      return ['stable_audio_3'];
-    }
-    if (tail === 'comfyui' || explicitBackendId.includes('comfyui')) return ['comfyui'];
+    const providers = resolveGenerationProviderPreference(
+      explicitBackendId,
+      'music',
+      listMusicGenerationProviders()
+    );
+    if (providers.length > 0) return [providers[0]];
+    throw new Error(
+      "No registered music-generation provider matches backend_id '" + explicitBackendId + "'"
+    );
   }
   const preference = params?.provider_preference || params?.providerPreference;
   return Array.isArray(preference) && preference.length > 0
     ? preference.filter((value): value is string => typeof value === 'string')
     : undefined;
 }
-
 /**
  * Purpose-driven music provider choice (seam `music-generation-provider`).
  * Only without a named backend (backend_id / music_adf.engine.backend_id):
@@ -592,34 +668,38 @@ async function waitForPromptCompletion(
   promptId: string,
   timeoutMs: number,
   pollIntervalMs: number,
-  modality: GenerationModality = 'workflow'
+  modality: GenerationModality = 'workflow',
+  provider = 'comfyui'
 ): Promise<ProviderHistory> {
-  const adapter = getGenerationHistoryAdapter(modality);
-  const providerClient = createComfyUiProviderClient();
+  const adapter = getGenerationHistoryAdapter(modality, provider);
+  const providerClient = createGenerationProviderHistoryClient(provider);
+  if (!providerClient) {
+    throw new Error('No generation history client registered for provider ' + provider);
+  }
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
-    const history = (await retry(async () => {
+    const response = (await retry(async () => {
       return providerClient.history(promptId);
     }, buildRetryOptions())) as unknown;
-    if (history && typeof history === 'object' && !Array.isArray(history)) {
-      const promptHistory = (history as Record<string, unknown>)[promptId];
+    const promptHistory = adapter.select_job_history(response, promptId);
+    if (promptHistory) {
       if (adapter.is_failed(promptHistory)) {
         throw new Error(`provider job ${promptId} failed or was canceled`);
       }
-      if (adapter.is_complete(promptHistory)) {
-        return (promptHistory || {}) as ProviderHistory;
-      }
+      if (adapter.is_complete(promptHistory)) return promptHistory;
     }
     await sleep(pollIntervalMs);
   }
-  throw new Error(`Timed out waiting for Comfy prompt ${promptId}`);
+  throw new Error('Timed out waiting for provider job ' + promptId + ' (' + provider + ')');
 }
 
 async function collectGenerationResult(
   action: string,
   params: any,
   promptId: string,
-  compiled?: any
+  compiled?: any,
+  provider = 'comfyui',
+  completedHistory?: ProviderHistory
 ) {
   const timeoutMs = Number(
     params.timeout_ms || params.music_adf?.output?.timeout_ms || 15 * 60 * 1000
@@ -628,9 +708,11 @@ async function collectGenerationResult(
     params.poll_interval_ms || params.music_adf?.output?.poll_interval_ms || 5_000
   );
   const modality = modalityForGenerationAction(action);
-  const adapter = getGenerationHistoryAdapterForAction(action);
-  const history = await waitForPromptCompletion(promptId, timeoutMs, pollIntervalMs, modality);
-  const artifacts = extractArtifacts(history, modality);
+  const adapter = getGenerationHistoryAdapterForAction(action, provider);
+  const history =
+    completedHistory ??
+    (await waitForPromptCompletion(promptId, timeoutMs, pollIntervalMs, modality, provider));
+  const artifacts = extractArtifacts(history, modality, provider);
   const adfKey =
     action === 'generate_image'
       ? 'image_adf'
@@ -670,7 +752,7 @@ async function collectGenerationResult(
     compiled_generation_request: compiled?.resolved,
     backend_id: backend.backend_id,
     backend_kind: backend.kind,
-    backend_provider: backend.provider,
+    backend_provider: provider || backend.provider,
     finished_at: nowIso(),
   };
 }

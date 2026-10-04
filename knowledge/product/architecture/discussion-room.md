@@ -82,7 +82,8 @@ decision ─► publishDiscussionOutcomes                       (discussion-outc
 ## 3. 拡張ポイント
 
 - 新しい議論プロトコル（ACE のロールペルソナ採点など）は `DiscussionSpeaker` の実装または `DiscussionEngine` のフェーズとして追加する。
-- ロスターは発言エンジンが LLM のときだけ LLM 提案、それ以外は目的のキーワード規則。TC-12 の roster proposer と `mission-team-plan-composer`（ミッションのチーム計画・staffing 台帳）への統合は未接続（`docs/developer/improvement-plans-2026-09/TEAM_COMPOSITION_DYNAMICS_PLAN_2026-09-20.ja.md`）。
+- discussion room の roster は、発言エンジンが proposeRoles を提供するときだけ裁量ロールを提案し、それ以外は room goal のキーワード規則で補う。提案ロールは登録済み候補に限定し、コア役割・チームサイズ制約は維持する。
+- mission team staffing の TC-12 roster proposer は別機能で、既定 OFF の governed policy に従い dispatch 前に一度だけ提案し、受理ロールを既存の supervisor staffing 経路へ渡す。提案・検証・staffing の詳細は docs/developer/improvement-plans-2026-09/TEAM_COMPOSITION_DYNAMICS_PLAN_2026-09-20.ja.md を参照する。discussion room の参加者編成とは同一視しない。
 - 議事録のミッション証跡化（`record-evidence`）は未接続。ミッションを始めたあとの進行は通常のミッション運用に委ねる。
 
 ## 4. 関連

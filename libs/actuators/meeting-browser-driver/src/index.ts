@@ -597,3 +597,21 @@ export function createBrowserMeetingJoinDriver(
 ): BrowserMeetingJoinDriver {
   return new BrowserMeetingJoinDriver(opts);
 }
+
+export function installMeetingParticipationDriver(
+  options: import('@agent/core/meeting/meeting-join-driver').MeetingParticipationDriverInstallOptions = {}
+): void {
+  installBrowserMeetingJoinDriver({
+    headed: Boolean(options.headed),
+    user_data_dir: options.userDataDir,
+    profile_directory: options.profileDirectory,
+    connect_over_cdp: Boolean(options.connectOverCdp),
+    cdp_url: options.cdpUrl,
+    cdp_port: options.cdpPort,
+    browser_channel: options.browserChannel,
+    account_slug: options.accountSlug,
+    microphone_device: options.microphoneDevice,
+    speaker_device: options.speakerDevice,
+    camera_device: options.cameraDevice,
+  });
+}

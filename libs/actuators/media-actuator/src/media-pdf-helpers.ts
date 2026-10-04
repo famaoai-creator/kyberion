@@ -223,7 +223,6 @@ export function buildPdfPageOcrOverlayLinesFromResult(
   const imageWidth = Math.max(1, Number(dominantImage?.width ?? page?.width ?? 960));
   const imageHeight = Math.max(1, Number(dominantImage?.height ?? page?.height ?? 540));
   const sourceLines = Array.isArray(result.lines) ? result.lines : [];
-  const normalizedProvider = result.provider === 'apple_vision';
 
   const lines = sourceLines.map((line) => {
     const box = line.boundingBox;
@@ -232,8 +231,7 @@ export function buildPdfPageOcrOverlayLinesFromResult(
     // from providers that predate boundingBoxUnits.
     const normalized = result.boundingBoxUnits
       ? result.boundingBoxUnits === 'normalized'
-      : normalizedProvider ||
-        [box.x, box.y, box.width, box.height].every((value) => value >= 0 && value <= 1);
+      : [box.x, box.y, box.width, box.height].every((value) => value >= 0 && value <= 1);
     const x = normalized ? box.x * imageWidth : box.x;
     const y = normalized ? box.y * imageHeight : box.y;
     const width = normalized ? box.width * imageWidth : box.width;

@@ -31,6 +31,23 @@ import {
 /** A registered meeting platform id (see meeting-platforms.json). */
 export type MeetingJoinPlatform = Exclude<MeetingPlatform, 'in_room' | 'auto'>;
 
+export interface MeetingParticipationDriverInstallOptions {
+  headed?: boolean;
+  accountSlug?: string;
+  microphoneDevice?: string;
+  speakerDevice?: string;
+  cameraDevice?: string;
+  userDataDir?: string;
+  profileDirectory?: string;
+  connectOverCdp?: boolean;
+  cdpUrl?: string;
+  cdpPort?: number;
+  browserChannel?: 'chrome' | 'chromium';
+  extensionWsPort?: number;
+  extensionWsHost?: string;
+  extensionJoinTimeoutSec?: number;
+}
+
 export interface MeetingJoinDriver {
   readonly driver_id: string;
   /** Platforms this driver can handle (a driver may serve multiple). */

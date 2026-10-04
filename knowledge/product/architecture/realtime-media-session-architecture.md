@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, realtime, voice, meeting, diarization, viseme, avatar, media-session]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-09-24
+last_updated: 2026-10-04
 kind: architecture
 scope: repository
 authority: reference
@@ -48,6 +48,7 @@ The repository already provides useful lower-level seams:
 - `MeetingParticipationCoordinator` composes a meeting driver, audio bus, STT,
   TTS, VAD, agent, consent, and audit in
   `libs/core/meeting/meeting-participation-coordinator.ts`.
+- Meeting driver modules use the common `installMeetingParticipationDriver(options)` contract. The governed `meeting-join-driver-modules.json` maps IDs to workspace packages; both the participation CLI and meeting actuator resolve unregistered drivers through this catalog, without driver-ID-specific installer branches. Adding a driver requires a module implementing the installer contract and a catalog entry. Optional compiled fallbacks remain repository-contained.
 - `realtime-voice-loop.ts` provides VAD-driven turn handling, streaming STT,
   sentence-level TTS, optional barge-in, transcript persistence, and metrics.
 - `meeting-intelligence-ops.ts` extracts action items and records speaker

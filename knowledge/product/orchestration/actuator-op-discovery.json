@@ -5851,8 +5851,7 @@
                 "type": "string"
               },
               "provider": {
-                "type": "string",
-                "enum": ["local", "colab"]
+                "type": "string"
               },
               "notebook_path": {
                 "type": "string"
@@ -5905,8 +5904,7 @@
                 "type": "string"
               },
               "provider": {
-                "type": "string",
-                "enum": ["local", "colab"]
+                "type": "string"
               }
             },
             "required": ["job_id"],
@@ -5926,6 +5924,9 @@
             "type": "object",
             "properties": {
               "job_id": {
+                "type": "string"
+              },
+              "provider": {
                 "type": "string"
               },
               "target_path": {
@@ -5956,6 +5957,9 @@
             "type": "object",
             "properties": {
               "job_id": {
+                "type": "string"
+              },
+              "provider": {
                 "type": "string"
               }
             },
@@ -22579,8 +22583,7 @@
                 "type": "string"
               },
               "audio_bridge": {
-                "type": "string",
-                "enum": ["blackhole", "pulseaudio", "none"]
+                "type": "string"
               },
               "answers": {
                 "type": "array"
@@ -22628,8 +22631,7 @@
                 "type": "boolean"
               },
               "join_backend": {
-                "type": "string",
-                "enum": ["auto", "playwright", "chrome-extension"]
+                "type": "string"
               },
               "join_timeout_sec": {
                 "type": "number"
@@ -22869,8 +22871,7 @@
                 "type": "string"
               },
               "audio_bridge": {
-                "type": "string",
-                "enum": ["blackhole", "pulseaudio", "none"]
+                "type": "string"
               },
               "answers": {
                 "type": "array"
@@ -22918,8 +22919,7 @@
                 "type": "boolean"
               },
               "join_backend": {
-                "type": "string",
-                "enum": ["auto", "playwright", "chrome-extension"]
+                "type": "string"
               },
               "join_timeout_sec": {
                 "type": "number"
@@ -23159,8 +23159,7 @@
                 "type": "string"
               },
               "audio_bridge": {
-                "type": "string",
-                "enum": ["blackhole", "pulseaudio", "none"]
+                "type": "string"
               },
               "answers": {
                 "type": "array"
@@ -23208,8 +23207,7 @@
                 "type": "boolean"
               },
               "join_backend": {
-                "type": "string",
-                "enum": ["auto", "playwright", "chrome-extension"]
+                "type": "string"
               },
               "join_timeout_sec": {
                 "type": "number"
@@ -23449,8 +23447,7 @@
                 "type": "string"
               },
               "audio_bridge": {
-                "type": "string",
-                "enum": ["blackhole", "pulseaudio", "none"]
+                "type": "string"
               },
               "answers": {
                 "type": "array"
@@ -23498,8 +23495,7 @@
                 "type": "boolean"
               },
               "join_backend": {
-                "type": "string",
-                "enum": ["auto", "playwright", "chrome-extension"]
+                "type": "string"
               },
               "join_timeout_sec": {
                 "type": "number"
@@ -23739,8 +23735,7 @@
                 "type": "string"
               },
               "audio_bridge": {
-                "type": "string",
-                "enum": ["blackhole", "pulseaudio", "none"]
+                "type": "string"
               },
               "answers": {
                 "type": "array"
@@ -23788,8 +23783,7 @@
                 "type": "boolean"
               },
               "join_backend": {
-                "type": "string",
-                "enum": ["auto", "playwright", "chrome-extension"]
+                "type": "string"
               },
               "join_timeout_sec": {
                 "type": "number"
@@ -24029,8 +24023,7 @@
                 "type": "string"
               },
               "audio_bridge": {
-                "type": "string",
-                "enum": ["blackhole", "pulseaudio", "none"]
+                "type": "string"
               },
               "answers": {
                 "type": "array"
@@ -24078,8 +24071,7 @@
                 "type": "boolean"
               },
               "join_backend": {
-                "type": "string",
-                "enum": ["auto", "playwright", "chrome-extension"]
+                "type": "string"
               },
               "join_timeout_sec": {
                 "type": "number"
@@ -24319,8 +24311,7 @@
                 "type": "string"
               },
               "audio_bridge": {
-                "type": "string",
-                "enum": ["blackhole", "pulseaudio", "none"]
+                "type": "string"
               },
               "answers": {
                 "type": "array"
@@ -24368,8 +24359,7 @@
                 "type": "boolean"
               },
               "join_backend": {
-                "type": "string",
-                "enum": ["auto", "playwright", "chrome-extension"]
+                "type": "string"
               },
               "join_timeout_sec": {
                 "type": "number"
@@ -24609,8 +24599,7 @@
                 "type": "string"
               },
               "audio_bridge": {
-                "type": "string",
-                "enum": ["blackhole", "pulseaudio", "none"]
+                "type": "string"
               },
               "answers": {
                 "type": "array"
@@ -24658,8 +24647,7 @@
                 "type": "boolean"
               },
               "join_backend": {
-                "type": "string",
-                "enum": ["auto", "playwright", "chrome-extension"]
+                "type": "string"
               },
               "join_timeout_sec": {
                 "type": "number"
@@ -24899,8 +24887,7 @@
                 "type": "string"
               },
               "audio_bridge": {
-                "type": "string",
-                "enum": ["blackhole", "pulseaudio", "none"]
+                "type": "string"
               },
               "answers": {
                 "type": "array"
@@ -24948,8 +24935,7 @@
                 "type": "boolean"
               },
               "join_backend": {
-                "type": "string",
-                "enum": ["auto", "playwright", "chrome-extension"]
+                "type": "string"
               },
               "join_timeout_sec": {
                 "type": "number"
@@ -25189,8 +25175,7 @@
                 "type": "string"
               },
               "audio_bridge": {
-                "type": "string",
-                "enum": ["blackhole", "pulseaudio", "none"]
+                "type": "string"
               },
               "answers": {
                 "type": "array"
@@ -25238,8 +25223,7 @@
                 "type": "boolean"
               },
               "join_backend": {
-                "type": "string",
-                "enum": ["auto", "playwright", "chrome-extension"]
+                "type": "string"
               },
               "join_timeout_sec": {
                 "type": "number"
@@ -25479,8 +25463,7 @@
                 "type": "string"
               },
               "audio_bridge": {
-                "type": "string",
-                "enum": ["blackhole", "pulseaudio", "none"]
+                "type": "string"
               },
               "answers": {
                 "type": "array"
@@ -25528,8 +25511,7 @@
                 "type": "boolean"
               },
               "join_backend": {
-                "type": "string",
-                "enum": ["auto", "playwright", "chrome-extension"]
+                "type": "string"
               },
               "join_timeout_sec": {
                 "type": "number"
@@ -25807,8 +25789,7 @@
                 "type": "string"
               },
               "audio_bridge": {
-                "type": "string",
-                "enum": ["blackhole", "pulseaudio", "none"]
+                "type": "string"
               },
               "answers": {
                 "type": "array"
@@ -25856,8 +25837,7 @@
                 "type": "boolean"
               },
               "join_backend": {
-                "type": "string",
-                "enum": ["auto", "playwright", "chrome-extension"]
+                "type": "string"
               },
               "join_timeout_sec": {
                 "type": "number"
@@ -26896,6 +26876,9 @@
             "type": "object",
             "properties": {
               "export_as": {
+                "type": "string"
+              },
+              "method": {
                 "type": "string"
               }
             },
@@ -28247,7 +28230,7 @@
               },
               "method": {
                 "type": "string",
-                "enum": ["GET", "POST", "PUT", "DELETE"]
+                "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]
               },
               "params": {
                 "type": "object",
@@ -28297,7 +28280,7 @@
               },
               "method": {
                 "type": "string",
-                "enum": ["GET", "POST", "PUT", "DELETE"]
+                "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]
               },
               "params": {
                 "type": "object",
@@ -28347,7 +28330,7 @@
               },
               "method": {
                 "type": "string",
-                "enum": ["GET", "POST", "PUT", "DELETE"]
+                "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]
               },
               "params": {
                 "type": "object",
@@ -28409,7 +28392,7 @@
               },
               "method": {
                 "type": "string",
-                "enum": ["GET", "POST", "PUT", "DELETE"]
+                "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]
               },
               "params": {
                 "type": "object",
@@ -28459,7 +28442,7 @@
               },
               "method": {
                 "type": "string",
-                "enum": ["GET", "POST", "PUT", "DELETE"]
+                "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]
               },
               "params": {
                 "type": "object",
@@ -28509,7 +28492,7 @@
               },
               "method": {
                 "type": "string",
-                "enum": ["GET", "POST", "PUT", "DELETE"]
+                "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]
               },
               "params": {
                 "type": "object",
@@ -32998,8 +32981,7 @@
                 "type": "string"
               },
               "backend": {
-                "type": "string",
-                "enum": ["auto", "bridge", "fluid_audio", "mlx_whisper"]
+                "type": "string"
               },
               "prefer_timestamps": {
                 "type": "boolean"
@@ -33045,8 +33027,7 @@
                 "type": "string"
               },
               "backend": {
-                "type": "string",
-                "enum": ["auto", "bridge", "fluid_audio", "mlx_whisper"]
+                "type": "string"
               },
               "prefer_timestamps": {
                 "type": "boolean"

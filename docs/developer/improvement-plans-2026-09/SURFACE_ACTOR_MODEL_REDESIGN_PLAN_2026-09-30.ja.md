@@ -3,7 +3,7 @@ title: Surfaces 再設計 — 「個人」と「組織」の定義から作り�
 category: Improvement Plan
 tags: [surfaces, onboarding, identity, organization, personal, integration, redesign]
 last_updated: 2026-09-30
-status: proposal
+status: active
 ---
 
 # Surfaces 再設計 — 「個人」と「組織」の定義から作り直す

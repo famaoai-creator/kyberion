@@ -2,7 +2,7 @@
 title: マネージド SaaS 実用化計画
 tags: [improvement-plan, 2026-09, saas, production-readiness, multi-tenant]
 last_updated: 2026-09-30
-status: proposed
+status: active
 ---
 
 # マネージド SaaS 実用化計画

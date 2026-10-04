@@ -7,9 +7,8 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { TtsLoopbackVerifier } from '@agent/core/voice/tts-loopback-verifier';
 import { resolveVoiceBackend } from '@agent/core/media/media-backend-registry';
 import { resolveVoiceEngineForPlatform } from '@agent/core/voice/voice-engine-registry';
-import { safeExec } from '@agent/core/secure-io';
 import { resolveAudioBus, type AudioBusId } from '@agent/core/voice/audio-bus-resolver';
-import { performPlayback } from './voice-runtime-helpers.js';
+import { performPlayback, resolveVoicePlaybackPlatformAdapter } from './voice-runtime-helpers.js';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import {
@@ -128,38 +127,9 @@ export async function listVoices(): Promise<any> {
     return { status: 'succeeded', voices: [], engine_id: engine.engine_id };
   }
 
-  if (process.platform === 'darwin') {
-    const output = safeExec('say', ['-v', '?']);
-    const voices = output
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const voice = line.split(/\s+/)[0];
-        return { id: voice, display_name: voice, provider: 'say' };
-      });
-    return { status: 'succeeded', voices, engine_id: engine.engine_id };
-  }
-
-  if (process.platform === 'linux') {
-    return {
-      status: 'succeeded',
-      voices: [{ id: 'espeak-default', display_name: 'espeak default', provider: 'espeak' }],
-      engine_id: engine.engine_id,
-    };
-  }
-
-  if (process.platform === 'win32') {
-    return {
-      status: 'succeeded',
-      voices: [
-        { id: 'windows-default', display_name: 'Windows Speech Synthesizer', provider: 'sapi' },
-      ],
-      engine_id: engine.engine_id,
-    };
-  }
-
-  return { status: 'succeeded', voices: [], engine_id: engine.engine_id };
+  const platformAdapter = resolveVoicePlaybackPlatformAdapter(process.platform);
+  const voices = (await platformAdapter.listVoices?.()) || [];
+  return { status: 'succeeded', voices, engine_id: engine.engine_id };
 }
 
 export async function listAudioRoutes(
