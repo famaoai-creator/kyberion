@@ -7126,6 +7126,18 @@
     "./state-probe": {
       "types": "./dist/state-probe.d.ts",
       "default": "./dist/state-probe.js"
+    },
+    "./surface/front-desk-conversation-history": {
+      "types": "./dist/surface/front-desk-conversation-history.d.ts",
+      "default": "./dist/surface/front-desk-conversation-history.js"
+    },
+    "./surface/front-desk-conversation-store": {
+      "types": "./dist/surface/front-desk-conversation-store.d.ts",
+      "default": "./dist/surface/front-desk-conversation-store.js"
+    },
+    "./surface/surface-conversation-runtime-context": {
+      "types": "./dist/surface/surface-conversation-runtime-context.d.ts",
+      "default": "./dist/surface/surface-conversation-runtime-context.js"
     }
   },
   "dependencies": {

@@ -653,6 +653,31 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/front-desk-conversation-store.ts#asStore",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/front-desk-conversation-store.ts#completeConversationTurn (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/front-desk-conversation-store.ts#markConversationTurnNotStarted (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/front-desk-conversation-store.ts#markConversationTurnUncertain (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/front-desk-conversation-store.ts#reserveConversationTurn (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/operator-notifications.ts#deliver",
       "roles": ["surface_runtime"],
       "unresolved": []
@@ -1337,21 +1362,6 @@
       "unresolved": []
     },
     {
-      "site": "presence/displays/concierge/src/lib/conversation-store.ts#asStore",
-      "roles": ["sovereign_concierge"],
-      "unresolved": []
-    },
-    {
-      "site": "presence/displays/concierge/src/lib/conversation-store.ts#beginConversationTurn (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": ["sovereign_concierge"],
-      "unresolved": []
-    },
-    {
-      "site": "presence/displays/concierge/src/lib/conversation-store.ts#completeConversationTurn (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": ["sovereign_concierge"],
-      "unresolved": []
-    },
-    {
       "site": "presence/displays/concierge/src/lib/front-desk-member.ts#resolveConciergeMembership",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -1848,6 +1858,11 @@
     {
       "site": "scripts/oauth_callback_surface.ts#<module>",
       "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/onboarding_apply.ts#ensureDir",
+      "roles": ["sovereign_concierge"],
       "unresolved": []
     },
     {

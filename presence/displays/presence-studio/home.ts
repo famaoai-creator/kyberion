@@ -66,6 +66,7 @@ export interface HomeProgressItem {
   title: string;
   detail?: string;
   percent?: number;
+  progress_basis?: 'phase_estimate';
   when?: string;
   href_hint: 'work' | 'outcome';
 }
@@ -155,6 +156,9 @@ export function buildHomePayload(input: BuildHomePayloadInput): HomePayload {
       kind: 'in_progress' as const,
       title: session.title,
       percent: estimateTaskSessionPercent(session.status),
+      ...(estimateTaskSessionPercent(session.status) !== undefined
+        ? { progress_basis: 'phase_estimate' as const }
+        : {}),
       when: session.when,
       href_hint: 'work' as const,
     }))

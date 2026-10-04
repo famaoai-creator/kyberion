@@ -351,7 +351,7 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     expect(route).toContain('resolveConciergeViewer');
     expect(route).toMatch(/resolved\.response/);
     expect(route).toContain('no-store');
-    expect(route).toContain('loadSurfaceManifest');
+    expect(route).toContain('resolveSurfaceBrowserUrl');
     expect(route).toContain('chronos-mirror-v2');
   });
 });
@@ -366,6 +366,10 @@ describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
       return {
         ...actual,
         readFrontDeskSurfacePorts: () => ({ 'presence-studio': 4031, concierge: 4050 }),
+        readFrontDeskSurfaceUrls: () => ({
+          'presence-studio': 'http://127.0.0.1:4031',
+          concierge: 'http://127.0.0.1:4050',
+        }),
       };
     });
 

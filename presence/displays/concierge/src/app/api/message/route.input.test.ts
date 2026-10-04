@@ -1,11 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const guard = vi.hoisted(() => vi.fn(() => null));
+const run = vi.hoisted(() => vi.fn());
 const viewer = vi.hoisted(() => ({
   role: 'readonly' as const,
   tenantSlugs: ['tenant-a'],
-  organizationIds: [],
-  projectIds: [],
+  organizationIds: 'all' as const,
+  projectIds: 'all' as const,
   tierAccess: ['public'] as Array<'public'>,
   source: 'token' as const,
   principalId: 'human:test-reader',
@@ -20,6 +21,21 @@ vi.mock('../../../lib/viewer-context', () => ({
   })),
   resolveConciergeViewer: vi.fn(() => ({ context: viewer })),
 }));
+vi.mock('../../../lib/conversation-store', async () => {
+  const actual = await vi.importActual<
+    typeof import('@agent/core/surface/front-desk-conversation-store')
+  >('@agent/core/surface/front-desk-conversation-store');
+  return {
+    ...actual,
+    conversationRef: () => ({ sessionId: 'server-input-thread', key: 'b'.repeat(64) }),
+    reserveConversationTurn: () => ({ id: '22222222-2222-4222-8222-222222222222', created: true }),
+    completeConversationTurn: vi.fn(),
+    markConversationTurnUncertain: vi.fn(),
+    markConversationTurnNotStarted: vi.fn(),
+    completedConversationContext: () => ({ messages: [], truncated: false }),
+  };
+});
+vi.mock('@agent/core/surface/channel-surface', () => ({ runSurfaceMessageConversation: run }));
 vi.mock('../../../lib/i18n', () => ({
   conciergeText: vi.fn((key: string) => key),
   resolveConciergeLocale: vi.fn(() => 'en'),
@@ -33,6 +49,8 @@ function request(body: unknown) {
     json: async () => body,
   } as any;
 }
+
+beforeEach(() => vi.clearAllMocks());
 
 describe('concierge message input contract', () => {
   it.each([
@@ -50,7 +68,7 @@ describe('concierge message input contract', () => {
     fetchSpy.mockRestore();
   });
 
-  it('projects a voice-hub approval-required contract as an execution preview', async () => {
+  it('projects a scoped orchestrator approval-required contract without contacting voice-hub', async () => {
     const intentResolution = {
       request_id: 'request-approval-1',
       normalized_intent: 'send the approved report',
@@ -65,24 +83,31 @@ describe('concierge message input contract', () => {
       },
       rationale: 'The requested operation changes external state.',
     };
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ reply: 'Ready for approval.', intentResolution }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      })
-    );
+    run.mockResolvedValue({ text: 'Ready for approval.', intentResolution });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
     const response = await POST(request({ text: 'send the approved report' }));
     const payload = await response.json();
 
     expect(response.status).toBe(200);
     expect(payload).toMatchObject({
-      mode: 'voice-hub',
+      mode: 'orchestrator',
       shape: 'execution_preview',
       nextActions: [{ id: 'approve', label: 'Approve and start' }],
       intentResolution,
     });
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationKey: 'b'.repeat(64),
+        conversationHistory: [],
+        scope: expect.objectContaining({
+          viewer_principal: 'human:test-reader',
+          tenant_slug: 'tenant-a',
+          tier: 'public',
+        }),
+      })
+    );
     fetchSpy.mockRestore();
   });
 });

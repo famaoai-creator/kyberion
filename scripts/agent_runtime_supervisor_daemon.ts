@@ -728,9 +728,13 @@ async function handleRequest(
       }
       case 'ensure': {
         const payload = request.payload || {};
+        if (payload.manifestAgentId !== undefined && typeof payload.manifestAgentId !== 'string') {
+          throw new Error('[AGENT_MANIFEST_ALIAS_INVALID] manifestAgentId must be a string');
+        }
         const agentId = String(payload.agentId || '');
         const handle = await ensureAgentRuntime({
           agentId,
+          manifestAgentId: payload.manifestAgentId as string | undefined,
           provider: String(payload.provider || ''),
           modelId: typeof payload.modelId === 'string' ? payload.modelId : undefined,
           systemPrompt: typeof payload.systemPrompt === 'string' ? payload.systemPrompt : undefined,
