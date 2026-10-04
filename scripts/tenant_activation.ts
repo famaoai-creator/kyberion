@@ -12,6 +12,7 @@ import {
   type TenantActivationProbeCheck,
   type TenantActivationProbeRefs,
 } from '@agent/core/organization/tenant-activation';
+import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
@@ -98,7 +99,16 @@ export function main(argv: string[] = [], print: Print = () => undefined): void 
     print(usage());
     return;
   }
-  if (command === 'probe') return probe(argv, print);
+  // Activation reads the tenant registry (personal tier) and writes the receipt
+  // beside the customer overlay: the governed onboarding authority, the same
+  // role `pnpm tenant` assumes, so the operator needs no exported persona.
+  if (command === 'probe') {
+    return withExecutionContextAsync('sovereign_concierge', () => probe(argv, print));
+  }
+  withExecutionContext('sovereign_concierge', () => dispatch(command, argv, print));
+}
+
+function dispatch(command: string, argv: string[], print: Print): void {
   if (command === 'show') {
     const activationInput = input(argv);
     print(JSON.stringify(loadTenantActivation(activationInput, activationInput.rootDir), null, 2));
