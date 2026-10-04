@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, autonomy, resident-agent, dots, charter, supervision]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-10-02
+last_updated: 2026-10-04
 ---
 
 # Resident Dot Model
@@ -17,17 +17,20 @@ existing primitives and defines the missing piece: the **dot charter**.
 
 ## Element mapping
 
-| OpenAI dot element                     | Kyberion primitive                                                                     |
-| -------------------------------------- | -------------------------------------------------------------------------------------- |
-| Holds an ongoing responsibility        | `DotCharter` (`dots/`) + `worker-goal-driver` goal loop (KD-01)                        |
-| Own computer + browser                 | Local host + browser-actuator / system-actuator (`computer_interaction`)               |
-| App connections                        | Actuators + provenance-gated plugins + MCP bridges                                     |
-| Delegates heavy work                   | mission_controller / WorkItem + `delegateTask` subagents + multi-provider co-execution |
-| Works between conversations            | `chronos` scheduler + `trigger-runner` (`cron`/`watch`/`wake`)                         |
-| Messages you when a decision is needed | `autonomous-ops-gate` → `approval-store` → satellites (slack/telegram/imessage)        |
-| Persistent memory                      | `knowledge/` tiers + distill → `memory-promote` loop                                   |
-| Emergency stop                         | `kill-switch`                                                                          |
-| Liveness                               | `daemon-heartbeat` + `daemon_watchdog` + leader lease                                  |
+| OpenAI dot element                     | Kyberion primitive                                                                      |
+| -------------------------------------- | --------------------------------------------------------------------------------------- |
+| Holds an ongoing responsibility        | `DotCharter` (`dots/`) + `worker-goal-driver` goal loop (KD-01)                         |
+| Own computer + browser                 | Local host + browser-actuator / system-actuator (`computer_interaction`)                |
+| App connections                        | Actuators + provenance-gated plugins + MCP bridges                                      |
+| Delegates heavy work                   | mission_controller / WorkItem + `delegateTask` subagents + multi-provider co-execution  |
+| Works between conversations            | `chronos` scheduler + `trigger-runner` (`cron`/`watch`/`wake`)                          |
+| Messages you when a decision is needed | proposal → `autonomous-ops-gate` + charter floor → decision card / veto → charter route |
+| Specialist identity                    | `dot:<id>` actor on WorkItems, approvals, audit chain; authority = charter role         |
+| Teams of dots                          | `team.responsibilities` (exclusive) + `accepts_handoffs_from` handoffs                  |
+| Learns from feedback                   | `dot-feedback.jsonl` → learned floors + prompt; `signal_probes` → signal ledger         |
+| Persistent memory                      | `knowledge/` tiers + distill → `memory-promote` loop                                    |
+| Emergency stop                         | `kill-switch`                                                                           |
+| Liveness                               | `daemon-heartbeat` + `daemon_watchdog` + leader lease                                   |
 
 ## The charter is the only new contract
 
@@ -60,9 +63,67 @@ decision floor (ops-gate), and notification (deliver_to + digest). See
 5. The dot's heartbeat (`runtime.heartbeat_id`) joins `daemon_watchdog`'s
    supervised set while active (`listActiveDotHeartbeatIds`), so a silent dot
    pages, same as any daemon.
-6. `autonomous-ops-gate` per-action floors (`decisions.*`) and
-   `notification.deliver_to` sends remain follow-on; the pilot stays
-   `default_decision: notify` and coordinates through its role scopes.
+6. A dot never acts directly: it proposes (MSN-RESIDENT-DOT-AUTONOMY-20261004,
+   see "Governed proposals" below).
+
+## Governed proposals (landed MSN-RESIDENT-DOT-AUTONOMY-20261004)
+
+A wake produces **proposals**, not effects: tool-capable backends call
+`dot_propose_action`; delegated shell CLIs end their reply with a fenced
+`dot-proposals` JSON array (`libs/core/dot/dot-proposals.ts`). The runtime
+governs each one in the supervisor process, under the charter role
+(`libs/core/dot/dot-dispatch.ts`):
+
+1. **Charter bounds**: the policy action is derived, never chosen by the dot
+   (`dot_handoff` with `handoff_to`, else `dot_delegate_work`), so a dot cannot
+   name a cheaper policy action. Then `allowed_work_shapes` (default `task_session`,
+   `direct_reply`), handoff acceptance, and `max_concurrent_delegations`
+   (default 3). Open WorkItems and parked decisions both count toward the cap.
+2. **Decision**: the `autonomous-ops-gate` verdict is raised to the strictest
+   of `decisions.default_decision`, the floor learned from operator
+   rejections, and the dot's own `requested_decision`. A charter
+   `veto_window_minutes` may lengthen the policy window, never shorten it.
+   Both dot actions score notify with a 60-minute policy veto window, so
+   they become veto cards. A handoff creates the same ready WorkItem as a
+   delegation, so it must never be the cheaper path.
+3. **Routing**: `routeAutonomousDecision` handles the decision card, the veto
+   window, and the digest notice. It delivers to the charter route:
+   `notification.delivery_mode` is `inbox` by default, and only `live` sends
+   to `deliver_to`. Quiet hours defer delivery to the inbox. A veto card
+   delivered to the inbox never starts its clock, so it falls back to a human
+   decision. Silence counts as consent only when the operator could actually
+   hear it. Waiting decisions count toward `max_concurrent_delegations`, so a
+   dot pauses proposing while that many wait. Message content stays local by
+   default; devices subscribed to Web Push still get a content-free wake-up.
+4. **Outcome**: proceed creates a `ready` WorkItem. Parked decisions are
+   settled each sweep (`settleDotParkedActions`): approved runs after the
+   charter scope is re-checked (it may have narrowed while it waited);
+   anything else is declined, and a declined proposal is not re-asked for
+   24 hours. Settlement is idempotent across a crash (one feedback row per
+   action, an existing WorkItem for the `action_ref` is reused), and a
+   transient approval-store read failure leaves the action parked. The
+   supervisor also ticks autonomy veto windows each sweep.
+
+**Identity**: every effect carries `dot:<dot_id>`. It appears in WorkItem
+metadata, as the approval requester, as the audit-chain `agentId`/`actor`,
+and in notification titles. A dot's authority is still exactly its role.
+Per-dot secret scoping beyond the role is not implemented.
+
+**Teams**: `team.responsibilities` are exclusive; activation is refused
+while another active dot holds the same key. A handoff creates a WorkItem and
+an inbox row `{dot_id: target, payload.handoff_from}`. That row wakes the
+target only if the target's `team.accepts_handoffs_from` lists the sender,
+even when the target declares no wake trigger.
+
+**Learning**: settled decisions land in `dot-feedback.jsonl`. A rejection
+raises the dot's floor (dot-wide, so re-labelling the work cannot escape it)
+to `approve` until 3 approvals with `decidedByType: human` follow;
+veto-window silence and agent or service deciders do not count. Feedback
+older than 30 days expires, so an old rejection stops holding the floor. It also feeds the execution-feedback
+store, so distill can propose a reviewed improvement. Recent feedback and
+`goal.signal_probes` measurements (`dot-signal-ledger.jsonl`) are injected
+into the next wake prompt and the `digest_cron` digest, and are shown in
+`kyberion dot status`.
 
 ## Hard-won constraint from MSN-RESIDENT-DOT-20261002
 

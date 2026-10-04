@@ -29331,6 +29331,18 @@
               },
               "scope": {
                 "type": "string"
+              },
+              "input_device_preference": {
+                "type": "string"
+              },
+              "output_device_preference": {
+                "type": "string"
+              },
+              "camera_device_preference": {
+                "type": "string"
+              },
+              "preferred_camera_backend": {
+                "type": "string"
               }
             },
             "additionalProperties": false

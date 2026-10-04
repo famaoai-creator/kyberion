@@ -30,6 +30,7 @@ export const SEE_USAGE = `Usage: pnpm kyberion see <image> [--describe] [--lang 
 Reads the text in a ${IMAGE_EXTENSIONS.join(' / ')} image with local OCR (no data egress) and prints Markdown.
   --describe     Also caption the image via the image description bridge (provider noted in the output)
   --lang <tag>   OCR language hint, e.g. ja, en, ja+en
+  --timeout-ms <ms>  OCR deadline (default 120000)
   --json         Print {file, bytes, width, height, ocr, description, warnings} as JSON
   --out <file>   Write the Markdown (or JSON) to a file inside the repository instead of stdout
   --verbose      Keep runtime logs (they go to stdout; off by default so stdout is the content)
@@ -39,6 +40,7 @@ The file must be inside the repository. Copy external files first, e.g.
 
 interface SeeArgs extends CommonArgs {
   describe: boolean;
+  timeoutMs?: number;
 }
 
 export interface SeeResult {
@@ -61,7 +63,12 @@ function parseSeeArgs(argv: string[]): SeeArgs {
       index += common.consumed;
       continue;
     }
-    if (value === '--describe') args.describe = true;
+    if (value === '--timeout-ms') {
+      const timeout = Number(argv[++index]);
+      if (!Number.isFinite(timeout) || timeout <= 0)
+        throw new ScriptExitError(1, '--timeout-ms requires a positive number');
+      args.timeoutMs = timeout;
+    } else if (value === '--describe') args.describe = true;
     else if (value.startsWith('--')) throw new ScriptExitError(1, `Unknown option: ${value}`);
     else if (!args.file) args.file = value;
     else throw new ScriptExitError(1, `Unexpected argument: ${value}`);
@@ -118,6 +125,13 @@ export async function runSeeCommand(
     const ocr = await deps.ocr({
       path: relative,
       mode: 'local_only',
+      timeout_ms: args.timeoutMs,
+      onProgress: (event) => {
+        if (deps === defaultPerceptionDeps)
+          process.stderr.write(
+            `[see] OCR ${event.stage}${event.provider ? ` (${event.provider})` : ''}\n`
+          );
+      },
       ...(args.lang ? { language: args.lang } : {}),
     });
     result.ocr = {

@@ -52,6 +52,12 @@ export interface DotCharter {
   goal: {
     statement: string;
     success_signals?: string[];
+    /** Measurable form of success_signals: a signal is healthy while its probe matches. */
+    signal_probes?: Array<{
+      signal: string;
+      probe: import('../state-probe.js').StateProbeSpec;
+      every_s?: number;
+    }>;
     budget?: {
       max_turns_per_wake?: number;
       wall_clock_ms_per_wake?: number;
@@ -79,6 +85,16 @@ export interface DotCharter {
     };
     digest_cron?: string;
     quiet_hours?: { start?: string; end?: string; timezone?: string };
+    /** `inbox` (default) keeps every send in the local inbox; `live` uses deliver_to. */
+    delivery_mode?: 'inbox' | 'live';
+  };
+  team?: {
+    /** Exclusive responsibility keys; two active dots may not hold the same key. */
+    responsibilities?: string[];
+    /** Dots allowed to hand work to this one through the dot inbox. */
+    accepts_handoffs_from?: string[];
+    /** Organization-level goal this dot contributes to (display + digest grouping). */
+    goal_ref?: string;
   };
   runtime: {
     heartbeat_id: string;

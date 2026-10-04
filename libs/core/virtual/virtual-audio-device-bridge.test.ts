@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { StubAudioBus } from '../voice/audio-bus.js';
 import {
   VIRTUAL_AUDIO_DEVICE_BRIDGE_ID,
@@ -14,6 +14,25 @@ function once<T>(iterable: AsyncIterable<T>): Promise<T> {
 }
 
 describe('createVirtualAudioDeviceBridge', () => {
+  it('passes requested devices to a bus before opening and rejects unsupported routing', async () => {
+    const bus = new StubAudioBus();
+    const selectDevices = vi.fn(async () => undefined);
+    const open = vi.spyOn(bus, 'open');
+    const format: AudioFormat = { encoding: 'pcm_s16le', sample_rate_hz: 16000, channels: 1 };
+    const selectable = Object.assign(bus, { selectDevices });
+    await createVirtualAudioDeviceBridge({
+      bus: selectable,
+      input_device_preference: 'Requested Mic',
+    }).open(format);
+    expect(selectDevices).toHaveBeenCalledWith({ input: 'Requested Mic', output: undefined });
+    expect(open).toHaveBeenCalledWith(format);
+    await expect(
+      createVirtualAudioDeviceBridge({
+        bus: new StubAudioBus(),
+        input_device_preference: 'Requested Mic',
+      }).open(format)
+    ).rejects.toThrow('does not support');
+  });
   it('wraps a bus with a stable bridge identity', async () => {
     const bus = new StubAudioBus();
     const bridge = createVirtualAudioDeviceBridge({ bus });

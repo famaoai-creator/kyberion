@@ -201,4 +201,42 @@ describe('createVirtualAudioInputRecordingBridge', () => {
       expect.objectContaining({ stdio: ['ignore', 'pipe', 'pipe'] })
     );
   });
+
+  it('allows a provider-specific recording backend to be registered', async () => {
+    const { createVirtualAudioInputRecordingBridge, registerAudioInputRecordingBackend } =
+      await import('./virtual-audio-input-recording-bridge.js');
+    const unregister = registerAudioInputRecordingBackend({
+      backend: 'test-provider-input',
+      platforms: ['darwin'],
+      inputFormat: 'test-input',
+      inputSpec: (name) => `source=${name}`,
+      recordingArgs: (name, _index, durationSec, outputPath) => [
+        '-f',
+        'test-input',
+        '-i',
+        `source=${name}`,
+        '-t',
+        String(durationSec),
+        outputPath,
+      ],
+    });
+
+    try {
+      const result = await createVirtualAudioInputRecordingBridge().recordOnInputs(
+        ['Built-in Microphone'],
+        { duration_sec: 2, output_path: 'active/shared/tmp/audio-input-recordings/provider.wav' }
+      );
+
+      expect(result.recordings[0]).toEqual(
+        expect.objectContaining({ selected_backend: 'test-provider-input', status: 'recorded' })
+      );
+      expect(mocks.safeExec).toHaveBeenCalledWith(
+        'ffmpeg',
+        expect.arrayContaining(['-f', 'test-input', '-i', 'source=Built-in Microphone']),
+        expect.any(Object)
+      );
+    } finally {
+      unregister();
+    }
+  });
 });

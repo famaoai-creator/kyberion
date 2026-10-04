@@ -48,6 +48,8 @@ import '../libs/core/task/task-plan-coordinator-port.js';
 import '../libs/core/task/task-session.js';
 import '../libs/core/surface/ui-element-detector.js';
 import '../libs/core/virtual/virtual-camera-bridge.js';
+import '../libs/core/virtual/screen-capture-bridge.js';
+import '../libs/core/virtual/virtual-device-inventory-bridge.js';
 import '../libs/core/voice/voice-bridge.js';
 import '../libs/core/voice/vad-registry.js';
 import '../libs/core/environment-capability.js';
