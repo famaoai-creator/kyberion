@@ -57,10 +57,11 @@ The install method is declared in the `tailscale` tool runtime
 
 ## Expose event intake for GitHub webhooks
 
-1. Enable the source and store its secret (see `dots/README.md`, "Operator
-   steps"): set `enabled: true` for `github` in
-   `knowledge/product/governance/event-intake-policy.json` and register
-   `EVENT_INTAKE_GITHUB_SECRET` with `pnpm kyberion secret introduce`.
+1. Enable the source on this host and store its secret (see `dots/README.md`,
+   "Operator steps"): set `KYBERION_EVENT_INTAKE_SOURCES=github` in the
+   environment of the process that runs the surface (no edit to the shared
+   `event-intake-policy.json`), and register `EVENT_INTAKE_GITHUB_SECRET` with
+   `pnpm kyberion secret introduce`.
 2. Start the surface: `pnpm surfaces enable -- --surface event-intake-surface`
    then `pnpm surfaces start -- --surface event-intake-surface`.
 3. `pnpm kyberion ingress up --surface event-intake` — prints
