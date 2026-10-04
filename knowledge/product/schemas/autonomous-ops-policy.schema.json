@@ -108,6 +108,66 @@
         }
       },
       "required": ["start", "end", "timezone"]
+    },
+    "autonomy": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Resident-dot graduated autonomy (L0-L4). Promotion always needs a human approval; demotion is automatic.",
+      "properties": {
+        "relaxable_actions": {
+          "type": "array",
+          "description": "Actions an L4 dot may relax from notify to auto (reversible, no high-risk paths; never a never_auto class or a policy approve).",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "promotion": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "min_decisions": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "min_agreement": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "min_outcome_success": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "max_incidents_30d": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": ["min_decisions", "min_agreement", "min_outcome_success", "max_incidents_30d"]
+        },
+        "demotion": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "on_regressed_outcomes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "on_rejection_streak": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "on_incident": {
+              "type": "boolean"
+            }
+          },
+          "required": ["on_regressed_outcomes", "on_rejection_streak", "on_incident"]
+        }
+      },
+      "required": ["relaxable_actions", "promotion", "demotion"]
     }
   },
   "required": ["version", "decision_thresholds", "axis_weights", "actions"],

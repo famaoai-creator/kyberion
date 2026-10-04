@@ -125,6 +125,8 @@ export interface DotActionRecord {
   request_id?: string;
   work_item_id?: string;
   reason?: string;
+  /** Set when the action was declined as `superseded` by another dot's approved action (DL-11). */
+  superseded_by?: { dot_id: string; action_ref: string };
   /** Set when a pre-gate check forced an operator decision. */
   escalation?: {
     check_id: string;
@@ -194,6 +196,17 @@ export function currentDotActions(dotId: string, deps: DotDispatchDeps = {}): Do
   return [...latest.values()];
 }
 
+/**
+ * Latest state per action_ref across every dot (insertion order preserved).
+ * Callers comparing dots must apply their own tenant-scope filter.
+ */
+export function latestDotActions(deps: DotDispatchDeps = {}): DotActionRecord[] {
+  const latest = new Map<string, DotActionRecord>();
+  for (const row of readDotActionLedger(deps)) latest.set(row.action_ref, row);
+  return [...latest.values()];
+}
+
+/** Identity of a proposal for dedupe: includes pipeline, target and intent so opposing proposals never collapse. */
 export function dotProposalHash(dotId: string, proposal: DotProposal): string {
   return createHash('sha256')
     .update(
@@ -203,6 +216,11 @@ export function dotProposalHash(dotId: string, proposal: DotProposal): string {
         proposal.title,
         proposal.objective,
         proposal.handoff_to ?? '',
+        // Appended only when set, so hashes of proposals without these fields
+        // (and their dedupe windows) are unchanged.
+        ...(proposal.pipeline_ref || proposal.target || proposal.intent
+          ? [proposal.pipeline_ref ?? '', proposal.target ?? '', proposal.intent ?? '']
+          : []),
       ])
     )
     .digest('hex')
@@ -265,6 +283,7 @@ export function dotBoundsPromptLines(charter: DotCharter, deps: DotDispatchDeps 
       (other) =>
         other.dot_id !== charter.dot_id &&
         other.status === 'active' &&
+        sameDotHandoffScope(charter, other) &&
         (other.team?.accepts_handoffs_from ?? []).includes(charter.dot_id)
     )
     .map((other) => other.dot_id);
@@ -323,6 +342,17 @@ function recordAudit(
 
 export type DotBoundsVerdict = { ok: true } | { ok: false; reason: string };
 
+/**
+ * A handoff never crosses a tenant: same tenant_slug (both untenanted counts
+ * as the same), and the same organization_id when both declare one.
+ */
+function sameDotHandoffScope(from: DotCharter, to: DotCharter): boolean {
+  if ((from.scope.tenant_slug ?? '') !== (to.scope.tenant_slug ?? '')) return false;
+  const fromOrg = from.scope.organization_id;
+  const toOrg = to.scope.organization_id;
+  return !fromOrg || !toOrg || fromOrg === toOrg;
+}
+
 /** What the proposal may be at all: action, shape, handoff target. Re-checked at settlement. */
 function checkDotProposalScope(
   charter: DotCharter,
@@ -361,6 +391,12 @@ function checkDotProposalScope(
     );
     if (!target || target.status !== 'active') {
       return { ok: false, reason: `handoff target '${proposal.handoff_to}' is not an active dot` };
+    }
+    if (!sameDotHandoffScope(charter, target)) {
+      return {
+        ok: false,
+        reason: `cross-tenant handoff denied: '${charter.dot_id}' and '${proposal.handoff_to}' are in different tenant scopes`,
+      };
     }
     if (!(target.team?.accepts_handoffs_from ?? []).includes(charter.dot_id)) {
       return {
@@ -851,7 +887,8 @@ function dotDecisionExpired(
 
 function expirePendingDecision(
   approval: ApprovalRequestRecord,
-  deps: DotDispatchDeps
+  deps: DotDispatchDeps,
+  reason = 'dot_decision_expired'
 ): ApprovalRequestRecord | null {
   try {
     return (
@@ -861,7 +898,7 @@ function expirePendingDecision(
           channel: record.channel,
           storageChannel: AUTONOMY_APPROVAL_CHANNEL,
           requestId: record.id,
-          reason: 'dot_decision_expired',
+          reason,
         }))
     )(approval);
   } catch (error) {
@@ -881,6 +918,46 @@ function declineParked(
   recordAudit(charter, row.action_id, 'denied', { action_ref: row.action_ref, reason }, deps);
   return appendActionRecord(
     { ...row, status: 'declined', reason, at: nowOf(deps).toISOString() },
+    deps
+  );
+}
+
+/** Decline reason for a parked action replaced by another dot's approved action (DL-11). */
+export const DOT_SUPERSEDED_REASON = 'superseded';
+
+/**
+ * Decline a parked action because another dot's approved action replaced it.
+ * Unlike an operator rejection this records NO dot feedback, so it never
+ * raises the dot's learned decision floor; its pending card is expired so the
+ * operator is not asked twice. Returns undefined when the action is not parked.
+ */
+export function supersedeDotParkedAction(
+  charter: DotCharter,
+  actionRef: string,
+  supersededBy: { dot_id: string; action_ref: string },
+  deps: DotDispatchDeps = {}
+): DotActionRecord | undefined {
+  const row = currentDotActions(charter.dot_id, deps).find(
+    (candidate) => candidate.action_ref === actionRef
+  );
+  if (!row || row.status !== 'parked') return undefined;
+  if (row.request_id) {
+    const load =
+      deps.loadApproval ??
+      ((requestId: string) => loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, requestId));
+    try {
+      const approval = load(row.request_id);
+      if (approval?.status === 'pending') expirePendingDecision(approval, deps, 'dot_superseded');
+    } catch (error) {
+      logger.warn(
+        `[dot-dispatch] approval ${row.request_id} unreadable while superseding ${actionRef} — ${error instanceof Error ? error.message : error} | next: the action is still declined; the stale card can be dismissed`
+      );
+    }
+  }
+  return declineParked(
+    charter,
+    { ...row, superseded_by: supersededBy },
+    DOT_SUPERSEDED_REASON,
     deps
   );
 }
