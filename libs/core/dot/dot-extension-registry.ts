@@ -9,6 +9,7 @@
 import type {
   DotDecisionRelaxer,
   DotDigestSection,
+  DotDispositionOverride,
   DotFloorContributor,
   DotPreGateCheck,
   DotPromptSection,
@@ -31,6 +32,7 @@ import { dotExecutorStatusSection, dotWorkResultsPromptSection } from './dot-exe
 import {
   dotAutonomyDecisionRelaxer,
   dotAutonomyDigestSection,
+  dotAutonomyDispositionOverride,
   dotAutonomyFloorContributor,
   dotAutonomyStatusSection,
 } from './dot-autonomy.js';
@@ -46,6 +48,7 @@ export const DOT_PROMPT_SECTIONS: DotPromptSection[] = [];
 export const DOT_FLOOR_CONTRIBUTORS: DotFloorContributor[] = [];
 export const DOT_PRE_GATE_CHECKS: DotPreGateCheck[] = [];
 export const DOT_DECISION_RELAXERS: DotDecisionRelaxer[] = [];
+export const DOT_DISPOSITION_OVERRIDES: DotDispositionOverride[] = [];
 export const DOT_WAKE_TOOLS: DotWakeTool[] = [];
 export const DOT_STATUS_SECTIONS: DotStatusSection[] = [];
 export const DOT_DIGEST_SECTIONS: DotDigestSection[] = [];
@@ -76,6 +79,7 @@ DOT_PRE_GATE_CHECKS.push(dotArbitrationPreGateCheck());
 // DL-10 graduated autonomy
 DOT_FLOOR_CONTRIBUTORS.push(dotAutonomyFloorContributor());
 DOT_DECISION_RELAXERS.push(dotAutonomyDecisionRelaxer());
+DOT_DISPOSITION_OVERRIDES.push(dotAutonomyDispositionOverride());
 DOT_STATUS_SECTIONS.push(dotAutonomyStatusSection());
 DOT_DIGEST_SECTIONS.push(dotAutonomyDigestSection());
 

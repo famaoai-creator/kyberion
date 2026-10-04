@@ -112,11 +112,15 @@
     "autonomy": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Resident-dot graduated autonomy (L0-L4). Promotion always needs a human approval; demotion is automatic.",
+      "description": "Resident-dot graduated autonomy (L0-L4). L0 is true shadow: proposals are recorded only (no decision card, no WorkItem). Promotion always needs a human approval; demotion is automatic.",
       "properties": {
+        "description": {
+          "type": "string",
+          "description": "Operator-facing note on how this autonomy section is applied."
+        },
         "relaxable_actions": {
           "type": "array",
-          "description": "Actions an L4 dot may relax from notify to auto (reversible, no high-risk paths; never a never_auto class or a policy approve).",
+          "description": "Actions an L4 dot may relax from notify to auto even though notify is the policy gate's own decision — the single permitted exception to 'never below the policy gate' (l4_notify_to_auto, enforced in dot-dispatch dotNotifyToAutoExceptionApplies). Only when the action is reversible (axis < 2), touches no high-risk path, has no never_auto / axis_max / budget escalation, the policy decision is exactly notify (never approve), no charter or hard floor is notify or stricter, and the dot's outcome success stays at or above promotion.min_outcome_success.",
           "items": {
             "type": "string",
             "minLength": 1
