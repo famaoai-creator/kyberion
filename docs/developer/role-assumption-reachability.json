@@ -3667,8 +3667,10 @@
       "unresolved_sites": [],
       "policy_roles_not_reachable": [
         "chronos_gateway",
+        "chronos_tenant_runner",
         "infrastructure_sentinel",
         "knowledge_steward",
+        "organization_operator",
         "scope_locale_reader",
         "slack_bridge",
         "surface_runtime"
@@ -4616,8 +4618,10 @@
       "unresolved_sites": [],
       "policy_roles_not_reachable": [
         "chronos_gateway",
+        "chronos_tenant_runner",
         "infrastructure_sentinel",
         "knowledge_steward",
+        "organization_operator",
         "scope_locale_reader",
         "slack_bridge"
       ]
@@ -5756,7 +5760,11 @@
         }
       },
       "unresolved_sites": [],
-      "policy_roles_not_reachable": ["knowledge_steward"]
+      "policy_roles_not_reachable": [
+        "chronos_tenant_runner",
+        "knowledge_steward",
+        "organization_operator"
+      ]
     },
     "system_configurator": {
       "entries": ["scripts/config_mission.ts", "scripts/run_pipeline.ts"],

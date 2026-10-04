@@ -222,9 +222,14 @@ export interface DotCharterSource {
  * tenant pipelines: symlink-free path, tenant listed under its own binding.
  */
 function listTenantDotCharterSources(rootDir: string): DotCharterSource[] {
+  // The repository path boundary resolves against an absolute root; a relative
+  // root (tests, CLI --root) would otherwise fail the boundary and list nothing.
+  const registryRoot = path.resolve(rootDir);
   let slugs: string[];
   try {
-    slugs = withExecutionContext(DOT_TENANT_SCAN_ROLE, () => listTenantProfileSlugs({ rootDir }));
+    slugs = withExecutionContext(DOT_TENANT_SCAN_ROLE, () =>
+      listTenantProfileSlugs({ rootDir: registryRoot })
+    );
   } catch {
     return [];
   }
@@ -234,7 +239,7 @@ function listTenantDotCharterSources(rootDir: string): DotCharterSource[] {
       withExecutionContext(
         DOT_TENANT_SCAN_ROLE,
         () => {
-          const knowledgeRoot = resolveTenant(slug, { rootDir }).knowledge_root;
+          const knowledgeRoot = resolveTenant(slug, { rootDir: registryRoot }).knowledge_root;
           if (knowledgeRoot !== `knowledge/confidential/${slug}`) return;
           const relativeDir = `${knowledgeRoot}/${DOT_CHARTER_DIR}`;
           const dir = path.join(rootDir, relativeDir);
