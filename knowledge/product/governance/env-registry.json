@@ -1357,6 +1357,15 @@
       "subsystem": "dot"
     },
     {
+      "name": "KYBERION_EVENT_INTAKE_SOURCES",
+      "category": "tuning",
+      "type": "string",
+      "required": false,
+      "description": "Comma-separated event intake source ids (e.g. github) this host accepts in addition to the enabled flags in event-intake-policy.json. Only declared sources can be enabled, and each still requires its HMAC secret in the secret store.",
+      "documented": true,
+      "subsystem": "dot"
+    },
+    {
       "name": "KYBERION_EXTERNAL_HOOKS",
       "category": "flag",
       "type": "string",
