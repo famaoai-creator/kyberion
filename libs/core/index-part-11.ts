@@ -154,3 +154,5 @@ export * from './dot/dot-inbox.js';
 export * from './dot/dot-proposals.js';
 export * from './dot/dot-dispatch.js';
 export * from './dot/dot-feedback.js';
+export * from './dot/dot-state-paths.js';
+export * from './key-result-spec.js';
