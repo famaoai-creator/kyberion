@@ -687,7 +687,7 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "Comma-separated Chronos schedule ids allowed to run on this host (e.g. organization-daily-digest). Unset runs every enabled schedule. Listing a schedule that ships disabled (schedule.enabled false in its pipeline, e.g. reconcile-config-fallbacks-weekly) opts this host into it; once set, only listed ids run.",
+      "description": "Comma-separated Chronos schedule ids allowed to run on this host (e.g. organization-daily-digest). Unset runs every enabled schedule. Listing a schedule that ships disabled (schedule.enabled false in its pipeline, e.g. reconcile-config-fallbacks-weekly) opts this host into it; once set, only listed ids run. Prefix an id with + (e.g. +organization-standup) to opt into it additively without restricting the other enabled schedules.",
       "documented": true
     },
     {

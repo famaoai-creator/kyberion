@@ -276,32 +276,49 @@ export function listScheduledPipelines(
  * every pipeline's `schedule`, so enabling another job is an env change, not
  * an edit to the pipeline files. Unset means every enabled schedule runs; a
  * set value that names no id (e.g. "," or blanks) fails closed and runs none.
+ *
+ * An id prefixed with `+` is an additive opt-in: it turns on a schedule that
+ * ships disabled without restricting the others. A value made only of `+ids`
+ * (e.g. "+organization-standup,+organization-retro") keeps every enabled
+ * schedule running, so new schedules are not silently dropped by a host that
+ * only wanted to opt into a few.
  */
 export function scheduleAllowedByOperator(
   scheduleId: string,
   allowlist = getRegisteredEnvText('KYBERION_CHRONOS_SCHEDULES')
 ): boolean {
   if (allowlist === undefined || allowlist === '') return true;
-  return parseScheduleAllowlist(allowlist).includes(scheduleId);
+  const { restrict, additive } = parseScheduleAllowlist(allowlist);
+  if (restrict.length === 0 && additive.length > 0) return true;
+  return restrict.includes(scheduleId) || additive.includes(scheduleId);
 }
 
 /**
  * Opt-in for schedules that ship disabled: only an explicit mention of the id
- * in KYBERION_CHRONOS_SCHEDULES turns them on (an unset env never does).
+ * in KYBERION_CHRONOS_SCHEDULES (plain or `+`-prefixed) turns them on (an
+ * unset env never does).
  */
 export function scheduleExplicitlyOptedIn(
   scheduleId: string,
   allowlist = getRegisteredEnvText('KYBERION_CHRONOS_SCHEDULES')
 ): boolean {
   if (!allowlist) return false;
-  return parseScheduleAllowlist(allowlist).includes(scheduleId);
+  const { restrict, additive } = parseScheduleAllowlist(allowlist);
+  return restrict.includes(scheduleId) || additive.includes(scheduleId);
 }
 
-function parseScheduleAllowlist(allowlist: string): string[] {
-  return allowlist
+function parseScheduleAllowlist(allowlist: string): { restrict: string[]; additive: string[] } {
+  const entries = allowlist
     .split(',')
     .map((entry) => entry.trim())
     .filter(Boolean);
+  return {
+    restrict: entries.filter((entry) => !entry.startsWith('+')),
+    additive: entries
+      .filter((entry) => entry.startsWith('+'))
+      .map((entry) => entry.slice(1).trim())
+      .filter(Boolean),
+  };
 }
 
 export function isScheduledPipelineDue(
