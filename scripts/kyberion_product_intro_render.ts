@@ -12,13 +12,24 @@ import { handleAction as handleVideoAction } from '../libs/actuators/video-compo
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const OUT_DIR = 'active/shared/tmp/kyberion-intro';
-const NARRATION_PATH = `${OUT_DIR}/kyberion-product-intro.aiff`;
+// Linux native rendering (espeak-ng) only emits wav; macOS `say` emits aiff.
+const NARRATION_FORMAT = process.platform === 'darwin' ? 'aiff' : 'wav';
+const NARRATION_PATH = `${OUT_DIR}/kyberion-product-intro.${NARRATION_FORMAT}`;
 const VIDEO_PATH = `${OUT_DIR}/kyberion-product-intro.mp4`;
 const BUNDLE_DIR = `${OUT_DIR}/video-composition/kyberion-product-intro`;
 
 const VOICE_SCRIPT =
   // i18n-exempt: JA demo video script content
   'Kyberionは曖昧な指示をそのまま実行しません。まず人間と意図を合意し、検証可能な活動定義に変換します。そのうえで安全なサンドボックスでタスクを実行し、実行ログと成果物の系統関係をエビデンスとして残します。さらに Quality Gate による多層検証で、成果物の信頼性と再現性を高めます。さあ、Kyberionを動かして、自律オペレーションを始めましょう。';
+
+// espeak-ng (Linux / non-macOS fallback) reads every kanji as "Chinese letter",
+// so narrate a kana reading of the same script there; on-screen text keeps kanji.
+const VOICE_SCRIPT_KANA =
+  // i18n-exempt: JA demo video script content
+  'Kyberion は、あいまいな しじを、そのまま じっこう しません。まず にんげんと いとを ごういし、けんしょう かのうな かつどう ていぎに へんかん します。そのうえで、あんぜんな サンドボックスで タスクを じっこうし、じっこう ログと せいかぶつの けいとう かんけいを、エビデンスとして のこします。さらに、Quality Gate による たそう けんしょうで、せいかぶつの しんらいせいと さいげんせいを たかめます。さあ、Kyberion を うごかして、じりつ オペレーションを はじめましょう。';
+const NARRATION_TEXT = process.platform === 'darwin' ? VOICE_SCRIPT : VOICE_SCRIPT_KANA;
+// The Linux `local_say` adapter calls espeak without a language voice; use the espeak-ng engine.
+const NARRATION_ENGINE = process.platform === 'darwin' ? 'local_say' : 'espeak_ng';
 
 // i18n-exempt: JA demo video script content
 const HOOK = 'Kyberionは曖昧な指示をそのまま実行しません。';
@@ -36,9 +47,9 @@ async function main() {
   const voice = await handleVoiceAction({
     action: 'generate_voice',
     request_id: 'kyberion-product-intro-audio',
-    text: VOICE_SCRIPT,
+    text: NARRATION_TEXT,
     profile_ref: { profile_id: 'operator-ja-default' },
-    engine: { engine_id: 'local_say' },
+    engine: { engine_id: NARRATION_ENGINE },
     rendering: {
       language: 'ja',
       chunking: {
@@ -49,7 +60,7 @@ async function main() {
     },
     delivery: {
       mode: 'artifact',
-      format: 'aiff',
+      format: NARRATION_FORMAT,
       artifact_path: NARRATION_PATH,
       emit_progress_packets: true,
     },
@@ -76,9 +87,10 @@ async function main() {
       { cwd: pathResolver.rootDir(), timeoutMs: 30_000 }
     ).trim()
   );
+  // Follow the narration (plus a short tail) so the voice is never cut off.
   const durationSec = Math.max(
     10,
-    Math.min(60, Number.isFinite(narrationDuration) ? Math.ceil(narrationDuration) : 35)
+    Math.min(300, Number.isFinite(narrationDuration) ? Math.ceil(narrationDuration) + 1 : 35)
   );
 
   console.log(`[kyberion-intro] composing video (${durationSec}s)…`);

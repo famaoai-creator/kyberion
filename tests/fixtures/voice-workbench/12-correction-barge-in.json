@@ -1,0 +1,44 @@
+{
+  "id": "correction-barge-in",
+  "description": "「いや、違う」 during playback confirms a hard stop whose intent is 'correcting' (CE-04).",
+  "timeline": [
+    {
+      "at_ms": 0,
+      "event": {
+        "type": "tts_start",
+        "text": "それでは説明します。"
+      }
+    },
+    {
+      "at_ms": 800,
+      "event": {
+        "type": "vad_start",
+        "rms": 3000
+      }
+    },
+    {
+      "at_ms": 950,
+      "event": {
+        "type": "stt_partial",
+        "text": "いや、違う"
+      }
+    },
+    {
+      "at_ms": 2000,
+      "event": {
+        "type": "tts_end"
+      }
+    }
+  ],
+  "expect": {
+    "hard_stops": 1,
+    "hard_stop_intents": ["correcting"],
+    "resumes": 0,
+    "commits": []
+  },
+  "options": {
+    "interaction": {
+      "intent": true
+    }
+  }
+}

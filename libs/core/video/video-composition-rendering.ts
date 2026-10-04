@@ -315,13 +315,35 @@ export function applySceneMotion(
     : `${block}\n${html}`;
 }
 
+/**
+ * Typography shared by every scene template. Japanese has no spaces, so the
+ * browser default breaks anywhere (orphaned kana such as a lone 「ん」);
+ * `auto-phrase` breaks on phrase boundaries and `balance` evens out lines.
+ * Negative tracking tuned for Latin display type crams kanji together.
+ */
+export const VIDEO_SCENE_TYPOGRAPHY_CSS = `<style data-kb-typography>
+:lang(ja) h1, :lang(ja) h2, :lang(ja) h3, :lang(ja) p, :lang(ja) li, :lang(ja) strong, :lang(ja) small, :lang(ja) .body {
+  word-break: auto-phrase;
+  line-break: strict;
+  overflow-wrap: anywhere;
+}
+:lang(ja) h1, :lang(ja) h2 { letter-spacing: 0; }
+h1, h2, h3 { text-wrap: balance; }
+p, li, small, .body { text-wrap: pretty; }
+</style>`;
+
+function injectIntoHead(html: string, markup: string): string {
+  return html.includes('</head>')
+    ? html.replace('</head>', `${markup}\n</head>`)
+    : `${markup}\n${html}`;
+}
+
 export function applyVideoThemeTokens(html: string, direction?: VideoVisualDirection): string {
   const tokenized = html.replace(/<style([^>]*)>([\s\S]*?)<\/style>/gi, (_match, attrs, css) => {
     return `<style${attrs}>${tokenizeVideoCss(css)}</style>`;
   });
-  if (!direction) return tokenized;
+  const typed = injectIntoHead(tokenized, VIDEO_SCENE_TYPOGRAPHY_CSS);
+  if (!direction) return typed;
   const rootVars = `<style data-kb-visual-direction="${escapeHtml(direction.mood)}">\n${visualDirectionToCssVars(direction)}\n</style>`;
-  return tokenized.includes('</head>')
-    ? tokenized.replace('</head>', `${rootVars}\n</head>`)
-    : `${rootVars}\n${tokenized}`;
+  return injectIntoHead(typed, rootVars);
 }
