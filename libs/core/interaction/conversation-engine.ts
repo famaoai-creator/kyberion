@@ -225,11 +225,18 @@ export class ConversationEngine {
 
   /** Engine clock — advanced only by `step()` inputs. Protected for adapters. */
   protected nowMs = 0;
-  private outputActive = false;
-  private outputIsReaction = false;
+  // Reply output and reaction output are tracked independently — a reaction
+  // may overlap a live reply (CE-06 instant-reaction slot), and neither
+  // ending must tear down the other's interruption evidence.
+  private replyActive = false;
+  private reactionActive = false;
   private spoken: Array<{ text: string; at_ms: number }> = [];
   private remoteSpeaking = false;
   private speechStartedAt: number | null = null;
+  /** Agent output (reply or reaction) currently emitted. */
+  private get outputActive(): boolean {
+    return this.replyActive || this.reactionActive;
+  }
   private silenceAt: number | null = null;
   private intraUtterancePaused = false;
   private pausedMs = 0;
@@ -285,7 +292,7 @@ export class ConversationEngine {
       remoteSpeaking: this.remoteSpeaking,
       eotPending: Boolean(this.eot?.pending),
       awaitingFinal: this.awaitingFinalUntil !== null && this.nowMs < this.awaitingFinalUntil,
-      emittingBackchannel: this.outputIsReaction,
+      emittingBackchannel: this.reactionActive && !this.replyActive,
       preparingToAct: this.speculative !== null,
     });
   }
@@ -370,11 +377,17 @@ export class ConversationEngine {
     const text = input.text ?? '';
     switch (type) {
       case 'output_started':
-      case 'reaction_started':
-        this.outputActive = true;
-        this.outputIsReaction = type === 'reaction_started';
+        this.replyActive = true;
         this.outputSinceLastUtterance = true;
         this.interruption?.reset();
+        this.spoken.push({ text, at_ms: this.nowMs });
+        return [];
+      case 'reaction_started':
+        this.reactionActive = true;
+        this.outputSinceLastUtterance = true;
+        // A reaction may overlap a live reply — clearing the arbiter's
+        // buffered evidence here would corrupt an in-flight barge-in probe.
+        if (!this.replyActive) this.interruption?.reset();
         this.spoken.push({ text, at_ms: this.nowMs });
         return [];
       case 'output_partial':
@@ -385,10 +398,12 @@ export class ConversationEngine {
         else this.spoken[this.spoken.length - 1]!.text = text;
         return [];
       case 'output_ended':
+        this.replyActive = false;
+        if (!this.reactionActive) this.interruption?.reset();
+        return [];
       case 'reaction_ended':
-        this.outputActive = false;
-        this.outputIsReaction = false;
-        this.interruption?.reset();
+        this.reactionActive = false;
+        if (!this.replyActive) this.interruption?.reset();
         return [];
       case 'speech_onset':
         return this.onSpeechOnset(input.rms);
@@ -474,9 +489,15 @@ export class ConversationEngine {
   }
 
   private onFinal(text: string): InteractionAction[] {
+    const emptyActions: InteractionAction[] = [];
     this.awaitingFinalUntil = null;
     this.lastPartial = '';
-    if (!text.trim()) return [];
+    if (!text.trim()) {
+      // An empty final still clears turn evidence — and revokes a speculation
+      // armed on partials that never became transcript.
+      if (this.speculative) emptyActions.push(this.abortSpeculative('eot_revoked'));
+      return emptyActions;
+    }
     const intent = this.classifyInternal(text);
     this.signalsTracker.observeTranscript(text, intent.intent);
     const actions: InteractionAction[] = [];
@@ -535,6 +556,7 @@ export class ConversationEngine {
       // A dropped turn must not arm speculation afterwards — clear the
       // partial evidence it was built on.
       this.lastPartial = '';
+      this.speculatedPartial = '';
       if (speculative) actions.push(this.abortSpeculative('external'));
       return [
         ...actions,
@@ -597,6 +619,8 @@ export class ConversationEngine {
 
   private abortSpeculative(reason: InteractionCancelReason): InteractionAction {
     this.speculative = null;
+    // Allow a later pause to re-arm on the same partial (resume→pause).
+    this.speculatedPartial = '';
     return { type: 'abort_speculative', reason };
   }
 
@@ -604,8 +628,10 @@ export class ConversationEngine {
     const out: InteractionAction[] = [];
     for (const action of actions) {
       if (action.type === 'hard_stop') {
-        this.outputActive = false;
-        this.outputIsReaction = false;
+        // A hard stop ends all agent output — both the reply and any live
+        // reaction are stopped by the adapter.
+        this.replyActive = false;
+        this.reactionActive = false;
         out.push(
           this.intentEnabled ? { ...action, intent: this.lastPartialIntent?.intent } : action
         );

@@ -631,8 +631,12 @@ export async function startRealtimeVoiceLoop(
   const onTranscriptText = (text: string, isFinal: boolean): void => {
     // Finals reach the engine once, at capture completion (the loop resolves
     // streaming-vs-batch first) — partials feed it live for interruption
-    // confirmation, intent suppression and speculation.
-    if (!isFinal) driveEngineAndApply({ type: 'stt_partial', at_ms: rel(), text });
+    // confirmation, intent suppression and speculation. Straggler partials
+    // from an ended feed must not confirm a barge-in on a later turn's
+    // output, so only forward while listening.
+    if (!isFinal && state === 'listening') {
+      driveEngineAndApply({ type: 'stt_partial', at_ms: rel(), text });
+    }
   };
 
   const armTurnToken = (
@@ -787,7 +791,9 @@ export async function startRealtimeVoiceLoop(
               });
               for (const buffered of arbiterBuffered()) bargeFeed.push(buffered);
             }
-          } else if (backchannelHandle) {
+          }
+          // A live reaction is output too — pause/stop it alongside the reply.
+          if (backchannelHandle) {
             // Same semantics as the main path: suspend; only stop if the
             // player cannot pause (e.g. Windows).
             if (backchannelHandle.pause?.() !== true) void backchannelHandle.stop();
@@ -806,17 +812,15 @@ export async function startRealtimeVoiceLoop(
               turn: activeTurnIndex,
               reason: action.reason,
             });
-          } else {
-            backchannelHandle?.resume?.();
           }
+          backchannelHandle?.resume?.();
           break;
         case 'hard_stop':
+          void backchannelHandle?.stop();
           if (speech) {
             const replay = arbiterBuffered();
             closeBargeFeed();
             pendingBargeIn = confirmBargeIn(replay, bargeInMode);
-          } else {
-            void backchannelHandle?.stop();
           }
           break;
         case 'start_speculative':
@@ -921,6 +925,11 @@ export async function startRealtimeVoiceLoop(
         ? 0
         : Date.now() +
           Math.max(0, options.selfAudioSuppressionMs ?? 0, options.postPlaybackDrainMs ?? 400);
+      // A substantive reply that ended during the reaction is the better echo
+      // reference — don't let the reaction's tail evict it.
+      if (!lastAssistant || lastAssistant.reaction) {
+        lastAssistant = { text, endedAt: Date.now(), reaction: true };
+      }
       driveEngineAndApply({ type: 'reaction_ended', at_ms: rel() });
     }
   };
@@ -931,11 +940,39 @@ export async function startRealtimeVoiceLoop(
     engine.arbiter?.reset();
   };
 
+  /**
+   * Pause/resume transitions + a tick (with pause evidence) for one chunk
+   * while the floor is remote — shared by the live chunk path and the
+   * barge-in replay path so replayed silence also counts toward speculation.
+   */
+  const feedListeningEvidence = (
+    result: { state: string; onset: boolean; speaking: boolean },
+    chunk: AudioChunk
+  ): void => {
+    if (result.state === 'recording' && !result.onset) {
+      if (!result.speaking && !intraUtterancePaused) {
+        intraUtterancePaused = true;
+        driveEngineAndApply({ type: 'speech_pause', at_ms: rel() });
+      } else if (result.speaking && intraUtterancePaused) {
+        intraUtterancePaused = false;
+        driveEngineAndApply({ type: 'speech_resume', at_ms: rel() });
+      }
+    }
+    driveEngineAndApply({
+      type: 'tick',
+      at_ms: rel(),
+      ...(intraUtterancePaused
+        ? { payload: { silenceDeltaMs: computeChunkDurationMs(chunk) } }
+        : {}),
+    });
+  };
+
   /** Feed replayed chunks into the segmenter (and a fresh STT feed on onset). */
   const replayIntoSegmenter = (replay: AudioChunk[]): void => {
     for (const replayChunk of replay) {
       const replayResult = segmenter.push(replayChunk);
       if (replayResult.onset) driveEngineAndApply({ type: 'vad_start', at_ms: rel() });
+      else feedListeningEvidence(replayResult, replayChunk);
       if (replayResult.onset && options.streamingStt) {
         sttFeed = startSttFeed(
           options.streamingStt,
@@ -1040,6 +1077,9 @@ export async function startRealtimeVoiceLoop(
     const sttMs = Date.now() - sttStartedAt;
     if (!userText) {
       logger.warn(`[realtime-voice-loop] empty transcript for turn ${turnIndex + 1}; skipping`);
+      // An empty final still clears the engine's turn evidence (lastPartial,
+      // awaitingFinal) and revokes a speculation armed on stale partials.
+      applyEngineActions(driveEngine({ type: 'stt_final', at_ms: rel(), text: '' }));
       abortSpeculation('eot_revoked');
       state = 'listening';
       emitState(state);
@@ -1158,8 +1198,13 @@ export async function startRealtimeVoiceLoop(
     // reasoning produces the slower claim/explanation/next content.
     let instantReactionFired = false;
     if (interactionOpts?.instantReaction) {
-      instantReactionFired = true;
-      void emitAgentBackchannel(engine.pickReaction(userText));
+      const phrase = engine.pickReaction(userText);
+      // Only claim the slot when the reaction will actually be emitted —
+      // otherwise the first reply segment must speak it itself.
+      if (phrase.trim() && !reactionInFlight) {
+        instantReactionFired = true;
+        void emitAgentBackchannel(phrase);
+      }
     }
     const { token, release } = armTurnToken(turnIndex);
     activeTurnIndex = turnIndex;
@@ -1321,15 +1366,40 @@ export async function startRealtimeVoiceLoop(
     });
 
     // 3. Speak, sentence-pipelined; barge-in watches the mic meanwhile.
+    // CE-06: when the instant reaction already spoke a bare acknowledgement,
+    // a reaction-like opening is dropped from the batch reply's speech too.
+    let speakText = assistantText;
+    if (instantReactionFired) {
+      const segments = segmentReplyStructure(
+        assistantText,
+        engine.packForText(assistantText || userText)
+      );
+      if (segments[0]?.kind === 'reaction') {
+        speakText = segments
+          .slice(1)
+          .map((segment) => segment.text)
+          .join(' ')
+          .trim();
+      }
+    }
+    if (!speechResult && !speakText) {
+      // The whole reply was the reaction slot — nothing left to synthesize.
+      speechResult = {
+        completed: true,
+        interrupted: false,
+        metrics: { segments_total: 0, segments_spoken: 0, first_audio_ms: null, total_ms: 0 },
+        audioPaths: [],
+      };
+    }
     if (!speechResult) {
       bargedDuringTurn = false;
-      spokenText = assistantText;
+      spokenText = speakText;
       armBargeIn();
-      driveEngineAndApply({ type: 'tts_start', at_ms: rel(), text: assistantText });
+      driveEngineAndApply({ type: 'tts_start', at_ms: rel(), text: speakText });
       state = 'speaking';
       emitState(state);
       const segmented = speakSegmented({
-        text: assistantText,
+        text: speakText,
         ...(options.maxSegmentChars ? { maxSegmentChars: options.maxSegmentChars } : {}),
         synthesize: (seg, index, signal) =>
           options.synthesizeSegment(seg, index, turnIndex, signal),
@@ -1339,9 +1409,10 @@ export async function startRealtimeVoiceLoop(
       speechResult = await segmented.done;
       setSpeech(null);
     }
-    driveEngineAndApply({ type: 'tts_end', at_ms: rel() });
-    // A provisional pause still open when playback ended: keep the user's audio.
+    // A provisional pause still open when playback ended: keep the user's
+    // audio. Read BEFORE driving tts_end — output_ended resets the arbiter.
     const pausedAudio = engine.arbiter?.state === 'paused' ? [...arbiterBuffered()] : [];
+    driveEngineAndApply({ type: 'tts_end', at_ms: rel() });
     closeBargeFeed();
     lastAssistant = { text: assistantText, endedAt: Date.now() };
     selfAudioSuppressionUntilMs =
@@ -1540,22 +1611,7 @@ export async function startRealtimeVoiceLoop(
             // speculation on pauses and to abort it on resume. Pause length
             // is chunk-duration evidence — the loop's clock can outrun real
             // time under replayed input.
-            if (result.state === 'recording' && !result.onset) {
-              if (!result.speaking && !intraUtterancePaused) {
-                intraUtterancePaused = true;
-                driveEngineAndApply({ type: 'speech_pause', at_ms: rel() });
-              } else if (result.speaking && intraUtterancePaused) {
-                intraUtterancePaused = false;
-                driveEngineAndApply({ type: 'speech_resume', at_ms: rel() });
-              }
-            }
-            driveEngineAndApply({
-              type: 'tick',
-              at_ms: rel(),
-              ...(intraUtterancePaused
-                ? { payload: { silenceDeltaMs: computeChunkDurationMs(chunk) } }
-                : {}),
-            });
+            feedListeningEvidence(result, chunk);
           }
           // Engine decisions may arrive on any tick (a held turn commits once
           // the speaker stays silent past maxHoldMs).
