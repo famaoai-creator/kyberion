@@ -3,7 +3,7 @@ title: Runtime Storage Layout
 category: Architecture
 tags: [storage, artifacts, workspace, tmp, cache, staging, tier, multi-tenant, retention]
 importance: 8
-last_updated: 2026-10-03
+last_updated: 2026-10-04
 runtime_stages: [alignment, execution, review]
 ---
 
@@ -130,6 +130,25 @@ Queries de-duplicate before filtering, so a superseded row (e.g. a mission
 deliverable since promoted to its project) never matches its old owner. The
 storage janitor compacts the file to the latest row per artifact **and owner**,
 so offboarding still sees every scope that ever owned an artifact.
+
+### Dot state domain
+
+Resident-dot loop state is **state** (durable, per retention-catalog entry) under
+one domain, `active/shared/runtime/dot/`, and is addressed only through
+`dotStatePath(charter, ...parts)` (`libs/core/dot/dot-state-paths.ts`):
+
+| Dot scope  | Place                                                                                             |
+| ---------- | ------------------------------------------------------------------------------------------------- |
+| untenanted | `active/shared/runtime/dot/<file>` (`work-results.jsonl`, `kr-ledger.jsonl`, `outcomes.jsonl`, …) |
+| tenant     | `active/shared/runtime/dot/tenants/<slug>/…` via `physicalScopedPath` (+ organization segment)    |
+
+Tenant prose (memory, follow-up reasons, inbound event bodies, work results)
+never goes in a system-floor file; the tenant-scoped inbound events ledger
+lives under the tenant namespace. The older flat dot ledgers directly under
+`active/shared/runtime/` (wake, action, inbox) stay shared and carry
+category-only text for tenant dots. One `storage-retention-catalog.json` entry
+covers `active/shared/runtime/dot`. See
+[resident-dot-model](./resident-dot-model.md).
 
 ## 3. Surface visibility
 
