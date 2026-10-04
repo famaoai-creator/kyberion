@@ -79,7 +79,7 @@ const PROPOSAL: DotProposal = {
   action_id: 'dot_delegate_work',
   title: 'Rerun CI',
   objective: 'Re-run the flaky job.',
-  work_shape: 'task_session',
+  work_shape: 'direct_reply',
 };
 
 function gateResult(

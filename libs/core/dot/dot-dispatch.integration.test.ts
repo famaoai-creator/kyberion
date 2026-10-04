@@ -81,7 +81,7 @@ describe('dot dispatch through the real gate and approval store', () => {
           action_id: 'dot_delegate_work',
           title: 'Tick overdue operations',
           objective: 'Run the overdue operation tick.',
-          work_shape: 'task_session',
+          work_shape: 'direct_reply',
         },
       ],
       deps(items)
@@ -122,7 +122,7 @@ describe('dot dispatch through the real gate and approval store', () => {
           action_id: 'dot_delegate_work',
           title: 'Edit the governance policy',
           objective: 'Loosen a threshold.',
-          work_shape: 'task_session',
+          work_shape: 'direct_reply',
           changed_paths: ['knowledge/product/governance/autonomous-ops-policy.json'],
         },
       ],
@@ -142,7 +142,7 @@ describe('dot dispatch through the real gate and approval store', () => {
           action_id: 'dot_delegate_work',
           title: 'Tick overdue operations',
           objective: 'Run the overdue operation tick.',
-          work_shape: 'task_session',
+          work_shape: 'direct_reply',
         },
       ],
       deps(items)

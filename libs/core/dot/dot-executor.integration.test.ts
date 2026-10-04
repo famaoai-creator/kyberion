@@ -28,7 +28,12 @@ import {
   type DotDispatchDeps,
 } from './dot-dispatch.js';
 import { setDotBudgetThrottleForTests } from './dot-budget.js';
-import { readDotWorkResults, runDotExecutorSweep, type DotExecutorPorts } from './dot-executor.js';
+import {
+  readDotWorkResults,
+  releaseDotWorkItem,
+  runDotExecutorSweep,
+  type DotExecutorPorts,
+} from './dot-executor.js';
 import { appendDotInboxEntry, DOT_INBOX_PATH, type DotInboxEntryInput } from './dot-inbox.js';
 import type { DotProposal } from './dot-proposals.js';
 import { DOT_EXECUTOR_REPORT_SOURCE } from './dot-runtime.js';
@@ -49,7 +54,7 @@ const CHARTER: DotCharter = {
   attention: { triggers: [{ kind: 'cron', cron: '0 9 * * *' }] },
   authority: {
     authority_role: 'infrastructure_sentinel',
-    allowed_work_shapes: ['task_session', 'pipeline'],
+    allowed_work_shapes: ['direct_reply', 'pipeline'],
     allowed_pipelines: ['pipelines/ok.json'],
     max_concurrent_delegations: 2,
   },
@@ -114,7 +119,7 @@ const PROPOSALS: DotProposal[] = [
     action_id: 'dot_delegate_work',
     title: 'Answer the runbook question',
     objective: 'Answer it.',
-    work_shape: 'task_session',
+    work_shape: 'direct_reply',
   },
 ];
 
@@ -433,6 +438,77 @@ describe('dot executor end to end', () => {
       { status: 'blocked', summary: expect.stringContaining('operator must verify') },
     ]);
     expect(p.runPipeline).not.toHaveBeenCalled();
+  });
+
+  it('re-attempts a quarantined item under a new attempt id only after an operator release', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const created = createWorkItem({
+      title: 'Unknown effect',
+      description: 'Worker crashed after starting',
+      status: 'ready',
+      metadata: {
+        dot_id: 'exec-it',
+        action_ref: 'dact-release',
+        requested_work_shape: 'pipeline',
+        pipeline_ref: 'pipelines/ok.json',
+      },
+    });
+    claimWorkItem({
+      itemId: created.item_id,
+      actorPeerId: 'dot:exec-it',
+      purpose: 'dot executor',
+      ttlMs: 5,
+    });
+    vi.setSystemTime(Date.now() + 10);
+    const p = ports();
+    const loaded = [{ path: 'dots/exec-it.json', charter: CHARTER }];
+    expect(await runDotExecutorSweep(loaded, p, { rootDir: TEST_ROOT })).toEqual([]);
+    const quarantined = getWorkItem(created.item_id)!;
+    expect(quarantined.status).toBe('archived');
+    const firstAttempt = quarantined.attempts?.at(-1)?.run_id;
+
+    vi.setSystemTime(Date.now() + 10);
+    const audits: Array<Record<string, unknown>> = [];
+    expect(() =>
+      releaseDotWorkItem(
+        CHARTER,
+        { workItemId: created.item_id, reason: ' ' },
+        { rootDir: TEST_ROOT }
+      )
+    ).toThrow(/DOT_RELEASE_REASON/);
+    const released = releaseDotWorkItem(
+      CHARTER,
+      { workItemId: created.item_id, reason: 'checked: no partial deploy', by: 'user:ops-lead' },
+      { rootDir: TEST_ROOT, audit: (entry) => void audits.push(entry as never) }
+    );
+    expect(released.status).toBe('ready');
+    expect(released.metadata?.dot_executor).toMatchObject({
+      operator_verified_by: 'user:ops-lead',
+      operator_verified_reason: 'checked: no partial deploy',
+      operator_verified_at: expect.any(String),
+    });
+    expect(audits[0]).toMatchObject({
+      operation: 'dot_work_item_operator_release',
+      actor: { kind: 'human', id: 'user:ops-lead' },
+    });
+
+    vi.setSystemTime(Date.now() + 10);
+    const rows = await runDotExecutorSweep(loaded, p, { rootDir: TEST_ROOT });
+    expect(rows).toMatchObject([{ status: 'done', mode: 'pipeline' }]);
+    expect(rows[0].attempt_id).toBeDefined();
+    expect(rows[0].attempt_id).not.toBe(firstAttempt);
+    expect(p.runPipeline).toHaveBeenCalledTimes(1);
+    const done = getWorkItem(created.item_id)!;
+    expect(done.status).toBe('done');
+    expect(done.metadata?.dot_executor).toMatchObject({ operator_verified_by: 'user:ops-lead' });
+    // Closed items cannot be released again.
+    expect(() =>
+      releaseDotWorkItem(
+        CHARTER,
+        { workItemId: created.item_id, reason: 'again' },
+        { rootDir: TEST_ROOT }
+      )
+    ).toThrow(/DOT_RELEASE_DONE/);
   });
 
   it('does not replay an effect when result persistence fails before release', async () => {
