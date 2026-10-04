@@ -1,0 +1,23 @@
+{
+  "record_id": "mem-MSN-RESIDENT-DOT-AUTONOMY-20261004-2026_10_04",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Governing agent proposals: derive the policy action from the effect, count only human trust",
+  "summary": "When an autonomous agent (resident dot) feeds proposals into the autonomous-ops gate, the gate is only as strong as the labels it scores. Derive the policy action from the effect, score same-effect actions identically, re-earn trust only from human deciders, and make parked-decision settlement idempotent.",
+  "candidate_id": "mem-MSN-RESIDENT-DOT-AUTONOMY-20261004-2026_10_04",
+  "evidence_refs": [
+    "active/missions/public/MSN-RESIDENT-DOT-AUTONOMY-20261004/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-RESIDENT-DOT-AUTONOMY-20261004/evidence/REVIEW-contract_authoring-ux-contract.md",
+    "active/missions/public/MSN-RESIDENT-DOT-AUTONOMY-20261004/evidence/design-spec.json"
+  ],
+  "created_at": "2026-10-04T06:44:32.267Z",
+  "applicability": ["mission", "mission:MSN-RESIDENT-DOT-AUTONOMY-20261004"],
+  "reusable_steps": [
+    "When an autonomous agent (resident dot) feeds proposals into the autonomous-ops gate, the gate is only as strong as the labels it scores",
+    "Derive the policy action from the effect, score same-effect actions identically, re-earn trust only from human deciders, and make parked-decision settlement idempotent"
+  ],
+  "expected_outcome": "Lessons from MSN-RESIDENT-DOT-AUTONOMY-20261004 (independent review found these after the first implementation passed all tests):\n1. Never let the proposing agent choose the policy action id. If it can name any action in autonomous-ops-policy.json it can pick a cheaper or shadow action and escape per-action floors. Derive the id from the requested effect (dot_handoff when handoff_to is set, else dot_delegate_work) and refuse anything else at the enforcement point.\n2. Actions with the same effect must score the same. A handoff that creates the same ready WorkItem as a delegation must not score lower, or two cooperating agents launder work through it.\n3. Learned floors (raise to approve after an operator rejection) must be keyed on the agent, not the action label, and released only by approvals with decidedByType human. Veto-window silence (policy:veto-window) and ai_agent/service deciders are not re-earned trust.\n4. A notify verdict becomes a veto card only when a veto window exists; give agent actions a policy veto_window_minutes instead of relying on each charter.\n5. Settling parked decisions must be idempotent: one feedback row per action_ref, reuse an existing WorkItem by metadata.action_ref, leave the action parked when its approval record cannot be read (decline only a confirmed-missing record), and re-check charter scope before executing an approval that waited.\n6. Tests that clear a shared store channel interfere across parallel vitest workers; the approval store vitest root is per worker (vitest-approvals/pool-<VITEST_POOL_ID>).\n7. Passing tests are not a review: spawn an independent reviewer subagent for governance code before shipping.",
+  "source_branch": "feat/resident-dot-autonomy-20261004",
+  "source_commit": "bde54a61089213983f0ba6c0df974d643490c233"
+}
