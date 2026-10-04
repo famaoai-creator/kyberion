@@ -35,7 +35,10 @@ import {
 } from '@agent/core/dot/dot-wake-backend';
 import type { DotWorkResultRow } from '@agent/core/dot/dot-state-paths';
 import { createLogger } from '@agent/core/logger';
-import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
+import {
+  getReasoningBackend,
+  type ReasoningBackend,
+} from '@agent/core/reasoning/reasoning-backend';
 import { runGoalDrivenLoop } from '@agent/core/workforce/worker-goal-driver';
 import type { DotSupervisorStep } from './dot_supervisor_extensions.js';
 
@@ -144,22 +147,37 @@ async function defaultExecutePipeline(
       };
 }
 
+/** Backend methods that reach a model; a call to any of them may have caused effects. */
+const MODEL_CALL_METHODS = [
+  'prompt',
+  'streamPrompt',
+  'promptWithImages',
+  'generateWithTools',
+  'delegateTask',
+  'delegateTaskHandle',
+] as const satisfies ReadonlyArray<keyof ReasoningBackend>;
+
 /**
- * Wrap the backend so the step can tell whether the goal driver reached the
- * model at all: a throw before the first backend call cannot have caused effects.
+ * Narrow wrapper so the step can tell whether the goal driver reached the
+ * model at all: a throw before the first model call cannot have caused effects.
+ * Only the model-call methods are overridden (each still runs with `this` bound
+ * to the original backend); everything else is inherited from it unchanged.
  */
 function observeBackendCalls<T extends object>(backend: T): { backend: T; called: () => boolean } {
   let called = false;
-  const observed = new Proxy(backend, {
-    get(target, key, receiver) {
-      const value = Reflect.get(target, key, receiver);
-      if (typeof value !== 'function') return value;
-      return (...args: unknown[]) => {
+  const observed = Object.create(backend) as T;
+  for (const method of MODEL_CALL_METHODS) {
+    const original = (backend as Record<string, unknown>)[method];
+    if (typeof original !== 'function') continue;
+    Object.defineProperty(observed, method, {
+      configurable: true,
+      enumerable: true,
+      value: (...args: unknown[]) => {
         called = true;
-        return (value as (...a: unknown[]) => unknown).apply(target, args);
-      };
-    },
-  });
+        return original.apply(backend, args);
+      },
+    });
+  }
   return { backend: observed, called: () => called };
 }
 

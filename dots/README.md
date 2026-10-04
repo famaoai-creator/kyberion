@@ -107,9 +107,14 @@ matching tools). State is kept under `active/shared/runtime/dot/`.
    target system whether the earlier attempt had any effect (undo or finish it
    by hand if needed), then run
    `pnpm kyberion dot release <dot_id> <work_item_id> --reason "<what you verified>" [--by user:<member_id>]`.
-   This is audited (`dot_work_item_operator_release`), records
-   `metadata.dot_executor.operator_verified_at/by/reason`, and returns the item
-   to `ready`; the next sweep re-attempts it under a new attempt id. To close
+   This only creates a human-only approval request (it prints its id); a
+   human approves it with `pnpm kyberion approvals --approve <id>` (72 h
+   before it expires). The next executor sweep then records
+   `metadata.dot_executor.operator_verified_at/by/reason` from the approver,
+   audits `dot_work_item_operator_release` and returns the item to `ready`;
+   the sweep after re-attempts it under a new attempt id. A rejected, expired
+   or non-human decision, a tenant mismatch, or an item changed since the
+   request releases nothing — request again if still needed. To close
    it instead, leave it archived (or cancel it through the work board). Do not
    reopen the item directly — a plain reopen is re-archived as a conflict.
 
