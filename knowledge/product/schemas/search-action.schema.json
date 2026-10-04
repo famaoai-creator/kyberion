@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Search Action ADF",
+  "description": "Query-origin search actions. Network transport pipelines remain owned by network-actuator.",
+  "type": "object",
+  "required": ["op"],
+  "properties": {
+    "op": {
+      "enum": ["web_search", "fetch_reader"]
+    },
+    "params": {
+      "type": "object",
+      "properties": {
+        "query": { "type": "string", "minLength": 1 },
+        "provider": { "type": "string", "minLength": 1 },
+        "top_k": { "type": "integer", "minimum": 1, "maximum": 50 },
+        "url": { "type": "string", "minLength": 1 },
+        "max_chars": { "type": "integer", "minimum": 1, "maximum": 200000 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

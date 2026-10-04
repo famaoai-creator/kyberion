@@ -5971,6 +5971,361 @@
       ]
     },
     {
+      "n": "data-actuator",
+      "path": "libs/actuators/data-actuator",
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "query",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "file_a": {
+                "type": "string",
+                "minLength": 1
+              },
+              "file_b": {
+                "type": "string",
+                "minLength": 1
+              },
+              "key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "left_key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "right_key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "how": {
+                "enum": ["inner", "left"]
+              },
+              "where": {
+                "type": "object",
+                "description": "Exact-match predicates: every key must equal the row value."
+              },
+              "select": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "sort_by": {
+                "type": "string"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "group_by": {
+                "type": "string"
+              },
+              "aggregations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["func"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "func": {
+                      "enum": ["count", "sum", "avg", "min", "max"]
+                    },
+                    "field": {
+                      "type": "string"
+                    },
+                    "as": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": ["file"]
+          },
+          "examples": [
+            {
+              "file": "active/shared/staging/rows.json",
+              "where": {
+                "status": "active"
+              },
+              "select": ["id", "status"],
+              "sort_by": "id",
+              "limit": 10
+            }
+          ]
+        },
+        {
+          "op": "filter",
+          "kind": "transform",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "file_a": {
+                "type": "string",
+                "minLength": 1
+              },
+              "file_b": {
+                "type": "string",
+                "minLength": 1
+              },
+              "key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "left_key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "right_key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "how": {
+                "enum": ["inner", "left"]
+              },
+              "where": {
+                "type": "object",
+                "description": "Exact-match predicates: every key must equal the row value."
+              },
+              "select": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "sort_by": {
+                "type": "string"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "group_by": {
+                "type": "string"
+              },
+              "aggregations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["func"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "func": {
+                      "enum": ["count", "sum", "avg", "min", "max"]
+                    },
+                    "field": {
+                      "type": "string"
+                    },
+                    "as": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": ["file"]
+          },
+          "examples": [
+            {
+              "file": "active/shared/staging/rows.csv",
+              "where": {
+                "status": "active"
+              }
+            }
+          ]
+        },
+        {
+          "op": "join",
+          "kind": "transform",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "file_a": {
+                "type": "string",
+                "minLength": 1
+              },
+              "file_b": {
+                "type": "string",
+                "minLength": 1
+              },
+              "key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "left_key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "right_key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "how": {
+                "enum": ["inner", "left"]
+              },
+              "where": {
+                "type": "object",
+                "description": "Exact-match predicates: every key must equal the row value."
+              },
+              "select": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "sort_by": {
+                "type": "string"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "group_by": {
+                "type": "string"
+              },
+              "aggregations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["func"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "func": {
+                      "enum": ["count", "sum", "avg", "min", "max"]
+                    },
+                    "field": {
+                      "type": "string"
+                    },
+                    "as": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": ["file_a", "file_b"]
+          },
+          "examples": [
+            {
+              "file_a": "active/shared/staging/orders.json",
+              "file_b": "active/shared/staging/customers.json",
+              "left_key": "customer_id",
+              "right_key": "id",
+              "how": "inner"
+            }
+          ]
+        },
+        {
+          "op": "aggregate",
+          "kind": "transform",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "file_a": {
+                "type": "string",
+                "minLength": 1
+              },
+              "file_b": {
+                "type": "string",
+                "minLength": 1
+              },
+              "key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "left_key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "right_key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "how": {
+                "enum": ["inner", "left"]
+              },
+              "where": {
+                "type": "object",
+                "description": "Exact-match predicates: every key must equal the row value."
+              },
+              "select": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "sort_by": {
+                "type": "string"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "group_by": {
+                "type": "string"
+              },
+              "aggregations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["func"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "func": {
+                      "enum": ["count", "sum", "avg", "min", "max"]
+                    },
+                    "field": {
+                      "type": "string"
+                    },
+                    "as": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": ["file", "group_by", "aggregations"]
+          },
+          "examples": [
+            {
+              "file": "active/shared/staging/orders.json",
+              "group_by": "status",
+              "aggregations": [
+                {
+                  "func": "count",
+                  "as": "n"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
       "n": "deployment-actuator",
       "path": "libs/actuators/deployment-actuator",
       "source": "describeOps",
@@ -27557,6 +27912,194 @@
       ]
     },
     {
+      "n": "scheduler-actuator",
+      "path": "libs/actuators/scheduler-actuator",
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "list",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "cron": {
+                "type": "string",
+                "minLength": 1
+              },
+              "payload": {
+                "type": "object"
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "schedule",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "cron": {
+                "type": "string",
+                "minLength": 1
+              },
+              "payload": {
+                "type": "object"
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false,
+            "required": ["cron", "payload"]
+          },
+          "examples": [
+            {
+              "cron": "0 9 * * 1",
+              "payload": {
+                "pipeline": "pipelines/morning-brief.json"
+              }
+            }
+          ]
+        },
+        {
+          "op": "cancel",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "cron": {
+                "type": "string",
+                "minLength": 1
+              },
+              "payload": {
+                "type": "object"
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false,
+            "required": ["id"]
+          },
+          "examples": [
+            {
+              "id": "sch-morning-brief"
+            }
+          ]
+        },
+        {
+          "op": "fire",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "cron": {
+                "type": "string",
+                "minLength": 1
+              },
+              "payload": {
+                "type": "object"
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false,
+            "required": ["id"]
+          },
+          "examples": [
+            {
+              "id": "sch-morning-brief"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "n": "search-actuator",
+      "path": "libs/actuators/search-actuator",
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "web_search",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "top_k": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 50
+              }
+            },
+            "additionalProperties": false,
+            "required": ["query"]
+          },
+          "examples": [
+            {
+              "query": "kyberion actuator contract",
+              "top_k": 5
+            }
+          ]
+        },
+        {
+          "op": "fetch_reader",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "minLength": 1
+              },
+              "max_chars": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200000
+              }
+            },
+            "additionalProperties": false,
+            "required": ["url"]
+          },
+          "examples": [
+            {
+              "url": "https://example.com/",
+              "max_chars": 8000
+            }
+          ]
+        }
+      ]
+    },
+    {
       "n": "secret-actuator",
       "path": "libs/actuators/secret-actuator",
       "source": "describeOps",
@@ -31179,6 +31722,355 @@
           "examples": [
             {
               "text": "pwd"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "n": "vcs-actuator",
+      "path": "libs/actuators/vcs-actuator",
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "status",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string"
+              },
+              "short": {
+                "type": "boolean"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "stat": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "oneline": {
+                "type": "boolean"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["list", "create", "delete"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "add": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "short": true
+            }
+          ]
+        },
+        {
+          "op": "diff",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string"
+              },
+              "short": {
+                "type": "boolean"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "stat": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "oneline": {
+                "type": "boolean"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["list", "create", "delete"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "add": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "stat": true
+            }
+          ]
+        },
+        {
+          "op": "log",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string"
+              },
+              "short": {
+                "type": "boolean"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "stat": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "oneline": {
+                "type": "boolean"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["list", "create", "delete"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "add": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "limit": 10,
+              "oneline": true
+            }
+          ]
+        },
+        {
+          "op": "branch",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string"
+              },
+              "short": {
+                "type": "boolean"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "stat": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "oneline": {
+                "type": "boolean"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["list", "create", "delete"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "add": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": ["action"]
+          },
+          "examples": [
+            {
+              "action": "list"
+            }
+          ]
+        },
+        {
+          "op": "commit",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string"
+              },
+              "short": {
+                "type": "boolean"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "stat": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "oneline": {
+                "type": "boolean"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["list", "create", "delete"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "add": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": ["message"]
+          },
+          "examples": [
+            {
+              "message": "Checkpoint mission progress",
+              "add": true
+            }
+          ]
+        },
+        {
+          "op": "pr_create",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string"
+              },
+              "short": {
+                "type": "boolean"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "stat": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "oneline": {
+                "type": "boolean"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["list", "create", "delete"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "add": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": ["title"]
+          },
+          "examples": [
+            {
+              "title": "Add vcs-actuator",
+              "base": "main"
             }
           ]
         }

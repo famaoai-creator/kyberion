@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  actuatorManifestAcceptsPipeline,
+  buildSingleOpPipelinePayload,
   defineActuator,
   defineCatalogBackedActuator,
   defineLegacyPipelineActuator,
@@ -76,6 +78,21 @@ describe('actuator SDK', () => {
     expect(resolveCliActionKind({ action: 'get' })).toBe('capture');
     expect(resolveCliActionKind({ action: 'set' })).toBe('apply');
     expect(resolveCliActionKind({ op: 'secret:list' })).toBe('capture');
+  });
+
+  it('wraps a discovery-only single op into the runtime one-step pipeline shape', () => {
+    expect(buildSingleOpPipelinePayload('read', { path: 'a' }, 'capture')).toEqual({
+      action: 'pipeline',
+      op: 'pipeline',
+      steps: [{ type: 'capture', op: 'read', params: { path: 'a' } }],
+      context: {},
+      options: {},
+    });
+    expect(buildSingleOpPipelinePayload('read', {}, 'bogus')).toMatchObject({
+      steps: [{ type: 'capture', op: 'read' }],
+    });
+    expect(actuatorManifestAcceptsPipeline({ capabilities: [{ op: 'pipeline' }] })).toBe(true);
+    expect(actuatorManifestAcceptsPipeline({ capabilities: [{ op: 'get' }] })).toBe(false);
   });
 
   it('skips apply handlers on dry-run after validating input', async () => {

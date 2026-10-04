@@ -1,0 +1,37 @@
+{
+  "actuator_id": "scheduler-actuator",
+  "version": "1.0.0",
+  "description": "Declaration-only schedule store: persists cron declarations as JSON under active/shared/runtime/scheduler/ for later execution by a runner. No daemonization — this actuator only declares, lists, cancels, and manually fires stored payloads.",
+  "contract_schema": "knowledge/product/schemas/scheduler-action.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "sequential_alternatives",
+    "retry_profile": "scheduler-actuator"
+  },
+  "capabilities": [
+    {
+      "op": "schedule",
+      "description": "Persists a cron declaration JSON (id, cron, payload, enabled) to the scheduler store",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "list",
+      "description": "Reads all stored schedule declarations from the scheduler store",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "cancel",
+      "description": "Removes a stored schedule declaration by id",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "fire",
+      "description": "Returns the stored payload for a schedule id for manual triggering (no daemon)",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    }
+  ]
+}

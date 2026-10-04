@@ -379,6 +379,12 @@ importers:
         specifier: workspace:*
         version: link:../../core
 
+  libs/actuators/data-actuator:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../core
+
   libs/actuators/deployment-actuator:
     dependencies:
       '@agent/core':
@@ -583,6 +589,18 @@ importers:
         specifier: ^17.7.3
         version: 17.7.3
 
+  libs/actuators/scheduler-actuator:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../core
+
+  libs/actuators/search-actuator:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../core
+
   libs/actuators/secret-actuator:
     dependencies:
       '@agent/core':
@@ -633,6 +651,12 @@ importers:
       yargs:
         specifier: ^17.7.3
         version: 17.7.3
+
+  libs/actuators/vcs-actuator:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../core
 
   libs/actuators/video-composition-actuator:
     dependencies:
