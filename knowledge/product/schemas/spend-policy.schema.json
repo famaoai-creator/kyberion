@@ -10,7 +10,38 @@
     "posture": { "type": "string", "enum": ["warn", "block", "allow"] },
     "daily_cap_usd": { "type": "number", "minimum": 0 },
     "mission_cap_usd": { "type": "number", "minimum": 0 },
-    "tenant_overrides": { "type": "object", "additionalProperties": true }
+    "tenant_overrides": { "type": "object", "additionalProperties": true },
+    "org_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "daily_token_cap": { "type": "number", "exclusiveMinimum": 0 },
+        "daily_cost_cap_usd": { "type": "number", "exclusiveMinimum": 0 },
+        "soft_ratio": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "hard_ratio": { "type": "number", "exclusiveMinimum": 0 },
+        "tenant_overrides": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/orgBudgetOverride" }
+        },
+        "organization_overrides": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/orgBudgetOverride" }
+        }
+      },
+      "required": ["daily_token_cap", "soft_ratio", "hard_ratio"]
+    }
+  },
+  "definitions": {
+    "orgBudgetOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "daily_token_cap": { "type": "number", "exclusiveMinimum": 0 },
+        "daily_cost_cap_usd": { "type": "number", "exclusiveMinimum": 0 },
+        "soft_ratio": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "hard_ratio": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    }
   },
   "required": ["version", "posture", "daily_cap_usd", "mission_cap_usd", "tenant_overrides"]
 }

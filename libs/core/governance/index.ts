@@ -16,3 +16,4 @@ export * from './governance-status.js';
 export type { AnomalyIndicator } from './kill-switch.js';
 export { getAnomalyConfig, onKillSwitchTermination, killSwitch } from './kill-switch.js';
 export * from './policy-engine.js';
+export * from './org-budget-governor.js';
