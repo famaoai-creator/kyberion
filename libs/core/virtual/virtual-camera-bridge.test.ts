@@ -3,6 +3,8 @@ import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import {
   createVirtualCameraBridge,
+  listCameraCaptureAdapters,
+  registerCameraCaptureAdapter,
   registerVirtualCameraCaptureBackend,
   resetVirtualCameraCaptureBackends,
   VIRTUAL_CAMERA_BRIDGE_ID,
@@ -68,6 +70,20 @@ describe('createVirtualCameraBridge', () => {
       expect(safeReadFile(outPath, { encoding: null })).toEqual(payload);
     } finally {
       safeRmSync(outPath, { force: true });
+    }
+  });
+
+  it('allows a provider-specific camera input adapter to be registered', () => {
+    const adapter = {
+      platforms: ['darwin'] as const,
+      inputFormat: 'provider-camera',
+      deviceArg: (preference?: string) => `camera=${preference || 'default'}`,
+    };
+    const unregister = registerCameraCaptureAdapter(adapter);
+    try {
+      expect(listCameraCaptureAdapters()[0]).toBe(adapter);
+    } finally {
+      unregister();
     }
   });
 

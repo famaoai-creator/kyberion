@@ -36,7 +36,7 @@ export interface VirtualAudioInputRecordingTargetResult {
   device_name: string;
   status: 'recorded' | 'failed' | 'skipped';
   recorded_path: string;
-  selected_backend: 'ffmpeg-avfoundation' | 'ffmpeg-dshow' | 'sox-default-input';
+  selected_backend: string;
   device_index?: number;
   output?: string;
   error?: string;
@@ -67,37 +67,103 @@ export interface VirtualAudioInputRecordingBridge {
   }>;
 }
 
-const DEFAULT_SOX_BIN = 'sox';
 const DEFAULT_STREAM_FORMAT: AudioFormat = {
   encoding: 'pcm_s16le',
   sample_rate_hz: 16000,
   channels: 1,
 };
 
-interface AudioInputPlatformAdapter {
-  backend: 'ffmpeg-avfoundation' | 'ffmpeg-dshow';
-  inputFormat: 'avfoundation' | 'dshow';
+export interface AudioInputRecordingBackendAdapter {
+  backend: string;
+  platforms: readonly NodeJS.Platform[];
+  inputFormat: string;
   inputSpec(deviceName: string, index: number): string;
+  listInputs?(ffmpegBin: string): Array<{ index: number; name: string }>;
+  recordingArgs(
+    deviceName: string,
+    index: number,
+    durationSec: number,
+    recordingPath: string
+  ): string[];
 }
 
-class DarwinAudioInputAdapter implements AudioInputPlatformAdapter {
+class DarwinAudioInputAdapter implements AudioInputRecordingBackendAdapter {
   backend = 'ffmpeg-avfoundation' as const;
   inputFormat = 'avfoundation' as const;
+  platforms = ['darwin'] as const;
+  listInputs(ffmpegBin: string) {
+    const result = safeExecResult(
+      ffmpegBin,
+      ['-hide_banner', '-f', this.inputFormat, '-list_devices', 'true', '-i', '""'],
+      { maxOutputMB: 5 }
+    );
+    return parseFfmpegAudioInputs(result.stdout, result.stderr);
+  }
   inputSpec(_deviceName: string, index: number): string {
     return `:${index}`;
   }
-}
-
-class WindowsAudioInputAdapter implements AudioInputPlatformAdapter {
-  backend = 'ffmpeg-dshow' as const;
-  inputFormat = 'dshow' as const;
-  inputSpec(deviceName: string, _index: number): string {
-    return `audio="${deviceName.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  recordingArgs(_deviceName: string, index: number, durationSec: number, recordingPath: string) {
+    return [
+      '-y',
+      '-f',
+      this.inputFormat,
+      '-i',
+      this.inputSpec('', index),
+      '-t',
+      String(durationSec),
+      '-ac',
+      '1',
+      '-ar',
+      '16000',
+      recordingPath,
+    ];
   }
 }
 
-function resolveAudioInputAdapter(platform: NodeJS.Platform): AudioInputPlatformAdapter {
-  return platform === 'win32' ? new WindowsAudioInputAdapter() : new DarwinAudioInputAdapter();
+class WindowsAudioInputAdapter implements AudioInputRecordingBackendAdapter {
+  backend = 'ffmpeg-dshow' as const;
+  inputFormat = 'dshow' as const;
+  platforms = ['win32'] as const;
+  inputSpec(deviceName: string, _index: number): string {
+    return `audio="${deviceName.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  }
+  recordingArgs(deviceName: string, _index: number, durationSec: number, recordingPath: string) {
+    return [
+      '-y',
+      '-f',
+      this.inputFormat,
+      '-i',
+      this.inputSpec(deviceName, -1),
+      '-t',
+      String(durationSec),
+      '-ac',
+      '1',
+      '-ar',
+      '16000',
+      recordingPath,
+    ];
+  }
+}
+
+const audioInputRecordingBackends: AudioInputRecordingBackendAdapter[] = [
+  new DarwinAudioInputAdapter(),
+  new WindowsAudioInputAdapter(),
+];
+
+export function registerAudioInputRecordingBackend(
+  adapter: AudioInputRecordingBackendAdapter
+): () => void {
+  audioInputRecordingBackends.unshift(adapter);
+  return () => {
+    const index = audioInputRecordingBackends.indexOf(adapter);
+    if (index >= 0) audioInputRecordingBackends.splice(index, 1);
+  };
+}
+
+function resolveAudioInputAdapter(
+  platform: NodeJS.Platform
+): AudioInputRecordingBackendAdapter | undefined {
+  return audioInputRecordingBackends.find((adapter) => adapter.platforms.includes(platform));
 }
 
 function safeSlug(value: string): string {
@@ -161,25 +227,23 @@ function pickInputIndex(
     candidate.name.trim().toLowerCase().includes(normalized)
   );
   if (contains) return contains;
-  return candidates[0];
+  return undefined;
 }
 
 async function collectStreamInputIndex(
   inventoryBridge: VirtualDeviceInventoryBridge,
   target?: string,
-  ffmpegBin = resolveFfmpegBin()
+  ffmpegBin = resolveFfmpegBin(),
+  adapter = resolveAudioInputAdapter(process.platform)
 ): Promise<{ name: string; index: number } | undefined> {
   const inventory = await inventoryBridge.probe();
   const selectedName =
     target && target.trim() ? target.trim() : inventory.inventory.audio_inputs[0]?.name;
   if (!selectedName) return undefined;
-  if (process.platform === 'win32') return { name: selectedName, index: -1 };
-  const ffmpegList = safeExecResult(
-    ffmpegBin,
-    ['-hide_banner', '-f', 'avfoundation', '-list_devices', 'true', '-i', '""'],
-    { maxOutputMB: 5 }
-  );
-  const ffmpegInputs = parseFfmpegAudioInputs(ffmpegList.stdout, ffmpegList.stderr);
+  if (!adapter?.listInputs) {
+    return { name: selectedName, index: -1 };
+  }
+  const ffmpegInputs = adapter.listInputs(ffmpegBin);
   return pickInputIndex(ffmpegInputs, selectedName);
 }
 
@@ -197,14 +261,12 @@ export class VirtualAudioInputRecordingBridgeImpl implements VirtualAudioInputRe
     return {
       bridge_id: VIRTUAL_AUDIO_INPUT_RECORDING_BRIDGE_ID,
       platform: process.platform,
-      available:
-        (process.platform === 'darwin' || process.platform === 'win32') && inputs.length > 0,
-      reason:
-        process.platform !== 'darwin' && process.platform !== 'win32'
-          ? `unsupported platform ${process.platform}`
-          : inputs.length === 0
-            ? 'no audio inputs found'
-            : undefined,
+      available: Boolean(resolveAudioInputAdapter(process.platform)) && inputs.length > 0,
+      reason: !resolveAudioInputAdapter(process.platform)
+        ? `unsupported platform ${process.platform}`
+        : inputs.length === 0
+          ? 'no audio inputs found'
+          : undefined,
       inputs,
     };
   }
@@ -213,22 +275,26 @@ export class VirtualAudioInputRecordingBridgeImpl implements VirtualAudioInputRe
     target?: string,
     request: VirtualAudioInputRecordingRequest = {}
   ): AsyncIterable<AudioChunk> {
-    if (process.platform !== 'darwin' && process.platform !== 'win32') {
+    const durationSec = Number(request.duration_sec || 0) > 0 ? Number(request.duration_sec) : 3;
+    const ffmpegBin = this.opts.ffmpeg_bin ?? resolveFfmpegBin();
+    const adapter = resolveAudioInputAdapter(process.platform);
+    if (!adapter) {
       throw new Error(
         `[virtual-audio-input-recording-bridge] stream capture unsupported on ${process.platform}`
       );
     }
-
-    const durationSec = Number(request.duration_sec || 0) > 0 ? Number(request.duration_sec) : 3;
-    const ffmpegBin = this.opts.ffmpeg_bin ?? resolveFfmpegBin();
-    const selected = await collectStreamInputIndex(this.inventoryBridge, target, ffmpegBin);
+    const selected = await collectStreamInputIndex(
+      this.inventoryBridge,
+      target,
+      ffmpegBin,
+      adapter
+    );
     if (!selected) {
       throw new Error(
         '[virtual-audio-input-recording-bridge] no audio input available for stream capture'
       );
     }
 
-    const adapter = resolveAudioInputAdapter(process.platform);
     const child = spawn(
       ffmpegBin,
       [
@@ -327,17 +393,8 @@ export class VirtualAudioInputRecordingBridgeImpl implements VirtualAudioInputRe
     const durationSec = Number(request.duration_sec || 0) > 0 ? Number(request.duration_sec) : 3;
     const results: VirtualAudioInputRecordingTargetResult[] = [];
     const ffmpegBin = this.opts.ffmpeg_bin ?? resolveFfmpegBin();
-    const soxBin = this.opts.sox_bin ?? DEFAULT_SOX_BIN;
     const adapter = resolveAudioInputAdapter(process.platform);
-    const ffmpegList =
-      process.platform === 'win32'
-        ? { stdout: '', stderr: '' }
-        : safeExecResult(
-            ffmpegBin,
-            ['-hide_banner', '-f', 'avfoundation', '-list_devices', 'true', '-i', '""'],
-            { maxOutputMB: 5 }
-          );
-    const ffmpegInputs = parseFfmpegAudioInputs(ffmpegList.stdout, ffmpegList.stderr);
+    const ffmpegInputs = adapter?.listInputs?.(ffmpegBin) ?? [];
     const candidateNames = new Set(inventory.inventory.audio_inputs.map((input) => input.name));
 
     for (const inputName of selectedInputs) {
@@ -355,7 +412,7 @@ export class VirtualAudioInputRecordingBridgeImpl implements VirtualAudioInputRe
           device_name: inputName,
           status: 'skipped',
           recorded_path: resolveRecordingPath(inputName, request.output_path),
-          selected_backend: 'ffmpeg-avfoundation',
+          selected_backend: adapter?.backend ?? 'unsupported',
           error: 'input device not found in inventory',
         });
         continue;
@@ -374,85 +431,38 @@ export class VirtualAudioInputRecordingBridgeImpl implements VirtualAudioInputRe
       }
 
       try {
-        if (process.platform === 'darwin' || process.platform === 'win32') {
-          if (adapter.backend === 'ffmpeg-dshow') {
+        if (adapter) {
+          if (!adapter.listInputs || ffmpegCandidate) {
             const output = safeExec(
               ffmpegBin,
-              [
-                '-y',
-                '-f',
-                'dshow',
-                '-i',
-                `audio="${candidate.name.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`,
-                '-t',
-                String(durationSec),
-                '-ac',
-                '1',
-                '-ar',
-                '16000',
-                recordingPath,
-              ],
+              adapter.recordingArgs(
+                candidate.name,
+                ffmpegCandidate?.index ?? -1,
+                durationSec,
+                recordingPath
+              ),
               { timeoutMs: Math.max(30_000, durationSec * 1000 + 15_000) }
             );
             results.push({
               device_name: candidate.name,
               status: 'recorded',
               recorded_path: recordingPath,
-              selected_backend: 'ffmpeg-dshow',
+              selected_backend: adapter.backend,
+              device_index: ffmpegCandidate?.index,
               output: output.trim() || undefined,
             });
             continue;
           }
-          if (ffmpegCandidate) {
-            const output = safeExec(
-              ffmpegBin,
-              [
-                '-y',
-                '-f',
-                'avfoundation',
-                '-i',
-                `:${ffmpegCandidate.index}`,
-                '-t',
-                String(durationSec),
-                '-ac',
-                '1',
-                '-ar',
-                '16000',
-                recordingPath,
-              ],
-              { timeoutMs: Math.max(30_000, durationSec * 1000 + 15_000) }
-            );
-            results.push({
-              device_name: candidate.name,
-              status: 'recorded',
-              recorded_path: recordingPath,
-              selected_backend: 'ffmpeg-avfoundation',
-              device_index: ffmpegCandidate.index,
-              output: output.trim() || undefined,
-            });
-            continue;
-          }
-
-          const output = safeExec(
-            soxBin,
-            ['-d', '-c', '1', '-r', '16000', recordingPath, 'trim', '0', String(durationSec)],
-            { timeoutMs: Math.max(30_000, durationSec * 1000 + 15_000) }
+          throw new Error(
+            `Recording backend '${adapter.backend}' could not resolve input '${candidate.name}'`
           );
-          results.push({
-            device_name: candidate.name,
-            status: 'recorded',
-            recorded_path: recordingPath,
-            selected_backend: 'sox-default-input',
-            output: output.trim() || undefined,
-          });
-          continue;
         }
 
         results.push({
           device_name: candidate.name,
           status: 'skipped',
           recorded_path: recordingPath,
-          selected_backend: 'ffmpeg-avfoundation',
+          selected_backend: adapter?.backend ?? 'unsupported',
           error: `unsupported platform ${process.platform}`,
         });
       } catch (error: any) {
@@ -460,7 +470,7 @@ export class VirtualAudioInputRecordingBridgeImpl implements VirtualAudioInputRe
           device_name: candidate.name,
           status: 'failed',
           recorded_path: recordingPath,
-          selected_backend: 'ffmpeg-avfoundation',
+          selected_backend: adapter?.backend ?? 'unsupported',
           error: error?.message || String(error),
         });
       }

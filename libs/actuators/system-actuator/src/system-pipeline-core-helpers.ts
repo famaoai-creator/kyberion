@@ -1120,10 +1120,14 @@ export const SYSTEM_CAPTURE_OP_HANDLERS: Readonly<Record<string, SystemCaptureOp
     };
   },
   control_media_devices: async ({ params, ctx }) => {
-    const bridge = createVirtualMediaDeviceControlBridge();
-    const result = await bridge.control({
+    const preference = (key: string) => (typeof params[key] === 'string' ? params[key] : undefined);
+    const result = await createVirtualMediaDeviceControlBridge().control({
       action: (typeof params.action === 'string' ? params.action : 'select') as never,
       scope: (typeof params.scope === 'string' ? params.scope : 'all') as never,
+      input_device_preference: preference('input_device_preference'),
+      output_device_preference: preference('output_device_preference'),
+      camera_device_preference: preference('camera_device_preference'),
+      preferred_camera_backend: preference('preferred_camera_backend'),
     });
     return { ...ctx, [String(params.export_as ?? 'media_control')]: result };
   },
