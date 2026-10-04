@@ -18,6 +18,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { readJsonLines } from '../foundation/json.js';
 import { withLockSync } from '../foundation/lock-utils.js';
+import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
 import { getZonedDateParts, matchesCron } from '../pipeline/cron-utils.js';
 import { safeMkdir, safeWriteFile } from '../secure-io.js';
@@ -25,6 +26,8 @@ import type { DotCharter } from './dot-charter.js';
 import type { DotExtCtx, DotPromptSection, DotWakeTool } from './dot-extensions.js';
 import type { DotWakeLedgerEntry, DueDotTrigger } from './dot-runtime.js';
 import { DOT_FOLLOWUPS_FILE, dotStatePath, type DotFollowupRow } from './dot-state-paths.js';
+
+const logger = createLogger('dot-followups');
 
 export const DOT_FOLLOWUP_MIN_DELAY_MINUTES = 5;
 export const DOT_FOLLOWUP_MAX_DELAY_MINUTES = 7 * 24 * 60;
@@ -163,7 +166,6 @@ export const dotScheduleFollowupTool: DotWakeTool = {
   name: 'dot_schedule_followup',
   fence: 'dot-followup',
   maxPerWake: DOT_FOLLOWUPS_PER_WAKE,
-  failWakeOnApplyError: true,
   definition: {
     name: 'dot_schedule_followup',
     description:
@@ -188,9 +190,21 @@ export const dotScheduleFollowupTool: DotWakeTool = {
       const errors: string[] = [];
       const now = ctx.now();
       const deps = { rootDir: ctx.rootDir, now: ctx.now };
-      // Strict read before rewriting: a damaged store is not evidence that a
-      // previous replacement was absent. Keep other dots' legacy shared rows.
-      const stored = readJsonLines<DotFollowupRow>(file);
+      // A torn / malformed line is skipped (counted + warned, then dropped by
+      // the rewrite below) so one bad row cannot block every later schedule.
+      // Every parseable row is kept, including other dots' legacy shared rows,
+      // and the successor check below runs over all of them (idempotency).
+      let malformed = 0;
+      const stored = readJsonLines<DotFollowupRow>(file, {
+        onMalformed: () => {
+          malformed += 1;
+        },
+      });
+      if (malformed > 0) {
+        logger.warn(
+          `follow-up store for ${c.dot_id} has ${malformed} malformed line(s) — skipped | next: the store is rewritten without them on this schedule | evidence: ${file}`
+        );
+      }
       const parent = ctx.completingFollowupKey?.startsWith('followup:')
         ? ctx.completingFollowupKey.slice('followup:'.length)
         : undefined;
