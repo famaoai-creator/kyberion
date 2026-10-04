@@ -55,8 +55,12 @@ export interface BudgetUsage {
   day: string;
   tokens: number;
   cost_usd: number;
-  /** The cost is a known subtotal, not a safe cap input, when attribution/pricing is missing. */
-  cost_status?: 'unknown';
+  /**
+   * 'unknown': attributable usage lacks cost/scope evidence — not a safe cap
+   * input (the throttle fails closed when a cost cap is set). 'partial': only
+   * unscoped, unattributed token-only rows lack cost — reported, never a pause.
+   */
+  cost_status?: 'unknown' | 'partial';
   /**
    * dots / missions are tokens; generation is generation-quota units — report
    * only: never added to `tokens` and never an input to the throttle.
@@ -217,6 +221,9 @@ function metricsRowScope(e: Record<string, any>): OrgBudgetScope {
 }
 
 const DOT_ACTOR_PATTERN = /^dot:/;
+/** More torn history lines than this, dated today or undatable, make cost unknown. */
+const MAX_TODAY_MALFORMED = 2;
+const MALFORMED_DAY_PATTERN = /"timestamp"\s*:\s*"(\d{4}-\d{2}-\d{2})/;
 
 /** Dot identity is an attribution label, never proof that a ledger charge exists. */
 function metricsDotId(e: Record<string, unknown>): string | undefined {
@@ -309,29 +316,71 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
   }
 
   // Missions / reasoning calls: metrics history rows tagged with tenant.
+  //
+  // Cost evidence rule (fail open for availability, closed only where cost is
+  // truly attributable):
+  // - A row in this scope with usage but no cost is 'unknown' when it is
+  //   attributable (explicit tenant/org, dot or accounting attribution) and
+  //   only 'partial' for an unscoped, unattributed row (global scope only).
+  // - Outside the scope, an unscoped row is ambiguous for this scope only when
+  //   it carries dot/accounting attribution and its dot is not a known charter.
+  //   Ordinary unscoped producers (operator CLI sessions, estimated CLI
+  //   metering, SDK calls outside a tenant context) never pause a tenant.
+  // - Torn history lines are skipped; only more than MAX_TODAY_MALFORMED lines
+  //   dated today (or undatable) make the day's cost unknown.
   let missions = 0;
   let cost = 0;
   let costUnknown = false;
+  let costPartial = false;
+  let malformedToday = 0;
   const measuredDotTokens = new Map<string, number>();
   try {
     const entries = deps.readMetricsHistory
       ? deps.readMetricsHistory()
-      : metrics.loadHistory({ strict: true });
+      : metrics.loadHistory({
+          strict: true,
+          onMalformed: (_line, raw) => {
+            const dated = MALFORMED_DAY_PATTERN.exec(raw)?.[1];
+            if (!dated || dated === day) malformedToday += 1;
+          },
+        });
+    if (malformedToday > MAX_TODAY_MALFORMED) {
+      costUnknown = true;
+      logger.warn(
+        `metrics history has ${malformedToday} malformed line(s) for ${day} — cost treated as unknown | next: repair active/shared metrics history.jsonl | evidence: threshold ${MAX_TODAY_MALFORMED}`
+      );
+    }
     for (const e of entries) {
       if (typeof e?.timestamp !== 'string' || e.timestamp.slice(0, 10) !== day) continue;
-      const rowScope = metricsRowScope(e);
+      const dotId = metricsDotId(e);
+      const charterScope = dotId ? dotScope.get(dotId) : undefined;
+      const explicitScope = metricsRowScope(e);
+      const rowScope =
+        charterScope && !explicitScope.tenant_slug && !explicitScope.organization_id
+          ? { ...charterScope }
+          : explicitScope;
       const hasUsage = e.usage && typeof e.usage === 'object';
       const hasCostEvidence = hasUsage || e.cost_usd !== undefined;
+      const runtimeAttributed = Boolean(dotId || nonEmpty(e.accounting_id));
+      const attributable =
+        Boolean(e.scope?.scope_kind) ||
+        Boolean(rowScope.tenant_slug || rowScope.organization_id) ||
+        runtimeAttributed;
       if (!inScope(scope, rowScope)) {
-        // Only today's potentially relevant legacy rows are ambiguous. A
-        // canonical scope (including system) is explicit, not missing.
-        if (hasCostEvidence && !e.scope?.scope_kind && couldBelongToScope(scope, rowScope)) {
+        // Only today's dot/accounting-attributed rows with no resolvable scope
+        // are ambiguous. A canonical scope (including system) is explicit.
+        if (
+          hasCostEvidence &&
+          runtimeAttributed &&
+          !charterScope &&
+          !e.scope?.scope_kind &&
+          couldBelongToScope(scope, rowScope)
+        ) {
           costUnknown = true;
         }
         continue;
       }
       const tokens = metricsTokens(e);
-      const dotId = metricsDotId(e);
       const accountingId = nonEmpty(e.accounting_id);
       if (dotId && accountingId) {
         const key = accountingKey(dotId, accountingId, rowScope, day);
@@ -345,7 +394,10 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
       const c = Number(e.cost_usd);
       if (e.cost_usd !== undefined && e.cost_usd !== null && Number.isFinite(c) && c >= 0)
         cost += c;
-      else if (hasCostEvidence) costUnknown = true;
+      else if (hasCostEvidence) {
+        if (attributable) costUnknown = true;
+        else costPartial = true;
+      }
     }
   } catch (error) {
     costUnknown = true;
@@ -378,7 +430,11 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
     day,
     tokens: dots + missions,
     cost_usd: Math.round(cost * 100000) / 100000,
-    ...(costUnknown ? { cost_status: 'unknown' as const } : {}),
+    ...(costUnknown
+      ? { cost_status: 'unknown' as const }
+      : costPartial
+        ? { cost_status: 'partial' as const }
+        : {}),
     by_source: { dots, missions, generation: Number(generation) || 0 },
   };
 }

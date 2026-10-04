@@ -97,9 +97,10 @@ describe('org-budget-governor', () => {
   });
 
   it("fails closed for today's ambiguous cost evidence only when a cost cap is configured", () => {
+    // Dot-attributed usage for an unknown charter with no scope could be acme's.
     const deps = base({
       readDotTokenUsage: () => [],
-      readMetricsHistory: () => [unattributedSdkRow],
+      readMetricsHistory: () => [{ ...unattributedSdkRow, actor_id: 'dot:ghost' }],
     });
     const unknown = evaluateBudgetThrottle({ tenant_slug: 'acme' }, deps);
     expect(unknown.usage).toMatchObject({ cost_usd: 0, cost_status: 'unknown' });
@@ -123,6 +124,45 @@ describe('org-budget-governor', () => {
         }
       ).throttle
     ).toBe('normal');
+  });
+
+  it('keeps a tenant normal under the shipped spend policy despite unscoped operator CLI usage', () => {
+    // As recordCliUsage persists a Claude Code session outside any tenant context.
+    const cliRow = {
+      component: 'claude-code-cli',
+      timestamp: '2026-10-04T06:00:00Z',
+      agent: 'claude-code-cli',
+      turns: 4,
+      usage: { prompt_tokens: 50_000, completion_tokens: 4_000 },
+      cost_usd: 30,
+    };
+    const deps = base({
+      policy: resolveOrgBudgetPolicy({ daily_cap_usd: 50 }),
+      readDotTokenUsage: () => [],
+      readMetricsHistory: () => [cliRow, unattributedSdkRow],
+    });
+    const tenant = evaluateBudgetThrottle({ tenant_slug: 'acme' }, deps);
+    expect(tenant.throttle).toBe('normal');
+    expect(tenant.usage.cost_status).toBeUndefined();
+    // The global scope simply counts the unscoped rows; token-only rows are partial, not a pause.
+    const global = evaluateBudgetThrottle(
+      {},
+      { ...deps, readMetricsHistory: () => [{ ...cliRow, cost_usd: undefined }] }
+    );
+    expect(global.usage.by_source.missions).toBe(54_000);
+    expect(global.usage.cost_status).toBe('partial');
+    expect(global.throttle).toBe('normal');
+  });
+
+  it('resolves unscoped legacy dot rows through the charter instead of pausing others', () => {
+    const legacy = { ...unattributedSdkRow, agent: 'dot:b', cost_usd: undefined };
+    const deps = base({ readDotTokenUsage: () => [], readMetricsHistory: () => [legacy] });
+    expect(evaluateBudgetThrottle({ tenant_slug: 'acme' }, deps).throttle).toBe('normal');
+    const big = evaluateBudgetThrottle({ tenant_slug: 'big' }, deps);
+    expect(big.usage.by_source.dots).toBe(700);
+    // Attributable dot usage with unknown cost stays conservative in its own scope.
+    expect(big.usage.cost_status).toBe('unknown');
+    expect(big.throttle).toBe('hard');
   });
 
   it('does not treat known other-tenant or system costs as ambiguous for this tenant', () => {
@@ -192,9 +232,17 @@ describe('org-budget-governor', () => {
     try {
       safeMkdir(metricsDir, { recursive: true });
       expect(evaluateBudgetThrottle({ tenant_slug: 'acme' }, deps).throttle).toBe('normal');
-      safeWriteFile(`${metricsDir}/history.jsonl`, '{corrupt\n');
+      // Torn lines dated yesterday are skipped; one undatable line is tolerated.
+      const yesterday = '{"timestamp":"2026-10-03T23:59:00Z","usage":{"prompt_tok\n';
+      safeWriteFile(`${metricsDir}/history.jsonl`, yesterday.repeat(5) + '{corrupt\n');
+      expect(evaluateBudgetThrottle({ tenant_slug: 'acme' }, deps).throttle).toBe('normal');
+      expect(history).toHaveBeenCalledWith(expect.objectContaining({ strict: true }));
+      // Beyond the threshold, today's (or undatable) torn evidence fails closed.
+      safeWriteFile(
+        `${metricsDir}/history.jsonl`,
+        yesterday + '{"timestamp":"2026-10-04T01:00:00Z","usa\n'.repeat(2) + '{corrupt\n'
+      );
       const result = evaluateBudgetThrottle({ tenant_slug: 'acme' }, deps);
-      expect(history).toHaveBeenCalledWith({ strict: true });
       expect(result.usage.cost_status).toBe('unknown');
       expect(result.throttle).toBe('hard');
       expect(
