@@ -87,9 +87,10 @@ async function main() {
       { cwd: pathResolver.rootDir(), timeoutMs: 30_000 }
     ).trim()
   );
+  // Follow the narration (plus a short tail) so the voice is never cut off.
   const durationSec = Math.max(
     10,
-    Math.min(60, Number.isFinite(narrationDuration) ? Math.ceil(narrationDuration) : 35)
+    Math.min(300, Number.isFinite(narrationDuration) ? Math.ceil(narrationDuration) + 1 : 35)
   );
 
   console.log(`[kyberion-intro] composing video (${durationSec}s)…`);

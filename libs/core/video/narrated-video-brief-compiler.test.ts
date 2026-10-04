@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { compileNarratedVideoBriefToCompositionADF } from './narrated-video-brief-compiler.js';
+import {
+  compileNarratedVideoBriefToCompositionADF,
+  sceneHeadline,
+  scriptBeatShares,
+} from './narrated-video-brief-compiler.js';
 
 describe('narrated video brief compiler', () => {
   it('compiles narrated brief into a video-composition-adf', () => {
@@ -313,7 +317,7 @@ describe('narrated video brief compiler', () => {
     expect(adf.scenes.map((scene) => scene.content.headline)).toEqual([
       'Kyberionは曖昧な指示をそのまま実行しません',
       'Intent → Contract → Execute',
-      'さあ、Kyberionを動かして自律オペレーションを始…',
+      'さあ、Kyberionを動かして自律オペレーションを始めましょう',
     ]);
     expect(adf.scenes[0].content.body).not.toBe(adf.scenes[0].content.headline);
     expect(adf.scenes[2].content.body).not.toBe(adf.scenes[2].content.headline);
@@ -323,10 +327,36 @@ describe('narrated video brief compiler', () => {
     expect(adf.scenes[0].template_ref.template_id).toBe('basic-title-card');
     expect(adf.scenes[1].template_ref.template_id).toBe('howto-guide');
     expect(adf.scenes[2].template_ref.template_id).toBe('logo-outro');
+    // Steps come from the feature beat's own clauses, not other beats' titles.
     expect(adf.scenes[1].content.visual_steps).toEqual([
-      { step: '01', detail: 'Kyberionは曖昧な指示をその…' },
-      { step: '02', detail: 'Intent → Contract…' },
-      { step: '03', detail: 'さあ、Kyberionを動かして自…' },
+      { step: '01', detail: '意図を合意し' },
+      { step: '02', detail: '検証可能な活動定義に変換してから安全に実行します' },
     ]);
+    // Beats are timed by script share (feature is the longest line), not a fixed split.
+    const [hook, feature, cta] = adf.scenes.map((scene) => scene.duration_sec);
+    expect(hook + feature + cta).toBeCloseTo(30, 1);
+    expect(feature).toBeGreaterThan(hook);
+    expect(adf.scenes[1].start_sec).toBeCloseTo(hook, 2);
+  });
+
+  it('keeps headlines whole or cuts them on clause boundaries, never mid-word', () => {
+    expect(sceneHeadline('さあ、Kyberionを動かして自律オペレーションを始めましょう。', 28)).toBe(
+      'さあ、Kyberionを動かして自律オペレーションを始めましょう'
+    );
+    const long =
+      '曖昧な依頼を受け取ったら、まず人間と意図を合意し、検証可能な活動定義に変換してから、安全なサンドボックスで実行します。';
+    expect(sceneHeadline(long, 28)).toBe('曖昧な依頼を受け取ったら、まず人間と意図を合意し');
+    expect(sceneHeadline('a'.repeat(80), 20)).toBe(`${'a'.repeat(19)}…`);
+  });
+
+  it('splits beat durations by script length with a floor for short beats', () => {
+    const shares = scriptBeatShares([
+      '短い。',
+      'これはかなり長い説明文で、機能の流れを詳しく話します。',
+      '始めよう。',
+    ]);
+    expect(shares.reduce((sum, value) => sum + value, 0)).toBeCloseTo(1, 6);
+    expect(shares[1]).toBeGreaterThan(shares[0]);
+    expect(Math.min(...shares)).toBeGreaterThan(0.15);
   });
 });
