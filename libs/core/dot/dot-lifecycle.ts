@@ -27,9 +27,10 @@ import { recordDaemonHeartbeat } from '../daemon-heartbeat.js';
 import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
 import { appendJsonLine } from '../foundation/json.js';
 import {
-  listDotCharterPaths,
-  loadDotCharter,
+  listDotCharterSources,
+  loadDotCharterSource,
   validateDotCharter,
+  type DotCharterSource,
   type DotCharter,
   type DotCharterStatus,
 } from './dot-charter.js';
@@ -63,10 +64,10 @@ export interface DotLifecycleDeps {
   hasRole?: (role: string) => boolean;
 }
 
-function findCharterPath(dotId: string, rootDir?: string): string | null {
-  for (const filePath of listDotCharterPaths(rootDir)) {
+function findCharterSource(dotId: string, rootDir?: string): DotCharterSource | null {
+  for (const source of listDotCharterSources(rootDir)) {
     try {
-      if (loadDotCharter(filePath).dot_id === dotId) return filePath;
+      if (loadDotCharterSource(source).dot_id === dotId) return source;
     } catch {
       // A malformed charter cannot be transitioned; skip it here and let
       // `dot validate` surface the parse error with its file name.
@@ -136,11 +137,20 @@ export function transitionDotCharterStatus(
   target: DotCharterStatus,
   deps: DotLifecycleDeps = {}
 ): DotCharter {
-  const filePath = findCharterPath(dotId, deps.rootDir);
-  if (!filePath) {
+  const source = findCharterSource(dotId, deps.rootDir);
+  if (!source) {
     throw new Error(`[DOT_NOT_FOUND] no charter for dot_id '${dotId}' under dots/`);
   }
-  const rawText = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+  const filePath = source.path;
+  // Tenant charters live under knowledge/confidential/<slug>/: read and write
+  // them inside that tenant's context (tier-guard denies the path otherwise).
+  const tenantSlug = source.tenant_slug;
+  const rawText = withExecutionContext(
+    CHARTER_WRITER_ROLE,
+    () => safeReadFile(filePath, { encoding: 'utf8' }) as string,
+    undefined,
+    tenantSlug
+  );
   const parsed = parseSafeJsonObjectInput(rawText, `dot charter ${filePath}`);
   const current = validateDotCharter(parsed, filePath);
 
@@ -151,10 +161,10 @@ export function transitionDotCharterStatus(
     );
   }
   if (target === 'active') {
-    const all = listDotCharterPaths(deps.rootDir)
+    const all = listDotCharterSources(deps.rootDir)
       .map((p) => {
         try {
-          return loadDotCharter(p);
+          return loadDotCharterSource(p);
         } catch {
           return null;
         }
@@ -165,32 +175,37 @@ export function transitionDotCharterStatus(
 
   const next = { ...parsed, status: target };
   const validated = validateDotCharter(next, filePath);
-  withExecutionContext(CHARTER_WRITER_ROLE, () => {
-    safeWriteFile(filePath, `${JSON.stringify(next, null, 2)}\n`, { encoding: 'utf8' });
-    auditTransition(
-      {
-        event: 'dot_status_transition',
-        dot_id: dotId,
-        from: current.status,
-        to: target,
-        path: filePath,
-      },
-      deps
-    );
-    // Activation seeds a heartbeat so the watchdog sees 'starting', not
-    // 'missing', until the first real wake lands.
-    if (target === 'active') {
-      recordDaemonHeartbeat(
-        validated.runtime.heartbeat_id,
-        { status: 'starting', details: { dot_id: dotId, event: 'activated' } },
-        deps.rootDir
-          ? {
-              rootDir: path.join(deps.rootDir, 'active/shared/runtime/heartbeats'),
-            }
-          : {}
+  withExecutionContext(
+    CHARTER_WRITER_ROLE,
+    () => {
+      safeWriteFile(filePath, `${JSON.stringify(next, null, 2)}\n`, { encoding: 'utf8' });
+      auditTransition(
+        {
+          event: 'dot_status_transition',
+          dot_id: dotId,
+          from: current.status,
+          to: target,
+          path: filePath,
+        },
+        deps
       );
-    }
-  });
+      // Activation seeds a heartbeat so the watchdog sees 'starting', not
+      // 'missing', until the first real wake lands.
+      if (target === 'active') {
+        recordDaemonHeartbeat(
+          validated.runtime.heartbeat_id,
+          { status: 'starting', details: { dot_id: dotId, event: 'activated' } },
+          deps.rootDir
+            ? {
+                rootDir: path.join(deps.rootDir, 'active/shared/runtime/heartbeats'),
+              }
+            : {}
+        );
+      }
+    },
+    undefined,
+    tenantSlug
+  );
   return validated;
 }
 
@@ -201,10 +216,10 @@ export function checkDotActivationReadiness(
 ): { ready: boolean; errors: string[] } {
   const errors: string[] = [];
   try {
-    const all = listDotCharterPaths(deps.rootDir)
+    const all = listDotCharterSources(deps.rootDir)
       .map((p) => {
         try {
-          return loadDotCharter(p);
+          return loadDotCharterSource(p);
         } catch {
           return null;
         }

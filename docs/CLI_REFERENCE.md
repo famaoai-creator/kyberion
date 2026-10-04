@@ -111,9 +111,15 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion channels list`                | `pnpm channels:list`              | List channels                                                                        |
 | `pnpm kyberion config report`                | `pnpm config:report`              | Report operational configuration                                                     |
 | `pnpm kyberion cost report`                  | `pnpm cost:report`                | Report usage cost                                                                    |
+| `pnpm kyberion dot autonomy`                 |                                   | Show a resident dot's graduated-autonomy level, metrics and shadow decisions         |
+| `pnpm kyberion dot followups`                |                                   | List a resident dot's pending self-scheduled follow-ups                              |
+| `pnpm kyberion dot kr`                       |                                   | Show a resident dot's latest key-result measurements and goal gaps                   |
 | `pnpm kyberion dot list`                     |                                   | List resident-agent (dot) charters and their status                                  |
+| `pnpm kyberion dot memory`                   |                                   | Show a resident dot's working memory (notes, open items, hypotheses)                 |
+| `pnpm kyberion dot outcomes`                 |                                   | Show the recorded outcome evaluations of a resident dot's actions                    |
 | `pnpm kyberion dot status`                   |                                   | Show wake/heartbeat/token status for dot charters                                    |
 | `pnpm kyberion dot validate`                 |                                   | Validate dot charters against schema and the activation gate                         |
+| `pnpm kyberion dot work`                     |                                   | Show recent delegated-work results executed for a resident dot                       |
 | `pnpm kyberion egress report`                | `pnpm egress:report`              | Report egress warnings                                                               |
 | `pnpm kyberion history search`               | `pnpm history:search`             | Search history                                                                       |
 | `pnpm kyberion hooks discover`               |                                   | List project-local Claude/Codex hook configs and whether each is trusted.            |
@@ -179,6 +185,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion dashboard`                     | `pnpm dashboard`                    | Open the sovereign dashboard                                                                        |
 | `pnpm kyberion doc-drop server`               |                                     | Start the document drop pad                                                                         |
 | `pnpm kyberion dot activate`                  |                                     | Activate a dot charter after the role/heartbeat gate passes                                         |
+| `pnpm kyberion dot event`                     |                                     | Ingest a local test event into the dot event ledger (--source, --file)                              |
 | `pnpm kyberion dot inbox`                     |                                     | Append a wake-lane row to a resident dot's inbox                                                    |
 | `pnpm kyberion dot pause`                     |                                     | Pause an active dot (triggers stop firing)                                                          |
 | `pnpm kyberion dot retire`                    |                                     | Retire a dot charter permanently                                                                    |
