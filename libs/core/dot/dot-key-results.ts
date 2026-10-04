@@ -10,10 +10,11 @@
  */
 
 import * as path from 'node:path';
+import { withExecutionContextAsync } from '../authority.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
-import { physicalScopedPath } from '../physical-namespace.js';
+import { isTenantPhysicalNamespacePath, physicalScopedPath } from '../physical-namespace.js';
 import { assertSafeRepositoryPath, safeMkdir, safeReadFile } from '../secure-io.js';
 import { evaluateStateProbe, type StateProbeDeps, type StateProbeResult } from '../state-probe.js';
 import {
@@ -77,6 +78,22 @@ export interface DotKeyResultDeps {
   readSignals?: (dotId: string) => DotSignalEntry[];
   loadPurpose?: (scope: ObjectiveProgressScope) => OrganizationPurposeRecord | null | undefined;
   probeTimeoutMs?: number;
+  /**
+   * Runs one charter's measurement inside its execution context (role, tenant,
+   * organization); defaults to `withExecutionContextAsync`. Test seam.
+   */
+  runAs?: <T>(c: DotCharter, fn: () => Promise<T>) => Promise<T>;
+}
+
+/** Run `fn` as the charter: its authority role, tenant and organization. */
+export function runAsDotCharter<T>(c: DotCharter, fn: () => Promise<T>): Promise<T> {
+  return withExecutionContextAsync(
+    c.authority.authority_role,
+    fn,
+    undefined,
+    c.scope.tenant_slug,
+    c.scope.organization_id
+  );
 }
 
 function diag(what: string, why: unknown, next: string, evidence: string): string {
@@ -192,6 +209,45 @@ function defaultOrgMetric(rootDir: string | undefined): NonNullable<DotKeyResult
 interface MeasureTarget {
   dotId?: string;
   orgScope: OrgMetricScope;
+  /** The measuring scope's own dot state subtree (tenant scopes only). */
+  stateRoot?: string;
+}
+
+/**
+ * Tenant confinement for `file` metrics: a tenant scope may read only
+ * `knowledge/public/**`, its own `knowledge/confidential/<slug>/**`, or its
+ * own dot state subtree; an untenanted scope may read neither confidential nor
+ * personal knowledge nor any tenant-namespaced runtime floor. Throws on denial.
+ */
+export function assertDotKrFilePathAllowed(
+  rel: string,
+  scope: { tenantSlug?: string; stateRoot?: string }
+): void {
+  const raw = String(rel ?? '').replace(/\\/g, '/');
+  const normalized = path.posix.normalize(raw);
+  if (!raw || path.posix.isAbsolute(normalized) || normalized.split('/').includes('..')) {
+    throw new Error(`file path must be repository-relative and confined: ${rel}`);
+  }
+  const under = (prefix: string) =>
+    normalized === prefix.replace(/\/$/, '') || normalized.startsWith(prefix);
+  if (under('knowledge/personal/')) {
+    throw new Error(`file metric may not read personal knowledge: ${normalized}`);
+  }
+  if (scope.tenantSlug) {
+    const allowed =
+      under('knowledge/public/') ||
+      under(`knowledge/confidential/${scope.tenantSlug}/`) ||
+      (scope.stateRoot !== undefined && under(`${scope.stateRoot.replace(/\/$/, '')}/`));
+    if (!allowed) {
+      throw new Error(
+        `file metric path outside tenant '${scope.tenantSlug}' scope (allowed: knowledge/public/, knowledge/confidential/${scope.tenantSlug}/, the dot state subtree): ${normalized}`
+      );
+    }
+    return;
+  }
+  if (under('knowledge/confidential/') || isTenantPhysicalNamespacePath(normalized)) {
+    throw new Error(`untenanted file metric may not read tenant-scoped data: ${normalized}`);
+  }
 }
 
 /** Returns a numeric value, or undefined when the metric is unmeasurable right now. */
@@ -216,6 +272,10 @@ async function measureSpec(
       throw new Error(`probe value is not numeric (${typeof result.value})`);
     }
     case 'file': {
+      assertDotKrFilePathAllowed(metric.path, {
+        tenantSlug: target.orgScope.tenantSlug,
+        stateRoot: target.stateRoot,
+      });
       const raw = (deps.readFile ?? defaultReadFile(deps.rootDir))(metric.path);
       const value = toNumber(extractJsonPath(JSON.parse(raw), metric.json_path), metric.aggregate);
       if (value === undefined) throw new Error(`no numeric value at ${metric.json_path}`);
@@ -291,6 +351,7 @@ export async function measureDotKeyResults(
   const rows: KrMeasurementRow[] = [];
   const target: MeasureTarget = {
     dotId: c.dot_id,
+    ...(c.scope.tenant_slug ? { stateRoot: dotStatePath(c) } : {}),
     orgScope: {
       organizationId: c.scope.organization_id,
       tenantSlug: c.scope.tenant_slug,
@@ -422,6 +483,14 @@ export async function measureOrganizationKeyResults(
     (row) => `${row.objective_id}\u0000${row.kr_id}`
   );
   const target: MeasureTarget = {
+    ...(scope.tenantSlug
+      ? {
+          stateRoot: physicalScopedPath(DOT_STATE_ROOT, {
+            tenant_slug: scope.tenantSlug,
+            organization_id: scope.organizationId,
+          }),
+        }
+      : {}),
     orgScope: {
       organizationId: scope.organizationId,
       tenantSlug: scope.tenantSlug,
@@ -641,10 +710,11 @@ export async function measureActiveDotKeyResults(
   deps: DotKeyResultDeps = {}
 ): Promise<DotKeyResultSweepResult> {
   const result: DotKeyResultSweepResult = { dot_rows: 0, org_rows: 0, orgs_measured: 0 };
-  const orgs = new Map<string, ObjectiveProgressScope>();
+  const orgs = new Map<string, { scope: ObjectiveProgressScope; as: DotCharter }>();
+  const runAs = deps.runAs ?? runAsDotCharter;
   for (const c of charters) {
     try {
-      result.dot_rows += (await measureDotKeyResults(c, deps)).length;
+      result.dot_rows += (await runAs(c, () => measureDotKeyResults(c, deps))).length;
     } catch (error) {
       logger.warn(
         diag(
@@ -661,12 +731,16 @@ export async function measureActiveDotKeyResults(
     if (!organizationId) continue;
     const key = [c.scope.tier, c.scope.tenant_slug ?? '', organizationId].join('\u0000');
     if (!orgs.has(key)) {
-      orgs.set(key, { organizationId, tenantSlug: c.scope.tenant_slug, tier: c.scope.tier });
+      orgs.set(key, {
+        scope: { organizationId, tenantSlug: c.scope.tenant_slug, tier: c.scope.tier },
+        as: c,
+      });
     }
   }
-  for (const scope of orgs.values()) {
+  // Each organization is measured as the first charter (same tier + tenant) that references it.
+  for (const { scope, as } of orgs.values()) {
     try {
-      result.org_rows += (await measureOrganizationKeyResults(scope, deps)).length;
+      result.org_rows += (await runAs(as, () => measureOrganizationKeyResults(scope, deps))).length;
       result.orgs_measured += 1;
     } catch (error) {
       logger.warn(
