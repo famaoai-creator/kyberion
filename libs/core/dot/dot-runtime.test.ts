@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import type { DotCharter } from './dot-charter.js';
@@ -15,8 +15,16 @@ import {
   recordDotTokenUsage,
   recordDotWatchSnapshot,
   runDotWake,
+  applyDotWakeOutputs,
+  dotWakeBackoffMs,
+  evaluateDotWakeCircuit,
+  normalizeDotWakeReason,
+  recordDotWakeOutcome,
+  DOT_WAKE_CIRCUIT_THRESHOLD,
   type DotWakeLoopResult,
 } from './dot-runtime.js';
+import { DOT_PROMPT_SECTIONS, DOT_WAKE_TOOLS } from './dot-extension-registry.js';
+import type { DotWakeTool } from './dot-extensions.js';
 
 const TEST_ROOT = 'active/shared/tmp/dot-runtime-tests';
 
@@ -496,5 +504,331 @@ describe('listActiveDotHeartbeatIds', () => {
       'paused.json'
     );
     expect(listActiveDotHeartbeatIds(TEST_ROOT)).toEqual(['dot-repo-guardian']);
+  });
+});
+
+describe('runtime reliability (DL-02)', () => {
+  afterEach(() => {
+    DOT_WAKE_TOOLS.length = 0;
+    DOT_PROMPT_SECTIONS.length = 0;
+    vi.unstubAllEnvs();
+  });
+
+  it('re-reads only its own charter file: a malformed sibling does not block the wake', async () => {
+    writeCharter(CHARTER, 'dot.json');
+    safeWriteFile(`${TEST_ROOT}/dots/broken.json`, '{ "kind": "dot-charter", ');
+    const receipt = await runDotWake(
+      { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+      { rootDir: TEST_ROOT, runLoop: async () => fakeResult(1, 5), hasRole: () => true }
+    );
+    expect(receipt.outcome).toBe('delivered');
+  });
+
+  it('re-reads a tenant charter from its tenant knowledge dir', async () => {
+    const tenant: DotCharter = {
+      ...CHARTER,
+      dot_id: 'tenant-dot',
+      scope: { tier: 'confidential', tenant_slug: 'acme' },
+      runtime: { heartbeat_id: 'dot-tenant-dot' },
+    };
+    const dir = `${TEST_ROOT}/knowledge/confidential/acme/dots`;
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(`${dir}/tenant-dot.json`, JSON.stringify(tenant));
+    const receipt = await runDotWake(
+      { path: `${dir}/tenant-dot.json`, charter: tenant },
+      { rootDir: TEST_ROOT, runLoop: async () => fakeResult(1, 5), hasRole: () => true }
+    );
+    expect(receipt.outcome).toBe('delivered');
+  });
+
+  it('records an unreadable own charter as failed with the real error', async () => {
+    safeMkdir(`${TEST_ROOT}/dots`, { recursive: true });
+    safeWriteFile(`${TEST_ROOT}/dots/dot.json`, JSON.stringify({ ...CHARTER, status: 'bogus' }));
+    const receipt = await runDotWake(
+      { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+      { rootDir: TEST_ROOT, runLoop: async () => fakeResult(1, 5), hasRole: () => true }
+    );
+    expect(receipt.outcome).toBe('failed');
+    expect(receipt.reason).toMatch(/^charter unreadable — Invalid dot charter at .*status/);
+    expect(receipt.reason).toContain('| next: pnpm kyberion dot validate repo-guardian');
+    expect(receipt.reason).toContain(`| evidence: ${TEST_ROOT}/dots/dot.json`);
+    const [row] = readDotWakeLedger({ rootDir: TEST_ROOT });
+    expect(row.outcome).toBe('failed');
+    expect(row.reason).toBe(receipt.reason);
+  });
+
+  it('doubles the per-key retry window on each consecutive failure, capped at 6h', async () => {
+    expect(dotWakeBackoffMs(1)).toBe(5 * 60_000);
+    expect(dotWakeBackoffMs(2)).toBe(10 * 60_000);
+    expect(dotWakeBackoffMs(3)).toBe(20 * 60_000);
+    expect(dotWakeBackoffMs(20)).toBe(6 * 60 * 60_000);
+
+    const watchCharter = {
+      ...CHARTER,
+      attention: { triggers: [{ kind: 'watch', paths: ['watched.txt'] }] },
+    } as DotCharter;
+    writeCharter(watchCharter);
+    safeWriteFile(`${TEST_ROOT}/watched.txt`, 'x\n');
+    const t0 = new Date('2026-10-02T10:00:00Z');
+    const [trigger] = evaluateDotTriggersDue(watchCharter, { rootDir: TEST_ROOT, now: () => t0 });
+    const fail = (at: Date) =>
+      recordDotWakeOutcome(watchCharter, trigger, 'failed', {
+        rootDir: TEST_ROOT,
+        now: () => at,
+        reason: 'backend down',
+      });
+    const dueAt = (ms: number) =>
+      evaluateDotTriggersDue(watchCharter, {
+        rootDir: TEST_ROOT,
+        now: () => new Date(t0.getTime() + ms),
+      }).length;
+    fail(t0);
+    expect(dueAt(5 * 60_000 - 1000)).toBe(0);
+    expect(dueAt(5 * 60_000)).toBe(1);
+    fail(new Date(t0.getTime() + 5 * 60_000));
+    // Second consecutive failure: 10 minutes from the last failure.
+    expect(dueAt(5 * 60_000 + 10 * 60_000 - 1000)).toBe(0);
+    expect(dueAt(5 * 60_000 + 10 * 60_000)).toBe(1);
+  });
+
+  it('opens a per-dot circuit after 5 same-reason failures on rotating keys, alerts once, then half-opens', () => {
+    const watchCharter = {
+      ...CHARTER,
+      attention: { triggers: [{ kind: 'watch', paths: ['watched.txt'] }] },
+    } as DotCharter;
+    writeCharter(watchCharter);
+    safeWriteFile(`${TEST_ROOT}/watched.txt`, 'x\n');
+    const t0 = new Date('2026-10-02T10:00:00Z');
+    // Rotating keys (as ops-alerts.jsonl@mtime did): each key fails once, so
+    // per-key backoff alone never holds anything back.
+    for (let index = 0; index < DOT_WAKE_CIRCUIT_THRESHOLD; index += 1) {
+      recordDotWakeOutcome(
+        watchCharter,
+        { trigger: { kind: 'watch', paths: ['watched.txt'] }, key: `watch:f@${1000 + index}:9` },
+        'failed',
+        {
+          rootDir: TEST_ROOT,
+          now: () => new Date(t0.getTime() + index * 60_000),
+          reason: `charter unreadable — line ${index + 3} col 7 | evidence: x`,
+        }
+      );
+    }
+    const alerts: unknown[] = [];
+    const lastFail = t0.getTime() + (DOT_WAKE_CIRCUIT_THRESHOLD - 1) * 60_000;
+    const at = (ms: number) => ({
+      rootDir: TEST_ROOT,
+      now: () => new Date(lastFail + ms),
+      opsAlert: (input: unknown) => void alerts.push(input),
+    });
+    const circuit = evaluateDotWakeCircuit(watchCharter, at(1000));
+    expect(circuit).toMatchObject({ consecutive: 5, tripped: true, open: true });
+    expect(normalizeDotWakeReason('line 12 col 7 abcdef12')).toBe('line # col # #');
+
+    // Open: every due trigger is held, and the alert fires once per opening.
+    expect(evaluateDotTriggersDue(watchCharter, at(1000))).toHaveLength(0);
+    expect(evaluateDotTriggersDue(watchCharter, at(2000))).toHaveLength(0);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({
+      dedupe_key: expect.stringMatching(/^dot-wake-circuit:repo-guardian:[0-9a-f]{12}$/),
+    });
+
+    // Past backoff(5) = 80 min: one half-open probe trigger, still one alert.
+    const halfOpen = evaluateDotTriggersDue(watchCharter, at(dotWakeBackoffMs(5)));
+    expect(halfOpen).toHaveLength(1);
+    expect(halfOpen[0].circuit).toBe(true);
+    expect(alerts).toHaveLength(1);
+
+    // A delivered wake closes the circuit.
+    recordDotWakeOutcome(watchCharter, halfOpen[0], 'delivered', at(dotWakeBackoffMs(5)));
+    expect(evaluateDotWakeCircuit(watchCharter, at(dotWakeBackoffMs(5) + 1000)).tripped).toBe(
+      false
+    );
+  });
+
+  it('wakes a dot on its own executor report-back even without a wake trigger', () => {
+    writeCharter(CHARTER);
+    safeMkdir(`${TEST_ROOT}/active/shared/runtime`, { recursive: true });
+    safeWriteFile(
+      `${TEST_ROOT}/${DOT_INBOX_PATH}`,
+      [
+        { dot_id: 'repo-guardian', channel: 'inbox', text: 'not for a channel-less dot' },
+        {
+          dot_id: 'repo-guardian',
+          channel: 'inbox',
+          source: 'dot-executor',
+          payload: { report_from: 'dot-executor', work_item_id: 'WI-1', status: 'done' },
+        },
+        {
+          dot_id: 'other-dot',
+          channel: 'inbox',
+          payload: { report_from: 'dot-executor', work_item_id: 'WI-2' },
+        },
+      ]
+        .map((row) => JSON.stringify(row))
+        .join('\n') + '\n'
+    );
+    const notCron = new Date('2026-10-02T10:16:00Z');
+    const due = evaluateDotTriggersDue(CHARTER, { rootDir: TEST_ROOT, now: () => notCron });
+    expect(due).toHaveLength(1);
+    expect(due[0].trigger.kind).toBe('wake');
+    expect(due[0].detail).toContain('WI-1');
+  });
+
+  it('never records the process-default stub as a delivery', async () => {
+    vi.stubEnv('KYBERION_REASONING_BACKEND', 'claude-cli');
+    writeCharter(CHARTER);
+    const receipt = await runDotWake(
+      { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+      { rootDir: TEST_ROOT, hasRole: () => true }
+    );
+    expect(receipt.outcome).toBe('failed');
+    expect(receipt.reason).toContain('no real reasoning backend in this process');
+    const rows = readDotWakeLedger({ rootDir: TEST_ROOT });
+    expect(rows.map((row) => row.outcome)).toEqual(['failed']);
+    expect(rows.some((row) => String(row.summary ?? '').includes('[STUB]'))).toBe(false);
+  });
+
+  it('records backendUnavailable from orchestration as a failed wake', async () => {
+    writeCharter(CHARTER);
+    const receipt = await runDotWake(
+      { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+      { rootDir: TEST_ROOT, hasRole: () => true, backendUnavailable: 'nothing real here' }
+    );
+    expect(receipt).toMatchObject({ outcome: 'failed', reason: 'nothing real here' });
+  });
+
+  it('degrades a tool loop with no live tool candidate to fenced proposals in the same wake', async () => {
+    writeCharter(CHARTER);
+    const governed: string[] = [];
+    const receipt = await runDotWake(
+      { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+      {
+        rootDir: TEST_ROOT,
+        hasRole: () => true,
+        runLoop: async () => {
+          throw new Error(
+            '[reasoning-backend:failover] generateWithTools failed across 0 candidate(s): '
+          );
+        },
+        backend: {
+          delegateTask: async () =>
+            'Fallback.\n```dot-proposals\n[{"title":"Fix","objective":"Do it.","work_shape":"task_session"}]\n```',
+        },
+        dispatch: (_charter, proposals) => {
+          governed.push(...proposals.map((p) => p.title));
+          return [];
+        },
+      }
+    );
+    expect(receipt.outcome).toBe('delivered');
+    expect(receipt.reason).toBe('degraded-fenced');
+    expect(governed).toEqual(['Fix']);
+    const [row] = readDotWakeLedger({ rootDir: TEST_ROOT });
+    expect(row.reason).toBe('degraded: tool backend unavailable → fenced proposals; proposals 1');
+  });
+
+  it('does not degrade on an unrelated tool-loop failure', async () => {
+    writeCharter(CHARTER);
+    const receipt = await runDotWake(
+      { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+      {
+        rootDir: TEST_ROOT,
+        hasRole: () => true,
+        runLoop: async () => {
+          throw new Error('provider timeout');
+        },
+        backend: { delegateTask: async () => 'should not run' },
+      }
+    );
+    expect(receipt).toMatchObject({ outcome: 'failed', reason: 'provider timeout' });
+  });
+
+  it('plumbs registered prompt sections and wake tools through tool and fence wakes', async () => {
+    writeCharter(CHARTER);
+    const applied: unknown[][] = [];
+    const tool: DotWakeTool = {
+      name: 'dot_note',
+      fence: 'dot-note',
+      maxPerWake: 2,
+      definition: {
+        name: 'dot_note',
+        description: 'Record a note.',
+        inputSchema: { type: 'object', properties: { text: { type: 'string' } } },
+      },
+      parse: (input) =>
+        input && typeof (input as { text?: unknown }).text === 'string'
+          ? { ok: true, value: (input as { text: string }).text }
+          : { ok: false, error: 'text is required' },
+      apply: (_charter, values) => {
+        applied.push(values);
+        return values.includes('bad-apply') ? ['could not store bad-apply'] : [];
+      },
+    };
+    DOT_WAKE_TOOLS.push(tool);
+    DOT_PROMPT_SECTIONS.push(
+      { id: 'late', order: 20, lines: () => ['SECTION-LATE'] },
+      {
+        id: 'boom',
+        order: 5,
+        lines: () => {
+          throw new Error('section exploded');
+        },
+      },
+      { id: 'early', order: 10, lines: () => ['SECTION-EARLY'] }
+    );
+
+    let systemPrompt = '';
+    const toolReceipt = await runDotWake(
+      { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+      {
+        rootDir: TEST_ROOT,
+        hasRole: () => true,
+        dispatch: () => [],
+        runLoop: async (options) => {
+          systemPrompt = options.systemPrompt ?? '';
+          expect(options.extraTools?.map((t) => t.name)).toEqual([
+            'dot_propose_action',
+            'dot_note',
+          ]);
+          options.executeTool!({ name: 'dot_note', input: { text: 'one' } });
+          options.executeTool!({ name: 'dot_note', input: {} });
+          options.executeTool!({ name: 'dot_note', input: { text: 'two' } });
+          expect(
+            options.executeTool!({ name: 'dot_note', input: { text: 'three' } }).resultText
+          ).toMatch(/limit/);
+          return fakeResult(1, 5);
+        },
+      }
+    );
+    expect(systemPrompt.indexOf('SECTION-EARLY')).toBeLessThan(
+      systemPrompt.indexOf('SECTION-LATE')
+    );
+    expect(applied).toEqual([['one', 'two']]);
+    expect(toolReceipt.tool_errors).toEqual([
+      'dot_note: text is required',
+      'dot_note: dropped (more than 2 per wake)',
+    ]);
+
+    let delegated = '';
+    const fenceReceipt = await runDotWake(
+      { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+      {
+        rootDir: TEST_ROOT,
+        hasRole: () => true,
+        dispatch: () => [],
+        backend: {
+          delegateTask: async (prompt: string) => {
+            delegated = prompt;
+            return 'Done.\n```dot-note\n[{"text":"fenced"},{"text":"bad-apply"}]\n```';
+          },
+        },
+      }
+    );
+    expect(delegated).toContain('```dot-note');
+    expect(applied.at(-1)).toEqual(['fenced', 'bad-apply']);
+    expect(fenceReceipt.tool_errors).toEqual(['dot_note: could not store bad-apply']);
+    // The wake summary drops registered fences too.
+    expect(readDotWakeLedger({ rootDir: TEST_ROOT }).at(-1)?.summary).toBe('Done.');
+    expect(applyDotWakeOutputs(CHARTER, {}, { now: () => new Date() })).toEqual([]);
   });
 });

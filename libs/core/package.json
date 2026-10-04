@@ -1363,6 +1363,10 @@
       "types": "./dist/outcome-contract.d.ts",
       "default": "./dist/outcome-contract.js"
     },
+    "./key-result-spec": {
+      "types": "./dist/key-result-spec.d.ts",
+      "default": "./dist/key-result-spec.js"
+    },
     "./intent-reconciliation": {
       "types": "./dist/intent/intent-reconciliation.d.ts",
       "default": "./dist/intent/intent-reconciliation.js"
@@ -7074,6 +7078,22 @@
     "./dot/dot-feedback": {
       "types": "./dist/dot/dot-feedback.d.ts",
       "default": "./dist/dot/dot-feedback.js"
+    },
+    "./dot/dot-state-paths": {
+      "types": "./dist/dot/dot-state-paths.d.ts",
+      "default": "./dist/dot/dot-state-paths.js"
+    },
+    "./dot/dot-extensions": {
+      "types": "./dist/dot/dot-extensions.d.ts",
+      "default": "./dist/dot/dot-extensions.js"
+    },
+    "./dot/dot-extension-registry": {
+      "types": "./dist/dot/dot-extension-registry.d.ts",
+      "default": "./dist/dot/dot-extension-registry.js"
+    },
+    "./dot/dot-wake-backend": {
+      "types": "./dist/dot/dot-wake-backend.d.ts",
+      "default": "./dist/dot/dot-wake-backend.js"
     },
     "./state-probe": {
       "types": "./dist/state-probe.d.ts",
