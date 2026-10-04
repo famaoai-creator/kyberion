@@ -152,6 +152,7 @@ function harness(
     },
     countOpenWorkItems: () => 0,
     listCharters: () => [CHARTER],
+    assertTenant: () => {},
     appendInbox: (input) => void h.inbox.push(input),
     notify: (event, payload, options) => {
       h.notes.push({ event, title: payload.title, route: options.route });
@@ -306,6 +307,15 @@ describe('dot handoff (team coordination)', () => {
     expect(records[0].reason).toMatch(/does not accept handoffs/);
   });
 
+  it('refuses before asking anyone when the tenant cannot take work', () => {
+    const h = harness('approve', { assertTenant: undefined });
+    const { records } = dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
+    expect(records[0].status).toBe('refused');
+    expect(records[0].reason).toMatch(/tenant 'acme' cannot take work: .*has no profile/);
+    expect(h.routed).toHaveLength(0);
+    expect(h.items).toHaveLength(0);
+  });
+
   it('hands work over and wakes the receiving dot through the inbox', () => {
     const h = harness('auto', {
       listCharters: () => [CHARTER, TARGET],
@@ -398,6 +408,19 @@ describe('settleDotParkedActions + learning', () => {
     expect(readDotFeedback('org-ops', h.deps)[0]).toMatchObject({ outcome: 'approved' });
     // Settled once: nothing left to settle.
     expect(settleDotParkedActions(CHARTER, h.deps)).toHaveLength(0);
+  });
+
+  it('declines an approved action whose tenant stopped taking work while it waited', () => {
+    const h = harness('approve');
+    dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
+    h.approvals.set('req-1', approval('approved'));
+    h.deps.assertTenant = () => {
+      throw new Error('tenant suspended');
+    };
+    const settled = settleDotParkedActions(CHARTER, h.deps);
+    expect(settled[0]).toMatchObject({ status: 'declined' });
+    expect(settled[0].reason).toMatch(/no longer in scope: .*tenant suspended/);
+    expect(h.items).toHaveLength(0);
   });
 
   it('declines a rejected action and raises that action to approve next time', () => {

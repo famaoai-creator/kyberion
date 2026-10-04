@@ -57,6 +57,7 @@ import {
 } from '../surface/operator-notifications.js';
 import { appendDotInboxEntry, type DotInboxEntryInput } from './dot-inbox.js';
 import { listDotCharters, type DotCharter } from './dot-charter.js';
+import { resolveTenant } from '../organization/tenant-registry.js';
 import {
   DOT_ACTION_IDS,
   type DotDecisionLevel,
@@ -126,6 +127,8 @@ export interface DotDispatchDeps {
   /** WorkItem already created for this action_ref (makes execution idempotent across a crash). */
   findWorkItemByActionRef?: (actionRef: string) => WorkItem | undefined;
   listCharters?: () => DotCharter[];
+  /** Throws when the tenant cannot take tenant-bound work (unregistered or not operational). */
+  assertTenant?: (tenantSlug: string) => void;
   appendInbox?: (input: DotInboxEntryInput) => void;
   notify?: (
     event: OperatorEvent,
@@ -317,6 +320,19 @@ function checkDotProposalScope(
       ok: false,
       reason: `work_shape '${proposal.work_shape}' is outside allowed_work_shapes (${shapes.join(', ')})`,
     };
+  }
+  const tenantSlug = charter.scope.tenant_slug;
+  if (tenantSlug) {
+    try {
+      (deps.assertTenant ?? ((slug) => void resolveTenant(slug, { rootDir: deps.rootDir })))(
+        tenantSlug
+      );
+    } catch (error) {
+      return {
+        ok: false,
+        reason: `tenant '${tenantSlug}' cannot take work: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
   }
   if (proposal.handoff_to) {
     if (proposal.handoff_to === charter.dot_id) {
