@@ -1,6 +1,6 @@
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
-import { getRegisteredEnvText } from '../foundation/env.js';
+import { resolveReasoningProviderSecretEnvValue } from './reasoning-provider-registry.js';
 import { currentScope, type ScopeContext } from '../scope-context.js';
 
 export type ReasoningBackendMode =
@@ -100,7 +100,7 @@ export function loadReasoningBackendPolicy(): ReasoningBackendPolicy {
 }
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
-  return getRegisteredEnvText(name, { env });
+  return resolveReasoningProviderSecretEnvValue(name, env);
 }
 
 export function normalizeReasoningBackendMode(
