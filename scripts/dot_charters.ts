@@ -216,7 +216,12 @@ function reportStatus(argv: string[]) {
         tokens_today: dotTokensUsedToday(entry.charter.dot_id, {}),
         wake_count: wakes.length,
         last_wake: last
-          ? { at: last.fired_at, outcome: last.outcome, trigger: last.trigger_key }
+          ? {
+              at: last.fired_at,
+              outcome: last.outcome,
+              trigger: last.trigger_key,
+              ...(last.summary ? { summary: last.summary } : {}),
+            }
           : null,
         actions: actionCounts,
         waiting_on_operator: actions
@@ -270,6 +275,7 @@ function printReport(report: Record<string, unknown>, print: (line: string) => v
           ? `  wakes=${dot.wake_count} tokens_today=${dot.tokens_today}${last ? `  last=${last.at} ${last.outcome}` : ''}`
           : `  [${dot.authority_role}]  triggers=${(dot.triggers as string[]).join(',')}  heartbeat=${dot.heartbeat_id}`;
       print(`${dot.status}  ${String(dot.dot_id).padEnd(24)} ${dot.title ?? ''}${tail}`.trimEnd());
+      if (last?.summary) print(`    last said: ${String(last.summary).slice(0, 200)}`);
       const actions = dot.actions as Record<string, number> | undefined;
       if (actions && Object.keys(actions).length > 0) {
         print(
