@@ -10,7 +10,11 @@
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import type { ReasoningBackendMode } from './reasoning/reasoning-backend-policy.js';
-import type { ReasoningProviderRuntimeBundle } from './reasoning/reasoning-provider-registry.js';
+import {
+  getReasoningProviderDescriptor,
+  resolveReasoningProviderEnvironment,
+  type ReasoningProviderRuntimeBundle,
+} from './reasoning/reasoning-provider-registry.js';
 
 export interface CliProviderBuildOptions {
   mode: ReasoningBackendMode;
@@ -60,7 +64,13 @@ export function buildCliProviderBundle(
   options: CliProviderBuildOptions
 ): ReasoningProviderRuntimeBundle | null | undefined {
   const factory = cliProviderBundleSeam.getOptional(options.mode);
-  return factory ? factory(options) : undefined;
+  if (!factory) return undefined;
+  const descriptor = getReasoningProviderDescriptor(options.mode);
+  const env = options.env ?? process.env;
+  return factory({
+    ...options,
+    env: descriptor ? resolveReasoningProviderEnvironment(descriptor, env) : env,
+  });
 }
 
 export function listCliProviderBundleModes(): string[] {

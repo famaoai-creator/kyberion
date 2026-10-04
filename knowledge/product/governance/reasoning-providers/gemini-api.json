@@ -13,6 +13,13 @@
         "input_modalities": ["text", "image"]
       },
       "env_keys": ["KYBERION_GEMINI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"],
+      "secret_refs": [
+        {
+          "service_id": "gemini",
+          "secret_key": "API_KEY",
+          "env_keys": ["KYBERION_GEMINI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"]
+        }
+      ],
       "cost_tier": "metered",
       "transport": "api",
       "data_egress": "external-api",
