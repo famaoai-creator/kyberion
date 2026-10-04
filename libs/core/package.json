@@ -179,6 +179,38 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./interaction": {
+      "types": "./dist/interaction/index.d.ts",
+      "default": "./dist/interaction/index.js"
+    },
+    "./interaction/backchannel-policy": {
+      "types": "./dist/interaction/backchannel-policy.d.ts",
+      "default": "./dist/interaction/backchannel-policy.js"
+    },
+    "./interaction/conversation-engine": {
+      "types": "./dist/interaction/conversation-engine.d.ts",
+      "default": "./dist/interaction/conversation-engine.js"
+    },
+    "./interaction/interaction-signals": {
+      "types": "./dist/interaction/interaction-signals.d.ts",
+      "default": "./dist/interaction/interaction-signals.js"
+    },
+    "./interaction/interaction-state": {
+      "types": "./dist/interaction/interaction-state.d.ts",
+      "default": "./dist/interaction/interaction-state.js"
+    },
+    "./interaction/language-pack": {
+      "types": "./dist/interaction/language-pack.d.ts",
+      "default": "./dist/interaction/language-pack.js"
+    },
+    "./interaction/user-rhythm": {
+      "types": "./dist/interaction/user-rhythm.d.ts",
+      "default": "./dist/interaction/user-rhythm.js"
+    },
+    "./interaction/utterance-intent": {
+      "types": "./dist/interaction/utterance-intent.d.ts",
+      "default": "./dist/interaction/utterance-intent.js"
+    },
     "./a2a-bridge": {
       "types": "./dist/mesh/a2a-bridge.d.ts",
       "default": "./dist/mesh/a2a-bridge.js"

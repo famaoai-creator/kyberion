@@ -1,0 +1,20 @@
+{
+  "id": "agent-backchannel",
+  "description": "While the user holds the floor, the engine emits agent backchannels at bounded intervals (CE-05) — never during output, capped per utterance.",
+  "options": {
+    "interaction": {
+      "backchannel": {
+        "enabled": true,
+        "minSpeechMs": 1000,
+        "minIntervalMs": 3000,
+        "maxPerUtterance": 2
+      }
+    }
+  },
+  "timeline": [
+    { "at_ms": 0, "event": { "type": "vad_start", "rms": 3000 } },
+    { "at_ms": 1500, "event": { "type": "stt_partial", "text": "それでですね" } },
+    { "at_ms": 5000, "event": { "type": "vad_silence" } }
+  ],
+  "expect": { "backchannels": 2, "commits": [], "hard_stops": 0 }
+}
