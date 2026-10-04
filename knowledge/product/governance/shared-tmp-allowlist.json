@@ -6,6 +6,12 @@
   "plan": "docs/developer/improvement-plans-2026-07/ARTIFACT_AGENT_LIFECYCLE_NHI_PLAN_2026-07-26.ja.md",
   "entries": [
     {
+      "file": "libs/actuators/video-composition-actuator/src/video-composition-action-helpers.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "create_timeline_video mixed narration track: re-generated from per-scene clips on every run and consumed by the render/mux step"
+    },
+    {
       "file": "libs/actuators/android-actuator/src/android-runtime-helpers.ts",
       "count": 1,
       "classification": "migrate-candidate",

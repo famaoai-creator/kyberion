@@ -1,7 +1,7 @@
 ---
 title: オンボーディング標準フロー — 環境 / Identity / Tenant / Activation / First Work
 tags: [governance, onboarding, identity, tenant, organization, activation, first-work]
-last_updated: 2026-09-22
+last_updated: 2026-10-04
 kind: governance
 scope: repository
 authority: standard
@@ -24,17 +24,44 @@ A. 共通土台         前提 → 導入とビルド → first-win → readines
 B. 主体と identity  stance を決める → identity を保存 → baseline を all_clear へ
 C. テナント運用     tenant registry → context binding → activation → first-work
 D. 完了確認         vital-check → baseline-check
+E. 組織の運営       purpose → service / operation → cadence / decision → 定常実行と状態確認
 ```
 
-| ルート                  | 使い方                                      | 通るブロック                                    |
-| ----------------------- | ------------------------------------------- | ----------------------------------------------- |
-| **1. 個人のみ**         | 自分の作業を自分の identity で任せる        | A → B → D                                       |
-| **2. AI 会社**          | AI workforce を主な労働力として会社を始める | A → B → C（`onboard company` で登録と結合） → D |
-| **3. 既存テナント追加** | 機密境界を持つ顧客・組織の仕事を扱う        | A → B → C（個別コマンドで登録と結合） → D       |
+| ルート                  | 使い方                                      | 通るブロック                                        |
+| ----------------------- | ------------------------------------------- | --------------------------------------------------- |
+| **1. 個人のみ**         | 自分の作業を自分の identity で任せる        | A → B → D                                           |
+| **2. AI 会社**          | AI workforce を主な労働力として会社を始める | A → B → C（`onboard company` で登録と結合） → D → E |
+| **3. 既存テナント追加** | 機密境界を持つ顧客・組織の仕事を扱う        | A → B → C（個別コマンドで登録と結合） → D → E       |
 
 ルート 1 は tenant を作らない。tenant に紐づく mission や first-work の apply が必要になった
 時点で、ルート 3 の C に進む。ルート 2 と 3 では、activation receipt が `active` になるまで
 最初の仕事を実行しない。
+
+### ルート 2（AI 会社）の実行順
+
+ルート 2 の stance（`customer/<company-slug>/`）は Step 5 の `onboard company` が作る。そのため
+Step 3 の identity は **2 回**保存する: まず個人 profile に（Step 3）、次に company stance に切り替えて
+もう一度（Step 5 の直後）。stance を有効にすると profile root が `customer/<company-slug>/` に
+切り替わり、mission start はそこにある `my-identity.json` / `my-vision.md` / `agent-identity.json`
+を要求するためである（無いと `Sovereign profile incomplete` で停止する）。
+
+```text
+Step 1〜2 → Step 3（個人 identity） → Step 4 → Step 5（onboard company）
+  → stance:switch → onboarding apply（company stance の identity） → Step 7 → Step 8 → Step 9 → Step 10
+```
+
+### 操作シェルの前提（全ルート共通）
+
+governed facade（`onboarding company`、`onboarding:context`、`tenant:activation`、
+`organization` の書き込み系）は操作者 persona で書き込み権限を判定する（`stance:create` は
+`customer/` への書き込みだけを許可されているので persona なしで動く）。`pnpm onboarding apply` は
+`KYBERION_PERSONA` を `.env.local` に記録するが、**pnpm script は `.env.local` を読み込まない**。
+identity を保存した後は、操作シェルで次を実行しておく（未設定だと
+`Operator persona not set in this shell` で拒否される）。
+
+```bash
+export KYBERION_PERSONA=sovereign
+```
 
 ## 2. 3 つの名前を混同しない
 
@@ -61,6 +88,8 @@ tenant JSON は表示・契約上の facet になり得るが、tenant registry 
 
 ```bash
 pnpm pipeline --input pipelines/baseline-check.json
+# 出力の `[BASELINE] status=<status> failed_layer=<layer>` 行で分岐する。
+# 層ごとの詳細 JSON が必要なら: node dist/scripts/run_baseline_check.js
 ```
 
 | status             | 意味                                                   | 次の行動                                         |
@@ -143,7 +172,8 @@ stance を決める。
 
 - 自分として使う（ルート 1）: `KYBERION_CUSTOMER` を設定しない。保存先は `knowledge/personal/`。
 - 顧客・会社として使う: 先に `pnpm stance:switch <customer-slug>` で stance を切り替える。保存先は
-  `customer/{customer-slug}/`。ルート 2 の `pnpm onboarding company` はこの overlay を作る。
+  `customer/{customer-slug}/`。ルート 2 の `pnpm onboarding company` はこの overlay を作るので、
+  ルート 2 では上の「ルート 2 の実行順」に従い、company stance でもう一度 identity を保存する。
 
 identity は次のどれかで保存する。
 
@@ -151,10 +181,16 @@ identity は次のどれかで保存する。
 # 対話（TTY あり）
 pnpm onboarding
 
-# 非対話。まず dry-run で検証してから適用する
+# 非対話。テンプレートを active/shared/tmp/ に複製して編集し、dry-run で検証してから適用する
 pnpm onboarding apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run
 pnpm onboarding apply --identity <reviewed-identity-json>
+
+# 保存後、操作シェルで persona を有効にする（.env.local は自動では読まれない）
+export KYBERION_PERSONA=sovereign
 ```
+
+TTY の無い環境（エージェント、CI）で `pnpm onboarding` を実行すると exit 2 で停止する。
+その場合は上の `onboarding apply` を使う。
 
 GUI では concierge の `/settings` を開く（旧 `/setup` と `/onboarding` はここへリダイレクトされる）。
 
@@ -205,6 +241,9 @@ pnpm tenant show <tenant-slug> --json
 pnpm check -- --only tenant-registry
 ```
 
+新しい tenant は `isolation_policy`（`strict_isolation: true`、`allow_cross_distillation: false`）付きで
+登録される。Step 7 の `memory_policy` チェックはこの値を要求する。
+
 registry が `active` でない tenant、未登録の tenant、tier 名と衝突する tenant は、後続の
 binding と activation に進めない。customer stance を切り替えても registry の正本は変わらない。
 
@@ -212,13 +251,22 @@ binding と activation に進めない。customer stance を切り替えても r
 確認してから、`--dry-run` を外して適用する。
 
 ```bash
+pnpm onboarding company --help   # 使える --vertical の一覧を表示する
 pnpm onboarding company --vertical saas-product-company --slug <company-slug> \
   --name "<会社名>" --owner-id human:<owner> \
   --goal "<最初に達成する顧客成果>" \
   --tenant-slug <tenant-slug> --dry-run
 ```
 
-適用後は `customer/<company-slug>/onboarding/ai-company-readiness.json` と `first-work-plan.md` を
+適用すると customer overlay、tenant registry、organization state、context binding（Step 6）が
+作られる。続けて company stance に切り替え、その stance の identity を保存する。
+
+```bash
+pnpm stance:switch <company-slug> && source active/shared/runtime/customer.env
+pnpm onboarding apply --identity <reviewed-identity-json>
+```
+
+`customer/<company-slug>/onboarding/ai-company-readiness.json` と `first-work-plan.md` を
 確認する。consistency check と Step 7 の activation は省略しない。
 
 ### Step 6: customer stance と organization を結合する（C）
@@ -277,6 +325,40 @@ pnpm tenant:activation activate \
 organization、tier、owner、NHI、次の行動、operation contract（task lease、heartbeat watchdog、
 quota と budget、approval gate、pause と escalation、drift watcher）、各 probe の監査証跡 ref が記録される。
 
+#### probe を実行して証跡を作る
+
+4 つの probe は `probe` サブコマンドがまとめて実行し、activation receipt の隣
+（`.../tenant-activation/<tenant>/<organization>/<tier>/probes/`）に証跡 JSON を書き出す。
+全項目が通ると、その証跡を参照する `activate` コマンドがそのまま表示される（`<human:owner>` を
+承認者に置き換えて実行する）。probe は観測するだけで、activation も NHI の発行も行わない。
+
+```bash
+pnpm tenant:activation probe --customer-slug <customer-slug> --tenant-slug <tenant-slug> \
+  --organization-id <organization-id> --nhi-id kyberion://agent/<organization-id>/<agent-slug> \
+  [--service <service-id>]...
+```
+
+| probe               | probe が確かめること                                                                                                              |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `isolation_probe`   | tenant が strict isolation を宣言し、`check:tenant-registry` が通る                                                               |
+| `viewer_scope`      | tenant が登録済み・active で viewer の絞り込みが解決でき、`KYBERION_VIEWER_SCOPE` が `off` でない（`enforce` で拒否まで行う）     |
+| `service_readiness` | binding の `default_service_ids` と `--service` の各サービスが `service:preflight` で ready（無ければ「外部サービスなし」で通る） |
+| `nhi_provisioned`   | 各 `--nhi-id` が NHI ledger にあり、retired / suspended でない                                                                    |
+
+`activate` / `plan` は ref を次の規則で検証する。
+
+- `<scheme>://...`（`audit://`、`probe://` など）は外部の証跡として、受け入れる人間の責任で扱う。
+- それ以外はリポジトリ内の実在ファイルでなければならない。probe の証跡 JSON の場合は、同じ scope で
+  記録され、その probe が `passed: true` でなければならない。
+- `--nhi-id` は `kyberion://agent/<organization-id>/<agent-slug>` の形式で、この組織のものでなければならない。
+
+**NHI について**: NHI は mission が agent を staffing したときに ledger へ記録され、発行専用の CLI は
+無い。新しい組織では ledger が空のため `nhi_provisioned` は通らない。既に同じ組織で mission を
+動かした NHI があればそれを指定する。無い場合は、外部の証跡（`--probe-ref nhi_provisioned=audit://...`）
+を人間が確認して受け入れる。
+
+`plan` の `blockers` が空になるまで `activate` しない。
+
 ### Step 7.1: 設定変更と外部入口の追加
 
 オンボーディング後の service binding、surface、channel、MCP grant、quota、egress の変更も、
@@ -312,6 +394,11 @@ pnpm onboarding:context first-work \
   管理単位へ接続する
 - 未確定、低 confidence、approval が必要: 実行せず、人間の判断を求める
 
+分類を上書きするフラグは無い。`next_action` が `request_human_confirmation` のままなら、成果物と
+管理単位が分かる言い回しに `--intent` を直して dry-run をやり直す（例: 「手順書を整備する」は
+`routine_operation` と推定されるが、「新しい顧客オンボーディングポータルを作る」は
+`solution_project` / `bootstrap_project` になる）。
+
 activation が `active` でない場合、first-work の apply は fail-closed で拒否される。
 レビューして受け入れた後にだけ apply する。
 
@@ -330,7 +417,7 @@ pnpm onboarding:context first-work \
   --intent "<最初の依頼>" \
   --apply --accept \
   --bootstrap-project \
-  --project-id <project-id> \
+  --project-id PRJ-<UPPER_SNAKE_OR_DASH_ID> \
   --project-name "<project-name>" \
   --project-summary "<project-summary>"
 ```
@@ -359,6 +446,57 @@ pnpm pipeline --input pipelines/baseline-check.json
 
 baseline が `all_clear` になれば完了である。`needs_attention` が残る場合は Step 0 の表で
 失敗層を確認し、Step 4 の対処を行う。
+
+### Step 10: 組織の運営を始める（E）
+
+activation 後の組織は、目的・サービス・定常業務・定例・意思決定を `pnpm organization` の
+governed facade で登録して回す。状態ファイル（`active/organizations/`）は直接編集しない。
+書き込み系は `--dry-run` か `--apply` のどちらかが必須で、confidential tier では
+`--tenant-slug` を明示する。全サブコマンドは `pnpm organization help` で確認できる
+（引数なしの `pnpm organization` は運営モデルのカタログ JSON を出す）。
+
+```bash
+O="--organization-id <organization-id> --tier confidential --tenant-slug <tenant-slug>"
+
+# 1. 現状を見る（未登録の項目と次の行動が出る）
+pnpm organization status $O
+
+# 2. 目的と目標
+pnpm organization purpose set $O --name "<組織名>" --purpose "<存在目的>" --owner-role ceo --apply
+pnpm organization objective add $O --objective-id <obj-id> --title "<目標>" --horizon 2026Q4 --owner-role ceo --apply
+
+# 3. 提供するサービス（domain → service の順。`onboard company` は org-chart の domain を登録済み）
+pnpm organization domain add $O --domain-id <domain-id> --name "<領域名>" --owner-role <role> --apply
+pnpm organization service add $O --service-id <svc-id> --domain-id <domain-id> --name "<サービス名>" \
+  --outcome "<顧客成果>" --owner-role <role> --consumer <consumer> --apply
+
+# 4. 定例と意思決定（decision は既存の cadence に属し、proposed から始まる）
+pnpm organization cadence add $O --cadence-id weekly-review --name "週次レビュー" --cadence-type weekly \
+  --schedule "Mon 09:00 JST" --owner-role ceo --apply
+pnpm organization decision add $O --decision-id <dec-id> --cadence-id weekly-review --title "<論点>" \
+  --decision-owner ceo --due-at <ISO8601> --option "<案A>" --option "<案B>" --apply
+
+# 5. 定常業務（自動実行できるのは pipelines/ の governed pipeline だけ。
+#    runbook 型は --execution-ref に operation scope 内の実在パスが必要）
+pnpm organization operation add $O --operation-id <op-id> --name "<業務名>" --operation-type scheduled \
+  --owner-role <role> --trigger-kind schedule --trigger-expression "0 8 * * *" --timezone Asia/Tokyo \
+  --execution-kind pipeline --execution-ref pipelines/vital-check.json --record-status active --apply
+```
+
+定常業務の実行は、scope を選んでから行う（tick / execute は dry-run でも scope 選択を要求する）。
+
+```bash
+pnpm scope use --tier confidential --tenant <tenant-slug> --organization <organization-id>
+pnpm organization operation run execute $O --operation-id <op-id> --run-id <op-id>-<YYYYMMDD> --apply
+pnpm organization operation tick $O --apply   # 期限の来た業務を 1 回ずつ実行し、中断した run を blocked に回収する
+pnpm organization operation run list $O --operation-id <op-id>
+```
+
+意思決定は `decision transition` で `proposed → pending_approval → approved → implemented` と進める。
+承認には `--rationale` と `--approval-ref <channel:id>` が要る。サービスの稼働状態は
+`organization service state set` で観測値として記録し、`status` が「Unobserved services」を
+出さなくなるまで埋める。運営の定期確認は `pnpm organization status $O` と
+`pnpm organization reconcile $O --dry-run` で行う。
 
 ## 4. オンボーディング後の調整（任意）
 
@@ -409,6 +547,8 @@ identity をやり直す場合は `pnpm onboarding reset` を使い、生成物�
 - scope chain が `tenant_slug → organization_id → project_id → mission_id → task_id` の typed context で保持されている
 - first-work が dry-run でレビュー済みで、実行形と approval boundary が確定している
 - 最初の外部効果が人間の承認の内側にある
+- （Step 10）purpose と少なくとも一つの service / operation / cadence が登録され、
+  `pnpm organization status` に次の行動が明示されている
 
 ## 関連文書
 

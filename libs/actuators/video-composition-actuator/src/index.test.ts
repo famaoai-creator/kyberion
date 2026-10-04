@@ -592,6 +592,27 @@ describe('video-composition-actuator', () => {
     );
   });
 
+  it('validates create_timeline_video scenes before rendering', async () => {
+    const { handleAction } = await import('./index.js');
+    await expect(
+      handleAction({ action: 'create_timeline_video', params: { scenes: [] } } as any)
+    ).rejects.toThrow(/Invalid video composition action|at least one scene/);
+    await expect(
+      handleAction({
+        action: 'create_timeline_video',
+        params: { scenes: [{ scene_id: 'hook' }] },
+      } as any)
+    ).rejects.toThrow(/Invalid video composition action|needs scene_id and html/);
+    await expect(
+      handleAction({
+        action: 'create_timeline_video',
+        params: {
+          scenes: [{ scene_id: 'hook', html: '<h1>x</h1>', narration_ref: '../../outside.wav' }],
+        },
+      } as any)
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
   it('rejects video artifact paths outside the repository', async () => {
     const { handleAction } = await import('./index.js');
     await expect(

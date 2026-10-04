@@ -78,6 +78,7 @@ function usage(): string {
     '',
     '  pnpm tenant:activation show --customer-slug <slug> --tenant-slug <slug> --organization-id <id>',
     '  pnpm tenant:activation plan --customer-slug <slug> --tenant-slug <slug> --organization-id <id>',
+    '  pnpm tenant:activation probe --customer-slug <slug> --tenant-slug <slug> --organization-id <id> --nhi-id <nhi-id> [--service <service-id>]...',
     '  pnpm tenant:activation activate --customer-slug <slug> --tenant-slug <slug> --organization-id <id> --apply --accept',
     '  pnpm tenant:activation resume --customer-slug <slug> --tenant-slug <slug> --organization-id <id> --apply --accept',
     '  pnpm tenant:activation rollback --customer-slug <slug> --tenant-slug <slug> --organization-id <id> --reason "<why>" --apply --accept',
@@ -86,15 +87,18 @@ function usage(): string {
     '',
     '  Explicit successful probes and audit refs are required: --check-viewer-scope --check-nhi --check-services --check-isolation',
     '  Probe refs: --probe-ref viewer_scope=<audit-ref> --probe-ref nhi_provisioned=<audit-ref> ...',
+    '  `probe` runs all four checks, writes evidence beside the receipt, and prints the activate command.',
+    '  A ref is either <scheme>://... (external attestation) or an existing repository path.',
   ].join('\n');
 }
 
-export function main(argv: string[] = [], print: Print = () => undefined): void {
+export function main(argv: string[] = [], print: Print = () => undefined): void | Promise<void> {
   const command = argv.find((arg) => !arg.startsWith('--')) || 'help';
   if (command === 'help') {
     print(usage());
     return;
   }
+  if (command === 'probe') return probe(argv, print);
   if (command === 'show') {
     const activationInput = input(argv);
     print(JSON.stringify(loadTenantActivation(activationInput, activationInput.rootDir), null, 2));
@@ -121,6 +125,22 @@ export function main(argv: string[] = [], print: Print = () => undefined): void 
                   accept: argv.includes('--accept'),
                 })
               : resolveTenantActivation(activationInput);
+  print(JSON.stringify(result, null, 2));
+}
+
+async function probe(argv: string[], print: Print): Promise<void> {
+  const { runTenantActivationProbes } = await import('./tenant_activation_probe.js');
+  const activationInput = input(argv);
+  const result = await runTenantActivationProbes({
+    customerSlug: activationInput.customerSlug,
+    tenantSlug: activationInput.tenantSlug,
+    organizationId: activationInput.organizationId,
+    nhiIds: activationInput.nhiIds,
+    serviceIds: argv.flatMap((arg, index) =>
+      arg === '--service' && argv[index + 1] ? [argv[index + 1]!] : []
+    ),
+    rootDir: activationInput.rootDir,
+  });
   print(JSON.stringify(result, null, 2));
 }
 
