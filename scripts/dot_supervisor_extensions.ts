@@ -12,6 +12,7 @@ import type { LoadedDotCharter } from '@agent/core/dot/dot-charter';
 import { createLogger } from '@agent/core/logger';
 import { distillDotMemory } from '@agent/core/dot/dot-memory';
 import { measureActiveDotKeyResults } from '@agent/core/dot/dot-key-results';
+import { DOT_EXECUTOR_SUPERVISOR_STEP } from './dot_executor_step.js';
 
 const logger = createLogger('dot-supervisor');
 
@@ -65,3 +66,6 @@ DOT_SUPERVISOR_STEPS.push({
     }
   },
 });
+
+// DL-01 executor: closes at most one delegated WorkItem per dot per sweep
+DOT_SUPERVISOR_STEPS.push(DOT_EXECUTOR_SUPERVISOR_STEP);

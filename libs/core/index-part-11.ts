@@ -162,3 +162,7 @@ export * from './dot/dot-wake-backend.js';
 export * from './dot/dot-key-results.js';
 export * from './dot/dot-memory.js';
 export * from './dot/dot-followups.js';
+export * from './dot/dot-event-intake.js';
+export * from './dot/dot-budget.js';
+export * from './dot/dot-executor.js';
+export * from './governance/org-budget-governor.js';
