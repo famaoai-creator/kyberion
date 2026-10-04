@@ -3,6 +3,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -253,9 +255,10 @@ describe('concierge surface contract', () => {
     expect(route).toContain('reply');
     expect(route).toContain('intentResolution');
     // Shared orchestrator repairs the UX contract; the route projects its approval result.
-    const orchestrator = fs.readFileSync(
-      path.join(appDir, '../../../libs/core/surface/surface-runtime-orchestrator.ts'),
-      'utf8'
+    const orchestrator = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/surface/surface-runtime-orchestrator.ts'), {
+        encoding: 'utf8',
+      })
     );
     expect(orchestrator).toContain('checkAndRepairSurfaceUxContract');
     expect(route).toContain('viewFromIntentResolution');
