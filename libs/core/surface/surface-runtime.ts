@@ -62,6 +62,8 @@ export interface SurfaceIngressPolicy {
   allowed: boolean;
   /** The only public path published for this surface (default `/`). */
   path_prefix?: string;
+  /** Registered env var that can move the listener; must agree with `port`. */
+  port_env?: string;
 }
 
 export interface SurfaceRuntimeManifest {

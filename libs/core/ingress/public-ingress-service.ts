@@ -2,32 +2,37 @@
  * Public ingress service — the caller-facing API (CLI, surfaces, doctor).
  *
  * Exposes a surface only when its manifest opts in (`ingress.allowed`), the
- * surface answers its health probe, and a human approved `ingress:expose`.
- * Provider choice goes through the resolver; this module never branches on a
- * provider id. Exposures are recorded under
- * active/shared/runtime/ingress/state.json (system partition: surface id,
- * provider id, public URL — no tenant data) and audited as
- * ingress_expose / ingress_withdraw.
+ * process answering on the manifest port identifies as that surface, and a
+ * human approved `ingress:expose`. Provider choice goes through the resolver;
+ * this module never branches on a provider id.
+ *
+ * Exposures are recorded under active/shared/runtime/ingress/state.json
+ * (system partition: surface id, provider id, public URL — no tenant data)
+ * and audited as ingress_expose / ingress_withdraw. That record is
+ * per-checkout while provider config is host-wide, so `withdraw` / `status`
+ * always ask the provider: without a record they query every candidate
+ * provider for a live mapping to this surface's loopback target, and they
+ * never report "not exposed" without having checked.
  */
+import { createHash } from 'node:crypto';
 import { auditChain } from '../governance/audit-chain.js';
 import { readJsonIfPresent, writeJson } from '../foundation/json.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { isRecord } from '../foundation/primitives.js';
 import { pathResolver } from '../path-resolver.js';
 import { requireApprovalForOp, RISKY_OPS } from '../risky-op-registry.js';
-import {
-  loadSurfaceManifest,
-  probeSurfaceHealth,
-  type SurfaceHealthStatus,
-  type SurfaceRuntimeDefinition,
-} from '../surface/surface-runtime.js';
+import { loadSurfaceManifest, type SurfaceRuntimeDefinition } from '../surface/surface-runtime.js';
 import {
   IngressError,
   assertIngressLocalPort,
   normalizeIngressPathPrefix,
   type IngressExposure,
+  type PublicIngressProvider,
 } from './public-ingress-contract.js';
 import {
   getPublicIngressProviderDescriptor,
   listPublicIngressCandidates,
+  listPublicIngressProviderDescriptors,
   loadPublicIngressProvider,
   selectPublicIngressProvider,
   type PublicIngressCandidate,
@@ -35,18 +40,28 @@ import {
 } from './public-ingress-provider-registry.js';
 
 export const PUBLIC_INGRESS_STATE_RELATIVE_PATH = 'runtime/ingress/state.json';
-/** Approval for one surface/provider pair is renewable after this long. */
+/** Approval for one surface/provider/effect is renewable after this long. */
 export const PUBLIC_INGRESS_APPROVAL_TTL_MS = 24 * 60 * 60 * 1000;
+const IDENTITY_PROBE_TIMEOUT_MS = 1500;
 
 export interface PublicIngressState {
   version: 1;
   exposures: Record<string, IngressExposure>;
 }
 
+export interface SurfaceIdentityProbe {
+  ok: boolean;
+  detail: string;
+}
+
 export interface PublicIngressServiceDeps {
   statePath?: string;
   loadSurfaces?: () => SurfaceRuntimeDefinition[];
-  probeHealth?: (definition: SurfaceRuntimeDefinition) => Promise<SurfaceHealthStatus>;
+  /** Verify the process on the manifest port is this surface (default: GET healthPath). */
+  probeIdentity?: (
+    surface: SurfaceRuntimeDefinition,
+    plan: SurfaceIngressPlan
+  ) => Promise<SurfaceIdentityProbe>;
   approve?: typeof requireApprovalForOp;
   now?: () => Date;
 }
@@ -67,13 +82,17 @@ function savePublicIngressState(state: PublicIngressState, deps: PublicIngressSe
   writeJson(publicIngressStatePath(deps), state);
 }
 
+function loadSurfaces(deps: PublicIngressServiceDeps): SurfaceRuntimeDefinition[] {
+  return deps.loadSurfaces ? deps.loadSurfaces() : loadSurfaceManifest().surfaces;
+}
+
 /** Resolve a surface by id; `event-intake` also matches `event-intake-surface`. */
 export function resolveIngressSurface(
   surfaceId: string,
   deps: PublicIngressServiceDeps = {}
 ): SurfaceRuntimeDefinition {
   const id = surfaceId.trim();
-  const surfaces = deps.loadSurfaces ? deps.loadSurfaces() : loadSurfaceManifest().surfaces;
+  const surfaces = loadSurfaces(deps);
   const surface =
     surfaces.find((entry) => entry.id === id) ??
     surfaces.find((entry) => entry.id === `${id}-surface`);
@@ -83,12 +102,14 @@ export function resolveIngressSurface(
   return surface;
 }
 
-/** The exposure plan for a surface, or the reason it may not be exposed. */
-export function planSurfaceIngress(surface: SurfaceRuntimeDefinition): {
+export interface SurfaceIngressPlan {
   localPort: number;
   pathPrefix: string;
   healthPath?: string;
-} {
+}
+
+/** The exposure plan for a surface, or the reason it may not be exposed. */
+export function planSurfaceIngress(surface: SurfaceRuntimeDefinition): SurfaceIngressPlan {
   if (surface.ingress?.allowed !== true) {
     throw new IngressError(
       'INGRESS_SURFACE_NOT_ALLOWED',
@@ -101,12 +122,83 @@ export function planSurfaceIngress(surface: SurfaceRuntimeDefinition): {
       `surface '${surface.id}' declares no local port`
     );
   }
+  const localPort = assertIngressLocalPort(surface.port);
+  const portEnv = surface.ingress.port_env;
+  const override = portEnv ? getRegisteredEnvText(portEnv)?.trim() : undefined;
+  if (portEnv && override && Number(override) !== localPort) {
+    throw new IngressError(
+      'INGRESS_SURFACE_NOT_ALLOWED',
+      `${portEnv}=${override} differs from the manifest port ${localPort} of '${surface.id}'; align them so the exposed port is the surface's`
+    );
+  }
   return {
-    localPort: assertIngressLocalPort(surface.port),
+    localPort,
     pathPrefix: normalizeIngressPathPrefix(surface.ingress.path_prefix),
     ...(surface.healthPath ? { healthPath: surface.healthPath } : {}),
   };
 }
+
+/**
+ * Default identity probe: GET 127.0.0.1:<port><healthPath> must answer 2xx
+ * with JSON `service` equal to the surface id, so a different process that
+ * happens to hold the port is never published.
+ */
+export async function probeSurfaceIdentity(
+  surface: SurfaceRuntimeDefinition,
+  plan: SurfaceIngressPlan
+): Promise<SurfaceIdentityProbe> {
+  if (!plan.healthPath) return { ok: false, detail: 'surface declares no healthPath' };
+  const url = `http://127.0.0.1:${plan.localPort}${plan.healthPath}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), IDENTITY_PROBE_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) return { ok: false, detail: `http_${response.status}` };
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      return { ok: false, detail: 'health response is not JSON' };
+    }
+    const service = isRecord(body) && typeof body.service === 'string' ? body.service : undefined;
+    return service === surface.id
+      ? { ok: true, detail: `service=${service}` }
+      : {
+          ok: false,
+          detail: `health identifies as '${service ?? 'unknown'}', not '${surface.id}'`,
+        };
+  } catch (error) {
+    return {
+      ok: false,
+      detail: (error as Error)?.name === 'AbortError' ? 'timeout' : 'connect_failed',
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Short digest of the effect an approval covers (port, prefix, provider, network). */
+export function ingressEffectDigest(effect: {
+  provider_id: string;
+  local_port: number;
+  path_prefix: string;
+  network_class: string;
+}): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify([
+        effect.provider_id,
+        effect.local_port,
+        effect.path_prefix,
+        effect.network_class,
+      ])
+    )
+    .digest('hex')
+    .slice(0, 12);
+}
+
+export type IngressApprovalState =
+  'created' | 'pending' | 'rejected' | 'expired' | 'effect_mismatch' | 'human_required' | 'unknown';
 
 export type ExposeSurfaceResult =
   | {
@@ -116,6 +208,7 @@ export type ExposeSurfaceResult =
     }
   | {
       status: 'approval_required';
+      approval_state: IngressApprovalState;
       approval_request_id?: string;
       message: string;
       provider_id: string;
@@ -129,6 +222,10 @@ function selectionSummary(
   return rest;
 }
 
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export async function exposeSurface(
   options: { surfaceId: string; providerId?: string; agentId?: string },
   deps: PublicIngressServiceDeps = {}
@@ -137,29 +234,34 @@ export async function exposeSurface(
   const surface = resolveIngressSurface(options.surfaceId, deps);
   const plan = planSurfaceIngress(surface);
 
-  const health = await (deps.probeHealth ?? probeSurfaceHealth)(surface);
-  if (health.status !== 'healthy') {
+  const identity = await (deps.probeIdentity ?? probeSurfaceIdentity)(surface, plan);
+  if (!identity.ok) {
     throw new IngressError(
       'INGRESS_SURFACE_UNHEALTHY',
-      `surface '${surface.id}' is not healthy on 127.0.0.1:${plan.localPort}${plan.healthPath ?? ''} (${health.status}: ${health.detail}); start it before exposing`
+      `surface '${surface.id}' is not serving on 127.0.0.1:${plan.localPort}${plan.healthPath ?? ''} (${identity.detail}); start it before exposing`
     );
   }
 
   const selection = await selectPublicIngressProvider({ providerId: options.providerId });
   const providerId = selection.candidate.provider_id;
+  const effect = {
+    provider_id: providerId,
+    local_port: plan.localPort,
+    path_prefix: plan.pathPrefix,
+    network_class: selection.candidate.network_class,
+  };
   const approve = deps.approve ?? requireApprovalForOp;
   const now = (deps.now ?? (() => new Date()))();
   const approval = approve({
     opId: RISKY_OPS.INGRESS_EXPOSE,
     agentId,
-    correlationId: `ingress:expose:${surface.id}:${providerId}`,
+    // The effect digest makes a changed port/prefix/provider a new request
+    // instead of an effect_mismatch against an older approval.
+    correlationId: `ingress:expose:${surface.id}:${providerId}:${ingressEffectDigest(effect)}`,
     channel: 'cli',
     payload: {
       surface_id: surface.id,
-      provider_id: providerId,
-      local_port: plan.localPort,
-      path_prefix: plan.pathPrefix,
-      network_class: selection.candidate.network_class,
+      ...effect,
       stable_url: selection.candidate.stable_url,
       rationale: `Publish surface ${surface.id} (${plan.pathPrefix}) to the public internet through ${selection.candidate.display_name}.`,
       consequences: [
@@ -176,6 +278,7 @@ export async function exposeSurface(
   if (!approval.allowed) {
     return {
       status: 'approval_required',
+      approval_state: approval.requestStatus ?? 'unknown',
       ...(approval.requestId ? { approval_request_id: approval.requestId } : {}),
       message: approval.message ?? `approval required for ${RISKY_OPS.INGRESS_EXPOSE}`,
       provider_id: providerId,
@@ -183,128 +286,282 @@ export async function exposeSurface(
     };
   }
 
-  const exposure = await selection.provider.up({
-    surfaceId: surface.id,
-    localPort: plan.localPort,
-    pathPrefix: plan.pathPrefix,
-    ...(plan.healthPath ? { localHealthPath: plan.healthPath } : {}),
-  });
-  const state = loadPublicIngressState(deps);
-  state.exposures[surface.id] = exposure;
-  savePublicIngressState(state, deps);
+  const auditMetadata = {
+    surface_id: surface.id,
+    provider_id: providerId,
+    path_prefix: plan.pathPrefix,
+    local_port: plan.localPort,
+    network_class: selection.candidate.network_class,
+  };
+  let exposure: IngressExposure;
+  try {
+    exposure = await selection.provider.up({
+      surfaceId: surface.id,
+      localPort: plan.localPort,
+      pathPrefix: plan.pathPrefix,
+      ...(plan.healthPath ? { localHealthPath: plan.healthPath } : {}),
+    });
+  } catch (error) {
+    auditChain.record({
+      agentId,
+      action: 'ingress_expose',
+      operation: RISKY_OPS.INGRESS_EXPOSE,
+      result: 'failed',
+      reason: errorText(error),
+      metadata: auditMetadata,
+    });
+    throw error;
+  }
+  try {
+    const state = loadPublicIngressState(deps);
+    state.exposures[surface.id] = exposure;
+    savePublicIngressState(state, deps);
+  } catch (error) {
+    // The mapping is live but unrecorded; status/down still find it through
+    // the provider, so report rather than tear it down.
+    auditChain.record({
+      agentId,
+      action: 'ingress_expose',
+      operation: RISKY_OPS.INGRESS_EXPOSE,
+      result: 'error',
+      reason: `exposed but state write failed: ${errorText(error)}`,
+      metadata: { ...auditMetadata, public_url: exposure.public_url },
+    });
+    throw new IngressError(
+      'INGRESS_COMMAND_FAILED',
+      `${surface.id} is exposed at ${exposure.public_url} but the state record could not be written (${errorText(error)}); \`ingress status\` / \`ingress down\` still find it through the provider`,
+      providerId
+    );
+  }
   auditChain.record({
     agentId,
     action: 'ingress_expose',
     operation: RISKY_OPS.INGRESS_EXPOSE,
     result: 'completed',
     reason: `${selection.route}: ${selection.reason}`,
-    metadata: {
-      surface_id: surface.id,
-      provider_id: providerId,
-      public_url: exposure.public_url,
-      path_prefix: exposure.path_prefix,
-      local_port: exposure.local_port,
-      network_class: selection.candidate.network_class,
-    },
+    metadata: { ...auditMetadata, public_url: exposure.public_url },
   });
   return { status: 'exposed', exposure, selection: selectionSummary(selection) };
 }
 
-async function providerForExposure(providerId: string) {
+async function providerForId(providerId: string): Promise<PublicIngressProvider> {
   const descriptor = getPublicIngressProviderDescriptor(providerId);
-  if (!descriptor || descriptor.status !== 'live') {
+  if (!descriptor) {
     throw new IngressError(
       'INGRESS_PROVIDER_UNKNOWN',
-      `exposure was created by '${providerId}', which is no longer a live provider`,
+      `unknown ingress provider '${providerId}'`,
+      providerId
+    );
+  }
+  if (descriptor.status !== 'live') {
+    throw new IngressError(
+      'INGRESS_PROVIDER_NOT_READY',
+      `'${providerId}' is ${descriptor.status}, not a live provider`,
       providerId
     );
   }
   return loadPublicIngressProvider(descriptor);
 }
 
-/** Withdraw a surface's exposure through the provider that created it. */
+/**
+ * Providers to inspect for a surface without a local record: the explicit one
+ * (argument or KYBERION_INGRESS_PROVIDER), else every live provider.
+ */
+function candidateProviderIds(providerId?: string): string[] {
+  const explicit = providerId?.trim() || getRegisteredEnvText('KYBERION_INGRESS_PROVIDER')?.trim();
+  if (explicit) return [explicit];
+  return listPublicIngressProviderDescriptors()
+    .filter((descriptor) => descriptor.status === 'live')
+    .map((descriptor) => descriptor.provider_id);
+}
+
+function surfaceTarget(surface: SurfaceRuntimeDefinition): {
+  localPort: number;
+  pathPrefix: string;
+} {
+  const plan = planSurfaceIngress(surface);
+  return { localPort: plan.localPort, pathPrefix: plan.pathPrefix };
+}
+
+export interface WithdrawSurfaceResult {
+  status: 'withdrawn' | 'not_exposed';
+  exposure?: IngressExposure;
+  /** True when the withdrawn mapping had no local state record. */
+  unrecorded?: boolean;
+  /** Providers that were asked (not_exposed is only reported after asking). */
+  checked_providers: string[];
+}
+
+/** Withdraw a surface's exposure; with no record, find it through the providers first. */
 export async function withdrawSurface(
   options: { surfaceId: string; providerId?: string; agentId?: string },
   deps: PublicIngressServiceDeps = {}
-): Promise<{ status: 'withdrawn' | 'not_exposed'; exposure?: IngressExposure }> {
+): Promise<WithdrawSurfaceResult> {
   const agentId = options.agentId ?? 'kyberion:ingress';
   const surface = resolveIngressSurface(options.surfaceId, deps);
   const state = loadPublicIngressState(deps);
   const recorded = state.exposures[surface.id];
-  const providerId = recorded?.provider_id ?? options.providerId;
-  if (!providerId) return { status: 'not_exposed' };
-  const provider = await providerForExposure(providerId);
-  const pathPrefix =
-    recorded?.path_prefix ?? normalizeIngressPathPrefix(surface.ingress?.path_prefix);
+
+  let providerId: string | undefined;
+  let target: { localPort: number; pathPrefix: string };
+  let live: IngressExposure | undefined;
+  const checked: string[] = [];
+  if (recorded) {
+    providerId = recorded.provider_id;
+    target = { localPort: recorded.local_port, pathPrefix: recorded.path_prefix };
+  } else {
+    target = surfaceTarget(surface);
+    for (const id of candidateProviderIds(options.providerId)) {
+      checked.push(id);
+      const provider = await providerForId(id);
+      live = await provider.status({ surfaceId: surface.id, ...target });
+      if (live) {
+        providerId = id;
+        break;
+      }
+    }
+    if (!providerId) return { status: 'not_exposed', checked_providers: checked };
+  }
+
+  const provider = await providerForId(providerId);
   await provider.down({
     surfaceId: surface.id,
-    pathPrefix,
+    ...target,
     ...(recorded ? { exposure: recorded } : {}),
   });
-  delete state.exposures[surface.id];
-  savePublicIngressState(state, deps);
+  if (recorded) {
+    delete state.exposures[surface.id];
+    savePublicIngressState(state, deps);
+  }
+  const exposure = recorded ?? live;
   auditChain.record({
     agentId,
     action: 'ingress_withdraw',
     operation: 'ingress:withdraw',
     result: 'completed',
-    reason: recorded ? 'recorded exposure withdrawn' : 'mapping withdrawn without a state record',
+    reason: recorded ? 'recorded exposure withdrawn' : 'live unrecorded mapping withdrawn',
     metadata: {
       surface_id: surface.id,
       provider_id: providerId,
-      public_url: recorded?.public_url ?? null,
-      path_prefix: pathPrefix,
+      public_url: exposure?.public_url ?? null,
+      path_prefix: target.pathPrefix,
+      local_port: target.localPort,
     },
   });
-  return { status: 'withdrawn', ...(recorded ? { exposure: recorded } : {}) };
+  return {
+    status: 'withdrawn',
+    ...(exposure ? { exposure } : {}),
+    ...(recorded ? {} : { unrecorded: true }),
+    checked_providers: recorded ? [providerId] : checked,
+  };
 }
 
 export interface SurfaceIngressStatus {
   surface_id: string;
+  provider_id?: string;
   recorded?: IngressExposure;
-  /** Live provider view; undefined when the mapping is gone or unverifiable. */
+  /** Live provider view; undefined when the mapping is gone. */
   live?: IngressExposure;
-  live_check: 'confirmed' | 'missing' | 'error' | 'skipped';
+  /**
+   * confirmed = recorded and live; unrecorded = live without a local record;
+   * missing = recorded but gone; not_exposed = providers checked, nothing
+   * live; error = a provider could not be inspected (see detail).
+   */
+  live_check: 'confirmed' | 'unrecorded' | 'missing' | 'not_exposed' | 'error';
   detail?: string;
 }
 
-/** Recorded exposures cross-checked against their provider. */
+async function inspectSurface(
+  surface: SurfaceRuntimeDefinition,
+  recorded: IngressExposure | undefined,
+  providerId: string | undefined
+): Promise<SurfaceIngressStatus[]> {
+  if (recorded) {
+    try {
+      const provider = await providerForId(recorded.provider_id);
+      const live = await provider.status({
+        surfaceId: surface.id,
+        pathPrefix: recorded.path_prefix,
+        localPort: recorded.local_port,
+        exposure: recorded,
+      });
+      return [
+        {
+          surface_id: surface.id,
+          provider_id: recorded.provider_id,
+          recorded,
+          ...(live ? { live } : {}),
+          live_check: live ? 'confirmed' : 'missing',
+        },
+      ];
+    } catch (error) {
+      return [
+        {
+          surface_id: surface.id,
+          provider_id: recorded.provider_id,
+          recorded,
+          live_check: 'error',
+          detail: errorText(error),
+        },
+      ];
+    }
+  }
+  const target = surfaceTarget(surface);
+  const providerIds = candidateProviderIds(providerId);
+  const results: SurfaceIngressStatus[] = [];
+  for (const id of providerIds) {
+    try {
+      const provider = await providerForId(id);
+      const live = await provider.status({ surfaceId: surface.id, ...target });
+      if (live) {
+        results.push({ surface_id: surface.id, provider_id: id, live, live_check: 'unrecorded' });
+      }
+    } catch (error) {
+      results.push({
+        surface_id: surface.id,
+        provider_id: id,
+        live_check: 'error',
+        detail: errorText(error),
+      });
+    }
+  }
+  if (results.length === 0) {
+    results.push({
+      surface_id: surface.id,
+      live_check: 'not_exposed',
+      detail: `checked ${providerIds.join(', ') || 'no live provider'}`,
+    });
+  }
+  return results;
+}
+
+/**
+ * Exposure status cross-checked with the providers: recorded surfaces plus
+ * every surface that opts in to ingress (a mapping may exist without a record).
+ */
 export async function listSurfaceIngressStatus(
-  options: { surfaceId?: string } = {},
+  options: { surfaceId?: string; providerId?: string } = {},
   deps: PublicIngressServiceDeps = {}
 ): Promise<SurfaceIngressStatus[]> {
   const state = loadPublicIngressState(deps);
-  const ids = options.surfaceId
-    ? [resolveIngressSurface(options.surfaceId, deps).id]
-    : Object.keys(state.exposures).sort();
+  const targets: SurfaceRuntimeDefinition[] = options.surfaceId
+    ? [resolveIngressSurface(options.surfaceId, deps)]
+    : loadSurfaces(deps).filter(
+        (surface) => surface.ingress?.allowed === true || Boolean(state.exposures[surface.id])
+      );
+  const sorted = [...targets].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const results: SurfaceIngressStatus[] = [];
-  for (const id of ids) {
-    const recorded = state.exposures[id];
-    if (!recorded) {
-      results.push({ surface_id: id, live_check: 'skipped', detail: 'no recorded exposure' });
+  for (const surface of sorted) {
+    const recorded = state.exposures[surface.id];
+    if (!recorded && surface.ingress?.allowed !== true) {
+      results.push({
+        surface_id: surface.id,
+        live_check: 'not_exposed',
+        detail: 'surface does not opt in to public ingress',
+      });
       continue;
     }
-    try {
-      const provider = await providerForExposure(recorded.provider_id);
-      const live = await provider.status({
-        surfaceId: id,
-        pathPrefix: recorded.path_prefix,
-        exposure: recorded,
-      });
-      results.push({
-        surface_id: id,
-        recorded,
-        ...(live ? { live } : {}),
-        live_check: live ? 'confirmed' : 'missing',
-      });
-    } catch (error) {
-      results.push({
-        surface_id: id,
-        recorded,
-        live_check: 'error',
-        detail: error instanceof Error ? error.message : String(error),
-      });
-    }
+    results.push(...(await inspectSurface(surface, recorded, options.providerId)));
   }
   return results;
 }

@@ -84,7 +84,11 @@ only the `/events` mapping and never resets other mappings.
 - `funnel node attribute is not granted` — step 4; changes apply within a minute.
 - `path /events ... already proxies to ...` — another process owns the path;
   inspect with `tailscale funnel status` and remove it deliberately.
-- `INGRESS_SURFACE_UNHEALTHY` — start the surface (setup step 2).
+- `INGRESS_SURFACE_UNHEALTHY` — start the surface (setup step 2). The health
+  response must identify as the surface (`service: "event-intake-surface"`),
+  and `KYBERION_EVENT_INTAKE_PORT`, when set, must equal the manifest port.
+- `Access denied` / `permission` from `tailscale funnel` — on Linux run
+  `sudo tailscale set --operator=$USER` once; on macOS use the app's CLI.
 
 ## Adding another provider
 
@@ -103,3 +107,18 @@ Providers follow the
 3. Add hermetic tests for readiness, command construction and status parsing.
 
 The CLI, approval gate, audit, state and doctor probe need no change.
+
+Each provider is its own module; the descriptor's `adapter` field only names
+the protocol family and is informational. The v1 contract assumes `up`
+leaves the exposure running without a Kyberion-owned foreground process
+(Funnel persists in `tailscaled`). Providers that need a long-running
+foreground agent — cloudflared and ngrok — first need a managed-process
+lifecycle extension to the contract (spawn through `spawnManagedProcess`,
+pid/health supervision, teardown on `down`); that is why their entries stay
+`planned`.
+
+`down` and `status` always ask the provider: the state file is per checkout
+while provider configuration is host-wide, so a mapping created from another
+worktree (or after the state file was lost) is still found — but only a
+mapping whose target is exactly this surface's loopback target
+(`http://127.0.0.1:<port><prefix>`) is reported as ours or removed.

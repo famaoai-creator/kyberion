@@ -90,6 +90,48 @@ export function surfaceEndpointHints(surfaceId: string, publicUrl: string): Ingr
   return SURFACE_ENDPOINT_HINTS[surfaceId]?.(publicUrl) ?? [];
 }
 
+type ApprovalRequired = Extract<
+  Awaited<ReturnType<typeof exposeSurface>>,
+  { status: 'approval_required' }
+>;
+
+/** Operator guidance per approval state; "Approve" only for an open request. */
+export function approvalLines(args: IngressCliArgs, result: ApprovalRequired): string[] {
+  const rerun = `pnpm kyberion ingress up --surface ${args.surface}${args.provider ? ` --provider ${args.provider}` : ''}`;
+  const lines = [
+    `Approval required to expose ${args.surface} via ${result.provider_id} (${result.selection.route}: ${result.selection.reason}).`,
+    `  ${result.message}`,
+  ];
+  switch (result.approval_state) {
+    case 'created':
+    case 'pending':
+      if (result.approval_request_id) {
+        lines.push(`  Approve: pnpm kyberion approvals --approve ${result.approval_request_id}`);
+      }
+      lines.push(`  Then re-run: ${rerun}`);
+      break;
+    case 'rejected':
+      lines.push(
+        '  The request was rejected. A new request is opened automatically once it lapses (24h after it was opened); changing the port, path prefix or provider opens a new one immediately.'
+      );
+      break;
+    case 'expired':
+    case 'effect_mismatch':
+      lines.push(
+        `  The earlier request no longer covers this exposure (${result.approval_state}); re-run once it lapses to open a new request: ${rerun}`
+      );
+      break;
+    case 'human_required':
+      lines.push(
+        '  No request was opened: this run is non-interactive. Re-run from an operator shell.'
+      );
+      break;
+    default:
+      lines.push(`  Re-run after resolving the approval: ${rerun}`);
+  }
+  return lines;
+}
+
 export async function runIngressCli(
   args: IngressCliArgs,
   print: (value: unknown) => void
@@ -112,31 +154,35 @@ export async function runIngressCli(
   if (args.command === 'status') {
     const statuses = await listSurfaceIngressStatus({
       ...(args.surface ? { surfaceId: args.surface } : {}),
+      ...(args.provider ? { providerId: args.provider } : {}),
     });
     if (args.json) {
       print({ exposures: statuses });
       return statuses;
     }
-    if (statuses.length === 0) print('No surface is exposed through public ingress.');
+    if (statuses.length === 0) print('No surface opts in to public ingress.');
     for (const status of statuses) {
       const url = status.live?.public_url ?? status.recorded?.public_url ?? '-';
       print(
-        `${status.surface_id}: ${status.live_check} ${url}${status.recorded ? ` via ${status.recorded.provider_id}` : ''}${status.detail ? ` (${status.detail})` : ''}`
+        `${status.surface_id}: ${status.live_check} ${url}${status.provider_id ? ` via ${status.provider_id}` : ''}${status.detail ? ` (${status.detail})` : ''}`
       );
     }
     return statuses;
   }
 
   if (args.command === 'down') {
-    const result = await withdrawSurface({ surfaceId: args.surface! });
+    const result = await withdrawSurface({
+      surfaceId: args.surface!,
+      ...(args.provider ? { providerId: args.provider } : {}),
+    });
     if (args.json) {
       print(result);
       return result;
     }
     print(
       result.status === 'withdrawn'
-        ? `Withdrawn ${args.surface}${result.exposure ? ` (${result.exposure.public_url})` : ''}.`
-        : `${args.surface} is not exposed.`
+        ? `Withdrawn ${args.surface}${result.exposure ? ` (${result.exposure.public_url})` : ''}${result.unrecorded ? ' — the mapping had no local record' : ''}.`
+        : `${args.surface} is not exposed (checked: ${result.checked_providers.join(', ') || 'no live provider'}).`
     );
     return result;
   }
@@ -148,15 +194,7 @@ export async function runIngressCli(
   });
   if (result.status === 'approval_required') {
     if (args.json) print(result);
-    else {
-      print(
-        `Approval required to expose ${args.surface} via ${result.provider_id} (${result.selection.route}: ${result.selection.reason}).`
-      );
-      if (result.approval_request_id) {
-        print(`  Approve: pnpm kyberion approvals --approve ${result.approval_request_id}`);
-      }
-      print(`  Then re-run: pnpm kyberion ingress up --surface ${args.surface}`);
-    }
+    else for (const line of approvalLines(args, result)) print(line);
     throw new ScriptExitError(3, '', true, result);
   }
   const endpoints = surfaceEndpointHints(result.exposure.surface_id, result.exposure.public_url);
