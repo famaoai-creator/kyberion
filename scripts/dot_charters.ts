@@ -8,7 +8,7 @@
  *   pnpm kyberion dot pause <dot_id>             # active → paused (wakes stop)
  *   pnpm kyberion dot retire <dot_id>            # any non-retired → retired
  *   pnpm kyberion dot wake <dot_id>              # run one bounded wake now
- *   pnpm kyberion dot status [<dot_id>]          # last wake + token usage per dot
+ *   pnpm kyberion dot status [<dot_id>]          # wakes, tokens, actions, waiting decisions, signals, feedback
  *   pnpm kyberion dot inbox append --channel <ch> [--dot-id <id>] [--text <s>]
  *                                                # append a wake-lane row (manual/testing)
  *
@@ -30,6 +30,8 @@ import {
 import { withExecutionContextAsync } from '@agent/core/authority';
 import { dotTokensUsedToday, readDotWakeLedger } from '@agent/core/dot/dot-runtime';
 import { appendDotInboxEntry } from '@agent/core/dot/dot-inbox';
+import { currentDotActions } from '@agent/core/dot/dot-dispatch';
+import { dotFeedbackPromptLines, latestDotSignals } from '@agent/core/dot/dot-feedback';
 import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
 import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
 import { DEFAULT_DAEMONS } from './daemon_watchdog.js';
@@ -202,6 +204,11 @@ function reportStatus(argv: string[]) {
     .map((entry) => {
       const wakes = ledger.filter((row) => row.dot_id === entry.charter.dot_id);
       const last = wakes[wakes.length - 1];
+      const actions = currentDotActions(entry.charter.dot_id);
+      const actionCounts: Record<string, number> = {};
+      for (const action of actions) {
+        actionCounts[action.status] = (actionCounts[action.status] ?? 0) + 1;
+      }
       return {
         dot_id: entry.charter.dot_id,
         status: entry.charter.status,
@@ -211,6 +218,16 @@ function reportStatus(argv: string[]) {
         last_wake: last
           ? { at: last.fired_at, outcome: last.outcome, trigger: last.trigger_key }
           : null,
+        actions: actionCounts,
+        waiting_on_operator: actions
+          .filter((action) => action.status === 'parked')
+          .map((action) => ({ title: action.title, request_id: action.request_id })),
+        signals: latestDotSignals(entry.charter).map(({ signal, latest }) => ({
+          signal,
+          healthy: latest?.healthy ?? null,
+          measured_at: latest?.measured_at ?? null,
+        })),
+        recent_feedback: dotFeedbackPromptLines(entry.charter.dot_id),
       };
     });
   if (dotId && dots.length === 0) {
@@ -253,6 +270,24 @@ function printReport(report: Record<string, unknown>, print: (line: string) => v
           ? `  wakes=${dot.wake_count} tokens_today=${dot.tokens_today}${last ? `  last=${last.at} ${last.outcome}` : ''}`
           : `  [${dot.authority_role}]  triggers=${(dot.triggers as string[]).join(',')}  heartbeat=${dot.heartbeat_id}`;
       print(`${dot.status}  ${String(dot.dot_id).padEnd(24)} ${dot.title ?? ''}${tail}`.trimEnd());
+      const actions = dot.actions as Record<string, number> | undefined;
+      if (actions && Object.keys(actions).length > 0) {
+        print(
+          `    actions: ${Object.entries(actions)
+            .map(([status, count]) => `${status}=${count}`)
+            .join(' ')}`
+        );
+      }
+      for (const waiting of (dot.waiting_on_operator ?? []) as Array<Record<string, unknown>>) {
+        print(`    waiting on you: ${waiting.title} (${waiting.request_id ?? 'no request'})`);
+      }
+      for (const signal of (dot.signals ?? []) as Array<Record<string, unknown>>) {
+        const mark = signal.healthy === null ? '??' : signal.healthy ? 'OK' : 'NG';
+        print(`    signal ${mark} ${signal.signal}`);
+      }
+      for (const line of (dot.recent_feedback ?? []) as string[]) {
+        print(`    feedback ${line.replace(/^- /, '')}`);
+      }
     }
     print(`-- ${(report.dots as unknown[]).length} dot(s)`);
   }
