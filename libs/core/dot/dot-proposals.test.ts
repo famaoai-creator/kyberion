@@ -115,16 +115,20 @@ describe('parseDotProposalsFromText', () => {
     });
   });
 
-  it('rejects malformed expected_effect, target and intent', () => {
+  it('drops malformed expected_effect, target and intent but keeps the proposal', () => {
     const base = { title: 't', objective: 'o', work_shape: 'task_session' };
-    expect(() =>
-      normalizeDotProposal({ ...base, expected_effect: { direction: 'increase' } })
-    ).toThrow(/kr_id or signal/);
-    expect(() =>
-      normalizeDotProposal({ ...base, expected_effect: { signal: 's', direction: 'up' } })
-    ).toThrow(/direction/);
-    expect(() => normalizeDotProposal({ ...base, target: 'whatever' })).toThrow(/target/);
-    expect(() => normalizeDotProposal({ ...base, intent: 'explode' })).toThrow(/intent/);
+    for (const extra of [
+      { expected_effect: { direction: 'increase' } },
+      { expected_effect: { signal: 's', direction: 'up' } },
+      { target: 'organization:acme/operations' },
+      { intent: 'explode' },
+    ]) {
+      const proposal = normalizeDotProposal({ ...base, ...extra });
+      expect(proposal).toMatchObject({ title: 't', objective: 'o' });
+      expect(proposal.expected_effect).toBeUndefined();
+      expect(proposal.target).toBeUndefined();
+      expect(proposal.intent).toBeUndefined();
+    }
   });
 
   it('parses the new fields from a fenced block', () => {

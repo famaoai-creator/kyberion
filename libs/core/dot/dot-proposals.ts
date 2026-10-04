@@ -163,34 +163,32 @@ export function normalizeDotProposal(value: unknown): DotProposal {
     throw new Error(`priority must be one of ${PRIORITIES.join(', ')}`);
   }
   const pipelineRef = optionalText(raw.pipeline_ref, 300);
+  // expected_effect / target / intent are advisory metadata (outcome
+  // measurement, arbitration). A malformed value is dropped rather than
+  // discarding the whole proposal — the work itself is still valid.
   let expectedEffect: DotExpectedEffect | undefined;
-  if (raw.expected_effect !== undefined) {
-    const effect = raw.expected_effect as Record<string, unknown> | null;
-    if (!effect || typeof effect !== 'object' || Array.isArray(effect)) {
-      throw new Error('expected_effect must be an object');
-    }
-    if (!EFFECT_DIRECTIONS.includes(effect.direction as (typeof EFFECT_DIRECTIONS)[number])) {
-      throw new Error(`expected_effect.direction must be one of ${EFFECT_DIRECTIONS.join(', ')}`);
-    }
+  const effect = raw.expected_effect as Record<string, unknown> | null | undefined;
+  if (
+    effect &&
+    typeof effect === 'object' &&
+    !Array.isArray(effect) &&
+    EFFECT_DIRECTIONS.includes(effect.direction as (typeof EFFECT_DIRECTIONS)[number])
+  ) {
     const krId = optionalText(effect.kr_id, 64);
     const signal = optionalText(effect.signal, 300);
-    if (!krId && !signal) throw new Error('expected_effect needs kr_id or signal');
-    expectedEffect = {
-      ...(krId ? { kr_id: krId } : {}),
-      ...(signal ? { signal } : {}),
-      direction: effect.direction as DotExpectedEffect['direction'],
-    };
+    if (krId || signal) {
+      expectedEffect = {
+        ...(krId ? { kr_id: krId } : {}),
+        ...(signal ? { signal } : {}),
+        direction: effect.direction as DotExpectedEffect['direction'],
+      };
+    }
   }
-  const target = optionalText(raw.target, 300);
-  if (target !== undefined && !TARGET_PATTERN.test(target)) {
-    throw new Error(
-      `target '${target}' must be path:<glob>, service:<id>, pr:<owner>/<repo>#<n>, work_item:<id>, or org_operation:<id>`
-    );
-  }
-  const intent = raw.intent;
-  if (intent !== undefined && !DOT_PROPOSAL_INTENTS.includes(intent as DotProposalIntent)) {
-    throw new Error(`intent must be one of ${DOT_PROPOSAL_INTENTS.join(', ')}`);
-  }
+  const rawTarget = optionalText(raw.target, 300);
+  const target = rawTarget !== undefined && TARGET_PATTERN.test(rawTarget) ? rawTarget : undefined;
+  const intent = DOT_PROPOSAL_INTENTS.includes(raw.intent as DotProposalIntent)
+    ? (raw.intent as DotProposalIntent)
+    : undefined;
   const changedPaths = Array.isArray(raw.changed_paths)
     ? raw.changed_paths
         .filter((entry): entry is string => typeof entry === 'string' && entry.trim() !== '')
@@ -209,7 +207,7 @@ export function normalizeDotProposal(value: unknown): DotProposal {
     ...(pipelineRef ? { pipeline_ref: pipelineRef } : {}),
     ...(expectedEffect ? { expected_effect: expectedEffect } : {}),
     ...(target ? { target } : {}),
-    ...(intent ? { intent: intent as DotProposalIntent } : {}),
+    ...(intent ? { intent } : {}),
   };
 }
 
