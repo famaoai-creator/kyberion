@@ -78,6 +78,10 @@ export const REVIEWED_CHILD_PROCESSES: Record<string, ReviewedChildProcess> = {
     targets: [],
     rationale: `camera capture tools (imagesnap / ffmpeg / sips / cp); ${EXTERNAL_BINARY}`,
   },
+  'libs/core/windows-os-automation.ts#runWindowsPointerActions': {
+    targets: [],
+    rationale: `Windows pointer script via the powershell.exe stdin bootstrap with an env built only from Windows system variables (windowsPowerShellEnv) plus KYBERION_WIN_POINTER; ${EXTERNAL_BINARY}`,
+  },
   'presence/bridge/nexus-daemon.ts#dispatchFeedback': {
     targets: (ws) =>
       readSafeJsonFile<{ channels?: Array<{ connector_skill?: string }> }>(
