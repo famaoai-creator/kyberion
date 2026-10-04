@@ -79,6 +79,20 @@
     "end": "22:00",
     "timezone": "Asia/Tokyo"
   },
+  "autonomy": {
+    "relaxable_actions": ["dot_delegate_work"],
+    "promotion": {
+      "min_decisions": 20,
+      "min_agreement": 0.9,
+      "min_outcome_success": 0.8,
+      "max_incidents_30d": 0
+    },
+    "demotion": {
+      "on_regressed_outcomes": 2,
+      "on_rejection_streak": 2,
+      "on_incident": true
+    }
+  },
   "actions": {
     "storage_janitor": {
       "title": "Storage janitor",
