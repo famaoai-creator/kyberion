@@ -33,9 +33,9 @@ import {
   registerMeetingJoinDriver,
   validateMeetingTarget,
   type MeetingJoinDriver,
+  type MeetingJoinPlatform,
 } from '@agent/core/meeting/meeting-join-driver';
-import { installInRoomMeetingJoinDriver } from '@agent/core/in-room-meeting-driver';
-import { installChromeExtensionMeetingJoinDriver } from '@agent/core/browser/chrome-extension-meeting-driver';
+import { installMeetingParticipationDriver as installMeetingJoinDriverModule } from '@agent/core/meeting/meeting-driver-module-loader';
 import { selectStreamingSttBridge } from '@agent/core/voice/streaming-stt-bridge';
 import { getStreamingTtsBridge } from '@agent/core/voice/streaming-tts-bridge';
 import { getVoiceProfileRegistry } from '@agent/core/voice/voice-profile-registry';
@@ -49,7 +49,6 @@ import { loadEnvironmentManifest, verifyReady } from '@agent/core/environment-ca
 import { resolveAudioBus } from '@agent/core/voice/audio-bus-resolver';
 import { resolveMeetingParticipationRuntimePlan } from '@agent/core/meeting/meeting-participation-runtime-plan';
 import { TraceContext, finalizeAndPersist } from '@agent/core/trace';
-import { pathResolver } from '@agent/core/path-resolver';
 import { logger } from '@agent/core/core';
 import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import { setRegisteredEnv } from '@agent/core/foundation';
@@ -62,7 +61,6 @@ import type {
 import { startMeetingCommandLoop } from './meeting_commands.js';
 import type { ConversationAgent } from '@agent/core/meeting/meeting-participation-coordinator';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { pathToFileURL } from 'node:url';
 import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.js';
 import { parseSafeJsonObjectInput } from './lib/json-input.js';
 // Side-effect imports register the audio-bus capability probes so the
@@ -123,7 +121,7 @@ export function extractFirstJson(text: string): Record<string, unknown> | null {
 
 export function prepareMeetingTarget(
   target: MeetingTarget
-): MeetingTarget & { platform: 'meet' | 'zoom' | 'teams' | 'in_room' } {
+): MeetingTarget & { platform: MeetingJoinPlatform | 'in_room' } {
   return validateMeetingTarget(target);
 }
 
@@ -146,69 +144,17 @@ async function loadDriver(
     extensionJoinTimeoutSec?: number;
   } = {}
 ): Promise<MeetingJoinDriver> {
-  if (driverId === 'in-room') {
-    // 同席モード: attend the physical meeting through the machine's own
-    // microphone/speakers — no browser, no external bot service.
-    installInRoomMeetingJoinDriver({
-      mic: opts.microphoneDevice ? { device: opts.microphoneDevice } : undefined,
-    });
-  }
-  if (driverId === 'browser-playwright') {
+  if (!getMeetingJoinDriver(driverId)) {
     try {
-      const mod = await import('@actuator/meeting-browser-driver');
-      mod.installBrowserMeetingJoinDriver({
-        headed: Boolean(opts.headed),
-        user_data_dir: opts.userDataDir,
-        profile_directory: opts.profileDirectory,
-        connect_over_cdp: Boolean(opts.connectOverCdp),
-        cdp_url: opts.cdpUrl,
-        cdp_port: opts.cdpPort,
-        browser_channel: opts.browserChannel,
-        account_slug: opts.accountSlug,
-        microphone_device: opts.microphoneDevice,
-        speaker_device: opts.speakerDevice,
-        camera_device: opts.cameraDevice,
-      });
-    } catch (err: any) {
-      try {
-        const fallbackPath = pathResolver.rootResolve(
-          'dist/libs/actuators/meeting-browser-driver/src/index.js'
-        );
-        const mod = await import(pathToFileURL(fallbackPath).href);
-        if (typeof mod.installBrowserMeetingJoinDriver === 'function') {
-          mod.installBrowserMeetingJoinDriver({
-            headed: Boolean(opts.headed),
-            user_data_dir: opts.userDataDir,
-            profile_directory: opts.profileDirectory,
-            connect_over_cdp: Boolean(opts.connectOverCdp),
-            cdp_url: opts.cdpUrl,
-            cdp_port: opts.cdpPort,
-            browser_channel: opts.browserChannel,
-            account_slug: opts.accountSlug,
-            microphone_device: opts.microphoneDevice,
-            speaker_device: opts.speakerDevice,
-            camera_device: opts.cameraDevice,
-          });
-          logger.info(`[participate-cli] browser driver loaded from ${fallbackPath}`);
-        } else {
-          throw new Error('fallback driver module did not export installBrowserMeetingJoinDriver');
-        }
-      } catch (fallbackErr: any) {
-        logger.warn(
-          `[participate-cli] browser driver not installed; falling back to stub. (${fallbackErr?.message ?? err?.message ?? err})`
-        );
+      const loaded = await installMeetingJoinDriverModule(driverId, opts);
+      if (loaded.fallback_path) {
+        logger.info(`[participate-cli] driver module loaded from ${loaded.fallback_path}`);
       }
+    } catch (err: any) {
+      logger.warn(
+        `[participate-cli] driver module '${driverId}' could not be loaded: ${err?.message ?? err}`
+      );
     }
-  }
-  if (driverId === 'chrome-extension') {
-    // Browser control via the operator's own Chrome running the Meet Copilot
-    // extension (tools/meet-copilot-extension), over a local WebSocket channel.
-    // Audio still flows through the BlackHole bus (decoupled from the driver).
-    installChromeExtensionMeetingJoinDriver({
-      wsPort: opts.extensionWsPort,
-      wsHost: opts.extensionWsHost,
-      joinTimeoutSec: opts.extensionJoinTimeoutSec,
-    });
   }
   const driver = getMeetingJoinDriver(driverId);
   if (driver) {
@@ -455,17 +401,6 @@ async function main(args: string[] = []): Promise<void> {
     logger.info(
       `[participate-cli] runtime plan transport=${runtimePlan.transport_mode} dry_run=${runtimePlan.dry_run} real_audio_bus=${runtimePlan.require_real_audio_bus} stt=${runtimePlan.require_streaming_stt} tts=${runtimePlan.require_streaming_tts} voice_profile=${runtimePlan.require_voice_profile}`
     );
-    if (
-      runtimePlan.transport_mode === 'captions_first' &&
-      String(argv.driver) !== 'chrome-extension'
-    ) {
-      logger.error(
-        '[participate-cli] --transport-mode captions_first requires --driver chrome-extension (platform live captions are scraped by the Meet Copilot extension).'
-      );
-      exitCode = 2;
-      return;
-    }
-
     // 同席モード (--driver in-room): the meeting is in the physical room, so
     // no meeting URL is required and the platform is forced to in_room.
     const inRoom = String(argv.driver) === 'in-room' || argv.platform === 'in_room';

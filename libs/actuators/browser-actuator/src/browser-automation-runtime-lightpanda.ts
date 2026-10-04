@@ -174,20 +174,23 @@ let registered = false;
 export function registerLightpandaBrowserAutomationRuntime(): void {
   if (registered) return;
   registered = true;
-  registerBrowserAutomationRuntimeBridge({
-    bridge_id: LIGHTPANDA_BRIDGE_ID,
-    capabilities: LIGHTPANDA_CAPABILITIES,
-    connectOverCDP() {
-      return Promise.reject(
-        new Error(
-          '[lightpanda] attaching to an existing browser is not supported; the provider owns its own `lightpanda serve` process'
-        )
-      );
+  registerBrowserAutomationRuntimeBridge(
+    {
+      bridge_id: LIGHTPANDA_BRIDGE_ID,
+      capabilities: LIGHTPANDA_CAPABILITIES,
+      connectOverCDP() {
+        return Promise.reject(
+          new Error(
+            '[lightpanda] attaching to an existing browser is not supported; the provider owns its own `lightpanda serve` process'
+          )
+        );
+      },
+      launchPersistentContext(_userDataDir, options) {
+        return launchLightpandaContext(options);
+      },
     },
-    launchPersistentContext(_userDataDir, options) {
-      return launchLightpandaContext(options);
-    },
-  });
+    { provenance: 'builtin', source: 'browser-automation-runtime-lightpanda' }
+  );
 }
 
 registerLightpandaBrowserAutomationRuntime();

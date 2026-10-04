@@ -1,0 +1,33 @@
+{
+  "$schema": "../schemas/viseme-provider-mappings.schema.json",
+  "version": "1.0.0",
+  "providers": [
+    {
+      "provider_id": "azure",
+      "visemes": {
+        "0": "sil",
+        "1": "AA",
+        "2": "AI",
+        "3": "AU",
+        "4": "E",
+        "5": "ER",
+        "6": "I",
+        "7": "U",
+        "8": "OW",
+        "9": "O",
+        "10": "A",
+        "11": "R",
+        "12": "L",
+        "13": "S",
+        "14": "SH",
+        "15": "TH",
+        "16": "T",
+        "17": "K",
+        "18": "P",
+        "19": "N",
+        "20": "H",
+        "21": "F"
+      }
+    }
+  ]
+}

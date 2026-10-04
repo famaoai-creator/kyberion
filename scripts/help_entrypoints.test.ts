@@ -98,7 +98,7 @@ describe('CLI help entrypoints', () => {
       'unknown',
     ]);
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain('Unsupported calendar provider: unknown');
+    expect(result.stderr).toContain("unknown provider 'unknown'");
   });
 
   it('prints usage for license audit help', () => {

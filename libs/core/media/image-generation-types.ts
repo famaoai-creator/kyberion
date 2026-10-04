@@ -82,6 +82,8 @@ export interface ImageGenerationResult {
 
 export interface ImageGenerationProvider {
   readonly id: string;
+  /** Media backend records implemented by this adapter; used for result and fallback routing. */
+  readonly backendIds?: readonly string[];
   readonly costTier?: 'free' | 'paid' | 'self_hosted' | 'environment';
   readonly dataPolicy?: 'training_eligible' | 'zero_retention' | 'local_only';
   readonly executionLocality?: 'local' | 'remote' | 'hybrid';

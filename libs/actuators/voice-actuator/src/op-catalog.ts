@@ -13,7 +13,7 @@ type InputSchema = Record<string, unknown>;
 // Params transcribeVoiceSample reads beyond the base contract (both the
 // `transcribe` and `transcribe_voice_sample` ops dispatch to it).
 const STT_HANDLER_PARAMS: Record<string, InputSchema> = {
-  backend: { type: 'string', enum: ['auto', 'bridge', 'fluid_audio', 'mlx_whisper'] },
+  backend: { type: 'string' },
   prefer_timestamps: { type: 'boolean' },
   allow_synthetic: { type: 'boolean' },
   write_sidecar: { type: 'boolean' },
@@ -34,7 +34,7 @@ const VOICE_CONTRACTS: Record<string, InputSchema> = {
   list_audio_routes: {
     type: 'object',
     properties: {
-      bus: { type: 'string', enum: ['blackhole', 'pulseaudio', 'stub'] },
+      bus: { type: 'string' },
       export_as: { type: 'string' },
     },
     additionalProperties: false,
@@ -42,7 +42,7 @@ const VOICE_CONTRACTS: Record<string, InputSchema> = {
   probe_audio_route: {
     type: 'object',
     properties: {
-      bus: { type: 'string', enum: ['blackhole', 'pulseaudio', 'stub'] },
+      bus: { type: 'string' },
       expected_device_label: { type: 'string' },
       input_device_uid: { type: 'string' },
       output_device_uid: { type: 'string' },

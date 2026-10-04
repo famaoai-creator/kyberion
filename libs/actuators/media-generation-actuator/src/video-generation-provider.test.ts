@@ -187,7 +187,7 @@ describe('purpose-driven video provider selection', () => {
       'first_frame_image (the Runway adapter uses image_to_video)',
     ]);
     expect(unmet['media-generation.comfyui.video']).toEqual([
-      'needs params.workflow, workflow_path or video_adf (ComfyUI runs workflows)',
+      'needs params.workflow, workflow_path or video_adf (service presets run workflows)',
     ]);
   });
 

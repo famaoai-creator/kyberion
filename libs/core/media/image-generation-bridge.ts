@@ -45,7 +45,7 @@ import { resolveGeminiApiKey } from '../provider/gemini-api-backend.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { isHostImageHandoffOutput, recordHostImageHandoffRequest } from '../host-image-handoff.js';
 import { isAppleSilicon } from '../platform.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 import {
   explainSeamProviderDecision,
   listSeamSelectionPurposes,
@@ -69,20 +69,29 @@ let imageGenerationGlobalRouter: any = null;
 let imageGenerationBuiltinsRegistered = false;
 
 /** Register an image-generation backend into the image-generation-provider seam. */
-export function registerImageGenerationProvider(provider: ImageGenerationProvider): () => void {
+export function registerImageGenerationProvider(
+  provider: ImageGenerationProvider,
+  metadata: SeamProviderMetadata = {
+    provenance: 'plugin',
+    source: 'image-generation-extension',
+  }
+): () => void {
   const id = String(provider.id || '').trim();
   if (!id) throw new Error('ImageGenerationProvider.id is required');
-  imageGenerationProviderDisposers.get(id)?.();
-  const disposer = imageGenerationProviderSeam.register(id, provider, {
-    provenance: 'builtin',
-    source: 'image-generation-bridge',
-  });
-  imageGenerationProviderDisposers.set(id, disposer);
+  const disposeFromSeam = imageGenerationProviderSeam.register(id, provider, metadata);
+  const dispose = () => {
+    disposeFromSeam();
+    if (imageGenerationProviderDisposers.get(id) === dispose)
+      imageGenerationProviderDisposers.delete(id);
+    imageGenerationGlobalRouter = null;
+  };
+  imageGenerationProviderDisposers.set(id, dispose);
   imageGenerationGlobalRouter = null;
-  return disposer;
+  return dispose;
 }
 
 export function listImageGenerationProviders(): ImageGenerationProvider[] {
+  ensureBuiltinImageGenerationProviders();
   return imageGenerationProviderSeam.list().map((entry) => entry.implementation);
 }
 
@@ -305,6 +314,7 @@ async function runLocalFluxGeneration(
 
 export class ComfyUiImageGenerationProvider implements ImageGenerationProvider {
   readonly id = 'comfyui';
+  readonly backendIds = ['media-generation.comfyui'];
   readonly costTier = 'self_hosted';
   readonly dataPolicy = 'local_only';
   readonly executionLocality = 'local';
@@ -347,6 +357,7 @@ export class ComfyUiImageGenerationProvider implements ImageGenerationProvider {
 
 export class GeminiFastImageGenerationProvider implements ImageGenerationProvider {
   readonly id = 'gemini_fast';
+  readonly backendIds = ['media-generation.gemini.imagen-3-fast'];
   readonly costTier = 'free';
   readonly dataPolicy = 'training_eligible';
   readonly executionLocality = 'remote';
@@ -406,6 +417,7 @@ export class GeminiFastImageGenerationProvider implements ImageGenerationProvide
 
 export class GeminiServiceImageGenerationProvider implements ImageGenerationProvider {
   readonly id = 'gemini_service';
+  readonly backendIds = ['media-generation.gemini'];
   readonly costTier = 'paid';
   readonly dataPolicy = 'zero_retention';
   readonly executionLocality = 'remote';
@@ -821,6 +833,7 @@ export class LocalFluxImageGenerationProvider implements ImageGenerationProvider
   readonly supportsReferenceImages = true;
   readonly dataEgress = 'local';
   readonly id = 'local_flux';
+  readonly backendIds = ['media-generation.local_flux'];
   readonly costTier = 'self_hosted';
   readonly dataPolicy = 'local_only';
   readonly executionLocality = 'local';
@@ -878,6 +891,7 @@ function getApplePlaygroundTargetPath(request: ImageGenerationRequest): string {
 
 export class ApplePlaygroundImageGenerationProvider implements ImageGenerationProvider {
   readonly id = 'apple_playground';
+  readonly backendIds = ['media-generation.apple_playground'];
   readonly costTier = 'self_hosted';
   readonly dataPolicy = 'local_only';
   readonly executionLocality = 'local';
@@ -1068,6 +1082,7 @@ function envEquals(name: string, expected: string): boolean {
 
 export class HostAgentImageGenerationProvider extends BaseHostBridgeImageGenerationProvider {
   readonly id = 'host_agent';
+  readonly backendIds = ['media-generation.host_agent'];
 
   protected readonly config: HostBridgeProviderConfig = {
     id: 'host_agent',
@@ -1105,6 +1120,7 @@ export class AgyHostBridgeImageGenerationProvider extends BaseHostBridgeImageGen
 
 export class CursorHostBridgeImageGenerationProvider extends BaseHostBridgeImageGenerationProvider {
   readonly id = 'cursor_host_bridge';
+  readonly backendIds = ['media-generation.cursor_host_bridge'];
 
   protected readonly config: HostBridgeProviderConfig = {
     id: 'cursor_host_bridge',
@@ -1116,23 +1132,11 @@ export class CursorHostBridgeImageGenerationProvider extends BaseHostBridgeImage
   };
 }
 
-/** Media backend registry id → image provider id (bridge providers without a record are absent). */
-const IMAGE_BACKEND_ID_TO_PROVIDER_ID: Record<string, string> = {
-  'media-generation.comfyui': 'comfyui',
-  'media-generation.gemini.imagen-3-fast': 'gemini_fast',
-  'media-generation.gemini': 'gemini_service',
-  'media-generation.host_agent': 'host_agent',
-  'media-generation.cursor_host_bridge': 'cursor_host_bridge',
-  'media-generation.local_flux': 'local_flux',
-  'media-generation.apple_playground': 'apple_playground',
-};
-
-/**
- * The media backend registry id of an image provider (the id a generation
- * result reports), or undefined for providers without a registry record.
- */
+/** The media backend registry id of an image provider, or undefined without a registry record. */
 export function imageGenerationBackendIdForProvider(providerId: string): string | undefined {
-  return Object.entries(IMAGE_BACKEND_ID_TO_PROVIDER_ID).find(([, id]) => id === providerId)?.[0];
+  ensureBuiltinImageGenerationProviders();
+  return listImageGenerationProviders().find((provider) => provider.id === providerId)
+    ?.backendIds?.[0];
 }
 
 /** Request facts operator rules may match on (e.g. `{ mode: 'fast' }`). */
@@ -1159,11 +1163,23 @@ export class AdaptivePolicyRouter {
     try {
       const registry = getMediaBackendRegistry();
       const backends = registry.backends.filter((b) => b.modality === 'image');
-      const aliasToProviderId = IMAGE_BACKEND_ID_TO_PROVIDER_ID;
+      const providerIdByBackendId = new Map<string, string>(
+        [...this.providers.values()].flatMap((provider) =>
+          (provider.backendIds ?? []).map((backendId) => [backendId, provider.id] as const)
+        )
+      );
+      const resolveProviderId = (backendId: string): string => {
+        const exact = providerIdByBackendId.get(backendId);
+        if (exact) return exact;
+        const aliasId = backends.find((backend) =>
+          backend.aliases?.includes(backendId)
+        )?.backend_id;
+        return providerIdByBackendId.get(aliasId ?? backendId) ?? aliasId ?? backendId;
+      };
       for (const b of backends) {
         if (b.fallback_backend_id) {
-          const fromId = aliasToProviderId[b.backend_id] || b.backend_id;
-          const toId = aliasToProviderId[b.fallback_backend_id] || b.fallback_backend_id;
+          const fromId = resolveProviderId(b.backend_id);
+          const toId = resolveProviderId(b.fallback_backend_id);
           this.fallbackGraph.set(fromId, toId);
         }
       }
@@ -1479,7 +1495,7 @@ export class AdaptivePolicyRouter {
 }
 
 function ensureBuiltinImageGenerationProviders(): void {
-  if (imageGenerationBuiltinsRegistered && listImageGenerationProviders().length > 0) return;
+  if (imageGenerationBuiltinsRegistered) return;
   for (const provider of [
     new ComfyUiImageGenerationProvider(),
     new GeminiFastImageGenerationProvider(),
@@ -1495,7 +1511,10 @@ function ensureBuiltinImageGenerationProviders(): void {
     new AgyHostBridgeImageGenerationProvider(),
     new HostAgentImageGenerationProvider(),
   ]) {
-    registerImageGenerationProvider(provider);
+    registerImageGenerationProvider(provider, {
+      provenance: 'builtin',
+      source: 'image-generation-bridge',
+    });
   }
   imageGenerationBuiltinsRegistered = true;
 }

@@ -620,3 +620,13 @@ export function installChromeExtensionMeetingJoinDriver(
 ): void {
   registerMeetingJoinDriver(new ChromeExtensionMeetingJoinDriver(options));
 }
+
+export function installChromeExtensionMeetingParticipationDriver(
+  options: import('../meeting/meeting-join-driver.js').MeetingParticipationDriverInstallOptions = {}
+): void {
+  installChromeExtensionMeetingJoinDriver({
+    wsPort: options.extensionWsPort,
+    wsHost: options.extensionWsHost,
+    joinTimeoutSec: options.extensionJoinTimeoutSec,
+  });
+}

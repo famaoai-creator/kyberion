@@ -7,39 +7,314 @@
     "web_search": {
       "type": "object",
       "properties": {
-        "enabled": { "type": "boolean" },
-        "provider": { "type": "string", "minLength": 1 },
-        "maxResults": { "type": "number" },
-        "timeoutMs": { "type": "number" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maxResults": {
+          "type": "number"
+        },
+        "timeoutMs": {
+          "type": "number"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "response_format": {
+          "type": "string",
+          "enum": ["duckduckgo_html", "json"]
+        },
+        "query_keys": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "query_values": {
+          "type": "object",
+          "additionalProperties": {
+            "type": ["string", "number", "boolean"]
+          }
+        },
+        "response_fields": {
+          "type": "object",
+          "properties": {
+            "results_path": {
+              "type": "string"
+            },
+            "title_path": {
+              "type": "string"
+            },
+            "url_path": {
+              "type": "string"
+            },
+            "snippet_path": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": true
     },
     "weather": {
       "type": "object",
       "properties": {
-        "enabled": { "type": "boolean" },
-        "provider": { "type": "string", "minLength": 1 },
-        "timeoutMs": { "type": "number" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeoutMs": {
+          "type": "number"
+        },
+        "geocoding": {
+          "type": "object",
+          "properties": {
+            "query_keys": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "string"
+                },
+                "language": {
+                  "type": "string"
+                },
+                "format": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "query_values": {
+              "type": "object",
+              "additionalProperties": {
+                "type": ["string", "number", "boolean"]
+              }
+            },
+            "response_fields": {
+              "type": "object",
+              "properties": {
+                "results_path": {
+                  "type": "string"
+                },
+                "name_path": {
+                  "type": "string"
+                },
+                "latitude_path": {
+                  "type": "string"
+                },
+                "longitude_path": {
+                  "type": "string"
+                },
+                "coerce_numeric_strings": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "forecast": {
+          "type": "object",
+          "properties": {
+            "query_keys": {
+              "type": "object",
+              "properties": {
+                "latitude": {
+                  "type": "string"
+                },
+                "longitude": {
+                  "type": "string"
+                },
+                "current": {
+                  "type": "string"
+                },
+                "timezone": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "query_values": {
+              "type": "object",
+              "additionalProperties": {
+                "type": ["string", "number", "boolean"]
+              }
+            },
+            "current_fields": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "response_fields": {
+              "type": "object",
+              "properties": {
+                "current_path": {
+                  "type": "string"
+                },
+                "temperature_path": {
+                  "type": "string"
+                },
+                "weather_code_path": {
+                  "type": "string"
+                },
+                "wind_speed_path": {
+                  "type": "string"
+                },
+                "humidity_path": {
+                  "type": "string"
+                },
+                "coerce_numeric_strings": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "display_units": {
+              "type": "object",
+              "properties": {
+                "temperature": {
+                  "type": "string"
+                },
+                "wind_speed": {
+                  "type": "string"
+                },
+                "humidity": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "weather_code_labels": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": true
     },
     "location": {
       "type": "object",
       "properties": {
-        "enabled": { "type": "boolean" },
-        "provider": { "type": "string", "minLength": 1 }
+        "enabled": {
+          "type": "boolean"
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "providers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "response_fields": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "region": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "country": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "latitude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "longitude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["id", "provider", "url"],
+            "additionalProperties": false
+          }
+        }
       },
       "additionalProperties": true
     },
     "knowledge": {
       "type": "object",
       "properties": {
-        "enabled": { "type": "boolean" },
-        "provider": { "type": "string", "minLength": 1 },
-        "limit": { "type": "number" },
-        "scope": { "type": "string" },
-        "phase": { "type": "string" },
-        "role": { "type": "string" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limit": {
+          "type": "number"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        }
       },
       "additionalProperties": true
     }

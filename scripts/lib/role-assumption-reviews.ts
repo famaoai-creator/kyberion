@@ -12,8 +12,27 @@ import type { Workspace } from './role-assumption-workspace.js';
  * the modules they can load (repo-relative, `*` matches one path segment).
  * An unreviewed computed import is reported as an "any role" site.
  */
-export const REVIEWED_DYNAMIC_IMPORTS: Record<string, { modules: string[]; rationale: string }> =
-  {};
+export const REVIEWED_DYNAMIC_IMPORTS: Record<string, { modules: string[]; rationale: string }> = {
+  'libs/actuators/browser-actuator/src/browser-profile-provider-registry.ts#loadProvider': {
+    modules: ['libs/actuators/browser-actuator/src/browser-profile-providers/*.ts'],
+    rationale:
+      'imports the module (or fallback_path dist file) named by knowledge/product/governance/browser-profile-providers.json; the catalog only lists browser-profile-providers/*',
+  },
+  'libs/actuators/ingest-actuator/src/document-parser-module-loader.ts#parseWithRegisteredDocumentParser':
+    {
+      modules: [],
+      rationale:
+        'imports the module named by knowledge/product/governance/ingest-document-parser-modules.json; the catalog is currently empty so nothing can load — a new parser entry forces re-review',
+    },
+  'libs/core/meeting/meeting-driver-module-loader.ts#installMeetingParticipationDriver': {
+    modules: [
+      'libs/core/meeting/driver-modules/*.ts',
+      'libs/actuators/meeting-browser-driver/src/index.ts',
+    ],
+    rationale:
+      'imports the module (or fallback_path dist file) named by knowledge/product/governance/meeting-join-driver-modules.json; the catalog only lists driver-modules/* and the meeting-browser-driver package',
+  },
+};
 
 /**
  * Child processes whose command is computed at runtime and that may inherit

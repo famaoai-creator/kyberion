@@ -2,6 +2,7 @@
 title: 'Coherence 監査 改善計画 (2026-10-01)'
 tags: [improvement-plan, cli, registry, i18n, orphan, docs]
 last_updated: 2026-10-01
+status: active
 ---
 
 # Coherence 監査 改善計画 (2026-10-01)

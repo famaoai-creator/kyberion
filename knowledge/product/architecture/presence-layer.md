@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, presence, layer]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-10-01
+last_updated: 2026-10-04
 ---
 
 # Presence Layer: Sensors, Displays, and Intervention
@@ -117,6 +117,9 @@ Surface query provider selection is also knowledge-driven:
 - `knowledge/product/presence/surface-query-providers.<role>.json` can specialize the runtime for a surface role
 - `knowledge/product/presence/surface-query-providers.<phase>.json` can specialize the runtime for a phase
 - personal overlays may further refine the defaults without changing code
+- location provider entries declare response_fields (canonical city, region, country, latitude, longitude mapped to response JSON paths), so a compatible endpoint can be added to the catalog without changing the location resolver.
+- weather configuration declares geocoding/forecast query keys and values, response field paths, requested current fields, display units, and optional weather-code labels. A compatible weather API can be connected through these catalogs without changing the weather resolver.
+- web_search configuration declares its endpoint, query keys/values, response format, result field paths, and maximum result count. JSON search APIs can be connected through the provider catalog without adding provider-specific branches to the query resolver.
 
 Examples currently shipped in knowledge:
 

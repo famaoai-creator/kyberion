@@ -1,4 +1,11 @@
-import { clamp, defineCatalog, isVitestProcess, nowIso, readJson } from '@agent/core/foundation';
+import {
+  clamp,
+  defineCatalog,
+  isRecord,
+  isVitestProcess,
+  nowIso,
+  readJson,
+} from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import { resolveLocale } from '@agent/core/locale';
 import { localeToBcp47 } from '@agent/core/locale-normalize';
@@ -21,6 +28,7 @@ import { getOpInputContract, validateOpInput } from '@agent/core/pipeline/op-inp
 import {
   getBrowserAutomationRuntimeCapabilities,
   resolveBrowserAutomationRuntime,
+  type BrowserAutomationRuntimeBridge,
 } from '@agent/core/browser/browser-automation-runtime-bridge';
 import type { Browser, BrowserContext, Page } from '@playwright/test';
 import * as path from 'node:path';
@@ -161,6 +169,41 @@ function getActivePage(runtime: BrowserRuntime): Page {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+const BROWSER_RUNTIME_CAPABILITY_KEYS = [
+  'multi_tab',
+  'pixel_screenshots',
+  'video_recording',
+  'webauthn',
+  'persistent_profile',
+  'attach_existing_browser',
+] as const;
+
+function resolveValidatedBrowserRuntime(preference?: string): BrowserAutomationRuntimeBridge {
+  const runtime: unknown = resolveBrowserAutomationRuntime(preference);
+  if (
+    !isRecord(runtime) ||
+    typeof runtime.bridge_id !== 'string' ||
+    !runtime.bridge_id.trim() ||
+    typeof runtime.connectOverCDP !== 'function' ||
+    typeof runtime.launchPersistentContext !== 'function'
+  ) {
+    throw new Error(
+      '[browser-automation-runtime] selected provider has an invalid runtime contract'
+    );
+  }
+  if (runtime.capabilities !== undefined) {
+    if (
+      !isRecord(runtime.capabilities) ||
+      BROWSER_RUNTIME_CAPABILITY_KEYS.some((key) => typeof runtime.capabilities[key] !== 'boolean')
+    ) {
+      throw new Error(
+        '[browser-automation-runtime] selected provider has invalid capability flags'
+      );
+    }
+  }
+  return runtime as unknown as BrowserAutomationRuntimeBridge;
 }
 
 function summarizeRecentActions(trail: unknown): BrowserSessionMetadata['recent_actions'] {
@@ -1103,7 +1146,7 @@ export const browserRuntimeHelpers = {
       return existing.runtime.context;
     }
 
-    const automationRuntime = resolveBrowserAutomationRuntime(options.browser_runtime);
+    const automationRuntime = resolveValidatedBrowserRuntime(options.browser_runtime);
     const persistedMetadata = loadBrowserSessionMetadata(sessionMetadataPath);
     assertPersistedBrowserSessionOwner(
       persistedMetadata,

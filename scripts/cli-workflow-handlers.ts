@@ -31,7 +31,6 @@ import {
   organizeEmailInbox,
   listEmailAccountProviders,
   readEmailDraftArtifact,
-  readGwsAuthStatus,
   resolveEmailTriagePath,
 } from '@agent/core/integrations/email-workflow';
 import {
@@ -39,7 +38,8 @@ import {
   listCalendarAgenda,
   listCalendars,
   queryCalendarFreeBusy,
-  readM365AuthStatus,
+  normalizeCalendarProviderId,
+  readCalendarProviderAuthStatus,
 } from '@agent/core/meeting/calendar-workflow';
 import { main as taskInitMain } from './task_init.js';
 import { main as taskListMain } from './task_list.js';
@@ -98,13 +98,10 @@ function printHeader(locale = resolveLocale()): void {
   printText(chalk.gray(t('cli_header_tagline', locale) + '\\n'));
 }
 
-function getCalendarProvider(
-  options: Record<string, string | boolean>
-): 'google-workspace' | 'm365' {
+function getCalendarProvider(options: Record<string, string | boolean>): string {
   const provider =
     typeof options['--provider'] === 'string' ? options['--provider'] : 'google-workspace';
-  if (provider === 'google-workspace' || provider === 'm365') return provider;
-  throw new Error(`Unsupported calendar provider: ${provider}`);
+  return normalizeCalendarProviderId(provider);
 }
 
 function printCalendarResult(result: unknown, options: Record<string, string | boolean>): void {
@@ -552,7 +549,7 @@ export async function handleCalendarWorkflowCommand(
 
   if (subcommand === 'status') {
     const provider = getCalendarProvider(options);
-    const status = provider === 'm365' ? await readM365AuthStatus() : readGwsAuthStatus();
+    const status = await readCalendarProviderAuthStatus(provider);
     printCalendarResult(status, options);
     return;
   }

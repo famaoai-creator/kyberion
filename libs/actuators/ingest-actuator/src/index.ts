@@ -48,6 +48,10 @@ export {
   type NormalizeCardInput,
   type NormalizeCardResult,
 } from './normalize-card.js';
+export type {
+  IngestDocumentParserInput,
+  IngestDocumentParserResult,
+} from './document-parser-module-loader.js';
 export {
   parseDocument,
   type IngestFormat,
@@ -81,6 +85,7 @@ export {
   type SyncSourceSystem,
   type SyncSourceTransport,
 } from './sync-source.js';
+export { getSourceWalker, listSupportedSources, registerSourceWalker } from './sources/index.js';
 
 type IngestOp =
   | 'sync_source'

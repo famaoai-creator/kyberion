@@ -74,22 +74,21 @@ import { normalizeTranscriptText } from './transcript-normalize.js';
 import { resolveNextMeetingTarget, type CalendarLikeEvent } from './meeting-target-resolve.js';
 import { extensionCaptionsToTranscript } from './extension-transcript.js';
 import { StubAudioBus } from '@agent/core/voice/audio-bus';
-import { installChromeExtensionMeetingJoinDriver } from '@agent/core/browser/chrome-extension-meeting-driver';
+import { resolveAudioBus, type AudioBusId } from '@agent/core/voice/audio-bus-resolver';
+import { installMeetingParticipationDriver } from '@agent/core/meeting/meeting-driver-module-loader';
 import { getMeetingJoinDriver } from '@agent/core/meeting/meeting-join-driver';
-import type { TranscriptChunk } from '@agent/core/meeting/meeting-session-types';
+import type { MeetingPlatform, TranscriptChunk } from '@agent/core/meeting/meeting-session-types';
 
 function resolveMeetingPath(ref: string, allowMissingLeaf = true): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf });
 }
 
 /**
- * Join via the operator's own Chrome (Meet Copilot extension) instead of
- * the Playwright subprocess. Collects `transcriptInput` caption chunks for
- * `duration_sec`, renders the shared `[mm:ss] Speaker: text` transcript
- * file, and leaves. Throws with setup guidance when the extension is not
- * connected — the caller (`auto` mode) falls back to Playwright.
+ * Run a registered MeetingJoinDriver, collect its optional transcript stream,
+ * render the shared `[mm:ss] Speaker: text` transcript file, and leave.
  */
-async function runExtensionJoin(params: {
+async function runRegisteredJoinDriver(params: {
+  driver_id?: string;
   url: string;
   platform?: string;
   display_name?: string;
@@ -98,33 +97,40 @@ async function runExtensionJoin(params: {
   ws_port?: number;
   join_timeout_sec?: number;
   raise_hand?: boolean;
+  audio_bridge?: string;
 }): Promise<Record<string, unknown>> {
   const url = String(params.url || '').trim();
   if (!url) throw new Error('[meeting] extension join requires params.url');
   const platform = String(params.platform || 'auto').trim() || 'auto';
+  const driverId = String(params.driver_id || 'chrome-extension').trim();
+  if (!driverId) throw new Error('[meeting] join driver id must not be empty');
   const durationSec = Math.max(0, Number(params.duration_sec || 0));
-  installChromeExtensionMeetingJoinDriver({
-    ...(params.ws_port !== undefined ? { wsPort: Number(params.ws_port) } : {}),
-    ...(params.join_timeout_sec !== undefined
-      ? { joinTimeoutSec: Number(params.join_timeout_sec) }
-      : {}),
-  });
-  const driver = getMeetingJoinDriver('chrome-extension');
-  if (!driver) throw new Error('[meeting] chrome-extension driver is not registered');
+  let driver = getMeetingJoinDriver(driverId);
+  if (!driver) {
+    await installMeetingParticipationDriver(driverId, {
+      ...(params.ws_port !== undefined ? { extensionWsPort: Number(params.ws_port) } : {}),
+      ...(params.join_timeout_sec !== undefined
+        ? { extensionJoinTimeoutSec: Number(params.join_timeout_sec) }
+        : {}),
+    });
+    driver = getMeetingJoinDriver(driverId);
+  }
+  if (!driver) throw new Error(`[meeting] '${driverId}' driver is not registered`);
   const probe = await driver.probe();
   if (!probe.available) {
-    throw new Error(
-      `[meeting] chrome-extension driver unavailable: ${probe.reason || 'unknown'}. ` +
-        'Load tools/meet-copilot-extension in Chrome and set KYBERION_MEET_EXTENSION_TOKEN.'
-    );
+    throw new Error(`[meeting] '${driverId}' driver unavailable: ${probe.reason || 'unknown'}`);
   }
+  const audioBus =
+    params.audio_bridge && params.audio_bridge !== 'none'
+      ? resolveAudioBus(params.audio_bridge as AudioBusId)
+      : new StubAudioBus();
   const session = await driver.join(
     {
       url,
-      platform: platform as 'meet' | 'zoom' | 'teams' | 'auto',
+      platform: platform as MeetingPlatform,
       display_name: String(params.display_name || 'Kyberion'),
     },
-    new StubAudioBus()
+    audioBus
   );
   // Declared gesture: announce presence right after joining so a
   // listen-only bot is visible in the participant list.
@@ -177,7 +183,7 @@ async function runExtensionJoin(params: {
   return {
     status: 'success',
     platform,
-    join_backend: 'chrome-extension',
+    join_backend: driverId,
     ...(transcriptPath ? { transcript_path: transcriptPath } : {}),
     caption_cues: rendered.cueCount,
     partial_state: rendered.cueCount === 0,
@@ -202,13 +208,13 @@ type MeetingActuatorProvider = NonNullable<MeetingAction['params']['provider']>;
 export interface MeetingAction {
   action: 'check_consent' | 'join' | 'leave' | 'speak' | 'listen' | 'chat' | 'status';
   params: {
-    platform: 'zoom' | 'teams' | 'meet' | 'auto';
-    provider?: 'google_meet' | 'teams_pipeline' | 'zoom' | 'auto';
+    platform: string;
+    provider?: string;
     provider_profile_id?: string;
     execution_profile_id?: string;
     mode?: 'transcribe' | 'realtime';
     node?: 'local' | 'named-node';
-    audio_bridge?: 'blackhole' | 'pulseaudio' | 'none';
+    audio_bridge?: string;
     url_policy?: 'explicit_only' | 'explicit_or_detected';
     url?: string;
     meeting_id?: string;
@@ -217,7 +223,7 @@ export interface MeetingAction {
     duration_sec?: number;
     transcript_path?: string;
     display_name?: string;
-    join_backend?: 'auto' | 'playwright' | 'chrome-extension';
+    join_backend?: string;
     ws_port?: number;
     join_timeout_sec?: number;
     raise_hand?: boolean;
@@ -833,18 +839,18 @@ export async function handleAction(
     platform: input.params.platform,
   });
 
-  // Backend selection for join/listen: the operator's own Chrome
-  // (chrome-extension) when requested, Playwright subprocess otherwise.
-  // `auto` tries the extension with a short connect timeout and falls
-  // back to Playwright so unattended runs keep working.
+  // Explicit driver ids resolve through MeetingJoinDriver. `playwright` keeps
+  // the established subprocess path; `auto` tries the operator's Chrome and
+  // falls back to Playwright for unattended runs.
   if (input.action === 'join' || input.action === 'listen') {
     const requested = String(input.params.join_backend || 'playwright')
       .trim()
       .toLowerCase();
     const url = String(input.params.url || '').trim();
-    if (url && (requested === 'chrome-extension' || requested === 'auto')) {
+    if (url && requested !== 'playwright') {
       try {
-        const extended = await runExtensionJoin({
+        const extended = await runRegisteredJoinDriver({
+          driver_id: requested === 'auto' ? 'chrome-extension' : requested,
           url,
           ...(input.params.platform ? { platform: String(input.params.platform) } : {}),
           ...(input.params.display_name ? { display_name: String(input.params.display_name) } : {}),
@@ -859,6 +865,7 @@ export async function handleAction(
           ...(input.params.raise_hand !== undefined
             ? { raise_hand: Boolean(input.params.raise_hand) }
             : {}),
+          ...(input.params.audio_bridge ? { audio_bridge: input.params.audio_bridge } : {}),
         });
         const done = {
           status: 'success',

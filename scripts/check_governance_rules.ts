@@ -1455,10 +1455,8 @@ const RULE_CHECK_HANDLERS: Record<string, RuleCheckHandler> = {
         'video-render-runtime-policy: render.allowed_output_formats must not be empty'
       );
     }
-    if (!['none', 'hyperframes_cli'].includes(String(typed.render?.backend || ''))) {
-      violations.push(
-        'video-render-runtime-policy: render.backend must be one of none|hyperframes_cli'
-      );
+    if (!String(typed.render?.backend || '')) {
+      violations.push('video-render-runtime-policy: render.backend must not be empty');
     }
     if (!['draft', 'standard', 'high'].includes(String(typed.render?.quality || ''))) {
       violations.push(

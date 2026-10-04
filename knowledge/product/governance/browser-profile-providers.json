@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "providers": [
+    {
+      "provider_id": "chrome",
+      "module": "@agent/core/browser-profile-providers/chrome",
+      "fallback_path": "dist/libs/actuators/browser-actuator/src/browser-profile-providers/chrome.js"
+    },
+    {
+      "provider_id": "playwright",
+      "module": "@agent/core/browser-profile-providers/playwright",
+      "fallback_path": "dist/libs/actuators/browser-actuator/src/browser-profile-providers/playwright.js"
+    }
+  ],
+  "$schema": "../schemas/browser-profile-providers.schema.json"
+}

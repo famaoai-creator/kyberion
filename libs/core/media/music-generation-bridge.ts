@@ -9,6 +9,7 @@ import {
 import { logger } from '../core.js';
 import { probeToolRuntime } from '../tool/tool-runtime-registry.js';
 import { isAppleSilicon } from '../platform.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 import {
   explainSeamProviderDecision,
   listSeamSelectionPurposes,
@@ -265,17 +266,59 @@ export class LocalStableAudioGenerationProvider implements MusicGenerationProvid
 
 const MUSIC_GENERATION_PROVIDER_SEAM = 'music-generation-provider';
 
-const providers: MusicGenerationProvider[] = [
-  new LocalMusicGenMlxGenerationProvider(),
-  new LocalStableAudioGenerationProvider(),
-];
+const musicGenerationProviderSeam = createSeam<MusicGenerationProvider>({
+  key: MUSIC_GENERATION_PROVIDER_SEAM,
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+const musicGenerationProviderDisposers = new Map<string, () => void>();
+let musicGenerationBuiltinsRegistered = false;
+
+/** Register an implementation into the governed music generation provider seam. */
+export function registerMusicGenerationProvider(
+  provider: MusicGenerationProvider,
+  metadata: SeamProviderMetadata = { provenance: 'plugin', source: 'music-generation-extension' }
+): () => void {
+  const id = String(provider.id || '').trim();
+  if (!id) throw new Error('MusicGenerationProvider.id is required');
+  const disposeFromSeam = musicGenerationProviderSeam.register(id, provider, metadata);
+  const dispose = () => {
+    disposeFromSeam();
+    if (musicGenerationProviderDisposers.get(id) === dispose) {
+      musicGenerationProviderDisposers.delete(id);
+    }
+  };
+  musicGenerationProviderDisposers.set(id, dispose);
+  return dispose;
+}
+
+function ensureBuiltinMusicGenerationProviders(): void {
+  if (musicGenerationBuiltinsRegistered) return;
+  for (const provider of [
+    new LocalMusicGenMlxGenerationProvider(),
+    new LocalStableAudioGenerationProvider(),
+  ]) {
+    registerMusicGenerationProvider(provider, {
+      provenance: 'builtin',
+      source: 'music-generation-bridge',
+    });
+  }
+  musicGenerationBuiltinsRegistered = true;
+}
 
 export function listMusicGenerationProviders(): MusicGenerationProvider[] {
-  return [...providers];
+  ensureBuiltinMusicGenerationProviders();
+  return musicGenerationProviderSeam.list().map((entry) => entry.implementation);
 }
 
 export function getMusicGenerationProvider(id: string): MusicGenerationProvider | undefined {
-  return providers.find((provider) => provider.id === id);
+  return listMusicGenerationProviders().find((provider) => provider.id === id);
+}
+
+export function resetMusicGenerationProviders(): void {
+  for (const dispose of musicGenerationProviderDisposers.values()) dispose();
+  musicGenerationProviderDisposers.clear();
+  musicGenerationBuiltinsRegistered = false;
 }
 
 /** Order used without a purpose: MLX first on Apple Silicon, Stable Audio elsewhere. */
@@ -292,7 +335,7 @@ export async function listMusicGenerationCandidates(
 ): Promise<SeamProviderCandidate[]> {
   const format = request.format?.trim().toLowerCase().replace(/^\./u, '');
   const candidates: SeamProviderCandidate[] = [];
-  for (const provider of providers) {
+  for (const provider of listMusicGenerationProviders()) {
     const unmet: string[] = [];
     if (format && provider.outputFormats && !provider.outputFormats.includes(format)) {
       unmet.push(`format ${format} (writes ${provider.outputFormats.join(', ')})`);
@@ -362,9 +405,13 @@ async function resolveMusicProviderChain(
   }
   const eligible = new Set(candidates.filter((c) => c.eligible).map((c) => c.id));
   const lead = operatorRuleLead(candidates);
+  const preferred = platformOrder();
   const chain = [
     ...lead,
-    ...platformOrder().filter((id) => eligible.has(id) && !lead.includes(id)),
+    ...preferred.filter((id) => eligible.has(id) && !lead.includes(id)),
+    ...[...eligible]
+      .filter((id) => !lead.includes(id) && !preferred.includes(id))
+      .sort((left, right) => left.localeCompare(right)),
   ];
   if (chain.length > 0) return chain;
   const reasons = candidates.map((c) => `${c.id}: ${(c.unmet ?? []).join(', ') || 'ineligible'}`);
@@ -391,7 +438,7 @@ export async function generateMusic(
 
   let lastError: string | undefined;
   for (const providerId of preference) {
-    const provider = providers.find((candidate) => candidate.id === providerId);
+    const provider = getMusicGenerationProvider(providerId);
     if (!provider) continue;
     const result = await provider.generate(request);
     if (result.status !== 'failed') return result;

@@ -23,7 +23,7 @@ import {
   getPasskeyAuthenticatorId,
   getOrCreatePageCdpSession,
 } from './browser-passkey-helpers.js';
-import { listBrowserProfiles } from './browser-profile-manager.js';
+import { discoverBrowserProfiles } from './browser-profile-provider-registry.js';
 import * as browserMarks from './browser-mark-target.js';
 import * as path from 'node:path';
 import type {
@@ -147,7 +147,9 @@ export const BROWSER_CAPTURE_OP_HANDLERS: Readonly<Record<string, BrowserCapture
       ctx,
       ref,
       page,
-      recordedRefTargetFromParams(params, { requireDomPathMatch: Boolean(params.high_risk) })
+      recordedRefTargetFromParams(params, {
+        requireDomPathMatch: Boolean(params.high_risk),
+      })
     );
     const rawContent = await page.innerText(selector);
     const content = processUntrustedContent(rawContent, `web:${page.url()}`).wrapped;
@@ -174,7 +176,11 @@ export const BROWSER_CAPTURE_OP_HANDLERS: Readonly<Record<string, BrowserCapture
       ctx.action_trail
     );
     return browserRuntimeHelpers.recordBrowserAction(
-      { ...ctx, last_capture: health, [params.export_as || 'browser_health']: health },
+      {
+        ...ctx,
+        last_capture: health,
+        [params.export_as || 'browser_health']: health,
+      },
       { kind: 'capture', op: 'session_health', tab_id: runtime.activeTabId }
     );
   },
@@ -182,7 +188,11 @@ export const BROWSER_CAPTURE_OP_HANDLERS: Readonly<Record<string, BrowserCapture
     const source = browserRuntimeHelpers.readRecordedActions(ctx, params.from);
     const trail = source.slice(-clamp(Number(params.limit || 50), 1, 2000));
     return browserRuntimeHelpers.recordBrowserAction(
-      { ...ctx, last_capture: trail, [params.export_as || 'action_trail']: trail },
+      {
+        ...ctx,
+        last_capture: trail,
+        [params.export_as || 'action_trail']: trail,
+      },
       { kind: 'capture', op: 'action_trail', tab_id: runtime.activeTabId }
     );
   },
@@ -251,7 +261,10 @@ export const BROWSER_CAPTURE_OP_HANDLERS: Readonly<Record<string, BrowserCapture
   },
   evaluate: async ({ op, params, runtime, ctx, page }) => {
     return browserRuntimeHelpers.recordBrowserAction(
-      { ...ctx, [params.export_as || 'last_capture']: await page.evaluate(params.script) },
+      {
+        ...ctx,
+        [params.export_as || 'last_capture']: await page.evaluate(params.script),
+      },
       {
         kind: 'capture',
         op: 'evaluate',
@@ -285,7 +298,12 @@ export const BROWSER_CAPTURE_OP_HANDLERS: Readonly<Record<string, BrowserCapture
     );
     return browserRuntimeHelpers.recordBrowserAction(
       { ...ctx, [params.export_as || 'element_count']: count },
-      { kind: 'capture', op: 'query_elements', tab_id: runtime.activeTabId, selector }
+      {
+        kind: 'capture',
+        op: 'query_elements',
+        tab_id: runtime.activeTabId,
+        selector,
+      }
     );
   },
   distill_dom: async ({ op, params, runtime, ctx, page, distillDomInventory }) => {
@@ -526,7 +544,9 @@ export const BROWSER_APPLY_OP_HANDLERS: Readonly<Record<string, BrowserApplyOpHa
       return opApply('click_ref', params, runtime, ctx, resolve);
     }
     await retry(async () => {
-      await page.click(resolve(params.selector), { timeout: params.timeout || 5000 });
+      await page.click(resolve(params.selector), {
+        timeout: params.timeout || 5000,
+      });
     }, buildRetryOptions(params));
     return browserRuntimeHelpers.recordBrowserAction(ctx, {
       kind: 'apply',
@@ -656,7 +676,9 @@ export const BROWSER_APPLY_OP_HANDLERS: Readonly<Record<string, BrowserApplyOpHa
       ctx,
       ref,
       page,
-      recordedRefTargetFromParams(params, { requireDomPathMatch: Boolean(params.high_risk) })
+      recordedRefTargetFromParams(params, {
+        requireDomPathMatch: Boolean(params.high_risk),
+      })
     );
     const element = browserRuntimeHelpers.findSnapshotElement(resolvedCtx, ref);
     await retry(async () => {
@@ -711,7 +733,9 @@ export const BROWSER_APPLY_OP_HANDLERS: Readonly<Record<string, BrowserApplyOpHa
     if (secretKey && text == null)
       throw new Error(`[BROWSER_SECRET_MISSING] SecretResolver could not resolve ${secretKey}`);
     await retry(async () => {
-      await page.fill(selector, String(text ?? ''), { timeout: params.timeout || 5000 });
+      await page.fill(selector, String(text ?? ''), {
+        timeout: params.timeout || 5000,
+      });
     }, buildRetryOptions(params));
     return browserRuntimeHelpers.recordBrowserAction(resolvedCtx, {
       kind: 'apply',
@@ -786,7 +810,9 @@ export const BROWSER_APPLY_OP_HANDLERS: Readonly<Record<string, BrowserApplyOpHa
       ctx,
       ref,
       page,
-      recordedRefTargetFromParams(params, { requireDomPathMatch: Boolean(params.high_risk) })
+      recordedRefTargetFromParams(params, {
+        requireDomPathMatch: Boolean(params.high_risk),
+      })
     );
     const element = browserRuntimeHelpers.findSnapshotElement(resolvedCtx, ref);
     await retry(async () => {
@@ -818,7 +844,9 @@ export const BROWSER_APPLY_OP_HANDLERS: Readonly<Record<string, BrowserApplyOpHa
       ctx,
       ref,
       page,
-      recordedRefTargetFromParams(params, { requireDomPathMatch: Boolean(params.high_risk) })
+      recordedRefTargetFromParams(params, {
+        requireDomPathMatch: Boolean(params.high_risk),
+      })
     );
     const element = browserRuntimeHelpers.findSnapshotElement(resolvedCtx, ref);
     await retry(
@@ -881,7 +909,9 @@ export const BROWSER_APPLY_OP_HANDLERS: Readonly<Record<string, BrowserApplyOpHa
       ctx,
       ref,
       page,
-      recordedRefTargetFromParams(params, { requireDomPathMatch: Boolean(params.high_risk) })
+      recordedRefTargetFromParams(params, {
+        requireDomPathMatch: Boolean(params.high_risk),
+      })
     );
     await retry(async () => {
       await page.waitForSelector(selector, {
@@ -933,7 +963,7 @@ export const BROWSER_APPLY_OP_HANDLERS: Readonly<Record<string, BrowserApplyOpHa
       /* ignore */
     }
 
-    const allDiscovered = listBrowserProfiles({
+    const allDiscovered = await discoverBrowserProfiles({
       provider: (params.provider as any) || 'all',
     });
 
@@ -1049,7 +1079,9 @@ export const BROWSER_APPLY_OP_HANDLERS: Readonly<Record<string, BrowserApplyOpHa
     const targetUrl = String(handoff.target_url || resolve(params.target_url || '')).trim();
     if (!targetUrl) throw new Error('import_session_handoff requires a target_url');
     browserRuntimeHelpers.assertNavigationAllowed(targetUrl, runtime.navigationPolicy);
-    await page.goto(targetUrl, { waitUntil: params.waitUntil || 'domcontentloaded' });
+    await page.goto(targetUrl, {
+      waitUntil: params.waitUntil || 'domcontentloaded',
+    });
     if (
       (handoff.local_storage && Object.keys(handoff.local_storage).length > 0) ||
       (handoff.session_storage && Object.keys(handoff.session_storage).length > 0)
@@ -1069,7 +1101,9 @@ export const BROWSER_APPLY_OP_HANDLERS: Readonly<Record<string, BrowserApplyOpHa
         }
       );
       if (params.reload_after_import !== false) {
-        await page.reload({ waitUntil: params.waitUntil || 'domcontentloaded' });
+        await page.reload({
+          waitUntil: params.waitUntil || 'domcontentloaded',
+        });
       }
     }
     return browserRuntimeHelpers.recordBrowserAction(

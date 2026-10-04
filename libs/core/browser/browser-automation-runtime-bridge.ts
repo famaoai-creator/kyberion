@@ -5,7 +5,7 @@
  * provider from the browser-actuator package so core never imports Playwright.
  */
 
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 export interface BrowserAutomationLaunchPersistentContextOptions {
   channel?: string;
@@ -66,17 +66,21 @@ const browserAutomationRuntimeSeam = createSeam<BrowserAutomationRuntimeBridge>(
 const registeredDisposers = new Map<string, () => void>();
 
 export function registerBrowserAutomationRuntimeBridge(
-  bridge: BrowserAutomationRuntimeBridge
+  bridge: BrowserAutomationRuntimeBridge,
+  metadata: SeamProviderMetadata = {
+    provenance: 'plugin',
+    source: 'browser-automation-runtime-extension',
+  }
 ): () => void {
   const id = String(bridge.bridge_id || '').trim();
   if (!id) throw new Error('BrowserAutomationRuntimeBridge.bridge_id is required');
-  registeredDisposers.get(id)?.();
-  const disposer = browserAutomationRuntimeSeam.register(id, bridge, {
-    provenance: 'builtin',
-    source: 'browser-automation-runtime-bridge',
-  });
-  registeredDisposers.set(id, disposer);
-  return disposer;
+  const disposeFromSeam = browserAutomationRuntimeSeam.register(id, bridge, metadata);
+  const dispose = () => {
+    disposeFromSeam();
+    if (registeredDisposers.get(id) === dispose) registeredDisposers.delete(id);
+  };
+  registeredDisposers.set(id, dispose);
+  return dispose;
 }
 
 export function listBrowserAutomationRuntimeBridges(): BrowserAutomationRuntimeBridge[] {
