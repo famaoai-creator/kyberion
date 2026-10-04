@@ -50,6 +50,11 @@ function fakeTailscale(options: {
   status?: string | TailscaleCommandResult;
   handlers?: Record<string, string>;
   allowFunnel?: boolean;
+  /** Fixed result for `funnel status --json` (e.g. a failure). */
+  funnelStatus?: TailscaleCommandResult;
+  /** Result for `funnel --bg`; `applyFunnel: false` keeps Funnel off after it. */
+  upResult?: TailscaleCommandResult;
+  applyFunnel?: boolean;
 }) {
   const handlers = { ...(options.handlers ?? {}) };
   let allowFunnel = options.allowFunnel ?? Object.keys(handlers).length > 0;
@@ -61,7 +66,9 @@ function fakeTailscale(options: {
         ? options.status
         : ok(options.status ?? statusJson());
     }
-    if (args[0] === 'funnel' && args[1] === 'status') return ok(serveJson(handlers, allowFunnel));
+    if (args[0] === 'funnel' && args[1] === 'status') {
+      return options.funnelStatus ?? ok(serveJson(handlers, allowFunnel));
+    }
     if (args[0] === 'funnel' && args.at(-1) === 'off') {
       const mount = args.find((arg) => arg.startsWith('--set-path='))!.slice('--set-path='.length);
       delete handlers[mount];
@@ -69,10 +76,11 @@ function fakeTailscale(options: {
       return ok('');
     }
     if (args[0] === 'funnel' && args.includes('--bg')) {
+      if (options.upResult && options.upResult.status !== 0) return options.upResult;
       const mount = args.find((arg) => arg.startsWith('--set-path='))!.slice('--set-path='.length);
       handlers[mount] = args.at(-1)!;
-      allowFunnel = true;
-      return ok('Available on the internet');
+      allowFunnel = options.applyFunnel ?? true;
+      return options.upResult ?? ok('Available on the internet');
     }
     return { stdout: '', stderr: `unexpected ${args.join(' ')}`, status: 1 };
   };
@@ -241,7 +249,7 @@ describe('TailscaleFunnelProvider', () => {
     expect(fake.calls.some((args) => args.includes('--bg'))).toBe(false);
   });
 
-  it('status reports the live mapping and down removes only that mapping', async () => {
+  it('status reports only a public mapping to this surface; down removes only that mapping', async () => {
     const fake = fakeTailscale({
       handlers: {
         '/events': 'http://127.0.0.1:8791/events',
@@ -249,23 +257,119 @@ describe('TailscaleFunnelProvider', () => {
       },
     });
     const provider = new TailscaleFunnelProvider({ run: fake.run, now: NOW });
-    const live = await provider.status({
-      surfaceId: 'event-intake-surface',
-      pathPrefix: '/events',
-    });
+    const target = { surfaceId: 'event-intake-surface', pathPrefix: '/events', localPort: 8791 };
+    const live = await provider.status(target);
     expect(live?.public_url).toBe(`https://${HOST}/events`);
     expect(live?.local_port).toBe(8791);
+    // A different expected port means the mapping is not this surface's.
+    expect(await provider.status({ ...target, localPort: 9999 })).toBeUndefined();
 
-    await provider.down({ surfaceId: 'event-intake-surface', pathPrefix: '/events' });
+    await provider.down(target);
     expect(fake.calls).toContainEqual(buildTailscaleFunnelDownArgs('/events'));
     expect(fake.handlers).toEqual({ '/other': 'http://127.0.0.1:4000' });
-    expect(
-      await provider.status({ surfaceId: 'event-intake-surface', pathPrefix: '/events' })
-    ).toBeUndefined();
+    expect(await provider.status(target)).toBeUndefined();
 
     // Already gone: down is a no-op, no second off command.
     const before = fake.calls.length;
-    await provider.down({ surfaceId: 'event-intake-surface', pathPrefix: '/events' });
+    await provider.down(target);
     expect(fake.calls.slice(before).some((args) => args.at(-1) === 'off')).toBe(false);
+  });
+
+  it('down / status need the surface port to identify the mapping', async () => {
+    const provider = new TailscaleFunnelProvider({ run: fakeTailscale({}).run });
+    await expect(provider.down({ surfaceId: 's', pathPrefix: '/events' })).rejects.toThrow(
+      /INGRESS_INVALID_REQUEST/
+    );
+    await expect(provider.status({ surfaceId: 's', pathPrefix: '/events' })).rejects.toThrow(
+      /INGRESS_INVALID_REQUEST/
+    );
+  });
+
+  it('down never removes a foreign mapping (non-loopback, other port, other path, unparseable)', async () => {
+    for (const foreign of [
+      'http://192.168.1.20:8791/events',
+      'http://127.0.0.1:9999/events',
+      'http://127.0.0.1:8791/elsewhere',
+      'https+insecure://127.0.0.1:8791/events',
+      'not a url',
+    ]) {
+      const fake = fakeTailscale({ handlers: { '/events': foreign } });
+      await expect(
+        new TailscaleFunnelProvider({ run: fake.run }).down({
+          surfaceId: 's',
+          pathPrefix: '/events',
+          localPort: 8791,
+        })
+      ).rejects.toThrow(/INGRESS_COMMAND_FAILED.*leaving it in place/);
+      expect(fake.calls.some((args) => args.at(-1) === 'off')).toBe(false);
+      expect(fake.handlers['/events']).toBe(foreign);
+    }
+  });
+
+  it('matches harmless normalisation of our own target', async () => {
+    const fake = fakeTailscale({ handlers: { '/events': 'http://localhost:8791/events/' } });
+    const provider = new TailscaleFunnelProvider({ run: fake.run, now: NOW });
+    const target = { surfaceId: 's', pathPrefix: '/events', localPort: 8791 };
+    expect((await provider.status(target))?.local_port).toBe(8791);
+    await provider.down(target);
+    expect(fake.handlers).toEqual({});
+  });
+
+  it('down / status fail closed when tailscale cannot be inspected', async () => {
+    const missing = Object.assign(new Error('spawn tailscale ENOENT'), { code: 'ENOENT' });
+    const runners = [
+      fakeTailscale({ status: { stdout: '', stderr: '', status: 1, error: missing } }),
+      fakeTailscale({ status: { stdout: 'garbage', stderr: 'daemon not running', status: 1 } }),
+      fakeTailscale({
+        handlers: { '/events': 'http://127.0.0.1:8791/events' },
+        funnelStatus: { stdout: '', stderr: 'Access denied: serve config denied', status: 1 },
+      }),
+    ];
+    for (const fake of runners) {
+      const provider = new TailscaleFunnelProvider({ run: fake.run });
+      const target = { surfaceId: 's', pathPrefix: '/events', localPort: 8791 };
+      await expect(provider.down(target)).rejects.toThrow(/INGRESS_PROVIDER_NOT_READY/);
+      await expect(provider.status(target)).rejects.toThrow(/INGRESS_PROVIDER_NOT_READY/);
+      expect(fake.calls.some((args) => args.at(-1) === 'off')).toBe(false);
+    }
+  });
+
+  it('up rolls back the mapping it created when the post-check fails', async () => {
+    const fake = fakeTailscale({ applyFunnel: false });
+    await expect(
+      new TailscaleFunnelProvider({ run: fake.run }).up({
+        surfaceId: 's',
+        localPort: 8791,
+        pathPrefix: '/events',
+      })
+    ).rejects.toThrow(/not published.*rolled back/);
+    expect(fake.calls).toContainEqual(buildTailscaleFunnelDownArgs('/events'));
+    expect(fake.handlers).toEqual({});
+  });
+
+  it('permission errors become needs_setup / NOT_READY with the operator step; other failures quote the CLI', async () => {
+    const denied = { stdout: '', stderr: 'Access denied: serve config denied', status: 1 };
+    const probeDenied = await new TailscaleFunnelProvider({
+      run: fakeTailscale({ funnelStatus: denied }).run,
+    }).probe();
+    expect(probeDenied.status).toBe('needs_setup');
+    expect(probeDenied.reason).toMatch(/Access denied/);
+    expect(probeDenied.setup_steps?.join(' ')).toMatch(/sudo tailscale set --operator=\$USER/);
+
+    const odd = { stdout: '', stderr: 'unknown subcommand: funnel', status: 1 };
+    const probeOdd = await new TailscaleFunnelProvider({
+      run: fakeTailscale({ funnelStatus: odd }).run,
+    }).probe();
+    expect(probeOdd.reason).toBe('tailscale funnel status failed: unknown subcommand: funnel');
+    expect(probeOdd.reason).not.toMatch(/1\.52/);
+
+    const upDenied = fakeTailscale({ upResult: denied });
+    await expect(
+      new TailscaleFunnelProvider({ run: upDenied.run }).up({
+        surfaceId: 's',
+        localPort: 8791,
+        pathPrefix: '/events',
+      })
+    ).rejects.toThrow(/INGRESS_PROVIDER_NOT_READY.*Access denied.*--operator/);
   });
 });

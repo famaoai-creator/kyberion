@@ -7,6 +7,23 @@
  * identity lives in knowledge/product/governance/public-ingress-providers.json
  * and provider logic lives in libs/core/ingress/providers/*.
  *
+ * Every provider is its own module implementing PublicIngressProvider; the
+ * descriptor's `adapter` field is informational (it names the protocol
+ * family), not a shared adapter implementation that providers plug into.
+ *
+ * Lifecycle scope (v1): `up` must leave the exposure running WITHOUT a
+ * foreground process owned by Kyberion (Tailscale Funnel persists its config
+ * in tailscaled). Providers that need a long-running foreground agent
+ * (cloudflared, ngrok) require a managed-process lifecycle extension to this
+ * contract (spawn via spawnManagedProcess, pid/health supervision, restart and
+ * teardown on `down`) before their catalog entries can go live.
+ *
+ * Host-wide state: a provider's configuration usually outlives this checkout
+ * (another worktree or a lost state file may have created it), so `down` and
+ * `status` must inspect the provider, never trust local records alone, and
+ * only ever act on a mapping whose target is exactly this surface's loopback
+ * target (sameIngressTarget).
+ *
  * See knowledge/product/governance/adapter-first-extension-policy.md.
  */
 
@@ -38,6 +55,12 @@ export interface IngressUpRequest {
 export interface IngressTargetRequest {
   surfaceId: string;
   pathPrefix?: string;
+  /**
+   * Loopback port the surface listens on. Together with the prefix it defines
+   * the only target a provider may report as this surface's or remove.
+   * Falls back to `exposure.local_port`; required when neither is given.
+   */
+  localPort?: number;
   /** The exposure previously recorded for this surface, when known. */
   exposure?: IngressExposure;
 }
@@ -59,7 +82,18 @@ export interface PublicIngressProvider {
   readonly id: string;
   probe(): Promise<IngressReadiness>;
   up(request: IngressUpRequest): Promise<IngressExposure>;
+  /**
+   * Remove the mapping at the prefix only when it forwards to this surface's
+   * loopback target; a missing mapping is a no-op; a foreign mapping fails
+   * with INGRESS_COMMAND_FAILED; an uninspectable provider fails closed with
+   * INGRESS_PROVIDER_NOT_READY.
+   */
   down(request: IngressTargetRequest): Promise<void>;
+  /**
+   * The live exposure when the mapping at the prefix is public and forwards to
+   * this surface's loopback target; undefined when absent or foreign. Throws
+   * INGRESS_PROVIDER_NOT_READY when the provider cannot be inspected.
+   */
   status(request: IngressTargetRequest): Promise<IngressExposure | undefined>;
 }
 
@@ -121,6 +155,45 @@ export function assertIngressLocalPort(port: unknown): number {
 export function ingressLoopbackTarget(port: number, pathPrefix: string): string {
   const prefix = normalizeIngressPathPrefix(pathPrefix);
   return `http://127.0.0.1:${assertIngressLocalPort(port)}${prefix === '/' ? '' : prefix}`;
+}
+
+/** The loopback port a down/status request is about (explicit or recorded). */
+export function ingressRequestPort(request: IngressTargetRequest): number {
+  const port = request.localPort ?? request.exposure?.local_port;
+  if (port === undefined) {
+    throw new IngressError(
+      'INGRESS_INVALID_REQUEST',
+      `no local port known for surface '${request.surfaceId}'; cannot identify its mapping`
+    );
+  }
+  return assertIngressLocalPort(port);
+}
+
+function canonicalTarget(value: string): string | undefined {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return undefined;
+    const host = ['localhost', '[::1]', '127.0.0.1'].includes(url.hostname)
+      ? '127.0.0.1'
+      : url.hostname.toLowerCase();
+    const port = url.port || (url.protocol === 'https:' ? '443' : '80');
+    const pathname = url.pathname.replace(/\/+$/u, '') || '/';
+    return `${url.protocol}//${host}:${port}${pathname}`;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Whether a provider-reported proxy target is exactly `expected`, compared on
+ * parsed scheme / host (loopback aliases folded) / port / path so harmless
+ * normalisation (trailing slash, explicit default port, localhost) matches.
+ * Unparseable or non-http targets never match.
+ */
+export function sameIngressTarget(actual: string | undefined, expected: string): boolean {
+  if (!actual) return false;
+  const left = canonicalTarget(actual);
+  return left !== undefined && left === canonicalTarget(expected);
 }
 
 /** Join a public origin and a prefix: https://host + /events → https://host/events. */
