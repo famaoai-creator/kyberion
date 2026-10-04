@@ -60,8 +60,10 @@ The install method is declared in the `tailscale` tool runtime
 1. Enable the source on this host and store its secret (see `dots/README.md`,
    "Operator steps"): set `KYBERION_EVENT_INTAKE_SOURCES=github` in the
    environment of the process that runs the surface (no edit to the shared
-   `event-intake-policy.json`), and register `EVENT_INTAKE_GITHUB_SECRET` with
-   `pnpm kyberion secret introduce`.
+   `event-intake-policy.json`), and store the secret under the `event-intake`
+   service: `pnpm kyberion secret introduce event-intake GITHUB_SECRET --from-file <file>`
+   (this becomes `EVENT_INTAKE_GITHUB_SECRET` / keychain `event-intake`; do not
+   repeat the `EVENT_INTAKE_` prefix in the key).
 2. Start the surface: `pnpm surfaces enable -- --surface event-intake-surface`
    then `pnpm surfaces start -- --surface event-intake-surface`.
 3. `pnpm kyberion ingress up --surface event-intake` — prints
