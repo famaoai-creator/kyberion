@@ -28,7 +28,7 @@ import type {
 
 export interface AudioBusProbe {
   /** Stable id to distinguish implementations in logs / audit. */
-  bus_id: 'blackhole' | 'pulseaudio' | 'vendor-sdk' | 'stub';
+  bus_id: 'blackhole' | 'pulseaudio' | 'vendor-sdk' | 'stub' | (string & {});
   /** True when the bus can wire real audio in/out on this host. */
   available: boolean;
   /** Human-readable diagnostic when `available=false`. */
@@ -43,6 +43,8 @@ export interface AudioBus {
   readonly bus_id: AudioBusProbe['bus_id'];
   /** Capability check; never throws. */
   probe(): Promise<AudioBusProbe>;
+  /** Configure resolved devices before open; implementations must reject unsupported routes. */
+  selectDevices?(devices: { input?: string; output?: string }): Promise<void>;
   /**
    * Open the bus. Allocates virtual devices / loads kernel modules /
    * negotiates format with the meeting client. Idempotent.

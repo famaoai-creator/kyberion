@@ -45,22 +45,28 @@ function normalizeDeviceName(value: unknown): string | undefined {
 }
 
 function pickDeviceByPreference(
-  candidates: Array<{ name: string }>,
+  candidates: Array<{ name: string; device_id?: string; provider_id?: string }>,
   preference?: string
 ): string | undefined {
   if (candidates.length === 0) return undefined;
   const normalizedPreference = normalizeDeviceName(preference);
   if (!normalizedPreference) return candidates[0]?.name;
   const lowerPreference = normalizedPreference.toLowerCase();
-  const exactMatch = candidates.find(
-    (candidate) => candidate.name.trim().toLowerCase() === lowerPreference
+  const exactMatches = candidates.filter(
+    (candidate) =>
+      candidate.name.trim().toLowerCase() === lowerPreference ||
+      candidate.device_id === normalizedPreference ||
+      `${candidate.provider_id}:${candidate.device_id}` === normalizedPreference
   );
-  if (exactMatch) return exactMatch.name;
-  const containsMatch = candidates.find((candidate) =>
+  if (exactMatches.length > 1) throw new Error(`Ambiguous audio device: ${normalizedPreference}`);
+  if (exactMatches[0]) return exactMatches[0].name;
+  const containsMatches = candidates.filter((candidate) =>
     candidate.name.trim().toLowerCase().includes(lowerPreference)
   );
-  if (containsMatch) return containsMatch.name;
-  return candidates[0]?.name;
+  if (containsMatches.length > 1)
+    throw new Error(`Ambiguous audio device: ${normalizedPreference}`);
+  if (containsMatches[0]) return containsMatches[0].name;
+  return undefined;
 }
 
 /**
@@ -108,6 +114,24 @@ export function createVirtualAudioDeviceBridge(
           input: selectedInput,
           output: selectedOutput,
         };
+        if (options.input_device_preference && !selectedInput) {
+          return {
+            ...probe,
+            bridge_id: VIRTUAL_AUDIO_DEVICE_BRIDGE_ID,
+            platform: process.platform,
+            available: false,
+            reason: `Audio input not found: ${options.input_device_preference}`,
+          };
+        }
+        if (options.output_device_preference && !selectedOutput) {
+          return {
+            ...probe,
+            bridge_id: VIRTUAL_AUDIO_DEVICE_BRIDGE_ID,
+            platform: process.platform,
+            available: false,
+            reason: `Audio output not found: ${options.output_device_preference}`,
+          };
+        }
       }
       return {
         ...probe,
@@ -118,6 +142,25 @@ export function createVirtualAudioDeviceBridge(
       };
     },
     async open(format: AudioFormat): Promise<void> {
+      if (options.input_device_preference || options.output_device_preference) {
+        const selection = await this.probe();
+        if (!selection.available)
+          throw new Error(selection.reason || 'Audio selection unavailable');
+        const requested = selection.selected_devices ?? {
+          input: options.input_device_preference,
+          output: options.output_device_preference,
+        };
+        if (bus.selectDevices) await bus.selectDevices(requested);
+        else {
+          const current = await bus.probe();
+          if (
+            (options.input_device_preference && requested.input !== current.devices?.input) ||
+            (options.output_device_preference && requested.output !== current.devices?.output)
+          ) {
+            throw new Error(`Audio bus '${bus.bus_id}' does not support requested device routing`);
+          }
+        }
+      }
       await bus.open(format);
     },
     inputStream(): AsyncIterable<AudioChunk> {

@@ -68,6 +68,10 @@ The schema is the real detailed contract.
 | `vision-actuator`           | action + compatibility                    | `inspect_image`, `ocr_image`                                                   | `schemas/vision-action.schema.json`                                                                             | Perception-first, legacy routes still described in schema                                                                                |
 | `voice-actuator`            | action + lightweight pipeline             | `speak_local`, `list_voices`, `pipeline`                                       | `schemas/voice-action.schema.json`                                                                              | Mixed contract explicitly documented                                                                                                     |
 | `wisdom-actuator`           | action                                    | `knowledge_search`, `knowledge_inject`, `knowledge_export`, `knowledge_import` | `schemas/wisdom-action.schema.json`                                                                             | Knowledge-tier operations                                                                                                                |
+| `vcs-actuator`              | action                                    | `status`, `diff`, `log`, `branch`, `commit`, `pr_create`                       | `schemas/vcs-action.schema.json`                                                                                | Git/gh boundary; read ops are capture, mutations are apply                                                                               |
+| `data-actuator`             | action                                    | `query`, `filter`, `join`, `aggregate`                                         | `schemas/data-action.schema.json`                                                                               | Offline json/csv query; no SQL engine, no network                                                                                        |
+| `search-actuator`           | action                                    | `web_search`, `fetch_reader`                                                   | `schemas/search-action.schema.json`                                                                             | Search origin; transport stays in `network-actuator`                                                                                     |
+| `scheduler-actuator`        | action                                    | `schedule`, `list`, `cancel`, `fire`                                           | `schemas/scheduler-action.schema.json`                                                                          | Declaration only; no daemonization (nexus/presence own runtime)                                                                          |
 
 ## Cleanup View
 
@@ -230,3 +234,33 @@ Use this shortcut:
 - if the manifest is too short, the schema is the next place to read, not the implementation
 
 That is the intended current UX.
+
+Supplemental device discovery uses `registerVirtualDeviceInventoryProvider`.
+Providers declare platform support and return a typed inventory, optionally
+asynchronously. Providers supply `device_id`; the registry assigns `provider_id`.
+Results merge with native discovery and deduplicate by kind, provider and device
+identity; existing audio and camera selectors consume the merged inventory. Provider
+errors propagate rather than reporting an incomplete scan as success.
+
+`control_media_devices` forwards input/output/camera preferences and the camera
+backend ID to the respective bridge for the requested scope. Selection resolves
+runtime candidates for that request; it does not persist host routing settings.
+Unavailable scoped bridges return a blocked selection rather than success.
+
+### Device and OCR extension contracts
+
+- Camera adapters own platform input arguments, including AVFoundation frame rate.
+  Unsupported platforms and unknown or ambiguous explicit selections fail.
+- Recording adapters own device enumeration. Explicit input selection never falls
+  back to the first device or a default SoX route.
+- Audio buses may implement `selectDevices` before `open`. A bus without routing
+  support must already match the requested devices; otherwise opening fails.
+- Playback adapters receive one `AudioOutputPlaybackBackendRequest` and own their
+  executable and script resolution. Asynchronous adapters are supported.
+- Supplemental inventory identities distinguish devices with identical names.
+  Native discovery uses OS identifiers where available, with name-based identity
+  as a fallback when the native inventory does not expose an identifier.
+- OCR requests share `timeout_ms`, `signal`, and `onProgress`. The default total
+  budget is 120 seconds; `see --timeout-ms` overrides it. Providers receive the
+  cancellation signal; Tesseract terminates its worker on cancellation. Other
+  providers must implement cooperative cancellation to stop their underlying work.

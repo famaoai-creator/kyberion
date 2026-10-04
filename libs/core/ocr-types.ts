@@ -17,6 +17,12 @@ export type OcrDataEgress = 'none' | 'loopback' | 'external';
 export type OcrBoundingBoxUnits = 'pixel' | 'normalized';
 
 export interface OcrRequest {
+  timeout_ms?: number;
+  signal?: AbortSignal;
+  onProgress?: (event: {
+    stage: 'resolving' | 'recognizing' | 'completed';
+    provider?: string;
+  }) => void;
   path: string;
   language?: string;
   mode?: OcrRoutingMode;
