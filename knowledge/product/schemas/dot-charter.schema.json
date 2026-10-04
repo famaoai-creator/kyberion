@@ -5,6 +5,44 @@
   "description": "Standing charter for a resident agent ('dot'): a durable responsibility that persists across sessions. The charter declares what the dot cares about (goal), when it wakes (attention), what it may do alone (authority via an existing authority role + optional accountability charter), and how it reaches the accountable human (notification). It never grants authority — it references roles that already exist in security-policy.json.",
   "type": "object",
   "additionalProperties": false,
+  "definitions": {
+    "stateProbe": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "path", "expect"],
+          "properties": {
+            "type": { "const": "file" },
+            "path": { "type": "string", "minLength": 1 },
+            "expect": { "enum": ["exists", "changed", "matches"] },
+            "regex": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "service_id", "action"],
+          "properties": {
+            "type": { "const": "service_preset" },
+            "service_id": { "type": "string", "minLength": 1 },
+            "action": { "type": "string", "minLength": 1 },
+            "params": { "type": "object" },
+            "expect": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "json_path": { "type": "string" },
+                "equals": {},
+                "not_equals": {},
+                "changed": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
   "required": [
     "kind",
     "dot_id",
@@ -60,6 +98,21 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "Observable conditions that mean the responsibility is healthy."
+        },
+        "signal_probes": {
+          "type": "array",
+          "maxItems": 20,
+          "description": "Measurable form of success_signals: each signal is healthy while its probe matches. Measured by the resident sweep and shown in `dot status`, the digest, and the next wake prompt.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["signal", "probe"],
+            "properties": {
+              "signal": { "type": "string", "minLength": 1, "maxLength": 300 },
+              "probe": { "$ref": "#/definitions/stateProbe" },
+              "every_s": { "type": "integer", "minimum": 60 }
+            }
+          }
         },
         "budget": {
           "type": "object",
@@ -126,42 +179,7 @@
                 "required": ["kind", "probe"],
                 "properties": {
                   "kind": { "const": "probe" },
-                  "probe": {
-                    "oneOf": [
-                      {
-                        "type": "object",
-                        "additionalProperties": false,
-                        "required": ["type", "path", "expect"],
-                        "properties": {
-                          "type": { "const": "file" },
-                          "path": { "type": "string", "minLength": 1 },
-                          "expect": { "enum": ["exists", "changed", "matches"] },
-                          "regex": { "type": "string" }
-                        }
-                      },
-                      {
-                        "type": "object",
-                        "additionalProperties": false,
-                        "required": ["type", "service_id", "action"],
-                        "properties": {
-                          "type": { "const": "service_preset" },
-                          "service_id": { "type": "string", "minLength": 1 },
-                          "action": { "type": "string", "minLength": 1 },
-                          "params": { "type": "object" },
-                          "expect": {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "properties": {
-                              "json_path": { "type": "string" },
-                              "equals": {},
-                              "not_equals": {},
-                              "changed": { "type": "boolean" }
-                            }
-                          }
-                        }
-                      }
-                    ]
-                  },
+                  "probe": { "$ref": "#/definitions/stateProbe" },
                   "every_s": { "type": "integer", "minimum": 10 }
                 }
               }
@@ -235,6 +253,34 @@
             "end": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$" },
             "timezone": { "type": "string" }
           }
+        },
+        "delivery_mode": {
+          "enum": ["inbox", "live"],
+          "description": "`inbox` (default) lands every notification, decision card, and digest in the local inbox; `live` routes them to deliver_to. Opting into live sends is an explicit charter edit."
+        }
+      }
+    },
+    "team": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "responsibilities": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.:-]*$", "maxLength": 100 },
+          "description": "Exclusive responsibility keys. Activation is refused while another active dot holds the same key."
+        },
+        "accepts_handoffs_from": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "description": "dot_ids allowed to hand work to this dot; a handoff wakes this dot through the dot inbox."
+        },
+        "goal_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Organization-level goal this dot contributes to."
         }
       }
     },

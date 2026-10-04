@@ -41,7 +41,11 @@ import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { getZonedDateParts, matchesCron } from '../pipeline/cron-utils.js';
 import { recordDaemonHeartbeat } from '../daemon-heartbeat.js';
 import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
-import type { ReasoningBackend } from '../reasoning/reasoning-backend-contracts.js';
+import type {
+  ReasoningBackend,
+  ToolCall,
+  ToolDefinition,
+} from '../reasoning/reasoning-backend-contracts.js';
 import type { DelegationHandle } from '../delegated-task-observability.js';
 import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
 import { estimateTokens } from '../workforce/worker-context-compaction.js';
@@ -54,6 +58,17 @@ import {
 } from './dot-charter.js';
 import { evaluateStateProbe, probeSpecId, type StateProbeDeps } from '../state-probe.js';
 import { createLogger } from '../logger.js';
+import {
+  buildDotProposeToolDefinition,
+  collectDotProposals,
+  dotProposalInstructions,
+  parseDotProposalsFromText,
+  DOT_PROPOSE_TOOL_NAME,
+  MAX_DOT_PROPOSALS_PER_WAKE,
+  type DotProposal,
+} from './dot-proposals.js';
+import { dispatchDotProposals, type DotActionRecord } from './dot-dispatch.js';
+import { dotFeedbackPromptLines, dotSignalStatusLines } from './dot-feedback.js';
 
 const logger = createLogger('dot-runtime');
 
@@ -84,6 +99,9 @@ export interface DotWakeLoopOptions {
     wallClockBudgetMs?: number;
     turnBudget?: number;
   };
+  /** The proposal tool — the only effectful tool a dot is given. */
+  extraTools?: ToolDefinition[];
+  executeTool?: (call: ToolCall) => { resultText: string };
 }
 
 /** Minimal wake receipt shape — only the fields the ledger/CLI need. */
@@ -158,6 +176,8 @@ export interface DotRuntimeDeps {
   backend?: Pick<ReasoningBackend, 'generateWithTools' | 'delegateTask' | 'delegateTaskHandle'>;
   /** Role-registry lookup for the per-wake revalidation (test seam). */
   hasRole?: (role: string) => boolean;
+  /** Proposal governance port; defaults to {@link dispatchDotProposals}. */
+  dispatch?: (charter: DotCharter, proposals: readonly DotProposal[]) => DotActionRecord[];
 }
 
 function runtimePath(rootDir: string | undefined, rel: string): string {
@@ -347,7 +367,8 @@ function wakeTriggerKeys(
   const declaredChannels = charter.attention.triggers
     .filter((t): t is Extract<DotTrigger, { kind: 'wake' }> => t.kind === 'wake')
     .flatMap((t) => t.channels);
-  if (declaredChannels.length === 0) return [];
+  const handoffSources = charter.team?.accepts_handoffs_from ?? [];
+  if (declaredChannels.length === 0 && handoffSources.length === 0) return [];
   const rows = readJsonLines<DotInboxEntry & { __line?: string; __index?: number }>(
     runtimePath(deps.rootDir, DOT_INBOX_PATH),
     {
@@ -361,7 +382,16 @@ function wakeTriggerKeys(
   );
   const hits: Array<{ key: string; detail: string }> = [];
   for (const row of rows) {
-    const addressed = row.dot_id === charter.dot_id;
+    const handoffFrom =
+      row.payload && typeof row.payload === 'object'
+        ? (row.payload as Record<string, unknown>).handoff_from
+        : undefined;
+    // A handoff wakes its target only from a dot the target accepts.
+    const addressed =
+      row.dot_id === charter.dot_id &&
+      (typeof handoffFrom === 'string'
+        ? handoffSources.includes(handoffFrom)
+        : declaredChannels.length > 0);
     const channelHit =
       !row.dot_id && typeof row.channel === 'string' && declaredChannels.includes(row.channel);
     if (!addressed && !channelHit) continue;
@@ -428,10 +458,20 @@ export function evaluateDotTriggersDue(
           due.push({ trigger, key, detail: `watch ${rel} changed` });
         }
       }
-    } else if (trigger.kind === 'wake') {
-      for (const hit of wakeTriggerKeys(charter, deps)) {
-        if (isDue(hit.key)) due.push({ trigger, key: hit.key, detail: hit.detail });
-      }
+    }
+  }
+  // Inbox rows are scanned once: declared wake channels and accepted handoffs
+  // share the lane, and a handoff-only dot declares no wake trigger at all.
+  const wakeTrigger =
+    charter.attention.triggers.find(
+      (t): t is Extract<DotTrigger, { kind: 'wake' }> => t.kind === 'wake'
+    ) ??
+    ((charter.team?.accepts_handoffs_from ?? []).length > 0
+      ? ({ kind: 'wake', channels: ['inbox'] } as const)
+      : undefined);
+  if (wakeTrigger) {
+    for (const hit of wakeTriggerKeys(charter, deps)) {
+      if (isDue(hit.key)) due.push({ trigger: wakeTrigger, key: hit.key, detail: hit.detail });
     }
   }
   return due;
@@ -622,26 +662,52 @@ export interface DotWakeReceipt {
   outcome: DotWakeOutcome;
   reason?: string;
   result?: DotWakeLoopResult;
+  /** Governed outcome of every proposal this wake produced. */
+  actions?: DotActionRecord[];
+  proposal_errors?: string[];
 }
 
-function dotSystemPrompt(charter: DotCharter): string {
+function dotSystemPrompt(charter: DotCharter, mode: 'tool' | 'fence', rootDir?: string): string {
+  const signals = dotSignalStatusLines(charter, { rootDir });
+  const feedback = dotFeedbackPromptLines(charter.dot_id, { rootDir });
   return [
-    `You are the resident dot "${charter.dot_id}".`,
+    `You are the resident dot "${charter.dot_id}" (actor id dot:${charter.dot_id}).`,
     `Standing purpose: ${charter.purpose}`,
+    charter.team?.goal_ref ? `Organization goal you contribute to: ${charter.team.goal_ref}` : '',
     charter.goal.success_signals?.length
       ? `Success signals: ${charter.goal.success_signals.join('; ')}`
       : '',
-    'You are a coordinator: observe, classify, and record findings. Do not write outside your role scopes; escalate decisions to the operator.',
+    signals.length ? `Measured signal status:\n${signals.join('\n')}` : '',
+    feedback.length
+      ? `Recent operator feedback on your proposals (respect it):\n${feedback.join('\n')}`
+      : '',
+    'You are a coordinator: observe and classify, then propose. Never write outside your role scopes.',
+    dotProposalInstructions(mode),
   ]
     .filter(Boolean)
     .join('\n');
 }
 
-function wakePrompt(charter: DotCharter, trigger?: DueDotTrigger): string {
+function wakePrompt(
+  charter: DotCharter,
+  mode: 'tool' | 'fence',
+  trigger?: DueDotTrigger,
+  rootDir?: string
+): string {
   const wakeLine = trigger
     ? `\n\nWake trigger: ${trigger.key}${trigger.detail ? `\nDetail: ${trigger.detail}` : ''}`
     : '';
-  return `${dotSystemPrompt(charter)}\n\nObjective: ${charter.goal.statement}${wakeLine}`;
+  return `${dotSystemPrompt(charter, mode, rootDir)}\n\nObjective: ${charter.goal.statement}${wakeLine}`;
+}
+
+function governProposals(
+  charter: DotCharter,
+  proposals: readonly DotProposal[],
+  deps: DotRuntimeDeps
+): DotActionRecord[] {
+  if (proposals.length === 0) return [];
+  if (deps.dispatch) return deps.dispatch(charter, proposals);
+  return dispatchDotProposals(charter, proposals, { rootDir: deps.rootDir, now: deps.now }).records;
 }
 
 /** One dot must never run two wakes concurrently, whatever the trigger mix. */
@@ -751,10 +817,11 @@ export async function runDotWake(
         // Delegation fallback: local shell backends cannot drive a tool loop,
         // so the wake becomes one delegated turn bounded by the charter's
         // wall clock — same XP-06 degradation shape as agent-dispatch. The
-        // delegated child intentionally runs without the charter role (SO-03
-        // strips inherited roles at the process boundary); keep delegated
-        // dots on read/coordination responsibilities until that gap closes.
-        const prompt = wakePrompt(current, deps.trigger);
+        // delegated child runs without the charter role (SO-03 strips
+        // inherited roles at the process boundary), so it only proposes: its
+        // fenced proposals are governed here, in this process, under the
+        // charter role.
+        const prompt = wakePrompt(current, 'fence', deps.trigger, deps.rootDir);
         const text = await runDelegatedWake(
           current,
           backend,
@@ -766,16 +833,24 @@ export async function runDotWake(
           result: { text, toolCalls: [] },
         });
         recordDotTokenUsage(current.dot_id, tokens, deps);
+        const parsed = parseDotProposalsFromText(text);
+        const actions = governProposals(current, parsed.proposals, deps);
         if (deps.trigger?.trigger.kind === 'watch') {
           recordWatchSnapshotFromKey(current, deps.trigger, deps);
         }
         recordDotWakeOutcome(current, deps.trigger, 'delivered', {
           ...deps,
-          reason: 'delegated-turn (backend lacks generateWithTools)',
+          reason: `delegated-turn (backend lacks generateWithTools); proposals ${parsed.proposals.length}`,
           turns_run: 1,
           tokens_used: tokens,
         });
-        return { dot_id: current.dot_id, outcome: 'delivered', reason: 'delegated-turn' };
+        return {
+          dot_id: current.dot_id,
+          outcome: 'delivered',
+          reason: 'delegated-turn',
+          actions,
+          ...(parsed.errors.length ? { proposal_errors: parsed.errors } : {}),
+        };
       }
       const runLoop = deps.runLoop;
       if (!runLoop) {
@@ -783,11 +858,27 @@ export async function runDotWake(
           'runDotWake requires deps.runLoop when the backend supports generateWithTools (orchestration must inject the goal driver)'
         );
       }
+      const proposalInputs: unknown[] = [];
       const result = await runLoop({
-        objective: wakePrompt(current, deps.trigger),
+        objective: wakePrompt(current, 'tool', deps.trigger, deps.rootDir),
         goalId: `dot-${current.dot_id}`,
-        systemPrompt: dotSystemPrompt(current),
+        systemPrompt: dotSystemPrompt(current, 'tool', deps.rootDir),
         toolRole: current.authority.authority_role,
+        extraTools: [buildDotProposeToolDefinition()],
+        executeTool: (call) => {
+          if (call.name !== DOT_PROPOSE_TOOL_NAME) {
+            return { resultText: `Tool ${call.name} is not available to a dot; propose instead.` };
+          }
+          if (proposalInputs.length >= MAX_DOT_PROPOSALS_PER_WAKE) {
+            return {
+              resultText: `Proposal limit (${MAX_DOT_PROPOSALS_PER_WAKE}) reached for this wake.`,
+            };
+          }
+          proposalInputs.push(call.input);
+          return {
+            resultText: 'Proposal recorded; the runtime governs it after this wake.',
+          };
+        },
         ...(budget?.max_turns_per_wake !== undefined
           ? { maxTurns: budget.max_turns_per_wake }
           : {}),
@@ -806,6 +897,8 @@ export async function runDotWake(
       });
       const tokens = result.goal.budgetStats?.tokensUsed ?? 0;
       recordDotTokenUsage(current.dot_id, tokens, deps);
+      const collected = collectDotProposals(proposalInputs);
+      const actions = governProposals(current, collected.proposals, deps);
       if (deps.trigger?.trigger.kind === 'watch') {
         recordWatchSnapshotFromKey(current, deps.trigger, deps);
       }
@@ -814,7 +907,13 @@ export async function runDotWake(
         turns_run: result.turnsRun,
         tokens_used: tokens,
       });
-      return { dot_id: current.dot_id, outcome: 'delivered', result };
+      return {
+        dot_id: current.dot_id,
+        outcome: 'delivered',
+        result,
+        actions,
+        ...(collected.errors.length ? { proposal_errors: collected.errors } : {}),
+      };
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       recordDotWakeOutcome(current, deps.trigger, 'failed', { ...deps, reason });

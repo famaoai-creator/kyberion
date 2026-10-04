@@ -20,21 +20,32 @@ and loaded via `@agent/core/dot/dot-charter`.
 | `decisions`    | Floor for `autonomous-ops-gate` outcomes (`auto`/`notify`/`approve`) + veto window + escalate chan                                                                                                                                                                                                        |
 | `notification` | `deliver_to` (slack/telegram/discord/imessage) + optional digest cron + quiet hours                                                                                                                                                                                                                       |
 | `runtime`      | `heartbeat_id` watched by `daemon-watchdog`, optional reasoning backend                                                                                                                                                                                                                                   |
+| `team`         | Exclusive `responsibilities` keys (activation refused on overlap), `accepts_handoffs_from` (dots allowed to hand work here), `goal_ref` (organization goal)                                                                                                                                               |
 
-## Execution model (target)
+`goal.signal_probes` makes `success_signals` measurable (a signal is healthy
+while its probe matches). `notification.delivery_mode` is `inbox` by default;
+set `live` to send to `deliver_to`.
 
-```
-charter ── attention trigger ──▶ bounded goal turn (worker-goal-driver)
+## Execution model
+
+````
+charter ── attention trigger ──▶ bounded goal turn (worker-goal-driver / delegated CLI)
                                    │  ├─ read: everything its role may read
-                                   │  ├─ decide: autonomous-ops-gate → auto | notify | approve
-                                   │  └─ work: delegate as WorkItem / mission — never direct writes
+                                   │  └─ propose: dot_propose_action / ```dot-proposals```
                                    ▼
-                        notification.deliver_to + approvals
-```
+             dot-dispatch (supervisor process, charter role)
+               bounds → gate ⊔ charter floor ⊔ learned floor → route
+                 ├─ proceed → WorkItem (dot:<id>) or handoff to another dot
+                 ├─ parked  → decision card / veto on the charter route → settled next sweeps
+                 └─ refused → recorded with the reason
+````
 
-The dot is a coordinator, not a worker — like OpenAI dots delegating to Codex,
-it dispatches substantive work through mission_controller / WorkItems and keeps
-the responsibility itself.
+The dot is a coordinator, not a worker. Like OpenAI dots delegating to Codex,
+it never acts itself: every effect is a governed proposal (see
+[resident-dot-model](../knowledge/product/architecture/resident-dot-model.md)
+"Governed proposals"). Each sweep also settles parked decisions, measures
+signals, and sends the `digest_cron` digest. `pnpm kyberion dot status` shows
+actions, open decisions, signals, and recent feedback.
 
 ## Status values
 

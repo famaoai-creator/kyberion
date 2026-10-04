@@ -450,9 +450,11 @@ export function approvalStoreRoots(env: Record<string, string | undefined> = pro
   observability: string;
 } {
   if (isVitestProcess(env)) {
+    // Per worker: parallel test files that clear a channel must not race each other.
+    const pool = env.VITEST_POOL_ID ? `/pool-${env.VITEST_POOL_ID.replace(/[^\w-]/g, '')}` : '';
     return {
-      coordination: `${VITEST_APPROVAL_STORE_ROOT}/coordination/channels`,
-      observability: `${VITEST_APPROVAL_STORE_ROOT}/observability/channels`,
+      coordination: `${VITEST_APPROVAL_STORE_ROOT}${pool}/coordination/channels`,
+      observability: `${VITEST_APPROVAL_STORE_ROOT}${pool}/observability/channels`,
     };
   }
   return {

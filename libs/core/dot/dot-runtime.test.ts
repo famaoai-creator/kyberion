@@ -225,6 +225,73 @@ describe('runDotWake', () => {
     expect(dotTokensUsedToday('repo-guardian', { rootDir: TEST_ROOT })).toBeGreaterThan(0);
   });
 
+  it('governs proposals from a delegated reply instead of letting the child act', async () => {
+    writeCharter(CHARTER);
+    const governed: Array<{ dot: string; titles: string[] }> = [];
+    const loaded = { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER };
+    let delegatedPrompt = '';
+    const receipt = await runDotWake(loaded, {
+      rootDir: TEST_ROOT,
+      backend: {
+        delegateTask: async (instruction: string) => {
+          delegatedPrompt = instruction;
+          return [
+            'CI is red on main.',
+            '```dot-proposals',
+            '[{"title":"Fix main","objective":"Repair the failing test.","work_shape":"task_session"}]',
+            '```',
+          ].join('\n');
+        },
+      },
+      hasRole: () => true,
+      dispatch: (charter, proposals) => {
+        governed.push({ dot: charter.dot_id, titles: proposals.map((p) => p.title) });
+        return [];
+      },
+    });
+    expect(delegatedPrompt).toContain('```dot-proposals');
+    expect(receipt.outcome).toBe('delivered');
+    expect(governed).toEqual([{ dot: 'repo-guardian', titles: ['Fix main'] }]);
+  });
+
+  it('collects dot_propose_action tool calls from the goal loop and refuses other tools', async () => {
+    writeCharter(CHARTER);
+    const governed: string[] = [];
+    const toolReplies: string[] = [];
+    const loaded = { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER };
+    const receipt = await runDotWake(loaded, {
+      rootDir: TEST_ROOT,
+      hasRole: () => true,
+      runLoop: async (options) => {
+        expect(options.extraTools?.map((t) => t.name)).toEqual(['dot_propose_action']);
+        expect(options.toolRole).toBe('infrastructure_sentinel');
+        toolReplies.push(
+          options.executeTool!({
+            name: 'dot_propose_action',
+            input: {
+              title: 'Rerun CI',
+              objective: 'Re-run the flaky job.',
+              work_shape: 'task_session',
+            },
+          }).resultText,
+          options.executeTool!({ name: 'shell_exec', input: { cmd: 'rm -rf /' } }).resultText,
+          options.executeTool!({
+            name: 'dot_propose_action',
+            input: { title: 'Bad', objective: 'x', work_shape: 'deploy' },
+          }).resultText
+        );
+        return fakeResult(1, 10);
+      },
+      dispatch: (_charter, proposals) => {
+        governed.push(...proposals.map((p) => p.title));
+        return [];
+      },
+    });
+    expect(governed).toEqual(['Rerun CI']);
+    expect(toolReplies[1]).toMatch(/not available to a dot/);
+    expect(receipt.proposal_errors?.[0]).toMatch(/work_shape/);
+  });
+
   it('retries a failed wake only after the backoff window', async () => {
     // Watch keys (unlike cron minute-keys) stay evaluable, so a failed watch
     // wake is the honest retry candidate.

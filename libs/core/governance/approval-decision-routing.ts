@@ -29,7 +29,10 @@ import type { SupportedLocale } from '../locale-normalize.js';
 import {
   loadNotificationPreferences,
   notifyOperatorSync,
+  resolveCallerNotificationRoute,
   resolveOperatorNotificationRoute,
+  type NotificationChannelTarget,
+  type NotificationQuietHours,
 } from '../surface/operator-notifications.js';
 
 /**
@@ -80,6 +83,10 @@ export interface RouteAutonomousDecisionInput {
    * parked on that request again instead of opening — and ringing — a new one.
    */
   dedupeKey?: string;
+  /** Caller-owned delivery route (a dot charter's deliver_to); defaults to operator preferences. */
+  notificationRoute?: NotificationChannelTarget;
+  /** Quiet hours applied to `notificationRoute`. */
+  quietHours?: NotificationQuietHours;
 }
 
 export interface RoutedDecision {
@@ -165,10 +172,16 @@ export function routeAutonomousDecision(input: RouteAutonomousDecisionInput): Ro
     }
   }
 
-  const route = resolveOperatorNotificationRoute(
-    'approval_required',
-    loadNotificationPreferences()
-  );
+  const prefs = loadNotificationPreferences();
+  const route = input.notificationRoute
+    ? resolveCallerNotificationRoute(
+        'approval_required',
+        input.notificationRoute,
+        input.quietHours,
+        prefs,
+        new Date(now)
+      )
+    : resolveOperatorNotificationRoute('approval_required', prefs);
   const deliveredVia = route && route !== 'mute' ? route : undefined;
   const activeHours = activeHoursFromPolicy();
   const veto =
@@ -228,11 +241,17 @@ export function routeAutonomousDecision(input: RouteAutonomousDecisionInput): Ro
   if (timing === 'immediate') {
     const surface = deliveredVia?.surface;
     const safe = (text: string) => (surface ? neutralizeSurfaceMarkup(text, surface) : text);
-    notified = notifyOperatorSync('approval_required', {
-      title: safe(input.title),
-      body: safe(renderDecisionCardText(card, input.locale)),
-      correlation_id: approvalDeliveryCorrelationId(record),
-    });
+    notified = notifyOperatorSync(
+      'approval_required',
+      {
+        title: safe(input.title),
+        body: safe(renderDecisionCardText(card, input.locale)),
+        correlation_id: approvalDeliveryCorrelationId(record),
+      },
+      input.notificationRoute
+        ? { route: input.notificationRoute, quietHours: input.quietHours }
+        : {}
+    );
     // iMessage is sent synchronously, so a handed-off card is a delivered one;
     // outbox surfaces confirm delivery from the bridge (recordApprovalDeliveryReceipt).
     if (notified && veto && deliveredVia?.surface === 'imessage') {
