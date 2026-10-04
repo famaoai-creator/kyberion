@@ -24,6 +24,11 @@ export const REVIEWED_DYNAMIC_IMPORTS: Record<string, { modules: string[]; ratio
       rationale:
         'imports the module named by knowledge/product/governance/ingest-document-parser-modules.json; the catalog is currently empty so nothing can load — a new parser entry forces re-review',
     },
+  'libs/core/ingress/public-ingress-provider-registry.ts#importProviderModule': {
+    modules: ['libs/core/ingress/providers/*.ts'],
+    rationale:
+      'imports the module (or fallback_path dist file) named by knowledge/product/governance/public-ingress-providers.json; the schema pins module to the core ingress/providers/* package exports and fallback_path to libs/core/dist/ingress/providers/*',
+  },
   'libs/core/meeting/meeting-driver-module-loader.ts#installMeetingParticipationDriver': {
     modules: [
       'libs/core/meeting/driver-modules/*.ts',

@@ -1,0 +1,61 @@
+{
+  "$schema": "../schemas/public-ingress-providers.schema.json",
+  "version": "1.0.0",
+  "description": "Public ingress providers: tunnels / reverse proxies that expose one loopback Kyberion surface (opt-in via the surface manifest `ingress` block) at a public HTTPS URL. Order is the default selection order: the first `live` provider whose readiness is `ready` wins unless KYBERION_INGRESS_PROVIDER or --provider names one. `planned` entries are declared so operators see them; they resolve to readiness `unsupported` until a provider module ships. Adding a provider = an entry here + a module exporting createPublicIngressProvider(); callers never change.",
+  "providers": [
+    {
+      "provider_id": "tailscale-funnel",
+      "display_name": "Tailscale Funnel",
+      "status": "live",
+      "adapter": "cli",
+      "module": "@agent/core/ingress/providers/tailscale-funnel",
+      "fallback_path": "libs/core/dist/ingress/providers/tailscale-funnel.js",
+      "tool_id": "tailscale",
+      "stable_url": true,
+      "network_class": "public_internet",
+      "secret_refs": [],
+      "config_requirements": [],
+      "platforms": ["darwin", "linux", "win32"],
+      "notes": "Exposes https://<machine>.<tailnet>.ts.net<path_prefix> through Tailscale's Funnel relays. Requires the Tailscale client logged in, HTTPS certificates enabled for the tailnet, and the funnel node attribute granted in the tailnet policy. Only the surface's path prefix is published; other serve/funnel mappings on the node are left untouched."
+    },
+    {
+      "provider_id": "cloudflared-quick",
+      "display_name": "Cloudflare Quick Tunnel",
+      "status": "planned",
+      "adapter": "cli",
+      "tool_id": "cloudflared",
+      "stable_url": false,
+      "network_class": "public_internet",
+      "secret_refs": [],
+      "config_requirements": [],
+      "platforms": ["darwin", "linux", "win32"],
+      "notes": "Ephemeral trycloudflare.com URL with no account. The URL changes on every start, so webhook senders must be re-pointed after each restart."
+    },
+    {
+      "provider_id": "cloudflared-named",
+      "display_name": "Cloudflare Named Tunnel",
+      "status": "planned",
+      "adapter": "cli",
+      "tool_id": "cloudflared",
+      "stable_url": true,
+      "network_class": "public_internet",
+      "secret_refs": ["CLOUDFLARED_TUNNEL_CREDENTIALS"],
+      "config_requirements": ["domain"],
+      "platforms": ["darwin", "linux", "win32"],
+      "notes": "Stable hostname on an operator-owned Cloudflare zone. Needs the zone (domain) and the tunnel credential stored in the secret store."
+    },
+    {
+      "provider_id": "ngrok",
+      "display_name": "ngrok",
+      "status": "planned",
+      "adapter": "cli",
+      "tool_id": "ngrok",
+      "stable_url": false,
+      "network_class": "public_internet",
+      "secret_refs": ["NGROK_AUTHTOKEN"],
+      "config_requirements": [],
+      "platforms": ["darwin", "linux", "win32"],
+      "notes": "ngrok agent tunnel. Needs the account authtoken in the secret store; the URL is stable only on plans with a reserved domain."
+    }
+  ]
+}
