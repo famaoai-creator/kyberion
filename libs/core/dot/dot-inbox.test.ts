@@ -5,6 +5,7 @@ import { safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
   appendDotInboxEntry,
   DOT_INBOX_PATH,
+  DOT_INBOX_RECEIPT_SCAN_BYTES,
   DOT_WAKE_CHANNELS,
   isDotWakeChannel,
 } from './dot-inbox.js';
@@ -76,15 +77,43 @@ describe('appendDotInboxEntry', () => {
     expect(readJsonLines(`${TEST_ROOT}/${DOT_INBOX_PATH}`)).toHaveLength(4);
   });
 
-  it('does not emit another wake when the existing delivery evidence is corrupt', () => {
+  it('skips a torn line from any producer when looking up a delivery receipt', () => {
     const input = { channel: 'inbox', dot_id: 'dot-a', idempotency_key: 'report-1' };
-    appendDotInboxEntry(input, { rootDir: TEST_ROOT });
+    const first = appendDotInboxEntry(input, { rootDir: TEST_ROOT });
     const file = `${TEST_ROOT}/${DOT_INBOX_PATH}`;
     const corrupt = `${String(safeReadFile(file, { encoding: 'utf8' }))}{broken\n`;
     safeWriteFile(file, corrupt);
 
-    expect(() => appendDotInboxEntry(input, { rootDir: TEST_ROOT })).toThrow();
+    // The receipt survives a torn neighbour: no second wake.
+    expect(appendDotInboxEntry(input, { rootDir: TEST_ROOT })).toEqual(first);
     expect(String(safeReadFile(file, { encoding: 'utf8' }))).toBe(corrupt);
+    // Another tenant's idempotent report is not blocked by the torn line.
+    const other = appendDotInboxEntry(
+      { channel: 'inbox', dot_id: 'dot-b', idempotency_key: 'report-9' },
+      { rootDir: TEST_ROOT }
+    );
+    expect(other.dot_id).toBe('dot-b');
+    expect(readJsonLines(file, { onMalformed: 'skip' })).toHaveLength(2);
+  });
+
+  it('bounds the receipt lookup to the newest window of the shared inbox', () => {
+    const file = `${TEST_ROOT}/${DOT_INBOX_PATH}`;
+    const old = { channel: 'inbox', dot_id: 'dot-a', idempotency_key: 'old-report' };
+    appendDotInboxEntry(old, { rootDir: TEST_ROOT });
+    const filler = `${JSON.stringify({ channel: 'slack', text: 'x'.repeat(1_000) })}\n`;
+    const fillerCount = Math.ceil(DOT_INBOX_RECEIPT_SCAN_BYTES / filler.length) + 1;
+    safeWriteFile(
+      file,
+      `${String(safeReadFile(file, { encoding: 'utf8' }))}${filler.repeat(fillerCount)}`
+    );
+    const recent = { channel: 'inbox', dot_id: 'dot-a', idempotency_key: 'recent-report' };
+    const first = appendDotInboxEntry(recent, { rootDir: TEST_ROOT });
+    expect(appendDotInboxEntry(recent, { rootDir: TEST_ROOT })).toEqual(first);
+    // Behind more than the window, a key counts as a new delivery (documented bound).
+    appendDotInboxEntry(old, { rootDir: TEST_ROOT });
+    const rows = readJsonLines<{ idempotency_key?: string }>(file);
+    expect(rows.filter((row) => row.idempotency_key === 'old-report')).toHaveLength(2);
+    expect(rows.filter((row) => row.idempotency_key === 'recent-report')).toHaveLength(1);
   });
 
   it('rejects empty, unsafe or unbounded delivery identities', () => {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { appendJsonLine } from '../foundation/json.js';
-import { safeMkdir, safeRmSync } from '../secure-io.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import type { DotCharter } from './dot-charter.js';
 import { DOT_PROMPT_SECTIONS, DOT_WAKE_TOOLS } from './dot-extension-registry.js';
 import {
@@ -166,6 +166,40 @@ describe('follow-ups', () => {
     expect(listPendingDotFollowups(one, ctx(at(6))).map((row) => row.reason)).toEqual([
       'valid successor',
     ]);
+  });
+
+  it('skips a torn store line but keeps successor idempotency', () => {
+    const one = { ...CHARTER, followups: { max_pending: 1 } } as DotCharter;
+    dotScheduleFollowupTool.apply(one, [{ delay_minutes: 5, reason: 'original' }], ctx(T0));
+    const [due] = evaluateDotFollowupsDue(one, ctx(at(6)));
+    const file = `${TEST_ROOT}/${dotStatePath(one, DOT_FOLLOWUPS_FILE)}`;
+    safeWriteFile(file, `${safeReadFile(file, { encoding: 'utf8' })}{"dot_id":"fu-dot","follo\n`);
+    expect(
+      dotScheduleFollowupTool.apply(one, [{ delay_minutes: 10, reason: 'successor' }], {
+        ...ctx(at(6)),
+        completingFollowupKey: due.key,
+      })
+    ).toEqual([]);
+    expect(listPendingDotFollowups(one, ctx(at(6))).map((row) => row.reason)).toEqual([
+      'successor',
+    ]);
+    // A retry with another torn line still sees the committed successor.
+    safeWriteFile(file, `${safeReadFile(file, { encoding: 'utf8' })}not json\n`);
+    expect(
+      dotScheduleFollowupTool.apply(one, [{ delay_minutes: 30, reason: 'duplicate' }], {
+        ...ctx(at(12)),
+        completingFollowupKey: due.key,
+      })
+    ).toEqual([]);
+    expect(listPendingDotFollowups(one, ctx(at(12))).map((row) => row.reason)).toEqual([
+      'successor',
+    ]);
+    // A fresh (non-completing) schedule also works past a torn line.
+    const two = { ...CHARTER, followups: { max_pending: 3 } } as DotCharter;
+    expect(
+      dotScheduleFollowupTool.apply(two, [{ delay_minutes: 5, reason: 'fresh' }], ctx(at(13)))
+    ).toEqual([]);
+    expect(listPendingDotFollowups(two, ctx(at(13))).map((row) => row.reason)).toContain('fresh');
   });
 });
 
