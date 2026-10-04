@@ -27,10 +27,9 @@ import { recordDaemonHeartbeat } from '../daemon-heartbeat.js';
 import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
 import { appendJsonLine } from '../foundation/json.js';
 import {
-  listDotCharterSources,
-  loadDotCharterSource,
+  findDotCharter,
+  listDotCharters,
   validateDotCharter,
-  type DotCharterSource,
   type DotCharter,
   type DotCharterStatus,
 } from './dot-charter.js';
@@ -62,18 +61,6 @@ export interface DotLifecycleDeps {
   supervisedDaemonIds?: readonly string[];
   /** Injectable role-registry lookup for hermetic tests. */
   hasRole?: (role: string) => boolean;
-}
-
-function findCharterSource(dotId: string, rootDir?: string): DotCharterSource | null {
-  for (const source of listDotCharterSources(rootDir)) {
-    try {
-      if (loadDotCharterSource(source).dot_id === dotId) return source;
-    } catch {
-      // A malformed charter cannot be transitioned; skip it here and let
-      // `dot validate` surface the parse error with its file name.
-    }
-  }
-  return null;
 }
 
 function assertActivationReady(
@@ -137,7 +124,7 @@ export function transitionDotCharterStatus(
   target: DotCharterStatus,
   deps: DotLifecycleDeps = {}
 ): DotCharter {
-  const source = findCharterSource(dotId, deps.rootDir);
+  const source = findDotCharter(dotId, deps.rootDir);
   if (!source) {
     throw new Error(`[DOT_NOT_FOUND] no charter for dot_id '${dotId}' under dots/`);
   }
@@ -161,15 +148,7 @@ export function transitionDotCharterStatus(
     );
   }
   if (target === 'active') {
-    const all = listDotCharterSources(deps.rootDir)
-      .map((p) => {
-        try {
-          return loadDotCharterSource(p);
-        } catch {
-          return null;
-        }
-      })
-      .filter((c): c is DotCharter => c !== null);
+    const all = listDotCharters(deps.rootDir, { errors: [] }).map((entry) => entry.charter);
     assertActivationReady(current, deps, all);
   }
 
@@ -216,15 +195,9 @@ export function checkDotActivationReadiness(
 ): { ready: boolean; errors: string[] } {
   const errors: string[] = [];
   try {
-    const all = listDotCharterSources(deps.rootDir)
-      .map((p) => {
-        try {
-          return loadDotCharterSource(p);
-        } catch {
-          return null;
-        }
-      })
-      .filter((c): c is DotCharter => c !== null);
+    // A direct readiness check must reject the same ambiguous identity as transitions.
+    findDotCharter(charter.dot_id, deps.rootDir);
+    const all = listDotCharters(deps.rootDir, { errors: [] }).map((entry) => entry.charter);
     assertActivationReady(charter, deps, all);
   } catch (error) {
     errors.push(error instanceof Error ? error.message : String(error));

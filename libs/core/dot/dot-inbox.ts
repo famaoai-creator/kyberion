@@ -13,9 +13,11 @@
  */
 
 import * as path from 'node:path';
-import { appendJsonLine } from '../foundation/json.js';
+import { createHash } from 'node:crypto';
+import { appendJsonLine, readJsonLines } from '../foundation/json.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { pathResolver } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeMkdir } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeLstat, safeMkdir } from '../secure-io.js';
 
 export const DOT_INBOX_PATH = 'active/shared/runtime/dot-inbox.jsonl';
 
@@ -50,6 +52,8 @@ export interface DotInboxEntryInput {
   payload?: Record<string, unknown>;
   /** Free-form producer tag, e.g. 'channel-turn', 'state-probe', 'cli'. */
   source?: string;
+  /** Trusted producer delivery identity, scoped to dot/channel/source. */
+  idempotency_key?: string;
 }
 
 export interface DotInboxAppendDeps {
@@ -77,6 +81,14 @@ export function appendDotInboxEntry(
     );
   }
   const dotId = input.dot_id?.trim();
+  const idempotencyKey = input.idempotency_key;
+  if (
+    idempotencyKey !== undefined &&
+    (typeof idempotencyKey !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9:._-]{0,199}$/.test(idempotencyKey))
+  ) {
+    throw new Error('[DOT_INBOX] idempotency_key must be a bounded ASCII delivery identity');
+  }
   const payloadText = input.payload === undefined ? undefined : JSON.stringify(input.payload);
   if (
     payloadText !== undefined &&
@@ -91,6 +103,7 @@ export function appendDotInboxEntry(
     ...(text?.trim() ? { text } : {}),
     ...(input.payload !== undefined ? { payload: input.payload } : {}),
     ...(input.source?.trim() ? { source: input.source.trim() } : {}),
+    ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
     enqueued_at: (deps.now?.() ?? new Date()).toISOString(),
   };
   const filePath = assertSafeRepositoryPath(
@@ -98,6 +111,41 @@ export function appendDotInboxEntry(
     { allowMissingLeaf: true }
   );
   safeMkdir(path.dirname(filePath), { recursive: true });
+  if (idempotencyKey) {
+    // The inbox row is the delivery receipt. Keep lookup and append under one
+    // file-scoped lock so a retry after an uncertain append returns that receipt
+    // rather than emitting a second wake. Never guess past unreadable evidence.
+    const lock = `dot-inbox-${createHash('sha256').update(filePath).digest('hex').slice(0, 24)}`;
+    return withLockSync(lock, () => {
+      let exists = true;
+      try {
+        safeLstat(filePath);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') exists = false;
+        else throw error;
+      }
+      const prior = exists
+        ? readJsonLines<AppendedDotInboxEntry>(filePath).find(
+            (row) =>
+              row?.idempotency_key === idempotencyKey &&
+              row.dot_id === entry.dot_id &&
+              row.channel === entry.channel &&
+              row.source === entry.source
+          )
+        : undefined;
+      if (prior) {
+        if (
+          typeof prior.enqueued_at !== 'string' ||
+          !Number.isFinite(Date.parse(prior.enqueued_at))
+        ) {
+          throw new Error('[DOT_INBOX] existing delivery receipt has an invalid timestamp');
+        }
+        return prior;
+      }
+      appendJsonLine(filePath, entry);
+      return entry;
+    });
+  }
   appendJsonLine(filePath, entry);
   return entry;
 }

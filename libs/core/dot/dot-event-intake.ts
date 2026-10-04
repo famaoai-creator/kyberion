@@ -61,7 +61,7 @@ export const DOT_EVENT_MAX_DUE_PER_SWEEP = 5;
 export const DOT_EVENT_SCAN_TAIL = 2000;
 /** Byte bound of the tail read (the whole ledger is never loaded). */
 export const DOT_EVENT_SCAN_TAIL_BYTES = 4 * 1024 * 1024;
-/** A same-source, same-type event with an identical payload digest inside this window is a replay. */
+/** A same-source event with an identical payload digest inside this window is a replay. */
 export const DOT_EVENT_REPLAY_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** Shorter HMAC secrets are treated as unconfigured (fail closed). */
 export const EVENT_INTAKE_MIN_SECRET_LENGTH = 16;
@@ -353,9 +353,12 @@ export interface IngestInboundEventResult {
   ledger: string;
 }
 
-/** True when `row` replays `event`: same source and type, same payload digest, within 24 h. */
+/**
+ * True when `row` replays `event`: same source and payload digest, within 24 h.
+ * Type and delivery headers are unsigned; changing either cannot bypass dedup.
+ */
 function isPayloadReplay(row: DotInboundEvent, event: DotInboundEvent): boolean {
-  if (row.source !== event.source || row.type !== event.type) return false;
+  if (row.source !== event.source) return false;
   if (!row.payload_digest || row.payload_digest !== event.payload_digest) return false;
   const gap = Math.abs(Date.parse(event.received_at) - Date.parse(row.received_at));
   return Number.isFinite(gap) && gap < DOT_EVENT_REPLAY_WINDOW_MS;

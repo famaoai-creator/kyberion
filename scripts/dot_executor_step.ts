@@ -3,22 +3,24 @@
  * `runDotExecutorSweep` and registers as the `dot-executor` step.
  *
  * Ports, resolved once per charter per sweep:
- *   - goal turn  → `runGoalDrivenLoop` with the backend `resolveDotWakeBackend`
- *                  chose (passed explicitly so the loop never re-resolves the stub);
- *   - delegated  → one advisory (read-only, `planner` profile) `delegateTask` /
+ *   - goal turn  → read-only direct replies via `runGoalDrivenLoop` with the
+ *                  backend `resolveDotWakeBackend` chose; task_session is
+ *                  refused until a governed work-tool executor is available;
+ *   - delegated  → one advisory (`planner` profile requested) `delegateTask` /
  *                  `delegateTaskHandle` turn bounded by the charter wall-clock
- *                  budget and cancelled on the executor's abort signal, used when
+ *                  budget, receiving a cancellation request on abort, used when
  *                  no live tool candidate exists;
  *   - pipeline   → in-process `executePipelineFile`, loaded lazily so the daemon
  *                  does not pay the pipeline engine's import cost on start.
  * The goal driver and pipeline engine accept no AbortSignal: on the executor's
- * wall-clock deadline they run on unobserved (the goal driver has its own
- * wall-clock bound) while the executor stops waiting and releases the item.
+ * wall-clock deadline they may keep running (the goal driver has its own
+ * wall-clock bound), so the executor quarantines the uncertain outcome.
  * An unconfigured stub backend leaves conversational items unclaimed.
  */
 
 import type { DotCharter, LoadedDotCharter } from '@agent/core/dot/dot-charter';
 import {
+  DOT_EXECUTOR_TASK_SESSION_GUIDANCE,
   runDotExecutorSweep,
   type DotExecutorDeps,
   type DotExecutorPorts,
@@ -50,10 +52,13 @@ export interface DotExecutorStepDeps extends DotExecutorDeps {
   maxPerSweep?: number;
 }
 
-/** Read-only delegation options: advice only, never a tool call or a write. */
+/**
+ * Request advice-only behavior. Provider restrictions differ: this option is
+ * not proof that native tools or writes are mechanically impossible.
+ */
 export const DOT_EXECUTOR_DELEGATE_OPTIONS = { advisory: true, profile: 'planner' } as const;
 
-/** Bounded, read-only delegated turn (same shape as the dot runtime's delegated wake). */
+/** Bounded advisory turn; cancellation and absence of effects remain unverified. */
 export async function delegateDotText(
   backend: DotWakeBackend,
   prompt: string,
@@ -146,6 +151,9 @@ export function buildDotExecutorPorts(
   const resolved = resolution.mode === 'unavailable' ? undefined : resolution.backend;
   const drive = deps.goalDriver ?? runGoalDrivenLoop;
   return {
+    // The driver has goal-control tools only here: no discovered work tools or
+    // executeTool port. A model's "complete" cannot prove task execution.
+    taskSessionUnavailable: DOT_EXECUTOR_TASK_SESSION_GUIDANCE,
     goalMode: () => goalModeOf(resolution),
     async runGoalTurn(options) {
       if (!resolved) throw new Error('no reasoning backend resolved for the goal turn');

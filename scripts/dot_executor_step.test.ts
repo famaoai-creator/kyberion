@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DotCharter } from '@agent/core/dot/dot-charter';
 import type { WorkItem } from '@agent/core/workforce/work-coordination-types';
+import { safeRmSync } from '@agent/core/secure-io';
 import {
   stubReasoningBackend,
   type ReasoningBackend,
@@ -46,6 +47,7 @@ const textBackend: ReasoningBackend = {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  safeRmSync('active/shared/tmp/dot-executor-step-tests', { recursive: true, force: true });
 });
 
 describe('buildDotExecutorPorts', () => {
@@ -79,7 +81,7 @@ describe('buildDotExecutorPorts', () => {
     await expect(delegateDotText(hanging, 'p', 10)).rejects.toThrow(/wall_clock budget 10ms/);
   });
 
-  it('delegates read-only: advisory + planner profile on delegateTask and delegateTaskHandle', async () => {
+  it('requests advisory + planner behavior on delegateTask and delegateTaskHandle', async () => {
     const delegateTask = vi.fn(async () => 'ok');
     await delegateDotText({ ...textBackend, delegateTask }, 'p', 5_000);
     expect(DOT_EXECUTOR_DELEGATE_OPTIONS).toEqual({ advisory: true, profile: 'planner' });
@@ -134,6 +136,112 @@ describe('buildDotExecutorPorts', () => {
 });
 
 describe('dot-executor supervisor step', () => {
+  it.each([toolBackend, textBackend])(
+    'refuses task_session work with the $name adapter instead of claiming a text-only completion',
+    async (backend) => {
+      const goalDriver = vi.fn(async () => ({
+        goalId: 'g',
+        finalState: 'complete',
+        goal: {},
+        turnsRun: 1,
+        rewindCount: 0,
+        persisted: null,
+        finalReport: 'claimed to have made the change',
+      }));
+      const target = {
+        item_id: 'unsupported',
+        title: 'Change a file',
+        description: 'Apply the change',
+        status: 'ready',
+        version: 1,
+        created_at: '2026-10-04T09:00:00Z',
+        metadata: {
+          dot_id: 'step-dot',
+          action_ref: 'dact-task',
+          requested_work_shape: 'task_session',
+        },
+      } as unknown as WorkItem;
+      const release = vi.fn(() => ({ item: target, lease: {} as never }));
+      const rows = await runDotExecutorStep(
+        new Date('2026-10-04T10:00:00Z'),
+        [{ path: 'dots/step-dot.json', charter: CHARTER }],
+        {
+          rootDir: 'active/shared/tmp/dot-executor-step-tests',
+          backend,
+          goalDriver: goalDriver as never,
+          listItems: () => [target],
+          claim: () => ({ item: target, lease: { lease_id: 'l1' } as never }),
+          release,
+          throttle: () => 'normal',
+          tokenCapReached: () => false,
+          reap: () => ({ expired: [], recovered: [], parked: [], replayed: [] }),
+          appendInbox: () => {},
+          audit: () => {},
+        }
+      );
+      expect(rows).toMatchObject([
+        {
+          status: 'blocked',
+          mode: 'escalated',
+          summary: expect.stringContaining('no governed work-tool executor'),
+        },
+      ]);
+      expect(goalDriver).not.toHaveBeenCalled();
+      expect(release).toHaveBeenCalledWith(expect.objectContaining({ nextStatus: 'archived' }));
+    }
+  );
+
+  it('preserves a legitimate advisory direct reply through the real adapter', async () => {
+    const goalDriver = vi.fn(async () => ({
+      goalId: 'g',
+      finalState: 'complete',
+      goal: {},
+      turnsRun: 1,
+      rewindCount: 0,
+      persisted: null,
+      finalReport: 'Here is the explanation.',
+    }));
+    const target = {
+      item_id: 'reply',
+      title: 'Explain the result',
+      description: 'Give an explanation',
+      status: 'ready',
+      version: 1,
+      created_at: '2026-10-04T09:00:00Z',
+      metadata: {
+        dot_id: 'step-dot',
+        action_ref: 'dact-reply',
+        requested_work_shape: 'direct_reply',
+      },
+    } as unknown as WorkItem;
+    const rows = await runDotExecutorStep(
+      new Date('2026-10-04T10:00:00Z'),
+      [{ path: 'dots/step-dot.json', charter: CHARTER }],
+      {
+        rootDir: 'active/shared/tmp/dot-executor-step-tests',
+        backend: toolBackend,
+        goalDriver: goalDriver as never,
+        listItems: () => [target],
+        claim: () => ({ item: target, lease: { lease_id: 'l1' } as never }),
+        release: () => ({ item: target, lease: {} as never }),
+        throttle: () => 'normal',
+        tokenCapReached: () => false,
+        reap: () => ({ expired: [], recovered: [], parked: [], replayed: [] }),
+        appendInbox: () => {},
+        audit: () => {},
+      }
+    );
+    expect(rows).toMatchObject([
+      {
+        status: 'done',
+        summary: expect.stringContaining('advisory result, effects are unverified'),
+      },
+    ]);
+    expect(goalDriver).toHaveBeenCalledWith(
+      expect.objectContaining({ systemPrompt: expect.stringContaining('You run read-only') })
+    );
+  });
+
   it('is registered after key-result measurement', () => {
     const ids = DOT_SUPERVISOR_STEPS.map((step) => step.id);
     expect(ids).toContain('dot-executor');

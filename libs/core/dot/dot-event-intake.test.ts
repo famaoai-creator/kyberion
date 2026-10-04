@@ -230,6 +230,53 @@ describe('processInboundEventRequest + ingest', () => {
     expect(readDotInboundEvents(undefined, { rootDir: TEST_ROOT })).toHaveLength(1);
   });
 
+  it('rejects a replay of the original signed body with changed unsigned delivery and type headers', () => {
+    const body = JSON.stringify({ workflow_run: { conclusion: 'failure' } });
+    const original = {
+      ...githubRequest(body, 'original-delivery'),
+      now: new Date('2026-10-04T10:00:00.000Z'),
+    };
+    expect(processInboundEventRequest(original)).toMatchObject({
+      status: 202,
+      result: { status: 'accepted' },
+    });
+    // Reuse the captured body and signature verbatim; only unsigned headers change.
+    const replay = {
+      ...original,
+      headers: {
+        ...original.headers,
+        'x-github-delivery': 'changed-delivery',
+        'x-github-event': 'push',
+      },
+      now: new Date('2026-10-04T11:00:00.000Z'),
+    };
+    expect(processInboundEventRequest(replay)).toMatchObject({
+      status: 202,
+      result: { status: 'duplicate' },
+    });
+    expect(readDotInboundEvents(undefined, { rootDir: TEST_ROOT })).toMatchObject([
+      { delivery_id: 'original-delivery', type: 'workflow_run' },
+    ]);
+  });
+
+  it('keeps payload replay detection scoped to the authenticated policy source', () => {
+    const request = githubRequest('{"status":"failed"}', 'same-delivery');
+    expect(processInboundEventRequest(request)).toMatchObject({
+      status: 202,
+      result: { status: 'accepted' },
+    });
+    expect(
+      processInboundEventRequest({
+        ...request,
+        source: 'other',
+        policy: { ...POLICY, sources: { ...POLICY.sources, other: POLICY.sources.github } },
+      })
+    ).toMatchObject({ status: 202, result: { status: 'accepted' } });
+    expect(
+      readDotInboundEvents(undefined, { rootDir: TEST_ROOT }).map((event) => event.source)
+    ).toEqual(['github', 'other']);
+  });
+
   it('answers 401 for bad signatures, disabled and unknown sources, 413 for oversize', () => {
     const body = '{"a":1}';
     const bad = {

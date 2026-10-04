@@ -65,6 +65,7 @@ export async function acquireLock(resourceId: string, timeoutMs = 5000): Promise
   // this tick" and skips, so on a busy machine a scheduler tick was dropped
   // while nothing was actually holding the lease. Returning false must mean "the
   // lock is genuinely held", never "we ran out of time before trying".
+  let recoveryBlocked: string | undefined;
   let stalePurges = 0;
   const MAX_STALE_PURGES = 3;
   for (;;) {
@@ -82,14 +83,18 @@ export async function acquireLock(resourceId: string, timeoutMs = 5000): Promise
       if (err.code !== 'EEXIST') throw err;
 
       // Lock held by another process, check if it's stale
-      if (_isLockStale(lockFile) && stalePurges < MAX_STALE_PURGES) {
+      const recovery = reclaimStaleLock(lockFile);
+      recoveryBlocked = recovery.blocked;
+      if (recovery.retry && stalePurges < MAX_STALE_PURGES) {
         stalePurges++;
         logger.warn(`⚠️ [LockUtils] Found stale lock for ${resourceId}. Purging...`);
-        io.unlink(lockFile);
-        continue; // Retry immediately
+        continue; // Retry immediately after guarded cleanup or disappearance
       }
       // The lock is really held: honour the caller's waiting budget.
-      if (Date.now() - startTime >= timeoutMs) return false;
+      if (Date.now() - startTime >= timeoutMs) {
+        if (recoveryBlocked) throw recoveryError(resourceId, recoveryBlocked);
+        return false;
+      }
       // Wait a bit before retrying (exponential backoff or simple delay)
       await new Promise((res) => setTimeout(res, 100 + Math.random() * 200));
     }
@@ -109,35 +114,70 @@ export function releaseLock(resourceId: string): void {
         io.unlink(lockFile);
       }
     } catch (_) {
-      // Force release if corrupted
-      io.unlink(lockFile);
+      // An incomplete record may belong to a live publisher. Never delete
+      // ownership we cannot verify; operator recovery must inspect it first.
     }
   }
 }
 
-/**
- * Checks if a lock file is stale (process no longer exists).
- */
-function _isLockStale(lockFile: string): boolean {
-  try {
-    const content = requireLockIo().loadJson<{ pid?: number }>(lockFile);
-    const pid = Number(content?.pid);
-    // A partially-written or hand-edited lock must never become a permanent
-    // delivery fence. Only a positive integer PID is meaningful ownership
-    // metadata; malformed records are safe to reclaim.
-    if (!Number.isInteger(pid) || pid <= 0) return true;
+type LockOwnerState = 'live' | 'dead' | 'missing' | 'unknown';
 
-    // Check if PID is still running (signal 0 doesn't kill but checks
-    // existence). EPERM means the process exists but is not inspectable, so
-    // keep the lock rather than allowing two writers to enter concurrently.
-    process.kill(pid, 0);
-    return false;
-  } catch (err: any) {
-    // A missing/corrupt lock record is stale. ESRCH means the recorded
-    // process no longer exists. Other process errors (for example EPERM)
-    // conservatively retain the lock.
-    if (err?.code === 'EPERM') return false;
-    return err?.code === 'ESRCH' || err?.name === 'SyntaxError' || err?.code === 'ENOENT';
+function lockOwnerState(lockFile: string): LockOwnerState {
+  let content: { pid?: number };
+  try {
+    content = requireLockIo().loadJson<{ pid?: number }>(lockFile);
+  } catch (error: unknown) {
+    return (error as NodeJS.ErrnoException)?.code === 'ENOENT' ? 'missing' : 'unknown';
+  }
+  if (typeof content?.pid !== 'number' || !Number.isInteger(content.pid) || content.pid <= 0)
+    return 'unknown';
+  try {
+    process.kill(content.pid, 0);
+    return 'live';
+  } catch (error: unknown) {
+    const code = (error as NodeJS.ErrnoException)?.code;
+    if (code === 'ESRCH') return 'dead';
+    if (code === 'EPERM') return 'live';
+    return 'unknown';
+  }
+}
+
+function recoveryError(resourceId: string, lockFile: string): Error {
+  return new Error(
+    `[LOCK_RECOVERY_REQUIRED] Cannot verify lock ownership for ${resourceId}: ${lockFile}. Inspect the lock and its owner; after confirming no holder remains, remove the orphaned record explicitly. No uncertain lock was deleted.`
+  );
+}
+
+/** Only stale cleanup is serialized. An orphaned cleanup guard deliberately
+ * requires operator inspection: recursively stealing it recreates the race.
+ * A missing main record is never unlinked, since a new owner may publish next. */
+function reclaimStaleLock(lockFile: string): { retry: boolean; blocked?: string } {
+  const initial = lockOwnerState(lockFile);
+  if (initial === 'missing') return { retry: true };
+  if (initial !== 'dead')
+    return { retry: false, ...(initial === 'unknown' ? { blocked: lockFile } : {}) };
+  const io = requireLockIo();
+  const guard = lockFile + '.reclaim';
+  try {
+    io.createExclusive(guard, JSON.stringify({ pid: process.pid, ts: nowIso() }));
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException)?.code !== 'EEXIST') throw error;
+    return { retry: false, ...(lockOwnerState(guard) === 'live' ? {} : { blocked: guard }) };
+  }
+  try {
+    const current = lockOwnerState(lockFile);
+    if (current === 'missing') return { retry: true };
+    if (current !== 'dead')
+      return { retry: false, ...(current === 'unknown' ? { blocked: lockFile } : {}) };
+    io.unlink(lockFile);
+    return { retry: true };
+  } finally {
+    try {
+      const owner = io.loadJson<{ pid?: number }>(guard);
+      if (owner.pid === process.pid) io.unlink(guard);
+    } catch {
+      /* Unknown cleanup ownership is never deleted. */
+    }
   }
 }
 
@@ -173,6 +213,7 @@ export async function withLock<T>(
 export function withLockSync<T>(resourceId: string, fn: () => T, timeoutMs = 5000): T {
   const lockFile = path.join(LOCK_ROOT, `${resourceId}.lock`);
   const startTime = Date.now();
+  let recoveryBlocked: string | undefined;
   const io = requireLockIo();
   if (!io.exists(LOCK_ROOT)) io.mkdir(LOCK_ROOT);
 
@@ -184,10 +225,9 @@ export function withLockSync<T>(resourceId: string, fn: () => T, timeoutMs = 500
       );
     } catch (err: any) {
       if (err?.code !== 'EEXIST') throw err;
-      if (_isLockStale(lockFile)) {
-        io.unlink(lockFile);
-        continue;
-      }
+      const recovery = reclaimStaleLock(lockFile);
+      recoveryBlocked = recovery.blocked;
+      if (recovery.retry) continue;
       const waitBuffer = new Int32Array(new SharedArrayBuffer(4));
       Atomics.wait(waitBuffer, 0, 0, 50);
       continue;
@@ -199,6 +239,7 @@ export function withLockSync<T>(resourceId: string, fn: () => T, timeoutMs = 500
     }
   }
 
+  if (recoveryBlocked) throw recoveryError(resourceId, recoveryBlocked);
   throw new Error(
     `[LOCK_TIMEOUT] Failed to acquire lock for resource: ${resourceId} within ${timeoutMs}ms`
   );

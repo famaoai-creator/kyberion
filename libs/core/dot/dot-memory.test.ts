@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { safeRmSync } from '../secure-io.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { readJsonLines } from '../foundation/json.js';
 import type { DotCharter } from './dot-charter.js';
 import { DOT_PROMPT_SECTIONS, DOT_WAKE_TOOLS } from './dot-extension-registry.js';
@@ -13,6 +13,7 @@ import {
   isoWeekKey,
   parseDotMemoryOp,
   readDotMemory,
+  writeDotMemory,
   DOT_MEMORY_PROMPT_BUDGET,
   type DotMemoryOp,
 } from './dot-memory.js';
@@ -94,6 +95,45 @@ describe('dot memory ops', () => {
     expect(boundDotMemory(doc, 99999).notes.map((n) => n.id)[0]).toBe('n-5');
   });
 
+  it('never reuses removed IDs after reloading memory', () => {
+    const adds: DotMemoryOp[] = [
+      { op: 'add_note', text: 'note' },
+      { op: 'add_item', text: 'item' },
+      { op: 'add_hypothesis', text: 'hypothesis' },
+    ];
+    dotUpdateMemoryTool.apply(CHARTER, adds, ctx);
+    dotUpdateMemoryTool.apply(
+      CHARTER,
+      ['n-1', 'i-1', 'h-1'].map((id) => ({ op: 'remove', id })),
+      ctx
+    );
+    expect(readDotMemory(CHARTER, ctx).last_ids).toEqual({ n: 1, i: 1, h: 1 });
+    dotUpdateMemoryTool.apply(CHARTER, adds, ctx);
+    const doc = readDotMemory(CHARTER, ctx);
+    expect([doc.notes[0].id, doc.open_items[0].id, doc.hypotheses[0].id]).toEqual([
+      'n-2',
+      'i-2',
+      'h-2',
+    ]);
+  });
+
+  it('retains high-water marks when the highest ID is evicted', () => {
+    const doc = emptyDotMemory('d', NOW);
+    doc.hypotheses = Array.from({ length: 21 }, (_, index) => ({
+      id: `h-${index + 1}`,
+      text: 'hypothesis',
+      at: NOW.toISOString(),
+      confidence: 0.5,
+      status: index === 20 ? 'confirmed' : 'open',
+    }));
+    const bounded = boundDotMemory(doc, 99999);
+    expect(bounded.hypotheses).toHaveLength(20);
+    expect(bounded.hypotheses.some((h) => h.id === 'h-21')).toBe(false);
+    writeDotMemory(CHARTER, bounded, ctx);
+    dotUpdateMemoryTool.apply(CHARTER, [{ op: 'add_hypothesis', text: 'new' }], ctx);
+    expect(readDotMemory(CHARTER, ctx).hypotheses.at(-1)?.id).toBe('h-22');
+  });
+
   it('enforces the byte budget deterministically: closed, resolved, notes, then open', () => {
     const doc = emptyDotMemory('d', NOW);
     const big = 'z'.repeat(400);
@@ -137,6 +177,18 @@ describe('dot memory ops', () => {
 });
 
 describe('distillDotMemory', () => {
+  it('blocks legacy ID migration when corrupt distillation evidence could hide an ID', () => {
+    const legacy = emptyDotMemory(CHARTER.dot_id, NOW);
+    delete legacy.last_ids;
+    writeDotMemory(CHARTER, legacy, ctx);
+    safeMkdir(`${TEST_ROOT}/${dotStatePath(CHARTER)}`, { recursive: true });
+    safeWriteFile(`${TEST_ROOT}/${dotStatePath(CHARTER, DOT_MEMORY_DISTILL_FILE)}`, '{corrupt\n');
+    expect(() => readDotMemory(CHARTER, ctx)).toThrow();
+    expect(() =>
+      dotUpdateMemoryTool.apply(CHARTER, [{ op: 'add_hypothesis', text: 'new' }], ctx)
+    ).toThrow();
+  });
+
   it('computes ISO weeks', () => {
     expect(isoWeekKey(new Date('2026-10-05T00:00:00Z'))).toBe('2026-W41');
     expect(isoWeekKey(new Date('2026-01-01T00:00:00Z'))).toBe('2026-W01');
@@ -178,4 +230,44 @@ describe('distillDotMemory', () => {
       })
     ).toBeUndefined();
   });
+
+  it.each(['remove', 'evict', 'legacy'] as const)(
+    'distills a new hypothesis after a prior hypothesis is %s and memory reloads',
+    async (mode) => {
+      const distillCtx = { ...ctx, recordFeedback: async () => ({ candidate_id: 'candidate' }) };
+      dotUpdateMemoryTool.apply(
+        CHARTER,
+        [
+          { op: 'add_hypothesis', text: 'first' },
+          { op: 'resolve_hypothesis', id: 'h-1', status: 'confirmed' },
+        ],
+        ctx
+      );
+      expect((await distillDotMemory(CHARTER, distillCtx))?.hypothesis_ids).toEqual(['h-1']);
+      if (mode === 'evict') {
+        const doc = readDotMemory(CHARTER, ctx);
+        doc.hypotheses[0].text = 'x'.repeat(400);
+        writeDotMemory(CHARTER, boundDotMemory(doc, 512), ctx);
+        expect(readDotMemory(CHARTER, ctx).hypotheses).toEqual([]);
+      } else {
+        dotUpdateMemoryTool.apply(CHARTER, [{ op: 'remove', id: 'h-1' }], ctx);
+        if (mode === 'legacy') {
+          const doc = readDotMemory(CHARTER, ctx);
+          delete doc.last_ids;
+          writeDotMemory(CHARTER, doc, ctx);
+        }
+      }
+      const nextWeek = { ...ctx, now: () => new Date('2026-10-12T00:00:00Z') };
+      dotUpdateMemoryTool.apply(
+        CHARTER,
+        [
+          { op: 'add_hypothesis', text: 'new learning' },
+          { op: 'resolve_hypothesis', id: 'h-2', status: 'refuted' },
+        ],
+        nextWeek
+      );
+      const row = await distillDotMemory(CHARTER, { ...distillCtx, ...nextWeek });
+      expect(row).toMatchObject({ hypothesis_ids: ['h-2'], confirmed: 0, refuted: 1 });
+    }
+  );
 });

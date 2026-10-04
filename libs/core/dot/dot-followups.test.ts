@@ -15,6 +15,7 @@ import {
 } from './dot-followups.js';
 import { DOT_WAKE_LEDGER_PATH, evaluateDotTriggersDue } from './dot-runtime.js';
 import './dot-extension-bootstrap.js';
+import { DOT_FOLLOWUPS_FILE, dotStatePath } from './dot-state-paths.js';
 
 const TEST_ROOT = 'active/shared/tmp/dot-followups-tests';
 const T0 = new Date('2026-10-05T10:00:00Z');
@@ -107,6 +108,64 @@ describe('follow-ups', () => {
     expect(
       dotScheduleFollowupTool.apply(one, [{ delay_minutes: 10, reason: 'x' }], ctx(at(2)))
     ).toHaveLength(1);
+  });
+
+  it('atomically replaces only the completing follow-up and does not re-arm on a retry', () => {
+    const one = { ...CHARTER, followups: { max_pending: 1 } } as DotCharter;
+    dotScheduleFollowupTool.apply(one, [{ delay_minutes: 5, reason: 'first' }], ctx(T0));
+    const [due] = evaluateDotFollowupsDue(one, ctx(at(6)));
+    expect(
+      dotScheduleFollowupTool.apply(one, [{ delay_minutes: 5, reason: 'wrong key' }], {
+        ...ctx(at(6)),
+        completingFollowupKey: 'followup:other',
+      })
+    ).toHaveLength(1);
+    expect(
+      dotScheduleFollowupTool.apply(one, [{ delay_minutes: 5, reason: 'replacement' }], {
+        ...ctx(at(6)),
+        completingFollowupKey: due.key,
+      })
+    ).toEqual([]);
+    // Successor commitment itself consumes the parent even if delivery is not recorded.
+    expect(listPendingDotFollowups(one, ctx(at(6))).map((row) => row.reason)).toEqual([
+      'replacement',
+    ]);
+    const [replacement] = listPendingDotFollowups(one, ctx(at(6)));
+    expect(
+      dotScheduleFollowupTool.apply(one, [{ delay_minutes: 20, reason: 'duplicate retry' }], {
+        ...ctx(at(12)),
+        completingFollowupKey: due.key,
+      })
+    ).toEqual([]);
+    expect(listPendingDotFollowups(one, ctx(at(12)))).toEqual([replacement]);
+    ledger({ trigger_key: due.key, fired_at: at(6).toISOString(), outcome: 'delivered' });
+    expect(listPendingDotFollowups(one, ctx(at(6))).map((row) => row.reason)).toEqual([
+      'replacement',
+    ]);
+  });
+
+  it('does not treat a malformed successor as a committed replacement', () => {
+    const one = { ...CHARTER, followups: { max_pending: 1 } } as DotCharter;
+    dotScheduleFollowupTool.apply(one, [{ delay_minutes: 5, reason: 'original' }], ctx(T0));
+    const [due] = evaluateDotFollowupsDue(one, ctx(at(6)));
+    appendJsonLine(`${TEST_ROOT}/${dotStatePath(one, DOT_FOLLOWUPS_FILE)}`, {
+      dot_id: one.dot_id,
+      followup_id: 'broken-successor',
+      replaces_followup_id: due.key.slice('followup:'.length),
+      due_at: 'not-a-date',
+      reason: 'broken',
+      created_at: T0.toISOString(),
+    });
+    expect(listPendingDotFollowups(one, ctx(at(6))).map((row) => row.reason)).toEqual(['original']);
+    expect(
+      dotScheduleFollowupTool.apply(one, [{ delay_minutes: 10, reason: 'valid successor' }], {
+        ...ctx(at(6)),
+        completingFollowupKey: due.key,
+      })
+    ).toEqual([]);
+    expect(listPendingDotFollowups(one, ctx(at(6))).map((row) => row.reason)).toEqual([
+      'valid successor',
+    ]);
   });
 });
 

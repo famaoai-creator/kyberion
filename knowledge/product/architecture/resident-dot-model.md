@@ -154,40 +154,62 @@ wake ──proposal──▶ dispatch (gate ⊔ floors, arbitration) ──▶ W
 
 - **Executor (DL-01)**: each sweep claims `ready` WorkItems addressed to the dot
   (`metadata.dot_id` or `handoff_to`) under the charter role, runs them by
-  shape (`task_session` / `direct_reply` as a bounded goal turn, `pipeline`
-  only if listed in `authority.allowed_pipelines`, `mission` is escalated),
-  releases the lease with a result and appends a row to `work-results.jsonl`
-  carrying the KR snapshot taken before the work. Failures retry up to 3
-  attempts; a stranded claim is reaped. Terminal results are escalated
-  (archived, so the delegation slot frees) and reported to the dot's inbox
-  (`payload.report_from = dot-executor`), which makes that dot due again.
+  shape (`direct_reply` as a bounded text turn, `pipeline` only if listed in
+  `authority.allowed_pipelines`, `mission` is escalated). The live
+  `task_session` adapter has no governed task tools yet and fails closed;
+  a model's declaration of completion is not evidence of an executed task.
+  Result evidence, including the pre-work KR snapshot, is persisted before
+  releasing the lease. Errors, timeouts and abandoned claims are quarantined
+  rather than retried: an abort signal does not prove cancellation, and late
+  effects may still occur. Recovery reconciles the original action/attempt
+  without re-executing it. Terminal reports use an idempotent inbox identity
+  plus a durable result receipt (`payload.report_from = dot-executor`), so a
+  failed release, enqueue or receipt update can be reconciled. Legacy results
+  lacking a receipt may receive one recovery report.
+  The shared filesystem lock primitive conservatively retains unknown ownership
+  and serializes stale cleanup. Restart competing workers on upgrade so they all
+  use the repaired primitive in the same PID/filesystem namespace; uncertain or
+  orphaned lock markers require explicit operator inspection and recovery.
 - **Key results (DL-03)**: `goal.key_results` are measured per sweep
   (`probe`, `file`, `signal_ratio`, `org_metric`) into `kr-ledger.jsonl`; gaps
   to target are injected into the wake prompt. Organization objectives roll up
   from the org-scope ledger.
 - **Outcomes (DL-04)**: a proposal's `expected_effect` ({kr_id|signal,
   direction}) is stored on the WorkItem. After the settle window
-  (`outcome_settle_minutes`, default 60) the KR is re-measured and a verdict
+  (`outcome_settle_minutes`, default 60), a measurement strictly after completion
+  and at or after the due time is required before a verdict
   `improved | no_change | regressed | unmeasurable` lands in `outcomes.jsonl`;
   `regressed` feeds execution feedback. Recent verdicts enter the next prompt.
 - **Memory (DL-05)**: `memory/<dot>.json` (notes, open items, hypotheses;
   8 KB, deterministic eviction), edited through the `dot_update_memory` tool /
-  `dot-memory` fence and distilled weekly.
+  `dot-memory` fence and distilled weekly. Persisted ID high-water marks survive
+  eviction/removal; legacy migration also reads distillation history strictly.
+  Already-reused legacy IDs cannot be reliably reconstructed and are not relabeled.
 - **Follow-ups and catch-up (DL-09)**: `dot_schedule_followup` / `dot-followup`
   (5 min to 7 days, 3 pending) writes `followups.jsonl`; a due follow-up is a
-  `followup:<id>` wake. Missed cron minutes within
+  `followup:<id>` wake. A follow-up can atomically replace itself at capacity;
+  deterministic successors survive failed wake-ledger writes without duplicate
+  rearming, and a failed replacement leaves the original retryable. Missed cron minutes within
   `runtime.cron_catch_up_hours` (default 6, max 24) coalesce into one wake.
 - **Events (DL-08)**: a charter trigger `{kind: 'event', sources, types?,
 match?}` wakes on an authenticated inbound event. The loopback-only
   `event-intake` surface verifies an HMAC-SHA256 signature (secret from the
-  secret store), dedups by delivery id and appends to `events.jsonl`; the
+  secret store), dedups by delivery id and source/payload digest, and appends
+  to `events.jsonl`. Unsigned type/delivery headers cannot evade payload dedup;
+  that check retains its existing 24-hour, 2,000-row / 4 MiB tail bounds. The
   tenant comes from `event-intake-policy.json`, never the payload. Every
   source ships disabled.
 - **Budget governor (DL-07)**: `org-budget-governor` aggregates daily token
   usage per tenant/organization (`spend-policy.json` `org_budget`): `soft`
   (80 %) forces proposals to `approve` (propose-only), `hard` (100 %) stops
   wakes and the executor while housekeeping continues. The cost cap inherits
-  `daily_cap_usd`. A broken governor fails open.
+  `daily_cap_usd`. Trusted per-attempt accounting IDs reconcile SDK token
+  evidence with dot-ledger estimates, including late responses; uncorrelated
+  legacy rows count conservatively and can overcount same-day overlap. Configured
+  cost caps pause on relevant unreadable, unpriced or unscoped cost evidence;
+  token-only policies do not pause solely for unknown cost. Historic dot-ledger
+  scope still depends on valid, stable charter scope. Unrelated governor exceptions
+  retain the existing outer fail-open behavior.
 - **Autonomy L0-L4 (DL-10)**: L0 shadow (decisions recorded, nothing acts),
   L1 approve-all, **L2 supervised (default, today's behavior)**, L3 trusted
   (one human approval releases a learned floor; decays in 7 days), L4
