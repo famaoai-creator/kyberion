@@ -4,6 +4,8 @@ import { getVideoRenderRuntimePolicy } from './video-render-runtime-policy.js';
 import * as pathResolver from '../path-resolver.js';
 import { slugify } from '../foundation/text.js';
 import { escapeHtml } from '../text-escaping.js';
+import { renderSceneTimelineRuntime, VIDEO_TIMELINE_CUE_CSS } from './video-timeline-runtime.js';
+import { resolveDefaultVideoBackgroundColor } from './video-design-system.js';
 import {
   assertSafeRepositoryPath,
   safeCopyFileSync,
@@ -125,15 +127,20 @@ export function writeVideoCompositionBundle(
   const motionDirection = resolveAdfMotionDirection(adf);
 
   for (const scene of plan.scenes) {
-    const sceneSource = applySceneComposition(
-      applySceneMotion(
-        applyVideoThemeTokens(renderSceneHtml(adf, scene), resolveAdfVisualDirection(adf)),
-        scene,
-        motionDirection
-      ),
-      scene,
-      adf.composition.scene_compositions
+    const themed = applyVideoThemeTokens(
+      renderSceneHtml(adf, scene),
+      resolveAdfVisualDirection(adf)
     );
+    // Authored timeline scenes choreograph their own cues; template motion and
+    // layout overrides would double-animate or re-position them.
+    const sceneSource =
+      scene.template_id === 'timeline-html'
+        ? themed
+        : applySceneComposition(
+            applySceneMotion(themed, scene, motionDirection),
+            scene,
+            adf.composition.scene_compositions
+          );
     const scenePath = path.join(plan.bundle_dir, scene.output_html);
     safeWriteFile(scenePath, sceneSource);
 
@@ -259,25 +266,18 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
             : ''
         }
       </div>`;
-  const hfScript = `<script>
-  const __hfTimeline = {
-    duration: () => ${scene.duration_sec},
-    time: () => 0,
-    pause: () => {},
-    play: () => {},
-    seek: (time) => { console.log('[HF] seek', time); },
-    totalTime: (time) => { console.log('[HF] totalTime', time); },
-    isPlaying: () => false,
-    setPlaybackRate: () => {},
-    getPlaybackRate: () => 1,
-  };
-  window.__hf = {
-    duration: ${scene.duration_sec},
-    seek: (time) => { console.log('[HF] seek', time); }
-  };
-  window.__timelines = window.__timelines || {};
-  window.__timelines["${sceneKey}"] = __hfTimeline;
-</script>`;
+  // Real seek: HyperFrames only seeks the top document, so each scene iframe
+  // moves its own CSS animation clock (the previous stub only logged).
+  const narrationSec = Number(scene.content?.narration_sec);
+  const hfScript = renderSceneTimelineRuntime({
+    sceneKey,
+    durationSec: scene.duration_sec,
+    narrationSec: Number.isFinite(narrationSec) ? narrationSec : undefined,
+  });
+
+  if (scene.template_id === 'timeline-html') {
+    return renderTimelineHtmlScene(adf, scene, sceneKey, sceneCssVars, hfScript);
+  }
 
   if (scene.template_id === 'howto-guide') {
     return `<!doctype html>
@@ -1107,7 +1107,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         height: ${adf.composition.height}px;
         font-family: var(--font-sans, 'Inter', 'Noto Sans JP', -apple-system, sans-serif);
         background: radial-gradient(circle at 50% 18%, rgba(255,255,255,0.05), transparent 46%), var(--bg, #0B1020);
-        color: var(--text, #f8fafc);
+        color: var(--text);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1438,6 +1438,60 @@ function copySceneAssets(bundleDir: string, assetRefs: VideoCompositionAssetRef[
 function buildDefaultBundleDir(adf: VideoCompositionADF, baseRoot: string): string {
   const baseName = slugify(adf.intent || adf.title || 'video-composition');
   return pathResolver.rootResolve(path.join(baseRoot, baseName));
+}
+
+/**
+ * Authored timeline scene: the brief supplies the scene markup (`content.html`)
+ * and optional CSS (`content.css`) using the cue runtime (`kb-cue` classes,
+ * `data-type` / `data-count`), so scenes can be designed per beat instead of
+ * filled into a fixed layout. Declared `asset_refs` are referenced as
+ * `{{asset:<asset_id>}}`.
+ */
+function renderTimelineHtmlScene(
+  adf: VideoCompositionADF,
+  scene: CompiledVideoCompositionScene,
+  sceneKey: string,
+  sceneCssVars: string,
+  runtimeScript: string
+): string {
+  // `{{asset:<asset_id>}}` → the copy writeVideoCompositionBundle places in
+  // <bundle>/assets/, relative to compositions/<scene>.html.
+  const markup = sceneText(scene, 'html').replace(/\{\{asset:([\w.-]+)\}\}/g, (match, assetId) => {
+    const asset = scene.asset_refs.find((ref) => ref.asset_id === assetId);
+    return asset
+      ? `../assets/${escapeHtml(safeAssetName(pathResolver.rootResolve(asset.path)))}`
+      : match;
+  });
+  const css = sceneText(scene, 'css').replace(/<\/style/gi, '<\\/style');
+  const background = escapeHtml(
+    adf.composition.background_color || resolveDefaultVideoBackgroundColor('promo')
+  );
+  return `<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body {
+        width: ${adf.composition.width}px;
+        height: ${adf.composition.height}px;
+        overflow: hidden;
+        background: ${background};
+        color: var(--text);
+        font-family: var(--font-sans, 'Noto Sans CJK JP', 'Noto Sans JP', 'Inter', sans-serif);
+      }
+      ${sceneCssVars}
+    </style>
+    ${VIDEO_TIMELINE_CUE_CSS}
+    <style data-kb-scene-css>${css}</style>
+  </head>
+  <body data-composition-id="${escapeHtml(sceneKey)}" data-width="${adf.composition.width}" data-height="${adf.composition.height}" data-duration="${scene.duration_sec}" data-start="0">
+    <div class="composition-root" data-composition-id="${escapeHtml(sceneKey)}" style="position:absolute;inset:0;">
+${markup}
+    </div>
+    ${runtimeScript}
+  </body>
+</html>`;
 }
 
 function sceneText(scene: CompiledVideoCompositionScene, key: string): string {
