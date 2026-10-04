@@ -143,6 +143,14 @@ describe('distillDotMemory', () => {
   });
 
   it('distills resolved hypotheses once per week', async () => {
+    const recorded: unknown[] = [];
+    const distillCtx = {
+      ...ctx,
+      recordFeedback: async (input: unknown) => {
+        recorded.push(input);
+        return { candidate_id: 'cand-1' };
+      },
+    };
     dotUpdateMemoryTool.apply(
       CHARTER,
       [
@@ -151,14 +159,23 @@ describe('distillDotMemory', () => {
       ],
       ctx
     );
-    const first = await distillDotMemory(CHARTER, ctx);
-    expect(first).toMatchObject({ key: 'distill:2026-W41', confirmed: 1, refuted: 0 });
-    expect(await distillDotMemory(CHARTER, ctx)).toBeUndefined();
+    const first = await distillDotMemory(CHARTER, distillCtx);
+    expect(first).toMatchObject({
+      key: 'distill:2026-W41',
+      confirmed: 1,
+      refuted: 0,
+      candidate_id: 'cand-1',
+    });
+    expect(recorded).toHaveLength(1);
+    expect(await distillDotMemory(CHARTER, distillCtx)).toBeUndefined();
     const rows = readJsonLines(`${TEST_ROOT}/${dotStatePath(CHARTER, DOT_MEMORY_DISTILL_FILE)}`);
     expect(rows).toHaveLength(1);
     // next week: the same hypothesis is not distilled again
     expect(
-      await distillDotMemory(CHARTER, { ...ctx, now: () => new Date('2026-10-12T00:00:00Z') })
+      await distillDotMemory(CHARTER, {
+        ...distillCtx,
+        now: () => new Date('2026-10-12T00:00:00Z'),
+      })
     ).toBeUndefined();
   });
 });

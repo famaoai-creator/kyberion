@@ -422,6 +422,46 @@ export function isoWeekKey(date: Date): string {
 export interface DotMemoryDistillDeps {
   rootDir?: string;
   now?: () => Date;
+  /**
+   * Records the distilled feedback and returns the materialized candidate id.
+   * Defaults to the global execution-feedback store (tests inject a stub).
+   */
+  recordFeedback?: (input: DotMemoryDistillFeedback) => Promise<{ candidate_id?: string }>;
+}
+
+export interface DotMemoryDistillFeedback {
+  dot_id: string;
+  tenant: boolean;
+  key: string;
+  outcome: 'satisfied' | 'dissatisfied';
+  comment: string;
+  correction?: string;
+}
+
+async function recordDistillFeedback(
+  input: DotMemoryDistillFeedback
+): Promise<{ candidate_id?: string }> {
+  const { recordExecutionFeedback, materializeExecutionFeedbackCandidate } =
+    await import('../execution-feedback.js');
+  const feedback = recordExecutionFeedback({
+    scenario_id: `dot-memory:${input.dot_id}`,
+    intent_id: input.key,
+    surface: 'dot',
+    outcome: input.outcome,
+    comment: input.comment,
+    ...(input.correction ? { correction: input.correction } : {}),
+    source: 'operator',
+  });
+  const { candidate } = materializeExecutionFeedbackCandidate({
+    feedback,
+    procedureId: `dot:${input.dot_id}`,
+  });
+  if (candidate && input.tenant) {
+    const { updateDistillCandidateRecord } =
+      await import('../knowledge/distill-candidate-registry.js');
+    updateDistillCandidateRecord(candidate.candidate_id, { tier: 'confidential' });
+  }
+  return candidate ? { candidate_id: candidate.candidate_id } : {};
 }
 
 /**
@@ -449,29 +489,17 @@ export async function distillDotMemory(
   const confirmed = fresh.filter((h) => h.status === 'confirmed');
   const refuted = fresh.filter((h) => h.status === 'refuted');
   const tenant = Boolean(c.scope.tenant_slug);
-  const { recordExecutionFeedback, materializeExecutionFeedbackCandidate } =
-    await import('../execution-feedback.js');
   const summary = `Weekly memory distillation (${key}): ${confirmed.length} hypotheses confirmed, ${refuted.length} refuted.`;
   const prose = (list: typeof fresh) => list.map((h) => h.text).join(' | ');
-  const feedback = recordExecutionFeedback({
-    scenario_id: `dot-memory:${c.dot_id}`,
-    intent_id: key,
-    surface: 'dot',
+  const candidate = await (deps.recordFeedback ?? recordDistillFeedback)({
+    dot_id: c.dot_id,
+    tenant,
+    key,
     outcome: refuted.length > 0 ? 'dissatisfied' : 'satisfied',
     comment:
       tenant || confirmed.length === 0 ? summary : `${summary} Confirmed: ${prose(confirmed)}`,
     ...(!tenant && refuted.length ? { correction: `Refuted assumptions: ${prose(refuted)}` } : {}),
-    source: 'operator',
   });
-  const { candidate } = materializeExecutionFeedbackCandidate({
-    feedback,
-    procedureId: `dot:${c.dot_id}`,
-  });
-  if (candidate && tenant) {
-    const { updateDistillCandidateRecord } =
-      await import('../knowledge/distill-candidate-registry.js');
-    updateDistillCandidateRecord(candidate.candidate_id, { tier: 'confidential' });
-  }
   const row: DotMemoryDistillRow = {
     dot_id: c.dot_id,
     key,
@@ -479,7 +507,7 @@ export async function distillDotMemory(
     confirmed: confirmed.length,
     refuted: refuted.length,
     hypothesis_ids: fresh.map((h) => h.id),
-    ...(candidate ? { candidate_id: candidate.candidate_id } : {}),
+    ...(candidate.candidate_id ? { candidate_id: candidate.candidate_id } : {}),
   };
   safeMkdir(path.dirname(file), { recursive: true });
   appendJsonLine(file, row);
