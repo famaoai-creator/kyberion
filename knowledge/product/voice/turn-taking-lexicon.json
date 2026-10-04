@@ -69,7 +69,8 @@
     ],
     "agent_backchannels": ["うん", "うんうん", "はい", "なるほど", "そうそう", "へえ"],
     "uses_word_spaces": false,
-    "question_endings": ["ますか", "ですか", "かな", "かい", "か"]
+    "question_endings": ["ますか", "ですか", "かな", "かい", "か"],
+    "next_step_markers": ["次は", "では", "さて", "それで", "最後に", "まとめると"]
   },
   "en": {
     "continuation_particles": ["and", "but", "so", "because", "or", "the", "a", "to", "with"],
@@ -136,6 +137,7 @@
     ],
     "agent_backchannels": ["yeah", "uh-huh", "right", "I see", "okay", "got it"],
     "uses_word_spaces": true,
-    "question_endings": []
+    "question_endings": [],
+    "next_step_markers": ["next", "then", "finally", "lastly", "so", "to summarize"]
   }
 }
