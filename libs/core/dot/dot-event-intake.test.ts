@@ -259,6 +259,30 @@ describe('processInboundEventRequest + ingest', () => {
     ]);
   });
 
+  it('honours a per-source replay_window_hours (shorter window, and 0 disables payload dedupe)', () => {
+    const body = JSON.stringify({ ping: true });
+    const at = new Date('2026-10-04T10:00:00.000Z');
+    const withWindow = (hours: number): EventIntakePolicy => ({
+      ...POLICY,
+      sources: {
+        ...POLICY.sources,
+        github: { ...POLICY.sources.github, replay_window_hours: hours },
+      },
+    });
+    const send = (delivery: string, minutes: number, policy: EventIntakePolicy) =>
+      processInboundEventRequest({
+        ...githubRequest(body, delivery),
+        policy,
+        now: new Date(at.getTime() + minutes * 60 * 1000),
+      });
+    expect(send('w-1', 0, withWindow(1))).toMatchObject({ result: { status: 'accepted' } });
+    expect(send('w-2', 30, withWindow(1))).toMatchObject({ result: { status: 'duplicate' } });
+    expect(send('w-3', 90, withWindow(1))).toMatchObject({ result: { status: 'accepted' } });
+    // 0 disables payload-digest dedupe; delivery-id dedupe still applies.
+    expect(send('w-4', 91, withWindow(0))).toMatchObject({ result: { status: 'accepted' } });
+    expect(send('w-4', 92, withWindow(0))).toMatchObject({ result: { status: 'duplicate' } });
+  });
+
   it('keeps payload replay detection scoped to the authenticated policy source', () => {
     const request = githubRequest('{"status":"failed"}', 'same-delivery');
     expect(processInboundEventRequest(request)).toMatchObject({

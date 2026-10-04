@@ -79,6 +79,13 @@ export interface EventIntakeSourcePolicy {
   delivery_id_header: string;
   tenant_slug?: string;
   max_body_bytes: number;
+  /**
+   * Payload-digest replay window in hours (default 24). Dedupe ignores the
+   * unsigned event type, so a sender that legitimately re-sends an identical
+   * body (e.g. a fixed ping) must lower this; 0 disables payload-digest dedupe
+   * and leaves only (source, delivery_id) dedupe.
+   */
+  replay_window_hours?: number;
 }
 
 export interface EventIntakePolicy {
@@ -305,6 +312,16 @@ export function dotEventsLedgerPath(tenantSlug?: string): string {
 
 export interface DotEventDeps {
   rootDir?: string;
+  /** Payload-digest replay window; defaults to {@link DOT_EVENT_REPLAY_WINDOW_MS}, 0 disables. */
+  replayWindowMs?: number;
+}
+
+/** The source's configured payload replay window in ms (default 24 h, 0 = disabled). */
+export function sourceReplayWindowMs(sourcePolicy: EventIntakeSourcePolicy): number {
+  const hours = sourcePolicy.replay_window_hours;
+  return typeof hours === 'number' && Number.isFinite(hours) && hours >= 0
+    ? hours * 60 * 60 * 1000
+    : DOT_EVENT_REPLAY_WINDOW_MS;
 }
 
 function absolute(rel: string, deps: DotEventDeps): string {
@@ -354,19 +371,21 @@ export interface IngestInboundEventResult {
 }
 
 /**
- * True when `row` replays `event`: same source and payload digest, within 24 h.
- * Type and delivery headers are unsigned; changing either cannot bypass dedup.
+ * True when `row` replays `event`: same source and payload digest, within the
+ * source's replay window (default 24 h; 0 disables). Type and delivery headers
+ * are unsigned; changing either cannot bypass dedup.
  */
-function isPayloadReplay(row: DotInboundEvent, event: DotInboundEvent): boolean {
+function isPayloadReplay(row: DotInboundEvent, event: DotInboundEvent, windowMs: number): boolean {
+  if (windowMs <= 0) return false;
   if (row.source !== event.source) return false;
   if (!row.payload_digest || row.payload_digest !== event.payload_digest) return false;
   const gap = Math.abs(Date.parse(event.received_at) - Date.parse(row.received_at));
-  return Number.isFinite(gap) && gap < DOT_EVENT_REPLAY_WINDOW_MS;
+  return Number.isFinite(gap) && gap < windowMs;
 }
 
 /**
  * Append once: a repeated (source, delivery_id) — or a replay of the same
- * payload under a fresh delivery id within 24 h — is reported as duplicate,
+ * payload under a fresh delivery id within the replay window — is reported as duplicate,
  * not re-written.
  */
 export function ingestInboundEvent(
@@ -380,7 +399,7 @@ export function ingestInboundEvent(
     const duplicate = readDotInboundEvents(event.tenant_slug, deps).some(
       (row) =>
         (row.source === event.source && row.delivery_id === event.delivery_id) ||
-        isPayloadReplay(row, event)
+        isPayloadReplay(row, event, deps.replayWindowMs ?? DOT_EVENT_REPLAY_WINDOW_MS)
     );
     if (duplicate) return { status: 'duplicate', event_id: event.event_id, ledger };
     safeMkdir(path.dirname(filePath), { recursive: true });
@@ -433,7 +452,13 @@ export function processInboundEventRequest(request: InboundEventRequest): Inboun
       body: raw,
       now: request.now,
     });
-    return { status: 202, result: ingestInboundEvent(event, { rootDir: request.rootDir }) };
+    return {
+      status: 202,
+      result: ingestInboundEvent(event, {
+        rootDir: request.rootDir,
+        replayWindowMs: sourceReplayWindowMs(sourcePolicy),
+      }),
+    };
   } catch (error) {
     if (error instanceof EventIntakeError) {
       return { status: error.code === 'too_large' ? 413 : 400, code: error.code };
@@ -474,7 +499,13 @@ export function ingestLocalEvent(input: {
     body,
     now: input.now,
   });
-  return { ...ingestInboundEvent(event, { rootDir: input.rootDir }), event };
+  return {
+    ...ingestInboundEvent(event, {
+      rootDir: input.rootDir,
+      replayWindowMs: sourceReplayWindowMs(sourcePolicy),
+    }),
+    event,
+  };
 }
 
 // ---------------------------------------------------------------------------
