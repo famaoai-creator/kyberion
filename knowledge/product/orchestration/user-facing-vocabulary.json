@@ -9671,6 +9671,11 @@
         "en": "No Playwright browser cache at {dir} — browser features (first-win screenshot, browser:goto) will silently fall back to text. Fix: `pnpm env:bootstrap` (installs the managed browser runtime).",
         "ja": "Playwright ブラウザ未導入です ({dir})。ブラウザ機能 (first-win スクリーンショット, browser:goto) はテキストにフォールバックします。`pnpm env:bootstrap` で管理ブラウザランタイムを導入してください。",
         "qps-ploc": "⟦Ñő Ṗŀȧẏẇřïɠħŧ ƀřőẇşėř ƈȧƈħė ȧŧ {dir} — ƀřőẇşėř ƒėȧŧůřėş (ƒïřşŧ-ẇïñ şƈřėėñşħőŧ, ƀřőẇşėř:ɠőŧő) ẇïŀŀ şïŀėñŧŀẏ ƒȧŀŀ ƀȧƈķ ŧő ŧėẋŧ. Ƒïẋ: `ṗñṗɱ ėñṽ:ƀőőŧşŧřȧṗ` (ïñşŧȧŀŀş ŧħė ɱȧñȧɠėḓ ƀřőẇşėř řůñŧïɱė). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "probe_playwright_revision_missing": {
+        "en": "Playwright browser cache at {dir} lacks {revisions}, which the installed playwright needs — browser:goto will fail to launch. Fix: `pnpm env:bootstrap --manifest kyberion-toolchain --apply` (installs the managed browser runtime).",
+        "ja": "Playwright ブラウザキャッシュ ({dir}) に、導入済み playwright が必要とする {revisions} がありません。browser:goto は起動に失敗します。`pnpm env:bootstrap --manifest kyberion-toolchain --apply` で管理ブラウザランタイムを導入してください。",
+        "qps-ploc": "⟦Ṗŀȧẏẇřïɠħŧ ƀřőẇşėř ƈȧƈħė ȧŧ {dir} ŀȧƈķş {revisions}, ẇħïƈħ ŧħė ïñşŧȧŀŀėḓ ṗŀȧẏẇřïɠħŧ ñėėḓş — ƀřőẇşėř:ɠőŧő ẇïŀŀ ƒȧïŀ ŧő ŀȧůñƈħ. Ƒïẋ: `ṗñṗɱ ėñṽ:ƀőőŧşŧřȧṗ --ɱȧñïƒėşŧ ķẏƀėřïőñ-ŧőőŀƈħȧïñ --ȧṗṗŀẏ` (ïñşŧȧŀŀş ŧħė ɱȧñȧɠėḓ ƀřőẇşėř řůñŧïɱė). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
       }
     },
     "error": {
