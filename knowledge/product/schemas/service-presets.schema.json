@@ -9,6 +9,10 @@
     "name": { "type": "string" },
     "description": { "type": "string" },
     "auth_strategy": { "type": "string" },
+    "tenant_binding_required": {
+      "type": "boolean",
+      "description": "Require a matching organization-owned tenant binding for every operation on this service."
+    },
     "setup_hint": { "type": "string" },
     "allow_unsafe_cli": { "type": "boolean" },
     "allow_local_network": { "type": "boolean" },
@@ -67,6 +71,10 @@
         "kind": { "enum": ["capture", "apply"] },
         "risk": { "enum": ["read", "write", "destructive"] },
         "approval_required": { "type": "boolean" },
+        "tenant_binding_required": {
+          "type": "boolean",
+          "description": "Require an organization-owned service binding matching the trusted mission tenant before this operation can execute."
+        },
         "idempotency": { "enum": ["not_applicable", "recommended", "required"] },
         "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
         "path": { "type": "string" },
