@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VCS Actuator Action",
+  "type": "object",
+  "required": ["op"],
+  "additionalProperties": false,
+  "properties": {
+    "op": {
+      "enum": ["status", "diff", "log", "branch", "commit", "pr_create"]
+    },
+    "params": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cwd": { "type": "string" },
+        "short": { "type": "boolean" },
+        "ref": { "type": "string" },
+        "stat": { "type": "boolean" },
+        "limit": { "type": "integer", "minimum": 1 },
+        "oneline": { "type": "boolean" },
+        "action": { "enum": ["list", "create", "delete"] },
+        "name": { "type": "string" },
+        "message": { "type": "string" },
+        "add": { "type": "boolean" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "base": { "type": "string" }
+      }
+    }
+  }
+}

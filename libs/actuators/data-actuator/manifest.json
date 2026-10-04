@@ -1,0 +1,37 @@
+{
+  "actuator_id": "data-actuator",
+  "version": "1.0.0",
+  "description": "Offline deterministic tabular data ops over local JSON/CSV files (query, filter, join, aggregate)",
+  "contract_schema": "knowledge/product/schemas/data-action.schema.json",
+  "resilience_tier": "none",
+  "recovery_policy": {
+    "fallback_strategy": "none",
+    "retry_profile": "data-actuator"
+  },
+  "capabilities": [
+    {
+      "op": "query",
+      "description": "Reads rows from a JSON/CSV file with optional predicate match, projection, sort, and limit",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "filter",
+      "description": "Filters rows from a JSON/CSV file by predicate match",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "join",
+      "description": "Joins two JSON/CSV files with inner/left semantics on key columns",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "aggregate",
+      "description": "Groups rows and computes count/sum/avg/min/max aggregations",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    }
+  ]
+}

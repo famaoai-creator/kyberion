@@ -293,6 +293,18 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   lines.push(
     "| Interactive terminal session (PTY, read/write a running shell) | `terminal-actuator` | `system-actuator`'s `pipeline` ops run a command to completion; they do not expose an interactive PTY. |"
   );
+  lines.push(
+    '| Git status/diff/log/branch/commit, GitHub PR creation | `vcs-actuator` | Canonical git/gh owner. `code-actuator` analyzes code, `service-actuator` github presets are transport only, `system-actuator` PR lifecycle is the release gate — none own the working tree. |'
+  );
+  lines.push(
+    '| Tabular query/join/aggregate over local json/csv files | `data-actuator` | Offline deterministic set ops. `wisdom-actuator` `json_query` reads a single document; it does not join or aggregate across files. |'
+  );
+  lines.push(
+    '| Web search as a pipeline starting point | `search-actuator` (`web_search`, `fetch_reader`) | Owns the query origin with bounded reader semantics. `network-actuator` owns fetch/A2A transport; it does not rank or select sources. |'
+  );
+  lines.push(
+    '| Cron-style schedule declarations (register/list/cancel/fire) | `scheduler-actuator` | Declaration store only, no daemon. `process-actuator` supervises running processes; it does not own time-based triggers. |'
+  );
   lines.push('');
   lines.push('## Governed Core Workloads');
   lines.push('');
