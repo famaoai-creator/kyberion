@@ -109,4 +109,25 @@ describe('AI company onboarding', () => {
     );
     expect(safeExistsSync(`${rootDir}/customer/acme-ai/onboarding/first-work-plan.md`)).toBe(false);
   });
+
+  it('registers a new strictly isolated tenant and seeds the org-chart domains', () => {
+    const result = onboardAiCompany({
+      vertical: 'saas-product-company',
+      slug: 'acme-ai',
+      companyName: 'ACME AI',
+      firstWork: 'Define the first customer outcome and launch plan',
+      accountableHumanId: 'human:founder',
+      tenantSlug: 'acme-prod',
+      rootDir,
+    });
+
+    expect(result.seededDomains).toEqual(
+      expect.arrayContaining(['leadership', 'engineering', 'growth', 'governance'])
+    );
+    const tenant = JSON.parse(readTextFile(`${rootDir}/knowledge/personal/tenants/acme-prod.json`));
+    expect(tenant.isolation_policy).toEqual({
+      strict_isolation: true,
+      allow_cross_distillation: false,
+    });
+  });
 });

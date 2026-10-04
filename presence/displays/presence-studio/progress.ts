@@ -20,7 +20,7 @@
  * inbox entry can only ever be `can_verdict: false` here — never fake a
  * verdict eligibility that doesn't exist.
  */
-import { loadSurfaceManifest } from '@agent/core/surface/surface-runtime';
+import { resolveSurfaceBrowserUrl } from '@agent/core/surface/surface-url';
 import { estimateTaskSessionPercent } from './home.js';
 
 export { estimateTaskSessionPercent };
@@ -44,6 +44,8 @@ export interface ProgressTaskSessionInput {
   id: string;
   title: string;
   status: string;
+  /** The real request correlation carried by the task session, when present. */
+  correlation_id?: string;
   /** ISO timestamp of the session's last update. */
   when?: string;
   /** Chronological (oldest-first) history entries — same shape the existing
@@ -74,7 +76,10 @@ export interface ProgressActiveItem {
   id: string;
   title: string;
   now: string;
+  status: string;
+  correlation_id?: string;
   percent?: number;
+  progress_basis?: 'phase_estimate';
   when?: string;
   selected_default?: boolean;
 }
@@ -84,6 +89,7 @@ export interface ProgressDeliveredItem {
   title: string;
   kind: string;
   when?: string;
+  status: ProgressArtifactInput['inbox_status'] | 'delivered';
   can_verdict: boolean;
   entry_id?: string;
   downloadable?: boolean;
@@ -93,6 +99,10 @@ export interface ProgressDoneItem {
   id: string;
   title: string;
   kind: 'task_session' | 'artifact';
+  /** Preserve the concrete terminal/verdict outcome; history is not success. */
+  status: string;
+  correlation_id?: string;
+  entry_id?: string;
   when?: string;
   downloadable?: boolean;
 }
@@ -151,7 +161,12 @@ export function buildProgressPayload(input: BuildProgressPayloadInput): Progress
       id: session.id,
       title: session.title,
       now: deriveNowText(session.status, session.history),
+      status: session.status,
+      ...(session.correlation_id ? { correlation_id: session.correlation_id } : {}),
       percent: estimateTaskSessionPercent(session.status),
+      ...(estimateTaskSessionPercent(session.status) !== undefined
+        ? { progress_basis: 'phase_estimate' as const }
+        : {}),
       when: session.when,
     }))
     .sort((a, b) => toTimeMs(b.when, nowMs) - toTimeMs(a.when, nowMs));
@@ -167,12 +182,15 @@ export function buildProgressPayload(input: BuildProgressPayloadInput): Progress
   );
 
   const delivered: ProgressDeliveredItem[] = deliveredArtifacts
-    .map((artifact) => ({
+    .map((artifact): ProgressDeliveredItem => ({
       id: artifact.id,
       title: artifact.title,
       kind: artifact.kind,
       when: artifact.when,
-      can_verdict: artifact.inbox_status === 'unread' || artifact.inbox_status === 'read',
+      status: artifact.inbox_status || 'delivered',
+      can_verdict:
+        Boolean(artifact.entry_id) &&
+        (artifact.inbox_status === 'unread' || artifact.inbox_status === 'read'),
       ...(artifact.entry_id ? { entry_id: artifact.entry_id } : {}),
       downloadable: Boolean(artifact.downloadable),
     }))
@@ -183,12 +201,16 @@ export function buildProgressPayload(input: BuildProgressPayloadInput): Progress
       id: session.id,
       title: session.title,
       kind: 'task_session' as const,
+      status: session.status,
+      ...(session.correlation_id ? { correlation_id: session.correlation_id } : {}),
       when: session.when,
     })),
     ...doneArtifacts.map((artifact) => ({
       id: artifact.id,
       title: artifact.title,
       kind: 'artifact' as const,
+      status: artifact.inbox_status!,
+      ...(artifact.entry_id ? { entry_id: artifact.entry_id } : {}),
       when: artifact.when,
       downloadable: Boolean(artifact.downloadable),
     })),
@@ -221,6 +243,7 @@ export interface ProgressDetailLogEntry {
 }
 
 export interface ProgressDetail {
+  status: string;
   requested: string;
   now: string;
   next?: string[];
@@ -246,6 +269,7 @@ export function buildProgressDetail(
   const log = events.slice(-8).map((event) => ({ when: event.when, text: event.text }));
 
   return {
+    status: session.status,
     requested,
     now,
     ...(next.length > 0 ? { next } : {}),
@@ -261,20 +285,10 @@ export function buildProgressDetail(
  * this never throws and falls back to `COMPUTER_SURFACE_MIRROR_FALLBACK_PORT`.
  */
 export function resolveComputerSurfaceMirrorHref(): string {
-  let port = COMPUTER_SURFACE_MIRROR_FALLBACK_PORT;
   try {
-    const manifest = loadSurfaceManifest();
-    const definition = manifest.surfaces.find((surface) => surface.id === 'computer-surface');
-    if (
-      definition &&
-      typeof definition.port === 'number' &&
-      Number.isFinite(definition.port) &&
-      definition.port > 0
-    ) {
-      port = definition.port;
-    }
+    return resolveSurfaceBrowserUrl('computer-surface') + '/';
   } catch {
     // Manifest absent/invalid — keep the documented fallback.
+    return `http://127.0.0.1:${COMPUTER_SURFACE_MIRROR_FALLBACK_PORT}/`;
   }
-  return `http://127.0.0.1:${port}/`;
 }

@@ -53,6 +53,36 @@ const VIDEO_COMPOSITION_CONTRACTS: Record<string, InputSchema> = {
     required: ['job_id'],
     additionalProperties: false,
   },
+  create_timeline_video: {
+    type: 'object',
+    properties: {
+      title: { type: 'string' },
+      scenes: {
+        type: 'array',
+        minItems: 1,
+        items: {
+          type: 'object',
+          properties: {
+            scene_id: { type: 'string' },
+            role: { type: 'string' },
+            html: { type: 'string' },
+            css: { type: 'string' },
+            narration_ref: { type: 'string' },
+            min_sec: { type: 'number' },
+            asset_refs: { type: 'array', items: { type: 'object' } },
+          },
+          required: ['scene_id', 'html'],
+        },
+      },
+      composition: { type: 'object' },
+      timing: { type: 'object' },
+      output: { type: 'object' },
+      job_id: { type: 'string' },
+      bundle_dir: { type: 'string' },
+    },
+    required: ['scenes'],
+    additionalProperties: false,
+  },
   create_narrated_intro_movie: {
     type: 'object',
     properties: {
@@ -132,6 +162,19 @@ const VIDEO_COMPOSITION_EXAMPLES: Record<string, Array<Record<string, unknown>>>
   await_video_composition_job: [{ job_id: 'video-job-1', timeout_ms: 300000 }],
   cancel_video_composition_job: [{ job_id: 'video-job-1', reason: 'operator requested' }],
   create_narrated_intro_movie: [{ narrated_video_brief: { title: 'Intro', story: 'Welcome' } }],
+  create_timeline_video: [
+    {
+      title: 'Kyberion intro',
+      scenes: [
+        {
+          scene_id: 'hook',
+          html: '<h1 class="kb-cue kb-rise" style="--at:.4">From intent to result.</h1>',
+          narration_ref: 'active/shared/tmp/voice/hook.wav',
+        },
+      ],
+      output: { format: 'mp4', target_path: 'active/shared/tmp/timeline.mp4' },
+    },
+  ],
   create_narrated_video_from_content_brief: [
     { video_content_brief: { title: 'Demo' }, narration_artifact_ref: 'artifact-1' },
   ],
@@ -169,6 +212,7 @@ export const VIDEO_COMPOSITION_ACTUATOR_APPLY_OPS = [
   'cancel_video_composition_job',
   'create_narrated_intro_movie',
   'create_narrated_video_from_content_brief',
+  'create_timeline_video',
   'prepare_video_composition',
   'verify_rendered_video_artifact',
   'validate_narrated_video_artifact',

@@ -37,10 +37,28 @@ describe('error-classifier', () => {
 
     it('classifies path-scope policy denials', () => {
       const c = classifyError(
-        "[POLICY_VIOLATION] Persona 'unknown' with authority role 'forks' is NOT authorized to write to '/x'."
+        "[POLICY_VIOLATION] Persona 'worker' with authority role 'forks' is NOT authorized to write to '/x'."
       );
       expect(c.category).toBe('permission_denied');
       expect(c.ruleId).toBe('kyberion.path-scope');
+    });
+
+    it('classifies a missing Playwright browser revision with the install fix', () => {
+      const c = classifyError(
+        "browserType.launchPersistentContext: Executable doesn't exist at /opt/pw-browsers/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell"
+      );
+      expect(c.category).toBe('missing_dependency');
+      expect(c.ruleId).toBe('kyberion.playwright-browser-missing');
+      expect(c.remediation).toContain('pnpm env:bootstrap --manifest kyberion-toolchain --apply');
+    });
+
+    it('points an unset operator persona at the shell export', () => {
+      const c = classifyError(
+        "[POLICY_VIOLATION] Persona 'unknown' with authority role 'forks' is NOT authorized to write to '/x'."
+      );
+      expect(c.category).toBe('permission_denied');
+      expect(c.ruleId).toBe('kyberion.path-scope-persona-unset');
+      expect(c.remediation).toContain('export KYBERION_PERSONA=sovereign');
     });
 
     it('classifies project-root path violations', () => {

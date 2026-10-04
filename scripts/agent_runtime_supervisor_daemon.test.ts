@@ -318,6 +318,50 @@ describe('agent_runtime_supervisor_daemon', () => {
     });
   }, 90000);
 
+  it('forwards scoped surface manifest identity and rejects malformed aliases', async () => {
+    instance = await startAgentRuntimeSupervisorDaemon({
+      transport: 'unix',
+      socketPath,
+      lockPath,
+      exitOnFatalError: false,
+      exitOnExistingHealthyDaemon: false,
+    });
+    await expect(
+      sendRequest(socketPath, {
+        id: 'scoped-ensure',
+        method: 'ensure',
+        payload: {
+          agentId: 'opaque-scoped-instance',
+          manifestAgentId: 'presence-surface-agent',
+          provider: 'claude',
+          requestedBy: 'surface_agent',
+          scope: { tier: 'public', viewer_principal: 'viewer-a' },
+        },
+      })
+    ).resolves.toMatchObject({ ok: true });
+    expect(mocks.ensureAgentRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentId: 'opaque-scoped-instance',
+        manifestAgentId: 'presence-surface-agent',
+        scope: expect.objectContaining({ viewer_principal: 'viewer-a' }),
+      })
+    );
+    mocks.ensureAgentRuntime.mockClear();
+    await expect(
+      sendRequest(socketPath, {
+        id: 'invalid-alias',
+        method: 'ensure',
+        payload: {
+          agentId: 'opaque-scoped-instance',
+          manifestAgentId: 42,
+          provider: 'claude',
+          requestedBy: 'surface_agent',
+        },
+      })
+    ).resolves.toMatchObject({ ok: false });
+    expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
+  }, 90000);
+
   it('enqueues a durable child input before spawning its supervised worker', async () => {
     instance = await startAgentRuntimeSupervisorDaemon({
       transport: 'unix',

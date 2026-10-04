@@ -72,7 +72,13 @@
     "accepts_handoffs_from": ["repo-guardian"],
     "goal_ref": "Kyberion runs its own operations autonomously and safely"
   },
+  "operations_cadence": {
+    "tick_every_minutes": 15,
+    "standup": { "cron": "45 8 * * 1-5", "timezone": "Asia/Tokyo" },
+    "retro": { "cron": "0 17 * * 5", "timezone": "Asia/Tokyo" }
+  },
   "runtime": {
-    "heartbeat_id": "dot-org-operations"
+    "heartbeat_id": "dot-org-operations",
+    "max_idle_wake_ms": 345600000
   }
 }

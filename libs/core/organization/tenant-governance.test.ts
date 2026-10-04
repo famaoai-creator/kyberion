@@ -63,6 +63,21 @@ describe('tenant lifecycle preserves provider policy state', () => {
     });
   });
 
+  it('creates new tenants strictly isolated so activation can pass memory_policy', () => {
+    const result = withExecutionContext('sovereign_concierge', () =>
+      mutateTenant({ verb: 'create', slug: 'beta', displayName: 'Beta', rootDir, apply: true })
+    );
+    expect(result.profile.isolation_policy).toEqual({
+      strict_isolation: true,
+      allow_cross_distillation: false,
+    });
+    // An update never invents a policy the existing profile did not declare.
+    const updated = withExecutionContext('sovereign_concierge', () =>
+      mutateTenant({ verb: 'update', slug: 'acme', displayName: 'Acme', rootDir, apply: true })
+    );
+    expect(updated.profile.isolation_policy).toBeUndefined();
+  });
+
   it('requires evidence and attribution for a non-training attestation', () => {
     expect(() =>
       withExecutionContext('sovereign_concierge', () =>

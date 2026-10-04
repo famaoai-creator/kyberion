@@ -1,6 +1,6 @@
 {
   "actuator_id": "video-composition-actuator",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Governed deterministic composed-video bundle preparation actuator",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
@@ -30,6 +30,11 @@
     },
     {
       "op": "create_narrated_intro_movie",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "create_timeline_video",
       "platforms": ["darwin", "linux", "win32"],
       "effect": "write"
     },

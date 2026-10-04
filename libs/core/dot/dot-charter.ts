@@ -57,6 +57,19 @@ export type DotTrigger =
       every_s?: number;
     };
 
+/** One cron-scheduled organization cadence (standup / retro). */
+export interface DotCadenceCron {
+  cron: string;
+  timezone?: string;
+}
+
+export interface DotOperationsCadence {
+  /** Minutes between organization operation ticks (default 15, min 5). */
+  tick_every_minutes?: number;
+  standup?: DotCadenceCron;
+  retro?: DotCadenceCron;
+}
+
 export interface DotCharter {
   kind: 'dot-charter';
   dot_id: string;
@@ -135,6 +148,12 @@ export interface DotCharter {
     max_level?: 'L0' | 'L1' | 'L2' | 'L3' | 'L4';
     min_level?: 'L0' | 'L1' | 'L2' | 'L3' | 'L4';
   };
+  /**
+   * Opt-in organization cadences the supervisor runs for this charter's own
+   * organization scope as its authority role (`dot-org-cadence` step).
+   * Valid only with `scope.organization_id`.
+   */
+  operations_cadence?: DotOperationsCadence;
   runtime: {
     heartbeat_id: string;
     reasoning_backend?: string;
@@ -171,6 +190,24 @@ function charterValidator(): ValidateFunction<DotCharter> {
   return validator;
 }
 
+/** Cadence timezones must be IANA zones the runtime can resolve (the schema checks shape only). */
+function assertOperationsCadenceTimezones(charter: DotCharter, sourcePath: string): void {
+  const cadence = charter.operations_cadence;
+  for (const [name, entry] of [
+    ['standup', cadence?.standup],
+    ['retro', cadence?.retro],
+  ] as const) {
+    if (!entry?.timezone) continue;
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: entry.timezone });
+    } catch {
+      throw new Error(
+        `Invalid dot charter at ${sourcePath}: /operations_cadence/${name}/timezone '${entry.timezone}' is not a valid IANA time zone`
+      );
+    }
+  }
+}
+
 export function validateDotCharter(value: unknown, sourcePath = '<inline>'): DotCharter {
   const candidate =
     value && typeof value === 'object' && !Array.isArray(value) && '$schema' in value
@@ -183,6 +220,7 @@ export function validateDotCharter(value: unknown, sourcePath = '<inline>'): Dot
       .join('; ');
     throw new Error(`Invalid dot charter at ${sourcePath}: ${errors}`);
   }
+  assertOperationsCadenceTimezones(candidate as DotCharter, sourcePath);
   return candidate as DotCharter;
 }
 

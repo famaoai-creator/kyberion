@@ -744,6 +744,31 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/front-desk-conversation-store.ts#asStore",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/front-desk-conversation-store.ts#completeConversationTurn (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/front-desk-conversation-store.ts#markConversationTurnNotStarted (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/front-desk-conversation-store.ts#markConversationTurnUncertain (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/front-desk-conversation-store.ts#reserveConversationTurn (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/operator-notifications.ts#deliver",
       "roles": ["surface_runtime"],
       "unresolved": []
@@ -1424,21 +1449,6 @@
     },
     {
       "site": "presence/displays/concierge/src/lib/avatar-generation-jobs.ts#defaultRunner [delegated child role]",
-      "roles": ["sovereign_concierge"],
-      "unresolved": []
-    },
-    {
-      "site": "presence/displays/concierge/src/lib/conversation-store.ts#asStore",
-      "roles": ["sovereign_concierge"],
-      "unresolved": []
-    },
-    {
-      "site": "presence/displays/concierge/src/lib/conversation-store.ts#beginConversationTurn (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": ["sovereign_concierge"],
-      "unresolved": []
-    },
-    {
-      "site": "presence/displays/concierge/src/lib/conversation-store.ts#completeConversationTurn (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
