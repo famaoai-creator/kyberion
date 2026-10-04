@@ -26,7 +26,11 @@ import { auditChain } from './audit-chain.js';
 import type { TraceContext } from '../analysis/trace.js';
 import { recordGovernanceAction } from './governance-action-recorder.js';
 import { notifyOperator } from '../surface/operator-notifications.js';
-import { runCharterGate, type ApprovalGateCharterInput } from './approval-gate-charter.js';
+import {
+  isCharterEligiblePolicy,
+  runCharterGate,
+  type ApprovalGateCharterInput,
+} from './approval-gate-charter.js';
 
 export interface ApprovalGateParams {
   /** Intent being executed. */
@@ -307,6 +311,11 @@ export function enforceApprovalGate(
     decisionRightsContext
   );
 
+  // Resolve floors before any delegated allow. Strict posture can preserve an
+  // ordinary base rule id, so the id alone does not describe its safety floor.
+  const resolvedPolicy = resolveApprovalPolicy({ intentId, payload });
+  const delegationEligible = isCharterEligiblePolicy(resolvedPolicy);
+
   const charterOutcome = params.charter
     ? runCharterGate({
         charter: params.charter,
@@ -321,14 +330,19 @@ export function enforceApprovalGate(
   if (charterOutcome.kind === 'stop') {
     return { allowed: false, status: 'pending', message: charterOutcome.message };
   }
-  if (charterOutcome.kind === 'allow') {
+  if (charterOutcome.kind === 'allow' && delegationEligible) {
     return { allowed: true, status: 'not_required', message: charterOutcome.message };
   }
   // Outside the charter: a human decides, even where decision rights or the
   // legacy policy would have let the action through (the charter only tightens).
   const forceApproval = charterOutcome.kind === 'require_approval';
 
-  if (!forceApproval && decisionRightsEvaluation && !decisionRightsEvaluation.requiresEscalation) {
+  if (
+    !forceApproval &&
+    delegationEligible &&
+    decisionRightsEvaluation &&
+    !decisionRightsEvaluation.requiresEscalation
+  ) {
     const goldenRulePriority = resolveGoldenRulePriorityOrder(
       resolveVision(decisionRightsContext.tenantSlug ?? null)
     );
@@ -355,7 +369,6 @@ export function enforceApprovalGate(
   }
 
   // --- Step 1: Resolve policy ---
-  const resolvedPolicy = resolveApprovalPolicy({ intentId, payload });
   const policy =
     forceApproval && !resolvedPolicy.requiresApproval
       ? {
@@ -505,7 +518,10 @@ export function enforceApprovalGate(
   // requests) returned above and are never short-circuited. Hardened policies
   // (dual-key = tier-sensitive secrets, injection-suspected override) bypass
   // the cache entirely, and the descriptor must name this exact operation.
+  // Mandatory floors (incl. strict-posture-floor, which always sets
+  // mandatoryApproval) are never cache-eligible.
   const sessionCacheEligible =
+    !policy.mandatoryApproval &&
     policy.matchedRuleId !== 'injection-suspected-override' &&
     !policy.missingRequirements.includes('dual_key_confirmation');
   const descriptor = params.actionDescriptor;

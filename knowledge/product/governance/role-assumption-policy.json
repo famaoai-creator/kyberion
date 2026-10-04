@@ -5,13 +5,15 @@
   "shared_core_roles": {
     "roles": [
       "chronos_gateway",
+      "chronos_tenant_runner",
       "infrastructure_sentinel",
       "knowledge_steward",
+      "organization_operator",
       "scope_locale_reader",
       "slack_bridge",
       "surface_runtime"
     ],
-    "rationale": "Narrow roles that libs/core modules assume internally on behalf of their callers to write their own governed stores: infrastructure_sentinel (work coordination, peer messaging, mesh, the stimuli journal), knowledge_steward (mission creation), scope_locale_reader (read-only: libs/core/locale.ts reads the tenant reply locale, knowledge/confidential/<tenant>/locale.json, bound to the turn's tenant, for every surface that renders a reply), and the GovernedArtifactRole set of artifact-store / surface stores (chronos_gateway, slack_bridge, surface_runtime; surface-coordination-store maps a surface to its role from a governed plus a personal-tier map, so any GovernedArtifactRole is reachable wherever it is used). operational_learning_writer is deliberately restricted to the system roles that reach its learning path. The broad roles (ecosystem_architect, mission_controller, sovereign_concierge) are never shared: each system role lists them only where docs/developer/role-assumption-reachability.json reaches them. The report shows oauth_callback_surface and surface_runtime do not reach some shared roles; they stay shared because removing a shared role for one system role needs a policy-shape change (tracked as a follow-up)."
+    "rationale": "Narrow roles that libs/core modules assume internally on behalf of their callers to write their own governed stores: infrastructure_sentinel (work coordination, peer messaging, mesh, the stimuli journal), knowledge_steward (mission creation), scope_locale_reader (read-only: libs/core/locale.ts reads the tenant reply locale, knowledge/confidential/<tenant>/locale.json, bound to the turn's tenant, for every surface that renders a reply), and the GovernedArtifactRole set of artifact-store / surface stores (chronos_gateway, slack_bridge, surface_runtime; surface-coordination-store maps a surface to its role from a governed plus a personal-tier map, so any GovernedArtifactRole is reachable wherever it is used). operational_learning_writer is deliberately restricted to the system roles that reach its learning path. The broad roles (ecosystem_architect, mission_controller, sovereign_concierge) are never shared: each system role lists them only where docs/developer/role-assumption-reachability.json reaches them. The report shows oauth_callback_surface and surface_runtime do not reach some shared roles; they stay shared because removing a shared role for one system role needs a policy-shape change (tracked as a follow-up). chronos_tenant_runner and organization_operator are reached through the agent-runtime supervisor daemon child process (resident-dot sweep): chronos_tenant_runner lists and reads knowledge/confidential/<tenant>/dots/ charters bound to that tenant (same rule as chronos tenant pipelines), and organization_operator runs scheduled organization operation pipelines bound to the operation's tenant/organization (DL-06). Both are assumed internally by libs/core / the governed operation executor on behalf of whichever surface started the daemon, never by the surface itself."
   },
   "system_roles": {
     "chronos_mirror_v2": {
@@ -47,6 +49,10 @@
     "discord_bridge": {
       "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
       "rationale": "ecosystem_architect, mission_controller, sovereign_concierge: reachable per docs/developer/role-assumption-reachability.json (e.g. mission_controller via libs/core agent-identity appendGoverned and approval-gate, ecosystem_architect via libs/core deployment-adapter / storage-janitor, sovereign_concierge via libs/core authn-providers / browser-onboarding / tool-runtime-policy, and the GovernedArtifactRole union of surface-coordination-store). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable."
+    },
+    "event_intake_surface": {
+      "may_assume": [],
+      "rationale": "scripts/event_intake_surface.ts (loopback-only inbound event intake, operator-launched through surface_runtime with SYSTEM_ROLE=event_intake_surface). Assumes no role: ingestInboundEvent only appends normalized events to the dot events ledgers under active/shared/runtime/dot/, so no broad role (ecosystem_architect, mission_controller, sovereign_concierge) is granted."
     },
     "imessage_bridge": {
       "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],

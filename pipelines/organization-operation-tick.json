@@ -1,0 +1,27 @@
+{
+  "action": "pipeline",
+  "name": "organization-operation-tick",
+  "version": "1.0.0",
+  "description": "Sovereign-only tick that runs every due scheduled organization operation across tenant scopes and recovers interrupted runs.",
+  "schedule": {
+    "id": "organization-operation-tick",
+    "cron": "*/15 * * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": false
+  },
+  "steps": [
+    {
+      "id": "tick_operations",
+      "role": "source",
+      "op": "core:organization_operation_tick",
+      "params": {
+        "apply": true
+      },
+      "produces": {
+        "channel": "organization_operation_tick",
+        "type": "OrganizationOperationTickReport",
+        "sensitive": true
+      }
+    }
+  ]
+}

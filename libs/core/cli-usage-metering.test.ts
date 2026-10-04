@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { metrics } from './metrics.js';
 import { recordEstimatedCliUsage } from './cli-usage-metering.js';
+import { withUsageAttribution } from './usage-accounting.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -27,6 +28,25 @@ describe('recordEstimatedCliUsage (OP-01)', () => {
       estimated: true,
       mission_id: 'MSN-METER-1',
       usage: { prompt_tokens: 100, completion_tokens: 20 },
+    });
+  });
+
+  it('carries trusted usage attribution so dot wakes on CLI backends reconcile', () => {
+    const spy = vi.spyOn(metrics, 'record').mockImplementation(() => undefined as never);
+    recordEstimatedCliUsage('codex-cli', 'codex-test', Date.now(), 'success', 40, 8);
+    expect(spy.mock.calls[0][3]).not.toHaveProperty('scope');
+    withUsageAttribution(
+      {
+        actor_id: 'dot:a',
+        accounting_id: 'wake-1',
+        scope: { tier: 'confidential', tenant_slug: 'acme' },
+      },
+      () => recordEstimatedCliUsage('codex-cli', 'codex-test', Date.now(), 'success', 40, 8)
+    );
+    expect(spy.mock.calls[1][3]).toMatchObject({
+      actor_id: 'dot:a',
+      accounting_id: 'wake-1',
+      scope: { tenant_slug: 'acme' },
     });
   });
 

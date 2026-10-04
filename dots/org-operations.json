@@ -47,7 +47,7 @@
   },
   "authority": {
     "authority_role": "organization_operator",
-    "allowed_work_shapes": ["pipeline", "task_session", "mission"],
+    "allowed_work_shapes": ["direct_reply", "pipeline", "mission"],
     "max_concurrent_delegations": 1
   },
   "decisions": {

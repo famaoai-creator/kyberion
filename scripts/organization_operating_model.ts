@@ -13,6 +13,8 @@ import {
   buildOrganizationDomainRecord,
   buildOrganizationLearningCandidate,
   buildOrganizationObjectiveAddition,
+  buildOrganizationKeyResultAddition,
+  buildOrganizationKeyResultRemoval,
   buildOrganizationPurposeRecord,
   buildOrganizationScaffold,
   buildOrganizationServiceAddition,
@@ -60,6 +62,7 @@ import {
   type OrganizationOperationRunOutcome,
 } from '@agent/core/organization/organization-operation-run-recording';
 import { validateWritePermission } from '@agent/core/tier-guard';
+import type { KeyResultMetric } from '@agent/core/key-result-spec';
 import type {
   OrganizationCadenceRecord,
   OrganizationDecisionRecord,
@@ -370,6 +373,13 @@ const READ_COMMAND_VIEWS: Record<string, ReadViewResolver> = {
       ? view.learning_candidates.filter((candidate) => candidate.status === parsed.status)
       : view.learning_candidates,
   'purpose show': (view) => view.purpose,
+  'objective kr list': (view, { parsed }) =>
+    (view.purpose?.objectives || [])
+      .filter((objective) => !parsed.objectiveId || objective.objective_id === parsed.objectiveId)
+      .map((objective) => ({
+        objective_id: objective.objective_id,
+        key_results: objective.key_results || [],
+      })),
   show: (view) => view,
 };
 
@@ -605,6 +615,69 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
         status: 'active',
         ...(parsed.ownerRole ? { owner_role: parsed.ownerRole } : {}),
       },
+    });
+    const savedPaths = mode === 'apply' ? [saveOrganizationPurpose(record)] : [];
+    emit({ mode, purpose: record, saved_paths: savedPaths }, parsed.json);
+    return;
+  },
+  'objective kr add': (ctx) => {
+    const { parsed, organizationId } = ctx;
+
+    if (!organizationId) throw new Error('--organization-id is required for objective kr add.');
+    requireFlags('objective kr add', {
+      '--tier': parsed.tier,
+      '--objective-id': parsed.objectiveId,
+      '--kr-id': parsed.krId,
+      '--title': parsed.title,
+      '--metric-json': parsed.metricJson,
+      '--direction': parsed.direction,
+    });
+    if (parsed.target === undefined || !Number.isFinite(parsed.target)) {
+      throw new Error('--target <number> is required for objective kr add.');
+    }
+    let metric: KeyResultMetric;
+    try {
+      metric = JSON.parse(parsed.metricJson!) as KeyResultMetric;
+    } catch {
+      throw new Error('--metric-json must be valid JSON.');
+    }
+    const mode = resolveWriteMode(parsed, 'objective kr add');
+    const record = buildOrganizationKeyResultAddition({
+      organizationId,
+      tier: parsed.tier!,
+      tenantSlug: parsed.tenantSlug,
+      objectiveId: parsed.objectiveId!,
+      keyResult: {
+        kr_id: parsed.krId!,
+        title: parsed.title!,
+        metric,
+        target: parsed.target,
+        direction: parsed.direction!,
+        ...(parsed.baseline !== undefined ? { baseline: parsed.baseline } : {}),
+        ...(parsed.unit ? { unit: parsed.unit } : {}),
+        ...(parsed.weight !== undefined ? { weight: parsed.weight } : {}),
+      },
+    });
+    const savedPaths = mode === 'apply' ? [saveOrganizationPurpose(record)] : [];
+    emit({ mode, purpose: record, saved_paths: savedPaths }, parsed.json);
+    return;
+  },
+  'objective kr remove': (ctx) => {
+    const { parsed, organizationId } = ctx;
+
+    if (!organizationId) throw new Error('--organization-id is required for objective kr remove.');
+    requireFlags('objective kr remove', {
+      '--tier': parsed.tier,
+      '--objective-id': parsed.objectiveId,
+      '--kr-id': parsed.krId,
+    });
+    const mode = resolveWriteMode(parsed, 'objective kr remove');
+    const record = buildOrganizationKeyResultRemoval({
+      organizationId,
+      tier: parsed.tier!,
+      tenantSlug: parsed.tenantSlug,
+      objectiveId: parsed.objectiveId!,
+      krId: parsed.krId!,
     });
     const savedPaths = mode === 'apply' ? [saveOrganizationPurpose(record)] : [];
     emit({ mode, purpose: record, saved_paths: savedPaths }, parsed.json);
@@ -1061,6 +1134,7 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
   show: handleReadCommand,
   status: handleReadCommand,
   'purpose show': handleReadCommand,
+  'objective kr list': handleReadCommand,
   'domain list': handleReadCommand,
   'service list': handleReadCommand,
   'operation list': handleReadCommand,

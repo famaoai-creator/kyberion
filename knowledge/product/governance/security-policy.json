@@ -690,8 +690,18 @@
       ]
     },
     "dot_lifecycle_writer": {
-      "allow_read": ["dots/", "active/shared/runtime/", "active/shared/tmp/"],
-      "allow_write": ["dots/", "active/shared/runtime/", "active/shared/tmp/"]
+      "allow_read": [
+        "dots/",
+        "knowledge/confidential/${KYBERION_TENANT}/dots/",
+        "active/shared/runtime/",
+        "active/shared/tmp/"
+      ],
+      "allow_write": [
+        "dots/",
+        "knowledge/confidential/${KYBERION_TENANT}/dots/",
+        "active/shared/runtime/",
+        "active/shared/tmp/"
+      ]
     }
   },
   "authority_permissions": {

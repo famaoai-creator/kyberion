@@ -4,6 +4,7 @@ import { auditChain } from '../governance/audit-chain.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { safeRmSync } from '../secure-io.js';
+import type { KeyResultSpec } from '../key-result-spec.js';
 
 export type OrganizationTier = 'personal' | 'confidential' | 'public';
 export type OrganizationWorkShape =
@@ -45,6 +46,8 @@ export interface OrganizationPurposeObjective {
   horizon?: string;
   status?: 'planned' | 'active' | 'completed' | 'retired';
   owner_role?: string;
+  /** Measurable key results (DL-03); measured by the KR ledger, rolled up by organization-objective-progress. */
+  key_results?: KeyResultSpec[];
 }
 
 export interface OrganizationPurposeRecord {
@@ -621,6 +624,8 @@ import {
   buildOrganizationScaffold,
   buildOrganizationPurposeRecord,
   buildOrganizationObjectiveAddition,
+  buildOrganizationKeyResultAddition,
+  buildOrganizationKeyResultRemoval,
   buildOrganizationDomainRecord,
   buildOrganizationServiceAddition,
   buildOrganizationServiceState,
@@ -658,6 +663,10 @@ export type { BuildOrganizationScaffoldInput } from './organization-operating-mo
 export type { OrganizationScaffold } from './organization-operating-model-operations.js';
 export type { BuildOrganizationPurposeInput } from './organization-operating-model-operations.js';
 export type { BuildOrganizationObjectiveInput } from './organization-operating-model-operations.js';
+export type {
+  BuildOrganizationKeyResultInput,
+  RemoveOrganizationKeyResultInput,
+} from './organization-operating-model-operations.js';
 export type { BuildOrganizationDomainInput } from './organization-operating-model-operations.js';
 export type { BuildOrganizationServiceInput } from './organization-operating-model-operations.js';
 export type { OrganizationServiceAddition } from './organization-operating-model-operations.js';
@@ -910,6 +919,8 @@ export {
   buildOrganizationScaffold,
   buildOrganizationPurposeRecord,
   buildOrganizationObjectiveAddition,
+  buildOrganizationKeyResultAddition,
+  buildOrganizationKeyResultRemoval,
   buildOrganizationDomainRecord,
   buildOrganizationServiceAddition,
   buildOrganizationServiceState,

@@ -12,6 +12,7 @@ import type { ReasoningToolName, SamplingParams } from './reasoning-route-resolv
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 import {
   getReasoningProviderDescriptor,
+  resolveReasoningProviderEnvironment,
   type ReasoningProviderAdapterId,
   type ReasoningProviderRuntimeBundle,
 } from './reasoning-provider-registry.js';
@@ -44,7 +45,9 @@ const API_ADAPTER_BUILDERS: Partial<Record<ReasoningProviderAdapterId, ApiAdapte
   'anthropic-api': (options, env) => {
     const { mode, provider } = options;
     if (!options.anthropicClient && !env.ANTHROPIC_API_KEY && !options.force) return null;
-    const client = options.anthropicClient ?? new Anthropic();
+    const client =
+      options.anthropicClient ??
+      (env.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }) : new Anthropic());
     return {
       mode,
       backend: {
@@ -114,5 +117,5 @@ export function buildApiProviderBundle(
       `[REASONING_API_ADAPTER_UNSUPPORTED] ${options.mode}: adapter ${descriptor.adapter} has no hosted-API builder`
     );
   }
-  return builder(options, env);
+  return builder(options, resolveReasoningProviderEnvironment(descriptor, env));
 }

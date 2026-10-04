@@ -34,6 +34,13 @@ export type ParsedArgs = {
   principles: string[];
   approvalState?: OrganizationPurposeRecord['approval_state'];
   objectiveId?: string;
+  krId?: string;
+  metricJson?: string;
+  target?: number;
+  direction?: 'increase' | 'decrease' | 'maintain';
+  baseline?: number;
+  unit?: string;
+  weight?: number;
   description?: string;
   horizon?: string;
   domainId?: string;
@@ -148,6 +155,13 @@ export function parseArgs(args: string[]): ParsedArgs {
     '--principle': { kind: 'push', field: 'principles' },
     '--approval-state': { kind: 'value', field: 'approvalState' },
     '--objective-id': { kind: 'value', field: 'objectiveId' },
+    '--kr-id': { kind: 'value', field: 'krId' },
+    '--metric-json': { kind: 'value', field: 'metricJson' },
+    '--target': { kind: 'value', field: 'target', asNumber: true },
+    '--direction': { kind: 'value', field: 'direction' },
+    '--baseline': { kind: 'value', field: 'baseline', asNumber: true },
+    '--unit': { kind: 'value', field: 'unit' },
+    '--weight': { kind: 'value', field: 'weight', asNumber: true },
     '--description': { kind: 'value', field: 'description' },
     '--horizon': { kind: 'value', field: 'horizon' },
     '--domain-id': { kind: 'value', field: 'domainId' },
@@ -260,6 +274,9 @@ export function usage(): string {
     '  pnpm organization parent set --organization-id <id> --tier <tier> [--tenant-slug <slug>] --parent-organization-id <id>|--clear (parent must be in the same tier and tenant)',
     '  pnpm organization purpose set --organization-id <id> --name <name> --tier <tier> [--tenant-slug <slug>] --purpose <text> --owner-role <role> [--principle <p>]... [--approval-state <state>]',
     '  pnpm organization objective add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --objective-id <id> --title <title> [--description <text>] [--horizon <h>] [--owner-role <role>]',
+    '  pnpm organization objective kr add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --objective-id <id> --kr-id <id> --title <title> --metric-json <json> --target <n> --direction <increase|decrease|maintain> [--baseline <n>] [--unit <u>] [--weight <n>]',
+    '  pnpm organization objective kr list --organization-id <id> --tier <tier> [--tenant-slug <slug>] [--objective-id <id>]',
+    '  pnpm organization objective kr remove --organization-id <id> --tier <tier> [--tenant-slug <slug>] --objective-id <id> --kr-id <id>',
     '  pnpm organization domain add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --domain-id <id> --name <name> --owner-role <role> [--purpose <text>]',
     '  pnpm organization service add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --service-id <id> --domain-id <id> --name <name> --outcome <text> --owner-role <role> --consumer <c>... [--slo-target <t>] [--slo-window <w>] [--runbook-ref <ref>]... [--record-status <s>]',
     '  pnpm organization operation add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --operation-id <id> --name <name> --operation-type <continuous|scheduled|event_driven|governance> --owner-role <role> [--service-id <id>] [--purpose <text>] [--trigger-kind <k>] [--trigger-expression <value>] --timezone <IANA> (required for schedule) [--deadline-business-day <n> --deadline-time <HH:MM>] [--execution-kind <mission|task_session|pipeline|actuator|runbook>] [--execution-ref <ref>] [--record-status <draft|active>] [--allowed-action <text>]... [--approval-required-action <text>]... [--forbidden-action <text>]... [--operation-source-ref <ref>]... [--evidence-output <ref>]...',
