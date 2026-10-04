@@ -102,8 +102,9 @@ describe('ingress CLI', () => {
   it('up exits 3 with the approval command while approval is pending', async () => {
     service.exposeSurface.mockResolvedValue({
       status: 'approval_required',
+      approval_state: 'created',
       approval_request_id: 'APR-9',
-      message: 'pending',
+      message: 'Approval request APR-9 created; awaiting decision',
       provider_id: 'tailscale-funnel',
       selection,
     });
@@ -114,6 +115,50 @@ describe('ingress CLI', () => {
       )
     ).rejects.toMatchObject({ code: 3 });
     expect(lines.join('\n')).toMatch(/pnpm kyberion approvals --approve APR-9/);
+  });
+
+  it('a rejected request explains why instead of offering the approve command', async () => {
+    service.exposeSurface.mockResolvedValue({
+      status: 'approval_required',
+      approval_state: 'rejected',
+      approval_request_id: 'APR-7',
+      message: 'Approval request APR-7 is rejected',
+      provider_id: 'tailscale-funnel',
+      selection,
+    });
+    const lines: unknown[] = [];
+    await expect(
+      runIngressCli({ command: 'up', surface: 'event-intake', json: false }, (line) =>
+        lines.push(line)
+      )
+    ).rejects.toMatchObject({ code: 3 });
+    const text = lines.join('\n');
+    expect(text).toMatch(/Approval request APR-7 is rejected/);
+    expect(text).toMatch(/new request is opened automatically once it lapses/);
+    expect(text).not.toMatch(/approvals --approve/);
+  });
+
+  it('down passes --provider and reports which providers were checked', async () => {
+    service.withdrawSurface.mockResolvedValue({
+      status: 'not_exposed',
+      checked_providers: ['tailscale-funnel'],
+    });
+    const lines: unknown[] = [];
+    await runIngressCli(
+      { command: 'down', surface: 'event-intake', provider: 'tailscale-funnel', json: false },
+      (line) => lines.push(line)
+    );
+    expect(service.withdrawSurface).toHaveBeenCalledWith({
+      surfaceId: 'event-intake',
+      providerId: 'tailscale-funnel',
+    });
+    expect(lines.join('\n')).toBe('event-intake is not exposed (checked: tailscale-funnel).');
+
+    service.listSurfaceIngressStatus.mockResolvedValue([]);
+    await runIngressCli({ command: 'status', provider: 'tailscale-funnel', json: true }, () => {});
+    expect(service.listSurfaceIngressStatus).toHaveBeenCalledWith({
+      providerId: 'tailscale-funnel',
+    });
   });
 
   it('endpoint hints are keyed by surface, empty for surfaces without hints', () => {

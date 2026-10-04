@@ -46,6 +46,11 @@
               "path_prefix": {
                 "type": "string",
                 "pattern": "^/(?:[A-Za-z0-9._~-]+(?:/[A-Za-z0-9._~-]+)*)?$"
+              },
+              "port_env": {
+                "type": "string",
+                "description": "Registered env var that can move the surface's listener; `ingress up` refuses when it is set to a different port than `port`.",
+                "pattern": "^KYBERION_[A-Z0-9_]+$"
               }
             },
             "additionalProperties": false
