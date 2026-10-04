@@ -12,6 +12,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { currentExecutionScope } from '../foundation/execution-scope.js';
+import { normalizeEventScope } from '../event-scope.js';
+import { getUsageAttribution } from '../usage-accounting.js';
 import { llmSemaphore } from '../semaphore.js';
 import { metrics } from '../metrics.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
@@ -424,10 +427,24 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     try {
       const usage = message?.usage;
       const cacheStats = deriveAnthropicCacheStats(usage);
+      const attribution = getUsageAttribution();
+      const execution = currentExecutionScope();
+      const scope =
+        attribution?.scope ??
+        (execution?.tenantSlug
+          ? normalizeEventScope({
+              tier: 'confidential',
+              tenant_slug: execution.tenantSlug,
+              organization_id: execution.organizationId,
+            })
+          : undefined);
       metrics.record('anthropic-sdk', Date.now() - started, status, {
         model: String(model || this.model),
         agent: 'anthropic-sdk',
         cause: 'assistant',
+        ...(scope ? { scope } : {}),
+        ...(attribution ? { actor_id: attribution.actor_id } : {}),
+        ...(attribution?.accounting_id ? { accounting_id: attribution.accounting_id } : {}),
         mission_id: getRegisteredEnvText('MISSION_ID') || undefined,
         ...(cacheStats ? { cacheStats } : {}),
         ...(usage

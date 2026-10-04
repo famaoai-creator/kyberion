@@ -28,6 +28,8 @@ export interface ApprovalPolicyResolution {
   requiresApproval: boolean;
   missingRequirements: string[];
   matchedRuleId?: string;
+  /** A runtime security floor that delegated authority or session grants cannot waive. */
+  mandatoryApproval?: boolean;
 }
 
 const approvalPolicyCatalog = defineCatalog<ApprovalPolicyFile>({
@@ -95,7 +97,7 @@ export function resolveApprovalPolicy(input: {
   intentId?: string;
   payload?: Record<string, unknown>;
 }): ApprovalPolicyResolution {
-  const base = resolveBaseApprovalPolicy(input);
+  const base = applyInjectionFloor(input, resolveBaseApprovalPolicy(input));
   // QM-04: strict posture = every intent pauses for a human. The floor is a
   // MONOTONE tightening applied on top of the base resolution: a base rule
   // that already requires approval keeps its rule id and its (possibly
@@ -106,6 +108,7 @@ export function resolveApprovalPolicy(input: {
     if (base.requiresApproval) {
       return {
         ...base,
+        mandatoryApproval: true,
         missingRequirements: Array.from(
           new Set([...base.missingRequirements, 'approval_confirmation'])
         ),
@@ -115,17 +118,16 @@ export function resolveApprovalPolicy(input: {
       requiresApproval: true,
       missingRequirements: ['approval_confirmation'],
       matchedRuleId: 'strict-posture-floor',
+      mandatoryApproval: true,
     };
   }
   return base;
 }
 
-function resolveBaseApprovalPolicy(input: {
-  intentId?: string;
-  payload?: Record<string, unknown>;
-}): ApprovalPolicyResolution {
-  const policy = loadApprovalPolicy();
-
+function applyInjectionFloor(
+  input: { intentId?: string; payload?: Record<string, unknown> },
+  base: ApprovalPolicyResolution
+): ApprovalPolicyResolution {
   if (isInjectionSuspected()) {
     const isEgress =
       /egress|network|http|https|fetch|request/i.test(input.intentId || '') ||
@@ -147,11 +149,22 @@ function resolveBaseApprovalPolicy(input: {
     if (isEgress || isShell || isModify) {
       return {
         requiresApproval: true,
-        missingRequirements: ['approval_confirmation'],
+        missingRequirements: Array.from(
+          new Set([...base.missingRequirements, 'approval_confirmation'])
+        ),
         matchedRuleId: 'injection-suspected-override',
+        mandatoryApproval: true,
       };
     }
   }
+  return base;
+}
+
+function resolveBaseApprovalPolicy(input: {
+  intentId?: string;
+  payload?: Record<string, unknown>;
+}): ApprovalPolicyResolution {
+  const policy = loadApprovalPolicy();
   for (const rule of policy.rules || []) {
     if (rule.intent_ids?.length && (!input.intentId || !rule.intent_ids.includes(input.intentId)))
       continue;

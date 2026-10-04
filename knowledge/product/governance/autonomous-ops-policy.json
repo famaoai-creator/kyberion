@@ -79,6 +79,21 @@
     "end": "22:00",
     "timezone": "Asia/Tokyo"
   },
+  "autonomy": {
+    "description": "L0 records proposals only (shadow; digest line, no card, no WorkItem). relaxable_actions is the single exception below the policy gate: an eligible L4 dot may turn notify into auto for these actions; approve, never_auto, high-risk paths, budget escalations and charter floors are never relaxed.",
+    "relaxable_actions": ["dot_delegate_work"],
+    "promotion": {
+      "min_decisions": 20,
+      "min_agreement": 0.9,
+      "min_outcome_success": 0.8,
+      "max_incidents_30d": 0
+    },
+    "demotion": {
+      "on_regressed_outcomes": 2,
+      "on_rejection_streak": 2,
+      "on_incident": true
+    }
+  },
   "actions": {
     "storage_janitor": {
       "title": "Storage janitor",

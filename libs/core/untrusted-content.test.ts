@@ -255,6 +255,7 @@ describe('SA-03 Prompt Injection & Untrusted Content Defense', () => {
       const result = resolveApprovalPolicy({ intentId: 'local:test' });
       expect(result.requiresApproval).toBe(true);
       expect(result.matchedRuleId).toBe('strict-posture-floor');
+      expect(result.mandatoryApproval).toBe(true);
     });
 
     it('strict tightens monotonically: dual-key on secrets survives (review P1-1)', () => {
@@ -263,6 +264,7 @@ describe('SA-03 Prompt Injection & Untrusted Content Defense', () => {
       expect(result.requiresApproval).toBe(true);
       expect(result.missingRequirements).toContain('dual_key_confirmation');
       expect(result.matchedRuleId).not.toBe('strict-posture-floor');
+      expect(result.mandatoryApproval).toBe(true);
     });
 
     it('strict keeps the injection-suspected override rule id (review P1-1)', () => {
@@ -272,6 +274,23 @@ describe('SA-03 Prompt Injection & Untrusted Content Defense', () => {
         const result = resolveApprovalPolicy({ intentId: 'network:fetch' });
         expect(result.matchedRuleId).toBe('injection-suspected-override');
         expect(result.missingRequirements).toContain('approval_confirmation');
+      } finally {
+        setInjectionSuspected(false);
+      }
+    });
+
+    it('injection tightens rather than replaces a base dual-key requirement', () => {
+      setInjectionSuspected(true);
+      try {
+        const result = resolveApprovalPolicy({ intentId: 'vault:write' });
+        expect(result).toMatchObject({
+          requiresApproval: true,
+          mandatoryApproval: true,
+          matchedRuleId: 'injection-suspected-override',
+        });
+        expect(result.missingRequirements).toEqual(
+          expect.arrayContaining(['dual_key_confirmation', 'approval_confirmation'])
+        );
       } finally {
         setInjectionSuspected(false);
       }

@@ -25,6 +25,8 @@ const FIXTURE_INPUT = {
     primary_domain: 'productization',
     vision: 'Make the ecosystem legible and reliable.',
     agent_id: 'agent-001',
+    // The caller's persisted .env.local persona is not a test fixture.
+    persona: 'sovereign' as const,
   },
   tenants: [
     {

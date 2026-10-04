@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { randomUUID } from 'node:crypto';
 
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import type {
@@ -19,10 +20,12 @@ import {
   currentDotActions,
   dispatchDotProposals,
   dotBoundsPromptLines,
+  effectiveDotWorkShapes,
   dotNotificationRoute,
   maybeSendDotDigest,
   runDotHousekeeping,
   settleDotParkedActions,
+  supersedeDotParkedAction,
   type DotDispatchDeps,
 } from './dot-dispatch.js';
 import {
@@ -32,10 +35,12 @@ import {
   recordDotFeedback,
 } from './dot-feedback.js';
 import { appendDotInboxEntry } from './dot-inbox.js';
+import { setDotBudgetThrottleForTests } from './dot-budget.js';
 import { evaluateDotTriggersDue } from './dot-runtime.js';
+import { DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE } from './dot-proposals.js';
 import type { DotProposal } from './dot-proposals.js';
 
-const TEST_ROOT = 'active/shared/tmp/dot-dispatch-tests';
+const TEST_ROOT = `active/shared/tmp/dot-dispatch-tests-${randomUUID()}`;
 const RANK = { auto: 0, notify: 1, approve: 2 } as const;
 
 const CHARTER: DotCharter = {
@@ -50,7 +55,7 @@ const CHARTER: DotCharter = {
   attention: { triggers: [{ kind: 'cron', cron: '0 9 * * *', timezone: 'UTC' }] },
   authority: {
     authority_role: 'organization_operator',
-    allowed_work_shapes: ['task_session', 'pipeline'],
+    allowed_work_shapes: ['direct_reply', 'pipeline'],
     max_concurrent_delegations: 2,
   },
   notification: { deliver_to: { surface: 'slack', channel: 'C-EXEC' } },
@@ -61,7 +66,7 @@ const PROPOSAL: DotProposal = {
   action_id: 'dot_delegate_work',
   title: 'Tick overdue operations',
   objective: 'Run the overdue operation tick.',
-  work_shape: 'task_session',
+  work_shape: 'direct_reply',
 };
 
 function gateResult(
@@ -174,7 +179,13 @@ function approval(
   return { status, decidedBy, decidedByType } as ApprovalRequestRecord;
 }
 
+// Hermetic: the budget floor contributor must never read real usage metrics.
+beforeEach(() => {
+  setDotBudgetThrottleForTests(() => 'normal');
+});
+
 afterEach(() => {
+  setDotBudgetThrottleForTests(undefined);
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
 });
 
@@ -260,7 +271,50 @@ describe('dispatchDotProposals — charter bounds', () => {
     expect(h.audits[0]).toMatchObject({ result: 'denied' });
   });
 
-  it('defaults to task_session/direct_reply when the charter declares no shapes', () => {
+  it('refuses task_session before the gate or any operator ask while no executor is configured', () => {
+    const h = harness('approve');
+    const charter = {
+      ...CHARTER,
+      authority: { ...CHARTER.authority, allowed_work_shapes: ['task_session', 'direct_reply'] },
+    } as DotCharter;
+    const { records } = dispatchDotProposals(
+      charter,
+      [{ ...PROPOSAL, work_shape: 'task_session' }],
+      h.deps
+    );
+    expect(records[0].status).toBe('refused');
+    expect(records[0].reason).toBe(DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE);
+    expect(h.gateInputs).toHaveLength(0);
+    expect(h.items).toHaveLength(0);
+    // Explicit opt-in: a configured task-session executor lets the declared shape through.
+    const opted = harness('auto', { taskSessionExecutorAvailable: true });
+    const allowed = dispatchDotProposals(
+      charter,
+      [{ ...PROPOSAL, work_shape: 'task_session' }],
+      opted.deps
+    );
+    expect(allowed.records[0].status).toBe('dispatched');
+  });
+
+  it('never defaults to task_session: an undeclared charter gets direct_reply only', () => {
+    const h = harness('auto');
+    const charter = {
+      ...CHARTER,
+      authority: { authority_role: 'organization_operator' },
+    } as DotCharter;
+    expect(effectiveDotWorkShapes(charter)).toEqual(['direct_reply']);
+    expect(effectiveDotWorkShapes(charter, { taskSessionExecutorAvailable: true })).toEqual([
+      'direct_reply',
+    ]);
+    const refused = dispatchDotProposals(
+      charter,
+      [{ ...PROPOSAL, work_shape: 'task_session' }],
+      h.deps
+    );
+    expect(refused.records[0].status).toBe('refused');
+  });
+
+  it('defaults to direct_reply when the charter declares no shapes', () => {
     const h = harness('auto');
     const charter = {
       ...CHARTER,
@@ -307,6 +361,23 @@ describe('dot handoff (team coordination)', () => {
     expect(records[0].reason).toMatch(/does not accept handoffs/);
   });
 
+  it('refuses a handoff to a dot in another tenant', () => {
+    const h = harness('auto', {
+      listCharters: () => [
+        CHARTER,
+        { ...TARGET, scope: { ...TARGET.scope, tenant_slug: 'other-tenant' } },
+      ],
+    });
+    const { records } = dispatchDotProposals(
+      CHARTER,
+      [{ ...PROPOSAL, action_id: 'dot_handoff', handoff_to: 'repo-guardian' }],
+      h.deps
+    );
+    expect(records[0].status).toBe('refused');
+    expect(records[0].reason).toMatch(/cross-tenant handoff denied/);
+    expect(h.items).toHaveLength(0);
+  });
+
   it('refuses before asking anyone when the tenant cannot take work', () => {
     const h = harness('approve', { assertTenant: undefined });
     const { records } = dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
@@ -350,13 +421,18 @@ describe('dotBoundsPromptLines', () => {
         ...CHARTER,
         authority: {
           ...CHARTER.authority,
-          allowed_work_shapes: ['task_session'],
+          allowed_work_shapes: ['task_session', 'pipeline'],
+          allowed_pipelines: ['pipelines/baseline-check.json'],
           max_concurrent_delegations: 2,
         },
       },
       { rootDir: TEST_ROOT, countOpenWorkItems: () => 1, listCharters: () => [CHARTER, partner] }
     );
-    expect(lines.join('\n')).toContain('Allowed work_shape values: task_session.');
+    expect(lines.join('\n')).toContain('Allowed work_shape values: pipeline.');
+    expect(lines.join('\n')).toContain(
+      'Allowed pipeline_ref values: pipelines/baseline-check.json'
+    );
+    expect(lines.join('\n')).toContain(DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE);
     expect(lines.join('\n')).toContain('Delegation slots free: 1 of 2');
     expect(lines.join('\n')).toContain('accept your handoffs (handoff_to): repo-guardian');
   });
@@ -591,7 +667,7 @@ describe('settleDotParkedActions + learning', () => {
     h.approvals.set('req-1', approval('approved'));
     const narrowed: DotCharter = {
       ...CHARTER,
-      authority: { ...CHARTER.authority, allowed_work_shapes: ['direct_reply'] },
+      authority: { ...CHARTER.authority, allowed_work_shapes: ['pipeline'] },
     };
     const settled = settleDotParkedActions(narrowed, h.deps);
     expect(settled[0]).toMatchObject({ status: 'declined' });
@@ -682,5 +758,33 @@ describe('digest and success signals', () => {
     expect(result.digest).toBe(true);
     expect(result.errors).toEqual([]);
     expect(currentDotActions('org-ops', h.deps)[0].status).toBe('dispatched');
+  });
+});
+
+describe('supersedeDotParkedAction', () => {
+  const by = { dot_id: 'newcomer', action_ref: 'dact-new-1' };
+
+  it('declines a pending parked action as superseded and expires its card', () => {
+    const expired: string[] = [];
+    const h = harness('approve', {
+      expireApproval: (record) => {
+        expired.push(record.id);
+        return { ...record, status: 'expired' };
+      },
+    });
+    const parked = dispatchDotProposals(CHARTER, [PROPOSAL], h.deps).records[0];
+    h.approvals.set('req-1', { ...approval('pending'), id: 'req-1' } as ApprovalRequestRecord);
+    const row = supersedeDotParkedAction(CHARTER, parked.action_ref, by, h.deps);
+    expect(row).toMatchObject({ status: 'declined', reason: 'superseded', superseded_by: by });
+    expect(expired).toEqual(['req-1']);
+  });
+
+  it('never silently overturns a card the operator already approved', () => {
+    const h = harness('approve');
+    const parked = dispatchDotProposals(CHARTER, [PROPOSAL], h.deps).records[0];
+    h.approvals.set('req-1', approval('approved'));
+    expect(supersedeDotParkedAction(CHARTER, parked.action_ref, by, h.deps)).toBeUndefined();
+    expect(currentDotActions('org-ops', h.deps)[0].status).toBe('parked');
+    expect(h.audits.at(-1)).toMatchObject({ operation: 'supersede_skipped', result: 'denied' });
   });
 });

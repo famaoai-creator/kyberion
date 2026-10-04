@@ -39,16 +39,33 @@ import {
 } from '@agent/core/foundation';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import { createTriggerRunner, resolveCurrentTriggerAuthority } from '@agent/core/trigger-runner';
-import { listDotCharters } from '@agent/core/dot/dot-charter';
 import {
+  listDotCharters,
+  type DotCharter,
+  type DotCharterLoadError,
+  type LoadedDotCharter,
+} from '@agent/core/dot/dot-charter';
+import {
+  applyDotWakeCircuit,
   dotDailyTokenCapReached,
   evaluateDotProbeTriggers,
   evaluateDotTriggersDue,
   recordDotWakeOutcome,
+  type DotWakeReceipt,
+  type DueDotTrigger,
 } from '@agent/core/dot/dot-runtime';
+import { evaluateDotCronCatchUp, evaluateDotFollowupsDue } from '@agent/core/dot/dot-followups';
+import { evaluateDotEventTriggers } from '@agent/core/dot/dot-event-intake';
+import {
+  installReasoningBackends,
+  reselectReasoningBackends,
+} from '@agent/core/reasoning/reasoning-bootstrap';
+import { runDotSupervisorExtensions } from './dot_supervisor_extensions.js';
 import { executeServicePreset } from '@agent/core/service/service-engine';
 import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
 import { runDotHousekeeping } from '@agent/core/dot/dot-dispatch';
+import '@agent/core/dot/dot-extension-bootstrap';
+import { dotBudgetThrottle, type DotBudgetThrottle } from '@agent/core/dot/dot-budget';
 import { tickVetoWindows } from '@agent/core/governance/approval-veto-window';
 import { AUTONOMY_APPROVAL_CHANNEL } from '@agent/core/governance/approval-decision-card';
 import { isRecord } from '@agent/core/foundation/text';
@@ -249,18 +266,101 @@ setInterval(
 const dotTriggerRunner = createTriggerRunner();
 let dotSweepInFlight = false;
 
-export async function runDotSweepOnce(now: Date = new Date()): Promise<number> {
+/** Re-select reasoning backends this often in the long-lived daemon. */
+export const DOT_BACKEND_RESELECT_INTERVAL_MS = 30 * 60 * 1000;
+/** Minimum spacing of failure-driven reselects (all wakes failed on the backend). */
+const DOT_BACKEND_FAILURE_RESELECT_MIN_MS = 5 * 60 * 1000;
+/** Stale-code drift is warned at most this often. */
+const STALE_CODE_WARN_INTERVAL_MS = 60 * 60 * 1000;
+
+let lastDotCharterErrors: DotCharterLoadError[] = [];
+const warnedDotCharterErrors = new Set<string>();
+let lastFailureReselectAt = 0;
+let lastStaleCodeWarnAt = 0;
+
+/** Wake failures caused by the reasoning backend, not the dot (reselect may fix them). */
+export function isDotBackendFailure(reason: string | undefined): boolean {
+  return /no real reasoning backend|lacks generateWithTools|failed across \d+ candidate|has no tool-capable backend|Reasoning backend is not configured/i.test(
+    String(reason ?? '')
+  );
+}
+
+export interface DotSweepDeps {
+  /** Active charters (malformed ones pushed onto `errors`); defaults to listDotCharters. */
+  listCharters?: (errors: DotCharterLoadError[]) => LoadedDotCharter[];
+  /** Executes one wake; defaults to runDotWakeWithGoalDriver. */
+  wake?: (loaded: LoadedDotCharter, deps: { trigger: DueDotTrigger }) => Promise<DotWakeReceipt>;
+  /** Backend reselect port; defaults to reselectReasoningBackends. */
+  reselectBackends?: () => void;
+  /** Org budget throttle port; defaults to dotBudgetThrottle (DL-07). */
+  budgetThrottle?: (charter: DotCharter) => DotBudgetThrottle;
+}
+
+/** Heartbeat details for the daemon: charter load errors and code-stamp drift. */
+export function dotSupervisorHeartbeatDetails(nowMs: number = Date.now()): Record<string, unknown> {
+  const currentStamp = computeSupervisorCodeStamp();
+  const stale = currentStamp !== 0 && DAEMON_CODE_STAMP !== 0 && currentStamp !== DAEMON_CODE_STAMP;
+  if (stale && nowMs - lastStaleCodeWarnAt >= STALE_CODE_WARN_INTERVAL_MS) {
+    lastStaleCodeWarnAt = nowMs;
+    logger.warn(
+      `[dot-sweep] supervisor runs stale code — core dist changed since start (${DAEMON_CODE_STAMP} → ${currentStamp}) | next: restart the agent-runtime supervisor daemon to load the new build | evidence: libs/core/dist/index.js`
+    );
+  }
+  return {
+    ...(lastDotCharterErrors.length
+      ? {
+          charter_errors: lastDotCharterErrors.map((entry) => ({
+            path: entry.path,
+            error: entry.error.slice(0, 300),
+          })),
+        }
+      : {}),
+    ...(stale ? { stale_code: true, code_stamp: DAEMON_CODE_STAMP, dist_stamp: currentStamp } : {}),
+  };
+}
+
+/** Test-only: reset sweep-level module state. */
+export function resetDotSweepStateForTests(): void {
+  lastDotCharterErrors = [];
+  warnedDotCharterErrors.clear();
+  lastFailureReselectAt = 0;
+  lastStaleCodeWarnAt = 0;
+  dotSweepInFlight = false;
+}
+
+function triggerRunnerSource(trigger: DueDotTrigger): 'cron' | 'watch' | 'wake' {
+  // probe / event / followup are dot-level kinds; at the runner they are a
+  // wake (an observation or self-scheduled event), same as an inbox row.
+  const kind = trigger.trigger.kind;
+  return kind === 'cron' || kind === 'watch' ? kind : 'wake';
+}
+
+export async function runDotSweepOnce(
+  now: Date = new Date(),
+  deps: DotSweepDeps = {}
+): Promise<number> {
   // One sweep at a time: a slow wake (up to the charter's wall-clock budget)
   // must not let the next tick pile a second sweep on top.
   if (dotSweepInFlight) return 0;
   dotSweepInFlight = true;
   try {
-    const charterErrors: Array<{ path: string; error: string }> = [];
-    const active = listDotCharters(undefined, { status: 'active', errors: charterErrors });
+    const charterErrors: DotCharterLoadError[] = [];
+    const active = (
+      deps.listCharters ??
+      ((errors: DotCharterLoadError[]) => listDotCharters(undefined, { status: 'active', errors }))
+    )(charterErrors);
+    lastDotCharterErrors = charterErrors;
     for (const error of charterErrors) {
-      logger.warn(`[dot-sweep] skipping malformed charter ${error.path}: ${error.error}`);
+      // Warn once per distinct (path, error); the heartbeat carries the live list.
+      const key = `${error.path}\u0000${error.error}`;
+      if (warnedDotCharterErrors.has(key)) continue;
+      warnedDotCharterErrors.add(key);
+      logger.warn(
+        `[dot-sweep] charter skipped — ${error.error} | next: pnpm kyberion dot validate, then fix the file | evidence: ${error.path}`
+      );
     }
     let delivered = 0;
+    const wakeReasons: Array<string | undefined> = [];
     // Veto windows on dot decision cards elapse here too, not only via
     // `approval-inbox tick`, so a silent-consent action does not wait for a CLI.
     try {
@@ -300,6 +400,11 @@ export async function runDotSweepOnce(now: Date = new Date()): Promise<number> {
       for (const message of housekeeping.errors) {
         logger.warn(`[dot-sweep] housekeeping for ${loaded.charter.dot_id} — ${message}`);
       }
+    }
+    // Registered per-sweep steps (executor, KR measurement, …) run after
+    // housekeeping and before wakes; each step is isolated.
+    await runDotSupervisorExtensions(now, active);
+    for (const loaded of active) {
       // Budget-capped dots skip before the runner layer so a pending trigger
       // doesn't burn a warn + 'failed' receipt every tick — but they still
       // heartbeat, or the watchdog would page a dot that is healthy-but-capped.
@@ -310,7 +415,27 @@ export async function runDotSweepOnce(now: Date = new Date()): Promise<number> {
         });
         continue;
       }
-      let due;
+      // DL-07: a scope at the hard org budget limit gets no wakes (housekeeping
+      // above still ran; the executor step skips it too). Fails open.
+      let budgetThrottle: DotBudgetThrottle = 'normal';
+      try {
+        budgetThrottle = (
+          deps.budgetThrottle ??
+          ((charter: DotCharter) => dotBudgetThrottle(charter, { now: () => now }).throttle)
+        )(loaded.charter);
+      } catch (error) {
+        logger.warn(
+          `[dot-sweep] budget evaluation failed for ${loaded.charter.dot_id} — ${error instanceof Error ? error.message : error} | next: wakes proceed; check spend-policy.json org_budget | evidence: libs/core/governance/org-budget-governor.ts`
+        );
+      }
+      if (budgetThrottle === 'hard') {
+        recordDaemonHeartbeat(loaded.charter.runtime.heartbeat_id, {
+          status: 'running',
+          details: { dot_id: loaded.charter.dot_id, trigger: 'budget-hard' },
+        });
+        continue;
+      }
+      let due: DueDotTrigger[];
       try {
         due = evaluateDotTriggersDue(loaded.charter, { now: () => now });
         due = due.concat(
@@ -325,6 +450,13 @@ export async function runDotSweepOnce(now: Date = new Date()): Promise<number> {
               ),
           })
         );
+        due = due.concat(
+          evaluateDotFollowupsDue(loaded.charter, { now: () => now }),
+          evaluateDotCronCatchUp(loaded.charter, { now: () => now })
+        );
+        due = due.concat(evaluateDotEventTriggers(loaded.charter, { now: () => now }));
+        // Re-applied over the concatenated list: one half-open probe at most.
+        due = applyDotWakeCircuit(loaded.charter, due, { now: () => now });
       } catch (error) {
         logger.warn(
           `[dot-sweep] trigger evaluation failed for ${loaded.charter.dot_id}: ${error instanceof Error ? error.message : error}`
@@ -345,15 +477,16 @@ export async function runDotSweepOnce(now: Date = new Date()): Promise<number> {
               return await dotTriggerRunner.run(
                 {
                   idempotencyKey: `dot:${loaded.charter.dot_id}:${trigger.key}`,
-                  // 'probe' is a dot-level kind; at the runner it is a wake
-                  // (an external-state observation), same as an inbox row.
-                  source: trigger.trigger.kind === 'probe' ? 'wake' : trigger.trigger.kind,
+                  source: triggerRunnerSource(trigger),
                   createdBy: authority,
                   payload: { dot_id: loaded.charter.dot_id, trigger_key: trigger.key },
                 },
                 async () => {
                   deliverRan = true;
-                  const wake = await runDotWakeWithGoalDriver(loaded, { trigger });
+                  const wake = await (deps.wake ?? runDotWakeWithGoalDriver)(loaded, { trigger });
+                  wakeReasons.push(
+                    wake.outcome === 'failed' ? (wake.reason ?? 'failed') : undefined
+                  );
                   // Only a real delivery may close the runner's idempotency
                   // key — 'delivered' is terminal there, so throwing on
                   // skipped/failed keeps the key retryable and lets the dot
@@ -396,6 +529,25 @@ export async function runDotSweepOnce(now: Date = new Date()): Promise<number> {
             `[dot-sweep] wake delivery error for ${loaded.charter.dot_id} (${trigger.key}): ${error instanceof Error ? error.message : error}`
           );
         }
+      }
+    }
+    // Every wake this sweep failed on the reasoning backend: providers may
+    // have come back (or a login completed) since the last selection.
+    if (
+      wakeReasons.length > 0 &&
+      wakeReasons.every((reason) => reason !== undefined && isDotBackendFailure(reason)) &&
+      now.getTime() - lastFailureReselectAt >= DOT_BACKEND_FAILURE_RESELECT_MIN_MS
+    ) {
+      lastFailureReselectAt = now.getTime();
+      try {
+        (deps.reselectBackends ?? (() => void reselectReasoningBackends()))();
+        logger.warn(
+          `[dot-sweep] all ${wakeReasons.length} wake(s) failed on the reasoning backend — re-selected backends | next: check \`pnpm reasoning:setup\` if the next sweep fails the same way | evidence: active/shared/runtime/dot-wake-ledger.jsonl`
+        );
+      } catch (error) {
+        logger.warn(
+          `[dot-sweep] backend reselect failed — ${error instanceof Error ? error.message : error} | next: periodic reselect retries in 30 min | evidence: reasoning-bootstrap`
+        );
       }
     }
     return delivered;
@@ -1308,9 +1460,32 @@ export async function startAgentRuntimeSupervisorDaemon(
 
 async function main(_args: string[] = []) {
   await startAgentRuntimeSupervisorDaemon();
+  // Dot wakes need a real backend in THIS process: without the bootstrap,
+  // getReasoningBackend() is the deterministic stub.
+  try {
+    if (!installReasoningBackends()) {
+      logger.warn(
+        '[agent-runtime-supervisor-daemon] no real reasoning backend installed — dot wakes fail as unavailable | next: pnpm reasoning:setup (re-selected every 30 min) | evidence: reasoning-bootstrap'
+      );
+    }
+  } catch (error) {
+    logger.warn(
+      `[agent-runtime-supervisor-daemon] reasoning bootstrap failed — ${error instanceof Error ? error.message : error} | next: pnpm reasoning:setup | evidence: reasoning-bootstrap`
+    );
+  }
+  setInterval(() => {
+    try {
+      reselectReasoningBackends();
+    } catch (error) {
+      logger.warn(
+        `[agent-runtime-supervisor-daemon] periodic backend reselect failed — ${error instanceof Error ? error.message : error} | next: retried in 30 min | evidence: reasoning-bootstrap`
+      );
+    }
+  }, DOT_BACKEND_RESELECT_INTERVAL_MS).unref?.();
   setInterval(() => {
     recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
       status: 'running',
+      details: dotSupervisorHeartbeatDetails(),
     });
   }, 30_000).unref?.();
   // Resident-dot multiplex: evaluate active charters' triggers each sweep.

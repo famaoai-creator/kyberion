@@ -96,4 +96,47 @@ describe('parseDotProposalsFromText', () => {
   it('returns nothing for a reply without a fence', () => {
     expect(parseDotProposalsFromText('all healthy')).toEqual({ proposals: [], errors: [] });
   });
+
+  it('keeps pipeline_ref, expected_effect, target and intent', () => {
+    const proposal = normalizeDotProposal({
+      title: 'Run it',
+      objective: 'Run the pipeline',
+      work_shape: 'pipeline',
+      pipeline_ref: 'pipelines/x.json',
+      expected_effect: { kr_id: 'ci-green', direction: 'increase' },
+      target: 'service:github',
+      intent: 'apply',
+    });
+    expect(proposal).toMatchObject({
+      pipeline_ref: 'pipelines/x.json',
+      expected_effect: { kr_id: 'ci-green', direction: 'increase' },
+      target: 'service:github',
+      intent: 'apply',
+    });
+  });
+
+  it('drops malformed expected_effect, target and intent but keeps the proposal', () => {
+    const base = { title: 't', objective: 'o', work_shape: 'task_session' };
+    for (const extra of [
+      { expected_effect: { direction: 'increase' } },
+      { expected_effect: { signal: 's', direction: 'up' } },
+      { target: 'organization:acme/operations' },
+      { intent: 'explode' },
+    ]) {
+      const proposal = normalizeDotProposal({ ...base, ...extra });
+      expect(proposal).toMatchObject({ title: 't', objective: 'o' });
+      expect(proposal.expected_effect).toBeUndefined();
+      expect(proposal.target).toBeUndefined();
+      expect(proposal.intent).toBeUndefined();
+    }
+  });
+
+  it('parses the new fields from a fenced block', () => {
+    const reply =
+      '```dot-proposals\n[{"title":"t","objective":"o","work_shape":"pipeline","target":"pr:a/b#12","intent":"merge"}]\n```';
+    expect(parseDotProposalsFromText(reply).proposals[0]).toMatchObject({
+      target: 'pr:a/b#12',
+      intent: 'merge',
+    });
+  });
 });

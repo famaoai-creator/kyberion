@@ -538,13 +538,37 @@ export class MetricsCollector {
     return this._aggregates.get(capabilityName) || null;
   }
 
-  loadHistory() {
+  /**
+   * Strict consumers distinguish missing history from unreadable/corrupt evidence.
+   * With `onMalformed`, strict reads skip torn lines and report them instead of
+   * throwing, so the caller can judge whether they matter (e.g. only today's).
+   */
+  loadHistory(
+    options: {
+      strict?: boolean;
+      onMalformed?: (lineNumber: number, rawLine: string) => void;
+    } = {}
+  ) {
     try {
       const filePath = this._metricsPath(this._metricsFile);
-      if (!safeExistsSync(filePath)) return [];
+      if (options.strict) {
+        try {
+          safeLstat(filePath);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+          throw error;
+        }
+      } else if (!safeExistsSync(filePath)) return [];
       this._ensureRegularMetricsFile(filePath);
-      return readJsonLines<Record<string, any>>(assertSafeRepositoryPath(filePath));
-    } catch (_) {
+      const onMalformed = options.onMalformed;
+      return readJsonLines<Record<string, any>>(
+        assertSafeRepositoryPath(filePath),
+        options.strict && onMalformed
+          ? { onMalformed: (_error, lineNumber, rawLine) => onMalformed(lineNumber, rawLine) }
+          : {}
+      );
+    } catch (error) {
+      if (options.strict) throw error;
       return [];
     }
   }

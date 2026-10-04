@@ -19,6 +19,7 @@
  */
 
 import * as path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeReadFile, safeWriteFile } from '../secure-io.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
@@ -27,8 +28,8 @@ import { recordDaemonHeartbeat } from '../daemon-heartbeat.js';
 import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
 import { appendJsonLine } from '../foundation/json.js';
 import {
-  listDotCharterPaths,
-  loadDotCharter,
+  findDotCharter,
+  listDotCharters,
   validateDotCharter,
   type DotCharter,
   type DotCharterStatus,
@@ -61,18 +62,6 @@ export interface DotLifecycleDeps {
   supervisedDaemonIds?: readonly string[];
   /** Injectable role-registry lookup for hermetic tests. */
   hasRole?: (role: string) => boolean;
-}
-
-function findCharterPath(dotId: string, rootDir?: string): string | null {
-  for (const filePath of listDotCharterPaths(rootDir)) {
-    try {
-      if (loadDotCharter(filePath).dot_id === dotId) return filePath;
-    } catch {
-      // A malformed charter cannot be transitioned; skip it here and let
-      // `dot validate` surface the parse error with its file name.
-    }
-  }
-  return null;
 }
 
 function assertActivationReady(
@@ -136,11 +125,20 @@ export function transitionDotCharterStatus(
   target: DotCharterStatus,
   deps: DotLifecycleDeps = {}
 ): DotCharter {
-  const filePath = findCharterPath(dotId, deps.rootDir);
-  if (!filePath) {
+  const source = findDotCharter(dotId, deps.rootDir);
+  if (!source) {
     throw new Error(`[DOT_NOT_FOUND] no charter for dot_id '${dotId}' under dots/`);
   }
-  const rawText = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+  const filePath = source.path;
+  // Tenant charters live under knowledge/confidential/<slug>/: read and write
+  // them inside that tenant's context (tier-guard denies the path otherwise).
+  const tenantSlug = source.tenant_slug;
+  const rawText = withExecutionContext(
+    CHARTER_WRITER_ROLE,
+    () => safeReadFile(filePath, { encoding: 'utf8' }) as string,
+    undefined,
+    tenantSlug
+  );
   const parsed = parseSafeJsonObjectInput(rawText, `dot charter ${filePath}`);
   const current = validateDotCharter(parsed, filePath);
 
@@ -151,46 +149,43 @@ export function transitionDotCharterStatus(
     );
   }
   if (target === 'active') {
-    const all = listDotCharterPaths(deps.rootDir)
-      .map((p) => {
-        try {
-          return loadDotCharter(p);
-        } catch {
-          return null;
-        }
-      })
-      .filter((c): c is DotCharter => c !== null);
+    const all = listDotCharters(deps.rootDir, { errors: [] }).map((entry) => entry.charter);
     assertActivationReady(current, deps, all);
   }
 
   const next = { ...parsed, status: target };
   const validated = validateDotCharter(next, filePath);
-  withExecutionContext(CHARTER_WRITER_ROLE, () => {
-    safeWriteFile(filePath, `${JSON.stringify(next, null, 2)}\n`, { encoding: 'utf8' });
-    auditTransition(
-      {
-        event: 'dot_status_transition',
-        dot_id: dotId,
-        from: current.status,
-        to: target,
-        path: filePath,
-      },
-      deps
-    );
-    // Activation seeds a heartbeat so the watchdog sees 'starting', not
-    // 'missing', until the first real wake lands.
-    if (target === 'active') {
-      recordDaemonHeartbeat(
-        validated.runtime.heartbeat_id,
-        { status: 'starting', details: { dot_id: dotId, event: 'activated' } },
-        deps.rootDir
-          ? {
-              rootDir: path.join(deps.rootDir, 'active/shared/runtime/heartbeats'),
-            }
-          : {}
+  withExecutionContext(
+    CHARTER_WRITER_ROLE,
+    () => {
+      safeWriteFile(filePath, `${JSON.stringify(next, null, 2)}\n`, { encoding: 'utf8' });
+      auditTransition(
+        {
+          event: 'dot_status_transition',
+          dot_id: dotId,
+          from: current.status,
+          to: target,
+          path: filePath,
+        },
+        deps
       );
-    }
-  });
+      // Activation seeds a heartbeat so the watchdog sees 'starting', not
+      // 'missing', until the first real wake lands.
+      if (target === 'active') {
+        recordDaemonHeartbeat(
+          validated.runtime.heartbeat_id,
+          { status: 'starting', details: { dot_id: dotId, event: 'activated' } },
+          deps.rootDir
+            ? {
+                rootDir: path.join(deps.rootDir, 'active/shared/runtime/heartbeats'),
+              }
+            : {}
+        );
+      }
+    },
+    undefined,
+    tenantSlug
+  );
   return validated;
 }
 
@@ -201,15 +196,15 @@ export function checkDotActivationReadiness(
 ): { ready: boolean; errors: string[] } {
   const errors: string[] = [];
   try {
-    const all = listDotCharterPaths(deps.rootDir)
-      .map((p) => {
-        try {
-          return loadDotCharter(p);
-        } catch {
-          return null;
-        }
-      })
-      .filter((c): c is DotCharter => c !== null);
+    // A direct readiness check must reject the same ambiguous identity as
+    // transitions, and a duplicate that does not own its dot_id.
+    const owner = findDotCharter(charter.dot_id, deps.rootDir);
+    if (owner && !isDeepStrictEqual(owner.charter, charter)) {
+      throw new Error(
+        `[DOT_IDENTITY] dot_id '${charter.dot_id}' is owned by ${owner.path}; this charter is a rejected duplicate`
+      );
+    }
+    const all = listDotCharters(deps.rootDir, { errors: [] }).map((entry) => entry.charter);
     assertActivationReady(charter, deps, all);
   } catch (error) {
     errors.push(error instanceof Error ? error.message : String(error));
