@@ -26,7 +26,12 @@ import {
   ConversationEngine,
   type InteractionAction,
   type InteractionEvent,
+  type InterruptionAction,
+  type InterruptionArbiter,
+  type RespondGateFn,
 } from '../interaction/conversation-engine.js';
+import { BargeInController, type BargeInControllerOptions } from '../barge-in-controller.js';
+import type { AudioChunk } from '../meeting/meeting-session-types.js';
 import { languagePacksFromLexicon } from '../interaction/language-pack.js';
 import type { BackchannelPolicyOptions } from '../interaction/backchannel-policy.js';
 import type { UserRhythmOptions, RhythmAdjustments } from '../interaction/user-rhythm.js';
@@ -50,9 +55,23 @@ export interface TurnTakingInteractionOptions {
 
 export interface TurnTakingOptions {
   barge_in?: Omit<TwoStageBargeInOptions, 'now' | 'isEcho' | 'streaming_stt'>;
+  /**
+   * Injection seam for the interruption arbiter — the realtime loop selects
+   * the implementation by `bargeIn.mode` (`two_stage`, `legacy`, or none for
+   * `off`). When omitted the machine builds a `TwoStageBargeIn` from
+   * `barge_in` (the historical default).
+   */
+  arbiter?: InterruptionArbiter | null;
   /** Streaming STT partials are available (enables word-confirmed barge-in). Default true. */
   streaming_stt?: boolean;
-  eot?: { commitThreshold?: number; maxHoldMs?: number };
+  /** EOT hold tuning; `false` disables holding entirely (every final commits). */
+  eot?: { commitThreshold?: number; maxHoldMs?: number } | false;
+  /**
+   * Respond-gate override — the realtime loop injects its echo-aware gate so
+   * reactions are the only output gated when barge-in is off. `false`
+   * disables gating (every committed turn is answered).
+   */
+  respond_gate?: RespondGateFn | false;
   speculative?: Partial<SpeculativeReplyPolicy>;
   /** After silence, how long to wait for the STT final before held text may commit. Default 800ms. */
   final_wait_ms?: number;
@@ -72,7 +91,8 @@ export class VoiceTurnTakingMachine extends ConversationEngine {
     const nowMs = () => self.engine?.nowMs ?? 0;
     const rhythmBox: { get: () => RhythmAdjustments | null } = { get: () => null };
     const echoWindowMs = options.echo_window_ms ?? 9_000;
-    const baseMaxHoldMs = options.eot?.maxHoldMs ?? 1500;
+    const eotOption = options.eot === false ? undefined : options.eot;
+    const baseMaxHoldMs = eotOption?.maxHoldMs ?? 1500;
     const baseBackchannelIntervalMs =
       typeof options.interaction?.backchannel === 'object' &&
       options.interaction.backchannel.minIntervalMs !== undefined
@@ -93,23 +113,33 @@ export class VoiceTurnTakingMachine extends ConversationEngine {
             },
           };
 
-    const interruption = new TwoStageBargeIn({
-      base_rms_threshold: DEFAULT_BASE_RMS_THRESHOLD,
-      ...options.barge_in,
-      streaming_stt: options.streaming_stt ?? true,
-      isEcho: (partial) => self.engine?.isEcho(partial) ?? false,
-      now: nowMs,
-    });
-    const eot = new EotHoldAggregator({
-      commitThreshold: options.eot?.commitThreshold,
-      maxHoldMs: () => rhythmBox.get()?.maxHoldMs ?? baseMaxHoldMs,
-      now: nowMs,
-    });
+    const interruption =
+      options.arbiter !== undefined
+        ? options.arbiter
+        : new TwoStageBargeIn({
+            base_rms_threshold: DEFAULT_BASE_RMS_THRESHOLD,
+            ...options.barge_in,
+            streaming_stt: options.streaming_stt ?? true,
+            isEcho: (partial) => self.engine?.isEcho(partial) ?? false,
+            now: nowMs,
+          });
+    const eot =
+      options.eot === false
+        ? undefined
+        : new EotHoldAggregator({
+            commitThreshold: eotOption?.commitThreshold,
+            maxHoldMs: () => rhythmBox.get()?.maxHoldMs ?? baseMaxHoldMs,
+            now: nowMs,
+          });
+    const respondGate =
+      options.respond_gate === false
+        ? undefined
+        : (options.respond_gate ?? shouldRespondToVoiceTurn);
 
     super({
       interruption,
       eot,
-      respondGate: shouldRespondToVoiceTurn,
+      respondGate,
       echo: (text, ctx) => isOwnTtsEcho(text, ctx, { windowMs: echoWindowMs }),
       speculation: {
         enabled: false,
@@ -138,5 +168,58 @@ export class VoiceTurnTakingMachine extends ConversationEngine {
 
   override step(input: TurnTakingInput): TurnTakingAction[] {
     return super.step(input as InteractionEvent);
+  }
+}
+
+/**
+ * Legacy-mode interruption arbiter: a sustained-energy probe that maps the
+ * historical `BargeInController` onto the engine's `InterruptionArbiter`
+ * contract. The loop feeds chunks through tick payloads while output is
+ * active; a sustained speech-energy run immediately hard-stops (no
+ * transcript confirmation, matching `--barge-in-mode legacy`).
+ */
+export class LegacyBargeInArbiter implements InterruptionArbiter {
+  private controller: BargeInController;
+  private buffered: AudioChunk[] = [];
+  private stopped = false;
+
+  constructor(private readonly options: BargeInControllerOptions) {
+    this.controller = new BargeInController(options);
+  }
+
+  get state(): string {
+    return this.stopped ? 'stopped' : 'listening';
+  }
+
+  observeTick(chunk: unknown, _partials: readonly string[]): InterruptionAction[] {
+    if (this.stopped) return [];
+    const observation = this.controller.observe(chunk as AudioChunk);
+    if (!observation.triggered) return [];
+    this.stopped = true;
+    this.buffered = observation.buffered_chunks;
+    return [{ type: 'hard_stop', words: 'speech' }];
+  }
+
+  observeVadStart(): InterruptionAction[] {
+    return [];
+  }
+  observeVadEnd(): InterruptionAction[] {
+    return [];
+  }
+  observePartial(): InterruptionAction[] {
+    return [];
+  }
+  tick(): InterruptionAction[] {
+    return [];
+  }
+
+  bufferedChunks(): readonly unknown[] {
+    return this.buffered;
+  }
+
+  reset(): void {
+    this.stopped = false;
+    this.buffered = [];
+    this.controller.reset();
   }
 }

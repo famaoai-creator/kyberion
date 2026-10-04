@@ -1053,4 +1053,71 @@ describe('conversation engine integration (CE)', () => {
       ).toBe(true);
     }
   );
+
+  it(
+    'CE-06: instant reaction fires before the reply and skips the duplicate reaction segment',
+    { timeout: 60_000 },
+    async () => {
+      const synth: Array<{ segment: string; index: number }> = [];
+      const mediaEvents: Array<{ text: string; segment?: string }> = [];
+      const turns: RealtimeVoiceLoopTurnResult[] = [];
+
+      const handle = await startRealtimeVoiceLoop({
+        recordingDir: testDir,
+        consent: { requireRecordingConsent: false },
+        mic: {
+          command: micCommand([{ speech: 500 }, { silence: 900 }, { wait: 2000 }]),
+          sampleRateHz: 16000,
+          chunkMs: 100,
+        },
+        vad: { rmsThreshold: 800, endpointMs: 700 },
+        maxTurns: 1,
+        interaction: { instantReaction: true },
+        transcribe: async () => '答えを教えて',
+        reply: async () => 'unused',
+        streamReply: async (_userText, _turn, onSegment) => {
+          await onSegment('うん');
+          await onSegment('答えは42です。');
+          await onSegment('理由は詳細の省略です。');
+          return 'うん。答えは42です。理由は詳細の省略です。';
+        },
+        synthesizeSegment: async (segment, index) => {
+          synth.push({ segment, index });
+          return '/tmp/fake.wav';
+        },
+        play: () => immediateHandle(),
+        onTurn: (turn) => turns.push(turn),
+        sessionId: 'voice-ce06',
+        mediaEventBufferFactory: (sessionId) => {
+          const buffer = new MediaEventBuffer(sessionId, 64);
+          buffer.subscribe((event) => {
+            if (event.type === 'assistant_text_delta' && !event.is_final) {
+              mediaEvents.push({ text: event.text, segment: event.segment });
+            }
+          });
+          return buffer;
+        },
+      });
+
+      const report = await handle.done;
+      expect(report.turns_completed).toBe(1);
+
+      // The CE instant reaction spoke first via the shortcut (index -1)...
+      const reactionCall = synth.findIndex((call) => call.index === -1);
+      const firstReplyIndex = synth.findIndex((call) => call.index >= 0);
+      expect(reactionCall).toBeGreaterThanOrEqual(0);
+      expect(JA_AIZUCHI.has(synth[reactionCall].segment)).toBe(true);
+      expect(reactionCall).toBeLessThan(firstReplyIndex);
+
+      // ...and the reply's own reaction segment was NOT synthesized again.
+      const replySegments = synth.filter((call) => call.index >= 0).map((call) => call.segment);
+      expect(replySegments).not.toContain('うん');
+      expect(replySegments).toContain('答えは42です。');
+
+      // Semantic labels ride the media stream.
+      const kinds = mediaEvents.map((e) => e.segment);
+      expect(kinds).toEqual(['reaction', 'claim', 'explanation']);
+      expect(turns[0].assistant_text).toBe('うん。答えは42です。理由は詳細の省略です。');
+    }
+  );
 });
