@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createVirtualDeviceInventoryBridge } from './virtual-device-inventory-bridge.js';
 import {
   createVirtualMediaDeviceControlBridge,
@@ -53,6 +53,17 @@ function makeCommandRunner() {
 }
 
 describe('createVirtualMediaDeviceControlBridge', () => {
+  const originalPlatform = process.platform;
+
+  beforeEach(() => {
+    // The fixtures below model system_profiler and AVFoundation devices.
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', { configurable: true, value: originalPlatform });
+  });
+
   it('selects existing audio and camera devices at runtime', async () => {
     const inventory = createVirtualDeviceInventoryBridge({
       command_runner: makeCommandRunner(),

@@ -364,6 +364,12 @@ vi.mock('@agent/core/secure-io', () => ({
   safeWriteFile: mocks.safeWriteFile,
   safeRmSync: mocks.safeRmSync,
 }));
+vi.mock('@agent/core/camera-output-bridge', () => ({
+  registerCameraOutputBridge: vi.fn(),
+  resolveCameraOutputBridge: vi.fn(async () => {
+    throw new Error('OBS is not reachable at ws://127.0.0.1:1');
+  }),
+}));
 vi.mock('@agent/core/path-resolver', async () => {
   const actual = await vi.importActual<typeof import('@agent/core/path-resolver')>(
     '@agent/core/path-resolver'
