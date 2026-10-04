@@ -48,6 +48,10 @@
       "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
       "rationale": "ecosystem_architect, mission_controller, sovereign_concierge: reachable per docs/developer/role-assumption-reachability.json (e.g. mission_controller via libs/core agent-identity appendGoverned and approval-gate, ecosystem_architect via libs/core deployment-adapter / storage-janitor, sovereign_concierge via libs/core authn-providers / browser-onboarding / tool-runtime-policy, and the GovernedArtifactRole union of surface-coordination-store). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable."
     },
+    "event_intake_surface": {
+      "may_assume": [],
+      "rationale": "scripts/event_intake_surface.ts (loopback-only inbound event intake, operator-launched through surface_runtime with SYSTEM_ROLE=event_intake_surface). Assumes no role: ingestInboundEvent only appends normalized events to the dot events ledgers under active/shared/runtime/dot/, so no broad role (ecosystem_architect, mission_controller, sovereign_concierge) is granted."
+    },
     "imessage_bridge": {
       "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
       "rationale": "ecosystem_architect, mission_controller, sovereign_concierge: reachable per docs/developer/role-assumption-reachability.json (e.g. mission_controller via libs/core agent-identity appendGoverned and approval-gate, ecosystem_architect via libs/core deployment-adapter / storage-janitor, sovereign_concierge via libs/core authn-providers / browser-onboarding / tool-runtime-policy, and the GovernedArtifactRole union of surface-coordination-store). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable."

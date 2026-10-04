@@ -8862,6 +8862,41 @@
         "en": "Append a wake-lane row to a resident dot's inbox",
         "ja": "dot の wake レーン（inbox）に手動で行を追加",
         "qps-ploc": "⟦Ȧṗṗėñḓ ȧ ẇȧķė-ŀȧñė řőẇ ŧő ȧ řėşïḓėñŧ ḓőŧ'ş ïñƀőẋ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "cli_cmd_script_dot_memory": {
+        "en": "Show a resident dot's working memory (notes, open items, hypotheses)",
+        "ja": "dot のワーキングメモリ（メモ・未決事項・仮説）を表示",
+        "qps-ploc": "⟦Şħőẇ ȧ řėşïḓėñŧ ḓőŧ'ş ẇőřķïñɠ ɱėɱőřẏ (ñőŧėş, őṗėñ ïŧėɱş, ħẏṗőŧħėşėş) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "cli_cmd_script_dot_followups": {
+        "en": "List a resident dot's pending self-scheduled follow-ups",
+        "ja": "dot の自己予約済みフォローアップ（未配信）を一覧表示",
+        "qps-ploc": "⟦Ŀïşŧ ȧ řėşïḓėñŧ ḓőŧ'ş ṗėñḓïñɠ şėŀƒ-şƈħėḓůŀėḓ ƒőŀŀőẇ-ůṗş ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "cli_cmd_script_dot_kr": {
+        "en": "Show a resident dot's latest key-result measurements and goal gaps",
+        "ja": "dot の最新の主要成果指標（KR）計測と目標ギャップを表示",
+        "qps-ploc": "⟦Şħőẇ ȧ řėşïḓėñŧ ḓőŧ'ş ŀȧŧėşŧ ķėẏ-řėşůŀŧ ɱėȧşůřėɱėñŧş ȧñḓ ɠőȧŀ ɠȧṗş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "cli_cmd_script_dot_autonomy": {
+        "en": "Show a resident dot's graduated-autonomy level, metrics and shadow decisions",
+        "ja": "dot の段階的自律レベル・指標・シャドー判定を表示",
+        "qps-ploc": "⟦Şħőẇ ȧ řėşïḓėñŧ ḓőŧ'ş ɠřȧḓůȧŧėḓ-ȧůŧőñőɱẏ ŀėṽėŀ, ɱėŧřïƈş ȧñḓ şħȧḓőẇ ḓėƈïşïőñş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "cli_cmd_script_dot_outcomes": {
+        "en": "Show the recorded outcome evaluations of a resident dot's actions",
+        "ja": "dot の行動に対する成果評価の記録を表示",
+        "qps-ploc": "⟦Şħőẇ ŧħė řėƈőřḓėḓ őůŧƈőɱė ėṽȧŀůȧŧïőñş őƒ ȧ řėşïḓėñŧ ḓőŧ'ş ȧƈŧïőñş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "cli_cmd_script_dot_work": {
+        "en": "Show recent delegated-work results executed for a resident dot",
+        "ja": "dot に委任された直近の作業実行結果を表示",
+        "qps-ploc": "⟦Şħőẇ řėƈėñŧ ḓėŀėɠȧŧėḓ-ẇőřķ řėşůŀŧş ėẋėƈůŧėḓ ƒőř ȧ řėşïḓėñŧ ḓőŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "cli_cmd_script_dot_event": {
+        "en": "Ingest a local test event into the dot event ledger (--source, --file)",
+        "ja": "ローカルのテストイベントを dot イベント台帳に取り込む（--source, --file）",
+        "qps-ploc": "⟦Ïñɠėşŧ ȧ ŀőƈȧŀ ŧėşŧ ėṽėñŧ ïñŧő ŧħė ḓőŧ ėṽėñŧ ŀėḓɠėř (--şőůřƈė, --ƒïŀė) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       }
     },
     "recorder": {
