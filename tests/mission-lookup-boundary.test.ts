@@ -61,6 +61,7 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'libs/core/mission/mission-team-plan-composer.ts': 'scope-derivation',
   'libs/core/reasoning/reasoning-backend.ts': 'scope-derivation',
   'libs/core/scope-context.ts': 'scope-derivation',
+  'libs/core/service/service-binding-registry.ts': 'scope-derivation',
   'libs/core/tool/runtime-scope.ts': 'scope-derivation',
   'libs/core/untrusted-content.ts': 'scope-derivation',
   'libs/core/visual-raster.ts': 'scope-derivation',

@@ -271,6 +271,74 @@ describe('executeServicePreset', () => {
     });
   });
 
+  it('rejects direct calls for a tenant-bound service without actuator admission context', async () => {
+    const { executeServicePreset, executeServicePresetCached } =
+      await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('mock/path.json')) {
+        return JSON.stringify({
+          tenant_binding_required: true,
+          operations: { read: { type: 'api', risk: 'read', path: 'items', method: 'GET' } },
+        });
+      }
+      return '';
+    });
+
+    await expect(executeServicePreset('test-service', 'read', {}, 'none')).rejects.toThrow(
+      /requires an admitted tenant service binding/
+    );
+    await expect(
+      executeServicePresetCached('test-service', 'read', {}, 'none', { cache_ttl_ms: 1000 })
+    ).rejects.toThrow(/requires an admitted tenant service binding/);
+    expect(mocks.secureFetch).not.toHaveBeenCalled();
+  });
+
+  it('does not accept caller-constructed tenant approval contexts', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('mock/path.json')) {
+        return JSON.stringify({
+          tenant_binding_required: true,
+          operations: { write: { type: 'api', risk: 'write', path: 'items', method: 'POST' } },
+        });
+      }
+      return '';
+    });
+    await expect(
+      executeServicePreset('test-service', 'write', {}, 'none', undefined, {
+        securityScope: {},
+        bindingId: 'binding-a',
+        approvalGranted: true,
+      })
+    ).rejects.toThrow(/Invalid tenant service actuator admission capability/);
+    expect(mocks.secureFetch).not.toHaveBeenCalled();
+  });
+
+  it('allows a declared unbound operation in a mixed preset without tenant admission', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('mock/path.json')) {
+        return JSON.stringify({
+          operations: {
+            tenant_read: { tenant_binding_required: true, type: 'api', risk: 'read' },
+            public_status: {
+              tenant_binding_required: false,
+              type: 'api',
+              risk: 'read',
+              method: 'GET',
+              path: 'status',
+            },
+          },
+        });
+      }
+      return '';
+    });
+    mocks.secureFetch.mockResolvedValue({ ok: true });
+    await expect(
+      executeServicePreset('test-service', 'public_status', {}, 'none')
+    ).resolves.toEqual({ ok: true });
+  });
+
   it('prefers a customer overlay connection when active', async () => {
     process.env.KYBERION_CUSTOMER = 'acme';
     mocks.resolveOverlay.mockReturnValue('/virtual/customer/acme/connections/slack.json');

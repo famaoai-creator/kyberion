@@ -47,7 +47,7 @@ This was the deliverable of **Phase C'-1** in `docs/PRODUCTIZATION_ROADMAP.md`, 
 | `docs/architecture/NERVE_SYSTEM_GUIDE.md`              | `docs/developer/architecture/NERVE_SYSTEM_GUIDE.md`              |
 | `docs/architecture/ONBOARDING_REVOLUTION.md`           | `docs/developer/architecture/ONBOARDING_REVOLUTION.md`           |
 | `docs/architecture/POST_ONBOARDING_UX_ROADMAP.md`      | `docs/developer/architecture/POST_ONBOARDING_UX_ROADMAP.md`      |
-| `docs/architecture/service-integration-plan.md`        | `docs/developer/architecture/service-integration-plan.md`        |
+| `docs/architecture/service-integration-plan.md`        | `knowledge/product/orchestration/service-integration-guide.md`   |
 | `docs/architecture/dependency-graph.mmd`               | `docs/developer/architecture/dependency-graph.mmd`               |
 | `docs/playbooks/AI_DLC_PLAYBOOK.md`                    | `docs/developer/playbooks/AI_DLC_PLAYBOOK.md`                    |
 | `docs/playbooks/creative-whiteboard.md`                | `docs/developer/playbooks/creative-whiteboard.md`                |
