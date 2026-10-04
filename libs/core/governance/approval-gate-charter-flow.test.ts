@@ -18,7 +18,10 @@ vi.mock('./approval-store.js', async (importOriginal) => ({
   computeApprovalPayloadHash: (p: Record<string, unknown> | undefined) => JSON.stringify(p || {}),
 }));
 vi.mock('./audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
-vi.mock('./approval-gate-charter.js', () => ({ runCharterGate: vi.fn() }));
+vi.mock('./approval-gate-charter.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./approval-gate-charter.js')>()),
+  runCharterGate: vi.fn(),
+}));
 
 import { enforceApprovalGate } from './approval-gate.js';
 import { resolveApprovalPolicy } from './approval-policy.js';
@@ -78,6 +81,24 @@ describe('enforceApprovalGate × accountability charter', () => {
     expect(r).toMatchObject({ allowed: true, status: 'not_required' });
     expect(create).not.toHaveBeenCalled();
   });
+
+  it.each(['ordinary-policy', 'injection-suspected-override'])(
+    'a charter allow cannot waive a mandatory floor carried by %s',
+    (matchedRuleId) => {
+      policy.mockReturnValue({
+        requiresApproval: true,
+        missingRequirements: ['approval_confirmation'],
+        matchedRuleId,
+        mandatoryApproval: true,
+      });
+      charterGate.mockReturnValue({ kind: 'allow', message: 'Within charter' });
+
+      expect(enforceApprovalGate({ ...params, hasHuman: false })).toMatchObject({
+        allowed: false,
+        message: expect.stringContaining('[HUMAN_REQUIRED]'),
+      });
+    }
+  );
 
   it('tripwire: blocked, and no approval request is opened (a human must clear the stop)', () => {
     charterGate.mockReturnValue({ kind: 'stop', message: '[CHARTER_STOP] tripwire:x' });

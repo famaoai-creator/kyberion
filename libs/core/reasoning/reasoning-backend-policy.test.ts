@@ -315,6 +315,6 @@ describe('reasoning-backend-policy', () => {
       })
     );
     expect(source).not.toMatch(/env\.KYBERION_/u);
-    expect(source).toContain('getRegisteredEnvText');
+    expect(source).toContain('resolveReasoningProviderSecretEnvValue');
   });
 });

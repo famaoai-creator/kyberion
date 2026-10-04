@@ -1216,6 +1216,12 @@ export interface ReapWorkLeasesOptions {
   maxErrorAttempts?: number;
   /** CE-12: inject the durable mission/run-journal evidence reader. */
   completedEvidence?: (item: WorkItem) => boolean;
+  /**
+   * Reconcile only the stranded items this predicate accepts (e.g. the dot
+   * executor reaps only items carrying `metadata.dot_id`). Lapsed leases are
+   * still expired globally — an expired lease is dead for every holder.
+   */
+  itemFilter?: (item: WorkItem) => boolean;
 }
 
 export interface ReapWorkLeasesResult {
@@ -1249,6 +1255,7 @@ export function reapExpiredWorkLeases(options: ReapWorkLeasesOptions = {}): Reap
 
   for (const item of currentWorkItems()) {
     if (item.status !== 'in_progress') continue;
+    if (options.itemFilter && !options.itemFilter(item)) continue;
     if (activeLeaseForItem(item.item_id)) continue;
 
     // Completion must come from the caller's durable evidence reader. A

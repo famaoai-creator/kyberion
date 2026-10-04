@@ -7,7 +7,11 @@
  *      `authority.max_concurrent_delegations` (open WorkItems + parked actions);
  *   2. decision — autonomous-ops-gate, raised (never lowered) to the strictest
  *      of the charter `decisions.default_decision`, the floor learned from
- *      operator rejections, and the dot's own requested decision;
+ *      operator rejections, and the dot's own requested decision. The single
+ *      exception is {@link dotNotifyToAutoExceptionApplies} (L4 notify → auto
+ *      for a policy `autonomy.relaxable_actions` action);
+ *   2b. disposition — a {@link DotDispositionOverride} may turn the proposal
+ *      into a record-only `shadow` row (L0: no card, no WorkItem);
  *   3. routing — `routeAutonomousDecision` (decision card, veto window,
  *      digest notice) delivered to the charter's route;
  *   4. outcome — proceed → WorkItem (or a handoff to another dot); parked →
@@ -29,6 +33,7 @@ import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { matchesCron, getZonedDateParts } from '../pipeline/cron-utils.js';
 import {
   evaluateAutonomousOpsAction,
+  getAutonomousOpsPolicy,
   type AutonomousOpsGateInput,
   type AutonomousOpsGateResult,
 } from '../governance/autonomous-ops-gate.js';
@@ -56,10 +61,11 @@ import {
   type OperatorNotificationPayload,
 } from '../surface/operator-notifications.js';
 import { appendDotInboxEntry, type DotInboxEntryInput } from './dot-inbox.js';
-import { listDotCharters, type DotCharter } from './dot-charter.js';
+import { dotGoalRefLabel, listDotCharters, type DotCharter } from './dot-charter.js';
 import { resolveTenant } from '../organization/tenant-registry.js';
 import {
   DOT_ACTION_IDS,
+  DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE,
   type DotDecisionLevel,
   type DotProposal,
   type DotWorkShape,
@@ -74,12 +80,29 @@ import {
   type DotFeedbackOutcome,
 } from './dot-feedback.js';
 import { createLogger } from '../logger.js';
+import {
+  DOT_DECISION_RELAXERS,
+  DOT_DIGEST_SECTIONS,
+  DOT_DISPOSITION_OVERRIDES,
+  DOT_FLOOR_CONTRIBUTORS,
+  DOT_PRE_GATE_CHECKS,
+} from './dot-extension-registry.js';
+import {
+  DOT_L4_NOTIFY_TO_AUTO_EXCEPTION,
+  type DotDecisionRelaxer,
+  type DotExtCtx,
+} from './dot-extensions.js';
 
 const logger = createLogger('dot-dispatch');
 
 export const DOT_ACTION_LEDGER_PATH = 'active/shared/runtime/dot-action-ledger.jsonl';
-/** Shapes a charter may dispatch when it declares no `allowed_work_shapes`. */
-export const DEFAULT_DOT_WORK_SHAPES: readonly DotWorkShape[] = ['task_session', 'direct_reply'];
+/**
+ * Shapes a charter may dispatch when it declares no `allowed_work_shapes`.
+ * `task_session` is not a default: no governed task-session executor exists,
+ * so a charter may only opt in explicitly and dispatch still refuses it unless
+ * {@link DotDispatchDeps.taskSessionExecutorAvailable} says one is configured.
+ */
+export const DEFAULT_DOT_WORK_SHAPES: readonly DotWorkShape[] = ['direct_reply'];
 /** Concurrency cap when a charter declares no `max_concurrent_delegations`. */
 export const DEFAULT_DOT_MAX_CONCURRENT_DELEGATIONS = 3;
 /** The same proposal is not re-dispatched or re-asked within this window. */
@@ -110,9 +133,26 @@ export interface DotActionRecord {
   handoff_to?: string;
   priority?: DotProposal['priority'];
   rationale?: string;
+  /** Carried from the proposal into the WorkItem metadata for the executor (DL-01). */
+  pipeline_ref?: DotProposal['pipeline_ref'];
+  expected_effect?: DotProposal['expected_effect'];
+  target?: DotProposal['target'];
+  intent?: DotProposal['intent'];
   request_id?: string;
   work_item_id?: string;
   reason?: string;
+  /** Set when the action was declined as `superseded` by another dot's approved action (DL-11). */
+  superseded_by?: { dot_id: string; action_ref: string };
+  /** Disposition override that recorded this action as `shadow` only (L0). */
+  disposition_by?: string;
+  /** Set when a pre-gate check forced an operator decision. */
+  escalation?: {
+    check_id: string;
+    reason: string;
+    link?: { action_ref: string; dot_id: string };
+    /** All linked conflicts when several escalations merged; only `link` is superseded on approve. */
+    links?: Array<{ action_ref: string; dot_id: string }>;
+  };
   at: string;
 }
 
@@ -140,6 +180,22 @@ export interface DotDispatchDeps {
   /** Mark a pending request expired in the approval store; returns the updated record. */
   expireApproval?: (record: ApprovalRequestRecord) => ApprovalRequestRecord;
   feedback?: Omit<DotFeedbackDeps, 'rootDir' | 'now'>;
+  /** Policy `autonomy.relaxable_actions`; defaults to the autonomous-ops policy. */
+  relaxableActions?: readonly string[];
+  /**
+   * True only when a governed task-session executor is configured. Defaults to
+   * false: `task_session` proposals are refused before any gate or operator ask.
+   */
+  taskSessionExecutorAvailable?: boolean;
+}
+
+/** The charter's declared (or default) shapes, minus capabilities this runtime lacks. */
+export function effectiveDotWorkShapes(
+  charter: DotCharter,
+  deps: Pick<DotDispatchDeps, 'taskSessionExecutorAvailable'> = {}
+): DotWorkShape[] {
+  const declared = charter.authority.allowed_work_shapes ?? DEFAULT_DOT_WORK_SHAPES;
+  return declared.filter((shape) => shape !== 'task_session' || deps.taskSessionExecutorAvailable);
 }
 
 export function dotActorId(dotId: string): string {
@@ -176,6 +232,17 @@ export function currentDotActions(dotId: string, deps: DotDispatchDeps = {}): Do
   return [...latest.values()];
 }
 
+/**
+ * Latest state per action_ref across every dot (insertion order preserved).
+ * Callers comparing dots must apply their own tenant-scope filter.
+ */
+export function latestDotActions(deps: DotDispatchDeps = {}): DotActionRecord[] {
+  const latest = new Map<string, DotActionRecord>();
+  for (const row of readDotActionLedger(deps)) latest.set(row.action_ref, row);
+  return [...latest.values()];
+}
+
+/** Identity of a proposal for dedupe: includes pipeline, target and intent so opposing proposals never collapse. */
 export function dotProposalHash(dotId: string, proposal: DotProposal): string {
   return createHash('sha256')
     .update(
@@ -185,6 +252,11 @@ export function dotProposalHash(dotId: string, proposal: DotProposal): string {
         proposal.title,
         proposal.objective,
         proposal.handoff_to ?? '',
+        // Appended only when set, so hashes of proposals without these fields
+        // (and their dedupe windows) are unchanged.
+        ...(proposal.pipeline_ref || proposal.target || proposal.intent
+          ? [proposal.pipeline_ref ?? '', proposal.target ?? '', proposal.intent ?? '']
+          : []),
       ])
     )
     .digest('hex')
@@ -238,7 +310,8 @@ function openDelegations(charter: DotCharter, deps: DotDispatchDeps): number {
  * them instead of spending proposals on refusals. Same sources as enforcement.
  */
 export function dotBoundsPromptLines(charter: DotCharter, deps: DotDispatchDeps = {}): string[] {
-  const shapes = charter.authority.allowed_work_shapes ?? DEFAULT_DOT_WORK_SHAPES;
+  const shapes = effectiveDotWorkShapes(charter, deps);
+  const pipelines = charter.authority.allowed_pipelines ?? [];
   const cap =
     charter.authority.max_concurrent_delegations ?? DEFAULT_DOT_MAX_CONCURRENT_DELEGATIONS;
   const free = Math.max(0, cap - openDelegations(charter, deps));
@@ -247,11 +320,25 @@ export function dotBoundsPromptLines(charter: DotCharter, deps: DotDispatchDeps 
       (other) =>
         other.dot_id !== charter.dot_id &&
         other.status === 'active' &&
+        sameDotHandoffScope(charter, other) &&
         (other.team?.accepts_handoffs_from ?? []).includes(charter.dot_id)
     )
     .map((other) => other.dot_id);
   return [
-    `Allowed work_shape values: ${shapes.join(', ')}. Any other shape is refused.`,
+    shapes.length
+      ? `Allowed work_shape values: ${shapes.join(', ')}. Any other shape is refused.`
+      : 'No work_shape is available to you now; propose nothing and report status instead.',
+    ...(shapes.includes('pipeline')
+      ? [
+          pipelines.length
+            ? `Allowed pipeline_ref values: ${pipelines.join(', ')}.`
+            : 'No pipeline is allowed by your charter; do not propose pipeline work.',
+        ]
+      : []),
+    ...(!shapes.includes('task_session') &&
+    (charter.authority.allowed_work_shapes ?? []).includes('task_session')
+      ? [DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE]
+      : []),
     free > 0
       ? `Delegation slots free: ${free} of ${cap}. Propose at most ${free}, most important first; extra proposals are refused.`
       : `Delegation slots free: 0 of ${cap} (open work or decisions waiting on the operator). Propose nothing new; report status instead.`,
@@ -305,6 +392,17 @@ function recordAudit(
 
 export type DotBoundsVerdict = { ok: true } | { ok: false; reason: string };
 
+/**
+ * A handoff never crosses a tenant: same tenant_slug (both untenanted counts
+ * as the same), and the same organization_id when both declare one.
+ */
+function sameDotHandoffScope(from: DotCharter, to: DotCharter): boolean {
+  if ((from.scope.tenant_slug ?? '') !== (to.scope.tenant_slug ?? '')) return false;
+  const fromOrg = from.scope.organization_id;
+  const toOrg = to.scope.organization_id;
+  return !fromOrg || !toOrg || fromOrg === toOrg;
+}
+
 /** What the proposal may be at all: action, shape, handoff target. Re-checked at settlement. */
 function checkDotProposalScope(
   charter: DotCharter,
@@ -314,7 +412,10 @@ function checkDotProposalScope(
   if (!DOT_ACTION_IDS.includes(proposal.action_id)) {
     return { ok: false, reason: `action '${proposal.action_id}' is not a dot action` };
   }
-  const shapes = charter.authority.allowed_work_shapes ?? DEFAULT_DOT_WORK_SHAPES;
+  const shapes = effectiveDotWorkShapes(charter, deps);
+  if (proposal.work_shape === 'task_session' && !deps.taskSessionExecutorAvailable) {
+    return { ok: false, reason: DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE };
+  }
   if (!shapes.includes(proposal.work_shape)) {
     return {
       ok: false,
@@ -343,6 +444,12 @@ function checkDotProposalScope(
     );
     if (!target || target.status !== 'active') {
       return { ok: false, reason: `handoff target '${proposal.handoff_to}' is not an active dot` };
+    }
+    if (!sameDotHandoffScope(charter, target)) {
+      return {
+        ok: false,
+        reason: `cross-tenant handoff denied: '${charter.dot_id}' and '${proposal.handoff_to}' are in different tenant scopes`,
+      };
     }
     if (!(target.team?.accepts_handoffs_from ?? []).includes(charter.dot_id)) {
       return {
@@ -379,31 +486,243 @@ export function evaluateDotProposalGate(
   charter: DotCharter,
   proposal: DotProposal,
   deps: DotDispatchDeps = {}
-): { gate: AutonomousOpsGateResult; floor?: DotDecisionLevel } {
-  const floor = strictest(
+): { gate: AutonomousOpsGateResult; floor?: DotDecisionLevel; relaxed_by?: string } {
+  const ctx = dotDispatchExtCtx(deps);
+  // Floors that can never be relaxed: charter default, the dot's own request,
+  // and every registered floor contributor.
+  const hardFloor = strictest(
     charter.decisions?.default_decision,
-    learnedDotDecisionFloor(charter.dot_id, { rootDir: deps.rootDir, now: deps.now }),
-    proposal.requested_decision
+    proposal.requested_decision,
+    ...DOT_FLOOR_CONTRIBUTORS.map((contributor) => {
+      try {
+        return contributor.floor(charter, proposal, ctx);
+      } catch (error) {
+        extensionFailure('floor contributor', contributor.id, charter.dot_id, error);
+        return undefined;
+      }
+    })
   );
-  const gate = (deps.gate ?? evaluateAutonomousOpsAction)({
-    actionId: proposal.action_id,
-    ...(charter.scope.tenant_slug ? { tenantSlug: charter.scope.tenant_slug } : {}),
-    ...(proposal.changed_paths ? { changedPaths: proposal.changed_paths } : {}),
-    ...(floor ? { requestedDecision: floor } : {}),
+  const learned = learnedDotDecisionFloor(charter.dot_id, {
+    rootDir: deps.rootDir,
+    now: deps.now,
   });
-  // The charter may lengthen a veto window, never shorten the policy's.
+  let floor = strictest(hardFloor, learned);
+  const runGate = (requested: DotDecisionLevel | undefined) =>
+    (deps.gate ?? evaluateAutonomousOpsAction)({
+      actionId: proposal.action_id,
+      ...(charter.scope.tenant_slug ? { tenantSlug: charter.scope.tenant_slug } : {}),
+      ...(proposal.changed_paths ? { changedPaths: proposal.changed_paths } : {}),
+      ...(requested ? { requestedDecision: requested } : {}),
+    });
+  let gate = runGate(floor);
+  let relaxedBy: string | undefined;
+  // Relaxers may only lower what the learned floor added: the result is
+  // clamped to the policy gate's own decision (without the learned floor) and
+  // to the charter default / hard floor. The one exception is the policy-listed
+  // L4 notify → auto, re-verified here by dotNotifyToAutoExceptionApplies.
+  if (DOT_DECISION_RELAXERS.length > 0 && ((floor && learned) || gate.decision === 'notify')) {
+    let policyGate: AutonomousOpsGateResult | undefined;
+    for (const relaxer of DOT_DECISION_RELAXERS) {
+      let relaxed: ReturnType<DotDecisionRelaxer['relax']>;
+      try {
+        relaxed = relaxer.relax(charter, proposal, gate, floor, ctx);
+      } catch (error) {
+        extensionFailure('decision relaxer', relaxer.id, charter.dot_id, error);
+        continue;
+      }
+      if (!relaxed) continue;
+      policyGate ??= runGate(hardFloor);
+      const relaxableActions = deps.relaxableActions ?? policyRelaxableActions();
+      if (
+        dotNotifyToAutoExceptionApplies({
+          proposal,
+          relaxed,
+          policyGate,
+          hardFloor,
+          relaxableActions,
+        })
+      ) {
+        floor = 'auto';
+        gate = {
+          ...policyGate,
+          decision: 'auto',
+          allowed: true,
+          vetoWindowMinutes: undefined,
+          reason: `${policyGate.reason}; ${DOT_L4_NOTIFY_TO_AUTO_EXCEPTION} by ${relaxer.id}: ${relaxed.reason}`,
+        };
+        relaxedBy = relaxer.id;
+        break;
+      }
+      const clamped = strictest(relaxed.decision, policyGate.decision, hardFloor) ?? gate.decision;
+      if (DECISION_RANK[clamped] < DECISION_RANK[gate.decision]) {
+        floor = clamped;
+        gate = runGate(floor);
+        gate = { ...gate, reason: `${gate.reason}; relaxed by ${relaxer.id}: ${relaxed.reason}` };
+        relaxedBy = relaxer.id;
+      }
+      break;
+    }
+  }
+  // The charter may lengthen a veto window, never shorten the policy's (an
+  // auto decision has no veto window to lengthen).
   const charterVeto = charter.decisions?.veto_window_minutes;
   const vetoWindowMinutes =
-    charterVeto !== undefined
-      ? Math.max(charterVeto, gate.vetoWindowMinutes ?? 0)
-      : gate.vetoWindowMinutes;
+    gate.decision === 'auto'
+      ? undefined
+      : charterVeto !== undefined
+        ? Math.max(charterVeto, gate.vetoWindowMinutes ?? 0)
+        : gate.vetoWindowMinutes;
+  const { vetoWindowMinutes: _veto, ...gateRest } = gate;
   return {
     gate: {
-      ...gate,
+      ...gateRest,
       ...(vetoWindowMinutes !== undefined ? { vetoWindowMinutes } : {}),
     },
     ...(floor ? { floor } : {}),
+    ...(relaxedBy ? { relaxed_by: relaxedBy } : {}),
   };
+}
+
+/**
+ * Policy `autonomy.relaxable_actions`, read straight from the policy (not via
+ * dot-autonomy, which imports this module). Fails closed: no section, no
+ * exception.
+ */
+function policyRelaxableActions(): readonly string[] {
+  try {
+    const autonomy = (getAutonomousOpsPolicy() as { autonomy?: { relaxable_actions?: unknown } })
+      .autonomy;
+    const list = autonomy?.relaxable_actions;
+    return Array.isArray(list) ? list.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Gate escalations the L4 exception never undercuts. */
+const DOT_NON_RELAXABLE_ESCALATIONS = new Set([
+  'never_auto',
+  'high_risk_path',
+  'axis_max',
+  'budget',
+]);
+
+/**
+ * The single permitted decision below the policy gate (DL-10): a relaxer that
+ * claims {@link DOT_L4_NOTIFY_TO_AUTO_EXCEPTION} may turn `notify` into `auto`
+ * only when, on the policy side,
+ *   - the action is in policy `autonomy.relaxable_actions`;
+ *   - the policy gate (with the hard floor, without the learned floor) says
+ *     exactly `notify` — never `approve`;
+ *   - no hard floor (charter default, the dot's own request, floor
+ *     contributors such as budget) is `notify` or stricter;
+ *   - no never_auto / high-risk-path / axis-max / budget escalation, no
+ *     high-risk path match, the action is not a policy shadow, and its
+ *     reversibility axis is below 2.
+ * The relaxer owns the dot side (L4, learned floor released, outcome success).
+ */
+export function dotNotifyToAutoExceptionApplies(input: {
+  proposal: Pick<DotProposal, 'action_id'>;
+  relaxed: { decision: DotDecisionLevel; exception?: string };
+  policyGate: AutonomousOpsGateResult;
+  hardFloor: DotDecisionLevel | undefined;
+  relaxableActions: readonly string[];
+}): boolean {
+  const { proposal, relaxed, policyGate, hardFloor } = input;
+  if (relaxed.exception !== DOT_L4_NOTIFY_TO_AUTO_EXCEPTION || relaxed.decision !== 'auto') {
+    return false;
+  }
+  if (!input.relaxableActions.includes(proposal.action_id)) return false;
+  if (policyGate.decision !== 'notify' || policyGate.shadow) return false;
+  if (hardFloor && DECISION_RANK[hardFloor] >= DECISION_RANK.notify) return false;
+  if ((policyGate.escalations ?? []).some((rule) => DOT_NON_RELAXABLE_ESCALATIONS.has(rule))) {
+    return false;
+  }
+  if ((policyGate.highRiskPathMatches ?? []).length > 0) return false;
+  return (policyGate.axes?.reversibility ?? 3) < 2;
+}
+
+function dotDispatchExtCtx(deps: DotDispatchDeps): DotExtCtx {
+  return { rootDir: deps.rootDir, now: deps.now ?? (() => new Date()) };
+}
+
+function extensionFailure(kind: string, id: string, dotId: string, error: unknown): void {
+  logger.warn(
+    `[dot-dispatch] ${kind} '${id}' failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: governance continues without it | evidence: libs/core/dot/dot-extension-bootstrap.ts`
+  );
+}
+
+/** First override that turns the proposal into a record-only shadow row; throwing ones are skipped. */
+function runDotDispositionOverrides(
+  charter: DotCharter,
+  proposal: DotProposal,
+  info: { action_ref: string; gate: AutonomousOpsGateResult; floor?: DotDecisionLevel },
+  deps: DotDispatchDeps
+): { id: string; reason: string } | undefined {
+  const ctx = dotDispatchExtCtx(deps);
+  for (const override of DOT_DISPOSITION_OVERRIDES) {
+    try {
+      const verdict = override.dispose(charter, proposal, info, ctx);
+      if (verdict?.disposition === 'shadow') return { id: override.id, reason: verdict.reason };
+    } catch (error) {
+      extensionFailure('disposition override', override.id, charter.dot_id, error);
+    }
+  }
+  return undefined;
+}
+
+type DotPreGateVerdict =
+  | { ok: true }
+  | { ok: false; reason: string; check_id: string }
+  | {
+      ok: 'escalate';
+      reason: string;
+      card_context: string;
+      check_id: string;
+      link?: { action_ref: string; dot_id: string };
+      /** Every linked conflict when several escalations merged onto one card. */
+      links?: Array<{ action_ref: string; dot_id: string }>;
+    };
+
+/**
+ * Registered pre-gate checks in order. The first refusal wins; escalations
+ * are merged (one forced operator decision carrying every check's context).
+ * A throwing check is skipped, never a refusal.
+ */
+function runDotPreGateChecks(
+  charter: DotCharter,
+  proposal: DotProposal,
+  deps: DotDispatchDeps
+): DotPreGateVerdict {
+  const ctx = dotDispatchExtCtx(deps);
+  let escalation: Extract<DotPreGateVerdict, { ok: 'escalate' }> | undefined;
+  for (const check of DOT_PRE_GATE_CHECKS) {
+    let verdict: ReturnType<typeof check.check>;
+    try {
+      verdict = check.check(charter, proposal, ctx);
+    } catch (error) {
+      extensionFailure('pre-gate check', check.id, charter.dot_id, error);
+      continue;
+    }
+    if (verdict.ok === false) return { ok: false, reason: verdict.reason, check_id: check.id };
+    if (verdict.ok === 'escalate') {
+      const links = [...(escalation?.links ?? []), ...(verdict.link ? [verdict.link] : [])];
+      escalation = escalation
+        ? {
+            ...escalation,
+            reason: `${escalation.reason}; ${verdict.reason}`,
+            card_context: `${escalation.card_context}\n${verdict.card_context}`,
+            ...(escalation.link ? {} : verdict.link ? { link: verdict.link } : {}),
+          }
+        : { ...verdict, check_id: check.id };
+      if (links.length) escalation.links = links;
+    }
+  }
+  if (escalation && (escalation.links?.length ?? 0) > 1 && escalation.link) {
+    // Approval settles the primary link only; say so on the card.
+    escalation.card_context = `${escalation.card_context}\nOn approve only ${escalation.link.action_ref} (${dotActorId(escalation.link.dot_id)}) is superseded; the other listed conflicts continue unless decided separately.`;
+  }
+  return escalation ?? { ok: true };
 }
 
 function notifyDot(
@@ -428,7 +747,7 @@ function workItemDescription(charter: DotCharter, record: DotActionRecord): stri
     record.objective,
     record.rationale ? `\nRationale: ${record.rationale}` : '',
     `\nProposed by ${dotActorId(charter.dot_id)} (${charter.title}) under role ${charter.authority.authority_role}; requested shape: ${record.work_shape}; decision: ${record.decision ?? 'n/a'}.`,
-    charter.team?.goal_ref ? `Contributes to: ${charter.team.goal_ref}` : '',
+    dotGoalRefLabel(charter) ? `Contributes to: ${dotGoalRefLabel(charter)}` : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -476,7 +795,11 @@ function executeDotAction(
           ...(record.decision ? { decision: record.decision } : {}),
           ...(record.request_id ? { approval_request_id: record.request_id } : {}),
           ...(record.handoff_to ? { handoff_to: record.handoff_to } : {}),
-          ...(charter.team?.goal_ref ? { goal_ref: charter.team.goal_ref } : {}),
+          ...(dotGoalRefLabel(charter) ? { goal_ref: dotGoalRefLabel(charter) } : {}),
+          ...(record.pipeline_ref ? { pipeline_ref: record.pipeline_ref } : {}),
+          ...(record.expected_effect ? { expected_effect: record.expected_effect } : {}),
+          ...(record.target ? { target: record.target } : {}),
+          ...(record.intent ? { intent: record.intent } : {}),
         },
       });
   } catch (error) {
@@ -550,11 +873,15 @@ export function dispatchDotProposals(
   for (const [index, proposal] of proposals.entries()) {
     const now = nowOf(deps);
     const hash = dotProposalHash(charter.dot_id, proposal);
-    // A declined proposal is not re-asked inside the window (no card spam).
+    // A declined proposal is not re-asked inside the window (no card spam);
+    // an override-shadowed one is not re-recorded (no digest spam).
     const recent = currentDotActions(charter.dot_id, deps).find(
       (row) =>
         row.proposal_hash === hash &&
-        (row.status === 'parked' || row.status === 'dispatched' || row.status === 'declined') &&
+        (row.status === 'parked' ||
+          row.status === 'dispatched' ||
+          row.status === 'declined' ||
+          (row.status === 'shadow' && Boolean(row.disposition_by))) &&
         now.getTime() - Date.parse(row.at) < DOT_PROPOSAL_DEDUPE_WINDOW_MS
     );
     if (recent) {
@@ -574,6 +901,10 @@ export function dispatchDotProposals(
       ...(proposal.handoff_to ? { handoff_to: proposal.handoff_to } : {}),
       ...(proposal.priority ? { priority: proposal.priority } : {}),
       ...(proposal.rationale ? { rationale: proposal.rationale } : {}),
+      ...(proposal.pipeline_ref ? { pipeline_ref: proposal.pipeline_ref } : {}),
+      ...(proposal.expected_effect ? { expected_effect: proposal.expected_effect } : {}),
+      ...(proposal.target ? { target: proposal.target } : {}),
+      ...(proposal.intent ? { intent: proposal.intent } : {}),
       at: now.toISOString(),
     };
     try {
@@ -583,12 +914,59 @@ export function dispatchDotProposals(
         records.push(appendActionRecord({ ...base, reason: bounds.reason }, deps));
         continue;
       }
-      const { gate, floor } = evaluateDotProposalGate(charter, proposal, deps);
+      const preGate = runDotPreGateChecks(charter, proposal, deps);
+      if (preGate.ok === false) {
+        const reason = `${preGate.check_id}: ${preGate.reason}`;
+        recordAudit(charter, proposal.action_id, 'denied', { reason }, deps);
+        records.push(appendActionRecord({ ...base, reason }, deps));
+        continue;
+      }
+      const escalation = preGate.ok === 'escalate' ? preGate : undefined;
+      // An escalation forces an operator decision: the proposal is gated as
+      // if the dot itself had asked for approval.
+      const { gate, floor } = evaluateDotProposalGate(
+        charter,
+        escalation ? { ...proposal, requested_decision: 'approve' } : proposal,
+        deps
+      );
+      const disposition = runDotDispositionOverrides(
+        charter,
+        proposal,
+        { action_ref: base.action_ref, gate, ...(floor ? { floor } : {}) },
+        deps
+      );
+      if (disposition) {
+        // Record only: no decision card, no notification, no WorkItem.
+        const reason = `${disposition.id}: ${disposition.reason}`;
+        recordAudit(
+          charter,
+          proposal.action_id,
+          'denied',
+          { action_ref: base.action_ref, shadow: true, reason },
+          deps
+        );
+        records.push(
+          appendActionRecord(
+            {
+              ...base,
+              status: 'shadow',
+              decision: gate.decision,
+              gate_decision: gate.decision,
+              ...(floor ? { floor } : {}),
+              disposition_by: disposition.id,
+              reason,
+            },
+            deps
+          )
+        );
+        continue;
+      }
+      const question = `${charter.title} proposes: ${proposal.title} — ${proposal.objective.slice(0, 500)}`;
       const routed = (deps.route ?? routeAutonomousDecision)({
         role: GOVERNED_STORE_ROLE,
         gate,
         title: `[${actor}] ${proposal.title}`,
-        question: `${charter.title} proposes: ${proposal.title} — ${proposal.objective.slice(0, 500)}`,
+        question: escalation ? `${question}\n\n${escalation.card_context}` : question,
         recommendation: proposal.rationale ?? proposal.objective,
         requestedBy: actor,
         source: { agentId: actor },
@@ -613,6 +991,16 @@ export function dispatchDotProposals(
         gate_decision: gate.decision,
         ...(floor ? { floor } : {}),
         ...(routed.requestId ? { request_id: routed.requestId } : {}),
+        ...(escalation
+          ? {
+              escalation: {
+                check_id: escalation.check_id,
+                reason: escalation.reason,
+                ...(escalation.link ? { link: escalation.link } : {}),
+                ...((escalation.links?.length ?? 0) > 1 ? { links: escalation.links } : {}),
+              },
+            }
+          : {}),
       };
       if (routed.proceed) {
         const executed = executeDotAction(charter, decided, deps);
@@ -701,7 +1089,8 @@ function dotDecisionExpired(
 
 function expirePendingDecision(
   approval: ApprovalRequestRecord,
-  deps: DotDispatchDeps
+  deps: DotDispatchDeps,
+  reason = 'dot_decision_expired'
 ): ApprovalRequestRecord | null {
   try {
     return (
@@ -711,7 +1100,7 @@ function expirePendingDecision(
           channel: record.channel,
           storageChannel: AUTONOMY_APPROVAL_CHANNEL,
           requestId: record.id,
-          reason: 'dot_decision_expired',
+          reason,
         }))
     )(approval);
   } catch (error) {
@@ -731,6 +1120,64 @@ function declineParked(
   recordAudit(charter, row.action_id, 'denied', { action_ref: row.action_ref, reason }, deps);
   return appendActionRecord(
     { ...row, status: 'declined', reason, at: nowOf(deps).toISOString() },
+    deps
+  );
+}
+
+/** Decline reason for a parked action replaced by another dot's approved action (DL-11). */
+export const DOT_SUPERSEDED_REASON = 'superseded';
+
+/**
+ * Decline a parked action because another dot's approved action replaced it.
+ * Unlike an operator rejection this records NO dot feedback, so it never
+ * raises the dot's learned decision floor; its pending card is expired so the
+ * operator is not asked twice. Returns undefined when the action is not parked,
+ * or when its card was already approved (audited `supersede_skipped`; the
+ * operator's approval is never overturned silently).
+ */
+export function supersedeDotParkedAction(
+  charter: DotCharter,
+  actionRef: string,
+  supersededBy: { dot_id: string; action_ref: string },
+  deps: DotDispatchDeps = {}
+): DotActionRecord | undefined {
+  const row = currentDotActions(charter.dot_id, deps).find(
+    (candidate) => candidate.action_ref === actionRef
+  );
+  if (!row || row.status !== 'parked') return undefined;
+  if (row.request_id) {
+    const load =
+      deps.loadApproval ??
+      ((requestId: string) => loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, requestId));
+    try {
+      const approval = load(row.request_id);
+      if (approval && (approval.status === 'approved' || approval.status === 'applied')) {
+        // An operator already said yes to this card: never overturn it
+        // silently. It stays parked (settled normally) and the skip is audited.
+        const reason = `not superseded: ${row.request_id} already ${approval.status} by ${approval.decidedBy ?? 'operator'}; superseding action ${supersededBy.action_ref} (${dotActorId(supersededBy.dot_id)}) needs a separate operator decision`;
+        recordAudit(
+          charter,
+          'supersede_skipped',
+          'denied',
+          { action_ref: row.action_ref, reason, superseded_by: supersededBy },
+          deps
+        );
+        logger.warn(
+          `[dot-dispatch] ${reason} | next: resolve the conflict by hand | evidence: ${DOT_ACTION_LEDGER_PATH}`
+        );
+        return undefined;
+      }
+      if (approval?.status === 'pending') expirePendingDecision(approval, deps, 'dot_superseded');
+    } catch (error) {
+      logger.warn(
+        `[dot-dispatch] approval ${row.request_id} unreadable while superseding ${actionRef} — ${error instanceof Error ? error.message : error} | next: the action is still declined; the stale card can be dismissed`
+      );
+    }
+  }
+  return declineParked(
+    charter,
+    { ...row, superseded_by: supersededBy },
+    DOT_SUPERSEDED_REASON,
     deps
   );
 }
@@ -902,7 +1349,7 @@ export function composeDotDigest(
   const waiting = actions.filter((row) => row.status === 'parked');
   const signals = dotSignalStatusLines(charter, { rootDir: deps.rootDir });
   return [
-    `${charter.title}${charter.team?.goal_ref ? ` — ${charter.team.goal_ref}` : ''}`,
+    `${charter.title}${dotGoalRefLabel(charter) ? ` — ${dotGoalRefLabel(charter)}` : ''}`,
     `Since last digest: dispatched ${count('dispatched')}, waiting ${waiting.length}, declined ${count('declined')}, refused ${count('refused')}.`,
     ...recent
       .filter((row) => row.status === 'dispatched')
@@ -910,7 +1357,25 @@ export function composeDotDigest(
       .map((row) => `- done: ${row.title}${row.work_item_id ? ` (${row.work_item_id})` : ''}`),
     ...waiting.slice(0, 5).map((row) => `- waiting on you: ${row.title}`),
     ...(signals.length ? ['Signals:', ...signals] : []),
+    ...dotDigestSectionLines(charter, since, deps),
   ].join('\n');
+}
+
+function dotDigestSectionLines(
+  charter: DotCharter,
+  since: Date | undefined,
+  deps: DotDispatchDeps
+): string[] {
+  const ctx = dotDispatchExtCtx(deps);
+  const lines: string[] = [];
+  for (const section of DOT_DIGEST_SECTIONS) {
+    try {
+      lines.push(...section.lines(charter, since, ctx));
+    } catch (error) {
+      extensionFailure('digest section', section.id, charter.dot_id, error);
+    }
+  }
+  return lines;
 }
 
 /** Send the charter digest when `digest_cron` is due (once per cron minute). */
