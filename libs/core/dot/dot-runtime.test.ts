@@ -273,7 +273,10 @@ describe('runDotWake', () => {
       rootDir: TEST_ROOT,
       hasRole: () => true,
       runLoop: async (options) => {
-        expect(options.extraTools?.map((t) => t.name)).toEqual(['dot_propose_action']);
+        expect(options.extraTools?.map((t) => t.name)).toEqual([
+          'dot_propose_action',
+          ...DOT_WAKE_TOOLS.map((t) => t.name),
+        ]);
         expect(options.toolRole).toBe('infrastructure_sentinel');
         toolReplies.push(
           options.executeTool!({

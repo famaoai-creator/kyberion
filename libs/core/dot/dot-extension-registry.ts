@@ -20,6 +20,8 @@ import {
   DOT_KEY_RESULTS_DIGEST_SECTION,
   DOT_KEY_RESULTS_STATUS_SECTION,
 } from './dot-key-results.js';
+import { dotMemoryPromptSection, dotUpdateMemoryTool } from './dot-memory.js';
+import { dotFollowupsPromptSection, dotScheduleFollowupTool } from './dot-followups.js';
 
 export const DOT_PROMPT_SECTIONS: DotPromptSection[] = [];
 export const DOT_FLOOR_CONTRIBUTORS: DotFloorContributor[] = [];
@@ -33,3 +35,7 @@ export const DOT_DIGEST_SECTIONS: DotDigestSection[] = [];
 DOT_PROMPT_SECTIONS.push(DOT_GOAL_GAP_PROMPT_SECTION);
 DOT_STATUS_SECTIONS.push(DOT_KEY_RESULTS_STATUS_SECTION);
 DOT_DIGEST_SECTIONS.push(DOT_KEY_RESULTS_DIGEST_SECTION);
+
+// DL-05 memory + DL-09 follow-ups
+DOT_WAKE_TOOLS.push(dotUpdateMemoryTool, dotScheduleFollowupTool);
+DOT_PROMPT_SECTIONS.push(dotMemoryPromptSection, dotFollowupsPromptSection);

@@ -10,6 +10,7 @@
 
 import type { LoadedDotCharter } from '@agent/core/dot/dot-charter';
 import { createLogger } from '@agent/core/logger';
+import { distillDotMemory } from '@agent/core/dot/dot-memory';
 import { measureActiveDotKeyResults } from '@agent/core/dot/dot-key-results';
 
 const logger = createLogger('dot-supervisor');
@@ -46,5 +47,21 @@ DOT_SUPERVISOR_STEPS.push({
   id: 'dot-kr-measure',
   async run(_now, active) {
     await measureActiveDotKeyResults(active.map((entry) => entry.charter));
+  },
+});
+
+// DL-05 weekly working-memory distillation (once per ISO week per dot)
+DOT_SUPERVISOR_STEPS.push({
+  id: 'dot-memory-distill',
+  async run(now, active) {
+    for (const loaded of active) {
+      try {
+        await distillDotMemory(loaded.charter, { now: () => now });
+      } catch (error) {
+        logger.warn(
+          `memory distill failed for ${loaded.charter.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: libs/core/dot/dot-memory.ts`
+        );
+      }
+    }
   },
 });
