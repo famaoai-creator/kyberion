@@ -468,6 +468,86 @@ describe('settleDotParkedActions + learning', () => {
     expect(settled[0]).toMatchObject({ status: 'declined', reason: 'approval request missing' });
   });
 
+  it('expires a decision that waited past the charter limit and frees the slot', () => {
+    const h = harness('approve');
+    dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
+    h.approvals.set('req-1', { ...approval('pending'), id: 'req-1', channel: 'operator' });
+    const expired: string[] = [];
+    const later = {
+      ...h.deps,
+      now: () => new Date('2026-10-05T09:00:10Z'),
+      expireApproval: (record: ApprovalRequestRecord) => {
+        expired.push(record.id);
+        return { ...record, status: 'expired' as const };
+      },
+    };
+    // Still inside the 24h default: nothing happens.
+    expect(
+      settleDotParkedActions(CHARTER, { ...later, now: () => new Date('2026-10-05T08:59:00Z') })
+    ).toHaveLength(0);
+    const settled = settleDotParkedActions(CHARTER, later);
+    expect(expired).toEqual(['req-1']);
+    expect(settled[0]).toMatchObject({ status: 'declined', reason: 'approval expired' });
+    expect(readDotFeedback('org-ops', later)[0]).toMatchObject({ outcome: 'expired' });
+    // Expiry is not a rejection: no learned floor.
+    expect(learnedDotDecisionFloor('org-ops', later)).toBeUndefined();
+    expect(
+      currentDotActions('org-ops', later).filter((row) => row.status === 'parked')
+    ).toHaveLength(0);
+  });
+
+  it('never lets the charter expiry pre-empt a live veto window', () => {
+    const h = harness('approve');
+    const short: DotCharter = {
+      ...CHARTER,
+      decisions: { ...CHARTER.decisions, decision_expiry_minutes: 10 },
+    };
+    dispatchDotProposals(short, [PROPOSAL], h.deps);
+    const live = {
+      ...approval('pending'),
+      id: 'req-1',
+      channel: 'operator',
+      veto: { windowMinutes: 60, proceedsAt: '2026-10-06T09:00:00Z' },
+    } as ApprovalRequestRecord;
+    h.approvals.set('req-1', live);
+    const expireApproval = (record: ApprovalRequestRecord) => ({
+      ...record,
+      status: 'expired' as const,
+    });
+    const later = { ...h.deps, now: () => new Date('2026-10-05T09:00:00Z'), expireApproval };
+    expect(settleDotParkedActions(short, later)).toHaveLength(0);
+    // Once the card fell back to a human decision, the charter expiry applies.
+    h.approvals.set('req-1', { ...live, veto: { ...live.veto!, fallback: 'undelivered' } });
+    expect(settleDotParkedActions(short, later)[0]).toMatchObject({ status: 'declined' });
+  });
+
+  it('honors a shorter charter decision_expiry_minutes and the request expiry', () => {
+    const h = harness('approve');
+    const short: DotCharter = {
+      ...CHARTER,
+      decisions: { ...CHARTER.decisions, decision_expiry_minutes: 30 },
+    };
+    dispatchDotProposals(short, [PROPOSAL], h.deps);
+    h.approvals.set('req-1', { ...approval('pending'), id: 'req-1', channel: 'operator' });
+    const expireApproval = (record: ApprovalRequestRecord) => ({
+      ...record,
+      status: 'expired' as const,
+    });
+    const in31 = { ...h.deps, now: () => new Date('2026-10-04T09:31:10Z'), expireApproval };
+    expect(settleDotParkedActions(short, in31)[0]).toMatchObject({ status: 'declined' });
+
+    const h2 = harness('approve');
+    dispatchDotProposals(CHARTER, [{ ...PROPOSAL, title: 'A different proposal' }], h2.deps);
+    h2.approvals.set('req-1', {
+      ...approval('pending'),
+      id: 'req-1',
+      channel: 'operator',
+      expiresAt: '2026-10-04T09:05:00Z',
+    });
+    const in10 = { ...h2.deps, now: () => new Date('2026-10-04T09:10:00Z'), expireApproval };
+    expect(settleDotParkedActions(CHARTER, in10)[0]).toMatchObject({ status: 'declined' });
+  });
+
   it('keeps an action parked when the approval store is transiently unreadable', () => {
     const h = harness('approve');
     dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);

@@ -38,7 +38,12 @@ import {
   type RoutedDecision,
 } from '../governance/approval-decision-routing.js';
 import { AUTONOMY_APPROVAL_CHANNEL } from '../governance/approval-decision-card.js';
-import { loadApprovalRequest, type ApprovalRequestRecord } from '../governance/approval-store.js';
+import {
+  expireApprovalRequest,
+  isApprovalRequestExpired,
+  loadApprovalRequest,
+  type ApprovalRequestRecord,
+} from '../governance/approval-store.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { createWorkItem, listWorkItems } from '../workforce/work-coordination.js';
 import type { CreateWorkItemInput, WorkItem } from '../workforce/work-coordination-types.js';
@@ -78,6 +83,8 @@ export const DEFAULT_DOT_WORK_SHAPES: readonly DotWorkShape[] = ['task_session',
 export const DEFAULT_DOT_MAX_CONCURRENT_DELEGATIONS = 3;
 /** The same proposal is not re-dispatched or re-asked within this window. */
 export const DOT_PROPOSAL_DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000;
+/** How long a proposal may wait on the operator when the charter sets no decision_expiry_minutes. */
+export const DEFAULT_DOT_DECISION_EXPIRY_MINUTES = 24 * 60;
 /** libs/core governed stores (approvals, WorkItems) write under this shared role. */
 const GOVERNED_STORE_ROLE = 'infrastructure_sentinel';
 
@@ -127,6 +134,8 @@ export interface DotDispatchDeps {
   ) => boolean;
   audit?: (entry: Parameters<typeof auditChain.record>[0]) => void;
   loadApproval?: (requestId: string) => ApprovalRequestRecord | null;
+  /** Mark a pending request expired in the approval store; returns the updated record. */
+  expireApproval?: (record: ApprovalRequestRecord) => ApprovalRequestRecord;
   feedback?: Omit<DotFeedbackDeps, 'rootDir' | 'now'>;
 }
 
@@ -652,6 +661,51 @@ const SETTLED_STATUS: Partial<Record<ApprovalRequestRecord['status'], DotFeedbac
   cancelled: 'cancelled',
 };
 
+/**
+ * A decision that waited longer than the charter allows (or past the
+ * request's own expiry) is expired, so an unattended inbox cannot hold the
+ * dot's delegation slots forever.
+ */
+function dotDecisionExpired(
+  charter: DotCharter,
+  row: DotActionRecord,
+  approval: ApprovalRequestRecord,
+  deps: DotDispatchDeps
+): boolean {
+  const now = nowOf(deps).getTime();
+  if (isApprovalRequestExpired(approval, now)) return true;
+  // A live veto window may still approve by silence; only a card that fell
+  // back to a human decision (or never had a window) waits on the operator.
+  if (approval.veto && !approval.veto.fallback) return false;
+  const maxWaitMs =
+    (charter.decisions?.decision_expiry_minutes ?? DEFAULT_DOT_DECISION_EXPIRY_MINUTES) * 60_000;
+  const parkedAt = Date.parse(row.at);
+  return !Number.isFinite(parkedAt) || now - parkedAt >= maxWaitMs;
+}
+
+function expirePendingDecision(
+  approval: ApprovalRequestRecord,
+  deps: DotDispatchDeps
+): ApprovalRequestRecord | null {
+  try {
+    return (
+      deps.expireApproval ??
+      ((record: ApprovalRequestRecord) =>
+        expireApprovalRequest(GOVERNED_STORE_ROLE, {
+          channel: record.channel,
+          storageChannel: AUTONOMY_APPROVAL_CHANNEL,
+          requestId: record.id,
+          reason: 'dot_decision_expired',
+        }))
+    )(approval);
+  } catch (error) {
+    logger.warn(
+      `[dot-dispatch] could not expire approval ${approval.id} — ${error instanceof Error ? error.message : error} | next: retried on the next sweep`
+    );
+    return approval;
+  }
+}
+
 function declineParked(
   charter: DotCharter,
   row: DotActionRecord,
@@ -691,6 +745,9 @@ export function settleDotParkedActions(
         `[dot-dispatch] approval ${row.request_id} unreadable for ${charter.dot_id} — ${error instanceof Error ? error.message : error} | next: retried on the next sweep`
       );
       continue;
+    }
+    if (approval?.status === 'pending' && dotDecisionExpired(charter, row, approval, deps)) {
+      approval = expirePendingDecision(approval, deps);
     }
     const outcome = approval ? SETTLED_STATUS[approval.status] : 'cancelled';
     if (!outcome) continue;

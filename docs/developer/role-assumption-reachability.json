@@ -135,6 +135,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/dot/dot-dispatch.ts#expirePendingDecision (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/dot/dot-lifecycle.ts#transitionDotCharterStatus",
       "roles": ["dot_lifecycle_writer"],
       "unresolved": []
