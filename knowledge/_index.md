@@ -360,7 +360,7 @@
 - [Antigravity CLI Multi-Account Profile Operations](./product/orchestration/antigravity-multi-account-operations.md) (public | Unknown)
 - [Autonomous Sentinel Operations](./product/orchestration/sentinel-operations.md) (public | Ecosystem Architect)
 - [Blog Authoring Playbook](./product/orchestration/blog-authoring-playbook.md) (public | Unknown)
-- [Browser Automation Best Practices (Omni-Browser v2)](./product/orchestration/browser-automation-best-practices.md) (public | Ecosystem Architect)
+- [Browser Automation Operating Checklist](./product/orchestration/browser-automation-best-practices.md) (public | Ecosystem Architect)
 - [Browser Discovery & Inspection Playbook](./product/orchestration/browser-discovery-playbook.md) (public | Kyberion Engineering)
 - [Browser Site Learning Playbook (新規サイト→リプレイ可能ADF)](./product/orchestration/browser-site-learning-playbook.md) (public | Kyberion Engineering)
 - [Capability Bundle Progressive Disclosure](./product/orchestration/capability-bundle-progressive-disclosure.md) (public | Ecosystem Architect)

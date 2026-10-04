@@ -4,7 +4,7 @@ category: Orchestration
 tags: [orchestration, browser, discovery, scratch, adf, recording, playbook]
 importance: 9
 author: Kyberion Engineering
-last_updated: 2026-10-03
+last_updated: 2026-10-04
 ---
 
 # Browser Site Learning Playbook（新規サイト → リプレイ可能ADF）
@@ -13,6 +13,10 @@ last_updated: 2026-10-03
 `browser-discovery-playbook.md`（Inspect 手順）と `adf-pipeline-learning-playbook.md`（学習ループ）、
 `pipeline-crystallization-loop.md`（Explore→Freeze）、`scratch-to-pipeline-video-promotion.md`（昇格の形）を
 ブラウザ用に統合したもの。AGENTS.md の「discovery は scratch-first（semantic-brief-first）」の実装でもある。
+
+運用上の正本は [Browser Automation Operating Checklist](./browser-automation-best-practices.md)。
+開始前の成功条件・承認範囲、各操作後の結果確認、結果不明時の再確認、秘密を残さない再開記録は
+全経路で同じチェックリストに従う。本書は学習・録画・昇格の経路を扱う。
 
 ## 0. 3経路の使い分け（最初に決める）
 
@@ -42,15 +46,16 @@ pnpm kyberion browser inspect --mode extension          # Akamai/Cloudflare等�
 
 - headed で目視: `browser inspect <url> --headed --screenshot active/shared/tmp/<slug>-scratch.png`
 - または CDP 接続の既存Chromeで手操作し、DOM差分を目視
-- 試行メモは `active/shared/tmp/<slug>-scratch.md` に残す（セレクタ候補、待機秒数、ハマり点）
-- 成功した操作列だけを残し、失敗試行は捨てる
+- 試行メモは `active/shared/tmp/<slug>-scratch.md` に残す（一意な対象候補、待機条件・上限、成功条件、ハマり点）。機密・個人情報の証跡は必要範囲に最小化・秘匿化し、所属する mission の tier/tenant 内に置く。認証秘密は保存しない
+- 再生対象は検証済みの操作列だけにする。失敗・結果不明の試行は、重複操作を避けるため必要な原因・試行回数・未確定効果だけを秘匿化して証跡に残す
 
 受理条件（全て満たしたら昇格可）:
 
 1. 操作順序が固定できた
-2. 各操作の `selector + role/name` が特定できた
-3. 待機条件（`waitUntil` / `wait` 秒数 / 待つセレクタ）が言語化できた
-4. 認証・WAF・2FA の扱い（プロファイル再利用か `pause_for_operator` か）が決まった
+2. 対象操作の一意な `selector + role/name` が特定できた
+3. 待機条件（`waitUntil` と対象状態／待つセレクタ）、上限時間、結果の確認方法が言語化できた
+4. 認証・WAF・2FA の扱い（許可されたプロファイル再利用か `pause_for_operator` か）が決まった
+5. 実際の成功条件と副作用、承認境界、停止・再開時の確認手順が決まった
 
 ## 3. Record（証跡を残す）
 
@@ -70,7 +75,7 @@ pnpm kyberion browser inspect --mode extension          # Akamai/Cloudflare等�
       "id": "open",
       "type": "control",
       "op": "browser:open_tab",
-      "params": { "url": "{{source_url}}", "keep_alive": true, "select": true }
+      "params": { "url": "{{source_url}}", "select": true }
     },
     { "id": "snap", "type": "capture", "op": "browser:snapshot", "params": {} },
     {
@@ -94,16 +99,17 @@ trail/録画をそのまま使わず、正規形に整える。
 
 - `control:browser:open_tab` → `capture:browser:snapshot` → `apply:browser:click|fill|press|wait` → `apply:code:write_artifact`
 - `open_tab` と `snapshot` は同一 `session_id`、snapshot後に `about:blank` でないことを確認
-- 各 apply には `selector + role/name` を付与、`@eN` 単独を残さない
+- 対象操作（click/fill/press）には観測で確認した `selector + role/name` を付与、`@eN` 単独を残さない。待機は対象状態の selector/state を指定する
 - secret は `browser:fill_secret_ref` + `dom_path` + `secret_ref`（`dom_path`なしは除外= fail-closed）
-- 遷移後は `wait`（セレクタ待ち）を入れ、media-heavy サイトは `waitUntil: load` を使う
+- 遷移後は `wait`（セレクタ・状態・timeout）と観測で準備完了を確認する。media-heavy サイトの `waitUntil: load` は背景通信の待ち過ぎを避ける設定であり、業務上の成功判定ではない
+- 再実行が危険な副作用のある step は対応する経路の retry を抑止する（Playwright ADF の `params.max_retries: 0` 等）。外側の再実行も含め、結果不明なら readback を先に行う
 - `screenshot` は証跡として保持される。`scroll` / `select_tab` は現exporterでは意図的に落とす（wheel-delta再演不可 / ephemeral tab_idのため）。必要なら `wait` + `snapshot` アンカーで置き換え、`select_tab` は `select_tab_matching` で記録し直す
 
-## 5. Verify（実データで2回振る）
+## 5. Verify（安全な入力で再現性と結果を確認する）
 
-- 実サイトで実行し、スナップショットが `about:blank` でないこと
-- 同一入力で2回実行し、構造（手順順・フィールド有無・artifact有無）を比較する（[学習Playbook §2 Step 7](./adf-pipeline-learning-playbook.md)）
-- 失敗時は `export_failure_bundle` の trail を見て分類する（load失敗か、dispatch失敗か、実行時失敗か）
+- 許可された対象環境（sandbox 優先）で実行し、スナップショットが `about:blank` でないこと
+- 読み取り専用／sandbox／安全にリセット可能な入力で2回実行し、構造（手順順・フィールド有無・artifact有無）と成功条件を比較する（[学習Playbook §2 Step 7](./adf-pipeline-learning-playbook.md)）。実サービスへの送信・購入・承認等を検証のために重複実行しない。実操作の反復は個別の権限確認と重複効果の確認が必要
+- 失敗時は `export_failure_bundle` の trail を秘匿化して確認し、load／dispatch／実行時のどこで止まったかを分類する。timeout・切断後の効果は失敗と断定せず、正本の「結果不明→readback→再試行判断」に従う
 
 ## 6. Promote（再利用する場合のみ昇格）
 
@@ -125,8 +131,9 @@ trail/録画をそのまま使わず、正規形に整える。
 - [ ] 未知が残れば scratch で試し、受理条件 (§2) を満たした
 - [ ] 正規op形で書いた（`open_tab` は `control`、`snapshot` は `capture`）
 - [ ] 同一 `session_id` で `about:blank` でないことを確認した
-- [ ] `selector + role/name` が全 apply にある
-- [ ] 実サイトで2回振って構造比較した
+- [ ] 対象操作の `selector + role/name` と、待機対象の状態を確認した
+- [ ] 正本の成功条件・承認・結果確認・再開チェックを満たした
+- [ ] 安全な入力で再現性と結果を比較し、実サービスに重複した副作用を起こしていない
 - [ ] 再利用する場合のみ昇格した（ADF↔録画の rails を混ぜない）
 
 関連: [Browser Discovery](./browser-discovery-playbook.md) · [ADF Learning](./adf-pipeline-learning-playbook.md) · [Crystallization Loop](./pipeline-crystallization-loop.md) · [実行基盤 howto](../architecture/browser-execution-substrate-howto.md)
