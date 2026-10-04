@@ -61,6 +61,11 @@
       "timezone": "Asia/Tokyo"
     }
   },
+  "team": {
+    "responsibilities": ["repository.health"],
+    "accepts_handoffs_from": ["org-operations"],
+    "goal_ref": "Kyberion runs its own operations autonomously and safely"
+  },
   "runtime": {
     "heartbeat_id": "dot-repo-guardian",
     "max_idle_wake_ms": 900000
