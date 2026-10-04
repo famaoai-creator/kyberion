@@ -13,6 +13,11 @@
       "ownerType": "surface-runtime-manifest",
       "port": 8791,
       "healthPath": "/health",
+      "ingress": {
+        "allowed": true,
+        "path_prefix": "/events",
+        "port_env": "KYBERION_EVENT_INTAKE_PORT"
+      },
       "enabled": false
     }
   ]

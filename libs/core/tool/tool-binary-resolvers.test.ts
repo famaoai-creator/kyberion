@@ -6,6 +6,7 @@ import {
   resolveFfprobeBin,
   resolveLightpandaBin,
   resolvePython3Bin,
+  resolveTailscaleBin,
   resolveXcodebuildBin,
   resolveXcrunBin,
 } from './tool-binary-resolvers.js';
@@ -52,6 +53,26 @@ describe('tool binary resolvers', () => {
     expect(resolveLightpandaBin()).toBe('/opt/kyberion/bin/lightpanda');
     vi.stubEnv('KYBERION_LIGHTPANDA_BIN', '');
     expect(resolveLightpandaBin()).toMatch(/lightpanda$/);
+  });
+
+  it('finds the Tailscale CLI on macOS without Install CLI, env override first', () => {
+    vi.stubEnv('KYBERION_TAILSCALE_BIN', '');
+    const bundle = '/Applications/Tailscale.app/Contents/MacOS/Tailscale';
+    expect(
+      resolveTailscaleBin({ platform: 'darwin', exists: (candidate) => candidate === bundle })
+    ).toBe(bundle);
+    expect(
+      resolveTailscaleBin({
+        platform: 'darwin',
+        exists: (candidate) => candidate === bundle || candidate === '/usr/local/bin/tailscale',
+      })
+    ).toBe('/usr/local/bin/tailscale');
+    expect(resolveTailscaleBin({ platform: 'linux', exists: () => true })).toMatch(/tailscale$/);
+    expect(resolveTailscaleBin({ platform: 'darwin', exists: () => false })).toMatch(/tailscale$/);
+    vi.stubEnv('KYBERION_TAILSCALE_BIN', '/opt/custom/tailscale');
+    expect(resolveTailscaleBin({ platform: 'darwin', exists: () => true })).toBe(
+      '/opt/custom/tailscale'
+    );
   });
 
   it('falls back to the literal only when the registry record is unavailable', () => {
