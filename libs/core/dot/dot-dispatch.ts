@@ -74,6 +74,13 @@ import {
   type DotFeedbackOutcome,
 } from './dot-feedback.js';
 import { createLogger } from '../logger.js';
+import {
+  DOT_DECISION_RELAXERS,
+  DOT_DIGEST_SECTIONS,
+  DOT_FLOOR_CONTRIBUTORS,
+  DOT_PRE_GATE_CHECKS,
+} from './dot-extension-registry.js';
+import type { DotExtCtx } from './dot-extensions.js';
 
 const logger = createLogger('dot-dispatch');
 
@@ -113,6 +120,12 @@ export interface DotActionRecord {
   request_id?: string;
   work_item_id?: string;
   reason?: string;
+  /** Set when a pre-gate check forced an operator decision. */
+  escalation?: {
+    check_id: string;
+    reason: string;
+    link?: { action_ref: string; dot_id: string };
+  };
   at: string;
 }
 
@@ -379,18 +392,61 @@ export function evaluateDotProposalGate(
   charter: DotCharter,
   proposal: DotProposal,
   deps: DotDispatchDeps = {}
-): { gate: AutonomousOpsGateResult; floor?: DotDecisionLevel } {
-  const floor = strictest(
+): { gate: AutonomousOpsGateResult; floor?: DotDecisionLevel; relaxed_by?: string } {
+  const ctx = dotDispatchExtCtx(deps);
+  // Floors that can never be relaxed: charter default, the dot's own request,
+  // and every registered floor contributor.
+  const hardFloor = strictest(
     charter.decisions?.default_decision,
-    learnedDotDecisionFloor(charter.dot_id, { rootDir: deps.rootDir, now: deps.now }),
-    proposal.requested_decision
+    proposal.requested_decision,
+    ...DOT_FLOOR_CONTRIBUTORS.map((contributor) => {
+      try {
+        return contributor.floor(charter, proposal, ctx);
+      } catch (error) {
+        extensionFailure('floor contributor', contributor.id, charter.dot_id, error);
+        return undefined;
+      }
+    })
   );
-  const gate = (deps.gate ?? evaluateAutonomousOpsAction)({
-    actionId: proposal.action_id,
-    ...(charter.scope.tenant_slug ? { tenantSlug: charter.scope.tenant_slug } : {}),
-    ...(proposal.changed_paths ? { changedPaths: proposal.changed_paths } : {}),
-    ...(floor ? { requestedDecision: floor } : {}),
+  const learned = learnedDotDecisionFloor(charter.dot_id, {
+    rootDir: deps.rootDir,
+    now: deps.now,
   });
+  let floor = strictest(hardFloor, learned);
+  const runGate = (requested: DotDecisionLevel | undefined) =>
+    (deps.gate ?? evaluateAutonomousOpsAction)({
+      actionId: proposal.action_id,
+      ...(charter.scope.tenant_slug ? { tenantSlug: charter.scope.tenant_slug } : {}),
+      ...(proposal.changed_paths ? { changedPaths: proposal.changed_paths } : {}),
+      ...(requested ? { requestedDecision: requested } : {}),
+    });
+  let gate = runGate(floor);
+  let relaxedBy: string | undefined;
+  // Relaxers may only lower what the learned floor added: the result is
+  // clamped to the policy gate's own decision (without the learned floor) and
+  // to the charter default / hard floor.
+  if (floor && learned && DOT_DECISION_RELAXERS.length > 0) {
+    let policyGate: AutonomousOpsGateResult | undefined;
+    for (const relaxer of DOT_DECISION_RELAXERS) {
+      let relaxed: { decision: DotDecisionLevel; reason: string } | undefined;
+      try {
+        relaxed = relaxer.relax(charter, proposal, gate, floor, ctx);
+      } catch (error) {
+        extensionFailure('decision relaxer', relaxer.id, charter.dot_id, error);
+        continue;
+      }
+      if (!relaxed) continue;
+      policyGate ??= runGate(hardFloor);
+      const clamped = strictest(relaxed.decision, policyGate.decision, hardFloor) ?? floor;
+      if (DECISION_RANK[clamped] < DECISION_RANK[floor]) {
+        floor = clamped;
+        gate = runGate(floor);
+        gate = { ...gate, reason: `${gate.reason}; relaxed by ${relaxer.id}: ${relaxed.reason}` };
+        relaxedBy = relaxer.id;
+      }
+      break;
+    }
+  }
   // The charter may lengthen a veto window, never shorten the policy's.
   const charterVeto = charter.decisions?.veto_window_minutes;
   const vetoWindowMinutes =
@@ -403,7 +459,64 @@ export function evaluateDotProposalGate(
       ...(vetoWindowMinutes !== undefined ? { vetoWindowMinutes } : {}),
     },
     ...(floor ? { floor } : {}),
+    ...(relaxedBy ? { relaxed_by: relaxedBy } : {}),
   };
+}
+
+function dotDispatchExtCtx(deps: DotDispatchDeps): DotExtCtx {
+  return { rootDir: deps.rootDir, now: deps.now ?? (() => new Date()) };
+}
+
+function extensionFailure(kind: string, id: string, dotId: string, error: unknown): void {
+  logger.warn(
+    `[dot-dispatch] ${kind} '${id}' failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: governance continues without it | evidence: libs/core/dot/dot-extension-registry.ts`
+  );
+}
+
+type DotPreGateVerdict =
+  | { ok: true }
+  | { ok: false; reason: string; check_id: string }
+  | {
+      ok: 'escalate';
+      reason: string;
+      card_context: string;
+      check_id: string;
+      link?: { action_ref: string; dot_id: string };
+    };
+
+/**
+ * Registered pre-gate checks in order. The first refusal wins; escalations
+ * are merged (one forced operator decision carrying every check's context).
+ * A throwing check is skipped, never a refusal.
+ */
+function runDotPreGateChecks(
+  charter: DotCharter,
+  proposal: DotProposal,
+  deps: DotDispatchDeps
+): DotPreGateVerdict {
+  const ctx = dotDispatchExtCtx(deps);
+  let escalation: Extract<DotPreGateVerdict, { ok: 'escalate' }> | undefined;
+  for (const check of DOT_PRE_GATE_CHECKS) {
+    let verdict: ReturnType<typeof check.check>;
+    try {
+      verdict = check.check(charter, proposal, ctx);
+    } catch (error) {
+      extensionFailure('pre-gate check', check.id, charter.dot_id, error);
+      continue;
+    }
+    if (verdict.ok === false) return { ok: false, reason: verdict.reason, check_id: check.id };
+    if (verdict.ok === 'escalate') {
+      escalation = escalation
+        ? {
+            ...escalation,
+            reason: `${escalation.reason}; ${verdict.reason}`,
+            card_context: `${escalation.card_context}\n${verdict.card_context}`,
+            ...(escalation.link ? {} : verdict.link ? { link: verdict.link } : {}),
+          }
+        : { ...verdict, check_id: check.id };
+    }
+  }
+  return escalation ?? { ok: true };
 }
 
 function notifyDot(
@@ -583,12 +696,27 @@ export function dispatchDotProposals(
         records.push(appendActionRecord({ ...base, reason: bounds.reason }, deps));
         continue;
       }
-      const { gate, floor } = evaluateDotProposalGate(charter, proposal, deps);
+      const preGate = runDotPreGateChecks(charter, proposal, deps);
+      if (preGate.ok === false) {
+        const reason = `${preGate.check_id}: ${preGate.reason}`;
+        recordAudit(charter, proposal.action_id, 'denied', { reason }, deps);
+        records.push(appendActionRecord({ ...base, reason }, deps));
+        continue;
+      }
+      const escalation = preGate.ok === 'escalate' ? preGate : undefined;
+      // An escalation forces an operator decision: the proposal is gated as
+      // if the dot itself had asked for approval.
+      const { gate, floor } = evaluateDotProposalGate(
+        charter,
+        escalation ? { ...proposal, requested_decision: 'approve' } : proposal,
+        deps
+      );
+      const question = `${charter.title} proposes: ${proposal.title} — ${proposal.objective.slice(0, 500)}`;
       const routed = (deps.route ?? routeAutonomousDecision)({
         role: GOVERNED_STORE_ROLE,
         gate,
         title: `[${actor}] ${proposal.title}`,
-        question: `${charter.title} proposes: ${proposal.title} — ${proposal.objective.slice(0, 500)}`,
+        question: escalation ? `${question}\n\n${escalation.card_context}` : question,
         recommendation: proposal.rationale ?? proposal.objective,
         requestedBy: actor,
         source: { agentId: actor },
@@ -613,6 +741,15 @@ export function dispatchDotProposals(
         gate_decision: gate.decision,
         ...(floor ? { floor } : {}),
         ...(routed.requestId ? { request_id: routed.requestId } : {}),
+        ...(escalation
+          ? {
+              escalation: {
+                check_id: escalation.check_id,
+                reason: escalation.reason,
+                ...(escalation.link ? { link: escalation.link } : {}),
+              },
+            }
+          : {}),
       };
       if (routed.proceed) {
         const executed = executeDotAction(charter, decided, deps);
@@ -910,7 +1047,25 @@ export function composeDotDigest(
       .map((row) => `- done: ${row.title}${row.work_item_id ? ` (${row.work_item_id})` : ''}`),
     ...waiting.slice(0, 5).map((row) => `- waiting on you: ${row.title}`),
     ...(signals.length ? ['Signals:', ...signals] : []),
+    ...dotDigestSectionLines(charter, since, deps),
   ].join('\n');
+}
+
+function dotDigestSectionLines(
+  charter: DotCharter,
+  since: Date | undefined,
+  deps: DotDispatchDeps
+): string[] {
+  const ctx = dotDispatchExtCtx(deps);
+  const lines: string[] = [];
+  for (const section of DOT_DIGEST_SECTIONS) {
+    try {
+      lines.push(...section.lines(charter, since, ctx));
+    } catch (error) {
+      extensionFailure('digest section', section.id, charter.dot_id, error);
+    }
+  }
+  return lines;
 }
 
 /** Send the charter digest when `digest_cron` is due (once per cron minute). */
