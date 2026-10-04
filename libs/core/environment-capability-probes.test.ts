@@ -168,11 +168,20 @@ describe('probeExplicitReasoningBackend (LC-04d: explicit selection is probed sp
   it('does not treat an empty Claude API key as an available agent backend', async () => {
     const result = await probeExplicitReasoningBackend(
       'claude-agent',
-      { CLAUDE_API_KEY: '   ' },
+      { ANTHROPIC_API_KEY: '   ', CLAUDE_API_KEY: '   ' },
       { claudeProbe: () => ({ available: false, reason: 'not authenticated' }) }
     );
     expect(result.available).toBe(false);
     expect(result.reason).toContain('not authenticated');
+  });
+
+  it('treats a registered Anthropic API key as an available Claude Agent backend', async () => {
+    const result = await probeExplicitReasoningBackend(
+      'claude-agent',
+      { ANTHROPIC_API_KEY: 'anthropic-test-key' },
+      { claudeProbe: () => ({ available: false, reason: 'Claude CLI is not installed' }) }
+    );
+    expect(result).toEqual({ available: true });
   });
 
   it('probes the grok CLI for grok-cli and normalizes the grok alias', async () => {

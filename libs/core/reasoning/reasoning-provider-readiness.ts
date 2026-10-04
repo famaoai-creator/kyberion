@@ -81,6 +81,7 @@ const ADAPTER_PROBES: Readonly<Record<ReasoningProviderAdapterId, AdapterProbe>>
   // credential intended for the Agent/API mode.
   'claude-cli': async (_descriptor, _env, deps) => deps.claudeProbe(),
   'claude-agent-sdk': async (_descriptor, env, deps) =>
+    getRegisteredEnvText('ANTHROPIC_API_KEY', { env })?.trim() ||
     getRegisteredEnvText('CLAUDE_API_KEY', { env })?.trim()
       ? { available: true }
       : deps.claudeProbe(),
