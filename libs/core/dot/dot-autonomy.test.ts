@@ -54,6 +54,7 @@ import {
   dotStatePath,
   type DotAutonomyLevel,
 } from './dot-state-paths.js';
+import './dot-extension-bootstrap.js';
 
 const TEST_ROOT = `active/shared/tmp/dot-autonomy-tests-${randomUUID()}`;
 const RANK = { auto: 0, notify: 1, approve: 2 } as const;

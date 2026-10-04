@@ -987,7 +987,7 @@ function dotExtCtx(deps: DotRuntimeDeps): DotExtCtx {
 
 function extensionFailure(kind: string, id: string, dotId: string, error: unknown): void {
   logger.warn(
-    `${kind} '${id}' failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: the wake continues without it | evidence: libs/core/dot/dot-extension-registry.ts`
+    `${kind} '${id}' failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: the wake continues without it | evidence: libs/core/dot/dot-extension-bootstrap.ts`
   );
 }
 

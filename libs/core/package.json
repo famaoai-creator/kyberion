@@ -5399,6 +5399,10 @@
       "types": "./dist/reasoning/reasoning-backend.d.ts",
       "default": "./dist/reasoning/reasoning-backend.js"
     },
+    "./reasoning/reasoning-live-capabilities": {
+      "types": "./dist/reasoning/reasoning-live-capabilities.d.ts",
+      "default": "./dist/reasoning/reasoning-live-capabilities.js"
+    },
     "./reasoning/reasoning-bootstrap": {
       "types": "./dist/reasoning/reasoning-bootstrap.d.ts",
       "default": "./dist/reasoning/reasoning-bootstrap.js"
@@ -7130,6 +7134,10 @@
     "./dot/dot-extension-registry": {
       "types": "./dist/dot/dot-extension-registry.d.ts",
       "default": "./dist/dot/dot-extension-registry.js"
+    },
+    "./dot/dot-extension-bootstrap": {
+      "types": "./dist/dot/dot-extension-bootstrap.d.ts",
+      "default": "./dist/dot/dot-extension-bootstrap.js"
     },
     "./dot/dot-wake-backend": {
       "types": "./dist/dot/dot-wake-backend.d.ts",

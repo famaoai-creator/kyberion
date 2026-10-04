@@ -114,6 +114,12 @@ import type {
   ReasoningFailoverPolicy,
 } from './reasoning-backend-contracts.js';
 export * from './reasoning-backend-contracts.js';
+import {
+  backendHasLiveToolCandidate,
+  type LiveCapabilityReporter,
+  type ReasoningLiveCapabilities,
+} from './reasoning-live-capabilities.js';
+export * from './reasoning-live-capabilities.js';
 
 function shouldRetryShortDelegationSummary(input: {
   instruction: string;
@@ -284,35 +290,6 @@ function recordCandidateServed(
         `primary failure: ${errorSummary}`
     );
   }
-}
-
-/** What a backend can serve right now, after provider-health demotion. */
-export interface ReasoningLiveCapabilities {
-  tools: boolean;
-  candidates: string[];
-}
-
-interface LiveCapabilityReporter {
-  liveCapabilities?: (role?: string) => ReasoningLiveCapabilities;
-}
-
-/**
- * True when `backend` (for `role`) has at least one non-demoted candidate that
- * supports `generateWithTools`. Backends without `liveCapabilities` (single
- * providers, test doubles) answer from `generateWithTools` presence.
- */
-export function backendHasLiveToolCandidate(
-  backend: Pick<ReasoningBackend, 'generateWithTools'> & LiveCapabilityReporter,
-  role?: string
-): boolean {
-  if (typeof backend.liveCapabilities === 'function') {
-    try {
-      return backend.liveCapabilities(role).tools;
-    } catch {
-      return false;
-    }
-  }
-  return Boolean(backend.generateWithTools);
 }
 
 export class FailoverReasoningBackend implements ReasoningBackend {

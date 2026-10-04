@@ -29,9 +29,9 @@
  * Ledger: `dotStatePath(newcomer, 'arbitration.jsonl')` — tenant-scoped for
  * tenant dots, so another tenant's titles never land in a shared file.
  *
- * Registry note: dot-extension-registry imports this module and dot-dispatch
- * imports the registry, so the registration is the hoisted function
- * {@link dotArbitrationPreGateCheck} (no module-level value read during the cycle).
+ * Registry note: dot-extension-bootstrap registers the factory
+ * {@link dotArbitrationPreGateCheck}; the registry itself is a leaf that
+ * dot-dispatch reads, so this module never forms an import cycle with it.
  */
 
 import * as path from 'node:path';
