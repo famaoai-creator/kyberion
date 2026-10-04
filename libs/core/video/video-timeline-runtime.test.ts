@@ -33,7 +33,8 @@ function runRuntime(script: string, nodes: Record<string, FakeEl[]>) {
     addEventListener: () => {},
   };
   const window: Record<string, any> = {};
-  const body = script.replace(/^<script[^>]*>/, '').replace(/<\/script>$/, '');
+  // The runtime is one <script>…</script> block; take what is between the tags.
+  const body = script.slice(script.indexOf('>') + 1, script.lastIndexOf('</'));
   new Function('window', 'document', body)(window, document);
   return { window, animations, rootVars };
 }

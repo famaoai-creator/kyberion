@@ -618,13 +618,16 @@ async function createTimelineVideo(params: {
 }
 
 function slugifyTimelineTitle(value: string): string {
-  return (
-    String(value)
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 60) || 'timeline-video'
-  );
+  // Linear scan (no anchored alternation regex) — titles come from callers.
+  const dashed = String(value)
+    .toLowerCase()
+    .slice(0, 200)
+    .replace(/[^a-z0-9]+/g, '-');
+  let start = 0;
+  let end = dashed.length;
+  while (start < end && dashed[start] === '-') start += 1;
+  while (end > start && dashed[end - 1] === '-') end -= 1;
+  return dashed.slice(start, end).slice(0, 60) || 'timeline-video';
 }
 
 async function verifyRenderedVideoArtifact(params: {

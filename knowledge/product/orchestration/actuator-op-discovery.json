@@ -32343,7 +32343,7 @@
               "scenes": [
                 {
                   "scene_id": "hook",
-                  "html": "<h1 class=\"kb-cue kb-rise\" style=\"--at:.4\">曖昧な依頼を、成果まで。</h1>",
+                  "html": "<h1 class=\"kb-cue kb-rise\" style=\"--at:.4\">From intent to result.</h1>",
                   "narration_ref": "active/shared/tmp/voice/hook.wav"
                 }
               ],
