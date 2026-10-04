@@ -20,15 +20,15 @@ afterEach(() => {
 });
 
 describe('lock utilities', () => {
-  it('reclaims a malformed lock record instead of blocking forever', async () => {
+  it('retains malformed ownership and reports explicit recovery instead of stealing it', async () => {
     const resourceId = `lock-utils-malformed-${process.pid}-${Date.now()}`;
     createdLockIds.push(resourceId);
     safeMkdir(lockRoot, { recursive: true });
     safeWriteFile(lockPath(resourceId), '{not-json');
 
-    await expect(acquireLock(resourceId, 500)).resolves.toBe(true);
+    await expect(acquireLock(resourceId, 1)).rejects.toThrow('[LOCK_RECOVERY_REQUIRED]');
     releaseLock(resourceId);
-    expect(safeExistsSync(lockPath(resourceId))).toBe(false);
+    expect(safeExistsSync(lockPath(resourceId))).toBe(true);
   });
 
   it('attempts acquisition at least once even with a non-blocking timeout', async () => {

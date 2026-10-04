@@ -158,6 +158,9 @@ export interface BuildSurfaceConversationInputOptions {
   locale?: SupportedLocale;
   cwd?: string;
   threadContext?: string;
+  conversationKey?: SurfaceConversationInput['conversationKey'];
+  conversationHistory?: SurfaceConversationInput['conversationHistory'];
+  conversationHistoryTruncated?: boolean;
   forcedReceiver?: string;
   missionId?: string;
   teamRole?: string;
@@ -661,6 +664,9 @@ export function buildSurfaceConversationInputFromMessage(
     surfaceText: message.text,
     attachments: message.attachments,
     threadContext: options.threadContext,
+    conversationKey: options.conversationKey,
+    conversationHistory: options.conversationHistory,
+    conversationHistoryTruncated: options.conversationHistoryTruncated,
     surfaceMetadata: slackThreadShape
       ? ({
           surface: 'slack',
@@ -762,6 +768,9 @@ export function buildSurfaceConversationInput(
     locale: input.locale,
     cwd: input.cwd,
     threadContext: input.threadContext,
+    conversationKey: input.conversationKey,
+    conversationHistory: input.conversationHistory,
+    conversationHistoryTruncated: input.conversationHistoryTruncated,
     forcedReceiver: input.forcedReceiver,
     missionId: input.missionId,
     teamRole: input.teamRole,

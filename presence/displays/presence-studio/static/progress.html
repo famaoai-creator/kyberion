@@ -65,10 +65,26 @@
               role="tab"
               aria-selected="false"
             >
-              {{t:front_desk:progress_filter_done}}
+              {{t:front_desk:progress_history}}
             </button>
           </div>
 
+          <div
+            id="progress-notice"
+            class="kb-section"
+            role="status"
+            hidden
+            data-progress_load_failed="{{t:front_desk:progress_load_failed}}"
+            data-progress_action_failed="{{t:front_desk:progress_action_failed}}"
+            data-progress_storage_required="{{t:front_desk:progress_storage_required}}"
+            data-progress_scope_required="{{t:front_desk:progress_scope_required}}"
+            data-progress_request_pending="{{t:front_desk:progress_request_pending}}"
+          >
+            <p data-notice-text></p>
+            <button type="button" class="kb-btn kb-btn--secondary">
+              {{t:front_desk:progress_refresh}}
+            </button>
+          </div>
           <div class="progress-columns">
             <section
               class="kb-section progress-list-col"
