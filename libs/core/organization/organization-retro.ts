@@ -4,7 +4,7 @@
  * budget pressure over the window.
  *
  * Same shape as the standup: `buildOrganizationRetro` is pure over injected
- * readers; `runOrganizationRetro` is the governed (sovereign-only, audited)
+ * readers; `runOrganizationRetro` is the governed (sovereign or scoped, audited)
  * sweep that files each retro in the organization's scope and notifies.
  */
 import * as path from 'node:path';
@@ -21,7 +21,11 @@ import type { MessageParams } from '../message-format.js';
 import type { VocabularyKey } from '../knowledge/vocabulary-keys.generated.js';
 import { pathResolver } from '../path-resolver.js';
 import { t } from '../t.js';
-import { assertSovereignCadencePersona, listOrganizationScopes } from './organization-cadence.js';
+import {
+  authorizeOrganizationCadence,
+  cadenceOrganizations,
+  type OrganizationCadenceScope,
+} from './organization-cadence.js';
 import { listOrganizationIncidents } from './organization-operating-model-management.js';
 import type {
   OrganizationIncidentRecord,
@@ -288,6 +292,8 @@ export function renderOrganizationRetroText(
 }
 
 export interface RunOrganizationRetroOptions {
+  /** Scoped mode: only this organization (no sovereign persona; bound tenant must match). */
+  scope?: OrganizationCadenceScope;
   /** Days of history to review (default 7). */
   sinceDays?: number;
   timezone?: string;
@@ -304,24 +310,26 @@ export interface OrganizationRetroRun {
   text: string;
 }
 
-/** Governed retro sweep over every organization (sovereign-only, audited). */
+/** Governed retro: every organization (sovereign-only) or one scoped organization; audited. */
 export function runOrganizationRetro(
   options: RunOrganizationRetroOptions = {},
   deps: OrganizationRetroDeps & {
     listOrganizations?: (tier: OrganizationTier) => OrganizationScopeRef[];
   } = {}
 ): OrganizationRetroRun {
-  const persona = assertSovereignCadencePersona('retro', options.env);
+  const auth = authorizeOrganizationCadence('retro', options.scope, options.env);
   const now = deps.now?.() ?? new Date();
   const timezone = options.timezone ?? ORGANIZATION_CADENCE_DEFAULT_TIMEZONE;
   const locale = options.locale ?? ORGANIZATION_CADENCE_DEFAULT_LOCALE;
   const days = options.sinceDays && options.sinceDays > 0 ? options.sinceDays : 7;
   const since = new Date(now.getTime() - days * DAY_MS);
-  const tiers = options.tiers ?? ['confidential', 'public'];
+  const tiers = options.scope
+    ? [options.scope.tier]
+    : (options.tiers ?? ['confidential', 'public']);
   const retros: OrganizationRetroRun['retros'] = [];
   let organizationCount = 0;
   for (const tier of tiers) {
-    const scopes = deps.listOrganizations?.(tier) ?? listOrganizationScopes({ tier }, deps.rootDir);
+    const scopes = cadenceOrganizations(tier, options.scope, deps.rootDir, deps.listOrganizations);
     for (const scope of scopes) {
       organizationCount += 1;
       const retro = buildOrganizationRetro(scope, since, { ...deps, now: () => now }, { timezone });
@@ -345,11 +353,17 @@ export function runOrganizationRetro(
     }
   }
   (deps.audit ?? ((entry) => auditChain.record(entry)))({
-    agentId: persona,
+    agentId: auth.agentId,
     action: 'organization.retro',
-    operation: 'retro:cross_tenant',
+    operation: `retro:${auth.mode}`,
     result: 'completed',
-    metadata: { tiers, organization_count: organizationCount, reported_count: retros.length },
+    ...(auth.tenantSlug ? { tenantSlug: auth.tenantSlug } : {}),
+    metadata: {
+      tiers,
+      ...(options.scope ? { organization_id: options.scope.organizationId } : {}),
+      organization_count: organizationCount,
+      reported_count: retros.length,
+    },
   });
   return {
     retros,

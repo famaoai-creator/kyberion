@@ -7,7 +7,7 @@
 import * as path from 'node:path';
 import { auditChain } from '../governance/audit-chain.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { executionPersonaText } from '../foundation/execution-scope.js';
+import { currentExecutionScope, executionPersonaText } from '../foundation/execution-scope.js';
 import { isReservedScopeName, isValidTenantSlug } from '../entity-scope.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReaddir, safeStat } from '../secure-io.js';
@@ -94,7 +94,113 @@ export function assertSovereignCadencePersona(
   return persona;
 }
 
+/**
+ * One organization a scoped cadence runs for — the per-tenant path the resident
+ * dot sweep uses (as `organization_operator`) instead of the sovereign
+ * cross-tenant sweep.
+ */
+export interface OrganizationCadenceScope {
+  tier: OrganizationTier;
+  /** Absent for an untenanted organization (the `shared` partition). */
+  tenantSlug?: string;
+  organizationId: string;
+}
+
+/**
+ * Scoped cadences need no sovereign persona, but must run inside a governed
+ * execution scope whose bound tenant equals the cadence tenant (and whose
+ * bound organization, when one is bound, equals the cadence organization).
+ * Returns the assumed role, used as the audit agent id.
+ */
+export function assertScopedCadenceExecution(
+  what: string,
+  scope: OrganizationCadenceScope
+): string {
+  if (!scope.organizationId?.trim()) {
+    throw new Error(
+      `[POLICY_VIOLATION] A scoped organization ${what} requires an organization id.`
+    );
+  }
+  const execution = currentExecutionScope();
+  const role = execution?.assumedRole?.trim();
+  if (!execution || !role) {
+    throw new Error(
+      `[POLICY_VIOLATION] A scoped organization ${what} must run inside a governed execution scope bound to its tenant (withExecutionContextAsync).`
+    );
+  }
+  const expected = normalizeCadenceTenant(scope.tenantSlug);
+  const bound = normalizeCadenceTenant(execution.tenantBound ? execution.tenantSlug : undefined);
+  if (bound !== expected) {
+    throw new Error(
+      `[POLICY_VIOLATION] The scoped organization ${what} for tenant '${expected || '(none)'}' cannot run in an execution scope bound to tenant '${bound || '(none)'}'.`
+    );
+  }
+  if (execution.organizationId && execution.organizationId !== scope.organizationId) {
+    throw new Error(
+      `[POLICY_VIOLATION] The scoped organization ${what} for organization '${scope.organizationId}' cannot run in an execution scope bound to organization '${execution.organizationId}'.`
+    );
+  }
+  return role;
+}
+
+/** Authorization for one cadence run: scoped (bound tenant) or cross-tenant (sovereign). */
+export interface CadenceAuthorization {
+  agentId: string;
+  mode: 'scoped' | 'cross_tenant';
+  tenantSlug?: string;
+}
+
+export function authorizeOrganizationCadence(
+  what: string,
+  scope: OrganizationCadenceScope | undefined,
+  env?: Record<string, string | undefined>
+): CadenceAuthorization {
+  if (!scope) return { agentId: assertSovereignCadencePersona(what, env), mode: 'cross_tenant' };
+  const tenant = normalizeCadenceTenant(scope.tenantSlug);
+  return {
+    agentId: assertScopedCadenceExecution(what, scope),
+    mode: 'scoped',
+    ...(tenant ? { tenantSlug: tenant } : {}),
+  };
+}
+
+function inCadenceScope(ref: OrganizationScopeRef, scope: OrganizationCadenceScope): boolean {
+  return (
+    ref.organizationId === scope.organizationId &&
+    ref.tier === scope.tier &&
+    normalizeCadenceTenant(ref.tenantSlug) === normalizeCadenceTenant(scope.tenantSlug)
+  );
+}
+
+/**
+ * Organizations one cadence covers under `tier`: every organization when
+ * unscoped, otherwise only the scoped organization (discovery results are
+ * filtered, so an injected lister can never widen a scoped run).
+ */
+export function cadenceOrganizations(
+  tier: OrganizationTier,
+  scope: OrganizationCadenceScope | undefined,
+  rootDir?: string,
+  list?: (tier: OrganizationTier) => OrganizationScopeRef[]
+): OrganizationScopeRef[] {
+  if (!scope) return list?.(tier) ?? listOrganizationScopes({ tier }, rootDir);
+  if (tier !== scope.tier) return [];
+  const refs =
+    list?.(tier) ??
+    listOrganizationScopes(
+      {
+        tier,
+        tenantSlug: normalizeCadenceTenant(scope.tenantSlug) ?? 'shared',
+        organizationId: scope.organizationId,
+      },
+      rootDir
+    );
+  return refs.filter((ref) => inCadenceScope(ref, scope));
+}
+
 export interface OrganizationOperationTickRunOptions {
+  /** Scoped mode: tick only this organization (no sovereign persona; bound tenant must match). */
+  scope?: OrganizationCadenceScope;
   tiers?: OrganizationTier[];
   apply: boolean;
   now?: Date;
@@ -102,16 +208,29 @@ export interface OrganizationOperationTickRunOptions {
   env?: Record<string, string | undefined>;
 }
 
-/** Governed sweep used by the scheduled op: sovereign-only, audited. */
+/**
+ * Governed sweep: sovereign-only across tenants, or scoped to one organization
+ * (`options.scope`) inside an execution scope bound to its tenant. Audited.
+ */
 export async function runOrganizationOperationTick(
   options: OrganizationOperationTickRunOptions,
   deps: Pick<TickDeps, 'executeOperation'> & Partial<TickDeps>
 ): Promise<TickReport> {
-  const persona = assertSovereignCadencePersona('operation tick', options.env);
-  const tiers = options.tiers ?? ['confidential', 'public'];
+  const auth = authorizeOrganizationCadence('operation tick', options.scope, options.env);
+  const scoped = options.scope;
+  const tiers = scoped ? [scoped.tier] : (options.tiers ?? ['confidential', 'public']);
+  const list = deps.listOrganizations;
   const tickDeps: TickDeps = {
-    listOrganizations: (scope) => listOrganizationScopes(scope, options.rootDir),
     ...deps,
+    listOrganizations: scoped
+      ? (query) =>
+          cadenceOrganizations(
+            query.tier,
+            scoped,
+            options.rootDir,
+            list ? () => list(query) : undefined
+          )
+      : (list ?? ((query) => listOrganizationScopes(query, options.rootDir))),
   };
   const result: TickReport = {
     mode: options.apply ? 'apply' : 'dry_run',
@@ -141,12 +260,14 @@ export async function runOrganizationOperationTick(
     result.run_count += report.run_count;
   }
   auditChain.record({
-    agentId: persona,
+    agentId: auth.agentId,
     action: 'organization.operation_tick',
-    operation: 'tick:cross_tenant',
+    operation: `tick:${auth.mode}`,
     result: result.failures.length ? 'failed' : 'completed',
+    ...(auth.tenantSlug ? { tenantSlug: auth.tenantSlug } : {}),
     metadata: {
       tiers,
+      ...(scoped ? { organization_id: scoped.organizationId } : {}),
       mode: result.mode,
       organizations: result.organizations,
       due_count: result.due_count,
