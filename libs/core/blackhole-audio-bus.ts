@@ -96,6 +96,25 @@ export class BlackHoleAudioBus implements AudioBus {
     this.sessionId = opts.session_id ?? `blackhole-${process.pid}-${Date.now()}`;
   }
 
+  async selectDevices(selection: { input?: string; output?: string }): Promise<void> {
+    const inventory = this.opts.inventory_bridge ?? createCoreAudioDeviceInventoryBridge();
+    const { devices } = await inventory.probe();
+    const resolve = (name: string, direction: 'input' | 'output') => {
+      const matches = devices.filter(
+        (device) =>
+          (device.display_name === name || device.uid === name) &&
+          (device.direction === direction || device.direction === 'duplex')
+      );
+      if (matches.length !== 1)
+        throw new Error(`Audio ${direction} selection is missing or ambiguous: ${name}`);
+      return matches[0].uid;
+    };
+    const input = selection.input ? resolve(selection.input, 'input') : undefined;
+    const output = selection.output ? resolve(selection.output, 'output') : undefined;
+    if (input) this.opts.input_device_uid = input;
+    if (output) this.opts.output_device_uid = output;
+  }
+
   async probe(): Promise<AudioBusProbe> {
     if (process.platform !== 'darwin') {
       return {

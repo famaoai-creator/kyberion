@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "backends": [
+    {
+      "backend_id": "ffmpeg-v4l2",
+      "platforms": ["linux"],
+      "priority": 100,
+      "requires_device_path": true,
+      "timeout_ms": 120000,
+      "command_args": [
+        "-y",
+        "-re",
+        "-i",
+        "{source}",
+        "-vf",
+        "format=yuv420p",
+        "-f",
+        "v4l2",
+        "{device}"
+      ],
+      "host_plan": {
+        "notes": ["Selected virtual camera device requires a writable v4l2 loopback node."],
+        "camera": [
+          "Provide a v4l2loopback device path or equivalent writable virtual camera node.",
+          "Pass the device path to the bridge and confirm it appears in inventory."
+        ]
+      }
+    }
+  ],
+  "$schema": "../schemas/virtual-camera-injection-backends.schema.json"
+}

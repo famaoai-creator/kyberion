@@ -11,6 +11,14 @@ interface SeamRoleEntry {
 }
 
 const SEAM_ROLES: Record<string, SeamRoleEntry> = {
+  'screen.capture-backend': {
+    declaration: 'libs/core/virtual/screen-capture-bridge.ts',
+    consumers: ['libs/core/virtual/screen-capture-bridge.ts'],
+  },
+  'virtual-device-inventory': {
+    declaration: 'libs/core/virtual/virtual-device-inventory-bridge.ts',
+    consumers: ['libs/core/virtual/virtual-device-inventory-bridge.ts'],
+  },
   'intent:param-extract': {
     declaration: 'libs/core/intent/intent-resolution.ts',
     consumers: ['libs/core/intent/intent-resolution.ts'],

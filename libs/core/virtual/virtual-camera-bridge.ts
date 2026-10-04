@@ -18,13 +18,14 @@ import type {
   VirtualDeviceInventory,
   VirtualDeviceInventoryBridge,
 } from './virtual-device-inventory-bridge.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 export const VIRTUAL_CAMERA_BRIDGE_ID = 'virtual-camera-bridge' as const;
 
-export type VirtualCameraBackendId = 'stub' | 'imagesnap' | 'ffmpeg' | 'libcamera-still';
+export type VirtualCameraBackendId =
+  'stub' | 'imagesnap' | 'ffmpeg' | 'libcamera-still' | (string & {});
 // `swift-avfoundation` is macOS-native AVFoundation capture via the helper script.
-export type VirtualCameraBackendIdExtended = VirtualCameraBackendId | 'swift-avfoundation';
+export type VirtualCameraBackendIdExtended = VirtualCameraBackendId;
 
 export interface VirtualCameraCaptureBackendProbeInput {
   imagesnap_bin?: string;
@@ -41,6 +42,10 @@ export interface VirtualCameraCaptureBackend {
   readonly auto_priority: number;
   /** Platforms this backend may auto-select on. Empty = never auto. */
   readonly platforms: ReadonlyArray<NodeJS.Platform | '*'>;
+  /** Explicitly opt into the last-resort auto-selection pass. */
+  readonly auto_fallback?: boolean;
+  /** Backend-specific auto-selection constraints; false skips the first pass. */
+  should_auto_select?(input: { platform: NodeJS.Platform; device_preference?: string }): boolean;
   probe(input: VirtualCameraCaptureBackendProbeInput): {
     available: boolean;
     reason?: string;
@@ -64,17 +69,23 @@ const virtualCameraCaptureDisposers = new Map<string, () => void>();
 let virtualCameraCaptureBuiltinsRegistered = false;
 
 export function registerVirtualCameraCaptureBackend(
-  backend: VirtualCameraCaptureBackend
+  backend: VirtualCameraCaptureBackend,
+  metadata: SeamProviderMetadata = {
+    provenance: 'plugin',
+    source: 'virtual-camera-capture-extension',
+  }
 ): () => void {
   const id = String(backend.backend_id || '').trim();
   if (!id) throw new Error('VirtualCameraCaptureBackend.backend_id is required');
-  virtualCameraCaptureDisposers.get(id)?.();
-  const disposer = virtualCameraCaptureSeam.register(id, backend, {
-    provenance: 'builtin',
-    source: 'virtual-camera-bridge',
-  });
-  virtualCameraCaptureDisposers.set(id, disposer);
-  return disposer;
+  const disposeFromSeam = virtualCameraCaptureSeam.register(id, backend, metadata);
+  const dispose = () => {
+    disposeFromSeam();
+    if (virtualCameraCaptureDisposers.get(id) === dispose) {
+      virtualCameraCaptureDisposers.delete(id);
+    }
+  };
+  virtualCameraCaptureDisposers.set(id, dispose);
+  return dispose;
 }
 
 export function listVirtualCameraCaptureBackends(): VirtualCameraCaptureBackend[] {
@@ -158,12 +169,15 @@ export interface VirtualCameraBridge {
 
 const DEFAULT_LIBCAMERA_STILL_BIN = 'libcamera-still';
 
-interface CameraCaptureAdapter {
+export interface CameraCaptureAdapter {
+  platforms: readonly NodeJS.Platform[];
   inputFormat: string;
   deviceArg(preference?: string): string;
+  inputArgs?(preference?: string): string[];
 }
 
 class WindowsCameraCaptureAdapter implements CameraCaptureAdapter {
+  platforms = ['win32'] as const;
   inputFormat = 'dshow';
   deviceArg(preference?: string): string {
     return `video="${(preference || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
@@ -171,14 +185,46 @@ class WindowsCameraCaptureAdapter implements CameraCaptureAdapter {
 }
 
 class LinuxCameraCaptureAdapter implements CameraCaptureAdapter {
+  platforms = ['linux'] as const;
   inputFormat = 'video4linux2';
   deviceArg(preference?: string): string {
     return preference?.startsWith('/dev/') ? preference : '/dev/video0';
   }
 }
 
+class DarwinCameraCaptureAdapter implements CameraCaptureAdapter {
+  platforms = ['darwin'] as const;
+  inputFormat = 'avfoundation';
+  deviceArg(preference?: string): string {
+    return `${preference || '0'}:none`;
+  }
+  inputArgs(preference?: string): string[] {
+    return ['-framerate', '30', '-f', this.inputFormat, '-i', this.deviceArg(preference)];
+  }
+}
+
+const cameraCaptureAdapters: CameraCaptureAdapter[] = [
+  new DarwinCameraCaptureAdapter(),
+  new LinuxCameraCaptureAdapter(),
+  new WindowsCameraCaptureAdapter(),
+];
+
+export function registerCameraCaptureAdapter(adapter: CameraCaptureAdapter): () => void {
+  cameraCaptureAdapters.unshift(adapter);
+  return () => {
+    const index = cameraCaptureAdapters.indexOf(adapter);
+    if (index >= 0) cameraCaptureAdapters.splice(index, 1);
+  };
+}
+
+export function listCameraCaptureAdapters(): CameraCaptureAdapter[] {
+  return [...cameraCaptureAdapters];
+}
+
 function resolveCameraCaptureAdapter(platform: NodeJS.Platform): CameraCaptureAdapter {
-  return platform === 'win32' ? new WindowsCameraCaptureAdapter() : new LinuxCameraCaptureAdapter();
+  const adapter = cameraCaptureAdapters.find((entry) => entry.platforms.includes(platform));
+  if (!adapter) throw new Error(`Unsupported camera input platform: ${platform}`);
+  return adapter;
 }
 const DEFAULT_OUTPUT_DIR = path.join('active', 'shared', 'tmp', 'camera-captures');
 const PLACEHOLDER_PNG = Buffer.from(
@@ -204,15 +250,21 @@ function pickCameraPreference(
   const normalizedPreference = normalizeDevicePreference(preference);
   if (!normalizedPreference) return candidates[0]?.name;
   const lowerPreference = normalizedPreference.toLowerCase();
-  const exactMatch = candidates.find(
-    (candidate) => candidate.name.trim().toLowerCase() === lowerPreference
+  const exactMatches = candidates.filter(
+    (candidate) =>
+      candidate.name.trim().toLowerCase() === lowerPreference ||
+      candidate.device_id === normalizedPreference ||
+      `${candidate.provider_id}:${candidate.device_id}` === normalizedPreference
   );
-  if (exactMatch) return exactMatch.name;
-  const containsMatch = candidates.find((candidate) =>
+  if (exactMatches.length > 1) throw new Error(`Ambiguous camera device: ${normalizedPreference}`);
+  if (exactMatches[0]) return exactMatches[0].name;
+  const containsMatches = candidates.filter((candidate) =>
     candidate.name.trim().toLowerCase().includes(lowerPreference)
   );
-  if (containsMatch) return containsMatch.name;
-  return candidates[0]?.name;
+  if (containsMatches.length > 1)
+    throw new Error(`Ambiguous camera device: ${normalizedPreference}`);
+  if (containsMatches[0]) return containsMatches[0].name;
+  throw new Error(`Camera device not found: ${normalizedPreference}`);
 }
 
 function isAvailableCommand(command: string, args: string[]): boolean {
@@ -228,124 +280,149 @@ function ensureBuiltinVirtualCameraCaptureBackends(): void {
   if (virtualCameraCaptureBuiltinsRegistered && listVirtualCameraCaptureBackends().length > 0) {
     return;
   }
-  registerVirtualCameraCaptureBackend({
-    backend_id: 'imagesnap',
-    auto_priority: 10,
-    platforms: ['darwin'],
-    probe(input) {
-      const bin = input.imagesnap_bin ?? resolveImagesnapBin();
-      return isAvailableCommand(bin, ['-h'])
-        ? { available: true }
-        : { available: false, reason: `${bin} not available` };
+  registerVirtualCameraCaptureBackend(
+    {
+      backend_id: 'imagesnap',
+      auto_priority: 10,
+      platforms: ['darwin'],
+      probe(input) {
+        const bin = input.imagesnap_bin ?? resolveImagesnapBin();
+        return isAvailableCommand(bin, ['-h'])
+          ? { available: true }
+          : { available: false, reason: `${bin} not available` };
+      },
+      capture(input) {
+        const bin = input.imagesnap_bin ?? resolveImagesnapBin();
+        const args = input.selected_camera
+          ? ['-d', input.selected_camera, input.save_path]
+          : input.device_preference
+            ? ['-d', input.device_preference, input.save_path]
+            : [input.save_path];
+        safeExec(bin, args, { env: process.env });
+      },
     },
-    capture(input) {
-      const bin = input.imagesnap_bin ?? resolveImagesnapBin();
-      const args = input.selected_camera
-        ? ['-d', input.selected_camera, input.save_path]
-        : input.device_preference
-          ? ['-d', input.device_preference, input.save_path]
-          : [input.save_path];
-      safeExec(bin, args, { env: process.env });
-    },
-  });
-  registerVirtualCameraCaptureBackend({
-    backend_id: 'swift-avfoundation',
-    auto_priority: 20,
-    platforms: ['darwin'],
-    probe(input) {
-      const bin = input.swift_bin ?? 'swift';
-      return isAvailableCommand(bin, ['--version'])
-        ? { available: true }
-        : { available: false, reason: `${bin} not available` };
-    },
-    capture(input) {
-      const bin = input.swift_bin ?? 'swift';
-      const script = assertSafeRepositoryPath(
-        pathResolver.rootResolve('libs/core/virtual-camera-capture.swift')
-      );
-      const tempCapture = assertSafeRepositoryPath(
-        path.join(
-          path.dirname(input.save_path),
-          `${path.basename(input.save_path, path.extname(input.save_path))}-${Date.now()}.jpg`
-        ),
-        { allowMissingLeaf: true }
-      );
-      const deviceArg = input.selected_camera ?? input.device_preference;
-      const args = [script, '--output', tempCapture];
-      if (deviceArg) args.push('--device', deviceArg);
-      try {
-        safeExec(bin, args, { env: process.env, timeoutMs: 120000 });
-        if (/\.png$/i.test(input.save_path)) {
-          safeExec('sips', ['-s', 'format', 'png', tempCapture, '--out', input.save_path], {
-            env: process.env,
-          });
-        } else if (tempCapture !== input.save_path) {
-          safeExec('cp', [tempCapture, input.save_path], { env: process.env });
+    { provenance: 'builtin', source: 'virtual-camera-bridge' }
+  );
+  registerVirtualCameraCaptureBackend(
+    {
+      backend_id: 'swift-avfoundation',
+      auto_priority: 20,
+      platforms: ['darwin'],
+      probe(input) {
+        const bin = input.swift_bin ?? 'swift';
+        return isAvailableCommand(bin, ['--version'])
+          ? { available: true }
+          : { available: false, reason: `${bin} not available` };
+      },
+      capture(input) {
+        const bin = input.swift_bin ?? 'swift';
+        const script = assertSafeRepositoryPath(
+          pathResolver.rootResolve('libs/core/virtual-camera-capture.swift')
+        );
+        const tempCapture = assertSafeRepositoryPath(
+          path.join(
+            path.dirname(input.save_path),
+            `${path.basename(input.save_path, path.extname(input.save_path))}-${Date.now()}.jpg`
+          ),
+          { allowMissingLeaf: true }
+        );
+        const deviceArg = input.selected_camera ?? input.device_preference;
+        const args = [script, '--output', tempCapture];
+        if (deviceArg) args.push('--device', deviceArg);
+        try {
+          safeExec(bin, args, { env: process.env, timeoutMs: 120000 });
+          if (/\.png$/i.test(input.save_path)) {
+            safeExec('sips', ['-s', 'format', 'png', tempCapture, '--out', input.save_path], {
+              env: process.env,
+            });
+          } else if (tempCapture !== input.save_path) {
+            safeExec('cp', [tempCapture, input.save_path], { env: process.env });
+          }
+        } finally {
+          safeRmSync(tempCapture, { force: true });
         }
-      } finally {
-        safeRmSync(tempCapture, { force: true });
-      }
+      },
     },
-  });
-  registerVirtualCameraCaptureBackend({
-    backend_id: 'ffmpeg',
-    auto_priority: 30,
-    platforms: ['darwin', 'linux', 'win32'],
-    probe(input) {
-      const bin = input.ffmpeg_bin ?? resolveFfmpegBin();
-      return isAvailableCommand(bin, ['-version'])
-        ? { available: true }
-        : { available: false, reason: `${bin} not available` };
-    },
-    capture(input) {
-      const bin = input.ffmpeg_bin ?? resolveFfmpegBin();
-      const adapter = resolveCameraCaptureAdapter(process.platform);
-      const device = adapter.deviceArg(input.selected_camera || input.device_preference);
-      safeExec(
-        bin,
-        [
-          '-y',
-          '-hide_banner',
-          '-loglevel',
-          'error',
+    { provenance: 'builtin', source: 'virtual-camera-bridge' }
+  );
+  registerVirtualCameraCaptureBackend(
+    {
+      backend_id: 'ffmpeg',
+      auto_priority: 30,
+      platforms: ['darwin', 'linux', 'win32'],
+      auto_fallback: true,
+      should_auto_select({ platform, device_preference }) {
+        return !(
+          (platform === 'linux' || platform === 'win32') &&
+          !(device_preference || safeExistsSync('/dev/video0'))
+        );
+      },
+      probe(input) {
+        const bin = input.ffmpeg_bin ?? resolveFfmpegBin();
+        return isAvailableCommand(bin, ['-version'])
+          ? { available: true }
+          : { available: false, reason: `${bin} not available` };
+      },
+      capture(input) {
+        const bin = input.ffmpeg_bin ?? resolveFfmpegBin();
+        const adapter = resolveCameraCaptureAdapter(process.platform);
+        const preference = input.selected_camera || input.device_preference;
+        const inputArgs = adapter.inputArgs?.(preference) ?? [
           '-f',
           adapter.inputFormat,
           '-i',
-          device,
-          '-frames:v',
-          '1',
-          input.save_path,
-        ],
-        { env: process.env }
-      );
+          adapter.deviceArg(preference),
+        ];
+        safeExec(
+          bin,
+          [
+            '-y',
+            '-hide_banner',
+            '-loglevel',
+            'error',
+            ...inputArgs,
+            '-frames:v',
+            '1',
+            input.save_path,
+          ],
+          { env: process.env, timeoutMs: 120000 }
+        );
+      },
     },
-  });
-  registerVirtualCameraCaptureBackend({
-    backend_id: 'libcamera-still',
-    auto_priority: 25,
-    platforms: ['linux'],
-    probe(input) {
-      const bin = input.libcamera_still_bin ?? DEFAULT_LIBCAMERA_STILL_BIN;
-      return isAvailableCommand(bin, ['--help'])
-        ? { available: true }
-        : { available: false, reason: `${bin} not available` };
+    { provenance: 'builtin', source: 'virtual-camera-bridge' }
+  );
+  registerVirtualCameraCaptureBackend(
+    {
+      backend_id: 'libcamera-still',
+      auto_priority: 25,
+      platforms: ['linux'],
+      probe(input) {
+        const bin = input.libcamera_still_bin ?? DEFAULT_LIBCAMERA_STILL_BIN;
+        return isAvailableCommand(bin, ['--help'])
+          ? { available: true }
+          : { available: false, reason: `${bin} not available` };
+      },
+      capture(input) {
+        const bin = input.libcamera_still_bin ?? DEFAULT_LIBCAMERA_STILL_BIN;
+        safeExec(bin, ['-n', '-o', input.save_path], { env: process.env });
+      },
     },
-    capture(input) {
-      const bin = input.libcamera_still_bin ?? DEFAULT_LIBCAMERA_STILL_BIN;
-      safeExec(bin, ['-n', '-o', input.save_path], { env: process.env });
+    { provenance: 'builtin', source: 'virtual-camera-bridge' }
+  );
+  registerVirtualCameraCaptureBackend(
+    {
+      backend_id: 'stub',
+      auto_priority: 1000,
+      platforms: ['*'],
+      probe() {
+        return { available: true, reason: 'no real camera backend detected; using stub' };
+      },
+      capture(input) {
+        safeWriteFile(input.save_path, PLACEHOLDER_PNG);
+      },
     },
-  });
-  registerVirtualCameraCaptureBackend({
-    backend_id: 'stub',
-    auto_priority: 1000,
-    platforms: ['*'],
-    probe() {
-      return { available: true, reason: 'no real camera backend detected; using stub' };
-    },
-    capture(input) {
-      safeWriteFile(input.save_path, PLACEHOLDER_PNG);
-    },
-  });
+    { provenance: 'builtin', source: 'virtual-camera-bridge' }
+  );
   virtualCameraCaptureBuiltinsRegistered = true;
 }
 
@@ -391,9 +468,10 @@ function chooseBackend(input: {
 
   for (const backend of platformBackends) {
     if (
-      backend.backend_id === 'ffmpeg' &&
-      (process.platform === 'linux' || process.platform === 'win32') &&
-      !(input.device_preference || safeExistsSync('/dev/video0'))
+      backend.should_auto_select?.({
+        platform: process.platform,
+        device_preference: input.device_preference,
+      }) === false
     ) {
       continue;
     }
@@ -401,11 +479,11 @@ function chooseBackend(input: {
     if (probe.available) return { backend: backend.backend_id, available: true };
   }
 
-  // Second pass: allow ffmpeg even without an explicit device hint.
+  // Second pass: probe backends that explicitly opt into last-resort auto-selection.
   for (const backend of platformBackends) {
-    if (backend.backend_id !== 'ffmpeg') continue;
+    if (backend.auto_fallback !== true) continue;
     const probe = backend.probe(probeInput);
-    if (probe.available) return { backend: 'ffmpeg', available: true };
+    if (probe.available) return { backend: backend.backend_id, available: true };
   }
 
   return {

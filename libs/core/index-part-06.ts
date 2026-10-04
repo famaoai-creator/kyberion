@@ -77,6 +77,7 @@ export type {
 export {
   SCREEN_CAPTURE_BRIDGE_ID,
   createScreenCaptureBridge,
+  registerScreenCaptureBackend,
 } from './virtual/screen-capture-bridge.js';
 
 export type {
@@ -84,6 +85,8 @@ export type {
   ScreenCaptureBridgeOptions,
   ScreenCaptureBridgeProbe,
   ScreenCaptureBackendId,
+  ScreenCaptureBackendAdapter,
+  ScreenCaptureBackendInput,
   ScreenCaptureRequest,
   ScreenCaptureStreamRequest,
   ScreenCaptureResult,
@@ -127,6 +130,7 @@ export type {
 export {
   VIRTUAL_AUDIO_OUTPUT_PLAYBACK_BRIDGE_ID,
   createVirtualAudioOutputPlaybackBridge,
+  registerAudioPlaybackBackend,
 } from './virtual/virtual-audio-output-playback-bridge.js';
 
 export type {
@@ -134,11 +138,14 @@ export type {
   VirtualAudioOutputPlaybackBridgeOptions,
   VirtualAudioOutputPlaybackProbe,
   VirtualAudioOutputPlaybackTargetResult,
+  AudioPlaybackBackendAdapter,
+  AudioOutputPlaybackBackendRequest,
 } from './virtual/virtual-audio-output-playback-bridge.js';
 
 export {
   VIRTUAL_AUDIO_INPUT_RECORDING_BRIDGE_ID,
   createVirtualAudioInputRecordingBridge,
+  registerAudioInputRecordingBackend,
 } from './virtual/virtual-audio-input-recording-bridge.js';
 
 export type {
@@ -147,11 +154,13 @@ export type {
   VirtualAudioInputRecordingProbe,
   VirtualAudioInputRecordingRequest,
   VirtualAudioInputRecordingTargetResult,
+  AudioInputRecordingBackendAdapter,
 } from './virtual/virtual-audio-input-recording-bridge.js';
 
 export {
   VIRTUAL_DEVICE_INVENTORY_BRIDGE_ID,
   createVirtualDeviceInventoryBridge,
+  registerVirtualDeviceInventoryProvider,
 } from './virtual/virtual-device-inventory-bridge.js';
 
 export type {
@@ -159,6 +168,7 @@ export type {
   VirtualDeviceInventoryBridge,
   VirtualDeviceInventoryOptions,
   VirtualDeviceInventoryProbe,
+  VirtualDeviceInventoryProvider,
   VirtualDeviceKind,
   VirtualDeviceRecord,
 } from './virtual/virtual-device-inventory-bridge.js';
@@ -180,6 +190,8 @@ export type {
 export {
   VIRTUAL_CAMERA_BRIDGE_ID,
   createVirtualCameraBridge,
+  listCameraCaptureAdapters,
+  registerCameraCaptureAdapter,
 } from './virtual/virtual-camera-bridge.js';
 
 export type {
@@ -190,6 +202,7 @@ export type {
   VirtualCameraCaptureRequest,
   VirtualCameraCaptureResult,
   VirtualCameraCaptureStreamRequest,
+  CameraCaptureAdapter,
 } from './virtual/virtual-camera-bridge.js';
 
 export {
