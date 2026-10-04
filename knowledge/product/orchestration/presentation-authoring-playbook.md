@@ -181,6 +181,28 @@ If a doc-style brief (with `payload.sections`) produces a deck of preset
 titles and empty bodies, the canonical path was taken by mistake — switch to
 `generic-deck`.
 
+## Japanese Text And Speaker Notes
+
+Lessons carried over from the narrated-video rebuild (see the timeline video authoring playbook in this directory):
+
+- **Titles break on phrases.** Japanese slide titles are wrapped with explicit,
+  balanced breaks at phrase boundaries (`balanceJaHeading`), and the fit
+  estimator applies kinsoku. A title never ends a line on 「ご」 or starts one
+  with 、。」 or small kana. Keep titles to one claim. If a title only fits by
+  shrinking a lot, shorten the copy instead.
+- **Say it in the notes, show it on the slide.** Put the spoken script in
+  `speaker_notes`, either on brief `payload.sections[]` or on storyline slides.
+  It is written as real PowerPoint notes (presenter view). The slide carries the
+  short claim, the number and the evidence, not the narration.
+- **No silent drops.** WBS, timeline, org-chart, swimlane and KPI components
+  have a fixed number of rows. Items past the cap show up as
+  `structured.<kind>` overflow entries (`droppedItems`) in the slide's
+  `layoutFit`, so preflight fails instead of the deck quietly losing content.
+  Split the data across slides.
+- **Look at the render.** Rasterize before delivery
+  (`soffice --headless --convert-to pdf`, then `pdftoppm -png`) and check the
+  pages. Measurement catches overflow, but only a look catches a bad break.
+
 ## Outputs
 
 Minimum output:

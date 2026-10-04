@@ -1,7 +1,12 @@
 import { logger } from '@agent/core/core';
 import { clamp } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
-import { splitLinesBalanced } from '@agent/core/media/native-pptx-engine/text-metrics';
+import {
+  balanceJaHeading,
+  isFullwidthChar,
+  measureTextWidthPt,
+  splitLinesBalanced,
+} from '@agent/core/media/native-pptx-engine/text-metrics';
 import { buildStructuredSlideBody } from './media-structured-pptx.js';
 import { ensureReadableOn, validateThemeContrast } from '@agent/core/design-qa';
 import { classifyRenderSemantic } from './media-document-helpers.js';
@@ -160,7 +165,12 @@ function buildPptxSlideFromPattern(
    * metadata so an overflowing deck is visible to the caller instead of
    * shipping with text running off the frame.
    */
-  const overflows: Array<{ zone: string; fillRatio: number; overflowAtParagraph?: number }> = [];
+  const overflows: Array<{
+    zone: string;
+    fillRatio: number;
+    overflowAtParagraph?: number;
+    droppedItems?: number;
+  }> = [];
   const shrunkZones: Array<{ zone: string; fontSize: number; designedFontSize: number }> = [];
   const recordFit = (zone: string, fitted: FittedTextBox): FittedTextBox => {
     if (fitted.fit.strategy === 'shrunk') {
@@ -270,7 +280,11 @@ function buildPptxSlideFromPattern(
         )
       );
       titleEl.style = { ...(titleEl.style || {}), fontSize: titleFit.fontSize };
-      titleEl.text = resolveSlideTemplate(titleEl.text, data, data.title);
+      titleEl.text = balanceTitleText(
+        resolveSlideTemplate(titleEl.text, data, data.title),
+        hro.title_w,
+        titleFit.fontSize
+      );
       elements.push(titleEl);
     }
 
@@ -444,7 +458,12 @@ function buildPptxSlideFromPattern(
           w: titleW,
           h: chr.header_h,
         },
-        text: resolveSlideTemplate(data.title, data, data.title),
+        text: balanceTitleText(
+          resolveSlideTemplate(data.title, data, data.title),
+          titleW,
+          titleFit.fontSize,
+          [0, 0, 0, 0.06]
+        ),
         style: {
           fontSize: titleFit.fontSize,
           bold: true,
@@ -496,6 +515,14 @@ function buildPptxSlideFromPattern(
       rootDir,
       spacing: theme?.spacing || theme?.theme?.spacing,
       typography: theme?.typography || theme?.theme?.typography,
+      // Fixed-row components cap their items; dropped items count as overflow.
+      reportTruncation: (kind: string, shown: number, total: number) => {
+        overflows.push({
+          zone: `structured.${kind}`,
+          fillRatio: Number((total / shown).toFixed(3)),
+          droppedItems: total - shown,
+        });
+      },
     });
     if (structuredElements) {
       elements.push(...structuredElements);
@@ -1177,6 +1204,11 @@ function buildPptxSlideFromPattern(
     bgXml: isHero ? undefined : data.bgXml || pageLayout?.bgXml,
     transitionXml: data.transitionXml || pageLayout?.transitionXml,
     notesXml: data.notesXml,
+    // Storyline speaker notes become real PowerPoint notes (presenter view).
+    ...(typeof (data.speaker_notes ?? data.notes) === 'string' &&
+    (data.speaker_notes ?? data.notes).trim()
+      ? { notes: String(data.speaker_notes ?? data.notes) }
+      : {}),
     extensions: data.extensions || pageLayout?.extensions,
     metadata: {
       pageLayoutId,
@@ -1226,3 +1258,19 @@ export {
   takeLinesThatFit,
   buildPptxSlideFromPattern,
 };
+
+/**
+ * Break a Japanese title on phrase boundaries with balanced lines instead of
+ * letting the renderer wrap at an arbitrary character (a lone 「ん」 on line 2).
+ * Latin-only titles are left to PowerPoint's own wrapping.
+ */
+function balanceTitleText(
+  text: string,
+  widthIn: number,
+  fontSizePt: number,
+  marginIn: [number, number, number, number] = [0, 0, 0, 0]
+): string {
+  if (!Array.from(String(text || '')).some(isFullwidthChar)) return text;
+  const widthPt = Math.max(0, widthIn - marginIn[1] - marginIn[3]) * 72;
+  return balanceJaHeading(text, widthPt, (value) => measureTextWidthPt(value, fontSizePt));
+}
