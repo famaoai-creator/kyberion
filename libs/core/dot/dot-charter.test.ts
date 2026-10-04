@@ -1,9 +1,31 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// Tier-guard classifies repo-relative paths only, so a fixture root under
+// active/shared/tmp never trips it. Emulate its tenant rule for fixture
+// charters: a read under knowledge/confidential/<slug>/ is denied unless the
+// caller runs in that tenant's bound context (as the real guard does in the
+// daemon, whose own role holds no tenant binding).
+vi.mock('../secure-io.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../secure-io.js')>();
+  const { resolveIdentityContext } = await import('../authority.js');
+  return {
+    ...actual,
+    safeReadFile: ((filePath: string, options?: unknown) => {
+      const match = String(filePath).match(/knowledge\/confidential\/([^/]+)\/dots\//);
+      if (match && resolveIdentityContext().tenantSlug !== match[1]) {
+        throw new Error(`[TIER_GUARD] read of ${filePath} outside tenant ${match[1]}`);
+      }
+      return (actual.safeReadFile as (p: string, o?: unknown) => unknown)(filePath, options);
+    }) as typeof actual.safeReadFile,
+  };
+});
 
 import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '../secure-io.js';
 import {
   listDotCharterPaths,
+  listDotCharterSources,
   dotGoalRefLabel,
+  type DotCharterLoadError,
   listDotCharters,
   loadDotCharter,
   validateDotCharter,
@@ -45,6 +67,87 @@ function writeCharter(root: string, name: string, value: unknown): string {
 
 afterEach(() => {
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
+});
+
+function seedTenant(slug: string): void {
+  const dir = `${TEST_ROOT}/knowledge/personal/tenants`;
+  safeMkdir(dir, { recursive: true });
+  safeWriteFile(
+    `${dir}/${slug}.json`,
+    JSON.stringify({
+      tenant_slug: slug,
+      display_name: `Tenant ${slug}`,
+      status: 'active',
+      assigned_role: 'owner',
+    })
+  );
+}
+
+function writeTenantCharter(slug: string, name: string, value: unknown): string {
+  const dir = `${TEST_ROOT}/knowledge/confidential/${slug}/dots`;
+  safeMkdir(dir, { recursive: true });
+  const filePath = `${dir}/${name}`;
+  safeWriteFile(filePath, JSON.stringify(value, null, 2) + '\n');
+  return filePath;
+}
+
+const tenantCharter = (slug: string, dotId: string, scope?: DotCharter['scope']): DotCharter => ({
+  ...VALID_CHARTER,
+  dot_id: dotId,
+  scope: scope ?? { tier: 'confidential', tenant_slug: slug },
+  runtime: { heartbeat_id: `dot-${dotId}` },
+});
+
+describe('tenant dot charters', () => {
+  it('lists and loads a tenant charter inside its tenant context', () => {
+    seedTenant('acme');
+    const filePath = writeTenantCharter('acme', 'acme-dot.json', tenantCharter('acme', 'acme-dot'));
+    expect(listDotCharterSources(TEST_ROOT)).toEqual([{ path: filePath, tenant_slug: 'acme' }]);
+    const errors: DotCharterLoadError[] = [];
+    const active = listDotCharters(TEST_ROOT, { status: 'active', errors });
+    expect(errors).toEqual([]);
+    expect(active.map((entry) => entry.charter.dot_id)).toEqual(['acme-dot']);
+    // The emulated guard really denies an unbound read of the same file.
+    expect(() => loadDotCharter(filePath)).toThrow(/TIER_GUARD/);
+  });
+
+  it('rejects a tenant charter that claims another tenant or a lower tier', () => {
+    seedTenant('acme');
+    seedTenant('globex');
+    writeTenantCharter('acme', 'spoof.json', tenantCharter('globex', 'spoof'));
+    writeTenantCharter(
+      'acme',
+      'public.json',
+      tenantCharter('acme', 'public-dot', { tier: 'public', tenant_slug: 'acme' })
+    );
+    writeTenantCharter(
+      'acme',
+      'untenanted.json',
+      tenantCharter('acme', 'bare', { tier: 'confidential' })
+    );
+    writeTenantCharter('globex', 'ok.json', tenantCharter('globex', 'globex-dot'));
+    const errors: DotCharterLoadError[] = [];
+    const loaded = listDotCharters(TEST_ROOT, { errors });
+    expect(loaded.map((entry) => entry.charter.dot_id)).toEqual(['globex-dot']);
+    expect(errors.map((entry) => entry.path.split('/').pop()).sort()).toEqual([
+      'public.json',
+      'spoof.json',
+      'untenanted.json',
+    ]);
+    for (const entry of errors) expect(entry.error).toMatch(/not bound to its tenant directory/);
+    // Without an error sink the mismatch throws like any invalid charter.
+    expect(() => listDotCharters(TEST_ROOT)).toThrow(/not bound to its tenant directory/);
+  });
+
+  it('keeps a repo-level charter that declares its tenant (org dots live in dots/)', () => {
+    seedTenant('acme');
+    writeCharter(TEST_ROOT, 'org.json', tenantCharter('acme', 'org-dot'));
+    const errors: DotCharterLoadError[] = [];
+    expect(listDotCharters(TEST_ROOT, { errors }).map((e) => e.charter.dot_id)).toEqual([
+      'org-dot',
+    ]);
+    expect(errors).toEqual([]);
+  });
 });
 
 describe('dot charter', () => {
