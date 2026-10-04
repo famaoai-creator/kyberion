@@ -6,6 +6,19 @@
   "type": "object",
   "additionalProperties": false,
   "definitions": {
+    "cadenceCron": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cron"],
+      "properties": {
+        "cron": {
+          "type": "string",
+          "pattern": "^\\s*\\S+(\\s+\\S+){4}\\s*$",
+          "description": "Five-field cron; the cadence runs once per occurrence (the latest missed occurrence is caught up once)."
+        },
+        "timezone": { "type": "string", "minLength": 1 }
+      }
+    },
     "stateProbe": {
       "oneOf": [
         {
@@ -482,6 +495,31 @@
         "min_level": { "enum": ["L0", "L1", "L2", "L3", "L4"] }
       },
       "description": "Autonomy ladder bounds (L0 shadow .. L4 autonomous)."
+    },
+    "operations_cadence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tick_every_minutes": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 1440,
+          "description": "Minutes between organization operation ticks (default 15)."
+        },
+        "standup": { "$ref": "#/definitions/cadenceCron" },
+        "retro": { "$ref": "#/definitions/cadenceCron" }
+      },
+      "description": "Opt-in organization cadences (operation tick, standup, retro) the resident-dot supervisor runs for this charter's own organization scope. Requires scope.organization_id and authority.authority_role organization_operator (the role that may write the organization's state)."
+    }
+  },
+  "if": { "required": ["operations_cadence"] },
+  "then": {
+    "properties": {
+      "scope": { "type": "object", "required": ["tier", "organization_id"] },
+      "authority": {
+        "type": "object",
+        "properties": { "authority_role": { "type": "string", "const": "organization_operator" } }
+      }
     }
   }
 }

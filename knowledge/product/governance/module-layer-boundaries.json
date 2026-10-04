@@ -262,6 +262,10 @@
     },
     {
       "layer": "orchestration",
+      "pattern": "scripts/dot_org_cadence_step.ts"
+    },
+    {
+      "layer": "orchestration",
       "pattern": "scripts/check_seam_multiplicity.ts"
     },
     {
