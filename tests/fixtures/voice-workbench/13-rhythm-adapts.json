@@ -1,0 +1,80 @@
+{
+  "id": "rhythm-adapts",
+  "description": "After enough utterances, a slow-pacing user's rhythm stretches the EOT hold budget (CE-07): the trailing-けど turn commits later than the 1500ms default.",
+  "options": {
+    "interaction": {
+      "rhythm": {
+        "minSamples": 2
+      },
+      "intent": true
+    }
+  },
+  "drain_ms": 3500,
+  "timeline": [
+    {
+      "at_ms": 0,
+      "event": {
+        "type": "vad_start",
+        "rms": 3000
+      }
+    },
+    {
+      "at_ms": 400,
+      "event": {
+        "type": "stt_final",
+        "text": "今日はです"
+      }
+    },
+    {
+      "at_ms": 500,
+      "event": {
+        "type": "vad_silence"
+      }
+    },
+    {
+      "at_ms": 1500,
+      "event": {
+        "type": "vad_start",
+        "rms": 3000
+      }
+    },
+    {
+      "at_ms": 1900,
+      "event": {
+        "type": "stt_final",
+        "text": "明日もです"
+      }
+    },
+    {
+      "at_ms": 2000,
+      "event": {
+        "type": "vad_silence"
+      }
+    },
+    {
+      "at_ms": 6000,
+      "event": {
+        "type": "vad_start",
+        "rms": 3000
+      }
+    },
+    {
+      "at_ms": 6400,
+      "event": {
+        "type": "stt_final",
+        "text": "それはなんだけど"
+      }
+    },
+    {
+      "at_ms": 6500,
+      "event": {
+        "type": "vad_silence"
+      }
+    }
+  ],
+  "expect": {
+    "commits": ["今日はです", "明日もです", "それはなんだけど"],
+    "commit_intents": ["substantive", "substantive", "thinking_aloud"],
+    "min_eot_latency_ms": 2500
+  }
+}

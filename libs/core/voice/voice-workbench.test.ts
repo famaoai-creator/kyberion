@@ -18,6 +18,10 @@ const EXPECTED_STATUS: Record<string, 'pass' | 'skipped'> = {
   'requires-real-tts-skipped': 'skipped',
   'en-trailing-and-held': 'pass',
   'backchannel-resumes': 'pass',
+  'agent-backchannel': 'pass',
+  'hold-intent-commit': 'pass',
+  'correction-barge-in': 'pass',
+  'rhythm-adapts': 'pass',
 };
 
 describe('voice workbench fixtures', () => {
