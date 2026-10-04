@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { safeMkdir, safeRmSync } from '../secure-io.js';
+import { runInExecutionScope } from '../foundation/execution-scope.js';
 
 const mocks = vi.hoisted(() => ({
   listStates: vi.fn(),
@@ -34,10 +35,29 @@ vi.mock('../lock-utils.js', () => ({
 }));
 
 import {
+  assertScopedCadenceExecution,
   listOrganizationScopes,
   normalizeCadenceTenant,
   runOrganizationOperationTick,
 } from './organization-cadence.js';
+
+/** Run `fn` as organization_operator bound to `tenantSlug` / `organizationId`. */
+function asOperator<T>(
+  tenantSlug: string | undefined,
+  organizationId: string | undefined,
+  fn: () => T
+): T {
+  return runInExecutionScope(
+    {
+      tenantBound: tenantSlug !== undefined,
+      ...(tenantSlug ? { tenantSlug } : {}),
+      ...(organizationId ? { organizationId } : {}),
+      assumedRole: 'organization_operator',
+      assumedPersona: null,
+    },
+    fn
+  );
+}
 
 const operation = {
   operation_id: 'OP-1',
@@ -141,5 +161,92 @@ describe('runOrganizationOperationTick', () => {
     expect(mocks.saveState).toHaveBeenCalledWith(
       expect.not.objectContaining({ tenant_slug: expect.anything() })
     );
+  });
+});
+
+describe('scoped cadence mode', () => {
+  const scope = { tier: 'public' as const, tenantSlug: 'acme', organizationId: 'ORG-2' };
+
+  it('refuses outside a governed execution scope', () => {
+    expect(() => assertScopedCadenceExecution('operation tick', scope)).toThrow(
+      /governed execution scope/
+    );
+  });
+
+  it('refuses an execution scope bound to another tenant or organization', () => {
+    expect(() =>
+      asOperator('other', 'ORG-2', () => assertScopedCadenceExecution('operation tick', scope))
+    ).toThrow(/bound to tenant 'other'/);
+    expect(() =>
+      asOperator(undefined, undefined, () => assertScopedCadenceExecution('standup', scope))
+    ).toThrow(/bound to tenant '\(none\)'/);
+    expect(() =>
+      asOperator('acme', 'ORG-9', () => assertScopedCadenceExecution('retro', scope))
+    ).toThrow(/bound to organization 'ORG-9'/);
+  });
+
+  it('ticks only the scoped organization without the sovereign persona and audits tick:scoped', async () => {
+    const executeOperation = vi.fn().mockResolvedValue(undefined);
+    const report = await asOperator('acme', 'ORG-2', () =>
+      runOrganizationOperationTick(
+        { scope, apply: true, rootDir, env: { KYBERION_PERSONA: 'worker' } },
+        { executeOperation }
+      )
+    );
+    expect(report.organizations).toBe(1);
+    expect(executeOperation).toHaveBeenCalledTimes(1);
+    expect(executeOperation.mock.calls[0][0]).toMatchObject({
+      organizationId: 'ORG-2',
+      tenantSlug: 'acme',
+    });
+    expect(mocks.listStates).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantSlug: 'acme', organizationId: 'ORG-2' })
+    );
+    expect(mocks.audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentId: 'organization_operator',
+        operation: 'tick:scoped',
+        tenantSlug: 'acme',
+      })
+    );
+  });
+
+  it('never widens a scoped tick through an injected organization lister', async () => {
+    const executeOperation = vi.fn().mockResolvedValue(undefined);
+    const report = await asOperator('acme', undefined, () =>
+      runOrganizationOperationTick(
+        { scope, apply: false, rootDir },
+        {
+          executeOperation,
+          listOrganizations: () => [
+            { organizationId: 'ORG-2', tier: 'public', tenantSlug: 'acme' },
+            { organizationId: 'ORG-X', tier: 'public', tenantSlug: 'other' },
+          ],
+        }
+      )
+    );
+    expect(report.organizations).toBe(1);
+  });
+
+  it('refuses a scoped tick for a mismatched tenant before running anything', async () => {
+    const executeOperation = vi.fn();
+    await expect(
+      asOperator('other', undefined, () =>
+        runOrganizationOperationTick({ scope, apply: true, rootDir }, { executeOperation })
+      )
+    ).rejects.toThrow(/POLICY_VIOLATION/);
+    expect(executeOperation).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
+  });
+
+  it('keeps the unscoped tick sovereign-only', async () => {
+    await expect(
+      asOperator('acme', 'ORG-2', () =>
+        runOrganizationOperationTick(
+          { apply: false, rootDir, env: { KYBERION_PERSONA: 'worker' } },
+          { executeOperation: vi.fn() }
+        )
+      )
+    ).rejects.toThrow(/requires KYBERION_PERSONA=sovereign/);
   });
 });
