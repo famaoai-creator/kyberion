@@ -1,0 +1,6 @@
+---
+category: Added
+---
+
+- **Per-tenant organization cadences in the resident-dot sweep** — a dot charter scoped to an organization can opt in with `operations_cadence` (`tick_every_minutes`, `standup.cron`, `retro.cron`). The supervisor's new `dot-org-cadence` step runs that organization's operation tick, standup and weekly retro as `organization_operator` bound to its tenant, so the Chronos daemon no longer has to run as `KYBERION_PERSONA=sovereign` for single-tenant operation. Standup and retro run once per cron occurrence (at most one catch-up after downtime) and are skipped at the organization budget hard limit. The repo cadence pipelines (`pipelines/organization-{operation-tick,standup,retro}.json`) stay sovereign-only for cross-tenant use. `dots/org-operations.json` now enables the cadence (weekday 08:45 standup, Friday 17:00 retro, Asia/Tokyo) and sets `runtime.max_idle_wake_ms` to 4 days so the watchdog does not page it over weekends.
+- **Scoped cadence mode** — `runOrganizationOperationTick` / `runOrganizationStandup` / `runOrganizationRetro` accept `scope: { tier, tenantSlug, organizationId }`: no sovereign persona, but the bound execution tenant (and organization, when bound) must match, audited as `tick:scoped` / `standup:scoped` / `retro:scoped`. Unscoped calls keep the sovereign check.
