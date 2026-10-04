@@ -147,37 +147,48 @@ async function defaultExecutePipeline(
       };
 }
 
-/** Backend methods that reach a model; a call to any of them may have caused effects. */
-const MODEL_CALL_METHODS = [
-  'prompt',
-  'streamPrompt',
-  'promptWithImages',
-  'generateWithTools',
-  'delegateTask',
-  'delegateTaskHandle',
-] as const satisfies ReadonlyArray<keyof ReasoningBackend>;
+/**
+ * Backend members verified (reasoning-backend-contracts.ts) never to reach a
+ * model: identity, runtime notes, capability flags and session reset. Every
+ * other function member — including ones added to the contract later — is
+ * counted as a model call (fail closed: an unknown call may have had effects).
+ * `getNativeSubagentAdopter` is deliberately absent: the adopter it returns
+ * can run a model outside this observer.
+ */
+const NON_MODEL_MEMBERS = new Set<string>([
+  'name',
+  'supportsVision',
+  'getRuntimeInstructions',
+  'getRuntimeProviderName',
+  'requiresNativeSubagent',
+  'resetSession',
+] satisfies ReadonlyArray<keyof ReasoningBackend>);
 
 /**
- * Narrow wrapper so the step can tell whether the goal driver reached the
- * model at all: a throw before the first model call cannot have caused effects.
- * Only the model-call methods are overridden (each still runs with `this` bound
- * to the original backend); everything else is inherited from it unchanged.
+ * Observer so the step can tell whether the goal driver reached the model at
+ * all: a throw before the first model call cannot have caused effects. Every
+ * function member is wrapped to run with `this` bound to the original backend
+ * (never inherited through a prototype); any member outside
+ * {@link NON_MODEL_MEMBERS} marks the model as reached.
  */
 function observeBackendCalls<T extends object>(backend: T): { backend: T; called: () => boolean } {
   let called = false;
-  const observed = Object.create(backend) as T;
-  for (const method of MODEL_CALL_METHODS) {
-    const original = (backend as Record<string, unknown>)[method];
-    if (typeof original !== 'function') continue;
-    Object.defineProperty(observed, method, {
-      configurable: true,
-      enumerable: true,
-      value: (...args: unknown[]) => {
-        called = true;
-        return original.apply(backend, args);
-      },
-    });
-  }
+  const wrappers = new Map<PropertyKey, { original: unknown; wrapper: unknown }>();
+  const observed = new Proxy(backend, {
+    get(target, prop) {
+      const value = Reflect.get(target, prop, target) as unknown;
+      if (typeof value !== 'function') return value;
+      const cached = wrappers.get(prop);
+      if (cached?.original === value) return cached.wrapper;
+      const reachesModel = typeof prop !== 'string' || !NON_MODEL_MEMBERS.has(prop);
+      const wrapper = (...args: unknown[]) => {
+        if (reachesModel) called = true;
+        return (value as (...a: unknown[]) => unknown).apply(target, args);
+      };
+      wrappers.set(prop, { original: value, wrapper });
+      return wrapper;
+    },
+  });
   return { backend: observed, called: () => called };
 }
 
