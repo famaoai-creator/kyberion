@@ -63,6 +63,7 @@ import {
   collectDotProposals,
   dotProposalInstructions,
   parseDotProposalsFromText,
+  DOT_PROPOSALS_FENCE,
   DOT_PROPOSE_TOOL_NAME,
   MAX_DOT_PROPOSALS_PER_WAKE,
   type DotProposal,
@@ -138,6 +139,21 @@ export interface DotWakeLedgerEntry {
   reason?: string;
   turns_run?: number;
   tokens_used?: number;
+  /** The dot's own words (proposal block removed), so "why did it propose nothing?" is answerable. */
+  summary?: string;
+}
+
+/** Max characters of the dot's reply kept in the wake ledger. */
+export const DOT_WAKE_SUMMARY_MAX = 600;
+
+/** Reply text minus the fenced proposal block, whitespace-collapsed and bounded. */
+export function dotWakeSummary(text: string | undefined): string | undefined {
+  if (!text) return undefined;
+  const prose = text
+    .replace(new RegExp('```' + DOT_PROPOSALS_FENCE + '[\\s\\S]*?```', 'g'), ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return prose ? prose.slice(0, DOT_WAKE_SUMMARY_MAX) : undefined;
 }
 
 export interface DotTokenUsageEntry {
@@ -208,7 +224,12 @@ export function recordDotWakeOutcome(
   charter: DotCharter,
   trigger: DueDotTrigger | undefined,
   outcome: DotWakeOutcome,
-  deps: DotRuntimeDeps & { reason?: string; turns_run?: number; tokens_used?: number } = {}
+  deps: DotRuntimeDeps & {
+    reason?: string;
+    turns_run?: number;
+    tokens_used?: number;
+    summary?: string;
+  } = {}
 ): void {
   const now = deps.now?.() ?? new Date();
   const key = trigger?.key ?? `manual:${now.toISOString()}`;
@@ -229,6 +250,7 @@ export function recordDotWakeOutcome(
       ...(deps.reason ? { reason: deps.reason } : {}),
       ...(deps.turns_run !== undefined ? { turns_run: deps.turns_run } : {}),
       ...(deps.tokens_used !== undefined ? { tokens_used: deps.tokens_used } : {}),
+      ...(deps.summary ? { summary: deps.summary } : {}),
     } satisfies DotWakeLedgerEntry,
     deps
   );
@@ -848,6 +870,8 @@ export async function runDotWake(
           reason: `delegated-turn (backend lacks generateWithTools); proposals ${parsed.proposals.length}`,
           turns_run: 1,
           tokens_used: tokens,
+          // The wake ledger is a shared system-floor file: tenant prose stays out.
+          ...(current.scope.tenant_slug ? {} : { summary: dotWakeSummary(text) }),
         });
         return {
           dot_id: current.dot_id,
