@@ -1,0 +1,5 @@
+{
+  "$schema": "../schemas/ingest-document-parser-modules.schema.json",
+  "version": "1.0.0",
+  "parsers": []
+}

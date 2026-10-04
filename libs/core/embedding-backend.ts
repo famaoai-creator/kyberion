@@ -3,6 +3,8 @@ import { coreSeamCatalog, createSeam } from './seam.js';
 export interface EmbeddingBackend {
   name: string;
   dimensions?: number;
+  quality?: 'semantic' | 'approximate' | 'unknown';
+  qualityNote?: string;
   embed(text: string): Promise<Float32Array>;
   embedBatch(texts: string[]): Promise<Float32Array[]>;
 }
@@ -63,6 +65,8 @@ export function getEmbeddingBackend(): EmbeddingBackend | null {
   if (getRegisteredEnvText('KYBERION_DISABLE_EMBEDDINGS') === '1') return null;
   return {
     name: 'local-hash-embedding',
+    quality: 'approximate',
+    qualityNote: 'hash-bucket approximation; not real semantic embeddings',
     async embed(text: string): Promise<Float32Array> {
       return embedText(text);
     },

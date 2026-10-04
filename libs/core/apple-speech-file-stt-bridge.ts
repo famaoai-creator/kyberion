@@ -185,7 +185,10 @@ export function installAppleSpeechFileToTextBridgeIfAvailable(
     return false;
   }
   if (!isAppleSpeechFileTranscriptionSupported()) return false;
-  registerSpeechToTextBridge(createAppleSpeechFileToTextBridge());
+  registerSpeechToTextBridge(createAppleSpeechFileToTextBridge(), {
+    provenance: 'builtin',
+    source: 'apple-speech-file-stt-bridge',
+  });
   logger.info('[stt-bridge] installed AppleSpeechFileToTextBridge (SFSpeechRecognizer, on-device)');
   return true;
 }

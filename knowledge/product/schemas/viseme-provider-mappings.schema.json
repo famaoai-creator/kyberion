@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "viseme-provider-mappings.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "providers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "provider_id": { "type": "string", "minLength": 1 },
+          "visemes": {
+            "type": "object",
+            "minProperties": 1,
+            "propertyNames": { "pattern": "^(0|[1-9][0-9]*)$" },
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "sil",
+                "AA",
+                "AI",
+                "AU",
+                "E",
+                "ER",
+                "I",
+                "U",
+                "OW",
+                "O",
+                "A",
+                "R",
+                "L",
+                "S",
+                "SH",
+                "TH",
+                "T",
+                "K",
+                "P",
+                "N",
+                "H",
+                "F"
+              ]
+            }
+          }
+        },
+        "required": ["provider_id", "visemes"]
+      }
+    }
+  },
+  "required": ["version", "providers"]
+}

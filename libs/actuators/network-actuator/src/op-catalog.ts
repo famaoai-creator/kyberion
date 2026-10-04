@@ -17,7 +17,7 @@ const NETWORK_CONTROL_SCHEMA: InputSchema = {
 const NETWORK_CONTRACTS: Record<string, InputSchema> = {
   a2a_poll: {
     type: 'object',
-    properties: { export_as: { type: 'string' } },
+    properties: { export_as: { type: 'string' }, method: { type: 'string' } },
     additionalProperties: false,
   },
   fetch: {

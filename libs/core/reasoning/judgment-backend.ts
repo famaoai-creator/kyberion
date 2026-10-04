@@ -41,7 +41,7 @@
  * only move a confidence, never a branch.
  */
 
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 import { checkProviderEgress, type ProviderEgressLabel } from '../provider/provider-egress-gate.js';
 import { pathResolver } from '../path-resolver.js';
 import { readJsonIfPresent } from '../foundation/json.js';
@@ -182,7 +182,13 @@ const judgmentSeam = createSeam<JudgmentBackend>({
 
 const registeredDisposers = new Map<string, () => void>();
 
-export function registerJudgmentBackend(backend: JudgmentBackend): () => void {
+export function registerJudgmentBackend(
+  backend: JudgmentBackend,
+  metadata: SeamProviderMetadata = {
+    provenance: 'plugin',
+    source: 'judgment-backend-extension',
+  }
+): () => void {
   const id = String(backend?.judgment_id || '').trim();
   if (!id) throw new TypeError('JudgmentBackend.judgment_id is required');
   if (backend.egress !== 'local-only' && backend.egress !== 'external-api') {
@@ -190,11 +196,11 @@ export function registerJudgmentBackend(backend: JudgmentBackend): () => void {
       `JudgmentBackend '${id}' must declare egress as 'local-only' or 'external-api'`
     );
   }
-  registeredDisposers.get(id)?.();
-  const dispose = judgmentSeam.register(id, backend, {
-    provenance: 'builtin',
-    source: 'judgment-backend',
-  });
+  const disposeFromSeam = judgmentSeam.register(id, backend, metadata);
+  const dispose = () => {
+    disposeFromSeam();
+    if (registeredDisposers.get(id) === dispose) registeredDisposers.delete(id);
+  };
   registeredDisposers.set(id, dispose);
   return dispose;
 }

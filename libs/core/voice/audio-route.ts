@@ -46,7 +46,7 @@ export interface AudioRouteMetrics {
 
 export interface AudioRouteProbe {
   route_id: string;
-  bus_id: 'blackhole' | 'pulseaudio' | 'vendor-sdk' | 'stub';
+  bus_id: 'blackhole' | 'pulseaudio' | 'vendor-sdk' | 'stub' | (string & {});
   available: boolean;
   reason?: string;
   input_device?: AudioDeviceDescriptor;

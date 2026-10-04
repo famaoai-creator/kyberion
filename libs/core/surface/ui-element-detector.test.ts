@@ -152,6 +152,7 @@ describe('ui-element-detector seam', () => {
       { text: 'Fallback', confidence: 80, boundingBox: { x: 0, y: 0, width: 0.1, height: 0.1 } },
     ]);
     useDetectors(ocr);
+    resetUiElementDetectors();
     registerUiElementDetector({
       id: 'browser_dom',
       kind: 'dom',
@@ -160,6 +161,7 @@ describe('ui-element-detector seam', () => {
         throw new Error('snapshot unreadable');
       },
     });
+    registerUiElementDetector(new OcrTextDetector(ocr));
     const result = await detectUiElements({ image_path: 's.png', image_size: IMAGE });
     expect(result.decision?.ranked).toEqual(['browser_dom', 'ocr_text']);
     expect(result.detectors_run).toEqual(['ocr_text']);

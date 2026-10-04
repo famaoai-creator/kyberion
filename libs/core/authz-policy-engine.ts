@@ -35,6 +35,7 @@ import {
   type SeamProviderCandidate,
   type SeamProviderDecision,
 } from './seam-provider-selection.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
 import type { ResolvedPrincipal } from './authn-principal-resolver.js';
 
 const logger = createLogger('authz-policy-engine');
@@ -140,18 +141,25 @@ export interface AuthzProvider {
   authorize(query: AuthzQuery, deps?: AuthzResolveDeps): AuthzDecision;
 }
 
-const providerRegistry = new Map<string, AuthzProvider>();
+const authzProviderSeam = createSeam<AuthzProvider>({
+  key: AUTHZ_SEAM_ID,
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
 
-export function registerAuthzProvider(provider: AuthzProvider): void {
-  providerRegistry.set(provider.id, provider);
+export function registerAuthzProvider(
+  provider: AuthzProvider,
+  metadata: SeamProviderMetadata = { provenance: 'plugin', source: 'authz-provider-extension' }
+): () => void {
+  return authzProviderSeam.register(provider.id, provider, metadata);
 }
 
 export function getAuthzProvider(id: string): AuthzProvider | null {
-  return providerRegistry.get(id) ?? null;
+  return authzProviderSeam.getOptional(id) ?? null;
 }
 
 export function listAuthzProviders(restrictTo?: readonly string[]): AuthzProvider[] {
-  const all = [...providerRegistry.values()];
+  const all = authzProviderSeam.list().map((entry) => entry.implementation);
   return restrictTo?.length ? all.filter((p) => restrictTo.includes(p.id)) : all;
 }
 
