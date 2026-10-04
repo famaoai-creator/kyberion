@@ -79,6 +79,9 @@ governs each one in the supervisor process, under the charter role
    name a cheaper policy action. Then `allowed_work_shapes` (default `task_session`,
    `direct_reply`), handoff acceptance, and `max_concurrent_delegations`
    (default 3). Open WorkItems and parked decisions both count toward the cap.
+   A tenant-scoped dot also needs its tenant registered and operational, so
+   the operator is never asked to approve work that cannot run. Every bound
+   except the cap is re-checked when an approved action settles.
 2. **Decision**: the `autonomous-ops-gate` verdict is raised to the strictest
    of `decisions.default_decision`, the floor learned from operator
    rejections, and the dot's own `requested_decision`. A charter
