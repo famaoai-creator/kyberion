@@ -13,6 +13,7 @@ import {
   safeExec,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '@agent/core/seam';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 
@@ -25,10 +26,88 @@ const A2A_INBOX = pathResolver.rootResolve('active/shared/runtime/a2a/inbox');
 const A2A_OUTBOX = pathResolver.rootResolve('active/shared/runtime/a2a/outbox');
 const A2A_QUARANTINE = path.join(A2A_INBOX, '.quarantine');
 
-interface TransportOptions {
-  method: 'local';
+export interface A2ATransportOptions {
+  /** Encrypt the envelope before it reaches the physical transport. */
   encrypt: boolean;
+  /** Repository-trusted public key reference used by the common encoder. */
   target_public_key?: string;
+}
+
+export interface A2ATransportPacket {
+  message_id: string;
+  payload: string;
+  encrypted: boolean;
+}
+
+export interface A2ATransport {
+  /** Receives only the serialized wire payload, already encrypted when requested. */
+  send(packet: A2ATransportPacket): Promise<void>;
+  poll(): Promise<A2AInboxMessage[]>;
+}
+
+const a2aTransportSeam = createSeam<A2ATransport>({
+  key: 'a2a-transport',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+
+/** Register a named physical A2A transport. */
+export function registerA2ATransport(
+  method: string,
+  transport: A2ATransport,
+  metadata: SeamProviderMetadata = {
+    provenance: 'plugin',
+    source: 'network-a2a-transport-extension',
+  }
+): () => void {
+  const id = method.trim().toLowerCase();
+  if (!/^[a-z][a-z0-9._-]*$/.test(id)) {
+    throw new Error(`[A2A_Transport] invalid transport method: ${method}`);
+  }
+  if (id === 'local') {
+    throw new Error('[A2A_Transport] local is reserved for the built-in transport');
+  }
+  if (!transport || typeof transport.send !== 'function' || typeof transport.poll !== 'function') {
+    throw new Error(`[A2A_Transport] '${id}' must implement send() and poll()`);
+  }
+  return a2aTransportSeam.register(id, transport, metadata);
+}
+
+export function listA2ATransportMethods(): string[] {
+  return [
+    'local',
+    ...a2aTransportSeam
+      .list()
+      .map((provider) => provider.id)
+      .sort(),
+  ];
+}
+
+function resolveA2ATransport(method: string): A2ATransport {
+  const id = method.trim().toLowerCase();
+  if (id === 'local') return localA2ATransport;
+  const matches = a2aTransportSeam
+    .list()
+    .filter((provider) => provider.id.trim().toLowerCase() === id);
+  if (matches.length === 0) {
+    throw new Error(`[A2A_Transport] unsupported transport method: ${method}`);
+  }
+  if (matches.length > 1) {
+    throw new Error(
+      `[A2A_Transport] transport method ${method} is ambiguous across: ${matches.map((provider) => provider.id).join(', ')}`
+    );
+  }
+  const transport: unknown = matches[0]?.implementation;
+  if (
+    !isRecord(transport) ||
+    typeof transport.send !== 'function' ||
+    typeof transport.poll !== 'function'
+  ) {
+    throw new Error(
+      `[A2A_Transport] registered transport ${matches[0]?.id} must implement send() and poll()`
+    );
+  }
+  return transport as unknown as A2ATransport;
 }
 
 export interface A2AEnvelope {
@@ -69,7 +148,10 @@ export function parseA2ASecretValue(value: unknown): string {
 /**
  * Sends an A2A message to the physical transport layer.
  */
-export async function sendA2AMessage(message: unknown, options: TransportOptions) {
+export async function sendA2AMessage(
+  message: unknown,
+  options: A2ATransportOptions & { method?: string }
+) {
   if (
     !isRecord(message) ||
     !isRecord(message.header) ||
@@ -78,31 +160,71 @@ export async function sendA2AMessage(message: unknown, options: TransportOptions
     throw new Error('[A2A_Transport] message must contain a valid header.msg_id');
   }
   const envelope = message as unknown as A2AEnvelope;
-  const msgId = envelope.header.msg_id;
-  let payload = JSON.stringify(envelope);
-
-  if (options.encrypt && options.target_public_key) {
-    logger.info(`🔒 [A2A_Transport] Encrypting message ${msgId}...`);
-    payload = await _encryptPayload(payload, options.target_public_key);
+  const messageId = envelope.header.msg_id;
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(messageId)) {
+    throw new Error(`[A2A_Transport] invalid message id: ${String(messageId)}`);
   }
+  if (options.encrypt && !options.target_public_key?.trim()) {
+    throw new Error('[A2A_Transport] encryption requested but target_public_key is missing');
+  }
+  let payload = JSON.stringify(envelope);
+  if (options.encrypt) {
+    logger.info(`🔒 [A2A_Transport] Encrypting message ${messageId}...`);
+    payload = await _encryptPayload(payload, options.target_public_key!);
+  }
+  const { method = 'local' } = options;
+  await resolveA2ATransport(method).send({
+    message_id: messageId,
+    payload,
+    encrypted: options.encrypt,
+  });
+}
 
-  if (options.method === 'local') {
+const localA2ATransport: A2ATransport = {
+  async send(packet) {
     if (!safeExistsSync(A2A_OUTBOX)) safeMkdir(A2A_OUTBOX, { recursive: true });
-    if (typeof msgId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(msgId)) {
-      throw new Error(`[A2A_Transport] invalid message id for local outbox: ${String(msgId)}`);
-    }
-    const outPath = assertSafeRepositoryPath(path.join(A2A_OUTBOX, `${msgId}.a2a`), {
+    const outPath = assertSafeRepositoryPath(path.join(A2A_OUTBOX, `${packet.message_id}.a2a`), {
       allowMissingLeaf: true,
     });
-    safeWriteFile(outPath, payload);
-    logger.success(`📥 [A2A_Transport] Message ${msgId} placed in local outbox.`);
-  }
-}
+    safeWriteFile(outPath, packet.payload);
+    logger.success(`📥 [A2A_Transport] Message ${packet.message_id} placed in local outbox.`);
+  },
+  poll: pollLocalA2AInbox,
+};
 
 /**
  * Checks for new A2A messages in the physical inbox.
  */
-export async function pollA2AInbox(): Promise<A2AInboxMessage[]> {
+export async function pollA2AInbox(method = 'local'): Promise<A2AInboxMessage[]> {
+  const messages = await resolveA2ATransport(method).poll();
+  if (!Array.isArray(messages)) {
+    throw new Error('[A2A_Transport] transport ' + method + ' poll() must return an array');
+  }
+  return messages.map((message, index) => {
+    const serialized = JSON.stringify(message);
+    if (typeof serialized !== 'string') {
+      throw new Error(
+        '[A2A_Transport] transport ' +
+          method +
+          ' returned a non-serializable message at index ' +
+          index
+      );
+    }
+    const safeMessage = parseSafeJsonInput(
+      serialized,
+      '[A2A_Transport] transport ' + method + ' message[' + index + ']'
+    );
+    const parsed = parseA2AInboxMessage(safeMessage);
+    if (!parsed) {
+      throw new Error(
+        '[A2A_Transport] transport ' + method + ' returned an invalid A2A message at index ' + index
+      );
+    }
+    return parsed;
+  });
+}
+
+async function pollLocalA2AInbox(): Promise<A2AInboxMessage[]> {
   if (!safeExistsSync(A2A_INBOX)) return [];
 
   const files = safeReaddir(A2A_INBOX).filter((f) => f.endsWith('.a2a'));
@@ -171,7 +293,9 @@ async function _encryptPayload(plainText: string, publicKeyPath: string): Promis
   if (!safeExistsSync(safePublicKeyPath) || !safeLstat(safePublicKeyPath).isFile()) {
     throw new Error(`[A2A_Transport] public key must be a regular file: ${publicKeyPath}`);
   }
-  const publicKey = safeReadFile(safePublicKeyPath, { encoding: 'utf8' }) as string;
+  const publicKey = safeReadFile(safePublicKeyPath, {
+    encoding: 'utf8',
+  }) as string;
   const encryptedKey = crypto.publicEncrypt(publicKey, symKey).toString('hex');
 
   return `---ENCRYPTED---\n${encryptedKey}\n${iv.toString('hex')}\n${encrypted}`;
@@ -189,7 +313,11 @@ async function _decryptPayload(encryptedBlob: string): Promise<string> {
     getPassInput,
     JSON.stringify({
       action: 'get',
-      params: { account: 'sovereign', service: 'kyberion-private-key-pass', export_as: 'v' },
+      params: {
+        account: 'sovereign',
+        service: 'kyberion-private-key-pass',
+        export_as: 'v',
+      },
     })
   );
 

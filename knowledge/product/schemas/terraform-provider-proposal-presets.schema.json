@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "terraform-provider-proposal-presets.schema.json",
+  "title": "Terraform Provider Proposal Presets",
+  "type": "object",
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]*$"
+          },
+          "required_provider_lines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "provider_configuration_lines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "resource_templates": {
+            "type": "object",
+            "patternProperties": {
+              "^[a-zA-Z0-9_-]+$": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": ["id", "required_provider_lines", "provider_configuration_lines"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["version", "providers"],
+  "additionalProperties": false
+}

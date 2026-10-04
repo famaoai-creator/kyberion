@@ -31,7 +31,7 @@ import type {
 
 export interface VideoRenderBackendResult {
   executed: boolean;
-  backend: 'none' | 'hyperframes_cli' | 'ffmpeg_fallback';
+  backend: string;
   output_path?: string;
   command?: string[];
   reason?: string;
@@ -133,12 +133,10 @@ async function renderVideoCompositionBundleImpl(
   // Check for render capability via platform abstraction
   const caps = await platform.getCapabilities();
 
-  if (policy.render.backend === 'hyperframes_cli') {
-    // 'hyperframes_cli' is a governed registry alias for video.hyperframes_cli
-    // (see media-backends/video.hyperframes_cli.json); resolution stays exact
-    // even when adapter defaults override the video default.
+  if (policy.render.backend !== 'none') {
+    // Resolve the configured backend exactly; the registry owns its invocation contract.
     const backend = resolveVideoBackend(policy.render.backend);
-    if (!backend.command || !backend.args) {
+    if (!backend.command || !backend.args || !backend.video_render?.argument_template) {
       throw new Error(
         `Media backend record "${backend.backend_id}" carries no governed command; refusing to guess the renderer invocation`
       );
@@ -146,7 +144,7 @@ async function renderVideoCompositionBundleImpl(
     if (!caps.hasFFmpeg) {
       return {
         executed: false,
-        backend: 'hyperframes_cli',
+        backend: policy.render.backend,
         reason:
           'ffmpeg not found on this platform. Please install ffmpeg to enable video rendering.',
         backend_id: backend.backend_id,
@@ -159,24 +157,44 @@ async function renderVideoCompositionBundleImpl(
       allowMissingLeaf: true,
     });
     const outputPath = resolveOutputPath(plan);
+    const preload = backend.video_render.preload_script
+      ? resolveRepositoryScript(backend.video_render.preload_script)
+      : undefined;
+    const registeredNodeOptions = getRegisteredEnvText('NODE_OPTIONS');
     const execEnv = buildSafeExecEnv({
-      NODE_OPTIONS: `${getRegisteredEnvText('NODE_OPTIONS') ? `${getRegisteredEnvText('NODE_OPTIONS')} ` : ''}--require=${resolveRepositoryScript('scripts/hyperframes-localhost-preload.cjs')}`,
+      ...(preload
+        ? {
+            NODE_OPTIONS:
+              (registeredNodeOptions ? registeredNodeOptions + ' ' : '') + '--require=' + preload,
+          }
+        : {}),
     });
-    // Renderer invocation comes from the governed media backend record
-    // (command/args), not from hardcoded literals.
+    // Renderer invocation comes from the governed media backend record.
     const launcher = backend.command;
-    const command = [
-      ...backend.args,
-      bundleDir,
-      '--output',
-      outputPath,
-      '--format',
-      plan.output_format,
-      '--fps',
-      String(plan.fps),
-      '--quality',
-      policy.render.quality,
-    ];
+    if (
+      backend.supports.artifact_formats?.length &&
+      !backend.supports.artifact_formats.includes(plan.output_format)
+    ) {
+      throw new Error(
+        'Video backend ' + backend.backend_id + ' does not support ' + plan.output_format
+      );
+    }
+    const values: Record<string, string> = {
+      bundle_dir: bundleDir,
+      output_path: outputPath,
+      output_format: plan.output_format,
+      fps: String(plan.fps),
+      quality: policy.render.quality,
+      duration_sec: String(plan.duration_sec),
+      width: String(plan.width),
+      height: String(plan.height),
+    };
+    const command = [...backend.args, ...backend.video_render.argument_template].map((part) =>
+      part.replace(/\{([a-z_]+)\}/gu, (_match, key: string) => {
+        if (!(key in values)) throw new Error('Unknown video render placeholder: ' + key);
+        return values[key];
+      })
+    );
 
     try {
       if (options.cancellable) {
@@ -226,7 +244,7 @@ async function renderVideoCompositionBundleImpl(
 
       return {
         executed: true,
-        backend: 'hyperframes_cli',
+        backend: policy.render.backend,
         output_path: outputPath,
         command: [launcher, ...command],
         backend_id: backend.backend_id,
@@ -234,7 +252,12 @@ async function renderVideoCompositionBundleImpl(
         backend_provider: backend.provider,
       };
     } catch (error: any) {
-      const fallbackResult = await renderVideoCompositionFallback(plan, outputPath, error);
+      const fallbackResult = await renderVideoCompositionFallback(
+        plan,
+        outputPath,
+        error,
+        policy.render.backend
+      );
       if (fallbackResult.degraded) {
         // Loud on purpose: a silent downgrade means a slideshow gets delivered
         // as if it were the requested render.
@@ -252,15 +275,17 @@ async function renderVideoCompositionBundleImpl(
 async function renderVideoCompositionFallback(
   plan: VideoCompositionRenderPlan,
   outputPath: string,
-  cause?: Error
+  cause?: Error,
+  requestedBackend = 'hyperframes_cli'
 ): Promise<VideoRenderBackendResult> {
-  return renderNarratedFallbackVideo(plan, outputPath, cause);
+  return renderNarratedFallbackVideo(plan, outputPath, cause, requestedBackend);
 }
 
 export async function renderNarratedFallbackVideo(
   plan: VideoCompositionRenderPlan,
   outputPath: string,
-  cause?: Error
+  cause?: Error,
+  requestedBackend = 'hyperframes_cli'
 ): Promise<VideoRenderBackendResult> {
   outputPath = assertSafeRepositoryPath(pathResolver.rootResolve(outputPath), {
     allowMissingLeaf: true,
@@ -397,7 +422,7 @@ export async function renderNarratedFallbackVideo(
     );
   }
 
-  const backend = resolveVideoBackend('hyperframes_cli');
+  const backend = resolveVideoBackend(requestedBackend);
   return {
     executed: true,
     backend: 'ffmpeg_fallback',
@@ -409,15 +434,15 @@ export async function renderNarratedFallbackVideo(
       resolveFfmpegBin(),
     ],
     reason: cause
-      ? `hyperframes backend failed; fallback rendered instead: ${cause.message}`
+      ? `requested backend failed; fallback rendered instead: ${cause.message}`
       : 'fallback render completed',
     backend_id: `${backend.backend_id}.fallback`,
     backend_kind: backend.kind,
     backend_provider: 'ffmpeg',
     degraded: true,
-    degraded_from: 'hyperframes_cli',
+    degraded_from: requestedBackend,
     degradation_reason: cause
-      ? `hyperframes rendering failed (${cause.message}); the artifact is a still-image slideshow without scene motion`
+      ? `requested backend rendering failed (${cause.message}); the artifact is a still-image slideshow without scene motion`
       : 'the artifact is a still-image slideshow without scene motion',
   };
 }

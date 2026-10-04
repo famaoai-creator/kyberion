@@ -115,7 +115,7 @@ export function checkFoundationAdoption(files = sourceFiles()): string[] {
       jsonlAppendViolations += [...source.matchAll(JSONL_APPEND_PATTERN)].length;
     }
     if (
-      !filePath.endsWith(`${path.sep}foundation${path.sep}ajv.ts`) &&
+      !/[\/]foundation[\/]ajv(?:-build-free)?\.(?:ts|mjs)$/u.test(filePath) &&
       /new\s+\w*Ajv\w*\s*\(/u.test(source)
     ) {
       ajvViolations += 1;

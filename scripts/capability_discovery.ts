@@ -6,9 +6,11 @@ import {
   type ActuatorManifestCapability,
 } from '@agent/core/actuator-manifest-index';
 import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
+import { createBinaryAvailability } from '#binary-availability';
+import { evaluateCapabilityContract } from '#capability-discovery-contract';
+import { scanActuatorManifests } from './capability-discovery-manifest-scan.mjs';
 import {
   assertSafeRepositoryPath,
-  safeExec,
   safeExistsSync,
   safeLstat,
   safeReaddir,
@@ -56,90 +58,51 @@ export function defaultEnvAvailable(name: string): boolean {
   return Boolean(getRegisteredEnvText(name));
 }
 
-function envRequirementsApply(
-  capability: ActuatorManifestCapability,
-  platform: NodeJS.Platform
-): boolean {
-  const envPlatforms = capability.requirements?.env_platforms;
-  return !envPlatforms || envPlatforms.length === 0 || envPlatforms.includes(platform);
-}
-
 export function evaluateCapability(
   capability: ActuatorManifestCapability,
   platform: NodeJS.Platform,
   binaryAvailable: (bin: string) => boolean,
   envAvailable: (name: string) => boolean = defaultEnvAvailable
 ): CapabilityDiscoveryCapability {
-  const platformMatch = capability.platforms.includes(platform);
-  const missingBins = (capability.requirements?.bin ?? []).filter((bin) => !binaryAvailable(bin));
-  const missingEnv = envRequirementsApply(capability, platform)
-    ? (capability.requirements?.env ?? []).filter((name) => !envAvailable(name))
-    : [];
-  return {
-    op: capability.op,
-    platforms: capability.platforms,
-    platformMatch,
-    missingBins,
-    missingEnv,
-    available: platformMatch && missingBins.length === 0 && missingEnv.length === 0,
-  };
+  return evaluateCapabilityContract(capability, platform, binaryAvailable, envAvailable);
 }
 
-function checkBinary(bin: string): boolean {
-  try {
-    safeExec('command', ['-v', bin]);
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
+const checkBinary = createBinaryAvailability({
+  platform: process.platform,
+  pathValue: process.env.PATH,
+  pathDelimiter: path.delimiter,
+  pathExt: process.env.PATHEXT,
+  exists: safeExistsSync,
+});
 
 export function discoverCapabilities(
   options: CapabilityDiscoveryOptions = {}
 ): CapabilityDiscoveryReport {
   const rootDir = options.rootDir ?? ROOT_DIR;
-  const actuatorsDir = assertSafeRepositoryPath(
-    options.actuatorsDir ?? pathResolver.rootResolve('libs/actuators'),
-    { allowMissingLeaf: false, rootDir }
-  );
-  const items = safeReaddir(actuatorsDir);
   const currentPlatform = options.platform ?? process.platform;
   const binaryAvailable = options.binaryAvailable ?? checkBinary;
   const envAvailable = options.envAvailable ?? defaultEnvAvailable;
-  const actuators: CapabilityDiscoveryActuator[] = [];
-  const errors: string[] = [];
-
-  for (const item of items) {
-    let manifestPath: string;
-    try {
-      manifestPath = assertSafeRepositoryPath(path.join(actuatorsDir, item, 'manifest.json'), {
-        allowMissingLeaf: false,
-        rootDir,
-      });
-    } catch {
-      continue;
-    }
-    if (!safeExistsSync(manifestPath) || !safeLstat(manifestPath).isFile()) continue;
-
-    try {
-      const manifest = loadActuatorManifest(manifestPath);
-      actuators.push({
-        actuatorId: manifest.actuator_id,
-        version: manifest.version,
-        description: manifest.description || 'No description available.',
-        capabilities: (manifest.capabilities || []).map((capability) =>
-          evaluateCapability(capability, currentPlatform, binaryAvailable, envAvailable)
-        ),
-      });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      const error = `Failed to parse manifest for ${item}: ${message}`;
-      errors.push(error);
-      logger.error(error);
-    }
-  }
-
-  return { platform: currentPlatform, rootDir, actuators, errors };
+  const scan = scanActuatorManifests({
+    rootDir,
+    actuatorsDir: options.actuatorsDir ?? pathResolver.rootResolve('libs/actuators'),
+    io: {
+      assertSafePath: assertSafeRepositoryPath,
+      exists: safeExistsSync,
+      readdir: safeReaddir,
+      lstat: safeLstat,
+    },
+    loadManifest: loadActuatorManifest,
+  });
+  for (const error of scan.errors) logger.error(error);
+  const actuators = scan.actuators.map(({ manifest }) => ({
+    actuatorId: manifest.actuator_id,
+    version: manifest.version,
+    description: manifest.description || 'No description available.',
+    capabilities: (manifest.capabilities || []).map((capability) =>
+      evaluateCapability(capability, currentPlatform, binaryAvailable, envAvailable)
+    ),
+  }));
+  return { platform: currentPlatform, rootDir, actuators, errors: scan.errors };
 }
 
 export function formatCapabilityDiscovery(report: CapabilityDiscoveryReport): string {

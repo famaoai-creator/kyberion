@@ -26,7 +26,7 @@ import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 import { MobileBetaDeploymentAdapter } from './deployment-adapters/mobile-beta.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 export interface DeployInput {
   /** Semantic environment — prod / staging / canary / dr etc. */
@@ -66,14 +66,17 @@ const deploymentAdapterSeam = createSeam<DeploymentAdapter>({
 });
 let registeredDisposer: (() => void) | null = null;
 
-export function registerDeploymentAdapter(adapter: DeploymentAdapter): () => void {
+export function registerDeploymentAdapter(
+  adapter: DeploymentAdapter,
+  metadata: SeamProviderMetadata = {
+    provenance: 'plugin',
+    source: 'deployment-adapter-extension',
+  }
+): () => void {
   if (!adapter || typeof adapter.name !== 'string' || !adapter.name.trim()) {
     throw new TypeError('Deployment adapter must have a non-empty name');
   }
-  registeredDisposer = deploymentAdapterSeam.register(adapter.name, adapter, {
-    provenance: 'builtin',
-    source: 'deployment-adapter',
-  });
+  registeredDisposer = deploymentAdapterSeam.register(adapter.name, adapter, metadata);
   return registeredDisposer;
 }
 
@@ -232,7 +235,8 @@ export function installShellDeploymentAdapterIfAvailable(
     new ShellDeploymentAdapter({
       command,
       ...(timeoutText ? { timeoutMs: parseInt(timeoutText, 10) } : {}),
-    })
+    }),
+    { provenance: 'generated', source: 'deployment-environment-config' }
   );
   logger.success(
     '[deployment-adapter] installed ShellDeploymentAdapter from KYBERION_DEPLOY_COMMAND'
@@ -262,7 +266,8 @@ export function installShellDeploymentAdapterFromConfigIfAvailable(
           ? { timeoutMs: loaded.config.timeout_ms }
           : {}),
         ...(loaded.config.env ? { env: loaded.config.env } : {}),
-      })
+      }),
+      { provenance: 'generated', source: loaded.path }
     );
     logger.success(
       `[deployment-adapter] installed MobileBetaDeploymentAdapter from ${loaded.path}`
@@ -283,7 +288,8 @@ export function installShellDeploymentAdapterFromConfigIfAvailable(
         : {}),
       ...(typeof loaded.config.cwd === 'string' ? { cwd: loaded.config.cwd } : {}),
       ...(loaded.config.env ? { env: loaded.config.env } : {}),
-    })
+    }),
+    { provenance: 'generated', source: loaded.path }
   );
   logger.success(`[deployment-adapter] installed ShellDeploymentAdapter from ${loaded.path}`);
   return true;

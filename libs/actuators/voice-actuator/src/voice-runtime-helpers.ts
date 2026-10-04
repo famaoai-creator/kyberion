@@ -21,6 +21,7 @@ import {
   safeStat,
 } from '@agent/core/secure-io';
 import { retry, getRetryDefaults } from '@agent/core/async-utils';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '@agent/core/seam';
 import { VoiceGenerationRuntime } from '@agent/core/voice/voice-generation-runtime';
 import { waitForJob } from '@agent/core/job-lifecycle';
 import { getRegisteredEnvText, isRecord, parseSafeJsonInput } from '@agent/core/foundation';
@@ -91,7 +92,13 @@ export function parseVoiceSttBridgeResponse(value: unknown): VoiceSttBridgeRespo
       ) {
         return [];
       }
-      return [{ start_sec: candidate.start_sec, end_sec: candidate.end_sec, text: candidate.text }];
+      return [
+        {
+          start_sec: candidate.start_sec,
+          end_sec: candidate.end_sec,
+          text: candidate.text,
+        },
+      ];
     });
   }
 
@@ -219,7 +226,9 @@ async function runPythonTtsBridge(
   if (!safeExistsSync(bridgeScript) || !safeLstat(bridgeScript).isFile()) {
     throw new Error(`Voice bridge script must be an existing regular file: ${bridgeScript}`);
   }
-  const safeOutputPath = assertSafeRepositoryPath(outputPath, { allowMissingLeaf: true });
+  const safeOutputPath = assertSafeRepositoryPath(outputPath, {
+    allowMissingLeaf: true,
+  });
 
   const refAudio = resolveProfileRefAudio(profile);
   const refText = refAudio ? resolveRefTranscript(refAudio) : undefined;
@@ -236,7 +245,9 @@ async function runPythonTtsBridge(
     },
   });
 
-  const result = safeExecResult(resolvePythonBin(runtimeId), [bridgeScript], { input: payload });
+  const result = safeExecResult(resolvePythonBin(runtimeId), [bridgeScript], {
+    input: payload,
+  });
   if (result.error || result.status !== 0) {
     throw new Error(
       `${path.basename(bridgeScriptPath)} failed: ${result.stderr || result.error?.message}`
@@ -298,11 +309,96 @@ async function runPythonTtsBridge(
   }
 }
 
-interface VoicePlaybackPlatformAdapter {
-  openArtifact(path: string): void;
+export interface VoicePlaybackVoice {
+  id: string;
+  display_name: string;
+  provider: string;
+}
+
+export interface VoicePlaybackPlatformAdapter {
+  listVoices?(): VoicePlaybackVoice[] | Promise<VoicePlaybackVoice[]>;
+  openArtifact?(path: string): void;
+  speak?(text: string, rate: number): void;
+  renderNativeArtifact?(
+    text: string,
+    options: {
+      requestId: string;
+      voice: string;
+      rate: number;
+      language: string;
+      format: VoiceArtifactFormat;
+      outputPath?: string;
+    }
+  ): string;
+  playViaOutputBridge?(
+    text: string,
+    playbackSourcePath: string | undefined,
+    options: {
+      language: string;
+      voice: string;
+      rate: number;
+      engineId: string;
+      profile?: any;
+      requireVoiceClone?: boolean;
+      candidateEngineIds?: string[];
+    }
+  ): Promise<{
+    bridge_id?: string;
+    platform?: NodeJS.Platform;
+    playback_source_path?: string;
+    outputs?: any[];
+  }>;
 }
 
 class DarwinVoicePlaybackAdapter implements VoicePlaybackPlatformAdapter {
+  listVoices(): VoicePlaybackVoice[] {
+    return safeExec('say', ['-v', '?'])
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const voice = line.split(/\s+/u)[0] || '';
+        return { id: voice, display_name: voice, provider: 'say' };
+      });
+  }
+
+  async playViaOutputBridge(
+    text: string,
+    playbackSourcePath: string | undefined,
+    options: {
+      language: string;
+      voice: string;
+      rate: number;
+      engineId: string;
+      profile?: any;
+      requireVoiceClone?: boolean;
+      candidateEngineIds?: string[];
+    }
+  ) {
+    const playbackSource = playbackSourcePath
+      ? assertSafeRepositoryPath(playbackSourcePath, { allowMissingLeaf: true })
+      : await renderVoicePlaybackSource(text, options);
+    const bridge = createVirtualAudioOutputPlaybackBridge({
+      inventory_bridge: createVirtualDeviceInventoryBridge(),
+    });
+    const probe = await bridge.probe();
+    if (!probe.available) {
+      throw new Error(
+        '[VOICE] virtual audio output bridge unavailable: ' + (probe.reason || 'unknown reason')
+      );
+    }
+    const outputs = await retry(
+      async () => bridge.playOnOutputs(probe.outputs, { source_path: playbackSource }),
+      buildRetryOptions()
+    );
+    return {
+      bridge_id: outputs.bridge_id,
+      platform: outputs.platform,
+      playback_source_path: playbackSource,
+      outputs: outputs.outputs,
+    };
+  }
+
   openArtifact(path: string): void {
     safeExec('open', [path]);
   }
@@ -311,6 +407,14 @@ class DarwinVoicePlaybackAdapter implements VoicePlaybackPlatformAdapter {
 class LinuxVoicePlaybackAdapter implements VoicePlaybackPlatformAdapter {
   openArtifact(path: string): void {
     safeExec('xdg-open', [path]);
+  }
+
+  listVoices(): VoicePlaybackVoice[] {
+    return [{ id: 'espeak-default', display_name: 'espeak default', provider: 'espeak' }];
+  }
+
+  speak(text: string, rate: number): void {
+    safeExec('espeak', ['-s', String(rate), text]);
   }
 }
 
@@ -321,6 +425,25 @@ class WindowsVoicePlaybackAdapter implements VoicePlaybackPlatformAdapter {
       '-NonInteractive',
       '-Command',
       `Start-Process -FilePath '${path.replace(/'/g, "''")}'`,
+    ]);
+  }
+
+  listVoices(): VoicePlaybackVoice[] {
+    return [
+      {
+        id: 'windows-default',
+        display_name: 'Windows Speech Synthesizer',
+        provider: 'sapi',
+      },
+    ];
+  }
+
+  speak(text: string): void {
+    safeExec('powershell.exe', [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      `Add-Type -AssemblyName System.Speech; $s=New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Speak('${text.replace(/'/g, "''")}'); $s.Dispose()`,
     ]);
   }
 }
@@ -397,45 +520,135 @@ class WindowsVoiceArtifactAdapter implements VoiceNativeArtifactAdapter {
     return path;
   }
 }
-const voiceArtifactAdapters: Record<string, VoiceNativeArtifactAdapter> = {
-  darwin: new DarwinVoiceArtifactAdapter(),
-  linux: new LinuxVoiceArtifactAdapter(),
-  win32: new WindowsVoiceArtifactAdapter(),
-};
+const voicePlaybackPlatformSeam = createSeam<VoicePlaybackPlatformAdapter>({
+  key: 'voice-playback-platform',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
 
-interface VoiceSpeechPlaybackAdapter {
-  speak(text: string, rate: number): void;
-}
-const voiceSpeechAdapters: Partial<Record<string, VoiceSpeechPlaybackAdapter>> = {
-  linux: { speak: (text, rate) => safeExec('espeak', ['-s', String(rate), text]) },
-  win32: {
-    speak: (text) =>
-      safeExec('powershell.exe', [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        `Add-Type -AssemblyName System.Speech; $s=New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Speak('${text.replace(/'/g, "''")}'); $s.Dispose()`,
-      ]),
-  },
-};
-
-function resolveVoicePlaybackAdapter(platform: NodeJS.Platform): VoicePlaybackPlatformAdapter {
-  switch (platform) {
-    case 'darwin':
-      return new DarwinVoicePlaybackAdapter();
-    case 'win32':
-      return new WindowsVoicePlaybackAdapter();
-    default:
-      return new LinuxVoicePlaybackAdapter();
+export function registerVoicePlaybackPlatformAdapter(
+  platform: string,
+  adapter: VoicePlaybackPlatformAdapter,
+  metadata: SeamProviderMetadata = {
+    provenance: 'plugin',
+    source: 'voice-playback-platform-extension',
   }
+): () => void {
+  const id = platform.trim().toLowerCase();
+  if (!/^[a-z][a-z0-9_-]*$/.test(id)) {
+    throw new Error('Invalid voice playback platform id: ' + platform);
+  }
+  if (!adapter || typeof adapter !== 'object') {
+    throw new Error(`Voice playback platform '${id}' requires an adapter object`);
+  }
+  const capabilities = [
+    'listVoices',
+    'openArtifact',
+    'speak',
+    'renderNativeArtifact',
+    'playViaOutputBridge',
+  ] as const;
+  const implemented = capabilities.filter((capability) => adapter[capability] !== undefined);
+  if (implemented.length === 0) {
+    throw new Error(`Voice playback platform '${id}' must provide at least one capability`);
+  }
+  for (const capability of implemented) {
+    if (typeof adapter[capability] !== 'function') {
+      throw new Error(`Voice playback platform '${id}' has an invalid ${capability} capability`);
+    }
+  }
+  return voicePlaybackPlatformSeam.register(id, adapter, metadata);
+}
+
+export function listVoicePlaybackPlatforms(): string[] {
+  return voicePlaybackPlatformSeam.list().map(({ id }) => id);
+}
+
+const darwinPlaybackAdapter = new DarwinVoicePlaybackAdapter();
+const darwinArtifactAdapter = new DarwinVoiceArtifactAdapter();
+registerVoicePlaybackPlatformAdapter(
+  'darwin',
+  {
+    listVoices: darwinPlaybackAdapter.listVoices.bind(darwinPlaybackAdapter),
+    openArtifact: darwinPlaybackAdapter.openArtifact.bind(darwinPlaybackAdapter),
+    playViaOutputBridge: darwinPlaybackAdapter.playViaOutputBridge.bind(darwinPlaybackAdapter),
+    renderNativeArtifact: darwinArtifactAdapter.render.bind(darwinArtifactAdapter),
+  },
+  { provenance: 'builtin', source: 'voice-runtime-helpers' }
+);
+
+const linuxPlaybackAdapter = new LinuxVoicePlaybackAdapter();
+const linuxArtifactAdapter = new LinuxVoiceArtifactAdapter();
+registerVoicePlaybackPlatformAdapter(
+  'linux',
+  {
+    listVoices: linuxPlaybackAdapter.listVoices.bind(linuxPlaybackAdapter),
+    openArtifact: linuxPlaybackAdapter.openArtifact.bind(linuxPlaybackAdapter),
+    speak: linuxPlaybackAdapter.speak.bind(linuxPlaybackAdapter),
+    renderNativeArtifact: linuxArtifactAdapter.render.bind(linuxArtifactAdapter),
+  },
+  { provenance: 'builtin', source: 'voice-runtime-helpers' }
+);
+
+const windowsPlaybackAdapter = new WindowsVoicePlaybackAdapter();
+const windowsArtifactAdapter = new WindowsVoiceArtifactAdapter();
+registerVoicePlaybackPlatformAdapter(
+  'win32',
+  {
+    listVoices: windowsPlaybackAdapter.listVoices.bind(windowsPlaybackAdapter),
+    openArtifact: windowsPlaybackAdapter.openArtifact.bind(windowsPlaybackAdapter),
+    speak: windowsPlaybackAdapter.speak.bind(windowsPlaybackAdapter),
+    renderNativeArtifact: windowsArtifactAdapter.render.bind(windowsArtifactAdapter),
+  },
+  { provenance: 'builtin', source: 'voice-runtime-helpers' }
+);
+
+export function resolveVoicePlaybackPlatformAdapter(
+  platform: string
+): VoicePlaybackPlatformAdapter {
+  const id = platform.trim().toLowerCase();
+  const adapter: unknown = voicePlaybackPlatformSeam.getOptional(id);
+  if (!adapter) {
+    throw new Error(
+      'Unsupported voice playback platform: ' +
+        platform +
+        '; registered platforms: ' +
+        listVoicePlaybackPlatforms().join(', ')
+    );
+  }
+  const capabilities = [
+    'listVoices',
+    'openArtifact',
+    'speak',
+    'renderNativeArtifact',
+    'playViaOutputBridge',
+  ] as const;
+  if (
+    !isRecord(adapter) ||
+    !capabilities.some((capability) => typeof adapter[capability] === 'function') ||
+    capabilities.some(
+      (capability) => adapter[capability] !== undefined && typeof adapter[capability] !== 'function'
+    )
+  ) {
+    throw new Error('Voice playback platform ' + id + ' has an invalid adapter contract');
+  }
+  return adapter as unknown as VoicePlaybackPlatformAdapter;
 }
 
 function openPlaybackArtifact(artifactPath: string): void {
-  const safeArtifactPath = assertSafeRepositoryPath(artifactPath, { allowMissingLeaf: true });
+  const safeArtifactPath = assertSafeRepositoryPath(artifactPath, {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(safeArtifactPath) || !safeLstat(safeArtifactPath).isFile()) {
     throw new Error(`Voice playback artifact must be an existing regular file: ${artifactPath}`);
   }
-  resolveVoicePlaybackAdapter(process.platform).openArtifact(safeArtifactPath);
+  const adapter = resolveVoicePlaybackPlatformAdapter(process.platform);
+  if (!adapter.openArtifact) {
+    throw new Error(
+      `Voice playback platform ${process.platform} does not support artifact playback`
+    );
+  }
+  adapter.openArtifact(safeArtifactPath);
 }
 
 async function renderWithEspeakNg(
@@ -625,16 +838,17 @@ async function renderVoiceArtifactWithEngine(
     return artifactPath;
   }
 
-  const nativeAdapter = voiceArtifactAdapters[process.platform];
-  if (nativeAdapter) {
-    const rendered = nativeAdapter.render(text, options);
-    if (await isRenderableAudioArtifact(rendered)) {
-      return rendered;
-    }
-    throw new Error(`native voice adapter produced an invalid audio artifact: ${rendered}`);
+  const nativeAdapter = resolveVoicePlaybackPlatformAdapter(process.platform);
+  if (!nativeAdapter.renderNativeArtifact) {
+    throw new Error(
+      `Voice playback platform ${process.platform} does not support native artifact rendering`
+    );
   }
-
-  throw new Error(`native artifact rendering is unsupported on ${process.platform}`);
+  const rendered = nativeAdapter.renderNativeArtifact(text, options);
+  if (await isRenderableAudioArtifact(rendered)) {
+    return rendered;
+  }
+  throw new Error(`native voice adapter produced an invalid audio artifact: ${rendered}`);
 }
 
 async function renderNativeArtifact(
@@ -727,7 +941,12 @@ async function performPlayback(
     throw new Error(`Voice engine ${engine.engine_id} does not support playback`);
   }
 
-  if (engine.bridge_script && process.platform !== 'darwin') {
+  const platformAdapter = resolveVoicePlaybackPlatformAdapter(process.platform);
+  if (platformAdapter.playViaOutputBridge) {
+    return platformAdapter.playViaOutputBridge(text, playbackSourcePath, options);
+  }
+
+  if (engine.bridge_script) {
     const tmpPath = playbackSourcePath
       ? assertSafeRepositoryPath(playbackSourcePath, { allowMissingLeaf: true })
       : assertSafeRepositoryPath(pathResolver.sharedTmp(`voice-playback-${Date.now()}.wav`), {
@@ -753,41 +972,19 @@ async function performPlayback(
     };
   }
 
-  if (process.platform === 'darwin') {
-    const playbackSource = playbackSourcePath
-      ? assertSafeRepositoryPath(playbackSourcePath, { allowMissingLeaf: true })
-      : await renderVoicePlaybackSource(text, options);
-    const bridge = createVirtualAudioOutputPlaybackBridge({
-      inventory_bridge: createVirtualDeviceInventoryBridge(),
-    });
-    const probe = await bridge.probe();
-    if (!probe.available) {
-      throw new Error(
-        `[VOICE] virtual audio output bridge unavailable: ${probe.reason || 'unknown reason'}`
-      );
-    }
-    const outputs = await retry(
-      async () => bridge.playOnOutputs(probe.outputs, { source_path: playbackSource }),
-      buildRetryOptions()
+  const speechAdapter = platformAdapter;
+  if (!speechAdapter.speak) {
+    throw new Error(
+      `Voice playback platform ${process.platform} does not support local speech playback`
     );
-    return {
-      bridge_id: outputs.bridge_id,
-      platform: outputs.platform,
-      playback_source_path: playbackSource,
-      outputs: outputs.outputs,
-    };
   }
-  const speechAdapter = voiceSpeechAdapters[process.platform];
-  if (speechAdapter) {
-    await retry(async () => {
-      speechAdapter.speak(text, options.rate);
-    }, buildRetryOptions());
-    return {
-      playback_source_path: undefined,
-      outputs: [],
-    };
-  }
-  throw new Error(`Unsupported voice playback platform: ${process.platform}`);
+  await retry(async () => {
+    speechAdapter.speak?.(text, options.rate);
+  }, buildRetryOptions());
+  return {
+    playback_source_path: undefined,
+    outputs: [],
+  };
 }
 
 async function renderVoicePlaybackSource(

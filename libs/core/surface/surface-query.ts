@@ -14,8 +14,18 @@ export interface SurfaceQueryProviderConfig {
   web_search?: {
     enabled?: boolean;
     provider?: string;
+    url?: string;
     maxResults?: number;
     timeoutMs?: number;
+    response_format?: 'duckduckgo_html' | 'json';
+    query_keys?: Partial<Record<'query' | 'limit', string>>;
+    query_values?: Record<string, string | number | boolean>;
+    response_fields?: {
+      results_path?: string;
+      title_path?: string;
+      url_path?: string;
+      snippet_path?: string;
+    };
   };
   weather?: {
     enabled?: boolean;
@@ -23,6 +33,36 @@ export interface SurfaceQueryProviderConfig {
     geocodingUrl?: string;
     forecastUrl?: string;
     timeoutMs?: number;
+    geocoding?: {
+      query_keys?: Partial<Record<'query' | 'count' | 'language' | 'format', string>>;
+      query_values?: Record<string, string | number | boolean>;
+      response_fields?: {
+        results_path?: string;
+        name_path?: string;
+        latitude_path?: string;
+        longitude_path?: string;
+        coerce_numeric_strings?: boolean;
+      };
+    };
+    forecast?: {
+      query_keys?: Partial<Record<'latitude' | 'longitude' | 'current' | 'timezone', string>>;
+      query_values?: Record<string, string | number | boolean>;
+      current_fields?: string[];
+      response_fields?: {
+        current_path?: string;
+        temperature_path?: string;
+        weather_code_path?: string;
+        wind_speed_path?: string;
+        humidity_path?: string;
+        coerce_numeric_strings?: boolean;
+      };
+      display_units?: {
+        temperature?: string;
+        wind_speed?: string;
+        humidity?: string;
+      };
+      weather_code_labels?: Record<string, string>;
+    };
   };
   location?: {
     enabled?: boolean;
@@ -31,6 +71,13 @@ export interface SurfaceQueryProviderConfig {
       id?: string;
       provider?: string;
       url?: string;
+      response_fields?: {
+        city?: string[];
+        region?: string[];
+        country?: string[];
+        latitude?: string[];
+        longitude?: string[];
+      };
     }>;
   };
   knowledge?: {
