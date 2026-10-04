@@ -123,6 +123,18 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/dot/dot-dispatch.ts#dispatchDotProposals (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/dot/dot-lifecycle.ts#transitionDotCharterStatus",
       "roles": ["dot_lifecycle_writer"],
       "unresolved": []
@@ -1471,10 +1483,15 @@
     },
     {
       "site": "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
-      "roles": [],
+      "roles": ["infrastructure_sentinel"],
       "unresolved": [
         "role argument `loaded.charter.authority.authority_role` could not be resolved at scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce"
       ]
+    },
+    {
+      "site": "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
     },
     {
       "site": "scripts/apply_dependency_patch.ts#main",
@@ -2437,18 +2454,13 @@
       "reachable_roles": {
         "chronos_gateway": {
           "example_path": [
-            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "chronos_localadmin": {
@@ -2488,18 +2500,13 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "knowledge_steward": {
@@ -2568,9 +2575,13 @@
         },
         "slack_bridge": {
           "example_path": [
-            "presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts#POST",
-            "presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts#loadChronosCore",
-            "libs/core/integrations/slack-approval-ui.ts#createSlackApprovalRequest"
+            "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "sovereign_concierge": {
@@ -2589,18 +2600,13 @@
         },
         "surface_runtime": {
           "example_path": [
-            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         }
       },
@@ -2697,21 +2703,19 @@
       "reachable_roles": {
         "chronos_gateway": {
           "example_path": [
-            "presence/displays/computer-surface/server.ts#<module>",
-            "presence/displays/computer-surface/os-control-plane.ts#<module>",
-            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
-            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "ecosystem_architect": {
@@ -2735,21 +2739,19 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "presence/displays/computer-surface/server.ts#<module>",
-            "presence/displays/computer-surface/os-control-plane.ts#<module>",
-            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
-            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "knowledge_steward": {
@@ -2768,10 +2770,8 @@
         },
         "mission_controller": {
           "example_path": [
-            "presence/displays/computer-surface/server.ts#<module>",
-            "presence/displays/computer-surface/os-control-plane.ts#<module>",
-            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
-            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
@@ -2811,21 +2811,19 @@
         },
         "slack_bridge": {
           "example_path": [
-            "presence/displays/computer-surface/server.ts#<module>",
-            "presence/displays/computer-surface/os-control-plane.ts#<module>",
-            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
-            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "sovereign_concierge": {
@@ -2837,21 +2835,19 @@
         },
         "surface_runtime": {
           "example_path": [
-            "presence/displays/computer-surface/server.ts#<module>",
-            "presence/displays/computer-surface/os-control-plane.ts#<module>",
-            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
-            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         }
       },
@@ -3108,18 +3104,16 @@
       "reachable_roles": {
         "chronos_gateway": {
           "example_path": [
-            "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "chronos_token_registry_reader": {
@@ -3153,18 +3147,16 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "ingest_commit": {
@@ -3204,9 +3196,16 @@
         },
         "slack_bridge": {
           "example_path": [
-            "presence/displays/concierge/src/app/api/message/route.ts#POST",
-            "presence/displays/concierge/src/app/api/message/route.ts#replyViaOrchestrator",
-            "libs/core/integrations/slack-approval-ui.ts#createSlackApprovalRequest"
+            "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "sovereign_concierge": {
@@ -3218,18 +3217,16 @@
         },
         "surface_runtime": {
           "example_path": [
-            "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         }
       },
@@ -3315,21 +3312,19 @@
       "reachable_roles": {
         "chronos_gateway": {
           "example_path": [
-            "satellites/discord-bridge/src/index.ts#handleDiscordInteraction",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord",
-            "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "ecosystem_architect": {
@@ -3348,21 +3343,19 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "satellites/discord-bridge/src/index.ts#handleDiscordInteraction",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord",
-            "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "knowledge_steward": {
@@ -3406,49 +3399,53 @@
         },
         "slack_bridge": {
           "example_path": [
-            "satellites/discord-bridge/src/index.ts#handleDiscordInteraction",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord",
-            "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "sovereign_concierge": {
           "example_path": [
-            "satellites/discord-bridge/src/index.ts#handleDiscordInteraction",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord",
-            "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "surface_runtime": {
           "example_path": [
-            "satellites/discord-bridge/src/index.ts#<module>",
-            "satellites/discord-bridge/src/index.ts#main",
-            "satellites/discord-bridge/src/index.ts#drainDiscordOutbox",
-            "libs/core/surface/surface-delivery.ts#drainSurfaceOutbox",
-            "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt"
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         }
       },
@@ -3533,20 +3530,21 @@
       "reachable_roles": {
         "chronos_gateway": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "ecosystem_architect": {
@@ -3567,20 +3565,21 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "knowledge_steward": {
@@ -3629,47 +3628,59 @@
         },
         "slack_bridge": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "sovereign_concierge": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "surface_runtime": {
           "example_path": [
             "satellites/imessage-bridge/src/index.ts#<module>",
             "satellites/imessage-bridge/src/index.ts#main",
-            "satellites/imessage-bridge/src/index.ts#drainIMessageOutbox",
-            "libs/core/surface/surface-delivery.ts#drainSurfaceOutbox",
-            "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt"
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         }
       },
@@ -3759,13 +3770,14 @@
             "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
             "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
             "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "ecosystem_architect": {
@@ -3793,13 +3805,14 @@
             "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
             "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
             "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "knowledge_steward": {
@@ -3859,13 +3872,14 @@
             "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
             "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
             "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "sovereign_concierge": {
@@ -3873,7 +3887,16 @@
             "scripts/mcp_server.ts#<module>",
             "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
             "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
-            "libs/core/governance/approval-cowork-adapter.ts#decideApprovalFromCowork"
+            "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "surface_runtime": {
@@ -4369,20 +4392,19 @@
       "reachable_roles": {
         "chronos_gateway": {
           "example_path": [
-            "presence/displays/operator-surface/src/lib/data.ts#getCloudflareOsSnapshot",
-            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
-            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "chronos_token_registry_reader": {
@@ -4413,20 +4435,19 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "presence/displays/operator-surface/src/lib/data.ts#getCloudflareOsSnapshot",
-            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
-            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "knowledge_steward": {
@@ -4447,9 +4468,9 @@
         },
         "mission_controller": {
           "example_path": [
-            "presence/displays/operator-surface/src/lib/data.ts#getCloudflareOsSnapshot",
-            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
-            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
@@ -4483,20 +4504,19 @@
         },
         "slack_bridge": {
           "example_path": [
-            "presence/displays/operator-surface/src/lib/data.ts#getCloudflareOsSnapshot",
-            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
-            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "sovereign_concierge": {
@@ -4508,20 +4528,19 @@
         },
         "surface_runtime": {
           "example_path": [
-            "presence/displays/operator-surface/src/lib/data.ts#getCloudflareOsSnapshot",
-            "libs/core/cloudflare-os-surface.ts#CloudflareOsSurface",
-            "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         }
       },
@@ -4603,20 +4622,24 @@
       "reachable_roles": {
         "chronos_gateway": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "chronos_token_registry_reader": {
@@ -4648,20 +4671,24 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "knowledge_steward": {
@@ -4713,20 +4740,24 @@
         },
         "slack_bridge": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "sovereign_concierge": {
@@ -4738,20 +4769,24 @@
         },
         "surface_runtime": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         }
       },
@@ -4850,17 +4885,16 @@
         "chronos_gateway": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
-            "presence/displays/presence-studio/presence-studio-runtime-data.ts#<module>",
-            "libs/core/in-room-minutes-recorder.ts#startInRoomMinutesSession",
-            "libs/core/in-room-minutes-recorder.ts#defaultRunMinutesPipeline",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "ecosystem_architect": {
@@ -4875,17 +4909,16 @@
         "infrastructure_sentinel": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
-            "presence/displays/presence-studio/presence-studio-runtime-data.ts#<module>",
-            "libs/core/in-room-minutes-recorder.ts#startInRoomMinutesSession",
-            "libs/core/in-room-minutes-recorder.ts#defaultRunMinutesPipeline",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "knowledge_steward": {
@@ -4926,17 +4959,16 @@
         "slack_bridge": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
-            "presence/displays/presence-studio/presence-studio-runtime-data.ts#<module>",
-            "libs/core/in-room-minutes-recorder.ts#startInRoomMinutesSession",
-            "libs/core/in-room-minutes-recorder.ts#defaultRunMinutesPipeline",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "sovereign_concierge": {
@@ -4950,17 +4982,16 @@
         "surface_runtime": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
-            "presence/displays/presence-studio/presence-studio-runtime-data.ts#<module>",
-            "libs/core/in-room-minutes-recorder.ts#startInRoomMinutesSession",
-            "libs/core/in-room-minutes-recorder.ts#defaultRunMinutesPipeline",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         }
       },
@@ -5052,18 +5083,18 @@
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
             "satellites/slack-bridge/src/index.ts#start",
-            "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "ecosystem_architect": {
@@ -5085,18 +5116,18 @@
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
             "satellites/slack-bridge/src/index.ts#start",
-            "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "knowledge_steward": {
@@ -5145,25 +5176,54 @@
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
             "satellites/slack-bridge/src/index.ts#start",
-            "satellites/slack-bridge/src/index.ts#postApprovalRequest",
-            "libs/core/integrations/slack-approval-ui.ts#createSlackApprovalRequest"
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "sovereign_concierge": {
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
             "satellites/slack-bridge/src/index.ts#start",
-            "libs/core/integrations/slack-onboarding.ts#handleSlackOnboardingTurn",
-            "libs/core/integrations/slack-onboarding.ts#persistOnboardingIdentity"
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "surface_runtime": {
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
             "satellites/slack-bridge/src/index.ts#start",
-            "satellites/slack-bridge/src/index.ts#processSlackOutbox",
-            "libs/core/surface/surface-delivery.ts#drainSurfaceOutbox",
-            "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt"
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         }
       },
@@ -5305,13 +5365,14 @@
         "chronos_gateway": {
           "example_path": [
             "scripts/run_pipeline.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "ecosystem_architect": {
@@ -5335,13 +5396,14 @@
         "infrastructure_sentinel": {
           "example_path": [
             "scripts/run_pipeline.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "knowledge_steward": {
@@ -5393,37 +5455,40 @@
         "slack_bridge": {
           "example_path": [
             "scripts/run_pipeline.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "sovereign_concierge": {
           "example_path": [
             "scripts/run_pipeline.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "surface_runtime": {
           "example_path": [
             "scripts/run_pipeline.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         }
       },
@@ -5508,21 +5573,19 @@
       "reachable_roles": {
         "chronos_gateway": {
           "example_path": [
-            "satellites/telegram-bridge/src/index.ts#handleTelegramCallbackQuery",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord",
-            "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "ecosystem_architect": {
@@ -5541,21 +5604,19 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "satellites/telegram-bridge/src/index.ts#handleTelegramCallbackQuery",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord",
-            "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "knowledge_steward": {
@@ -5599,48 +5660,53 @@
         },
         "slack_bridge": {
           "example_path": [
-            "satellites/telegram-bridge/src/index.ts#handleTelegramCallbackQuery",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord",
-            "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "sovereign_concierge": {
           "example_path": [
-            "satellites/telegram-bridge/src/index.ts#handleTelegramCallbackQuery",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
-            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord",
-            "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "surface_runtime": {
           "example_path": [
-            "satellites/telegram-bridge/src/index.ts#<module>",
-            "satellites/telegram-bridge/src/index.ts#main",
-            "libs/core/surface/surface-delivery.ts#drainSurfaceOutbox",
-            "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt"
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         }
       },
@@ -5729,20 +5795,16 @@
       "reachable_roles": {
         "chronos_gateway": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "ecosystem_architect": {
@@ -5765,20 +5827,16 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "knowledge_steward": {
@@ -5830,56 +5888,44 @@
         },
         "slack_bridge": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "sovereign_concierge": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "surface_runtime": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         }
       },
@@ -5962,20 +6008,16 @@
       "reachable_roles": {
         "chronos_gateway": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "ecosystem_architect": {
@@ -5998,20 +6040,16 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "knowledge_steward": {
@@ -6056,56 +6094,44 @@
         },
         "slack_bridge": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "sovereign_concierge": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         },
         "surface_runtime": {
           "example_path": [
-            "scripts/pipeline-execution-part-control.ts#dispatchProgrammaticToolCall",
-            "scripts/pipeline-execution-part-control.ts#dispatchLeafOp",
-            "scripts/pipeline-execution-part-control.ts#hasBoundApproval",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-control.ts#<module>",
-            "scripts/pipeline-execution-part-control.ts#domainOps",
-            "scripts/pipeline-domain-ops.ts#runInlineMeshDelivery",
-            "scripts/mesh_delivery_driver.ts#runMeshDeliveryDriverOnce",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPass",
-            "libs/core/mesh/mesh-delivery-driver.ts#runMeshDeliveryPassUnfenced",
-            "libs/core/mesh/mesh-hub-peer-messaging-adapter.ts#MeshHubPeerMessagingAdapter"
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
+            "libs/core/dot/dot-runtime.ts#runDotWake",
+            "libs/core/dot/dot-runtime.ts#governProposals",
+            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
           ]
         }
       },

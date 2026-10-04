@@ -7063,6 +7063,18 @@
       "types": "./dist/dot/dot-inbox.d.ts",
       "default": "./dist/dot/dot-inbox.js"
     },
+    "./dot/dot-proposals": {
+      "types": "./dist/dot/dot-proposals.d.ts",
+      "default": "./dist/dot/dot-proposals.js"
+    },
+    "./dot/dot-dispatch": {
+      "types": "./dist/dot/dot-dispatch.d.ts",
+      "default": "./dist/dot/dot-dispatch.js"
+    },
+    "./dot/dot-feedback": {
+      "types": "./dist/dot/dot-feedback.d.ts",
+      "default": "./dist/dot/dot-feedback.js"
+    },
     "./state-probe": {
       "types": "./dist/state-probe.d.ts",
       "default": "./dist/state-probe.js"

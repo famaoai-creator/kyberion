@@ -302,6 +302,28 @@
       "action_class": "stale_wait_escalation",
       "shadow": true
     },
+    "dot_delegate_work": {
+      "title": "Resident dot delegates work",
+      "description": "Default action for a resident dot proposal: the runtime creates a ready WorkItem carrying the dot actor id. Raised to the charter decision floor, and to approve dot-wide after an operator rejection until three human approvals follow; high-risk changed_paths force approve. The veto window makes notify a veto card (charters may only lengthen it).",
+      "axis_scores": {
+        "scope": 1,
+        "reversibility": 1,
+        "sensitivity": 1,
+        "confidence": 1
+      },
+      "veto_window_minutes": 60
+    },
+    "dot_handoff": {
+      "title": "Resident dot hands work to another dot",
+      "description": "A dot hands a WorkItem to a dot whose charter accepts its handoffs; the receiving dot is woken through the dot inbox and governs its own follow-up proposals. Scored like dot_delegate_work because it creates the same ready WorkItem; a handoff must never be a cheaper path than delegation.",
+      "axis_scores": {
+        "scope": 1,
+        "reversibility": 1,
+        "sensitivity": 1,
+        "confidence": 1
+      },
+      "veto_window_minutes": 60
+    },
     "secret_mutation": {
       "title": "Introduce or change a secret",
       "description": "never_auto: always a human decision with a second factor, regardless of scores.",
