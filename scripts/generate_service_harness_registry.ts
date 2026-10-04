@@ -20,6 +20,7 @@ type ServiceHarnessRegistry = {
       kind: 'capture' | 'apply';
       risk: 'read' | 'write' | 'destructive';
       approval_required: boolean;
+      tenant_binding_required: boolean;
       idempotency: 'not_applicable' | 'recommended' | 'required';
     }>;
   }>;
@@ -46,6 +47,7 @@ function buildRegistry(): ServiceHarnessRegistry {
           kind: operation.kind,
           risk: operation.risk,
           approval_required: operation.approval_required,
+          tenant_binding_required: operation.tenant_binding_required,
           idempotency: operation.idempotency,
         })),
       };

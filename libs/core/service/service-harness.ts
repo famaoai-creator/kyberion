@@ -30,6 +30,7 @@ export type ServiceOperationContract = {
   kind: ServiceOperationKind;
   risk: ServiceOperationRisk;
   approval_required: boolean;
+  tenant_binding_required: boolean;
   idempotency: ServiceIdempotency;
   parameters: Record<string, Record<string, unknown>>;
   alternatives: ServiceOperationAlternativeSummary[];
@@ -56,6 +57,7 @@ export type ServiceOperationPlan = {
   risk: ServiceOperationRisk;
   kind_of_operation: ServiceOperationKind;
   approval_required: boolean;
+  tenant_binding_required: boolean;
   idempotency: ServiceIdempotency;
   inputs: Record<string, unknown>;
   selected_route: ServiceOperationAlternativeSummary | null;
@@ -80,6 +82,7 @@ export type ServiceExecutionReceipt = {
   action: string;
   risk: ServiceOperationRisk;
   approval_required: boolean;
+  tenant_binding_required: boolean;
   selected_route: ServiceOperationAlternativeSummary | null;
   inputs: Record<string, unknown>;
   status: 'succeeded' | 'failed' | 'approval_required';
@@ -171,7 +174,11 @@ function normalizeVerification(value: unknown): ServiceVerificationSpec {
   return { kind: 'result_present' };
 }
 
-function normalizeOperation(action: string, raw: unknown): ServiceOperationContract {
+function normalizeOperation(
+  action: string,
+  raw: unknown,
+  serviceTenantBindingRequired = false
+): ServiceOperationContract {
   const operation = recordOrEmpty(raw);
   const rawAlternatives =
     Array.isArray(operation.alternatives) && operation.alternatives.length > 0
@@ -191,6 +198,8 @@ function normalizeOperation(action: string, raw: unknown): ServiceOperationContr
       typeof operation.approval_required === 'boolean'
         ? operation.approval_required
         : risk !== 'read',
+    tenant_binding_required:
+      serviceTenantBindingRequired || operation.tenant_binding_required === true,
     idempotency: inferIdempotency(operation, risk),
     parameters,
     alternatives,
@@ -220,7 +229,7 @@ export function describeServiceHarness(
   if (!normalizedServiceId) throw new Error('service_id is required');
   const { preset, endpoint } = loadHarnessPreset(normalizedServiceId);
   const allOperations = Object.entries(preset.operations || {}).map(([action, operation]) =>
-    normalizeOperation(action, operation)
+    normalizeOperation(action, operation, preset.tenant_binding_required === true)
   );
   const operations =
     options.detail === false
@@ -363,6 +372,7 @@ export function planServiceOperation(
     risk: operation.risk,
     kind_of_operation: operation.kind,
     approval_required: operation.approval_required,
+    tenant_binding_required: operation.tenant_binding_required,
     idempotency: operation.idempotency,
     inputs: redactServiceInputs(normalizedInputs),
     selected_route: operation.alternatives[0] || null,
@@ -467,6 +477,7 @@ export function createServiceExecutionReceipt(
     action: plan.action,
     risk: plan.risk,
     approval_required: plan.approval_required,
+    tenant_binding_required: plan.tenant_binding_required,
     selected_route: plan.selected_route,
     inputs: redactServiceInputs(plan.inputs),
     status,

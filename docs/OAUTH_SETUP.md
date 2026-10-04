@@ -1,68 +1,68 @@
-# Kyberion OAuth Integration Setup Guide
+# OAuth Service Setup
 
-Kyberion relies on a robust `service-actuator` to manage connections to third-party services securely. To establish an OAuth 2.0 integration (e.g., Notion, Canva), you must complete an OAuth handshake and allow Kyberion to securely store the tokens in its Sovereign Sanctuary (the Personal Tier).
+This document covers connecting an OAuth integration that is already defined
+in Kyberion. To add a new integration, start with the
+[Service Integration and Connection Guide](../knowledge/product/orchestration/service-integration-guide.md#oauth-egress-authority-and-harness-controls).
 
-This guide explains the flow and how to automate the setup using the built-in Kyberion pipeline.
+## Before setup
 
-## Overview of the OAuth Flow
+The service preset must define its OAuth profile (`authorize_url`, explicit
+least-privilege `scopes`, `token_operation`, and optional `refresh_operation`)
+and the matching code-exchange/refresh operations. Kyberion's OAuth broker
+rejects requested scopes that are not in the preset's scope list. PKCE is on
+by default; disable it only when the provider cannot support it.
 
-1. **Client ID / Secret Acquisition:**
-   - The user must create an integration on the provider's platform (e.g., Notion) and obtain a Client ID and Client Secret.
-   - The user registers `http://localhost:8787/oauth/callback` as the valid OAuth Redirect URI on the provider's dashboard.
-2. **Vault Storage:**
-   - The user stores the credentials safely in Kyberion's local vault: `vault/secrets/secrets.json`.
-3. **Background Callback Server:**
-   - Kyberion starts an ephemeral callback server (`scripts/oauth_callback_surface.ts`) running locally on port 8787.
-   - The setup entrypoint launches it with the `sovereign` persona (`KYBERION_PERSONA=sovereign`) so it has permission to write the acquired tokens into the Personal Tier.
-4. **Authorization Code Flow:**
-   - The user is provided with an Authorization URL. Opening this in the browser initiates the provider's consent screen.
-   - Upon granting consent, the provider redirects the user to `http://localhost:8787/oauth/callback` with a one-time authorization code.
-5. **Token Exchange & Persistence:**
-   - The background server exchanges the code for an Access Token and saves it to `knowledge/personal/connections/<service>.json`.
-   - The background server is then safely terminated.
+Create an OAuth app with the provider and register the callback URI used by
+Kyberion. The default is:
 
----
-
-## Setting up an OAuth Connection Automatically
-
-We have created an interactive pipeline to automate steps 3 through 5 for you.
-
-### Prerequisite: Provider Configuration
-
-Before running the pipeline, ensure you have:
-1. Created an OAuth integration on the provider (e.g. [Notion Integrations](https://www.notion.so/my-integrations)).
-2. Set the redirect URI to: `http://localhost:8787/oauth/callback`
-3. Obtained the **Client ID** and **Client Secret**.
-4. Added them to your `vault/secrets/secrets.json` under the service key (e.g., `"notion"`):
-
-```json
-{
-  "notion": {
-    "client_id": "your-client-id",
-    "client_secret": "your-client-secret"
-  }
-}
+```text
+http://127.0.0.1:8787/oauth/callback
 ```
 
-### Running the Setup Pipeline
+The host, port, and path can be configured with the registered
+`KYBERION_OAUTH_CALLBACK_HOST`, `KYBERION_OAUTH_CALLBACK_PORT`, and
+`KYBERION_OAUTH_CALLBACK_PATH` settings. The callback must remain loopback
+HTTP; non-loopback redirects are rejected.
 
-To begin the interactive setup, run the following pipeline command, replacing `<service_name>` with your service (e.g., `notion`):
+## Store client credentials and authorize
+
+Store the OAuth app credentials through the governed secret flow. Do not edit
+`vault/secrets/secrets.json`, connection documents, or `.env` directly:
 
 ```bash
-pnpm pipeline --input pipelines/setup-oauth.json --vars "service_name=notion"
+pnpm kyberion secret introduce <service-id> CLIENT_ID
+pnpm kyberion secret introduce <service-id> CLIENT_SECRET
 ```
 
-If you want to run the entrypoint directly without the pipeline wrapper, use:
+Follow any approval/apply steps printed by the command. Then start the
+interactive OAuth setup pipeline:
 
 ```bash
-KYBERION_OAUTH_SERVICE_ID=notion node --import ./scripts/ts-loader.mjs scripts/setup_oauth.ts
+pnpm pipeline --input pipelines/setup-oauth.json --vars "service_name=<service-id>"
 ```
 
-### What the Pipeline Does
-1. Checks that your secrets are correctly configured through the OAuth broker.
-2. Launches the local OAuth Callback Server in the background with `KYBERION_PERSONA=sovereign` to allow Personal-tier writes.
-3. Generates the correct Authorization URL from the service OAuth profile and prints it.
-4. Waits for you to open the URL in your browser, click "Allow", and see the "Authorization Complete" screen.
-5. Automatically terminates the background callback server and confirms that your access tokens are saved in `knowledge/personal/connections/<service_name>.json`.
+Open the authorization URL printed by the pipeline, approve the requested
+scopes at the provider, and return to the terminal when the callback reports
+completion. Kyberion exchanges the code and stores the returned tokens in the
+active private connection overlay through the OAuth broker. The callback
+server is stopped after setup.
 
-You can then freely use the `service-actuator` to execute API commands for this service.
+## Verify
+
+```bash
+pnpm kyberion secret status <service-id>
+pnpm service:setup
+pnpm service:preflight -- --service <service-id>
+```
+
+These commands report registration/readiness without printing secret values.
+Preflight may also check CLI, bridge, or local-runtime prerequisites for that
+service. OAuth token revocation is not exposed by the current OAuth broker
+action surface; do not assume a provider preset's `revoke_operation` field
+means Kyberion can revoke a grant.
+
+OAuth consent scopes are provider-side permissions. They do not replace
+Kyberion's egress policy, tenant data boundaries, operation approval rules, or
+mission authority grants. See the
+[Service Integration and Connection Guide](../knowledge/product/orchestration/service-integration-guide.md#egress-and-authority)
+for those boundaries.

@@ -33,6 +33,7 @@ import { listProjectRecords } from '@agent/core/project/project-registry';
 import { listManagedProjects } from '@agent/core/project/project-management';
 import { listProjectTrackRecords } from '@agent/core/project/project-track-registry';
 import { listServiceBindingRecords } from '@agent/core/service/service-binding-registry';
+import { registerServiceBindingsRoute } from './service-bindings-route.js';
 import { listMissionSeedRecords } from '@agent/core/mission/mission-seed-registry';
 import { listDistillCandidateRecords } from '@agent/core/knowledge/distill-candidate-registry';
 import { getActiveTaskSession, listTaskSessions } from '@agent/core/task/task-session';
@@ -277,11 +278,11 @@ presenceStudioData.app.get('/api/project-tracks', (_req, res) => {
   });
 });
 
-presenceStudioData.app.get('/api/service-bindings', (_req, res) => {
-  res.json({
-    ok: true,
-    items: listServiceBindingRecords(),
-  });
+registerServiceBindingsRoute({
+  app: presenceStudioData.app,
+  listBindings: listServiceBindingRecords,
+  resolveViewer: resolvePresenceStudioViewerContext,
+  wireError: presenceStudioData.presenceStudioWireError,
 });
 
 presenceStudioData.app.get('/api/mission-seeds', (_req, res) => {

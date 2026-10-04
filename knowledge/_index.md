@@ -420,6 +420,7 @@
 - [Schedule Delivery Protocol](./product/orchestration/schedule-delivery-protocol.md) (public | Ecosystem Architect)
 - [Scratch-to-Pipeline Video Promotion](./product/orchestration/scratch-to-pipeline-video-promotion.md) (public | ecosystem_architect)
 - [Self-Refinement Protocol: The Path to Perpetual Growth](./product/orchestration/self-refinement-protocol.md) (public | Ecosystem Architect)
+- [Service Integration and Connection Guide](./product/orchestration/service-integration-guide.md) (public | Unknown)
 - [Sovereign Autonomous Agent Protocol (SAAP)](./product/orchestration/autonomous-agent-protocol.md) (public | Ecosystem Architect)
 - [Sovereign Onboarding Protocol (moved)](./product/orchestration/onboarding-protocol.md) (public | Unknown)
 - [Stakeholder Consensus Protocol](./product/orchestration/stakeholder-consensus-protocol.md) (public | Ecosystem Architect)
