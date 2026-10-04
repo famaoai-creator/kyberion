@@ -1173,9 +1173,13 @@ export async function runOnboarding(
       '    2. If you need a customer overlay, create it first with `pnpm stance:create <slug>`'
     );
     print('       and activate it with `pnpm stance:switch <slug>` before onboarding.');
-    print('    3. Use the agent Path B flow (CLAUDE.md → docs/.../onboarding.md): write the');
-    print(`       active profile root (${profileRoot()}/...) directly per the schemas under`);
-    print('       knowledge/public/{schemas,templates}.');
+    print(
+      '    3. Apply a reviewed identity file (Path B): copy knowledge/public/templates/onboarding/identity.example.json'
+    );
+    print(
+      '       into active/shared/tmp/, edit it, then `pnpm onboarding apply --identity <file> --dry-run` and rerun without --dry-run.'
+    );
+    print(`       It is written to the active profile root (${profileRoot()}).`);
     print(
       '    4. To intentionally accept defaults, re-run with KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1'
     );

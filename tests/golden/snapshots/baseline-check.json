@@ -1,13 +1,17 @@
 {
-  "generated_at": "2026-08-28T13:16:52.897Z",
+  "generated_at": "2026-10-04T15:57:09.240Z",
   "pipeline_id": "baseline-check",
   "pipeline_path": "pipelines/baseline-check.json",
-  "result_hash": "03d007906cac46fa5c68a356652439c9d894d655c2548a1edd13ee8cd7eb5866",
+  "result_hash": "51e489624886592fb03323d5a58c8ca612d40a6fb4f36ca32acb5a59818d88d4",
   "result": {
     "status": "succeeded",
     "results": [
       {
         "op": "system:baseline_check",
+        "status": "success"
+      },
+      {
+        "op": "system:log",
         "status": "success"
       }
     ],

@@ -666,7 +666,7 @@ describe('run_pipeline compatibility', () => {
 
   it('formats classified pipeline failures with remediation', () => {
     const failure = formatPipelineFailure(
-      "[POLICY_VIOLATION] Persona 'unknown' with authority role 'forks' is NOT authorized to write to '/x'."
+      "[POLICY_VIOLATION] Persona 'worker' with authority role 'forks' is NOT authorized to write to '/x'."
     );
 
     expect(failure.classification.category).toBe('permission_denied');

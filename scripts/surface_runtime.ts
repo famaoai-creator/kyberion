@@ -652,6 +652,45 @@ async function listUnits() {
   return { status: 'ok', units: results };
 }
 
+/** One line per surface (health from state + probe); `--json` keeps the full diagnostics. */
+export function formatSurfaceStatus(result: Awaited<ReturnType<typeof statusSurfaces>>): string {
+  const header = `${'SURFACE'.padEnd(25)} ${'STATE'.padEnd(10)} ${'PID'.padEnd(8)} STARTED`;
+  const lines = ['', header, '-'.repeat(header.length + 16)];
+  const counts: Record<string, number> = {};
+  for (const [id, raw] of Object.entries(result.diagnostics)) {
+    const diagnostic = raw as {
+      stateHealth: string;
+      nextAction?: Parameters<typeof formatNextAction>[0];
+      lastKnownState: { pid: number; startedAt: string } | null;
+    };
+    counts[diagnostic.stateHealth] = (counts[diagnostic.stateHealth] ?? 0) + 1;
+    const icon =
+      diagnostic.stateHealth === 'healthy'
+        ? '🟢'
+        : diagnostic.stateHealth === 'untracked'
+          ? '⚪'
+          : '🟠';
+    lines.push(
+      `${id.padEnd(25)} ${icon} ${diagnostic.stateHealth.padEnd(8)} ${String(diagnostic.lastKnownState?.pid ?? '-').padEnd(8)} ${diagnostic.lastKnownState?.startedAt ?? '-'}`
+    );
+    if (
+      diagnostic.nextAction &&
+      (diagnostic.stateHealth === 'degraded' || diagnostic.stateHealth === 'stale')
+    ) {
+      lines.push(...formatNextAction(diagnostic.nextAction).map((line) => `  ${line}`));
+    }
+  }
+  lines.push(
+    '',
+    `Summary: ${Object.entries(counts)
+      .map(([state, count]) => `${count} ${state}`)
+      .join(', ')}`,
+    `State: ${result.statePath}  (add --json for full diagnostics and log tails)`,
+    ''
+  );
+  return lines.join('\n');
+}
+
 function formatListUnits(result: Awaited<ReturnType<typeof listUnits>>): string {
   const header = `${'UNIT'.padEnd(25)} ${'KIND'.padEnd(10)} ${'ENABLED'.padEnd(10)} ${'STATUS'.padEnd(10)} ${'HEALTH'.padEnd(10)} ${'AUTH'.padEnd(10)} ${'PORT'.padEnd(6)} PID`;
   const lines = ['', header, '-'.repeat(header.length + 5)];
@@ -1120,6 +1159,8 @@ export const runSurfaceRuntime = defineScript({
       print(formatListUnits(result as Awaited<ReturnType<typeof listUnits>>));
     else if (!json && typeof result === 'object' && result !== null && 'rows' in result)
       print(formatSurfaceSetupReport(result as Awaited<ReturnType<typeof setupSurfaces>>));
+    else if (!json && typeof result === 'object' && result !== null && 'diagnostics' in result)
+      print(formatSurfaceStatus(result as Awaited<ReturnType<typeof statusSurfaces>>));
     else print(result);
     return result;
   },

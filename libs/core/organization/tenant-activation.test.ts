@@ -7,6 +7,8 @@ import {
   rollbackTenantActivation,
   resolveTenantActivation,
   suspendTenantActivation,
+  TENANT_ACTIVATION_PROBE_EVIDENCE_KIND,
+  tenantActivationProbeEvidenceDir,
 } from './tenant-activation.js';
 import { applyOnboardingContextBinding } from './onboarding-context.js';
 import { writeTenantProfile } from './tenant-registry.js';
@@ -213,6 +215,59 @@ describe('tenant activation', () => {
         },
       })
     ).toThrow(/auditable probe reference|provisioned NHI id/);
+  });
+
+  it('rejects missing evidence paths, failed probe evidence, and foreign NHI ids', () => {
+    seed();
+    const evidenceDir = tenantActivationProbeEvidenceDir(
+      { customerSlug: 'acme-ai', tenantSlug: 'acme-prod', organizationId: 'org-acme-ai' },
+      rootDir
+    );
+    const evidencePath = path.join(evidenceDir, 'probe.json');
+    safeWriteFile(
+      evidencePath,
+      JSON.stringify({
+        kind: TENANT_ACTIVATION_PROBE_EVIDENCE_KIND,
+        customer_slug: 'acme-ai',
+        tenant_slug: 'acme-prod',
+        organization_id: 'org-acme-ai',
+        results: {
+          isolation_probe: { passed: true },
+          service_readiness: { passed: false },
+        },
+      }),
+      { mkdir: true }
+    );
+    const evidenceRef = path.relative(rootDir, evidencePath);
+    const blockers = resolveTenantActivation({
+      customerSlug: 'acme-ai',
+      tenantSlug: 'acme-prod',
+      organizationId: 'org-acme-ai',
+      ownerId: 'human:founder',
+      rootDir,
+      checks: {
+        viewer_scope: true,
+        nhi_provisioned: true,
+        service_readiness: true,
+        isolation_probe: true,
+      },
+      nhiIds: ['kyberion://agent/other-org/planner'],
+      probeRefs: {
+        viewer_scope: 'active/shared/tmp/does-not-exist.txt',
+        nhi_provisioned: probeRefs.nhi_provisioned,
+        service_readiness: evidenceRef,
+        isolation_probe: evidenceRef,
+      },
+    }).record.blockers;
+
+    expect(blockers).toContain(
+      "viewer_scope probe ref 'active/shared/tmp/does-not-exist.txt' does not exist"
+    );
+    expect(blockers).toContain(`service_readiness probe evidence '${evidenceRef}' did not pass`);
+    expect(blockers.some((blocker) => blocker.startsWith('isolation_probe'))).toBe(false);
+    expect(
+      blockers.some((blocker) => blocker.includes("'kyberion://agent/other-org/planner'"))
+    ).toBe(true);
   });
 
   it('does not let a receipt for one organization satisfy another context', () => {
