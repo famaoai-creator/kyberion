@@ -8,6 +8,7 @@ import {
   parseEnginesNodeFloor,
   playwrightBrowsersDir,
   probeExplicitReasoningBackend,
+  requiredPlaywrightChromiumDirs,
 } from './environment-capability-probes.js';
 import { probeManifest, type EnvironmentManifest } from './environment-capability.js';
 import * as pathResolver from './path-resolver.js';
@@ -123,6 +124,17 @@ describe('playwrightBrowsersDir', () => {
     const dir = playwrightBrowsersDir({});
     expect(path.basename(dir)).toBe('ms-playwright');
     expect(path.isAbsolute(dir)).toBe(true);
+  });
+
+  it('names the browser directories the installed playwright-core launches', () => {
+    const dirs = requiredPlaywrightChromiumDirs();
+    expect(dirs).not.toBeNull();
+    expect(dirs).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^chromium-\d+$/),
+        expect.stringMatching(/^chromium_headless_shell-\d+$/),
+      ])
+    );
   });
 });
 

@@ -78,11 +78,10 @@ pnpm onboarding:context bind --customer-slug <customer-slug> --tenant-slug <tena
 pnpm onboarding:context bind ... --apply --json
 pnpm tenant:activation plan --customer-slug <customer-slug> --tenant-slug <tenant-slug> \
   --organization-id <organization-id>
-pnpm tenant:activation activate ... --owner-id human:<owner> --nhi-id <nhi-id> \
-  --check-viewer-scope --check-nhi --check-services --check-isolation \
-  --probe-ref viewer_scope=<audit-ref> --probe-ref nhi_provisioned=<audit-ref> \
-  --probe-ref service_readiness=<audit-ref> --probe-ref isolation_probe=<audit-ref> \
-  --apply --accept
+pnpm tenant:activation probe --customer-slug <customer-slug> --tenant-slug <tenant-slug> \
+  --organization-id <organization-id> --nhi-id kyberion://agent/<organization-id>/<agent-slug>
+# 全 probe が通ると、証跡を参照する activate コマンドが表示される。<human:owner> を置き換えて実行する
+pnpm tenant:activation activate ... --owner-id human:<owner> --apply --accept
 pnpm onboarding:context first-work --customer-slug <customer-slug> \
   --intent "<最初の依頼>" --dry-run --json
 ```

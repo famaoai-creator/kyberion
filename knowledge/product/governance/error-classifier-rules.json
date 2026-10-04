@@ -55,6 +55,14 @@
       "repairAction": "Analyze the step parameters and the expected input for this actuator. Fix any mismatched key names or invalid paths in the pipeline ADF."
     },
     {
+      "id": "kyberion.playwright-browser-missing",
+      "category": "missing_dependency",
+      "label": "Playwright browser revision not installed",
+      "remediation": "The installed playwright needs a browser revision that is not in the browser cache (`PLAYWRIGHT_BROWSERS_PATH` or the platform default). Run `pnpm env:bootstrap --manifest kyberion-toolchain --apply` to install the managed browser runtime.",
+      "patterns": ["Executable doesn't exist at .*(chrom|ms-playwright|pw-browsers)"],
+      "repairAction": "Install the matching Playwright browser revision and rerun the same pipeline."
+    },
+    {
       "id": "kyberion.path-scope-persona-unset",
       "category": "permission_denied",
       "label": "Operator persona not set in this shell",
