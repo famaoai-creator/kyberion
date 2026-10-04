@@ -4,6 +4,9 @@ category: Orchestration
 tags: [onboarding, setup, concierge, identity]
 importance: 8
 last_updated: 2026-10-04
+kind: reference
+scope: global
+authority: reference
 status: archived
 ---
 
