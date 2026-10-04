@@ -5,6 +5,7 @@ import { logger } from '@agent/core/core';
 import {
   extractSurfaceBearerToken,
   narrowSurfaceViewerTenant,
+  narrowSurfaceViewerScope,
   SurfaceViewerScopeError,
   resolveSurfaceViewerToken,
   type SurfaceViewerScope,
@@ -18,7 +19,7 @@ import {
   SURFACE_SESSION_TOKEN_PREFIX,
 } from '@agent/core/surface/surface-session-cookie';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface/surface-authorization';
-import type { EventScopeInput } from '@agent/core/event-scope';
+import { eventScopeFromRecord, type EventScopeInput } from '@agent/core/event-scope';
 export {
   parsePersonalAgentIdentity as parsePresenceStudioAgentIdentity,
   parsePersonalSovereignIdentity as parsePresenceStudioSovereignIdentity,
@@ -255,6 +256,8 @@ export function authorizePresenceStudioRequest(
 export interface PresenceStudioViewerContext {
   principalId: string;
   tenantSlugs: string[] | 'all';
+  organizationIds?: string[] | 'all';
+  projectIds?: string[] | 'all';
   source: 'loopback' | 'token';
   /** The seam-resolved principal, when authn produced one (authz seam input). */
   principal?: ResolvedPrincipal;
@@ -290,8 +293,8 @@ export function toSurfaceAuthorizationContext(
   return {
     role: viewer.source === 'loopback' ? 'localadmin' : 'readonly',
     tenantSlugs: viewer.tenantSlugs,
-    organizationIds: 'all',
-    projectIds: 'all',
+    organizationIds: viewer.organizationIds ?? viewer.principal?.organizationIds ?? 'all',
+    projectIds: viewer.projectIds ?? viewer.principal?.projectIds ?? 'all',
     tierAccess:
       viewer.source === 'loopback'
         ? ['personal', 'confidential', 'public']
@@ -314,8 +317,8 @@ export function toFrontDeskViewerScope(viewer: PresenceStudioViewerContext): Sur
   return {
     role: viewer.source === 'loopback' ? 'localadmin' : 'readonly',
     tenantSlugs: viewer.tenantSlugs,
-    organizationIds: 'all',
-    projectIds: 'all',
+    organizationIds: viewer.organizationIds ?? viewer.principal?.organizationIds ?? 'all',
+    projectIds: viewer.projectIds ?? viewer.principal?.projectIds ?? 'all',
     tierAccess:
       viewer.source === 'loopback'
         ? ['personal', 'confidential', 'public']
@@ -369,9 +372,36 @@ export function presenceStudioRecordInScope(
   viewer: PresenceStudioViewerContext,
   value: unknown
 ): boolean {
-  if (viewer.tenantSlugs === 'all') return true;
+  const allowed = toFrontDeskViewerScope(viewer);
   const tenant = recordTenant(value);
-  return Boolean(tenant && viewer.tenantSlugs.includes(tenant));
+  if (allowed.tenantSlugs !== 'all' && (!tenant || !allowed.tenantSlugs.includes(tenant)))
+    return false;
+  if (allowed.organizationIds === 'all' && allowed.projectIds === 'all') return true;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  // Explicit narrower reads require canonical scope metadata. Unknown or
+  // conflicting legacy metadata is omitted rather than widening the result.
+  const scope = eventScopeFromRecord(value as Record<string, unknown>);
+  if (!scope) return false;
+  return (
+    (allowed.organizationIds === 'all' ||
+      Boolean(scope.organization_id && allowed.organizationIds.includes(scope.organization_id))) &&
+    (allowed.projectIds === 'all' ||
+      Boolean(scope.project_id && allowed.projectIds.includes(scope.project_id)))
+  );
+}
+
+export function narrowPresenceStudioScope(
+  viewer: PresenceStudioViewerContext,
+  requested: { tenant?: string | null; organizationId?: string | null; projectId?: string | null }
+): PresenceStudioViewerContext {
+  try {
+    return { ...viewer, ...narrowSurfaceViewerScope(toFrontDeskViewerScope(viewer), requested) };
+  } catch (error) {
+    throw new PresenceStudioViewerError(
+      403,
+      error instanceof Error ? error.message : 'viewer scope denied'
+    );
+  }
 }
 
 export function narrowPresenceStudioTenant(
@@ -704,6 +734,10 @@ export const presenceStudioApprovalDecisionSchema = z
 export const presenceStudioOutcomeVerdictSchema = z
   .object({
     status: z.enum(['accepted', 'rejected']),
+    viewer_scope_id: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
     note: z.string().trim().min(1).max(4000).optional(),
   })
   .strict();
@@ -714,6 +748,15 @@ export const presenceStudioConversationSchema = z
     text: z.string().trim().min(1, 'text is required').max(4000, 'text is too long'),
     locale: z.string().trim().min(2).max(32).optional(),
     session_id: z.string().trim().min(1).max(128).optional(),
+    conversation_id: z
+      .string()
+      .regex(/^concierge-[a-f0-9]{64}$/)
+      .optional(),
+    request_id: z.string().uuid().optional(),
+    request_created_at: z.number().finite().nonnegative().optional(),
+    organizationId: z.string().trim().min(1).max(128).optional(),
+    projectId: z.string().trim().min(1).max(128).optional(),
+    tenant: z.string().trim().min(1).max(32).optional(),
   })
   .strict();
 

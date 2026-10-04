@@ -6,6 +6,7 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
+  DEFAULT_TENANT_ISOLATION_POLICY,
   readTenantProfile,
   tenantProfilePath,
   writeTenantProfile,
@@ -21,6 +22,11 @@ import {
 } from '@agent/core/secure-io';
 import { applyOnboardingContextBinding } from '@agent/core/organization/onboarding-context';
 import { loadOrganizationProfileAtPath } from '@agent/core/organization/organization-profile';
+import {
+  loadOrganizationDomain,
+  saveOrganizationDomain,
+} from '@agent/core/organization/organization-operating-model';
+import { buildOrganizationDomainRecord } from '@agent/core/organization/organization-operating-model-operations';
 import {
   getRegisteredEnvText,
   nowIso,
@@ -51,6 +57,8 @@ export interface AiCompanyOnboardingResult {
   readinessPath: string;
   firstWorkPath: string;
   contextBindingPath?: string;
+  /** Org-chart domains registered in the operating model (`organization domain list`). */
+  seededDomains?: string[];
   writtenFiles: string[];
   nextCommands: string[];
 }
@@ -82,6 +90,56 @@ function requireRegularFile(filePath: string, rootDir: string, label: string): s
   return safePath;
 }
 
+interface OrgChartDomain {
+  domain_id?: unknown;
+  name?: unknown;
+  role_ids?: unknown;
+}
+
+/**
+ * Register the vertical's org-chart domains in the operating model so
+ * `pnpm organization domain list` starts from the company's structure instead
+ * of empty. The first role of each domain owns it; existing domains are kept.
+ */
+function seedOrgChartDomains(input: {
+  orgChartPath: string;
+  organizationId: string;
+  tenantSlug: string;
+  rootDir: string;
+}): string[] {
+  if (!safeExistsSync(input.orgChartPath)) return [];
+  const chart = JSON.parse(readTextFile(input.orgChartPath)) as { domains?: OrgChartDomain[] };
+  const seeded: string[] = [];
+  for (const domain of chart.domains ?? []) {
+    const roles = Array.isArray(domain.role_ids) ? domain.role_ids : [];
+    if (
+      typeof domain.domain_id !== 'string' ||
+      typeof domain.name !== 'string' ||
+      typeof roles[0] !== 'string'
+    ) {
+      continue;
+    }
+    const scope = {
+      organizationId: input.organizationId,
+      tier: 'confidential' as const,
+      tenantSlug: input.tenantSlug,
+    };
+    if (loadOrganizationDomain(domain.domain_id, { ...scope, rootDir: input.rootDir })) continue;
+    saveOrganizationDomain(
+      buildOrganizationDomainRecord({
+        ...scope,
+        domainId: domain.domain_id,
+        name: domain.name,
+        ownerRole: roles[0],
+        rootDir: input.rootDir,
+      }),
+      { rootDir: input.rootDir }
+    );
+    seeded.push(domain.domain_id);
+  }
+  return seeded;
+}
+
 function snapshotFiles(filePaths: string[], rootDir: string): Map<string, string | undefined> {
   return new Map(
     filePaths.map((filePath) => [
@@ -93,15 +151,27 @@ function snapshotFiles(filePaths: string[], rootDir: string): Map<string, string
   );
 }
 
-function restoreFiles(snapshots: Map<string, string | undefined>, rootDir: string): void {
+/**
+ * Best-effort rollback. Returns the files it could not restore instead of
+ * throwing, so the caller can still surface the error that caused the
+ * rollback (a failed unlink must never mask a policy denial on the first write).
+ */
+function restoreFiles(snapshots: Map<string, string | undefined>, rootDir: string): string[] {
+  const unrestored: string[] = [];
   for (const [filePath, previous] of snapshots) {
-    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true, rootDir });
-    if (previous === undefined) safeUnlinkSync(safePath);
-    else {
-      safeMkdir(path.dirname(safePath), { recursive: true });
-      safeWriteFile(safePath, previous, { encoding: 'utf8' });
+    try {
+      const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true, rootDir });
+      if (previous === undefined) {
+        if (safeExistsSync(safePath)) safeUnlinkSync(safePath);
+      } else {
+        safeMkdir(path.dirname(safePath), { recursive: true });
+        safeWriteFile(safePath, previous, { encoding: 'utf8' });
+      }
+    } catch {
+      unrestored.push(filePath);
     }
   }
+  return unrestored;
 }
 
 export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnboardingResult {
@@ -132,8 +202,11 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
   const tenantSlug = normalized.tenantSlug || '<registered-tenant>';
   const organizationId = normalized.tenantSlug ? normalized.slug : '<organization>';
   const nextCommands = [
-    `export KYBERION_CUSTOMER=${normalized.slug}`,
+    `pnpm stance:switch ${normalized.slug} && source active/shared/runtime/customer.env`,
     'export KYBERION_TENANT_SCOPE_REQUIRED=true',
+    // The stance has its own profile root (customer/<slug>/): missions refuse
+    // to start until my-identity.json / my-vision.md / agent-identity.json exist there.
+    'pnpm onboarding apply --identity <reviewed-identity-json>',
     'pnpm kyberion setup report --persona first-time-user',
     normalized.tenantSlug
       ? `pnpm tenant show ${normalized.tenantSlug} --json`
@@ -256,6 +329,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
       ].join('\n')
     );
     let contextBindingPath: string | undefined;
+    let seededDomains: string[] = [];
     if (normalized.tenantSlug) {
       const previousCustomer = getRegisteredEnvText('KYBERION_CUSTOMER');
       setRegisteredEnv('KYBERION_CUSTOMER', normalized.slug);
@@ -289,6 +363,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
               display_name: normalized.companyName,
               status: 'active',
               assigned_role: 'owner',
+              isolation_policy: { ...DEFAULT_TENANT_ISOLATION_POLICY },
               metadata: { onboarding_source: 'onboard company', purpose: normalized.firstWork },
             },
             { rootDir, env: { ...process.env, KYBERION_CUSTOMER: normalized.slug } }
@@ -306,9 +381,20 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
         contextBindingPath = binding.saved_paths.find((entry) =>
           entry.endsWith('organization-context.json')
         );
+        seededDomains = seedOrgChartDomains({
+          orgChartPath: path.join(customerDir, 'org-chart.json'),
+          organizationId: normalized.slug,
+          tenantSlug: tenant.tenant_slug,
+          rootDir,
+        });
       } catch (error) {
-        if (previousTenantProfile === undefined) safeUnlinkSync(safeTenantPath);
-        else safeWriteFile(safeTenantPath, previousTenantProfile, { encoding: 'utf8' });
+        try {
+          if (previousTenantProfile === undefined) {
+            if (safeExistsSync(safeTenantPath)) safeUnlinkSync(safeTenantPath);
+          } else safeWriteFile(safeTenantPath, previousTenantProfile, { encoding: 'utf8' });
+        } catch {
+          // keep the original failure; the outer rollback reports what remains
+        }
         throw error;
       } finally {
         setRegisteredEnv('KYBERION_CUSTOMER', previousCustomer);
@@ -320,6 +406,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
       readinessPath,
       firstWorkPath,
       ...(contextBindingPath ? { contextBindingPath } : {}),
+      ...(seededDomains.length ? { seededDomains } : {}),
       writtenFiles: [
         ...bootstrapped.writtenFiles,
         profilePath,
@@ -330,7 +417,10 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
       nextCommands,
     };
   } catch (error) {
-    restoreFiles(snapshots, rootDir);
+    const unrestored = restoreFiles(snapshots, rootDir);
+    if (unrestored.length > 0 && error instanceof Error) {
+      error.message += ` (rollback could not restore: ${unrestored.join(', ')})`;
+    }
     throw error;
   }
 }
@@ -346,6 +436,7 @@ export function main(argv: string[], print: (value: unknown) => void = () => und
     print(
       'Usage: pnpm onboarding company --vertical <id> --slug <slug> --name "<company>" --goal "<first work>" [--owner-id human:operator] [--tenant-slug <tenant>] [--root-dir <path>] [--dry-run]'
     );
+    print(`Verticals: ${listCompanyVerticals().join(', ')}`);
     return argv.length === 0 ? 1 : 0;
   }
   const result = onboardAiCompany({

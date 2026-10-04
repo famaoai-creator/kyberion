@@ -4,7 +4,11 @@ import * as React from 'react';
 import { usePathname } from 'next/navigation';
 import { renderMessage } from '@agent/core/message-format';
 import { A2UIActionProvider, NavRail, useA2UIActions } from '@agent/shared-ui';
-import { announceTenantChange } from '../lib/tenant-context';
+import {
+  announceTenantChange,
+  readSelectedTenant,
+  withSelectedTenant,
+} from '../lib/tenant-context';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { frontDeskText } from '../lib/i18n';
 import { attachFrontDeskAuthHeaders, isLoopbackHostname } from '../lib/front-desk-auth-token';
@@ -66,7 +70,7 @@ interface FrontDeskMeResponse {
 
 function readStoredTenant(): string | null {
   try {
-    return window.localStorage.getItem(TENANT_STORAGE_KEY);
+    return readSelectedTenant();
   } catch {
     return null;
   }
@@ -105,10 +109,12 @@ export function FrontDeskRail() {
   const pathname = usePathname();
   const [nav, setNav] = React.useState<FrontDeskNavResponse | null>(null);
   const [me, setMe] = React.useState<FrontDeskMeResponse | null>(null);
+  const selectionGeneration = React.useRef(0);
 
   const fetchMe = React.useCallback((tenant?: string | null) => {
+    const generation = ++selectionGeneration.current;
     const query = tenant ? `?tenant=${encodeURIComponent(tenant)}` : '';
-    fetch(`/api/me${query}`, { headers: attachFrontDeskAuthHeaders() })
+    return fetch(`/api/me${query}`, { headers: attachFrontDeskAuthHeaders() })
       .then((res) => {
         // FD-07 item 7: a remote (non-loopback) request with no/invalid
         // token gets 401 from /api/me — send it to the "どなたですか？"
@@ -130,7 +136,14 @@ export function FrontDeskRail() {
         return res.ok ? res.json() : null;
       })
       .then((data: FrontDeskMeResponse | null) => {
-        if (data?.ok) setMe(data);
+        if (generation !== selectionGeneration.current) return;
+        if (data?.ok && (!tenant || data.viewing?.tenant_slug === tenant)) {
+          setMe(data);
+          if (data.viewing && (!tenant || tenant === data.viewing.tenant_slug)) {
+            storeTenant(data.viewing.tenant_slug);
+            announceTenantChange(data.viewing.tenant_slug);
+          }
+        }
       })
       .catch(() => {
         // The rail degrades to "no tenant block" — it must never block the
@@ -142,7 +155,11 @@ export function FrontDeskRail() {
     // A slower response for the previous locale must not overwrite the
     // current one after a language switch.
     let current = true;
-    fetch(`/api/front-desk/nav?locale=${locale}`, { headers: attachFrontDeskAuthHeaders() })
+    setNav(null);
+    if (!me) return;
+    fetch(withSelectedTenant(`/api/front-desk/nav?locale=${locale}`, me.viewing?.tenant_slug), {
+      headers: attachFrontDeskAuthHeaders(),
+    })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: FrontDeskNavResponse | null) => {
         if (current && data?.ok) setNav(data);
@@ -151,7 +168,7 @@ export function FrontDeskRail() {
     return () => {
       current = false;
     };
-  }, [locale]);
+  }, [locale, me]);
 
   React.useEffect(() => {
     let storedTenant: string | null = null;
@@ -168,9 +185,7 @@ export function FrontDeskRail() {
   const onAction = React.useCallback(
     (actionId: string, payload?: Record<string, unknown>) => {
       if (actionId !== TENANT_SWITCH_ACTION || typeof payload?.value !== 'string') return;
-      storeTenant(payload.value);
       fetchMe(payload.value);
-      announceTenantChange(payload.value);
     },
     [fetchMe]
   );
@@ -195,7 +210,7 @@ export function FrontDeskRail() {
       id: item.id,
       label: item.label,
       hint: item.sublabel,
-      href: item.href,
+      href: withSelectedTenant(item.href, me?.viewing?.tenant_slug),
       icon: RAIL_ICONS[item.id],
       active: item.id === current,
     }));

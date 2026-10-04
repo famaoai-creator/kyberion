@@ -75,17 +75,20 @@ The dry-run shows the write scope and next commands without changing files. The 
 
 When `KYBERION_CUSTOMER` is set, `customer/{slug}/` is preferred for customer-specific identity and onboarding artifacts.
 
-Before starting the first work, activate the tenant after the readiness probes, then review its management unit:
+Before starting the first work, run the readiness probes, activate the tenant with the evidence they record, then review its management unit. When every probe passes, `probe` prints the exact `activate` command that cites its evidence:
 
 ```bash
+pnpm tenant:activation probe \
+  --customer-slug acme-ai --tenant-slug <tenant> --organization-id acme-ai \
+  --nhi-id kyberion://agent/acme-ai/<agent-slug>
 pnpm tenant:activation activate \
   --customer-slug acme-ai --tenant-slug <tenant> --organization-id acme-ai \
-  --owner-id human:founder --nhi-id <nhi-id> \
+  --owner-id human:founder --nhi-id kyberion://agent/acme-ai/<agent-slug> \
   --check-viewer-scope --check-nhi --check-services --check-isolation \
-  --probe-ref viewer_scope=<audit-ref> \
-  --probe-ref nhi_provisioned=<audit-ref> \
-  --probe-ref service_readiness=<audit-ref> \
-  --probe-ref isolation_probe=<audit-ref> \
+  --probe-ref viewer_scope=<evidence-path> \
+  --probe-ref nhi_provisioned=<evidence-path> \
+  --probe-ref service_readiness=<evidence-path> \
+  --probe-ref isolation_probe=<evidence-path> \
   --apply --accept
 ```
 
@@ -161,28 +164,34 @@ After the screenshot exists, spend the remaining 10 minutes on structure:
 
 ## 3. Bring Up The Local Surfaces
 
+After the install and full build in §1, run this from the repository root. The managed runtime starts the enabled local surfaces together; a development server for one UI does not start the others.
+
+<!-- kyberion-managed-startup -->
+
 ```bash
-pnpm agent-runtime:supervisor
-pnpm mission:orchestrator
+set -e
 export KYBERION_LOCALHOST_AUTOADMIN=true
-pnpm chronos:dev
+pnpm surfaces reconcile
+pnpm surfaces status
+pnpm kyberion setup report --persona first-time-user
 ```
 
-Useful local surfaces (full role map: [`docs/SURFACES.md`](./SURFACES.md)):
+`KYBERION_LOCALHOST_AUTOADMIN=true` grants loopback callers `localadmin` for the local UI APIs. Use it only on a trusted local machine; remote/shared deployments need an explicit viewer identity and scope (see [viewer-scope operations](./developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md)). Set it before starting the managed surfaces so the child processes inherit it.
 
-- `Chronos`: `http://127.0.0.1:3000` (control tower)
-- `Concierge`: `http://127.0.0.1:3050` (CEO secretary — requests, approvals, deliverables)
-- `Presence Studio`: usually `http://127.0.0.1:3031`
-- `Terminal HUD`: `pnpm tui` (Ink TUI for missions / work items / runtimes)
+Wait for a surface's health to become `healthy` in `pnpm surfaces status` before opening it. A `started` result or an enabled manifest is not a readiness check. If a surface is still starting, rerun status; if it fails, follow its diagnostic and targeted repair command rather than starting a second server on the same port. For example: `pnpm surfaces repair --surface concierge`, then check status again.
 
-Chronos API routes resolve a viewer principal server-side; `KYBERION_LOCALHOST_AUTOADMIN=true` grants loopback callers `localadmin` (see `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`).
+Choose the surface for the task (full role map: [SURFACES](./SURFACES.md)):
 
-If you are unsure which one matters for your goal, `pnpm kyberion setup report --persona first-time-user` is the canonical entry guide:
+- **Make a request, review a decision, or receive a deliverable:** Concierge at `http://127.0.0.1:3050`. Start here for everyday work. Complete the profile in Settings when prompted, then describe the outcome you want.
+- **Inspect a runtime or investigate a failure:** Chronos at `http://127.0.0.1:3000`.
+- **Try voice and live transcripts:** Presence Studio at `http://127.0.0.1:3031`, with a healthy `voice-hub` and the voice prerequisites reported by `pnpm kyberion doctor --runtime voice`.
+- **Use a terminal control view:** `pnpm tui`.
 
-- `Chronos` for runtime visibility and operator control
-- `Concierge` for the "what should I decide now" secretary view
-- `Presence Studio + voice-hub` for conversational voice/browser demos
-- `Slack` when you want threaded remote interaction and auth is ready
+These are the default registry URLs. The setup report probes the configured local endpoints and gives one next step for the Concierge request flow. If you changed ports, use the report and manifest values. A healthy UI confirms reachability; individual requests still check their own permissions and service requirements.
+
+External messaging bridges such as Slack are optional and disabled by default. Their missing credentials do not block local Concierge use, and `reconcile` deliberately skips disabled surfaces. Set up a bridge only when you need that channel; inspect `pnpm surfaces setup`, then explicitly opt in with `pnpm surfaces enable --surface slack-bridge` once its prerequisites are ready.
+
+Do not launch `pnpm agent-runtime:supervisor` or `pnpm mission:orchestrator` as startup daemons. They are one-shot workers that require a `--request` or `--event` payload; managed execution dispatches them as needed. `pnpm chronos:dev` is for developing Chronos alone and is not the complete startup path.
 
 ## 4. Use Kyberion By Asking For Outcomes
 

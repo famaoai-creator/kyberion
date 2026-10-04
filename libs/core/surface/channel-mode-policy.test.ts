@@ -7,6 +7,7 @@ import {
   evaluateChannelActorAccess,
   evaluateChannelApprovalAuthority,
   resolveChannelModePolicy,
+  type ChannelAuthorityOptions,
 } from './channel-mode-policy.js';
 
 const TEAM_CONFIG = {
@@ -22,6 +23,22 @@ function stubModes(value: unknown): void {
     'KYBERION_SURFACE_CHANNEL_MODES',
     typeof value === 'string' ? value : JSON.stringify(value)
   );
+}
+
+// P0 allowlist/approver fallback tests use an explicitly unbound speaker,
+// never the checkout's private member registry. Membership resolution itself
+// is covered by channel-speaker-principal.test.ts with a fixture root.
+function unboundSpeaker(actorId: string): ChannelAuthorityOptions {
+  return {
+    speaker: {
+      surface: 'slack',
+      actorId,
+      tenantSlug: 'acme',
+      denied: false,
+      tierAccess: ['public', 'confidential'],
+      capabilities: ['ask'],
+    },
+  };
 }
 
 describe('channel-mode-policy', () => {
@@ -72,7 +89,7 @@ describe('channel-mode-policy', () => {
       const policy = resolveChannelModePolicy('slack', 'C1');
       expect(policy.source).toBe('invalid');
       expect(policy.mode).toBe('team');
-      expect(evaluateChannelActorAccess(policy, 'U1').allowed).toBe(false);
+      expect(evaluateChannelActorAccess(policy, 'U1', unboundSpeaker('U1')).allowed).toBe(false);
       expect(evaluateChannelApprovalAuthority(policy, 'U1').allowed).toBe(false);
     });
 
@@ -86,7 +103,11 @@ describe('channel-mode-policy', () => {
     it('denies team speakers when no allowlist is configured, unlike owner_direct', () => {
       stubModes(TEAM_CONFIG);
       expect(
-        evaluateChannelActorAccess(resolveChannelModePolicy('slack', 'C0TEAM'), 'U1')
+        evaluateChannelActorAccess(
+          resolveChannelModePolicy('slack', 'C0TEAM'),
+          'U1',
+          unboundSpeaker('U1')
+        )
       ).toMatchObject({
         allowed: false,
         reason: 'allowlist_unconfigured',
@@ -100,8 +121,8 @@ describe('channel-mode-policy', () => {
       stubModes(TEAM_CONFIG);
       vi.stubEnv('KYBERION_SURFACE_ALLOWLISTS', JSON.stringify({ slack: ['U1'] }));
       const policy = resolveChannelModePolicy('slack', 'C0TEAM');
-      expect(evaluateChannelActorAccess(policy, 'U1').allowed).toBe(true);
-      expect(evaluateChannelActorAccess(policy, 'U2').allowed).toBe(false);
+      expect(evaluateChannelActorAccess(policy, 'U1', unboundSpeaker('U1')).allowed).toBe(true);
+      expect(evaluateChannelActorAccess(policy, 'U2', unboundSpeaker('U2')).allowed).toBe(false);
     });
   });
 
@@ -184,18 +205,38 @@ describe('channel-mode-policy', () => {
     it('restricts team approvals to channel approvers', () => {
       stubModes(TEAM_CONFIG);
       const team = resolveChannelModePolicy('slack', 'C0TEAM');
-      expect(evaluateChannelApprovalAuthority(team, 'U0LEAD').allowed).toBe(true);
-      expect(evaluateChannelApprovalAuthority(team, 'U1')).toMatchObject({
+      expect(
+        evaluateChannelApprovalAuthority(team, 'U0LEAD', unboundSpeaker('U0LEAD')).allowed
+      ).toBe(true);
+      expect(evaluateChannelApprovalAuthority(team, 'U1', unboundSpeaker('U1'))).toMatchObject({
         allowed: false,
         reason: 'not_channel_approver',
       });
       expect(
-        evaluateChannelApprovalAuthority(resolveChannelModePolicy('slack', 'C0PUB'), 'U0LEAD')
-          .allowed
+        evaluateChannelApprovalAuthority(
+          resolveChannelModePolicy('slack', 'C0PUB'),
+          'U0LEAD',
+          unboundSpeaker('U0LEAD')
+        ).allowed
       ).toBe(false);
       expect(
         evaluateChannelApprovalAuthority(resolveChannelModePolicy('slack', 'C0DM'), 'U1').allowed
       ).toBe(true);
+    });
+  });
+
+  it('never lets allowlist or approver fallback override a denied member binding', () => {
+    stubModes(TEAM_CONFIG);
+    vi.stubEnv('KYBERION_SURFACE_ALLOWLISTS', JSON.stringify({ slack: ['U0LEAD'] }));
+    const team = resolveChannelModePolicy('slack', 'C0TEAM');
+    const speaker = { ...unboundSpeaker('U0LEAD').speaker!, denied: true };
+    expect(evaluateChannelActorAccess(team, 'U0LEAD', { speaker })).toMatchObject({
+      allowed: false,
+      reason: 'member_binding_denied',
+    });
+    expect(evaluateChannelApprovalAuthority(team, 'U0LEAD', { speaker })).toMatchObject({
+      allowed: false,
+      reason: 'member_binding_denied',
     });
   });
 

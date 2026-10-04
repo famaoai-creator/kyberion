@@ -58,12 +58,19 @@
               <p class="ask-empty" id="ask-empty">{{t:front_desk:ask_empty}}</p>
             </div>
 
+            <div id="conversation-status" class="kb-section" role="status" aria-live="polite"></div>
+            <details id="conversation-legacy" class="hidden">
+              <summary>{{t:front_desk:conversation_legacy_history}}</summary>
+              <p>{{t:front_desk:conversation_legacy_notice}}</p>
+              <ol id="conversation-legacy-turns"></ol>
+            </details>
             <form id="ask-form" class="ask-input-row">
               <input
                 type="text"
                 id="ask-input"
                 class="kb-input ask-input"
                 autocomplete="off"
+                maxlength="4000"
                 placeholder="{{t:front_desk:home_ask_placeholder}}"
                 aria-label="{{t:front_desk:nav_ask}}"
               />

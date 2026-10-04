@@ -190,9 +190,11 @@ export async function main(
     }
   }
   const scopeIndex = args.indexOf('--scope');
-  const scopeValue = scopeIndex >= 0 ? args[scopeIndex + 1] : 'pr';
   const onlyIndex = args.indexOf('--only');
   const only = onlyIndex >= 0 ? args[onlyIndex + 1] : undefined;
+  // A named gate (`--only tenant-registry`) is found in pr and full gates alike;
+  // only a bare run defaults to the pr set.
+  const scopeValue = scopeIndex >= 0 ? args[scopeIndex + 1] : only ? 'full' : 'pr';
   const json = args.includes('--json');
   const error = (message: string): number => {
     if (json) print({ scope: scopeValue, results: [], failed: 0, error: message });

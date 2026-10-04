@@ -33,3 +33,34 @@ export function resolveSurfaceUrl(surfaceId: string): string {
   const base = override || `http://127.0.0.1:${resolveSurfacePort(surfaceId)}`;
   return String(base).replace(/\/+$/u, '');
 }
+
+/** Browser navigation follows the already-declared public origin contract.
+ * Keep runtime service calls on resolveSurfaceUrl: public proxies do not change
+ * listeners, trust-proxy policy, cookies or action authorization. */
+export function resolveSurfaceBrowserUrl(surfaceId: string): string {
+  const entries = (getRegisteredEnvText('KYBERION_OIDC_PUBLIC_BASE_URLS') ?? '').split(',');
+  const named = entries
+    .map((entry) => {
+      const split = entry.indexOf('=');
+      return split < 0 ? null : [entry.slice(0, split).trim(), entry.slice(split + 1).trim()];
+    })
+    .filter((entry): entry is string[] => entry !== null)
+    .find((entry) => entry[0] === surfaceId)?.[1];
+  const declared = named || getRegisteredEnvText('KYBERION_OIDC_PUBLIC_BASE_URL');
+  if (declared) {
+    const url = new URL(declared);
+    const local = ['127.0.0.1', 'localhost', '[::1]', '::1'].includes(url.hostname);
+    if (
+      url.username ||
+      url.password ||
+      (url.protocol !== 'https:' && !(url.protocol === 'http:' && local))
+    )
+      throw new Error('[SURFACE_PUBLIC_ORIGIN] Invalid public surface origin');
+    return url.origin;
+  }
+  const base = resolveSurfaceUrl(surfaceId);
+  const url = new URL(base);
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password)
+    throw new Error('[SURFACE_URL] Invalid browser surface URL');
+  return base;
+}

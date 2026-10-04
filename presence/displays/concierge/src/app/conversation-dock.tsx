@@ -6,7 +6,13 @@ import { useVoice } from '../lib/use-voice';
 import { DockAvatar } from './dock-avatar';
 import { buildIntentResolutionView } from '../lib/intent-resolution-view';
 import { parseConversationHistory } from '../lib/conversation-history';
-import type { ConciergeMessageKey } from '../lib/i18n';
+import {
+  readSelectedTenant,
+  withSelectedTenant,
+  TENANT_CHANGED_EVENT,
+  tenantFromChangeEvent,
+} from '../lib/tenant-context';
+import { frontDeskText, type ConciergeMessageKey, type FrontDeskMessageKey } from '../lib/i18n';
 import type {
   ConversationMessageResponse,
   ConversationNextAction,
@@ -22,6 +28,7 @@ type DockMessage = {
   id: string;
   role: 'user' | 'secretary';
   text: string;
+  createdAt?: number;
   shape?: ConversationShape;
   promoted?: ConversationPromotion;
   nextActions?: ConversationNextAction[];
@@ -72,24 +79,30 @@ function newMessageId(): string {
   return `msg-${Date.now()}-${crypto.randomUUID().replace(/-/g, '').slice(0, 6)}`;
 }
 
-export function ConversationDock() {
+export function ConversationDock({ progressHref = '/progress' }: { progressHref?: string } = {}) {
   const { locale, t } = useConciergeI18n();
   const [open, setOpen] = React.useState(false);
   const [messages, setMessages] = React.useState<DockMessage[]>([]);
   const [draft, setDraft] = React.useState('');
+  const [tenant, setTenant] = React.useState<string | null>(readSelectedTenant);
+  const scopeEpoch = React.useRef(0);
+  const pendingRequest = React.useRef<{ id: string; text: string; createdAt: number } | null>(null);
+  const inFlight = React.useRef(false);
   const [busy, setBusy] = React.useState(false);
   const [historyState, setHistoryState] = React.useState<'loading' | 'ready' | 'failed'>('loading');
   const [historyWarning, setHistoryWarning] = React.useState(false);
+  const [storageVerified, setStorageVerified] = React.useState(false);
   const [pendingTurns, setPendingTurns] = React.useState(0);
   const [historyAttempt, setHistoryAttempt] = React.useState(0);
   const voice = useVoice(locale);
   const [voiceSettingsOpen, setVoiceSettingsOpen] = React.useState(false);
   const { speakText, notifyServerSpeech, unlockSpeechAudio } = voice;
   const sessionIdRef = React.useRef<string | null>(null);
+  const preserveDraftOnRestore = React.useRef(false);
   const logRef = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
-    if (!open || sessionIdRef.current) return;
+    if (!open) return;
     const controller = new AbortController();
     const timeout = setTimeout(() => {
       setHistoryState('failed');
@@ -98,7 +111,7 @@ export function ConversationDock() {
     setHistoryState('loading');
     void (async () => {
       try {
-        const response = await fetch('/api/message', {
+        const response = await fetch(withSelectedTenant('/api/message', tenant), {
           cache: 'no-store',
           signal: controller.signal,
         });
@@ -107,6 +120,30 @@ export function ConversationDock() {
         if (!history) throw new Error('invalid_history');
         if (controller.signal.aborted) return;
         sessionIdRef.current = history.sessionId;
+        try {
+          const raw = window.sessionStorage.getItem('front-desk.request.' + history.sessionId);
+          const saved = raw === null ? null : JSON.parse(raw);
+          if (
+            raw !== null &&
+            (!saved ||
+              typeof saved !== 'object' ||
+              Array.isArray(saved) ||
+              typeof saved.id !== 'string' ||
+              !/^[a-f0-9-]{36}$/.test(saved.id) ||
+              typeof saved.text !== 'string' ||
+              typeof saved.createdAt !== 'number' ||
+              !Number.isFinite(saved.createdAt))
+          )
+            throw new Error('invalid saved request');
+          if (saved) pendingRequest.current = saved;
+          const savedDraft =
+            window.sessionStorage.getItem('front-desk.draft.' + history.sessionId) || '';
+          if (!preserveDraftOnRestore.current) setDraft(savedDraft);
+          preserveDraftOnRestore.current = false;
+          setStorageVerified(true);
+        } catch {
+          setStorageVerified(false);
+        }
         setMessages(history.messages);
         setPendingTurns(history.pending);
         setHistoryState('ready');
@@ -120,7 +157,38 @@ export function ConversationDock() {
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [open, historyAttempt]);
+  }, [open, historyAttempt, tenant]);
+
+  React.useEffect(() => {
+    const change = (event: Event) => {
+      const next = tenantFromChangeEvent(event);
+      if (!next || next === tenant) return;
+      preserveDraftOnRestore.current = false;
+      scopeEpoch.current += 1;
+      sessionIdRef.current = null;
+      pendingRequest.current = null;
+      inFlight.current = false;
+      setDraft('');
+      setMessages([]);
+      setBusy(false);
+      setPendingTurns(0);
+      setHistoryState('loading');
+      setStorageVerified(false);
+      setTenant(next);
+    };
+    window.addEventListener(TENANT_CHANGED_EVENT, change);
+    return () => window.removeEventListener(TENANT_CHANGED_EVENT, change);
+  }, [tenant]);
+
+  function storeDraft(value: string) {
+    setDraft(value);
+    if (!sessionIdRef.current) return;
+    try {
+      window.sessionStorage.setItem('front-desk.draft.' + sessionIdRef.current, value);
+    } catch {
+      /* Optional. */
+    }
+  }
 
   React.useEffect(() => {
     const log = logRef.current;
@@ -138,40 +206,115 @@ export function ConversationDock() {
   const send = React.useCallback(
     async (text: string) => {
       const trimmed = text.trim();
-      if (!trimmed || busy || historyState !== 'ready' || !sessionIdRef.current) return;
+      if (
+        !trimmed ||
+        busy ||
+        inFlight.current ||
+        !storageVerified ||
+        historyState !== 'ready' ||
+        !sessionIdRef.current
+      )
+        return;
       // PA-09: every send path starts from a user gesture (submit, chip,
       // action button) or a mic turn that began with one — resume Web Audio
       // now so the avatar's reply audio may play (autoplay policy).
       void unlockSpeechAudio();
-      setBusy(true);
-      setMessages((prev) => [...prev, { id: newMessageId(), role: 'user', text: trimmed }]);
+      const epoch = scopeEpoch.current;
+      const waiting = messages.find(
+        (message) =>
+          message.role === 'user' &&
+          message.text === trimmed &&
+          message.id.endsWith('-user') &&
+          !messages.some((reply) => reply.id === message.id.replace(/-user$/, '-secretary'))
+      );
+      const request = waiting
+        ? {
+            id: waiting.id.replace(/-user$/, ''),
+            text: trimmed,
+            createdAt: waiting.createdAt ?? Date.now(),
+          }
+        : pendingRequest.current?.text === trimmed
+          ? pendingRequest.current
+          : { id: crypto.randomUUID(), text: trimmed, createdAt: Date.now() };
       try {
+        const key = 'front-desk.request.' + sessionIdRef.current;
+        const serialized = JSON.stringify(request);
+        window.sessionStorage.setItem(key, serialized);
+        if (window.sessionStorage.getItem(key) !== serialized)
+          throw new Error('request not retained');
+      } catch {
+        setStorageVerified(false);
+        return;
+      }
+      pendingRequest.current = request;
+      inFlight.current = true;
+      setBusy(true);
+      setMessages((prev) =>
+        prev.some((message) => message.id === request.id + '-user')
+          ? prev
+          : [
+              ...prev,
+              {
+                id: request.id + '-user',
+                role: 'user',
+                text: trimmed,
+                createdAt: request.createdAt,
+              },
+            ]
+      );
+      let outcomeUncertain = true;
+      try {
+        const selectedScope = new URL(window.location.href).searchParams;
         const response = await fetch('/api/message', {
           method: 'POST',
           cache: 'no-store',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: trimmed, locale, sessionId: sessionIdRef.current }),
+          body: JSON.stringify({
+            text: trimmed,
+            locale,
+            sessionId: sessionIdRef.current,
+            requestId: request.id,
+            requestCreatedAt: request.createdAt,
+            tenant: tenant || undefined,
+            organizationId: selectedScope.get('organizationId') || undefined,
+            projectId: selectedScope.get('projectId') || undefined,
+          }),
         });
         const rawPayload: unknown = await response.json();
+        if (epoch !== scopeEpoch.current) return;
+        if (!response.ok || response.status === 202) {
+          const raw =
+            rawPayload && typeof rawPayload === 'object'
+              ? (rawPayload as Record<string, unknown>)
+              : {};
+          const failure = conversationFailurePolicy(response.status, raw);
+          outcomeUncertain = failure.uncertain;
+          if (failure.invalidateHistory) {
+            preserveDraftOnRestore.current = true;
+            sessionIdRef.current = null;
+            pendingRequest.current = null;
+            setMessages([]);
+            setHistoryState('failed');
+            throw new Error(t('dock.history.failed'));
+          }
+          const typedError = failure.messageKey;
+          throw new Error(
+            typedError
+              ? frontDeskText(typedError, locale)
+              : t(raw.retry_safe === true ? 'api.history_unavailable' : 'dock.history.pending')
+          );
+        }
         const payload = parseConversationMessageResponse(rawPayload);
         if (response.status === 413) throw new Error(t('api.message_too_long'));
         if (response.status === 503 && !payload.reply)
           throw new Error(t('api.history_unavailable'));
         if (payload.historySaved === false) setHistoryWarning(true);
-        if (response.status === 409) {
-          sessionIdRef.current = null;
-          setMessages([]);
-          setHistoryState('failed');
-          throw new Error(t('dock.history.failed'));
-        }
-        // A 503 still carries a polite, actionable reply — show it as the
-        // secretary's answer instead of a technical failure.
         const reply = typeof payload.reply === 'string' ? payload.reply : '';
         if (!reply) throw new Error(payload.error || `request failed (${response.status})`);
         setMessages((prev) => [
-          ...prev,
+          ...prev.filter((message) => message.id !== request.id + '-secretary'),
           {
-            id: newMessageId(),
+            id: request.id + '-secretary',
             role: 'secretary',
             text: reply,
             shape: payload.shape || 'reply',
@@ -181,6 +324,22 @@ export function ConversationDock() {
             error: payload.mode === 'unavailable',
           },
         ]);
+        pendingRequest.current = null;
+        try {
+          window.sessionStorage.removeItem('front-desk.request.' + sessionIdRef.current);
+        } catch {
+          /* Optional. */
+        }
+        setDraft((value) => (value.trim() === trimmed ? '' : value));
+        try {
+          if (
+            window.sessionStorage.getItem('front-desk.draft.' + sessionIdRef.current)?.trim() ===
+            trimmed
+          )
+            window.sessionStorage.removeItem('front-desk.draft.' + sessionIdRef.current);
+        } catch {
+          /* Optional. */
+        }
         // Voice output (CS-02): a voice-hub reply was ALREADY spoken
         // server-side (ingest-text does TTS) — only mirror the speaking
         // indicator. Orchestrator/unavailable turns are browser-spoken.
@@ -190,6 +349,8 @@ export function ConversationDock() {
           speakText(reply);
         }
       } catch (error) {
+        if (epoch !== scopeEpoch.current) return;
+        if (outcomeUncertain) setPendingTurns((count) => Math.max(count, 1));
         setMessages((prev) => [
           ...prev,
           {
@@ -203,10 +364,24 @@ export function ConversationDock() {
           },
         ]);
       } finally {
-        setBusy(false);
+        if (epoch === scopeEpoch.current) {
+          inFlight.current = false;
+          setBusy(false);
+        }
       }
     },
-    [busy, historyState, locale, t, notifyServerSpeech, speakText, unlockSpeechAudio]
+    [
+      busy,
+      messages,
+      storageVerified,
+      historyState,
+      locale,
+      tenant,
+      t,
+      notifyServerSpeech,
+      speakText,
+      unlockSpeechAudio,
+    ]
   );
 
   // Tier 1 mic turn: one server-side capture → STT → reply. The transcript is
@@ -272,7 +447,7 @@ export function ConversationDock() {
     // path so it appears as a user bubble like any typed message.
     voice.startListening(
       (text) => {
-        setDraft('');
+        storeDraft(text);
         void send(text);
       },
       (interim) => setDraft(interim)
@@ -283,7 +458,6 @@ export function ConversationDock() {
     (event: React.FormEvent) => {
       event.preventDefault();
       const text = draft;
-      setDraft('');
       void send(text);
     },
     [draft, send]
@@ -328,6 +502,28 @@ export function ConversationDock() {
         ) : null}
         {historyState === 'ready' && pendingTurns > 0 ? t('dock.history.pending') : null}
         {historyWarning ? t('dock.history.unsaved') : null}
+        {historyState === 'ready' && !storageVerified ? (
+          <>
+            {frontDeskText('conversation_storage_required', locale)}{' '}
+            <button type="button" onClick={() => setHistoryAttempt((attempt) => attempt + 1)}>
+              {t('dock.history.retry')}
+            </button>
+          </>
+        ) : null}
+        {pendingTurns > 0 || historyState === 'failed' ? (
+          <>
+            {' '}
+            <a href={withSelectedTenant(progressHref, tenant)}>
+              {frontDeskText('nav_progress', locale)}
+            </a>{' '}
+            <a href={withSelectedTenant('/settings', tenant)}>
+              {frontDeskText('nav_settings', locale)}
+            </a>{' '}
+            <button type="button" onClick={() => setHistoryAttempt((attempt) => attempt + 1)}>
+              {t('dock.history.retry')}
+            </button>
+          </>
+        ) : null}
       </div>
       <div className="dock-log" ref={logRef} aria-live="polite">
         {messages.length === 0 ? <p className="dock-empty">{t('dock.empty')}</p> : null}
@@ -352,6 +548,16 @@ export function ConversationDock() {
               </span>
               {shapeKey ? <span className="dock-shape-chip">{t(shapeKey)}</span> : null}
               <p className="dock-text">{message.text}</p>
+              {message.role === 'user' && /^[a-f0-9-]{36}-user$/.test(message.id) ? (
+                <a
+                  href={withSelectedTenant(
+                    progressHref + '?request=' + encodeURIComponent(message.id.slice(0, -5)),
+                    tenant
+                  )}
+                >
+                  {frontDeskText('nav_progress', locale)}
+                </a>
+              ) : null}
               {message.promoted ? (
                 <p className="dock-promoted">
                   {t(
@@ -555,13 +761,14 @@ export function ConversationDock() {
           value={draft}
           placeholder={t('dock.placeholder')}
           aria-label={t('dock.placeholder')}
-          onChange={(event) => setDraft(event.target.value)}
-          disabled={busy || historyState !== 'ready'}
+          onChange={(event) => storeDraft(event.target.value)}
+          maxLength={8192}
+          disabled={historyState !== 'ready'}
         />
         <button
           type="submit"
           className="action-button"
-          disabled={busy || historyState !== 'ready' || !draft.trim()}
+          disabled={busy || historyState !== 'ready' || !storageVerified || !draft.trim()}
         >
           {t('dock.send')}
         </button>
@@ -579,7 +786,10 @@ export function parseConversationMessageResponse(
   const raw = value as Record<string, unknown>;
   const reply = typeof raw.reply === 'string' ? raw.reply.trim() : undefined;
   const mode =
-    raw.mode === 'voice-hub' || raw.mode === 'orchestrator' || raw.mode === 'unavailable'
+    raw.mode === 'voice-hub' ||
+    raw.mode === 'orchestrator' ||
+    raw.mode === 'unavailable' ||
+    raw.mode === 'history'
       ? raw.mode
       : undefined;
   const shape =
@@ -593,6 +803,13 @@ export function parseConversationMessageResponse(
   if (!reply || !mode || !shape) {
     return { error: 'The conversation response was invalid.' };
   }
+  if (mode === 'history')
+    return {
+      reply,
+      mode,
+      shape: 'reply',
+      ...(typeof raw.historySaved === 'boolean' ? { historySaved: raw.historySaved } : {}),
+    };
   const intentResolution = parseIntentResolutionContract(raw.intentResolution);
   const nextActions = Array.isArray(raw.nextActions)
     ? raw.nextActions.flatMap((action): ConversationNextAction[] => {
@@ -641,4 +858,22 @@ function isSafeConversationResponseTree(value: unknown): boolean {
 
 function isConversationPromotionKind(value: unknown): value is ConversationPromotion['kind'] {
   return value === 'mission' || value === 'task_session';
+}
+
+/** Pure recovery policy shared by the POST handler and regression tests. */
+export function conversationFailurePolicy(
+  status: number,
+  raw: Record<string, unknown>
+): { uncertain: boolean; invalidateHistory: boolean; messageKey: FrontDeskMessageKey | undefined } {
+  const messageKey =
+    raw.error === 'conversation_not_started' ||
+    raw.error === 'conversation_scope_selection_required' ||
+    raw.error === 'conversation_capability_unsupported'
+      ? raw.error
+      : undefined;
+  return {
+    uncertain: raw.retry_safe !== true,
+    invalidateHistory: status === 409 && raw.error === 'conversation_scope_changed',
+    messageKey,
+  };
 }
