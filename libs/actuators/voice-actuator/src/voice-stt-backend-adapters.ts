@@ -54,7 +54,7 @@ function createFasterWhisperBridge(
         const script = pathResolver.rootResolve(
           'libs/actuators/voice-actuator/scripts/faster_whisper_stt_bridge.py'
         );
-        const result = safeExecResult(resolvePythonBin('faster_whisper'), [script], {
+        const result = safeExecResult(resolvePythonBin('faster_whisper'), ['-X', 'utf8', script], {
           input: JSON.stringify({
             action: 'transcribe',
             params: { audio_path: audioPath, language: options.language },

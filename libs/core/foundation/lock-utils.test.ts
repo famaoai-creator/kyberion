@@ -16,6 +16,7 @@ import {
   inspectLockRecovery,
   LOCK_RECOVERY_AGE_MS,
   releaseLock,
+  withLockSync,
 } from './lock-utils.js';
 
 const lockRoot = pathResolver.rootResolve('active/shared/runtime/locks');
@@ -33,6 +34,35 @@ afterEach(() => {
 });
 
 describe('lock utilities', () => {
+  it.each([
+    ['writer-lease-path:abc', 'writer-lease-path%3Aabc'],
+    ['../nested\\key', '..%2Fnested%5Ckey'],
+    ['CON', '%43ON'],
+    ['nul.txt', '%6Eul.txt'],
+  ])('acquires and releases a portable lock for %s', async (key, filename) => {
+    createdLockIds.push(filename);
+    await expect(acquireLock(key, 1)).resolves.toBe(true);
+    expect(safeExistsSync(lockPath(filename))).toBe(true);
+    await expect(acquireLock(key, 1)).resolves.toBe(false);
+    expect(inspectLockRecovery(key)).toMatchObject({ state: 'live' });
+    releaseLock(key);
+    expect(safeExistsSync(lockPath(filename))).toBe(false);
+    expect(withLockSync(key, () => 'locked')).toBe('locked');
+    expect(safeExistsSync(lockPath(filename))).toBe(false);
+  });
+
+  it('keeps escaped resource IDs distinct from literal percent sequences', async () => {
+    const key = `lock-utils:${process.pid}`;
+    const escapedKey = `lock-utils%3A${process.pid}`;
+    createdLockIds.push(`lock-utils%3A${process.pid}`, `lock-utils%253A${process.pid}`);
+    await expect(acquireLock(key, 1)).resolves.toBe(true);
+    await expect(acquireLock(escapedKey, 1)).resolves.toBe(true);
+    expect(safeExistsSync(path.join(lockRoot, `lock-utils%3A${process.pid}.lock`))).toBe(true);
+    expect(safeExistsSync(path.join(lockRoot, `lock-utils%253A${process.pid}.lock`))).toBe(true);
+    releaseLock(key);
+    releaseLock(escapedKey);
+  });
+
   it('reclaims an old malformed record once it exceeds the recovery age', async () => {
     const resourceId = `lock-utils-malformed-old-${process.pid}-${Date.now()}`;
     createdLockIds.push(resourceId);

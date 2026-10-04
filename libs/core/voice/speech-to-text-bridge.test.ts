@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
+import * as secureIo from '../secure-io.js';
+import { discoverLocalSttBackends } from '../local-stt-discovery.js';
 import * as path from 'node:path';
+
+vi.mock('../local-stt-discovery.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../local-stt-discovery.js')>()),
+  discoverLocalSttBackends: vi.fn(() => []),
+}));
 
 vi.mock('../path-resolver.js', async () => {
   const actual = await vi.importActual<typeof import('../path-resolver.js')>('../path-resolver.js');
@@ -31,6 +38,7 @@ import {
   ShellSpeechToTextBridge,
   buildWhisperKitTranscribeArgs,
   installAvailableSpeechToTextBridges,
+  installManagedFasterWhisperSpeechToTextBridgeIfAvailable,
   installFluidAudioSpeechToTextBridgeIfAvailable,
   installShellSpeechToTextBridgeIfAvailable,
   type SpeechToTextBridge,
@@ -51,8 +59,176 @@ describe('speech-to-text-bridge', () => {
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+    vi.mocked(discoverLocalSttBackends).mockReturnValue([]);
     vi.clearAllMocks();
     resetSpeechToTextBridge();
+  });
+
+  it('transcribes Japanese with the managed faster-whisper bridge in UTF-8', async () => {
+    const script = path.join(
+      tmpDir,
+      'libs/actuators/voice-actuator/scripts/faster_whisper_stt_bridge.py'
+    );
+    secureIo.safeMkdir(path.dirname(script), { recursive: true });
+    secureIo.safeWriteFile(script, '# fixture');
+    const audio = path.join(tmpDir, 'sample.wav');
+    secureIo.safeWriteFile(audio, 'audio fixture');
+    vi.mocked(discoverLocalSttBackends).mockReturnValue([
+      {
+        backend: 'faster_whisper',
+        display_name: 'faster-whisper',
+        source: 'managed-runtime',
+        priority: 90,
+        verification: 'python-module',
+        python_bin: 'managed-python',
+        detail: 'ready',
+        connection: {},
+      },
+    ]);
+    const exec = vi.spyOn(secureIo, 'safeExecResult').mockReturnValue({
+      status: 0,
+      stderr: '',
+      stdout: JSON.stringify({
+        status: 'success',
+        text: 'こんにちは。',
+        language: 'ja',
+        segments: [{ start_sec: 0, end_sec: 1, text: 'こんにちは。' }],
+      }),
+    });
+    expect(installManagedFasterWhisperSpeechToTextBridgeIfAvailable({})).toBe(true);
+    const bridge = getSpeechToTextBridges().find(
+      (candidate) => candidate.name === 'faster_whisper'
+    )!;
+    const result = await bridge.transcribe({
+      audioPath: audio,
+      language: 'ja',
+      outputPath: path.join(tmpDir, 'transcript.txt'),
+    });
+    expect(result.text).toBe('こんにちは。');
+    expect(result.segments).toEqual([{ start_sec: 0, end_sec: 1, text: 'こんにちは。' }]);
+    expect(exec).toHaveBeenCalledWith(
+      'managed-python',
+      ['-X', 'utf8', script],
+      expect.objectContaining({ input: expect.stringContaining('ja') })
+    );
+    expect(safeReadFile(path.join(tmpDir, 'transcript.txt'))).toBe('こんにちは。\n');
+    exec.mockRestore();
+    vi.mocked(discoverLocalSttBackends).mockReturnValue([]);
+  });
+
+  it('does not install an unavailable managed faster-whisper runtime or override an explicit command', () => {
+    vi.mocked(discoverLocalSttBackends).mockReturnValue([]);
+    expect(installManagedFasterWhisperSpeechToTextBridgeIfAvailable({})).toBe(false);
+    expect(getSpeechToTextBridge().name).toBe('stub');
+    expect(
+      installManagedFasterWhisperSpeechToTextBridgeIfAvailable({ KYBERION_STT_COMMAND: 'explicit' })
+    ).toBe(false);
+  });
+
+  it.each([
+    {
+      label: 'nonzero exit',
+      status: 1,
+      stdout: '{"text":"must not persist"}',
+      stderr: 'model failed',
+      error: 'backend failed: model failed',
+    },
+    {
+      label: 'error response',
+      status: 0,
+      stdout: '{"status":"error","error":"model failed"}',
+      stderr: '',
+      error: 'backend returned empty text',
+    },
+    { label: 'invalid JSON', status: 0, stdout: 'not-json', stderr: '', error: 'valid JSON' },
+    {
+      label: 'empty text',
+      status: 0,
+      stdout: '{"status":"success","text":"   "}',
+      stderr: '',
+      error: 'backend returned empty text',
+    },
+  ])('rejects managed faster-whisper $label without writing a transcript', async (response) => {
+    const script = path.join(
+      tmpDir,
+      'libs/actuators/voice-actuator/scripts/faster_whisper_stt_bridge.py'
+    );
+    secureIo.safeMkdir(path.dirname(script), { recursive: true });
+    secureIo.safeWriteFile(script, '# fixture');
+    const audio = path.join(tmpDir, 'failure.wav');
+    const output = path.join(tmpDir, 'failure.txt');
+    secureIo.safeWriteFile(audio, 'audio fixture');
+    vi.mocked(discoverLocalSttBackends).mockReturnValue([
+      {
+        backend: 'faster_whisper',
+        display_name: 'faster-whisper',
+        source: 'managed-runtime',
+        priority: 90,
+        verification: 'python-module',
+        python_bin: 'managed-python',
+        detail: 'ready',
+        connection: {},
+      },
+    ]);
+    const exec = vi.spyOn(secureIo, 'safeExecResult').mockReturnValue({
+      status: response.status,
+      stdout: response.stdout,
+      stderr: response.stderr,
+    });
+    expect(installManagedFasterWhisperSpeechToTextBridgeIfAvailable({})).toBe(true);
+    const bridge = getSpeechToTextBridges().find(
+      (candidate) => candidate.name === 'faster_whisper'
+    )!;
+    await expect(bridge.transcribe({ audioPath: audio, outputPath: output })).rejects.toThrow(
+      response.error
+    );
+    expect(exec).toHaveBeenCalledTimes(1);
+    expect(secureIo.safeExistsSync(output)).toBe(false);
+  });
+
+  it('keeps an explicit command ahead of a previously registered runtime', () => {
+    registerSpeechToTextBridge({
+      name: 'faster_whisper',
+      priority: 90,
+      transcribe: async () => ({ text: 'previous', backend: 'faster_whisper' }),
+    });
+    expect(
+      installManagedFasterWhisperSpeechToTextBridgeIfAvailable({
+        KYBERION_STT_COMMAND: 'explicit',
+      })
+    ).toBe(false);
+    const selected = installAvailableSpeechToTextBridges({ KYBERION_STT_COMMAND: 'explicit' });
+    expect(getSpeechToTextBridges().map((bridge) => bridge.name)).toContain('shell');
+    expect(selected.name).toBe('shell');
+  });
+
+  it('preserves explicit manual STT priority when a runtime was already registered', () => {
+    registerSpeechToTextBridge({
+      name: 'faster_whisper',
+      priority: 90,
+      transcribe: async () => ({ text: 'previous', backend: 'faster_whisper' }),
+    });
+    expect(
+      installAvailableSpeechToTextBridges({
+        KYBERION_STT_COMMAND: 'explicit',
+        KYBERION_STT_PRIORITY: '7',
+      }).name
+    ).toBe('faster_whisper');
+    expect(getSpeechToTextBridges().find((bridge) => bridge.name === 'shell')?.priority).toBe(7);
+  });
+
+  it('keeps explicit FluidAudio ahead of a previously registered higher-priority runtime', () => {
+    registerSpeechToTextBridge({
+      name: 'faster_whisper',
+      priority: 150,
+      transcribe: async () => ({ text: 'previous', backend: 'faster_whisper' }),
+    });
+    expect(
+      installAvailableSpeechToTextBridges({
+        KYBERION_FLUID_AUDIO_STT_COMMAND: 'explicit',
+      }).name
+    ).toBe('fluid-audio-parakeet');
   });
 
   it('defaults to the stub bridge', () => {
