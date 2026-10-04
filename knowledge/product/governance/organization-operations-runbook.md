@@ -1,7 +1,7 @@
 ---
 title: Organization Operations Runbook
 tags: [organization, operation, incident, decision, governance]
-last_updated: 2026-09-24
+last_updated: 2026-10-05
 ---
 
 # Organization operations
@@ -18,6 +18,12 @@ pnpm organization operation tick --organization-id ORG --tier confidential --ten
 ```
 
 `tick` performs one catch-up run for each due Operation. The occurrence determines a stable Run ID, and execution holds an operation lock to prevent overlapping ticks from running it twice. If a process stops after recording `started`, the next applied tick marks that Run blocked and opens an Incident for operator review. Operations needing additional approval or another execution target are reported as blocked for a separate governed execution path. Arrange repeated `tick` calls through the operator's scheduler; creating an Operation record alone does not install a scheduler job.
+
+### Scheduled cadences (tick, standup, retro)
+
+Prefer the per-tenant resident-dot cadence: give the organization's dot charter an `operations_cadence` block (`tick_every_minutes`, `standup.cron`, `retro.cron`; requires `scope.organization_id` and `authority_role: organization_operator`). The agent-runtime supervisor then ticks due operations, files the standup and the weekly retro for that organization only, as `organization_operator` bound to the organization's tenant; a run whose bound tenant differs is refused and nothing needs `KYBERION_PERSONA=sovereign`. Each cadence is audited as `tick:scoped` / `standup:scoped` / `retro:scoped`, skipped while the organization budget is at the hard limit, and caught up at most once after downtime. `dots/org-operations.json` is the reference charter. See `dots/README.md`.
+
+Use the sovereign Chronos schedules (`organization-operation-tick`, `organization-standup`, `organization-retro`, `organization-daily-digest`) only for a single operator who needs the cross-tenant view; they aggregate every tenant and refuse any persona other than `sovereign`. Do not enable both paths for the same organization, or its standup and retro are filed twice.
 
 For a blocked Run, inspect its Incident and pipeline Trace, decide whether external effects already occurred, and resolve the Incident through the governed transition commands. A subsequent attempt needs a new explicit Run ID; the same scheduled occurrence ID is never replayed automatically. Correct the underlying failure before triggering another run.
 

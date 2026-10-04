@@ -17,6 +17,7 @@ import { settleDotArbitration } from '@agent/core/dot/dot-arbitration';
 import { runDotAutonomyStep } from '@agent/core/dot/dot-autonomy';
 import '@agent/core/dot/dot-extension-bootstrap';
 import { DOT_EXECUTOR_SUPERVISOR_STEP } from './dot_executor_step.js';
+import { DOT_ORG_CADENCE_SUPERVISOR_STEP } from './dot_org_cadence_step.js';
 
 const logger = createLogger('dot-supervisor');
 
@@ -134,3 +135,8 @@ DOT_SUPERVISOR_STEPS.push({
     }
   },
 });
+
+// Per-tenant organization cadences (operation tick, standup, retro) for charters
+// that opt in with operations_cadence — scoped to the charter's own organization
+// and run as its authority role, so no sovereign chronos daemon is required
+DOT_SUPERVISOR_STEPS.push(DOT_ORG_CADENCE_SUPERVISOR_STEP);

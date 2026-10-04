@@ -3,7 +3,8 @@
  * since the last standup, what waits on a human, and how objectives moved.
  *
  * `buildOrganizationStandup` is pure over injected readers; `runOrganizationStandup`
- * is the governed entry point (sovereign-only, audited) that renders, files each
+ * is the governed entry point (sovereign across tenants, or scoped to one
+ * organization inside its bound tenant; audited) that renders, files each
  * organization's standup as a published report in its own scope and sends one
  * `decision_digest` notification per organization with something to report.
  */
@@ -24,9 +25,10 @@ import { notifyOperatorSync } from '../surface/operator-notifications.js';
 import { listWorkItems, type WorkItem } from '../workforce/work-coordination.js';
 import { writeScopedArtifact } from '../workforce/artifact-store.js';
 import {
-  assertSovereignCadencePersona,
-  listOrganizationScopes,
+  authorizeOrganizationCadence,
+  cadenceOrganizations,
   normalizeCadenceTenant,
+  type OrganizationCadenceScope,
 } from './organization-cadence.js';
 import { listOrganizationDecisions } from './organization-operating-model-management.js';
 import { listOrganizationOperationRuns } from './organization-operating-model-operations.js';
@@ -505,6 +507,8 @@ export function defaultStandupWindowHours(now: Date, timezone: string): number {
 }
 
 export interface RunOrganizationStandupOptions {
+  /** Scoped mode: only this organization (no sovereign persona; bound tenant must match). */
+  scope?: OrganizationCadenceScope;
   /** Hours of history to report (default: since the previous weekday standup). */
   sinceHours?: number;
   timezone?: string;
@@ -525,14 +529,14 @@ export function organizationDisplayName(scope: OrganizationScopeRef): string {
   return scope.name || scope.organizationId;
 }
 
-/** Governed standup sweep over every organization (sovereign-only, audited). */
+/** Governed standup: every organization (sovereign-only) or one scoped organization; audited. */
 export function runOrganizationStandup(
   options: RunOrganizationStandupOptions = {},
   deps: OrganizationCadenceDeps & {
     listOrganizations?: (tier: OrganizationTier) => OrganizationScopeRef[];
   } = {}
 ): OrganizationStandupRun {
-  const persona = assertSovereignCadencePersona('standup', options.env);
+  const auth = authorizeOrganizationCadence('standup', options.scope, options.env);
   const now = deps.now?.() ?? new Date();
   const timezone = options.timezone ?? ORGANIZATION_CADENCE_DEFAULT_TIMEZONE;
   const locale = options.locale ?? ORGANIZATION_CADENCE_DEFAULT_LOCALE;
@@ -541,11 +545,13 @@ export function runOrganizationStandup(
       ? options.sinceHours
       : defaultStandupWindowHours(now, timezone);
   const since = new Date(now.getTime() - hours * HOUR_MS);
-  const tiers = options.tiers ?? ['confidential', 'public'];
+  const tiers = options.scope
+    ? [options.scope.tier]
+    : (options.tiers ?? ['confidential', 'public']);
   const standups: OrganizationStandupRun['standups'] = [];
   let organizationCount = 0;
   for (const tier of tiers) {
-    const scopes = deps.listOrganizations?.(tier) ?? listOrganizationScopes({ tier }, deps.rootDir);
+    const scopes = cadenceOrganizations(tier, options.scope, deps.rootDir, deps.listOrganizations);
     for (const scope of scopes) {
       organizationCount += 1;
       const standup = buildOrganizationStandup(
@@ -574,11 +580,17 @@ export function runOrganizationStandup(
     }
   }
   (deps.audit ?? ((entry) => auditChain.record(entry)))({
-    agentId: persona,
+    agentId: auth.agentId,
     action: 'organization.standup',
-    operation: 'standup:cross_tenant',
+    operation: `standup:${auth.mode}`,
     result: 'completed',
-    metadata: { tiers, organization_count: organizationCount, reported_count: standups.length },
+    ...(auth.tenantSlug ? { tenantSlug: auth.tenantSlug } : {}),
+    metadata: {
+      tiers,
+      ...(options.scope ? { organization_id: options.scope.organizationId } : {}),
+      organization_count: organizationCount,
+      reported_count: standups.length,
+    },
   });
   return {
     standups,

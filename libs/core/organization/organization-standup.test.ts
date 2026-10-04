@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { runInExecutionScope } from '../foundation/execution-scope.js';
 import type { DotCharter, LoadedDotCharter } from '../dot/dot-charter.js';
 import type { DotActionRecord } from '../dot/dot-dispatch.js';
 import type { KrMeasurementRow } from '../dot/dot-state-paths.js';
@@ -242,5 +243,53 @@ describe('defaultStandupWindowHours', () => {
     expect(defaultStandupWindowHours(new Date('2026-10-04T00:00:00.000Z'), 'Asia/Tokyo')).toBe(48);
     // Still Sunday evening in UTC.
     expect(defaultStandupWindowHours(new Date('2026-10-04T23:00:00.000Z'), 'UTC')).toBe(48);
+  });
+});
+
+describe('runOrganizationStandup scoped mode', () => {
+  const cadenceScope = {
+    tier: 'confidential' as const,
+    tenantSlug: 'acme',
+    organizationId: 'org-a',
+  };
+  const bound = <T>(tenantSlug: string, fn: () => T): T =>
+    runInExecutionScope(
+      {
+        tenantBound: true,
+        tenantSlug,
+        assumedRole: 'organization_operator',
+        assumedPersona: null,
+      },
+      fn
+    );
+
+  it('runs for the bound tenant without the sovereign persona and audits standup:scoped', () => {
+    const audit = vi.fn();
+    const other = { ...scope, organizationId: 'org-b' };
+    const result = bound('acme', () =>
+      runOrganizationStandup(
+        { scope: cadenceScope, persist: false, locale: 'en', env: { KYBERION_PERSONA: 'worker' } },
+        { ...deps(), audit, listOrganizations: () => [scope, other] }
+      )
+    );
+    expect(result.organization_count).toBe(1);
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'standup:scoped',
+        tenantSlug: 'acme',
+        agentId: 'organization_operator',
+      })
+    );
+  });
+
+  it('refuses a mismatched bound tenant', () => {
+    expect(() =>
+      bound('other', () =>
+        runOrganizationStandup(
+          { scope: cadenceScope, persist: false },
+          { ...deps(), listOrganizations: () => [scope] }
+        )
+      )
+    ).toThrow(/POLICY_VIOLATION/);
   });
 });
