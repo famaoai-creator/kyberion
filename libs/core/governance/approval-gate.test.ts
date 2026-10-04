@@ -54,8 +54,10 @@ const mockExpireRequest = vi.mocked(expireApprovalRequest);
 const mockLookupSessionCache = vi.mocked(lookupSessionApprovalCache);
 const mockRecordSessionCacheAutoApproval = vi.mocked(recordSessionCacheAutoApproval);
 const mockAuditRecord = vi.mocked(auditChain.record);
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
+type WithDefault<T> = T & { default?: T };
+const Ajv = (AjvModule as WithDefault<typeof AjvModule>).default ?? AjvModule;
+const addFormats =
+  (addFormatsModule as WithDefault<typeof addFormatsModule>).default ?? addFormatsModule;
 
 const baseParams = {
   operationId: 'secret:set',
