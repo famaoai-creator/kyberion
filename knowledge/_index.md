@@ -830,6 +830,7 @@
 - [対外報告用ステータスレポート・テンプレート](./public/pmo/templates/external_status_report.md) (public | Ecosystem Architect)
 
 ## 📁 public/procedures
+- [Expose a surface through public ingress (Tailscale Funnel)](./public/procedures/expose-surface-public-ingress.md) (public | Unknown)
 - [Select a reasoning provider and model](./public/procedures/select-reasoning-provider-and-model.md) (public | Unknown)
 - [Select adapter-backed runtime defaults](./public/procedures/select-adapter-backed-runtime-defaults.md) (public | Unknown)
 
