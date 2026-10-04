@@ -25,6 +25,14 @@ import { executePipelineFile } from './run_pipeline.js';
 import * as path from 'node:path';
 import { withLock } from '@agent/core/lock-utils';
 import { resolveScopeResolution } from '@agent/core/scope-context';
+import { withExecutionContextAsync } from '@agent/core/authority';
+import { normalizeCadenceTenant } from '@agent/core/organization/organization-cadence';
+
+/**
+ * Governed authority role a scheduled (unattended) operation run executes
+ * under. The CLI path inherits the operator's selected scope instead.
+ */
+export const SCHEDULED_OPERATION_ROLE = 'organization_operator';
 
 function assertSelectedOrganizationScope(
   organizationId: string,
@@ -102,8 +110,10 @@ async function executeOrganizationOperationLocked(input: {
   runId: string;
   tier: 'public' | 'confidential' | 'personal';
   tenantSlug?: string;
+  /** Scheduled runs bind the pipeline to the operation's tenant/organization scope. */
+  scheduled?: boolean;
 }): Promise<void> {
-  const { flags, organizationId, operationId, runId, tier, tenantSlug } = input;
+  const { flags, organizationId, operationId, runId, tier, tenantSlug, scheduled } = input;
   const operation = loadOrganizationOperation(operationId, { organizationId, tier, tenantSlug });
   if (!operation || operation.status !== 'active')
     throw new Error(`Active operation not found: ${operationId}`);
@@ -164,20 +174,30 @@ async function executeOrganizationOperationLocked(input: {
   let summary = 'Pipeline completed.';
   let evidenceRefs: string[] = [];
   try {
-    const result = await executePipelineFile(ref, {
-      payloadScope: {
-        tier,
-        tenant_slug: tenantSlug,
-        purpose: `organization operation ${organizationId}/${operationId}`,
-      },
-      context: {
-        organization_id: organizationId,
-        tenant_slug: tenantSlug,
-        tier,
-        operation_id: operationId,
-        operation_run_id: runId,
-      },
-    });
+    const runPipeline = () =>
+      executePipelineFile(ref, {
+        payloadScope: {
+          tier,
+          tenant_slug: tenantSlug,
+          purpose: `organization operation ${organizationId}/${operationId}`,
+        },
+        context: {
+          organization_id: organizationId,
+          tenant_slug: tenantSlug,
+          tier,
+          operation_id: operationId,
+          operation_run_id: runId,
+        },
+      });
+    const result = scheduled
+      ? await withExecutionContextAsync(
+          SCHEDULED_OPERATION_ROLE,
+          runPipeline,
+          undefined,
+          tenantSlug,
+          organizationId
+        )
+      : await runPipeline();
     evidenceRefs = [`trace:${result.trace.traceId}`];
     if (result.results.some((step) => step.status === 'failed')) {
       status = 'failed';
@@ -296,7 +316,8 @@ export async function tickOrganizationOperations(args: string[]): Promise<void> 
 export async function executeScheduledOrganizationOperation(
   input: TickExecuteInput
 ): Promise<void> {
-  const { organizationId, operationId, runId, tier, tenantSlug } = input;
+  const { organizationId, operationId, runId, tier } = input;
+  const tenantSlug = normalizeCadenceTenant(input.tenantSlug);
   return withLock(
     operationLockId(organizationId, operationId, tenantSlug),
     () =>
@@ -307,6 +328,7 @@ export async function executeScheduledOrganizationOperation(
         runId,
         tier,
         tenantSlug,
+        scheduled: true,
       }),
     1000
   );

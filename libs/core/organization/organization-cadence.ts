@@ -8,7 +8,7 @@ import * as path from 'node:path';
 import { auditChain } from '../governance/audit-chain.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { executionPersonaText } from '../foundation/execution-scope.js';
-import { isValidTenantSlug } from '../entity-scope.js';
+import { isReservedScopeName, isValidTenantSlug } from '../entity-scope.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReaddir, safeStat } from '../secure-io.js';
 import { listOrganizationOperationalStates } from './organization-operating-model-management.js';
@@ -29,7 +29,22 @@ function listDirectories(dir: string): string[] {
     .sort();
 }
 
-/** Organizations under one tier (optionally one tenant / one organization). */
+/**
+ * The tenant of a discovered organization scope. Directory partitions such as
+ * `shared` (untenanted organizations) and every other reserved scope name are
+ * never tenants (RESERVED_SCOPE_NAMES), so they normalise to `undefined`. The
+ * single rule every cadence (tick, standup, retro) applies before persisting
+ * or binding a `tenant_slug`.
+ */
+export function normalizeCadenceTenant(tenantSlug: string | undefined): string | undefined {
+  const trimmed = tenantSlug?.trim();
+  return !trimmed || isReservedScopeName(trimmed) ? undefined : trimmed;
+}
+
+/**
+ * Organizations under one tier (optionally one tenant / one organization).
+ * `tenantSlug` on each ref is normalised: untenanted organizations carry none.
+ */
 export function listOrganizationScopes(
   scope: Pick<TickOptions, 'tier' | 'tenantSlug' | 'organizationId'>,
   rootDir: string = pathResolver.rootDir()
@@ -53,10 +68,11 @@ export function listOrganizationScopes(
     }
     for (const state of states) {
       if (state.status === 'archived') continue;
+      const tenant = normalizeCadenceTenant(tenantSlug);
       refs.push({
         organizationId: state.organization_id,
         tier: scope.tier,
-        tenantSlug,
+        ...(tenant ? { tenantSlug: tenant } : {}),
         name: state.name,
       });
     }
