@@ -160,3 +160,5 @@ export * from './dot/dot-extensions.js';
 export * from './dot/dot-extension-registry.js';
 export * from './dot/dot-wake-backend.js';
 export * from './dot/dot-key-results.js';
+export * from './dot/dot-memory.js';
+export * from './dot/dot-followups.js';
