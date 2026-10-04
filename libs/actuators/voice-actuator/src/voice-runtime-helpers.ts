@@ -245,7 +245,7 @@ async function runPythonTtsBridge(
     },
   });
 
-  const result = safeExecResult(resolvePythonBin(runtimeId), [bridgeScript], {
+  const result = safeExecResult(resolvePythonBin(runtimeId), ['-X', 'utf8', bridgeScript], {
     input: payload,
   });
   if (result.error || result.status !== 0) {
