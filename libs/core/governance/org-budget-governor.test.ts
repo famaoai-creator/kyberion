@@ -144,14 +144,26 @@ describe('org-budget-governor', () => {
     const tenant = evaluateBudgetThrottle({ tenant_slug: 'acme' }, deps);
     expect(tenant.throttle).toBe('normal');
     expect(tenant.usage.cost_status).toBeUndefined();
-    // The global scope simply counts the unscoped rows; token-only rows are partial, not a pause.
+    // The global scope reports interactive CLI sessions but never caps repo dots on them.
     const global = evaluateBudgetThrottle(
       {},
-      { ...deps, readMetricsHistory: () => [{ ...cliRow, cost_usd: undefined }] }
+      {
+        ...deps,
+        policy: { daily_token_cap: 10_000, daily_cost_cap_usd: 10, soft_ratio: 0.8, hard_ratio: 1 },
+        readMetricsHistory: () => [cliRow, { ...cliRow, cost_usd: undefined }],
+      }
     );
-    expect(global.usage.by_source.missions).toBe(54_000);
-    expect(global.usage.cost_status).toBe('partial');
+    expect(global.usage.by_source).toMatchObject({ missions: 0, interactive: 108_000 });
+    expect(global.usage).toMatchObject({ tokens: 0, cost_usd: 0 });
+    expect(global.usage.cost_status).toBeUndefined();
     expect(global.throttle).toBe('normal');
+    // Attributed CLI rows (explicit scope) remain a cap input.
+    const scoped = evaluateBudgetThrottle(
+      {},
+      { ...deps, readMetricsHistory: () => [{ ...cliRow, tenant_slug: 'acme' }] }
+    );
+    expect(scoped.usage.by_source.missions).toBe(54_000);
+    expect(scoped.usage.by_source.interactive).toBeUndefined();
   });
 
   it('resolves unscoped legacy dot rows through the charter instead of pausing others', () => {
@@ -237,6 +249,17 @@ describe('org-budget-governor', () => {
       safeWriteFile(`${metricsDir}/history.jsonl`, yesterday.repeat(5) + '{corrupt\n');
       expect(evaluateBudgetThrottle({ tenant_slug: 'acme' }, deps).throttle).toBe('normal');
       expect(history).toHaveBeenCalledWith(expect.objectContaining({ strict: true }));
+      // Undatable torn lines before the first today-dated line belong to earlier days.
+      const todayOk = '{"timestamp":"2026-10-04T00:30:00Z","component":"probe"}\n';
+      safeWriteFile(`${metricsDir}/history.jsonl`, yesterday + '{corrupt\n'.repeat(4) + todayOk);
+      expect(evaluateBudgetThrottle({ tenant_slug: 'acme' }, deps).usage.cost_status).toBe(
+        undefined
+      );
+      // The same undatable lines after it count toward today's malformed total.
+      safeWriteFile(`${metricsDir}/history.jsonl`, yesterday + todayOk + '{corrupt\n'.repeat(3));
+      expect(evaluateBudgetThrottle({ tenant_slug: 'acme' }, deps).usage.cost_status).toBe(
+        'unknown'
+      );
       // Beyond the threshold, today's (or undatable) torn evidence fails closed.
       safeWriteFile(
         `${metricsDir}/history.jsonl`,

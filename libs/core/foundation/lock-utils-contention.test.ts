@@ -4,6 +4,7 @@ import { pathResolver } from '../path-resolver.js';
 import {
   acquireLock,
   inspectLockRecovery,
+  LOCK_LIVE_GUARD_RECOVERY_AGE_MS,
   LOCK_RECOVERY_AGE_MS,
   registerLockIo,
   releaseLock,
@@ -21,8 +22,10 @@ let hooks: {
   opened?: (file: string) => void;
   read?: (file: string) => void;
   missing?: (file: string) => void;
+  renamed?: (from: string, to: string) => void;
 };
 let removed: string[];
+let denied: Set<string>;
 let previousIo: LockIo | undefined;
 const error = (code: string) => Object.assign(new Error(code), { code });
 function publish(file: string, pid = process.pid) {
@@ -32,6 +35,7 @@ function publish(file: string, pid = process.pid) {
 beforeEach(() => {
   files = new Map();
   removed = [];
+  denied = new Set();
   now = 0;
   hooks = {};
   vi.spyOn(Date, 'now').mockImplementation(() => now);
@@ -62,10 +66,21 @@ beforeEach(() => {
     rename: (from, to) => {
       const cell = files.get(from);
       if (!cell) throw error('ENOENT');
+      removed.push(from); // the record leaves its path (tomb rename)
       files.delete(from);
       files.set(to, cell);
+      hooks.renamed?.(from, to);
     },
+    linkExclusive: (from, to) => {
+      const cell = files.get(from);
+      if (!cell) throw error('ENOENT');
+      if (files.has(to)) throw error('EEXIST');
+      files.set(to, cell); // same inode
+    },
+    readdir: (dir) =>
+      [...files.keys()].filter((file) => path.dirname(file) === dir).map((f) => path.basename(f)),
     loadJson: <T>(file: string): T => {
+      if (denied.has(file)) throw error('EACCES');
       const cell = files.get(file);
       if (!cell) {
         hooks.missing?.(file);
@@ -155,9 +170,13 @@ describe('lock publication and cleanup interleavings', () => {
     expect(files.has(lock)).toBe(true);
     expect(removed).not.toContain(lock);
   });
-  it.each(['', JSON.stringify({ pid: 0 }), JSON.stringify({ pid: process.pid })])(
-    'retains a fresh cleanup marker and reclaims it once past the recovery age (%s)',
-    (text) => {
+  it.each([
+    ['', LOCK_RECOVERY_AGE_MS],
+    [JSON.stringify({ pid: 0 }), LOCK_RECOVERY_AGE_MS],
+    [JSON.stringify({ pid: process.pid }), LOCK_LIVE_GUARD_RECOVERY_AGE_MS],
+  ])(
+    'retains a fresh cleanup marker and reclaims it once past its recovery age (%s)',
+    (text, recoveryAge) => {
       publish(lock, DEAD_PID);
       files.set(lock + '.reclaim', { text, mtime: now });
       expect(() => withLockSync(resource, () => 'must not run', 50)).toThrow('[LOCK_TIMEOUT]');
@@ -165,7 +184,14 @@ describe('lock publication and cleanup interleavings', () => {
       expect(files.has(lock + '.reclaim')).toBe(true);
       expect(removed).toEqual([]);
 
-      now += LOCK_RECOVERY_AGE_MS; // unverifiable or PID-reused guard is now provably orphaned
+      now += LOCK_RECOVERY_AGE_MS;
+      if (recoveryAge > LOCK_RECOVERY_AGE_MS) {
+        // A guard whose PID is alive is not reclaimed at the unverifiable-record age.
+        expect(() => withLockSync(resource, () => 'must not run', 50)).toThrow('[LOCK_TIMEOUT]');
+        expect(files.has(lock + '.reclaim')).toBe(true);
+        now += recoveryAge;
+      }
+      // The unverifiable or PID-reused guard is now provably orphaned.
       expect(withLockSync(resource, () => 'recovered', 50)).toBe('recovered');
       expect(files.has(lock + '.reclaim')).toBe(false);
       expect([...files.keys()].filter((file) => file.includes('.stale-'))).toEqual([]);
@@ -240,5 +266,130 @@ describe('lock publication and cleanup interleavings', () => {
     releaseLock(resource);
     expect(files.has(lock)).toBe(true);
     expect(removed).toEqual([]);
+  });
+});
+
+describe('identity-checked removal', () => {
+  const guard = lock + '.reclaim';
+  const record = (pid: number, ts: string) => JSON.stringify({ pid, ts });
+  const tombs = () => [...files.keys()].filter((file) => file.includes('.stale-'));
+
+  it('restores a holder that published between the dead inspection and the removal', () => {
+    publish(lock, DEAD_PID);
+    const holder = { text: record(process.pid + 1, 'holder'), mtime: now };
+    let armed = false;
+    let replaced = false;
+    hooks.read = (file) => {
+      // The cleaner has inspected the record as dead and now confirms its own
+      // guard; meanwhile (stolen guard) the dead record is replaced by a live holder.
+      if (file === lock) armed = true;
+      else if (file === guard && armed && !replaced) {
+        replaced = true;
+        files.set(lock, holder);
+      }
+    };
+    expect(() => withLockSync(resource, () => 'must not run', 50)).toThrow('[LOCK_TIMEOUT]');
+    expect(files.get(lock)).toBe(holder); // same inode put back, never deleted
+    expect(tombs()).toEqual([]);
+    expect(files.has(guard)).toBe(false);
+  });
+
+  it('aborts when its own guard was taken over before the removal', () => {
+    publish(lock, DEAD_PID);
+    let swapped = false;
+    hooks.read = (file) => {
+      if (file === lock && files.has(guard) && !swapped) {
+        swapped = true;
+        files.set(guard, { text: record(process.pid + 1, 'other-cleaner'), mtime: now });
+      }
+    };
+    expect(() => withLockSync(resource, () => 'must not run', 50)).toThrow('[LOCK_TIMEOUT]');
+    expect(JSON.parse(files.get(lock)!.text).pid).toBe(DEAD_PID); // left to the guard owner
+    expect(JSON.parse(files.get(guard)!.text).ts).toBe('other-cleaner'); // never released by us
+  });
+
+  it('lets a second cleaner finish inside the guard put-back window without losing records', async () => {
+    publish(lock, DEAD_PID);
+    publish(guard, DEAD_PID);
+    const fresh = { text: record(process.pid + 1, 'fresh-cleaner'), mtime: now };
+    let nested: Promise<boolean> | undefined;
+    let fired = false;
+    hooks.read = (file) => {
+      // A live cleaner replaces the orphan between judgement and the tomb rename.
+      if (file === guard && !files.get(guard)!.text.includes('fresh-cleaner'))
+        files.set(guard, fresh);
+    };
+    hooks.renamed = (from) => {
+      // Put-back window: the fresh guard sits in a tomb; a third cleaner runs.
+      if (from === guard && !fired) {
+        fired = true;
+        hooks.read = undefined;
+        nested = acquireLock(resource, 0);
+      }
+    };
+    expect(() => withLockSync(resource, () => 'must not run', 50)).toThrow('[LOCK_TIMEOUT]');
+    await expect(nested).resolves.toBe(true);
+    expect(JSON.parse(files.get(lock)!.text).pid).toBe(process.pid); // third cleaner's lock kept
+    expect(files.get(guard)).toBe(fresh); // fresh guard restored after the third cleaner left
+    expect(removed.filter((file) => file === lock)).toHaveLength(1); // only the dead record
+  });
+
+  it('never overwrites a guard published by another cleaner during the put-back window', () => {
+    publish(lock, DEAD_PID);
+    publish(guard, DEAD_PID);
+    const fresh = { text: record(process.pid + 1, 'fresh-cleaner'), mtime: now };
+    const third = { text: record(process.pid + 2, 'third-cleaner'), mtime: now };
+    let done = false;
+    hooks.read = (file) => {
+      if (file === guard && !done && files.get(guard)!.text.includes(String(DEAD_PID)))
+        files.set(guard, fresh);
+    };
+    hooks.renamed = (from) => {
+      if (from === guard && !done) {
+        done = true;
+        files.set(guard, third); // third cleaner takes the guard while it is absent
+      }
+    };
+    expect(() => withLockSync(resource, () => 'must not run', 50)).toThrow('[LOCK_TIMEOUT]');
+    expect(files.get(guard)).toBe(third);
+    expect(JSON.parse(files.get(lock)!.text).pid).toBe(DEAD_PID); // still serialized by the third
+    expect(tombs().map((file) => files.get(file))).toEqual([fresh]); // displaced, kept for inspection
+  });
+
+  it('treats an unreadable record as held: never reclaimed, reported without an estimate', () => {
+    publish(lock, DEAD_PID);
+    denied.add(lock);
+    now += LOCK_RECOVERY_AGE_MS * 100;
+    expect(() => withLockSync(resource, () => 'must not run', 50)).toThrow('[LOCK_TIMEOUT]');
+    expect(files.has(lock)).toBe(true);
+    expect(removed).toEqual([]);
+    const recovery = inspectLockRecovery(resource);
+    expect(recovery).toMatchObject({
+      path: lock,
+      kind: 'lock_record',
+      state: 'live',
+      unreadable: true,
+    });
+    expect(recovery?.reclaimInMs).toBeUndefined();
+  });
+
+  it('sweeps old publication temps and dead tombs during reclaim, keeping fresh ones', () => {
+    const dir = path.dirname(lock);
+    const other = path.join(dir, 'other.lock');
+    files.set(other + '.123.0123456789ab.tmp', { text: '', mtime: 0 });
+    files.set(other + `.reclaim.stale-${DEAD_PID}-0-1`, { text: '{}', mtime: 0 });
+    files.set(other + `.stale-${process.pid}-0-2`, { text: '{}', mtime: 0 }); // live cleaner
+    files.set(path.join(dir, 'unrelated.json'), { text: '{}', mtime: 0 });
+    now = LOCK_RECOVERY_AGE_MS;
+    files.set(other + '.456.abcdefabcdef.tmp', { text: '', mtime: now }); // fresh
+    publish(lock, DEAD_PID);
+    expect(withLockSync(resource, () => 'recovered', 50)).toBe('recovered');
+    expect([...files.keys()].sort()).toEqual(
+      [
+        other + '.456.abcdefabcdef.tmp',
+        other + `.stale-${process.pid}-0-2`,
+        path.join(dir, 'unrelated.json'),
+      ].sort()
+    );
   });
 });

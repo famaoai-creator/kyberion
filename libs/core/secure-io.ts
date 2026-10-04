@@ -799,6 +799,26 @@ export function safePublishExclusiveFileSync(filePath: string, data: string | Bu
 }
 
 /**
+ * Hard-link an existing file to `toPath` exclusively (EEXIST when the target
+ * exists, never an overwrite). Lock recovery uses it to put a displaced
+ * record back at its path with the same inode, so a writer still holding a
+ * descriptor keeps writing to the restored record.
+ */
+export function safeLinkExclusiveSync(fromPath: string, toPath: string): void {
+  assertSensitivePathAllowed(fromPath, 'read', isSensitivePathMediated());
+  assertSensitivePathAllowed(toPath, 'write', isSensitivePathMediated());
+  const resolvedFrom = pathResolver.resolve(fromPath);
+  const resolvedTo = pathResolver.resolve(toPath);
+  const readGuard = validateReadPermission(resolvedFrom);
+  if (!readGuard.allowed) {
+    throw new Error(`[SECURITY] Read access denied to ${fromPath}: ${readGuard.reason}`);
+  }
+  const writeGuard = validateWritePermission(resolvedTo);
+  if (!writeGuard.allowed) throw new Error(writeGuard.reason);
+  fs.linkSync(resolvedFrom, resolvedTo);
+}
+
+/**
  * Milliseconds since `filePath` was last modified, or undefined when it does
  * not exist. Used by lock recovery to age-bound reclaim of orphaned records.
  */
@@ -1528,6 +1548,8 @@ registerOptionalAuditIo('registerLockIo', {
   publishExclusive: (filePath, content) => safePublishExclusiveFileSync(filePath, content),
   ageMs: safeFileAgeMs,
   rename: safeMoveSync,
+  linkExclusive: safeLinkExclusiveSync,
+  readdir: safeReaddir,
   unlink: safeUnlinkSync,
   loadJson: secureLoadJson,
 });
