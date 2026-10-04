@@ -16,6 +16,31 @@ import {
 } from './ocr-bridge.js';
 import { OcrProvider } from './ocr-types.js';
 
+describe('OCR execution budget', () => {
+  it('cancels a pending provider at the shared deadline without starting a fallback', async () => {
+    let signal: AbortSignal | undefined;
+    const provider: OcrProvider = {
+      id: 'tesseract',
+      dataEgress: 'none',
+      isAvailable: async () => true,
+      recognize: async (request) => {
+        signal = request.signal;
+        return await new Promise(() => {});
+      },
+    };
+    const router = new AdaptivePolicyRouter([provider]);
+    const stages: string[] = [];
+    await expect(
+      ocrImageWithRouter(
+        { path: 'test.png', timeout_ms: 20, onProgress: (event) => stages.push(event.stage) },
+        router
+      )
+    ).rejects.toThrow('deadline exceeded');
+    expect(signal?.aborted).toBe(true);
+    expect(stages).toEqual(['resolving', 'recognizing']);
+  });
+});
+
 const mocks = vi.hoisted(() => {
   const spawn = vi.fn();
   const safeLstat = vi.fn(() => ({ isFile: () => true }));
