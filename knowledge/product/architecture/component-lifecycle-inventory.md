@@ -52,7 +52,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 
 ## Legacy Review Queue
 
-- Source of truth: [legacy_component_index.json](../orchestration/legacy_component_index.json)
+- Source of truth: [legacy_component_index.json](knowledge/product/orchestration/legacy_component_index.json)
 - Count: 0
 
 ## Consolidation Recommendations

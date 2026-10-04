@@ -2,6 +2,7 @@ import { safeExecResult } from '../secure-io.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord } from '../foundation/text.js';
 import { resolveFfmpegBin } from '../tool/tool-binary-resolvers.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 export const VIRTUAL_DEVICE_INVENTORY_BRIDGE_ID = 'virtual-device-inventory-bridge' as const;
 
@@ -9,10 +10,12 @@ export type VirtualDeviceKind =
   'audio-input' | 'audio-output' | 'camera' | 'virtual-audio' | 'virtual-camera';
 
 export interface VirtualDeviceRecord {
+  device_id?: string;
+  provider_id?: string;
   kind: VirtualDeviceKind;
   name: string;
   platform: NodeJS.Platform;
-  source: 'system_profiler' | 'ffmpeg' | 'pactl' | 'imagesnap' | 'powershell' | 'heuristic';
+  source: string;
   available: boolean;
   details?: Record<string, unknown>;
 }
@@ -57,6 +60,29 @@ export interface VirtualDeviceInventoryOptions {
   };
 }
 
+export interface VirtualDeviceInventoryProvider {
+  readonly provider_id: string;
+  readonly platforms: readonly NodeJS.Platform[];
+  scan(
+    options: VirtualDeviceInventoryOptions
+  ): VirtualDeviceInventory | Promise<VirtualDeviceInventory>;
+}
+
+const inventoryProviderSeam = createSeam<VirtualDeviceInventoryProvider>({
+  key: 'virtual-device-inventory',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+
+/** Supplemental device discovery; disposal removes only this registration. */
+export function registerVirtualDeviceInventoryProvider(
+  provider: VirtualDeviceInventoryProvider,
+  metadata: SeamProviderMetadata = { provenance: 'plugin', source: 'device-inventory-extension' }
+): () => void {
+  if (!provider.provider_id.trim()) throw new Error('Inventory provider_id is required');
+  return inventoryProviderSeam.register(provider.provider_id, provider, metadata);
+}
+
 const DEFAULT_SYSTEM_PROFILER = 'system_profiler';
 const DEFAULT_PACTL = 'pactl';
 const DEFAULT_POWERSHELL = 'powershell.exe';
@@ -74,12 +100,20 @@ function emptyInventory(): VirtualDeviceInventory {
 
 function uniqueByName(records: VirtualDeviceRecord[]): VirtualDeviceRecord[] {
   const seen = new Set<string>();
-  return records.filter((record) => {
-    const key = `${record.kind}:${record.name}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  return records
+    .map((record) => ({
+      ...record,
+      provider_id: record.provider_id ?? record.source,
+      device_id:
+        record.device_id ??
+        String(record.details?.uid ?? record.details?.instance_id ?? `name:${record.name}`),
+    }))
+    .filter((record) => {
+      const key = `${record.kind}:${record.provider_id || record.source}:${record.device_id || record.name}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 }
 
 function tryParseJson(text: string): unknown | null {
@@ -213,27 +247,14 @@ function collectMacCameraDevices(
           source: 'ffmpeg',
           available: true,
         });
-      } else if (section === 'audio') {
-        records.push({
-          kind: 'audio-input',
-          name,
-          platform: process.platform,
-          source: 'ffmpeg',
-          available: true,
-        });
-        records.push({
-          kind: 'audio-output',
-          name,
-          platform: process.platform,
-          source: 'ffmpeg',
-          available: true,
-        });
       }
     }
   }
 
-  const virtualSource = records.find((record) => /blackhole|loopback|virtual/i.test(record.name));
-  if (virtualSource) {
+  const virtualSources = records.filter(
+    (record) => record.kind === 'camera' && /loopback|virtual/i.test(record.name)
+  );
+  for (const virtualSource of virtualSources) {
     records.push({
       kind: 'virtual-camera',
       name: virtualSource.name,
@@ -412,6 +433,42 @@ export class VirtualDeviceInventoryBridgeImpl implements VirtualDeviceInventoryB
 
   async scan(): Promise<VirtualDeviceInventory> {
     const inventory = resolveVirtualDeviceAdapter(process.platform).scan(this.opts);
+    for (const { implementation: provider } of inventoryProviderSeam.list()) {
+      if (!provider.platforms.includes(process.platform)) continue;
+      const scanned = await provider.scan(this.opts);
+      const qualify = (records: VirtualDeviceRecord[]) =>
+        records.map((record) => {
+          if (!record.device_id)
+            throw new Error(`Inventory provider '${provider.provider_id}' must supply device_id`);
+          return { ...record, provider_id: provider.provider_id };
+        });
+      const additional = {
+        ...scanned,
+        audio_inputs: qualify(scanned.audio_inputs),
+        audio_outputs: qualify(scanned.audio_outputs),
+        cameras: qualify(scanned.cameras),
+        virtual_audio_devices: qualify(scanned.virtual_audio_devices),
+        virtual_cameras: qualify(scanned.virtual_cameras),
+      };
+      inventory.audio_inputs = uniqueByName([
+        ...inventory.audio_inputs,
+        ...additional.audio_inputs,
+      ]);
+      inventory.audio_outputs = uniqueByName([
+        ...inventory.audio_outputs,
+        ...additional.audio_outputs,
+      ]);
+      inventory.cameras = uniqueByName([...inventory.cameras, ...additional.cameras]);
+      inventory.virtual_audio_devices = uniqueByName([
+        ...inventory.virtual_audio_devices,
+        ...additional.virtual_audio_devices,
+      ]);
+      inventory.virtual_cameras = uniqueByName([
+        ...inventory.virtual_cameras,
+        ...additional.virtual_cameras,
+      ]);
+      inventory.notes.push(...additional.notes);
+    }
 
     if (
       inventory.audio_inputs.length === 0 &&

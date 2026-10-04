@@ -161,6 +161,14 @@ describe('Kyberion CLI helpers', () => {
     ]);
   });
 
+  it('dispatches capture and record verbs to their governed command handlers', async () => {
+    const captureOutput = await captureMainOutput(['capture', '--help']);
+    const recordOutput = await captureMainOutput(['record', '--help']);
+
+    expect(captureOutput).toContain('Usage: pnpm kyberion capture');
+    expect(recordOutput).toContain('Usage: pnpm kyberion record');
+  });
+
   it('forwards --dry-run from pnpm kyberion run to the actuator process', () => {
     expect(
       buildKyberionRunNodeArgs('dist/libs/actuators/secret-actuator/src/index.js', [
