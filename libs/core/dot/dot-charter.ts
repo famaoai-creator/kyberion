@@ -74,6 +74,7 @@ export interface DotCharter {
   decisions?: {
     default_decision?: 'auto' | 'notify' | 'approve';
     veto_window_minutes?: number;
+    decision_expiry_minutes?: number;
     escalate_channel?: 'slack' | 'telegram' | 'discord' | 'imessage' | 'surface';
   };
   notification: {

@@ -7,6 +7,8 @@ import {
   DOT_WAKE_RETRY_AFTER_MS,
   dotDailyTokenCapReached,
   dotTokensUsedToday,
+  dotWakeSummary,
+  DOT_WAKE_SUMMARY_MAX,
   evaluateDotTriggersDue,
   listActiveDotHeartbeatIds,
   readDotWakeLedger,
@@ -438,6 +440,46 @@ describe('runDotWake', () => {
     });
     expect(prompt).toContain('cron:x@m');
     expect(prompt).toContain('cron detail');
+  });
+
+  it('keeps a reply summary for system charters only, never tenant prose', async () => {
+    const reply = 'Nothing to propose today.\n```dot-proposals\n[]\n```';
+    const backend = { delegateTask: async () => reply };
+    writeCharter(CHARTER);
+    await runDotWake(
+      { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+      { rootDir: TEST_ROOT, hasRole: () => true, backend }
+    );
+    const tenant: DotCharter = {
+      ...CHARTER,
+      dot_id: 'tenant-dot',
+      scope: { ...CHARTER.scope, tenant_slug: 'acme' },
+      runtime: { heartbeat_id: 'dot-tenant-dot' },
+    };
+    writeCharter(tenant, 'tenant.json');
+    await runDotWake(
+      { path: `${TEST_ROOT}/dots/tenant.json`, charter: tenant },
+      { rootDir: TEST_ROOT, hasRole: () => true, backend }
+    );
+    const rows = readDotWakeLedger({ rootDir: TEST_ROOT });
+    expect(rows.find((row) => row.dot_id === CHARTER.dot_id)?.summary).toBe(
+      'Nothing to propose today.'
+    );
+    const tenantRow = rows.find((row) => row.dot_id === 'tenant-dot');
+    expect(tenantRow?.outcome).toBe('delivered');
+    expect(tenantRow?.summary).toBeUndefined();
+  });
+});
+
+describe('dotWakeSummary', () => {
+  it('keeps the prose, drops the proposal block, and bounds the length', () => {
+    const text =
+      'All signals green.\n\nNothing to propose: the operator rejected the last two.\n```dot-proposals\n[]\n```';
+    expect(dotWakeSummary(text)).toBe(
+      'All signals green. Nothing to propose: the operator rejected the last two.'
+    );
+    expect(dotWakeSummary('```dot-proposals\n[]\n```')).toBeUndefined();
+    expect(dotWakeSummary('x'.repeat(5000))).toHaveLength(DOT_WAKE_SUMMARY_MAX);
   });
 });
 
