@@ -1,3 +1,16 @@
+/**
+ * File-based inter-process locks (atomic publication, guarded stale reclaim).
+ *
+ * Residual window: every removal is identity-checked through a tomb rename,
+ * and a publication whose temp sibling was swept as litter while the publisher
+ * stalled (ENOENT from publish) is retried with a fresh temp. What remains is
+ * a process stalled for longer than {@link LOCK_LIVE_GUARD_RECOVERY_AGE_MS}
+ * (10 minutes) in the middle of a reclaim: its `.reclaim` guard and its tomb
+ * are then treated as abandoned and swept, so a holder's record it had moved
+ * to a tomb can be lost, or put back after another process already published.
+ * A stall that long (suspended laptop, SIGSTOP, debugger) is accepted as out
+ * of scope; the bounded ages keep normal crashes recoverable without operators.
+ */
 import * as path from 'node:path';
 import { createLogger } from '../logger.js';
 import { nowIso } from './time.js';
@@ -83,10 +96,26 @@ function ownerRecord(resourceId: string): string {
   return JSON.stringify({ pid: process.pid, ts: nowIso(), id: resourceId });
 }
 
-/** Publish a complete record exclusively; never a partial file at the lock path. */
+/** Publication attempts when the temp sibling vanished mid-publish (ENOENT). */
+const PUBLISH_ENOENT_ATTEMPTS = 3;
+
+/**
+ * Publish a complete record exclusively; never a partial file at the lock path.
+ * ENOENT means nothing was published — the publication temp was swept as
+ * litter while this process stalled past LOCK_RECOVERY_AGE_MS — so it is
+ * retried with a fresh temp (bounded) instead of failing the lock.
+ */
 function publish(io: LockIo, filePath: string, content: string): void {
-  if (io.publishExclusive) io.publishExclusive(filePath, content);
-  else io.createExclusive(filePath, content);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      if (io.publishExclusive) io.publishExclusive(filePath, content);
+      else io.createExclusive(filePath, content);
+      return;
+    } catch (error: unknown) {
+      if (errorCode(error) !== 'ENOENT' || attempt >= PUBLISH_ENOENT_ATTEMPTS) throw error;
+      logger.debug(`lock publication ${filePath} lost its temp (ENOENT); retrying (${attempt})`);
+    }
+  }
 }
 
 /**

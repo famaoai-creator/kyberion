@@ -373,6 +373,40 @@ describe('identity-checked removal', () => {
     expect(recovery?.reclaimInMs).toBeUndefined();
   });
 
+  it('retries a publication whose temp was swept mid-publish (ENOENT) instead of throwing', async () => {
+    let lost = 0;
+    const io: LockIo = {
+      exists: () => true,
+      mkdir: () => {},
+      createExclusive: () => {
+        throw new Error('non-atomic path must not be used');
+      },
+      publishExclusive: (file, text) => {
+        // The litter sweep removed the temp sibling before the link: nothing published.
+        if (lost++ % 2 === 0) throw error('ENOENT');
+        if (files.has(file)) throw error('EEXIST');
+        files.set(file, { text, mtime: now });
+      },
+      unlink: (file) => void files.delete(file),
+      loadJson: <T>(file: string): T => {
+        const cell = files.get(file);
+        if (!cell) throw error('ENOENT');
+        return JSON.parse(cell.text) as T;
+      },
+    };
+    registerLockIo(io);
+    expect(withLockSync(resource, () => 'sync', 50)).toBe('sync');
+    expect(await acquireLock(resource, 50)).toBe(true);
+    releaseLock(resource);
+    expect(files.has(lock)).toBe(false);
+    expect(lost).toBe(4);
+
+    // Persistent ENOENT (e.g. an unwritable locks root) still surfaces, bounded.
+    io.publishExclusive = () => {
+      throw error('ENOENT');
+    };
+    expect(() => withLockSync(resource, () => 'never', 50)).toThrow('ENOENT');
+  });
   it('sweeps old publication temps and dead tombs during reclaim, keeping fresh ones', () => {
     const dir = path.dirname(lock);
     const other = path.join(dir, 'other.lock');
