@@ -9,6 +9,14 @@ import { readSafeJsonFile, readSafeJsonValueFile } from './lib/json-input.js';
 
 const ROOT = pathResolver.rootDir();
 
+export function isArchivedScriptDocumentation(file: string): boolean {
+  const normalized = file.replace(/\\/gu, '/');
+  return (
+    normalized.includes('/improvement-plans-2026-08/reviews/') ||
+    normalized.includes('/improvement-plans-archive/')
+  );
+}
+
 export function readScriptIntegrityTextFile(filePath: string, label = filePath): string {
   if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
     throw new Error(`${label} must be a regular file`);
@@ -359,12 +367,7 @@ export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): stri
     if (!safeExistsSync(absolute)) continue;
     const files = safeStat(absolute).isDirectory() ? getAllFiles(absolute) : [absolute];
     for (const file of files) {
-      if (
-        !/\.(?:md|yml|yaml|json)$/u.test(file) ||
-        file.includes('/improvement-plans-2026-08/reviews/') ||
-        file.includes('/improvement-plans-archive/')
-      )
-        continue;
+      if (!/\.(?:md|yml|yaml|json)$/u.test(file) || isArchivedScriptDocumentation(file)) continue;
       validatePackageScriptReferences(
         readScriptIntegrityTextFile(file, toRepoRelative(file)),
         toRepoRelative(file),

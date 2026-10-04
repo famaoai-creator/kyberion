@@ -628,7 +628,8 @@ export function installFluidAudioSpeechToTextBridgeIfAvailable(
       name: 'fluid-audio-parakeet',
       command,
       structuredOutput: true,
-      priority: 100,
+      priority:
+        Math.max(100, ...getSpeechToTextBridges().map((bridge) => bridge.priority || 0)) + 1,
       capabilities: { timestamps: true, granularity: 'segment', local_only: true },
       ...(timeoutText ? { timeoutMs: parseInt(timeoutText, 10) } : {}),
     }),
@@ -670,7 +671,9 @@ export function installShellSpeechToTextBridgeIfAvailable(
       command,
       ...(envText(env, 'KYBERION_STT_OUTPUT_FORMAT') === 'json' ? { structuredOutput: true } : {}),
       ...(capabilities ? { capabilities } : {}),
-      ...(priorityText ? { priority: parseInt(priorityText, 10) } : {}),
+      priority: priorityText
+        ? parseInt(priorityText, 10)
+        : Math.max(100, ...getSpeechToTextBridges().map((bridge) => bridge.priority || 0)) + 1,
       ...(timeoutText ? { timeoutMs: parseInt(timeoutText, 10) } : {}),
     }),
     RUNTIME_STT_METADATA
@@ -784,7 +787,10 @@ export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
   }
   if (getSpeechToTextBridges().some((bridge) => bridge.name === 'mlx_whisper')) return true;
   const detected = discoverLocalSttBackends().filter(
-    (candidate) => candidate.verification === 'python-module' && Boolean(candidate.python_bin)
+    (candidate) =>
+      candidate.backend === 'mlx_whisper' &&
+      candidate.verification === 'python-module' &&
+      Boolean(candidate.python_bin)
   );
   const selected = selectPreferredLocalSttBackend(detected);
   const pythonBin = selected?.python_bin;
@@ -844,6 +850,81 @@ export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
   return true;
 }
 
+export function installManagedFasterWhisperSpeechToTextBridgeIfAvailable(
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  if (
+    envText(env, 'KYBERION_STT_COMMAND')?.trim() ||
+    envText(env, 'KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
+  ) {
+    return false;
+  }
+  if (getSpeechToTextBridges().some((bridge) => bridge.name === 'faster_whisper')) return true;
+  const selected = discoverLocalSttBackends().find(
+    (candidate) =>
+      candidate.backend === 'faster_whisper' &&
+      candidate.verification === 'python-module' &&
+      Boolean(candidate.python_bin)
+  );
+  const pythonBin = selected?.python_bin;
+  const priority = selected?.priority ?? 0;
+  if (!pythonBin) return false;
+  const bridgeScript = assertSafeRepositoryPath(
+    rootResolve('libs/actuators/voice-actuator/scripts/faster_whisper_stt_bridge.py')
+  );
+  if (!pythonBin || !safeExistsSync(bridgeScript)) return false;
+
+  registerSpeechToTextBridge(
+    {
+      name: 'faster_whisper',
+      priority,
+      capabilities: MLX_WHISPER_CAPABILITIES,
+      async transcribe(input) {
+        const audioAbs = resolveAudioPath(input.audioPath);
+        if (!safeExistsSync(audioAbs)) {
+          throw new Error(`[stt-bridge:faster_whisper] audio file not found: ${input.audioPath}`);
+        }
+        assertRegularFile(audioAbs, 'audio input');
+        const result = safeExecResult(pythonBin, ['-X', 'utf8', bridgeScript], {
+          input: JSON.stringify({
+            action: 'transcribe',
+            params: {
+              audio_path: audioAbs,
+              ...(input.language ? { language: input.language } : {}),
+            },
+          }),
+
+          timeoutMs: 120_000,
+          maxOutputMB: 2,
+        });
+        if (result.error || result.status !== 0) {
+          throw new Error(
+            `[stt-bridge:faster_whisper] backend failed: ${result.stderr || result.error?.message || 'unknown error'}`
+          );
+        }
+        const response = parseStructuredOutput(result.stdout);
+        const text = String(response.text || '').trim();
+        if (!text) throw new Error('[stt-bridge:faster_whisper] backend returned empty text');
+        const outputPath = resolveTranscriptPath(input.outputPath, audioAbs);
+        safeWriteFile(outputPath, `${text}\n`, { encoding: 'utf8', mkdir: true });
+        return {
+          text,
+          language: String(response.language || input.language || resolveLocale()),
+          written_to: outputPath,
+          backend: 'faster_whisper',
+          capabilities: response.capabilities || MLX_WHISPER_CAPABILITIES,
+          ...(Array.isArray(response.segments)
+            ? { segments: response.segments as TranscriptSegment[] }
+            : {}),
+        };
+      },
+    },
+    RUNTIME_STT_METADATA
+  );
+  logger.success('[stt-bridge] installed managed faster_whisper SpeechToTextBridge');
+  return true;
+}
+
 /**
  * Register all locally available synchronous STT bridges, then let the seam
  * select the winner from the governed discovery catalog priorities. Explicit
@@ -856,6 +937,7 @@ export function installAvailableSpeechToTextBridges(
   if (installShellSpeechToTextBridgeIfAvailable(env)) return getSpeechToTextBridge();
   if (installFluidAudioSpeechToTextBridgeIfAvailable(env)) return getSpeechToTextBridge();
 
+  installManagedFasterWhisperSpeechToTextBridgeIfAvailable(env);
   installWhisperKitSpeechToTextBridgeIfAvailable(env);
   installManagedMlxWhisperSpeechToTextBridgeIfAvailable(env);
   return getSpeechToTextBridge();

@@ -32,6 +32,11 @@ function writeFixture(relativePath: string, content: string): string {
 }
 
 describe('scanFileForKanaLiterals', () => {
+  it('honors same-line and preceding-line exemptions with CRLF', () => {
+    const source =
+      "// i18n-exempt: fixture\r\nconst a = 'こんにちは';\r\nconst b = 'こんにちは'; // i18n-exempt: fixture\r\n\r\nconst c = 'こんにちは';\r\n";
+    expect(scanFileForKanaLiterals(source, 'example.ts')).toEqual({ count: 1, exemptions: 2 });
+  });
   it('detects a plain string literal containing Hiragana/Katakana', () => {
     const result = scanFileForKanaLiterals("export const label = 'こんにちは';\n", 'example.ts');
     expect(result).toEqual({ count: 1, exemptions: 0 });
