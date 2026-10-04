@@ -543,6 +543,34 @@ export interface CalendarBackendAvailabilityOverrides {
   [backendId: string]: boolean | undefined;
 }
 
+const CALENDAR_BACKEND_REQUIRED_METHODS = [
+  'isAvailable',
+  'unavailableMessage',
+  'listCalendars',
+  'listEvents',
+  'queryFreeBusy',
+  'createEvent',
+] as const;
+const CALENDAR_BACKEND_OPTIONAL_METHODS = ['updateEvent', 'deleteEvent', 'findSlots'] as const;
+
+function assertCalendarBackendAdapter(adapter: CalendarBackendAdapter): string {
+  const id = adapter?.id;
+  if (typeof id !== 'string' || id !== id.trim() || !/^[a-z][a-z0-9._-]*$/.test(id)) {
+    throw new Error(`calendar-actuator: invalid backend adapter id: ${String(id)}`);
+  }
+  for (const method of CALENDAR_BACKEND_REQUIRED_METHODS) {
+    if (typeof adapter[method] !== 'function') {
+      throw new Error(`calendar-actuator: backend adapter '${id}' must implement ${method}()`);
+    }
+  }
+  for (const method of CALENDAR_BACKEND_OPTIONAL_METHODS) {
+    if (adapter[method] !== undefined && typeof adapter[method] !== 'function') {
+      throw new Error(`calendar-actuator: backend adapter '${id}' has invalid ${method}()`);
+    }
+  }
+  return id;
+}
+
 export class CalendarBackendRegistry {
   private readonly adapters = new Map<string, CalendarBackendAdapter>();
 
@@ -551,8 +579,7 @@ export class CalendarBackendRegistry {
   }
 
   register(adapter: CalendarBackendAdapter): this {
-    const id = adapter.id.trim();
-    if (!id) throw new Error('calendar-actuator: backend adapter id is required');
+    const id = assertCalendarBackendAdapter(adapter);
     if (this.adapters.has(id)) {
       throw new Error(`calendar-actuator: backend adapter "${id}" is already registered`);
     }
@@ -581,20 +608,37 @@ export class CalendarBackendRegistry {
   ): CalendarBackendAdapter {
     if (requested !== 'auto') {
       const adapter = this.get(requested);
-      if (!this.isAvailable(adapter, platform, availabilityOverrides)) {
-        throw new Error(adapter.unavailableMessage());
+      let available: boolean;
+      try {
+        available = this.isAvailable(adapter, platform, availabilityOverrides);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        throw new Error(`${adapter.unavailableMessage()} Availability probe failed: ${reason}`);
       }
+      if (!available) throw new Error(adapter.unavailableMessage());
       return adapter;
     }
 
+    const probeErrors: string[] = [];
     const available = [...this.adapters.values()]
-      .filter((adapter) => this.isAvailable(adapter, platform, availabilityOverrides))
+      .filter((adapter) => {
+        try {
+          return this.isAvailable(adapter, platform, availabilityOverrides);
+        } catch (error) {
+          probeErrors.push(
+            `${adapter.id}: ${error instanceof Error ? error.message : String(error)}`
+          );
+          return false;
+        }
+      })
       .sort((left, right) => (left.priority ?? 100) - (right.priority ?? 100));
     if (available[0]) return available[0];
+    const diagnostics = [
+      ...[...this.adapters.values()].map((adapter) => adapter.unavailableMessage()),
+      ...probeErrors.map((error) => `availability probe failed for ${error}`),
+    ];
     throw new Error(
-      `calendar-actuator: no calendar backend is ready. ${[...this.adapters.values()]
-        .map((adapter) => adapter.unavailableMessage())
-        .join(' ')} Available backends: ${this.ids().join(', ') || '(none)'}`
+      `calendar-actuator: no calendar backend is ready. ${diagnostics.join(' ')} Available backends: ${this.ids().join(', ') || '(none)'}`
     );
   }
 

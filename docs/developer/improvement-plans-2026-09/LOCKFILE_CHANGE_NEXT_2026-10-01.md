@@ -1,3 +1,10 @@
+---
+title: LOCKFILE CHANGE NEXT 2026 10 01.md
+tags: [improvement-plan, 2026-09]
+last_updated: 2026-09-01
+status: active
+---
+
 # Lockfile change review — next security update
 
 - **Date**: 2026-10-01

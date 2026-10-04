@@ -9,6 +9,7 @@
 
 import type { AudioChunk, AudioFormat, TranscriptChunk } from './meeting/meeting-session-types.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { resolveCanonicalViseme } from './voice/viseme-provider-registry.js';
 
 export const MEDIA_SESSION_MODES = [
   'assistant',
@@ -440,31 +441,6 @@ export function normalizeVibeVoiceAsrSegments(
   return events;
 }
 
-const AZURE_VISEME_TO_CANONICAL: Readonly<Record<number, string>> = {
-  0: 'sil',
-  1: 'AA',
-  2: 'AI',
-  3: 'AU',
-  4: 'E',
-  5: 'ER',
-  6: 'I',
-  7: 'U',
-  8: 'OW',
-  9: 'O',
-  10: 'A',
-  11: 'R',
-  12: 'L',
-  13: 'S',
-  14: 'SH',
-  15: 'TH',
-  16: 'T',
-  17: 'K',
-  18: 'P',
-  19: 'N',
-  20: 'H',
-  21: 'F',
-};
-
 export function normalizeProviderViseme(input: {
   provider_id: string;
   viseme_id: number;
@@ -493,7 +469,7 @@ export function normalizeProviderViseme(input: {
   ) {
     throw new Error('[viseme] confidence must be between 0 and 1');
   }
-  const canonical = provider === 'azure' ? AZURE_VISEME_TO_CANONICAL[input.viseme_id] : undefined;
+  const canonical = resolveCanonicalViseme(provider, input.viseme_id);
   return {
     target_avatar_id: input.target_avatar_id,
     ...(input.audio_track_id ? { audio_track_id: input.audio_track_id } : {}),

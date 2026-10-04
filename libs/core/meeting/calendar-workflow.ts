@@ -1,10 +1,20 @@
 import { randomUUID } from 'node:crypto';
 import { clamp, isRecord } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
-import { executeServicePreset } from '../service/service-engine.js';
-import { resolveCalendarProvider, type CalendarProviderId } from './calendar-provider-bridge.js';
+import {
+  resolveCalendarProvider,
+  type CalendarEventSummary,
+  type CalendarFreeBusyWindow,
+  type CalendarListEntry,
+  type CalendarProviderId,
+} from './calendar-provider-bridge.js';
+export type { CalendarEventSummary, CalendarFreeBusyWindow } from './calendar-provider-bridge.js';
 
 export { readGwsAuthStatus } from '../integrations/email-workflow.js';
+export {
+  normalizeCalendarProviderId,
+  readCalendarProviderAuthStatus,
+} from './calendar-provider-bridge.js';
 
 export type CalendarProvider = CalendarProviderId;
 
@@ -65,19 +75,6 @@ export interface CalendarEventDeleteInput {
   send_updates?: 'all' | 'externalOnly' | 'none';
 }
 
-export interface CalendarEventSummary {
-  end: string;
-  hangout_link: string;
-  html_link: string;
-  id: string;
-  /** Provider event description when returned by the agenda API. */
-  description?: string;
-  location: string;
-  start: string;
-  status: string;
-  summary: string;
-}
-
 export interface CalendarAgendaResult {
   calendar_id: string;
   events: CalendarEventSummary[];
@@ -90,26 +87,10 @@ export interface CalendarAgendaResult {
   total_items: number;
 }
 
-export interface CalendarListEntry {
-  access_role: string;
-  description: string;
-  id: string;
-  primary: boolean;
-  selected: boolean;
-  summary: string;
-  time_zone: string;
-}
-
 export interface CalendarListResult {
   calendars: CalendarListEntry[];
   ok: boolean;
   total_items: number;
-}
-
-export interface CalendarFreeBusyWindow {
-  busy: Array<{ end: string; start: string }>;
-  calendar_id: string;
-  errors: string[];
 }
 
 export interface CalendarFreeBusyResult {
@@ -134,29 +115,6 @@ export interface CalendarEventDeleteResult {
   ok: boolean;
 }
 
-export async function readM365AuthStatus(): Promise<{
-  ok: boolean;
-  available: boolean;
-  raw: unknown;
-  error?: string;
-}> {
-  try {
-    const raw = await executeServicePreset('m365', 'auth_status', { params: {} });
-    return {
-      ok: true,
-      available: true,
-      raw,
-    };
-  } catch (error: unknown) {
-    return {
-      ok: false,
-      available: false,
-      raw: null,
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
-}
-
 function stringValue(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
@@ -179,7 +137,7 @@ function normalizeRfc3339Value(value: string, timeZone?: string): Record<string,
   return timeZone ? { dateTime: trimmed, timeZone } : { dateTime: trimmed };
 }
 
-function normalizeEvent(item: unknown): CalendarEventSummary | null {
+function normalizeGenericEvent(item: unknown): CalendarEventSummary | null {
   if (!isRecord(item) || !nonEmptyString(item.id)) return null;
   const description = stringValue(item.description);
   return {
@@ -193,6 +151,13 @@ function normalizeEvent(item: unknown): CalendarEventSummary | null {
     html_link: stringValue(item.htmlLink),
     hangout_link: stringValue(item.hangoutLink),
   };
+}
+
+function normalizeProviderEvent(
+  bridge: ReturnType<typeof resolveCalendarProvider>,
+  item: unknown
+): CalendarEventSummary | null {
+  return bridge.normalizeEvent ? bridge.normalizeEvent(item) : normalizeGenericEvent(item);
 }
 
 function extractEventItems(payload: unknown): unknown[] {
@@ -222,36 +187,9 @@ function extractCalendarListItems(payload: unknown): unknown[] {
 }
 
 function extractFreeBusyWindows(payload: unknown): CalendarFreeBusyWindow[] {
-  if (isRecord(payload) && Array.isArray(payload.value)) {
-    return payload.value
-      .map((calendar) => {
-        const busy =
-          isRecord(calendar) && Array.isArray(calendar.scheduleItems)
-            ? calendar.scheduleItems.map((window) => ({
-                start: nestedStringValue(window, 'start', 'dateTime'),
-                end: nestedStringValue(window, 'end', 'dateTime'),
-              }))
-            : [];
-        return {
-          calendar_id: isRecord(calendar)
-            ? stringValue(calendar.scheduleId) || stringValue(calendar.id)
-            : '',
-          busy,
-          errors:
-            isRecord(calendar) && Array.isArray(calendar.error)
-              ? calendar.error.filter((error): error is string => typeof error === 'string')
-              : [],
-        };
-      })
-      .filter((calendar) => nonEmptyString(calendar.calendar_id));
-  }
-
   const calendars =
     isRecord(payload) && isRecord(payload.calendars) ? payload.calendars : undefined;
-  if (!calendars) {
-    return [];
-  }
-
+  if (!calendars) return [];
   return Object.entries(calendars)
     .map(([calendar_id, value]) => {
       const busy =
@@ -265,31 +203,9 @@ function extractFreeBusyWindows(payload: unknown): CalendarFreeBusyWindow[] {
         isRecord(value) && Array.isArray(value.errors)
           ? value.errors.filter((error): error is string => typeof error === 'string')
           : [];
-
       return { calendar_id, busy, errors };
     })
     .filter((calendar) => nonEmptyString(calendar.calendar_id));
-}
-
-function normalizeGraphEvent(item: unknown): CalendarEventSummary | null {
-  if (!isRecord(item) || !nonEmptyString(item.id)) return null;
-  const location = isRecord(item.location) ? item.location : undefined;
-  const onlineMeeting = isRecord(item.onlineMeeting) ? item.onlineMeeting : undefined;
-  const description =
-    nestedStringValue(item, 'body', 'content') ||
-    stringValue(item.bodyPreview) ||
-    stringValue(item.description);
-  return {
-    id: item.id,
-    summary: stringValue(item.subject) || stringValue(item.summary),
-    ...(description ? { description } : {}),
-    start: nestedStringValue(item, 'start', 'dateTime') || nestedStringValue(item, 'start', 'date'),
-    end: nestedStringValue(item, 'end', 'dateTime') || nestedStringValue(item, 'end', 'date'),
-    location: stringValue(location?.displayName) || stringValue(item.location),
-    status: stringValue(item.showAs) || stringValue(item.status),
-    html_link: stringValue(item.webLink),
-    hangout_link: stringValue(item.onlineMeetingUrl) || stringValue(onlineMeeting?.joinUrl),
-  };
 }
 
 function normalizeCalendarListEntry(item: unknown): CalendarListEntry | null {
@@ -347,9 +263,11 @@ export async function listCalendarAgenda(
     ...(timeZone ? { timeZone } : {}),
   });
 
-  const events = extractEventItems(response)
-    .map(bridge.provider_id === 'm365' ? normalizeGraphEvent : normalizeEvent)
-    .filter(isCalendarEventSummary);
+  const events = bridge.normalizeEvents
+    ? bridge.normalizeEvents(response)
+    : extractEventItems(response)
+        .map((item) => normalizeProviderEvent(bridge, item))
+        .filter(isCalendarEventSummary);
 
   return {
     ok: true,
@@ -369,9 +287,11 @@ export async function listCalendars(
 ): Promise<CalendarListResult> {
   const bridge = resolveCalendarProvider(provider);
   const response = await bridge.listCalendars();
-  const calendars = extractCalendarListItems(response)
-    .map(normalizeCalendarListEntry)
-    .filter(isCalendarListEntry);
+  const calendars = bridge.normalizeCalendarList
+    ? bridge.normalizeCalendarList(response)
+    : extractCalendarListItems(response)
+        .map(normalizeCalendarListEntry)
+        .filter(isCalendarListEntry);
 
   return {
     ok: true,
@@ -402,7 +322,7 @@ export async function queryCalendarFreeBusy(
 
   return {
     ok: true,
-    calendars: extractFreeBusyWindows(response),
+    calendars: bridge.normalizeFreeBusy?.(response) ?? extractFreeBusyWindows(response),
     time_min: input.time_min,
     time_max: input.time_max,
     ...(timeZone ? { time_zone: timeZone } : {}),
@@ -450,9 +370,7 @@ export async function createCalendarEvent(
     calendar_id: calendarId,
     ...(conferenceRequestId ? { conference_request_id: conferenceRequestId } : {}),
     with_meet: withMeet,
-    created_event: requireCalendarEvent(
-      bridge.provider_id === 'm365' ? normalizeGraphEvent(response) : normalizeEvent(response)
-    ),
+    created_event: requireCalendarEvent(normalizeProviderEvent(bridge, response)),
   };
 }
 
@@ -495,9 +413,7 @@ export async function updateCalendarEvent(
     ok: true,
     calendar_id: calendarId,
     with_meet: false,
-    created_event: requireCalendarEvent(
-      bridge.provider_id === 'm365' ? normalizeGraphEvent(response) : normalizeEvent(response)
-    ),
+    created_event: requireCalendarEvent(normalizeProviderEvent(bridge, response)),
   };
 }
 

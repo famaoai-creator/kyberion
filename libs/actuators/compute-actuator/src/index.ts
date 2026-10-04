@@ -14,6 +14,7 @@ export const actuator = defineCatalogBackedActuator({
   id: 'compute-actuator',
   describeOps,
   handleAction,
+  actionInput: (op, params) => ({ action: op, params }),
 });
 
 const main = async () => {
@@ -29,3 +30,10 @@ if (isDirectEntry(import.meta.url, 'libs/actuators/compute-actuator/src/index.ts
 }
 
 export { handleAction };
+export {
+  getComputeDriver,
+  listComputeProviders,
+  registerComputeDriver,
+  resolveDriverForJob,
+} from './compute-driver.js';
+export type { ComputeDriver, ComputeJobSpec, ComputeJobState } from './compute-driver.js';

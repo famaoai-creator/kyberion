@@ -197,3 +197,7 @@ ADF の `options` に `profile`, `profile_name`, または `profile_email` を�
   ]
 }
 ```
+
+## Extending profile providers
+
+Browser profile discovery and opening share the schema-backed `browser-profile-providers.json` registry. A provider module exports `browserProfileProvider` with `listProfiles(options)` and `openProfile(profile, url, print)`. Add the module package and one registry entry; the CLI and browser pipeline consume the same provider contract without provider-specific branches. Keep provider IDs stable and return profiles whose `provider` exactly matches the registry ID. Optional compiled fallback paths must remain repository-relative regular files.

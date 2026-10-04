@@ -2,7 +2,7 @@
 title: Scope Governance 統合計画 (SC-01〜09)
 tags: [improvement-plan, 2026-10, entity-scope, workspace, cloudflare-os, governance]
 last_updated: 2026-10-03
-status: draft
+status: active
 revision: 2
 ---
 

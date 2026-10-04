@@ -3,7 +3,7 @@ title: 責任者憲章(Accountability Charter) — HITL から「誰がケツを
 category: Improvement Plan
 tags: [accountability, autonomy, hitl, authority, risk-appetite, delegation, charter]
 last_updated: 2026-09-30
-status: proposal
+status: active
 ---
 
 # 責任者憲章(Accountability Charter)

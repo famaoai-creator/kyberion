@@ -7,6 +7,7 @@
  */
 
 import path from 'node:path';
+import { createBinaryAvailability } from '#binary-availability';
 import { logger } from '../core.js';
 import { getRegisteredEnvBool, getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
@@ -82,34 +83,13 @@ function compareActuatorCatalogOrder(left: string, right: string): number {
 // `which` costs one spawned process per call; scanning PATH entries with stat
 // checks is milliseconds for the whole manifest set. PATHEXT covers Windows
 // .cmd/.exe shims just like `where`.
-const binaryPresenceCache = new Map<string, boolean>();
-let pathDirsCache: string[] | null = null;
-const PATHEXT_EXTENSIONS =
-  process.platform === 'win32'
-    ? (process.env.PATHEXT || '.EXE;.CMD;.BAT;.COM').toLowerCase().split(';')
-    : [''];
-
-function binarySearchDirs(): string[] {
-  if (!pathDirsCache) {
-    pathDirsCache = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
-  }
-  return pathDirsCache;
-}
-
-function hasBinary(binary: string): boolean {
-  const cached = binaryPresenceCache.get(binary);
-  if (cached !== undefined) return cached;
-  const lower = binary.toLowerCase();
-  const variants =
-    PATHEXT_EXTENSIONS.some((ext) => lower.endsWith(ext)) && process.platform === 'win32'
-      ? [binary]
-      : PATHEXT_EXTENSIONS.map((ext) => binary + ext);
-  const present = binarySearchDirs().some((dir) =>
-    variants.some((name) => safeExistsSync(path.join(dir, name)))
-  );
-  binaryPresenceCache.set(binary, present);
-  return present;
-}
+const hasBinary = createBinaryAvailability({
+  platform: process.platform,
+  pathValue: process.env.PATH,
+  pathDelimiter: path.delimiter,
+  pathExt: process.env.PATHEXT,
+  exists: safeExistsSync,
+});
 
 function envRequirementMet(name: string): boolean {
   const flag = getRegisteredEnvBool(name);

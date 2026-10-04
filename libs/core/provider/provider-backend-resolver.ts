@@ -3,8 +3,8 @@
  * "real per-provider backend resolver so `runBestOfProviders` can actually
  * delegate").
  *
- * `best-of-providers.ts` needs a way to turn a provider id ('claude' /
- * 'codex' / 'agy' / 'grok') into something that satisfies its minimal
+ * `best-of-providers.ts` needs a way to turn a registered provider id into
+ * something that satisfies its minimal
  * `{ delegateTask(instruction, context?): Promise<string> }` structural
  * interface. This module is that resolver. It is deliberately standalone —
  * it does NOT import `best-of-providers.ts` (avoids a cycle; the return
@@ -12,7 +12,7 @@
  * `BestOfProviderBackend`, so it satisfies that interface with no adapter,
  * the same trick `best-of-providers.ts` itself uses for `ReasoningBackend`).
  *
- * Per-provider constructor choice (see `DEFAULT_CONSTRUCTORS` below):
+ * Builtin constructor choices (registered through the same seam as extensions):
  *
  *   - 'claude' → `ShellClaudeCliBackend` (`shell-claude-cli-backend.ts`),
  *     built from `buildClaudeCliOptionsFromEnv` directly — NOT from
@@ -85,6 +85,7 @@ import {
 } from './provider-capability-registry.js';
 import { providerIdForReasoningIdentifier } from './provider-egress-gate.js';
 import { resolveClaudeCliFallbackCandidates } from './claude-cli-resolution.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 /**
  * Minimal structural shape returned by this resolver — declared
@@ -97,13 +98,6 @@ import { resolveClaudeCliFallbackCandidates } from './claude-cli-resolution.js';
  */
 export interface ProviderBackendHandle {
   delegateTask(instruction: string, context?: string): Promise<string>;
-}
-
-const KNOWN_PROVIDERS = ['claude', 'codex', 'agy', 'grok'] as const;
-type KnownProvider = (typeof KNOWN_PROVIDERS)[number];
-
-function isKnownProvider(value: string): value is KnownProvider {
-  return (KNOWN_PROVIDERS as readonly string[]).includes(value);
 }
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
@@ -126,9 +120,17 @@ function readCodexOptionsWithoutSpawn(env: NodeJS.ProcessEnv): CodexCliQueryOpti
   };
 }
 
-type ProviderConstructor = (env: NodeJS.ProcessEnv) => ProviderBackendHandle | null;
+export type ProviderBackendConstructor = (env: NodeJS.ProcessEnv) => ProviderBackendHandle | null;
 
-const DEFAULT_CONSTRUCTORS: Readonly<Record<KnownProvider, ProviderConstructor>> = {
+const providerBackendConstructorSeam = createSeam<ProviderBackendConstructor>({
+  key: 'provider-backend-constructor',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+const providerBackendConstructorDisposers = new Map<string, () => void>();
+const backendCache = new Map<string, ProviderBackendHandle | null>();
+
+const BUILTIN_CONSTRUCTORS: Readonly<Record<string, ProviderBackendConstructor>> = {
   claude: (env) => {
     const options = buildClaudeCliOptionsFromEnv(env);
     if (options.bin) return new ShellClaudeCliBackend(options);
@@ -143,19 +145,45 @@ const DEFAULT_CONSTRUCTORS: Readonly<Record<KnownProvider, ProviderConstructor>>
   grok: (env) => new ShellGrokCliBackend(buildGrokCliOptionsFromEnv(env)),
 };
 
+/** Register a lazy delegate-capable backend constructor for one provider id. */
+export function registerProviderBackendConstructor(
+  providerId: string,
+  constructor: ProviderBackendConstructor,
+  metadata: SeamProviderMetadata = { provenance: 'plugin', source: 'provider-backend-extension' }
+): () => void {
+  const id = providerId.trim();
+  if (!id) throw new Error('Provider backend id is required');
+  const disposeFromSeam = providerBackendConstructorSeam.register(id, constructor, metadata);
+  const dispose = () => {
+    disposeFromSeam();
+    if (providerBackendConstructorDisposers.get(id) === dispose) {
+      providerBackendConstructorDisposers.delete(id);
+      backendCache.delete(id);
+    }
+  };
+  providerBackendConstructorDisposers.set(id, dispose);
+  backendCache.delete(id);
+  return dispose;
+}
+
+for (const [providerId, constructor] of Object.entries(BUILTIN_CONSTRUCTORS)) {
+  registerProviderBackendConstructor(providerId, constructor, {
+    provenance: 'builtin',
+    source: 'provider-backend-resolver',
+  });
+}
+
 export interface ProviderBackendResolverOptions {
   /** Default: `process.env`. */
   env?: NodeJS.ProcessEnv;
   /** Default: `peekProviderCapabilityRegistry` (XP-01 cached snapshot; never live-probes). */
   registrySnapshot?: () => ProviderCapability[] | null;
   /** Per-provider construction override — test seam so no real config/binary access happens. */
-  construct?: Partial<Record<KnownProvider, ProviderConstructor>>;
+  construct?: Readonly<Record<string, ProviderBackendConstructor | undefined>>;
 }
 
-const backendCache = new Map<KnownProvider, ProviderBackendHandle | null>();
-
 function isProviderAvailable(
-  provider: KnownProvider,
+  provider: string,
   registrySnapshot: (() => ProviderCapability[] | null) | undefined
 ): boolean {
   const snapshotFn = registrySnapshot ?? peekProviderCapabilityRegistry;
@@ -173,9 +201,9 @@ function isProviderAvailable(
 
 /**
  * Resolve a lazily-constructed, cached, delegate-capable backend for a
- * provider id ('claude' / 'codex' / 'agy' / 'grok', or a known reasoning
- * mode/backend-name alias per `providerIdForReasoningIdentifier` — e.g.
- * 'shell-claude-cli'). Returns `null` for unknown or (per the XP-01
+ * provider id registered through the backend-constructor seam (or a known
+ * reasoning mode/backend-name alias per `providerIdForReasoningIdentifier` —
+ * e.g. 'shell-claude-cli'). Returns `null` for unregistered or (per the XP-01
  * registry) unavailable providers. Never throws. Constructs only — never
  * spawns a process (see module header for the per-provider detail).
  */
@@ -186,7 +214,9 @@ export function resolveProviderBackend(
   const raw = String(provider || '').trim();
   if (!raw) return null;
   const normalized = providerIdForReasoningIdentifier(raw) ?? raw;
-  if (!isKnownProvider(normalized)) return null;
+  const constructFn =
+    options.construct?.[normalized] ?? providerBackendConstructorSeam.getOptional(normalized);
+  if (!constructFn) return null;
 
   if (backendCache.has(normalized)) {
     return backendCache.get(normalized) ?? null;
@@ -200,7 +230,6 @@ export function resolveProviderBackend(
   const env = options.env ?? process.env;
   let backend: ProviderBackendHandle | null = null;
   try {
-    const constructFn = options.construct?.[normalized] ?? DEFAULT_CONSTRUCTORS[normalized];
     backend = constructFn(env) ?? null;
   } catch (err) {
     logger.warn(

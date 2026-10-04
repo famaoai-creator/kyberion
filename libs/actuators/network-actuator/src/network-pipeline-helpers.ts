@@ -256,7 +256,7 @@ async function opCapture(op: string, rawParams: unknown, ctx: NetworkPipelineCon
       return { ...ctx, [exportKey(params, 'last_capture')]: safeExec(cmd).trim() };
 
     case 'a2a_poll':
-      const messages = await pollA2AInbox();
+      const messages = await pollA2AInbox(readStringParam(params, 'method', 'local'));
       return { ...ctx, [exportKey(params, 'inbox_messages')]: messages };
 
     default:
@@ -326,7 +326,7 @@ async function opApply(op: string, rawParams: unknown, ctx: NetworkPipelineConte
     case 'a2a_send':
       const message = resolveVars(params.message, ctx);
       await sendA2AMessage(message, {
-        method: readStringParam(params, 'method', 'local') === 'local' ? 'local' : 'local',
+        method: readStringParam(params, 'method', 'local'),
         encrypt: params.encrypt !== false,
         target_public_key: params.target_public_key
           ? resolveNetworkPath(String(resolveVars(params.target_public_key, ctx)))

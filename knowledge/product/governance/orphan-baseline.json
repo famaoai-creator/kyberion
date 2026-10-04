@@ -46,6 +46,14 @@
     {
       "id": "libs/core/windows-local-assist-bridge.ts",
       "reason": "Windows (Foundry Local) counterpart of apple-intelligence-bridge, unit-tested. Its natural call site is the doctor local-capability section next to probeAppleIntelligence in scripts/run_doctor.ts, which is owned by another branch; wire it there (opt-in probe, silent off Windows) when that branch lands."
+    },
+    {
+      "id": "libs/core/meeting/driver-modules/chrome-extension.ts",
+      "reason": "Data-driven extension module: meeting-driver-module-loader resolves it dynamically via the meeting-join-driver-modules.json catalog (driver_id 'chrome-extension') and the @agent/core/meeting/driver-modules/chrome-extension package export, so no static in-repo caller exists."
+    },
+    {
+      "id": "libs/core/meeting/driver-modules/in-room.ts",
+      "reason": "Data-driven extension module: meeting-driver-module-loader resolves it dynamically via the meeting-join-driver-modules.json catalog (driver_id 'in-room') and the @agent/core/meeting/driver-modules/in-room package export, so no static in-repo caller exists."
     }
   ],
   "scripts": [],

@@ -18,7 +18,11 @@ import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/
 import { secureFetch } from '@agent/core/network';
 import { sleep } from '@agent/core/async-utils';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
+import { createSeam, coreSeamCatalog, type SeamProviderMetadata } from '@agent/core/seam';
 import * as path from 'node:path';
+
+export const VIDEO_GENERATION_PROVIDER_SEAM = 'video-generation-provider';
+const VIDEO_GENERATION_ADAPTER_SEAM = 'video-generation-provider-adapter';
 
 export type VideoProviderStatus = 'submitted' | 'running' | 'succeeded' | 'failed' | 'canceled';
 
@@ -70,6 +74,29 @@ export interface VideoGenerationProvider {
   download(status: VideoGenerationStatus, request?: VideoGenerationRequest): Promise<Buffer>;
   cancel?(providerJobId: string): Promise<void>;
 }
+
+/** What the adapter actually sends to its API; used for request eligibility. */
+export interface DirectVideoFeatures {
+  /** How a first / last frame can be passed: any URI, only a data: URI, or not at all. */
+  first_frame_image: 'any' | 'data_uri' | false;
+  last_frame_image: 'any' | 'data_uri' | false;
+  /** Aspect ratios the adapter sends; false = it sends resolution (size) only. */
+  aspect_ratios: readonly string[] | false;
+  /** Set when the adapter cannot run without a first frame. */
+  requires_first_frame?: string;
+}
+
+export interface DirectVideoProviderAdapter {
+  create: () => VideoGenerationProvider;
+  features: DirectVideoFeatures;
+}
+
+const directVideoProviderAdapters = createSeam<DirectVideoProviderAdapter>({
+  key: VIDEO_GENERATION_ADAPTER_SEAM,
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+let directVideoBuiltinsRegistered = false;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -533,31 +560,157 @@ class MiniMaxHailuoProvider implements VideoGenerationProvider {
   }
 }
 
-const PROVIDER_FACTORIES: Record<string, () => VideoGenerationProvider> = {
-  google_veo: () => new GoogleVeoProvider(),
-  runway: () => new RunwayProvider(),
-  openai_sora: () => new OpenAiSoraProvider(),
-  minimax_hailuo: () => new MiniMaxHailuoProvider(),
-};
+function assertDirectVideoProviderAdapter(
+  provider: string,
+  candidate: unknown
+): asserts candidate is DirectVideoProviderAdapter {
+  if (!/^[a-z][a-z0-9._-]*$/.test(provider)) {
+    throw new Error('Invalid direct video provider id: ' + provider);
+  }
+  if (
+    !isJsonRecord(candidate) ||
+    typeof candidate.create !== 'function' ||
+    !isJsonRecord(candidate.features)
+  ) {
+    throw new Error(
+      'Direct video provider ' + provider + ' requires a factory and feature contract'
+    );
+  }
+  const features = candidate.features;
+  for (const feature of ['first_frame_image', 'last_frame_image'] as const) {
+    const mode = features[feature];
+    if (mode !== 'any' && mode !== 'data_uri' && mode !== false) {
+      throw new Error(
+        'Direct video provider ' + provider + ' has invalid ' + feature + ' capability'
+      );
+    }
+  }
+  const ratios = features.aspect_ratios;
+  if (
+    ratios !== false &&
+    (!Array.isArray(ratios) || ratios.some((ratio) => typeof ratio !== 'string' || !ratio.trim()))
+  ) {
+    throw new Error('Direct video provider ' + provider + ' has invalid aspect_ratios capability');
+  }
+  if (
+    features.requires_first_frame !== undefined &&
+    (typeof features.requires_first_frame !== 'string' ||
+      !features.requires_first_frame.trim() ||
+      features.first_frame_image === false)
+  ) {
+    throw new Error(
+      'Direct video provider ' + provider + ' has an inconsistent first-frame requirement'
+    );
+  }
+}
+/** Register one direct API adapter and its request-capability contract. */
+export function registerDirectVideoProviderAdapter(
+  provider: string,
+  adapter: DirectVideoProviderAdapter,
+  metadata: SeamProviderMetadata = { provenance: 'plugin', source: 'video-generation-extension' }
+): () => void {
+  const id = provider.trim();
+  assertDirectVideoProviderAdapter(id, adapter);
+  return directVideoProviderAdapters.register(id, adapter, metadata);
+}
+
+function ensureDirectVideoProviderAdapters(): void {
+  if (directVideoBuiltinsRegistered) return;
+  for (const [id, create, features] of [
+    [
+      'google_veo',
+      () => new GoogleVeoProvider(),
+      {
+        first_frame_image: 'data_uri',
+        last_frame_image: 'data_uri',
+        aspect_ratios: ['16:9', '9:16'],
+      },
+    ],
+    [
+      'runway',
+      () => new RunwayProvider(),
+      {
+        first_frame_image: 'any',
+        last_frame_image: 'any',
+        aspect_ratios: ['16:9', '9:16', '1:1'],
+        requires_first_frame: 'first_frame_image (the Runway adapter uses image_to_video)',
+      },
+    ],
+    [
+      'openai_sora',
+      () => new OpenAiSoraProvider(),
+      { first_frame_image: 'data_uri', last_frame_image: false, aspect_ratios: false },
+    ],
+    [
+      'minimax_hailuo',
+      () => new MiniMaxHailuoProvider(),
+      { first_frame_image: 'any', last_frame_image: 'any', aspect_ratios: false },
+    ],
+  ] as const) {
+    registerDirectVideoProviderAdapter(
+      id,
+      { create, features },
+      { provenance: 'builtin', source: 'video-generation-provider' }
+    );
+  }
+  directVideoBuiltinsRegistered = true;
+}
+
+function getDirectVideoProviderAdapter(provider: string): DirectVideoProviderAdapter | undefined {
+  ensureDirectVideoProviderAdapters();
+  const adapter: unknown = directVideoProviderAdapters.getOptional(provider);
+  if (!adapter) return undefined;
+  assertDirectVideoProviderAdapter(provider, adapter);
+  return adapter;
+}
 
 export function isDirectVideoGenerationBackend(backend: MediaBackendRecord): boolean {
   return (
-    backend.modality === 'video' && backend.kind === 'api' && backend.provider in PROVIDER_FACTORIES
+    backend.modality === 'video' &&
+    backend.kind === 'api' &&
+    Boolean(getDirectVideoProviderAdapter(backend.provider))
   );
 }
 
 export function resolveVideoGenerationBackend(params: VideoGenerationParams): MediaBackendRecord {
   const backendId = String(params.backend_id || params.video_adf?.engine?.backend_id || '').trim();
-  return getMediaBackendRecord(backendId || undefined, 'video');
+  if (!backendId) return getMediaBackendRecord(undefined, 'video');
+
+  const backend = listMediaBackends('video').find(
+    (entry) => entry.backend_id === backendId || entry.aliases?.includes(backendId)
+  );
+  if (!backend) {
+    throw new Error(`No registered video-generation backend matches backend_id '${backendId}'`);
+  }
+  return getMediaBackendRecord(backend.backend_id, 'video');
 }
 
+function assertVideoGenerationProvider(
+  providerId: string,
+  candidate: unknown
+): asserts candidate is VideoGenerationProvider {
+  if (
+    !isJsonRecord(candidate) ||
+    candidate.provider !== providerId ||
+    typeof candidate.submit !== 'function' ||
+    typeof candidate.status !== 'function' ||
+    typeof candidate.download !== 'function' ||
+    (candidate.cancel !== undefined && typeof candidate.cancel !== 'function')
+  ) {
+    throw new Error(
+      'Video provider adapter ' + providerId + ' created an invalid provider contract'
+    );
+  }
+}
 export function createVideoGenerationProvider(
   backend: MediaBackendRecord
 ): VideoGenerationProvider {
-  const factory = PROVIDER_FACTORIES[backend.provider];
-  if (!factory)
+  const adapter = getDirectVideoProviderAdapter(backend.provider);
+  if (!adapter)
     throw new Error(`No video generation provider adapter registered for ${backend.provider}`);
-  return factory();
+  const provider: unknown = adapter.create();
+  assertVideoGenerationProvider(backend.provider, provider);
+  return provider;
 }
 
 export function normalizeVideoGenerationRequest(
@@ -717,35 +870,6 @@ export async function collectDirectVideoArtifactForJob(
   };
 }
 
-export const VIDEO_GENERATION_PROVIDER_SEAM = 'video-generation-provider';
-
-/** What each direct adapter actually sends to its API (code truth for eligibility). */
-interface DirectVideoFeatures {
-  /** How a first / last frame can be passed: any URI, only a data: URI, or not at all. */
-  first_frame_image: 'any' | 'data_uri' | false;
-  last_frame_image: 'any' | 'data_uri' | false;
-  /** Aspect ratios the adapter sends; false = it sends resolution (size) only. */
-  aspect_ratios: readonly string[] | false;
-  /** Set when the adapter cannot run without a first frame. */
-  requires_first_frame?: string;
-}
-
-const DIRECT_VIDEO_FEATURES: Record<string, DirectVideoFeatures> = {
-  google_veo: {
-    first_frame_image: 'data_uri',
-    last_frame_image: 'data_uri',
-    aspect_ratios: ['16:9', '9:16'],
-  },
-  runway: {
-    first_frame_image: 'any',
-    last_frame_image: 'any',
-    aspect_ratios: ['16:9', '9:16', '1:1'],
-    requires_first_frame: 'first_frame_image (the Runway adapter uses image_to_video)',
-  },
-  openai_sora: { first_frame_image: 'data_uri', last_frame_image: false, aspect_ratios: false },
-  minimax_hailuo: { first_frame_image: 'any', last_frame_image: 'any', aspect_ratios: false },
-};
-
 function textParam(params: JsonRecord, key: string): string | undefined {
   const value = params[key];
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
@@ -769,9 +893,9 @@ function frameUnmet(
 
 /**
  * Text-to-video candidates for a request (hyperframes is render-only and
- * never a candidate): each governed API backend with a direct adapter plus
- * the ComfyUI workflow backend. Eligible = the request's features are sent
- * by the adapter, and the backend is available (credentials / service probe).
+ * never a candidate): governed API backends with direct adapters plus
+ * service presets handled by the media-generation workflow runtime. Eligible
+ * means the request's features are supported and the backend is available.
  */
 export async function listVideoGenerationCandidates(
   params: VideoGenerationParams,
@@ -790,10 +914,14 @@ export async function listVideoGenerationCandidates(
   const candidates: SeamProviderCandidate[] = [];
   for (const backend of listMediaBackends('video')) {
     const direct = isDirectVideoGenerationBackend(backend);
-    if (!direct && backend.provider !== 'comfyui') continue;
+    const workflowPreset =
+      backend.kind === 'service_preset' &&
+      backend.service_id === 'media-generation' &&
+      backend.action === 'generate_video';
+    if (!direct && !workflowPreset) continue;
     const unmet: string[] = [];
     if (direct) {
-      const features = DIRECT_VIDEO_FEATURES[backend.provider]!;
+      const features = getDirectVideoProviderAdapter(backend.provider)!.features;
       const first = frameUnmet(
         'first_frame_image',
         firstFrame,
@@ -821,10 +949,12 @@ export async function listVideoGenerationCandidates(
       if (inputVideo) unmet.push('input_video (not sent by any direct adapter)');
     } else {
       if (!hasWorkflow) {
-        unmet.push('needs params.workflow, workflow_path or video_adf (ComfyUI runs workflows)');
+        unmet.push(
+          'needs params.workflow, workflow_path or video_adf (service presets run workflows)'
+        );
       }
       if (firstFrame || lastFrame)
-        unmet.push('first/last frame images (not passed to ComfyUI workflows)');
+        unmet.push('first/last frame images (not passed to service preset workflows)');
     }
     if (wantsAudio && !backend.supports.mux_audio) unmet.push('generate_audio (no native audio)');
     if (unmet.length === 0) {

@@ -41,7 +41,7 @@ describe('voice-actuator op input contracts cover what the handlers read', () =>
       model: 'mlx-community/whisper-large-v3-turbo',
     };
     expect(validate(params), JSON.stringify(validate.errors)).toBe(true);
-    expect(validate({ ...params, backend: 'cloud' })).toBe(false);
+    expect(validate({ ...params, backend: 123 })).toBe(false);
   });
 
   it('speak_local accepts purpose and local_only', () => {
