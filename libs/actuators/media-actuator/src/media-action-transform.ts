@@ -963,6 +963,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         media_kind: slide.media_kind,
         layout_key: slide.layout_key,
         semantic_type: slide.semantic_type,
+        ...(slide.speaker_notes ? { speaker_notes: slide.speaker_notes } : {}),
         design_system_id: storyline.design_system_id,
         branding: storyline.branding || {},
       }));

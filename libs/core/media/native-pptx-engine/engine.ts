@@ -1,3 +1,9 @@
+import {
+  generateNotesMasterRels,
+  generateNotesMasterXml,
+  generateNotesSlideRels,
+  generateNotesSlideXml,
+} from './notes.js';
 import AdmZip from 'adm-zip';
 import * as path from 'path';
 import { safeExistsSync, safeReadFile } from '../../secure-io.js';
@@ -123,9 +129,14 @@ export async function generateNativePptx(
   // Pre-count diagrams, charts, and notes for Content_Types
   let totalDiagrams = 0;
   let totalCharts = 0;
-  let totalNotes = 0;
+  const notesSlideNumbers: number[] = [];
+  protocol.slides.forEach((slide, index) => {
+    if (slide.notesXml || slide.notes?.trim()) notesSlideNumbers.push(index + 1);
+  });
+  const hasNotes = notesSlideNumbers.length > 0;
+  // The notes master gets its own theme part after the slide masters' themes.
+  const notesThemeIndex = masterCount + 1;
   for (const slide of protocol.slides) {
-    if (slide.notesXml) totalNotes++;
     for (const el of slide.elements) {
       if (el.type === 'smartart' && el.smartArtData) totalDiagrams++;
       if (el.type === 'chart' && el.chartData) totalCharts++;
@@ -142,7 +153,8 @@ export async function generateNativePptx(
         masterCount,
         totalDiagrams,
         totalCharts,
-        totalNotes
+        0,
+        hasNotes ? { slideNumbers: notesSlideNumbers, themeIndex: notesThemeIndex } : undefined
       ),
       'utf8'
     )
@@ -172,14 +184,15 @@ export async function generateNativePptx(
         masterCount,
         Math.round(protocol.canvas.w * 914400),
         Math.round(protocol.canvas.h * 914400),
-        protocol.extensions
+        protocol.extensions,
+        hasNotes
       ),
       'utf8'
     )
   );
   zip.addFile(
     'ppt/_rels/presentation.xml.rels',
-    Buffer.from(generatePresentationRels(slideCount, masterCount), 'utf8')
+    Buffer.from(generatePresentationRels(slideCount, masterCount, hasNotes), 'utf8')
   );
   zip.addFile(
     'ppt/presProps.xml',
@@ -206,6 +219,14 @@ export async function generateNativePptx(
   // 3. Theme (use raw XML if available for faithful round-trip)
   const themeXml = protocol.rawThemeXml || generateTheme(protocol.theme);
   zip.addFile('ppt/theme/theme1.xml', Buffer.from(themeXml, 'utf8'));
+  if (hasNotes) {
+    zip.addFile(`ppt/theme/theme${notesThemeIndex}.xml`, Buffer.from(themeXml, 'utf8'));
+    zip.addFile('ppt/notesMasters/notesMaster1.xml', Buffer.from(generateNotesMasterXml(), 'utf8'));
+    zip.addFile(
+      'ppt/notesMasters/_rels/notesMaster1.xml.rels',
+      Buffer.from(generateNotesMasterRels(notesThemeIndex), 'utf8')
+    );
+  }
 
   // 4. Slide Master & Layouts
   let imageCounter = 1;
@@ -591,11 +612,14 @@ export async function generateNativePptx(
   ${slide.extensions || ''}
 </p:sld>`;
 
-    if (slide.notesXml) {
+    const notesXml =
+      slide.notesXml || (slide.notes?.trim() ? generateNotesSlideXml(slide.notes) : undefined);
+    if (notesXml) {
       const nId = `rId${slideIdCounter++}`;
+      zip.addFile(`ppt/notesSlides/notesSlide${slideNumber}.xml`, Buffer.from(notesXml, 'utf8'));
       zip.addFile(
-        `ppt/notesSlides/notesSlide${slideNumber}.xml`,
-        Buffer.from(slide.notesXml, 'utf8')
+        `ppt/notesSlides/_rels/notesSlide${slideNumber}.xml.rels`,
+        Buffer.from(generateNotesSlideRels(slideNumber), 'utf8')
       );
       slideExtras.push({
         id: nId,

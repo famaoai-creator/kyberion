@@ -135,6 +135,8 @@ export interface PptxSlide {
   bgXml?: string;
   transitionXml?: string;
   notesXml?: string;
+  /** Plain-text speaker notes; ignored when notesXml (round-tripped XML) is present. */
+  notes?: string;
   elements: PptxElement[];
   extensions?: string;
   layoutIndex?: number; // 1-based index into layouts; defaults to 1 for first slide, 2 for others
