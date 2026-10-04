@@ -13,8 +13,11 @@ import { pathResolver } from '../path-resolver.js';
 
 /** Optional per-language cue lists; missing lists default to empty. */
 export interface TurnTakingLanguageEntry {
-  /** True when words are space-separated (en); false for unspaced scripts (ja/zh/th). */
-  uses_word_spaces?: boolean;
+  /**
+   * True when words are space-separated (en); false for unspaced scripts
+   * (ja/zh/th). Required on every entry — never inferred from the id.
+   */
+  uses_word_spaces: boolean;
   continuation_particles?: readonly string[];
   eot_fillers?: readonly string[];
   commit_endings?: readonly string[];
@@ -26,6 +29,8 @@ export interface TurnTakingLanguageEntry {
   hold_markers?: readonly string[];
   /** Phrases the assistant itself may emit as backchannels/reactions. */
   agent_backchannels?: readonly string[];
+  /** Suffixes that mark a question in this language (beyond '?'). */
+  question_endings?: readonly string[];
 }
 
 export interface VoiceTurnTakingLexicon {
@@ -58,9 +63,11 @@ function optionalStringList(value: unknown, field: string): readonly string[] {
 }
 
 function languageEntry(raw: Record<string, unknown>, lang: string): TurnTakingLanguageEntry {
+  if (typeof raw.uses_word_spaces !== 'boolean') {
+    throw new Error(`[VOICE_LEXICON_INVALID] ${lang}.uses_word_spaces must be a boolean`);
+  }
   return {
-    uses_word_spaces:
-      typeof raw.uses_word_spaces === 'boolean' ? raw.uses_word_spaces : lang !== 'ja',
+    uses_word_spaces: raw.uses_word_spaces,
     continuation_particles: optionalStringList(
       raw.continuation_particles,
       `${lang}.continuation_particles`
@@ -78,6 +85,7 @@ function languageEntry(raw: Record<string, unknown>, lang: string): TurnTakingLa
     correction_markers: optionalStringList(raw.correction_markers, `${lang}.correction_markers`),
     hold_markers: optionalStringList(raw.hold_markers, `${lang}.hold_markers`),
     agent_backchannels: optionalStringList(raw.agent_backchannels, `${lang}.agent_backchannels`),
+    question_endings: optionalStringList(raw.question_endings, `${lang}.question_endings`),
   };
 }
 

@@ -11,7 +11,7 @@ tags:
     2026-10,
   ]
 last_updated: 2026-10-04
-status: implemented (MSN-CONVERSATION-ENGINE-20261004; CE-02 完全移行と CE-06 完全セグメント化は残件)
+status: partial
 ---
 
 # Conversation Engine 改良計画(CE)
