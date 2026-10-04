@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { assertSafeRepositoryPath, safeExec, safeMkdir } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
 import { resolveFfmpegBin } from '../tool/tool-binary-resolvers.js';
 import type { VideoFrame } from '../meeting/meeting-session-types.js';
 import type { VideoFrameBus } from '../video/video-frame-bus.js';
@@ -10,10 +11,42 @@ import {
   type VirtualDeviceInventory,
   type VirtualDeviceInventoryBridge,
 } from './virtual-device-inventory-bridge.js';
+interface VirtualCameraInjectionBackendDescriptor {
+  backend_id: string;
+  platforms: string[];
+  priority: number;
+  requires_device_path: boolean;
+  timeout_ms: number;
+  command_args: string[];
+  host_plan?: { notes?: string[]; camera?: string[] };
+}
+interface VirtualCameraInjectionBackendRegistry {
+  version: string;
+  backends: VirtualCameraInjectionBackendDescriptor[];
+}
+const virtualCameraInjectionBackendCatalog = defineCatalog<VirtualCameraInjectionBackendRegistry>({
+  id: 'virtual-camera-injection-backends',
+  path: () => pathResolver.knowledge('product/governance/virtual-camera-injection-backends.json'),
+  schema: pathResolver.knowledge('product/schemas/virtual-camera-injection-backends.schema.json'),
+});
+
+function resolveBackendArguments(
+  backend: VirtualCameraInjectionBackendDescriptor,
+  values: Record<string, string>
+): string[] {
+  return backend.command_args.map((argument) =>
+    argument.replace(/\{([a-z_]+)\}/gu, (_match, key: string) => {
+      const value = values[key];
+      if (value === undefined)
+        throw new Error('[virtual-camera-injection] unsupported argument placeholder: ' + key);
+      return value;
+    })
+  );
+}
 
 export const VIRTUAL_CAMERA_INJECTION_BRIDGE_ID = 'virtual-camera-injection-bridge' as const;
 
-export type VirtualCameraInjectionBackendId = 'stub' | 'ffmpeg-v4l2';
+export type VirtualCameraInjectionBackendId = string;
 export type VirtualCameraInjectionMode = 'replay' | 'device';
 export type VirtualCameraInjectionStatus = 'succeeded' | 'blocked';
 
@@ -24,6 +57,8 @@ export interface VirtualCameraInjectionRequest {
   device_preference?: string;
   /** Optional explicit device path, e.g. /dev/video2 on Linux. */
   device_path?: string;
+  /** Optional registered native injection backend. */
+  backend_id?: string;
   /** Optional MP4 sidecar output for replay artifacts. */
   output_path?: string;
   /** Optional fps hint for archive decode/encode. */
@@ -70,6 +105,7 @@ export interface VirtualCameraInjectionBridgeOptions {
   ffmpeg_bin?: string;
   device_preference?: string;
   device_path?: string;
+  backend_id?: string;
 }
 
 export interface VirtualCameraInjectionBridge {
@@ -129,37 +165,21 @@ function pickCamera(
 }
 
 function buildHostPlan(
-  platform: NodeJS.Platform,
   selectedCamera?: string,
-  selectedDevicePath?: string
+  selectedDevicePath?: string,
+  backend?: VirtualCameraInjectionBackendDescriptor
 ): VirtualCameraInjectionHostPlan {
   const notes = [
     'Runtime can replay frames from mp4, but host-level virtual camera injection requires an OS-specific sink.',
+    ...(backend?.host_plan?.notes ?? []),
   ];
-  const camera: string[] = [];
-  if (platform === 'darwin') {
-    camera.push(
-      'Install or enable a virtual camera sink such as OBS Virtual Camera or another CoreMediaIO-backed device.',
-      'Expose a concrete sink that the runtime can target, then select it through the bridge.',
-      'Use the replay path for validation when a sink is not yet present.'
-    );
-  } else if (platform === 'linux') {
-    camera.push(
-      'Provide a v4l2loopback device path or equivalent writable virtual camera node.',
-      'Pass that device path to the bridge so ffmpeg can stream mp4 frames into it.',
-      'Confirm the injected device appears in the inventory scan before relying on it in meeting flows.'
-    );
-  } else {
-    camera.push(
-      'This platform does not have a native camera injection backend in the runtime bridge.'
-    );
-  }
-  if (selectedCamera) {
-    notes.push(`Selected camera hint: ${selectedCamera}.`);
-  }
-  if (selectedDevicePath) {
-    notes.push(`Selected device path: ${selectedDevicePath}.`);
-  }
+  const camera = backend?.host_plan?.camera
+    ? [...backend.host_plan.camera]
+    : [
+        'No native injection backend is configured for the current platform; use the replay output for validation.',
+      ];
+  if (selectedCamera) notes.push(`Selected camera hint: ${selectedCamera}.`);
+  if (selectedDevicePath) notes.push(`Selected device path: ${selectedDevicePath}.`);
   return { notes, camera };
 }
 
@@ -188,23 +208,42 @@ export class VirtualCameraInjectionBridgeImpl implements VirtualCameraInjectionB
     );
     const selectedDevicePath = normalizePreference(request.device_path ?? this.opts.device_path);
     const ffmpegBin = this.opts.ffmpeg_bin ?? resolveFfmpegBin();
-    const ffmpegAvailable = isAvailableCommand(ffmpegBin, ['-version']);
-    const actualDeviceReady =
-      process.platform === 'linux' && Boolean(selectedDevicePath) && ffmpegAvailable;
-    const backend: VirtualCameraInjectionBackendId = actualDeviceReady ? 'ffmpeg-v4l2' : 'stub';
-    const reason = actualDeviceReady
+    const requestedBackend = normalizePreference(request.backend_id ?? this.opts.backend_id);
+    const registry = virtualCameraInjectionBackendCatalog.load();
+    if (
+      requestedBackend &&
+      !registry.backends.some((backend) => backend.backend_id === requestedBackend)
+    )
+      throw new Error('Unknown virtual camera injection backend: ' + requestedBackend);
+    const candidates = registry.backends
+      .filter(
+        (backend) =>
+          backend.platforms.includes(process.platform) &&
+          (!backend.requires_device_path || Boolean(selectedDevicePath))
+      )
+      .sort(
+        (left, right) =>
+          right.priority - left.priority || left.backend_id.localeCompare(right.backend_id)
+      );
+    const candidate = requestedBackend
+      ? candidates.find((backend) => backend.backend_id === requestedBackend)
+      : candidates[0];
+    const ffmpegAvailable = candidate ? isAvailableCommand(ffmpegBin, ['-version']) : false;
+    const backend = candidate && ffmpegAvailable ? candidate : undefined;
+    const reason = backend
       ? undefined
-      : process.platform === 'linux'
-        ? 'no writable v4l2 device path selected; replay-only backend active'
-        : 'no native camera injection backend detected; replay-only backend active';
+      : requestedBackend
+        ? 'requested backend is unavailable for this platform or required device path'
+        : 'no configured native camera backend is available; replay-only backend active';
     return {
       inventory,
       selectedCamera,
       selectedDevicePath,
       backend,
+      backendId: backend?.backend_id ?? 'stub',
       available: true,
       reason,
-      host_plan: buildHostPlan(process.platform, selectedCamera, selectedDevicePath),
+      host_plan: buildHostPlan(selectedCamera, selectedDevicePath, backend),
       ffmpegBin,
     };
   }
@@ -214,7 +253,7 @@ export class VirtualCameraInjectionBridgeImpl implements VirtualCameraInjectionB
     return {
       bridge_id: VIRTUAL_CAMERA_INJECTION_BRIDGE_ID,
       platform: process.platform,
-      backend: selection.backend,
+      backend: selection.backendId,
       available: selection.available,
       reason: selection.reason,
       selected_camera: selection.selectedCamera,
@@ -238,13 +277,13 @@ export class VirtualCameraInjectionBridgeImpl implements VirtualCameraInjectionB
       })
     );
 
-    if (selection.backend === 'ffmpeg-v4l2') {
+    if (selection.backend) {
       const devicePath = selection.selectedDevicePath;
-      if (!devicePath) {
+      if (selection.backend.requires_device_path && !devicePath) {
         return {
           bridge_id: VIRTUAL_CAMERA_INJECTION_BRIDGE_ID,
           platform: process.platform,
-          backend: 'ffmpeg-v4l2',
+          backend: selection.backendId,
           mode: 'device',
           status: 'blocked',
           source_path: sourcePath,
@@ -253,18 +292,22 @@ export class VirtualCameraInjectionBridgeImpl implements VirtualCameraInjectionB
           injected_frame_count: frameCount,
           subject_hint: request.subject_hint,
           host_plan: selection.host_plan,
-          reason: 'no writable v4l2 device path selected',
+          reason: 'required device path was not selected',
         };
       }
-      safeExec(
-        selection.ffmpegBin,
-        ['-y', '-re', '-i', sourcePath, '-vf', 'format=yuv420p', '-f', 'v4l2', devicePath],
-        { env: process.env, timeoutMs: 120_000 }
-      );
+      const args = resolveBackendArguments(selection.backend, {
+        source: sourcePath,
+        device: devicePath ?? '',
+        fps: String(request.fps ?? 30),
+      });
+      safeExec(selection.ffmpegBin, args, {
+        env: process.env,
+        timeoutMs: selection.backend.timeout_ms,
+      });
       return {
         bridge_id: VIRTUAL_CAMERA_INJECTION_BRIDGE_ID,
         platform: process.platform,
-        backend: 'ffmpeg-v4l2',
+        backend: selection.backendId,
         mode: 'device',
         status: 'succeeded',
         source_path: sourcePath,
@@ -272,6 +315,7 @@ export class VirtualCameraInjectionBridgeImpl implements VirtualCameraInjectionB
         selected_device_path: devicePath,
         injected_frame_count: frameCount,
         subject_hint: request.subject_hint,
+        host_plan: selection.host_plan,
       };
     }
 
@@ -297,7 +341,7 @@ export class VirtualCameraInjectionBridgeImpl implements VirtualCameraInjectionB
     return {
       bridge_id: VIRTUAL_CAMERA_INJECTION_BRIDGE_ID,
       platform: process.platform,
-      backend: 'stub',
+      backend: selection.backendId,
       mode: 'replay',
       status: 'succeeded',
       source_path: sourcePath,

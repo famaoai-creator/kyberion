@@ -15,7 +15,7 @@ import {
   probeWindowsNativeImageRecognition,
   recognizeTextWithWindowsNativeApi,
 } from './windows-native-image-recognition-bridge.js';
-import { coreSeamCatalog, createSeam } from './seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
 import {
   resolveSeamProviderDecision,
   type SeamProviderCandidate,
@@ -40,14 +40,13 @@ function providerDataPolicy(provider: OcrProvider): NonNullable<OcrProvider['dat
 }
 
 /** Register an OCR backend into the ocr-provider seam. */
-export function registerOcrProvider(provider: OcrProvider): () => void {
+export function registerOcrProvider(
+  provider: OcrProvider,
+  metadata: SeamProviderMetadata = { provenance: 'plugin', source: 'ocr-provider-extension' }
+): () => void {
   const id = String(provider.id || '').trim();
   if (!id) throw new Error('OcrProvider.id is required');
-  ocrProviderDisposers.get(id)?.();
-  const disposer = ocrProviderSeam.register(id, provider, {
-    provenance: 'builtin',
-    source: 'ocr-bridge',
-  });
+  const disposer = ocrProviderSeam.register(id, provider, metadata);
   ocrProviderDisposers.set(id, disposer);
   ocrGlobalRouter = null;
   return disposer;
@@ -234,6 +233,9 @@ export class TesseractOcrProvider implements OcrProvider {
     const resolvedPath = resolveOcrImagePath(request.path);
     const lang = toTesseractLanguage(request.language);
     let worker: any = null;
+    const abortWorker = () => {
+      if (worker) void worker.terminate().catch(() => undefined);
+    };
 
     try {
       const { createWorker } = await import('tesseract.js');
@@ -244,6 +246,12 @@ export class TesseractOcrProvider implements OcrProvider {
         errorHandler: (error: unknown) =>
           logger.warn(`[ocr_bridge] Tesseract worker error: ${String(error)}`),
       });
+      if (request.signal?.aborted) {
+        await worker.terminate();
+        worker = null;
+        throw new Error('OCR cancelled before recognition');
+      }
+      request.signal?.addEventListener('abort', abortWorker, { once: true });
       const result = await worker.recognize(resolvedPath);
 
       return {
@@ -276,6 +284,7 @@ export class TesseractOcrProvider implements OcrProvider {
         elapsedMs: Date.now() - startedAt,
       };
     } finally {
+      request.signal?.removeEventListener('abort', abortWorker);
       if (worker) {
         try {
           await worker.terminate();
@@ -851,11 +860,12 @@ export class AdaptivePolicyRouter {
 /** Register the built-in OCR providers (idempotent); callers listing providers need this first. */
 export function ensureBuiltinOcrProviders(): void {
   if (ocrBuiltinsRegistered && listOcrProviders().length > 0) return;
-  registerOcrProvider(new WindowsNativeOcrProvider());
-  registerOcrProvider(new AppleVisionOcrProvider());
-  registerOcrProvider(new LlmApiOcrProvider());
-  registerOcrProvider(new LocalVlmOcrProvider());
-  registerOcrProvider(new TesseractOcrProvider());
+  const metadata: SeamProviderMetadata = { provenance: 'builtin', source: 'ocr-bridge' };
+  registerOcrProvider(new WindowsNativeOcrProvider(), metadata);
+  registerOcrProvider(new AppleVisionOcrProvider(), metadata);
+  registerOcrProvider(new LlmApiOcrProvider(), metadata);
+  registerOcrProvider(new LocalVlmOcrProvider(), metadata);
+  registerOcrProvider(new TesseractOcrProvider(), metadata);
   ocrBuiltinsRegistered = true;
 }
 
@@ -878,6 +888,40 @@ export async function ocrImageWithRouter(
   request: OcrRequest,
   router: AdaptivePolicyRouter
 ): Promise<OcrResult> {
+  const timeout = request.timeout_ms ?? 120000;
+  if (!Number.isFinite(timeout) || timeout <= 0) throw new Error('OCR timeout_ms must be positive');
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let listener: (() => void) | undefined;
+  const interrupted = new Promise<never>((_, reject) => {
+    listener = () => {
+      controller.abort();
+      reject(new Error('OCR cancelled'));
+    };
+    request.signal?.addEventListener('abort', listener, { once: true });
+    if (request.signal?.aborted) listener();
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error(`OCR deadline exceeded (${timeout}ms)`));
+    }, timeout);
+  });
+  try {
+    return await Promise.race([
+      interrupted,
+      executeOcrWithRouter({ ...request, signal: controller.signal }, router),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    if (listener) request.signal?.removeEventListener('abort', listener);
+  }
+}
+
+async function executeOcrWithRouter(
+  request: OcrRequest,
+  router: AdaptivePolicyRouter
+): Promise<OcrResult> {
+  request.signal?.throwIfAborted();
+  request.onProgress?.({ stage: 'resolving' });
   const candidates = await router.resolveCandidates(request);
   if (candidates.length === 0) {
     throw new Error('No available OCR provider could be resolved.');
@@ -885,6 +929,8 @@ export async function ocrImageWithRouter(
 
   let lastError: Error | null = null;
   for (const provider of candidates) {
+    request.signal?.throwIfAborted();
+    request.onProgress?.({ stage: 'recognizing', provider: provider.id });
     logger.info(`[ocr_bridge] Routing OCR request for ${request.path} to provider: ${provider.id}`);
     try {
       const result = await withEgressPayloadContext(
@@ -896,6 +942,8 @@ export async function ocrImageWithRouter(
         () => provider.recognize(request)
       );
       if (result.status === 'succeeded') {
+        request.signal?.throwIfAborted();
+        request.onProgress?.({ stage: 'completed', provider: provider.id });
         // Stamp the served egress so callers can assert what actually happened
         // instead of trusting the mode they asked for.
         return {

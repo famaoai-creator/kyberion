@@ -37,7 +37,7 @@ import {
   readTextFile,
   setRegisteredEnv,
 } from '@agent/core/foundation';
-import { withExecutionContextAsync } from '@agent/core/authority';
+import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import { createTriggerRunner, resolveCurrentTriggerAuthority } from '@agent/core/trigger-runner';
 import { listDotCharters } from '@agent/core/dot/dot-charter';
 import {
@@ -48,6 +48,9 @@ import {
 } from '@agent/core/dot/dot-runtime';
 import { executeServicePreset } from '@agent/core/service/service-engine';
 import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
+import { runDotHousekeeping } from '@agent/core/dot/dot-dispatch';
+import { tickVetoWindows } from '@agent/core/governance/approval-veto-window';
+import { AUTONOMY_APPROVAL_CHANNEL } from '@agent/core/governance/approval-decision-card';
 import { isRecord } from '@agent/core/foundation/text';
 import { logger } from '@agent/core/core';
 import { pathResolver, rootDir } from '@agent/core/path-resolver';
@@ -258,7 +261,45 @@ export async function runDotSweepOnce(now: Date = new Date()): Promise<number> {
       logger.warn(`[dot-sweep] skipping malformed charter ${error.path}: ${error.error}`);
     }
     let delivered = 0;
+    // Veto windows on dot decision cards elapse here too, not only via
+    // `approval-inbox tick`, so a silent-consent action does not wait for a CLI.
+    try {
+      withExecutionContext('infrastructure_sentinel', () =>
+        tickVetoWindows('infrastructure_sentinel', {
+          now: now.getTime(),
+          storageChannels: [AUTONOMY_APPROVAL_CHANNEL],
+        })
+      );
+    } catch (error) {
+      logger.warn(
+        `[dot-sweep] veto-window tick failed: ${error instanceof Error ? error.message : error}`
+      );
+    }
     for (const loaded of active) {
+      const housekeeping = await withExecutionContextAsync(
+        loaded.charter.authority.authority_role,
+        () =>
+          runDotHousekeeping(loaded.charter, {
+            now: () => now,
+            serviceCall: (input) =>
+              executeServicePreset(
+                input.service_id,
+                input.action,
+                input.params ?? {},
+                'secret-guard'
+              ),
+          }),
+        undefined,
+        loaded.charter.scope.tenant_slug
+      ).catch((error: unknown) => ({
+        settled: [],
+        signals: 0,
+        digest: false,
+        errors: [`housekeeping: ${error instanceof Error ? error.message : String(error)}`],
+      }));
+      for (const message of housekeeping.errors) {
+        logger.warn(`[dot-sweep] housekeeping for ${loaded.charter.dot_id} — ${message}`);
+      }
       // Budget-capped dots skip before the runner layer so a pending trigger
       // doesn't burn a warn + 'failed' receipt every tick — but they still
       // heartbeat, or the watchdog would page a dot that is healthy-but-capped.

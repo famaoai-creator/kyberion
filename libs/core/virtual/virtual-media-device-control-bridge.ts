@@ -121,10 +121,31 @@ export class VirtualMediaDeviceControlBridgeImpl {
     this.cameraOptions = { ...(opts.camera_bridge || {}), inventory_bridge: this.inventoryBridge };
   }
 
-  async probe(): Promise<VirtualMediaDeviceControlProbe> {
+  async probe(request?: VirtualMediaDeviceControlRequest): Promise<VirtualMediaDeviceControlProbe> {
     const inventory = await this.inventoryBridge.probe();
-    const audioProbe = await createVirtualAudioDeviceBridge(this.audioOptions).probe();
-    const cameraProbe = await createVirtualCameraBridge(this.cameraOptions).probe();
+    const scope = normalizeScope(request?.scope);
+    const audioOptions = { ...this.audioOptions };
+    const cameraOptions = { ...this.cameraOptions };
+    if (request?.action === 'select') {
+      if (scope === 'audio' || scope === 'all') {
+        if (request.input_device_preference !== undefined) {
+          audioOptions.input_device_preference = request.input_device_preference;
+        }
+        if (request.output_device_preference !== undefined) {
+          audioOptions.output_device_preference = request.output_device_preference;
+        }
+      }
+      if (scope === 'camera' || scope === 'all') {
+        if (request.camera_device_preference !== undefined) {
+          cameraOptions.device_preference = request.camera_device_preference;
+        }
+        if (request.preferred_camera_backend !== undefined) {
+          cameraOptions.preferred_backend = request.preferred_camera_backend;
+        }
+      }
+    }
+    const audioProbe = await createVirtualAudioDeviceBridge(audioOptions).probe();
+    const cameraProbe = await createVirtualCameraBridge(cameraOptions).probe();
     return {
       bridge_id: VIRTUAL_MEDIA_DEVICE_CONTROL_BRIDGE_ID,
       platform: process.platform,
@@ -165,14 +186,18 @@ export class VirtualMediaDeviceControlBridgeImpl {
     request: VirtualMediaDeviceControlRequest
   ): Promise<VirtualMediaDeviceControlResult> {
     const scope = normalizeScope(request.scope);
-    const selection = await this.probe();
+    const selection = await this.probe(request);
     if (request.action === 'select') {
       return {
         bridge_id: VIRTUAL_MEDIA_DEVICE_CONTROL_BRIDGE_ID,
         platform: process.platform,
         action: request.action,
         scope,
-        status: 'succeeded',
+        status:
+          ((scope === 'camera' || scope === 'all') && !selection.selection.camera?.available) ||
+          ((scope === 'audio' || scope === 'all') && !selection.selection.audio?.available)
+            ? 'blocked'
+            : 'succeeded',
         selection: selection.selection,
       };
     }

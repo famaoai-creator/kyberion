@@ -136,6 +136,22 @@ export function createCliCommandHandlers(deps: CliCommandDeps): Record<string, C
     see: handleSeeListenWatch,
     listen: handleSeeListenWatch,
     watch: handleSeeListenWatch,
+    capture: async (ctx) => {
+      const { firstArg, restArgs, normalizedArgs } = ctx;
+      if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
+      const { runCaptureCommand } = await import('./cli-capture.js');
+      const commandArgs = firstArg === undefined ? restArgs : [firstArg, ...restArgs];
+      await runCaptureCommand(commandArgs, printText);
+      return;
+    },
+    record: async (ctx) => {
+      const { firstArg, restArgs, normalizedArgs } = ctx;
+      if (!normalizedArgs.includes('--verbose')) setRegisteredEnv('LOG_LEVEL', 'silent');
+      const { runRecordCommand } = await import('./cli-record.js');
+      const commandArgs = firstArg === undefined ? restArgs : [firstArg, ...restArgs];
+      await runRecordCommand(commandArgs, printText);
+      return;
+    },
     list: async (ctx) => {
       const { normalizedArgs, actuators } = ctx;
 

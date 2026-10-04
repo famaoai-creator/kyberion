@@ -162,6 +162,9 @@ export async function runCaptureCommand(
   let raw: Record<string, unknown>;
   try {
     raw = await deps.capture(input);
+    if (raw.status === 'failed' || raw.status === 'blocked') {
+      throw new Error(JSON.stringify(raw.results ?? raw.error ?? raw.status));
+    }
   } catch (error) {
     throw new ScriptExitError(1, `[capture] system:${opName} failed: ${(error as Error).message}`);
   }
@@ -184,11 +187,11 @@ export async function runCaptureCommand(
     const dims = sniffImageDimensions(buffer);
     width = dims.width;
     height = dims.height;
-  } catch {
+  } catch (error) {
     // The actuator reported success; a missing file is still an error surface.
     throw new ScriptExitError(
       1,
-      `[capture] system:${opName} reported success but ${relative} is unreadable`
+      `[capture] system:${opName} reported success but ${relative} is unreadable: ${(error as Error).message}`
     );
   }
   const result: CaptureResult = {

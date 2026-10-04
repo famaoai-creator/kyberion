@@ -14,10 +14,58 @@ import type { VideoFrame } from '../meeting/meeting-session-types.js';
 import type { VideoFrameBus } from '../video/video-frame-bus.js';
 import { platform } from '../platform.js';
 import { takeScreenshot } from './os-automation.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 export const SCREEN_CAPTURE_BRIDGE_ID = 'screen-capture-bridge' as const;
 
-export type ScreenCaptureBackendId = 'stub' | 'platform' | 'os-automation';
+export type ScreenCaptureBackendId = string;
+
+export interface ScreenCaptureBackendInput {
+  output_path: string;
+  display_index?: number;
+  capture_mode: ScreenCaptureRequest['capture_mode'];
+}
+
+export interface ScreenCaptureBackendAdapter {
+  readonly backend_id: string;
+  readonly platforms: readonly string[];
+  readonly priority?: number;
+  supports?(input: ScreenCaptureBackendInput): boolean;
+  probe():
+    Promise<{ available: boolean; reason?: string }> | { available: boolean; reason?: string };
+  capture(input: ScreenCaptureBackendInput): Promise<void> | void;
+}
+
+const screenCaptureBackendSeam = createSeam<ScreenCaptureBackendAdapter>({
+  key: 'screen.capture-backend',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+
+export function registerScreenCaptureBackend(
+  adapter: ScreenCaptureBackendAdapter,
+  metadata: SeamProviderMetadata = {
+    provenance: 'plugin',
+    source: 'screen-capture-backend-extension',
+  }
+): () => void {
+  if (!adapter || !/^[a-z][a-z0-9._-]*$/u.test(adapter.backend_id)) {
+    throw new Error('screen-capture-bridge — invalid backend adapter id');
+  }
+  if (!Array.isArray(adapter.platforms) || adapter.platforms.length === 0) {
+    throw new Error(
+      'screen-capture-bridge — backend ' + adapter.backend_id + ' must declare platforms'
+    );
+  }
+  if (typeof adapter.probe !== 'function' || typeof adapter.capture !== 'function') {
+    throw new Error(
+      'screen-capture-bridge — backend ' +
+        adapter.backend_id +
+        ' must implement probe() and capture()'
+    );
+  }
+  return screenCaptureBackendSeam.register(adapter.backend_id, adapter, metadata);
+}
 
 export interface ScreenCaptureRequest {
   save_path?: string;
@@ -32,7 +80,7 @@ export interface ScreenCaptureStreamRequest extends ScreenCaptureRequest {
 }
 
 export interface ScreenCaptureBridgeOptions {
-  preferred_backend?: ScreenCaptureBackendId;
+  preferred_backend?: string;
 }
 
 export interface ScreenCaptureBridgeProbe {
@@ -120,28 +168,144 @@ async function captureViaPlatform(
   await platform.captureScreen(outputPath);
 }
 
+let screenCaptureBuiltinsRegistered = false;
+
+function ensureScreenCaptureBuiltins(): void {
+  if (screenCaptureBuiltinsRegistered) return;
+  registerScreenCaptureBackend(
+    {
+      backend_id: 'platform',
+      platforms: ['*'],
+      priority: 100,
+      async probe() {
+        const capabilities = await platform.getCapabilities();
+        return capabilities.hasScreenCapture
+          ? { available: true }
+          : {
+              available: false,
+              reason: 'screen capture unavailable on this host',
+            };
+      },
+      capture: (input) => captureViaPlatform(input.output_path, input.capture_mode),
+    },
+    { provenance: 'builtin', source: 'screen-capture-bridge' }
+  );
+  registerScreenCaptureBackend(
+    {
+      backend_id: 'os-automation',
+      platforms: ['darwin'],
+      priority: 200,
+      supports: (input) =>
+        typeof input.display_index === 'number' && input.capture_mode !== 'focused_window',
+      probe: () => ({ available: true }),
+      capture: (input) => {
+        takeScreenshot(input.output_path, {
+          displayIndex: input.display_index!,
+        });
+      },
+    },
+    { provenance: 'builtin', source: 'screen-capture-bridge' }
+  );
+  registerScreenCaptureBackend(
+    {
+      backend_id: 'stub',
+      platforms: ['*'],
+      priority: -1000,
+      probe: () => ({ available: true }),
+      capture: (input) => {
+        safeWriteFile(input.output_path, PLACEHOLDER_PNG);
+      },
+    },
+    { provenance: 'builtin', source: 'screen-capture-bridge' }
+  );
+  screenCaptureBuiltinsRegistered = true;
+}
+
+ensureScreenCaptureBuiltins();
+
+function listScreenCaptureBackends(): ScreenCaptureBackendAdapter[] {
+  ensureScreenCaptureBuiltins();
+  return screenCaptureBackendSeam.list().map((entry) => entry.implementation);
+}
+
+async function resolveScreenCaptureBackend(
+  preferredBackend: string | undefined,
+  input: ScreenCaptureBackendInput
+): Promise<{
+  backend: ScreenCaptureBackendAdapter;
+  available: boolean;
+  reason?: string;
+}> {
+  const backends = listScreenCaptureBackends();
+  if (preferredBackend) {
+    const backend = backends.find((entry) => entry.backend_id === preferredBackend);
+    if (!backend)
+      return {
+        backend: backends.find((entry) => entry.backend_id === 'stub')!,
+        available: false,
+        reason: 'unknown screen capture backend: ' + preferredBackend,
+      };
+    if (!(backend.platforms.includes('*') || backend.platforms.includes(process.platform))) {
+      return {
+        backend,
+        available: false,
+        reason:
+          'screen capture backend ' + preferredBackend + ' is unsupported on ' + process.platform,
+      };
+    }
+    if (backend.supports && !backend.supports(input)) {
+      return {
+        backend,
+        available: false,
+        reason:
+          'screen capture backend ' +
+          preferredBackend +
+          ' does not support the requested capture mode',
+      };
+    }
+    const probe = await backend.probe();
+    return { backend, ...probe };
+  }
+  const candidates = backends
+    .filter((entry) => entry.backend_id !== 'stub')
+    .filter((entry) => entry.platforms.includes('*') || entry.platforms.includes(process.platform))
+    .filter((entry) => !entry.supports || entry.supports(input))
+    .sort(
+      (left, right) =>
+        (right.priority ?? 0) - (left.priority ?? 0) ||
+        left.backend_id.localeCompare(right.backend_id)
+    );
+  let lastReason: string | undefined;
+  for (const backend of candidates) {
+    const probe = await backend.probe();
+    if (probe.available) return { backend, ...probe };
+    lastReason = probe.reason ?? lastReason;
+  }
+  const stub = backends.find((entry) => entry.backend_id === 'stub');
+  if (!stub) throw new Error('screen-capture-bridge — built-in stub backend is not registered');
+  return {
+    backend: stub,
+    available: false,
+    reason: lastReason ?? 'screen capture unavailable on this host',
+  };
+}
+
 export class ScreenCaptureBridgeImpl implements ScreenCaptureBridge {
   readonly bridge_id = SCREEN_CAPTURE_BRIDGE_ID;
 
   constructor(private readonly opts: ScreenCaptureBridgeOptions = {}) {}
 
   async probe(): Promise<ScreenCaptureBridgeProbe> {
-    if (this.opts.preferred_backend === 'stub') {
-      return {
-        bridge_id: SCREEN_CAPTURE_BRIDGE_ID,
-        platform: process.platform,
-        backend: 'stub',
-        available: true,
-      };
-    }
-    const capabilities = await platform.getCapabilities();
-    const available = capabilities.hasScreenCapture;
+    const selection = await resolveScreenCaptureBackend(this.opts.preferred_backend, {
+      output_path: '',
+      capture_mode: 'screen',
+    });
     return {
       bridge_id: SCREEN_CAPTURE_BRIDGE_ID,
       platform: process.platform,
-      backend: this.opts.preferred_backend ?? (capabilities.hasScreenCapture ? 'platform' : 'stub'),
-      available,
-      reason: available ? undefined : 'screen capture unavailable on this host',
+      backend: selection.backend.backend_id,
+      available: selection.available,
+      reason: selection.reason,
     };
   }
 
@@ -152,45 +316,25 @@ export class ScreenCaptureBridgeImpl implements ScreenCaptureBridge {
     );
     const captureMode = normalizeCaptureMode(input.capture_mode);
     const displayIndex = normalizeDisplayIndex(input.display_index);
-    const probe = await this.probe();
-    const backend = this.opts.preferred_backend ?? probe.backend;
-    const runtimeBackend: ScreenCaptureBackendId =
-      backend === 'stub'
-        ? 'stub'
-        : process.platform === 'darwin' &&
-            typeof displayIndex === 'number' &&
-            captureMode !== 'focused_window'
-          ? 'os-automation'
-          : 'platform';
+    const selection = await resolveScreenCaptureBackend(this.opts.preferred_backend, {
+      output_path: savePath,
+      display_index: displayIndex,
+      capture_mode: captureMode,
+    });
+    if (this.opts.preferred_backend && !selection.available) {
+      throw new Error(selection.reason ?? 'requested screen capture backend is unavailable');
+    }
     safeMkdir(path.dirname(savePath), { recursive: true });
-
-    if (backend === 'stub') {
-      safeWriteFile(savePath, PLACEHOLDER_PNG);
-      return {
-        bridge_id: SCREEN_CAPTURE_BRIDGE_ID,
-        platform: process.platform,
-        backend,
-        save_path: savePath,
-        display_index: displayIndex,
-        capture_mode: captureMode,
-        subject_hint: input.subject_hint,
-      };
-    }
-
-    if (
-      process.platform === 'darwin' &&
-      typeof displayIndex === 'number' &&
-      captureMode !== 'focused_window'
-    ) {
-      takeScreenshot(savePath, { displayIndex });
-    } else {
-      await captureViaPlatform(savePath, captureMode);
-    }
+    await selection.backend.capture({
+      output_path: savePath,
+      display_index: displayIndex,
+      capture_mode: captureMode,
+    });
 
     return {
       bridge_id: SCREEN_CAPTURE_BRIDGE_ID,
       platform: process.platform,
-      backend: runtimeBackend,
+      backend: selection.backend.backend_id,
       save_path: savePath,
       display_index: displayIndex,
       capture_mode: captureMode,
@@ -225,7 +369,9 @@ export class ScreenCaptureBridgeImpl implements ScreenCaptureBridge {
           ? new Uint8Array(payload)
           : new Uint8Array(Buffer.from(payload));
         yield {
-          format: { mime_type: detectImageMimeType(framePayload, result.save_path) },
+          format: {
+            mime_type: detectImageMimeType(framePayload, result.save_path),
+          },
           payload: framePayload,
           ts_ms: index * intervalMs,
         };

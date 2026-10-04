@@ -119,6 +119,30 @@ describe('routeAutonomousDecision', () => {
     ).toBeTruthy();
   });
 
+  it('delivers to a caller-owned route and defers it to the inbox in quiet hours', () => {
+    const quietHours = { start: '00:00', end: '23:59', timezone: 'UTC' };
+    const routed = routeAutonomousDecision({
+      role: 'mission_controller',
+      gate: gate(),
+      title: 'Dot proposal',
+      question: 'Run the overdue tick?',
+      recommendation: 'Approve',
+      requestedBy: 'dot:org-ops',
+      notificationRoute: { surface: 'slack', target: 'C-EXEC' },
+      quietHours,
+      now: Date.parse('2026-10-04T12:00:00Z'),
+    });
+    const stored = loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, routed.requestId!);
+    // Quiet hours win over the caller route, never the operator's default channel.
+    expect(stored?.decisionCard?.deliveredVia).toEqual({ surface: 'inbox', target: 'quiet-hours' });
+    const [, , options] = notifications.notifyOperatorSync.mock.calls[0] as unknown as [
+      string,
+      unknown,
+      { route: unknown; quietHours: unknown },
+    ];
+    expect(options).toEqual({ route: { surface: 'slack', target: 'C-EXEC' }, quietHours });
+  });
+
   it('neutralizes agent-written markup for the surface the card is sent to', () => {
     const hostileTitle = 'Merge [PR 42](https://evil.invalid) <!channel>';
     const send = (surface: 'slack' | 'telegram') => {

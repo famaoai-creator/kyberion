@@ -77,6 +77,35 @@ describe('transitionDotCharterStatus', () => {
     );
   });
 
+  it('rejects activation while another active dot holds the same responsibility', () => {
+    writeCharter(
+      { ...DRAFT, status: 'active', team: { responsibilities: ['ci.health', 'deps'] } },
+      'one.json'
+    );
+    writeCharter(
+      {
+        ...DRAFT,
+        dot_id: 'second-dot',
+        runtime: { heartbeat_id: 'dot-second' },
+        team: { responsibilities: ['deps'] },
+      },
+      'two.json'
+    );
+    expect(() => transitionDotCharterStatus('second-dot', 'active', deps)).toThrow(
+      /DOT_ACTIVATE_RESPONSIBILITY.*deps.*repo-guardian/
+    );
+    writeCharter(
+      {
+        ...DRAFT,
+        dot_id: 'second-dot',
+        runtime: { heartbeat_id: 'dot-second' },
+        team: { responsibilities: ['releases'] },
+      },
+      'two.json'
+    );
+    expect(transitionDotCharterStatus('second-dot', 'active', deps).status).toBe('active');
+  });
+
   it('allows pause and re-activation, forbids retiring a retired dot', () => {
     writeCharter({ ...DRAFT, status: 'active' });
     expect(transitionDotCharterStatus('repo-guardian', 'paused', deps).status).toBe('paused');

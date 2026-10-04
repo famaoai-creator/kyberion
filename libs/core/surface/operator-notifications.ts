@@ -385,6 +385,29 @@ export function resolveOperatorNotificationRoute(
     : route;
 }
 
+/**
+ * Caller-owned routing (e.g. a dot charter's `deliver_to` + `quiet_hours`).
+ * Preferences still decide urgency; quiet hours defer to the inbox exactly as
+ * for preference routes.
+ */
+export interface OperatorNotificationOptions {
+  route?: NotificationChannelTarget;
+  quietHours?: NotificationQuietHours;
+}
+
+export function resolveCallerNotificationRoute(
+  event: OperatorEvent,
+  route: NotificationChannelTarget,
+  quietHours: NotificationQuietHours | undefined,
+  prefs: NotificationPreferences,
+  now: Date = new Date()
+): NotificationChannelTarget {
+  if (!quietHours || route.surface === 'inbox') return route;
+  const urgent = prefs.urgent_events ?? DEFAULT_URGENT_EVENTS;
+  if (urgent.includes(event)) return route;
+  return isWithinQuietHours(now, quietHours) ? { surface: 'inbox', target: 'quiet-hours' } : route;
+}
+
 function deliver(
   route: NotificationChannelTarget,
   text: string,
@@ -470,7 +493,8 @@ function fanOutWebPush(event: OperatorEvent, dedupeKey: string): boolean {
 /** Synchronous delivery path used when a caller must return an honest receipt. */
 export function notifyOperatorSync(
   event: OperatorEvent,
-  payload: OperatorNotificationPayload
+  payload: OperatorNotificationPayload,
+  options: OperatorNotificationOptions = {}
 ): boolean {
   // Tests exercising real mission flows must not pollute the operator's
   // real inbox/channels (81 phantom entries taught us this). Suites that
@@ -480,7 +504,9 @@ export function notifyOperatorSync(
   }
   try {
     const prefs = loadNotificationPreferences();
-    const route = resolveOperatorNotificationRoute(event, prefs);
+    const route = options.route
+      ? resolveCallerNotificationRoute(event, options.route, options.quietHours, prefs)
+      : resolveOperatorNotificationRoute(event, prefs);
     if (route === 'mute') return false;
     if (!route) {
       // Web Push is its own opt-in channel (a device subscribed): it needs no
