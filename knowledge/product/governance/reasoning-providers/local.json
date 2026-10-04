@@ -13,6 +13,13 @@
         "input_modalities": ["text"]
       },
       "env_keys": ["KYBERION_LOCAL_LLM_URL"],
+      "secret_refs": [
+        {
+          "service_id": "local-llm",
+          "secret_key": "API_KEY",
+          "env_keys": ["KYBERION_LOCAL_LLM_KEY"]
+        }
+      ],
       "cost_tier": "free",
       "transport": "local-server",
       "data_egress": "local-only",
