@@ -1,5 +1,11 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { buildNextAction, formatNextAction } from '@agent/core/next-action';
+import {
+  loadSurfaceManifest,
+  probeSurfaceHealth,
+  type SurfaceHealthStatus,
+  type SurfaceRuntimeDefinition,
+} from '@agent/core/surface/surface-runtime';
 import { setupSurfaces } from './surface_runtime.js';
 import { setupServices } from './services_setup.js';
 import { runReasoningSetup } from './reasoning_setup.js';
@@ -14,26 +20,63 @@ export {
 } from './setup-report-format.js';
 
 type SetupPersona = 'operator' | 'first-time-user';
+type NextAction = ReturnType<typeof buildNextAction>;
 
-type SurfaceRecommendation = {
-  id: 'chronos' | 'voice-first-win' | 'messaging';
+export type SetupSurfaceHealth = SurfaceHealthStatus & { url?: string };
+
+export type SurfaceRecommendation = {
+  id: 'concierge' | 'chronos' | 'voice-first-win' | 'messaging';
   title: string;
   whenToUse: string;
   surfaces: string[];
-  readiness: 'ready' | 'needs_setup' | 'unavailable';
+  optional: boolean;
+  readiness: 'ready' | 'needs_setup' | 'unavailable' | 'unverified';
   reason: string;
-  suggestedCommand: string;
+  suggestedCommand?: string;
+  openUrl?: string;
+  nextAction: NextAction;
 };
 
 type SetupReport = {
   surfaces: Awaited<ReturnType<typeof setupSurfaces>>;
+  surfaceHealth: Record<string, SetupSurfaceHealth>;
   services: Awaited<ReturnType<typeof setupServices>>;
   reasoning: { must: number; should: number; nice: number };
   doctor: Awaited<ReturnType<typeof collectDoctorReport>>;
   vital: ReturnType<typeof buildVitalReport>;
   recommendedSurfaces: SurfaceRecommendation[];
-  nextActions: ReturnType<typeof buildNextAction>[];
+  nextActions: NextAction[];
 };
+
+export type SetupReadinessInput = {
+  surfaces: Pick<SetupReport['surfaces'], 'rows'>;
+  surfaceHealth: SetupReport['surfaceHealth'];
+  reasoning: SetupReport['reasoning'];
+  doctor: Pick<SetupReport['doctor'], 'summaries'>;
+  vital: Pick<SetupReport['vital'], 'checks'>;
+};
+
+/** Read-only HTTP evidence using the same probe as surfaces status. Never starts a surface. */
+export async function collectSetupSurfaceHealth(
+  definitions: SurfaceRuntimeDefinition[] = loadSurfaceManifest().surfaces
+): Promise<Record<string, SetupSurfaceHealth>> {
+  const entries = await Promise.all(
+    definitions.map(async (definition): Promise<[string, SetupSurfaceHealth]> => {
+      if (definition.enabled === false) {
+        return [definition.id, { status: 'unknown', detail: 'disabled' }];
+      }
+      const health = await probeSurfaceHealth(definition);
+      return [
+        definition.id,
+        {
+          ...health,
+          ...(definition.port ? { url: `http://127.0.0.1:${definition.port}` } : {}),
+        },
+      ];
+    })
+  );
+  return Object.fromEntries(entries);
+}
 
 export async function runSetupReport(): Promise<SetupReport> {
   return runSetupReportWithPersona({});
@@ -43,22 +86,32 @@ export async function runSetupReportWithPersona(options: {
   persona?: SetupPersona;
   quiet?: boolean;
 }): Promise<SetupReport> {
-  const quiet = options.quiet ?? options.persona === 'first-time-user';
+  const quiet = options.quiet || options.persona === 'first-time-user';
   const surfaces = await setupSurfaces({ quiet });
+  const surfaceHealth = await collectSetupSurfaceHealth();
   const services = await setupServices({ quiet });
   const reasoning = await runReasoningSetup({ quiet });
   const doctor = await collectDoctorReport({});
   const vital = buildVitalReport();
-  const recommendedSurfaces = buildRecommendedSurfaces({ surfaces, doctor });
+  const readiness = { surfaces, surfaceHealth, reasoning, doctor, vital };
+  const recommendedSurfaces = buildRecommendedSurfaces(readiness);
+  const nextActions = buildFirstTimeUserNextActions(readiness);
 
-  const nextActions = buildFirstTimeUserNextActions({ surfaces, services, doctor, vital });
-
-  return { surfaces, services, reasoning, doctor, vital, recommendedSurfaces, nextActions };
+  return {
+    surfaces,
+    surfaceHealth,
+    services,
+    reasoning,
+    doctor,
+    vital,
+    recommendedSurfaces,
+    nextActions,
+  };
 }
 
 export function buildProfileSetupNextAction(
   vital: Pick<ReturnType<typeof buildVitalReport>, 'checks'>
-): ReturnType<typeof buildNextAction> | undefined {
+): NextAction | undefined {
   const profileCheckIds = new Set([
     'sovereign_identity',
     'agent_identity',
@@ -77,158 +130,238 @@ export function buildProfileSetupNextAction(
   });
 }
 
-export function buildFirstTimeUserNextActions(
-  report: Pick<SetupReport, 'surfaces' | 'services' | 'doctor' | 'vital'>
-): Array<ReturnType<typeof buildNextAction>> {
-  const actions: Array<ReturnType<typeof buildNextAction>> = [];
-  const profileAction = buildProfileSetupNextAction(report.vital);
-  if (profileAction) actions.push(profileAction);
-  if (report.surfaces.summary.missing > 0 || report.surfaces.summary.disabled > 0) {
-    actions.push(
-      buildNextAction({
-        title: 'Reconcile surface readiness',
-        reason: `${report.surfaces.summary.missing} surface auth gaps and ${report.surfaces.summary.disabled} disabled surfaces need attention.`,
-        next_action_type: 'run_command',
-        suggested_command: 'pnpm surfaces reconcile',
-      })
-    );
+type TaskReadiness = Pick<SurfaceRecommendation, 'readiness' | 'reason' | 'openUrl'> & {
+  nextAction?: NextAction;
+};
+
+function inspectTaskSurfaces(report: SetupReadinessInput, ids: string[]): TaskReadiness {
+  for (const id of ids) {
+    const row = report.surfaces.rows.find((entry) => entry.surface === id);
+    if (!row) {
+      const reason = `Surface ${id} is not in the current registry.`;
+      return {
+        readiness: 'unavailable',
+        reason,
+        nextAction: buildNextAction({
+          title: `Inspect missing surface ${id}`,
+          reason,
+          next_action_type: 'inspect_artifact',
+          suggested_command: 'pnpm surfaces setup',
+        }),
+      };
+    }
+    if (row.enabled === 'disabled') {
+      const reason = `Surface ${id} is disabled. Reconcile leaves it disabled; enable it only if you want this task.`;
+      return {
+        readiness: 'unavailable',
+        reason,
+        nextAction: buildNextAction({
+          title: `Enable ${id} when needed`,
+          reason,
+          next_action_type: 'run_command',
+          suggested_command: `pnpm surfaces enable --surface ${id}`,
+        }),
+      };
+    }
+    if (row.auth === 'missing') {
+      const reason = `Surface ${id} needs authentication. ${row.hint}`;
+      return {
+        readiness: 'needs_setup',
+        reason,
+        nextAction: buildNextAction({
+          title: `Set up authentication for ${id}`,
+          reason,
+          next_action_type: 'bootstrap_environment',
+          suggested_command: 'pnpm surfaces setup',
+        }),
+      };
+    }
+    const health = report.surfaceHealth[id];
+    if (!health || health.status === 'unknown') {
+      const reason = `Surface ${id} is configured, but live readiness is unverified (${health?.detail || 'not_probed'}). Credentials or a running PID alone do not prove delivery.`;
+      return {
+        readiness: 'unverified',
+        reason,
+        nextAction: buildNextAction({
+          title: `Verify ${id} before use`,
+          reason,
+          next_action_type: 'inspect_artifact',
+          suggested_command: 'pnpm surfaces status',
+        }),
+      };
+    }
+    if (health.status !== 'healthy') {
+      const accessDenied = health.detail === 'http_401' || health.detail === 'http_403';
+      const reason = accessDenied
+        ? `Surface ${id} rejected the health request (${health.detail}); verify the local viewer identity and scope before using it.`
+        : `Surface ${id} is not healthy (${health.detail}). If it is still starting, check status again; otherwise use the targeted repair.`;
+      return {
+        readiness: 'needs_setup',
+        reason,
+        nextAction: buildNextAction({
+          title: accessDenied ? `Check access to ${id}` : `Start or repair ${id}`,
+          reason,
+          next_action_type: accessDenied ? 'inspect_artifact' : 'repair_surface',
+          suggested_command: accessDenied
+            ? 'pnpm surfaces status'
+            : `pnpm surfaces repair --surface ${id}`,
+        }),
+      };
+    }
   }
-  if (report.services.summary.authMissing > 0 || report.services.summary.connectionMissing > 0) {
-    actions.push(
-      buildNextAction({
-        title: 'Repair service setup',
-        reason: `${report.services.summary.authMissing} services are missing auth and ${report.services.summary.connectionMissing} are missing connections.`,
-        next_action_type: 'bootstrap_environment',
-        suggested_command: 'pnpm service:setup',
-      })
-    );
-  }
-  const doctorSummary = report.doctor.summaries.find(
-    (summary) => summary.counts.must + summary.counts.should > 0
-  );
-  if (doctorSummary) {
-    actions.push(
-      buildNextAction({
-        title: `Bootstrap ${doctorSummary.manifestId}`,
-        reason: `Doctor reports ${doctorSummary.counts.must} must and ${doctorSummary.counts.should} should gaps.`,
-        next_action_type: 'bootstrap_environment',
-        suggested_command: `pnpm env:bootstrap --manifest ${doctorSummary.manifestId} --apply`,
-      })
-    );
-  }
-  if (actions.length === 0) {
-    actions.push(
-      buildNextAction({
-        title: 'Re-run setup report after changes',
-        reason: 'Everything looks ready right now.',
-        next_action_type: 'inspect_artifact',
-        suggested_command: 'pnpm kyberion setup report',
-      })
-    );
-  }
-  return actions.slice(0, 4);
+  return {
+    readiness: 'ready',
+    reason: `Live health checks passed: ${ids.map((id) => `${id} (${report.surfaceHealth[id].detail})`).join(', ')}. Requests still check their own permissions and service requirements.`,
+    openUrl: report.surfaceHealth[ids[0]]?.url,
+  };
 }
 
-function buildRecommendedSurfaces(
-  report: Pick<SetupReport, 'surfaces' | 'doctor'>
-): SurfaceRecommendation[] {
-  const rows = report.surfaces.rows || [];
-  const rowById = new Map(rows.map((row: any) => [row.surface, row]));
-  const doctorByManifest = new Map(
-    report.doctor.summaries.map((summary) => [summary.manifestId, summary])
+function firstRequestPrerequisite(report: SetupReadinessInput): NextAction | undefined {
+  const profile = buildProfileSetupNextAction(report.vital);
+  if (profile) return profile;
+  if (report.reasoning.must > 0) {
+    return buildNextAction({
+      title: 'Configure reasoning for your first request',
+      reason: `Reasoning has ${report.reasoning.must} required setup gaps. The UI can open, but real work needs a configured backend.`,
+      next_action_type: 'bootstrap_environment',
+      suggested_command: 'pnpm reasoning:setup',
+    });
+  }
+  const baseline = report.doctor.summaries.find(
+    (summary) => summary.manifestId === 'kyberion-runtime-baseline' && summary.counts.must > 0
   );
+  if (baseline) {
+    return buildNextAction({
+      title: 'Complete the required local runtime setup',
+      reason: `Doctor reports ${baseline.counts.must} required local runtime gaps.`,
+      next_action_type: 'bootstrap_environment',
+      suggested_command: 'pnpm env:bootstrap --manifest kyberion-runtime-baseline --apply',
+    });
+  }
+  return undefined;
+}
 
-  const chronos = rowById.get('chronos-mirror-v2');
-  const voiceHub = rowById.get('voice-hub');
-  const presenceStudio = rowById.get('presence-studio');
-  const slack = rowById.get('slack-bridge');
-  const meetingDoctor = doctorByManifest.get('meeting-participation-runtime');
-
-  const chronosReadiness: SurfaceRecommendation['readiness'] =
-    chronos?.enabled === 'enabled'
-      ? chronos.auth === 'missing'
-        ? 'needs_setup'
-        : 'ready'
-      : 'unavailable';
-
-  const voiceReadiness: SurfaceRecommendation['readiness'] =
-    voiceHub?.enabled === 'enabled' && presenceStudio?.enabled === 'enabled'
-      ? meetingDoctor && meetingDoctor.counts.must + meetingDoctor.counts.should > 0
-        ? 'needs_setup'
-        : 'ready'
-      : 'unavailable';
-
-  const messagingReadiness: SurfaceRecommendation['readiness'] =
-    slack?.enabled === 'enabled'
-      ? slack.auth === 'ready'
-        ? 'ready'
-        : 'needs_setup'
-      : 'unavailable';
-
-  return [
+export function buildRecommendedSurfaces(report: SetupReadinessInput): SurfaceRecommendation[] {
+  const tasks = [
     {
-      id: 'chronos',
-      title: 'Chronos control surface',
-      whenToUse:
-        'Open this first when you want to see what Kyberion is running and which runtime needs attention.',
+      id: 'concierge' as const,
+      title: 'Concierge: request, decide, receive',
+      whenToUse: 'Start here to ask for an outcome, review approvals, and find delivered results.',
+      surfaces: ['concierge'],
+      optional: false,
+    },
+    {
+      id: 'chronos' as const,
+      title: 'Chronos: inspect and recover',
+      whenToUse: 'Use this to inspect running work and investigate a runtime problem.',
       surfaces: ['chronos-mirror-v2'],
-      readiness: chronosReadiness,
-      reason:
-        chronosReadiness === 'ready'
-          ? 'The local control UI is enabled, so this is the best entry point for system visibility.'
-          : chronosReadiness === 'needs_setup'
-            ? 'The control UI exists, but surface readiness still needs setup or repair before it is trustworthy.'
-            : 'The control UI is disabled in the current manifest, so this is not your immediate first surface.',
-      suggestedCommand:
-        chronosReadiness === 'ready'
-          ? 'pnpm chronos:dev'
-          : chronosReadiness === 'needs_setup'
-            ? 'pnpm surfaces reconcile'
-            : 'pnpm surfaces status',
+      optional: false,
     },
     {
-      id: 'voice-first-win',
-      title: 'Presence Studio + voice path',
-      whenToUse:
-        'Use this when you want a conversational surface with transcript and browser/voice feedback.',
+      id: 'voice-first-win' as const,
+      title: 'Presence Studio: try voice',
+      whenToUse: 'Use this for live transcripts and conversational voice feedback.',
       surfaces: ['presence-studio', 'voice-hub'],
-      readiness: voiceReadiness,
-      reason:
-        voiceReadiness === 'ready'
-          ? 'The voice surfaces are enabled and doctor did not report meeting/browser runtime gaps.'
-          : voiceReadiness === 'needs_setup'
-            ? 'The voice surfaces exist, but doctor still sees browser, voice, or consent gaps that will block the first voice win.'
-            : 'The required voice surfaces are not all enabled right now.',
-      suggestedCommand:
-        voiceReadiness === 'ready'
-          ? 'pnpm pipeline --input pipelines/voice-hello.json'
-          : voiceReadiness === 'needs_setup'
-            ? 'pnpm kyberion doctor --runtime browser'
-            : 'pnpm surfaces status',
+      optional: true,
     },
     {
-      id: 'messaging',
-      title: 'Slack thread surface',
-      whenToUse: 'Use this when you want remote, threaded conversation and follow-up in Slack.',
+      id: 'messaging' as const,
+      title: 'Slack: work in a thread',
+      whenToUse: 'Enable this only when you want remote conversation and follow-up in Slack.',
       surfaces: ['slack-bridge'],
-      readiness: messagingReadiness,
-      reason:
-        messagingReadiness === 'ready'
-          ? 'Slack auth is ready, so Kyberion can accept and return work in the same thread.'
-          : messagingReadiness === 'needs_setup'
-            ? 'Slack is the right messaging surface, but its auth is not ready yet.'
-            : 'Slack is disabled, so messaging work should stay in terminal or Chronos for now.',
-      suggestedCommand:
-        messagingReadiness === 'ready'
-          ? 'pnpm surfaces start --surface slack-bridge'
-          : messagingReadiness === 'needs_setup'
-            ? 'pnpm surfaces setup'
-            : 'pnpm surfaces status',
+      optional: true,
     },
   ];
+
+  return tasks.map((task): SurfaceRecommendation => {
+    let readiness = inspectTaskSurfaces(report, task.surfaces);
+    if (readiness.readiness === 'ready' && task.id === 'concierge') {
+      const prerequisite = firstRequestPrerequisite(report);
+      if (prerequisite) {
+        readiness = {
+          ...readiness,
+          readiness: 'needs_setup',
+          reason: prerequisite.reason,
+          nextAction: prerequisite,
+        };
+      }
+    }
+    if (readiness.readiness === 'ready' && task.id === 'voice-first-win') {
+      const voice = report.doctor.summaries.find(
+        (summary) => summary.manifestId === 'meeting-participation-runtime'
+      );
+      if (!voice || voice.counts.must + voice.counts.should > 0) {
+        const reason = voice
+          ? `Voice prerequisites have ${voice.counts.must} required and ${voice.counts.should} recommended gaps.`
+          : 'The surfaces respond, but voice prerequisites were not checked in this report.';
+        readiness = {
+          ...readiness,
+          readiness: voice ? 'needs_setup' : 'unverified',
+          reason,
+          nextAction: buildNextAction({
+            title: 'Check voice prerequisites',
+            reason,
+            next_action_type: 'inspect_artifact',
+            suggested_command: 'pnpm kyberion doctor --runtime voice',
+          }),
+        };
+      }
+    }
+    const nextAction =
+      readiness.nextAction ||
+      buildNextAction({
+        title:
+          task.id === 'concierge'
+            ? 'Open Concierge and make your first request'
+            : `Open ${task.title.split(':')[0]}`,
+        reason: readiness.reason,
+        next_action_type: 'inspect_artifact',
+        ...(readiness.openUrl
+          ? { suggested_followup_request: `Open ${readiness.openUrl}` }
+          : { suggested_command: 'pnpm surfaces status' }),
+      });
+    return {
+      ...task,
+      ...readiness,
+      nextAction,
+      ...(nextAction.suggested_command ? { suggestedCommand: nextAction.suggested_command } : {}),
+    };
+  });
 }
 
-function formatSetupReport(report: SetupReport, persona: SetupPersona): string {
+/** One next step for the default request path; optional integrations never block it. */
+export function buildFirstTimeUserNextActions(report: SetupReadinessInput): NextAction[] {
+  return [buildRecommendedSurfaces(report)[0].nextAction];
+}
+
+export function formatSetupReport(report: SetupReport, persona: SetupPersona): string {
+  if (persona === 'first-time-user') {
+    const primary = report.recommendedSurfaces[0];
+    const lines = [
+      '',
+      `First request: ${primary.readiness}`,
+      ...report.nextActions.flatMap(formatNextAction),
+      '',
+      'Choose by task:',
+    ];
+    for (const surface of report.recommendedSurfaces) {
+      lines.push(
+        `- ${surface.title} [${surface.readiness}]${surface.optional ? ' (optional)' : ''}`
+      );
+      lines.push(`  use when: ${surface.whenToUse}`);
+      lines.push(`  evidence: ${surface.reason}`);
+      if (surface.readiness === 'ready' && surface.openUrl)
+        lines.push(`  open: ${surface.openUrl}`);
+      else if (surface.suggestedCommand) lines.push(`  when needed: ${surface.suggestedCommand}`);
+    }
+    lines.push(
+      '',
+      'Optional service and messaging setup is informational; configure only what your request needs.',
+      'For all service/auth details: pnpm service:setup. For runtime diagnostics: pnpm surfaces status.'
+    );
+    return lines.join('\n');
+  }
+
   const lines = [
     '',
     formatSetupSummaryLine([
@@ -244,34 +377,21 @@ function formatSetupReport(report: SetupReport, persona: SetupPersona): string {
             ].includes(check.id) && check.status !== 'ok'
         ).length,
       ],
-      ['surface issues', report.surfaces.summary.missing],
+      ['surface auth gaps', report.surfaces.summary.missing],
       ['service auth missing', report.services.summary.authMissing],
       ['service connections missing', report.services.summary.connectionMissing],
       ['reasoning must', report.reasoning.must],
       ['reasoning should', report.reasoning.should],
-      ['doctor must', report.doctor.totalMissing],
+      ['doctor gaps', report.doctor.totalMissing],
     ]),
   ];
-
-  if (persona === 'first-time-user') {
-    lines.push('Recommended surfaces:');
-    for (const surface of report.recommendedSurfaces) {
-      lines.push(`- ${surface.title} [${surface.readiness}]`);
-      lines.push(`  use when: ${surface.whenToUse}`);
-      lines.push(`  surfaces: ${surface.surfaces.join(', ')}`);
-      lines.push(`  why now: ${surface.reason}`);
-      lines.push(`  try: ${surface.suggestedCommand}`);
-    }
-    lines.push('', 'First-time user next actions:');
-    for (const action of report.nextActions) lines.push(...formatNextAction(action));
-  } else if (report.doctor.summaries.length > 0) {
+  if (report.doctor.summaries.length > 0) {
     lines.push('Doctor detail:');
     for (const summary of report.doctor.summaries) {
       lines.push(`  - ${summary.manifestId}`);
       lines.push(...summary.lines.map((line) => `    ${line}`));
     }
   }
-
   return lines.join('\n');
 }
 

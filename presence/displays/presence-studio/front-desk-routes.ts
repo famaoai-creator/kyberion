@@ -7,7 +7,11 @@
 // here exactly as they did when these were inline in `server.ts`.
 import type express from 'express';
 import * as path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { registerConversationRoutes } from './conversation-routes.js';
+import {
+  conversationRef,
+  presenceFrontDeskConversationViewer,
+} from '@agent/core/surface/front-desk-conversation-store';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { normalizeLocale } from '@agent/core/locale-normalize';
 import { readFrontDeskMe } from '@agent/core/front-desk-identity';
@@ -19,6 +23,7 @@ import {
   FRONT_DESK_HELP_LINK,
   frontDeskRoleFromViewer,
   readFrontDeskSurfacePorts,
+  readFrontDeskSurfaceUrls,
   resolveFrontDeskMenu,
   type FrontDeskRole,
 } from '@agent/core/front-desk-nav';
@@ -35,21 +40,14 @@ import {
   listInboxEntries,
   markInboxEntry,
 } from '@agent/core/deliverable-inbox';
-import { loadStandardIntentCatalog } from '@agent/core/intent/intent-resolution';
 import { readSurfaceStringParam } from '@agent/core/surface/surface-request-input';
 import { listTaskSessions } from '@agent/core/task/task-session';
 import { pathResolver } from '@agent/core/path-resolver';
-import { isSimpleGreetingText } from '@agent/core/intent/intent-contract';
-import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract-parser';
-import { checkAndRepairSurfaceUxContract } from '@agent/core/surface/surface-ux-contract';
-import { runSurfaceMessageConversation } from '@agent/core/surface/channel-surface';
 import {
   PresenceStudioViewerError,
-  presenceStudioConversationSchema,
-  presenceStudioConversationScope,
   parsePresenceStudioAgentIdentity,
   parsePresenceStudioSovereignIdentity,
-  narrowPresenceStudioTenant,
+  narrowPresenceStudioScope,
   presenceStudioOutcomeVerdictSchema,
   presenceStudioRecordInScope,
   resolvePresenceStudioViewerContext,
@@ -74,12 +72,7 @@ import {
   type ProgressHistoryEntryInput,
   type ProgressTaskSessionInput,
 } from './progress.js';
-import {
-  parseAskVoiceHubReply,
-  resolveIntentLabel,
-  viewFromIntentResolution,
-  type AskConversationView,
-} from './ask-view.js';
+
 import {
   ASK_VOCABULARY_KEYS,
   HELP_VOCABULARY_KEYS,
@@ -146,18 +139,6 @@ function findMatchingInboxEntry(
   if (!artifactPath) return undefined;
   return inboxEntries.find((entry) => entry.artifact_paths.includes(artifactPath));
 }
-
-// FD-03: `POST /api/conversation` — the "頼む" (ask) conversation turn.
-// Node port of the concierge's `/api/message` route
-// (`presence/displays/concierge/src/app/api/message/route.ts`): try
-// voice-hub first (bounded by a short abort timeout so the UI never hangs on
-// a stopped daemon), degrade to the in-process orchestrator, and only return
-// `mode: 'unavailable'` when both paths genuinely fail — never a fabricated
-// reply. Asking is a write (it can trigger delegated work), so — like
-// `/api/outcomes/:id/verdict` — it requires the server-derived loopback
-// localadmin session; a remote readonly token never reaches this route
-// (`/api/conversation` is not in `security.ts`'s remote-safe allowlist).
-const ASK_CONVERSATION_VOICE_HUB_TIMEOUT_MS = 3000;
 
 /** Membership-aware rail role (B1): a resolved member's viewed-tenant
  * membership role gates nav items; a member with no membership on that
@@ -284,12 +265,19 @@ export function registerFrontDeskRoutes(app: express.Express): void {
   // is the single source of the 5-item menu).
   app.get('/api/front-desk/nav', (req, res) => {
     try {
-      const viewer = resolvePresenceStudioViewerContext(req);
+      const resolved = resolvePresenceStudioViewerContext(req);
+      const requestedTenant = readSurfaceStringParam(req.query.tenant) || undefined;
+      const viewer = narrowPresenceStudioScope(resolved, {
+        tenant: requestedTenant,
+        organizationId: readSurfaceStringParam(req.query.organizationId),
+        projectId: readSurfaceStringParam(req.query.projectId),
+      });
       const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
       const role = resolvePresenceStudioNavRole(viewer);
       const items = resolveFrontDeskMenu({
         currentSurface: 'presence-studio',
         ports: readFrontDeskSurfacePorts(),
+        urls: readFrontDeskSurfaceUrls(),
         role,
       }).map((item) => ({
         id: item.id,
@@ -353,10 +341,11 @@ export function registerFrontDeskRoutes(app: express.Express): void {
       // Same rule as the headless overview (`presenceStudioRecordInScope`):
       // `?tenant=` only narrows, and records with no tenant are denied for a
       // scoped viewer rather than shown to everyone.
-      const scopedViewer = {
-        ...viewer,
-        tenantSlugs: narrowPresenceStudioTenant(viewer, requestedTenant),
-      };
+      const scopedViewer = narrowPresenceStudioScope(viewer, {
+        tenant: requestedTenant,
+        organizationId: readSurfaceStringParam(req.query.organizationId),
+        projectId: readSurfaceStringParam(req.query.projectId),
+      });
 
       const approvals: HomeDecideCandidateInput[] = listApprovalRequests({ status: 'pending' })
         .filter((record) => presenceStudioRecordInScope(scopedViewer, record))
@@ -432,22 +421,26 @@ export function registerFrontDeskRoutes(app: express.Express): void {
     try {
       const viewer = resolvePresenceStudioViewerContext(req);
       const requestedTenant = readSurfaceStringParam(req.query.tenant);
-      const scopedViewer = {
-        ...viewer,
-        tenantSlugs: narrowPresenceStudioTenant(viewer, requestedTenant),
-      };
+      const scopedViewer = narrowPresenceStudioScope(viewer, {
+        tenant: requestedTenant,
+        organizationId: readSurfaceStringParam(req.query.organizationId),
+        projectId: readSurfaceStringParam(req.query.projectId),
+      });
 
       const taskSessions: ProgressTaskSessionInput[] = listTaskSessions('presence')
         .filter((session) => presenceStudioRecordInScope(scopedViewer, session))
         .map((session) => ({
           id: session.session_id,
+          correlation_id: session.correlation_id,
           title: session.goal?.summary || session.session_id,
           status: session.status,
           when: session.updated_at,
           history: progressHistoryFromTaskSession(session),
         }));
 
-      const inboxEntries = listInboxEntries({ limit: 1000 });
+      const inboxEntries = listInboxEntries({ limit: 1000 }).filter((entry) =>
+        presenceStudioRecordInScope(scopedViewer, entry)
+      );
       const artifacts: ProgressArtifactInput[] = listArtifactRecords()
         .filter((record) => presenceStudioRecordInScope(scopedViewer, record))
         .map((record) => {
@@ -475,7 +468,10 @@ export function registerFrontDeskRoutes(app: express.Express): void {
         mirrorHref: resolveComputerSurfaceMirrorHref(),
       });
       res.setHeader('Cache-Control', 'no-store');
-      res.json(payload);
+      const viewerScopeId = conversationRef(
+        presenceFrontDeskConversationViewer(toFrontDeskViewerScope(scopedViewer))
+      ).key;
+      res.json({ ...payload, viewer_scope_id: viewerScopeId });
     } catch (error) {
       const status = error instanceof PresenceStudioViewerError ? error.status : 500;
       res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
@@ -492,15 +488,18 @@ export function registerFrontDeskRoutes(app: express.Express): void {
     try {
       const viewer = resolvePresenceStudioViewerContext(req);
       const requestedTenant = readSurfaceStringParam(req.query.tenant);
-      const scopedViewer = {
-        ...viewer,
-        tenantSlugs: narrowPresenceStudioTenant(viewer, requestedTenant),
-      };
+      const scopedViewer = narrowPresenceStudioScope(viewer, {
+        tenant: requestedTenant,
+        organizationId: readSurfaceStringParam(req.query.organizationId),
+        projectId: readSurfaceStringParam(req.query.projectId),
+      });
 
       const directSession = presenceStudioData.findTaskSession(id);
       const artifact = directSession
         ? undefined
         : listArtifactRecords().find((record) => record.artifact_id === id);
+      if (artifact && !presenceStudioRecordInScope(scopedViewer, artifact))
+        return res.status(404).json({ ok: false, error: `progress item not found: ${id}` });
       const session = directSession
         ? directSession
         : artifact?.task_session_id
@@ -529,7 +528,9 @@ export function registerFrontDeskRoutes(app: express.Express): void {
           return res.status(404).json({ ok: false, error: `progress item not found: ${id}` });
         }
         const matchedEntry = findMatchingInboxEntry(
-          listInboxEntries({ limit: 1000 }),
+          listInboxEntries({ limit: 1000 }).filter((entry) =>
+            presenceStudioRecordInScope(scopedViewer, entry)
+          ),
           artifact.path
         );
         const detail = buildProgressDetail(
@@ -570,6 +571,20 @@ export function registerFrontDeskRoutes(app: express.Express): void {
     try {
       const viewer = resolvePresenceStudioViewerContext(req);
       requirePresenceStudioLocalAdmin(viewer);
+      const requestedTenant = readSurfaceStringParam(req.query.tenant);
+      const scopedViewer = narrowPresenceStudioScope(viewer, {
+        tenant: requestedTenant,
+        organizationId: readSurfaceStringParam(req.query.organizationId),
+        projectId: readSurfaceStringParam(req.query.projectId),
+      });
+      const viewerScopeId = conversationRef(
+        presenceFrontDeskConversationViewer(toFrontDeskViewerScope(scopedViewer))
+      ).key;
+      if (parsed.data.viewer_scope_id && parsed.data.viewer_scope_id !== viewerScopeId) {
+        return res
+          .status(409)
+          .json({ ok: false, error: 'decision_scope_changed', retry_safe: true });
+      }
       const { status, note } = parsed.data;
       // The verdict lands on the entry's tenant — the member's role is
       // checked against THAT tenant, never the first scope entry (F2/F4).
@@ -579,7 +594,12 @@ export function registerFrontDeskRoutes(app: express.Express): void {
       if (!entry) {
         return res.status(404).json({ ok: false, error: `deliverable not found: ${entryId}` });
       }
-      const actor = resolvePresenceStudioDecisionActor(viewer, entry.tenant_slug);
+      if (!presenceStudioRecordInScope(scopedViewer, entry)) {
+        return res
+          .status(403)
+          .json({ ok: false, error: 'deliverable_scope_denied', retry_safe: true });
+      }
+      const actor = resolvePresenceStudioDecisionActor(scopedViewer, entry.tenant_slug);
       const updated =
         status === 'accepted'
           ? acceptInboxEntryWithHumanReceipt({
@@ -646,151 +666,5 @@ export function registerFrontDeskRoutes(app: express.Express): void {
     res.json({ ok: true, locale, texts });
   });
 
-  app.post('/api/conversation', async (req, res) => {
-    const parsed = presenceStudioConversationSchema.safeParse(
-      presenceStudioData.safeParsePresenceStudioRequestBody(req.body, 'conversation body')
-    );
-    if (!parsed.success) {
-      return res
-        .status(400)
-        .json({ ok: false, error: presenceStudioData.validationErrorMessage(parsed.error) });
-    }
-
-    let viewer: ReturnType<typeof resolvePresenceStudioViewerContext>;
-    try {
-      viewer = resolvePresenceStudioViewerContext(req);
-      requirePresenceStudioLocalAdmin(viewer);
-    } catch (error) {
-      const status = error instanceof PresenceStudioViewerError ? error.status : 500;
-      logger.warn(
-        presenceStudioData.presenceStudioAuditLine(req, 'conversation.reject', {
-          status,
-          error: error instanceof Error ? error.message : String(error),
-        })
-      );
-      return res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
-    }
-
-    const { text, session_id: sessionId } = parsed.data;
-    const locale = normalizeLocale(parsed.data.locale) ?? 'en';
-    const requestId = randomUUID();
-    const scope = presenceStudioConversationScope(viewer);
-
-    function deliverAskReply(
-      rawReply: string,
-      mode: 'voice-hub' | 'orchestrator',
-      intentResolution: IntentResolutionContract | undefined
-    ) {
-      const view: AskConversationView = intentResolution
-        ? viewFromIntentResolution(intentResolution)
-        : { shape: 'reply' };
-      // FD-09: resolve `normalized_intent` to human wording server-side so
-      // `static/ask.js` never renders the raw internal slug — the
-      // standard-intent catalog's own `description` when registered there,
-      // else a humanized slug (see `resolveIntentLabel` module doc).
-      const intentLabel = intentResolution
-        ? resolveIntentLabel(
-            intentResolution.normalized_intent,
-            new Map(
-              loadStandardIntentCatalog()
-                .filter((intent): intent is typeof intent & { id: string } => Boolean(intent.id))
-                .map((intent) => [intent.id, intent.description ?? ''])
-            )
-          )
-        : undefined;
-      const check = checkAndRepairSurfaceUxContract(rawReply, {
-        allow_conversational_reply: isSimpleGreetingText(text),
-        approval_required: intentResolution?.authority_level === 'approval_required',
-      });
-      if (!check.repaired && !check.verdict.valid) {
-        logger.warn(
-          `[presence-studio][ask] ${mode} reply violates surface UX contract: ${check.verdict.violations.join('; ')}`
-        );
-      }
-      logger.info(
-        presenceStudioData.presenceStudioAuditLine(req, 'conversation.complete', {
-          request_id: requestId,
-          mode,
-          status: 200,
-        })
-      );
-      return res.json({
-        ok: true,
-        reply: check.text,
-        mode,
-        shape: view.shape,
-        ...(view.nextActions ? { next_actions: view.nextActions } : {}),
-        ...(intentResolution ? { intent_resolution: intentResolution } : {}),
-        ...(intentLabel
-          ? { intent_label: intentLabel.label, intent_label_source: intentLabel.source }
-          : {}),
-        request_id: requestId,
-      });
-    }
-
-    // Primary path: voice-hub (rich reply + TTS + presence reflection).
-    try {
-      const response = await fetch(`${presenceStudioData.VOICE_HUB_URL}/api/ingest-text`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          request_id: requestId,
-          text,
-          intent: 'conversation',
-          source_id: 'ask-page',
-          speaker: viewer.principalId,
-          scope,
-          reflect_to_surface: true,
-          auto_reply: true,
-        }),
-        signal: AbortSignal.timeout(ASK_CONVERSATION_VOICE_HUB_TIMEOUT_MS),
-      });
-      if (!response.ok) throw new Error(`voice-hub responded ${response.status}`);
-      const parsedReply = parseAskVoiceHubReply(await response.json());
-      if (!parsedReply) throw new Error('invalid voice-hub response');
-      return deliverAskReply(parsedReply.reply, 'voice-hub', parsedReply.intentResolution);
-    } catch (error) {
-      logger.warn(
-        `[presence-studio][ask] voice-hub path failed (${error instanceof Error ? error.message : String(error)}); falling back to the orchestrator`
-      );
-    }
-
-    // Fallback path: call the orchestrator directly (no voice-hub needed).
-    try {
-      const conversation = await runSurfaceMessageConversation({
-        surface: 'presence',
-        text,
-        locale,
-        senderAgentId: 'kyberion:presence-studio',
-        agentId: 'presence-surface-agent',
-        actorId: viewer.principalId,
-        threadTs: sessionId,
-        cwd: pathResolver.rootDir(),
-        scope,
-      });
-      const reply = typeof conversation?.text === 'string' ? conversation.text.trim() : '';
-      if (!reply) throw new Error('empty orchestrator reply');
-      return deliverAskReply(reply, 'orchestrator', conversation.intentResolution);
-    } catch (error) {
-      logger.warn(
-        `[presence-studio][ask] orchestrator fallback failed (${error instanceof Error ? error.message : String(error)})`
-      );
-    }
-
-    // Both paths failed — an honest, actionable message (never a silent or
-    // fabricated reply).
-    logger.warn(
-      presenceStudioData.presenceStudioAuditLine(req, 'conversation.unavailable', {
-        request_id: requestId,
-        status: 200,
-      })
-    );
-    return res.json({
-      ok: true,
-      reply: catalogT('front_desk:ask_send_failed', undefined, locale),
-      mode: 'unavailable',
-      shape: 'reply',
-      request_id: requestId,
-    });
-  });
+  registerConversationRoutes(app);
 }

@@ -3,6 +3,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -233,29 +235,33 @@ describe('concierge surface contract', () => {
     }
   });
 
-  it('implements the CS-01 conversation core with the two-path failover', () => {
+  it('implements the CS-01 durable scoped conversation without uncertain failover', () => {
     const route = fs.readFileSync(path.join(appDir, 'src/app/api/message/route.ts'), 'utf8');
     expect(route).toContain('requireConciergeMutationAccess');
-    // Primary path: voice-hub ingest with a bounded timeout so the UI never hangs.
-    expect(route).toContain('/api/ingest-text');
-    expect(route).toContain('AbortSignal.timeout');
-    // Fallback path: lazy orchestrator import (no second daemon required).
+    // Durable scoped requests execute once; bridge timeouts cannot safely retry.
+    expect(route).not.toContain('/api/ingest-text');
+    expect(route).toContain('reserveConversationTurn');
+    expect(route).toContain('conversationKey');
     expect(route).toContain("import('@agent/core/surface/channel-surface')");
     expect(route).toContain('runSurfaceMessageConversation');
     // Conversation execution receives a server-resolved, non-personal scope
-    // on both the rich bridge and the in-process fallback.
+    // through the single supervised direct-conversation path.
     expect(route).toContain('resolveConciergeViewer');
-    expect(route).toContain('conciergeConversationScope');
+    expect(route).toContain('frontDeskRuntimeScope');
     expect(route).toContain('scope');
-    // Both paths failing must produce a loud, actionable 503 — never silence.
+    // An uncertain execution produces an actionable non-success 503.
     expect(route).toContain("mode: 'unavailable'");
     expect(route).toContain('503');
     expect(route).toContain('reply');
     expect(route).toContain('intentResolution');
-    // The rich voice-hub path must pass through the same deterministic
-    // vocabulary/approval contract as the in-process fallback.
-    expect(route).toContain('checkAndRepairSurfaceUxContract');
-    expect(route).toContain('prepareReplyForDelivery');
+    // Shared orchestrator repairs the UX contract; the route projects its approval result.
+    const orchestrator = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/surface/surface-runtime-orchestrator.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(orchestrator).toContain('checkAndRepairSurfaceUxContract');
+    expect(route).toContain('viewFromIntentResolution');
     expect(route).toContain("shape: 'clarification'");
     expect(route).toContain("shape: 'execution_preview'");
     expect(route).toContain('locale,\n    senderAgentId:');
@@ -811,7 +817,9 @@ describe('concierge surface contract', () => {
     // (manifest-resolved, read server-side in layout.tsx) instead of a bare
     // `<CommandPalette />` — see test/front-desk-contract.test.ts for the
     // no-hardcoded-port assertion.
-    expect(layout).toContain('<CommandPalette frontDeskPorts={frontDeskPorts} />');
+    expect(layout).toContain(
+      '<CommandPalette frontDeskPorts={frontDeskPorts} frontDeskUrls={frontDeskUrls} />'
+    );
     expect(palette).toContain('role="dialog"');
     expect(palette).toContain('aria-modal');
     expect(palette).toContain('prefers-reduced-motion');
