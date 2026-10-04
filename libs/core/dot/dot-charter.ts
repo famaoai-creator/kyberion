@@ -301,27 +301,31 @@ export function loadDotCharterSource(source: DotCharterSource): DotCharter {
   return charter;
 }
 
-export interface LoadedDotCharter {
-  path: string;
+export interface LoadedDotCharter extends DotCharterSource {
   charter: DotCharter;
 }
 
 export interface DotCharterLoadError {
   path: string;
   error: string;
+  /** Present for a successfully parsed identity rejected because it collides. */
+  dot_id?: string;
 }
 
 /**
- * List charters under `dots/`. By default a malformed file throws (the CLI
+ * List repo and tenant charters. By default a malformed file throws (the CLI
  * uses that for `dot validate`/`dot list` reporting). Pass `options.errors`
  * to collect parse failures instead — resident consumers (the supervisor
  * sweep, the watchdog union) must never let one bad charter starve the rest.
+ * Dot IDs key shared runtime stores, so every successfully loaded charter
+ * with a colliding ID is rejected, across scopes and before status filtering.
  */
 export function listDotCharters(
   rootDir = pathResolver.rootDir(),
   options: { status?: DotCharterStatus; errors?: DotCharterLoadError[] } = {}
 ): LoadedDotCharter[] {
   const charters: LoadedDotCharter[] = [];
+  const pathsById = new Map<string, string[]>();
   for (const source of listDotCharterSources(rootDir)) {
     const filePath = source.path;
     let charter: DotCharter;
@@ -335,8 +339,33 @@ export function listDotCharters(
       });
       continue;
     }
-    if (options.status && charter.status !== options.status) continue;
-    charters.push({ path: filePath, charter });
+    charters.push({ ...source, charter });
+    const paths = pathsById.get(charter.dot_id) ?? [];
+    paths.push(filePath);
+    pathsById.set(charter.dot_id, paths);
   }
-  return charters;
+  const collidingIds = new Set<string>();
+  for (const [dotId, paths] of pathsById) {
+    if (paths.length < 2) continue;
+    const error = `Duplicate dot_id '${dotId}' across dot charters: ${paths.join(', ')}`;
+    if (!options.errors) throw new Error(error);
+    collidingIds.add(dotId);
+    for (const filePath of paths) options.errors.push({ path: filePath, error, dot_id: dotId });
+  }
+  return charters.filter(
+    ({ charter }) =>
+      !collidingIds.has(charter.dot_id) && (!options.status || charter.status === options.status)
+  );
+}
+
+/** Resolve one identity, rejecting ambiguity while isolating malformed or colliding siblings. */
+export function findDotCharter(
+  dotId: string,
+  rootDir = pathResolver.rootDir()
+): LoadedDotCharter | undefined {
+  const errors: DotCharterLoadError[] = [];
+  const loaded = listDotCharters(rootDir, { errors });
+  const collision = errors.find((entry) => entry.dot_id === dotId);
+  if (collision) throw new Error(collision.error);
+  return loaded.find((entry) => entry.charter.dot_id === dotId);
 }

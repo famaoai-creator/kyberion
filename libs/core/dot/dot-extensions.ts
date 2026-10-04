@@ -16,6 +16,8 @@ import type { DotDecisionLevel, DotProposal } from './dot-proposals.js';
 export interface DotExtCtx {
   rootDir?: string;
   now: () => Date;
+  /** Follow-up being completed by this wake, available only while applying successful outputs. */
+  completingFollowupKey?: string;
 }
 
 /** Extra system-prompt lines; sections render in ascending `order`. */
@@ -111,6 +113,8 @@ export interface DotWakeTool {
   fence: string;
   definition: ToolDefinition;
   maxPerWake: number;
+  /** Durable wake outputs must not consume their trigger if persistence fails. */
+  failWakeOnApplyError?: boolean;
   parse(input: unknown): { ok: true; value: unknown } | { ok: false; error: string };
   /** Returns error strings (empty when everything applied). */
   apply(c: DotCharter, values: unknown[], ctx: DotExtCtx): string[];

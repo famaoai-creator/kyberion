@@ -11,6 +11,8 @@ import {
   type OrgBudgetPolicy,
 } from './org-budget-governor.js';
 import type { LoadedDotCharter } from '../dot/dot-charter.js';
+import { metrics, MetricsCollector } from '../metrics.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 
 const now = () => new Date('2026-10-04T10:00:00Z');
 const policy: OrgBudgetPolicy = {
@@ -94,6 +96,69 @@ describe('org-budget-governor', () => {
     expect(e.reason).toContain('cost');
   });
 
+  it("fails closed for today's ambiguous cost evidence only when a cost cap is configured", () => {
+    const deps = base({
+      readDotTokenUsage: () => [],
+      readMetricsHistory: () => [unattributedSdkRow],
+    });
+    const unknown = evaluateBudgetThrottle({ tenant_slug: 'acme' }, deps);
+    expect(unknown.usage).toMatchObject({ cost_usd: 0, cost_status: 'unknown' });
+    expect(unknown.throttle).toBe('hard');
+    expect(unknown.reason).toContain('missing cost or scope evidence');
+    expect(
+      evaluateBudgetThrottle(
+        { tenant_slug: 'acme' },
+        {
+          ...deps,
+          policy: { daily_token_cap: 1000, soft_ratio: 0.8, hard_ratio: 1 },
+        }
+      ).throttle
+    ).toBe('normal');
+    expect(
+      evaluateBudgetThrottle(
+        { tenant_slug: 'acme' },
+        {
+          ...deps,
+          now: () => new Date('2026-10-05T10:00:00Z'),
+        }
+      ).throttle
+    ).toBe('normal');
+  });
+
+  it('does not treat known other-tenant or system costs as ambiguous for this tenant', () => {
+    const evaluation = evaluateBudgetThrottle(
+      { tenant_slug: 'acme' },
+      base({
+        readDotTokenUsage: () => [],
+        readMetricsHistory: () => [
+          { ...unattributedSdkRow, tenant_slug: 'other' },
+          { ...unattributedSdkRow, scope: { scope_kind: 'system', tier: 'public' } },
+        ],
+      })
+    );
+    expect(evaluation.throttle).toBe('normal');
+    expect(evaluation.usage.cost_usd).toBe(0);
+    expect(evaluation.usage.cost_status).toBeUndefined();
+  });
+
+  it.each(['missing cost', 'unreadable history'] as const)(
+    'reports %s as unknown rather than zero spend',
+    (failure) => {
+      const evaluation = evaluateBudgetThrottle(
+        { tenant_slug: 'acme' },
+        base({
+          readDotTokenUsage: () => [],
+          readMetricsHistory: () => {
+            if (failure === 'unreadable history') throw new Error('history unavailable');
+            return [{ ...askRow, cost_usd: undefined }];
+          },
+        })
+      );
+      expect(evaluation.throttle).toBe('hard');
+      expect(evaluation.usage.cost_status).toBe('unknown');
+    }
+  );
+
   it('alerts once per scope/day/throttle', () => {
     const alert = vi.fn();
     const e = evaluateBudgetThrottle({ tenant_slug: 'acme' }, base());
@@ -111,6 +176,40 @@ describe('org-budget-governor', () => {
     expect(p.soft_ratio).toBe(0.8);
     expect(p.daily_cost_cap_usd).toBe(50);
     expect(loadOrgBudgetPolicy(now)).toBe(p);
+  });
+
+  it('opts the production history reader into strict evidence reads', () => {
+    const metricsDir = 'active/shared/tmp/org-budget-strict-history-tests';
+    const collector = new MetricsCollector({
+      metricsDir,
+      metricsFile: 'history.jsonl',
+      persist: false,
+    });
+    const history = vi
+      .spyOn(metrics, 'loadHistory')
+      .mockImplementation((options) => collector.loadHistory(options));
+    const deps = base({ readMetricsHistory: undefined, readDotTokenUsage: () => [] });
+    try {
+      safeMkdir(metricsDir, { recursive: true });
+      expect(evaluateBudgetThrottle({ tenant_slug: 'acme' }, deps).throttle).toBe('normal');
+      safeWriteFile(`${metricsDir}/history.jsonl`, '{corrupt\n');
+      const result = evaluateBudgetThrottle({ tenant_slug: 'acme' }, deps);
+      expect(history).toHaveBeenCalledWith({ strict: true });
+      expect(result.usage.cost_status).toBe('unknown');
+      expect(result.throttle).toBe('hard');
+      expect(
+        evaluateBudgetThrottle(
+          { tenant_slug: 'acme' },
+          {
+            ...deps,
+            policy: { daily_token_cap: 1000, soft_ratio: 0.8, hard_ratio: 1 },
+          }
+        ).throttle
+      ).toBe('normal');
+    } finally {
+      history.mockRestore();
+      safeRmSync(metricsDir, { recursive: true, force: true });
+    }
   });
 
   // Row shapes as MetricsCollector.record persists them (component + ...extra).
@@ -173,12 +272,86 @@ describe('org-budget-governor', () => {
     ).toBe(0);
   });
 
-  it('does not double count dot tokens in the global scope, but keeps their cost', () => {
+  it('conservatively counts legacy tokens without inventing accounting-ID matches', () => {
     const global = computeBudgetUsage({}, base({ readMetricsHistory: realRows }));
-    // dots: 500 (a) + 700 (b); missions: ask 120 + mission sdk 100.
-    expect(global.by_source).toEqual({ dots: 1200, missions: 220, generation: 0 });
-    expect(global.tokens).toBe(1420);
+    expect(global.by_source).toEqual({ dots: 2100, missions: 920, generation: 0 });
+    expect(global.tokens).toBe(3020);
     expect(global.cost_usd).toBe(4.75);
+  });
+
+  it('reconciles complete attempts and counts late/failed calls separately on the same dot/day', () => {
+    const metric = (accounting_id: string, tokens: number) => ({
+      ...askRow,
+      actor_id: 'dot:a',
+      accounting_id,
+      usage: { prompt_tokens: tokens },
+      cost_usd: 0,
+    });
+    const rows = [
+      metric('success', 40),
+      metric('success', 60),
+      metric('partial', 50),
+      metric('partial', 30),
+    ];
+    const deps = base({
+      readDotTokenUsage: () => [
+        { dot_id: 'a', accounting_id: 'success', day: '2026-10-04', tokens: 100 },
+        { dot_id: 'a', accounting_id: 'partial', day: '2026-10-04', tokens: 40 },
+      ],
+      readMetricsHistory: () => rows,
+    });
+    expect(computeBudgetUsage({ tenant_slug: 'acme', organization_id: 'o1' }, deps).tokens).toBe(
+      180
+    );
+    rows.push(metric('timed-out-attempt', 70));
+    expect(computeBudgetUsage({ tenant_slug: 'acme', organization_id: 'o1' }, deps).tokens).toBe(
+      250
+    );
+    rows.push(metric('timed-out-attempt', 85));
+    expect(computeBudgetUsage({ tenant_slug: 'acme', organization_id: 'o1' }, deps).tokens).toBe(
+      335
+    );
+  });
+
+  it.each([
+    { tenant_slug: 'acme', organization_id: 'o2' },
+    { tenant_slug: 'other', organization_id: 'o1' },
+  ])('never reconciles identical IDs across a different scope %j', (scope) => {
+    const usage = computeBudgetUsage(
+      {},
+      base({
+        readDotTokenUsage: () => [
+          { dot_id: 'a', accounting_id: 'same', day: '2026-10-04', tokens: 100 },
+        ],
+        readMetricsHistory: () => [
+          {
+            ...askRow,
+            scope,
+            actor_id: 'dot:a',
+            accounting_id: 'same',
+            usage: { prompt_tokens: 70 },
+          },
+        ],
+      })
+    );
+    expect(usage.tokens).toBe(170);
+  });
+
+  it('counts a late completion on its actual UTC day and leaves uncharged pipeline tokens intact', () => {
+    const usage = computeBudgetUsage(
+      { tenant_slug: 'acme' },
+      base({
+        readDotTokenUsage: () => [
+          { dot_id: 'a', accounting_id: 'late', day: '2026-10-03', tokens: 100 },
+        ],
+        readMetricsHistory: () => [
+          { ...askRow, actor_id: 'dot:a', accounting_id: 'late', usage: { prompt_tokens: 70 } },
+          { ...askRow, component: 'pipeline-reasoning', usage: { prompt_tokens: 30 } },
+        ],
+      })
+    );
+    expect(usage.tokens).toBe(100);
+    expect(usage.by_source).toEqual({ dots: 70, missions: 30, generation: 3 });
   });
 
   it('caches the throttle per scope for 60 s and per UTC day', () => {

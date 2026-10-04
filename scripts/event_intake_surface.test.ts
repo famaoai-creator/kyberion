@@ -76,6 +76,13 @@ describe('event intake surface', () => {
     const again = await post('ci', body, headers);
     expect(again.status).toBe(202);
     expect(await again.json()).toMatchObject({ event_id: accepted.event_id, duplicate: true });
+    const replay = await post('ci', body, {
+      ...headers,
+      'x-kyberion-event': 'changed-type',
+      'x-kyberion-delivery': 'changed-delivery',
+    });
+    expect(replay.status).toBe(202);
+    expect(await replay.json()).toMatchObject({ duplicate: true });
     const logged = info.mock.calls.map((call) => String(call[0])).join('\n');
     expect(logged).not.toContain('BODY-MARKER');
     expect(logged).not.toContain(SECRET);

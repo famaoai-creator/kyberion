@@ -51,6 +51,10 @@ export interface DotWorkResultRow {
   started_at: string;
   completed_at: string;
   tokens_used?: number;
+  /** Persisted before releasing work so report recovery survives a missing WorkItem. */
+  report_to_dot_id?: string;
+  /** Durable inbox receipt observed; suppresses re-delivery after inbox retention. */
+  report_enqueued_at?: string;
   kr_snapshot?: Record<string, number>;
   /** Latest health (1 healthy / 0) per signal, captured at claim time — the "before" of a signal effect. */
   signal_snapshot?: Record<string, 0 | 1>;
@@ -86,6 +90,8 @@ export interface DotMemoryDoc {
   dot_id: string;
   version: 1;
   updated_at: string;
+  /** Durable ID high-water marks, retained when entries are removed or evicted. */
+  last_ids?: { n: number; i: number; h: number };
   notes: Array<{ id: string; text: string; at: string }>;
   open_items: Array<{
     id: string;
@@ -110,6 +116,8 @@ export interface DotFollowupRow {
   due_at: string;
   reason: string;
   created_at: string;
+  /** A committed successor consumes this parent independently of wake-ledger delivery. */
+  replaces_followup_id?: string;
 }
 
 /** DL-08: a normalized inbound event, as stored in `events.jsonl`. */

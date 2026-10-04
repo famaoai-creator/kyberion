@@ -1,7 +1,12 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { withExecutionContext } from '../authority.js';
+import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
-import { safeMkdir, safeRmSync } from '../secure-io.js';
+import { computeBudgetUsage } from '../governance/org-budget-governor.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeMkdir, safeReadFile, safeRmSync } from '../secure-io.js';
+import { getUsageAttribution, withUsageAttribution } from '../usage-accounting.js';
 import type {
   ClaimWorkItemInput,
   ReleaseWorkItemInput,
@@ -174,9 +179,171 @@ describe('listClaimableDotWorkItems', () => {
     );
     expect(ids).toEqual(['w1', 'w3', 'w7']);
   });
+
+  it('reads protected terminal evidence in the charter scope and restores the outer scope', () => {
+    const c = charter({
+      scope: { tier: 'confidential', tenant_slug: 'acme' },
+      authority: { authority_role: 'organization_operator' },
+    });
+    const fixtureRoot = path.resolve(TEST_ROOT);
+    const evidenceRoot = path.join(fixtureRoot, 'knowledge/confidential/acme/executor');
+    const file = path.join(evidenceRoot, dotStatePath(c, DOT_WORK_RESULTS_FILE));
+    safeMkdir(path.dirname(file), { recursive: true });
+    appendJsonLine(file, {
+      dot_id: c.dot_id,
+      work_item_id: 'w1',
+      action_ref: 'dact-w1',
+      status: 'done',
+      mode: 'pipeline',
+      summary: 'already applied',
+      started_at: NOW.toISOString(),
+      completed_at: NOW.toISOString(),
+    });
+    // Treat the fixture as the repository root, so secure-io evaluates a real
+    // confidential path rather than the globally allowed active/shared/tmp prefix.
+    const root = vi.spyOn(pathResolver, 'rootDir').mockReturnValue(fixtureRoot);
+    try {
+      withExecutionContext(
+        'organization_operator',
+        () => {
+          expect(() => safeReadFile(file)).toThrow(/tenant.scope_violation/);
+          expect(
+            listClaimableDotWorkItems(c, {
+              rootDir: evidenceRoot,
+              listItems: () => [item('w1', {}, { context: { tenant_slug: 'acme' } })],
+            })
+          ).toEqual([]);
+          expect(currentExecutionScope()?.tenantSlug).toBe('other-tenant');
+        },
+        undefined,
+        'other-tenant'
+      );
+    } finally {
+      root.mockRestore();
+    }
+  });
+
+  it('fails closed when the charter role cannot read protected execution evidence', async () => {
+    const c = charter({ scope: { tier: 'confidential', tenant_slug: 'acme' } });
+    const fixtureRoot = path.resolve(TEST_ROOT);
+    const evidenceRoot = path.join(fixtureRoot, 'knowledge/confidential/acme/executor');
+    const file = path.join(evidenceRoot, dotStatePath(c, DOT_WORK_RESULTS_FILE));
+    safeMkdir(path.dirname(file), { recursive: true });
+    appendJsonLine(file, { dot_id: c.dot_id, work_item_id: 'w1', status: 'done' });
+    const h = harness([item('w1', {}, { context: { tenant_slug: 'acme' } })]);
+    h.deps.rootDir = evidenceRoot;
+    const p = ports();
+    const root = vi.spyOn(pathResolver, 'rootDir').mockReturnValue(fixtureRoot);
+    try {
+      expect(await runDotExecutorSweep([{ path: 'dots/ops.json', charter: c }], p, h.deps)).toEqual(
+        []
+      );
+      expect(h.claims).toEqual([]);
+      expect(p.runGoalTurn).not.toHaveBeenCalled();
+    } finally {
+      root.mockRestore();
+    }
+  });
 });
 
 describe('executeDotWorkItem', () => {
+  it.each(['tool', 'delegated'] as const)(
+    'attributes %s executor usage to the dot without counting SDK tokens twice',
+    async (mode) => {
+      const c = charter({
+        scope: { tier: 'confidential', tenant_slug: 'acme', organization_id: 'o1' },
+      });
+      const target = item(
+        'w1',
+        { requested_work_shape: 'direct_reply' },
+        { context: { tenant_slug: 'acme' } }
+      );
+      const h = harness([target]);
+      h.deps.recordTokens = undefined; // Exercise the real persisted dot token ledger.
+      const sdkRows: Array<Record<string, unknown>> = [];
+      const meter = async (tokens: number) => {
+        await Promise.resolve();
+        const attribution = getUsageAttribution();
+        expect(attribution).toEqual({
+          actor_id: 'dot:ops',
+          accounting_id: 'run-1',
+          scope: {
+            tier: 'confidential',
+            tenant_slug: 'acme',
+            organization_id: 'o1',
+            scope_kind: 'organization',
+          },
+        });
+        sdkRows.push({
+          component: 'anthropic-sdk',
+          agent: 'anthropic-sdk',
+          timestamp: NOW.toISOString(),
+          ...attribution,
+          usage: { prompt_tokens: tokens },
+          cost_usd: 0.5,
+        });
+      };
+      const p = ports({
+        goalMode: () => mode,
+        runGoalTurn: async () => {
+          await meter(900);
+          return {
+            turnsRun: 1,
+            finalState: 'complete',
+            goal: { budgetStats: { tokensUsed: 900 } },
+            finalText: 'answer',
+          };
+        },
+        delegateText: async (prompt) => {
+          await meter(Math.ceil((prompt.length + 'answer'.length) / 3));
+          return 'answer';
+        },
+      });
+      expect(getUsageAttribution()).toBeUndefined();
+      const row = await withUsageAttribution(
+        { actor_id: 'outer-owner', scope: { tier: 'public' } },
+        async () => {
+          const result = await executeDotWorkItem(c, target, p, h.deps);
+          expect(getUsageAttribution()?.actor_id).toBe('outer-owner');
+          return result;
+        }
+      );
+      expect(getUsageAttribution()).toBeUndefined();
+      const usage = computeBudgetUsage(
+        { tenant_slug: 'acme', organization_id: 'o1' },
+        {
+          rootDir: TEST_ROOT,
+          now: () => NOW,
+          listCharters: () => [{ charter: c }],
+          readMetricsHistory: () => sdkRows,
+          readGenerationUnits: () => 0,
+        }
+      );
+      expect(usage.tokens).toBe(row.tokens_used);
+      expect(usage.by_source).toEqual({ dots: row.tokens_used, missions: 0, generation: 0 });
+      expect(usage.cost_usd).toBe(0.5);
+    }
+  );
+
+  it('leaves pipeline SDK usage provider-owned because pipelines do not populate the dot ledger', async () => {
+    const target = item('w1', {
+      requested_work_shape: 'pipeline',
+      pipeline_ref: 'pipelines/ok.json',
+    });
+    const h = harness([target]);
+    const p = ports({
+      runPipeline: async () => {
+        await Promise.resolve();
+        expect(getUsageAttribution()).toBeUndefined();
+        return { status: 'succeeded', summary: 'ok' };
+      },
+    });
+    const row = await executeDotWorkItem(charter(), target, p, h.deps);
+    expect(row.tokens_used).toBeUndefined();
+    expect(h.tokens).toEqual([]);
+    expect(getUsageAttribution()).toBeUndefined();
+  });
+
   it('snapshots signal health at claim time, before the action can change it', async () => {
     const c = charter();
     const ledger = path.join(TEST_ROOT, DOT_SIGNAL_LEDGER_PATH);
@@ -286,7 +453,7 @@ describe('executeDotWorkItem', () => {
     });
   });
 
-  it('falls back to one read-only delegated turn without a live tool backend', async () => {
+  it('falls back to one advisory delegated turn without a live tool backend', async () => {
     const target = item('w1', { requested_work_shape: 'direct_reply' });
     const h = harness([target]);
     const p = ports({ goalMode: () => 'delegated' });
@@ -342,32 +509,44 @@ describe('executeDotWorkItem', () => {
     expect(h.inbox).toHaveLength(1);
   });
 
-  it('re-queues a failure silently until the attempt limit, then blocks and reports', async () => {
-    const target = item('w1', {});
-    const failing = ports({
-      runGoalTurn: vi.fn(async () => {
-        throw new Error('provider down');
-      }),
-    });
-    const first = harness([target], 1);
-    const row = await executeDotWorkItem(charter(), target, failing, first.deps);
-    expect(row).toMatchObject({ status: 'failed', summary: 'provider down' });
-    expect(first.releases[0].nextStatus).toBe('ready');
-    expect(first.inbox).toHaveLength(0);
-    const last = harness([target], 3);
-    await executeDotWorkItem(charter(), target, failing, last.deps);
-    expect(last.releases[0].nextStatus).toBe('archived');
-    expect(last.inbox).toHaveLength(1);
-  });
+  it.each(['tool', 'delegated'] as const)(
+    'quarantines a read-only-labelled %s failure because the port may have produced effects',
+    async (mode) => {
+      const target = item('w1', { requested_work_shape: 'direct_reply' });
+      const failing = ports({
+        goalMode: () => mode,
+        runGoalTurn: vi.fn(async () => {
+          throw new Error('provider down');
+        }),
+        delegateText: vi.fn(async () => {
+          throw new Error('provider down');
+        }),
+      });
+      const first = harness([target], 1);
+      const row = await executeDotWorkItem(charter(), target, failing, first.deps);
+      expect(row).toMatchObject({
+        status: 'blocked',
+        summary: expect.stringContaining('provider down'),
+      });
+      expect(first.releases[0].nextStatus).toBe('archived');
+      expect(first.inbox).toHaveLength(1);
+      const last = harness([target], 3);
+      expect((await executeDotWorkItem(charter(), target, failing, last.deps)).status).toBe(
+        'skipped'
+      );
+      expect(last.releases).toHaveLength(0);
+      expect(mode === 'tool' ? failing.runGoalTurn : failing.delegateText).toHaveBeenCalledTimes(1);
+    }
+  );
 
-  it('marks a goal that ran out of budget as failed and a blocked goal as blocked', async () => {
-    const target = item('w1', {});
+  it('quarantines an incomplete read-only goal and preserves an explicit blocked reason', async () => {
+    const target = item('w1', { requested_work_shape: 'direct_reply' });
     const paused = ports({
       runGoalTurn: vi.fn(async () => ({ turnsRun: 4, finalState: 'paused', goal: {} })),
     });
     expect(
       (await executeDotWorkItem(charter(), target, paused, harness([target]).deps)).status
-    ).toBe('failed');
+    ).toBe('blocked');
     const blocked = ports({
       runGoalTurn: vi.fn(async () => ({
         turnsRun: 1,
@@ -376,8 +555,30 @@ describe('executeDotWorkItem', () => {
         finalText: 'needs creds',
       })),
     });
-    const row = await executeDotWorkItem(charter(), target, blocked, harness([target]).deps);
-    expect(row).toMatchObject({ status: 'blocked', summary: 'needs creds' });
+    const other = item('w2', { requested_work_shape: 'direct_reply' });
+    const row = await executeDotWorkItem(charter(), other, blocked, harness([other]).deps);
+    expect(row).toMatchObject({
+      status: 'blocked',
+      summary: expect.stringContaining('needs creds'),
+    });
+  });
+
+  it('quarantines an effect-capable goal that throws after a possible effect', async () => {
+    const target = item('w1', {});
+    const h = harness([target]);
+    let effects = 0;
+    const p = ports({
+      runGoalTurn: vi.fn(async () => {
+        effects += 1;
+        throw new Error('lost response after applying change');
+      }),
+    });
+    const row = await executeDotWorkItem(charter(), target, p, h.deps);
+    expect(row.status).toBe('blocked');
+    expect(row.summary).toContain('partial effects cannot be ruled out');
+    expect(h.releases[0].nextStatus).toBe('archived');
+    expect((await executeDotWorkItem(charter(), target, p, h.deps)).status).toBe('skipped');
+    expect(effects).toBe(1);
   });
 
   it('keeps tenant prose out of the shared WorkItem store, audit chain and inbox', async () => {
@@ -471,7 +672,7 @@ describe('dot-work-results prompt section', () => {
 });
 
 describe('executor bounds and escalation', () => {
-  it('fails an item whose port never resolves once the wall-clock budget runs out, and aborts the port', async () => {
+  it('quarantines an item whose port never resolves at the wall-clock budget, and signals abort', async () => {
     const target = item('w1', {
       requested_work_shape: 'pipeline',
       pipeline_ref: 'pipelines/ok.json',
@@ -486,11 +687,11 @@ describe('executor bounds and escalation', () => {
     });
     const c = charter({ goal: { statement: 'g', budget: { wall_clock_ms_per_wake: 40 } } });
     const row = await executeDotWorkItem(c, target, p, h.deps);
-    expect(row).toMatchObject({ status: 'failed', mode: 'pipeline' });
+    expect(row).toMatchObject({ status: 'blocked', mode: 'pipeline' });
     expect(row.summary).toContain('exceeded wall_clock budget 40ms');
     expect(seen?.aborted).toBe(true);
-    // first attempt: re-queued, not escalated
-    expect(h.releases[0].nextStatus).toBe('ready');
+    expect(row.summary).toContain('outcome uncertain');
+    expect(h.releases[0].nextStatus).toBe('archived');
   });
 
   it('stops renewing the lease past the deadline', async () => {
@@ -512,7 +713,7 @@ describe('executor bounds and escalation', () => {
     await vi.advanceTimersByTimeAsync(30);
     expect(renew.mock.calls.length).toBe(before);
     await vi.advanceTimersByTimeAsync(100);
-    expect((await pending).status).toBe('failed');
+    expect((await pending).status).toBe('blocked');
   });
 
   it('denies (and audits once) an item scoped to another tenant without claiming it', async () => {

@@ -11,11 +11,11 @@
  * - missions / reasoning: metrics-history rows, scoped by `scope.tenant_slug`
  *   / `scope.organization_id` (EventScope written by MetricsCollector.record
  *   callers), with legacy top-level `tenant_slug` / `tenant` fallbacks.
- *   Reasoning backends meter dot wakes too, without a dot marker; so tokens of
- *   rows that are dot-tagged (`agent`/`actor_id`/`component` `dot:*`, or a
- *   `dot_id` field) or wholly unattributed (no mission_id, no scope, no
- *   tenant) are not added — the dot ledger already counts them. Their cost
- *   still counts (the dot ledger carries no cost).
+ *   Dot metrics and ledger estimates reconcile only by accounting_id, dot,
+ *   tenant/org and UTC day. Each attempt contributes the larger of its ledger
+ *   estimate and summed SDK usage. Unmatched/legacy SDK usage still counts;
+ *   actor labels alone never prove a ledger charge. Cost always comes from
+ *   metrics (the dot ledger carries no cost).
  * - generation: generation-quota units, report-only — never part of the
  *   token total nor the throttle.
  */
@@ -55,6 +55,8 @@ export interface BudgetUsage {
   day: string;
   tokens: number;
   cost_usd: number;
+  /** The cost is a known subtotal, not a safe cap input, when attribution/pricing is missing. */
+  cost_status?: 'unknown';
   /**
    * dots / missions are tokens; generation is generation-quota units — report
    * only: never added to `tokens` and never an input to the throttle.
@@ -83,7 +85,12 @@ export interface OrgBudgetDeps {
   now?: () => Date;
   policy?: OrgBudgetPolicy;
   listCharters?: () => Array<Pick<LoadedDotCharter, 'charter'>>;
-  readDotTokenUsage?: () => Array<{ dot_id?: string; day?: string; tokens?: number }>;
+  readDotTokenUsage?: () => Array<{
+    dot_id?: string;
+    accounting_id?: string;
+    day?: string;
+    tokens?: number;
+  }>;
   readMetricsHistory?: () => Array<Record<string, any>>;
   readGenerationUnits?: (tenantSlug: string, now: Date) => number;
   /** evaluateBudgetThrottle cache window per scope (default 60 s); 0 disables it. */
@@ -211,21 +218,28 @@ function metricsRowScope(e: Record<string, any>): OrgBudgetScope {
 
 const DOT_ACTOR_PATTERN = /^dot:/;
 
-/**
- * Rows whose tokens the dot ledger already counts: explicitly dot-tagged, or
- * wholly unattributed reasoning (backends meter dot wakes with no mission,
- * scope or tenant — the resident daemon's only unscoped reasoning source).
- */
-function isDotAttributableMetricsRow(e: Record<string, any>, rowScope: OrgBudgetScope): boolean {
-  if (nonEmpty(e.dot_id) || nonEmpty(e.scope?.dot_id)) return true;
-  if (
-    [e.agent, e.actor_id, e.component].some(
-      (v) => typeof v === 'string' && DOT_ACTOR_PATTERN.test(v)
-    )
-  ) {
-    return true;
-  }
-  return !nonEmpty(e.mission_id) && !e.scope && !rowScope.tenant_slug && !rowScope.organization_id;
+/** Dot identity is an attribution label, never proof that a ledger charge exists. */
+function metricsDotId(e: Record<string, unknown>): string | undefined {
+  if (nonEmpty(e.dot_id)) return nonEmpty(e.dot_id);
+  const actor = [e.actor_id, e.agent, e.component].find(
+    (value) => typeof value === 'string' && DOT_ACTOR_PATTERN.test(value)
+  );
+  return typeof actor === 'string' ? nonEmpty(actor.slice(4)) : undefined;
+}
+
+function accountingKey(
+  dotId: string,
+  accountingId: string,
+  scope: OrgBudgetScope,
+  day: string
+): string {
+  return JSON.stringify([
+    day,
+    scope.tenant_slug ?? '',
+    scope.organization_id ?? '',
+    dotId,
+    accountingId,
+  ]);
 }
 
 function metricsTokens(entry: Record<string, any>): number {
@@ -239,6 +253,14 @@ function metricsTokens(entry: Record<string, any>): number {
     u.cache_write_1h_tokens,
   ].reduce((acc: number, v) => acc + (Number(v) > 0 ? Number(v) : 0), 0);
   return sum;
+}
+
+/** Missing legacy scope could belong here; an explicit different tenant/org cannot. */
+function couldBelongToScope(scope: OrgBudgetScope, row: OrgBudgetScope): boolean {
+  return (
+    !(scope.tenant_slug && row.tenant_slug && scope.tenant_slug !== row.tenant_slug) &&
+    !(scope.organization_id && row.organization_id && scope.organization_id !== row.organization_id)
+  );
 }
 
 export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = {}): BudgetUsage {
@@ -262,17 +284,23 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
     );
   }
   let dots = 0;
+  const accountedTokens = new Map<string, number>();
   try {
     const rows = deps.readDotTokenUsage
       ? deps.readDotTokenUsage()
-      : readJsonLines<{ dot_id?: string; day?: string; tokens?: number }>(
+      : readJsonLines<{ dot_id?: string; accounting_id?: string; day?: string; tokens?: number }>(
           path.join(root, DOT_TOKEN_USAGE_REL),
           { onMalformed: 'skip' }
         );
     for (const row of rows) {
       if (row?.day !== day || !row.dot_id || !(Number(row.tokens) > 0)) continue;
       const s = dotScope.get(row.dot_id) ?? {};
-      if (inScope(scope, s)) dots += Number(row.tokens);
+      if (!inScope(scope, s)) continue;
+      dots += Number(row.tokens);
+      if (nonEmpty(row.accounting_id)) {
+        const key = accountingKey(row.dot_id, row.accounting_id!, s, day);
+        accountedTokens.set(key, (accountedTokens.get(key) ?? 0) + Number(row.tokens));
+      }
     }
   } catch (error) {
     logger.warn(
@@ -283,20 +311,53 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
   // Missions / reasoning calls: metrics history rows tagged with tenant.
   let missions = 0;
   let cost = 0;
+  let costUnknown = false;
+  const measuredDotTokens = new Map<string, number>();
   try {
-    const entries = deps.readMetricsHistory ? deps.readMetricsHistory() : metrics.loadHistory();
+    const entries = deps.readMetricsHistory
+      ? deps.readMetricsHistory()
+      : metrics.loadHistory({ strict: true });
     for (const e of entries) {
       if (typeof e?.timestamp !== 'string' || e.timestamp.slice(0, 10) !== day) continue;
       const rowScope = metricsRowScope(e);
-      if (!inScope(scope, rowScope)) continue;
-      if (!isDotAttributableMetricsRow(e, rowScope)) missions += metricsTokens(e);
+      const hasUsage = e.usage && typeof e.usage === 'object';
+      const hasCostEvidence = hasUsage || e.cost_usd !== undefined;
+      if (!inScope(scope, rowScope)) {
+        // Only today's potentially relevant legacy rows are ambiguous. A
+        // canonical scope (including system) is explicit, not missing.
+        if (hasCostEvidence && !e.scope?.scope_kind && couldBelongToScope(scope, rowScope)) {
+          costUnknown = true;
+        }
+        continue;
+      }
+      const tokens = metricsTokens(e);
+      const dotId = metricsDotId(e);
+      const accountingId = nonEmpty(e.accounting_id);
+      if (dotId && accountingId) {
+        const key = accountingKey(dotId, accountingId, rowScope, day);
+        measuredDotTokens.set(key, (measuredDotTokens.get(key) ?? 0) + tokens);
+      } else if (dotId) {
+        // Legacy rows cannot prove overlap with a particular ledger charge.
+        dots += tokens;
+      } else {
+        missions += tokens;
+      }
       const c = Number(e.cost_usd);
-      if (Number.isFinite(c) && c > 0) cost += c;
+      if (e.cost_usd !== undefined && e.cost_usd !== null && Number.isFinite(c) && c >= 0)
+        cost += c;
+      else if (hasCostEvidence) costUnknown = true;
     }
   } catch (error) {
+    costUnknown = true;
     logger.warn(
       `metrics history unreadable — ${error instanceof Error ? error.message : String(error)}`
     );
+  }
+
+  // Reconcile the entire attempt, not individual SDK calls. Late/failed
+  // attempts without a charge contribute fully; actual excess is never lost.
+  for (const [key, tokens] of measuredDotTokens) {
+    dots += Math.max(0, tokens - (accountedTokens.get(key) ?? 0));
   }
 
   let generation = 0;
@@ -317,6 +378,7 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
     day,
     tokens: dots + missions,
     cost_usd: Math.round(cost * 100000) / 100000,
+    ...(costUnknown ? { cost_status: 'unknown' as const } : {}),
     by_source: { dots, missions, generation: Number(generation) || 0 },
   };
 }
@@ -352,6 +414,15 @@ function computeBudgetThrottle(scope: OrgBudgetScope, deps: OrgBudgetDeps): OrgB
   const policy = deps.policy ?? loadOrgBudgetPolicy(deps.now);
   const cap = resolveCap(policy, scope);
   const usage = computeBudgetUsage(scope, deps);
+  if (cap.daily_cost_cap_usd && usage.cost_status === 'unknown') {
+    return {
+      throttle: 'hard',
+      usage,
+      cap,
+      reason:
+        "cost budget unavailable (today's usage has missing cost or scope evidence); restore metering attribution/history or wait for the UTC day rollover",
+    };
+  }
   const tokenRatio = usage.tokens / cap.daily_token_cap;
   const costRatio = cap.daily_cost_cap_usd ? usage.cost_usd / cap.daily_cost_cap_usd : 0;
   const ratio = Math.max(tokenRatio, costRatio);

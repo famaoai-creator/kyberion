@@ -8,7 +8,7 @@
  * `before` is the executor's claim-time `kr_snapshot` / `signal_snapshot` (no
  * pre-action snapshot → unmeasurable); without an `expected_effect` every KR is
  * compared and the largest |Δ| decides. `after` must be measured after the
- * action completed: a stale or failed re-measure keeps the check pending and is
+ * action completed and at or after `due_at`: an unsettled, stale or failed re-measure keeps the check pending and is
  * retried each sweep until {@link DOT_OUTCOME_MAX_WAIT_MS} past due, then it is
  * recorded unmeasurable. Read-only `delegated` results (advice, no effect) are
  * never scheduled.
@@ -238,9 +238,11 @@ type Judgement = Judged | { retry: string };
 
 type KrReadings = Record<string, Reading>;
 
-/** A reading counts as "after" only when it was taken after the action completed. */
-function fresh(reading: Reading | undefined, completedAt: string): reading is Reading {
-  return reading !== undefined && Date.parse(reading.at) > Date.parse(completedAt);
+/** "After" evidence must be post-action and cover the full settlement window. */
+function fresh(reading: Reading | undefined, pending: DotOutcomePendingRow): reading is Reading {
+  if (!reading) return false;
+  const measuredAt = Date.parse(reading.at);
+  return measuredAt > Date.parse(pending.completed_at) && measuredAt >= Date.parse(pending.due_at);
 }
 
 async function judge(
@@ -259,8 +261,7 @@ async function judge(
     const readings = await krNow();
     if (!readings) return { retry: 'KR re-measure failed' };
     const after = readings[effect.kr_id];
-    if (!fresh(after, pending.completed_at))
-      return { retry: `no ${effect.kr_id} measurement after completion` };
+    if (!fresh(after, pending)) return { retry: `no ${effect.kr_id} measurement after settlement` };
     const direction = effect.direction ?? spec?.direction ?? 'increase';
     return {
       ref,
@@ -274,8 +275,8 @@ async function judge(
     const before = pending.signal_before;
     if (before === undefined) return { ref, verdict: 'unmeasurable' };
     const after = signalReading(c, effect.signal, deps, now);
-    if (!fresh(after, pending.completed_at))
-      return { retry: `no ${effect.signal} measurement after completion` };
+    if (!fresh(after, pending))
+      return { retry: `no ${effect.signal} measurement after settlement` };
     return {
       ref,
       before,
@@ -294,12 +295,12 @@ async function judge(
   for (const spec of candidates) {
     const before = pending.kr_snapshot![spec.kr_id];
     const after = readings[spec.kr_id];
-    if (!fresh(after, pending.completed_at)) continue;
+    if (!fresh(after, pending)) continue;
     if (!best || Math.abs(after.value - before) > Math.abs(best.after - best.before)) {
       best = { id: spec.kr_id, before, after: after.value };
     }
   }
-  if (!best) return { retry: 'no KR measurement after completion' };
+  if (!best) return { retry: 'no KR measurement after settlement' };
   const spec = krSpec(c, best.id);
   return {
     ref: { kr_id: best.id },

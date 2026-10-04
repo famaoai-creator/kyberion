@@ -162,10 +162,31 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/dot/dot-executor.ts#appendWorkResult",
+      "roles": [],
+      "unresolved": [
+        "role argument `c.authority.authority_role` could not be resolved at libs/core/dot/dot-executor.ts#appendWorkResult"
+      ]
+    },
+    {
+      "site": "libs/core/dot/dot-executor.ts#markReportEnqueued",
+      "roles": [],
+      "unresolved": [
+        "role argument `c.authority.authority_role` could not be resolved at libs/core/dot/dot-executor.ts#markReportEnqueued"
+      ]
+    },
+    {
       "site": "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
       "roles": [],
       "unresolved": [
         "role argument `charter.authority.authority_role` could not be resolved at libs/core/dot/dot-executor.ts#runDotExecutorSweep"
+      ]
+    },
+    {
+      "site": "libs/core/dot/dot-executor.ts#scopedWorkResults",
+      "roles": [],
+      "unresolved": [
+        "role argument `c.authority.authority_role` could not be resolved at libs/core/dot/dot-executor.ts#scopedWorkResults"
       ]
     },
     {
@@ -1906,6 +1927,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/onboarding_apply.ts#ensureDir",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/onboarding_apply.ts#writeJson",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -2107,8 +2133,17 @@
     "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
+    "libs/core/dot/dot-executor.ts#appendWorkResult": [
+      "role argument `c.authority.authority_role` could not be resolved at libs/core/dot/dot-executor.ts#appendWorkResult"
+    ],
+    "libs/core/dot/dot-executor.ts#markReportEnqueued": [
+      "role argument `c.authority.authority_role` could not be resolved at libs/core/dot/dot-executor.ts#markReportEnqueued"
+    ],
     "libs/core/dot/dot-executor.ts#runDotExecutorSweep": [
       "role argument `charter.authority.authority_role` could not be resolved at libs/core/dot/dot-executor.ts#runDotExecutorSweep"
+    ],
+    "libs/core/dot/dot-executor.ts#scopedWorkResults": [
+      "role argument `c.authority.authority_role` could not be resolved at libs/core/dot/dot-executor.ts#scopedWorkResults"
     ],
     "libs/core/dot/dot-key-results.ts#runAsDotCharter": [
       "role argument `c.authority.authority_role` could not be resolved at libs/core/dot/dot-key-results.ts#runAsDotCharter"
@@ -2704,7 +2739,10 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#appendWorkResult",
+        "libs/core/dot/dot-executor.ts#markReportEnqueued",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-executor.ts#scopedWorkResults",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
@@ -2976,7 +3014,10 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#appendWorkResult",
+        "libs/core/dot/dot-executor.ts#markReportEnqueued",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-executor.ts#scopedWorkResults",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
@@ -3376,7 +3417,10 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#appendWorkResult",
+        "libs/core/dot/dot-executor.ts#markReportEnqueued",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-executor.ts#scopedWorkResults",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
@@ -3626,7 +3670,10 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#appendWorkResult",
+        "libs/core/dot/dot-executor.ts#markReportEnqueued",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-executor.ts#scopedWorkResults",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
@@ -3913,7 +3960,10 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#appendWorkResult",
+        "libs/core/dot/dot-executor.ts#markReportEnqueued",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-executor.ts#scopedWorkResults",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
@@ -4161,7 +4211,10 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#appendWorkResult",
+        "libs/core/dot/dot-executor.ts#markReportEnqueued",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-executor.ts#scopedWorkResults",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
@@ -4544,7 +4597,10 @@
         "libs/core/command-runner.ts#runGovernedCommand",
         "libs/core/command-runner.ts#runGovernedShellScript",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#appendWorkResult",
+        "libs/core/dot/dot-executor.ts#markReportEnqueued",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-executor.ts#scopedWorkResults",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
@@ -4888,7 +4944,10 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#appendWorkResult",
+        "libs/core/dot/dot-executor.ts#markReportEnqueued",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-executor.ts#scopedWorkResults",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
@@ -5177,7 +5236,10 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#appendWorkResult",
+        "libs/core/dot/dot-executor.ts#markReportEnqueued",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-executor.ts#scopedWorkResults",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
@@ -5404,7 +5466,10 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#appendWorkResult",
+        "libs/core/dot/dot-executor.ts#markReportEnqueued",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-executor.ts#scopedWorkResults",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
@@ -5669,7 +5734,10 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#appendWorkResult",
+        "libs/core/dot/dot-executor.ts#markReportEnqueued",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-executor.ts#scopedWorkResults",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
@@ -5948,7 +6016,10 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#appendWorkResult",
+        "libs/core/dot/dot-executor.ts#markReportEnqueued",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-executor.ts#scopedWorkResults",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
@@ -6197,7 +6268,10 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#appendWorkResult",
+        "libs/core/dot/dot-executor.ts#markReportEnqueued",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-executor.ts#scopedWorkResults",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
@@ -6438,7 +6512,10 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#appendWorkResult",
+        "libs/core/dot/dot-executor.ts#markReportEnqueued",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-executor.ts#scopedWorkResults",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
@@ -6666,7 +6743,10 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#appendWorkResult",
+        "libs/core/dot/dot-executor.ts#markReportEnqueued",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-executor.ts#scopedWorkResults",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",

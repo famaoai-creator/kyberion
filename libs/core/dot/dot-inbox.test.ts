@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { readJsonLines } from '../foundation/json.js';
-import { safeRmSync } from '../secure-io.js';
+import { safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
   appendDotInboxEntry,
   DOT_INBOX_PATH,
@@ -35,6 +35,74 @@ describe('appendDotInboxEntry', () => {
       { rootDir: TEST_ROOT }
     );
     expect(entry.dot_id).toBe('repo-guardian');
+  });
+
+  it('returns the original delivery receipt when a producer retries after an uncertain append', () => {
+    const input = {
+      channel: 'inbox',
+      dot_id: 'repo-guardian',
+      source: 'dot-executor',
+      idempotency_key: 'report:work-1:attempt-1',
+      text: 'Work complete',
+    };
+    const first = appendDotInboxEntry(input, {
+      rootDir: TEST_ROOT,
+      now: () => new Date('2026-10-03T00:00:00Z'),
+    });
+    const retried = appendDotInboxEntry(input, {
+      rootDir: TEST_ROOT,
+      now: () => new Date('2026-10-03T01:00:00Z'),
+    });
+
+    expect(retried).toEqual(first);
+    expect(readJsonLines(`${TEST_ROOT}/${DOT_INBOX_PATH}`)).toHaveLength(1);
+  });
+
+  it('scopes a delivery identity to the addressed dot, channel and producer', () => {
+    const input = {
+      channel: 'inbox',
+      dot_id: 'dot-a',
+      source: 'producer-a',
+      idempotency_key: 'report-1',
+    };
+    for (const change of [
+      {},
+      { dot_id: 'dot-b' },
+      { channel: 'slack' },
+      { source: 'producer-b' },
+    ]) {
+      appendDotInboxEntry({ ...input, ...change }, { rootDir: TEST_ROOT });
+    }
+    expect(readJsonLines(`${TEST_ROOT}/${DOT_INBOX_PATH}`)).toHaveLength(4);
+  });
+
+  it('does not emit another wake when the existing delivery evidence is corrupt', () => {
+    const input = { channel: 'inbox', dot_id: 'dot-a', idempotency_key: 'report-1' };
+    appendDotInboxEntry(input, { rootDir: TEST_ROOT });
+    const file = `${TEST_ROOT}/${DOT_INBOX_PATH}`;
+    const corrupt = `${String(safeReadFile(file, { encoding: 'utf8' }))}{broken\n`;
+    safeWriteFile(file, corrupt);
+
+    expect(() => appendDotInboxEntry(input, { rootDir: TEST_ROOT })).toThrow();
+    expect(String(safeReadFile(file, { encoding: 'utf8' }))).toBe(corrupt);
+  });
+
+  it('rejects empty, unsafe or unbounded delivery identities', () => {
+    for (const key of ['', '../report', 'report\n1', 'x'.repeat(201)]) {
+      expect(() =>
+        appendDotInboxEntry({ channel: 'inbox', idempotency_key: key }, { rootDir: TEST_ROOT })
+      ).toThrow(/idempotency_key/);
+    }
+  });
+
+  it('does not treat a matching but malformed row as delivery evidence', () => {
+    const input = { channel: 'inbox', dot_id: 'dot-a', idempotency_key: 'report-1' };
+    safeWriteFile(
+      `${TEST_ROOT}/${DOT_INBOX_PATH}`,
+      `${JSON.stringify({ ...input, enqueued_at: 2 })}\n`
+    );
+    expect(() => appendDotInboxEntry(input, { rootDir: TEST_ROOT })).toThrow(/invalid timestamp/);
+    expect(readJsonLines(`${TEST_ROOT}/${DOT_INBOX_PATH}`)).toHaveLength(1);
   });
 
   it('rejects channels outside the wake enum', () => {
