@@ -21,9 +21,11 @@ import { runtimeSupervisor } from '@agent/core/tool/runtime-supervisor';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import { derivePipelineStatus } from '@agent/core/pipeline/pipeline-contract';
 import { resolveServiceBinding } from '@agent/core/service/service-binding';
+import { authorizeTenantServiceBinding } from './service-actuator-tenant-binding.js';
 import * as pathResolver from '@agent/core/path-resolver';
 import { stripAuthorityEnvOverrides } from '@agent/core/authority';
 import { executeServicePreset, executeMcp } from '@agent/core/service/service-engine';
+import { issueTenantServiceEngineAdmission } from '@agent/core/service/service-engine-admission';
 import {
   beginServiceOAuth,
   exchangeServiceOAuthCode,
@@ -411,6 +413,21 @@ async function handleSingleAction(
   const execute = async (): Promise<unknown> => {
     switch (input.mode) {
       case 'PRESET':
+        if (input.context?.security_scope && input.context?.service_binding_id) {
+          const admission = issueTenantServiceEngineAdmission({
+            securityScope: input.context.security_scope,
+            bindingId: input.context.service_binding_id,
+            approvalGranted: input.context.service_binding_approval_granted === true,
+          });
+          return await executeServicePreset(
+            input.service_id,
+            input.action,
+            input.params,
+            input.auth === 'secret-guard' ? 'secret-guard' : 'none',
+            undefined,
+            admission
+          );
+        }
         return await executeServicePreset(
           input.service_id,
           input.action,
@@ -504,6 +521,13 @@ async function admitServiceAction(
   if (!hasSafeDynamicServiceTree(input)) {
     throw new Error('[POLICY_VIOLATION] Service action payload contains a reserved prototype key');
   }
+  const bindingAuthorization = authorizeTenantServiceBinding(input);
+  if (bindingAuthorization.bindingId) {
+    input = {
+      ...input,
+      context: { ...(input.context || {}), service_binding_id: bindingAuthorization.bindingId },
+    };
+  }
   ensureDefaultOpPreflight();
   const preflight = await runOpPreflight({
     op: `service:${String(input.mode || input.action || 'unknown').toLowerCase()}:${input.action || 'unknown'}`,
@@ -511,7 +535,9 @@ async function admitServiceAction(
     context: input.context,
     source: 'actuator',
     requiresApproval:
-      input.params?._approval_required === true || input.context?._approval_required === true,
+      bindingAuthorization.approvalRequired ||
+      input.params?._approval_required === true ||
+      input.context?._approval_required === true,
     approvalGranted: options.approvalGranted ? await options.approvalGranted(input) : false,
     ...(options.hasHuman !== undefined ? { hasHuman: options.hasHuman } : {}),
   });
@@ -523,7 +549,16 @@ async function admitServiceAction(
       `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || 'Service operation was not admitted.'}`
     );
   }
-  return preflight.input as unknown as ServiceAction;
+  const admitted = preflight.input as unknown as ServiceAction;
+  if (!bindingAuthorization.bindingId) return admitted;
+  return {
+    ...admitted,
+    context: {
+      ...(admitted.context || {}),
+      service_binding_id: bindingAuthorization.bindingId,
+      service_binding_approval_granted: true,
+    },
+  };
 }
 
 async function executeHarnessRequest(input: ServiceAction): Promise<unknown> {

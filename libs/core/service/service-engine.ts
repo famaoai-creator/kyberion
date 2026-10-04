@@ -10,6 +10,8 @@ import {
   resolveRequestEnvelope,
 } from './service-engine-helpers.js';
 import { executeServicePresetAlternative } from './service-engine-execution.js';
+import { authorizeTenantServiceAction } from './service-binding-registry.js';
+import { resolveTenantServiceEngineAdmission } from './service-engine-admission.js';
 
 const logger = createLogger('service-engine');
 
@@ -24,12 +26,52 @@ export interface ServicePresetCacheOptions {
   tier?: 'personal' | 'confidential' | 'public';
 }
 
+function enforceTenantBindingContract(
+  serviceId: string,
+  action: string,
+  preset: NonNullable<ReturnType<typeof getServicePresetRecord>>,
+  tenantBindingCapability?: object
+): void {
+  const operation = preset.operations[action];
+  if (!operation) throw new Error(`Operation "${action}" not found in presets for ${serviceId}`);
+  const operationBindingRequired =
+    preset.tenant_binding_required === true || operation.tenant_binding_required === true;
+  if (!operationBindingRequired) return;
+  if (!tenantBindingCapability) {
+    throw new Error(
+      `[POLICY_VIOLATION] ${serviceId}:${action} requires an admitted tenant service binding`
+    );
+  }
+  const tenantBindingContext = resolveTenantServiceEngineAdmission(tenantBindingCapability);
+  if (!tenantBindingContext) {
+    throw new Error('[POLICY_VIOLATION] Invalid tenant service actuator admission capability');
+  }
+  const authorization = authorizeTenantServiceAction({
+    serviceId,
+    action,
+    securityScope: tenantBindingContext.securityScope,
+    bindingId: tenantBindingContext.bindingId,
+  });
+  const approvalRequired =
+    authorization.approvalRequired ||
+    operation.approval_required === true ||
+    operation.risk === 'write' ||
+    operation.risk === 'destructive' ||
+    (operation.approval_required !== false && operation.risk !== 'read');
+  if (approvalRequired && tenantBindingContext.approvalGranted !== true) {
+    throw new Error(
+      `[POLICY_VIOLATION] ${serviceId}:${action} requires an admitted approval decision`
+    );
+  }
+}
+
 export async function executeServicePreset(
   serviceId: string,
   action: string,
   params: any,
   auth: 'none' | 'secret-guard' = 'none',
-  cacheOpts?: ServicePresetCacheOptions
+  cacheOpts?: ServicePresetCacheOptions,
+  tenantBindingCapability?: object
 ): Promise<any> {
   const endpoints = loadServiceEndpointsCatalog();
   const serviceConfig = endpoints.services[serviceId];
@@ -43,6 +85,8 @@ export async function executeServicePreset(
   }
   const op = preset.operations[action];
   if (!op) throw new Error(`Operation "${action}" not found in presets for ${serviceId}`);
+
+  enforceTenantBindingContract(serviceId, action, preset, tenantBindingCapability);
 
   const alternatives = op.alternatives || [{ ...op, type: op.type || 'api' }];
   const envelope = resolveRequestEnvelope(params);
@@ -92,20 +136,38 @@ export async function executeServicePresetCached(
   action: string,
   params: any,
   auth: 'none' | 'secret-guard' = 'none',
-  cacheOpts: Required<Pick<ServicePresetCacheOptions, 'cache_ttl_ms'>> & ServicePresetCacheOptions
+  cacheOpts: Required<Pick<ServicePresetCacheOptions, 'cache_ttl_ms'>> & ServicePresetCacheOptions,
+  tenantBindingCapability?: object
 ): Promise<{ result: any; fromCache: boolean }> {
+  const preset = getServicePresetRecord(serviceId);
+  if (preset) enforceTenantBindingContract(serviceId, action, preset, tenantBindingCapability);
+  const admission = tenantBindingCapability
+    ? resolveTenantServiceEngineAdmission(tenantBindingCapability)
+    : undefined;
   const { createHash } = await import('node:crypto');
   const cacheKey = `${action}:${createHash('sha256')
     .update(JSON.stringify(params ?? {}))
     .digest('hex')
     .slice(0, 16)}`;
+  const admittedProjectId = admission?.securityScope.project_id;
+  if (admission && cacheOpts.project_id && cacheOpts.project_id !== admittedProjectId) {
+    throw new Error(
+      '[POLICY_VIOLATION] Service cache project does not match admitted project scope'
+    );
+  }
+  const cacheProjectId = admission
+    ? admittedProjectId || admission.securityScope.tenant_slug || admission.securityScope.tenant_id
+    : cacheOpts.project_id;
+  const scopedCacheKey = admission
+    ? `${admission.securityScope.tenant_slug ?? admission.securityScope.tenant_id ?? 'unknown'}:${cacheProjectId ?? '_tenant'}:${admission.bindingId}:${cacheKey}`
+    : cacheKey;
   const { data: result, fromCache } = await fetchWithVaultCache(
     serviceId,
-    cacheKey,
-    () => executeServicePreset(serviceId, action, params, auth),
+    scopedCacheKey,
+    () => executeServicePreset(serviceId, action, params, auth, undefined, tenantBindingCapability),
     {
       ttlMs: cacheOpts.cache_ttl_ms,
-      projectId: cacheOpts.project_id,
+      projectId: cacheProjectId,
       tier: cacheOpts.tier ?? 'confidential',
     }
   );

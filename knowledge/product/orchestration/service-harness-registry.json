@@ -15,6 +15,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -23,6 +24,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -31,6 +33,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -39,6 +42,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -56,6 +60,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         }
       ]
@@ -73,6 +78,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -81,6 +87,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -89,6 +96,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -97,6 +105,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -105,6 +114,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -113,6 +123,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -121,6 +132,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -129,6 +141,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -137,6 +150,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -145,6 +159,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -153,6 +168,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -161,6 +177,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -169,6 +186,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -177,6 +195,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -185,6 +204,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -202,6 +222,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -210,6 +231,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -218,6 +240,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -226,6 +249,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -242,6 +266,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -249,6 +274,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -266,6 +292,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -274,6 +301,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -282,6 +310,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -290,6 +319,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -298,6 +328,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -306,6 +337,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -314,6 +346,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -322,6 +355,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -339,6 +373,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -347,6 +382,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -355,6 +391,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -363,6 +400,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         }
       ]
@@ -379,6 +417,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -387,6 +426,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -395,6 +435,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -403,6 +444,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -411,6 +453,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -419,6 +462,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -436,6 +480,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -444,6 +489,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -452,6 +498,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -460,6 +507,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -468,6 +516,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -476,6 +525,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -484,6 +534,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -492,6 +543,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -500,6 +552,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -508,6 +561,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -516,6 +570,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -533,6 +588,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -541,6 +597,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         }
       ]
@@ -558,6 +615,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -566,6 +624,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -574,6 +633,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -582,6 +642,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -590,7 +651,7 @@
       "service_id": "gemini",
       "display_name": "Google AI Studio Gemini API presets",
       "auth_strategy": "api_key_query",
-      "operation_count": 4,
+      "operation_count": 6,
       "detail_ref": "knowledge/product/orchestration/service-presets/gemini.json",
       "operations": [
         {
@@ -598,6 +659,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -605,6 +667,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -612,6 +675,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -619,6 +683,23 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "design_voice",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "tenant_binding_required": false,
+          "idempotency": "recommended"
+        },
+        {
+          "action": "clone_voice",
+          "kind": "apply",
+          "risk": "write",
+          "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         }
       ]
@@ -636,6 +717,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -644,6 +726,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -652,6 +735,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -660,6 +744,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -668,6 +753,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -676,6 +762,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -684,6 +771,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -692,6 +780,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -700,6 +789,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -708,6 +798,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -716,6 +807,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -724,6 +816,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -732,6 +825,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -740,6 +834,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -748,6 +843,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -756,6 +852,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -764,6 +861,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -772,6 +870,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -780,6 +879,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         }
       ]
@@ -796,6 +896,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -803,6 +904,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -810,6 +912,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         }
       ]
@@ -827,6 +930,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -835,6 +939,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -843,6 +948,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -851,6 +957,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -859,6 +966,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -875,6 +983,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -882,6 +991,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -899,6 +1009,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -907,6 +1018,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -915,6 +1027,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -923,6 +1036,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -931,6 +1045,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -939,6 +1054,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -947,6 +1063,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -955,6 +1072,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -963,6 +1081,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -971,6 +1090,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -979,6 +1099,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -987,6 +1108,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -995,6 +1117,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1003,6 +1126,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1011,6 +1135,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1019,6 +1144,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1027,6 +1153,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1035,6 +1162,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1043,6 +1171,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1051,6 +1180,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1059,6 +1189,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1067,6 +1198,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1075,6 +1207,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1083,6 +1216,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1091,6 +1225,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1099,6 +1234,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1107,6 +1243,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1115,6 +1252,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1123,6 +1261,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1131,6 +1270,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1139,6 +1279,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -1156,6 +1297,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1164,6 +1306,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1172,6 +1315,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1180,6 +1324,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1188,6 +1333,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1196,6 +1342,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1204,6 +1351,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1212,6 +1360,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1220,6 +1369,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1228,6 +1378,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         }
       ]
@@ -1245,6 +1396,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1253,6 +1405,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         }
       ]
@@ -1270,6 +1423,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1278,6 +1432,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1286,6 +1441,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1294,6 +1450,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1302,6 +1459,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1310,6 +1468,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1318,6 +1477,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1326,6 +1486,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1334,6 +1495,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1342,6 +1504,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1350,6 +1513,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1358,6 +1522,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1366,6 +1531,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1374,6 +1540,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1382,6 +1549,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1390,6 +1558,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1398,6 +1567,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1406,6 +1576,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1414,6 +1585,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -1429,6 +1601,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1436,6 +1609,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1443,6 +1617,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1450,6 +1625,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         }
       ]
@@ -1466,6 +1642,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1474,6 +1651,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1482,6 +1660,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1490,6 +1669,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1498,6 +1678,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1506,6 +1687,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -1523,6 +1705,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1531,6 +1714,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1539,6 +1723,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         }
       ]
@@ -1557,6 +1742,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1565,6 +1751,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1573,6 +1760,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1581,6 +1769,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1589,6 +1778,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1597,6 +1787,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1605,6 +1796,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -1622,6 +1814,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1630,6 +1823,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1638,6 +1832,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1646,6 +1841,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -1661,6 +1857,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -1677,6 +1874,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1684,6 +1882,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -1701,6 +1900,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1709,6 +1909,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1717,6 +1918,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1725,6 +1927,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         }
       ]
@@ -1742,6 +1945,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1750,6 +1954,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -1766,6 +1971,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -1781,6 +1987,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         }
       ]
@@ -1796,6 +2003,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1803,6 +2011,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -1819,6 +2028,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1827,6 +2037,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -1842,6 +2053,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1849,6 +2061,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1857,6 +2070,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1865,6 +2079,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -1883,6 +2098,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1891,6 +2107,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1899,6 +2116,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -1917,6 +2135,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1925,6 +2144,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1933,6 +2153,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1941,6 +2162,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -1957,6 +2179,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
@@ -1974,6 +2197,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1982,6 +2206,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -1990,6 +2215,7 @@
           "kind": "apply",
           "risk": "write",
           "approval_required": true,
+          "tenant_binding_required": false,
           "idempotency": "recommended"
         },
         {
@@ -1998,6 +2224,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         },
         {
@@ -2006,6 +2233,7 @@
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
+          "tenant_binding_required": false,
           "idempotency": "not_applicable"
         }
       ]
