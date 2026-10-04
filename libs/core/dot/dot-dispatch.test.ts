@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import type {
@@ -32,6 +32,7 @@ import {
   recordDotFeedback,
 } from './dot-feedback.js';
 import { appendDotInboxEntry } from './dot-inbox.js';
+import { setDotBudgetThrottleForTests } from './dot-budget.js';
 import { evaluateDotTriggersDue } from './dot-runtime.js';
 import type { DotProposal } from './dot-proposals.js';
 
@@ -174,7 +175,13 @@ function approval(
   return { status, decidedBy, decidedByType } as ApprovalRequestRecord;
 }
 
+// Hermetic: the budget floor contributor must never read real usage metrics.
+beforeEach(() => {
+  setDotBudgetThrottleForTests(() => 'normal');
+});
+
 afterEach(() => {
+  setDotBudgetThrottleForTests(undefined);
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
 });
 
@@ -305,6 +312,23 @@ describe('dot handoff (team coordination)', () => {
     );
     expect(records[0].status).toBe('refused');
     expect(records[0].reason).toMatch(/does not accept handoffs/);
+  });
+
+  it('refuses a handoff to a dot in another tenant', () => {
+    const h = harness('auto', {
+      listCharters: () => [
+        CHARTER,
+        { ...TARGET, scope: { ...TARGET.scope, tenant_slug: 'other-tenant' } },
+      ],
+    });
+    const { records } = dispatchDotProposals(
+      CHARTER,
+      [{ ...PROPOSAL, action_id: 'dot_handoff', handoff_to: 'repo-guardian' }],
+      h.deps
+    );
+    expect(records[0].status).toBe('refused');
+    expect(records[0].reason).toMatch(/cross-tenant handoff denied/);
+    expect(h.items).toHaveLength(0);
   });
 
   it('refuses before asking anyone when the tenant cannot take work', () => {

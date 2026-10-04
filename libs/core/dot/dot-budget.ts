@@ -2,9 +2,13 @@
  * Dot budget wiring (DL-07) — connects the organization budget governor to
  * the resident-dot loop.
  *
- * - `dotBudgetThrottle(charter)` evaluates the charter's tenant / organization
- *   scope (60 s cache per scope) and raises at most one ops alert per scope,
- *   day and threshold.
+ * - `evaluateDotBudget(charter)` evaluates the charter's tenant / organization
+ *   scope (60 s cache per scope) with no side effects — the floor contributor,
+ *   status and digest sections use it, so the gate never sends alerts.
+ * - `dotBudgetThrottle(charter)` (daemon / executor paths only) evaluates the
+ *   same way and raises at most one ops alert per scope, day and threshold.
+ * - `setDotBudgetThrottleForTests(fn)` replaces the evaluation so tests never
+ *   read real metrics.
  * - floor contributor `budget-soft`: at soft or hard throttle every proposal
  *   needs operator approval.
  * - the supervisor skips wakes and the executor skips work for a dot whose
@@ -57,14 +61,45 @@ export function dotBudgetScope(charter: DotCharter): OrgBudgetScope {
   };
 }
 
-/** Evaluate the charter's budget throttle (cached per scope) and alert on a threshold crossing. */
-export function dotBudgetThrottle(
+type DotBudgetOverride = (charter: DotCharter) => OrgBudgetEvaluation | BudgetThrottle;
+let override: DotBudgetOverride | undefined;
+
+/**
+ * Test seam: every budget read (gate floor, status, digest, executor,
+ * supervisor) returns `fn(charter)` instead of evaluating real usage, and no
+ * alert is sent. Pass `undefined` to restore the governor.
+ */
+export function setDotBudgetThrottleForTests(fn: DotBudgetOverride | undefined): void {
+  override = fn;
+}
+
+function fromOverride(charter: DotCharter, now: Date, fn: DotBudgetOverride): OrgBudgetEvaluation {
+  const value = fn(charter);
+  if (typeof value !== 'string') return value;
+  return {
+    throttle: value,
+    usage: {
+      scope: dotBudgetScope(charter),
+      day: now.toISOString().slice(0, 10),
+      tokens: 0,
+      cost_usd: 0,
+      by_source: { dots: 0, missions: 0, generation: 0 },
+    },
+    cap: { daily_token_cap: 0, soft_ratio: 0.8, hard_ratio: 1 },
+    ...(value === 'normal' ? {} : { reason: `${value} budget throttle (test override)` }),
+  };
+}
+
+/** Evaluate the charter's budget throttle (cached per scope). Side-effect free: never alerts. */
+export function evaluateDotBudget(
   charter: DotCharter,
   deps: DotBudgetDeps = {}
 ): OrgBudgetEvaluation {
-  const { evaluate, alert, cacheMs, ...governorDeps } = deps;
+  const { evaluate, alert: _alert, cacheMs, ...governorDeps } = deps;
+  const now = deps.now?.() ?? new Date();
+  if (override) return fromOverride(charter, now, override);
   const scope = dotBudgetScope(charter);
-  const nowMs = (deps.now?.() ?? new Date()).getTime();
+  const nowMs = now.getTime();
   const ttl = cacheMs ?? DOT_BUDGET_CACHE_MS;
   const key = [deps.rootDir ?? '', scope.tenant_slug ?? '', scope.organization_id ?? ''].join(
     '\u0000'
@@ -73,7 +108,20 @@ export function dotBudgetThrottle(
   if (ttl > 0 && hit && nowMs - hit.at < ttl) return hit.value;
   const value = (evaluate ?? evaluateBudgetThrottle)(scope, governorDeps);
   if (ttl > 0) cache.set(key, { at: nowMs, value });
-  maybeAlertBudgetThreshold(value, alert ? { alert } : {});
+  return value;
+}
+
+/**
+ * Evaluate the charter's budget throttle and alert on a threshold crossing.
+ * Daemon / supervisor paths only (the supervisor's wake skip, the executor
+ * sweep) — gate and CLI paths use {@link evaluateDotBudget}.
+ */
+export function dotBudgetThrottle(
+  charter: DotCharter,
+  deps: DotBudgetDeps = {}
+): OrgBudgetEvaluation {
+  const value = evaluateDotBudget(charter, deps);
+  if (!override) maybeAlertBudgetThreshold(value, deps.alert ? { alert: deps.alert } : {});
   return value;
 }
 
@@ -83,7 +131,7 @@ function ratioPct(evaluation: OrgBudgetEvaluation): number {
 }
 
 function throttleOf(charter: DotCharter, rootDir: string | undefined, now: () => Date) {
-  return dotBudgetThrottle(charter, { rootDir, now });
+  return evaluateDotBudget(charter, { rootDir, now });
 }
 
 /** True when the charter's scope is at the hard limit (no wakes, no executor work). */

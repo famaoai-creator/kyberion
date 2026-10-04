@@ -5,10 +5,15 @@
  * Ports, resolved once per charter per sweep:
  *   - goal turn  → `runGoalDrivenLoop` with the backend `resolveDotWakeBackend`
  *                  chose (passed explicitly so the loop never re-resolves the stub);
- *   - delegated  → one `delegateTask` / `delegateTaskHandle` turn bounded by the
- *                  charter wall-clock budget, used when no live tool candidate exists;
+ *   - delegated  → one advisory (read-only, `planner` profile) `delegateTask` /
+ *                  `delegateTaskHandle` turn bounded by the charter wall-clock
+ *                  budget and cancelled on the executor's abort signal, used when
+ *                  no live tool candidate exists;
  *   - pipeline   → in-process `executePipelineFile`, loaded lazily so the daemon
  *                  does not pay the pipeline engine's import cost on start.
+ * The goal driver and pipeline engine accept no AbortSignal: on the executor's
+ * wall-clock deadline they run on unobserved (the goal driver has its own
+ * wall-clock bound) while the executor stops waiting and releases the item.
  * An unconfigured stub backend leaves conversational items unclaimed.
  */
 
@@ -44,11 +49,15 @@ export interface DotExecutorStepDeps extends DotExecutorDeps {
   maxPerSweep?: number;
 }
 
-/** Bounded delegated turn (same shape as the dot runtime's delegated wake). */
+/** Read-only delegation options: advice only, never a tool call or a write. */
+export const DOT_EXECUTOR_DELEGATE_OPTIONS = { advisory: true, profile: 'planner' } as const;
+
+/** Bounded, read-only delegated turn (same shape as the dot runtime's delegated wake). */
 export async function delegateDotText(
   backend: DotWakeBackend,
   prompt: string,
-  timeoutMs: number
+  timeoutMs: number,
+  signal?: AbortSignal
 ): Promise<string> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = (onTimeout?: () => void) =>
@@ -59,19 +68,36 @@ export async function delegateDotText(
       }, timeoutMs);
       timer.unref?.();
     });
+  let onAbort: (() => void) | undefined;
+  const aborted = (cancel?: (reason: string) => void) =>
+    new Promise<string>((_resolve, reject) => {
+      if (!signal) return;
+      onAbort = () => {
+        cancel?.('executor wall_clock deadline reached');
+        reject(new Error('delegated executor turn aborted by the executor deadline'));
+      };
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+    });
+  const options = { ...DOT_EXECUTOR_DELEGATE_OPTIONS, ...(signal ? { signal } : {}) };
   try {
     if (backend.delegateTaskHandle) {
-      const handle = backend.delegateTaskHandle(prompt, undefined);
+      const handle = backend.delegateTaskHandle(prompt, undefined, options);
+      const cancel = (reason: string) => void handle.cancel(reason).catch(() => {});
       return await Promise.race([
         handle.join(),
-        timeout(
-          () => void handle.cancel(`wall_clock budget ${timeoutMs}ms exceeded`).catch(() => {})
-        ),
+        timeout(() => cancel(`wall_clock budget ${timeoutMs}ms exceeded`)),
+        aborted(cancel),
       ]);
     }
-    return await Promise.race([backend.delegateTask(prompt, undefined), timeout()]);
+    return await Promise.race([
+      backend.delegateTask(prompt, undefined, options),
+      timeout(),
+      aborted(),
+    ]);
   } finally {
     if (timer) clearTimeout(timer);
+    if (signal && onAbort) signal.removeEventListener('abort', onAbort);
   }
 }
 
@@ -128,9 +154,9 @@ export function buildDotExecutorPorts(
         finalText: result.finalReport ?? result.goal.terminalReason,
       };
     },
-    async delegateText(prompt, timeoutMs) {
+    async delegateText(prompt, timeoutMs, signal) {
       if (!resolved) throw new Error('no reasoning backend resolved for the delegated turn');
-      return await delegateDotText(resolved, prompt, timeoutMs);
+      return await delegateDotText(resolved, prompt, timeoutMs, signal);
     },
     runPipeline: (ref, ctx) => (deps.executePipeline ?? defaultExecutePipeline)(ref, ctx, charter),
   };

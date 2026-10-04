@@ -18,10 +18,20 @@
  *        charter role, or — without a live tool backend — one read-only
  *        delegated turn whose effects must be re-proposed;
  *      - `mission` → blocked with guidance: the executor never starts missions;
- *   4. release the item (done / blocked; a failure is re-queued until
- *      {@link DOT_EXECUTOR_MAX_ATTEMPTS}), append a {@link DotWorkResultRow},
- *      record an audit-chain entry and wake the dot with a report-back inbox
- *      row (`payload.report_from = 'dot-executor'`).
+ *   4. release the item (done; a failure is re-queued until
+ *      {@link DOT_EXECUTOR_MAX_ATTEMPTS}; an escalation — blocked, or failed
+ *      out of attempts — is released `archived` so it stops holding a
+ *      delegation slot, with the real status in `metadata.dot_executor`),
+ *      append a {@link DotWorkResultRow}, record an audit-chain entry and wake
+ *      the dot with a report-back inbox row (`payload.report_from = 'dot-executor'`).
+ *
+ * Bounds: every item races the charter wall-clock budget (an AbortSignal is
+ * handed to the ports; a timeout fails the item and lease renewal stops), a
+ * sweep stops starting new items after {@link DOT_EXECUTOR_SWEEP_BUDGET_MS},
+ * a dot at its own daily token cap or its scope's hard budget limit is skipped,
+ * and items whose context tenant differs from the executing charter's are
+ * denied (audited) without a claim. Before each sweep the executor reaps dot
+ * items stranded `in_progress` by a crashed executor (expired / absent lease).
  *
  * Tenant dots: result prose lives only in the tenant-scoped
  * `dotStatePath(...)/work-results.jsonl`; the shared WorkItem store, audit
@@ -41,18 +51,23 @@ import { safeMkdir } from '../secure-io.js';
 import {
   claimWorkItem,
   listWorkItems,
+  reapExpiredWorkLeases,
   releaseWorkItem,
   renewWorkItemLease,
+  updateWorkItem,
+  type ReapWorkLeasesOptions,
+  type ReapWorkLeasesResult,
 } from '../workforce/work-coordination.js';
 import type { WorkItem, WorkItemStatus } from '../workforce/work-coordination-types.js';
 import { dotBudgetThrottle } from './dot-budget.js';
 import type { DotCharter, LoadedDotCharter } from './dot-charter.js';
-import type { DotPromptSection } from './dot-extensions.js';
+import type { DotPromptSection, DotStatusSection } from './dot-extensions.js';
 import type { DotExtCtx } from './dot-extensions.js';
 import { appendDotInboxEntry, type DotInboxEntryInput } from './dot-inbox.js';
 import type { DotWorkShape } from './dot-proposals.js';
 import {
   DOT_EXECUTOR_REPORT_SOURCE,
+  dotDailyTokenCapReached,
   recordDotTokenUsage,
   type DotWakeLoopOptions,
   type DotWakeLoopResult,
@@ -73,25 +88,40 @@ export const DOT_EXECUTOR_DEFAULT_WALL_CLOCK_MS = 15 * 60 * 1000;
 export const DOT_EXECUTOR_LEASE_SLACK_MS = 60 * 1000;
 /** Max characters of a result summary. */
 export const DOT_WORK_RESULT_SUMMARY_MAX = 600;
-/** A failing item is re-queued until it has been attempted this many times, then blocked. */
+/** A failing item is re-queued until it has been attempted this many times, then escalated. */
 export const DOT_EXECUTOR_MAX_ATTEMPTS = 3;
 /** Results shown in the wake prompt. */
 export const DOT_WORK_RESULTS_PROMPT_LIMIT = 5;
+/** A sweep starts no new item once this much wall-clock time has elapsed (wakes must not starve). */
+export const DOT_EXECUTOR_SWEEP_BUDGET_MS = 2 * 60 * 1000;
+/** WorkItem status an escalated item is released to: terminal, so it frees the delegation slot. */
+export const DOT_EXECUTOR_ESCALATED_STATUS: WorkItemStatus = 'archived';
 export const DOT_EXECUTOR_READ_ONLY_PREFIX = 'read-only result, effects must be re-proposed: ';
+export const DOT_EXECUTOR_CROSS_TENANT_DENIAL =
+  'denied: the WorkItem context tenant differs from the executing charter tenant — not claimed';
 export const DOT_EXECUTOR_MISSION_GUIDANCE =
   'mission-shaped work needs `mission_controller start` by an operator — the dot executor never starts missions; re-propose as task_session or pipeline, or ask the operator to start a mission';
 
 export type DotGoalMode = 'tool' | 'delegated' | { unavailable: string };
 
+/**
+ * Execution ports. Each receives an AbortSignal that fires when the charter's
+ * wall-clock budget runs out; the executor stops waiting at that moment either
+ * way, so a port that cannot cancel merely runs on unobserved.
+ */
 export interface DotExecutorPorts {
   /** Bounded goal-driven loop under the charter role (live tool backend). */
-  runGoalTurn(o: DotWakeLoopOptions): Promise<DotWakeLoopResult & { finalText?: string }>;
+  runGoalTurn(
+    o: DotWakeLoopOptions,
+    signal?: AbortSignal
+  ): Promise<DotWakeLoopResult & { finalText?: string }>;
   /** One read-only delegated turn, bounded by `timeoutMs`. */
-  delegateText(prompt: string, timeoutMs: number): Promise<string>;
+  delegateText(prompt: string, timeoutMs: number, signal?: AbortSignal): Promise<string>;
   /** Run an allowed pipeline in-process. */
   runPipeline(
     ref: string,
-    ctx: Record<string, unknown>
+    ctx: Record<string, unknown>,
+    signal?: AbortSignal
   ): Promise<{ status: 'succeeded' | 'failed'; summary: string }>;
   /**
    * How conversational work runs for this charter now; defaults to `tool`.
@@ -115,6 +145,16 @@ export interface DotExecutorDeps {
   recordTokens?: (dotId: string, tokens: number) => void;
   /** Lease renewal period; defaults to a third of the lease TTL (min 30 s). */
   renewIntervalMs?: number;
+  /** The dot's own daily token cap check; defaults to {@link dotDailyTokenCapReached}. */
+  tokenCapReached?: (c: DotCharter) => boolean;
+  /** Stranded-claim reaper; defaults to {@link reapExpiredWorkLeases}. */
+  reap?: (options: ReapWorkLeasesOptions) => ReapWorkLeasesResult;
+  /** WorkItem update port (archives reaper-parked items); defaults to {@link updateWorkItem}. */
+  update?: typeof updateWorkItem;
+  /** Elapsed-time clock in ms (wall-clock bounds); defaults to `Date.now`. */
+  clock?: () => number;
+  /** Per-sweep budget; defaults to {@link DOT_EXECUTOR_SWEEP_BUDGET_MS}. */
+  sweepBudgetMs?: number;
 }
 
 export type DotExecutorPortsInput = DotExecutorPorts | ((c: DotCharter) => DotExecutorPorts);
@@ -266,7 +306,8 @@ async function routeItem(
   c: DotCharter,
   item: WorkItem,
   ports: DotExecutorPorts,
-  goalMode: DotGoalMode
+  goalMode: DotGoalMode,
+  signal: AbortSignal
 ): Promise<Outcome> {
   const shape = (meta(item, 'requested_work_shape') ?? 'task_session') as DotWorkShape;
   if (shape === 'mission') {
@@ -284,16 +325,20 @@ async function routeItem(
           : 'pipeline-shaped work without pipeline_ref — the dot must re-propose with pipeline_ref',
       };
     }
-    const result = await ports.runPipeline(ref, {
-      dot_id: c.dot_id,
-      actor_id: actorOf(c),
-      work_item_id: item.item_id,
-      action_ref: meta(item, 'action_ref'),
-      ...(c.scope.tenant_slug ? { tenant_slug: c.scope.tenant_slug } : {}),
-      ...(c.scope.organization_id ? { organization_id: c.scope.organization_id } : {}),
-      ...(meta(item, 'target') ? { target: meta(item, 'target') } : {}),
-      ...(meta(item, 'intent') ? { intent: meta(item, 'intent') } : {}),
-    });
+    const result = await ports.runPipeline(
+      ref,
+      {
+        dot_id: c.dot_id,
+        actor_id: actorOf(c),
+        work_item_id: item.item_id,
+        action_ref: meta(item, 'action_ref'),
+        ...(c.scope.tenant_slug ? { tenant_slug: c.scope.tenant_slug } : {}),
+        ...(c.scope.organization_id ? { organization_id: c.scope.organization_id } : {}),
+        ...(meta(item, 'target') ? { target: meta(item, 'target') } : {}),
+        ...(meta(item, 'intent') ? { intent: meta(item, 'intent') } : {}),
+      },
+      signal
+    );
     return {
       mode: 'pipeline',
       status: result.status === 'succeeded' ? 'done' : 'failed',
@@ -310,7 +355,7 @@ async function routeItem(
   const budget = c.goal.budget;
   if (goalMode === 'delegated') {
     const prompt = `${executorSystemPrompt(c, true)}\n\n${executorObjective(item)}`;
-    const text = await ports.delegateText(prompt, wallClockMs(c));
+    const text = await ports.delegateText(prompt, wallClockMs(c), signal);
     return {
       mode: 'delegated',
       status: 'done',
@@ -318,19 +363,22 @@ async function routeItem(
       tokens: Math.ceil((prompt.length + text.length) / 3),
     };
   }
-  const result = await ports.runGoalTurn({
-    objective: executorObjective(item),
-    goalId: `dot-exec-${item.item_id}`,
-    systemPrompt: executorSystemPrompt(c, false),
-    toolRole: c.authority.authority_role,
-    ...(budget?.max_turns_per_wake !== undefined ? { maxTurns: budget.max_turns_per_wake } : {}),
-    budget: {
-      wallClockBudgetMs: wallClockMs(c),
-      ...(budget?.max_turns_per_wake !== undefined
-        ? { turnBudget: budget.max_turns_per_wake }
-        : {}),
+  const result = await ports.runGoalTurn(
+    {
+      objective: executorObjective(item),
+      goalId: `dot-exec-${item.item_id}`,
+      systemPrompt: executorSystemPrompt(c, false),
+      toolRole: c.authority.authority_role,
+      ...(budget?.max_turns_per_wake !== undefined ? { maxTurns: budget.max_turns_per_wake } : {}),
+      budget: {
+        wallClockBudgetMs: wallClockMs(c),
+        ...(budget?.max_turns_per_wake !== undefined
+          ? { turnBudget: budget.max_turns_per_wake }
+          : {}),
+      },
     },
-  });
+    signal
+  );
   const report = result.finalText?.trim();
   const state = result.finalState ?? 'paused';
   const status: Outcome['status'] =
@@ -390,6 +438,49 @@ function skippedRow(
   };
 }
 
+/** Items already audited as cross-tenant denials in this process (audit once, not every sweep). */
+const deniedAudited = new Set<string>();
+
+/** True when the item's context tenant differs from the executing charter's tenant. */
+export function dotItemTenantMismatch(c: DotCharter, item: WorkItem): boolean {
+  const itemTenant = item.context?.tenant_slug || undefined;
+  const charterTenant = c.scope.tenant_slug || undefined;
+  return itemTenant !== charterTenant;
+}
+
+/**
+ * Tenant re-check before any claim (handed-off items included): deny and
+ * audit once when the item belongs to another tenant scope. The audit carries
+ * only whether the item was tenant-bound — never the other tenant's slug.
+ */
+function denyCrossTenantItem(c: DotCharter, item: WorkItem, deps: DotExecutorDeps): boolean {
+  if (!dotItemTenantMismatch(c, item)) return false;
+  const key = `${c.dot_id}\u0000${item.item_id}`;
+  if (!deniedAudited.has(key)) {
+    deniedAudited.add(key);
+    recordAudit(
+      c,
+      'denied',
+      {
+        work_item_id: item.item_id,
+        action_ref: meta(item, 'action_ref') ?? item.item_id,
+        reason: 'cross_tenant_work_item',
+        item_tenant_bound: Boolean(item.context?.tenant_slug),
+      },
+      deps
+    );
+    logger.warn(
+      `cross-tenant WorkItem refused for ${c.dot_id} — ${item.item_id} is scoped to a different tenant than the charter | next: the item stays unclaimed; an operator re-addresses or cancels it | evidence: ${item.item_id}`
+    );
+  }
+  return true;
+}
+
+/** Test hook: forget which cross-tenant denials were already audited. */
+export function resetDotExecutorDenialAuditForTests(): void {
+  deniedAudited.clear();
+}
+
 /**
  * Claim, run and close one WorkItem for this dot. Returns a `skipped` row
  * (not persisted) when the item could not be claimed or no backend can run it.
@@ -403,6 +494,9 @@ export async function executeDotWorkItem(
   const startedAt = nowOf(deps).toISOString();
   const actionRef = meta(item, 'action_ref') ?? item.item_id;
   const actor = actorOf(c);
+  if (denyCrossTenantItem(c, item, deps)) {
+    return skippedRow(c, item, startedAt, DOT_EXECUTOR_CROSS_TENANT_DENIAL, deps);
+  }
   const shape = meta(item, 'requested_work_shape') ?? 'task_session';
   const goalMode: DotGoalMode =
     shape === 'task_session' || shape === 'direct_reply' ? (ports.goalMode?.(c) ?? 'tool') : 'tool';
@@ -432,8 +526,16 @@ export async function executeDotWorkItem(
     );
   }
   const { lease } = claimed;
+  const clock = deps.clock ?? Date.now;
+  const budgetMs = wallClockMs(c);
+  const deadlineAt = clock() + budgetMs;
   const renewEvery = deps.renewIntervalMs ?? Math.max(30_000, Math.floor(ttlMs / 3));
   const renewTimer = setInterval(() => {
+    // Past the deadline the item is being abandoned: let the lease lapse.
+    if (clock() >= deadlineAt) {
+      clearInterval(renewTimer);
+      return;
+    }
     try {
       (deps.renew ?? renewWorkItemLease)({ leaseId: lease.lease_id, ttlMs, actorPeerId: actor });
     } catch (error) {
@@ -444,24 +546,39 @@ export async function executeDotWorkItem(
   }, renewEvery);
   renewTimer.unref?.();
 
+  const failedMode: Outcome['mode'] =
+    shape === 'pipeline' ? 'pipeline' : goalMode === 'delegated' ? 'delegated' : 'goal_turn';
+  const controller = new AbortController();
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<Outcome>((resolve) => {
+    deadlineTimer = setTimeout(() => {
+      const summary = `exceeded wall_clock budget ${budgetMs}ms — abandoned (the port was signalled to abort)`;
+      controller.abort(new Error(summary));
+      resolve({ mode: failedMode, status: 'failed', summary });
+    }, budgetMs);
+  });
   let outcome: Outcome;
   try {
-    outcome = await routeItem(c, item, ports, goalMode);
-  } catch (error) {
-    outcome = {
-      mode:
-        shape === 'pipeline' ? 'pipeline' : goalMode === 'delegated' ? 'delegated' : 'goal_turn',
-      status: 'failed',
-      summary: error instanceof Error ? error.message : String(error),
-    };
+    outcome = await Promise.race([
+      routeItem(c, item, ports, goalMode, controller.signal).catch((error): Outcome => ({
+        mode: failedMode,
+        status: 'failed',
+        summary: error instanceof Error ? error.message : String(error),
+      })),
+      deadline,
+    ]);
   } finally {
+    if (deadlineTimer) clearTimeout(deadlineTimer);
     clearInterval(renewTimer);
   }
 
   const attempts = claimed.item.attempts?.length ?? 1;
   const retry = outcome.status === 'failed' && attempts < DOT_EXECUTOR_MAX_ATTEMPTS;
+  // Escalations end terminal (archived) so they stop holding a delegation slot;
+  // the real status lives in metadata.dot_executor, the result row and the report.
+  const escalated = outcome.status !== 'done' && !retry;
   const nextStatus: WorkItemStatus =
-    outcome.status === 'done' ? 'done' : retry ? 'ready' : 'blocked';
+    outcome.status === 'done' ? 'done' : retry ? 'ready' : DOT_EXECUTOR_ESCALATED_STATUS;
   const summary = bounded(outcome.summary);
   const tenantBound = Boolean(c.scope.tenant_slug);
   const completedAt = nowOf(deps).toISOString();
@@ -473,10 +590,17 @@ export async function executeDotWorkItem(
       nextStatus,
       // The WorkItem store is a shared floor: tenant prose stays in the dot state path.
       summary: tenantBound
-        ? `dot executor: ${outcome.status} (${outcome.mode}); details in the dot work results`
-        : summary,
+        ? `dot executor: ${outcome.status} (${outcome.mode})${escalated ? ', escalated to the dot' : ''}; details in the dot work results`
+        : escalated
+          ? bounded(`escalated (${outcome.status}): ${summary}`)
+          : summary,
       metadata: {
-        dot_executor: { status: outcome.status, mode: outcome.mode, completed_at: completedAt },
+        dot_executor: {
+          status: outcome.status,
+          mode: outcome.mode,
+          completed_at: completedAt,
+          ...(escalated ? { escalated: true } : {}),
+        },
       },
     });
   } catch (error) {
@@ -537,15 +661,18 @@ export async function executeDotWorkItem(
         dot_id: reportTo,
         channel: 'inbox',
         source: DOT_EXECUTOR_REPORT_SOURCE,
-        text: tenantBound
-          ? `WorkItem ${item.item_id} ${outcome.status}`
-          : `WorkItem ${item.item_id} ${outcome.status}: ${bounded(item.title, 120)}`,
+        text: `${
+          tenantBound
+            ? `WorkItem ${item.item_id} ${outcome.status}`
+            : `WorkItem ${item.item_id} ${outcome.status}: ${bounded(item.title, 120)}`
+        }${escalated ? ' — escalated: re-propose differently or ask the operator' : ''}`,
         payload: {
           report_from: DOT_EXECUTOR_REPORT_SOURCE,
           work_item_id: item.item_id,
           action_ref: actionRef,
           status: outcome.status,
           mode: outcome.mode,
+          ...(escalated ? { escalated: true } : {}),
           ...(reportTo !== c.dot_id ? { executed_by: c.dot_id } : {}),
         },
       });
@@ -558,15 +685,172 @@ export async function executeDotWorkItem(
   return row;
 }
 
+const isDotItem = (item: WorkItem): boolean =>
+  typeof item.metadata?.dot_id === 'string' && item.metadata.dot_id.length > 0;
+
+/**
+ * Crash recovery: reset dot WorkItems stranded `in_progress` by an executor
+ * that died mid-item (lease expired or absent) back to `ready`. An item the
+ * reaper parks after {@link DOT_EXECUTOR_MAX_ATTEMPTS} lapsed attempts is
+ * escalated like any other — archived (frees the slot), result row, audit and
+ * report-back — when its executing charter is in `active`. Never throws.
+ */
+export function reapStrandedDotWorkItems(
+  active: readonly LoadedDotCharter[],
+  deps: DotExecutorDeps = {}
+): ReapWorkLeasesResult | undefined {
+  let result: ReapWorkLeasesResult;
+  try {
+    result = (deps.reap ?? reapExpiredWorkLeases)({
+      itemFilter: isDotItem,
+      maxErrorAttempts: DOT_EXECUTOR_MAX_ATTEMPTS,
+    });
+  } catch (error) {
+    logger.warn(
+      `dot work reaper failed — ${error instanceof Error ? error.message : String(error)} | next: stranded items wait for the next sweep | evidence: work-coordination store`
+    );
+    return undefined;
+  }
+  for (const item of result.recovered) {
+    logger.info(`reaped stranded dot WorkItem ${item.item_id} back to ready`);
+  }
+  for (const item of result.parked) {
+    const executor = active.find(({ charter }) => addressedTo(charter, item))?.charter;
+    try {
+      (deps.update ?? updateWorkItem)({
+        itemId: item.item_id,
+        expectedVersion: item.version,
+        status: DOT_EXECUTOR_ESCALATED_STATUS,
+        metadata: {
+          dot_executor: {
+            status: 'failed',
+            mode: 'escalated',
+            escalated: true,
+            completed_at: nowOf(deps).toISOString(),
+            reason: 'executor crashed or timed out on every attempt',
+          },
+        },
+      });
+    } catch (error) {
+      logger.warn(
+        `archiving reaper-parked item ${item.item_id} failed — ${error instanceof Error ? error.message : String(error)} | next: it stays blocked and counts toward the delegation cap until an operator closes it | evidence: ${item.item_id}`
+      );
+      continue;
+    }
+    if (!executor) continue;
+    const at = nowOf(deps).toISOString();
+    const row: DotWorkResultRow = {
+      dot_id: executor.dot_id,
+      work_item_id: item.item_id,
+      action_ref: meta(item, 'action_ref') ?? item.item_id,
+      mode: 'escalated',
+      status: 'failed',
+      summary: `abandoned after ${item.attempts?.length ?? DOT_EXECUTOR_MAX_ATTEMPTS} attempt(s) that never released (executor crash or timeout) — re-propose a smaller step`,
+      started_at: at,
+      completed_at: at,
+    };
+    try {
+      appendWorkResult(executor, row, deps);
+    } catch (error) {
+      logger.warn(
+        `result write failed for reaped ${item.item_id} — ${error instanceof Error ? error.message : String(error)} | next: the archive and audit still record it | evidence: ${dotStatePath(executor, DOT_WORK_RESULTS_FILE)}`
+      );
+    }
+    recordAudit(
+      executor,
+      'failed',
+      {
+        work_item_id: item.item_id,
+        action_ref: row.action_ref,
+        mode: 'escalated',
+        status: 'failed',
+        next_status: DOT_EXECUTOR_ESCALATED_STATUS,
+        reason: 'reaper_parked',
+      },
+      deps
+    );
+    const reportTo = meta(item, 'dot_id') ?? executor.dot_id;
+    try {
+      (
+        deps.appendInbox ??
+        ((input: DotInboxEntryInput) =>
+          void appendDotInboxEntry(input, { rootDir: deps.rootDir, now: deps.now }))
+      )({
+        dot_id: reportTo,
+        channel: 'inbox',
+        source: DOT_EXECUTOR_REPORT_SOURCE,
+        text: `WorkItem ${item.item_id} failed — escalated: abandoned after repeated executor crashes`,
+        payload: {
+          report_from: DOT_EXECUTOR_REPORT_SOURCE,
+          work_item_id: item.item_id,
+          action_ref: row.action_ref,
+          status: 'failed',
+          mode: 'escalated',
+          escalated: true,
+        },
+      });
+    } catch (error) {
+      logger.warn(
+        `report-back failed for reaped ${item.item_id} — ${error instanceof Error ? error.message : String(error)} | next: the result row still records it | evidence: ${item.item_id}`
+      );
+    }
+  }
+  return result;
+}
+
+/** Recent escalations shown in `dot status`. */
+export const DOT_EXECUTOR_STATUS_ESCALATION_LIMIT = 5;
+
+/**
+ * `dot status` section: delegated-work totals and the latest escalations
+ * (blocked / failed results the dot must re-propose or hand to the operator).
+ * A hoisted function for the same import-cycle reason as the prompt section.
+ */
+export function dotExecutorStatusSection(): DotStatusSection {
+  return {
+    id: 'executor',
+    collect(c, ctx) {
+      const rows = readDotWorkResults(c, { rootDir: ctx.rootDir });
+      const escalations = rows.filter(
+        (row) => row.status === 'blocked' || (row.status === 'failed' && row.mode === 'escalated')
+      );
+      const byStatus: Record<string, number> = {};
+      for (const row of rows) byStatus[row.status] = (byStatus[row.status] ?? 0) + 1;
+      return {
+        results_total: rows.length,
+        by_status: byStatus,
+        ...(rows.length ? { last_completed_at: rows[rows.length - 1].completed_at } : {}),
+        escalations_total: escalations.length,
+        recent_escalations: escalations.slice(-DOT_EXECUTOR_STATUS_ESCALATION_LIMIT).map((row) => ({
+          work_item_id: row.work_item_id,
+          action_ref: row.action_ref,
+          status: row.status,
+          mode: row.mode,
+          completed_at: row.completed_at,
+          summary: bounded(row.summary, 160),
+        })),
+      };
+    },
+  };
+}
+
 function throttleFor(c: DotCharter, deps: DotExecutorDeps): 'normal' | 'soft' | 'hard' {
   if (deps.throttle) return deps.throttle(c);
   return dotBudgetThrottle(c, { rootDir: deps.rootDir, now: deps.now }).throttle;
 }
 
+function tokenCapReached(c: DotCharter, deps: DotExecutorDeps): boolean {
+  if (deps.tokenCapReached) return deps.tokenCapReached(c);
+  return dotDailyTokenCapReached(c, { rootDir: deps.rootDir, now: deps.now });
+}
+
 /**
- * One executor pass over the active charters: at most `maxPerSweep` (default
- * 1) item per active, non-paused, not hard-throttled dot, each run inside the
- * charter's role and tenant context. Never throws for a single dot.
+ * One executor pass over the active charters: first reap stranded dot claims,
+ * then at most `maxPerSweep` (default 1) item per active, non-paused dot that
+ * is neither at its own daily token cap nor at its scope's hard budget limit,
+ * each run inside the charter's role and tenant context. Cross-tenant items
+ * are denied without counting against the per-dot quota. No new item starts
+ * once the sweep has run for `sweepBudgetMs`. Never throws for a single dot.
  */
 export async function runDotExecutorSweep(
   active: readonly LoadedDotCharter[],
@@ -575,9 +859,32 @@ export async function runDotExecutorSweep(
 ): Promise<DotWorkResultRow[]> {
   const rows: DotWorkResultRow[] = [];
   const max = Math.max(0, deps.maxPerSweep ?? 1);
+  if (max === 0) return rows;
+  const clock = deps.clock ?? Date.now;
+  const sweepStart = clock();
+  const sweepBudget = deps.sweepBudgetMs ?? DOT_EXECUTOR_SWEEP_BUDGET_MS;
+  reapStrandedDotWorkItems(active, deps);
   for (const { charter } of active) {
-    if (charter.status !== 'active' || max === 0) continue;
+    if (charter.status !== 'active') continue;
+    if (clock() - sweepStart >= sweepBudget) {
+      logger.info(
+        `executor sweep budget ${sweepBudget}ms spent — remaining dots wait for the next sweep`
+      );
+      break;
+    }
     try {
+      let capped = false;
+      try {
+        capped = tokenCapReached(charter, deps);
+      } catch (error) {
+        logger.warn(
+          `token cap check failed for ${charter.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: the executor proceeds | evidence: active/shared/runtime/dot`
+        );
+      }
+      if (capped) {
+        logger.debug(`executor skips ${charter.dot_id}: daily token cap reached`);
+        continue;
+      }
       let throttle: 'normal' | 'soft' | 'hard';
       try {
         throttle = throttleFor(charter, deps);
@@ -589,10 +896,13 @@ export async function runDotExecutorSweep(
         throttle = 'normal';
       }
       if (throttle === 'hard') continue;
-      const candidates = listClaimableDotWorkItems(charter, deps).slice(0, max);
+      const candidates = listClaimableDotWorkItems(charter, deps).filter(
+        (item) => !denyCrossTenantItem(charter, item, deps)
+      );
       if (candidates.length === 0) continue;
       const charterPorts = typeof ports === 'function' ? ports(charter) : ports;
-      for (const item of candidates) {
+      for (const item of candidates.slice(0, max)) {
+        if (clock() - sweepStart >= sweepBudget) break;
         const row = await withExecutionContextAsync(
           charter.authority.authority_role,
           () => executeDotWorkItem(charter, item, charterPorts, deps),

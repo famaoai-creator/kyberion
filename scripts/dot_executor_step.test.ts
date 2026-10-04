@@ -6,6 +6,7 @@ import {
   type ReasoningBackend,
 } from '@agent/core/reasoning/reasoning-backend';
 import {
+  DOT_EXECUTOR_DELEGATE_OPTIONS,
   DOT_EXECUTOR_SUPERVISOR_STEP,
   buildDotExecutorPorts,
   delegateDotText,
@@ -78,6 +79,42 @@ describe('buildDotExecutorPorts', () => {
     await expect(delegateDotText(hanging, 'p', 10)).rejects.toThrow(/wall_clock budget 10ms/);
   });
 
+  it('delegates read-only: advisory + planner profile on delegateTask and delegateTaskHandle', async () => {
+    const delegateTask = vi.fn(async () => 'ok');
+    await delegateDotText({ ...textBackend, delegateTask }, 'p', 5_000);
+    expect(DOT_EXECUTOR_DELEGATE_OPTIONS).toEqual({ advisory: true, profile: 'planner' });
+    expect(delegateTask).toHaveBeenCalledWith(
+      'p',
+      undefined,
+      expect.objectContaining({ advisory: true, profile: 'planner' })
+    );
+    const handle = { join: vi.fn(async () => 'ok'), cancel: vi.fn(async () => {}) };
+    const delegateTaskHandle = vi.fn(() => handle as never);
+    await delegateDotText({ ...textBackend, delegateTaskHandle }, 'p', 5_000);
+    expect(delegateTaskHandle).toHaveBeenCalledWith(
+      'p',
+      undefined,
+      expect.objectContaining({ advisory: true, profile: 'planner' })
+    );
+  });
+
+  it('cancels the delegated turn when the executor deadline aborts', async () => {
+    const handle = {
+      join: () => new Promise<string>(() => {}),
+      cancel: vi.fn(async () => {}),
+    };
+    const controller = new AbortController();
+    const pending = delegateDotText(
+      { ...textBackend, delegateTaskHandle: () => handle as never },
+      'p',
+      60_000,
+      controller.signal
+    );
+    controller.abort();
+    await expect(pending).rejects.toThrow(/aborted by the executor deadline/);
+    expect(handle.cancel).toHaveBeenCalledTimes(1);
+  });
+
   it('reports the process-default stub as unavailable (items stay unclaimed)', () => {
     vi.stubEnv('KYBERION_REASONING_BACKEND', 'claude-cli');
     const ports = buildDotExecutorPorts(CHARTER, {});
@@ -133,6 +170,8 @@ describe('dot-executor supervisor step', () => {
         claim: () => ({ item, lease: { lease_id: 'l1' } as never }),
         release: () => ({ item, lease: {} as never }),
         throttle: () => 'normal',
+        tokenCapReached: () => false,
+        reap: () => ({ expired: [], recovered: [], parked: [], replayed: [] }),
         appendInbox: () => {},
         audit: () => {},
       }

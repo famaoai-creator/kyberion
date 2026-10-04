@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -11,6 +12,7 @@ import type { DotCharter } from './dot-charter.js';
 import {
   DOT_EVENT_LOOKBACK_MS,
   DOT_EVENT_PAYLOAD_MAX_BYTES,
+  DOT_EVENT_SCAN_TAIL_BYTES,
   dotEventMatchesTrigger,
   dotEventsLedgerPath,
   evaluateDotEventTriggers,
@@ -430,5 +432,58 @@ describe('loadEventIntakePolicy', () => {
         { rootDir: TEST_ROOT }
       ).status
     ).toBe('duplicate');
+  });
+
+  it('ingestInboundEvent treats the same payload under a fresh delivery id within 24 h as a replay', () => {
+    const at = new Date('2026-10-04T10:00:00.000Z');
+    const first = normalizeInboundEvent({
+      source: 'github',
+      policy: POLICY,
+      headers: { 'x-github-delivery': 'r-1', 'x-github-event': 'push' },
+      body: '{"ref":"main","after":"abc"}',
+      now: at,
+    });
+    expect(ingestInboundEvent(first, { rootDir: TEST_ROOT }).status).toBe('accepted');
+    const replay = normalizeInboundEvent({
+      source: 'github',
+      policy: POLICY,
+      headers: { 'x-github-delivery': 'r-2', 'x-github-event': 'push' },
+      body: '{"ref":"main","after":"abc"}',
+      now: new Date(at.getTime() + 60 * 60 * 1000),
+    });
+    expect(replay.payload_digest).toBe(first.payload_digest);
+    expect(ingestInboundEvent(replay, { rootDir: TEST_ROOT }).status).toBe('duplicate');
+    const later = normalizeInboundEvent({
+      source: 'github',
+      policy: POLICY,
+      headers: { 'x-github-delivery': 'r-3', 'x-github-event': 'push' },
+      body: '{"ref":"main","after":"abc"}',
+      now: new Date(at.getTime() + 25 * 60 * 60 * 1000),
+    });
+    expect(ingestInboundEvent(later, { rootDir: TEST_ROOT }).status).toBe('accepted');
+    const changed = normalizeInboundEvent({
+      source: 'github',
+      policy: POLICY,
+      headers: { 'x-github-delivery': 'r-4', 'x-github-event': 'push' },
+      body: '{"ref":"main","after":"def"}',
+      now: new Date(at.getTime() + 60 * 60 * 1000),
+    });
+    expect(ingestInboundEvent(changed, { rootDir: TEST_ROOT }).status).toBe('accepted');
+  });
+
+  it('reads the ledger tail bounded and skips a torn line', () => {
+    const event = normalizeInboundEvent({
+      source: 'github',
+      policy: POLICY,
+      headers: { 'x-github-delivery': 't-1' },
+      body: '{"a":1}',
+    });
+    ingestInboundEvent(event, { rootDir: TEST_ROOT });
+    const file = `${TEST_ROOT}/${dotEventsLedgerPath()}`;
+    safeAppendFileSync(file, '{"torn":\n');
+    expect(DOT_EVENT_SCAN_TAIL_BYTES).toBeGreaterThan(0);
+    expect(
+      readDotInboundEvents(undefined, { rootDir: TEST_ROOT }).map((e) => e.delivery_id)
+    ).toEqual(['t-1']);
   });
 });

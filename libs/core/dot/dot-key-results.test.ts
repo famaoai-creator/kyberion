@@ -3,6 +3,7 @@ import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import type { DotCharter } from './dot-charter.js';
 import type { KeyResultSpec } from '../key-result-spec.js';
 import {
+  assertDotKrFilePathAllowed,
   dotGoalGapLines,
   measureActiveDotKeyResults,
   measureDotKeyResults,
@@ -76,7 +77,13 @@ describe('dot key results', () => {
         { dot_id: 'kr-dot', signal: 'up', healthy: false, measured_at: at(-4)().toISOString() },
       ],
     };
-    const c = charter({}, { tenant_slug: 'acme' });
+    // A tenant dot may read only its own confidential knowledge / public / state subtree.
+    const tenantKrs = krs.map((kr) =>
+      kr.metric.source === 'file'
+        ? { ...kr, metric: { ...kr.metric, path: 'knowledge/confidential/acme/metrics/m.json' } }
+        : kr
+    ) as KeyResultSpec[];
+    const c = charter({ key_results: tenantKrs }, { tenant_slug: 'acme' });
     const first = await measureDotKeyResults(c, { ...deps, now: at(0) });
     expect(first.map((r) => [r.kr_id, r.value])).toEqual([
       ['errors', 8],
@@ -189,5 +196,84 @@ describe('dot key results', () => {
     safeRmSync('active/shared/runtime/dot/org-kr-ledger.jsonl', { force: true });
     void safeMkdir;
     void safeWriteFile;
+  });
+});
+
+describe('file metric tenant confinement', () => {
+  const fileKr = (p: string): KeyResultSpec => ({
+    kr_id: 'leak',
+    title: 'Leak',
+    metric: { source: 'file', path: p, json_path: 'n' },
+    target: 0,
+    direction: 'decrease',
+  });
+
+  it("a tenant dot cannot read another tenant's confidential knowledge (file never opened)", async () => {
+    const reads: string[] = [];
+    const c = charter(
+      { key_results: [fileKr('knowledge/confidential/globex/kpi.json')] },
+      {
+        tier: 'confidential',
+        tenant_slug: 'acme',
+      }
+    );
+    const rows = await measureDotKeyResults(c, {
+      rootDir: ROOT,
+      now: at(0),
+      readFile: (rel) => {
+        reads.push(rel);
+        return JSON.stringify({ n: 1 });
+      },
+    });
+    expect(rows).toEqual([]);
+    expect(reads).toEqual([]);
+  });
+
+  it('allows own confidential, public knowledge and the own state subtree; denies the rest', () => {
+    const acme = { tenantSlug: 'acme', stateRoot: 'active/shared/runtime/dot/tenants/acme' };
+    expect(() =>
+      assertDotKrFilePathAllowed('knowledge/confidential/acme/k.json', acme)
+    ).not.toThrow();
+    expect(() => assertDotKrFilePathAllowed('knowledge/public/k.json', acme)).not.toThrow();
+    expect(() =>
+      assertDotKrFilePathAllowed('active/shared/runtime/dot/tenants/acme/x.json', acme)
+    ).not.toThrow();
+    for (const bad of [
+      'knowledge/confidential/globex/k.json',
+      'knowledge/confidential/acme/../globex/k.json',
+      'knowledge/personal/me.json',
+      'active/shared/runtime/dot/tenants/globex/x.json',
+      'active/shared/tmp/m.json',
+      '/etc/passwd',
+      '../outside.json',
+    ]) {
+      expect(() => assertDotKrFilePathAllowed(bad, acme), bad).toThrow();
+    }
+    expect(() => assertDotKrFilePathAllowed('active/shared/tmp/m.json', {})).not.toThrow();
+    for (const bad of [
+      'knowledge/confidential/acme/k.json',
+      'knowledge/personal/me.json',
+      'active/shared/runtime/dot/tenants/acme/x.json',
+    ]) {
+      expect(() => assertDotKrFilePathAllowed(bad, {}), bad).toThrow();
+    }
+  });
+
+  it('measures each charter inside its own execution context', async () => {
+    const seen: string[] = [];
+    await measureActiveDotKeyResults(
+      [
+        charter({ key_results: [] }, { tier: 'confidential', tenant_slug: 'acme' }),
+        charter({ key_results: [] }),
+      ],
+      {
+        rootDir: ROOT,
+        runAs: async (c, fn) => {
+          seen.push(`${c.authority.authority_role}:${c.scope.tenant_slug ?? '-'}`);
+          return fn();
+        },
+      }
+    );
+    expect(seen).toEqual(['infrastructure_sentinel:acme', 'infrastructure_sentinel:-']);
   });
 });

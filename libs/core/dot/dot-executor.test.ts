@@ -9,7 +9,11 @@ import type {
 } from '../workforce/work-coordination-types.js';
 import type { DotCharter, LoadedDotCharter } from './dot-charter.js';
 import {
+  DOT_EXECUTOR_CROSS_TENANT_DENIAL,
   DOT_EXECUTOR_MISSION_GUIDANCE,
+  dotExecutorStatusSection,
+  reapStrandedDotWorkItems,
+  resetDotExecutorDenialAuditForTests,
   DOT_EXECUTOR_READ_ONLY_PREFIX,
   dotWorkResultsPromptLines,
   executeDotWorkItem,
@@ -19,7 +23,7 @@ import {
   type DotExecutorDeps,
   type DotExecutorPorts,
 } from './dot-executor.js';
-import { DOT_PROMPT_SECTIONS } from './dot-extension-registry.js';
+import { DOT_PROMPT_SECTIONS, DOT_STATUS_SECTIONS } from './dot-extension-registry.js';
 import type { DotInboxEntryInput } from './dot-inbox.js';
 import { DOT_EXECUTOR_REPORT_SOURCE } from './dot-runtime.js';
 import {
@@ -111,6 +115,8 @@ function harness(items: WorkItem[] = [], attempts = 1): Harness {
     },
     renew: vi.fn() as any,
     throttle: () => 'normal',
+    tokenCapReached: () => false,
+    reap: () => ({ expired: [], recovered: [], parked: [], replayed: [] }),
     appendInbox: (input) => void h.inbox.push(input),
     audit: (entry) => void h.audits.push(entry as Record<string, any>),
     recordTokens: (dotId, tokens) => void h.tokens.push([dotId, tokens]),
@@ -142,6 +148,8 @@ function results(c: DotCharter): DotWorkResultRow[] {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
+  resetDotExecutorDenialAuditForTests();
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
 });
 
@@ -210,7 +218,8 @@ describe('executeDotWorkItem', () => {
         maxTurns: 4,
         budget: { wallClockBudgetMs: 120_000, turnBudget: 4 },
         objective: expect.stringContaining('Target: service:ops; intent: apply'),
-      })
+      }),
+      expect.any(AbortSignal)
     );
     expect(h.releases[0]).toMatchObject({
       itemId: 'w1',
@@ -251,7 +260,11 @@ describe('executeDotWorkItem', () => {
     const p = ports({ goalMode: () => 'delegated' });
     const row = await executeDotWorkItem(charter(), target, p, h.deps);
     expect(p.runGoalTurn).not.toHaveBeenCalled();
-    expect(p.delegateText).toHaveBeenCalledWith(expect.stringContaining('read-only'), 120_000);
+    expect(p.delegateText).toHaveBeenCalledWith(
+      expect.stringContaining('read-only'),
+      120_000,
+      expect.any(AbortSignal)
+    );
     expect(row.mode).toBe('delegated');
     expect(row.summary.startsWith(DOT_EXECUTOR_READ_ONLY_PREFIX)).toBe(true);
   });
@@ -267,14 +280,19 @@ describe('executeDotWorkItem', () => {
     const done = await executeDotWorkItem(charter(), ok, p, h.deps);
     expect(p.runPipeline).toHaveBeenCalledWith(
       'pipelines/ok.json',
-      expect.objectContaining({ dot_id: 'ops', work_item_id: 'w1', action_ref: 'dact-w1' })
+      expect.objectContaining({ dot_id: 'ops', work_item_id: 'w1', action_ref: 'dact-w1' }),
+      expect.any(AbortSignal)
     );
     expect(done).toMatchObject({ status: 'done', mode: 'pipeline' });
     const blocked = await executeDotWorkItem(charter(), bad, p, h.deps);
     expect(p.runPipeline).toHaveBeenCalledTimes(1);
     expect(blocked).toMatchObject({ status: 'blocked', mode: 'escalated' });
     expect(blocked.summary).toContain('not in charter authority.allowed_pipelines');
-    expect(h.releases[1].nextStatus).toBe('blocked');
+    // Escalations release terminal (archived) so they free the delegation slot.
+    expect(h.releases[1].nextStatus).toBe('archived');
+    expect(h.releases[1].metadata).toMatchObject({
+      dot_executor: { status: 'blocked', mode: 'escalated', escalated: true },
+    });
     expect(h.audits[1].result).toBe('denied');
   });
 
@@ -306,7 +324,7 @@ describe('executeDotWorkItem', () => {
     expect(first.inbox).toHaveLength(0);
     const last = harness([target], 3);
     await executeDotWorkItem(charter(), target, failing, last.deps);
-    expect(last.releases[0].nextStatus).toBe('blocked');
+    expect(last.releases[0].nextStatus).toBe('archived');
     expect(last.inbox).toHaveLength(1);
   });
 
@@ -334,7 +352,7 @@ describe('executeDotWorkItem', () => {
     const c = charter({
       scope: { tier: 'confidential', tenant_slug: 'acme', organization_id: 'acme-org' },
     });
-    const target = item('w1', {});
+    const target = item('w1', {}, { context: { tenant_slug: 'acme' } } as Partial<WorkItem>);
     const h = harness([target]);
     await executeDotWorkItem(c, target, ports(), h.deps);
     expect(h.releases[0].summary).not.toContain('Ticked');
@@ -417,5 +435,155 @@ describe('dot-work-results prompt section', () => {
     expect(lines[1]).toContain('dact-w1');
     expect(lines[5]).toContain('[done] dact-w5 (goal_turn');
     expect(readDotKrSnapshot(c, { rootDir: TEST_ROOT })).toBeUndefined();
+  });
+});
+
+describe('executor bounds and escalation', () => {
+  it('fails an item whose port never resolves once the wall-clock budget runs out, and aborts the port', async () => {
+    const target = item('w1', {
+      requested_work_shape: 'pipeline',
+      pipeline_ref: 'pipelines/ok.json',
+    });
+    const h = harness([target]);
+    let seen: AbortSignal | undefined;
+    const p = ports({
+      runPipeline: vi.fn((_ref: string, _ctx: Record<string, unknown>, signal?: AbortSignal) => {
+        seen = signal;
+        return new Promise<never>(() => {});
+      }),
+    });
+    const c = charter({ goal: { statement: 'g', budget: { wall_clock_ms_per_wake: 40 } } });
+    const row = await executeDotWorkItem(c, target, p, h.deps);
+    expect(row).toMatchObject({ status: 'failed', mode: 'pipeline' });
+    expect(row.summary).toContain('exceeded wall_clock budget 40ms');
+    expect(seen?.aborted).toBe(true);
+    // first attempt: re-queued, not escalated
+    expect(h.releases[0].nextStatus).toBe('ready');
+  });
+
+  it('stops renewing the lease past the deadline', async () => {
+    vi.useFakeTimers();
+    const target = item('w1', {});
+    const h = harness([target]);
+    const renew = vi.fn();
+    h.deps.renew = renew as any;
+    h.deps.renewIntervalMs = 10;
+    let clock = 0;
+    h.deps.clock = () => clock;
+    const p = ports({ runGoalTurn: vi.fn(() => new Promise<never>(() => {})) });
+    const c = charter({ goal: { statement: 'g', budget: { wall_clock_ms_per_wake: 100 } } });
+    const pending = executeDotWorkItem(c, target, p, h.deps);
+    await vi.advanceTimersByTimeAsync(30);
+    expect(renew).toHaveBeenCalled();
+    const before = renew.mock.calls.length;
+    clock = 1_000; // the clock passes the deadline before the deadline timer fires
+    await vi.advanceTimersByTimeAsync(30);
+    expect(renew.mock.calls.length).toBe(before);
+    await vi.advanceTimersByTimeAsync(100);
+    expect((await pending).status).toBe('failed');
+  });
+
+  it('denies (and audits once) an item scoped to another tenant without claiming it', async () => {
+    const c = charter({ scope: { tier: 'confidential', tenant_slug: 'acme' } });
+    const foreign = item('w1', {}, { context: { tenant_slug: 'globex' } } as Partial<WorkItem>);
+    const untenanted = item('w2', {});
+    const own = item('w3', {}, { context: { tenant_slug: 'acme' } } as Partial<WorkItem>);
+    const h = harness([foreign, untenanted, own]);
+    const row = await executeDotWorkItem(c, foreign, ports(), h.deps);
+    expect(row).toMatchObject({ status: 'skipped', summary: DOT_EXECUTOR_CROSS_TENANT_DENIAL });
+    expect(h.claims).toEqual([]);
+    expect(h.audits[0]).toMatchObject({
+      result: 'denied',
+      metadata: { reason: 'cross_tenant_work_item', item_tenant_bound: true },
+    });
+    expect(JSON.stringify(h.audits[0])).not.toContain('globex');
+    // The sweep skips both foreign items without using the per-dot quota and audits once each.
+    const rows = await runDotExecutorSweep(
+      [{ path: 'dots/ops.json', charter: c }],
+      ports(),
+      h.deps
+    );
+    expect(rows.map((r) => r.work_item_id)).toEqual(['w3']);
+    expect(h.claims.map((cl) => cl.itemId)).toEqual(['w3']);
+    expect(h.audits.filter((a) => a.result === 'denied')).toHaveLength(2);
+  });
+
+  it('skips a dot whose own daily token cap is reached', async () => {
+    const h = harness([item('w1', {})]);
+    h.deps.tokenCapReached = (c) => c.dot_id === 'ops';
+    const rows = await runDotExecutorSweep(
+      [{ path: 'dots/ops.json', charter: charter() }],
+      ports(),
+      h.deps
+    );
+    expect(rows).toEqual([]);
+    expect(h.claims).toEqual([]);
+  });
+
+  it('starts no new item once the sweep budget is spent', async () => {
+    const h = harness([item('w1', {}), item('w2', { dot_id: 'second' })]);
+    let clock = 0;
+    h.deps.clock = () => clock;
+    h.deps.sweepBudgetMs = 100;
+    const p = ports({
+      runGoalTurn: vi.fn(async () => {
+        clock += 150;
+        return { turnsRun: 1, finalState: 'complete', goal: {}, finalText: 'ok' };
+      }),
+    });
+    const rows = await runDotExecutorSweep(
+      [
+        { path: 'dots/ops.json', charter: charter() },
+        { path: 'dots/second.json', charter: charter({ dot_id: 'second' }) },
+      ],
+      p,
+      h.deps
+    );
+    expect(rows.map((r) => r.work_item_id)).toEqual(['w1']);
+  });
+
+  it('reaps stranded dot claims before the sweep and escalates reaper-parked items', async () => {
+    const parked = item('w9', {}, { status: 'blocked', version: 4 } as Partial<WorkItem>);
+    const reap = vi.fn(() => ({ expired: [], recovered: [], parked: [parked], replayed: [] }));
+    const update = vi.fn();
+    const h = harness([]);
+    h.deps.reap = reap;
+    h.deps.update = update as any;
+    await runDotExecutorSweep([{ path: 'dots/ops.json', charter: charter() }], ports(), h.deps);
+    expect(reap).toHaveBeenCalledWith(expect.objectContaining({ maxErrorAttempts: 3 }));
+    const filter = (reap.mock.calls[0] as any)[0].itemFilter as (i: WorkItem) => boolean;
+    expect(filter(item('x', {}))).toBe(true);
+    expect(filter({ ...item('y', {}), metadata: {} } as WorkItem)).toBe(false);
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ itemId: 'w9', status: 'archived', expectedVersion: 4 })
+    );
+    expect(results(charter())[0]).toMatchObject({
+      work_item_id: 'w9',
+      status: 'failed',
+      mode: 'escalated',
+    });
+    expect(h.inbox[0].payload).toMatchObject({ work_item_id: 'w9', escalated: true });
+    expect(
+      reapStrandedDotWorkItems([], {
+        reap: () => {
+          throw new Error('x');
+        },
+      })
+    ).toBeUndefined();
+  });
+
+  it('shows escalations in the executor status section', async () => {
+    expect(DOT_STATUS_SECTIONS.some((section) => section.id === 'executor')).toBe(true);
+    const target = item('w1', { requested_work_shape: 'mission' });
+    await executeDotWorkItem(charter(), target, ports(), harness([target]).deps);
+    const status = dotExecutorStatusSection().collect(charter(), {
+      rootDir: TEST_ROOT,
+      now: () => NOW,
+    });
+    expect(status).toMatchObject({
+      results_total: 1,
+      escalations_total: 1,
+      recent_escalations: [{ work_item_id: 'w1', status: 'blocked', mode: 'escalated' }],
+    });
   });
 });

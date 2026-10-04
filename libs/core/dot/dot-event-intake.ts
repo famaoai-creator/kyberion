@@ -29,8 +29,8 @@ import * as path from 'node:path';
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { pathResolver } from '../path-resolver.js';
-import { safeMkdir } from '../secure-io.js';
-import { appendJsonLine, readJson, readJsonLines } from '../foundation/json.js';
+import { safeExistsSync, safeMkdir, safeReadFileTail } from '../secure-io.js';
+import { appendJsonLine, readJson } from '../foundation/json.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { withLockSync } from '../foundation/lock-utils.js';
@@ -59,6 +59,10 @@ export const DOT_EVENT_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 export const DOT_EVENT_MAX_DUE_PER_SWEEP = 5;
 /** Only the ledger tail is scanned per sweep / dedup check. */
 export const DOT_EVENT_SCAN_TAIL = 2000;
+/** Byte bound of the tail read (the whole ledger is never loaded). */
+export const DOT_EVENT_SCAN_TAIL_BYTES = 4 * 1024 * 1024;
+/** A same-source, same-type event with an identical payload digest inside this window is a replay. */
+export const DOT_EVENT_REPLAY_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** Shorter HMAC secrets are treated as unconfigured (fail closed). */
 export const EVENT_INTAKE_MIN_SECRET_LENGTH = 16;
 const EVENT_SUMMARY_MAX = 300;
@@ -307,11 +311,33 @@ function absolute(rel: string, deps: DotEventDeps): string {
   return path.join(deps.rootDir ?? pathResolver.rootDir(), rel);
 }
 
-/** Ledger tail for one tenant (or the system floor). */
+/**
+ * Bounded JSONL tail: at most {@link DOT_EVENT_SCAN_TAIL_BYTES} from the end of
+ * the ledger. When the window was cut, its first line is a fragment and is
+ * dropped; malformed lines are skipped.
+ */
+function readLedgerTail(filePath: string): unknown[] {
+  if (!safeExistsSync(filePath)) return [];
+  const { buffer, truncated } = safeReadFileTail(filePath, DOT_EVENT_SCAN_TAIL_BYTES);
+  const lines = buffer.toString('utf8').split(/\r?\n/);
+  if (truncated) lines.shift();
+  const rows: unknown[] = [];
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    try {
+      rows.push(parseSafeJsonInput(line, 'dot events ledger tail entry'));
+    } catch {
+      /* a torn or malformed line must not hide the rest of the tail */
+    }
+  }
+  return rows;
+}
+
+/** Ledger tail for one tenant (or the system floor); a bounded read. */
 export function readDotInboundEvents(tenantSlug: string | undefined, deps: DotEventDeps = {}) {
-  const rows = readJsonLines<DotInboundEvent>(absolute(dotEventsLedgerPath(tenantSlug), deps), {
-    onMalformed: 'skip',
-  }).filter(
+  const rows = (
+    readLedgerTail(absolute(dotEventsLedgerPath(tenantSlug), deps)) as DotInboundEvent[]
+  ).filter(
     (row) =>
       typeof row?.event_id === 'string' &&
       typeof row?.source === 'string' &&
@@ -327,7 +353,19 @@ export interface IngestInboundEventResult {
   ledger: string;
 }
 
-/** Append once: a repeated (source, delivery_id) is reported as duplicate, not re-written. */
+/** True when `row` replays `event`: same source and type, same payload digest, within 24 h. */
+function isPayloadReplay(row: DotInboundEvent, event: DotInboundEvent): boolean {
+  if (row.source !== event.source || row.type !== event.type) return false;
+  if (!row.payload_digest || row.payload_digest !== event.payload_digest) return false;
+  const gap = Math.abs(Date.parse(event.received_at) - Date.parse(row.received_at));
+  return Number.isFinite(gap) && gap < DOT_EVENT_REPLAY_WINDOW_MS;
+}
+
+/**
+ * Append once: a repeated (source, delivery_id) — or a replay of the same
+ * payload under a fresh delivery id within 24 h — is reported as duplicate,
+ * not re-written.
+ */
 export function ingestInboundEvent(
   event: DotInboundEvent,
   deps: DotEventDeps = {}
@@ -337,7 +375,9 @@ export function ingestInboundEvent(
   const lockId = `dot-event-intake-${createHash('sha256').update(filePath).digest('hex').slice(0, 24)}`;
   return withLockSync(lockId, () => {
     const duplicate = readDotInboundEvents(event.tenant_slug, deps).some(
-      (row) => row.source === event.source && row.delivery_id === event.delivery_id
+      (row) =>
+        (row.source === event.source && row.delivery_id === event.delivery_id) ||
+        isPayloadReplay(row, event)
     );
     if (duplicate) return { status: 'duplicate', event_id: event.event_id, ledger };
     safeMkdir(path.dirname(filePath), { recursive: true });
