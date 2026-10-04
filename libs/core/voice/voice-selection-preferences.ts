@@ -19,6 +19,7 @@ import {
   type VoiceEngineRecord,
 } from './voice-engine-registry.js';
 import {
+  isVoiceSttBackendAvailable,
   parseVoiceSttBackend,
   resolveVoiceSttBackendOrder,
   type VoiceSttAvailability,
@@ -27,7 +28,11 @@ import {
 import { hasBuiltInTts } from '../media/native-tts.js';
 import { probeToolRuntime } from '../tool/tool-runtime-registry.js';
 import { pathResolver } from '../path-resolver.js';
-import { listVoiceSttAdapters, resolveVoiceTtsAdapter } from './voice-provider-adapters.js';
+import {
+  listVoiceSttAdapters,
+  resolveVoiceSttAdapter,
+  resolveVoiceTtsAdapter,
+} from './voice-provider-adapters.js';
 
 export interface VoiceSelectionPreferences {
   version: '1.0.0';
@@ -206,24 +211,16 @@ function resolveSttAvailability(): VoiceSttAvailability {
 
 function sttCandidates(availability: VoiceSttAvailability): VoiceSttSelectionCandidate[] {
   const isAvailable = (backend: VoiceSttBackend): boolean => {
-    if (backend === 'server') return availability.server;
-    if (backend === 'fluid_audio') return availability.fluidAudio === true;
-    if (backend === 'faster_whisper') return availability.fasterWhisper === true;
-    if (backend === 'mlx_whisper') return availability.mlxWhisper === true;
-    if (backend === 'whisper_cpp') return availability.whisperCpp;
-    if (backend === 'native_speech') return availability.nativeSpeech;
-    return false;
+    return isVoiceSttBackendAvailable(backend, availability);
   };
   const reasonFor = (backend: VoiceSttBackend): string => {
-    if (backend === 'server') return 'Set VOICE_HUB_STT_BASE_URL or a provider-specific STT URL.';
-    if (backend === 'fluid_audio')
-      return 'Set KYBERION_FLUID_AUDIO_STT_COMMAND to a local FluidAudio/Parakeet JSON bridge command.';
-    if (backend === 'faster_whisper')
-      return 'Set KYBERION_WINDOWS_STT_BACKEND=faster_whisper and install faster-whisper in the selected Python runtime.';
-    if (backend === 'mlx_whisper') return 'Uses the managed mlx-whisper runtime on Apple Silicon.';
-    if (backend === 'whisper_cpp') return 'Requires the configured whisper.cpp CLI and model.';
-    if (backend === 'native_speech')
-      return 'Uses the host OS speech API and microphone permission.';
+    if (backend === 'auto')
+      return 'Uses the configured fallback order and skips unavailable backends.';
+    const adapter = resolveVoiceSttAdapter(backend);
+    if (adapter.setup_guidance) return adapter.setup_guidance;
+    if (adapter.adapter_id === 'speech_to_text_bridge') {
+      return `Uses registered SpeechToTextBridge '${backend}'.`;
+    }
     return 'Uses the configured fallback order and skips unavailable backends.';
   };
   return [

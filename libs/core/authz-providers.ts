@@ -533,7 +533,10 @@ export function registerBuiltinAuthzProviders(): void {
     allowAllProvider,
     denyAllProvider,
   ]) {
-    registerAuthzProvider(provider);
+    registerAuthzProvider(provider, {
+      provenance: 'builtin',
+      source: 'authz-providers',
+    });
   }
 }
 

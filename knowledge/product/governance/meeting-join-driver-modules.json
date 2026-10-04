@@ -1,0 +1,19 @@
+{
+  "version": "1.0.0",
+  "drivers": [
+    {
+      "driver_id": "in-room",
+      "module": "@agent/core/meeting/driver-modules/in-room"
+    },
+    {
+      "driver_id": "chrome-extension",
+      "module": "@agent/core/meeting/driver-modules/chrome-extension"
+    },
+    {
+      "driver_id": "browser-playwright",
+      "module": "@actuator/meeting-browser-driver",
+      "fallback_path": "dist/libs/actuators/meeting-browser-driver/src/index.js"
+    }
+  ],
+  "$schema": "../schemas/meeting-join-driver-modules.schema.json"
+}

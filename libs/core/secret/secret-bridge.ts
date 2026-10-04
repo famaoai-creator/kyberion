@@ -12,6 +12,7 @@ import {
   safeWriteFile,
   safeMkdir,
   safeExecResult,
+  withSensitivePathMediation,
 } from '../secure-io.js';
 import { SecretProvider, RegistryEntry } from './secret-types.js';
 
@@ -52,21 +53,25 @@ function fileSecretsCatalog(filePath: string) {
 }
 
 function loadRegistry(): KeychainRegistry {
-  const registryPath = keychainRegistryPath();
-  if (!safeExistsSync(registryPath)) return { entries: [] };
-  try {
-    return keychainRegistryCatalog().load();
-  } catch {
-    return { entries: [] };
-  }
+  return withSensitivePathMediation(() => {
+    const registryPath = keychainRegistryPath();
+    if (!safeExistsSync(registryPath)) return { entries: [] };
+    try {
+      return keychainRegistryCatalog().load();
+    } catch {
+      return { entries: [] };
+    }
+  });
 }
 
 function saveRegistry(registry: KeychainRegistry): void {
-  const registryPath = keychainRegistryPath();
-  const dir = path.dirname(registryPath);
-  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  const validated = keychainRegistryCatalog().validate(registry, registryPath);
-  safeWriteFile(registryPath, JSON.stringify(validated, null, 2));
+  withSensitivePathMediation(() => {
+    const registryPath = keychainRegistryPath();
+    const dir = path.dirname(registryPath);
+    if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+    const validated = keychainRegistryCatalog().validate(registry, registryPath);
+    safeWriteFile(registryPath, JSON.stringify(validated, null, 2));
+  });
 }
 
 export function registryAdd(service: string, account: string): void {
@@ -131,9 +136,8 @@ export class MacKeychainSecretProvider implements SecretProvider {
     const script = [
       'import Foundation',
       'import Security',
-      'guard let service = readLine(), let account = readLine() else { exit(2) }',
-      'let passwordData = FileHandle.standardInput.readDataToEndOfFile()',
-      'guard !passwordData.isEmpty else { exit(3) }',
+      'guard let service = readLine(), let account = readLine(), let password = readLine() else { exit(2) }',
+      'guard let passwordData = password.data(using: .utf8), !passwordData.isEmpty else { exit(3) }',
       'let query: [String: Any] = [',
       '  kSecClass as String: kSecClassGenericPassword,',
       '  kSecAttrService as String: service,',
@@ -302,30 +306,34 @@ export class FileSecretProvider implements SecretProvider {
   }
 
   private readSecretsFile(): Record<string, Record<string, string>> {
-    if (!safeExistsSync(this.secretsPath)) return {};
-    this.assertNotSymlink(this.secretsPath, 'secret file');
-    try {
-      return fileSecretsCatalog(this.secretsPath).load();
-    } catch {
-      return {};
-    }
+    return withSensitivePathMediation(() => {
+      if (!safeExistsSync(this.secretsPath)) return {};
+      this.assertNotSymlink(this.secretsPath, 'secret file');
+      try {
+        return fileSecretsCatalog(this.secretsPath).load();
+      } catch {
+        return {};
+      }
+    });
   }
 
   private writeSecretsFile(secrets: Record<string, Record<string, string>>): void {
-    const dir = path.dirname(this.secretsPath);
-    if (safeExistsSync(dir)) {
-      this.assertNotSymlink(dir, 'secret directory');
-    } else {
-      safeMkdir(dir, { recursive: true, mode: 0o700 });
-    }
-    safeChmodSync(dir, 0o700);
-    if (safeExistsSync(this.secretsPath)) {
-      this.assertNotSymlink(this.secretsPath, 'secret file');
-    }
-    const validated = fileSecretsCatalog(this.secretsPath).validate(secrets, this.secretsPath);
-    safeWriteFile(this.secretsPath, JSON.stringify(validated, null, 2), { mode: 0o600 });
-    // Also repair permissions of files created by older versions.
-    safeChmodSync(this.secretsPath, 0o600);
+    withSensitivePathMediation(() => {
+      const dir = path.dirname(this.secretsPath);
+      if (safeExistsSync(dir)) {
+        this.assertNotSymlink(dir, 'secret directory');
+      } else {
+        safeMkdir(dir, { recursive: true, mode: 0o700 });
+      }
+      safeChmodSync(dir, 0o700);
+      if (safeExistsSync(this.secretsPath)) {
+        this.assertNotSymlink(this.secretsPath, 'secret file');
+      }
+      const validated = fileSecretsCatalog(this.secretsPath).validate(secrets, this.secretsPath);
+      safeWriteFile(this.secretsPath, JSON.stringify(validated, null, 2), { mode: 0o600 });
+      // Also repair permissions of files created by older versions.
+      safeChmodSync(this.secretsPath, 0o600);
+    });
   }
 
   private assertNotSymlink(targetPath: string, label: string): void {

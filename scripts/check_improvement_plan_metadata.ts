@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
 import { readTextFile } from '@agent/core/foundation';
-import { safeExistsSync, safeLstat, safeWriteFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeReaddir, safeWriteFile } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -146,12 +146,21 @@ export function normalizePlanFrontmatter(
   return `${normalizedHeader}\n---${markdown.slice(end + '\n---'.length)}`;
 }
 
+/** Discover current and future monthly plans, plus the single archive tree. */
+export function discoverImprovementPlanRoots(
+  developerRoot = pathResolver.rootResolve('docs/developer')
+): string[] {
+  if (!safeExistsSync(developerRoot) || !safeLstat(developerRoot).isDirectory()) return [];
+  return safeReaddir(developerRoot)
+    .filter((name) => /^improvement-plans-(?:[0-9]{4}-(?:0[1-9]|1[0-2])|archive)$/u.test(name))
+    .map((name) => path.join(developerRoot, name))
+    .filter((root) => safeLstat(root).isDirectory())
+    .sort((left, right) => left.localeCompare(right));
+}
+
 export function listImprovementPlans(rootDir?: string): string[] {
-  const roots = rootDir
-    ? [rootDir]
-    : IMPROVEMENT_PLAN_ROOTS.map((entry) => pathResolver.rootResolve(entry.root));
-  return roots
-    .flatMap((root) => getAllFiles(root))
+  const roots = rootDir ? [rootDir] : discoverImprovementPlanRoots();
+  return [...new Set(roots.flatMap((root) => getAllFiles(root)))]
     .filter((filePath) => filePath.endsWith('.md'))
     .sort((a, b) => a.localeCompare(b));
 }
@@ -161,9 +170,13 @@ function defaultsForPlan(filePath: string): PlanFrontmatterDefaults {
   const entry = IMPROVEMENT_PLAN_ROOTS.find((candidate) =>
     relative.startsWith(`${candidate.root}/`)
   );
-  return entry
-    ? { tag: entry.tag, last_updated: entry.last_updated, status: entry.default_status }
-    : {};
+  if (entry)
+    return { tag: entry.tag, last_updated: entry.last_updated, status: entry.default_status };
+  const month = new RegExp(
+    '^docs/developer/improvement-plans-([0-9]{4}-(?:0[1-9]|1[0-2]))/',
+    'u'
+  ).exec(relative)?.[1];
+  return month ? { tag: month, last_updated: month + '-01', status: 'active' } : {};
 }
 
 export function checkImprovementPlanMetadata(): string[] {

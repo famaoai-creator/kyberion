@@ -5,7 +5,7 @@ import {
   type MeetingPlatformDescriptor,
 } from '@agent/core/meeting/meeting-platform-registry';
 
-export type MeetingProviderId = 'zoom' | 'teams' | 'google_meet';
+export type MeetingProviderId = 'zoom' | 'teams' | 'google_meet' | (string & {});
 
 export interface MeetingProviderAdapter {
   readonly id: MeetingProviderId;
@@ -26,7 +26,7 @@ class RegistryMeetingProviderAdapter implements MeetingProviderAdapter {
   readonly hosts: readonly string[];
 
   constructor(descriptor: MeetingPlatformDescriptor) {
-    this.id = descriptor.provider_id as MeetingProviderId;
+    this.id = descriptor.provider_id;
     this.platform = descriptor.id;
     this.executionProvider = descriptor.execution_provider;
     this.hosts = descriptor.hosts.map((entry) => entry.host);

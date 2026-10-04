@@ -135,6 +135,6 @@ describe('voice STT helpers', () => {
         bridge_script: 'bridge.py',
         supports: { list_voices: false, playback: true, artifact_formats: ['wav'] },
       }).adapter_id
-    ).toBe('unsupported');
+    ).toBe('python_bridge');
   });
 });

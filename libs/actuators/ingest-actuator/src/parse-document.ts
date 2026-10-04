@@ -26,9 +26,12 @@ import {
   safeReadFile,
 } from '@agent/core/secure-io';
 import { htmlToMarkdown } from '@agent/core/html-to-markdown';
+import { parseWithRegisteredDocumentParser } from './document-parser-module-loader.js';
 
 export type IngestFormat =
-  'docx' | 'pdf' | 'xlsx' | 'pptx' | 'html' | 'slack_thread' | 'markdown' | 'text';
+  'docx' | 'pdf' | 'xlsx' | 'pptx' | 'html' | 'slack_thread' | 'markdown' | 'text' | (string & {});
+
+type OfficeIngestFormat = 'docx' | 'pdf' | 'xlsx' | 'pptx';
 
 export interface IngestSourceMeta {
   source_system?: string;
@@ -256,7 +259,11 @@ export async function parseDocument(input: ParseDocumentInput): Promise<IngestIr
     case 'pdf':
     case 'xlsx':
     case 'pptx': {
-      const parsed = await readOfficeDocument(raw, input.format, input.ocr === true);
+      const parsed = await readOfficeDocument(
+        raw,
+        input.format as OfficeIngestFormat,
+        input.ocr === true
+      );
       textMarkdown = normalizeMarkdown(parsed.markdown);
       tables = parsed.tables.length > 0 ? parsed.tables : undefined;
       title = parsed.title;
@@ -276,8 +283,21 @@ export async function parseDocument(input: ParseDocumentInput): Promise<IngestIr
     case 'text':
       textMarkdown = normalizeMarkdown(raw.toString('utf8'));
       break;
-    default:
-      throw new Error(`ingest:parse_document — unsupported format: ${String(input.format)}`);
+    default: {
+      const parsed = await parseWithRegisteredDocumentParser({
+        format: input.format,
+        bytes: raw,
+        ...(input.source_path ? { source_path: input.source_path } : {}),
+        ...(input.ocr !== undefined ? { ocr: input.ocr } : {}),
+      });
+      if (!parsed) {
+        throw new Error('ingest:parse_document — unsupported format: ' + String(input.format));
+      }
+      textMarkdown = normalizeMarkdown(parsed.markdown);
+      tables = parsed.tables?.length ? parsed.tables : undefined;
+      title = parsed.title ?? extractTitle(textMarkdown);
+      break;
+    }
   }
 
   // xlsx/text never contain an H1 to extract a title from (xlsx headings are

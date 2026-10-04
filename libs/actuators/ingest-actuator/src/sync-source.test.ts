@@ -453,7 +453,7 @@ describe('ingest:sync_source (DA-03)', () => {
           source_params: {},
           cursor_path_seam: cursorsDir,
         })
-      ).rejects.toThrow(/source_system must be one of box\|slack\|confluence\|google_drive/);
+      ).rejects.toThrow(/source_system must be one of box\|confluence\|google_drive\|slack/);
       await expect(
         syncSource({
           tenant_slug: 'no-folder',

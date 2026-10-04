@@ -312,7 +312,7 @@ describe('Kyberion CLI helpers', () => {
 
   it('rejects unsupported calendar providers', async () => {
     await expect(main(['calendar', 'status', '--provider', 'unknown'])).rejects.toThrow(
-      'Unsupported calendar provider: unknown'
+      "unknown provider 'unknown'"
     );
   });
 

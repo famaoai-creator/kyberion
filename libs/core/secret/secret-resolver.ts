@@ -22,7 +22,7 @@
 import { execFileSync } from 'node:child_process';
 import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 export interface ResolveSecretInput {
   key: string;
@@ -57,14 +57,17 @@ const secretResolverSeam = createSeam<SecretResolver>({
 });
 let registeredDisposer: (() => void) | null = null;
 
-export function registerSecretResolver(resolver: SecretResolver): () => void {
+export function registerSecretResolver(
+  resolver: SecretResolver,
+  metadata: SeamProviderMetadata = {
+    provenance: 'plugin',
+    source: 'secret-resolver-extension',
+  }
+): () => void {
   if (!resolver || typeof resolver.name !== 'string' || !resolver.name.trim()) {
     throw new TypeError('Secret resolver must have a non-empty name');
   }
-  registeredDisposer = secretResolverSeam.register(resolver.name, resolver, {
-    provenance: 'builtin',
-    source: 'secret-resolver',
-  });
+  registeredDisposer = secretResolverSeam.register(resolver.name, resolver, metadata);
   return registeredDisposer;
 }
 
@@ -250,7 +253,8 @@ export function installSecretResolverIfAvailable(env: NodeJS.ProcessEnv = proces
     new ShellSecretResolver({
       command,
       ...(timeoutRaw ? { timeoutMs: parseInt(timeoutRaw, 10) } : {}),
-    })
+    }),
+    { provenance: 'generated', source: 'secret-resolver-environment-config' }
   );
   logger.success(
     '[secret-resolver] installed ShellSecretResolver from KYBERION_SECRET_RESOLVER_COMMAND'

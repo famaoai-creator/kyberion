@@ -1,3 +1,10 @@
+---
+title: LOCKFILE CHANGE ESBUILD 2026 09 28.md
+tags: [improvement-plan, 2026-09]
+last_updated: 2026-09-01
+status: active
+---
+
 # Lockfile change review — esbuild devDependency
 
 - **Date**: 2026-09-28

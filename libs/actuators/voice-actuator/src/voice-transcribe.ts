@@ -30,7 +30,7 @@ export async function transcribeVoiceSample(input: {
   model?: string;
   write_sidecar?: boolean;
   prefer_timestamps?: boolean;
-  backend?: 'auto' | 'bridge' | 'fluid_audio' | 'mlx_whisper';
+  backend?: string;
   allow_synthetic?: boolean;
   /**
    * Governed selection purpose (accuracy / latency / privacy); only used with
@@ -208,19 +208,36 @@ export async function transcribeVoiceSample(input: {
           (mlxError ? `; ${(mlxError as Error).message}` : '')
       );
     }
-  } else if (backendPreference === 'mlx_whisper') {
-    transcribeWithMlxWhisper();
-  } else if (backendPreference === 'fluid_audio') {
-    const bridge = usableBridges.find((candidate) => candidate.name === 'fluid-audio-parakeet');
-    if (!bridge) {
-      throw new Error(
-        'FluidAudio/Parakeet bridge is not installed; set KYBERION_FLUID_AUDIO_STT_COMMAND.'
-      );
-    }
-    await transcribeWithBridge(bridge);
   } else if (backendPreference === 'bridge') {
     for (const bridge of [...timestampBridges, ...textBridges]) {
       await transcribeWithBridge(bridge);
+    }
+  } else if (backendPreference !== 'auto') {
+    // Registered provider IDs take precedence over legacy aliases and the
+    // direct MLX fallback so extensions can claim any explicit backend name.
+    const bridge = usableBridges.find((candidate) => candidate.name === backendPreference);
+    if (bridge) {
+      if (!(await transcribeWithBridge(bridge))) {
+        throw new Error(
+          `Requested STT backend '${backendPreference}' failed: ${errors.at(-1)?.message || 'no transcription result'}.`
+        );
+      }
+    } else if (backendPreference === 'mlx_whisper') {
+      transcribeWithMlxWhisper();
+    } else if (backendPreference === 'fluid_audio') {
+      const fluidBridge = usableBridges.find(
+        (candidate) => candidate.name === 'fluid-audio-parakeet'
+      );
+      if (!fluidBridge) {
+        throw new Error(
+          'FluidAudio/Parakeet bridge is not installed; set KYBERION_FLUID_AUDIO_STT_COMMAND.'
+        );
+      }
+      await transcribeWithBridge(fluidBridge);
+    } else {
+      throw new Error(
+        `Requested STT backend '${backendPreference}' is not registered. Available: ${usableBridges.map((candidate) => candidate.name).join(', ') || 'none'}.`
+      );
     }
   } else if (preferTimestamps) {
     for (const bridge of timestampBridges) {

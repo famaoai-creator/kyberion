@@ -1,3 +1,10 @@
+---
+title: ORPHAN DECISIONS 2026 10 01.md
+tags: [improvement-plan, 2026-10]
+last_updated: 2026-10-01
+status: active
+---
+
 # Orphan decisions — libs/core (OW-01 / OW-02), 2026-10-01
 
 Scope: COHERENCE_AUDIT_PLAN_2026-10-01 items OW-01 (subsystems) and OW-02 (modules). Each

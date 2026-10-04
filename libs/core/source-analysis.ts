@@ -14,6 +14,7 @@ import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { isRecord } from './foundation/primitives.js';
 import { clamp, readTextFile } from './foundation/text.js';
 import { parseTestInventory } from './software-quality.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 const SOURCE_EXTENSIONS = new Set([
   '.c',
@@ -843,107 +844,63 @@ export function validateEngineeringArtifacts(bundle: EngineeringArtifactBundle):
   }
 }
 
+interface TerraformProviderProposalPreset {
+  id: string;
+  required_provider_lines: string[];
+  provider_configuration_lines: string[];
+  resource_templates?: Record<string, string[]>;
+}
+
+const terraformProviderProposalPresets = defineCatalog<{
+  version: string;
+  providers: TerraformProviderProposalPreset[];
+}>({
+  id: 'terraform-provider-proposal-presets',
+  path: pathResolver.knowledge('product/governance/terraform-provider-proposal-presets.json'),
+  schema: pathResolver.knowledge('product/schemas/terraform-provider-proposal-presets.schema.json'),
+});
+
 function renderTerraformProposal(provider: string, candidateResources: string[]): string {
-  const providerBlocks: Record<string, string[]> = {
-    aws: ['    aws = {', '      source  = "hashicorp/aws"', '      version = "~> 5.0"', '    }'],
-    azurerm: [
-      '    azurerm = {',
-      '      source  = "hashicorp/azurerm"',
-      '      version = "~> 4.0"',
-      '    }',
-    ],
-    google: [
-      '    google = {',
-      '      source  = "hashicorp/google"',
-      '      version = "~> 6.0"',
-      '    }',
-    ],
-    kubernetes: [
-      '    kubernetes = {',
-      '      source  = "hashicorp/kubernetes"',
-      '      version = "~> 2.0"',
-      '    }',
-    ],
-  };
+  const normalizedProvider = provider.trim().toLowerCase();
+  const displayProvider =
+    normalizedProvider.replace(/[^a-z0-9_-]/giu, '_').slice(0, 128) || '(unspecified)';
+  const preset = terraformProviderProposalPresets
+    .load()
+    .providers.find((candidate) => candidate.id === normalizedProvider);
   const lines = [
     'terraform {',
     '  required_version = ">= 1.6.0"',
-    ...(providerBlocks[provider]
-      ? ['  required_providers {', ...providerBlocks[provider], '  }']
-      : [
-          `  # Provider ${provider} is not in the built-in registry mapping; add its reviewed source and version.`,
-        ]),
+    ...(preset
+      ? ['  required_providers {', ...preset.required_provider_lines, '  }']
+      : ['  # Provider ' + displayProvider + ' is not in the reviewed preset catalog.']),
     '}',
     '',
-    `# Target provider: ${provider}`,
+    '# Target provider: ' + displayProvider,
     '# Generated as a proposal only. Review every value before init, plan, or apply.',
   ];
-
-  if (provider === 'aws') {
-    lines.push(
-      '',
-      'variable "aws_region" {',
-      '  type        = string',
-      '  description = "AWS region selected during review."',
-      '}',
-      '',
-      'provider "aws" {',
-      '  region = var.aws_region',
-      '}'
-    );
-  } else if (provider === 'azurerm') {
-    lines.push('', 'provider "azurerm" {', '  features {}', '}');
-  } else if (provider === 'google') {
-    lines.push(
-      '',
-      'variable "gcp_project" {',
-      '  type        = string',
-      '  description = "GCP project selected during review."',
-      '}',
-      '',
-      'variable "gcp_region" {',
-      '  type        = string',
-      '  description = "GCP region selected during review."',
-      '}',
-      '',
-      'provider "google" {',
-      '  project = var.gcp_project',
-      '  region  = var.gcp_region',
-      '}'
-    );
-  } else if (provider === 'kubernetes') {
-    lines.push('', 'provider "kubernetes" {}');
-  }
-
+  if (preset?.provider_configuration_lines.length)
+    lines.push('', ...preset.provider_configuration_lines);
   const resourceTypes = unique(
     candidateResources
       .filter((resource) => resource.startsWith('resource:'))
       .map((resource) => resource.slice('resource:'.length))
   );
-  if (provider === 'aws' && resourceTypes.includes('aws_s3_bucket')) {
-    lines.push(
-      '',
-      '# Starter generated from the detected resource signal; review naming, encryption, and policy.',
-      'variable "source_detected_bucket_name" {',
-      '  type        = string',
-      '  description = "Globally unique bucket name selected during review."',
-      '}',
-      '',
-      'resource "aws_s3_bucket" "source_detected" {',
-      '  bucket = var.source_detected_bucket_name',
-      '}'
-    );
+  let emittedResourceTemplate = false;
+  for (const resourceType of resourceTypes) {
+    const template = preset?.resource_templates?.[resourceType];
+    if (!template) continue;
+    lines.push('', ...template);
+    emittedResourceTemplate = true;
   }
-
+  if (resourceTypes.some((resourceType) => !preset?.resource_templates?.[resourceType])) {
+    if (emittedResourceTemplate) lines.push('');
+    lines.push('# Additional detected resources require a reviewed provider-specific module.');
+  }
   lines.push('', '# Candidate signals:');
-  lines.push(...candidateResources.map((resource) => `# - ${resource}`));
-  if (resourceTypes.some((resource) => resource !== 'aws_s3_bucket' || provider !== 'aws')) {
-    lines.push('# Additional detected resources require a provider-specific reviewed module.');
-  }
+  lines.push(...candidateResources.map((resource) => '# - ' + resource));
   lines.push('');
   return lines.join('\n');
 }
-
 export function compileEngineeringArtifacts(input: {
   analysis: SourceAnalysisIr;
   projectId?: string;

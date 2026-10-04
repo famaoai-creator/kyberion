@@ -2,6 +2,7 @@
 title: エージェントインスタンスプール — 同一モデル複数 NHI によるスケールアウト
 last_updated: 2026-09-28
 tags: [workforce, NHI, agent-pool, capacity, TC]
+status: active
 ---
 
 # Agent Instance Pool Plan

@@ -3,7 +3,7 @@ import { ocrImage } from '../ocr-bridge.js';
 import type { OcrRequest, OcrResult, OcrRoutingMode } from '../ocr-types.js';
 import { OsAccessibilityDetector } from '../virtual/os-accessibility-detector.js';
 import { PixelRegionDetector } from '../pixel-region-detector.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 import {
   resolveSeamProviderDecision,
   type SeamProviderCandidate,
@@ -99,16 +99,22 @@ const uiElementDetectorSeam = createSeam<UiElementDetector>({
 const detectorDisposers = new Map<string, () => void>();
 let builtinsRegistered = false;
 
-export function registerUiElementDetector(detector: UiElementDetector): () => void {
+export function registerUiElementDetector(
+  detector: UiElementDetector,
+  metadata: SeamProviderMetadata = {
+    provenance: 'plugin',
+    source: 'ui-element-detector-extension',
+  }
+): () => void {
   const id = String(detector.id || '').trim();
   if (!id) throw new Error('UiElementDetector.id is required');
-  detectorDisposers.get(id)?.();
-  const disposer = uiElementDetectorSeam.register(id, detector, {
-    provenance: 'builtin',
-    source: 'ui-element-detector',
-  });
-  detectorDisposers.set(id, disposer);
-  return disposer;
+  const disposeFromSeam = uiElementDetectorSeam.register(id, detector, metadata);
+  const dispose = () => {
+    disposeFromSeam();
+    if (detectorDisposers.get(id) === dispose) detectorDisposers.delete(id);
+  };
+  detectorDisposers.set(id, dispose);
+  return dispose;
 }
 
 export function listUiElementDetectors(): UiElementDetector[] {
@@ -172,7 +178,12 @@ export function ensureBuiltinUiElementDetectors(): void {
     new OsAccessibilityDetector(),
     new PixelRegionDetector(),
   ]) {
-    if (!registered.has(detector.id)) registerUiElementDetector(detector);
+    if (!registered.has(detector.id)) {
+      registerUiElementDetector(detector, {
+        provenance: 'builtin',
+        source: 'ui-element-detector',
+      });
+    }
   }
   builtinsRegistered = true;
 }

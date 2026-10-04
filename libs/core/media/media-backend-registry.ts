@@ -49,6 +49,7 @@ export interface MediaBackendRecord {
   endpoint_env?: string;
   command?: string;
   args?: string[];
+  video_render?: { argument_template: string[]; preload_script?: string };
   /** Legacy backend ids governed by the registry that resolve to this record. */
   aliases?: string[];
   /**
