@@ -633,6 +633,12 @@ function buildProposalNarrativeOutline(
               section.section_id === 'decision' && tokens.tone ? `Tone: ${tokens.tone}` : undefined,
             ].filter(Boolean),
             visual: supporting.title || section.visual || 'supporting visual',
+            // What the presenter says; rendered as PowerPoint speaker notes.
+            speaker_notes:
+              sanitizeProposalText(
+                payloadSection?.speaker_notes ?? payloadSection?.notes ?? section.speaker_notes,
+                ''
+              ) || undefined,
             media_kind: section.media_kind || 'content',
             layout_key: section.layout_key || 'title-body',
             semantic_type:
