@@ -90,4 +90,25 @@ describe('createVirtualMediaDeviceControlBridge', () => {
     expect(result.host_plan?.audio?.length).toBeGreaterThan(0);
     expect(result.host_plan?.camera?.length).toBeGreaterThan(0);
   });
+
+  it('routes request camera preferences and rejects unavailable registered backends', async () => {
+    const inventory = createVirtualDeviceInventoryBridge({ command_runner: makeCommandRunner() });
+    const bridge = createVirtualMediaDeviceControlBridge({ inventory_bridge: inventory });
+    const result = await bridge.control({
+      action: 'select',
+      scope: 'camera',
+      preferred_camera_backend: 'stub',
+      camera_device_preference: 'FaceTime',
+    });
+    expect(result.status).toBe('succeeded');
+    expect(result.selection?.camera?.backend).toBe('stub');
+    expect(result.selection?.camera?.selected_camera).toBe('FaceTime HD Camera');
+    const rejected = await bridge.control({
+      action: 'select',
+      scope: 'camera',
+      preferred_camera_backend: 'unregistered-camera',
+    });
+    expect(rejected.status).toBe('blocked');
+    expect(rejected.selection?.camera?.reason).toContain('unknown');
+  });
 });

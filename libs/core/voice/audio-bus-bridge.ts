@@ -7,9 +7,9 @@
 import type { AudioBus } from './audio-bus.js';
 import { StubAudioBus } from './audio-bus.js';
 import { getRegisteredEnv } from '../foundation/env.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
-export type AudioBusId = 'stub' | 'blackhole' | 'pulseaudio';
+export type AudioBusId = 'stub' | 'blackhole' | 'pulseaudio' | (string & {});
 
 export interface AudioBusCreateOptions {
   input_device_uid?: string;
@@ -33,16 +33,22 @@ const audioBusSeam = createSeam<AudioBusBridge>({
 
 const registeredDisposers = new Map<string, () => void>();
 
-export function registerAudioBusBridge(bridge: AudioBusBridge): () => void {
+export function registerAudioBusBridge(
+  bridge: AudioBusBridge,
+  metadata: SeamProviderMetadata = {
+    provenance: 'plugin',
+    source: 'audio-bus-extension',
+  }
+): () => void {
   const id = String(bridge.bridge_id || '').trim();
   if (!id) throw new Error('AudioBusBridge.bridge_id is required');
-  registeredDisposers.get(id)?.();
-  const disposer = audioBusSeam.register(id, bridge, {
-    provenance: 'builtin',
-    source: 'audio-bus-bridge',
-  });
-  registeredDisposers.set(id, disposer);
-  return disposer;
+  const disposeFromSeam = audioBusSeam.register(id, bridge, metadata);
+  const dispose = () => {
+    disposeFromSeam();
+    if (registeredDisposers.get(id) === dispose) registeredDisposers.delete(id);
+  };
+  registeredDisposers.set(id, dispose);
+  return dispose;
 }
 
 export function resetAudioBusBridges(): void {
