@@ -2140,9 +2140,6 @@
     "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
-    "libs/core/windows-os-automation.ts#runWindowsPointerActions": [
-      "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
-    ],
     "presence/displays/operator-surface/src/lib/view.ts#<module>": [
       "module specifier '@agent/shared-ui/vanilla' does not resolve to an analysed source (presence/displays/operator-surface/src/lib/view.ts#<module>)"
     ],
@@ -2643,7 +2640,6 @@
         "libs/core/virtual/virtual-camera-injection-bridge.ts#VirtualCameraInjectionBridgeImpl",
         "libs/core/virtual/virtual-camera-injection-bridge.ts#isAvailableCommand",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -2887,7 +2883,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -3265,7 +3260,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -3484,7 +3478,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -3706,7 +3699,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -3919,7 +3911,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -4259,7 +4250,6 @@
         "libs/core/virtual/virtual-camera-injection-bridge.ts#VirtualCameraInjectionBridgeImpl",
         "libs/core/virtual/virtual-camera-injection-bridge.ts#isAvailableCommand",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -4561,7 +4551,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
         "presence/displays/operator-surface/src/lib/view.ts#<module>",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
@@ -4795,7 +4784,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -5007,7 +4995,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -5206,7 +5193,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -5275,8 +5261,8 @@
           ]
         }
       },
-      "unresolved_sites": ["libs/core/windows-os-automation.ts#runWindowsPointerActions"],
-      "policy_roles_not_reachable": []
+      "unresolved_sites": [],
+      "policy_roles_not_reachable": ["knowledge_steward"]
     },
     "system_configurator": {
       "entries": ["scripts/config_mission.ts", "scripts/run_pipeline.ts"],
@@ -5467,7 +5453,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -5685,7 +5670,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
@@ -5925,7 +5909,6 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
         "presence/displays/terminal-hud/src/actions/exec.ts#defaultExec",
         "presence/displays/terminal-hud/src/actions/schedule-actions.ts#runScheduleNow",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
@@ -6154,7 +6137,6 @@
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend",
         "libs/core/virtual/virtual-audio-input-recording-bridge.ts#VirtualAudioInputRecordingBridgeImpl",
         "libs/core/voice/speech-to-text-bridge.ts#ShellSpeechToTextBridge",
-        "libs/core/windows-os-automation.ts#runWindowsPointerActions",
         "satellites/shared/supervise-child.ts#spawnSupervisedChild",
         "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce",
         "scripts/backup.ts#runRequired",
