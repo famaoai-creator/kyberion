@@ -79,6 +79,9 @@ governs each one in the supervisor process, under the charter role
    name a cheaper policy action. Then `allowed_work_shapes` (default `task_session`,
    `direct_reply`), handoff acceptance, and `max_concurrent_delegations`
    (default 3). Open WorkItems and parked decisions both count toward the cap.
+   A tenant-scoped dot also needs its tenant registered and operational, so
+   the operator is never asked to approve work that cannot run. Every bound
+   except the cap is re-checked when an approved action settles.
 2. **Decision**: the `autonomous-ops-gate` verdict is raised to the strictest
    of `decisions.default_decision`, the floor learned from operator
    rejections, and the dot's own `requested_decision`. A charter
@@ -93,7 +96,13 @@ governs each one in the supervisor process, under the charter role
    delivered to the inbox never starts its clock, so it falls back to a human
    decision. Silence counts as consent only when the operator could actually
    hear it. Waiting decisions count toward `max_concurrent_delegations`, so a
-   dot pauses proposing while that many wait. Message content stays local by
+   dot pauses proposing while that many wait — until a decision waits past
+   `decisions.decision_expiry_minutes` (default 24 h) or its own request
+   expiry. The charter expiry never cuts a live veto window short; it
+   applies once the card has no window or has fallen back to a human
+   decision. Then settlement expires the request and declines the action as
+   `expired`. That frees the slot, and expiry does not raise the learned
+   floor (an unattended inbox is not a rejection). Message content stays local by
    default; devices subscribed to Web Push still get a content-free wake-up.
 4. **Outcome**: proceed creates a `ready` WorkItem. Parked decisions are
    settled each sweep (`settleDotParkedActions`): approved runs after the
@@ -106,7 +115,12 @@ governs each one in the supervisor process, under the charter role
 
 **Identity**: every effect carries `dot:<dot_id>`. It appears in WorkItem
 metadata, as the approval requester, as the audit-chain `agentId`/`actor`,
-and in notification titles. A dot's authority is still exactly its role.
+and in notification titles. The wake ledger keeps a bounded `summary` of the
+dot's own words (proposal block removed), shown as "last said" in
+`dot status`, so a wake that proposed nothing still explains itself. The
+ledger is a shared system-floor file, so tenant-scoped dots never write a
+summary. A dot's
+authority is still exactly its role.
 Per-dot secret scoping beyond the role is not implemented.
 
 **Teams**: `team.responsibilities` are exclusive; activation is refused

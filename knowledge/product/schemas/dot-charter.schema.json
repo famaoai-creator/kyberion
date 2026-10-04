@@ -218,6 +218,12 @@
           "description": "Floor for autonomous-ops-gate outcomes: an action scoring 'auto' may be raised to this level, never lowered."
         },
         "veto_window_minutes": { "type": "integer", "minimum": 0 },
+        "decision_expiry_minutes": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 10080,
+          "description": "How long a proposal may wait on the operator before it expires and frees its delegation slot (default 1440). Expiry is not a rejection: it does not raise the learned floor."
+        },
         "escalate_channel": {
           "enum": ["slack", "telegram", "discord", "imessage", "surface"],
           "description": "Channel used when the gate returns 'approve'."
