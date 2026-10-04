@@ -21,12 +21,22 @@ vi.mock('@agent/core/organization/organization-operating-model-operations', () =
   loadOrganizationIncident: mocks.loadIncident,
   saveOrganizationIncident: mocks.saveIncident,
 }));
-vi.mock('@agent/core/path-resolver', () => ({
-  pathResolver: {
+vi.mock('@agent/core/path-resolver', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/path-resolver')>();
+  const overrides: Record<string, unknown> = {
     rootDir: () => '/repo',
     knowledge: (relative = '') => `/repo/knowledge/${relative}`,
-  },
-}));
+  };
+  return {
+    ...actual,
+    pathResolver: new Proxy(actual.pathResolver, {
+      get: (target, key, receiver) =>
+        typeof key === 'string' && key in overrides
+          ? overrides[key]
+          : Reflect.get(target, key, receiver),
+    }),
+  };
+});
 vi.mock('@agent/core/organization/organization-interventions', () => ({
   createOrganizationIncident: (input: Record<string, unknown>) => ({
     incident_id: input.incidentId,
@@ -42,8 +52,10 @@ vi.mock('@agent/core/scope-context', () => ({
 }));
 vi.mock('./run_pipeline.js', () => ({ executePipelineFile: mocks.pipeline }));
 
+import { currentExecutionScope } from '@agent/core/foundation';
 import {
   executeOrganizationOperation,
+  executeScheduledOrganizationOperation,
   tickOrganizationOperations,
 } from './organization_operation_execute.js';
 
@@ -165,6 +177,74 @@ describe('organization operation execution', () => {
         expect.objectContaining({ operation_id: 'OP-1' })
       );
       expect(mocks.pipeline).not.toHaveBeenCalled();
+    } finally {
+      output.mockRestore();
+    }
+  });
+
+  it('runs a scheduled pipeline inside the operation tenant and organization scope', async () => {
+    const output = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const scopes: unknown[] = [];
+    mocks.loadOperation.mockReturnValue({
+      ...operation,
+      tier: 'confidential',
+      tenant_slug: 'acme',
+    });
+    mocks.pipeline.mockImplementation(async () => {
+      scopes.push(currentExecutionScope());
+      return { trace: { traceId: 'T-1' }, results: [] };
+    });
+    try {
+      await executeScheduledOrganizationOperation({
+        organizationId: 'ORG-1',
+        operationId: 'OP-1',
+        runId: 'scheduled-1',
+        tier: 'confidential',
+        tenantSlug: 'acme',
+      });
+      expect(scopes).toEqual([
+        expect.objectContaining({
+          tenantBound: true,
+          tenantSlug: 'acme',
+          organizationId: 'ORG-1',
+          assumedRole: 'organization_operator',
+        }),
+      ]);
+      expect(currentExecutionScope()).toBeUndefined();
+      expect(mocks.saveRun).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'succeeded', tenant_slug: 'acme' })
+      );
+    } finally {
+      output.mockRestore();
+    }
+  });
+
+  it('never binds or persists the shared partition as a tenant for a scheduled run', async () => {
+    const output = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const scopes: Array<ReturnType<typeof currentExecutionScope>> = [];
+    mocks.pipeline.mockImplementation(async () => {
+      scopes.push(currentExecutionScope());
+      return { trace: { traceId: 'T-2' }, results: [] };
+    });
+    try {
+      await executeScheduledOrganizationOperation({
+        organizationId: 'ORG-1',
+        operationId: 'OP-1',
+        runId: 'scheduled-2',
+        tier: 'public',
+        tenantSlug: 'shared',
+      });
+      expect(scopes[0]).toMatchObject({ organizationId: 'ORG-1', tenantBound: false });
+      expect(scopes[0]?.tenantSlug).toBeUndefined();
+      for (const [record] of [...mocks.saveRun.mock.calls, ...mocks.saveState.mock.calls]) {
+        expect(record).not.toHaveProperty('tenant_slug');
+      }
+      expect(mocks.pipeline).toHaveBeenCalledWith(
+        'pipelines/example.json',
+        expect.objectContaining({
+          context: expect.objectContaining({ tenant_slug: undefined }),
+        })
+      );
     } finally {
       output.mockRestore();
     }

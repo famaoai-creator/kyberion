@@ -1,9 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { appendJsonLine } from '../foundation/json.js';
 import { safeMkdir, safeRmSync } from '../secure-io.js';
 import type { DotCharter } from './dot-charter.js';
 import {
+  DOT_OUTCOME_MAX_WAIT_MS,
   dotOutcomeStats,
   dotOutcomeVerdict,
   dotOutcomesPromptLines,
@@ -12,9 +14,10 @@ import {
   scheduleDotOutcomeChecks,
   type DotOutcomeDeps,
 } from './dot-outcomes.js';
+import { DOT_SIGNAL_LEDGER_PATH } from './dot-feedback.js';
 import { DOT_WORK_RESULTS_FILE, dotStatePath, type DotWorkResultRow } from './dot-state-paths.js';
 
-const TEST_ROOT = 'active/shared/tmp/dot-outcomes-tests';
+const TEST_ROOT = `active/shared/tmp/dot-outcomes-tests-${randomUUID()}`;
 const T0 = new Date('2026-10-04T10:00:00Z');
 const at = (min: number) => new Date(T0.getTime() + min * 60_000);
 
@@ -58,7 +61,7 @@ function result(ref: string, over: Partial<DotWorkResultRow> = {}): DotWorkResul
     dot_id: 'ops',
     work_item_id: `wi-${ref}`,
     action_ref: ref,
-    mode: 'delegated',
+    mode: 'goal_turn',
     status: 'done',
     summary: 's',
     started_at: T0.toISOString(),
@@ -154,19 +157,25 @@ describe('dot outcomes', () => {
     expect((await evaluateDueDotOutcomes(c, deps))[0].verdict).toBe('regressed');
   });
 
-  it('signal effects use before/after health; missing data is unmeasurable', async () => {
+  it('signal effects judge the claim-time snapshot against a later measurement', async () => {
     const c = charter();
-    seed(c, [result('s1'), result('s2')]);
-    let health: number | undefined = 0;
+    seed(c, [
+      result('s1', { signal_snapshot: { api: 0 } }),
+      result('s2', { signal_snapshot: { api: 0 } }),
+      // No pre-action snapshot: measuring "before" now would see the action's own effect.
+      result('s4'),
+    ]);
     const deps = base(at(60), {
       expectedEffectOf: () => ({ signal: 'api', direction: 'increase' }),
-      measureSignal: () => health,
+      // The action already fixed the signal by the time outcomes are scheduled.
+      measureSignal: () => 1,
       measureKrs: async () => ({}),
     });
-    scheduleDotOutcomeChecks(c, deps);
-    health = 1;
+    const scheduled = scheduleDotOutcomeChecks(c, deps);
+    expect(scheduled.map((p) => p.signal_before)).toEqual([0, 0, undefined]);
     const rows = await evaluateDueDotOutcomes(c, deps);
-    expect(rows.every((r) => r.verdict === 'improved')).toBe(true);
+    const byRef = Object.fromEntries(rows.map((r) => [r.action_ref, r.verdict]));
+    expect(byRef).toEqual({ s1: 'improved', s2: 'improved', s4: 'unmeasurable' });
 
     const c2 = charter();
     safeRmSync(TEST_ROOT, { recursive: true, force: true });
@@ -174,5 +183,64 @@ describe('dot outcomes', () => {
     const d2 = base(at(60), { measureKrs: async () => ({ errors: 1 }) });
     scheduleDotOutcomeChecks(c2, d2);
     expect((await evaluateDueDotOutcomes(c2, d2))[0].verdict).toBe('unmeasurable');
+  });
+
+  it('never schedules read-only delegated results', () => {
+    const c = charter();
+    seed(c, [result('d1', { mode: 'delegated' }), result('g1')]);
+    expect(scheduleDotOutcomeChecks(c, base(T0)).map((p) => p.action_ref)).toEqual(['g1']);
+  });
+
+  it('keeps a check pending until a measurement after completion, then expires it', async () => {
+    const c = charter({ outcome_settle_minutes: 0 });
+    seed(c, [result('a1', { completed_at: at(30).toISOString() })]);
+    const ledger = path.join(TEST_ROOT, DOT_SIGNAL_LEDGER_PATH);
+    safeMkdir(path.dirname(ledger), { recursive: true });
+    // Only a measurement taken before the action completed exists.
+    appendJsonLine(ledger, {
+      dot_id: 'ops',
+      signal: 'api',
+      healthy: true,
+      measured_at: at(20).toISOString(),
+    });
+    const deps = (now: Date) =>
+      base(now, {
+        expectedEffectOf: () => ({ signal: 'api', direction: 'increase' }),
+        readResults: () => [
+          result('a1', { completed_at: at(30).toISOString(), signal_snapshot: { api: 0 } }),
+        ],
+      });
+    scheduleDotOutcomeChecks(c, deps(at(30)));
+    // No measurement after completed_at -> no verdict yet.
+    const stale = await evaluateDueDotOutcomes(c, deps(at(40)));
+    expect(stale).toEqual([]);
+    // Past the max wait with still no fresh measurement -> unmeasurable, once.
+    const late = at(30 + DOT_OUTCOME_MAX_WAIT_MS / 60_000 + 1);
+    const expired = await evaluateDueDotOutcomes(c, deps(late));
+    expect(expired).toEqual([
+      expect.objectContaining({
+        action_ref: 'a1',
+        verdict: 'unmeasurable',
+        ref: { signal: 'api' },
+      }),
+    ]);
+    expect(await evaluateDueDotOutcomes(c, deps(late))).toEqual([]);
+  });
+
+  it('a failed KR re-measure retries instead of closing the check', async () => {
+    const c = charter();
+    seed(c, [result('a1')]);
+    scheduleDotOutcomeChecks(c, base(T0));
+    const failing = base(at(60), {
+      measureKrs: async () => {
+        throw new Error('metric source down');
+      },
+    });
+    expect(await evaluateDueDotOutcomes(c, failing)).toEqual([]);
+    const recovered = await evaluateDueDotOutcomes(
+      c,
+      base(at(70), { measureKrs: async () => ({ errors: 4, cov: 50 }) })
+    );
+    expect(recovered).toEqual([expect.objectContaining({ action_ref: 'a1', verdict: 'improved' })]);
   });
 });

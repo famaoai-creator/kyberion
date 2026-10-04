@@ -197,7 +197,11 @@ the mission state `context.mission_artifact_promotion`.
 a published report in that organization's own scope
 (`…/<org>/artifacts/report/digests/<YYYY-MM-DD>.json`). The cross-tenant digest
 itself is never stored as one file, so a tenant viewer only sees its own
-organizations' digests.
+organizations' digests. The standup and retro cadences (`core:organization_standup` /
+`core:organization_retro`) file under `…/report/standups/` and
+`…/report/retros/` the same way, their notifications land in the sovereign
+operator inbox like the daily digest, and the pipeline context and trace carry
+only counts and artifact paths — never the joined all-tenant text.
 
 ## 4. Migration status
 

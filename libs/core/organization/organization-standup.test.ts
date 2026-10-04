@@ -4,6 +4,7 @@ import type { DotActionRecord } from '../dot/dot-dispatch.js';
 import type { KrMeasurementRow } from '../dot/dot-state-paths.js';
 import {
   buildOrganizationStandup,
+  defaultStandupWindowHours,
   renderOrganizationStandupText,
   runOrganizationStandup,
   type OrganizationCadenceDeps,
@@ -230,5 +231,16 @@ describe('runOrganizationStandup', () => {
     );
     expect(result.standups[0].persistence).toMatchObject({ path: 'active/x.json', notified: true });
     expect(audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'organization.standup' }));
+  });
+});
+
+describe('defaultStandupWindowHours', () => {
+  it('reaches back to the previous weekday standup', () => {
+    // 2026-10-05 is a Monday in Asia/Tokyo (09:00 local).
+    expect(defaultStandupWindowHours(NOW, 'Asia/Tokyo')).toBe(72);
+    expect(defaultStandupWindowHours(new Date('2026-10-06T00:00:00.000Z'), 'Asia/Tokyo')).toBe(24);
+    expect(defaultStandupWindowHours(new Date('2026-10-04T00:00:00.000Z'), 'Asia/Tokyo')).toBe(48);
+    // Still Sunday evening in UTC.
+    expect(defaultStandupWindowHours(new Date('2026-10-04T23:00:00.000Z'), 'UTC')).toBe(48);
   });
 });
