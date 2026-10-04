@@ -8,9 +8,9 @@
  * `/api/progress`) — this file never hardcodes a surface port or host, and
  * never invents data the server did not send.
  *
- * The turn list persists in `sessionStorage` (last 20 turns, one random
- * `session_id` per tab) so a reload keeps the conversation — this is
- * intentionally per-tab, not a server-side conversation log.
+ * Conversation history is server-owned and shared with Concierge. Older
+ * per-tab history is retained locally as a read-only archive, never replayed.
+ * Hearing sessions keep their independent legacy IDs.
  *
  * Voice: the mic button and the header hands-free toggle both use the
  * browser's `SpeechRecognition` (ported, in a much smaller form, from
@@ -43,7 +43,7 @@
 
   var TURNS_STORAGE_KEY = 'kyberion.ask.turns';
   var SESSION_STORAGE_KEY = 'kyberion.ask.session_id';
-  var MAX_TURNS = 20;
+  var MAX_TURNS = 100;
 
   // `/api/ask-vocabulary`'s `texts` object is keyed by the fully-qualified
   // `namespace:key` form (same as `/api/ui-vocabulary` / `/api/home-vocabulary`).
@@ -131,19 +131,18 @@
     }
   }
 
-  function saveTurns(turns) {
-    try {
-      window.sessionStorage.setItem(TURNS_STORAGE_KEY, JSON.stringify(turns.slice(-MAX_TURNS)));
-    } catch (err) {
-      // Best effort only — the conversation still works for this page view.
-    }
-  }
-
   var state = {
     vocab: {},
     locale: 'en',
     sessionId: readSessionId(),
-    turns: loadTurns(),
+    turns: [],
+    conversationId: null,
+    historyState: 'loading',
+    storageVerified: false,
+    pending: 0,
+    errorKey: null,
+    setupHref: '/onboarding',
+    pendingRequest: null,
     sending: false,
     listening: false,
     handsFree: false,
@@ -377,8 +376,8 @@
       .slice(0, 3)
       .map(function (item) {
         return (
-          '<li><a class="ask-recent-row" href="/progress#' +
-          encodeURIComponent(item.id) +
+          '<li><a class="ask-recent-row" href="' +
+          escapeHtml(scopedUrl('/progress#' + encodeURIComponent(item.id))) +
           '">' +
           escapeHtml(item.title) +
           '</a></li>'
@@ -426,6 +425,13 @@
       '</div>' +
       shapeHtml +
       actionsHtml +
+      (turn.role === 'user' && typeof turn.id === 'string' && /^[a-f0-9-]{36}-user$/.test(turn.id)
+        ? '<a href="' +
+          escapeHtml(scopedUrl('/progress?request=' + encodeURIComponent(turn.id.slice(0, -5)))) +
+          '">' +
+          escapeHtml(vt(state.vocab, 'front_desk:nav_progress')) +
+          '</a>'
+        : '') +
       '</li>'
     );
   }
@@ -470,6 +476,7 @@
     renderTurns();
     renderHearing();
     syncAvatar();
+    renderConversationStatus();
   }
 
   // PA-09: page state -> avatar controller (the avatar overlays `speaking`
@@ -814,7 +821,6 @@
   function pushTurn(turn) {
     state.turns.push(turn);
     if (state.turns.length > MAX_TURNS) state.turns = state.turns.slice(-MAX_TURNS);
-    saveTurns(state.turns);
   }
 
   function speakReply(text) {
@@ -834,7 +840,7 @@
   }
 
   function refreshRecent() {
-    fetchJson('/api/progress')
+    fetchJson(scopedUrl('/api/progress'))
       .then(function (result) {
         if (result.ok && result.body && result.body.ok) {
           renderRecent(result.body.active || []);
@@ -846,46 +852,267 @@
       });
   }
 
+  function scopedUrl(path) {
+    return window.KyberionPrefs && window.KyberionPrefs.scopedUrl
+      ? window.KyberionPrefs.scopedUrl(path)
+      : path;
+  }
+
+  function draftKey() {
+    return state.conversationId ? 'kyberion.ask.draft.' + state.conversationId : null;
+  }
+  function saveDraft() {
+    var input = document.getElementById('ask-input');
+    var key = draftKey();
+    if (!key || !input) return;
+    try {
+      window.sessionStorage.setItem(key, input.value);
+    } catch (err) {
+      /* Browser-only draft. */
+    }
+  }
+
+  function renderConversationStatus() {
+    var host = document.getElementById('conversation-status');
+    if (!host) return;
+    var key =
+      state.errorKey ||
+      (state.historyState === 'loading'
+        ? 'concierge:dock.history.loading'
+        : state.historyState === 'failed'
+          ? 'concierge:dock.history.failed'
+          : state.pending
+            ? 'concierge:dock.history.pending'
+            : null);
+    var send = document.getElementById('ask-send');
+    if (send)
+      send.disabled = state.sending || state.historyState !== 'ready' || !state.storageVerified;
+    host.classList.toggle('hidden', !key);
+    if (!key) {
+      host.innerHTML = '';
+      return;
+    }
+    host.innerHTML =
+      '<p>' +
+      escapeHtml(vt(state.vocab, key)) +
+      '</p>' +
+      '<button type="button" class="kb-btn kb-btn--secondary" id="conversation-reload">' +
+      escapeHtml(vt(state.vocab, 'concierge:dock.history.retry')) +
+      '</button> ' +
+      '<a href="' +
+      escapeHtml(scopedUrl('/progress')) +
+      '">' +
+      escapeHtml(vt(state.vocab, 'front_desk:nav_progress')) +
+      '</a> ' +
+      '<a href="' +
+      escapeHtml(scopedUrl(state.setupHref)) +
+      '">' +
+      escapeHtml(vt(state.vocab, 'front_desk:nav_settings')) +
+      '</a>';
+    document.getElementById('conversation-reload').addEventListener('click', function () {
+      restoreConversation(false);
+    });
+  }
+
+  function restoreConversation(restoreDraft) {
+    state.historyState = 'loading';
+    renderConversationStatus();
+    return fetchJson(scopedUrl('/api/conversation'), { cache: 'no-store' })
+      .then(function (result) {
+        var body = result.body || {};
+        if (result.status === 401 || result.status === 403) {
+          state.errorKey = 'front_desk:conversation_access_required';
+          throw new Error('access denied');
+        }
+        if (
+          !result.ok ||
+          !body.ok ||
+          typeof body.sessionId !== 'string' ||
+          !/^concierge-[a-f0-9]{64}$/.test(body.sessionId) ||
+          !Array.isArray(body.messages)
+        )
+          throw new Error('history unavailable');
+        state.conversationId = body.sessionId;
+        state.historyState = 'ready';
+        state.pending = body.pending || 0;
+        state.errorKey = null;
+        if (body.next_action && typeof body.next_action.href === 'string')
+          state.setupHref = body.next_action.href;
+        // Only display data is restored. Historical approval actions never reactivate.
+        state.turns = body.messages
+          .filter(function (m) {
+            return m && typeof m.text === 'string' && (m.role === 'user' || m.role === 'secretary');
+          })
+          .map(function (m) {
+            return {
+              id: m.id,
+              role: m.role === 'user' ? 'user' : 'companion',
+              text: m.text,
+              createdAt: m.createdAt,
+            };
+          });
+        var input = document.getElementById('ask-input');
+        try {
+          var savedDraft = window.sessionStorage.getItem(draftKey());
+          var savedRaw = window.sessionStorage.getItem(draftKey() + '.request');
+          var saved = savedRaw === null ? null : JSON.parse(savedRaw);
+          if (
+            savedRaw !== null &&
+            (!saved ||
+              typeof saved !== 'object' ||
+              Array.isArray(saved) ||
+              typeof saved.id !== 'string' ||
+              !/^[a-f0-9-]{36}$/.test(saved.id) ||
+              typeof saved.text !== 'string' ||
+              typeof saved.createdAt !== 'number' ||
+              !isFinite(saved.createdAt))
+          )
+            throw new Error('invalid saved request');
+          if (saved) state.pendingRequest = saved;
+          state.storageVerified = true;
+          if (restoreDraft && input) input.value = savedDraft || input.value;
+        } catch (err) {
+          state.storageVerified = false;
+          state.errorKey = 'front_desk:conversation_storage_required';
+        }
+        render();
+      })
+      .catch(function () {
+        state.historyState = 'failed';
+        render();
+      });
+  }
+
   function sendText(text) {
     var trimmed = String(text || '').trim();
-    if (!trimmed || state.sending) return;
-
-    pushTurn({ role: 'user', text: trimmed });
+    if (
+      !trimmed ||
+      state.sending ||
+      state.historyState !== 'ready' ||
+      !state.conversationId ||
+      !state.storageVerified
+    )
+      return;
+    var waiting = state.turns.find(function (turn) {
+      return (
+        turn.role === 'user' &&
+        turn.text === trimmed &&
+        typeof turn.id === 'string' &&
+        !state.turns.some(function (reply) {
+          return reply.id === turn.id.replace(/-user$/, '-secretary');
+        })
+      );
+    });
+    var request = waiting
+      ? {
+          id: waiting.id.replace(/-user$/, ''),
+          text: trimmed,
+          createdAt: waiting.createdAt || Date.now(),
+        }
+      : state.pendingRequest && state.pendingRequest.text === trimmed
+        ? state.pendingRequest
+        : { id: randomId(), text: trimmed, createdAt: Date.now() };
+    try {
+      var serialized = JSON.stringify(request);
+      window.sessionStorage.setItem(draftKey() + '.request', serialized);
+      if (window.sessionStorage.getItem(draftKey() + '.request') !== serialized)
+        throw new Error('request not retained');
+    } catch (err) {
+      state.storageVerified = false;
+      state.errorKey = 'front_desk:conversation_storage_required';
+      render();
+      return;
+    }
+    state.pendingRequest = request;
     state.sending = true;
+    state.errorKey = null;
+    saveDraft();
     render();
-
-    var input = document.getElementById('ask-input');
-    if (input) input.value = '';
-
+    var tenant =
+      window.KyberionPrefs && window.KyberionPrefs.tenant ? window.KyberionPrefs.tenant() : null;
+    var selectedScope = new URL(window.location.href).searchParams;
     fetchJson('/api/conversation', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: trimmed, locale: state.locale, session_id: state.sessionId }),
+      body: JSON.stringify({
+        text: trimmed,
+        locale: state.locale,
+        conversation_id: state.conversationId,
+        request_id: request.id,
+        request_created_at: request.createdAt,
+        tenant: tenant || undefined,
+        organizationId: selectedScope.get('organizationId') || undefined,
+        projectId: selectedScope.get('projectId') || undefined,
+      }),
     })
       .then(function (result) {
         var body = result.body || {};
-        if (!result.ok || !body.ok || typeof body.reply !== 'string') {
-          throw new Error('conversation request failed');
+        if (
+          !result.ok ||
+          !body.ok ||
+          body.mode === 'unavailable' ||
+          typeof body.reply !== 'string'
+        ) {
+          var typedErrors = {
+            conversation_not_started: 'front_desk:conversation_not_started',
+            conversation_scope_selection_required:
+              'front_desk:conversation_scope_selection_required',
+            conversation_capability_unsupported: 'front_desk:conversation_capability_unsupported',
+          };
+          state.errorKey =
+            typedErrors[body.error] ||
+            (result.status === 401 || result.status === 403
+              ? 'front_desk:conversation_access_required'
+              : body.retry_safe === true
+                ? 'concierge:api.history_unavailable'
+                : 'concierge:dock.history.pending');
+          if (body.retry_safe !== true) state.pending = Math.max(1, state.pending);
+          if (body.next_action && typeof body.next_action.href === 'string')
+            state.setupHref = body.next_action.href;
+          if (result.status === 409 && body.error !== 'conversation_not_started')
+            state.historyState = 'failed';
+          return;
         }
+        if (
+          !state.turns.some(function (turn) {
+            return turn.id === request.id + '-user';
+          })
+        )
+          pushTurn({
+            id: request.id + '-user',
+            role: 'user',
+            text: trimmed,
+            createdAt: request.createdAt,
+          });
+        state.turns = state.turns.filter(function (turn) {
+          return turn.id !== request.id + '-secretary';
+        });
         pushTurn({
+          id: request.id + '-secretary',
           role: 'companion',
           text: body.reply,
           shape: body.shape,
-          next_actions: body.next_actions,
-          intent_resolution: body.intent_resolution,
+          next_actions: body.replayed ? undefined : body.next_actions,
+          intent_resolution: body.replayed ? undefined : body.intent_resolution,
           intent_label: body.intent_label,
           intent_label_source: body.intent_label_source,
         });
-        return updateHearing(trimmed, body.intent_resolution).catch(function () {
-          // The conversation remains usable when the hearing record is unavailable.
-        });
-      })
-      .then(function () {
-        speakReply(state.turns[state.turns.length - 1]?.text || '');
+        state.pendingRequest = null;
+        try {
+          window.sessionStorage.removeItem(draftKey() + '.request');
+        } catch (err) {}
+        var input = document.getElementById('ask-input');
+        if (input && input.value.trim() === trimmed) input.value = '';
+        saveDraft();
+        if (body.historySaved === false) state.errorKey = 'concierge:dock.history.unsaved';
+        speakReply(body.reply);
         refreshRecent();
+        if (!body.replayed)
+          return updateHearing(trimmed, body.intent_resolution).catch(function () {});
       })
       .catch(function () {
-        pushTurn({ role: 'companion', text: vt(state.vocab, 'front_desk:ask_send_failed') });
+        state.pending = Math.max(1, state.pending);
+        state.errorKey = 'concierge:dock.history.pending';
       })
       .finally(function () {
         state.sending = false;
@@ -1074,7 +1301,17 @@
         if (params.get('send') === '1') sendText(ask);
       }
       if (mic && SpeechRecognitionCtor) startRecognitionCycle(false);
-      if (ask || mic) window.history.replaceState(null, '', window.location.pathname);
+      if (ask || mic) {
+        params.delete('ask');
+        params.delete('mic');
+        params.delete('send');
+        var query = params.toString();
+        window.history.replaceState(
+          window.history.state,
+          '',
+          window.location.pathname + (query ? '?' + query : '') + window.location.hash
+        );
+      }
     } catch (err) {
       // Best effort only.
     }
@@ -1098,10 +1335,13 @@
     wireChips();
     wireHearingDecision();
 
-    Promise.all([
-      fetchJson('/api/ask-vocabulary?locale=' + encodeURIComponent(state.locale)),
-      fetchJson('/api/progress'),
-    ])
+    Promise.resolve(window.FrontDeskRail && window.FrontDeskRail.ready)
+      .then(function () {
+        return Promise.all([
+          fetchJson('/api/ask-vocabulary?locale=' + encodeURIComponent(state.locale)),
+          fetchJson(scopedUrl('/api/progress')),
+        ]);
+      })
       .then(function (pair) {
         var vocabResult = pair[0];
         var progressResult = pair[1];
@@ -1113,7 +1353,20 @@
         if (progressResult.ok && progressResult.body && progressResult.body.ok) {
           renderRecent(progressResult.body.active || []);
         }
-        applyUrlPrefill();
+        var input = document.getElementById('ask-input');
+        if (input) input.addEventListener('input', saveDraft);
+        var legacy = loadTurns();
+        var archive = document.getElementById('conversation-legacy');
+        var archiveTurns = document.getElementById('conversation-legacy-turns');
+        if (legacy.length && archive && archiveTurns) {
+          archive.classList.remove('hidden');
+          archiveTurns.innerHTML = legacy
+            .map(function (turn) {
+              return '<li>' + escapeHtml(turn.text) + '</li>';
+            })
+            .join('');
+        }
+        restoreConversation(true).then(applyUrlPrefill);
       })
       .catch(function () {
         // The ask page is additive chrome around the rail — a fetch failure

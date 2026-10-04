@@ -16,7 +16,7 @@ tags:
   ]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-09-27
+last_updated: 2026-10-04
 role_affinity: [ecosystem_architect, mission_controller, implementer, operator]
 phase_affinity: [alignment, execution]
 ---
@@ -70,7 +70,10 @@ They are **not duplicates**; their action sets do not overlap.
   construction). Reachable as `pnpm kyberion capture [--screen|--window|--camera]`
   and `pnpm kyberion record screen|audio|camera`. Mobile stays still-image only
   (`capture_screen`); mobile video has no device bridge yet.
-- Details: [browser-automation-best-practices.md](./browser-automation-best-practices.md),
+- Browser operations follow the canonical [operating checklist](./browser-automation-best-practices.md):
+  define success, observe a unique target, act with approval, verify the result, and
+  reconcile uncertain effects before retry/resume. A receipt alone is not outcome proof.
+- Architecture:
   [computer-use-runtime-model.md](../architecture/computer-use-runtime-model.md),
   [os-automation-bridge-model.md](../architecture/os-automation-bridge-model.md).
 
