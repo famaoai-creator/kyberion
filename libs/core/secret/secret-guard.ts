@@ -388,6 +388,30 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
   return null;
 };
 
+/** Resolve a declared service/key identity when its service is not in the
+ * general service-endpoint catalog (for example, a reasoning provider). */
+export function getSecretForIdentity(
+  identity: { envName: string; keychainService: string; keychainAccount: string },
+  operation?: string
+): string | null {
+  const value = getSecret(identity.envName, undefined, operation);
+  if (value) return value;
+  assertPluginGrantAllows('secrets', identity.envName);
+  try {
+    const { fetchSecretSync } = requireSecretModules(
+      './secret-bridge.js'
+    ) as typeof import('./secret-bridge.js');
+    const bridged = fetchSecretSync(identity.keychainService, identity.keychainAccount);
+    if (bridged && bridged.length > 0) {
+      if (bridged.length > 8) _rememberActiveSecret(identity.envName, bridged);
+      return bridged;
+    }
+  } catch {
+    /* An unavailable platform keychain is a miss, matching getSecret(). */
+  }
+  return null;
+}
+
 export const loadConnectionDocument = (serviceId: string): Record<string, any> => {
   assertPluginGrantAllows('secrets', `connection:${serviceId}`);
   return _loadConnectionDocument(serviceId);

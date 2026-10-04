@@ -21,6 +21,7 @@ import type {
   ReasoningProviderCli,
   ReasoningProviderDescriptor,
 } from './reasoning-provider-registry.js';
+import { resolveReasoningProviderEnvironment } from './reasoning-provider-registry.js';
 
 export interface ReasoningProviderReadiness {
   available: boolean;
@@ -117,7 +118,11 @@ export async function probeReasoningProviderReadiness(
     anthropicProbe:
       deps.anthropicProbe ?? ((selectedEnv) => probeAnthropicApiBackendAvailability(selectedEnv)),
   };
-  const result = await probe(descriptor, env, resolvedDeps);
+  const result = await probe(
+    descriptor,
+    resolveReasoningProviderEnvironment(descriptor, env),
+    resolvedDeps
+  );
   return result.available
     ? { available: true }
     : { available: false, reason: result.reason || `${descriptor.mode} readiness probe failed` };

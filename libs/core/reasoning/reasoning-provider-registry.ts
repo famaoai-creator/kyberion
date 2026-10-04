@@ -32,6 +32,8 @@ import { pathResolver } from '../path-resolver.js';
 import { loadRegistryDirectory, type RegistryDirectoryOptions } from '../registry-directory.js';
 import { assertModuleInvariant } from '../invariants.js';
 import { isRecord } from '../foundation/text.js';
+import { resolveSecretIdentity } from '../secret/secret-identity.js';
+import { getSecretForIdentity } from '../secret/secret-guard.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { createLogger } from '../logger.js';
 
@@ -136,6 +138,7 @@ export interface ReasoningProviderDescriptor {
   module: string;
   capabilities: ReasoningProviderCapabilities;
   env_keys: string[];
+  secret_refs?: readonly ReasoningProviderSecretRef[];
   cost_tier?: ReasoningProviderCostTier;
   transport: BackendTransport;
   data_egress: BackendDataEgress;
@@ -150,6 +153,12 @@ export interface ReasoningProviderDescriptor {
   setup_hint?: string;
   runtime_instructions?: readonly string[];
   cli?: ReasoningProviderCli;
+}
+
+export interface ReasoningProviderSecretRef {
+  service_id: string;
+  secret_key: string;
+  env_keys: readonly string[];
 }
 
 export interface ReasoningProviderRuntimeBundle {
@@ -610,6 +619,29 @@ export function explainReasoningProviderDescriptor(value: unknown): ParseResult 
   if (value.model_env_keys !== undefined && !isStringArray(value.model_env_keys, ENV_KEY_PATTERN)) {
     return { reason: 'model_env_keys must be env var names' };
   }
+  let secretRefs: ReasoningProviderSecretRef[] | undefined;
+  if (value.secret_refs !== undefined) {
+    if (!Array.isArray(value.secret_refs)) return { reason: 'secret_refs must be an array' };
+    secretRefs = [];
+    for (const [index, entry] of value.secret_refs.entries()) {
+      if (
+        !isRecord(entry) ||
+        typeof entry.service_id !== 'string' ||
+        !/^[a-z0-9][a-z0-9._-]{0,63}$/u.test(entry.service_id) ||
+        typeof entry.secret_key !== 'string' ||
+        !/^[A-Z][A-Z0-9_]{0,63}$/u.test(entry.secret_key) ||
+        !isStringArray(entry.env_keys, ENV_KEY_PATTERN) ||
+        entry.env_keys.length === 0
+      ) {
+        return { reason: `secret_refs[${index}] needs service_id, secret_key, and env_keys` };
+      }
+      secretRefs.push({
+        service_id: entry.service_id,
+        secret_key: entry.secret_key,
+        env_keys: [...entry.env_keys],
+      });
+    }
+  }
   if (value.runtime_instructions !== undefined && !isStringArray(value.runtime_instructions)) {
     return { reason: 'runtime_instructions must be non-empty strings' };
   }
@@ -625,6 +657,7 @@ export function explainReasoningProviderDescriptor(value: unknown): ParseResult 
       input_modalities: inputModalities,
     },
     env_keys: value.env_keys.map((entry) => entry.trim()),
+    ...(secretRefs ? { secret_refs: secretRefs } : {}),
     ...(costTier !== undefined ? { cost_tier: costTier } : {}),
     transport,
     data_egress: value.data_egress as BackendDataEgress,
@@ -751,6 +784,48 @@ export function getReasoningProviderDescriptor(
   mode: ReasoningBackendMode
 ): ReasoningProviderDescriptor | undefined {
   return listReasoningProviderDescriptors().find((descriptor) => descriptor.mode === mode);
+}
+
+/**
+ * Resolve only the secret references declared for a provider. Explicit
+ * environment values take precedence; secret-store values are considered
+ * only for the live process environment, never for caller-supplied fixtures.
+ */
+export function resolveReasoningProviderEnvironment(
+  descriptor: ReasoningProviderDescriptor,
+  env: NodeJS.ProcessEnv = process.env
+): NodeJS.ProcessEnv {
+  if (env !== process.env || !descriptor.secret_refs?.length) return env;
+  let resolved: NodeJS.ProcessEnv | undefined;
+  for (const reference of descriptor.secret_refs) {
+    const target = resolved ?? env;
+    if (reference.env_keys.some((name) => getRegisteredEnvText(name, { env: target })?.trim())) {
+      continue;
+    }
+    const identity = resolveSecretIdentity(reference.service_id, reference.secret_key);
+    const value = getSecretForIdentity(identity, `reasoning.${descriptor.mode}`)?.trim();
+    if (!value) continue;
+    resolved ??= { ...env };
+    for (const name of reference.env_keys) resolved[name] = value;
+  }
+  return resolved ?? env;
+}
+
+/** Secret-aware credential lookup for backend auto-selection policy rules. */
+export function resolveReasoningProviderSecretEnvValue(
+  envName: string,
+  env: NodeJS.ProcessEnv = process.env
+): string | undefined {
+  const direct = getRegisteredEnvText(envName, { env })?.trim();
+  if (direct || env !== process.env) return direct;
+  for (const descriptor of listReasoningProviderDescriptors()) {
+    if (!descriptor.secret_refs?.some((reference) => reference.env_keys.includes(envName)))
+      continue;
+    const resolved = resolveReasoningProviderEnvironment(descriptor, env);
+    const value = getRegisteredEnvText(envName, { env: resolved })?.trim();
+    if (value) return value;
+  }
+  return undefined;
 }
 
 /**

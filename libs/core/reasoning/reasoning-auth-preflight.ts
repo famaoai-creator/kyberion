@@ -1,6 +1,11 @@
 import { loadReasoningRoutePolicy, type ReasoningRoutePolicy } from './reasoning-route-resolver.js';
 import { probeExplicitReasoningBackend } from '../environment-capability-probes.js';
 import { nowIso } from '../foundation/time.js';
+import {
+  getReasoningProviderDescriptor,
+  resolveReasoningProviderEnvironment,
+} from './reasoning-provider-registry.js';
+import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 
 export type ReasoningAuthPreflightStatus =
   'configured' | 'missing' | 'cli-managed' | 'not-required';
@@ -9,7 +14,7 @@ export interface ReasoningAuthPreflightResult {
   mode: string;
   status: ReasoningAuthPreflightStatus;
   configured: boolean;
-  credential_source: 'environment' | 'cli' | 'none';
+  credential_source: 'environment' | 'secret-store' | 'cli' | 'none';
   required_environment: string[];
   missing_environment: string[];
   note: string;
@@ -25,7 +30,7 @@ export interface ReasoningAuthProbeResult extends ReasoningAuthPreflightResult {
   probe: ReasoningAuthProbe;
 }
 
-/** Check credential configuration shape without reading or refreshing secrets. */
+/** Check credential configuration shape without validating or refreshing secrets. */
 export function checkReasoningBackendAuth(
   mode: string,
   env: NodeJS.ProcessEnv = process.env,
@@ -70,13 +75,18 @@ export function checkReasoningBackendAuth(
     };
   }
 
-  const missingEnvironment = requiredEnvironment.filter((name) => !env[name]?.trim());
+  const descriptor = getReasoningProviderDescriptor(mode as ReasoningBackendMode);
+  const resolvedEnv = descriptor ? resolveReasoningProviderEnvironment(descriptor, env) : env;
+  const missingEnvironment = requiredEnvironment.filter((name) => !resolvedEnv[name]?.trim());
   const configured = missingEnvironment.length < requiredEnvironment.length;
+  const suppliedBySecretStore =
+    configured &&
+    requiredEnvironment.some((name) => Boolean(resolvedEnv[name]?.trim()) && !env[name]?.trim());
   return {
     mode,
     status: configured ? 'configured' : 'missing',
     configured,
-    credential_source: 'environment',
+    credential_source: suppliedBySecretStore ? 'secret-store' : 'environment',
     required_environment: requiredEnvironment,
     missing_environment: missingEnvironment,
     note: configured
