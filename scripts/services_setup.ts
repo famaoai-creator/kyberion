@@ -17,6 +17,7 @@ import { safeExistsSync } from '@agent/core/secure-io';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { main as runServiceBindingController } from './service_binding_controller.js';
 import { withSensitivePathMediation } from '@agent/core/secure-io';
 import { formatSetupHintLine, formatSetupSummaryLine } from './setup-report-format.js';
 import { discoverLocalSttBackends } from '@agent/core/local-stt-discovery';
@@ -288,6 +289,10 @@ export async function setupServices(options: { quiet?: boolean; print?: Print } 
 }
 
 async function main(args: string[] = [], print: Print = () => undefined): Promise<void> {
+  if (args[0] === 'binding') {
+    await runServiceBindingController(args.slice(1), print);
+    return;
+  }
   const argv = await createStandardYargs(['node', 'services_setup', ...args])
     .option('json', { type: 'boolean', default: false })
     .parseSync();

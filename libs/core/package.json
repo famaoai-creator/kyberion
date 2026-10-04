@@ -5671,6 +5671,10 @@
       "types": "./dist/service/service-engine.d.ts",
       "default": "./dist/service/service-engine.js"
     },
+    "./service/service-engine-admission": {
+      "types": "./dist/service/service-engine-admission.d.ts",
+      "default": "./dist/service/service-engine-admission.js"
+    },
     "./service/service-harness": {
       "types": "./dist/service/service-harness.d.ts",
       "default": "./dist/service/service-harness.js"
