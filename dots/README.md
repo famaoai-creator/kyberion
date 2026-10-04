@@ -43,6 +43,8 @@ optional; the full design is in
 | `autonomy`                           | `initial_level` / `min_level` / `max_level`, L0-L4 (default L2, ceiling L3)                                               |
 | `team.owns` / `team.priority`        | Arbitration inputs when two dots target the same resource                                                                 |
 | `runtime.cron_catch_up_hours`        | Missed cron minutes coalesced into one wake (default 6, max 24)                                                           |
+| `runtime.max_idle_wake_ms`           | Watchdog staleness bound for this dot's heartbeat (dots heartbeat per wake); it does not force wakes                      |
+| `operations_cadence`                 | Organization cadences run by the supervisor for this charter's own organization (see below)                               |
 
 ```json
 {
@@ -134,6 +136,39 @@ matching tools). State is kept under `active/shared/runtime/dot/`.
   to `ready` for up to 3 attempts, then ends as an escalated failure — never a
   quarantine. Any other error, timeout or stranded claim is quarantined until
   an operator releases it (step 5).
+
+## Organization cadences (`operations_cadence`)
+
+A charter scoped to an organization (`scope.organization_id` set,
+`authority.authority_role: organization_operator`) can opt in to that
+organization's cadences. The supervisor's `dot-org-cadence` step runs them
+inside the charter's execution context (role, tenant, organization) using the
+scoped cadence mode — the tenant bound to the run must equal the
+organization's tenant, and the audit records `tick:scoped` /
+`standup:scoped` / `retro:scoped`.
+
+```json
+"operations_cadence": {
+  "tick_every_minutes": 15,
+  "standup": { "cron": "45 8 * * 1-5", "timezone": "Asia/Tokyo" },
+  "retro": { "cron": "0 17 * * 5", "timezone": "Asia/Tokyo" }
+}
+```
+
+- `tick_every_minutes` (default 15, min 5): governed operation tick for the
+  organization's due scheduled operations.
+- `standup` / `retro`: run once per cron occurrence. Only the latest
+  occurrence inside an 8-day look-back is run, so downtime (or first enabling
+  the field) yields at most one catch-up run per cadence, never a storm.
+- Markers live in `active/shared/runtime/dot/.../org-cadence.json`; at the
+  organization budget hard limit the step skips every cadence; a failure is
+  logged and never stops the sweep.
+
+The repo cadence pipelines (`pipelines/organization-{operation-tick,standup,retro}.json`)
+stay **sovereign-only** and aggregate across tenants for a single operator;
+prefer the dot cadence for per-tenant operation. A dot that wakes only on
+weekday crons should set `runtime.max_idle_wake_ms` above the weekend gap
+(`dots/org-operations.json` uses 4 days) so the watchdog does not page it.
 
 ## Execution model
 
