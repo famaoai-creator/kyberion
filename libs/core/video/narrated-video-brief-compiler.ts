@@ -212,7 +212,7 @@ function buildStoryboardSceneContent(
       storyboard.design_system_ref?.css_vars || brief.design_system.theme_tokens?.css_vars || {},
   };
   if (isProcessLikeSemantic(beat.semantic)) {
-    content.visual_steps = deriveProcessSteps(storyboard);
+    content.visual_steps = deriveProcessSteps(storyboard, beat);
   }
   if (isProofLikeSemantic(beat.semantic)) {
     content.evidence_items = storyboard.desired_takeaway
@@ -350,8 +350,15 @@ export function synthesizeStoryboardFromScript(
   totalDuration: number
 ): VideoStoryboard {
   const duration = clampDuration(totalDuration);
-  const hookDuration = roundTo2(duration * 0.33);
-  const featureDuration = roundTo2(duration * 0.45);
+  // Narration reads the script beats in order, so time each beat by its share
+  // of the script (with a floor so short beats stay on screen long enough).
+  const [hookShare, featureShare] = scriptBeatShares([
+    brief.script.hook,
+    brief.script.feature,
+    brief.script.cta,
+  ]);
+  const hookDuration = roundTo2(duration * hookShare);
+  const featureDuration = roundTo2(duration * featureShare);
   const outroDuration = roundTo2(Math.max(0.1, duration - hookDuration - featureDuration));
   const format = resolveDefaultCompositionFormat();
   return {
@@ -417,20 +424,67 @@ export function synthesizeStoryboardFromScript(
   };
 }
 
-/** Keep on-screen headlines readable while preserving the full script as body. */
+const MIN_BEAT_SHARE = 0.18;
+
+/** Per-beat duration shares proportional to script length, floored at MIN_BEAT_SHARE. */
+export function scriptBeatShares(beats: string[]): number[] {
+  const lengths = beats.map((text) => Math.max(1, String(text || '').trim().length));
+  const total = lengths.reduce((sum, value) => sum + value, 0);
+  const floored = lengths.map((value) => Math.max(MIN_BEAT_SHARE, value / total));
+  const norm = floored.reduce((sum, value) => sum + value, 0);
+  return floored.map((value) => value / norm);
+}
+
+/**
+ * Keep on-screen headlines readable while preserving the full script as body.
+ * Prefers the whole first sentence (the renderer wraps it on phrase boundaries),
+ * then whole clauses; truncates with an ellipsis only as a last resort so
+ * headlines never end mid-word.
+ */
 export function sceneHeadline(text: string, maxLen = 56): string {
   const trimmed = String(text || '').trim();
   if (!trimmed) return 'Kyberion';
-  const firstClause = trimmed.split(/[。．.!！？?\n]/)[0]?.trim() || trimmed;
-  if (firstClause.length <= maxLen) return firstClause;
-  return `${firstClause.slice(0, Math.max(1, maxLen - 1))}…`;
+  const sentence = trimmed.split(/[。．.!！？?\n]/)[0]?.trim() || trimmed;
+  if (sentence.length <= Math.ceil(maxLen * 1.6)) return sentence;
+  const clauses = sentence
+    .split(/[、，,]/)
+    .map((clause) => clause.trim())
+    .filter(Boolean);
+  let headline = '';
+  for (const clause of clauses) {
+    const next = headline ? `${headline}、${clause}` : clause;
+    if (next.length > maxLen) break;
+    headline = next;
+  }
+  if (headline.length >= Math.ceil(maxLen * 0.4)) return headline;
+  return `${sentence.slice(0, Math.max(1, maxLen - 1))}…`;
 }
 
-function deriveProcessSteps(storyboard: VideoStoryboard): Array<{ step: string; detail: string }> {
+/** Split a sentence into short step labels on clause boundaries. */
+function scriptClauses(text: string | undefined): string[] {
+  return String(text || '')
+    .split(/[、，,。．!！？?\n]/)
+    .map((clause) => clause.trim())
+    .filter((clause) => clause.length >= 2);
+}
+
+function deriveProcessSteps(
+  storyboard: VideoStoryboard,
+  beat?: VideoStoryboard['beats'][number]
+): Array<{ step: string; detail: string }> {
+  // Steps describe this beat's process; reusing other beats' titles repeated
+  // the hook/CTA copy inside the feature scene.
+  const clauses = scriptClauses(beat?.message || beat?.visual_intent).slice(0, 4);
+  if (clauses.length >= 2) {
+    return clauses.map((clause, index) => ({
+      step: String(index + 1).padStart(2, '0'),
+      detail: sceneHeadline(clause, 24),
+    }));
+  }
   const shortLabels = ['合意', '実行', '検証', '公開'];
-  return storyboard.beats.slice(0, 4).map((beat, index) => ({
+  return storyboard.beats.slice(0, 4).map((storyBeat, index) => ({
     step: String(index + 1).padStart(2, '0'),
-    detail: sceneHeadline(beat.title || shortLabels[index] || `Beat ${index + 1}`, 18),
+    detail: sceneHeadline(storyBeat.title || shortLabels[index] || `Beat ${index + 1}`, 18),
   }));
 }
 
