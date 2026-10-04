@@ -41,11 +41,16 @@ describe('approval-store test isolation', () => {
     expect(approvalStoreRoots({ VITEST: 'true' }).coordination).toBe(
       `${VITEST_APPROVAL_STORE_ROOT}/coordination/channels`
     );
+    expect(approvalStoreRoots({ VITEST: 'true', VITEST_POOL_ID: '3' }).coordination).toBe(
+      `${VITEST_APPROVAL_STORE_ROOT}/pool-3/coordination/channels`
+    );
+    const roots = approvalStoreRoots();
+    expect(roots.coordination.startsWith(`${VITEST_APPROVAL_STORE_ROOT}/`)).toBe(true);
     expect(approvalRequestLogicalPath('terminal', id)).toBe(
-      `${VITEST_APPROVAL_STORE_ROOT}/coordination/channels/terminal/approvals/requests/${id}.json`
+      `${roots.coordination}/terminal/approvals/requests/${id}.json`
     );
     expect(approvalEventLogicalPath('terminal')).toBe(
-      `${VITEST_APPROVAL_STORE_ROOT}/observability/channels/terminal/approvals.jsonl`
+      `${roots.observability}/terminal/approvals.jsonl`
     );
   });
 

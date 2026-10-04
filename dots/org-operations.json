@@ -67,6 +67,11 @@
       "timezone": "Asia/Tokyo"
     }
   },
+  "team": {
+    "responsibilities": ["organization.operations-loop"],
+    "accepts_handoffs_from": ["repo-guardian"],
+    "goal_ref": "Kyberion runs its own operations autonomously and safely"
+  },
   "runtime": {
     "heartbeat_id": "dot-org-operations"
   }
