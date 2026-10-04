@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-01T20:51:06.529Z",
+  "generated_at": "2026-10-04T05:57:55.996Z",
   "generator_note": "Baseline of actuator extension-point surfaces for semver enforcement. See docs/developer/EXTENSION_POINTS.md. Update via `pnpm check:contract-semver -- --rebaseline`.",
   "actuators": [
     {
@@ -95,6 +95,13 @@
       "ops": ["cancel_job", "collect_artifact", "poll_status", "submit_job"],
       "contract_schema": null,
       "contract_schema_sha256": null
+    },
+    {
+      "actuator_id": "data-actuator",
+      "version": "1.0.0",
+      "ops": ["aggregate", "filter", "join", "query"],
+      "contract_schema": "knowledge/product/schemas/data-action.schema.json",
+      "contract_schema_sha256": "49281488f3b88557b79934b52a93db2f6a380d20127b71f0ca321e41de2fd929"
     },
     {
       "actuator_id": "deployment-actuator",
@@ -216,6 +223,20 @@
       "contract_schema_sha256": "3cdfa30561aa37d76588d888af5ee44444020b2006426f296583d4f8dfd5fe8a"
     },
     {
+      "actuator_id": "scheduler-actuator",
+      "version": "1.0.0",
+      "ops": ["cancel", "fire", "list", "schedule"],
+      "contract_schema": "knowledge/product/schemas/scheduler-action.schema.json",
+      "contract_schema_sha256": "3d40698a41a05524411ba2126147fa2b71bd2f5b3396efee2816f97f9677624f"
+    },
+    {
+      "actuator_id": "search-actuator",
+      "version": "1.0.0",
+      "ops": ["fetch_reader", "web_search"],
+      "contract_schema": "knowledge/product/schemas/search-action.schema.json",
+      "contract_schema_sha256": "559e31b1f557d994e674e5025c5aa2e06095eaa141604a25c1fa4619ce10ea77"
+    },
+    {
       "actuator_id": "secret-actuator",
       "version": "1.2.0",
       "ops": ["delete", "get", "list", "set"],
@@ -278,6 +299,13 @@
       "ops": ["computer_interaction", "kill", "poll", "spawn", "write"],
       "contract_schema": "knowledge/product/schemas/terminal-action.schema.json",
       "contract_schema_sha256": "aff7129e9d112ec00a183d37c7ff8200e2c8059a5a400aaee6cb75a91d759553"
+    },
+    {
+      "actuator_id": "vcs-actuator",
+      "version": "1.0.0",
+      "ops": ["branch", "commit", "diff", "log", "pr_create", "status"],
+      "contract_schema": "knowledge/product/schemas/vcs-action.schema.json",
+      "contract_schema_sha256": "dcbd335865f6137abb185860fb86c44d421099db11395fa47c036a846346a507"
     },
     {
       "actuator_id": "video-composition-actuator",

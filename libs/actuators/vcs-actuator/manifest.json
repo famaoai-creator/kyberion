@@ -1,0 +1,67 @@
+{
+  "actuator_id": "vcs-actuator",
+  "version": "1.0.0",
+  "description": "Git version-control operations (status, diff, log, branch, commit) plus GitHub PR creation via the gh CLI",
+  "contract_schema": "knowledge/product/schemas/vcs-action.schema.json",
+  "resilience_tier": "adaptive_retry",
+  "recovery_policy": {
+    "fallback_strategy": "sequential_alternatives",
+    "retry_profile": "vcs-actuator"
+  },
+  "capabilities": [
+    {
+      "op": "status",
+      "description": "Shows the working-tree status via git status",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {
+        "bin": ["git"]
+      },
+      "effect": "read"
+    },
+    {
+      "op": "diff",
+      "description": "Shows unstaged or ref-scoped changes via git diff",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {
+        "bin": ["git"]
+      },
+      "effect": "read"
+    },
+    {
+      "op": "log",
+      "description": "Shows commit history via git log",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {
+        "bin": ["git"]
+      },
+      "effect": "read"
+    },
+    {
+      "op": "branch",
+      "description": "Lists, creates, or deletes local branches via git branch (apply: create/delete mutate the tree)",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {
+        "bin": ["git"]
+      },
+      "effect": "write"
+    },
+    {
+      "op": "commit",
+      "description": "Stages changes and creates a commit via git add/commit",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {
+        "bin": ["git"]
+      },
+      "effect": "write"
+    },
+    {
+      "op": "pr_create",
+      "description": "Opens a pull request for the current branch via gh pr create",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {
+        "bin": ["git", "gh"]
+      },
+      "effect": "egress"
+    }
+  ]
+}

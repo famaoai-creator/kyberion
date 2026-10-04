@@ -13,7 +13,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 ## Current Runtime Surface
 
 - Source of truth: `libs/actuators/*/manifest.json`
-- Count: 33
+- Count: 37
 - Rule: If a component should be discoverable by the CLI or governance layer, it needs a `manifest.json`.
 
 - `agent-actuator`: Meta-Actuator for Agent Lifecycle and A2A (7 ops, v1.1.0, schema knowledge/product/schemas/agent-action.schema.json)
@@ -26,6 +26,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `calendar-actuator`: Adapter-based calendar coordination with user-selectable and multi-calendar backends, including macOS Calendar.app (JXA) and authenticated Google Workspace (gws) (7 ops, v1.4.0, schema knowledge/product/schemas/calendar-action.schema.json)
 - `code-actuator`: ADF-driven code analysis and refactoring pipeline engine (4 ops, v2.2.0, schema knowledge/product/schemas/code-pipeline.schema.json)
 - `compute-actuator`: Remote and local compute orchestration actuator for heavy batch workloads, fine-tuning, and model execution across local and ephemeral substrates (such as Google Colab). (4 ops, v1.0.0)
+- `data-actuator`: Offline deterministic tabular data ops over local JSON/CSV files (query, filter, join, aggregate) (4 ops, v1.0.0, schema knowledge/product/schemas/data-action.schema.json)
 - `deployment-actuator`: Deployment capability boundary backed by the governed DeploymentAdapter (1 ops, v1.0.0, schema knowledge/product/schemas/deployment-action.schema.json)
 - `email-actuator`: Adapter-based email composition and sending with selectable macOS Mail.app (JXA) and SMTP backends (3 ops, v1.2.0, schema libs/actuators/email-actuator/schemas/email-action.schema.json)
 - `file-actuator`: Generic File-Actuator for Kyberion (1 ops, v1.1.0, schema knowledge/product/schemas/file-pipeline.schema.json)
@@ -40,10 +41,13 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `orchestrator-actuator`: Mission/control-plane transformation and execution-plan orchestration actuator (2 ops, v1.0.0, schema knowledge/product/schemas/orchestrator-pipeline.schema.json)
 - `presence-actuator`: Human Presence and Messaging Bridge (3 ops, v1.0.0, schema knowledge/product/schemas/presence-action.schema.json)
 - `process-actuator`: Managed process lifecycle actuator backed by the runtime supervisor (4 ops, v1.0.0, schema knowledge/product/schemas/process-action.schema.json)
+- `scheduler-actuator`: Declaration-only schedule store: persists cron declarations as JSON under active/shared/runtime/scheduler/ for later execution by a runner. No daemonization — this actuator only declares, lists, cancels, and manually fires stored payloads. (4 ops, v1.0.0, schema knowledge/product/schemas/scheduler-action.schema.json)
+- `search-actuator`: Query-origin web search stub and plain-text URL reader. Owns the search query starting point; network-actuator owns fetch transport pipelines. (2 ops, v1.0.0, schema knowledge/product/schemas/search-action.schema.json)
 - `secret-actuator`: OS Native Secret Manager Bridge. Prefer kyberion secret introduce / Concierge for value collection. (4 ops, v1.2.0, schema knowledge/product/schemas/secret-action.schema.json)
 - `service-actuator`: Unified External SaaS/API/MCP Reachability Layer (7 ops, v1.3.0, schema knowledge/product/schemas/service-action.schema.json)
 - `system-actuator`: OS-level control plane for diagnostics, input toggles, and short-lived OS actions (35 ops, v1.11.0, schema knowledge/product/schemas/system-pipeline.schema.json)
 - `terminal-actuator`: PTY-driven Terminal Actuator (5 ops, v1.0.0, schema knowledge/product/schemas/terminal-action.schema.json)
+- `vcs-actuator`: Git version-control operations (status, diff, log, branch, commit) plus GitHub PR creation via the gh CLI (6 ops, v1.0.0, schema knowledge/product/schemas/vcs-action.schema.json)
 - `video-composition-actuator`: Governed deterministic composed-video bundle preparation actuator (9 ops, v1.1.0)
 - `vision-actuator`: Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator (7 ops, v1.5.0, schema knowledge/product/schemas/vision-action.schema.json)
 - `voice-actuator`: Governed local voice generation actuator with native playback and artifact fallback (12 ops, v1.8.0, schema knowledge/product/schemas/voice-action.schema.json)
@@ -52,7 +56,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 
 ## Legacy Review Queue
 
-- Source of truth: [legacy_component_index.json](../orchestration/legacy_component_index.json)
+- Source of truth: [legacy_component_index.json](knowledge/product/orchestration/legacy_component_index.json)
 - Count: 0
 
 ## Consolidation Recommendations
