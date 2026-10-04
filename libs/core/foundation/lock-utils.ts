@@ -18,6 +18,10 @@ export interface LockIo {
   ageMs?(filePath: string): number | undefined;
   /** Rename; must throw ENOENT when the source is gone. */
   rename?(fromPath: string, toPath: string): void;
+  /** Hard-link `fromPath` to `toPath`; EEXIST when the target exists, never overwrites. */
+  linkExclusive?(fromPath: string, toPath: string): void;
+  /** Directory listing (names), used for best-effort housekeeping of lock litter. */
+  readdir?(dirPath: string): string[];
 }
 
 let lockIo: LockIo | undefined;
@@ -59,6 +63,17 @@ const LOCK_ROOT = path.join(pathResolver.rootDir(), 'active/shared/runtime/locks
  * microseconds. Thirty seconds is far beyond either legitimate window.
  */
 export const LOCK_RECOVERY_AGE_MS = 30_000;
+
+/**
+ * A cleanup guard whose recorded PID is alive is only reclaimed past this age
+ * (the PID was reused by an unrelated process). Main-record removal is
+ * identity-checked, so even a cleaner stalled this long cannot delete a newer
+ * holder's record.
+ */
+export const LOCK_LIVE_GUARD_RECOVERY_AGE_MS = 10 * 60_000;
+
+/** Upper bound on litter files removed per housekeeping sweep. */
+const LOCK_SWEEP_LIMIT = 32;
 
 function lockPath(resourceId: string): string {
   return path.join(LOCK_ROOT, `${resourceId}.lock`);
@@ -152,11 +167,33 @@ interface LockRecordView {
   state: LockOwnerState;
   /** Best-known age in ms (file mtime, or the record's own `ts`), if any. */
   ageMs?: number;
+  /**
+   * Identity of a parsed record (pid, ts, id, nonce); undefined when the
+   * record is missing or unparseable. Removal compares it before deleting.
+   */
+  identity?: string;
+  /** The record exists but could not be read (EACCES, EMFILE, EIO, policy denial). */
+  unreadable?: boolean;
+}
+
+function errorCode(error: unknown): string | undefined {
+  return (error as NodeJS.ErrnoException)?.code;
+}
+
+/** Only content problems make a record 'unknown'; I/O failures do not. */
+function isMalformedRecordError(error: unknown): boolean {
+  if (error instanceof SyntaxError) return true;
+  const message = error instanceof Error ? error.message : '';
+  return /dangerous JSON key|must be valid JSON/.test(message);
+}
+
+function recordIdentity(content: Record<string, unknown>): string {
+  return JSON.stringify([content.pid, content.ts, content.id, content.nonce]);
 }
 
 function inspectRecord(file: string): LockRecordView {
   const io = requireLockIo();
-  let content: { pid?: unknown; ts?: unknown };
+  let content: Record<string, unknown> | null;
   let statAge: number | undefined;
   try {
     statAge = io.ageMs?.(file);
@@ -164,12 +201,20 @@ function inspectRecord(file: string): LockRecordView {
     statAge = undefined;
   }
   try {
-    content = io.loadJson<{ pid?: unknown; ts?: unknown }>(file);
+    content = io.loadJson<Record<string, unknown> | null>(file);
   } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return { state: 'missing' };
-    return { state: 'unknown', ageMs: statAge };
+    if (errorCode(error) === 'ENOENT') return { state: 'missing' };
+    if (isMalformedRecordError(error)) return { state: 'unknown', ageMs: statAge };
+    // An unreadable record is never reclaimed: treat its owner as live.
+    logger.warn(
+      `Lock record ${file} unreadable — ${errorCode(error) ?? (error as Error)?.message ?? String(error)} | treated as held and never reclaimed; check permissions, fd limits or policy | evidence: ${file}`
+    );
+    return { state: 'live', ageMs: statAge, unreadable: true };
   }
-  const tsMs = typeof content?.ts === 'string' ? Date.parse(content.ts) : NaN;
+  if (content === null || typeof content !== 'object' || Array.isArray(content))
+    return { state: 'unknown', ageMs: statAge };
+  const identity = recordIdentity(content);
+  const tsMs = typeof content.ts === 'string' ? Date.parse(content.ts) : NaN;
   const recordAge = Number.isFinite(tsMs) ? Date.now() - tsMs : undefined;
   const ageMs =
     statAge === undefined
@@ -177,22 +222,29 @@ function inspectRecord(file: string): LockRecordView {
       : recordAge === undefined
         ? statAge
         : Math.max(statAge, recordAge);
-  const pid = content?.pid;
+  const pid = content.pid;
   if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0)
-    return { state: 'unknown', ageMs };
+    return { state: 'unknown', ageMs, identity };
   try {
     process.kill(pid, 0);
-    return { state: 'live', ageMs };
+    return { state: 'live', ageMs, identity };
   } catch (error: unknown) {
-    const code = (error as NodeJS.ErrnoException)?.code;
-    if (code === 'ESRCH') return { state: 'dead', ageMs };
-    if (code === 'EPERM') return { state: 'live', ageMs };
-    return { state: 'unknown', ageMs };
+    const code = errorCode(error);
+    if (code === 'ESRCH') return { state: 'dead', ageMs, identity };
+    if (code !== 'EPERM')
+      logger.warn(
+        `Lock owner probe for ${file} failed — ${code ?? String(error)} | owner treated as live | evidence: pid ${pid}`
+      );
+    return { state: 'live', ageMs, identity };
   }
 }
 
+function agedPast(view: LockRecordView, limitMs: number): boolean {
+  return view.ageMs !== undefined && view.ageMs >= limitMs;
+}
+
 function aged(view: LockRecordView): boolean {
-  return view.ageMs !== undefined && view.ageMs >= LOCK_RECOVERY_AGE_MS;
+  return agedPast(view, LOCK_RECOVERY_AGE_MS);
 }
 
 /** A main lock record may be removed: its owner is gone, or it is unverifiable and old. */
@@ -200,54 +252,146 @@ function lockReclaimable(view: LockRecordView): boolean {
   return view.state === 'dead' || (view.state === 'unknown' && aged(view));
 }
 
-/** A cleanup guard may be removed: its cleaner is gone, or it is unverifiable or
- * PID-reused (live) yet older than any real cleanup could take. */
+/**
+ * A cleanup guard may be removed: its cleaner is gone, it is unverifiable and
+ * old, or its PID is alive (reused) yet older than LOCK_LIVE_GUARD_RECOVERY_AGE_MS.
+ * An unreadable guard is never removed.
+ */
 function guardReclaimable(view: LockRecordView): boolean {
+  if (view.unreadable) return false;
   return (
-    view.state === 'dead' || ((view.state === 'unknown' || view.state === 'live') && aged(view))
+    view.state === 'dead' ||
+    (view.state === 'unknown' && aged(view)) ||
+    (view.state === 'live' && agedPast(view, LOCK_LIVE_GUARD_RECOVERY_AGE_MS))
   );
 }
 
 let tombCounter = 0;
 
-/**
- * Remove an orphaned cleanup guard. With a rename-capable IO the guard is
- * first moved to a unique tomb, so of several concurrent reclaimers only one
- * obtains a given inode; the tomb is then re-verified, and a guard that turns
- * out to be fresh (another cleaner replaced the orphan in between) is put back
- * with exclusive publication.
- */
-function reclaimOrphanedGuard(io: LockIo, guard: string): void {
-  if (!io.rename) {
-    if (guardReclaimable(inspectRecord(guard))) io.unlink(guard);
-    return;
-  }
-  const tomb = `${guard}.stale-${process.pid}-${++tombCounter}`;
+/** Tomb names embed the cleaner PID and creation time so housekeeping can age them. */
+function tombPath(file: string): string {
+  return `${file}.stale-${process.pid}-${Date.now()}-${++tombCounter}`;
+}
+
+function bestEffortUnlink(io: LockIo, file: string): void {
   try {
-    io.rename(guard, tomb);
+    io.unlink(file);
   } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return; // another reclaimer won
+    logger.debug(`lock litter ${file} not removed: ${errorCode(error) ?? String(error)}`);
+  }
+}
+
+/** Put a displaced record back at `file` exclusively (link, else publish); never overwrite. */
+function putBack(io: LockIo, tomb: string, file: string): boolean {
+  try {
+    if (io.linkExclusive) io.linkExclusive(tomb, file);
+    else publish(io, file, JSON.stringify(io.loadJson<unknown>(tomb)));
+    return true;
+  } catch (error: unknown) {
+    logger.warn(
+      `Lock record ${file} could not be restored — ${errorCode(error) ?? String(error)} | the displaced record is kept for inspection and swept after ${LOCK_RECOVERY_AGE_MS}ms | evidence: ${tomb}`
+    );
+    return false;
+  }
+}
+
+type RemovalOutcome = 'removed' | 'gone' | 'changed';
+
+/**
+ * Remove `file` only while it is still the record `expected` describes. With a
+ * rename-capable IO the record is first moved to a unique tomb, so of several
+ * concurrent cleaners only one obtains a given inode; the tomb is then
+ * verified (same identity, still removable). A record that differs — a new
+ * holder published, or another cleaner replaced an orphaned guard — is put
+ * back exclusively and the removal is aborted.
+ */
+function removeIfUnchanged(
+  io: LockIo,
+  file: string,
+  expected: LockRecordView,
+  removable: (view: LockRecordView) => boolean
+): RemovalOutcome {
+  if (!io.rename) {
+    const again = inspectRecord(file);
+    if (again.state === 'missing') return 'gone';
+    if (again.identity !== expected.identity || !removable(again)) return 'changed';
+    io.unlink(file);
+    return 'removed';
+  }
+  const tomb = tombPath(file);
+  try {
+    io.rename(file, tomb);
+  } catch (error: unknown) {
+    if (errorCode(error) === 'ENOENT') return 'gone'; // another cleaner won
     throw error;
   }
+  const claimed = inspectRecord(tomb);
+  if (claimed.state === 'missing') return 'gone';
+  if (claimed.identity === expected.identity && removable(claimed)) {
+    bestEffortUnlink(io, tomb);
+    return 'removed';
+  }
+  if (putBack(io, tomb, file)) bestEffortUnlink(io, tomb);
+  return 'changed';
+}
+
+const TOMB_PATTERN = /\.stale-(\d+)-(\d+)-\d+$/;
+const PUBLISH_TEMP_PATTERN = /\.lock(?:\.reclaim)?\.\d+\.[0-9a-f]{12}\.tmp$/;
+
+function pidAlive(pid: number): boolean {
   try {
-    const claimed = inspectRecord(tomb);
-    if (!guardReclaimable(claimed) && claimed.state === 'live') {
-      const owner = io.loadJson<Record<string, unknown>>(tomb);
+    process.kill(pid, 0);
+    return true;
+  } catch (error: unknown) {
+    return errorCode(error) !== 'ESRCH';
+  }
+}
+
+/**
+ * Best-effort, bounded removal of lock litter in the locks directory:
+ * publication temp siblings and recovery tombs older than LOCK_RECOVERY_AGE_MS
+ * (a tomb whose cleaner is still alive is kept until the live-guard age).
+ */
+function sweepLockLitter(io: LockIo, dir: string): void {
+  if (!io.readdir) return;
+  let names: string[];
+  try {
+    names = io.readdir(dir);
+  } catch {
+    return;
+  }
+  let removed = 0;
+  for (const name of names) {
+    if (removed >= LOCK_SWEEP_LIMIT) break;
+    const file = path.join(dir, name);
+    const tomb = TOMB_PATTERN.exec(name);
+    let litter = false;
+    if (tomb) {
+      const age = Date.now() - Number(tomb[2]);
+      litter =
+        age >= LOCK_LIVE_GUARD_RECOVERY_AGE_MS ||
+        (age >= LOCK_RECOVERY_AGE_MS && !pidAlive(Number(tomb[1])));
+    } else if (PUBLISH_TEMP_PATTERN.test(name)) {
+      let age: number | undefined;
       try {
-        publish(io, guard, JSON.stringify(owner));
-      } catch (error: unknown) {
-        if ((error as NodeJS.ErrnoException)?.code !== 'EEXIST') throw error;
+        age = io.ageMs?.(file);
+      } catch {
+        age = undefined;
       }
+      litter = age !== undefined && age >= LOCK_RECOVERY_AGE_MS;
     }
-  } finally {
-    io.unlink(tomb);
+    if (!litter) continue;
+    bestEffortUnlink(io, file);
+    removed++;
   }
 }
 
 /**
  * Stale cleanup is serialized through an exclusive `.reclaim` guard and the
- * lock record is re-verified under it. A missing main record is never
- * unlinked (a new owner may publish next), EPERM counts as a live owner, and
+ * lock record is re-verified under it. Every removal (main record, orphaned
+ * guard, own guard) is identity-checked through a tomb rename, so a stalled
+ * cleaner can never delete a record it did not inspect. A missing main record
+ * is never unlinked, EPERM and unreadable records count as live, and
  * unverifiable records/guards are only reclaimed once older than
  * LOCK_RECOVERY_AGE_MS. `pending` names a record that is waiting for that age.
  */
@@ -258,32 +402,39 @@ function reclaimStaleLock(lockFile: string): { retry: boolean; pending?: string 
     return { retry: false, ...(initial.state === 'unknown' ? { pending: lockFile } : {}) };
   const io = requireLockIo();
   const guard = lockFile + '.reclaim';
+  const mine = {
+    pid: process.pid,
+    ts: nowIso(),
+    nonce: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+  };
+  const myIdentity = recordIdentity(mine);
   try {
-    publish(io, guard, JSON.stringify({ pid: process.pid, ts: nowIso() }));
+    publish(io, guard, JSON.stringify(mine));
   } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException)?.code !== 'EEXIST') throw error;
+    if (errorCode(error) !== 'EEXIST') throw error;
     const holder = inspectRecord(guard);
     if (holder.state === 'missing') return { retry: true };
     if (guardReclaimable(holder)) {
-      reclaimOrphanedGuard(io, guard);
+      removeIfUnchanged(io, guard, holder, guardReclaimable);
+      sweepLockLitter(io, path.dirname(lockFile));
       return { retry: true };
     }
     return { retry: false, ...(holder.state === 'live' ? {} : { pending: guard }) };
   }
   try {
+    sweepLockLitter(io, path.dirname(lockFile));
     const current = inspectRecord(lockFile);
     if (current.state === 'missing') return { retry: true };
     if (!lockReclaimable(current))
       return { retry: false, ...(current.state === 'unknown' ? { pending: lockFile } : {}) };
-    io.unlink(lockFile);
-    return { retry: true };
+    // A cleaner that stalled long enough to lose its guard must not proceed.
+    if (inspectRecord(guard).identity !== myIdentity) return { retry: false };
+    return { retry: removeIfUnchanged(io, lockFile, current, lockReclaimable) !== 'changed' };
   } finally {
-    try {
-      const owner = io.loadJson<{ pid?: number }>(guard);
-      if (owner.pid === process.pid) io.unlink(guard);
-    } catch {
-      /* Unknown cleanup ownership is never deleted here; it ages out instead. */
-    }
+    const own = inspectRecord(guard);
+    // Unknown cleanup ownership is never deleted here; it ages out instead.
+    if (own.identity === myIdentity)
+      removeIfUnchanged(io, guard, own, (view) => view.identity === myIdentity);
   }
 }
 
@@ -293,8 +444,10 @@ export interface LockRecoveryState {
   kind: 'lock_record' | 'cleanup_guard';
   state: LockOwnerState;
   ageMs?: number;
-  /** ms until automatic reclaim; undefined when the age is unknown. */
+  /** ms until automatic reclaim; undefined when the age is unknown or never reclaimed. */
   reclaimInMs?: number;
+  /** The record exists but cannot be read; it is never reclaimed automatically. */
+  unreadable?: boolean;
 }
 
 /**
@@ -309,16 +462,29 @@ export function inspectLockRecovery(resourceId: string): LockRecoveryState | und
   ];
   for (const [file, kind] of candidates) {
     const view = inspectRecord(file);
-    const verifiable =
-      view.state === 'missing' || (kind === 'lock_record' && view.state === 'live');
-    if (verifiable || (kind === 'lock_record' && view.state === 'dead')) continue;
-    if (kind === 'cleanup_guard' && view.state === 'live' && !aged(view)) continue;
+    if (view.state === 'missing') continue;
+    if (view.unreadable) {
+      // Never reclaimed automatically: report without a reclaim estimate.
+      return {
+        path: file,
+        kind,
+        state: view.state,
+        unreadable: true,
+        ...(view.ageMs !== undefined ? { ageMs: view.ageMs } : {}),
+      };
+    }
+    if (kind === 'lock_record' && (view.state === 'live' || view.state === 'dead')) continue;
+    const limit =
+      kind === 'cleanup_guard' && view.state === 'live'
+        ? LOCK_LIVE_GUARD_RECOVERY_AGE_MS
+        : LOCK_RECOVERY_AGE_MS;
+    if (kind === 'cleanup_guard' && view.state === 'live' && !agedPast(view, limit)) continue;
     return {
       path: file,
       kind,
       state: view.state,
       ...(view.ageMs !== undefined
-        ? { ageMs: view.ageMs, reclaimInMs: Math.max(0, LOCK_RECOVERY_AGE_MS - view.ageMs) }
+        ? { ageMs: view.ageMs, reclaimInMs: Math.max(0, limit - view.ageMs) }
         : {}),
     };
   }
