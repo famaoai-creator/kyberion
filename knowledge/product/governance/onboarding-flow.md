@@ -52,8 +52,9 @@ Step 1〜2 → Step 3（個人 identity） → Step 4 → Step 5（onboard compa
 
 ### 操作シェルの前提（全ルート共通）
 
-governed facade（`stance:create`、`onboarding company`、`onboarding:context`、`tenant:activation`、
-`organization` の書き込み系）は操作者 persona で書き込み権限を判定する。`pnpm onboarding apply` は
+governed facade（`onboarding company`、`onboarding:context`、`tenant:activation`、
+`organization` の書き込み系）は操作者 persona で書き込み権限を判定する（`stance:create` は
+`customer/` への書き込みだけを許可されているので persona なしで動く）。`pnpm onboarding apply` は
 `KYBERION_PERSONA` を `.env.local` に記録するが、**pnpm script は `.env.local` を読み込まない**。
 identity を保存した後は、操作シェルで次を実行しておく（未設定だと
 `Operator persona not set in this shell` で拒否される）。
@@ -324,20 +325,37 @@ pnpm tenant:activation activate \
 organization、tier、owner、NHI、次の行動、operation contract（task lease、heartbeat watchdog、
 quota と budget、approval gate、pause と escalation、drift watcher）、各 probe の監査証跡 ref が記録される。
 
-#### probe の証跡を用意する
+#### probe を実行して証跡を作る
 
-`activate` は 4 つの probe について「確認した」という宣言（`--check-*`）と証跡の参照
-（`--probe-ref <probe>=<ref>`）を記録する。**ツールは ref の中身や NHI の実在を検証しない**
-（空でなければ受け付ける）。したがって証跡の妥当性は `--accept` する人間の責任であり、
-実在する証跡を先に保存してから参照する。証跡は `active/shared/tmp/<job>/` に出力を保存し、
-そのパスを ref にするのが最も簡単である。
+4 つの probe は `probe` サブコマンドがまとめて実行し、activation receipt の隣
+（`.../tenant-activation/<tenant>/<organization>/<tier>/probes/`）に証跡 JSON を書き出す。
+全項目が通ると、その証跡を参照する `activate` コマンドがそのまま表示される（`<human:owner>` を
+承認者に置き換えて実行する）。probe は観測するだけで、activation も NHI の発行も行わない。
 
-| probe               | 何を確かめるか                                           | 証跡を作るコマンド（例）                                                                                                                                                                   |
-| ------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `isolation_probe`   | registry・機密 index・customer overlay が整合している    | `pnpm check -- --only tenant-registry > active/shared/tmp/<job>/isolation.txt`                                                                                                             |
-| `service_readiness` | 最初の仕事で使うサービスの認証と接続が揃っている         | `pnpm service:preflight -- --service <service-id>`（使うサービスごと。無ければ `pnpm service:setup` の出力）                                                                               |
-| `viewer_scope`      | Chronos / concierge の閲覧者がこの tenant に絞られている | `pnpm kyberion check plugin-views-e2e`、または承認者に発行した viewer token の確認記録（[CHRONOS_VIEWER_SCOPE_OPERATIONS](../../../docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md)） |
-| `nhi_provisioned`   | この組織で働く AI worker の NHI が責任者付きで存在する   | NHI id は `kyberion://agent/<organization-id>/<agent-slug>`（例: `onboard company` の worker は `ceo-operator`）。発行専用の CLI は無く、mission の staffing 時に ledger へ記録される      |
+```bash
+pnpm tenant:activation probe --customer-slug <customer-slug> --tenant-slug <tenant-slug> \
+  --organization-id <organization-id> --nhi-id kyberion://agent/<organization-id>/<agent-slug> \
+  [--service <service-id>]...
+```
+
+| probe               | probe が確かめること                                                                                                              |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `isolation_probe`   | tenant が strict isolation を宣言し、`check:tenant-registry` が通る                                                               |
+| `viewer_scope`      | tenant が登録済み・active で viewer の絞り込みが解決でき、`KYBERION_VIEWER_SCOPE` が `off` でない（`enforce` で拒否まで行う）     |
+| `service_readiness` | binding の `default_service_ids` と `--service` の各サービスが `service:preflight` で ready（無ければ「外部サービスなし」で通る） |
+| `nhi_provisioned`   | 各 `--nhi-id` が NHI ledger にあり、retired / suspended でない                                                                    |
+
+`activate` / `plan` は ref を次の規則で検証する。
+
+- `<scheme>://...`（`audit://`、`probe://` など）は外部の証跡として、受け入れる人間の責任で扱う。
+- それ以外はリポジトリ内の実在ファイルでなければならない。probe の証跡 JSON の場合は、同じ scope で
+  記録され、その probe が `passed: true` でなければならない。
+- `--nhi-id` は `kyberion://agent/<organization-id>/<agent-slug>` の形式で、この組織のものでなければならない。
+
+**NHI について**: NHI は mission が agent を staffing したときに ledger へ記録され、発行専用の CLI は
+無い。新しい組織では ledger が空のため `nhi_provisioned` は通らない。既に同じ組織で mission を
+動かした NHI があればそれを指定する。無い場合は、外部の証跡（`--probe-ref nhi_provisioned=audit://...`）
+を人間が確認して受け入れる。
 
 `plan` の `blockers` が空になるまで `activate` しない。
 
@@ -447,7 +465,7 @@ pnpm organization status $O
 pnpm organization purpose set $O --name "<組織名>" --purpose "<存在目的>" --owner-role ceo --apply
 pnpm organization objective add $O --objective-id <obj-id> --title "<目標>" --horizon 2026Q4 --owner-role ceo --apply
 
-# 3. 提供するサービス（domain → service の順。org-chart の domain は自動では取り込まれない）
+# 3. 提供するサービス（domain → service の順。`onboard company` は org-chart の domain を登録済み）
 pnpm organization domain add $O --domain-id <domain-id> --name "<領域名>" --owner-role <role> --apply
 pnpm organization service add $O --service-id <svc-id> --domain-id <domain-id> --name "<サービス名>" \
   --outcome "<顧客成果>" --owner-role <role> --consumer <consumer> --apply

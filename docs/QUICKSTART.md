@@ -75,17 +75,20 @@ The dry-run shows the write scope and next commands without changing files. The 
 
 When `KYBERION_CUSTOMER` is set, `customer/{slug}/` is preferred for customer-specific identity and onboarding artifacts.
 
-Before starting the first work, activate the tenant after the readiness probes, then review its management unit:
+Before starting the first work, run the readiness probes, activate the tenant with the evidence they record, then review its management unit. When every probe passes, `probe` prints the exact `activate` command that cites its evidence:
 
 ```bash
+pnpm tenant:activation probe \
+  --customer-slug acme-ai --tenant-slug <tenant> --organization-id acme-ai \
+  --nhi-id kyberion://agent/acme-ai/<agent-slug>
 pnpm tenant:activation activate \
   --customer-slug acme-ai --tenant-slug <tenant> --organization-id acme-ai \
-  --owner-id human:founder --nhi-id <nhi-id> \
+  --owner-id human:founder --nhi-id kyberion://agent/acme-ai/<agent-slug> \
   --check-viewer-scope --check-nhi --check-services --check-isolation \
-  --probe-ref viewer_scope=<audit-ref> \
-  --probe-ref nhi_provisioned=<audit-ref> \
-  --probe-ref service_readiness=<audit-ref> \
-  --probe-ref isolation_probe=<audit-ref> \
+  --probe-ref viewer_scope=<evidence-path> \
+  --probe-ref nhi_provisioned=<evidence-path> \
+  --probe-ref service_readiness=<evidence-path> \
+  --probe-ref isolation_probe=<evidence-path> \
   --apply --accept
 ```
 

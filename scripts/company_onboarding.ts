@@ -23,6 +23,11 @@ import {
 import { applyOnboardingContextBinding } from '@agent/core/organization/onboarding-context';
 import { loadOrganizationProfileAtPath } from '@agent/core/organization/organization-profile';
 import {
+  loadOrganizationDomain,
+  saveOrganizationDomain,
+} from '@agent/core/organization/organization-operating-model';
+import { buildOrganizationDomainRecord } from '@agent/core/organization/organization-operating-model-operations';
+import {
   getRegisteredEnvText,
   nowIso,
   readTextFile,
@@ -52,6 +57,8 @@ export interface AiCompanyOnboardingResult {
   readinessPath: string;
   firstWorkPath: string;
   contextBindingPath?: string;
+  /** Org-chart domains registered in the operating model (`organization domain list`). */
+  seededDomains?: string[];
   writtenFiles: string[];
   nextCommands: string[];
 }
@@ -81,6 +88,56 @@ function requireRegularFile(filePath: string, rootDir: string, label: string): s
     throw new Error(`[company-onboard] ${label} must be a regular file`);
   }
   return safePath;
+}
+
+interface OrgChartDomain {
+  domain_id?: unknown;
+  name?: unknown;
+  role_ids?: unknown;
+}
+
+/**
+ * Register the vertical's org-chart domains in the operating model so
+ * `pnpm organization domain list` starts from the company's structure instead
+ * of empty. The first role of each domain owns it; existing domains are kept.
+ */
+function seedOrgChartDomains(input: {
+  orgChartPath: string;
+  organizationId: string;
+  tenantSlug: string;
+  rootDir: string;
+}): string[] {
+  if (!safeExistsSync(input.orgChartPath)) return [];
+  const chart = JSON.parse(readTextFile(input.orgChartPath)) as { domains?: OrgChartDomain[] };
+  const seeded: string[] = [];
+  for (const domain of chart.domains ?? []) {
+    const roles = Array.isArray(domain.role_ids) ? domain.role_ids : [];
+    if (
+      typeof domain.domain_id !== 'string' ||
+      typeof domain.name !== 'string' ||
+      typeof roles[0] !== 'string'
+    ) {
+      continue;
+    }
+    const scope = {
+      organizationId: input.organizationId,
+      tier: 'confidential' as const,
+      tenantSlug: input.tenantSlug,
+    };
+    if (loadOrganizationDomain(domain.domain_id, { ...scope, rootDir: input.rootDir })) continue;
+    saveOrganizationDomain(
+      buildOrganizationDomainRecord({
+        ...scope,
+        domainId: domain.domain_id,
+        name: domain.name,
+        ownerRole: roles[0],
+        rootDir: input.rootDir,
+      }),
+      { rootDir: input.rootDir }
+    );
+    seeded.push(domain.domain_id);
+  }
+  return seeded;
 }
 
 function snapshotFiles(filePaths: string[], rootDir: string): Map<string, string | undefined> {
@@ -272,6 +329,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
       ].join('\n')
     );
     let contextBindingPath: string | undefined;
+    let seededDomains: string[] = [];
     if (normalized.tenantSlug) {
       const previousCustomer = getRegisteredEnvText('KYBERION_CUSTOMER');
       setRegisteredEnv('KYBERION_CUSTOMER', normalized.slug);
@@ -323,6 +381,12 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
         contextBindingPath = binding.saved_paths.find((entry) =>
           entry.endsWith('organization-context.json')
         );
+        seededDomains = seedOrgChartDomains({
+          orgChartPath: path.join(customerDir, 'org-chart.json'),
+          organizationId: normalized.slug,
+          tenantSlug: tenant.tenant_slug,
+          rootDir,
+        });
       } catch (error) {
         try {
           if (previousTenantProfile === undefined) {
@@ -342,6 +406,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
       readinessPath,
       firstWorkPath,
       ...(contextBindingPath ? { contextBindingPath } : {}),
+      ...(seededDomains.length ? { seededDomains } : {}),
       writtenFiles: [
         ...bootstrapped.writtenFiles,
         profilePath,

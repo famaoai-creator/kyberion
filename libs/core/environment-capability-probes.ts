@@ -19,6 +19,7 @@
  */
 
 import * as os from 'node:os';
+import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import { t } from './t.js';
 import { logger } from './core.js';
@@ -323,12 +324,50 @@ export function playwrightBrowsersDir(env: NodeJS.ProcessEnv = process.env): str
   return path.join(env.XDG_CACHE_HOME ?? path.join(home, '.cache'), 'ms-playwright');
 }
 
+/**
+ * Browser directories the installed playwright-core launches
+ * (`chromium-<rev>`, `chromium_headless_shell-<rev>`), or null when
+ * playwright is not resolvable from the repository root.
+ */
+export function requiredPlaywrightChromiumDirs(): string[] | null {
+  try {
+    const rootRequire = createRequire(pathResolver.rootResolve('package.json'));
+    const corePackage = createRequire(rootRequire.resolve('playwright/package.json')).resolve(
+      'playwright-core/package.json'
+    );
+    const manifest = readJson<{ browsers?: Array<{ name?: string; revision?: string }> }>(
+      path.join(path.dirname(corePackage), 'browsers.json')
+    );
+    const dirNames: Record<string, string> = {
+      chromium: 'chromium',
+      'chromium-headless-shell': 'chromium_headless_shell',
+    };
+    return (manifest.browsers ?? []).flatMap((browser) =>
+      browser.name && browser.revision && dirNames[browser.name]
+        ? [`${dirNames[browser.name]}-${browser.revision}`]
+        : []
+    );
+  } catch {
+    return null;
+  }
+}
+
 async function probePlaywrightChromium(): Promise<{ available: boolean; reason?: string }> {
   const dir = playwrightBrowsersDir();
-  if (safeExistsSync(dir)) return { available: true };
+  if (!safeExistsSync(dir)) {
+    return {
+      available: false,
+      reason: t('status:probe_playwright_missing', { dir }),
+    };
+  }
+  // A cache from an older playwright holds other revisions; launch would fail.
+  const missing = (requiredPlaywrightChromiumDirs() ?? []).filter(
+    (name) => !safeExistsSync(path.join(dir, name))
+  );
+  if (missing.length === 0) return { available: true };
   return {
     available: false,
-    reason: t('status:probe_playwright_missing', { dir }),
+    reason: t('status:probe_playwright_revision_missing', { dir, revisions: missing.join(', ') }),
   };
 }
 
