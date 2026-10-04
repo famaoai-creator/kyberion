@@ -135,15 +135,21 @@ export interface DotAutonomyState {
   history: Array<{ level: DotAutonomyLevel; at: string; reason: string }>;
 }
 
-/** DL-11: one arbitration decision between two dots' proposals. */
+/**
+ * DL-11: one arbitration decision between two dots' proposals. Pre-gate rows
+ * know the newcomer only by `proposal_hash` (its action_ref is assigned after
+ * the check); settlement rows (`superseded` / `declined`) carry `action_ref`.
+ */
 export interface DotArbitrationRow {
   at: string;
   dot_id: string;
-  action_ref: string;
+  proposal_hash: string;
+  action_ref?: string;
   conflicts_with: { dot_id: string; action_ref: string };
   target?: string;
   intent?: DotProposal['intent'];
-  resolution: 'proceed' | 'defer_to_owner' | 'defer_to_priority' | 'escalated' | 'superseded';
+  resolution:
+    'proceed' | 'defer_to_owner' | 'defer_to_priority' | 'escalated' | 'superseded' | 'declined';
   floor?: DotDecisionLevel;
   reason: string;
 }

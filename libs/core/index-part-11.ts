@@ -166,3 +166,6 @@ export * from './dot/dot-event-intake.js';
 export * from './dot/dot-budget.js';
 export * from './dot/dot-executor.js';
 export * from './governance/org-budget-governor.js';
+export * from './dot/dot-outcomes.js';
+export * from './dot/dot-arbitration.js';
+export * from './dot/dot-autonomy.js';

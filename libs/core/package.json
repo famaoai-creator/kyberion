@@ -5051,6 +5051,22 @@
       "types": "./dist/organization/organization-digest-artifacts.d.ts",
       "default": "./dist/organization/organization-digest-artifacts.js"
     },
+    "./organization/organization-operation-tick": {
+      "types": "./dist/organization/organization-operation-tick.d.ts",
+      "default": "./dist/organization/organization-operation-tick.js"
+    },
+    "./organization/organization-retro": {
+      "types": "./dist/organization/organization-retro.d.ts",
+      "default": "./dist/organization/organization-retro.js"
+    },
+    "./organization/organization-standup": {
+      "types": "./dist/organization/organization-standup.d.ts",
+      "default": "./dist/organization/organization-standup.js"
+    },
+    "./organization/organization-cadence": {
+      "types": "./dist/organization/organization-cadence.d.ts",
+      "default": "./dist/organization/organization-cadence.js"
+    },
     "./organization/organization-interventions": {
       "types": "./dist/organization/organization-interventions.d.ts",
       "default": "./dist/organization/organization-interventions.js"
@@ -7118,6 +7134,18 @@
     "./dot/dot-executor": {
       "types": "./dist/dot/dot-executor.d.ts",
       "default": "./dist/dot/dot-executor.js"
+    },
+    "./dot/dot-arbitration": {
+      "types": "./dist/dot/dot-arbitration.d.ts",
+      "default": "./dist/dot/dot-arbitration.js"
+    },
+    "./dot/dot-outcomes": {
+      "types": "./dist/dot/dot-outcomes.d.ts",
+      "default": "./dist/dot/dot-outcomes.js"
+    },
+    "./dot/dot-autonomy": {
+      "types": "./dist/dot/dot-autonomy.d.ts",
+      "default": "./dist/dot/dot-autonomy.js"
     },
     "./governance/org-budget-governor": {
       "types": "./dist/governance/org-budget-governor.d.ts",

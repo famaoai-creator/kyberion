@@ -11,7 +11,10 @@
 import type { LoadedDotCharter } from '@agent/core/dot/dot-charter';
 import { createLogger } from '@agent/core/logger';
 import { distillDotMemory } from '@agent/core/dot/dot-memory';
-import { measureActiveDotKeyResults } from '@agent/core/dot/dot-key-results';
+import { measureActiveDotKeyResults, runAsDotCharter } from '@agent/core/dot/dot-key-results';
+import { evaluateDueDotOutcomes, scheduleDotOutcomeChecks } from '@agent/core/dot/dot-outcomes';
+import { settleDotArbitration } from '@agent/core/dot/dot-arbitration';
+import { runDotAutonomySweep } from '@agent/core/dot/dot-autonomy';
 import { DOT_EXECUTOR_SUPERVISOR_STEP } from './dot_executor_step.js';
 
 const logger = createLogger('dot-supervisor');
@@ -43,7 +46,8 @@ export async function runDotSupervisorExtensions(
   return failed;
 }
 
-// DL-03 key-result measurement (dots' KRs + referenced organization objectives' KRs)
+// DL-03 key-result measurement (dots' KRs + referenced organization objectives' KRs),
+// each charter measured inside its own role / tenant / organization context
 DOT_SUPERVISOR_STEPS.push({
   id: 'dot-kr-measure',
   async run(_now, active) {
@@ -57,7 +61,9 @@ DOT_SUPERVISOR_STEPS.push({
   async run(now, active) {
     for (const loaded of active) {
       try {
-        await distillDotMemory(loaded.charter, { now: () => now });
+        await runAsDotCharter(loaded.charter, () =>
+          distillDotMemory(loaded.charter, { now: () => now })
+        );
       } catch (error) {
         logger.warn(
           `memory distill failed for ${loaded.charter.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: libs/core/dot/dot-memory.ts`
@@ -69,3 +75,48 @@ DOT_SUPERVISOR_STEPS.push({
 
 // DL-01 executor: closes at most one delegated WorkItem per dot per sweep
 DOT_SUPERVISOR_STEPS.push(DOT_EXECUTOR_SUPERVISOR_STEP);
+
+// DL-04 outcome checks: schedule new done results, evaluate the due ones (each dot isolated)
+DOT_SUPERVISOR_STEPS.push({
+  id: 'dot-outcomes',
+  async run(now, active) {
+    for (const loaded of active) {
+      try {
+        scheduleDotOutcomeChecks(loaded.charter, { now: () => now });
+        await evaluateDueDotOutcomes(loaded.charter, { now: () => now });
+      } catch (error) {
+        logger.warn(
+          `outcome check failed for ${loaded.charter.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: libs/core/dot/dot-outcomes.ts`
+        );
+      }
+    }
+  },
+});
+
+// DL-11 settle combined arbitration cards (after housekeeping settled the newcomer)
+DOT_SUPERVISOR_STEPS.push({
+  id: 'dot-arbitration-settle',
+  async run(now, active) {
+    for (const loaded of active) {
+      try {
+        settleDotArbitration(loaded.charter, now);
+      } catch (error) {
+        logger.warn(
+          `arbitration settlement failed for ${loaded.charter.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: libs/core/dot/dot-arbitration.ts`
+        );
+      }
+    }
+  },
+});
+
+// DL-10 graduated autonomy: shadow ledger, automatic demotion, promotion cards
+// (daily evaluation; a promotion applies only after a human approval settles)
+DOT_SUPERVISOR_STEPS.push({
+  id: 'dot-autonomy',
+  async run(now, active) {
+    runDotAutonomySweep(
+      active.map((loaded) => loaded.charter),
+      { now: () => now }
+    );
+  },
+});

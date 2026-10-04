@@ -27,7 +27,20 @@ import {
   DOT_BUDGET_FLOOR_CONTRIBUTOR,
   DOT_BUDGET_STATUS_SECTION,
 } from './dot-budget.js';
-import { dotWorkResultsPromptSection } from './dot-executor.js';
+import { dotExecutorStatusSection, dotWorkResultsPromptSection } from './dot-executor.js';
+import {
+  dotAutonomyDecisionRelaxer,
+  dotAutonomyDigestSection,
+  dotAutonomyFloorContributor,
+  dotAutonomyStatusSection,
+} from './dot-autonomy.js';
+
+import {
+  dotOutcomesDigestSection,
+  dotOutcomesPromptSection,
+  dotOutcomesStatusSection,
+} from './dot-outcomes.js';
+import { dotArbitrationPreGateCheck } from './dot-arbitration.js';
 
 export const DOT_PROMPT_SECTIONS: DotPromptSection[] = [];
 export const DOT_FLOOR_CONTRIBUTORS: DotFloorContributor[] = [];
@@ -51,3 +64,20 @@ DOT_PROMPT_SECTIONS.push(dotWorkResultsPromptSection());
 DOT_FLOOR_CONTRIBUTORS.push(DOT_BUDGET_FLOOR_CONTRIBUTOR);
 DOT_STATUS_SECTIONS.push(DOT_BUDGET_STATUS_SECTION);
 DOT_DIGEST_SECTIONS.push(DOT_BUDGET_DIGEST_SECTION);
+
+// DL-04 outcome evaluation
+DOT_PROMPT_SECTIONS.push(dotOutcomesPromptSection());
+DOT_STATUS_SECTIONS.push(dotOutcomesStatusSection());
+DOT_DIGEST_SECTIONS.push(dotOutcomesDigestSection());
+
+// DL-11 cross-dot arbitration
+DOT_PRE_GATE_CHECKS.push(dotArbitrationPreGateCheck());
+
+// DL-10 graduated autonomy
+DOT_FLOOR_CONTRIBUTORS.push(dotAutonomyFloorContributor());
+DOT_DECISION_RELAXERS.push(dotAutonomyDecisionRelaxer());
+DOT_STATUS_SECTIONS.push(dotAutonomyStatusSection());
+DOT_DIGEST_SECTIONS.push(dotAutonomyDigestSection());
+
+// DL-01 executor status (results + escalations)
+DOT_STATUS_SECTIONS.push(dotExecutorStatusSection());
