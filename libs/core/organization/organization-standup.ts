@@ -308,7 +308,7 @@ export function buildOrganizationStandup(
 }
 
 export function formatCadenceLocal(iso: string, timeZone: string, locale: SupportedLocale): string {
-  return new Intl.DateTimeFormat(locale === 'ja' ? 'ja-JP' : 'en-US', {
+  return new Intl.DateTimeFormat(localeToBcp47(locale), {
     timeZone,
     month: 'numeric',
     day: 'numeric',
