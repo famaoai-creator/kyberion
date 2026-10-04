@@ -206,10 +206,47 @@ export function dotQuietHours(charter: DotCharter): NotificationQuietHours | und
   };
 }
 
-function defaultCountOpenWorkItems(dotId: string): number {
-  return listWorkItems({ status: [...OPEN_WORK_ITEM_STATUSES] }).filter(
+function defaultCountOpenWorkItems(dotId: string, rootDir?: string): number {
+  return listWorkItems({ status: [...OPEN_WORK_ITEM_STATUSES] }, rootDir ? { rootDir } : {}).filter(
     (item) => item.metadata?.dot_id === dotId
   ).length;
+}
+
+function openDelegations(charter: DotCharter, deps: DotDispatchDeps): number {
+  const parked = currentDotActions(charter.dot_id, deps).filter(
+    (row) => row.status === 'parked'
+  ).length;
+  const count =
+    deps.countOpenWorkItems ?? ((dotId: string) => defaultCountOpenWorkItems(dotId, deps.rootDir));
+  return count(charter.dot_id) + parked;
+}
+
+/**
+ * The charter bounds, phrased for the wake prompt, so the dot proposes inside
+ * them instead of spending proposals on refusals. Same sources as enforcement.
+ */
+export function dotBoundsPromptLines(charter: DotCharter, deps: DotDispatchDeps = {}): string[] {
+  const shapes = charter.authority.allowed_work_shapes ?? DEFAULT_DOT_WORK_SHAPES;
+  const cap =
+    charter.authority.max_concurrent_delegations ?? DEFAULT_DOT_MAX_CONCURRENT_DELEGATIONS;
+  const free = Math.max(0, cap - openDelegations(charter, deps));
+  const partners = (deps.listCharters?.() ?? defaultListCharters(deps))
+    .filter(
+      (other) =>
+        other.dot_id !== charter.dot_id &&
+        other.status === 'active' &&
+        (other.team?.accepts_handoffs_from ?? []).includes(charter.dot_id)
+    )
+    .map((other) => other.dot_id);
+  return [
+    `Allowed work_shape values: ${shapes.join(', ')}. Any other shape is refused.`,
+    free > 0
+      ? `Delegation slots free: ${free} of ${cap}. Propose at most ${free}, most important first; extra proposals are refused.`
+      : `Delegation slots free: 0 of ${cap} (open work or decisions waiting on the operator). Propose nothing new; report status instead.`,
+    partners.length
+      ? `Dots that accept your handoffs (handoff_to): ${partners.join(', ')}.`
+      : 'No dot accepts handoffs from you; do not use handoff_to.',
+  ];
 }
 
 function defaultFindWorkItemByActionRef(
@@ -302,10 +339,7 @@ export function checkDotProposalBounds(
   if (scope.ok === false) return scope;
   const cap =
     charter.authority.max_concurrent_delegations ?? DEFAULT_DOT_MAX_CONCURRENT_DELEGATIONS;
-  const parked = currentDotActions(charter.dot_id, deps).filter(
-    (row) => row.status === 'parked'
-  ).length;
-  const open = (deps.countOpenWorkItems ?? defaultCountOpenWorkItems)(charter.dot_id) + parked;
+  const open = openDelegations(charter, deps);
   if (open >= cap) {
     return {
       ok: false,

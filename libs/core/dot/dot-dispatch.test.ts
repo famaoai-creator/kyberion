@@ -18,6 +18,7 @@ import {
   composeDotDigest,
   currentDotActions,
   dispatchDotProposals,
+  dotBoundsPromptLines,
   dotNotificationRoute,
   maybeSendDotDigest,
   runDotHousekeeping,
@@ -324,6 +325,40 @@ describe('dot handoff (team coordination)', () => {
     // A dot that does not accept the sender is not woken by the same row.
     const stranger = { ...TARGET, team: { accepts_handoffs_from: ['someone-else'] } };
     expect(evaluateDotTriggersDue(stranger, { rootDir: TEST_ROOT })).toHaveLength(0);
+  });
+});
+
+describe('dotBoundsPromptLines', () => {
+  it('tells the dot its shapes, free slots, and handoff partners', () => {
+    const partner = {
+      ...CHARTER,
+      dot_id: 'repo-guardian',
+      team: { accepts_handoffs_from: ['org-ops'] },
+    };
+    const lines = dotBoundsPromptLines(
+      {
+        ...CHARTER,
+        authority: {
+          ...CHARTER.authority,
+          allowed_work_shapes: ['task_session'],
+          max_concurrent_delegations: 2,
+        },
+      },
+      { rootDir: TEST_ROOT, countOpenWorkItems: () => 1, listCharters: () => [CHARTER, partner] }
+    );
+    expect(lines.join('\n')).toContain('Allowed work_shape values: task_session.');
+    expect(lines.join('\n')).toContain('Delegation slots free: 1 of 2');
+    expect(lines.join('\n')).toContain('accept your handoffs (handoff_to): repo-guardian');
+  });
+
+  it('asks for no new proposals when every slot is taken', () => {
+    const lines = dotBoundsPromptLines(CHARTER, {
+      rootDir: TEST_ROOT,
+      countOpenWorkItems: () => 99,
+      listCharters: () => [CHARTER],
+    });
+    expect(lines.join('\n')).toMatch(/slots free: 0 of .*Propose nothing new/s);
+    expect(lines.join('\n')).toContain('do not use handoff_to');
   });
 });
 

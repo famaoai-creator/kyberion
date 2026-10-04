@@ -67,7 +67,11 @@ import {
   MAX_DOT_PROPOSALS_PER_WAKE,
   type DotProposal,
 } from './dot-proposals.js';
-import { dispatchDotProposals, type DotActionRecord } from './dot-dispatch.js';
+import {
+  dispatchDotProposals,
+  dotBoundsPromptLines,
+  type DotActionRecord,
+} from './dot-dispatch.js';
 import { dotFeedbackPromptLines, dotSignalStatusLines } from './dot-feedback.js';
 
 const logger = createLogger('dot-runtime');
@@ -683,6 +687,7 @@ function dotSystemPrompt(charter: DotCharter, mode: 'tool' | 'fence', rootDir?: 
       : '',
     'You are a coordinator: observe and classify, then propose. Never write outside your role scopes.',
     dotProposalInstructions(mode),
+    `Your charter bounds:\n${dotBoundsPromptLines(charter, { rootDir }).join('\n')}`,
   ]
     .filter(Boolean)
     .join('\n');
