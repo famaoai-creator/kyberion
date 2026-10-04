@@ -15,8 +15,9 @@
  * foreground process owned by Kyberion (Tailscale Funnel persists its config
  * in tailscaled). Providers that need a long-running foreground agent
  * (cloudflared, ngrok) require a managed-process lifecycle extension to this
- * contract (spawn via spawnManagedProcess, pid/health supervision, restart and
- * teardown on `down`) before their catalog entries can go live.
+ * contract (spawn through the governed managed-process helper, pid/health
+ * supervision, restart and teardown on `down`) before their catalog entries
+ * can go live.
  *
  * Host-wide state: a provider's configuration usually outlives this checkout
  * (another worktree or a lost state file may have created it), so `down` and
@@ -133,7 +134,10 @@ export function normalizeIngressPathPrefix(value: string | undefined): string {
   if (!value.startsWith('/')) {
     throw new IngressError('INGRESS_INVALID_REQUEST', `path prefix must start with '/': ${value}`);
   }
-  const segments = value.replace(/\/+$/u, '').split('/').slice(1);
+  // Strip trailing slashes without a regex (linear; CodeQL js/polynomial-redos).
+  let end = value.length;
+  while (end > 1 && value.charCodeAt(end - 1) === 0x2f) end -= 1;
+  const segments = value.slice(0, end).split('/').slice(1);
   if (
     segments.length === 0 ||
     segments.some((segment) => !PATH_SEGMENT.test(segment) || /^\.+$/u.test(segment))
