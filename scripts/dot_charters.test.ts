@@ -7,6 +7,15 @@ const mocks = vi.hoisted(() => ({
   wake: vi.fn(async () => ({ dot_id: 'collision', outcome: 'delivered' })),
   install: vi.fn(),
   appendInbox: vi.fn((entry: Record<string, unknown>) => entry),
+  release: vi.fn((_charter: unknown, input: { workItemId: string }) => ({
+    item_id: input.workItemId,
+    status: 'ready',
+    metadata: { dot_executor: { operator_verified_by: 'user:ops' } },
+  })),
+}));
+vi.mock('@agent/core/dot/dot-executor', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/dot/dot-executor')>()),
+  releaseDotWorkItem: mocks.release,
 }));
 vi.mock('@agent/core/dot/dot-charter', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/dot/dot-charter')>();
@@ -92,8 +101,9 @@ afterEach(() => {
 
 describe('dot charter CLI identity resolution', () => {
   it('refuses a targeted inbox write for a duplicate identity', async () => {
+    // Two repo charters share the ID: same-scope duplicates have no owner.
     writeCharter(CHARTER, 'one');
-    writeCharter(CHARTER, 'two', 'acme');
+    writeCharter(CHARTER, 'two');
     expect(
       await runDotCharters([
         'inbox',
@@ -114,7 +124,7 @@ describe('dot charter CLI identity resolution', () => {
 
   it('refuses to wake a duplicate identity before installing a backend or running a turn', async () => {
     writeCharter(CHARTER, 'active');
-    writeCharter({ ...CHARTER, status: 'paused' }, 'paused', 'acme');
+    writeCharter({ ...CHARTER, status: 'paused' }, 'paused');
     expect(await runDotCharters(['wake', 'collision', '--json', '--quiet'])).toBeUndefined();
     expect(process.exitCode).toBe(1);
     expect(console.error).toHaveBeenCalledWith(
@@ -128,7 +138,8 @@ describe('dot charter CLI identity resolution', () => {
     'reports every colliding path through %s while retaining valid siblings',
     async (command) => {
       const first = writeCharter(CHARTER, 'first', 'acme');
-      const second = writeCharter({ ...CHARTER, status: 'retired' }, 'second', 'globex');
+      // Two established (active + paused) tenant charters across tenants: no owner.
+      const second = writeCharter({ ...CHARTER, status: 'paused' }, 'second', 'globex');
       writeCharter({ ...CHARTER, dot_id: 'unique', status: 'draft' }, 'unique');
       const broken = `${TEST_ROOT}/dots/broken.json`;
       safeWriteFile(broken, '{');
@@ -163,5 +174,39 @@ describe('dot charter CLI identity resolution', () => {
       }),
       {}
     );
+  });
+});
+
+describe('dot release', () => {
+  it('releases a work item for the resolved charter with the operator reason', async () => {
+    writeCharter(CHARTER, 'one');
+    const report = await runDotCharters([
+      'release',
+      'collision',
+      'wi-1',
+      '--reason',
+      'verified no partial effect',
+      '--by',
+      'user:ops',
+      '--json',
+      '--quiet',
+    ]);
+    expect(report).toMatchObject({
+      ok: true,
+      released: { dot_id: 'collision', work_item_id: 'wi-1', status: 'ready' },
+    });
+    expect(mocks.release).toHaveBeenCalledWith(expect.objectContaining({ dot_id: 'collision' }), {
+      workItemId: 'wi-1',
+      reason: 'verified no partial effect',
+      by: 'user:ops',
+    });
+  });
+
+  it('refuses a release without --reason', async () => {
+    writeCharter(CHARTER, 'one');
+    expect(await runDotCharters(['release', 'collision', 'wi-1', '--json'])).toBeUndefined();
+    expect(process.exitCode).toBe(1);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('--reason'));
+    expect(mocks.release).not.toHaveBeenCalled();
   });
 });

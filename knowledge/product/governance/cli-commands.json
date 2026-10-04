@@ -3728,6 +3728,17 @@
       "audience": "operator",
       "description": "cli_cmd_script_dot_event",
       "group": "operate"
+    },
+    {
+      "id": "script.dot.release",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot release",
+      "args": ["release"],
+      "noun": "dot",
+      "verb": "release",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_release",
+      "group": "operate"
     }
   ],
   "deprecated_script_aliases": [

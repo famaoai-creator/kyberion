@@ -38,7 +38,7 @@ const PROPOSAL = {
   action_id: 'dot_delegate_work',
   title: 't',
   objective: 'o',
-  work_shape: 'task_session',
+  work_shape: 'direct_reply',
 } as DotProposal;
 const NOW = new Date('2026-10-04T10:00:00Z');
 
