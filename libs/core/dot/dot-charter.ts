@@ -209,19 +209,26 @@ function jsonChildren(dir: string): string[] {
   return found;
 }
 
+/** Where a charter file was found; tenant charters carry their directory slug. */
+export interface DotCharterSource {
+  path: string;
+  /** Set for `knowledge/confidential/<slug>/dots/*.json`; absent for repo-level `dots/`. */
+  tenant_slug?: string;
+}
+
 /**
  * Charters of registered, operational tenants: direct `*.json` children of
  * `knowledge/confidential/<slug>/dots/`. Same deny-by-default rule as chronos
  * tenant pipelines: symlink-free path, tenant listed under its own binding.
  */
-function listTenantDotCharterPaths(rootDir: string): string[] {
+function listTenantDotCharterSources(rootDir: string): DotCharterSource[] {
   let slugs: string[];
   try {
     slugs = withExecutionContext(DOT_TENANT_SCAN_ROLE, () => listTenantProfileSlugs({ rootDir }));
   } catch {
     return [];
   }
-  const found: string[] = [];
+  const found: DotCharterSource[] = [];
   for (const slug of slugs) {
     try {
       withExecutionContext(
@@ -233,7 +240,8 @@ function listTenantDotCharterPaths(rootDir: string): string[] {
           const dir = path.join(rootDir, relativeDir);
           if (!safeExistsSync(dir)) return;
           assertSafeRepositoryPath(dir, { rootDir: path.resolve(rootDir), allowMissingLeaf: true });
-          found.push(...jsonChildren(dir));
+          for (const filePath of jsonChildren(dir))
+            found.push({ path: filePath, tenant_slug: slug });
         },
         undefined,
         slug
@@ -247,10 +255,45 @@ function listTenantDotCharterPaths(rootDir: string): string[] {
   return found;
 }
 
-export function listDotCharterPaths(rootDir = pathResolver.rootDir()): string[] {
+/** Every charter file with the tenant its directory binds it to (path-sorted). */
+export function listDotCharterSources(rootDir = pathResolver.rootDir()): DotCharterSource[] {
   const dir = dotCharterDir(rootDir);
-  const repoLevel = safeExistsSync(dir) ? jsonChildren(dir) : [];
-  return [...repoLevel, ...listTenantDotCharterPaths(rootDir)].sort();
+  const repoLevel: DotCharterSource[] = safeExistsSync(dir)
+    ? jsonChildren(dir).map((filePath) => ({ path: filePath }))
+    : [];
+  return [...repoLevel, ...listTenantDotCharterSources(rootDir)].sort((a, b) =>
+    a.path < b.path ? -1 : a.path > b.path ? 1 : 0
+  );
+}
+
+export function listDotCharterPaths(rootDir = pathResolver.rootDir()): string[] {
+  return listDotCharterSources(rootDir).map((source) => source.path);
+}
+
+/**
+ * Load a charter from where it was found. A tenant charter is read inside the
+ * same tenant-bound runner context it was listed under (tier-guard denies the
+ * confidential path in any other context) and must declare the tenant its
+ * directory binds it to — a charter under `knowledge/confidential/<slug>/dots`
+ * claiming another tenant (or a non-confidential tier) is rejected. Repo-level
+ * `dots/` charters keep their declared scope (e.g. an org dot bound to the
+ * operator's own tenant).
+ */
+export function loadDotCharterSource(source: DotCharterSource): DotCharter {
+  const slug = source.tenant_slug;
+  if (!slug) return loadDotCharter(source.path);
+  const charter = withExecutionContext(
+    DOT_TENANT_SCAN_ROLE,
+    () => loadDotCharter(source.path),
+    undefined,
+    slug
+  );
+  if (charter.scope.tenant_slug !== slug || charter.scope.tier !== 'confidential') {
+    throw new Error(
+      `Dot charter at ${source.path} is not bound to its tenant directory: scope must be { tier: 'confidential', tenant_slug: '${slug}' }`
+    );
+  }
+  return charter;
 }
 
 export interface LoadedDotCharter {
@@ -274,10 +317,11 @@ export function listDotCharters(
   options: { status?: DotCharterStatus; errors?: DotCharterLoadError[] } = {}
 ): LoadedDotCharter[] {
   const charters: LoadedDotCharter[] = [];
-  for (const filePath of listDotCharterPaths(rootDir)) {
+  for (const source of listDotCharterSources(rootDir)) {
+    const filePath = source.path;
     let charter: DotCharter;
     try {
-      charter = loadDotCharter(filePath);
+      charter = loadDotCharterSource(source);
     } catch (error) {
       if (!options.errors) throw error;
       options.errors.push({

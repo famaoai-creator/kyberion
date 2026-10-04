@@ -5,6 +5,19 @@
  * organization) across resident dots, missions and media generation, and maps
  * it onto a normal / soft / hard throttle using the `org_budget` section of
  * spend-policy.json. Pure read-side: wiring into the dot runtime is separate.
+ *
+ * Sources and attribution:
+ * - dots: `dot-token-usage.jsonl` joined to each charter's tenant/org scope.
+ * - missions / reasoning: metrics-history rows, scoped by `scope.tenant_slug`
+ *   / `scope.organization_id` (EventScope written by MetricsCollector.record
+ *   callers), with legacy top-level `tenant_slug` / `tenant` fallbacks.
+ *   Reasoning backends meter dot wakes too, without a dot marker; so tokens of
+ *   rows that are dot-tagged (`agent`/`actor_id`/`component` `dot:*`, or a
+ *   `dot_id` field) or wholly unattributed (no mission_id, no scope, no
+ *   tenant) are not added — the dot ledger already counts them. Their cost
+ *   still counts (the dot ledger carries no cost).
+ * - generation: generation-quota units, report-only — never part of the
+ *   token total nor the throttle.
  */
 
 import * as path from 'node:path';
@@ -42,7 +55,10 @@ export interface BudgetUsage {
   day: string;
   tokens: number;
   cost_usd: number;
-  /** dots / missions are tokens; generation is generation-quota units (not added to tokens). */
+  /**
+   * dots / missions are tokens; generation is generation-quota units — report
+   * only: never added to `tokens` and never an input to the throttle.
+   */
   by_source: { dots: number; missions: number; generation: number };
 }
 
@@ -70,9 +86,12 @@ export interface OrgBudgetDeps {
   readDotTokenUsage?: () => Array<{ dot_id?: string; day?: string; tokens?: number }>;
   readMetricsHistory?: () => Array<Record<string, any>>;
   readGenerationUnits?: (tenantSlug: string, now: Date) => number;
+  /** evaluateBudgetThrottle cache window per scope (default 60 s); 0 disables it. */
+  throttleCacheMs?: number;
 }
 
-interface RawSpendPolicy {
+/** The spend-policy.json fields the governor reads. */
+export interface RawSpendPolicy {
   daily_cap_usd?: number;
   tenant_overrides?: Record<string, { daily_cap_usd?: number }>;
   org_budget?: OrgBudgetPolicy;
@@ -86,13 +105,14 @@ const catalog = defineCatalog<RawSpendPolicy>({
 
 let policyCache: { at: number; value: OrgBudgetPolicy } | null = null;
 
-/** Loads `org_budget` (60 s cache; inherits daily_cap_usd as the cost cap). */
-export function loadOrgBudgetPolicy(now: () => Date = () => new Date()): OrgBudgetPolicy {
-  const t = now().getTime();
-  if (policyCache && t - policyCache.at < CACHE_TTL_MS) return policyCache.value;
-  const raw = catalog.load();
+/**
+ * Map spend-policy.json onto the governor policy: `org_budget` values, the
+ * global `daily_cap_usd` as the default cost cap, and each spend-policy
+ * `tenant_overrides[slug].daily_cap_usd` as that tenant's cost cap.
+ */
+export function resolveOrgBudgetPolicy(raw: RawSpendPolicy): OrgBudgetPolicy {
   const ob = raw.org_budget;
-  const value: OrgBudgetPolicy = {
+  return {
     daily_token_cap: positive(ob?.daily_token_cap)
       ? ob!.daily_token_cap
       : DEFAULT_ORG_BUDGET_TOKEN_CAP,
@@ -103,11 +123,36 @@ export function loadOrgBudgetPolicy(now: () => Date = () => new Date()): OrgBudg
         : {}),
     soft_ratio: positive(ob?.soft_ratio) ? ob!.soft_ratio : 0.8,
     hard_ratio: positive(ob?.hard_ratio) ? ob!.hard_ratio : 1,
-    ...(ob?.tenant_overrides ? { tenant_overrides: ob.tenant_overrides } : {}),
+    ...tenantOverridesWithSpendCaps(raw, ob),
     ...(ob?.organization_overrides ? { organization_overrides: ob.organization_overrides } : {}),
   };
+}
+
+/** Loads `org_budget` from spend-policy.json (60 s cache); see {@link resolveOrgBudgetPolicy}. */
+export function loadOrgBudgetPolicy(now: () => Date = () => new Date()): OrgBudgetPolicy {
+  const t = now().getTime();
+  if (policyCache && t - policyCache.at < CACHE_TTL_MS) return policyCache.value;
+  const value = resolveOrgBudgetPolicy(catalog.load());
   policyCache = { at: t, value };
   return value;
+}
+
+/**
+ * org_budget.tenant_overrides, plus spend-policy `tenant_overrides[slug].daily_cap_usd`
+ * inherited as that tenant's cost cap when org_budget sets none for it.
+ */
+function tenantOverridesWithSpendCaps(
+  raw: RawSpendPolicy,
+  ob: OrgBudgetPolicy | undefined
+): Pick<OrgBudgetPolicy, 'tenant_overrides'> {
+  const merged: Record<string, Partial<OrgBudgetPolicy>> = { ...(ob?.tenant_overrides ?? {}) };
+  for (const [slug, spend] of Object.entries(raw.tenant_overrides ?? {})) {
+    if (!positive(spend?.daily_cap_usd)) continue;
+    const existing = merged[slug] ?? {};
+    if (positive(existing.daily_cost_cap_usd)) continue;
+    merged[slug] = { ...existing, daily_cost_cap_usd: spend.daily_cap_usd };
+  }
+  return Object.keys(merged).length || ob?.tenant_overrides ? { tenant_overrides: merged } : {};
 }
 
 /** Test hook: drop the 60 s policy cache. */
@@ -149,6 +194,38 @@ function inScope(
   if (scope.tenant_slug && row.tenant_slug !== scope.tenant_slug) return false;
   if (scope.organization_id && row.organization_id !== scope.organization_id) return false;
   return true;
+}
+
+function nonEmpty(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+/** Tenant/org of a metrics row: canonical `scope` first, then legacy top-level fields. */
+function metricsRowScope(e: Record<string, any>): OrgBudgetScope {
+  const scope = e.scope && typeof e.scope === 'object' ? e.scope : {};
+  return {
+    tenant_slug: nonEmpty(scope.tenant_slug) ?? nonEmpty(e.tenant_slug) ?? nonEmpty(e.tenant),
+    organization_id: nonEmpty(scope.organization_id) ?? nonEmpty(e.organization_id),
+  };
+}
+
+const DOT_ACTOR_PATTERN = /^dot:/;
+
+/**
+ * Rows whose tokens the dot ledger already counts: explicitly dot-tagged, or
+ * wholly unattributed reasoning (backends meter dot wakes with no mission,
+ * scope or tenant — the resident daemon's only unscoped reasoning source).
+ */
+function isDotAttributableMetricsRow(e: Record<string, any>, rowScope: OrgBudgetScope): boolean {
+  if (nonEmpty(e.dot_id) || nonEmpty(e.scope?.dot_id)) return true;
+  if (
+    [e.agent, e.actor_id, e.component].some(
+      (v) => typeof v === 'string' && DOT_ACTOR_PATTERN.test(v)
+    )
+  ) {
+    return true;
+  }
+  return !nonEmpty(e.mission_id) && !e.scope && !rowScope.tenant_slug && !rowScope.organization_id;
 }
 
 function metricsTokens(entry: Record<string, any>): number {
@@ -210,12 +287,9 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
     const entries = deps.readMetricsHistory ? deps.readMetricsHistory() : metrics.loadHistory();
     for (const e of entries) {
       if (typeof e?.timestamp !== 'string' || e.timestamp.slice(0, 10) !== day) continue;
-      const rowScope = {
-        tenant_slug: e.tenant_slug ?? e.tenant,
-        organization_id: e.organization_id,
-      };
+      const rowScope = metricsRowScope(e);
       if (!inScope(scope, rowScope)) continue;
-      missions += metricsTokens(e);
+      if (!isDotAttributableMetricsRow(e, rowScope)) missions += metricsTokens(e);
       const c = Number(e.cost_usd);
       if (Number.isFinite(c) && c > 0) cost += c;
     }
@@ -247,10 +321,34 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
   };
 }
 
+const throttleCache = new Map<string, { at: number; value: OrgBudgetEvaluation }>();
+
+/** Test hook: drop cached throttle evaluations. */
+export function resetOrgBudgetThrottleCache(): void {
+  throttleCache.clear();
+}
+
+/** Throttle for a scope; cached per scope (and UTC day) for `throttleCacheMs` (60 s). */
 export function evaluateBudgetThrottle(
   scope: OrgBudgetScope,
   deps: OrgBudgetDeps = {}
 ): OrgBudgetEvaluation {
+  const now = deps.now?.() ?? new Date();
+  const ttl = deps.throttleCacheMs ?? CACHE_TTL_MS;
+  const key = [
+    deps.rootDir ?? '',
+    scope.tenant_slug ?? '',
+    scope.organization_id ?? '',
+    now.toISOString().slice(0, 10),
+  ].join('\u0000');
+  const hit = throttleCache.get(key);
+  if (ttl > 0 && hit && now.getTime() - hit.at < ttl) return hit.value;
+  const value = computeBudgetThrottle(scope, deps);
+  if (ttl > 0) throttleCache.set(key, { at: now.getTime(), value });
+  return value;
+}
+
+function computeBudgetThrottle(scope: OrgBudgetScope, deps: OrgBudgetDeps): OrgBudgetEvaluation {
   const policy = deps.policy ?? loadOrgBudgetPolicy(deps.now);
   const cap = resolveCap(policy, scope);
   const usage = computeBudgetUsage(scope, deps);

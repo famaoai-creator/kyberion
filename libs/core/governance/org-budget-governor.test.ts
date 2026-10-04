@@ -6,6 +6,8 @@ import {
   maybeAlertBudgetThreshold,
   resetOrgBudgetAlertState,
   resetOrgBudgetPolicyCache,
+  resetOrgBudgetThrottleCache,
+  resolveOrgBudgetPolicy,
   type OrgBudgetPolicy,
 } from './org-budget-governor.js';
 
@@ -46,6 +48,7 @@ const base = (extra: Record<string, unknown> = {}) => ({
     },
   ],
   readGenerationUnits: () => 3,
+  throttleCacheMs: 0,
   ...extra,
 });
 
@@ -53,6 +56,7 @@ describe('org-budget-governor', () => {
   beforeEach(() => {
     resetOrgBudgetAlertState();
     resetOrgBudgetPolicyCache();
+    resetOrgBudgetThrottleCache();
   });
 
   it('aggregates today only, scoped per tenant', () => {
@@ -106,5 +110,126 @@ describe('org-budget-governor', () => {
     expect(p.soft_ratio).toBe(0.8);
     expect(p.daily_cost_cap_usd).toBe(50);
     expect(loadOrgBudgetPolicy(now)).toBe(p);
+  });
+
+  // Row shapes as MetricsCollector.record persists them (component + ...extra).
+  const askRow = {
+    component: 'agent-runtime:ask',
+    timestamp: '2026-10-04T02:00:00Z',
+    status: 'success',
+    agent: 'agent-x',
+    provider: 'anthropic',
+    model: 'claude-sonnet',
+    scope: { scope_kind: 'organization', tenant_slug: 'acme', organization_id: 'o1' },
+    usage: { prompt_tokens: 100, completion_tokens: 20 },
+    cost_usd: 1,
+  };
+  const missionSdkRow = {
+    component: 'anthropic-sdk',
+    timestamp: '2026-10-04T03:00:00Z',
+    agent: 'anthropic-sdk',
+    cause: 'assistant',
+    mission_id: 'MSN-X',
+    usage: { prompt_tokens: 40, completion_tokens: 10, cache_read_tokens: 50 },
+    cost_usd: 0.5,
+  };
+  // A dot wake metered by the backend: no mission, no scope, no tenant.
+  const unattributedSdkRow = {
+    component: 'anthropic-sdk',
+    timestamp: '2026-10-04T04:00:00Z',
+    agent: 'anthropic-sdk',
+    cause: 'assistant',
+    usage: { prompt_tokens: 600, completion_tokens: 100 },
+    cost_usd: 3,
+  };
+  const dotTaggedRow = {
+    component: 'claude-cli',
+    timestamp: '2026-10-04T05:00:00Z',
+    agent: 'dot:repo-guardian',
+    mission_id: 'MSN-Y',
+    usage: { prompt_tokens: 900 },
+    cost_usd: 0.25,
+  };
+  const realRows = () => [askRow, missionSdkRow, unattributedSdkRow, dotTaggedRow];
+
+  it('scopes metrics rows by their EventScope tenant / organization', () => {
+    const acme = computeBudgetUsage(
+      { tenant_slug: 'acme' },
+      base({ readDotTokenUsage: () => [], readMetricsHistory: realRows })
+    );
+    expect(acme.by_source.missions).toBe(120);
+    expect(acme.cost_usd).toBe(1);
+    const org = computeBudgetUsage(
+      { organization_id: 'o1' },
+      base({ readDotTokenUsage: () => [], readMetricsHistory: realRows })
+    );
+    expect(org.by_source.missions).toBe(120);
+    expect(
+      computeBudgetUsage(
+        { tenant_slug: 'big' },
+        base({ readDotTokenUsage: () => [], readMetricsHistory: realRows })
+      ).by_source.missions
+    ).toBe(0);
+  });
+
+  it('does not double count dot tokens in the global scope, but keeps their cost', () => {
+    const global = computeBudgetUsage({}, base({ readMetricsHistory: realRows }));
+    // dots: 500 (a) + 700 (b); missions: ask 120 + mission sdk 100.
+    expect(global.by_source).toEqual({ dots: 1200, missions: 220, generation: 0 });
+    expect(global.tokens).toBe(1420);
+    expect(global.cost_usd).toBe(4.75);
+  });
+
+  it('caches the throttle per scope for 60 s and per UTC day', () => {
+    let t = new Date('2026-10-04T10:00:00Z');
+    let tokens = 100;
+    const deps = base({
+      now: () => t,
+      throttleCacheMs: undefined,
+      readMetricsHistory: () => [],
+      readDotTokenUsage: () => [{ dot_id: 'a', day: t.toISOString().slice(0, 10), tokens }],
+    });
+    expect(evaluateBudgetThrottle({ tenant_slug: 'acme' }, deps).throttle).toBe('normal');
+    tokens = 2000;
+    t = new Date('2026-10-04T10:00:59Z');
+    expect(evaluateBudgetThrottle({ tenant_slug: 'acme' }, deps).throttle).toBe('normal');
+    // A different scope is evaluated on its own.
+    expect(
+      evaluateBudgetThrottle({ tenant_slug: 'acme', organization_id: 'o1' }, deps).throttle
+    ).toBe('hard');
+    t = new Date('2026-10-04T10:01:00Z');
+    expect(evaluateBudgetThrottle({ tenant_slug: 'acme' }, deps).throttle).toBe('hard');
+    tokens = 0;
+    resetOrgBudgetThrottleCache();
+    expect(evaluateBudgetThrottle({ tenant_slug: 'acme' }, deps).throttle).toBe('normal');
+  });
+
+  it('inherits spend-policy tenant daily_cap_usd as the tenant cost cap', () => {
+    const p = resolveOrgBudgetPolicy({
+      daily_cap_usd: 50,
+      tenant_overrides: { acme: { daily_cap_usd: 5 }, big: { daily_cap_usd: 7 } },
+      org_budget: {
+        daily_token_cap: 1000,
+        soft_ratio: 0.8,
+        hard_ratio: 1,
+        tenant_overrides: { big: { daily_cost_cap_usd: 30 } },
+      },
+    });
+    expect(p.daily_cost_cap_usd).toBe(50);
+    expect(p.tenant_overrides).toEqual({
+      acme: { daily_cost_cap_usd: 5 },
+      big: { daily_cost_cap_usd: 30 },
+    });
+    const e = evaluateBudgetThrottle(
+      { tenant_slug: 'acme' },
+      base({
+        policy: p,
+        readDotTokenUsage: () => [],
+        readMetricsHistory: () => [askRow],
+        readGenerationUnits: () => 0,
+      })
+    );
+    expect(e.cap.daily_cost_cap_usd).toBe(5);
+    expect(e.throttle).toBe('normal');
   });
 });

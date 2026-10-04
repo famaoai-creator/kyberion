@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '../secure-io.js';
 import type { DotCharter } from './dot-charter.js';
 import {
   DOT_INBOX_PATH,
@@ -21,6 +27,9 @@ import {
   normalizeDotWakeReason,
   recordDotWakeOutcome,
   DOT_WAKE_CIRCUIT_THRESHOLD,
+  dotWakeErrorsPath,
+  DOT_WAKE_FAILURE_CATEGORY,
+  isDotWakeProcessFailure,
   type DotWakeLoopResult,
 } from './dot-runtime.js';
 import { DOT_PROMPT_SECTIONS, DOT_WAKE_TOOLS } from './dot-extension-registry.js';
@@ -594,6 +603,47 @@ describe('runtime reliability (DL-02)', () => {
     expect(dueAt(5 * 60_000 + 10 * 60_000)).toBe(1);
   });
 
+  it('never counts backend/process-level failures toward the per-dot circuit', () => {
+    expect(isDotWakeProcessFailure('backend unavailable')).toBe(true);
+    expect(
+      isDotWakeProcessFailure(
+        'no real reasoning backend in this process — next: run `pnpm reasoning:setup`'
+      )
+    ).toBe(true);
+    expect(isDotWakeProcessFailure('[GOAL_DRIVER] backend lacks generateWithTools')).toBe(true);
+    expect(isDotWakeProcessFailure('generateWithTools failed across 3 candidate(s): x')).toBe(true);
+    expect(isDotWakeProcessFailure('provider timeout')).toBe(false);
+
+    writeCharter(CHARTER);
+    const t0 = new Date('2026-10-02T10:00:00Z');
+    const fail = (index: number, reason: string) =>
+      recordDotWakeOutcome(
+        CHARTER,
+        { trigger: { kind: 'cron', cron: '* * * * *' }, key: `cron:k${index}` },
+        'failed',
+        { rootDir: TEST_ROOT, now: () => new Date(t0.getTime() + index * 60_000), reason }
+      );
+    for (let index = 0; index < DOT_WAKE_CIRCUIT_THRESHOLD + 3; index += 1) {
+      fail(index, `generateWithTools failed across ${index} candidate(s): down`);
+    }
+    const after = { rootDir: TEST_ROOT, now: () => new Date(t0.getTime() + 9 * 60_000) };
+    expect(evaluateDotWakeCircuit(CHARTER, after)).toMatchObject({
+      consecutive: 0,
+      tripped: false,
+    });
+    // Interleaved backend failures neither break nor extend a real streak.
+    for (let index = 10; index < 10 + DOT_WAKE_CIRCUIT_THRESHOLD; index += 1) {
+      fail(index, 'provider timeout');
+      fail(index + 100, DOT_WAKE_FAILURE_CATEGORY.backend);
+    }
+    expect(
+      evaluateDotWakeCircuit(CHARTER, {
+        rootDir: TEST_ROOT,
+        now: () => new Date(t0.getTime() + 200 * 60_000),
+      }).consecutive
+    ).toBe(DOT_WAKE_CIRCUIT_THRESHOLD);
+  });
+
   it('opens a per-dot circuit after 5 same-reason failures on rotating keys, alerts once, then half-opens', () => {
     const watchCharter = {
       ...CHARTER,
@@ -744,6 +794,125 @@ describe('runtime reliability (DL-02)', () => {
       }
     );
     expect(receipt).toMatchObject({ outcome: 'failed', reason: 'provider timeout' });
+  });
+
+  it('falls back to a fenced turn only when no tool-loop turn completed', async () => {
+    writeCharter(CHARTER);
+    const delegate = vi.fn(async () => 'should not run');
+    const receipt = await runDotWake(
+      { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+      {
+        rootDir: TEST_ROOT,
+        hasRole: () => true,
+        runLoop: async (options) => {
+          // Turn 1 got a response (estimated), turn 2's backend call fails.
+          options.onPromptVisible?.('x'.repeat(300), 'goal_turn');
+          options.estimateTurnTokens?.({
+            prompt: 'x'.repeat(300),
+            result: { text: 'y'.repeat(30) },
+          });
+          options.onPromptVisible?.('x'.repeat(300), 'goal_turn');
+          throw new Error(
+            '[reasoning-backend:failover] generateWithTools failed across 0 candidate(s): '
+          );
+        },
+        backend: { delegateTask: delegate },
+      }
+    );
+    expect(delegate).not.toHaveBeenCalled();
+    expect(receipt.outcome).toBe('failed');
+    const [row] = readDotWakeLedger({ rootDir: TEST_ROOT });
+    expect(row).toMatchObject({ outcome: 'failed', turns_run: 1, tokens_used: 110 });
+    // The partial loop's tokens count against the daily cap.
+    expect(dotTokensUsedToday(CHARTER.dot_id, { rootDir: TEST_ROOT })).toBe(110);
+  });
+
+  it('records partial loop tokens even without a turn estimator (no budget)', async () => {
+    writeCharter(CHARTER);
+    await runDotWake(
+      { path: `${TEST_ROOT}/dots/dot.json`, charter: CHARTER },
+      {
+        rootDir: TEST_ROOT,
+        hasRole: () => true,
+        runLoop: async (options) => {
+          options.onPromptVisible?.('x'.repeat(300), 'goal_turn');
+          options.onPromptVisible?.('x'.repeat(600), 'goal_turn');
+          throw new Error('provider timeout');
+        },
+        backend: { delegateTask: async () => 'unused' },
+      }
+    );
+    // Only the completed first turn's prompt is counted.
+    expect(dotTokensUsedToday(CHARTER.dot_id, { rootDir: TEST_ROOT })).toBe(100);
+  });
+
+  it('keeps tenant failure prose out of the shared ledger and heartbeat', async () => {
+    const tenant: DotCharter = {
+      ...CHARTER,
+      dot_id: 'tenant-dot',
+      scope: { tier: 'confidential', tenant_slug: 'acme' },
+      runtime: { heartbeat_id: 'dot-tenant-dot' },
+    };
+    const dir = `${TEST_ROOT}/knowledge/confidential/acme/dots`;
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(`${dir}/tenant-dot.json`, JSON.stringify(tenant));
+    const receipt = await runDotWake(
+      { path: `${dir}/tenant-dot.json`, charter: tenant },
+      {
+        rootDir: TEST_ROOT,
+        hasRole: () => true,
+        runLoop: async () => {
+          throw new Error('Acme merger memo leaked into the error');
+        },
+        backend: { delegateTask: async () => 'unused' },
+      }
+    );
+    expect(receipt.reason).toBe('Acme merger memo leaked into the error');
+    const [row] = readDotWakeLedger({ rootDir: TEST_ROOT });
+    expect(row.reason).toBe('wake failed');
+    const heartbeat = JSON.parse(
+      safeReadFile(`${TEST_ROOT}/active/shared/runtime/heartbeats/dot-tenant-dot.json`, {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(heartbeat.details.error).toBe('wake failed');
+    const errorsFile = `${TEST_ROOT}/${dotWakeErrorsPath(tenant)}`;
+    expect(errorsFile).toContain('/acme/');
+    const [logged] = (safeReadFile(errorsFile, { encoding: 'utf8' }) as string)
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    expect(logged).toMatchObject({
+      dot_id: 'tenant-dot',
+      category: 'wake failed',
+      reason: 'Acme merger memo leaked into the error',
+    });
+
+    // An unreadable tenant charter: category only in the ledger.
+    safeWriteFile(`${dir}/tenant-dot.json`, JSON.stringify({ ...tenant, status: 'bogus' }));
+    await runDotWake(
+      { path: `${dir}/tenant-dot.json`, charter: tenant },
+      { rootDir: TEST_ROOT, runLoop: async () => fakeResult(1, 5), hasRole: () => true }
+    );
+    expect(readDotWakeLedger({ rootDir: TEST_ROOT }).at(-1)?.reason).toBe('charter unreadable');
+  });
+
+  it('rejects a tenant charter whose re-read scope names another tenant', async () => {
+    const spoof: DotCharter = {
+      ...CHARTER,
+      dot_id: 'spoof-dot',
+      scope: { tier: 'confidential', tenant_slug: 'globex' },
+      runtime: { heartbeat_id: 'dot-spoof-dot' },
+    };
+    const dir = `${TEST_ROOT}/knowledge/confidential/acme/dots`;
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(`${dir}/spoof.json`, JSON.stringify(spoof));
+    const receipt = await runDotWake(
+      { path: `${dir}/spoof.json`, charter: spoof },
+      { rootDir: TEST_ROOT, runLoop: async () => fakeResult(1, 5), hasRole: () => true }
+    );
+    expect(receipt.outcome).toBe('failed');
+    expect(receipt.reason).toMatch(/not bound to its tenant directory/);
   });
 
   it('plumbs registered prompt sections and wake tools through tool and fence wakes', async () => {

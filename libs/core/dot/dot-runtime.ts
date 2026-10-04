@@ -40,7 +40,6 @@ import { appendJsonLine, readJsonIfPresent, readJsonLines, writeJson } from '../
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { getZonedDateParts, matchesCron } from '../pipeline/cron-utils.js';
 import { recordDaemonHeartbeat } from '../daemon-heartbeat.js';
-import { withExecutionContext } from '../authority.js';
 import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
 import { sendOpsAlert, type OpsAlertInput } from '../ops-alert.js';
 import type {
@@ -54,7 +53,7 @@ import { estimateTokens } from '../workforce/worker-context-compaction.js';
 import {
   dotGoalRefLabel,
   listDotCharters,
-  loadDotCharter,
+  loadDotCharterSource,
   type DotCharter,
   type DotCharterLoadError,
   type DotTrigger,
@@ -135,6 +134,13 @@ export interface DotWakeLoopOptions {
    * loop never re-resolves a different (e.g. stub) process backend.
    */
   backend?: Pick<ReasoningBackend, 'generateWithTools'>;
+  /** Called with each turn's prompt as it is sent (the goal driver's `onPromptVisible`). */
+  onPromptVisible?: (content: string, form: string) => void;
+  /** Per-turn token estimator (the goal driver's `estimateTurnTokens`); called after each turn's response. */
+  estimateTurnTokens?: (input: {
+    prompt: string;
+    result: { text?: string; toolCalls?: Array<{ name: string; input: unknown }> };
+  }) => number;
 }
 
 /** Minimal wake receipt shape — only the fields the ledger/CLI need. */
@@ -518,6 +524,76 @@ export function buildDotDueChecker(
   };
 }
 
+/**
+ * Category-only failure reasons. Tenant dots write only these to the shared
+ * system-floor wake ledger and heartbeat; the full message goes to the
+ * tenant-scoped `wake-errors.jsonl` ({@link dotWakeErrorsPath}).
+ */
+export const DOT_WAKE_FAILURE_CATEGORY = {
+  charter: 'charter unreadable',
+  backend: 'backend unavailable',
+  wake: 'wake failed',
+} as const;
+export type DotWakeFailureCategory =
+  (typeof DOT_WAKE_FAILURE_CATEGORY)[keyof typeof DOT_WAKE_FAILURE_CATEGORY];
+
+/**
+ * Backend / process-level failure (no real backend, no tool-capable
+ * candidate, failover chain exhausted): not this dot's fault, so it never
+ * counts toward the per-dot wake circuit — a healthy dot resumes as soon as
+ * the backend recovers instead of being held for the circuit's backoff.
+ */
+export function isDotWakeProcessFailure(reason: string | undefined): boolean {
+  if (!reason) return false;
+  if (reason === DOT_WAKE_FAILURE_CATEGORY.backend) return true;
+  return /no real reasoning backend|lacks generateWithTools|failed across \d+ candidate|has no tool-capable backend/.test(
+    reason
+  );
+}
+
+/** Tenant-scoped full-text wake error log for a dot. */
+export function dotWakeErrorsPath(charter: DotCharter): string {
+  return dotStatePath(charter, 'wake-errors.jsonl');
+}
+
+/**
+ * Record a failed wake. Untenanted dots keep the full reason in the shared
+ * ledger; tenant dots write only `category` there and the full reason to
+ * their tenant-scoped `wake-errors.jsonl`. Returns the ledger reason.
+ */
+function recordDotWakeFailure(
+  charter: DotCharter,
+  trigger: DueDotTrigger | undefined,
+  category: DotWakeFailureCategory,
+  reason: string,
+  deps: DotRuntimeDeps & { turns_run?: number; tokens_used?: number }
+): string {
+  if (!charter.scope.tenant_slug) {
+    recordDotWakeOutcome(charter, trigger, 'failed', { ...deps, reason });
+    return reason;
+  }
+  recordDotWakeOutcome(charter, trigger, 'failed', { ...deps, reason: category });
+  try {
+    const now = deps.now?.() ?? new Date();
+    appendJsonlEnsured(
+      dotWakeErrorsPath(charter),
+      {
+        dot_id: charter.dot_id,
+        trigger_key: trigger?.key ?? `manual:${now.toISOString()}`,
+        fired_at: now.toISOString(),
+        category,
+        reason,
+      },
+      deps
+    );
+  } catch (error) {
+    logger.warn(
+      `wake error log write failed for ${charter.dot_id} — ${error instanceof Error ? error.message : error} | next: the ledger still records '${category}' | evidence: ${dotWakeErrorsPath(charter)}`
+    );
+  }
+  return category;
+}
+
 /** Digits and hex runs stripped, so "same failure, different id/mtime" is one reason. */
 export function normalizeDotWakeReason(reason: string | undefined): string {
   return String(reason ?? '')
@@ -545,7 +621,8 @@ export interface DotWakeCircuitState {
 
 /**
  * Per-dot wake circuit: the last {@link DOT_WAKE_CIRCUIT_THRESHOLD} wake
- * attempts (skipped audit markers ignored) all failed with the same
+ * attempts (skipped audit markers and backend/process-level failures
+ * ignored — see {@link isDotWakeProcessFailure}) all failed with the same
  * normalized reason → hold every trigger until `lastFailedAt + backoff(n)`.
  * This is what stops rotating keys (`watch:<file>@<mtime>`) from defeating
  * the per-key backoff and flooding the ledger with one failure per change.
@@ -555,8 +632,13 @@ export function evaluateDotWakeCircuit(
   deps: DotRuntimeDeps = {}
 ): DotWakeCircuitState {
   const now = (deps.now?.() ?? new Date()).getTime();
+  // Skipped audit markers and backend/process-level failures are transparent:
+  // they neither extend nor break a dot's own failure streak.
   const rows = readDotWakeLedger(deps).filter(
-    (row) => row.dot_id === charter.dot_id && row.outcome !== 'skipped'
+    (row) =>
+      row.dot_id === charter.dot_id &&
+      row.outcome !== 'skipped' &&
+      !(row.outcome === 'failed' && isDotWakeProcessFailure(row.reason))
   );
   const last = rows.at(-1);
   if (!last || last.outcome !== 'failed') return { consecutive: 0, tripped: false, open: false };
@@ -1150,24 +1232,19 @@ async function runFencedWake(
 }
 
 /**
- * Same tenant-bound reader role the charter loader scans tenant charter dirs
- * with (dot-charter.ts); a charter role need not read its own tenant's
- * `knowledge/confidential/<slug>/dots/`.
+ * Re-read the charter's own file. A tenant charter is read in the same
+ * tenant-bound runner context the loader scanned it with (dot-charter.ts); a
+ * charter role need not read its own tenant's `knowledge/confidential/<slug>/dots/`.
  */
-const DOT_TENANT_CHARTER_READ_ROLE = 'chronos_tenant_runner';
-
 function rereadOwnCharter(loaded: LoadedDotCharter): DotCharter {
-  const tenant = loaded.charter.scope.tenant_slug;
   const normalized = loaded.path.split(path.sep).join('/');
-  if (tenant && normalized.includes('knowledge/confidential/')) {
-    return withExecutionContext(
-      DOT_TENANT_CHARTER_READ_ROLE,
-      () => loadDotCharter(loaded.path),
-      undefined,
-      tenant
-    );
-  }
-  return loadDotCharter(loaded.path);
+  // The directory binds a tenant charter (loadDotCharterSource reads it in
+  // that tenant's context and rejects a scope that names another tenant).
+  const dirTenant = normalized.match(/(?:^|\/)knowledge\/confidential\/([^/]+)\/dots\/[^/]+$/)?.[1];
+  return loadDotCharterSource({
+    path: loaded.path,
+    ...(dirTenant ? { tenant_slug: dirTenant } : {}),
+  });
 }
 
 /**
@@ -1202,9 +1279,9 @@ export async function runDotWake(
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const reason = `charter unreadable — ${message} | next: pnpm kyberion dot validate ${charter.dot_id} | evidence: ${loaded.path}`;
+      const reason = `${DOT_WAKE_FAILURE_CATEGORY.charter} — ${message} | next: pnpm kyberion dot validate ${charter.dot_id} | evidence: ${loaded.path}`;
       logger.warn(reason);
-      recordDotWakeOutcome(charter, deps.trigger, 'failed', { ...deps, reason });
+      recordDotWakeFailure(charter, deps.trigger, DOT_WAKE_FAILURE_CATEGORY.charter, reason, deps);
       return { dot_id: charter.dot_id, outcome: 'failed', reason };
     }
     if (current.status !== 'active') {
@@ -1267,9 +1344,29 @@ export async function runDotWake(
       const proposalInputs: unknown[] = [];
       const toolOutputs: DotWakeToolOutputs = {};
       const toolErrors: string[] = [];
+      // Partial-loop accounting: a loop that throws mid-wake has still spent
+      // the turns that got a backend response.
+      let promptsSent = 0;
+      let toolCallsSeen = 0;
+      let estimatedTokens = 0;
+      let estimatorCalls = 0;
+      let completedPromptTokens = 0;
+      let lastPromptTokens = 0;
       let result: DotWakeLoopResult;
       try {
         result = await runLoop({
+          onPromptVisible: (content) => {
+            // A new prompt means the previous turn completed.
+            if (promptsSent > 0) completedPromptTokens += lastPromptTokens;
+            promptsSent += 1;
+            lastPromptTokens = estimateTokens(content);
+          },
+          estimateTurnTokens: (input) => {
+            const tokens = estimateWakeTokensFromText(input);
+            estimatorCalls += 1;
+            estimatedTokens += tokens;
+            return tokens;
+          },
           objective: wakePrompt(current, 'tool', deps.trigger, deps),
           goalId: `dot-${current.dot_id}`,
           systemPrompt: dotSystemPrompt(current, 'tool', deps),
@@ -1279,6 +1376,7 @@ export async function runDotWake(
             ...DOT_WAKE_TOOLS.map((tool) => tool.definition),
           ],
           executeTool: (call) => {
+            toolCallsSeen += 1;
             if (call.name === DOT_PROPOSE_TOOL_NAME) {
               if (proposalInputs.length >= MAX_DOT_PROPOSALS_PER_WAKE) {
                 return {
@@ -1318,9 +1416,22 @@ export async function runDotWake(
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        // Turns that got a backend response: every prompt but the one that
+        // threw, or all of them once a tool call ran.
+        const turnsCompleted = toolCallsSeen > 0 ? promptsSent : Math.max(0, promptsSent - 1);
+        const partialTokens =
+          estimatorCalls > 0
+            ? estimatedTokens
+            : completedPromptTokens + (toolCallsSeen > 0 ? lastPromptTokens : 0);
+        recordDotTokenUsage(current.dot_id, partialTokens, deps);
         const nothingCollected =
           proposalInputs.length === 0 && Object.keys(toolOutputs).length === 0;
-        if (realBackend && nothingCollected && isDotToolBackendUnavailableError(message)) {
+        if (
+          realBackend &&
+          turnsCompleted === 0 &&
+          nothingCollected &&
+          isDotToolBackendUnavailableError(message)
+        ) {
           logger.warn(
             `tool loop unavailable for ${current.dot_id} — ${message} | next: serving this wake as a fenced delegated turn | evidence: ${DOT_WAKE_LEDGER_PATH}`
           );
@@ -1329,7 +1440,9 @@ export async function runDotWake(
             receiptReason: 'degraded-fenced',
           });
         }
-        throw error;
+        throw Object.assign(error instanceof Error ? error : new Error(message), {
+          dotPartial: { turns_run: turnsCompleted, tokens_used: partialTokens },
+        });
       }
       const tokens = result.goal.budgetStats?.tokensUsed ?? 0;
       recordDotTokenUsage(current.dot_id, tokens, deps);
@@ -1354,10 +1467,19 @@ export async function runDotWake(
       };
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      recordDotWakeOutcome(current, deps.trigger, 'failed', { ...deps, reason });
+      const partial = (error as { dotPartial?: { turns_run: number; tokens_used: number } })
+        ?.dotPartial;
+      const category = isDotWakeProcessFailure(reason)
+        ? DOT_WAKE_FAILURE_CATEGORY.backend
+        : DOT_WAKE_FAILURE_CATEGORY.wake;
+      const ledgerReason = recordDotWakeFailure(current, deps.trigger, category, reason, {
+        ...deps,
+        ...(partial?.turns_run ? { turns_run: partial.turns_run } : {}),
+        ...(partial?.tokens_used ? { tokens_used: partial.tokens_used } : {}),
+      });
       recordDaemonHeartbeat(
         current.runtime.heartbeat_id,
-        { status: 'error', details: { dot_id: current.dot_id, error: reason } },
+        { status: 'error', details: { dot_id: current.dot_id, error: ledgerReason } },
         heartbeatOptions
       );
       return { dot_id: current.dot_id, outcome: 'failed', reason };
