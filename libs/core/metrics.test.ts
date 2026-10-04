@@ -23,6 +23,12 @@ describe('metrics core', () => {
       safeWriteFile(historyPath, '{broken json\n');
       expect(collector.loadHistory()).toEqual([]);
       expect(() => collector.loadHistory({ strict: true })).toThrow();
+      safeWriteFile(historyPath, '{"timestamp":"t1"}\n{broken json\n{"timestamp":"t2"}\n');
+      const malformed: number[] = [];
+      expect(
+        collector.loadHistory({ strict: true, onMalformed: (line) => malformed.push(line) })
+      ).toEqual([{ timestamp: 't1' }, { timestamp: 't2' }]);
+      expect(malformed).toEqual([2]);
       safeRmSync(historyPath);
       safeMkdir(historyPath);
       expect(collector.loadHistory()).toEqual([]);
