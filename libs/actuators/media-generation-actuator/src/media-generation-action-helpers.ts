@@ -539,8 +539,12 @@ async function getGenerationJob(params: any) {
       return { ...currentJob, ...finalizeActuatorTrace(traceCtx) };
     }
 
-    const promptHistory = (history as Record<string, unknown>)[promptId];
-    if (!promptHistory) {
+    const historyAdapter = getGenerationHistoryAdapterForAction(currentJob.action, provider);
+    const promptHistory = historyAdapter.select_job_history(history, promptId);
+    if (
+      !isPlainObject(promptHistory) ||
+      (!historyAdapter.is_failed(promptHistory) && !historyAdapter.is_complete(promptHistory))
+    ) {
       if (currentJob.status !== 'running') {
         const runningJob = transitionGenerationJob(currentJob, 'running', {
           kind: currentJob.kind || 'generation-job',
@@ -553,7 +557,6 @@ async function getGenerationJob(params: any) {
       return { ...currentJob, ...finalizeActuatorTrace(traceCtx) };
     }
 
-    const historyAdapter = getGenerationHistoryAdapterForAction(currentJob.action);
     if (historyAdapter.is_failed(promptHistory)) {
       throw new Error(`provider job ${promptId} failed or was canceled`);
     }
@@ -562,7 +565,9 @@ async function getGenerationJob(params: any) {
       currentJob.action,
       currentJob.request || {},
       promptId,
-      { resolved: currentJob.result?.compiled_generation_request }
+      { resolved: currentJob.result?.compiled_generation_request },
+      provider,
+      promptHistory
     );
     if (result.status !== 'succeeded' || !result.artifact) {
       const failedJob = transitionGenerationJob(currentJob, 'failed', {

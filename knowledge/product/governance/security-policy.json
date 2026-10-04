@@ -600,6 +600,15 @@
     "check_tenant_registry_consistency": {
       "allow_read": ["knowledge/personal/tenants/", "knowledge/confidential/tenants/index.json"]
     },
+    "secret_introduce": {
+      "allow_read": ["vault/secrets/", "knowledge/personal/connections/", "active/shared/tmp/"],
+      "allow_write": [
+        "vault/secrets/",
+        "knowledge/personal/connections/",
+        "active/shared/tmp/",
+        "active/shared/runtime/approvals.json"
+      ]
+    },
     "assemble_changelog": {
       "allow_write": ["CHANGELOG.md", "changelog.d/"]
     },

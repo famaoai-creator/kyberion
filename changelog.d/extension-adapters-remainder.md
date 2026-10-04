@@ -1,0 +1,5 @@
+---
+category: Added
+---
+
+- **Extension adapters for backends and drivers** — providers that used to be hard-coded enums are now registered through seams and catalog-driven modules, so new adapters can be added without editing core switch statements: voice/audio playback, STT/TTS adapters, image/video/media backends, calendar providers, ingest source walkers, surface query providers, UI element detectors, browser profile providers (chrome/playwright), meeting participation drivers (in-room/chrome-extension/browser-playwright via `meeting-join-driver-modules.json`), ingest document parsers, viseme providers, and terraform proposal presets. Unknown provider ids fall back to declared `bridge_script`/`fallback_path` modules instead of hard failure. The build-free `capability_discovery_entry.mjs` now shares the same contract via `#binary-availability`, `#capability-discovery-contract`, `#repository-path-boundary`, and `#ajv-build-free` subpath imports instead of duplicating logic with `spawnSync`.

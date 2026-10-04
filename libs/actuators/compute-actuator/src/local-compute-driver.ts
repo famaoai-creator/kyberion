@@ -99,4 +99,7 @@ export class LocalComputeDriver extends BaseComputeDriver {
 }
 
 // Auto-register local compute driver
-registerComputeDriver(new LocalComputeDriver());
+registerComputeDriver(new LocalComputeDriver(), {
+  provenance: 'builtin',
+  source: 'local-compute-driver',
+});

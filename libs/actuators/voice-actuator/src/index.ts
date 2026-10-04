@@ -274,15 +274,37 @@ async function voiceHealth(input: {
   const toolRuntimes = listToolRuntimeInventory(requestedMode as any);
   const voiceEngineRegistry = getVoiceEngineRegistry();
   const activeEngines = voiceEngineRegistry.engines.filter((engine) => engine.status === 'active');
-  const qwen3Engine =
-    voiceEngineRegistry.engines.find((engine) => engine.engine_id === 'mlx_audio_qwen3') || null;
-  const resolvedQwen3Engine = qwen3Engine
-    ? resolveVoiceEngineForPlatform(qwen3Engine.engine_id)
-    : null;
-  const mlxAudioRuntime =
-    toolRuntimes.items.find((item) => item.tool.tool_id === 'mlx_audio') || null;
-  const mlxWhisperRuntime =
-    toolRuntimes.items.find((item) => item.tool.tool_id === 'mlx_whisper') || null;
+  const engines = voiceEngineRegistry.engines.map((engine) => {
+    let resolvedEngineId: string | null = null;
+    try {
+      resolvedEngineId = resolveVoiceEngineForPlatform(engine.engine_id)?.engine_id || null;
+    } catch {
+      // Health remains useful when an optional engine has no compatible adapter here.
+    }
+    return {
+      engine_id: engine.engine_id,
+      status: engine.status,
+      kind: engine.kind,
+      provider: engine.provider,
+      supported_artifact_formats: engine.supports.artifact_formats,
+      fallback_engine_id: engine.fallback_engine_id || null,
+      resolved_engine_id: resolvedEngineId,
+    };
+  });
+  const runtimeItems = Object.fromEntries(
+    toolRuntimes.items.map((item) => [
+      item.tool.tool_id,
+      {
+        lifecycle_stage: item.lifecycle_stage,
+        selected_action: item.selected_action,
+        selected_backend: item.selected_backend,
+        installed: item.installed,
+        requires_install: item.requires_install,
+        managed_env_path: item.managed_env_path,
+        reason: item.reason,
+      },
+    ])
+  );
 
   return {
     status: 'succeeded',
@@ -293,45 +315,12 @@ async function voiceHealth(input: {
       version: voiceEngineRegistry.version,
       default_engine_id: voiceEngineRegistry.default_engine_id,
       active_engine_count: activeEngines.length,
-      qwen3_engine: qwen3Engine
-        ? {
-            engine_id: qwen3Engine.engine_id,
-            status: qwen3Engine.status,
-            kind: qwen3Engine.kind,
-            provider: qwen3Engine.provider,
-            supported_artifact_formats: qwen3Engine.supports.artifact_formats,
-            fallback_engine_id: qwen3Engine.fallback_engine_id || null,
-            resolved_engine_id: resolvedQwen3Engine?.engine_id || null,
-          }
-        : null,
+      engines,
     },
     tool_runtimes: {
       version: toolRuntimes.version,
       default_tool_id: toolRuntimes.default_tool_id,
-      items: {
-        mlx_audio: mlxAudioRuntime
-          ? {
-              lifecycle_stage: mlxAudioRuntime.lifecycle_stage,
-              selected_action: mlxAudioRuntime.selected_action,
-              selected_backend: mlxAudioRuntime.selected_backend,
-              installed: mlxAudioRuntime.installed,
-              requires_install: mlxAudioRuntime.requires_install,
-              managed_env_path: mlxAudioRuntime.managed_env_path,
-              reason: mlxAudioRuntime.reason,
-            }
-          : null,
-        mlx_whisper: mlxWhisperRuntime
-          ? {
-              lifecycle_stage: mlxWhisperRuntime.lifecycle_stage,
-              selected_action: mlxWhisperRuntime.selected_action,
-              selected_backend: mlxWhisperRuntime.selected_backend,
-              installed: mlxWhisperRuntime.installed,
-              requires_install: mlxWhisperRuntime.requires_install,
-              managed_env_path: mlxWhisperRuntime.managed_env_path,
-              reason: mlxWhisperRuntime.reason,
-            }
-          : null,
-      },
+      items: runtimeItems,
     },
   };
 }
@@ -863,6 +852,13 @@ async function collectAndRegisterVoiceProfile(input: {
     registration,
   };
 }
+
+export {
+  listVoicePlaybackPlatforms,
+  registerVoicePlaybackPlatformAdapter,
+  resolveVoicePlaybackPlatformAdapter,
+  type VoicePlaybackVoice,
+} from './voice-runtime-helpers.js';
 
 export async function handleAction(input: VoiceAction) {
   const normalized = normalizeVoiceActionInput(input) as VoiceAction;

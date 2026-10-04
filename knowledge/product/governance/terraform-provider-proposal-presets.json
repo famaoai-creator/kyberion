@@ -1,0 +1,83 @@
+{
+  "version": "1.0.0",
+  "providers": [
+    {
+      "id": "aws",
+      "required_provider_lines": [
+        "    aws = {",
+        "      source  = \"hashicorp/aws\"",
+        "      version = \"~> 5.0\"",
+        "    }"
+      ],
+      "provider_configuration_lines": [
+        "variable \"aws_region\" {",
+        "  type        = string",
+        "  description = \"AWS region selected during review.\"",
+        "}",
+        "",
+        "provider \"aws\" {",
+        "  region = var.aws_region",
+        "}"
+      ],
+      "resource_templates": {
+        "aws_s3_bucket": [
+          "# Starter generated from the detected resource signal; review naming, encryption, and policy.",
+          "variable \"source_detected_bucket_name\" {",
+          "  type        = string",
+          "  description = \"Globally unique bucket name selected during review.\"",
+          "}",
+          "",
+          "resource \"aws_s3_bucket\" \"source_detected\" {",
+          "  bucket = var.source_detected_bucket_name",
+          "}"
+        ]
+      }
+    },
+    {
+      "id": "azurerm",
+      "required_provider_lines": [
+        "    azurerm = {",
+        "      source  = \"hashicorp/azurerm\"",
+        "      version = \"~> 4.0\"",
+        "    }"
+      ],
+      "provider_configuration_lines": ["provider \"azurerm\" {", "  features {}", "}"]
+    },
+    {
+      "id": "google",
+      "required_provider_lines": [
+        "    google = {",
+        "      source  = \"hashicorp/google\"",
+        "      version = \"~> 6.0\"",
+        "    }"
+      ],
+      "provider_configuration_lines": [
+        "variable \"gcp_project\" {",
+        "  type        = string",
+        "  description = \"GCP project selected during review.\"",
+        "}",
+        "",
+        "variable \"gcp_region\" {",
+        "  type        = string",
+        "  description = \"GCP region selected during review.\"",
+        "}",
+        "",
+        "provider \"google\" {",
+        "  project = var.gcp_project",
+        "  region  = var.gcp_region",
+        "}"
+      ]
+    },
+    {
+      "id": "kubernetes",
+      "required_provider_lines": [
+        "    kubernetes = {",
+        "      source  = \"hashicorp/kubernetes\"",
+        "      version = \"~> 2.0\"",
+        "    }"
+      ],
+      "provider_configuration_lines": ["provider \"kubernetes\" {}"]
+    }
+  ],
+  "$schema": "../schemas/terraform-provider-proposal-presets.schema.json"
+}

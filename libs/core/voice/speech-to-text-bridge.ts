@@ -35,7 +35,7 @@ import {
   discoverLocalSttBackends,
   selectPreferredLocalSttBackend,
 } from '../local-stt-discovery.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 import {
   getSeamSelectionPolicy,
   listSeamSelectionPurposes,
@@ -127,16 +127,27 @@ const speechToTextSeam = createSeam<SpeechToTextBridge>({
     )[0]?.implementation,
 });
 const registeredDisposers = new Map<string, () => void>();
+const RUNTIME_STT_METADATA: SeamProviderMetadata = {
+  provenance: 'generated',
+  source: 'speech-to-text-runtime-discovery',
+};
 
-export function registerSpeechToTextBridge(bridge: SpeechToTextBridge): () => void {
+export function registerSpeechToTextBridge(
+  bridge: SpeechToTextBridge,
+  metadata: SeamProviderMetadata = {
+    provenance: 'plugin',
+    source: 'speech-to-text-extension',
+  }
+): () => void {
   const name = String(bridge.name || '').trim();
   if (!name) throw new Error('SpeechToTextBridge.name is required');
-  const disposer = speechToTextSeam.register(name, bridge, {
-    provenance: 'builtin',
-    source: 'speech-to-text-bridge',
-  });
-  registeredDisposers.set(name, disposer);
-  return disposer;
+  const disposeFromSeam = speechToTextSeam.register(name, bridge, metadata);
+  const dispose = () => {
+    disposeFromSeam();
+    if (registeredDisposers.get(name) === dispose) registeredDisposers.delete(name);
+  };
+  registeredDisposers.set(name, dispose);
+  return dispose;
 }
 
 export function getSpeechToTextBridge(): SpeechToTextBridge {
@@ -620,7 +631,8 @@ export function installFluidAudioSpeechToTextBridgeIfAvailable(
       priority: 100,
       capabilities: { timestamps: true, granularity: 'segment', local_only: true },
       ...(timeoutText ? { timeoutMs: parseInt(timeoutText, 10) } : {}),
-    })
+    }),
+    RUNTIME_STT_METADATA
   );
   logger.success('[stt-bridge] installed FluidAudio Parakeet bridge');
   return true;
@@ -660,7 +672,8 @@ export function installShellSpeechToTextBridgeIfAvailable(
       ...(capabilities ? { capabilities } : {}),
       ...(priorityText ? { priority: parseInt(priorityText, 10) } : {}),
       ...(timeoutText ? { timeoutMs: parseInt(timeoutText, 10) } : {}),
-    })
+    }),
+    RUNTIME_STT_METADATA
   );
   logger.success(`[stt-bridge] installed ShellSpeechToTextBridge from KYBERION_STT_COMMAND`);
   return true;
@@ -712,42 +725,45 @@ export function installWhisperKitSpeechToTextBridgeIfAvailable(
   const executable = detected?.executable;
   if (!executable) return false;
 
-  registerSpeechToTextBridge({
-    name: 'whisperkit-cli',
-    priority: detected?.priority ?? 0,
-    capabilities: WHISPERKIT_CAPABILITIES,
-    async transcribe(input) {
-      const audioAbs = resolveAudioPath(input.audioPath);
-      if (!safeExistsSync(audioAbs)) {
-        throw new Error(`[stt-bridge:whisperkit-cli] audio file not found: ${input.audioPath}`);
-      }
-      assertRegularFile(audioAbs, 'audio input');
-      const result = safeExecResult(
-        executable,
-        buildWhisperKitTranscribeArgs(audioAbs, input.language),
-        {
-          timeoutMs: 5 * 60 * 1000,
-          maxOutputMB: 64,
+  registerSpeechToTextBridge(
+    {
+      name: 'whisperkit-cli',
+      priority: detected?.priority ?? 0,
+      capabilities: WHISPERKIT_CAPABILITIES,
+      async transcribe(input) {
+        const audioAbs = resolveAudioPath(input.audioPath);
+        if (!safeExistsSync(audioAbs)) {
+          throw new Error(`[stt-bridge:whisperkit-cli] audio file not found: ${input.audioPath}`);
         }
-      );
-      if (result.error || result.status !== 0) {
-        throw new Error(
-          `[stt-bridge:whisperkit-cli] backend failed: ${result.stderr || result.error?.message || `exit ${result.status}`}`
+        assertRegularFile(audioAbs, 'audio input');
+        const result = safeExecResult(
+          executable,
+          buildWhisperKitTranscribeArgs(audioAbs, input.language),
+          {
+            timeoutMs: 5 * 60 * 1000,
+            maxOutputMB: 64,
+          }
         );
-      }
-      const text = result.stdout.trim();
-      if (!text) throw new Error('[stt-bridge:whisperkit-cli] backend returned empty text');
-      const outputPath = resolveTranscriptPath(input.outputPath, audioAbs);
-      safeWriteFile(outputPath, `${text}\n`, { encoding: 'utf8', mkdir: true });
-      return {
-        text,
-        language: input.language || resolveLocale(),
-        written_to: outputPath,
-        backend: 'whisperkit-cli',
-        capabilities: WHISPERKIT_CAPABILITIES,
-      };
+        if (result.error || result.status !== 0) {
+          throw new Error(
+            `[stt-bridge:whisperkit-cli] backend failed: ${result.stderr || result.error?.message || `exit ${result.status}`}`
+          );
+        }
+        const text = result.stdout.trim();
+        if (!text) throw new Error('[stt-bridge:whisperkit-cli] backend returned empty text');
+        const outputPath = resolveTranscriptPath(input.outputPath, audioAbs);
+        safeWriteFile(outputPath, `${text}\n`, { encoding: 'utf8', mkdir: true });
+        return {
+          text,
+          language: input.language || resolveLocale(),
+          written_to: outputPath,
+          backend: 'whisperkit-cli',
+          capabilities: WHISPERKIT_CAPABILITIES,
+        };
+      },
     },
-  });
+    RUNTIME_STT_METADATA
+  );
   logger.debug(`[stt-bridge] installed WhisperKit CLI bridge (${executable})`);
   return true;
 }
@@ -778,46 +794,52 @@ export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
   );
   if (!pythonBin || !safeExistsSync(bridgeScript)) return false;
 
-  registerSpeechToTextBridge({
-    name: 'mlx_whisper',
-    priority,
-    capabilities: MLX_WHISPER_CAPABILITIES,
-    async transcribe(input) {
-      const audioAbs = resolveAudioPath(input.audioPath);
-      if (!safeExistsSync(audioAbs)) {
-        throw new Error(`[stt-bridge:mlx_whisper] audio file not found: ${input.audioPath}`);
-      }
-      const result = safeExecResult(pythonBin, [bridgeScript], {
-        input: JSON.stringify({
-          action: 'transcribe',
-          params: { audio_path: audioAbs, ...(input.language ? { language: input.language } : {}) },
-        }),
-        env: { KYBERION_PROJECT_ROOT: assertSafeRepositoryPath(rootResolve('.')) },
-        timeoutMs: 120_000,
-        maxOutputMB: 2,
-      });
-      if (result.error || result.status !== 0) {
-        throw new Error(
-          `[stt-bridge:mlx_whisper] backend failed: ${result.stderr || result.error?.message || 'unknown error'}`
-        );
-      }
-      const response = parseStructuredOutput(result.stdout);
-      const text = String(response.text || '').trim();
-      if (!text) throw new Error('[stt-bridge:mlx_whisper] backend returned empty text');
-      const outputPath = resolveTranscriptPath(input.outputPath, audioAbs);
-      safeWriteFile(outputPath, `${text}\n`, { encoding: 'utf8', mkdir: true });
-      return {
-        text,
-        language: String(response.language || input.language || resolveLocale()),
-        written_to: outputPath,
-        backend: 'mlx_whisper',
-        capabilities: response.capabilities || MLX_WHISPER_CAPABILITIES,
-        ...(Array.isArray(response.segments)
-          ? { segments: response.segments as TranscriptSegment[] }
-          : {}),
-      };
+  registerSpeechToTextBridge(
+    {
+      name: 'mlx_whisper',
+      priority,
+      capabilities: MLX_WHISPER_CAPABILITIES,
+      async transcribe(input) {
+        const audioAbs = resolveAudioPath(input.audioPath);
+        if (!safeExistsSync(audioAbs)) {
+          throw new Error(`[stt-bridge:mlx_whisper] audio file not found: ${input.audioPath}`);
+        }
+        const result = safeExecResult(pythonBin, [bridgeScript], {
+          input: JSON.stringify({
+            action: 'transcribe',
+            params: {
+              audio_path: audioAbs,
+              ...(input.language ? { language: input.language } : {}),
+            },
+          }),
+          env: { KYBERION_PROJECT_ROOT: assertSafeRepositoryPath(rootResolve('.')) },
+          timeoutMs: 120_000,
+          maxOutputMB: 2,
+        });
+        if (result.error || result.status !== 0) {
+          throw new Error(
+            `[stt-bridge:mlx_whisper] backend failed: ${result.stderr || result.error?.message || 'unknown error'}`
+          );
+        }
+        const response = parseStructuredOutput(result.stdout);
+        const text = String(response.text || '').trim();
+        if (!text) throw new Error('[stt-bridge:mlx_whisper] backend returned empty text');
+        const outputPath = resolveTranscriptPath(input.outputPath, audioAbs);
+        safeWriteFile(outputPath, `${text}\n`, { encoding: 'utf8', mkdir: true });
+        return {
+          text,
+          language: String(response.language || input.language || resolveLocale()),
+          written_to: outputPath,
+          backend: 'mlx_whisper',
+          capabilities: response.capabilities || MLX_WHISPER_CAPABILITIES,
+          ...(Array.isArray(response.segments)
+            ? { segments: response.segments as TranscriptSegment[] }
+            : {}),
+        };
+      },
     },
-  });
+    RUNTIME_STT_METADATA
+  );
   logger.success('[stt-bridge] installed managed mlx_whisper SpeechToTextBridge');
   return true;
 }

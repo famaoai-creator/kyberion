@@ -4,7 +4,7 @@ category: Orchestration
 tags: [orchestration, media-actuator, ingest-actuator, pdf, pptx, xlsx, docx, ocr, ingest]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-09-25
+last_updated: 2026-10-04
 role_affinity: [ecosystem_architect, knowledge_steward, researcher, analyst, mission_controller]
 phase_affinity: [alignment, execution]
 ---
@@ -17,6 +17,10 @@ cost time when the wrong rung is picked. `read` also takes `.html` / `.htm` / `.
 `.txt` (URLs are refused — save them with `network:fetch` first); images, audio and
 video have their own commands (`see` / `listen` / `watch`) — see
 [perception-playbook.md](./perception-playbook.md). Japanese: [document-file-reading-playbook.ja.md](./document-file-reading-playbook.ja.md).
+
+## Extending ingest formats
+
+Built-in document formats share the core document reader. For a new source format, register a parser module in knowledge/product/governance/ingest-document-parser-modules.json; the module exports parseIngestDocument({ format, bytes, source_path?, ocr? }) and returns Markdown with optional title/tables. Its package must be under the @actuator/ namespace and is loaded only for its declared format. Existing readers remain unchanged.
 
 ## 1. Decide the goal first
 

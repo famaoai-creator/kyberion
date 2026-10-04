@@ -3,14 +3,59 @@
     "enabled": true,
     "provider": "duckduckgo_html",
     "maxResults": 3,
-    "timeoutMs": 5000
+    "timeoutMs": 5000,
+    "url": "https://html.duckduckgo.com/html/",
+    "response_format": "duckduckgo_html",
+    "query_keys": {
+      "query": "q"
+    }
   },
   "weather": {
     "enabled": true,
     "provider": "open_meteo",
     "geocodingUrl": "https://geocoding-api.open-meteo.com/v1/search",
     "forecastUrl": "https://api.open-meteo.com/v1/forecast",
-    "timeoutMs": 5000
+    "timeoutMs": 5000,
+    "geocoding": {
+      "query_keys": {
+        "query": "name",
+        "count": "count",
+        "language": "language",
+        "format": "format"
+      },
+      "response_fields": {
+        "results_path": "results",
+        "name_path": "name",
+        "latitude_path": "latitude",
+        "longitude_path": "longitude"
+      }
+    },
+    "forecast": {
+      "query_keys": {
+        "latitude": "latitude",
+        "longitude": "longitude",
+        "current": "current",
+        "timezone": "timezone"
+      },
+      "current_fields": [
+        "temperature_2m",
+        "weather_code",
+        "wind_speed_10m",
+        "relative_humidity_2m"
+      ],
+      "response_fields": {
+        "current_path": "current",
+        "temperature_path": "temperature_2m",
+        "weather_code_path": "weather_code",
+        "wind_speed_path": "wind_speed_10m",
+        "humidity_path": "relative_humidity_2m"
+      },
+      "display_units": {
+        "temperature": "°C",
+        "wind_speed": "km/h",
+        "humidity": "%"
+      }
+    }
   },
   "location": {
     "enabled": true,
@@ -19,12 +64,26 @@
       {
         "id": "ipapi",
         "provider": "ipapi",
-        "url": "https://ipapi.co/json/"
+        "url": "https://ipapi.co/json/",
+        "response_fields": {
+          "city": ["city"],
+          "region": ["region", "region_code"],
+          "country": ["country_name", "country"],
+          "latitude": ["latitude"],
+          "longitude": ["longitude"]
+        }
       },
       {
         "id": "ipwho",
         "provider": "ipwho",
-        "url": "https://ipwho.is/"
+        "url": "https://ipwho.is/",
+        "response_fields": {
+          "city": ["city"],
+          "region": ["region"],
+          "country": ["country", "country_name"],
+          "latitude": ["latitude"],
+          "longitude": ["longitude"]
+        }
       }
     ]
   },

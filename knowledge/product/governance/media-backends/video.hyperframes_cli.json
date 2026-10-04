@@ -22,6 +22,20 @@
       },
       "command": "npx",
       "args": ["hyperframes", "render"],
+      "video_render": {
+        "argument_template": [
+          "{bundle_dir}",
+          "--output",
+          "{output_path}",
+          "--format",
+          "{output_format}",
+          "--fps",
+          "{fps}",
+          "--quality",
+          "{quality}"
+        ],
+        "preload_script": "scripts/hyperframes-localhost-preload.cjs"
+      },
       "aliases": ["hyperframes_cli"],
       "probe": { "kind": "registry" },
       "cost_tier": "self_hosted",

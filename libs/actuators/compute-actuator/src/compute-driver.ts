@@ -2,6 +2,7 @@
  * compute-driver.ts
  * Polymorphic compute execution driver interface and registry for Kyberion Compute Seam.
  */
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '@agent/core/seam';
 
 export type ComputeProviderType = 'local' | 'colab' | (string & {});
 
@@ -35,6 +36,8 @@ export interface ComputeJobState {
 
 export interface ComputeDriver {
   readonly providerId: string;
+  /** Synchronously reports whether this driver owns a job when provider is omitted. */
+  ownsJob?(jobId: string): boolean;
   submitJob(spec: ComputeJobSpec): Promise<ComputeJobState>;
   pollStatus(jobId: string): Promise<ComputeJobState>;
   collectArtifact(
@@ -52,6 +55,10 @@ export interface ComputeDriver {
 export abstract class BaseComputeDriver implements ComputeDriver {
   abstract readonly providerId: string;
   readonly stateStore = new Map<string, ComputeJobState>();
+
+  ownsJob(jobId: string): boolean {
+    return this.stateStore.has(jobId);
+  }
 
   abstract submitJob(spec: ComputeJobSpec): Promise<ComputeJobState>;
 
@@ -119,24 +126,65 @@ export abstract class BaseComputeDriver implements ComputeDriver {
 }
 
 /** Polymorphic Registry of Compute Drivers */
-const driverRegistry = new Map<string, ComputeDriver>();
+const computeDriverSeam = createSeam<ComputeDriver>({
+  key: 'compute-execution-provider',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
 
-export function registerComputeDriver(driver: ComputeDriver): void {
-  driverRegistry.set(driver.providerId, driver);
+function validateComputeDriver(providerId: string, candidate: unknown): ComputeDriver {
+  if (!/^[a-z][a-z0-9._-]*$/.test(providerId)) {
+    throw new Error('compute-actuator — invalid compute provider id: ' + providerId);
+  }
+  if (!candidate || typeof candidate !== 'object') {
+    throw new Error('compute-actuator — provider ' + providerId + ' must be an object');
+  }
+  const driver = candidate as Partial<ComputeDriver>;
+  if (driver.providerId !== providerId) {
+    throw new Error(
+      'compute-actuator — provider registration ' + providerId + ' does not match implementation id'
+    );
+  }
+  for (const method of ['submitJob', 'pollStatus', 'collectArtifact', 'cancelJob'] as const) {
+    if (typeof driver[method] !== 'function') {
+      throw new Error(
+        'compute-actuator — provider ' + providerId + ' must implement ' + method + '()'
+      );
+    }
+  }
+  if (driver.ownsJob !== undefined && typeof driver.ownsJob !== 'function') {
+    throw new Error('compute-actuator — provider ' + providerId + ' has invalid ownsJob()');
+  }
+  return driver as ComputeDriver;
+}
+
+export function registerComputeDriver(
+  driver: ComputeDriver,
+  metadata: SeamProviderMetadata = { provenance: 'plugin', source: 'compute-driver-extension' }
+): () => void {
+  const providerId = driver?.providerId;
+  if (typeof providerId !== 'string') {
+    throw new Error('compute-actuator — invalid compute provider id: ' + String(providerId));
+  }
+  return computeDriverSeam.register(
+    providerId,
+    validateComputeDriver(providerId, driver),
+    metadata
+  );
 }
 
 export function listComputeProviders(): string[] {
-  return Array.from(driverRegistry.keys());
+  return computeDriverSeam.list().map((entry) => entry.id);
 }
 
 export function getComputeDriver(provider: string = 'local'): ComputeDriver {
-  const driver = driverRegistry.get(provider);
+  const driver: unknown = computeDriverSeam.getOptional(provider);
   if (!driver) {
     throw new Error(
       `compute-actuator — compute provider '${provider}' is not registered. Available providers: ${listComputeProviders().join(', ')}`
     );
   }
-  return driver;
+  return validateComputeDriver(provider, driver);
 }
 
 /**
@@ -146,10 +194,29 @@ export function resolveDriverForJob(jobId: string, explicitProvider?: string): C
   if (explicitProvider) {
     return getComputeDriver(explicitProvider);
   }
-  for (const driver of driverRegistry.values()) {
-    if (driver instanceof BaseComputeDriver && driver.stateStore.has(jobId)) {
-      return driver;
+  const owners: Array<{ id: string; implementation: ComputeDriver }> = [];
+  const probeErrors: string[] = [];
+  for (const { id, implementation } of computeDriverSeam.list()) {
+    try {
+      const driver = validateComputeDriver(id, implementation);
+      const ownsJob =
+        driver.ownsJob?.(jobId) ??
+        (driver instanceof BaseComputeDriver && driver.stateStore.has(jobId));
+      if (ownsJob) owners.push({ id, implementation: driver });
+    } catch (error) {
+      probeErrors.push(`${id}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+  if (probeErrors.length > 0) {
+    throw new Error(
+      `compute-actuator — could not safely resolve job '${jobId}' because provider ownership checks failed: ${probeErrors.join('; ')}. Specify provider explicitly.`
+    );
+  }
+  if (owners.length > 1) {
+    throw new Error(
+      `compute-actuator — job '${jobId}' is claimed by multiple providers: ${owners.map(({ id }) => id).join(', ')}`
+    );
+  }
+  if (owners[0]) return owners[0].implementation;
   return getComputeDriver('local');
 }

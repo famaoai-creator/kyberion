@@ -19,7 +19,7 @@ import { buildBrowserPipelineSummary, refMapFromSnapshot } from './browser-pipel
 import { opControl } from './browser-control-helpers.js';
 import { type CDPSession, type Page } from '@playwright/test';
 import * as path from 'node:path';
-import { resolveBrowserProfile } from './browser-profile-manager.js';
+import { resolveRegisteredBrowserProfile } from './browser-profile-provider-registry.js';
 import {
   BROWSER_APPLY_OP_HANDLERS,
   BROWSER_CAPTURE_OP_HANDLERS,
@@ -39,7 +39,12 @@ export interface BrowserRuntime {
   pageIds: WeakMap<Page, string>;
   cdpSessions: WeakMap<Page, CDPSession>;
   activeTabId: string;
-  consoleEvents: Array<{ tab_id: string; type: string; text: string; ts: string }>;
+  consoleEvents: Array<{
+    tab_id: string;
+    type: string;
+    text: string;
+    ts: string;
+  }>;
   networkEvents: Array<{
     tab_id: string;
     method: string;
@@ -111,7 +116,7 @@ export async function executePipeline(
   const TIMEOUT = options.timeout_ms || 300000;
 
   if (options.profile || options.profile_name || options.profile_email) {
-    const resolved = resolveBrowserProfile({
+    const resolved = await resolveRegisteredBrowserProfile({
       provider: options.browser_channel === 'chrome' ? 'chrome' : undefined,
       profile: String(options.profile || options.profile_name || options.profile_email),
     });
@@ -152,7 +157,11 @@ export async function executePipeline(
 
   // Start Tracing if requested
   if (options.record_trace) {
-    await browserContext.tracing.start({ screenshots: true, snapshots: true, sources: true });
+    await browserContext.tracing.start({
+      screenshots: true,
+      snapshots: true,
+      sources: true,
+    });
   }
 
   const runtime = browserRuntimeHelpers.getOrCreateBrowserRuntime(
@@ -342,7 +351,10 @@ export async function executePipeline(
     // keep_alive/lease so leased sessions survive between outer steps.
     const outerOptions =
       ctx.__pipeline_options && typeof ctx.__pipeline_options === 'object'
-        ? (ctx.__pipeline_options as { keep_alive?: unknown; lease_ms?: unknown })
+        ? (ctx.__pipeline_options as {
+            keep_alive?: unknown;
+            lease_ms?: unknown;
+          })
         : undefined;
     const keepAlive =
       options.keep_alive === true ||
@@ -453,7 +465,15 @@ export async function opCapture(
   if (!handler) {
     throw new Error(`Unsupported capture operator in Browser-Actuator: ${op}`);
   }
-  return handler({ op, params, runtime, ctx, resolve, page, ...browserOpSupport() });
+  return handler({
+    op,
+    params,
+    runtime,
+    ctx,
+    resolve,
+    page,
+    ...browserOpSupport(),
+  });
 }
 
 export async function opTransform(op: string, params: any, ctx: any, resolve: Function) {
@@ -479,7 +499,15 @@ export async function opTransform(op: string, params: any, ctx: any, resolve: Fu
 export async function distillDomInventory(
   page: Page,
   options: { maxElements?: number } = {}
-): Promise<Array<{ selector: string; tag: string; role: string; text: string; visible: boolean }>> {
+): Promise<
+  Array<{
+    selector: string;
+    tag: string;
+    role: string;
+    text: string;
+    visible: boolean;
+  }>
+> {
   const maxElements = Math.min(options.maxElements ?? 120, 300);
   return page.evaluate((cap: number) => {
     const nodes = Array.from(
@@ -532,7 +560,12 @@ export async function distillDomInventory(
 
 export async function fillWithFallback(
   page: Page,
-  input: { selector: string; text: string; timeoutMs: number; fieldHint?: string }
+  input: {
+    selector: string;
+    text: string;
+    timeoutMs: number;
+    fieldHint?: string;
+  }
 ): Promise<{ strategy: string }> {
   const attempts: string[] = [];
   const hint =
@@ -616,7 +649,9 @@ export async function fillWithFallback(
       });
       if (decision) {
         const llmPick = await tryStrategy('llm_pick', () =>
-          page.fill(decision.decision, input.text, { timeout: input.timeoutMs })
+          page.fill(decision.decision, input.text, {
+            timeout: input.timeoutMs,
+          })
         );
         if (llmPick) return llmPick;
       }
@@ -633,7 +668,12 @@ export async function fillWithFallback(
 export function recordedRefTargetFromParams(
   params: Record<string, unknown>,
   overrides: { requireDomPathMatch?: boolean } = {}
-): { role?: string; name?: string; dom_path?: string; requireDomPathMatch?: boolean } {
+): {
+  role?: string;
+  name?: string;
+  dom_path?: string;
+  requireDomPathMatch?: boolean;
+} {
   return {
     ...(typeof params.role === 'string' ? { role: params.role } : {}),
     ...(typeof params.name === 'string' ? { name: params.name } : {}),
@@ -662,7 +702,15 @@ export async function opApply(
   if (!handler) {
     throw new Error(`Unsupported apply operator in Browser-Actuator: ${op}`);
   }
-  return handler({ op, params, runtime, ctx, resolve, page, ...browserOpSupport() });
+  return handler({
+    op,
+    params,
+    runtime,
+    ctx,
+    resolve,
+    page,
+    ...browserOpSupport(),
+  });
 }
 
 export { buildRetryOptions };

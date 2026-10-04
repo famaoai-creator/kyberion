@@ -2,7 +2,7 @@
 title: SEAM DISPATCH UNIFICATION PLAN 2026 09 28
 tags: [improvement-plan, 2026-09, refactoring, seam, dispatch]
 last_updated: 2026-09-28
-status: draft
+status: active
 ---
 
 # if 連鎖の seam / adapter / facade 移行計画(DS-01〜DS-09)

@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "imports": {
+    "#binary-availability": "./binary-availability.mjs",
+    "#repository-path-boundary": "./repository-path-boundary.mjs"
+  },
   "description": "Core utilities and wrappers for Kyberion.",
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -4414,6 +4418,18 @@
     "./meeting/meeting-facilitator-policy": {
       "types": "./dist/meeting/meeting-facilitator-policy.d.ts",
       "default": "./dist/meeting/meeting-facilitator-policy.js"
+    },
+    "./meeting/driver-modules/in-room": {
+      "types": "./dist/meeting/driver-modules/in-room.d.ts",
+      "default": "./dist/meeting/driver-modules/in-room.js"
+    },
+    "./meeting/driver-modules/chrome-extension": {
+      "types": "./dist/meeting/driver-modules/chrome-extension.d.ts",
+      "default": "./dist/meeting/driver-modules/chrome-extension.js"
+    },
+    "./meeting/meeting-driver-module-loader": {
+      "types": "./dist/meeting/meeting-driver-module-loader.d.ts",
+      "default": "./dist/meeting/meeting-driver-module-loader.js"
     },
     "./meeting/meeting-join-driver": {
       "types": "./dist/meeting/meeting-join-driver.d.ts",

@@ -7,6 +7,13 @@
     "kyberion": "dist/scripts/kyberion.js"
   },
   "type": "module",
+  "imports": {
+    "#ajv-build-free": "./libs/core/foundation/ajv-build-free.mjs",
+    "#capability-discovery-contract": "./scripts/capability-discovery-contract.mjs",
+    "#capability-discovery-manifest-scan": "./scripts/capability-discovery-manifest-scan.mjs",
+    "#binary-availability": "./libs/core/binary-availability.mjs",
+    "#repository-path-boundary": "./libs/core/repository-path-boundary.mjs"
+  },
   "description": "Monorepo for Kyberion Ecosystem",
   "engines": {
     "node": ">=24.0.0"

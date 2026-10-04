@@ -3,7 +3,7 @@ title: サーフェスの OIDC ログイン — 未認証ブラウザを生の 4
 category: Improvement Plan
 tags: [surfaces, authentication, oidc, sso, google, entra, rbac, multi-tenant]
 last_updated: 2026-09-30
-status: implemented
+status: completed
 ---
 
 # サーフェスの OIDC ログイン

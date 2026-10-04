@@ -430,6 +430,15 @@
       "subsystem": "meeting"
     },
     {
+      "name": "KYBERION_AUDIO_PLAYBACK_BACKEND",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Optional registered local audio playback backend ID; leave unset to use the preferred backend for this operating system.",
+      "documented": true,
+      "subsystem": "voice"
+    },
+    {
       "name": "KYBERION_AUDIO_RECORD_COMMAND",
       "category": "provider",
       "type": "string",

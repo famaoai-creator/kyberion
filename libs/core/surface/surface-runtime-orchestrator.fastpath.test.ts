@@ -394,7 +394,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
       senderAgentId: 'test-sender',
     });
     expect(result.text).toContain('Weather for Tokyo:');
-    expect(result.text).toContain('temperature 18.5°C');
+    expect(result.text).toContain('temperature 18.5 °C');
     expect(mocks.secureFetch).toHaveBeenCalledWith(
       expect.objectContaining({
         url: 'https://geocoding-api.open-meteo.com/v1/search',
@@ -494,7 +494,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
       senderAgentId: 'test-sender',
     });
     expect(result.text).toContain('Weather for Tokyo, Tokyo, Japan:');
-    expect(result.text).toContain('temperature 18.5°C');
+    expect(result.text).toContain('temperature 18.5 °C');
     expect(mocks.secureFetch).toHaveBeenCalledWith(
       expect.objectContaining({
         url: 'https://geocoding-api.open-meteo.com/v1/search',

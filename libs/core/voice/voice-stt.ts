@@ -14,7 +14,8 @@ export type VoiceSttBackend =
   | 'faster_whisper'
   | 'mlx_whisper'
   | 'whisper_cpp'
-  | 'native_speech';
+  | 'native_speech'
+  | (string & {});
 
 export interface VoiceSttAvailability {
   server: boolean;
@@ -46,7 +47,9 @@ function normalizeBaseUrl(value: string): string | null {
 
 export function parseVoiceSttBackend(value: unknown): VoiceSttBackend {
   if (typeof value !== 'string') return 'auto';
-  const normalized = value.trim().toLowerCase();
+  const raw = value.trim();
+  const normalized = raw.toLowerCase();
+  if (!raw) return 'auto';
   if (normalized === 'server') return 'server';
   if (normalized === 'fluid_audio' || normalized === 'fluid-audio' || normalized === 'parakeet')
     return 'fluid_audio';
@@ -55,7 +58,7 @@ export function parseVoiceSttBackend(value: unknown): VoiceSttBackend {
   if (normalized === 'whisper_cpp' || normalized === 'whisper.cpp') return 'whisper_cpp';
   if (normalized === 'native_speech' || normalized === 'native' || normalized === 'apple_speech')
     return 'native_speech';
-  return 'auto';
+  return resolveVoiceSttAdapter(raw).adapter_id === 'speech_to_text_bridge' ? raw : 'auto';
 }
 
 export function resolveVoiceSttServerConfig(
@@ -106,18 +109,15 @@ export interface VoiceSttOrderOptions {
   record?: boolean;
 }
 
-function isVoiceSttBackendAvailable(
-  backend: ConcreteVoiceSttBackend,
+export function isVoiceSttBackendAvailable(
+  backend: VoiceSttBackend,
   availability: VoiceSttAvailability
 ): boolean {
+  if (backend === 'auto') return true;
   const adapter = resolveVoiceSttAdapter(backend);
-  if (adapter.adapter_id === 'openai_compatible_server') return availability.server;
-  if (adapter.adapter_id === 'fluid_audio_native') return availability.fluidAudio === true;
-  if (adapter.adapter_id === 'faster_whisper_python') return availability.fasterWhisper === true;
-  if (adapter.adapter_id === 'managed_python_bridge') return availability.mlxWhisper === true;
-  if (adapter.adapter_id === 'whisper_cpp_cli') return availability.whisperCpp;
-  if (adapter.adapter_id === 'native_speech') return availability.nativeSpeech;
-  return false;
+  if (adapter.adapter_id === 'speech_to_text_bridge') return true;
+  const availabilityKey = adapter.availability_key;
+  return availabilityKey ? availability[availabilityKey] === true : false;
 }
 
 /**

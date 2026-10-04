@@ -38,6 +38,8 @@ import '../libs/core/ocr-bridge.js';
 import '../libs/core/reasoning/reasoning-backend.js';
 import '../libs/core/risky-op-approval-port.js';
 import '../libs/core/secret/secret-resolver.js';
+import '../libs/core/voice/audio-playback.js';
+import '../libs/core/provider/provider-backend-resolver.js';
 import '../libs/core/voice/speech-to-text-bridge.js';
 import '../libs/core/voice/streaming-stt-bridge.js';
 import '../libs/core/voice/streaming-tts-bridge.js';

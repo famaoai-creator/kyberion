@@ -183,3 +183,10 @@ export class InRoomMeetingJoinDriver implements MeetingJoinDriver {
 export function installInRoomMeetingJoinDriver(options?: InRoomMeetingDriverOptions): void {
   registerMeetingJoinDriver(new InRoomMeetingJoinDriver(options));
 }
+export function installInRoomMeetingParticipationDriver(
+  options: import('./meeting/meeting-join-driver.js').MeetingParticipationDriverInstallOptions = {}
+): void {
+  installInRoomMeetingJoinDriver({
+    mic: options.microphoneDevice ? { device: options.microphoneDevice } : undefined,
+  });
+}

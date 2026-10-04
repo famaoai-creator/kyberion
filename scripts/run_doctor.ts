@@ -142,24 +142,30 @@ export function collectHealthRollupLines(
 }
 
 /**
- * KM-02 Task 2 — make the hash-embedding fallback visible: on non-Apple
- * hosts "semantic" search is a hash-bucket approximation, and operators
- * should not mistake it for real embeddings.
+ * Report embedding backend quality through capability metadata so new
+ * approximate backends need no provider-specific doctor branch.
  */
 export function collectSemanticSearchDoctorLine(): string {
   try {
     installEmbeddingBackendIfAvailable();
     const backend = getEmbeddingBackend();
     if (!backend) return 'Semantic search: disabled (KYBERION_DISABLE_EMBEDDINGS)';
-    if (backend.name === 'local-hash-embedding') {
-      return 'Semantic search: ⚠ DEGRADED — hash-bucket approximation (local-hash-embedding), not real embeddings';
+    if (backend.quality === 'approximate') {
+      return (
+        'Semantic search: ⚠ DEGRADED — ' +
+        (backend.qualityNote || 'approximate embeddings') +
+        ' (' +
+        backend.name +
+        ')'
+      );
     }
-    return `Semantic search: ${backend.name}`;
+    return backend.qualityNote
+      ? 'Semantic search: ' + backend.name + ' — ' + backend.qualityNote
+      : 'Semantic search: ' + backend.name;
   } catch (err) {
-    return `Semantic search: status unavailable (${err})`;
+    return 'Semantic search: status unavailable (' + err + ')';
   }
 }
-
 export function collectPipelineScheduleDoctorLines(): string[] {
   const schedules = listScheduledPipelines().sort((a, b) => a.id.localeCompare(b.id));
   const lines = [`Pipeline schedules: ${schedules.length} registered`];

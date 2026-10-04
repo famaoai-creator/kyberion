@@ -611,7 +611,10 @@ export async function installAppleSpeechToTextBridgeIfAvailable(): Promise<boole
   }
   const availability = await probeAppleIntelligence();
   if (!availability.available) return false;
-  registerSpeechToTextBridge(createAppleSpeechToTextBridge());
+  registerSpeechToTextBridge(createAppleSpeechToTextBridge(), {
+    provenance: 'builtin',
+    source: 'apple-intelligence-bridge',
+  });
   logger.info('[stt-bridge] installed AppleSpeechToTextBridge (on-device SpeechAnalyzer)');
   return true;
 }

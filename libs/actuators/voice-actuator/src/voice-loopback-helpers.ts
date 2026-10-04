@@ -133,14 +133,13 @@ export function createNativeArtifactTtsSource(options: {
       const defaults = getVoiceTtsLanguageConfig(options.language);
       const engine = resolveVoiceEngineForPlatform(profile.default_engine_id);
       const artifactFormats = engine.supports.artifact_formats;
-      const artifactFormat =
-        process.platform === 'darwin' &&
-        engine.engine_id === 'local_say' &&
-        artifactFormats.includes('aiff')
-          ? 'aiff'
-          : artifactFormats.includes('wav')
-            ? 'wav'
-            : (artifactFormats[0] ?? 'wav');
+      // Prefer the platform-native container when the selected engine declares it.
+      const preferredFormat = process.platform === 'darwin' ? 'aiff' : 'wav';
+      const artifactFormat = artifactFormats.includes(preferredFormat)
+        ? preferredFormat
+        : artifactFormats.includes('wav')
+          ? 'wav'
+          : (artifactFormats[0] ?? 'wav');
       const artifact = await renderNativeArtifact(text, {
         requestId: options.requestId,
         voice: defaults.voice,

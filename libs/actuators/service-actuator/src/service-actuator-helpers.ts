@@ -71,7 +71,7 @@ export interface ServiceAction {
   service_id: string;
   mode: 'API' | 'CLI' | 'SDK' | 'RECONCILE' | 'PRESET' | 'OAUTH' | 'MCP' | 'HARNESS';
   action: string;
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   params: any;
   auth?: 'none' | 'secret-guard' | 'session';
   steps?: Array<{

@@ -13,6 +13,8 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { coreSeamCatalog, createSeam } from '../seam.js';
 
 export interface PlaybackHandle {
   /** Resolves when playback finishes or is stopped. Never rejects. */
@@ -48,68 +50,113 @@ export interface PlaybackResult {
 }
 
 export interface PlayAudioOptions {
+  /** Registered backend ID override; platform default is used when omitted. */
+  backend?: string;
   /** Full argv override; audio path is appended unless `{file}` placeholder is used. */
   command?: string[];
 }
 
 export interface AudioPlaybackProbeResult {
   available: boolean;
-  backend: 'afplay' | 'aplay' | 'powershell-soundplayer' | 'custom' | 'none';
+  backend: string;
   reason?: string;
 }
 
-interface AudioPlaybackAdapter {
-  backend: 'afplay' | 'aplay' | 'powershell-soundplayer';
+export interface AudioPlaybackAdapter {
+  readonly backend_id: string;
+  readonly platforms: readonly NodeJS.Platform[];
+  readonly availabilityTarget: string;
+  readonly priority?: number;
   command(audioPath: string): string[];
   probe(): boolean;
 }
-const audioAdapters: Partial<Record<NodeJS.Platform, AudioPlaybackAdapter>> = {
-  darwin: {
-    backend: 'afplay',
+
+const audioPlaybackSeam = createSeam<AudioPlaybackAdapter>({
+  key: 'voice.audio-playback',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+
+export function registerAudioPlaybackAdapter(
+  adapter: AudioPlaybackAdapter,
+  provenance: 'builtin' | 'plugin' = 'plugin'
+): () => void {
+  return audioPlaybackSeam.register(adapter.backend_id, adapter, {
+    provenance,
+    source: 'audio-playback:' + adapter.backend_id,
+  });
+}
+
+const builtinAdapters: AudioPlaybackAdapter[] = [
+  {
+    backend_id: 'afplay',
+    platforms: ['darwin'],
+    availabilityTarget: 'afplay',
+    priority: 100,
     command: (file) => ['afplay', file],
     probe: () => spawnSync('which', ['afplay'], { stdio: 'ignore' }).status === 0,
   },
-  linux: {
-    backend: 'aplay',
+  {
+    backend_id: 'aplay',
+    platforms: ['linux'],
+    availabilityTarget: 'aplay',
+    priority: 100,
     command: (file) => ['aplay', '-q', file],
     probe: () => spawnSync('which', ['aplay'], { stdio: 'ignore' }).status === 0,
   },
-  win32: {
-    backend: 'powershell-soundplayer',
+  {
+    backend_id: 'powershell-soundplayer',
+    platforms: ['win32'],
+    availabilityTarget: 'powershell.exe',
+    priority: 100,
     command: (file) => [
       'powershell.exe',
       '-NoProfile',
       '-NonInteractive',
       '-Command',
-      `(New-Object System.Media.SoundPlayer '${file.replace(/'/g, "''")}').PlaySync()`,
+      "(New-Object System.Media.SoundPlayer '" + file.replace(/'/g, "''") + "').PlaySync()",
     ],
     probe: () => spawnSync('where', ['powershell.exe'], { stdio: 'ignore' }).status === 0,
   },
-};
-function resolveAudioPlaybackAdapter(): AudioPlaybackAdapter | undefined {
-  return audioAdapters[process.platform];
-}
+];
+for (const adapter of builtinAdapters) registerAudioPlaybackAdapter(adapter, 'builtin');
 
+function resolveAudioPlaybackAdapter(backendId?: string): AudioPlaybackAdapter | undefined {
+  const selectedId =
+    backendId?.trim() || getRegisteredEnvText('KYBERION_AUDIO_PLAYBACK_BACKEND')?.trim();
+  const candidates = audioPlaybackSeam
+    .list()
+    .map((record) => record.implementation)
+    .filter((adapter) => adapter.platforms.includes(process.platform))
+    .sort(
+      (left, right) =>
+        (right.priority ?? 0) - (left.priority ?? 0) ||
+        left.backend_id.localeCompare(right.backend_id)
+    );
+  return selectedId
+    ? candidates.find((adapter) => adapter.backend_id === selectedId)
+    : candidates[0];
+}
 export function probeAudioPlayback(opts: PlayAudioOptions = {}): AudioPlaybackProbeResult {
   if (opts.command?.length) return { available: true, backend: 'custom' };
-  const adapter = resolveAudioPlaybackAdapter();
-  const binary =
-    adapter?.backend === 'afplay'
-      ? 'afplay'
-      : adapter?.backend === 'aplay'
-        ? 'aplay'
-        : 'powershell.exe';
-  const probe = adapter
-    ? { error: undefined, status: adapter.probe() ? 0 : 1 }
-    : { error: new Error('unsupported'), status: 1 };
-  if (probe.error || probe.status !== 0) {
+  const adapter = resolveAudioPlaybackAdapter(opts.backend);
+  if (!adapter) {
     return {
       available: false,
       backend: 'none',
-      reason: `${binary} is not available on PATH — local playback is disabled`,
+      reason: opts.backend
+        ? `Audio playback backend ${opts.backend} is unavailable on ${process.platform}`
+        : `No audio playback backend is registered for ${process.platform}`,
     };
   }
-  return { available: true, backend: adapter!.backend };
+  if (!adapter.probe()) {
+    return {
+      available: false,
+      backend: 'none',
+      reason: `${adapter.availabilityTarget} is not available on PATH — local playback is disabled`,
+    };
+  }
+  return { available: true, backend: adapter.backend_id };
 }
 
 function buildArgv(audioPath: string, opts: PlayAudioOptions): string[] {
@@ -117,14 +164,22 @@ function buildArgv(audioPath: string, opts: PlayAudioOptions): string[] {
     const argv = opts.command.map((part) => (part === '{file}' ? audioPath : part));
     return argv.includes(audioPath) ? argv : [...argv, audioPath];
   }
-  const adapter = resolveAudioPlaybackAdapter();
-  if (!adapter) throw new Error(`audio playback is unsupported on ${process.platform}`);
+  const adapter = resolveAudioPlaybackAdapter(opts.backend);
+  if (!adapter)
+    throw new Error(
+      opts.backend
+        ? `audio playback backend ${opts.backend} is unavailable on ${process.platform}`
+        : `audio playback is unsupported on ${process.platform}`
+    );
   return adapter.command(audioPath);
 }
 
 /** Resolve the native playback command for callers that stream their own audio. */
-export function resolveAudioPlaybackCommand(audioPath = '{file}'): string[] | null {
-  const adapter = resolveAudioPlaybackAdapter();
+export function resolveAudioPlaybackCommand(
+  audioPath = '{file}',
+  backend?: string
+): string[] | null {
+  const adapter = resolveAudioPlaybackAdapter(backend);
   return adapter ? adapter.command(audioPath) : null;
 }
 
