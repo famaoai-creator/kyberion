@@ -16,6 +16,12 @@ import {
 import { retry } from '@agent/core/async-utils';
 import { resolveFfmpegBin, resolveFfprobeBin } from '@agent/core/tool/tool-binary-resolvers';
 import { compileNarratedVideoBriefToCompositionADF } from '@agent/core/video/narrated-video-brief-compiler';
+import { resolveDefaultVideoBackgroundColor } from '@agent/core/video/video-design-system';
+import {
+  mixNarrationTimeline,
+  planNarrationTimeline,
+  probeAudioDurationSec,
+} from '@agent/core/video/video-narration-timeline';
 import {
   compileVideoCompositionADF,
   writeVideoCompositionBundle,
@@ -505,6 +511,120 @@ async function createNarratedIntroMovie(params: {
     video_composition_adf: adf,
     execution,
   };
+}
+
+interface TimelineVideoSceneInput {
+  scene_id: string;
+  role?: string;
+  html: string;
+  css?: string;
+  narration_ref?: string;
+  min_sec?: number;
+  asset_refs?: Array<{ asset_id: string; path: string; role?: string }>;
+}
+
+/**
+ * Narration-first authored video: each scene brings its own markup and
+ * narration clip; scene lengths follow the measured narration, the clips are
+ * mixed onto one track, and the result renders through the governed backend.
+ */
+async function createTimelineVideo(params: {
+  title?: string;
+  scenes?: TimelineVideoSceneInput[];
+  composition?: { width?: number; height?: number; fps?: number; background_color?: string };
+  timing?: { lead_sec?: number; tail_sec?: number; silent_scene_sec?: number };
+  output?: Record<string, unknown>;
+  job_id?: string;
+  bundle_dir?: string;
+}) {
+  const scenes = Array.isArray(params.scenes) ? params.scenes : [];
+  if (scenes.length === 0) {
+    throw new Error('create_timeline_video requires params.scenes with at least one scene');
+  }
+  const clips: Record<string, string> = {};
+  const segments = scenes.map((scene) => {
+    if (!scene.scene_id || typeof scene.html !== 'string' || !scene.html.trim()) {
+      throw new Error('create_timeline_video: every scene needs scene_id and html');
+    }
+    let narrationSec = 0;
+    if (scene.narration_ref) {
+      const clipPath = resolveVideoRepositoryPath(scene.narration_ref, false);
+      narrationSec = probeAudioDurationSec(clipPath);
+      clips[scene.scene_id] = clipPath;
+    }
+    return { scene_id: scene.scene_id, narration_sec: narrationSec, min_sec: scene.min_sec };
+  });
+  const plan = planNarrationTimeline(segments, params.timing);
+  const title = params.title || 'Timeline video';
+  const slug = slugifyTimelineTitle(params.job_id || title);
+  const narrationPath = Object.keys(clips).length
+    ? mixNarrationTimeline(
+        plan,
+        clips,
+        pathResolver.sharedTmp(`video-composition/timeline-narration/${slug}.wav`)
+      )
+    : undefined;
+  const adf: VideoCompositionADF = {
+    kind: 'video-composition-adf',
+    version: '1.0.0',
+    intent: title,
+    title,
+    composition: {
+      duration_sec: plan.total_duration_sec,
+      fps: params.composition?.fps || 30,
+      width: params.composition?.width || 1920,
+      height: params.composition?.height || 1080,
+      background_color:
+        params.composition?.background_color || resolveDefaultVideoBackgroundColor('promo'),
+    },
+    ...(narrationPath
+      ? { audio: { narration_ref: path.relative(pathResolver.rootDir(), narrationPath) } }
+      : {}),
+    scenes: scenes.map((scene, index) => ({
+      scene_id: scene.scene_id,
+      role: (scene.role as any) || 'generic',
+      start_sec: plan.scenes[index].start_sec,
+      duration_sec: plan.scenes[index].duration_sec,
+      template_ref: { template_id: 'timeline-html' },
+      content: {
+        html: scene.html,
+        css: scene.css || '',
+        narration_sec: plan.scenes[index].narration_sec,
+      },
+      asset_refs: (scene.asset_refs || []) as any,
+    })),
+    output: {
+      format: (params.output?.format as any) || 'mp4',
+      target_path: params.output?.target_path as string | undefined,
+      bundle_dir: (params.output?.bundle_dir as string | undefined) || params.bundle_dir,
+      emit_progress_packets: true,
+      await_completion: params.output?.await_completion as boolean | undefined,
+      detached_background: params.output?.detached_background as boolean | undefined,
+    },
+  };
+  const execution = await prepareVideoComposition({
+    video_composition_adf: adf,
+    job_id: params.job_id,
+    bundle_dir: params.bundle_dir,
+  });
+  return {
+    status: execution.status,
+    kind: 'timeline_video_run',
+    timeline: plan,
+    narration_ref: narrationPath,
+    video_composition_adf: adf,
+    execution,
+  };
+}
+
+function slugifyTimelineTitle(value: string): string {
+  return (
+    String(value)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'timeline-video'
+  );
 }
 
 async function verifyRenderedVideoArtifact(params: {
@@ -1238,6 +1358,9 @@ export async function handleSingleAction(input: VideoCompositionAction) {
   }
   if (action === 'create_narrated_video_from_content_brief') {
     return createNarratedVideoFromContentBrief(params);
+  }
+  if (action === 'create_timeline_video') {
+    return createTimelineVideo(params);
   }
   if (action === 'create_narrated_intro_movie') {
     return createNarratedIntroMovie(params);

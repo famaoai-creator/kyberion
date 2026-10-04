@@ -32276,6 +32276,85 @@
           ]
         },
         {
+          "op": "create_timeline_video",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "scenes": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "scene_id": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string"
+                    },
+                    "html": {
+                      "type": "string"
+                    },
+                    "css": {
+                      "type": "string"
+                    },
+                    "narration_ref": {
+                      "type": "string"
+                    },
+                    "min_sec": {
+                      "type": "number"
+                    },
+                    "asset_refs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  },
+                  "required": ["scene_id", "html"]
+                }
+              },
+              "composition": {
+                "type": "object"
+              },
+              "timing": {
+                "type": "object"
+              },
+              "output": {
+                "type": "object"
+              },
+              "job_id": {
+                "type": "string"
+              },
+              "bundle_dir": {
+                "type": "string"
+              }
+            },
+            "required": ["scenes"],
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "title": "Kyberion intro",
+              "scenes": [
+                {
+                  "scene_id": "hook",
+                  "html": "<h1 class=\"kb-cue kb-rise\" style=\"--at:.4\">曖昧な依頼を、成果まで。</h1>",
+                  "narration_ref": "active/shared/tmp/voice/hook.wav"
+                }
+              ],
+              "output": {
+                "format": "mp4",
+                "target_path": "active/shared/tmp/timeline.mp4"
+              }
+            }
+          ]
+        },
+        {
           "op": "prepare_video_composition",
           "kind": "apply",
           "input_schema": {
