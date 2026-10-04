@@ -86,3 +86,21 @@ describe('resolveAskTransportTimeout', () => {
     ).toThrow(/TOOL_LOCKDOWN_UNSUPPORTED/);
   });
 });
+
+describe('scoped surface manifest transport', () => {
+  it('forwards the base manifest binding without replacing the runtime identity', () => {
+    expect(
+      toSupervisorEnsurePayload({
+        agentId: 'opaque-runtime-instance',
+        manifestAgentId: 'presence-surface-agent',
+        provider: 'claude',
+        requestedBy: 'surface_agent',
+        scope: { tier: 'public', viewer_principal: 'viewer-a' },
+      })
+    ).toMatchObject({
+      agentId: 'opaque-runtime-instance',
+      manifestAgentId: 'presence-surface-agent',
+      scope: { tier: 'public', viewer_principal: 'viewer-a' },
+    });
+  });
+});

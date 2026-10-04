@@ -1,15 +1,14 @@
 /**
  * File-based inter-process locks (atomic publication, guarded stale reclaim).
  *
- * Residual window: every removal is identity-checked through a tomb rename,
- * and a publication whose temp sibling was swept as litter while the publisher
- * stalled (ENOENT from publish) is retried with a fresh temp. What remains is
- * a process stalled for longer than {@link LOCK_LIVE_GUARD_RECOVERY_AGE_MS}
- * (10 minutes) in the middle of a reclaim: its `.reclaim` guard and its tomb
- * are then treated as abandoned and swept, so a holder's record it had moved
- * to a tomb can be lost, or put back after another process already published.
- * A stall that long (suspended laptop, SIGSTOP, debugger) is accepted as out
- * of scope; the bounded ages keep normal crashes recoverable without operators.
+ * Main records with dead owners, or old malformed records, recover automatically.
+ * An extant cleanup guard is never taken over: compare-then-rename is not an
+ * atomic conditional removal, and moving a replacement live guard even briefly
+ * can admit two cleaners and then two main-lock holders. A cleaner that dies
+ * before releasing its guard therefore requires resource-scoped quiescent
+ * operator recovery. No measured frequency is claimed for this exception.
+ * All competing processes must use this protocol and the same PID/filesystem
+ * namespace. Live cleaner tombs are never swept, even after a long suspension.
  */
 import * as path from 'node:path';
 import { createLogger } from '../logger.js';
@@ -70,18 +69,16 @@ const LOCK_ROOT = path.join(pathResolver.rootDir(), 'active/shared/runtime/locks
 
 /**
  * Age after which an unverifiable lock record (empty, partial, malformed or
- * PID-less) or an orphaned `.reclaim` cleanup guard is reclaimed. Records are
- * published atomically, so an unverifiable record only appears through the
- * wx-create fallback, a power loss or a hand edit; cleanup guards are held for
- * microseconds. Thirty seconds is far beyond either legitimate window.
+ * PID-less) main record is reclaimed. Cleanup guards are never age-reclaimed.
+ * Production publishes atomically. The legacy wx fallback cannot protect a
+ * partial publisher suspended beyond this age; custom IO must publish atomically
+ * when it requires the same mutual-exclusion guarantee.
  */
 export const LOCK_RECOVERY_AGE_MS = 30_000;
 
 /**
- * A cleanup guard whose recorded PID is alive is only reclaimed past this age
- * (the PID was reused by an unrelated process). Main-record removal is
- * identity-checked, so even a cleaner stalled this long cannot delete a newer
- * holder's record.
+ * Diagnostic threshold for a long-held cleanup guard. Retained for API
+ * compatibility; this age never authorizes taking over a live or unknown guard.
  */
 export const LOCK_LIVE_GUARD_RECOVERY_AGE_MS = 10 * 60_000;
 
@@ -281,20 +278,6 @@ function lockReclaimable(view: LockRecordView): boolean {
   return view.state === 'dead' || (view.state === 'unknown' && aged(view));
 }
 
-/**
- * A cleanup guard may be removed: its cleaner is gone, it is unverifiable and
- * old, or its PID is alive (reused) yet older than LOCK_LIVE_GUARD_RECOVERY_AGE_MS.
- * An unreadable guard is never removed.
- */
-function guardReclaimable(view: LockRecordView): boolean {
-  if (view.unreadable) return false;
-  return (
-    view.state === 'dead' ||
-    (view.state === 'unknown' && aged(view)) ||
-    (view.state === 'live' && agedPast(view, LOCK_LIVE_GUARD_RECOVERY_AGE_MS))
-  );
-}
-
 let tombCounter = 0;
 
 /** Tomb names embed the cleaner PID and creation time so housekeeping can age them. */
@@ -318,7 +301,7 @@ function putBack(io: LockIo, tomb: string, file: string): boolean {
     return true;
   } catch (error: unknown) {
     logger.warn(
-      `Lock record ${file} could not be restored — ${errorCode(error) ?? String(error)} | the displaced record is kept for inspection and swept after ${LOCK_RECOVERY_AGE_MS}ms | evidence: ${tomb}`
+      `Lock record ${file} could not be restored — ${errorCode(error) ?? String(error)} | the displaced record is kept for inspection; live-cleaner records are never swept | evidence: ${tomb}`
     );
     return false;
   }
@@ -328,11 +311,11 @@ type RemovalOutcome = 'removed' | 'gone' | 'changed';
 
 /**
  * Remove `file` only while it is still the record `expected` describes. With a
- * rename-capable IO the record is first moved to a unique tomb, so of several
- * concurrent cleaners only one obtains a given inode; the tomb is then
- * verified (same identity, still removable). A record that differs — a new
- * holder published, or another cleaner replaced an orphaned guard — is put
- * back exclusively and the removal is aborted.
+ * rename-capable IO the record is first moved to a unique tomb. Concurrent
+ * main cleaners are excluded by the unreclaimed guard; the tomb is then
+ * verified (same identity, still removable). This is not an atomic conditional
+ * removal and must never be used to take over another guard. An unexpected
+ * identity change is restored exclusively and the removal is aborted.
  */
 function removeIfUnchanged(
   io: LockIo,
@@ -379,7 +362,7 @@ function pidAlive(pid: number): boolean {
 /**
  * Best-effort, bounded removal of lock litter in the locks directory:
  * publication temp siblings and recovery tombs older than LOCK_RECOVERY_AGE_MS
- * (a tomb whose cleaner is still alive is kept until the live-guard age).
+ * (a tomb whose cleaner is still alive or cannot be verified is always kept).
  */
 function sweepLockLitter(io: LockIo, dir: string): void {
   if (!io.readdir) return;
@@ -397,9 +380,7 @@ function sweepLockLitter(io: LockIo, dir: string): void {
     let litter = false;
     if (tomb) {
       const age = Date.now() - Number(tomb[2]);
-      litter =
-        age >= LOCK_LIVE_GUARD_RECOVERY_AGE_MS ||
-        (age >= LOCK_RECOVERY_AGE_MS && !pidAlive(Number(tomb[1])));
+      litter = age >= LOCK_RECOVERY_AGE_MS && !pidAlive(Number(tomb[1]));
     } else if (PUBLISH_TEMP_PATTERN.test(name)) {
       let age: number | undefined;
       try {
@@ -416,13 +397,10 @@ function sweepLockLitter(io: LockIo, dir: string): void {
 }
 
 /**
- * Stale cleanup is serialized through an exclusive `.reclaim` guard and the
- * lock record is re-verified under it. Every removal (main record, orphaned
- * guard, own guard) is identity-checked through a tomb rename, so a stalled
- * cleaner can never delete a record it did not inspect. A missing main record
- * is never unlinked, EPERM and unreadable records count as live, and
- * unverifiable records/guards are only reclaimed once older than
- * LOCK_RECOVERY_AGE_MS. `pending` names a record that is waiting for that age.
+ * Serialize stale main cleanup through an exclusive, non-reclaimable guard.
+ * A missing main record is never removed. EPERM/unreadable records stay held.
+ * Only the guard owner can release it; an interrupted cleaner requires
+ * quiescent recovery rather than unsafe recursive guard reclamation.
  */
 function reclaimStaleLock(lockFile: string): { retry: boolean; pending?: string } {
   const initial = inspectRecord(lockFile);
@@ -443,12 +421,10 @@ function reclaimStaleLock(lockFile: string): { retry: boolean; pending?: string 
     if (errorCode(error) !== 'EEXIST') throw error;
     const holder = inspectRecord(guard);
     if (holder.state === 'missing') return { retry: true };
-    if (guardReclaimable(holder)) {
-      removeIfUnchanged(io, guard, holder, guardReclaimable);
-      sweepLockLitter(io, path.dirname(lockFile));
-      return { retry: true };
-    }
-    return { retry: false, ...(holder.state === 'live' ? {} : { pending: guard }) };
+    // Never displace an extant guard, even when its earlier owner was dead.
+    // Another cleaner may have replaced it since inspection; rename/restore
+    // would expose an unsafe gap before identity verification.
+    return { retry: false, pending: guard };
   }
   try {
     sweepLockLitter(io, path.dirname(lockFile));
@@ -456,12 +432,12 @@ function reclaimStaleLock(lockFile: string): { retry: boolean; pending?: string 
     if (current.state === 'missing') return { retry: true };
     if (!lockReclaimable(current))
       return { retry: false, ...(current.state === 'unknown' ? { pending: lockFile } : {}) };
-    // A cleaner that stalled long enough to lose its guard must not proceed.
+    // Unexpected ownership change (for example external mutation) fails closed.
     if (inspectRecord(guard).identity !== myIdentity) return { retry: false };
     return { retry: removeIfUnchanged(io, lockFile, current, lockReclaimable) !== 'changed' };
   } finally {
     const own = inspectRecord(guard);
-    // Unknown cleanup ownership is never deleted here; it ages out instead.
+    // Unknown cleanup ownership is retained for quiescent operator recovery.
     if (own.identity === myIdentity)
       removeIfUnchanged(io, guard, own, (view) => view.identity === myIdentity);
   }
@@ -473,6 +449,8 @@ export interface LockRecoveryState {
   kind: 'lock_record' | 'cleanup_guard';
   state: LockOwnerState;
   ageMs?: number;
+  /** A cleanup guard needs quiescent operator recovery if its owner cannot finish. */
+  manualRecoveryRequired?: boolean;
   /** ms until automatic reclaim; undefined when the age is unknown or never reclaimed. */
   reclaimInMs?: number;
   /** The record exists but cannot be read; it is never reclaimed automatically. */
@@ -499,21 +477,27 @@ export function inspectLockRecovery(resourceId: string): LockRecoveryState | und
         kind,
         state: view.state,
         unreadable: true,
+        ...(kind === 'cleanup_guard' ? { manualRecoveryRequired: true } : {}),
         ...(view.ageMs !== undefined ? { ageMs: view.ageMs } : {}),
       };
     }
     if (kind === 'lock_record' && (view.state === 'live' || view.state === 'dead')) continue;
-    const limit =
-      kind === 'cleanup_guard' && view.state === 'live'
-        ? LOCK_LIVE_GUARD_RECOVERY_AGE_MS
-        : LOCK_RECOVERY_AGE_MS;
-    if (kind === 'cleanup_guard' && view.state === 'live' && !agedPast(view, limit)) continue;
+    if (kind === 'cleanup_guard') {
+      if (view.state === 'live' && !agedPast(view, LOCK_LIVE_GUARD_RECOVERY_AGE_MS)) continue;
+      return {
+        path: file,
+        kind,
+        state: view.state,
+        manualRecoveryRequired: true,
+        ...(view.ageMs !== undefined ? { ageMs: view.ageMs } : {}),
+      };
+    }
     return {
       path: file,
       kind,
       state: view.state,
       ...(view.ageMs !== undefined
-        ? { ageMs: view.ageMs, reclaimInMs: Math.max(0, limit - view.ageMs) }
+        ? { ageMs: view.ageMs, reclaimInMs: Math.max(0, LOCK_RECOVERY_AGE_MS - view.ageMs) }
         : {}),
     };
   }
@@ -521,12 +505,14 @@ export function inspectLockRecovery(resourceId: string): LockRecoveryState | und
 }
 
 function recoveryHint(pending: string): string {
+  if (pending.endsWith('.reclaim'))
+    return `cleanup guard ${pending} is never reclaimed automatically; let its owner finish, or confirm all processes that can use this resource are stopped before inspecting/removing the orphan guard and restarting those processes`;
   return `unverifiable lock record ${pending} is reclaimed automatically once older than ${LOCK_RECOVERY_AGE_MS}ms`;
 }
 
 function warnPendingRecovery(resourceId: string, pending: string): void {
   logger.warn(
-    `Lock ${resourceId} not acquired — ${recoveryHint(pending)} | retry later, or inspect with inspectLockRecovery('${resourceId}') if it persists | evidence: ${pending}`
+    `Lock ${resourceId} not acquired — ${recoveryHint(pending)} | inspect with inspectLockRecovery('${resourceId}') if it persists | evidence: ${pending}`
   );
 }
 
