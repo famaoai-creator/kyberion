@@ -45,6 +45,7 @@ const HARDENED_RULES = new Set(['injection-suspected-override', 'strict-posture-
 
 /** Policies whose reason for a human lies outside what an envelope can express. */
 export function isCharterEligiblePolicy(policy: ApprovalPolicyResolution): boolean {
+  if (policy.mandatoryApproval) return false;
   const rule = policy.matchedRuleId;
   if (rule && (HARDENED_RULES.has(rule) || rule.startsWith('fallback-dangerous-'))) return false;
   return !policy.missingRequirements.includes('dual_key_confirmation');

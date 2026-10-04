@@ -1,0 +1,7 @@
+---
+category: Added
+---
+
+- Cross-dot arbitration (DL-11): new pre-gate check `dot-arbitration` (`@agent/core/dot/dot-arbitration`) detects when a dot's targeted proposal conflicts with another same-tenant dot's live action from the last 6 h (parked, or dispatched with an open WorkItem) on an equal or glob-overlapping target with opposing or both-mutating intents. The sole `team.owns` owner wins, else a `team.priority` gap of 10 or more decides; otherwise one combined `approve` decision card lists both proposals and links the action it supersedes. Decisions land in the tenant-scoped `arbitration.jsonl`. The supervisor step `dot-arbitration-settle` applies the operator's answer: approved declines the older parked action as `superseded` (no dot feedback, so the learned decision floor is not raised; its stale card is expired) or blocks its open WorkItem; rejected leaves the newcomer declined.
+- `dotProposalHash` now includes `pipeline_ref`, `target` and `intent` (only when set), so opposing proposals with the same title are no longer deduped as duplicates. Proposals that carry any of these fields get a new hash, so one already parked/declined within the 24 h dedupe window may be re-asked once after upgrade; proposals without them keep their hash.
+- Dot handoffs no longer cross tenants: a `handoff_to` target in a different tenant scope (or a different `organization_id` when both declare one) is refused with an audited `cross-tenant handoff denied` reason, and such dots are no longer listed as handoff partners in the wake prompt.

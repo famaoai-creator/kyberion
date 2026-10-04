@@ -40,11 +40,88 @@ function writeCharter(charter: unknown, name = 'dot.json'): string {
   return filePath;
 }
 
+function writeTenantCharter(slug: string, charter: DotCharter, name = 'dot.json'): string {
+  const profiles = `${TEST_ROOT}/knowledge/personal/tenants`;
+  safeMkdir(profiles, { recursive: true });
+  safeWriteFile(
+    `${profiles}/${slug}.json`,
+    JSON.stringify({
+      tenant_slug: slug,
+      display_name: slug,
+      status: 'active',
+      assigned_role: 'owner',
+    })
+  );
+  const dir = `${TEST_ROOT}/knowledge/confidential/${slug}/dots`;
+  safeMkdir(dir, { recursive: true });
+  const filePath = `${dir}/${name}`;
+  safeWriteFile(
+    filePath,
+    JSON.stringify({
+      ...charter,
+      scope: { tier: 'confidential', tenant_slug: slug },
+    })
+  );
+  return filePath;
+}
+
 afterEach(() => {
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
 });
 
 describe('transitionDotCharterStatus', () => {
+  it.each(['active', 'paused', 'retired'] as const)(
+    'rejects ambiguous identity before a %s transition or any write',
+    (target) => {
+      const status = target === 'active' ? 'draft' : 'active';
+      const repoPath = writeCharter({ ...DRAFT, status });
+      const secondPath = writeCharter({ ...DRAFT, status }, 'second.json');
+      expect(() => transitionDotCharterStatus(DRAFT.dot_id, target, deps)).toThrow(
+        /Duplicate dot_id 'repo-guardian'/
+      );
+      expect(loadDotCharter(repoPath).status).toBe(status);
+      expect(loadDotCharter(secondPath).status).toBe(status);
+      expect(safeExistsSync(`${TEST_ROOT}/${DOT_LIFECYCLE_AUDIT_PATH}`)).toBe(false);
+    }
+  );
+
+  it('transitions the repo owner of an id a tenant duplicate reuses, leaving the duplicate', () => {
+    const repoPath = writeCharter(DRAFT);
+    const tenantPath = writeTenantCharter('acme', { ...DRAFT, status: 'draft' });
+    expect(transitionDotCharterStatus(DRAFT.dot_id, 'active', deps).status).toBe('active');
+    expect(loadDotCharter(repoPath).status).toBe('active');
+    expect(loadDotCharter(tenantPath).status).toBe('draft');
+  });
+
+  it('transitions only the owner of an identity shared by two tenants', () => {
+    const first = writeTenantCharter('acme', { ...DRAFT, status: 'active' });
+    const second = writeTenantCharter('globex', { ...DRAFT, status: 'active' });
+    // No lifecycle history: the earliest-activated established charter owns the id.
+    expect(transitionDotCharterStatus(DRAFT.dot_id, 'paused', deps).status).toBe('paused');
+    expect(loadDotCharter(first).status).toBe('paused');
+    expect(loadDotCharter(second).status).toBe('active');
+  });
+
+  it('rejects a transition for an identity two files in one tenant declare', () => {
+    const first = writeTenantCharter('acme', { ...DRAFT, status: 'active' });
+    const second = writeTenantCharter('acme', { ...DRAFT, status: 'active' }, 'second.json');
+    expect(() => transitionDotCharterStatus(DRAFT.dot_id, 'paused', deps)).toThrow(
+      /Duplicate dot_id 'repo-guardian'/
+    );
+    expect(loadDotCharter(first).status).toBe('active');
+    expect(loadDotCharter(second).status).toBe('active');
+    expect(safeExistsSync(`${TEST_ROOT}/${DOT_LIFECYCLE_AUDIT_PATH}`)).toBe(false);
+  });
+
+  it('still transitions an unambiguous tenant charter beside malformed and colliding siblings', () => {
+    writeCharter({ ...DRAFT, dot_id: 'collision' }, 'one.json');
+    writeCharter({ ...DRAFT, dot_id: 'collision' }, 'two.json');
+    writeCharter({ ...DRAFT, bogus: true }, 'broken.json');
+    const filePath = writeTenantCharter('acme', { ...DRAFT, dot_id: 'unique', status: 'active' });
+    expect(transitionDotCharterStatus('unique', 'paused', deps).status).toBe('paused');
+    expect(loadDotCharter(filePath).status).toBe('paused');
+  });
+
   it('activates a draft charter when the gate passes', () => {
     const filePath = writeCharter({ ...DRAFT, $schema: '../schema.json' });
     const updated = transitionDotCharterStatus('repo-guardian', 'active', deps);
@@ -127,6 +204,30 @@ describe('transitionDotCharterStatus', () => {
 });
 
 describe('checkDotActivationReadiness', () => {
+  it('reports an ownerless duplicate identity as an activation blocker', () => {
+    writeCharter(DRAFT);
+    writeCharter(DRAFT, 'second.json');
+    expect(checkDotActivationReadiness(DRAFT, deps)).toMatchObject({
+      ready: false,
+      errors: [expect.stringContaining("Duplicate dot_id 'repo-guardian'")],
+    });
+  });
+
+  it('blocks a rejected duplicate but not the owner of its id', () => {
+    writeCharter(DRAFT);
+    writeTenantCharter('acme', { ...DRAFT, status: 'retired' });
+    expect(checkDotActivationReadiness(DRAFT, deps)).toEqual({ ready: true, errors: [] });
+    const duplicate: DotCharter = {
+      ...DRAFT,
+      status: 'retired',
+      scope: { tier: 'confidential', tenant_slug: 'acme' },
+    };
+    expect(checkDotActivationReadiness(duplicate, deps)).toMatchObject({
+      ready: false,
+      errors: [expect.stringContaining('[DOT_IDENTITY]')],
+    });
+  });
+
   it('reports gate errors without mutating the charter', () => {
     writeCharter({ ...DRAFT, authority: { authority_role: 'ghost_role' } });
     const check = checkDotActivationReadiness(

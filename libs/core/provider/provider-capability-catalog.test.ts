@@ -81,14 +81,21 @@ vi.mock('../foundation/io.js', () => ({
   registerFoundationIo: vi.fn(),
 }));
 
-vi.mock('../path-resolver.js', () => ({
-  pathResolver: {
+vi.mock('../path-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../path-resolver.js')>();
+  return {
+    ...actual,
     rootResolve: mocks.rootResolve,
-    rootDir: mocks.rootDir,
-    shared: mocks.shared,
-    knowledge: mocks.knowledge,
-  },
-}));
+    resolve: vi.fn((value: string) => value),
+    pathResolver: {
+      ...actual.pathResolver,
+      rootResolve: mocks.rootResolve,
+      rootDir: mocks.rootDir,
+      shared: mocks.shared,
+      knowledge: mocks.knowledge,
+    },
+  };
+});
 
 const CATALOG_PATH = '/repo/knowledge/product/orchestration/provider-capabilities.json';
 function claudeInstalled() {

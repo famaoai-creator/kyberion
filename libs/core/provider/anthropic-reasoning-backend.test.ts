@@ -8,11 +8,16 @@ import {
 } from './anthropic-reasoning-backend.js';
 import { applyCacheBreakpointToSystemBlocks } from '../reasoning/prompt-cache-discipline.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
-import { metrics } from '../metrics.js';
+import { metrics, MetricsCollector } from '../metrics.js';
+import { getUsageAttribution, withUsageAttribution } from '../usage-accounting.js';
+import { evaluateBudgetThrottle } from '../governance/org-budget-governor.js';
+import type { LoadedDotCharter } from '../dot/dot-charter.js';
+import { withExecutionContextAsync } from '../authority.js';
 
 describe('AnthropicReasoningBackend', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   it('routes SDK usage mission attribution through the governed environment accessor', () => {
@@ -181,6 +186,123 @@ describe('AnthropicReasoningBackend', () => {
       'success',
       expect.objectContaining({ cacheStats: { hits: 1, misses: 0 } })
     );
+  });
+
+  it('attributes concurrent dot SDK costs to their scopes and counts wake tokens once', async () => {
+    const create = vi.fn(async () => {
+      await Promise.resolve();
+      return {
+        content: [{ type: 'text', text: 'ok' }],
+        usage: { input_tokens: 500, output_tokens: 100 },
+      };
+    });
+    const backend = new AnthropicReasoningBackend({
+      client: { messages: { create, parse: vi.fn() } } as unknown as Anthropic,
+    });
+    const collector = new MetricsCollector({
+      persist: false,
+      costRegistry: { models: {}, default: { prompt: 1, completion: 1 } },
+    });
+    const rows: Array<Record<string, unknown>> = [];
+    vi.spyOn(metrics, 'record').mockImplementation((component, duration, status, extra) => {
+      collector.record(component, duration, status, extra);
+      rows.push({ timestamp: '2026-10-04T10:00:00Z', component, ...extra });
+    });
+    const scopes = [
+      { tier: 'confidential' as const, tenant_slug: 'acme', organization_id: 'o1' },
+      { tier: 'confidential' as const, tenant_slug: 'other', organization_id: 'o2' },
+    ];
+    await Promise.all(
+      scopes.map((scope, index) =>
+        withUsageAttribution(
+          { actor_id: `dot:d${index}`, accounting_id: `attempt-${index}`, scope },
+          () => backend.generateWithTools('wake', [])
+        )
+      )
+    );
+    expect(getUsageAttribution()).toBeUndefined();
+    expect(rows).toEqual(
+      expect.arrayContaining(
+        scopes.map((scope, index) =>
+          expect.objectContaining({
+            actor_id: `dot:d${index}`,
+            accounting_id: `attempt-${index}`,
+            scope: { ...scope, scope_kind: 'organization' },
+            cost_usd: 0.6,
+          })
+        )
+      )
+    );
+    const evaluation = evaluateBudgetThrottle(
+      { tenant_slug: 'acme', organization_id: 'o1' },
+      {
+        now: () => new Date('2026-10-04T10:00:00Z'),
+        policy: {
+          daily_token_cap: 1_000_000,
+          daily_cost_cap_usd: 0.5,
+          soft_ratio: 0.8,
+          hard_ratio: 1,
+        },
+        listCharters: () =>
+          scopes.map((scope, index) => ({ charter: { dot_id: `d${index}`, scope } })) as Array<
+            Pick<LoadedDotCharter, 'charter'>
+          >,
+        readDotTokenUsage: () =>
+          scopes.map((_, index) => ({
+            dot_id: `d${index}`,
+            accounting_id: `attempt-${index}`,
+            day: '2026-10-04',
+            tokens: 600,
+          })),
+        readMetricsHistory: () => rows,
+        readGenerationUnits: () => 0,
+        throttleCacheMs: 0,
+      }
+    );
+    expect(evaluation.usage).toMatchObject({
+      cost_usd: 0.6,
+      tokens: 600,
+      by_source: { dots: 600, missions: 0 },
+    });
+    expect(evaluation.usage.cost_status).toBeUndefined();
+    expect(evaluation.throttle).toBe('hard');
+    expect(evaluation.reason).toContain('cost');
+  });
+
+  it('uses canonical execution scope for non-dot SDK usage without inventing a dot actor', async () => {
+    const record = vi.spyOn(metrics, 'record').mockImplementation(() => undefined);
+    const backend = new AnthropicReasoningBackend({
+      client: {
+        messages: {
+          create: vi.fn().mockResolvedValue({
+            content: [{ type: 'text', text: 'ok' }],
+            usage: { input_tokens: 1, output_tokens: 1 },
+          }),
+          parse: vi.fn(),
+        },
+      } as unknown as Anthropic,
+    });
+    await withExecutionContextAsync(
+      'infrastructure_sentinel',
+      () => backend.generateWithTools('wake', []),
+      undefined,
+      'acme',
+      'o1'
+    );
+    expect(record).toHaveBeenCalledWith(
+      'anthropic-sdk',
+      expect.any(Number),
+      'success',
+      expect.objectContaining({
+        scope: {
+          tier: 'confidential',
+          tenant_slug: 'acme',
+          organization_id: 'o1',
+          scope_kind: 'organization',
+        },
+      })
+    );
+    expect(record.mock.calls.at(-1)?.[3]?.actor_id).toBeUndefined();
   });
 });
 

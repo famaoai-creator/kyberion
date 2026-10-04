@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   MetricsCollector,
   resolveCostRatesFromRegistry,
@@ -8,6 +9,35 @@ import {
 } from './metrics.js';
 
 describe('metrics core', () => {
+  it('strict history distinguishes absent, corrupt and non-file evidence while preserving legacy reads', () => {
+    const metricsDir = 'active/shared/tmp/metrics-strict-history-tests';
+    const historyPath = `${metricsDir}/history.jsonl`;
+    const collector = new MetricsCollector({
+      metricsDir,
+      metricsFile: 'history.jsonl',
+      persist: false,
+    });
+    try {
+      safeMkdir(metricsDir, { recursive: true });
+      expect(collector.loadHistory({ strict: true })).toEqual([]);
+      safeWriteFile(historyPath, '{broken json\n');
+      expect(collector.loadHistory()).toEqual([]);
+      expect(() => collector.loadHistory({ strict: true })).toThrow();
+      safeWriteFile(historyPath, '{"timestamp":"t1"}\n{broken json\n{"timestamp":"t2"}\n');
+      const malformed: number[] = [];
+      expect(
+        collector.loadHistory({ strict: true, onMalformed: (line) => malformed.push(line) })
+      ).toEqual([{ timestamp: 't1' }, { timestamp: 't2' }]);
+      expect(malformed).toEqual([2]);
+      safeRmSync(historyPath);
+      safeMkdir(historyPath);
+      expect(collector.loadHistory()).toEqual([]);
+      expect(() => collector.loadHistory({ strict: true })).toThrow('regular file');
+    } finally {
+      safeRmSync(metricsDir, { recursive: true, force: true });
+    }
+  });
+
   it('selects the highest applicable input tier and exposes cache rates per token', () => {
     const registry: ModelCostRegistry = {
       models: {

@@ -7,7 +7,11 @@ export function generateGlobalRels(): string {
 </Relationships>`;
 }
 
-export function generatePresentationRels(slideCount: number, masterCount: number): string {
+export function generatePresentationRels(
+  slideCount: number,
+  masterCount: number,
+  hasNotesMaster = false
+): string {
   let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`;
   let rId = 1;
@@ -22,6 +26,10 @@ export function generatePresentationRels(slideCount: number, masterCount: number
   xml += `\n  <Relationship Id="rId${rId++}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps" Target="viewProps.xml"/>`;
   xml += `\n  <Relationship Id="rId${rId++}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>`;
   xml += `\n  <Relationship Id="rId${rId++}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles" Target="tableStyles.xml"/>`;
+  if (hasNotesMaster) {
+    // rId = masterCount + slideCount + 5 — generatePresentation references it.
+    xml += `\n  <Relationship Id="rId${rId++}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster" Target="notesMasters/notesMaster1.xml"/>`;
+  }
   xml += `\n</Relationships>`;
   return xml;
 }

@@ -11,8 +11,15 @@ tags:
     2026-10,
   ]
 last_updated: 2026-10-04
-status: partial
+status: completed
 ---
+
+## 実装状況(2026-10-04 時点)
+
+- **PR #912 (マージ済み)**: CE-01/03/04/05/07/08/09 を実装 — `libs/core/interaction/` の汎用 Conversation Engine(InteractionState・連続シグナル・発話意図・BackchannelPolicy・UserRhythm・言語パック駆動) + voice アダプタ + ループへの opt-in 配線(CE→TTS 相槌・意図ショートカット)。この時点ではエンジンはシャドウ位置で、§13 の判定は従来パスが正本だった。
+- **フォローアップミッション (本 PR)**: 残件の **CE-02**(ループ完全移行)と **CE-06**(意味的応答分割)を完了。
+  - CE-02: `realtime-voice-loop.ts` はイベントをエンジンに送り、その action を消費するだけの構造になった。barge-in(two_stage / legacy / off は arbiter 注入差し替え)・EOT hold・respond gate・speculation の判定は全てエンジン内の同一 decider が担い、ループ側の二重実装を解消。`stt_final` は capture 完了時に 1 回だけ供給し、`speech_pause`/`speech_resume`/`output_partial` の新イベントで intra-utterance ポーズとエコー可視性をエンジンへ伝達。発話中ポーズ時間は `silenceDeltaMs`(チャンク長の証拠時間)で計測し、リプレイでイベント時計が実時間を追い越しても挙動が変わらない。
+  - CE-06: `libs/core/interaction/reply-structure.ts` が `reaction → claim → explanation → next` の意味的分割を提供(lexicon の `next_step_markers` + 言語非依存の文末クラスで多言語拡張可能)。`interaction.instantReaction` で CE の即時 reaction スロットが LLM 推論と並走して発声し、ストリームの reaction セグメントは TTS で重複発声しない(テキストは transcript に残る)。media event の `assistant_text_delta` に `segment` ラベルが載る。
 
 # Conversation Engine 改良計画(CE)
 

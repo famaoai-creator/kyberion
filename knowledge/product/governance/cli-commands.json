@@ -3651,6 +3651,94 @@
       "audience": "operator",
       "description": "cli_cmd_script_dot_inbox",
       "group": "operate"
+    },
+    {
+      "id": "script.dot.memory",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot memory",
+      "args": ["memory"],
+      "noun": "dot",
+      "verb": "memory",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_memory",
+      "group": "inspect"
+    },
+    {
+      "id": "script.dot.followups",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot followups",
+      "args": ["followups"],
+      "noun": "dot",
+      "verb": "followups",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_followups",
+      "group": "inspect"
+    },
+    {
+      "id": "script.dot.kr",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot kr",
+      "args": ["kr"],
+      "noun": "dot",
+      "verb": "kr",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_kr",
+      "group": "inspect"
+    },
+    {
+      "id": "script.dot.autonomy",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot autonomy",
+      "args": ["autonomy"],
+      "noun": "dot",
+      "verb": "autonomy",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_autonomy",
+      "group": "inspect"
+    },
+    {
+      "id": "script.dot.outcomes",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot outcomes",
+      "args": ["outcomes"],
+      "noun": "dot",
+      "verb": "outcomes",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_outcomes",
+      "group": "inspect"
+    },
+    {
+      "id": "script.dot.work",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot work",
+      "args": ["work"],
+      "noun": "dot",
+      "verb": "work",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_work",
+      "group": "inspect"
+    },
+    {
+      "id": "script.dot.event",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot event",
+      "args": ["event"],
+      "noun": "dot",
+      "verb": "event",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_event",
+      "group": "operate"
+    },
+    {
+      "id": "script.dot.release",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot release",
+      "args": ["release"],
+      "noun": "dot",
+      "verb": "release",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_release",
+      "group": "operate"
     }
   ],
   "deprecated_script_aliases": [

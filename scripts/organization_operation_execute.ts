@@ -1,14 +1,18 @@
 import {
   loadOrganizationOperation,
-  listOrganizationOperations,
   listOrganizationOperationRuns,
-  loadOrganizationOperationState,
   saveOrganizationOperationRun,
   saveOrganizationOperationState,
   loadOrganizationIncident,
   saveOrganizationIncident,
 } from '@agent/core/organization/organization-operating-model-operations';
 import { createOrganizationIncident } from '@agent/core/organization/organization-interventions';
+import {
+  operationIncidentId,
+  operationLockId,
+  tickDueOrganizationOperations,
+  type TickExecuteInput,
+} from '@agent/core/organization/organization-operation-tick';
 import { organizationOperationDueProjection } from '@agent/core/organization/organization-operation-runtime';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
@@ -17,22 +21,18 @@ import type {
   OrganizationOperationRun,
   OrganizationOperationState,
 } from '@agent/core/organization/organization-operating-model';
-import { executePipelineFile } from './run_pipeline.js';
+import { pipelineFileRunner } from './lib/pipeline-file-runner.js';
 import * as path from 'node:path';
-import { createHash } from 'node:crypto';
 import { withLock } from '@agent/core/lock-utils';
 import { resolveScopeResolution } from '@agent/core/scope-context';
+import { withExecutionContextAsync } from '@agent/core/authority';
+import { normalizeCadenceTenant } from '@agent/core/organization/organization-cadence';
 
-function operationLockId(organizationId: string, operationId: string, tenantSlug?: string): string {
-  return `organization-operation-${createHash('sha256')
-    .update(`${tenantSlug || 'shared'}:${organizationId}:${operationId}`)
-    .digest('hex')
-    .slice(0, 32)}`;
-}
-
-function operationIncidentId(organizationId: string, runId: string): string {
-  return `operation-${createHash('sha256').update(`${organizationId}:${runId}`).digest('hex').slice(0, 32)}`;
-}
+/**
+ * Governed authority role a scheduled (unattended) operation run executes
+ * under. The CLI path inherits the operator's selected scope instead.
+ */
+export const SCHEDULED_OPERATION_ROLE = 'organization_operator';
 
 function assertSelectedOrganizationScope(
   organizationId: string,
@@ -110,8 +110,10 @@ async function executeOrganizationOperationLocked(input: {
   runId: string;
   tier: 'public' | 'confidential' | 'personal';
   tenantSlug?: string;
+  /** Scheduled runs bind the pipeline to the operation's tenant/organization scope. */
+  scheduled?: boolean;
 }): Promise<void> {
-  const { flags, organizationId, operationId, runId, tier, tenantSlug } = input;
+  const { flags, organizationId, operationId, runId, tier, tenantSlug, scheduled } = input;
   const operation = loadOrganizationOperation(operationId, { organizationId, tier, tenantSlug });
   if (!operation || operation.status !== 'active')
     throw new Error(`Active operation not found: ${operationId}`);
@@ -172,20 +174,30 @@ async function executeOrganizationOperationLocked(input: {
   let summary = 'Pipeline completed.';
   let evidenceRefs: string[] = [];
   try {
-    const result = await executePipelineFile(ref, {
-      payloadScope: {
-        tier,
-        tenant_slug: tenantSlug,
-        purpose: `organization operation ${organizationId}/${operationId}`,
-      },
-      context: {
-        organization_id: organizationId,
-        tenant_slug: tenantSlug,
-        tier,
-        operation_id: operationId,
-        operation_run_id: runId,
-      },
-    });
+    const runPipeline = () =>
+      pipelineFileRunner()(ref, {
+        payloadScope: {
+          tier,
+          tenant_slug: tenantSlug,
+          purpose: `organization operation ${organizationId}/${operationId}`,
+        },
+        context: {
+          organization_id: organizationId,
+          tenant_slug: tenantSlug,
+          tier,
+          operation_id: operationId,
+          operation_run_id: runId,
+        },
+      });
+    const result = scheduled
+      ? await withExecutionContextAsync(
+          SCHEDULED_OPERATION_ROLE,
+          runPipeline,
+          undefined,
+          tenantSlug,
+          organizationId
+        )
+      : await runPipeline();
     evidenceRefs = [`trace:${result.trace.traceId}`];
     if (result.results.some((step) => step.status === 'failed')) {
       status = 'failed';
@@ -262,157 +274,62 @@ export async function tickOrganizationOperations(args: string[]): Promise<void> 
   if (!organizationId || !tier || (tier === 'confidential' && !tenantSlug))
     throw new Error('--organization-id, --tier, and confidential --tenant-slug are required.');
   assertSelectedOrganizationScope(organizationId, tier, tenantSlug);
-  const mode = flags.has('--apply') ? 'apply' : 'dry_run';
-  const incomplete = listOrganizationOperationRuns({ organizationId, tier, tenantSlug }).filter(
-    (run) => run.status === 'started'
+  const report = await tickDueOrganizationOperations(
+    { organizationId, tier, tenantSlug, apply: flags.has('--apply') },
+    { executeOperation: executeScheduledOrganizationOperation }
   );
-  const recovered: string[] = [];
-  const active: string[] = [];
-  if (mode === 'apply') {
-    for (const stale of incomplete) {
-      try {
-        await withLock(
-          operationLockId(organizationId, stale.operation_id, tenantSlug),
-          async () => {
-            const latest = listOrganizationOperationRuns({ organizationId, tier, tenantSlug }).find(
-              (run) => run.run_id === stale.run_id
-            );
-            if (!latest || latest.status !== 'started') return;
-            const operation = loadOrganizationOperation(latest.operation_id, {
-              organizationId,
-              tier,
-              tenantSlug,
-            });
-            const completedAt = nowIso();
-            const summary =
-              'Execution stopped before recording a result; operator review required.';
-            saveOrganizationOperationRun({
-              ...latest,
-              status: 'blocked',
-              completed_at: completedAt,
-              result_summary: summary,
-              recorded_at: completedAt,
-            });
-            const priorState = loadOrganizationOperationState(latest.operation_id, {
-              organizationId,
-              tier,
-              tenantSlug,
-            });
-            saveOrganizationOperationState({
-              operation_id: latest.operation_id,
-              organization_id: organizationId,
-              tier,
-              ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
-              status: 'blocked',
-              ...(operation
-                ? organizationOperationDueProjection(operation, priorState)
-                : { due_status: 'unknown' as const }),
-              ...(priorState?.last_run_at ? { last_run_at: priorState.last_run_at } : {}),
-              last_result_summary: summary,
-              updated_at: completedAt,
-            });
-            const incidentId = operationIncidentId(organizationId, latest.run_id);
-            const existingIncident = loadOrganizationIncident(incidentId, {
-              organizationId,
-              tier,
-              tenantSlug,
-            });
-            if (
-              existingIncident &&
-              (existingIncident.operation_id !== latest.operation_id ||
-                !existingIncident.trigger_refs?.includes(`operation-run:${latest.run_id}`))
-            ) {
-              throw new Error(`Incident ID collision for operation run ${latest.run_id}.`);
-            }
-            if (!existingIncident) {
-              saveOrganizationIncident(
-                createOrganizationIncident({
-                  incidentId,
-                  organizationId,
-                  tier,
-                  tenantSlug,
-                  title: `Operation ${latest.operation_id} interrupted`,
-                  severity: 'high',
-                  ownerRole: operation?.owner_role || 'operator',
-                  impactSummary: summary,
-                  operationId: latest.operation_id,
-                  triggerRefs: [`operation-run:${latest.run_id}`],
-                })
-              );
-            }
-            recovered.push(latest.run_id);
-          },
-          1000
-        );
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('[LOCK_TIMEOUT]'))
-          active.push(stale.run_id);
-        else throw error;
-      }
-    }
-  }
-  const existingRuns = new Set(
-    listOrganizationOperationRuns({ organizationId, tier, tenantSlug }).map((run) => run.run_id)
-  );
-  const due = listOrganizationOperations({ organizationId, tier, tenantSlug })
-    .filter((operation) => operation.status === 'active' && operation.trigger.kind === 'schedule')
-    .flatMap((operation) => {
-      const projection = organizationOperationDueProjection(
-        operation,
-        loadOrganizationOperationState(operation.operation_id, { organizationId, tier, tenantSlug })
-      );
-      if (!projection.next_due_at || !['due', 'overdue'].includes(projection.due_status)) return [];
-      const hash = createHash('sha256')
-        .update(`${organizationId}:${operation.operation_id}:${projection.next_due_at}`)
-        .digest('hex')
-        .slice(0, 24);
-      const runId = `scheduled-${hash}`;
-      return existingRuns.has(runId) ? [] : [{ operation, runId, dueAt: projection.next_due_at }];
-    });
-  const blocked = due
-    .filter(
-      ({ operation }) =>
-        operation.execution_target.kind !== 'pipeline' ||
-        operation.automation_boundary.approval_required_actions.length > 0 ||
-        operation.automation_boundary.forbidden_actions.length > 0
-    )
-    .map(({ operation }) => ({
-      operation_id: operation.operation_id,
-      reason: 'Requires a separate governed execution path.',
-    }));
-  const runnable = due.filter(
-    ({ operation }) => !blocked.some((entry) => entry.operation_id === operation.operation_id)
-  );
-  if (mode === 'dry_run') {
+  const blocked = report.blocked.map(({ operation_id, reason }) => ({ operation_id, reason }));
+  if (report.mode === 'dry_run') {
     process.stdout.write(
-      `${JSON.stringify({ mode, due: due.map(({ operation, runId, dueAt }) => ({ operation_id: operation.operation_id, run_id: runId, due_at: dueAt })), blocked, incomplete_runs: incomplete.map((run) => run.run_id) })}\n`
+      `${JSON.stringify({
+        mode: report.mode,
+        due: report.due.map(({ operation_id, run_id, due_at }) => ({
+          operation_id,
+          run_id,
+          due_at,
+        })),
+        blocked,
+        incomplete_runs: report.incomplete_runs,
+      })}\n`
     );
     return;
   }
-  const failures: string[] = [];
-  for (const { operation, runId } of runnable) {
-    try {
-      await executeOrganizationOperation([
-        '--organization-id',
-        organizationId,
-        '--tier',
-        tier,
-        ...(tenantSlug ? ['--tenant-slug', tenantSlug] : []),
-        '--operation-id',
-        operation.operation_id,
-        '--run-id',
-        runId,
-        '--apply',
-      ]);
-    } catch (error) {
-      failures.push(
-        `${operation.operation_id}: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  }
   process.stdout.write(
-    `${JSON.stringify({ mode, due_count: due.length, run_count: runnable.length, blocked, recovered, active, failures })}\n`
+    `${JSON.stringify({
+      mode: report.mode,
+      due_count: report.due_count,
+      run_count: report.run_count,
+      blocked,
+      recovered: report.recovered,
+      active: report.active,
+      failures: report.failures,
+    })}\n`
   );
-  if (failures.length)
-    throw new Error(`Organization operation tick had ${failures.length} failed run(s).`);
+  if (report.failures.length)
+    throw new Error(`Organization operation tick had ${report.failures.length} failed run(s).`);
+}
+
+/**
+ * Executes one scheduled operation. No selected-scope assertion: the caller is
+ * the tick, which enumerates organization scopes itself.
+ */
+export async function executeScheduledOrganizationOperation(
+  input: TickExecuteInput
+): Promise<void> {
+  const { organizationId, operationId, runId, tier } = input;
+  const tenantSlug = normalizeCadenceTenant(input.tenantSlug);
+  return withLock(
+    operationLockId(organizationId, operationId, tenantSlug),
+    () =>
+      executeOrganizationOperationLocked({
+        flags: new Map([['--apply', 'true']]),
+        organizationId,
+        operationId,
+        runId,
+        tier,
+        tenantSlug,
+        scheduled: true,
+      }),
+    1000
+  );
 }

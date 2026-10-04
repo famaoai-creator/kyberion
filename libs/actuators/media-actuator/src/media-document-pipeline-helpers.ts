@@ -225,6 +225,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
       media_kind: entry.media_kind,
       layout_key: entry.layout_key,
       semantic_type: entry.semantic_type,
+      speaker_notes: entry.speaker_notes ?? entry.notes,
       ...pickStructuredSectionFields(entry),
       composition: entry.composition,
       columns: entry.columns,
