@@ -11,15 +11,15 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@agent/core/process-guards', () => ({ installProcessGuards: vi.fn() }));
 vi.mock('@agent/core/tool/runtime-health-history', () => ({ recordRuntimeHealthSample: vi.fn() }));
 vi.mock('@agent/core/daemon-heartbeat', async () => ({
-  ...(await vi.importActual<any>('@agent/core/daemon-heartbeat')),
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/daemon-heartbeat')),
   recordDaemonHeartbeat: mocks.recordDaemonHeartbeat,
 }));
 vi.mock('@agent/core/ops-alert', async () => ({
-  ...(await vi.importActual<any>('@agent/core/ops-alert')),
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/ops-alert')),
   sendOpsAlert: vi.fn(),
 }));
 vi.mock('@agent/core/core', async () => ({
-  ...(await vi.importActual<any>('@agent/core/core')),
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/core')),
   logger: mocks.logger,
 }));
 vi.mock('@agent/core/reasoning/reasoning-bootstrap', () => ({
@@ -28,11 +28,11 @@ vi.mock('@agent/core/reasoning/reasoning-bootstrap', () => ({
 }));
 vi.mock('@agent/core/governance/approval-veto-window', () => ({ tickVetoWindows: vi.fn() }));
 vi.mock('@agent/core/dot/dot-dispatch', async () => ({
-  ...(await vi.importActual<any>('@agent/core/dot/dot-dispatch')),
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/dot/dot-dispatch')),
   runDotHousekeeping: mocks.housekeeping,
 }));
 vi.mock('@agent/core/dot/dot-runtime', async () => ({
-  ...(await vi.importActual<any>('@agent/core/dot/dot-runtime')),
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/dot/dot-runtime')),
   dotDailyTokenCapReached: () => false,
   evaluateDotTriggersDue: (charter: DotCharter): DueDotTrigger[] => [
     { trigger: { kind: 'cron', cron: '* * * * *' }, key: `cron:${charter.dot_id}` },

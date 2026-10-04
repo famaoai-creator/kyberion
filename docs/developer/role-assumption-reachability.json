@@ -3663,23 +3663,7 @@
       "entries": ["scripts/event_intake_surface.ts"],
       "reviewed_infeasible": [],
       "child_process_entries": [],
-      "reachable_roles": {
-        "chronos_tenant_runner": {
-          "example_path": [
-            "scripts/event_intake_surface.ts#<module>",
-            "libs/core/dot/dot-event-intake.ts#<module>",
-            "libs/core/dot/dot-runtime.ts#<module>",
-            "libs/core/dot/dot-extension-registry.ts#<module>",
-            "libs/core/dot/dot-arbitration.ts#dotArbitrationPreGateCheck",
-            "libs/core/dot/dot-arbitration.ts#checkDotArbitration",
-            "libs/core/dot/dot-arbitration.ts#dotArbitrationConflicts",
-            "libs/core/dot/dot-arbitration.ts#charterList",
-            "libs/core/dot/dot-charter.ts#listDotCharters",
-            "libs/core/dot/dot-charter.ts#listDotCharterSources",
-            "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
-          ]
-        }
-      },
+      "reachable_roles": {},
       "unresolved_sites": [],
       "policy_roles_not_reachable": [
         "chronos_gateway",

@@ -24,6 +24,7 @@ import {
   type DotExecutorPorts,
   type DotGoalMode,
 } from '@agent/core/dot/dot-executor';
+import '@agent/core/dot/dot-extension-bootstrap';
 import {
   resolveDotWakeBackend,
   type DotWakeBackend,

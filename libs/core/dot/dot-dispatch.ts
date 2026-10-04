@@ -611,7 +611,7 @@ function dotDispatchExtCtx(deps: DotDispatchDeps): DotExtCtx {
 
 function extensionFailure(kind: string, id: string, dotId: string, error: unknown): void {
   logger.warn(
-    `[dot-dispatch] ${kind} '${id}' failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: governance continues without it | evidence: libs/core/dot/dot-extension-registry.ts`
+    `[dot-dispatch] ${kind} '${id}' failed for ${dotId} — ${error instanceof Error ? error.message : String(error)} | next: governance continues without it | evidence: libs/core/dot/dot-extension-bootstrap.ts`
   );
 }
 

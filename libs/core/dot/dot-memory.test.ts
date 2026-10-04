@@ -17,6 +17,7 @@ import {
   type DotMemoryOp,
 } from './dot-memory.js';
 import { DOT_MEMORY_DISTILL_FILE, dotStatePath } from './dot-state-paths.js';
+import './dot-extension-bootstrap.js';
 
 const TEST_ROOT = 'active/shared/tmp/dot-memory-tests';
 const NOW = new Date('2026-10-05T00:00:00Z');

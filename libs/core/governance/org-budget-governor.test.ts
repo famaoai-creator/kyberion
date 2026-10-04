@@ -10,6 +10,7 @@ import {
   resolveOrgBudgetPolicy,
   type OrgBudgetPolicy,
 } from './org-budget-governor.js';
+import type { LoadedDotCharter } from '../dot/dot-charter.js';
 
 const now = () => new Date('2026-10-04T10:00:00Z');
 const policy: OrgBudgetPolicy = {
@@ -18,12 +19,12 @@ const policy: OrgBudgetPolicy = {
   soft_ratio: 0.8,
   hard_ratio: 1,
   tenant_overrides: { big: { daily_token_cap: 5000 } },
-  organization_overrides: { 'org-x': { daily_token_cap: 100 } } as any,
+  organization_overrides: { 'org-x': { daily_token_cap: 100 } },
 };
 const charters = [
   { charter: { dot_id: 'a', scope: { tenant_slug: 'acme', organization_id: 'o1' } } },
   { charter: { dot_id: 'b', scope: { tenant_slug: 'big' } } },
-] as any;
+] as unknown as Array<Pick<LoadedDotCharter, 'charter'>>;
 const base = (extra: Record<string, unknown> = {}) => ({
   now,
   policy,
