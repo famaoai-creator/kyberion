@@ -53,6 +53,7 @@ import {
   type DotWakeReceipt,
   type DueDotTrigger,
 } from '@agent/core/dot/dot-runtime';
+import { evaluateDotCronCatchUp, evaluateDotFollowupsDue } from '@agent/core/dot/dot-followups';
 import {
   installReasoningBackends,
   reselectReasoningBackends,
@@ -422,6 +423,10 @@ export async function runDotSweepOnce(
                 'secret-guard'
               ),
           })
+        );
+        due = due.concat(
+          evaluateDotFollowupsDue(loaded.charter, { now: () => now }),
+          evaluateDotCronCatchUp(loaded.charter, { now: () => now })
         );
         // Re-applied over the concatenated list: one half-open probe at most.
         due = applyDotWakeCircuit(loaded.charter, due, { now: () => now });

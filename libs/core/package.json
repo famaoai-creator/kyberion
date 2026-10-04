@@ -7087,6 +7087,14 @@
       "types": "./dist/dot/dot-extensions.d.ts",
       "default": "./dist/dot/dot-extensions.js"
     },
+    "./dot/dot-memory": {
+      "types": "./dist/dot/dot-memory.d.ts",
+      "default": "./dist/dot/dot-memory.js"
+    },
+    "./dot/dot-followups": {
+      "types": "./dist/dot/dot-followups.d.ts",
+      "default": "./dist/dot/dot-followups.js"
+    },
     "./dot/dot-extension-registry": {
       "types": "./dist/dot/dot-extension-registry.d.ts",
       "default": "./dist/dot/dot-extension-registry.js"
