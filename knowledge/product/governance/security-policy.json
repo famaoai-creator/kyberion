@@ -610,6 +610,12 @@
         "active/shared/runtime/approvals.json"
       ]
     },
+    "customer_create": {
+      "allow_write": ["customer/"]
+    },
+    "onboarding": {
+      "allow_write": ["customer/"]
+    },
     "assemble_changelog": {
       "allow_write": ["CHANGELOG.md", "changelog.d/"]
     },
