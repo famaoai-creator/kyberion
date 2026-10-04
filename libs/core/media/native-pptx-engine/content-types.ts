@@ -4,7 +4,8 @@ export function generateContentTypes(
   masterCount: number,
   diagramCount: number,
   chartCount: number = 0,
-  notesCount: number = 0
+  notesCount: number = 0,
+  notes?: { slideNumbers: number[]; themeIndex: number }
 ): string {
   let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -47,8 +48,17 @@ export function generateContentTypes(
   for (let i = 1; i <= chartCount; i++) {
     xml += `\n  <Override PartName="/ppt/charts/chart${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`;
   }
-  for (let i = 1; i <= notesCount; i++) {
+  // Notes slides are named by slide number, so overrides follow those numbers.
+  const notesSlideNumbers =
+    notes?.slideNumbers ?? Array.from({ length: notesCount }, (_, index) => index + 1);
+  for (const i of notesSlideNumbers) {
     xml += `\n  <Override PartName="/ppt/notesSlides/notesSlide${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"/>`;
+  }
+  if (notes) {
+    xml += `\n  <Override PartName="/ppt/notesMasters/notesMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml"/>`;
+    if (notes.themeIndex > masterCount) {
+      xml += `\n  <Override PartName="/ppt/theme/theme${notes.themeIndex}.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>`;
+    }
   }
 
   xml += `\n</Types>`;

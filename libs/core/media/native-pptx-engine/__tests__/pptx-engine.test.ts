@@ -1008,3 +1008,60 @@ describe('Native PPTX Engine', () => {
     });
   });
 });
+
+describe('speaker notes', () => {
+  it('writes notes with a notes master, relationships and matching content types', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pptx-notes-'));
+    try {
+      const protocol = createTestProtocol();
+      const base = protocol.slides[0]!;
+      protocol.slides = [
+        { ...base, id: 'slide1' },
+        { ...base, id: 'slide2', notes: '結論から話す。\n次に根拠 <3 & 補足' },
+      ];
+      const outputPath = path.join(tmpDir, 'notes.pptx');
+      await generateNativePptx(protocol, outputPath);
+      const files = extractPptx(outputPath);
+
+      // Only slide 2 has notes, and its part is named by slide number.
+      expect(files.has('ppt/notesSlides/notesSlide1.xml')).toBe(false);
+      const notes = files.get('ppt/notesSlides/notesSlide2.xml')!;
+      expect(notes).toContain('結論から話す。');
+      expect(notes).toContain('次に根拠 &lt;3 &amp; 補足');
+      expect(files.get('ppt/notesSlides/_rels/notesSlide2.xml.rels')).toContain(
+        '../notesMasters/notesMaster1.xml'
+      );
+      expect(files.get('ppt/notesSlides/_rels/notesSlide2.xml.rels')).toContain(
+        '../slides/slide2.xml'
+      );
+      expect(files.get('ppt/slides/_rels/slide2.xml.rels')).toContain('notesSlide2.xml');
+
+      // The notes master is registered everywhere PowerPoint looks for it.
+      expect(files.has('ppt/notesMasters/notesMaster1.xml')).toBe(true);
+      expect(files.get('ppt/notesMasters/_rels/notesMaster1.xml.rels')).toContain('theme2.xml');
+      expect(files.has('ppt/theme/theme2.xml')).toBe(true);
+      const contentTypes = files.get('[Content_Types].xml')!;
+      expect(contentTypes).toContain('/ppt/notesSlides/notesSlide2.xml');
+      expect(contentTypes).not.toContain('/ppt/notesSlides/notesSlide1.xml');
+      expect(contentTypes).toContain('/ppt/notesMasters/notesMaster1.xml');
+      expect(contentTypes).toContain('/ppt/theme/theme2.xml');
+      const presentation = files.get('ppt/presentation.xml')!;
+      const notesMasterRid = xmlAttr(presentation, 'p:notesMasterId', 'r:id');
+      expect(notesMasterRid).toBeTruthy();
+      expect(files.get('ppt/_rels/presentation.xml.rels')).toMatch(
+        new RegExp(`Id="${notesMasterRid}"[^>]*notesMaster"`)
+      );
+      // Every part parses as XML.
+      for (const [name, xml] of files) {
+        if (!name.endsWith('.xml') && !name.endsWith('.rels')) continue;
+        const errors: string[] = [];
+        new DOMParser({
+          onError: (_level: string, msg: string) => errors.push(msg),
+        } as any).parseFromString(xml, 'text/xml');
+        expect(errors, name).toEqual([]);
+      }
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
