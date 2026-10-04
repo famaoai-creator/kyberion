@@ -151,3 +151,6 @@ export * from './dot/dot-runtime.js';
 export * from './dot/dot-wake-orchestration.js';
 export * from './dot/dot-lifecycle.js';
 export * from './dot/dot-inbox.js';
+export * from './dot/dot-proposals.js';
+export * from './dot/dot-dispatch.js';
+export * from './dot/dot-feedback.js';

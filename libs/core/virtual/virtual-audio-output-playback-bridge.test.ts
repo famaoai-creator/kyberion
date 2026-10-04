@@ -182,4 +182,42 @@ describe('createVirtualAudioOutputPlaybackBridge', () => {
     expect(mocks.safeWriteFile).toHaveBeenCalled();
     expect(mocks.safeExec).toHaveBeenCalledTimes(1);
   });
+
+  it('allows a provider-specific playback backend to be registered', async () => {
+    const { createVirtualAudioOutputPlaybackBridge, registerAudioPlaybackBackend } =
+      await import('./virtual-audio-output-playback-bridge.js');
+    const unregister = registerAudioPlaybackBackend({
+      backend: 'test-provider-output',
+      platforms: ['darwin'],
+      warning: 'provider test backend',
+      play: ({ source_path: filePath, device_name: device }) => {
+        return mocks.safeExec(
+          'provider-player',
+          ['--provider-device', device, '--file', filePath],
+          {
+            env: {},
+            timeoutMs: 120000,
+          }
+        );
+      },
+    });
+
+    try {
+      const sourcePath = pathResolver.sharedTmp('virtual-audio-output-boundary-test/provider.wav');
+      fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+      fs.writeFileSync(sourcePath, Buffer.from('wav-fixture'));
+      const result = await createVirtualAudioOutputPlaybackBridge().playOnOutputs(
+        ['Built-in Output'],
+        { source_path: sourcePath }
+      );
+      expect(result.outputs[0]).toEqual(
+        expect.objectContaining({ selected_backend: 'test-provider-output', status: 'played' })
+      );
+      expect(mocks.safeExec.mock.calls[0]?.[1]).toEqual(
+        expect.arrayContaining(['--provider-device', 'Built-in Output'])
+      );
+    } finally {
+      unregister();
+    }
+  });
 });

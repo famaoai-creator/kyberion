@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createVirtualDeviceInventoryBridge } from './virtual-device-inventory-bridge.js';
 import {
   createVirtualMediaDeviceControlBridge,
@@ -53,6 +53,17 @@ function makeCommandRunner() {
 }
 
 describe('createVirtualMediaDeviceControlBridge', () => {
+  const originalPlatform = process.platform;
+
+  beforeEach(() => {
+    // The fixtures below model system_profiler and AVFoundation devices.
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', { configurable: true, value: originalPlatform });
+  });
+
   it('selects existing audio and camera devices at runtime', async () => {
     const inventory = createVirtualDeviceInventoryBridge({
       command_runner: makeCommandRunner(),
@@ -89,5 +100,26 @@ describe('createVirtualMediaDeviceControlBridge', () => {
     expect(result.status).toBe('blocked');
     expect(result.host_plan?.audio?.length).toBeGreaterThan(0);
     expect(result.host_plan?.camera?.length).toBeGreaterThan(0);
+  });
+
+  it('routes request camera preferences and rejects unavailable registered backends', async () => {
+    const inventory = createVirtualDeviceInventoryBridge({ command_runner: makeCommandRunner() });
+    const bridge = createVirtualMediaDeviceControlBridge({ inventory_bridge: inventory });
+    const result = await bridge.control({
+      action: 'select',
+      scope: 'camera',
+      preferred_camera_backend: 'stub',
+      camera_device_preference: 'FaceTime',
+    });
+    expect(result.status).toBe('succeeded');
+    expect(result.selection?.camera?.backend).toBe('stub');
+    expect(result.selection?.camera?.selected_camera).toBe('FaceTime HD Camera');
+    const rejected = await bridge.control({
+      action: 'select',
+      scope: 'camera',
+      preferred_camera_backend: 'unregistered-camera',
+    });
+    expect(rejected.status).toBe('blocked');
+    expect(rejected.selection?.camera?.reason).toContain('unknown');
   });
 });

@@ -157,8 +157,13 @@ function parseRecordArgs(argv: string[]): RecordArgs {
       index += commonRes.consumed;
       continue;
     }
-    if (value === '--screen' || value === '--audio' || value === '--camera') {
-      const source = value.slice(2);
+    if (
+      value === '--screen' ||
+      value === '--audio' ||
+      value === '--camera' ||
+      (index === 0 && ['screen', 'audio', 'camera'].includes(value))
+    ) {
+      const source = value.startsWith('--') ? value.slice(2) : value;
       if (sourceSeen && sourceSeen !== source) {
         throw new ScriptExitError(1, '[record] pass one of --screen, --audio, --camera');
       }
@@ -283,6 +288,9 @@ export async function runRecordCommand(
     let raw: Record<string, unknown>;
     try {
       raw = await deps.record(input);
+      if (raw.status === 'failed' || raw.status === 'blocked') {
+        throw new Error(JSON.stringify(raw.results ?? raw.error ?? raw.status));
+      }
     } catch (error) {
       throw new ScriptExitError(1, `[record] system:${opName} failed: ${(error as Error).message}`);
     }
@@ -324,6 +332,12 @@ export async function runRecordCommand(
   }
   const context =
     raw.context && typeof raw.context === 'object' ? (raw.context as Record<string, unknown>) : raw;
+  if (raw.status === 'failed' || raw.status === 'blocked') {
+    throw new ScriptExitError(
+      1,
+      `[record] system:record_audio failed: ${JSON.stringify(raw.results ?? raw.error ?? raw.status)}`
+    );
+  }
   const recording =
     context.audio_recording && typeof context.audio_recording === 'object'
       ? (context.audio_recording as Record<string, unknown>)

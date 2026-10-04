@@ -34,22 +34,31 @@ let registered = false;
 export function registerBuiltinAudioBusBridges(): void {
   if (registered) return;
   registered = true;
-  registerAudioBusBridge({
-    bridge_id: 'stub',
-    createBus: () => new StubAudioBus(),
-  });
-  registerAudioBusBridge({
-    bridge_id: 'blackhole',
-    createBus: (options) => new BlackHoleAudioBus(mergeBlackHoleOptions(options)),
-  });
-  registerAudioBusBridge({
-    bridge_id: 'pulseaudio',
-    createBus: (options) =>
-      new PulseAudioBus({
-        ...(options?.source_name ? { source_name: options.source_name } : {}),
-        ...(options?.sink_name ? { sink_name: options.sink_name } : {}),
-      }),
-  });
+  registerAudioBusBridge(
+    {
+      bridge_id: 'stub',
+      createBus: () => new StubAudioBus(),
+    },
+    { provenance: 'builtin', source: 'audio-bus-providers' }
+  );
+  registerAudioBusBridge(
+    {
+      bridge_id: 'blackhole',
+      createBus: (options) => new BlackHoleAudioBus(mergeBlackHoleOptions(options)),
+    },
+    { provenance: 'builtin', source: 'audio-bus-providers' }
+  );
+  registerAudioBusBridge(
+    {
+      bridge_id: 'pulseaudio',
+      createBus: (options) =>
+        new PulseAudioBus({
+          ...(options?.source_name ? { source_name: options.source_name } : {}),
+          ...(options?.sink_name ? { sink_name: options.sink_name } : {}),
+        }),
+    },
+    { provenance: 'builtin', source: 'audio-bus-providers' }
+  );
 }
 
 registerBuiltinAudioBusBridges();

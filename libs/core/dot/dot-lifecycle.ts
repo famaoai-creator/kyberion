@@ -104,6 +104,16 @@ function assertActivationReady(
       `[DOT_ACTIVATE_HEARTBEAT] heartbeat_id '${heartbeatId}' is already used by active dot '${colliding.dot_id}'.`
     );
   }
+  const owned = new Set(charter.team?.responsibilities ?? []);
+  for (const other of allCharters) {
+    if (other.dot_id === charter.dot_id || other.status !== 'active') continue;
+    const overlap = (other.team?.responsibilities ?? []).filter((key) => owned.has(key));
+    if (overlap.length > 0) {
+      throw new Error(
+        `[DOT_ACTIVATE_RESPONSIBILITY] responsibilities ${overlap.join(', ')} are already held by active dot '${other.dot_id}'; hand them off (pause/retire that dot or drop the key) so one dot owns each responsibility.`
+      );
+    }
+  }
 }
 
 function auditTransition(entry: Record<string, unknown>, deps: DotLifecycleDeps): void {
