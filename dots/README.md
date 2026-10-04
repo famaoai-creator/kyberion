@@ -20,11 +20,88 @@ and loaded via `@agent/core/dot/dot-charter`.
 | `decisions`    | Floor for `autonomous-ops-gate` outcomes (`auto`/`notify`/`approve`) + veto window + `decision_expiry_minutes` (default 1440) + escalate chan                                                                                                                                                             |
 | `notification` | `deliver_to` (slack/telegram/discord/imessage) + optional digest cron + quiet hours                                                                                                                                                                                                                       |
 | `runtime`      | `heartbeat_id` watched by `daemon-watchdog`, optional reasoning backend                                                                                                                                                                                                                                   |
-| `team`         | Exclusive `responsibilities` keys (activation refused on overlap), `accepts_handoffs_from` (dots allowed to hand work here), `goal_ref` (organization goal)                                                                                                                                               |
+| `team`         | Exclusive `responsibilities` keys (activation refused on overlap), `accepts_handoffs_from` (dots allowed to hand work here), `goal_ref` (organization goal), `owns` (target patterns this dot owns) and `priority` (0-100, arbitration)                                                                   |
 
 `goal.signal_probes` makes `success_signals` measurable (a signal is healthy
 while its probe matches). `notification.delivery_mode` is `inbox` by default;
 set `live` to send to `deliver_to`.
+
+## Closed-loop fields (organization loop)
+
+A dot can execute, measure and learn, not only propose. All fields below are
+optional; the full design is in
+[resident-dot-model](../knowledge/product/architecture/resident-dot-model.md)
+"The closed organization loop".
+
+| Field                                | Meaning                                                                                                                   |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `goal.key_results[]`                 | Measurable KRs (`probe` / `file` / `signal_ratio` / `org_metric`) with `target`, `direction`, `every_s`, `settle_minutes` |
+| `goal.outcome_settle_minutes`        | Minutes after completion before an action's KR effect is judged (default 60)                                              |
+| `authority.allowed_pipelines`        | Repo-relative pipelines the executor may run for `pipeline`-shaped work                                                   |
+| `attention.triggers[].kind: "event"` | Wake on an authenticated inbound event (`sources`, `types`, `match`)                                                      |
+| `memory` / `followups`               | Working memory (`max_bytes`) and self-scheduled follow-ups (`max_pending`, default 3)                                     |
+| `autonomy`                           | `initial_level` / `min_level` / `max_level`, L0-L4 (default L2, ceiling L3)                                               |
+| `team.owns` / `team.priority`        | Arbitration inputs when two dots target the same resource                                                                 |
+| `runtime.cron_catch_up_hours`        | Missed cron minutes coalesced into one wake (default 6, max 24)                                                           |
+
+```json
+{
+  "goal": {
+    "statement": "Keep overdue operations under control.",
+    "outcome_settle_minutes": 30,
+    "key_results": [
+      {
+        "kr_id": "overdue",
+        "title": "Overdue operations",
+        "metric": { "source": "org_metric", "metric": "overdue_operations" },
+        "target": 2,
+        "direction": "decrease",
+        "baseline": 8,
+        "every_s": 900
+      }
+    ]
+  },
+  "attention": {
+    "triggers": [
+      { "kind": "cron", "cron": "0 9 * * *", "timezone": "Asia/Tokyo" },
+      { "kind": "event", "sources": ["ci"], "types": ["build_failed"] }
+    ]
+  },
+  "authority": {
+    "authority_role": "infrastructure_sentinel",
+    "allowed_work_shapes": ["task_session", "pipeline"],
+    "allowed_pipelines": ["pipelines/ok.json"]
+  },
+  "memory": { "enabled": true, "max_bytes": 8192 },
+  "followups": { "max_pending": 3 },
+  "autonomy": { "initial_level": "L2", "max_level": "L3" },
+  "team": { "owns": ["service:ops"], "priority": 60 }
+}
+```
+
+In a wake the dot reports `expected_effect` (`{kr_id, direction}`) and `target`
+on proposals, and may emit `dot-memory` / `dot-followup` fences (or the
+matching tools). State is kept under `active/shared/runtime/dot/`.
+
+### Operator steps
+
+1. **Event intake (off by default)**: set `enabled: true` for the source in
+   `knowledge/product/governance/event-intake-policy.json` (bind a
+   `tenant_slug` for tenant sources) and register its HMAC secret under the
+   source's `secret_key` (for example `EVENT_INTAKE_CI_SECRET`):
+   `pnpm kyberion secret introduce <service-id> <secret-key>`. The intake
+   surface listens on `127.0.0.1` (`KYBERION_EVENT_INTAKE_PORT` /
+   `KYBERION_EVENT_INTAKE_HOST`) at `POST /events/<source>`.
+2. **Cadence pipelines (opt-in)**: `organization-operation-tick`,
+   `organization-standup` and `organization-retro` ship `enabled: false`.
+   Enable per host with
+   `KYBERION_CHRONOS_SCHEDULES=organization-operation-tick,organization-standup,organization-retro`.
+3. **Restart the supervisor daemon after `pnpm build`.** The daemon is
+   long-lived; it keeps running the previous compiled loop (executor, KR
+   measurement, outcomes, autonomy) until restarted.
+4. Check `pnpm kyberion dot status` for the executor, KR, outcome, budget and
+   autonomy sections. A promotion above L2 is only applied after a human
+   approves its decision card.
 
 ## Execution model
 

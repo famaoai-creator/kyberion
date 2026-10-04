@@ -124,6 +124,14 @@ last_updated: 2026-10-04
 
 ## 4. 状況
 
-| ID        | 状態   |
-| --------- | ------ |
-| DL-01〜11 | 実装中 |
+| ID        | 状態     |
+| --------- | -------- |
+| DL-01〜11 | 実装済み |
+
+注記:
+
+- ケイデンス pipeline（DL-06）は `enabled: false` で出荷。ホストごとに `KYBERION_CHRONOS_SCHEDULES` で opt-in する。
+- 新しいループは `pnpm build` 後に supervisor daemon を再起動するまで反映されない（運用者の手順）。
+- イベント source（DL-08）は既定で無効。有効化には policy の `enabled: true` と HMAC secret の登録が要る。
+- 自律度の既定は L2（従来動作）、上限は L3。昇格は人間の承認後にのみ適用される。
+- end-to-end テスト: `libs/core/dot/dot-loop.integration.test.ts`。運用者向け手順: `dots/README.md`。
