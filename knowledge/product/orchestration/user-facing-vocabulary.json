@@ -169,6 +169,146 @@
         "ja": "ほか{count}件",
         "qps-ploc": "⟦{count} ɱőřė ŀőř⟧"
       },
+      "organization_cadence_more": {
+        "en": "{count} more",
+        "ja": "ほか{count}件",
+        "qps-ploc": "⟦{count} ɱőřė ŀőř⟧"
+      },
+      "organization_standup_header": {
+        "en": "*Standup* {name} (since {since})",
+        "ja": "*朝会* {name}（{since}以降）",
+        "qps-ploc": "⟦*Şŧȧñḓůṗ* {name} (şïñƈė {since}) ŀőřėɱ ïṗşů⟧"
+      },
+      "organization_standup_quiet": {
+        "en": "Nothing to report since the last standup.",
+        "ja": "前回の朝会以降、報告事項はありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ŧő řėṗőřŧ şïñƈė ŧħė ŀȧşŧ şŧȧñḓůṗ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "organization_standup_section_runs": {
+        "en": "Operation runs",
+        "ja": "運用の実行",
+        "qps-ploc": "⟦Őṗėřȧŧïőñ řůñş ŀőřė⟧"
+      },
+      "organization_standup_run_line": {
+        "en": "[{status}] {operation}",
+        "ja": "[{status}] {operation}",
+        "qps-ploc": "⟦[{status}] {operation} ŀőřėɱ ï⟧"
+      },
+      "organization_standup_section_dot_work": {
+        "en": "Dot work results",
+        "ja": "ドットの作業結果",
+        "qps-ploc": "⟦Ḓőŧ ẇőřķ řėşůŀŧş ŀőřėɱ⟧"
+      },
+      "organization_standup_work_line": {
+        "en": "[{status}] {dot}: {summary}",
+        "ja": "[{status}] {dot}: {summary}",
+        "qps-ploc": "⟦[{status}] {dot}: {summary} ŀőřėɱ ïṗ⟧"
+      },
+      "organization_standup_section_actions": {
+        "en": "Dispatched and parked actions",
+        "ja": "実行済み・保留中のアクション",
+        "qps-ploc": "⟦Ḓïşṗȧŧƈħėḓ ȧñḓ ṗȧřķėḓ ȧƈŧïőñş ŀőřėɱ ïṗş⟧"
+      },
+      "organization_standup_action_line": {
+        "en": "[{status}] {dot}: {title}",
+        "ja": "[{status}] {dot}: {title}",
+        "qps-ploc": "⟦[{status}] {dot}: {title} ŀőřėɱ ïṗ⟧"
+      },
+      "organization_standup_section_decisions": {
+        "en": "Decisions awaiting approval",
+        "ja": "承認待ちの決定事項",
+        "qps-ploc": "⟦Ḓėƈïşïőñş ȧẇȧïŧïñɠ ȧṗṗřőṽȧŀ ŀőřėɱ ïṗ⟧"
+      },
+      "organization_standup_decision_line": {
+        "en": "{title} (due {when})",
+        "ja": "{title}（期限 {when}）",
+        "qps-ploc": "⟦{title} (ḓůė {when}) ŀőřėɱ ⟧"
+      },
+      "organization_standup_section_blocked": {
+        "en": "Blocked work items",
+        "ja": "ブロック中の作業項目",
+        "qps-ploc": "⟦Ƀŀőƈķėḓ ẇőřķ ïŧėɱş ŀőřėɱ⟧"
+      },
+      "organization_standup_blocked_line": {
+        "en": "{title}",
+        "ja": "{title}",
+        "qps-ploc": "⟦{title} ŀőř⟧"
+      },
+      "organization_standup_section_objectives": {
+        "en": "Objective progress changes",
+        "ja": "目標進捗の変化",
+        "qps-ploc": "⟦Őƀĵėƈŧïṽė ṗřőɠřėşş ƈħȧñɠėş ŀőřėɱ ïṗ⟧"
+      },
+      "organization_standup_objective_line": {
+        "en": "{title}: {from}% to {to}% ({delta} pt)",
+        "ja": "{title}: {from}% → {to}%（{delta}pt）",
+        "qps-ploc": "⟦{title}: {from}% ŧő {to}% ({delta} ṗŧ) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "organization_retro_header": {
+        "en": "*Weekly retro* {name} (since {since})",
+        "ja": "*週次ふりかえり* {name}（{since}以降）",
+        "qps-ploc": "⟦*Ẇėėķŀẏ řėŧřő* {name} (şïñƈė {since}) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "organization_retro_quiet": {
+        "en": "Nothing noteworthy this week.",
+        "ja": "今週、特筆すべき事項はありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ñőŧėẇőřŧħẏ ŧħïş ẇėėķ. ŀőřėɱ ïṗş⟧"
+      },
+      "organization_retro_section_objectives": {
+        "en": "Objective progress",
+        "ja": "目標の進捗",
+        "qps-ploc": "⟦Őƀĵėƈŧïṽė ṗřőɠřėşş ŀőřėɱ⟧"
+      },
+      "organization_retro_objective_line": {
+        "en": "{title}: {to}% ({delta} pt this week)",
+        "ja": "{title}: {to}%（今週 {delta}pt）",
+        "qps-ploc": "⟦{title}: {to}% ({delta} ṗŧ ŧħïş ẇėėķ) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "organization_retro_objective_line_new": {
+        "en": "{title}: {to}%",
+        "ja": "{title}: {to}%",
+        "qps-ploc": "⟦{title}: {to}% ŀőřė⟧"
+      },
+      "organization_retro_section_outcomes": {
+        "en": "Did actions move the signals?",
+        "ja": "アクションは指標を動かしたか",
+        "qps-ploc": "⟦Ḓïḓ ȧƈŧïőñş ɱőṽė ŧħė şïɠñȧŀş? ŀőřėɱ ïṗş⟧"
+      },
+      "organization_retro_outcome_line": {
+        "en": "improved {improved}, no change {no_change}, regressed {regressed}, unmeasurable {unmeasurable} (success {rate}%)",
+        "ja": "改善{improved}・変化なし{no_change}・悪化{regressed}・測定不能{unmeasurable}（成功率{rate}%）",
+        "qps-ploc": "⟦ïɱṗřőṽėḓ {improved}, ñő ƈħȧñɠė {no_change}, řėɠřėşşėḓ {regressed}, ůñɱėȧşůřȧƀŀė {unmeasurable} (şůƈƈėşş {rate}%) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "organization_retro_section_rejections": {
+        "en": "Refused or declined actions",
+        "ja": "拒否・却下されたアクション",
+        "qps-ploc": "⟦Řėƒůşėḓ őř ḓėƈŀïñėḓ ȧƈŧïőñş ŀőřėɱ ïṗ⟧"
+      },
+      "organization_retro_rejection_line": {
+        "en": "[{status}] {dot}: {title} — {reason}",
+        "ja": "[{status}] {dot}: {title} — {reason}",
+        "qps-ploc": "⟦[{status}] {dot}: {title} — {reason} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "organization_retro_section_incidents": {
+        "en": "Incidents this week",
+        "ja": "今週のインシデント",
+        "qps-ploc": "⟦Ïñƈïḓėñŧş ŧħïş ẇėėķ ŀőřėɱ ⟧"
+      },
+      "organization_retro_incident_line": {
+        "en": "[{severity}] {title} ({status})",
+        "ja": "[{severity}] {title}（{status}）",
+        "qps-ploc": "⟦[{severity}] {title} ({status}) ŀőřėɱ ïṗşů⟧"
+      },
+      "organization_retro_section_budget": {
+        "en": "Budget pressure",
+        "ja": "予算の逼迫",
+        "qps-ploc": "⟦Ƀůḓɠėŧ ṗřėşşůřė ŀőřė⟧"
+      },
+      "organization_retro_budget_line": {
+        "en": "{throttle}: {tokens} of {cap} daily tokens used",
+        "ja": "{throttle}: 1日の上限{cap}トークン中{tokens}を使用",
+        "qps-ploc": "⟦{throttle}: {tokens} őƒ {cap} ḓȧïŀẏ ŧőķėñş ůşėḓ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
       "organization_digest_service_expiring_line": {
         "en": "[expires within 7 days] {name} — until {when}",
         "ja": "[7日以内に失効] {name} — {when}まで",

@@ -1,0 +1,30 @@
+{
+  "action": "pipeline",
+  "name": "organization-retro",
+  "version": "1.0.0",
+  "description": "Sovereign-only weekly retro per organization: objective trend, action outcomes, refused or declined actions, incidents and budget pressure. Filed in each organization's scope and delivered to the operator inbox.",
+  "schedule": {
+    "id": "organization-retro",
+    "cron": "0 17 * * 5",
+    "timezone": "Asia/Tokyo",
+    "enabled": false
+  },
+  "steps": [
+    {
+      "id": "build_retro",
+      "role": "source",
+      "op": "core:organization_retro",
+      "params": {
+        "timezone": "Asia/Tokyo",
+        "locale": "ja-JP",
+        "since_days": 7,
+        "persist": true
+      },
+      "produces": {
+        "channel": "organization_retro",
+        "type": "OrganizationRetroRun",
+        "sensitive": true
+      }
+    }
+  ]
+}
