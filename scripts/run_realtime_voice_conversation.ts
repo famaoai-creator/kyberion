@@ -130,6 +130,14 @@ export interface RealtimeVoiceConversationCliOptions {
   eotHold?: boolean;
   /** Skip reasoning for filler-only turns and own-TTS echo (default on). */
   respondGate?: boolean;
+  /** Conversation Engine bundle: intent shortcuts + user-rhythm adaptation (CE). */
+  conversationEngine?: boolean;
+  /** Agent backchannel emission while listening (CE→TTS shortcut; headset recommended). */
+  backchannel?: boolean;
+  /** Instant reaction for pure hold requests and drop for pure user backchannels. */
+  intentShortcuts?: boolean;
+  /** Adapt timing constants to the user's conversational rhythm. */
+  rhythm?: boolean;
   /** VAD backend id ('energy' | 'silero' | registered custom). */
   vadBackend?: string;
   /** VAD selection purpose (voice.vad-backend policy) when no backend is named. */
@@ -759,6 +767,18 @@ export async function runRealtimeVoiceConversationLoop(
       idleTimeoutMs: options.idleTimeoutSeconds * 1000,
       maxSegmentChars: options.speechSegmentChars ?? 120,
       consent: { missionId: options.mission },
+      ...(options.conversationEngine ||
+      options.backchannel ||
+      options.intentShortcuts ||
+      options.rhythm
+        ? {
+            interaction: {
+              ...(options.backchannel ? { backchannel: true } : {}),
+              intentShortcuts: Boolean(options.conversationEngine || options.intentShortcuts),
+              rhythm: Boolean(options.conversationEngine || options.rhythm),
+            },
+          }
+        : {}),
       ...(streamingStt ? { streamingStt } : {}),
       transcribe: async (audioPath) => (await sttBridge.transcribe({ audioPath, language })).text,
       reply: (userText) =>
@@ -974,6 +994,11 @@ export function parseRealtimeVoiceConversationCli(
     firstPhraseCache: Boolean(argv['first-phrase-cache']),
     eotHold: argv['eot-hold'] === undefined ? true : Boolean(argv['eot-hold']),
     respondGate: argv['respond-gate'] === undefined ? true : Boolean(argv['respond-gate']),
+    conversationEngine: Boolean(argv['conversation-engine']),
+    backchannel: Boolean(argv['backchannel']),
+    intentShortcuts:
+      argv['intent-shortcuts'] === undefined ? undefined : Boolean(argv['intent-shortcuts']),
+    rhythm: argv['rhythm'] === undefined ? undefined : Boolean(argv['rhythm']),
     ...(argv['vad-backend'] ? { vadBackend: String(argv['vad-backend']) } : {}),
     ...(argv['vad-purpose'] ? { vadPurpose: String(argv['vad-purpose']) } : {}),
     ...(argv['stt-purpose'] ? { sttPurpose: String(argv['stt-purpose']) } : {}),
@@ -1124,6 +1149,28 @@ export async function main(
       default: true,
       describe:
         'Do not reply to filler-only turns or (with barge-in on) the assistant echo picked up by the mic',
+    })
+    .option('conversation-engine', {
+      type: 'boolean',
+      default: false,
+      describe:
+        'Conversation Engine bundle: intent shortcuts (pure hold → instant reaction, pure backchannel → drop) + user-rhythm timing adaptation. Does not enable --backchannel',
+    })
+    .option('backchannel', {
+      type: 'boolean',
+      default: false,
+      describe:
+        'Agent backchannels (「うん」「なるほど」) while the user speaks, emitted via the Conversation Engine → TTS shortcut with no reasoning call. Headset recommended on speaker setups',
+    })
+    .option('intent-shortcuts', {
+      type: 'boolean',
+      describe:
+        'Answer pure hold requests (「ちょっと待って」) with an instant reaction and drop pure user backchannels (「うん」) without a reasoning call',
+    })
+    .option('rhythm', {
+      type: 'boolean',
+      describe:
+        'Adapt EOT hold / speculation / backchannel timing to the user\u2019s conversational rhythm (activates after a few utterances)',
     })
     .option('vad-backend', {
       type: 'string',
