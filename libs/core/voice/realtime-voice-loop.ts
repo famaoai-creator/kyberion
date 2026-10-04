@@ -49,19 +49,18 @@ import {
 } from '../streaming-voice-playback.js';
 import type { StreamingTextToSpeechBridge } from './streaming-tts-bridge.js';
 import { VadTurnSegmenter, type VadTurnSegmenterOptions } from './vad-turn-recorder.js';
-import { computeChunkDurationMs, computeChunkRms } from './voice-activity-detector.js';
+import { computeChunkRms } from './voice-activity-detector.js';
 import {
-  LegacyBargeInArbiter,
-  VoiceTurnTakingMachine,
-  type TurnTakingAction,
-  type TurnTakingInput,
-} from './voice-turn-taking.js';
+  createLoopReactionEmitter,
+  createVoiceLoopEngine,
+  type EngineDecision,
+} from './voice-loop-engine.js';
 import {
   ReplySegmentLabeler,
   segmentReplyStructure,
   type ReplySegmentKind,
 } from '../interaction/reply-structure.js';
-import { shouldRespondToVoiceTurn, type OwnTtsEchoContext } from './voice-respond-gate.js';
+import type { OwnTtsEchoContext } from './voice-respond-gate.js';
 import {
   VoiceTurnCancellationCoordinator,
   type VoiceTurnCancelReason,
@@ -548,7 +547,6 @@ export async function startRealtimeVoiceLoop(
   let bargeFeed: SttFeed | null = null;
   let bargePartials: string[] = [];
   // Segmenter-level pause inside the current utterance (feeds speech_pause/resume).
-  let intraUtterancePaused = false;
 
   const closeBargeFeed = (): void => {
     bargeFeed?.end();
@@ -682,165 +680,116 @@ export async function startRealtimeVoiceLoop(
    * The loop feeds observations (vad/stt/tts/tick) and acts on the engine's
    * actions; it no longer runs its own barge-in / EOT-hold / respond-gate /
    * speculation deciders. `interaction` keeps gating the CE extras
-   * (agent backchannels, intent shortcuts, rhythm).
+   * (agent backchannels, intent shortcuts, rhythm). Engine wiring lives in
+   * voice-loop-engine.ts.
    * ------------------------------------------------------------------ */
   const rel = (): number => Math.max(0, Date.now() - loopStartedAt);
   const interactionOpts = options.interaction;
-  const engineBaseRms = segmenter.rmsThreshold > 0 ? segmenter.rmsThreshold : 800;
-  const engine = new VoiceTurnTakingMachine({
-    streaming_stt: Boolean(options.streamingStt),
-    // The arbiter needs the loop's calibrated threshold, not the module
-    // default — otherwise quiet mics never confirm an interruption.
-    ...(bargeInMode === 'off' ? { arbiter: null } : {}),
-    ...(bargeInMode === 'legacy'
-      ? {
-          arbiter: new LegacyBargeInArbiter({
-            base_rms_threshold: engineBaseRms,
-            threshold_multiplier: bargeInMultiplier,
-            min_speech_ms: bargeInMinSpeechMs,
-          }),
-        }
-      : {}),
-    barge_in: {
-      base_rms_threshold: engineBaseRms,
-      threshold_multiplier: bargeInMultiplier,
-      ...(options.bargeIn?.provisionalSpeechMs !== undefined
-        ? { provisional_speech_ms: options.bargeIn.provisionalSpeechMs }
-        : {}),
-      ...(options.bargeIn?.wordsGraceMs !== undefined
-        ? { words_grace_ms: options.bargeIn.wordsGraceMs }
-        : {}),
-      ...(options.bargeIn?.fallbackHardStopSpeechMs !== undefined
-        ? { fallback_hard_stop_speech_ms: options.bargeIn.fallbackHardStopSpeechMs }
-        : {}),
-    },
-    eot: options.eotHold?.enabled
-      ? {
-          ...(options.eotHold.commitThreshold !== undefined
-            ? { commitThreshold: options.eotHold.commitThreshold }
-            : {}),
-          ...(options.eotHold.maxHoldMs !== undefined
-            ? { maxHoldMs: options.eotHold.maxHoldMs }
-            : {}),
-        }
-      : false,
-    speculative: {
-      enabled: speculationEnabled,
-      tentativeSilenceMs: speculativePolicy.tentativeSilenceMs,
-      minPartialChars: speculativePolicy.minPartialChars,
-    },
-    respond_gate: respondGateEnabled
-      ? (text: string) => shouldRespondToVoiceTurn(text, echoContext())
-      : false,
-    interaction: {
-      intent: Boolean(interactionOpts),
-      rhythm: interactionOpts?.rhythm ? {} : false,
-      backchannel: interactionOpts?.backchannel
-        ? {
-            enabled: true,
-            ...(typeof interactionOpts.backchannel === 'object' ? interactionOpts.backchannel : {}),
-          }
-        : false,
-    },
-  });
 
-  let backchannelHandle: PlaybackHandle | null = null;
-  // Synchronous guard: only one reaction in flight — the handle alone cannot
-  // dedupe because it is assigned after an await.
-  let reactionInFlight = false;
   let pendingBargeIn: Promise<void> | null = null;
   // Turn decisions (hold/commit/drop) queued by engine actions and drained
   // by the turn path — capture-time decisions drain inside processUtterance,
   // tick-driven commits drain in the chunk loop.
-  type EngineDecision = Extract<TurnTakingAction, { type: 'hold' | 'commit' | 'drop' }>;
   const engineDecisions: EngineDecision[] = [];
 
-  const driveEngine = (input: TurnTakingInput): TurnTakingAction[] => {
-    try {
-      return engine.step(input);
-    } catch (err: unknown) {
-      const reason = err instanceof Error ? err.message : String(err);
-      logger.warn(`[realtime-voice-loop] interaction engine step failed: ${reason}`);
-      return [];
+  const loopEngine = createVoiceLoopEngine(
+    {
+      bargeInMode,
+      bargeInMultiplier,
+      bargeInMinSpeechMs,
+      ...(options.bargeIn ? { bargeIn: options.bargeIn } : {}),
+      ...(options.eotHold ? { eotHold: options.eotHold } : {}),
+      respondGateEnabled,
+      speculationEnabled,
+      speculativePolicy,
+      streamingStt: Boolean(options.streamingStt),
+      ...(interactionOpts ? { interaction: interactionOpts } : {}),
+      calibratedRmsThreshold: segmenter.rmsThreshold,
+      // Deferred — echoContext is declared later in this scope.
+      echoContext: () => echoContext(),
+    },
+    {
+      emitBackchannel: (text) => reactionEmitter.emit(text),
+      pauseSpeech: (buffered) => {
+        if (!speech) return;
+        speech.pause?.();
+        options.onEvent?.({ kind: 'barge_in_provisional', turn: activeTurnIndex });
+        trace?.addEvent('realtime_voice.barge_in_provisional', { turn: activeTurnIndex });
+        if (options.streamingStt) {
+          bargeFeed = startSttFeed(options.streamingStt, format, (text) => {
+            bargePartials.push(text);
+          });
+          for (const chunk of buffered) bargeFeed.push(chunk);
+        }
+      },
+      resumeSpeech: (reason) => {
+        if (!speech) return;
+        closeBargeFeed();
+        speech.resume?.();
+        options.onEvent?.({ kind: 'barge_in_resumed', turn: activeTurnIndex, reason });
+        trace?.addEvent('realtime_voice.barge_in_resumed', { turn: activeTurnIndex, reason });
+      },
+      // A live reaction is output too — pause/stop it alongside the reply.
+      pauseReaction: () => reactionEmitter.pause(),
+      resumeReaction: () => reactionEmitter.resume(),
+      stopReaction: () => reactionEmitter.stop(),
+      hardStopSpeech: (replay) => {
+        if (!speech) return;
+        closeBargeFeed();
+        pendingBargeIn = confirmBargeIn(replay, bargeInMode);
+      },
+      startSpeculative: (partial) => startSpeculation(partial, segmentsCaptured),
+      abortSpeculative: (reason) => abortSpeculation(reason),
+      enqueueDecision: (action) => {
+        engineDecisions.push(action);
+      },
+      onWarn: (reason) => logger.warn(`[realtime-voice-loop] ${reason}`),
+      onBackchannelTrace: (text) => trace?.addEvent('realtime_voice.backchannel', { text }),
     }
-  };
+  );
+  const engine = loopEngine.machine;
+  const arbiterBuffered = loopEngine.arbiterBuffered;
+  const driveEngineAndApply = loopEngine.driveAndApply;
 
-  /** Evidence buffered by the engine's arbiter while probing an interruption. */
-  const arbiterBuffered = (): AudioChunk[] =>
-    (engine.arbiter?.bufferedChunks?.() ?? []) as AudioChunk[];
-
-  /**
-   * Side effects for engine actions. `hold`/`commit`/`drop` are turn
-   * decisions — queued for the caller that owns utterance context.
-   */
-  const applyEngineActions = (actions: readonly TurnTakingAction[]): void => {
-    for (const action of actions) {
-      switch (action.type) {
-        case 'emit_backchannel':
-          trace?.addEvent('realtime_voice.backchannel', { text: action.text });
-          void emitAgentBackchannel(action.text);
-          break;
-        case 'pause_tts':
-          if (speech) {
-            speech.pause?.();
-            options.onEvent?.({ kind: 'barge_in_provisional', turn: activeTurnIndex });
-            trace?.addEvent('realtime_voice.barge_in_provisional', { turn: activeTurnIndex });
-            if (options.streamingStt) {
-              bargeFeed = startSttFeed(options.streamingStt, format, (text) => {
-                bargePartials.push(text);
-              });
-              for (const buffered of arbiterBuffered()) bargeFeed.push(buffered);
-            }
-          }
-          // A live reaction is output too — pause/stop it alongside the reply.
-          if (backchannelHandle) {
-            // Same semantics as the main path: suspend; only stop if the
-            // player cannot pause (e.g. Windows).
-            if (backchannelHandle.pause?.() !== true) void backchannelHandle.stop();
-          }
-          break;
-        case 'resume_tts':
-          if (speech) {
-            closeBargeFeed();
-            speech.resume?.();
-            options.onEvent?.({
-              kind: 'barge_in_resumed',
-              turn: activeTurnIndex,
-              reason: action.reason,
-            });
-            trace?.addEvent('realtime_voice.barge_in_resumed', {
-              turn: activeTurnIndex,
-              reason: action.reason,
-            });
-          }
-          backchannelHandle?.resume?.();
-          break;
-        case 'hard_stop':
-          void backchannelHandle?.stop();
-          if (speech) {
-            const replay = arbiterBuffered();
-            closeBargeFeed();
-            pendingBargeIn = confirmBargeIn(replay, bargeInMode);
-          }
-          break;
-        case 'start_speculative':
-          startSpeculation(action.partial, segmentsCaptured);
-          break;
-        case 'abort_speculative':
-          abortSpeculation(action.reason);
-          break;
-        case 'hold':
-        case 'commit':
-        case 'drop':
-          engineDecisions.push(action);
-          break;
+  // CE→TTS reaction shortcut (backchannels + CE-06 instant reaction slot).
+  const reactionEmitter = createLoopReactionEmitter({
+    ...(interactionOpts?.speakBackchannel
+      ? { speakBackchannel: async (text) => interactionOpts.speakBackchannel?.(text) }
+      : {}),
+    ...(options.streamingTts ? { streamingTts: options.streamingTts } : {}),
+    ...(options.voiceProfileId ? { voiceProfileId: options.voiceProfileId } : {}),
+    ...(options.playAudioStream ? { playAudioStream: options.playAudioStream } : {}),
+    ...(options.synthesizeSegment
+      ? {
+          synthesizeSegment: async (seg, index, turn) =>
+            options.synthesizeSegment!(seg, index, turn),
+        }
+      : {}),
+    play: (audioPath, index) => play(audioPath, index),
+    observeAudioStream,
+    publishMediaEvent,
+    onDegraded: (what, reason) => options.onEvent?.({ kind: 'degraded', what, reason }),
+    onTrace: (name, attrs) => trace?.addEvent(name, attrs),
+    onEngine: (input) => loopEngine.driveAndApply(input),
+    onEchoAssistantStarted: (text) => {
+      lastAssistant = { text, endedAt: Date.now(), reaction: true };
+    },
+    // A substantive reply that ended during the reaction is the better echo
+    // reference — don't let the reaction's tail evict it.
+    onEchoAssistantEnded: (text) => {
+      if (!lastAssistant || lastAssistant.reaction) {
+        lastAssistant = { text, endedAt: Date.now(), reaction: true };
       }
-    }
-  };
-
-  const driveEngineAndApply = (input: TurnTakingInput): void => {
-    applyEngineActions(driveEngine(input));
-  };
+    },
+    onSuppressEcho: (untilMs) => {
+      selfAudioSuppressionUntilMs = untilMs;
+    },
+    rel,
+    sessionId,
+    turnsCompleted: () => turnsCompleted,
+    drainMs: () =>
+      Math.max(0, options.selfAudioSuppressionMs ?? 0, options.postPlaybackDrainMs ?? 400),
+  });
 
   /**
    * Engine decisions outside the capture path: a held turn may force-commit
@@ -863,108 +812,10 @@ export async function startRealtimeVoiceLoop(
     }
   };
 
-  /**
-   * CE→output shortcut: speak a short reaction without touching reasoning.
-   * The reaction registers with the loop's echo context and self-suppression
-   * so its own audio cannot bounce back in as a user turn on speaker setups.
-   */
-  const emitAgentBackchannel = async (text: string): Promise<void> => {
-    if (!text.trim() || reactionInFlight) return;
-    reactionInFlight = true;
-    driveEngineAndApply({ type: 'reaction_started', at_ms: rel(), text });
-    // Echo context must see the reaction immediately — a fast mic echo can
-    // endpoint before playback finishes (H1). Flagged as a reaction so the
-    // gate applies even when the mic is otherwise closed during playback.
-    lastAssistant = { text, endedAt: Date.now(), reaction: true };
-    publishMediaEvent({
-      event_id: `${sessionId}:backchannel:${randomUUID()}`,
-      session_id: sessionId,
-      type: 'assistant_text_delta',
-      at_ms: rel(),
-      emitted_at: nowIso(),
-      source: 'interaction-backchannel',
-      text,
-      is_final: true,
-    });
-    let handle: PlaybackHandle | null = null;
-    let interrupted = false;
-    try {
-      if (interactionOpts?.speakBackchannel) {
-        await interactionOpts.speakBackchannel(text);
-      } else if (options.streamingTts && options.voiceProfileId && options.playAudioStream) {
-        const stream = await options.streamingTts.synthesizeStream(
-          (async function* (): AsyncGenerator<string> {
-            yield text;
-          })(),
-          options.voiceProfileId
-        );
-        handle = options.playAudioStream(
-          observeAudioStream(stream, turnsCompleted, 'interaction-backchannel'),
-          -1
-        );
-        backchannelHandle = handle;
-        interrupted = (await handle.done).interrupted;
-      } else {
-        const audioPath = await options.synthesizeSegment(text, -1, turnsCompleted);
-        handle = play(audioPath, -1);
-        backchannelHandle = handle;
-        interrupted = (await handle.done).interrupted;
-      }
-    } catch (err: unknown) {
-      const reason = err instanceof Error ? err.message : String(err);
-      options.onEvent?.({ kind: 'degraded', what: 'backchannel', reason });
-      trace?.addEvent('realtime_voice.backchannel_failed', { reason });
-    } finally {
-      if (backchannelHandle === handle) backchannelHandle = null;
-      reactionInFlight = false;
-      lastAssistant = { text, endedAt: Date.now(), reaction: true };
-      // Drain the mic briefly so the reaction's own tail cannot trigger a
-      // false onset — skipped when the user cut the reaction (their speech
-      // is already in flight and must not be swallowed).
-      selfAudioSuppressionUntilMs = interrupted
-        ? 0
-        : Date.now() +
-          Math.max(0, options.selfAudioSuppressionMs ?? 0, options.postPlaybackDrainMs ?? 400);
-      // A substantive reply that ended during the reaction is the better echo
-      // reference — don't let the reaction's tail evict it.
-      if (!lastAssistant || lastAssistant.reaction) {
-        lastAssistant = { text, endedAt: Date.now(), reaction: true };
-      }
-      driveEngineAndApply({ type: 'reaction_ended', at_ms: rel() });
-    }
-  };
-
   /** Re-arm the engine's interruption arbiter for a fresh output turn. */
   const armBargeIn = (): void => {
     closeBargeFeed();
     engine.arbiter?.reset();
-  };
-
-  /**
-   * Pause/resume transitions + a tick (with pause evidence) for one chunk
-   * while the floor is remote — shared by the live chunk path and the
-   * barge-in replay path so replayed silence also counts toward speculation.
-   */
-  const feedListeningEvidence = (
-    result: { state: string; onset: boolean; speaking: boolean },
-    chunk: AudioChunk
-  ): void => {
-    if (result.state === 'recording' && !result.onset) {
-      if (!result.speaking && !intraUtterancePaused) {
-        intraUtterancePaused = true;
-        driveEngineAndApply({ type: 'speech_pause', at_ms: rel() });
-      } else if (result.speaking && intraUtterancePaused) {
-        intraUtterancePaused = false;
-        driveEngineAndApply({ type: 'speech_resume', at_ms: rel() });
-      }
-    }
-    driveEngineAndApply({
-      type: 'tick',
-      at_ms: rel(),
-      ...(intraUtterancePaused
-        ? { payload: { silenceDeltaMs: computeChunkDurationMs(chunk) } }
-        : {}),
-    });
   };
 
   /** Feed replayed chunks into the segmenter (and a fresh STT feed on onset). */
@@ -972,7 +823,7 @@ export async function startRealtimeVoiceLoop(
     for (const replayChunk of replay) {
       const replayResult = segmenter.push(replayChunk);
       if (replayResult.onset) driveEngineAndApply({ type: 'vad_start', at_ms: rel() });
-      else feedListeningEvidence(replayResult, replayChunk);
+      else loopEngine.feedListeningEvidence(replayResult, replayChunk, rel());
       if (replayResult.onset && options.streamingStt) {
         sttFeed = startSttFeed(
           options.streamingStt,
@@ -1079,7 +930,7 @@ export async function startRealtimeVoiceLoop(
       logger.warn(`[realtime-voice-loop] empty transcript for turn ${turnIndex + 1}; skipping`);
       // An empty final still clears the engine's turn evidence (lastPartial,
       // awaitingFinal) and revokes a speculation armed on stale partials.
-      applyEngineActions(driveEngine({ type: 'stt_final', at_ms: rel(), text: '' }));
+      loopEngine.driveAndApply({ type: 'stt_final', at_ms: rel(), text: '' });
       abortSpeculation('eot_revoked');
       state = 'listening';
       emitState(state);
@@ -1145,7 +996,7 @@ export async function startRealtimeVoiceLoop(
     // (「ちょっと待って」) is almost always followed by the real content,
     // and 'thinking' would drop those chunks.
     backToListening();
-    await emitAgentBackchannel(phrase);
+    reactionEmitter.emit(phrase);
     const result: RealtimeVoiceLoopTurnResult = {
       turn: turnIndex,
       user_text: userText,
@@ -1201,9 +1052,9 @@ export async function startRealtimeVoiceLoop(
       const phrase = engine.pickReaction(userText);
       // Only claim the slot when the reaction will actually be emitted —
       // otherwise the first reply segment must speak it itself.
-      if (phrase.trim() && !reactionInFlight) {
+      if (phrase.trim() && !reactionEmitter.inFlight()) {
         instantReactionFired = true;
-        void emitAgentBackchannel(phrase);
+        reactionEmitter.emit(phrase);
       }
     }
     const { token, release } = armTurnToken(turnIndex);
@@ -1477,7 +1328,7 @@ export async function startRealtimeVoiceLoop(
           listenMs: heldUtterance.listenMs + captured.listenMs,
         }
       : captured;
-    applyEngineActions(driveEngine({ type: 'stt_final', at_ms: rel(), text: captured.userText }));
+    loopEngine.driveAndApply({ type: 'stt_final', at_ms: rel(), text: captured.userText });
     const decision = engineDecisions.splice(0)[0];
     if (decision?.type === 'hold') {
       heldUtterance = merged;
@@ -1584,7 +1435,6 @@ export async function startRealtimeVoiceLoop(
             sttFeed?.push(chunk);
           }
           if (result.onset) {
-            intraUtterancePaused = false;
             driveEngineAndApply({ type: 'vad_start', at_ms: rel(), rms: computeChunkRms(chunk) });
             publishMediaEvent({
               event_id: `${sessionId}:speech-started:${segmentsCaptured + 1}`,
@@ -1597,7 +1447,6 @@ export async function startRealtimeVoiceLoop(
             });
           }
           if (result.endpoint || result.capped) {
-            intraUtterancePaused = false;
             driveEngineAndApply({ type: 'vad_silence', at_ms: rel() });
             state = 'thinking';
             emitState(state);
@@ -1611,7 +1460,7 @@ export async function startRealtimeVoiceLoop(
             // speculation on pauses and to abort it on resume. Pause length
             // is chunk-duration evidence — the loop's clock can outrun real
             // time under replayed input.
-            feedListeningEvidence(result, chunk);
+            loopEngine.feedListeningEvidence(result, chunk, rel());
           }
           // Engine decisions may arrive on any tick (a held turn commits once
           // the speaker stays silent past maxHoldMs).
@@ -1655,7 +1504,8 @@ export async function startRealtimeVoiceLoop(
       cancellation.abortCurrent('external');
       abortSpeculation('external');
       await stopSpeech();
-      await backchannelHandle?.stop();
+      reactionEmitter.stop();
+      await reactionEmitter.done();
       closeBargeFeed();
       if (pendingTurn) await pendingTurn;
       await segmenter.dispose();
