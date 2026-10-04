@@ -56,7 +56,7 @@ import {
   type OperatorNotificationPayload,
 } from '../surface/operator-notifications.js';
 import { appendDotInboxEntry, type DotInboxEntryInput } from './dot-inbox.js';
-import { listDotCharters, type DotCharter } from './dot-charter.js';
+import { dotGoalRefLabel, listDotCharters, type DotCharter } from './dot-charter.js';
 import { resolveTenant } from '../organization/tenant-registry.js';
 import {
   DOT_ACTION_IDS,
@@ -428,7 +428,7 @@ function workItemDescription(charter: DotCharter, record: DotActionRecord): stri
     record.objective,
     record.rationale ? `\nRationale: ${record.rationale}` : '',
     `\nProposed by ${dotActorId(charter.dot_id)} (${charter.title}) under role ${charter.authority.authority_role}; requested shape: ${record.work_shape}; decision: ${record.decision ?? 'n/a'}.`,
-    charter.team?.goal_ref ? `Contributes to: ${charter.team.goal_ref}` : '',
+    dotGoalRefLabel(charter) ? `Contributes to: ${dotGoalRefLabel(charter)}` : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -476,7 +476,7 @@ function executeDotAction(
           ...(record.decision ? { decision: record.decision } : {}),
           ...(record.request_id ? { approval_request_id: record.request_id } : {}),
           ...(record.handoff_to ? { handoff_to: record.handoff_to } : {}),
-          ...(charter.team?.goal_ref ? { goal_ref: charter.team.goal_ref } : {}),
+          ...(dotGoalRefLabel(charter) ? { goal_ref: dotGoalRefLabel(charter) } : {}),
         },
       });
   } catch (error) {
@@ -902,7 +902,7 @@ export function composeDotDigest(
   const waiting = actions.filter((row) => row.status === 'parked');
   const signals = dotSignalStatusLines(charter, { rootDir: deps.rootDir });
   return [
-    `${charter.title}${charter.team?.goal_ref ? ` — ${charter.team.goal_ref}` : ''}`,
+    `${charter.title}${dotGoalRefLabel(charter) ? ` — ${dotGoalRefLabel(charter)}` : ''}`,
     `Since last digest: dispatched ${count('dispatched')}, waiting ${waiting.length}, declined ${count('declined')}, refused ${count('refused')}.`,
     ...recent
       .filter((row) => row.status === 'dispatched')
