@@ -7095,6 +7095,10 @@
       "types": "./dist/dot/dot-wake-backend.d.ts",
       "default": "./dist/dot/dot-wake-backend.js"
     },
+    "./dot/dot-key-results": {
+      "types": "./dist/dot/dot-key-results.d.ts",
+      "default": "./dist/dot/dot-key-results.js"
+    },
     "./state-probe": {
       "types": "./dist/state-probe.d.ts",
       "default": "./dist/state-probe.js"
