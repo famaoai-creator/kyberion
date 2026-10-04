@@ -65,6 +65,12 @@
       "missing_requirements": ["approval_confirmation"]
     },
     {
+      "id": "ingress-expose",
+      "intent_ids": ["ingress:expose"],
+      "requires_approval": true,
+      "missing_requirements": ["approval_confirmation"]
+    },
+    {
       "id": "customer-outbound-send",
       "intent_ids": ["customer:outbound"],
       "requires_approval": true,

@@ -17,6 +17,7 @@ describe('risky-op-registry', () => {
       expect(RISKY_OPS.CLAUDE_BROWSER_INTERACTIVE).toBe('claude:browser_interactive');
       expect(RISKY_OPS.CLAUDE_DOCUMENT_GENERATION).toBe('claude:document_generation');
       expect(RISKY_OPS.DESKTOP_DESTRUCTIVE_ACTION).toBe('desktop:destructive_action');
+      expect(RISKY_OPS.INGRESS_EXPOSE).toBe('ingress:expose');
     });
   });
 

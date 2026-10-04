@@ -96,6 +96,15 @@ export interface ApprovalGateResult {
   status: 'approved' | 'pending' | 'not_required';
   requestId?: string;
   message?: string;
+  /**
+   * Why a blocked result is blocked, for callers that tell the operator what
+   * to do next: `created` (new request opened), `pending` (an open request
+   * awaits a decision), `rejected` / `expired` / `effect_mismatch` (a matched
+   * request binds the correlation id and must lapse or be superseded), or
+   * `human_required` (non-interactive boundary, no request opened).
+   */
+  requestStatus?:
+    'created' | 'pending' | 'rejected' | 'expired' | 'effect_mismatch' | 'human_required';
 }
 
 function toStringList(value: unknown): string[] {
@@ -509,6 +518,12 @@ export function enforceApprovalGate(
       status: 'pending',
       requestId: matched.id,
       message: `Approval request ${matched.id} is ${effectiveStatus}`,
+      ...(effectiveStatus === 'pending' ||
+      effectiveStatus === 'rejected' ||
+      effectiveStatus === 'expired' ||
+      effectiveStatus === 'effect_mismatch'
+        ? { requestStatus: effectiveStatus }
+        : {}),
     };
   }
 
@@ -595,7 +610,12 @@ export function enforceApprovalGate(
       reason: 'human_required_non_interactive',
     });
     recordGovernanceAction(agentId, 'approval_gate', `${operationId}:denied`, true);
-    return { allowed: false, status: 'pending', message: `[HUMAN_REQUIRED] ${reason}` };
+    return {
+      allowed: false,
+      status: 'pending',
+      message: `[HUMAN_REQUIRED] ${reason}`,
+      requestStatus: 'human_required',
+    };
   }
 
   const record = createApprovalRequest(role, {
@@ -640,6 +660,7 @@ export function enforceApprovalGate(
     allowed: false,
     status: 'pending',
     requestId: record.id,
+    requestStatus: 'created',
     message:
       decisionRightsEvaluation?.escalationReason && decisionRightsEvaluation.requiresEscalation
         ? `Approval request ${record.id} created; ${decisionRightsEvaluation.escalationReason}`

@@ -10,6 +10,7 @@ import {
 } from '../secure-io.js';
 import type { DotCharter } from './dot-charter.js';
 import {
+  applyEventIntakeHostOptIn,
   DOT_EVENT_LOOKBACK_MS,
   DOT_EVENT_PAYLOAD_MAX_BYTES,
   DOT_EVENT_SCAN_TAIL_BYTES,
@@ -476,8 +477,18 @@ describe('match helpers', () => {
 });
 
 describe('loadEventIntakePolicy', () => {
+  it('enables declared sources per host through KYBERION_EVENT_INTAKE_SOURCES only', () => {
+    const shipped = loadEventIntakePolicy({ hostOptIn: '' });
+    const opted = applyEventIntakeHostOptIn(shipped, ' github , nope ');
+    expect(opted.sources.github.enabled).toBe(true);
+    expect(opted.sources.ci.enabled).toBe(false);
+    expect(Object.keys(opted.sources)).not.toContain('nope');
+    expect(shipped.sources.github.enabled).toBe(false);
+    expect(loadEventIntakePolicy({ hostOptIn: 'github' }).sources.github.enabled).toBe(true);
+  });
+
   it('ships every source disabled and fails closed on an invalid policy file', () => {
-    const shipped = loadEventIntakePolicy();
+    const shipped = loadEventIntakePolicy({ hostOptIn: '' });
     expect(Object.keys(shipped.sources).sort()).toEqual(['ci', 'custom', 'email', 'github']);
     expect(Object.values(shipped.sources).every((s) => s.enabled === false)).toBe(true);
 
