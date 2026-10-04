@@ -72,6 +72,16 @@
       "required_content_fields": ["headline"],
       "supported_output_formats": ["mp4", "mov", "webm"],
       "notes": "Large centered quotation with attribution — testimonials, key messages, hooks for vertical shorts."
+    },
+    {
+      "template_id": "timeline-html",
+      "display_name": "Timeline HTML",
+      "status": "active",
+      "renderer": "builtin_html",
+      "supported_roles": ["hook", "feature", "proof", "cta", "outro", "generic"],
+      "required_content_fields": ["html"],
+      "supported_output_formats": ["mp4", "mov", "webm"],
+      "notes": "Authored scene markup (content.html, optional content.css) choreographed with the seekable cue runtime: kb-cue classes with --at / --f (fraction of content.narration_sec), data-type typewriter, data-count count-up. Use for designed promo scenes; template motion is not applied."
     }
   ]
 }

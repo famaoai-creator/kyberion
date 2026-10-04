@@ -6179,6 +6179,14 @@
       "types": "./dist/video/video-scene-composition.d.ts",
       "default": "./dist/video/video-scene-composition.js"
     },
+    "./video/video-timeline-runtime": {
+      "types": "./dist/video/video-timeline-runtime.d.ts",
+      "default": "./dist/video/video-timeline-runtime.js"
+    },
+    "./video/video-narration-timeline": {
+      "types": "./dist/video/video-narration-timeline.d.ts",
+      "default": "./dist/video/video-narration-timeline.js"
+    },
     "./video/video-visual-direction": {
       "types": "./dist/video/video-visual-direction.d.ts",
       "default": "./dist/video/video-visual-direction.js"

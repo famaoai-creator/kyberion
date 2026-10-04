@@ -18,6 +18,7 @@
             "lint_video_composition",
             "create_narrated_video_from_content_brief",
             "create_narrated_intro_movie",
+            "create_timeline_video",
             "list_video_composition_templates",
             "get_video_composition_job_status",
             "await_video_composition_job",
@@ -25,14 +26,18 @@
             "get_video_composition_queue"
           ]
         },
-        "params": { "type": "object" }
+        "params": {
+          "type": "object"
+        }
       }
     },
     {
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "const": "compile_narrated_video_brief" },
+        "action": {
+          "const": "compile_narrated_video_brief"
+        },
         "params": {
           "type": "object",
           "additionalProperties": false,
@@ -49,7 +54,9 @@
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "const": "compile_video_content_brief" },
+        "action": {
+          "const": "compile_video_content_brief"
+        },
         "params": {
           "type": "object",
           "additionalProperties": false,
@@ -66,7 +73,9 @@
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "const": "create_narrated_video_from_content_brief" },
+        "action": {
+          "const": "create_narrated_video_from_content_brief"
+        },
         "params": {
           "type": "object",
           "additionalProperties": false,
@@ -75,19 +84,47 @@
             "video_content_brief": {
               "$ref": "./video-content-brief.schema.json"
             },
-            "narration_artifact_ref": { "type": "string", "minLength": 1 },
-            "job_id": { "type": "string", "minLength": 1 },
-            "bundle_dir": { "type": "string", "minLength": 1 },
+            "narration_artifact_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "job_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "bundle_dir": {
+              "type": "string",
+              "minLength": 1
+            },
             "output": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "format": { "type": "string", "enum": ["mp4", "mov", "webm"] },
-                "target_path": { "type": "string", "minLength": 1 },
-                "bundle_dir": { "type": "string", "minLength": 1 },
-                "await_completion": { "type": "boolean" },
-                "duration_sec": { "type": "number", "minimum": 3, "maximum": 300 },
-                "fps": { "type": "integer", "minimum": 1, "maximum": 60 }
+                "format": {
+                  "type": "string",
+                  "enum": ["mp4", "mov", "webm"]
+                },
+                "target_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "bundle_dir": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "await_completion": {
+                  "type": "boolean"
+                },
+                "duration_sec": {
+                  "type": "number",
+                  "minimum": 3,
+                  "maximum": 300
+                },
+                "fps": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 60
+                }
               }
             }
           }
@@ -98,7 +135,9 @@
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "const": "create_narrated_intro_movie" },
+        "action": {
+          "const": "create_narrated_intro_movie"
+        },
         "params": {
           "type": "object",
           "additionalProperties": false,
@@ -107,8 +146,128 @@
             "narrated_video_brief": {
               "$ref": "./narrated-video-brief.schema.json"
             },
-            "job_id": { "type": "string", "minLength": 1 },
-            "bundle_dir": { "type": "string", "minLength": 1 }
+            "job_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "bundle_dir": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": {
+          "const": "create_timeline_video"
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scenes"],
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "scenes": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["scene_id", "html"],
+                "properties": {
+                  "scene_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "html": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "css": {
+                    "type": "string"
+                  },
+                  "narration_ref": {
+                    "type": "string"
+                  },
+                  "min_sec": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "asset_refs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["asset_id", "path"],
+                      "properties": {
+                        "asset_id": {
+                          "type": "string"
+                        },
+                        "path": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "composition": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "width": {
+                  "type": "integer"
+                },
+                "height": {
+                  "type": "integer"
+                },
+                "fps": {
+                  "type": "number"
+                },
+                "background_color": {
+                  "type": "string"
+                }
+              }
+            },
+            "timing": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "lead_sec": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "tail_sec": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "silent_scene_sec": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            },
+            "output": {
+              "type": "object"
+            },
+            "job_id": {
+              "type": "string"
+            },
+            "bundle_dir": {
+              "type": "string"
+            }
           }
         }
       }
@@ -117,7 +276,9 @@
       "type": "object",
       "required": ["action", "steps"],
       "properties": {
-        "action": { "const": "pipeline" },
+        "action": {
+          "const": "pipeline"
+        },
         "steps": {
           "type": "array",
           "items": {
@@ -137,6 +298,7 @@
                       "compile_video_content_brief",
                       "create_narrated_video_from_content_brief",
                       "create_narrated_intro_movie",
+                      "create_timeline_video",
                       "list_video_composition_templates",
                       "get_video_composition_job_status",
                       "await_video_composition_job",
@@ -144,14 +306,18 @@
                       "get_video_composition_queue"
                     ]
                   },
-                  "params": { "type": "object" }
+                  "params": {
+                    "type": "object"
+                  }
                 }
               },
               {
                 "type": "object",
                 "required": ["action", "params"],
                 "properties": {
-                  "action": { "const": "compile_narrated_video_brief" },
+                  "action": {
+                    "const": "compile_narrated_video_brief"
+                  },
                   "params": {
                     "type": "object",
                     "additionalProperties": false,
@@ -168,7 +334,9 @@
                 "type": "object",
                 "required": ["action", "params"],
                 "properties": {
-                  "action": { "const": "compile_video_content_brief" },
+                  "action": {
+                    "const": "compile_video_content_brief"
+                  },
                   "params": {
                     "type": "object",
                     "additionalProperties": false,
@@ -185,7 +353,9 @@
                 "type": "object",
                 "required": ["action", "params"],
                 "properties": {
-                  "action": { "const": "create_narrated_video_from_content_brief" },
+                  "action": {
+                    "const": "create_narrated_video_from_content_brief"
+                  },
                   "params": {
                     "type": "object",
                     "additionalProperties": false,
@@ -194,19 +364,47 @@
                       "video_content_brief": {
                         "$ref": "./video-content-brief.schema.json"
                       },
-                      "narration_artifact_ref": { "type": "string", "minLength": 1 },
-                      "job_id": { "type": "string", "minLength": 1 },
-                      "bundle_dir": { "type": "string", "minLength": 1 },
+                      "narration_artifact_ref": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "job_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "bundle_dir": {
+                        "type": "string",
+                        "minLength": 1
+                      },
                       "output": {
                         "type": "object",
                         "additionalProperties": false,
                         "properties": {
-                          "format": { "type": "string", "enum": ["mp4", "mov", "webm"] },
-                          "target_path": { "type": "string", "minLength": 1 },
-                          "bundle_dir": { "type": "string", "minLength": 1 },
-                          "await_completion": { "type": "boolean" },
-                          "duration_sec": { "type": "number", "minimum": 3, "maximum": 300 },
-                          "fps": { "type": "integer", "minimum": 1, "maximum": 60 }
+                          "format": {
+                            "type": "string",
+                            "enum": ["mp4", "mov", "webm"]
+                          },
+                          "target_path": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "bundle_dir": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "await_completion": {
+                            "type": "boolean"
+                          },
+                          "duration_sec": {
+                            "type": "number",
+                            "minimum": 3,
+                            "maximum": 300
+                          },
+                          "fps": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 60
+                          }
                         }
                       }
                     }
@@ -217,7 +415,9 @@
                 "type": "object",
                 "required": ["action", "params"],
                 "properties": {
-                  "action": { "const": "create_narrated_intro_movie" },
+                  "action": {
+                    "const": "create_narrated_intro_movie"
+                  },
                   "params": {
                     "type": "object",
                     "additionalProperties": false,
@@ -226,8 +426,14 @@
                       "narrated_video_brief": {
                         "$ref": "./narrated-video-brief.schema.json"
                       },
-                      "job_id": { "type": "string", "minLength": 1 },
-                      "bundle_dir": { "type": "string", "minLength": 1 }
+                      "job_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "bundle_dir": {
+                        "type": "string",
+                        "minLength": 1
+                      }
                     }
                   }
                 }

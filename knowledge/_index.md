@@ -427,6 +427,7 @@
 - [Standard SDLC Loop Fragment Spec](./product/orchestration/standard-sdlc-loop-fragment-spec.md) (public | Unknown)
 - [Supported Actuators Catalog / サポートアクチュエータ一覧](./product/orchestration/supported-actuators.md) (public | Antigravity)
 - [The Data Ingestion Protocol (外部データ持ち込み規約)](./product/orchestration/data-ingestion-protocol.md) (public | Ecosystem Architect)
+- [Timeline Video Authoring Playbook](./product/orchestration/timeline-video-authoring-playbook.md) (public | ecosystem_architect)
 - [Travel Planning Playbook](./product/orchestration/travel-planning-playbook.md) (public | Unknown)
 - [Trial Narrated Report Simplification Proposal](./product/orchestration/trial-narrated-report-simplification-proposal.md) (public | Unknown)
 - [UI-TARS Desktop Clean-Room Notes](./product/orchestration/ui-tars-desktop-clean-room-notes.md) (public | Unknown)
