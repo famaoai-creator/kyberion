@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 
 import { safeMkdir, safeRmSync } from '../secure-io.js';
@@ -13,7 +14,12 @@ import type {
   RoutedDecision,
 } from '../governance/approval-decision-routing.js';
 import type { DotCharter } from './dot-charter.js';
-import { evaluateDotProposalGate, type DotDispatchDeps } from './dot-dispatch.js';
+import {
+  dispatchDotProposals,
+  evaluateDotProposalGate,
+  type DotDispatchDeps,
+} from './dot-dispatch.js';
+import type { CreateWorkItemInput, WorkItem } from '../workforce/work-coordination-types.js';
 import {
   DOT_DECISION_RELAXERS,
   DOT_DIGEST_SECTIONS,
@@ -31,6 +37,7 @@ import {
   dotAutonomyFloorContributor,
   dotAutonomyLevel,
   dotAutonomyMetrics,
+  dotAutonomyPromotionReady,
   dotLearnedFloorHolds,
   readDotAutonomyShadow,
   readDotAutonomyState,
@@ -48,7 +55,7 @@ import {
   type DotAutonomyLevel,
 } from './dot-state-paths.js';
 
-const TEST_ROOT = 'active/shared/tmp/dot-autonomy-tests';
+const TEST_ROOT = `active/shared/tmp/dot-autonomy-tests-${randomUUID()}`;
 const RANK = { auto: 0, notify: 1, approve: 2 } as const;
 const T0 = new Date('2026-10-04T09:00:00Z');
 
@@ -245,7 +252,7 @@ describe('dot autonomy levels and state', () => {
 });
 
 describe('dot autonomy through the dispatch gate', () => {
-  it('never yields a decision below gate.decision or the charter floor at any level', () => {
+  it('never yields a decision below gate.decision or the charter floor, except L4 notify → auto', () => {
     const levels: DotAutonomyLevel[] = [...DOT_AUTONOMY_LEVELS];
     const decisions: DotDecisionLevel[] = ['auto', 'notify', 'approve'];
     for (const level of levels) {
@@ -266,6 +273,14 @@ describe('dot autonomy through the dispatch gate', () => {
             };
             const { gate } = evaluateDotProposalGate(charter, PROPOSAL, dispatchDeps(base));
             const label = `${level}/${base}/${charterFloor}/${learned}`;
+            // The single permitted exception: L4, policy notify, no hard floor
+            // at notify or above (the learned floor is released after one approval).
+            const exception =
+              level === 'L4' && base === 'notify' && (!charterFloor || charterFloor === 'auto');
+            if (exception) {
+              expect(gate.decision, label).toBe('auto');
+              continue;
+            }
             expect(RANK[gate.decision], label).toBeGreaterThanOrEqual(RANK[base]);
             if (charterFloor) {
               expect(RANK[gate.decision], label).toBeGreaterThanOrEqual(RANK[charterFloor]);
@@ -275,6 +290,79 @@ describe('dot autonomy through the dispatch gate', () => {
         }
       }
     }
+  });
+
+  it('L4 relaxes notify → auto only for a relaxable, eligible action', () => {
+    const l4 = { ...CHARTER, autonomy: { max_level: 'L4' as const } };
+    setLevel('L4');
+    outcome('improved', new Date(T0.getTime() - 3_600_000), 'o1');
+    const relaxed = evaluateDotProposalGate(l4, PROPOSAL, dispatchDeps('notify'));
+    expect(relaxed.gate).toMatchObject({ decision: 'auto', allowed: true });
+    expect(relaxed.gate.vetoWindowMinutes).toBeUndefined();
+    expect(relaxed.gate.reason).toContain('l4_notify_to_auto');
+    expect(relaxed.relaxed_by).toBe('autonomy');
+    // Not in policy autonomy.relaxable_actions.
+    expect(
+      evaluateDotProposalGate(l4, PROPOSAL, { ...dispatchDeps('notify'), relaxableActions: [] })
+        .gate.decision
+    ).toBe('notify');
+    expect(
+      evaluateDotProposalGate(
+        l4,
+        { ...PROPOSAL, action_id: 'dot_handoff', handoff_to: 'other' },
+        dispatchDeps('notify')
+      ).gate.decision
+    ).toBe('notify');
+    // L3 never takes the exception.
+    setLevel('L3');
+    expect(evaluateDotProposalGate(l4, PROPOSAL, dispatchDeps('notify')).gate.decision).toBe(
+      'notify'
+    );
+  });
+
+  it('L4 never relaxes approve, high-risk, irreversible, poor outcomes or a charter floor', () => {
+    const l4 = { ...CHARTER, autonomy: { max_level: 'L4' as const } };
+    setLevel('L4');
+    outcome('improved', new Date(T0.getTime() - 3_600_000), 'o1');
+    expect(evaluateDotProposalGate(l4, PROPOSAL, dispatchDeps('approve')).gate.decision).toBe(
+      'approve'
+    );
+    const withGate = (extra: Partial<AutonomousOpsGateResult>): DotDispatchDeps => ({
+      ...dispatchDeps('notify'),
+      gate: (input) => gateResult(input, 'notify', extra),
+    });
+    expect(
+      evaluateDotProposalGate(l4, PROPOSAL, withGate({ highRiskPathMatches: ['libs/core/**'] }))
+        .gate.decision
+    ).toBe('notify');
+    expect(
+      evaluateDotProposalGate(
+        l4,
+        PROPOSAL,
+        withGate({ axes: { scope: 1, reversibility: 2, sensitivity: 1, confidence: 1 } })
+      ).gate.decision
+    ).toBe('notify');
+    expect(
+      evaluateDotProposalGate(l4, PROPOSAL, withGate({ escalations: ['budget'] })).gate.decision
+    ).toBe('notify');
+    expect(
+      evaluateDotProposalGate(
+        { ...l4, decisions: { default_decision: 'notify' } },
+        PROPOSAL,
+        dispatchDeps('notify')
+      ).gate.decision
+    ).toBe('notify');
+    expect(
+      evaluateDotProposalGate(
+        l4,
+        { ...PROPOSAL, requested_decision: 'notify' },
+        dispatchDeps('notify')
+      ).gate.decision
+    ).toBe('notify');
+    outcome('regressed', new Date(T0.getTime() - 3_000_000), 'o2');
+    expect(evaluateDotProposalGate(l4, PROPOSAL, dispatchDeps('notify')).gate.decision).toBe(
+      'notify'
+    );
   });
 
   it('L3 lifts the learned floor after one human approval; L2 keeps it', () => {
@@ -301,6 +389,87 @@ describe('dot autonomy through the dispatch gate', () => {
     expect(relaxer.relax(CHARTER, PROPOSAL, ok, 'approve', ctx)?.decision).toBe('auto');
     setLevel('L2');
     expect(relaxer.relax(CHARTER, PROPOSAL, ok, 'approve', ctx)).toBeUndefined();
+  });
+});
+
+describe('dot autonomy L0 true shadow', () => {
+  function l0Harness() {
+    const routed: RouteAutonomousDecisionInput[] = [];
+    const items: CreateWorkItemInput[] = [];
+    const notes: string[] = [];
+    const deps: DotDispatchDeps = {
+      ...dispatchDeps('auto'),
+      route: (input) => {
+        routed.push(input);
+        throw new Error('L0 must never route a decision card');
+      },
+      createWorkItem: (input) => {
+        items.push(input);
+        return { item_id: `witem-${items.length}` } as WorkItem;
+      },
+      countOpenWorkItems: () => 0,
+      listCharters: () => [CHARTER],
+      notify: (_e, payload) => {
+        notes.push(payload.title);
+        return true;
+      },
+      audit: () => {},
+    };
+    return { deps, routed, items, notes };
+  }
+
+  it('records proposals only: no decision card, no notification, no WorkItem', () => {
+    setLevel('L0');
+    const h = l0Harness();
+    const { records } = dispatchDotProposals(
+      CHARTER,
+      [PROPOSAL, { ...PROPOSAL, title: 'Clean caches', objective: 'Drop stale caches.' }],
+      h.deps
+    );
+    expect(records.map((r) => [r.status, r.disposition_by])).toEqual([
+      ['shadow', 'autonomy'],
+      ['shadow', 'autonomy'],
+    ]);
+    expect(records[0].work_item_id).toBeUndefined();
+    expect(records[0].request_id).toBeUndefined();
+    expect(h.routed).toHaveLength(0);
+    expect(h.items).toHaveLength(0);
+    expect(h.notes).toHaveLength(0);
+
+    const shadow = readDotAutonomyShadow(CHARTER, { rootDir: TEST_ROOT });
+    expect(shadow.map((r) => [r.action_ref, r.disposition, r.next_level, r.would_have])).toEqual([
+      [records[0].action_ref, 'shadow', 'L1', 'approve'],
+      [records[1].action_ref, 'shadow', 'L1', 'approve'],
+    ]);
+    expect(shadow.every((r) => r.agree && r.human_outcome === undefined)).toBe(true);
+
+    // Not re-recorded inside the dedupe window; never counted as a delegation slot.
+    const again = dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
+    expect(again.records).toHaveLength(0);
+    expect(again.duplicates).toEqual([records[0].action_ref]);
+
+    // Surfaced in the digest; counted as decisions for the L0 → L1 promotion.
+    const lines = dotAutonomyDigestLines(CHARTER, undefined, { rootDir: TEST_ROOT, now: () => T0 });
+    expect(lines[0]).toContain('2 proposal(s) recorded only');
+    expect(lines).toContain('- shadow: Clean caches (L1 would ask: approve)');
+    const metrics = dotAutonomyMetrics(CHARTER, { rootDir: TEST_ROOT, now: () => T0 });
+    expect(metrics).toMatchObject({ level: 'L0', decisions: 2, agreement_rate: 1 });
+    // No outcomes exist at L0, so the outcome bar is waived for that step only.
+    const policy = {
+      ...DEFAULT_DOT_AUTONOMY_POLICY,
+      promotion: { ...DEFAULT_DOT_AUTONOMY_POLICY.promotion, min_decisions: 2 },
+    };
+    expect(dotAutonomyPromotionReady(metrics, policy).ready).toBe(true);
+    expect(dotAutonomyPromotionReady({ ...metrics, level: 'L1' }, policy).ready).toBe(false);
+  });
+
+  it('L1 still routes every proposal to an operator decision', () => {
+    setLevel('L1');
+    const h = l0Harness();
+    expect(() => dispatchDotProposals(CHARTER, [PROPOSAL], h.deps)).not.toThrow();
+    expect(h.routed).toHaveLength(1);
+    expect(h.routed[0].gate.decision).toBe('approve');
+    expect(readDotAutonomyShadow(CHARTER, { rootDir: TEST_ROOT })).toHaveLength(0);
   });
 });
 
@@ -338,6 +507,17 @@ describe('dot autonomy shadow ledger and metrics', () => {
       mode: 'goal_turn',
       status: 'failed',
       summary: 'boom',
+      started_at: T0.toISOString(),
+      completed_at: T0.toISOString(),
+    });
+    // By-design stops (escalated guidance, blocked) are not incidents.
+    appendState(DOT_WORK_RESULTS_FILE, {
+      dot_id: CHARTER.dot_id,
+      work_item_id: 'w2',
+      action_ref: 'y',
+      mode: 'escalated',
+      status: 'blocked',
+      summary: 'mission-shaped: needs an operator',
       started_at: T0.toISOString(),
       completed_at: T0.toISOString(),
     });

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { randomUUID } from 'node:crypto';
 
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import type {
@@ -23,6 +24,7 @@ import {
   maybeSendDotDigest,
   runDotHousekeeping,
   settleDotParkedActions,
+  supersedeDotParkedAction,
   type DotDispatchDeps,
 } from './dot-dispatch.js';
 import {
@@ -36,7 +38,7 @@ import { setDotBudgetThrottleForTests } from './dot-budget.js';
 import { evaluateDotTriggersDue } from './dot-runtime.js';
 import type { DotProposal } from './dot-proposals.js';
 
-const TEST_ROOT = 'active/shared/tmp/dot-dispatch-tests';
+const TEST_ROOT = `active/shared/tmp/dot-dispatch-tests-${randomUUID()}`;
 const RANK = { auto: 0, notify: 1, approve: 2 } as const;
 
 const CHARTER: DotCharter = {
@@ -706,5 +708,33 @@ describe('digest and success signals', () => {
     expect(result.digest).toBe(true);
     expect(result.errors).toEqual([]);
     expect(currentDotActions('org-ops', h.deps)[0].status).toBe('dispatched');
+  });
+});
+
+describe('supersedeDotParkedAction', () => {
+  const by = { dot_id: 'newcomer', action_ref: 'dact-new-1' };
+
+  it('declines a pending parked action as superseded and expires its card', () => {
+    const expired: string[] = [];
+    const h = harness('approve', {
+      expireApproval: (record) => {
+        expired.push(record.id);
+        return { ...record, status: 'expired' };
+      },
+    });
+    const parked = dispatchDotProposals(CHARTER, [PROPOSAL], h.deps).records[0];
+    h.approvals.set('req-1', { ...approval('pending'), id: 'req-1' } as ApprovalRequestRecord);
+    const row = supersedeDotParkedAction(CHARTER, parked.action_ref, by, h.deps);
+    expect(row).toMatchObject({ status: 'declined', reason: 'superseded', superseded_by: by });
+    expect(expired).toEqual(['req-1']);
+  });
+
+  it('never silently overturns a card the operator already approved', () => {
+    const h = harness('approve');
+    const parked = dispatchDotProposals(CHARTER, [PROPOSAL], h.deps).records[0];
+    h.approvals.set('req-1', approval('approved'));
+    expect(supersedeDotParkedAction(CHARTER, parked.action_ref, by, h.deps)).toBeUndefined();
+    expect(currentDotActions('org-ops', h.deps)[0].status).toBe('parked');
+    expect(h.audits.at(-1)).toMatchObject({ operation: 'supersede_skipped', result: 'denied' });
   });
 });
