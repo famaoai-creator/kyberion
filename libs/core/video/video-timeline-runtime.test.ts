@@ -32,7 +32,10 @@ function runRuntime(script: string, nodes: Record<string, FakeEl[]>) {
     getAnimations: () => animations,
     addEventListener: () => {},
   };
-  const window: Record<string, any> = {};
+  const window = {} as {
+    __timelines: Record<string, { seek(t: number): void; time(): number }>;
+    __hf: { seek(t: number): void };
+  };
   // The runtime is one <script>…</script> block; take what is between the tags.
   const body = script.slice(script.indexOf('>') + 1, script.lastIndexOf('</'));
   new Function('window', 'document', body)(window, document);
