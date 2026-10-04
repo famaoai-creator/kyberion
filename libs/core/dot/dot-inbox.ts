@@ -14,10 +14,13 @@
 
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import { appendJsonLine, readJsonLines } from '../foundation/json.js';
+import { appendJsonLine, parseSafeJsonInput } from '../foundation/json.js';
 import { withLockSync } from '../foundation/lock-utils.js';
+import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeLstat, safeMkdir } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeLstat, safeMkdir, safeReadFileTail } from '../secure-io.js';
+
+const logger = createLogger('dot-inbox');
 
 export const DOT_INBOX_PATH = 'active/shared/runtime/dot-inbox.jsonl';
 
@@ -42,6 +45,54 @@ export function isDotWakeChannel(value: string): value is DotWakeChannel {
 /** Bounded so the wake lane stays a pointer, never the payload. */
 const MAX_INBOX_TEXT_CHARS = 2_000;
 const MAX_INBOX_PAYLOAD_BYTES = 4 * 1024;
+
+/**
+ * Receipt lookup window: only the newest bytes of the shared inbox are
+ * scanned for an idempotent retry. A producer retry is near-term, so a key
+ * older than this window (behind ≥ 4 MiB of newer wake rows) counts as a new
+ * delivery — the scan under the global lock stays O(window), not O(inbox).
+ */
+export const DOT_INBOX_RECEIPT_SCAN_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Newest-first scan for a parseable row carrying the same delivery identity.
+ * The inbox is shared by every tenant: an unparseable (torn) line is skipped
+ * and counted — it cannot be attributed to a key, so it is never treated as a
+ * receipt and never blocks another tenant's idempotent report. A parseable
+ * matching row is still the receipt, even when it later fails validation.
+ */
+function findDotInboxReceipt(
+  filePath: string,
+  matches: (row: AppendedDotInboxEntry) => boolean
+): AppendedDotInboxEntry | undefined {
+  const tail = safeReadFileTail(filePath, DOT_INBOX_RECEIPT_SCAN_BYTES);
+  const lines = tail.buffer.toString('utf8').split(/\r?\n/);
+  // A truncated window starts mid-line; that fragment is not a row.
+  if (tail.truncated) lines.shift();
+  let malformed = 0;
+  let found: AppendedDotInboxEntry | undefined;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    if (!line.trim()) continue;
+    let row: AppendedDotInboxEntry;
+    try {
+      row = parseSafeJsonInput(line, 'dot inbox row') as AppendedDotInboxEntry;
+    } catch {
+      malformed += 1;
+      continue;
+    }
+    if (row && typeof row === 'object' && matches(row)) {
+      found = row;
+      break;
+    }
+  }
+  if (malformed > 0) {
+    logger.warn(
+      `dot inbox has ${malformed} malformed line(s) in the receipt window — skipped | next: inspect the torn rows; idempotent delivery continues | evidence: ${filePath}`
+    );
+  }
+  return found;
+}
 
 export interface DotInboxEntryInput {
   /** Omit for broadcast: every charter declaring `channel` wakes. */
@@ -114,7 +165,8 @@ export function appendDotInboxEntry(
   if (idempotencyKey) {
     // The inbox row is the delivery receipt. Keep lookup and append under one
     // file-scoped lock so a retry after an uncertain append returns that receipt
-    // rather than emitting a second wake. Never guess past unreadable evidence.
+    // rather than emitting a second wake. A parseable matching row with an
+    // invalid timestamp is unreadable evidence and still fails closed.
     const lock = `dot-inbox-${createHash('sha256').update(filePath).digest('hex').slice(0, 24)}`;
     return withLockSync(lock, () => {
       let exists = true;
@@ -125,9 +177,10 @@ export function appendDotInboxEntry(
         else throw error;
       }
       const prior = exists
-        ? readJsonLines<AppendedDotInboxEntry>(filePath).find(
+        ? findDotInboxReceipt(
+            filePath,
             (row) =>
-              row?.idempotency_key === idempotencyKey &&
+              row.idempotency_key === idempotencyKey &&
               row.dot_id === entry.dot_id &&
               row.channel === entry.channel &&
               row.source === entry.source

@@ -25,6 +25,7 @@ import {
   listDotCharterPaths,
   listDotCharterSources,
   dotGoalRefLabel,
+  findDotCharter,
   type DotCharterLoadError,
   listDotCharters,
   loadDotCharter,
@@ -151,33 +152,96 @@ describe('tenant dot charters', () => {
 });
 
 describe('dot charter identity collisions', () => {
+  type Location = { slug?: string; status?: DotCharter['status'] };
   it.each([
-    { locations: [undefined, 'acme'], label: 'repo and tenant directories' },
-    { locations: ['acme', 'globex'], label: 'two tenant directories' },
-    { locations: [undefined, 'acme', 'globex'], label: 'all three directories' },
-    { locations: [undefined, undefined], label: 'two repo files' },
-  ])('rejects every colliding charter across $label', ({ locations }) => {
-    const paths = locations.map((slug, index) => {
+    {
+      label: 'a repo charter keeps its id over a tenant duplicate',
+      locations: [{}, { slug: 'acme', status: 'draft' }] as Location[],
+      owner: 0,
+    },
+    {
+      label: 'a repo charter keeps its id over two tenant duplicates',
+      locations: [{}, { slug: 'acme' }, { slug: 'globex' }] as Location[],
+      owner: 0,
+    },
+    {
+      label: "a tenant draft never unseats another tenant's active dot",
+      locations: [{ slug: 'acme' }, { slug: 'globex', status: 'draft' }] as Location[],
+      owner: 0,
+    },
+    {
+      label: "a tenant retired duplicate never unseats another tenant's paused dot",
+      locations: [
+        { slug: 'acme', status: 'retired' },
+        { slug: 'globex', status: 'paused' },
+      ] as Location[],
+      owner: 1,
+    },
+    {
+      label: 'two established tenant charters have no owner',
+      locations: [{ slug: 'acme' }, { slug: 'globex', status: 'paused' }] as Location[],
+      owner: undefined,
+    },
+    {
+      label: 'two repo files have no owner (and outrank tenants)',
+      locations: [{}, {}, { slug: 'acme' }] as Location[],
+      owner: undefined,
+    },
+    {
+      label: 'two files in one tenant have no owner',
+      locations: [{ slug: 'acme' }, { slug: 'acme', status: 'draft' }] as Location[],
+      owner: undefined,
+    },
+    {
+      label: 'an ambiguous tenant cannot own the id even as the only active one',
+      locations: [
+        { slug: 'acme' },
+        { slug: 'acme', status: 'draft' },
+        { slug: 'globex', status: 'draft' },
+      ] as Location[],
+      owner: undefined,
+    },
+  ])('resolves dot_id collisions: $label', ({ locations, owner }) => {
+    const paths = locations.map(({ slug, status = 'active' }, index) => {
       if (slug) {
         seedTenant(slug);
-        return writeTenantCharter(slug, `${index}.json`, tenantCharter(slug, 'collision'));
+        return writeTenantCharter(slug, `${index}.json`, {
+          ...tenantCharter(slug, 'collision'),
+          status,
+        });
       }
-      return writeCharter(TEST_ROOT, `${index}.json`, { ...VALID_CHARTER, dot_id: 'collision' });
+      return writeCharter(TEST_ROOT, `${index}.json`, {
+        ...VALID_CHARTER,
+        dot_id: 'collision',
+        status,
+      });
     });
     writeCharter(TEST_ROOT, 'unique.json', { ...VALID_CHARTER, dot_id: 'unique-dot' });
     const errors: DotCharterLoadError[] = [];
     const loaded = listDotCharters(TEST_ROOT, { errors });
-    expect(loaded.map((entry) => entry.charter.dot_id)).toEqual(['unique-dot']);
-    expect(errors.map((entry) => entry.path).sort()).toEqual(paths.sort());
+    const ownerPath = owner === undefined ? undefined : paths[owner];
+    expect(loaded.map((entry) => entry.path).sort()).toEqual(
+      [`${TEST_ROOT}/dots/unique.json`, ...(ownerPath ? [ownerPath] : [])].sort()
+    );
+    expect(errors.map((entry) => entry.path).sort()).toEqual(
+      paths.filter((filePath) => filePath !== ownerPath).sort()
+    );
     for (const entry of errors) {
+      expect(entry.dot_id).toBe('collision');
       expect(entry.error).toMatch(/Duplicate dot_id 'collision'/);
-      for (const filePath of paths) expect(entry.error).toContain(filePath);
+      expect(entry.error).toContain(ownerPath ? `${ownerPath} keeps the id` : 'all rejected');
     }
+    if (ownerPath) {
+      expect(findDotCharter('collision', TEST_ROOT)?.path).toBe(ownerPath);
+    } else {
+      expect(() => findDotCharter('collision', TEST_ROOT)).toThrow(/Duplicate dot_id/);
+    }
+    // Strict listing (dot validate) still reports any collision.
     expect(() => listDotCharters(TEST_ROOT)).toThrow(/Duplicate dot_id 'collision'/);
   });
 
   it.each(['draft', 'paused', 'retired'] as const)(
-    'checks collisions before status filtering when the tenant charter is %s',
+    'keeps an active repo dot when a %s tenant charter reuses its id',
     (status) => {
       seedTenant('acme');
       const activePath = writeCharter(TEST_ROOT, 'active.json', VALID_CHARTER);
@@ -185,17 +249,16 @@ describe('dot charter identity collisions', () => {
         ...tenantCharter('acme', VALID_CHARTER.dot_id),
         status,
       });
-      writeCharter(TEST_ROOT, 'unique-active.json', { ...VALID_CHARTER, dot_id: 'unique-active' });
       writeCharter(TEST_ROOT, 'unique-inactive.json', {
         ...VALID_CHARTER,
         dot_id: 'unique-inactive',
         status,
       });
       const errors: DotCharterLoadError[] = [];
-      expect(
-        listDotCharters(TEST_ROOT, { status: 'active', errors }).map((e) => e.charter.dot_id)
-      ).toEqual(['unique-active']);
-      expect(errors.map((entry) => entry.path).sort()).toEqual([activePath, inactivePath].sort());
+      expect(listDotCharters(TEST_ROOT, { status: 'active', errors }).map((e) => e.path)).toEqual([
+        activePath,
+      ]);
+      expect(errors.map((entry) => entry.path)).toEqual([inactivePath]);
       expect(() => listDotCharters(TEST_ROOT, { status: 'active' })).toThrow(
         /Duplicate dot_id 'repo-guardian'/
       );

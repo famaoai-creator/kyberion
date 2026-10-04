@@ -75,15 +75,23 @@ describe('transitionDotCharterStatus', () => {
     (target) => {
       const status = target === 'active' ? 'draft' : 'active';
       const repoPath = writeCharter({ ...DRAFT, status });
-      const tenantPath = writeTenantCharter('acme', { ...DRAFT, status: 'retired' });
+      const secondPath = writeCharter({ ...DRAFT, status }, 'second.json');
       expect(() => transitionDotCharterStatus(DRAFT.dot_id, target, deps)).toThrow(
         /Duplicate dot_id 'repo-guardian'/
       );
       expect(loadDotCharter(repoPath).status).toBe(status);
-      expect(loadDotCharter(tenantPath).status).toBe('retired');
+      expect(loadDotCharter(secondPath).status).toBe(status);
       expect(safeExistsSync(`${TEST_ROOT}/${DOT_LIFECYCLE_AUDIT_PATH}`)).toBe(false);
     }
   );
+
+  it('transitions the repo owner of an id a tenant duplicate reuses, leaving the duplicate', () => {
+    const repoPath = writeCharter(DRAFT);
+    const tenantPath = writeTenantCharter('acme', { ...DRAFT, status: 'draft' });
+    expect(transitionDotCharterStatus(DRAFT.dot_id, 'active', deps).status).toBe('active');
+    expect(loadDotCharter(repoPath).status).toBe('active');
+    expect(loadDotCharter(tenantPath).status).toBe('draft');
+  });
 
   it('rejects a transition for an identity shared by two tenants', () => {
     const first = writeTenantCharter('acme', { ...DRAFT, status: 'active' });
@@ -187,12 +195,27 @@ describe('transitionDotCharterStatus', () => {
 });
 
 describe('checkDotActivationReadiness', () => {
-  it('reports duplicate identities as an activation blocker', () => {
+  it('reports an ownerless duplicate identity as an activation blocker', () => {
     writeCharter(DRAFT);
-    writeTenantCharter('acme', { ...DRAFT, status: 'retired' });
+    writeCharter(DRAFT, 'second.json');
     expect(checkDotActivationReadiness(DRAFT, deps)).toMatchObject({
       ready: false,
       errors: [expect.stringContaining("Duplicate dot_id 'repo-guardian'")],
+    });
+  });
+
+  it('blocks a rejected duplicate but not the owner of its id', () => {
+    writeCharter(DRAFT);
+    writeTenantCharter('acme', { ...DRAFT, status: 'retired' });
+    expect(checkDotActivationReadiness(DRAFT, deps)).toEqual({ ready: true, errors: [] });
+    const duplicate: DotCharter = {
+      ...DRAFT,
+      status: 'retired',
+      scope: { tier: 'confidential', tenant_slug: 'acme' },
+    };
+    expect(checkDotActivationReadiness(duplicate, deps)).toMatchObject({
+      ready: false,
+      errors: [expect.stringContaining('[DOT_IDENTITY]')],
     });
   });
 

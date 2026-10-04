@@ -19,6 +19,7 @@
  */
 
 import * as path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeReadFile, safeWriteFile } from '../secure-io.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
@@ -195,8 +196,14 @@ export function checkDotActivationReadiness(
 ): { ready: boolean; errors: string[] } {
   const errors: string[] = [];
   try {
-    // A direct readiness check must reject the same ambiguous identity as transitions.
-    findDotCharter(charter.dot_id, deps.rootDir);
+    // A direct readiness check must reject the same ambiguous identity as
+    // transitions, and a duplicate that does not own its dot_id.
+    const owner = findDotCharter(charter.dot_id, deps.rootDir);
+    if (owner && !isDeepStrictEqual(owner.charter, charter)) {
+      throw new Error(
+        `[DOT_IDENTITY] dot_id '${charter.dot_id}' is owned by ${owner.path}; this charter is a rejected duplicate`
+      );
+    }
     const all = listDotCharters(deps.rootDir, { errors: [] }).map((entry) => entry.charter);
     assertActivationReady(charter, deps, all);
   } catch (error) {

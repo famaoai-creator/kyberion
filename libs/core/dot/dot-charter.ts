@@ -313,19 +313,53 @@ export interface DotCharterLoadError {
 }
 
 /**
- * List repo and tenant charters. By default a malformed file throws (the CLI
- * uses that for `dot validate`/`dot list` reporting). Pass `options.errors`
- * to collect parse failures instead — resident consumers (the supervisor
- * sweep, the watchdog union) must never let one bad charter starve the rest.
- * Dot IDs key shared runtime stores, so every successfully loaded charter
- * with a colliding ID is rejected, across scopes and before status filtering.
+ * Resolve one dot_id collision group to its owner, or none. Dot IDs key shared
+ * runtime stores, so only one charter per ID may load. The rule never lets a
+ * scope take another scope's dot offline:
+ * - two charters for one ID in the same scope (repo `dots/`, or one tenant's
+ *   `dots/`) are an author error there — all of that scope's are rejected;
+ * - a repo-level charter owns its ID: every tenant-level duplicate is rejected
+ *   (and if the repo itself is ambiguous, nothing owns the ID);
+ * - with no repo owner, a tenant-level ID shared across tenants belongs to the
+ *   single established (`active` or `paused`) charter among them — a draft or
+ *   retired duplicate never unseats a running (or resumable) dot; with zero or
+ *   several established ones, all are rejected.
+ * Collision checks run before status filtering.
+ */
+function resolveDotIdOwner(group: LoadedDotCharter[]): LoadedDotCharter | undefined {
+  if (group.length === 1) return group[0];
+  const byScope = new Map<string, LoadedDotCharter[]>();
+  for (const entry of group) {
+    const key = entry.tenant_slug ?? '';
+    byScope.set(key, [...(byScope.get(key) ?? []), entry]);
+  }
+  const single = (key: string): LoadedDotCharter | undefined => {
+    const entries = byScope.get(key);
+    return entries?.length === 1 ? entries[0] : undefined;
+  };
+  if (byScope.has('')) return single('');
+  if (byScope.size === 1) return undefined;
+  const established = group.filter(
+    (entry) => entry.charter.status === 'active' || entry.charter.status === 'paused'
+  );
+  if (established.length !== 1) return undefined;
+  return single(established[0].tenant_slug ?? '');
+}
+
+/**
+ * List repo and tenant charters. By default a malformed file or any dot_id
+ * collision throws (the CLI uses that for `dot validate`/`dot list`
+ * reporting). Pass `options.errors` to collect failures instead — resident
+ * consumers (the supervisor sweep, the watchdog union) must never let one bad
+ * charter starve the rest; a colliding duplicate is then reported there while
+ * the ID's owner (see {@link resolveDotIdOwner}) stays loaded.
  */
 export function listDotCharters(
   rootDir = pathResolver.rootDir(),
   options: { status?: DotCharterStatus; errors?: DotCharterLoadError[] } = {}
 ): LoadedDotCharter[] {
   const charters: LoadedDotCharter[] = [];
-  const pathsById = new Map<string, string[]>();
+  const byId = new Map<string, LoadedDotCharter[]>();
   for (const source of listDotCharterSources(rootDir)) {
     const filePath = source.path;
     let charter: DotCharter;
@@ -339,33 +373,44 @@ export function listDotCharters(
       });
       continue;
     }
-    charters.push({ ...source, charter });
-    const paths = pathsById.get(charter.dot_id) ?? [];
-    paths.push(filePath);
-    pathsById.set(charter.dot_id, paths);
+    const loaded = { ...source, charter };
+    charters.push(loaded);
+    byId.set(charter.dot_id, [...(byId.get(charter.dot_id) ?? []), loaded]);
   }
-  const collidingIds = new Set<string>();
-  for (const [dotId, paths] of pathsById) {
-    if (paths.length < 2) continue;
-    const error = `Duplicate dot_id '${dotId}' across dot charters: ${paths.join(', ')}`;
-    if (!options.errors) throw new Error(error);
-    collidingIds.add(dotId);
-    for (const filePath of paths) options.errors.push({ path: filePath, error, dot_id: dotId });
+  const rejected = new Set<LoadedDotCharter>();
+  for (const [dotId, group] of byId) {
+    if (group.length < 2) continue;
+    const paths = group.map((entry) => entry.path).join(', ');
+    if (!options.errors)
+      throw new Error(`Duplicate dot_id '${dotId}' across dot charters: ${paths}`);
+    const owner = resolveDotIdOwner(group);
+    const error = owner
+      ? `Duplicate dot_id '${dotId}' across dot charters: ${paths} — rejected; ${owner.path} keeps the id`
+      : `Duplicate dot_id '${dotId}' across dot charters: ${paths} — no owner, all rejected`;
+    for (const entry of group) {
+      if (entry === owner) continue;
+      rejected.add(entry);
+      options.errors.push({ path: entry.path, error, dot_id: dotId });
+    }
   }
   return charters.filter(
-    ({ charter }) =>
-      !collidingIds.has(charter.dot_id) && (!options.status || charter.status === options.status)
+    (entry) => !rejected.has(entry) && (!options.status || entry.charter.status === options.status)
   );
 }
 
-/** Resolve one identity, rejecting ambiguity while isolating malformed or colliding siblings. */
+/**
+ * Resolve one identity to its owner (see {@link listDotCharters}); throws only
+ * when the ID collides and no charter owns it. Malformed siblings are isolated.
+ */
 export function findDotCharter(
   dotId: string,
   rootDir = pathResolver.rootDir()
 ): LoadedDotCharter | undefined {
   const errors: DotCharterLoadError[] = [];
   const loaded = listDotCharters(rootDir, { errors });
+  const owner = loaded.find((entry) => entry.charter.dot_id === dotId);
+  if (owner) return owner;
   const collision = errors.find((entry) => entry.dot_id === dotId);
   if (collision) throw new Error(collision.error);
-  return loaded.find((entry) => entry.charter.dot_id === dotId);
+  return undefined;
 }

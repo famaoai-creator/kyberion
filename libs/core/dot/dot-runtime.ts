@@ -1139,8 +1139,12 @@ export function parseDotWakeToolFences(text: string): {
 
 /**
  * Apply the values each registered wake tool collected during one wake.
- * Returns error strings for optional outputs. A durable output's persistence
- * failure propagates, so the wake cannot consume its trigger without saving it.
+ * Returns error strings; never throws. Wake tools apply after the wake's
+ * proposals were governed (WorkItems / approvals may already exist), so a
+ * persistence failure — including a durable follow-up — is recorded as a
+ * receipt `tool_errors` entry and a warn, never a failed wake: failing here
+ * would retry the trigger and re-spend tokens, re-dispatch the governed
+ * proposals and re-apply earlier wake tools.
  */
 export function applyDotWakeOutputs(
   charter: DotCharter,
@@ -1154,7 +1158,6 @@ export function applyDotWakeOutputs(
     try {
       errors.push(...tool.apply(charter, values, ctx).map((error) => `${tool.name}: ${error}`));
     } catch (error) {
-      if (tool.failWakeOnApplyError) throw error;
       extensionFailure('wake tool', tool.name, charter.dot_id, error);
       errors.push(
         `${tool.name}: apply failed (${error instanceof Error ? error.message : String(error)})`

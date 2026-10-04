@@ -587,9 +587,81 @@ describe('runtime reliability (DL-02)', () => {
     }
   );
 
+  it.each(['native', 'fenced'] as const)(
+    'records a %s follow-up persist failure after dispatch as a tool error, never a retry',
+    async (mode) => {
+      DOT_WAKE_TOOLS.push(dotScheduleFollowupTool);
+      const charter: DotCharter = { ...CHARTER, followups: { max_pending: 1 } };
+      writeCharter(charter);
+      const t0 = new Date('2026-10-04T10:00:00Z');
+      let now = new Date('2026-10-04T10:06:00Z');
+      const deps = { rootDir: TEST_ROOT, now: () => now };
+      dotScheduleFollowupTool.apply(charter, [{ delay_minutes: 5, reason: 'original' }], {
+        ...deps,
+        now: () => t0,
+      });
+      const [trigger] = evaluateDotFollowupsDue(charter, deps);
+      const proposal = { title: 'Fix main', objective: 'Repair it.', work_shape: 'task_session' };
+      const replacement = { delay_minutes: 10, reason: 'successor' };
+      const dispatched: string[] = [];
+      const originalWrite = secureIo.safeWriteFile;
+      const write = vi
+        .spyOn(secureIo, 'safeWriteFile')
+        .mockImplementation((file, data, options) => {
+          if (file.endsWith(DOT_FOLLOWUPS_FILE)) throw new Error('followup store unavailable');
+          return originalWrite(file, data, options);
+        });
+      try {
+        const receipt = await runDotWake(
+          { path: `${TEST_ROOT}/dots/dot.json`, charter },
+          {
+            ...deps,
+            trigger,
+            hasRole: () => true,
+            dispatch: (_charter, proposals) => {
+              dispatched.push(...proposals.map((p) => p.title));
+              return [];
+            },
+            ...(mode === 'native'
+              ? {
+                  runLoop: async (options: DotWakeLoopOptions) => {
+                    options.executeTool!({ name: 'dot_propose_action', input: proposal });
+                    options.executeTool!({ name: 'dot_schedule_followup', input: replacement });
+                    return fakeResult(1, 5);
+                  },
+                }
+              : {
+                  backend: {
+                    delegateTask: async () =>
+                      [
+                        `\`\`\`dot-proposals\n${JSON.stringify([proposal])}\n\`\`\``,
+                        `\`\`\`dot-followup\n${JSON.stringify(replacement)}\n\`\`\``,
+                      ].join('\n'),
+                  },
+                }),
+          }
+        );
+        expect(receipt.outcome).toBe('delivered');
+        expect(receipt.tool_errors).toEqual([
+          'dot_schedule_followup: apply failed (followup store unavailable)',
+        ]);
+        expect(dispatched).toEqual(['Fix main']);
+        expect(readDotWakeLedger(deps)).toMatchObject([
+          { trigger_key: trigger.key, outcome: 'delivered' },
+        ]);
+        // The next sweep has nothing to re-fire, so nothing is re-dispatched.
+        now = new Date('2026-10-04T10:30:00Z');
+        expect(evaluateDotFollowupsDue(charter, deps)).toEqual([]);
+        expect(evaluateDotTriggersDue(charter, deps).some((t) => t.key === trigger.key)).toBe(
+          false
+        );
+      } finally {
+        write.mockRestore();
+      }
+    }
+  );
+
   it.each([
-    ['native', 'replacement'],
-    ['fenced', 'replacement'],
     ['native', 'delivery'],
     ['fenced', 'delivery'],
   ] as const)('recovers a %s follow-up when %s persistence fails', async (mode, failure) => {
