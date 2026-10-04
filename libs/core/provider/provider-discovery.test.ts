@@ -36,14 +36,21 @@ vi.mock('../foundation/json.js', () => ({
   readJson: (filePath: string) => JSON.parse(String(mocks.safeReadFile(filePath))),
 }));
 
-vi.mock('../path-resolver.js', () => ({
-  pathResolver: {
-    rootDir: mocks.rootDir,
+vi.mock('../path-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../path-resolver.js')>();
+  return {
+    ...actual,
     rootResolve: mocks.rootResolve,
-    knowledge: mocks.rootResolve,
-    shared: mocks.shared,
-  },
-}));
+    resolve: vi.fn((value: string) => value),
+    pathResolver: {
+      ...actual.pathResolver,
+      rootDir: mocks.rootDir,
+      rootResolve: mocks.rootResolve,
+      knowledge: mocks.rootResolve,
+      shared: mocks.shared,
+    },
+  };
+});
 
 describe('provider-discovery', () => {
   it('marks codex as not installed when the codex binary is not on PATH', async () => {

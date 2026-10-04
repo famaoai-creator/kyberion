@@ -5,7 +5,10 @@ import {
   buildOpenAiCompatibleBackendForPreset,
   type OpenAiCompatibleBackendOverrides,
 } from '../provider/openai-compatible-backend.js';
-import { getReasoningProviderDescriptor } from './reasoning-provider-registry.js';
+import {
+  getReasoningProviderDescriptor,
+  resolveReasoningProviderEnvironment,
+} from './reasoning-provider-registry.js';
 import type { ReasoningBackendCandidate } from './reasoning-backend.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 import type { ReasoningProviderRuntimeBundle } from './reasoning-provider-registry.js';
@@ -33,7 +36,7 @@ export function buildOpenAiCompatibleProviderBundle(
   }
   const backend = buildOpenAiCompatibleBackendForPreset(
     descriptor.openai_compatible_preset,
-    options.env ?? process.env,
+    resolveReasoningProviderEnvironment(descriptor, options.env ?? process.env),
     options.overrides
   );
   if (!backend) return null;

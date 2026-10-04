@@ -13,6 +13,13 @@
         "input_modalities": ["text"]
       },
       "env_keys": ["OPENROUTER_API_KEY", "KYBERION_OPENROUTER_KEY"],
+      "secret_refs": [
+        {
+          "service_id": "openrouter",
+          "secret_key": "API_KEY",
+          "env_keys": ["OPENROUTER_API_KEY", "KYBERION_OPENROUTER_KEY"]
+        }
+      ],
       "cost_tier": "metered",
       "transport": "api",
       "data_egress": "external-api",

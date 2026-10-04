@@ -13,6 +13,18 @@
         "input_modalities": ["text"]
       },
       "env_keys": ["KYBERION_NEMOTRON_URL"],
+      "secret_refs": [
+        {
+          "service_id": "nemotron",
+          "secret_key": "API_KEY",
+          "env_keys": ["KYBERION_NEMOTRON_KEY"]
+        },
+        {
+          "service_id": "local-llm",
+          "secret_key": "API_KEY",
+          "env_keys": ["KYBERION_LOCAL_LLM_KEY"]
+        }
+      ],
       "cost_tier": "metered",
       "transport": "api",
       "data_egress": "external-api",
