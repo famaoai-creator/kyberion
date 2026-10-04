@@ -102,7 +102,6 @@ function endsWithMarker(text: string, markers: readonly string[]): string | null
 }
 
 const QUESTION_END = /[?？]$/;
-const JA_QUESTION_ENDINGS = ['ますか', 'ですか', 'かな', 'かい', 'か'];
 
 /**
  * Classify one utterance. Priority: correction > hold > pure backchannel >
@@ -130,9 +129,9 @@ export function classifyUtteranceIntent(text: string, pack: LanguagePack): Utter
   const fillerPure = pureMarkers(trimmed, pack.respondGateFillers, pack.usesWordSpaces);
   if (fillerPure) return { intent: 'backchannel', pure: true, matched: fillerPure };
 
-  const normalized = trimEndPunctuation(trimmed);
-  if (QUESTION_END.test(trimmed) || JA_QUESTION_ENDINGS.some((e) => normalized.endsWith(e))) {
-    return { intent: 'questioning', pure: false };
+  const questionEnd = endsWithMarker(trimmed, pack.questionEndings);
+  if (QUESTION_END.test(trimmed) || questionEnd) {
+    return { intent: 'questioning', pure: false, ...(questionEnd ? { matched: questionEnd } : {}) };
   }
 
   const trailing =
@@ -140,11 +139,4 @@ export function classifyUtteranceIntent(text: string, pack: LanguagePack): Utter
   if (trailing) return { intent: 'thinking_aloud', pure: false, matched: trailing };
 
   return { intent: 'substantive', pure: false };
-}
-
-function trimEndPunctuation(text: string): string {
-  return text
-    .normalize('NFKC')
-    .toLowerCase()
-    .replace(/[。！？!?,、.?\s]+$/u, '');
 }

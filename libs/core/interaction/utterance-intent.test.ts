@@ -4,6 +4,7 @@ import { languagePackFromSource } from './language-pack.js';
 
 const ja = languagePackFromSource('ja', {
   uses_word_spaces: false,
+  question_endings: ['ますか', 'ですか', 'かな', 'かい', 'か'],
   continuation_particles: ['けど', 'て', 'が'],
   eot_fillers: ['えーと', 'うーん'],
   commit_endings: ['です', 'ます', 'か'],

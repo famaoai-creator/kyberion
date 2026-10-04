@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { BackchannelPolicy } from './backchannel-policy.js';
 import { languagePackFromSource } from './language-pack.js';
 
-const ja = languagePackFromSource('ja', { agent_backchannels: ['うん', 'はい', 'なるほど'] });
+const ja = languagePackFromSource('ja', {
+  uses_word_spaces: false,
+  agent_backchannels: ['うん', 'はい', 'なるほど'],
+});
 
 function policyAt(now: { t: number }, options = {}) {
   return new BackchannelPolicy({ enabled: true, now: () => now.t, ...options });

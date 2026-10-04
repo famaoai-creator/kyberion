@@ -36,11 +36,14 @@ export interface LanguagePack {
   holdMarkers: readonly string[];
   /** Phrases the agent itself may emit as backchannels or instant reactions. */
   agentBackchannels: readonly string[];
+  /** Suffixes that mark a question in this language (beyond '?'). */
+  questionEndings: readonly string[];
 }
 
 /** Minimal shape a lexicon language entry must satisfy to become a pack. */
 export interface LanguagePackSource {
-  uses_word_spaces?: boolean;
+  /** Required, explicit per language — never inferred from a language id. */
+  uses_word_spaces: boolean;
   continuation_particles?: readonly string[];
   eot_fillers?: readonly string[];
   commit_endings?: readonly string[];
@@ -49,6 +52,8 @@ export interface LanguagePackSource {
   correction_markers?: readonly string[];
   hold_markers?: readonly string[];
   agent_backchannels?: readonly string[];
+  /** Suffixes that mark a question in this language (beyond '?'). */
+  question_endings?: readonly string[];
 }
 
 /** Charset hints keyed by language id — script detection, not linguistic data. */
@@ -64,7 +69,7 @@ function readonlyList(value: readonly string[] | undefined): readonly string[] {
 export function languagePackFromSource(id: string, source: LanguagePackSource): LanguagePack {
   return {
     id,
-    usesWordSpaces: source.uses_word_spaces ?? id !== 'ja',
+    usesWordSpaces: source.uses_word_spaces,
     ...(SCRIPT_HINTS[id] ? { detectPattern: SCRIPT_HINTS[id] } : {}),
     continuationMarkers: readonlyList(source.continuation_particles),
     eotFillers: readonlyList(source.eot_fillers),
@@ -74,13 +79,14 @@ export function languagePackFromSource(id: string, source: LanguagePackSource): 
     correctionMarkers: readonlyList(source.correction_markers),
     holdMarkers: readonlyList(source.hold_markers),
     agentBackchannels: readonlyList(source.agent_backchannels),
+    questionEndings: readonlyList(source.question_endings),
   };
 }
 
 /**
  * Build packs from a parsed lexicon map (`{ ja: {...}, en: {...} }`).
- * `uses_word_spaces` defaults per language id ('ja' → false, others → true)
- * unless the source overrides it.
+ * `uses_word_spaces` is required on every entry — never inferred from the
+ * language id.
  */
 export function languagePacksFromLexicon(
   languages: Record<string, LanguagePackSource>

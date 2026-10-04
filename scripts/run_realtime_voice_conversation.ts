@@ -1160,11 +1160,13 @@ export async function main(
       type: 'boolean',
       default: false,
       describe:
+        // i18n-exempt: JA voice demo script output
         'Agent backchannels (「うん」「なるほど」) while the user speaks, emitted via the Conversation Engine → TTS shortcut with no reasoning call. Headset recommended on speaker setups',
     })
     .option('intent-shortcuts', {
       type: 'boolean',
       describe:
+        // i18n-exempt: JA voice demo script output
         'Answer pure hold requests (「ちょっと待って」) with an instant reaction and drop pure user backchannels (「うん」) without a reasoning call',
     })
     .option('rhythm', {
