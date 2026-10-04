@@ -46,6 +46,7 @@ import {
   PipelineSuspendedError,
 } from './pipeline-execution-part-bootstrap.js';
 import type { RunStepsOptions } from './pipeline-execution-part-bootstrap.js';
+import { registerPipelineFileRunner } from './lib/pipeline-file-runner.js';
 /** Validate Typed Flow channel integrity before allowing any step side effects. */
 export class TypedFlowValidationError extends Error {
   constructor(readonly flowErrors: ReturnType<typeof validateFlow>) {
@@ -873,3 +874,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
     throw new ScriptExitError(1, '', true);
   }
 }
+
+// Nested pipelines (scheduled organization operations) run through the port so
+// the operation executor never imports the engine (runtime import cycle).
+registerPipelineFileRunner(executePipelineFile);

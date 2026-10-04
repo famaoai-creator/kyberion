@@ -89,7 +89,7 @@ export function buildStructuredSlideBody(data: any, ctx: any): any[] | null {
     // bold face, deeper levels indent with a tree connector.
     const rowH = Math.min(0.4, contentH / Math.max(wbs.length, 8));
     const indentStep = sp('xl', 0.3);
-    wbs.slice(0, 20).forEach((entry, i) => {
+    capItems(wbs, 20, 'wbs', ctx).forEach((entry, i) => {
       const y = contentY + i * rowH;
       const level = Math.min(entry.level, 4);
       if (level === 1) {
@@ -138,7 +138,7 @@ export function buildStructuredSlideBody(data: any, ctx: any): any[] | null {
       const trackX = bodyX + labelW + sp('md', 0.15);
       const trackW = bodyW - labelW - sp('md', 0.15);
       const rowH = Math.min(0.52, contentH / Math.max(timeline.length, 5));
-      timeline.slice(0, 10).forEach((entry, i) => {
+      capItems(timeline, 10, 'timeline', ctx).forEach((entry, i) => {
         const y = contentY + i * rowH;
         elements.push({
           type: 'text',
@@ -191,7 +191,7 @@ export function buildStructuredSlideBody(data: any, ctx: any): any[] | null {
         style: { fill: ctx.borderHex || ctx.primaryHex, color: ctx.borderHex || ctx.primaryHex },
         text: '',
       });
-      timeline.slice(0, 8).forEach((entry, i) => {
+      capItems(timeline, 8, 'timeline', ctx).forEach((entry, i) => {
         const x = bodyX + (bodyW / Math.max(count, 1)) * i + sp('md', 0.15);
         const above = i % 2 === 0;
         elements.push({
@@ -428,7 +428,7 @@ export function buildStructuredSlideBody(data: any, ctx: any): any[] | null {
     const levelH = Math.min(0.75, contentH / Math.max(levels, 2));
     const gapL = sp('md', 0.15);
     const byLevel: Array<Array<(typeof org)[number]>> = Array.from({ length: levels }, () => []);
-    org.slice(0, 18).forEach((e) => byLevel[e.level - 1].push(e));
+    capItems(org, 18, 'org_chart', ctx).forEach((e) => byLevel[e.level - 1].push(e));
     const centers = new Map<number, number>();
     byLevel.forEach((members, li) => {
       if (members.length === 0) return;
@@ -576,7 +576,7 @@ export function buildStructuredSlideBody(data: any, ctx: any): any[] | null {
     const laneLabelW = Math.min(1.6, bodyW * 0.18);
     const laneW = bodyW - laneLabelW - sp('sm', 0.1);
     const laneH = Math.min(0.95, contentH / Math.max(flow.length, 2) - sp('xs', 0.08));
-    flow.slice(0, 5).forEach((lane, li) => {
+    capItems(flow, 5, 'swimlane', ctx).forEach((lane, li) => {
       const y = contentY + li * (laneH + sp('xs', 0.08));
       elements.push({
         type: 'shape',
@@ -722,7 +722,7 @@ export function buildStructuredSlideBody(data: any, ctx: any): any[] | null {
   if (kpiTable.length > 0) {
     // KPI table — metric label left, big value, target/delta right-aligned.
     const rowH = Math.min(0.52, contentH / Math.max(kpiTable.length, 3));
-    kpiTable.slice(0, 8).forEach((entry, i) => {
+    capItems(kpiTable, 8, 'kpi_table', ctx).forEach((entry, i) => {
       const y = contentY + i * rowH;
       if (i % 2 === 1) {
         elements.push({
@@ -1105,4 +1105,16 @@ export function buildStructuredSlideBody(data: any, ctx: any): any[] | null {
   }
 
   return elements;
+}
+
+/**
+ * Components have a fixed number of rows; items past the cap are not drawn.
+ * Report the drop so layout fit / preflight sees it instead of the deck
+ * silently losing content.
+ */
+function capItems<T>(items: T[], max: number, kind: string, ctx: any): T[] {
+  if (items.length > max && typeof ctx?.reportTruncation === 'function') {
+    ctx.reportTruncation(kind, max, items.length);
+  }
+  return items.slice(0, max);
 }

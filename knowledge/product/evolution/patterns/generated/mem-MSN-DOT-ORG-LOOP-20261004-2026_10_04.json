@@ -1,0 +1,18 @@
+{
+  "record_id": "mem-MSN-DOT-ORG-LOOP-20261004-2026_10_04",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Closing an autonomous resident-agent loop: terminal paths, daemon bootstrap, leaf registries, tenant-bound reads",
+  "summary": "Reusable rules from implementing the resident-dot org loop: every claimed work unit needs a terminal path, daemons must bootstrap reasoning, registries stay leaves, advisory model fields are dropped not rejected, tenant reads bind file+context, tests inject ports for global stores.",
+  "candidate_id": "mem-MSN-DOT-ORG-LOOP-20261004-2026_10_04",
+  "evidence_refs": ["active/missions/public/MSN-DOT-ORG-LOOP-20261004/evidence/distillation.md"],
+  "created_at": "2026-10-04T11:21:02.730Z",
+  "applicability": ["mission", "mission:MSN-DOT-ORG-LOOP-20261004"],
+  "reusable_steps": [
+    "Reusable rules from implementing the resident-dot org loop: every claimed work unit needs a terminal path, daemons must bootstrap reasoning, registries stay leaves, advisory model fields are dropped not rejected, tenant reads bind file+context, tests inject ports for global stores"
+  ],
+  "expected_outcome": "Lessons from closing the resident-dot organization loop (DL-01..11):\n\n1. Every claimed unit of autonomous work needs a terminal path. Dispatch counted `blocked` and `in_progress` WorkItems as open delegations, so escalations, crashed claims and hung pipelines held a dot's slots forever. An executor must (a) bound each item by wall clock with abort, (b) reap stranded claims before each sweep, and (c) release escalations to a terminal status, keeping the real status in metadata.\n2. A long-lived daemon must bootstrap reasoning itself (`installReasoningBackends()` + periodic reselect). Otherwise `getReasoningBackend()` is the stub, and a stub delegate silently records fake deliveries. Refuse the unconfigured stub explicitly.\n3. Keep an extension registry a leaf (arrays only) and register extensions from a bootstrap module imported by entry points. Registries that import their extensions form runtime import cycles with the modules that read them (dep-cycles / module-boundaries gates).\n4. Model-proposed advisory metadata (expected_effect, target, intent) must be dropped when malformed, not used to reject the proposal: a live wake invented a target form and lost valid work.\n5. Tenant-bound reads must bind the file to its directory's tenant AND run inside that tenant's execution context. Listing in context but reading in the caller's context fails tier-guard in the daemon.\n6. Tests of feedback, distill or budget code must inject ports. Defaults that write `active/shared/runtime/execution-feedback.json` or read real metrics history pollute other suites (the full run failed on execution-feedback.test.ts).\n7. Since #909 the repository path boundary rejects relative roots. Resolve a registry `rootDir` with `path.resolve` before calling tenant-registry helpers.\n8. Per-wave independent review paid off: 15 blocking findings across 3 waves (tenant escapes, slot leaks, races), all caught before the PR.",
+  "source_branch": "feat/dot-org-loop-20261004",
+  "source_commit": "fb7e34ed75b6996e19d3b64785d9ac3a4becd78b"
+}

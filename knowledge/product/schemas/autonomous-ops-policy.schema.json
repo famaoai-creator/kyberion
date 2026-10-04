@@ -108,6 +108,70 @@
         }
       },
       "required": ["start", "end", "timezone"]
+    },
+    "autonomy": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Resident-dot graduated autonomy (L0-L4). L0 is true shadow: proposals are recorded only (no decision card, no WorkItem). Promotion always needs a human approval; demotion is automatic.",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Operator-facing note on how this autonomy section is applied."
+        },
+        "relaxable_actions": {
+          "type": "array",
+          "description": "Actions an L4 dot may relax from notify to auto even though notify is the policy gate's own decision — the single permitted exception to 'never below the policy gate' (l4_notify_to_auto, enforced in dot-dispatch dotNotifyToAutoExceptionApplies). Only when the action is reversible (axis < 2), touches no high-risk path, has no never_auto / axis_max / budget escalation, the policy decision is exactly notify (never approve), no charter or hard floor is notify or stricter, and the dot's outcome success stays at or above promotion.min_outcome_success.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "promotion": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "min_decisions": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "min_agreement": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "min_outcome_success": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "max_incidents_30d": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": ["min_decisions", "min_agreement", "min_outcome_success", "max_incidents_30d"]
+        },
+        "demotion": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "on_regressed_outcomes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "on_rejection_streak": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "on_incident": {
+              "type": "boolean"
+            }
+          },
+          "required": ["on_regressed_outcomes", "on_rejection_streak", "on_incident"]
+        }
+      },
+      "required": ["relaxable_actions", "promotion", "demotion"]
     }
   },
   "required": ["version", "decision_thresholds", "axis_weights", "actions"],

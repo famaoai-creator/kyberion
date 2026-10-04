@@ -19,11 +19,14 @@ export async function main(args: string[] = currentProcessArgv().slice(2)): Prom
     return;
   }
   if (args[0] === 'operation' && args[1] === 'run' && args[2] === 'execute') {
+    // Load the pipeline engine so it registers the nested-pipeline runner.
+    await import('./run_pipeline.js');
     const { executeOrganizationOperation } = await import('./organization_operation_execute.js');
     await executeOrganizationOperation(args.slice(3));
     return;
   }
   if (args[0] === 'operation' && args[1] === 'tick') {
+    await import('./run_pipeline.js');
     const { tickOrganizationOperations } = await import('./organization_operation_execute.js');
     await tickOrganizationOperations(args.slice(2));
     return;
