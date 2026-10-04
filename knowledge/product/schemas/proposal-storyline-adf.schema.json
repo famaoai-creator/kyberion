@@ -19,16 +19,28 @@
     "core_message": {
       "type": "string"
     },
-    "document_profile": { "type": "string" },
-    "design_system_id": { "type": "string" },
+    "document_profile": {
+      "type": "string"
+    },
+    "design_system_id": {
+      "type": "string"
+    },
     "branding": {
       "type": "object",
       "additionalProperties": true
     },
-    "layout_template_id": { "type": "string" },
-    "narrative_pattern_id": { "type": "string" },
-    "recommended_theme": { "type": "string" },
-    "recommended_layout_template_id": { "type": "string" },
+    "layout_template_id": {
+      "type": "string"
+    },
+    "narrative_pattern_id": {
+      "type": "string"
+    },
+    "recommended_theme": {
+      "type": "string"
+    },
+    "recommended_layout_template_id": {
+      "type": "string"
+    },
     "toc": {
       "type": "array",
       "items": {
@@ -50,27 +62,56 @@
         "additionalProperties": false,
         "required": ["id", "title", "objective"],
         "properties": {
-          "id": { "type": "string", "minLength": 1 },
-          "title": { "type": "string", "minLength": 1 },
-          "objective": { "type": "string", "minLength": 1 },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "objective": {
+            "type": "string",
+            "minLength": 1
+          },
           "body": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           },
-          "visual": { "type": "string" },
-          "media_kind": { "type": "string" },
-          "layout_key": { "type": "string" },
-          "semantic_type": { "type": "string" },
-          "pattern_id": { "type": "string" },
+          "visual": {
+            "type": "string"
+          },
+          "media_kind": {
+            "type": "string"
+          },
+          "layout_key": {
+            "type": "string"
+          },
+          "semantic_type": {
+            "type": "string"
+          },
+          "pattern_id": {
+            "type": "string"
+          },
           "slide_pattern": {
             "type": "object",
             "additionalProperties": true
           },
-          "body_zone": { "type": "string" },
-          "design_system_id": { "type": "string" },
+          "body_zone": {
+            "type": "string"
+          },
+          "design_system_id": {
+            "type": "string"
+          },
           "branding": {
             "type": "object",
             "additionalProperties": true
+          },
+          "speaker_notes": {
+            "type": "string",
+            "description": "What the presenter says on this slide; rendered as PowerPoint speaker notes."
           }
         }
       }
