@@ -19,8 +19,10 @@ import {
   IngressError,
   assertIngressLocalPort,
   ingressLoopbackTarget,
+  ingressRequestPort,
   joinIngressPublicUrl,
   normalizeIngressPathPrefix,
+  sameIngressTarget,
   type IngressExposure,
   type IngressReadiness,
   type IngressTargetRequest,
@@ -197,6 +199,13 @@ function isMissingBinary(result: TailscaleCommandResult): boolean {
   return code === 'ENOENT' || /ENOENT/u.test(result.error?.message || '');
 }
 
+/** tailscaled refuses serve/funnel changes from a non-operator user (Linux) or a sandboxed CLI. */
+export function isTailscalePermissionDenied(result: TailscaleCommandResult): boolean {
+  return /access denied|permission denied|not permitted|operator/iu.test(
+    `${result.stderr} ${result.stdout} ${result.error?.message ?? ''}`
+  );
+}
+
 const INSTALL_STEPS = [
   'Install Tailscale (macOS: `brew install --cask tailscale-app`, or https://tailscale.com/download).',
   'Make the CLI reachable: Tailscale menu > Settings > Install CLI, or set KYBERION_TAILSCALE_BIN=/Applications/Tailscale.app/Contents/MacOS/Tailscale.',
@@ -211,6 +220,13 @@ const FUNNEL_STEPS = [
   'Admin console > Access controls: grant the `funnel` node attribute to this device (nodeAttrs: {"target": [...], "attr": ["funnel"]}).',
   'Re-run `pnpm kyberion ingress probe` to confirm readiness.',
 ];
+export const TAILSCALE_PERMISSION_STEPS = [
+  'Linux: allow your user to change serve/funnel config once with `sudo tailscale set --operator=$USER`.',
+  'macOS: use the Tailscale app CLI (menu > Settings > Install CLI) or the Homebrew tailscaled you are logged in to.',
+];
+const FUNNEL_STATUS_STEPS = [
+  'Run `tailscale funnel status --json` by hand and resolve the error it prints (update Tailscale if the funnel subcommand is missing).',
+];
 
 export class TailscaleFunnelProvider implements PublicIngressProvider {
   readonly id = TAILSCALE_FUNNEL_PROVIDER_ID;
@@ -224,6 +240,10 @@ export class TailscaleFunnelProvider implements PublicIngressProvider {
 
   private needsSetup(reason: string, steps: string[]): IngressReadiness {
     return { status: 'needs_setup', reason, setup_steps: steps, network_class: NETWORK_CLASS };
+  }
+
+  private notReady(reason: string): IngressError {
+    return new IngressError('INGRESS_PROVIDER_NOT_READY', reason, this.id);
   }
 
   /** Exactly one of `node` / `readiness` (the setup reason) is set. */
@@ -242,12 +262,23 @@ export class TailscaleFunnelProvider implements PublicIngressProvider {
       node = parseTailscaleStatus(result.stdout);
     } catch {
       return {
-        readiness: this.needsSetup(`tailscale status failed: ${commandDetail(result)}`, [
-          ...LOGIN_STEPS,
-        ]),
+        readiness: this.needsSetup(
+          `tailscale status failed: ${commandDetail(result)}`,
+          isTailscalePermissionDenied(result) ? TAILSCALE_PERMISSION_STEPS : [...LOGIN_STEPS]
+        ),
       };
     }
     return { node };
+  }
+
+  /** Node that can be inspected (has a MagicDNS name); fails closed otherwise. */
+  private async inspectableNode(): Promise<TailscaleNodeStatus> {
+    const status = await this.nodeStatus();
+    if (!status.node) {
+      throw this.notReady(status.readiness?.reason ?? 'tailscale status unavailable');
+    }
+    if (!status.node.dnsName) throw this.notReady('MagicDNS name is not available');
+    return status.node;
   }
 
   async probe(): Promise<IngressReadiness> {
@@ -271,9 +302,10 @@ export class TailscaleFunnelProvider implements PublicIngressProvider {
     }
     const funnel = await this.run([...TAILSCALE_FUNNEL_STATUS_ARGS]);
     if (funnel.status !== 0) {
-      return this.needsSetup(`tailscale funnel status failed: ${commandDetail(funnel)}`, [
-        'Update Tailscale to a version with `tailscale funnel --bg` (1.52 or later).',
-      ]);
+      return this.needsSetup(
+        `tailscale funnel status failed: ${commandDetail(funnel)}`,
+        isTailscalePermissionDenied(funnel) ? TAILSCALE_PERMISSION_STEPS : FUNNEL_STATUS_STEPS
+      );
     }
     return {
       status: 'ready',
@@ -284,30 +316,23 @@ export class TailscaleFunnelProvider implements PublicIngressProvider {
 
   private async readyNode(): Promise<TailscaleNodeStatus> {
     const readiness = await this.probe();
-    if (readiness.status !== 'ready') {
-      throw new IngressError('INGRESS_PROVIDER_NOT_READY', readiness.reason, this.id);
-    }
-    const status = await this.nodeStatus();
-    if (!status.node) {
-      throw new IngressError(
-        'INGRESS_PROVIDER_NOT_READY',
-        status.readiness?.reason ?? 'tailscale status unavailable',
-        this.id
-      );
-    }
-    return status.node;
+    if (readiness.status !== 'ready') throw this.notReady(readiness.reason);
+    return this.inspectableNode();
   }
 
+  /** Current serve/funnel mapping; an unreadable config fails closed (NOT_READY). */
   private async mapping(dnsName: string, prefix: string): Promise<TailscaleFunnelMapping> {
     const result = await this.run([...TAILSCALE_FUNNEL_STATUS_ARGS]);
     if (result.status !== 0) {
-      throw new IngressError(
-        'INGRESS_COMMAND_FAILED',
-        `tailscale funnel status failed: ${commandDetail(result)}`,
-        this.id
+      throw this.notReady(`tailscale funnel status failed: ${commandDetail(result)}`);
+    }
+    try {
+      return parseTailscaleFunnelMapping(result.stdout, dnsName, prefix);
+    } catch (error) {
+      throw this.notReady(
+        `tailscale funnel status is unreadable: ${error instanceof Error ? error.message : String(error)}`
       );
     }
-    return parseTailscaleFunnelMapping(result.stdout, dnsName, prefix);
   }
 
   private exposure(
@@ -328,13 +353,27 @@ export class TailscaleFunnelProvider implements PublicIngressProvider {
     };
   }
 
+  private commandFailure(action: string, result: TailscaleCommandResult): IngressError {
+    if (isTailscalePermissionDenied(result)) {
+      return this.notReady(
+        `${action} was refused: ${commandDetail(result)} — ${TAILSCALE_PERMISSION_STEPS.join(' / ')}`
+      );
+    }
+    return new IngressError(
+      'INGRESS_COMMAND_FAILED',
+      `${action} failed: ${commandDetail(result)}`,
+      this.id
+    );
+  }
+
   async up(request: IngressUpRequest): Promise<IngressExposure> {
     const prefix = normalizeIngressPathPrefix(request.pathPrefix);
     const port = assertIngressLocalPort(request.localPort);
     const target = ingressLoopbackTarget(port, prefix);
     const node = await this.readyNode();
     const before = await this.mapping(node.dnsName, prefix);
-    if (before.proxy && before.proxy !== target) {
+    const ownedBefore = sameIngressTarget(before.proxy, target);
+    if (before.proxy && !ownedBefore) {
       throw new IngressError(
         'INGRESS_COMMAND_FAILED',
         `path ${prefix} on ${node.dnsName} already proxies to ${before.proxy}; withdraw that mapping first`,
@@ -348,68 +387,74 @@ export class TailscaleFunnelProvider implements PublicIngressProvider {
         this.id
       );
     }
-    if (before.proxy !== target || !before.funnelEnabled) {
+    let issued = false;
+    if (!ownedBefore || !before.funnelEnabled) {
       const result = await this.run(buildTailscaleFunnelUpArgs(port, prefix));
-      if (result.status !== 0) {
-        throw new IngressError(
-          'INGRESS_COMMAND_FAILED',
-          `tailscale funnel failed: ${commandDetail(result)}`,
-          this.id
-        );
-      }
+      issued = true;
+      if (result.status !== 0) throw this.commandFailure('tailscale funnel', result);
     }
-    const after = await this.mapping(node.dnsName, prefix);
-    if (after.proxy !== target || !after.funnelEnabled) {
-      throw new IngressError(
-        'INGRESS_COMMAND_FAILED',
-        `tailscale accepted the command but ${prefix} is not published (proxy=${after.proxy ?? 'none'}, funnel=${String(after.funnelEnabled)})`,
-        this.id
-      );
+    let after: TailscaleFunnelMapping | undefined;
+    let verifyError: unknown;
+    try {
+      after = await this.mapping(node.dnsName, prefix);
+    } catch (error) {
+      verifyError = error;
     }
-    return this.exposure(request.surfaceId, node.dnsName, prefix, port);
+    if (after && sameIngressTarget(after.proxy, target) && after.funnelEnabled) {
+      return this.exposure(request.surfaceId, node.dnsName, prefix, port);
+    }
+    // Post-check failed. Roll back only a mapping this run created and that
+    // still (or possibly still) forwards to our own target.
+    const createdByThisRun = issued && !before.proxy;
+    const rollbackSafe = !after || sameIngressTarget(after.proxy, target);
+    let rollback = 'not attempted';
+    if (createdByThisRun && rollbackSafe) {
+      const undo = await this.run(buildTailscaleFunnelDownArgs(prefix));
+      rollback = undo.status === 0 ? 'rolled back' : `rollback failed: ${commandDetail(undo)}`;
+    }
+    const observed = after
+      ? `proxy=${after.proxy ?? 'none'}, funnel=${String(after.funnelEnabled)}`
+      : `verification failed: ${verifyError instanceof Error ? verifyError.message : String(verifyError)}`;
+    throw new IngressError(
+      'INGRESS_COMMAND_FAILED',
+      `tailscale accepted the command but ${prefix} is not published (${observed}); ${rollback}`,
+      this.id
+    );
   }
 
   async down(request: IngressTargetRequest): Promise<void> {
     const prefix = normalizeIngressPathPrefix(request.pathPrefix ?? request.exposure?.path_prefix);
-    const status = await this.nodeStatus();
-    if (status.node?.dnsName) {
-      const current = await this.mapping(status.node.dnsName, prefix);
-      if (!current.proxy) return;
-      if (
-        request.exposure &&
-        current.localPort !== undefined &&
-        current.localPort !== request.exposure.local_port
-      ) {
-        throw new IngressError(
-          'INGRESS_COMMAND_FAILED',
-          `path ${prefix} now proxies to ${current.proxy}, not this surface; leaving it in place`,
-          this.id
-        );
-      }
-    }
-    const result = await this.run(buildTailscaleFunnelDownArgs(prefix));
-    if (result.status !== 0) {
+    const target = ingressLoopbackTarget(ingressRequestPort(request), prefix);
+    const node = await this.inspectableNode();
+    const current = await this.mapping(node.dnsName, prefix);
+    if (!current.proxy) return;
+    if (!sameIngressTarget(current.proxy, target)) {
       throw new IngressError(
         'INGRESS_COMMAND_FAILED',
-        `tailscale funnel off failed: ${commandDetail(result)}`,
+        `path ${prefix} proxies to ${current.proxy}, not this surface (${target}); leaving it in place`,
         this.id
       );
     }
+    const result = await this.run(buildTailscaleFunnelDownArgs(prefix));
+    if (result.status !== 0) throw this.commandFailure('tailscale funnel off', result);
   }
 
   async status(request: IngressTargetRequest): Promise<IngressExposure | undefined> {
     const prefix = normalizeIngressPathPrefix(request.pathPrefix ?? request.exposure?.path_prefix);
-    const status = await this.nodeStatus();
-    if (!status.node?.dnsName) return undefined;
-    const current = await this.mapping(status.node.dnsName, prefix);
-    if (!current.proxy || !current.funnelEnabled || current.localPort === undefined) {
+    const port = ingressRequestPort(request);
+    const node = await this.inspectableNode();
+    const current = await this.mapping(node.dnsName, prefix);
+    if (
+      !current.funnelEnabled ||
+      !sameIngressTarget(current.proxy, ingressLoopbackTarget(port, prefix))
+    ) {
       return undefined;
     }
     return this.exposure(
       request.surfaceId,
-      status.node.dnsName,
+      node.dnsName,
       prefix,
-      current.localPort,
+      port,
       request.exposure?.started_at ?? ''
     );
   }
