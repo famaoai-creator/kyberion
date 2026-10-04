@@ -6,6 +6,28 @@ const mocks = vi.hoisted(() => ({
   runReasoningSetup: vi.fn(),
   collectDoctorReport: vi.fn(),
   buildVitalReport: vi.fn(),
+  probeSurfaceHealth: vi.fn(async () => ({ status: 'healthy', detail: 'http_200' })),
+}));
+
+vi.mock('@agent/core/surface/surface-runtime', () => ({
+  loadSurfaceManifest: () => ({
+    version: 1,
+    surfaces: [
+      ['concierge', 3038],
+      ['chronos-mirror-v2', 3000],
+      ['presence-studio', 3031],
+      ['voice-hub', 3032],
+      ['slack-bridge', 3033],
+    ].map(([id, port]) => ({
+      id,
+      port,
+      kind: 'ui',
+      description: 'fixture',
+      command: 'node',
+      enabled: true,
+    })),
+  }),
+  probeSurfaceHealth: mocks.probeSurfaceHealth,
 }));
 
 vi.mock('../scripts/surface_runtime.js', () => ({
@@ -76,13 +98,27 @@ describe('setup report', () => {
     expect(report.reasoning).toEqual({ must: 0, should: 1, nice: 2 });
     expect(report.doctor.totalMissing).toBe(3);
     expect(report.services.summary.authMissing).toBe(0);
-    expect(report.recommendedSurfaces).toHaveLength(3);
+    expect(report.recommendedSurfaces.map((surface) => surface.id)).toEqual([
+      'concierge',
+      'chronos',
+      'voice-first-win',
+      'messaging',
+    ]);
   });
 
-  it('compresses first-time-user setup output into concise next steps', async () => {
+  it.each([undefined, false, true])('uses one first-use step (quiet=%s)', async (quiet) => {
     mocks.setupSurfaces.mockResolvedValue({
       status: 'ok',
       rows: [
+        {
+          surface: 'concierge',
+          enabled: 'enabled',
+          auth: 'n/a',
+          strategy: 'host-managed',
+          secrets: '',
+          cli: '',
+          hint: 'Managed UI fixture',
+        },
         {
           surface: 'chronos-mirror-v2',
           enabled: 'enabled',
@@ -156,7 +192,7 @@ describe('setup report', () => {
     });
 
     const { runSetupReportWithPersona } = await import('../scripts/setup_report.js');
-    const report = await runSetupReportWithPersona({ persona: 'first-time-user' });
+    const report = await runSetupReportWithPersona({ persona: 'first-time-user', quiet });
 
     expect(mocks.setupSurfaces).toHaveBeenCalledWith({ quiet: true });
     expect(mocks.setupServices).toHaveBeenCalledWith({ quiet: true });
@@ -164,38 +200,45 @@ describe('setup report', () => {
     expect(report.surfaces.summary.missing).toBe(1);
     expect(report.services.summary.authMissing).toBe(1);
     expect(report.doctor.totalMissing).toBe(2);
-    expect(report.recommendedSurfaces).toHaveLength(3);
+    expect(report.recommendedSurfaces.map((surface) => surface.id)).toEqual([
+      'concierge',
+      'chronos',
+      'voice-first-win',
+      'messaging',
+    ]);
     expect(report.recommendedSurfaces[0]).toMatchObject({
-      title: 'Chronos control surface',
-      readiness: 'ready',
-      suggestedCommand: 'pnpm chronos:dev',
+      id: 'concierge',
+      readiness: 'needs_setup',
+      optional: false,
+      suggestedCommand: 'pnpm onboarding',
     });
     expect(report.recommendedSurfaces[1]).toMatchObject({
-      title: 'Presence Studio + voice path',
+      id: 'chronos',
       readiness: 'ready',
-      suggestedCommand: 'pnpm pipeline --input pipelines/voice-hello.json',
+      openUrl: 'http://127.0.0.1:3000',
     });
     expect(report.recommendedSurfaces[2]).toMatchObject({
-      title: 'Slack thread surface',
+      id: 'voice-first-win',
+      readiness: 'unverified',
+      optional: true,
+      suggestedCommand: 'pnpm kyberion doctor --runtime voice',
+    });
+    expect(report.recommendedSurfaces[3]).toMatchObject({
+      id: 'messaging',
       readiness: 'needs_setup',
+      optional: true,
       suggestedCommand: 'pnpm surfaces setup',
     });
-    expect(report.nextActions).toHaveLength(4);
-    expect(report.nextActions[0]).toMatchObject({
-      title: 'Complete identity and onboarding profile',
-      suggested_command: 'pnpm onboarding',
+    expect(mocks.probeSurfaceHealth).toHaveBeenCalledTimes(5);
+    expect(report.surfaceHealth.concierge).toMatchObject({
+      status: 'healthy',
+      detail: 'http_200',
     });
-    expect(report.nextActions[1]).toMatchObject({
-      title: 'Reconcile surface readiness',
-      suggested_command: 'pnpm surfaces reconcile',
-    });
-    expect(report.nextActions[2]).toMatchObject({
-      title: 'Repair service setup',
-      suggested_command: 'pnpm service:setup',
-    });
-    expect(report.nextActions[3]).toMatchObject({
-      title: 'Bootstrap kyberion-runtime-baseline',
-      suggested_command: 'pnpm env:bootstrap --manifest kyberion-runtime-baseline --apply',
-    });
+    expect(report.nextActions).toEqual([
+      expect.objectContaining({
+        title: 'Complete identity and onboarding profile',
+        suggested_command: 'pnpm onboarding',
+      }),
+    ]);
   });
 });
