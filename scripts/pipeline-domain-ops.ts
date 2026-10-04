@@ -40,6 +40,9 @@ import { runRegisterAvatar } from './register_avatar.js';
 import { runOAuthSetupForService } from './setup_oauth.js';
 import { runOrganizationDigest } from '@agent/core/organization/organization-digest';
 import { persistOrganizationDigest } from '@agent/core/organization/organization-digest-artifacts';
+import { runOrganizationOperationTick } from '@agent/core/organization/organization-cadence';
+import { runOrganizationStandup } from '@agent/core/organization/organization-standup';
+import { runOrganizationRetro } from '@agent/core/organization/organization-retro';
 import { runAccountabilityDigest } from '@agent/core/governance/accountability-digest';
 import { normalizeLocale } from '@agent/core/locale-normalize';
 import {
@@ -835,6 +838,102 @@ export function runInlineOrganizationDigest(
       ? { persisted: persistOrganizationDigest(result.digest) }
       : {};
   return exportValue(params, step, { ...result.digest, text: result.text, ...persisted }, ctx);
+}
+
+function cadenceLocale(
+  op: string,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): ReturnType<typeof normalizeLocale> {
+  const rawLocale = String(resolveVars(params.locale ?? '', ctx)).trim();
+  const locale = rawLocale ? normalizeLocale(rawLocale) : null;
+  if (rawLocale && !locale) throw new Error(`core:${op}: unsupported locale ${rawLocale}`);
+  return locale;
+}
+
+function cadenceNumber(value: unknown, ctx: Record<string, unknown>): number | undefined {
+  const parsed = Number(resolveVars(value ?? '', ctx));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+/**
+ * core:organization_operation_tick — sovereign-only sweep that runs every due
+ * scheduled organization operation (and recovers interrupted runs) across
+ * tenants. `apply: false` reports what is due without running it.
+ */
+export async function runInlineOrganizationOperationTick(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const apply = resolveVars(params.apply ?? false, ctx) === true;
+  const { executeScheduledOrganizationOperation } =
+    await import('./organization_operation_execute.js');
+  const report = await runOrganizationOperationTick(
+    { apply },
+    { executeOperation: executeScheduledOrganizationOperation }
+  );
+  const result = exportValue(params, step, { ...report }, ctx);
+  if (report.failures.length > 0) {
+    throw new Error(
+      `core:organization_operation_tick: ${report.failures.length} operation run(s) failed: ${report.failures.join('; ')}`
+    );
+  }
+  return result;
+}
+
+/** core:organization_standup — sovereign-only standup per organization (filed + notified). */
+export function runInlineOrganizationStandup(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Record<string, unknown> {
+  const timezone = String(resolveVars(params.timezone ?? '', ctx)).trim() || undefined;
+  const locale = cadenceLocale('organization_standup', params, ctx);
+  const result = runOrganizationStandup({
+    ...(timezone ? { timezone } : {}),
+    ...(locale ? { locale } : {}),
+    sinceHours: cadenceNumber(params.since_hours, ctx),
+    persist: resolveVars(params.persist ?? true, ctx) !== false,
+  });
+  return exportValue(
+    params,
+    step,
+    {
+      organization_count: result.organization_count,
+      reported_count: result.reported_count,
+      text: result.text,
+      persisted: result.standups.flatMap((entry) => (entry.persistence ? [entry.persistence] : [])),
+    },
+    ctx
+  );
+}
+
+/** core:organization_retro — sovereign-only weekly retro per organization (filed + notified). */
+export function runInlineOrganizationRetro(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Record<string, unknown> {
+  const timezone = String(resolveVars(params.timezone ?? '', ctx)).trim() || undefined;
+  const locale = cadenceLocale('organization_retro', params, ctx);
+  const result = runOrganizationRetro({
+    ...(timezone ? { timezone } : {}),
+    ...(locale ? { locale } : {}),
+    sinceDays: cadenceNumber(params.since_days, ctx),
+    persist: resolveVars(params.persist ?? true, ctx) !== false,
+  });
+  return exportValue(
+    params,
+    step,
+    {
+      organization_count: result.organization_count,
+      reported_count: result.reported_count,
+      text: result.text,
+      persisted: result.retros.flatMap((entry) => (entry.persistence ? [entry.persistence] : [])),
+    },
+    ctx
+  );
 }
 
 /**
