@@ -92,6 +92,7 @@ export class BackchannelPolicy {
   /** Rotate through the pack's agent backchannels so reactions vary. */
   pickPhrase(pack: LanguagePack): string {
     const phrases = pack.agentBackchannels;
+    // i18n-exempt: JA fallback reaction — only used when the pack has no phrases
     if (phrases.length === 0) return pack.usesWordSpaces ? 'okay' : 'うん';
     const phrase = phrases[this.phraseCursor % phrases.length];
     this.phraseCursor += 1;

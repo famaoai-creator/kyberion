@@ -68,7 +68,8 @@
       "少し待って"
     ],
     "agent_backchannels": ["うん", "うんうん", "はい", "なるほど", "そうそう", "へえ"],
-    "uses_word_spaces": false
+    "uses_word_spaces": false,
+    "question_endings": ["ますか", "ですか", "かな", "かい", "か"]
   },
   "en": {
     "continuation_particles": ["and", "but", "so", "because", "or", "the", "a", "to", "with"],
@@ -134,6 +135,7 @@
       "just a moment"
     ],
     "agent_backchannels": ["yeah", "uh-huh", "right", "I see", "okay", "got it"],
-    "uses_word_spaces": true
+    "uses_word_spaces": true,
+    "question_endings": []
   }
 }

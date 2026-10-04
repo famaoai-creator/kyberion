@@ -318,6 +318,7 @@ export class ConversationEngine {
    */
   pickReaction(contextText = ''): string {
     const pack = this.packFor(contextText || this.lastPartial);
+    // i18n-exempt: JA fallback reaction — only used when the pack has no phrases
     const fallback = pack?.usesWordSpaces === false ? 'うん' : 'okay';
     if (!pack) return fallback;
     return this.backchannelPolicy?.pickPhrase(pack) ?? pack.agentBackchannels[0] ?? fallback;

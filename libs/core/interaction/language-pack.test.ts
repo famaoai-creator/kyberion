@@ -8,6 +8,8 @@ import {
 
 const lexicon = {
   ja: {
+    uses_word_spaces: false,
+    question_endings: ['か'],
     continuation_particles: ['けど'],
     eot_fillers: ['えーと'],
     commit_endings: ['です'],
@@ -18,6 +20,7 @@ const lexicon = {
     agent_backchannels: ['うん', 'はい'],
   },
   en: {
+    uses_word_spaces: true,
     continuation_particles: ['and'],
     eot_fillers: ['um'],
     commit_endings: [],
@@ -55,7 +58,7 @@ describe('language packs', () => {
   it('a new language is a data-only addition', () => {
     const packs = languagePacksFromLexicon({
       ...lexicon,
-      ko: { agent_backchannels: ['네'], barge_in_backchannels: ['네'] },
+      ko: { uses_word_spaces: true, agent_backchannels: ['네'], barge_in_backchannels: ['네'] },
     });
     const ko = packs.find((p) => p.id === 'ko');
     expect(ko?.agentBackchannels).toEqual(['네']);
