@@ -3,7 +3,7 @@ title: Runtime Storage Layout
 category: Architecture
 tags: [storage, artifacts, workspace, tmp, cache, staging, tier, multi-tenant, retention]
 importance: 8
-last_updated: 2026-10-03
+last_updated: 2026-10-04
 runtime_stages: [alignment, execution, review]
 ---
 
@@ -131,6 +131,25 @@ deliverable since promoted to its project) never matches its old owner. The
 storage janitor compacts the file to the latest row per artifact **and owner**,
 so offboarding still sees every scope that ever owned an artifact.
 
+### Dot state domain
+
+Resident-dot loop state is **state** (durable, per retention-catalog entry) under
+one domain, `active/shared/runtime/dot/`, and is addressed only through
+`dotStatePath(charter, ...parts)` (`libs/core/dot/dot-state-paths.ts`):
+
+| Dot scope  | Place                                                                                             |
+| ---------- | ------------------------------------------------------------------------------------------------- |
+| untenanted | `active/shared/runtime/dot/<file>` (`work-results.jsonl`, `kr-ledger.jsonl`, `outcomes.jsonl`, …) |
+| tenant     | `active/shared/runtime/dot/tenants/<slug>/…` via `physicalScopedPath` (+ organization segment)    |
+
+Tenant prose (memory, follow-up reasons, inbound event bodies, work results)
+never goes in a system-floor file; the tenant-scoped inbound events ledger
+lives under the tenant namespace. The older flat dot ledgers directly under
+`active/shared/runtime/` (wake, action, inbox) stay shared and carry
+category-only text for tenant dots. One `storage-retention-catalog.json` entry
+covers `active/shared/runtime/dot`. See
+[resident-dot-model](./resident-dot-model.md).
+
 ## 3. Surface visibility
 
 Surfaces (Chronos deliverable inbox, mission-asset preview) list
@@ -178,7 +197,11 @@ the mission state `context.mission_artifact_promotion`.
 a published report in that organization's own scope
 (`…/<org>/artifacts/report/digests/<YYYY-MM-DD>.json`). The cross-tenant digest
 itself is never stored as one file, so a tenant viewer only sees its own
-organizations' digests.
+organizations' digests. The standup and retro cadences (`core:organization_standup` /
+`core:organization_retro`) file under `…/report/standups/` and
+`…/report/retros/` the same way, their notifications land in the sovereign
+operator inbox like the daily digest, and the pipeline context and trace carry
+only counts and artifact paths — never the joined all-tenant text.
 
 ## 4. Migration status
 

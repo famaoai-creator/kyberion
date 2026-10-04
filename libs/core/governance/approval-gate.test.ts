@@ -619,6 +619,39 @@ describe('enforceApprovalGate', () => {
     );
   });
 
+  it.each([
+    {
+      matchedRuleId: 'ordinary-policy',
+      mandatoryApproval: true,
+      missingRequirements: ['approval_confirmation'],
+    },
+    {
+      matchedRuleId: 'injection-suspected-override',
+      mandatoryApproval: true,
+      missingRequirements: ['approval_confirmation'],
+    },
+    { matchedRuleId: 'secret-policy', missingRequirements: ['dual_key_confirmation'] },
+    { matchedRuleId: 'fallback-dangerous-shell', missingRequirements: ['approval_confirmation'] },
+  ])('decision rights cannot waive hardened policy $matchedRuleId', (policy) => {
+    mockResolvePolicy.mockReturnValue({ requiresApproval: true, ...policy });
+    mockResolveDecisionRightsMatrix.mockReturnValue(null);
+    mockEvaluateDecisionRights.mockReturnValue({
+      decisionType: 'operational_spend',
+      authorizedRole: 'finance_controller',
+      thresholdMetric: 'amount_jpy',
+      thresholdValue: 500000,
+      requiresEscalation: false,
+      escalationReason: null,
+    });
+    mockListRequests.mockReturnValue([]);
+
+    const result = enforceApprovalGate({ ...baseParams, hasHuman: false });
+
+    expect(result.allowed).toBe(false);
+    expect(result.message).toContain('[HUMAN_REQUIRED]');
+    expect(mockLookupSessionCache).not.toHaveBeenCalled();
+  });
+
   describe('session action cache (KC-03)', () => {
     const descriptor = { action: 'secret:set', targetClass: 'service:github' };
     const cacheEntry = {
@@ -710,6 +743,31 @@ describe('enforceApprovalGate', () => {
       expect(mockLookupSessionCache).not.toHaveBeenCalled();
       expect(mockCreateRequest).toHaveBeenCalledTimes(1);
     });
+
+    it.each(['ordinary-policy', 'strict-posture-floor'])(
+      'a session grant cannot waive strict posture with base rule %s',
+      (matchedRuleId) => {
+        mockResolvePolicy.mockReturnValue({
+          requiresApproval: true,
+          missingRequirements: ['approval_confirmation'],
+          matchedRuleId,
+          mandatoryApproval: true,
+        });
+        mockLookupSessionCache.mockReturnValueOnce(
+          cacheEntry as NonNullable<ReturnType<typeof lookupSessionApprovalCache>>
+        );
+        mockCreateRequest.mockReturnValue({
+          id: 'req-strict',
+          status: 'pending',
+        } as ApprovalRequestRecord);
+
+        const result = enforceApprovalGate({ ...baseParams, actionDescriptor: descriptor });
+
+        expect(result.allowed).toBe(false);
+        expect(mockLookupSessionCache).not.toHaveBeenCalled();
+        expect(mockCreateRequest).toHaveBeenCalledTimes(1);
+      }
+    );
 
     it('bypasses the cache when the policy requires dual-key confirmation', () => {
       mockResolvePolicy.mockReturnValue({
