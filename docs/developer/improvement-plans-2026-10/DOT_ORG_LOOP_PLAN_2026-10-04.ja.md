@@ -2,6 +2,7 @@
 title: 'Resident dot 自律組織ループ計画 (DL-01〜11)'
 tags: [dots, autonomy, organization, plan]
 last_updated: 2026-10-04
+status: active
 ---
 
 # Resident dot 自律組織ループ計画 (DL-01〜11)

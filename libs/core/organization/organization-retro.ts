@@ -208,7 +208,7 @@ export function renderOrganizationRetroText(
   const more = (count: number) => tr('organization_cadence_more', { count });
   const header = tr('organization_retro_header', {
     name: organizationName,
-    since: new Intl.DateTimeFormat(locale === 'ja' ? 'ja-JP' : 'en-US', {
+    since: new Intl.DateTimeFormat(localeToBcp47(locale), {
       timeZone: retro.timezone,
       month: 'numeric',
       day: 'numeric',
