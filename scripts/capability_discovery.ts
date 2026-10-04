@@ -8,7 +8,7 @@ import {
 import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
 import { createBinaryAvailability } from '#binary-availability';
 import { evaluateCapabilityContract } from '#capability-discovery-contract';
-import { scanActuatorManifests } from './capability-discovery-manifest-scan.mjs';
+import { scanActuatorManifests } from '#capability-discovery-manifest-scan';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,

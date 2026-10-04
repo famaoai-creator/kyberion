@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { compileBuildFreeSchema } from '#ajv-build-free';
 import { createBinaryAvailability } from '#binary-availability';
 import { evaluateCapabilityContract } from '#capability-discovery-contract';
-import { scanActuatorManifests } from './capability-discovery-manifest-scan.mjs';
+import { scanActuatorManifests } from '#capability-discovery-manifest-scan';
 import { assertSafeRepositoryPath } from '#repository-path-boundary';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
