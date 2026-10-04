@@ -41,6 +41,7 @@ import { withExecutionContext, withExecutionContextAsync } from '@agent/core/aut
 import { createTriggerRunner, resolveCurrentTriggerAuthority } from '@agent/core/trigger-runner';
 import {
   listDotCharters,
+  type DotCharter,
   type DotCharterLoadError,
   type LoadedDotCharter,
 } from '@agent/core/dot/dot-charter';
@@ -54,6 +55,7 @@ import {
   type DueDotTrigger,
 } from '@agent/core/dot/dot-runtime';
 import { evaluateDotCronCatchUp, evaluateDotFollowupsDue } from '@agent/core/dot/dot-followups';
+import { evaluateDotEventTriggers } from '@agent/core/dot/dot-event-intake';
 import {
   installReasoningBackends,
   reselectReasoningBackends,
@@ -62,6 +64,7 @@ import { runDotSupervisorExtensions } from './dot_supervisor_extensions.js';
 import { executeServicePreset } from '@agent/core/service/service-engine';
 import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
 import { runDotHousekeeping } from '@agent/core/dot/dot-dispatch';
+import { dotBudgetThrottle, type DotBudgetThrottle } from '@agent/core/dot/dot-budget';
 import { tickVetoWindows } from '@agent/core/governance/approval-veto-window';
 import { AUTONOMY_APPROVAL_CHANNEL } from '@agent/core/governance/approval-decision-card';
 import { isRecord } from '@agent/core/foundation/text';
@@ -288,6 +291,8 @@ export interface DotSweepDeps {
   wake?: (loaded: LoadedDotCharter, deps: { trigger: DueDotTrigger }) => Promise<DotWakeReceipt>;
   /** Backend reselect port; defaults to reselectReasoningBackends. */
   reselectBackends?: () => void;
+  /** Org budget throttle port; defaults to dotBudgetThrottle (DL-07). */
+  budgetThrottle?: (charter: DotCharter) => DotBudgetThrottle;
 }
 
 /** Heartbeat details for the daemon: charter load errors and code-stamp drift. */
@@ -409,6 +414,26 @@ export async function runDotSweepOnce(
         });
         continue;
       }
+      // DL-07: a scope at the hard org budget limit gets no wakes (housekeeping
+      // above still ran; the executor step skips it too). Fails open.
+      let budgetThrottle: DotBudgetThrottle = 'normal';
+      try {
+        budgetThrottle = (
+          deps.budgetThrottle ??
+          ((charter: DotCharter) => dotBudgetThrottle(charter, { now: () => now }).throttle)
+        )(loaded.charter);
+      } catch (error) {
+        logger.warn(
+          `[dot-sweep] budget evaluation failed for ${loaded.charter.dot_id} — ${error instanceof Error ? error.message : error} | next: wakes proceed; check spend-policy.json org_budget | evidence: libs/core/governance/org-budget-governor.ts`
+        );
+      }
+      if (budgetThrottle === 'hard') {
+        recordDaemonHeartbeat(loaded.charter.runtime.heartbeat_id, {
+          status: 'running',
+          details: { dot_id: loaded.charter.dot_id, trigger: 'budget-hard' },
+        });
+        continue;
+      }
       let due: DueDotTrigger[];
       try {
         due = evaluateDotTriggersDue(loaded.charter, { now: () => now });
@@ -428,6 +453,7 @@ export async function runDotSweepOnce(
           evaluateDotFollowupsDue(loaded.charter, { now: () => now }),
           evaluateDotCronCatchUp(loaded.charter, { now: () => now })
         );
+        due = due.concat(evaluateDotEventTriggers(loaded.charter, { now: () => now }));
         // Re-applied over the concatenated list: one half-open probe at most.
         due = applyDotWakeCircuit(loaded.charter, due, { now: () => now });
       } catch (error) {
