@@ -55,8 +55,10 @@ pnpm onboarding
 # または（非対話）
 pnpm onboarding apply --identity <reviewed-identity-json> --dry-run
 pnpm onboarding apply --identity <reviewed-identity-json>
-export KYBERION_PERSONA=sovereign   # .env.local は自動では読み込まれない
 ```
+
+オンボーディングのコマンドは persona なしで動く。`pnpm organization` の書き込み（Step 10）だけは
+`export KYBERION_PERSONA=sovereign` が要る（`.env.local` は自動では読み込まれない）。
 
 GUI では concierge（`http://127.0.0.1:3050`）の `/settings` から保存できる。メンバーと承認者も
 ここで登録する。この段階では外部効果や mission を開始しない。

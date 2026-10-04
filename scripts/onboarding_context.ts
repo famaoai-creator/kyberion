@@ -10,6 +10,7 @@ import {
 } from '@agent/core/organization/onboarding-context';
 import * as customerResolver from '@agent/core/customer-resolver';
 import type { OrganizationTier } from '@agent/core/organization/organization-operating-model';
+import { withExecutionContext } from '@agent/core/authority';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
@@ -188,7 +189,10 @@ export const runOnboardingContext = defineScript({
   flags: [],
   run: ({ argv, print }) => {
     try {
-      run(argv, print);
+      // Binding and first-work read the tenant registry (personal tier) and
+      // write tenant-scoped organization state: the governed onboarding
+      // authority `pnpm tenant` assumes, so no exported persona is needed.
+      withExecutionContext('sovereign_concierge', () => run(argv, print));
     } catch (error) {
       print(
         JSON.stringify(
