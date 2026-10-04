@@ -75,19 +75,25 @@ vi.mock('@agent/core/virtual/computer-surface', () => ({ emitComputerSurfacePatc
 vi.mock('@agent/core/platform-command-adapters', () => ({
   resolveShellAdapter: vi.fn(() => ({ shell: '/bin/bash', args: ['-lc'] })),
 }));
-vi.mock('@agent/core/path-resolver', () => ({
-  rootDir: vi.fn(() => '/tmp/terminal-actuator-test'),
-  rootResolve: vi.fn((value: string) => value),
-  knowledge: vi.fn((value: string) => `/tmp/terminal-actuator-test/knowledge/${value}`),
-  pathResolver: {
+vi.mock('@agent/core/path-resolver', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/path-resolver')>();
+  return {
+    ...actual,
     rootDir: vi.fn(() => '/tmp/terminal-actuator-test'),
-    rootResolve: vi.fn((value: string) => value),
-    shared: vi.fn((value = '') => `/tmp/terminal-actuator-test/active/shared/${value}`),
-    sharedTmp: vi.fn((value = '') => `/tmp/terminal-actuator-test/active/shared/tmp/${value}`),
-    knowledge: vi.fn((value: string) => `/tmp/terminal-actuator-test/knowledge/${value}`),
     resolve: vi.fn((value: string) => value),
-  },
-}));
+    rootResolve: vi.fn((value: string) => value),
+    knowledge: vi.fn((value: string) => `/tmp/terminal-actuator-test/knowledge/${value}`),
+    pathResolver: {
+      ...actual.pathResolver,
+      rootDir: vi.fn(() => '/tmp/terminal-actuator-test'),
+      rootResolve: vi.fn((value: string) => value),
+      shared: vi.fn((value = '') => `/tmp/terminal-actuator-test/active/shared/${value}`),
+      sharedTmp: vi.fn((value = '') => `/tmp/terminal-actuator-test/active/shared/tmp/${value}`),
+      knowledge: vi.fn((value: string) => `/tmp/terminal-actuator-test/knowledge/${value}`),
+      resolve: vi.fn((value: string) => value),
+    },
+  };
+});
 vi.mock('@agent/core/recovery-policy', () => ({
   createGovernedRetryOptionsBuilder:
     (input: { defaults: Record<string, unknown> }) => (override?: Record<string, unknown>) => ({
