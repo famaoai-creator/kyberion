@@ -50,8 +50,18 @@ export interface DotPreGateCheck {
 }
 
 /**
+ * Marker a relaxer sets to claim the single policy-listed exception to the
+ * clamp: an L4 dot's notify → auto for an `autonomy.relaxable_actions` action.
+ * dot-dispatch re-checks the policy side itself (see
+ * `dotNotifyToAutoExceptionApplies`); the marker alone never lowers anything.
+ */
+export const DOT_L4_NOTIFY_TO_AUTO_EXCEPTION = 'l4_notify_to_auto' as const;
+
+/**
  * May lower the LEARNED floor only. dot-dispatch clamps the result so it is
- * never below the policy gate's own decision or the charter default.
+ * never below the policy gate's own decision or the charter default — except
+ * the one {@link DOT_L4_NOTIFY_TO_AUTO_EXCEPTION}, which dispatch re-verifies.
+ * Relaxers are consulted when a learned floor exists or the gate says notify.
  */
 export interface DotDecisionRelaxer {
   id: string;
@@ -59,9 +69,36 @@ export interface DotDecisionRelaxer {
     c: DotCharter,
     p: DotProposal,
     gate: AutonomousOpsGateResult,
-    floor: DotDecisionLevel,
+    floor: DotDecisionLevel | undefined,
     ctx: DotExtCtx
-  ): { decision: DotDecisionLevel; reason: string } | undefined;
+  ):
+    | {
+        decision: DotDecisionLevel;
+        reason: string;
+        exception?: typeof DOT_L4_NOTIFY_TO_AUTO_EXCEPTION;
+      }
+    | undefined;
+}
+
+/**
+ * Runs after the gate, before routing. Returning `shadow` records the proposal
+ * only: an action-ledger row with status `shadow`, no decision card, no
+ * notification, no WorkItem (L0 autonomy). The hook may write its own evidence
+ * (e.g. the autonomy shadow ledger) for the `action_ref` it is given. A
+ * throwing override is skipped, so the proposal is governed normally.
+ */
+export interface DotDispositionOverride {
+  id: string;
+  dispose(
+    c: DotCharter,
+    p: DotProposal,
+    info: {
+      action_ref: string;
+      gate: AutonomousOpsGateResult;
+      floor?: DotDecisionLevel;
+    },
+    ctx: DotExtCtx
+  ): { disposition: 'shadow'; reason: string } | undefined;
 }
 
 /**

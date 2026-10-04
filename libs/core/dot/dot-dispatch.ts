@@ -7,7 +7,11 @@
  *      `authority.max_concurrent_delegations` (open WorkItems + parked actions);
  *   2. decision — autonomous-ops-gate, raised (never lowered) to the strictest
  *      of the charter `decisions.default_decision`, the floor learned from
- *      operator rejections, and the dot's own requested decision;
+ *      operator rejections, and the dot's own requested decision. The single
+ *      exception is {@link dotNotifyToAutoExceptionApplies} (L4 notify → auto
+ *      for a policy `autonomy.relaxable_actions` action);
+ *   2b. disposition — a {@link DotDispositionOverride} may turn the proposal
+ *      into a record-only `shadow` row (L0: no card, no WorkItem);
  *   3. routing — `routeAutonomousDecision` (decision card, veto window,
  *      digest notice) delivered to the charter's route;
  *   4. outcome — proceed → WorkItem (or a handoff to another dot); parked →
@@ -29,6 +33,7 @@ import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { matchesCron, getZonedDateParts } from '../pipeline/cron-utils.js';
 import {
   evaluateAutonomousOpsAction,
+  getAutonomousOpsPolicy,
   type AutonomousOpsGateInput,
   type AutonomousOpsGateResult,
 } from '../governance/autonomous-ops-gate.js';
@@ -77,10 +82,15 @@ import { createLogger } from '../logger.js';
 import {
   DOT_DECISION_RELAXERS,
   DOT_DIGEST_SECTIONS,
+  DOT_DISPOSITION_OVERRIDES,
   DOT_FLOOR_CONTRIBUTORS,
   DOT_PRE_GATE_CHECKS,
 } from './dot-extension-registry.js';
-import type { DotExtCtx } from './dot-extensions.js';
+import {
+  DOT_L4_NOTIFY_TO_AUTO_EXCEPTION,
+  type DotDecisionRelaxer,
+  type DotExtCtx,
+} from './dot-extensions.js';
 
 const logger = createLogger('dot-dispatch');
 
@@ -127,11 +137,15 @@ export interface DotActionRecord {
   reason?: string;
   /** Set when the action was declined as `superseded` by another dot's approved action (DL-11). */
   superseded_by?: { dot_id: string; action_ref: string };
+  /** Disposition override that recorded this action as `shadow` only (L0). */
+  disposition_by?: string;
   /** Set when a pre-gate check forced an operator decision. */
   escalation?: {
     check_id: string;
     reason: string;
     link?: { action_ref: string; dot_id: string };
+    /** All linked conflicts when several escalations merged; only `link` is superseded on approve. */
+    links?: Array<{ action_ref: string; dot_id: string }>;
   };
   at: string;
 }
@@ -160,6 +174,8 @@ export interface DotDispatchDeps {
   /** Mark a pending request expired in the approval store; returns the updated record. */
   expireApproval?: (record: ApprovalRequestRecord) => ApprovalRequestRecord;
   feedback?: Omit<DotFeedbackDeps, 'rootDir' | 'now'>;
+  /** Policy `autonomy.relaxable_actions`; defaults to the autonomous-ops policy. */
+  relaxableActions?: readonly string[];
 }
 
 export function dotActorId(dotId: string): string {
@@ -465,11 +481,12 @@ export function evaluateDotProposalGate(
   let relaxedBy: string | undefined;
   // Relaxers may only lower what the learned floor added: the result is
   // clamped to the policy gate's own decision (without the learned floor) and
-  // to the charter default / hard floor.
-  if (floor && learned && DOT_DECISION_RELAXERS.length > 0) {
+  // to the charter default / hard floor. The one exception is the policy-listed
+  // L4 notify → auto, re-verified here by dotNotifyToAutoExceptionApplies.
+  if (DOT_DECISION_RELAXERS.length > 0 && ((floor && learned) || gate.decision === 'notify')) {
     let policyGate: AutonomousOpsGateResult | undefined;
     for (const relaxer of DOT_DECISION_RELAXERS) {
-      let relaxed: { decision: DotDecisionLevel; reason: string } | undefined;
+      let relaxed: ReturnType<DotDecisionRelaxer['relax']>;
       try {
         relaxed = relaxer.relax(charter, proposal, gate, floor, ctx);
       } catch (error) {
@@ -478,8 +495,29 @@ export function evaluateDotProposalGate(
       }
       if (!relaxed) continue;
       policyGate ??= runGate(hardFloor);
-      const clamped = strictest(relaxed.decision, policyGate.decision, hardFloor) ?? floor;
-      if (DECISION_RANK[clamped] < DECISION_RANK[floor]) {
+      const relaxableActions = deps.relaxableActions ?? policyRelaxableActions();
+      if (
+        dotNotifyToAutoExceptionApplies({
+          proposal,
+          relaxed,
+          policyGate,
+          hardFloor,
+          relaxableActions,
+        })
+      ) {
+        floor = 'auto';
+        gate = {
+          ...policyGate,
+          decision: 'auto',
+          allowed: true,
+          vetoWindowMinutes: undefined,
+          reason: `${policyGate.reason}; ${DOT_L4_NOTIFY_TO_AUTO_EXCEPTION} by ${relaxer.id}: ${relaxed.reason}`,
+        };
+        relaxedBy = relaxer.id;
+        break;
+      }
+      const clamped = strictest(relaxed.decision, policyGate.decision, hardFloor) ?? gate.decision;
+      if (DECISION_RANK[clamped] < DECISION_RANK[gate.decision]) {
         floor = clamped;
         gate = runGate(floor);
         gate = { ...gate, reason: `${gate.reason}; relaxed by ${relaxer.id}: ${relaxed.reason}` };
@@ -488,20 +526,83 @@ export function evaluateDotProposalGate(
       break;
     }
   }
-  // The charter may lengthen a veto window, never shorten the policy's.
+  // The charter may lengthen a veto window, never shorten the policy's (an
+  // auto decision has no veto window to lengthen).
   const charterVeto = charter.decisions?.veto_window_minutes;
   const vetoWindowMinutes =
-    charterVeto !== undefined
-      ? Math.max(charterVeto, gate.vetoWindowMinutes ?? 0)
-      : gate.vetoWindowMinutes;
+    gate.decision === 'auto'
+      ? undefined
+      : charterVeto !== undefined
+        ? Math.max(charterVeto, gate.vetoWindowMinutes ?? 0)
+        : gate.vetoWindowMinutes;
+  const { vetoWindowMinutes: _veto, ...gateRest } = gate;
   return {
     gate: {
-      ...gate,
+      ...gateRest,
       ...(vetoWindowMinutes !== undefined ? { vetoWindowMinutes } : {}),
     },
     ...(floor ? { floor } : {}),
     ...(relaxedBy ? { relaxed_by: relaxedBy } : {}),
   };
+}
+
+/**
+ * Policy `autonomy.relaxable_actions`, read straight from the policy (not via
+ * dot-autonomy, which imports this module). Fails closed: no section, no
+ * exception.
+ */
+function policyRelaxableActions(): readonly string[] {
+  try {
+    const autonomy = (getAutonomousOpsPolicy() as { autonomy?: { relaxable_actions?: unknown } })
+      .autonomy;
+    const list = autonomy?.relaxable_actions;
+    return Array.isArray(list) ? list.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Gate escalations the L4 exception never undercuts. */
+const DOT_NON_RELAXABLE_ESCALATIONS = new Set([
+  'never_auto',
+  'high_risk_path',
+  'axis_max',
+  'budget',
+]);
+
+/**
+ * The single permitted decision below the policy gate (DL-10): a relaxer that
+ * claims {@link DOT_L4_NOTIFY_TO_AUTO_EXCEPTION} may turn `notify` into `auto`
+ * only when, on the policy side,
+ *   - the action is in policy `autonomy.relaxable_actions`;
+ *   - the policy gate (with the hard floor, without the learned floor) says
+ *     exactly `notify` — never `approve`;
+ *   - no hard floor (charter default, the dot's own request, floor
+ *     contributors such as budget) is `notify` or stricter;
+ *   - no never_auto / high-risk-path / axis-max / budget escalation, no
+ *     high-risk path match, the action is not a policy shadow, and its
+ *     reversibility axis is below 2.
+ * The relaxer owns the dot side (L4, learned floor released, outcome success).
+ */
+export function dotNotifyToAutoExceptionApplies(input: {
+  proposal: Pick<DotProposal, 'action_id'>;
+  relaxed: { decision: DotDecisionLevel; exception?: string };
+  policyGate: AutonomousOpsGateResult;
+  hardFloor: DotDecisionLevel | undefined;
+  relaxableActions: readonly string[];
+}): boolean {
+  const { proposal, relaxed, policyGate, hardFloor } = input;
+  if (relaxed.exception !== DOT_L4_NOTIFY_TO_AUTO_EXCEPTION || relaxed.decision !== 'auto') {
+    return false;
+  }
+  if (!input.relaxableActions.includes(proposal.action_id)) return false;
+  if (policyGate.decision !== 'notify' || policyGate.shadow) return false;
+  if (hardFloor && DECISION_RANK[hardFloor] >= DECISION_RANK.notify) return false;
+  if ((policyGate.escalations ?? []).some((rule) => DOT_NON_RELAXABLE_ESCALATIONS.has(rule))) {
+    return false;
+  }
+  if ((policyGate.highRiskPathMatches ?? []).length > 0) return false;
+  return (policyGate.axes?.reversibility ?? 3) < 2;
 }
 
 function dotDispatchExtCtx(deps: DotDispatchDeps): DotExtCtx {
@@ -514,6 +615,25 @@ function extensionFailure(kind: string, id: string, dotId: string, error: unknow
   );
 }
 
+/** First override that turns the proposal into a record-only shadow row; throwing ones are skipped. */
+function runDotDispositionOverrides(
+  charter: DotCharter,
+  proposal: DotProposal,
+  info: { action_ref: string; gate: AutonomousOpsGateResult; floor?: DotDecisionLevel },
+  deps: DotDispatchDeps
+): { id: string; reason: string } | undefined {
+  const ctx = dotDispatchExtCtx(deps);
+  for (const override of DOT_DISPOSITION_OVERRIDES) {
+    try {
+      const verdict = override.dispose(charter, proposal, info, ctx);
+      if (verdict?.disposition === 'shadow') return { id: override.id, reason: verdict.reason };
+    } catch (error) {
+      extensionFailure('disposition override', override.id, charter.dot_id, error);
+    }
+  }
+  return undefined;
+}
+
 type DotPreGateVerdict =
   | { ok: true }
   | { ok: false; reason: string; check_id: string }
@@ -523,6 +643,8 @@ type DotPreGateVerdict =
       card_context: string;
       check_id: string;
       link?: { action_ref: string; dot_id: string };
+      /** Every linked conflict when several escalations merged onto one card. */
+      links?: Array<{ action_ref: string; dot_id: string }>;
     };
 
 /**
@@ -547,6 +669,7 @@ function runDotPreGateChecks(
     }
     if (verdict.ok === false) return { ok: false, reason: verdict.reason, check_id: check.id };
     if (verdict.ok === 'escalate') {
+      const links = [...(escalation?.links ?? []), ...(verdict.link ? [verdict.link] : [])];
       escalation = escalation
         ? {
             ...escalation,
@@ -555,7 +678,12 @@ function runDotPreGateChecks(
             ...(escalation.link ? {} : verdict.link ? { link: verdict.link } : {}),
           }
         : { ...verdict, check_id: check.id };
+      if (links.length) escalation.links = links;
     }
+  }
+  if (escalation && (escalation.links?.length ?? 0) > 1 && escalation.link) {
+    // Approval settles the primary link only; say so on the card.
+    escalation.card_context = `${escalation.card_context}\nOn approve only ${escalation.link.action_ref} (${dotActorId(escalation.link.dot_id)}) is superseded; the other listed conflicts continue unless decided separately.`;
   }
   return escalation ?? { ok: true };
 }
@@ -708,11 +836,15 @@ export function dispatchDotProposals(
   for (const [index, proposal] of proposals.entries()) {
     const now = nowOf(deps);
     const hash = dotProposalHash(charter.dot_id, proposal);
-    // A declined proposal is not re-asked inside the window (no card spam).
+    // A declined proposal is not re-asked inside the window (no card spam);
+    // an override-shadowed one is not re-recorded (no digest spam).
     const recent = currentDotActions(charter.dot_id, deps).find(
       (row) =>
         row.proposal_hash === hash &&
-        (row.status === 'parked' || row.status === 'dispatched' || row.status === 'declined') &&
+        (row.status === 'parked' ||
+          row.status === 'dispatched' ||
+          row.status === 'declined' ||
+          (row.status === 'shadow' && Boolean(row.disposition_by))) &&
         now.getTime() - Date.parse(row.at) < DOT_PROPOSAL_DEDUPE_WINDOW_MS
     );
     if (recent) {
@@ -760,6 +892,38 @@ export function dispatchDotProposals(
         escalation ? { ...proposal, requested_decision: 'approve' } : proposal,
         deps
       );
+      const disposition = runDotDispositionOverrides(
+        charter,
+        proposal,
+        { action_ref: base.action_ref, gate, ...(floor ? { floor } : {}) },
+        deps
+      );
+      if (disposition) {
+        // Record only: no decision card, no notification, no WorkItem.
+        const reason = `${disposition.id}: ${disposition.reason}`;
+        recordAudit(
+          charter,
+          proposal.action_id,
+          'denied',
+          { action_ref: base.action_ref, shadow: true, reason },
+          deps
+        );
+        records.push(
+          appendActionRecord(
+            {
+              ...base,
+              status: 'shadow',
+              decision: gate.decision,
+              gate_decision: gate.decision,
+              ...(floor ? { floor } : {}),
+              disposition_by: disposition.id,
+              reason,
+            },
+            deps
+          )
+        );
+        continue;
+      }
       const question = `${charter.title} proposes: ${proposal.title} — ${proposal.objective.slice(0, 500)}`;
       const routed = (deps.route ?? routeAutonomousDecision)({
         role: GOVERNED_STORE_ROLE,
@@ -796,6 +960,7 @@ export function dispatchDotProposals(
                 check_id: escalation.check_id,
                 reason: escalation.reason,
                 ...(escalation.link ? { link: escalation.link } : {}),
+                ...((escalation.links?.length ?? 0) > 1 ? { links: escalation.links } : {}),
               },
             }
           : {}),
@@ -929,7 +1094,9 @@ export const DOT_SUPERSEDED_REASON = 'superseded';
  * Decline a parked action because another dot's approved action replaced it.
  * Unlike an operator rejection this records NO dot feedback, so it never
  * raises the dot's learned decision floor; its pending card is expired so the
- * operator is not asked twice. Returns undefined when the action is not parked.
+ * operator is not asked twice. Returns undefined when the action is not parked,
+ * or when its card was already approved (audited `supersede_skipped`; the
+ * operator's approval is never overturned silently).
  */
 export function supersedeDotParkedAction(
   charter: DotCharter,
@@ -947,6 +1114,22 @@ export function supersedeDotParkedAction(
       ((requestId: string) => loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, requestId));
     try {
       const approval = load(row.request_id);
+      if (approval && (approval.status === 'approved' || approval.status === 'applied')) {
+        // An operator already said yes to this card: never overturn it
+        // silently. It stays parked (settled normally) and the skip is audited.
+        const reason = `not superseded: ${row.request_id} already ${approval.status} by ${approval.decidedBy ?? 'operator'}; superseding action ${supersededBy.action_ref} (${dotActorId(supersededBy.dot_id)}) needs a separate operator decision`;
+        recordAudit(
+          charter,
+          'supersede_skipped',
+          'denied',
+          { action_ref: row.action_ref, reason, superseded_by: supersededBy },
+          deps
+        );
+        logger.warn(
+          `[dot-dispatch] ${reason} | next: resolve the conflict by hand | evidence: ${DOT_ACTION_LEDGER_PATH}`
+        );
+        return undefined;
+      }
       if (approval?.status === 'pending') expirePendingDecision(approval, deps, 'dot_superseded');
     } catch (error) {
       logger.warn(

@@ -2,9 +2,10 @@
  * Dot graduated autonomy (DL-10) — the L0–L4 ladder a resident dot climbs
  * only with a human's consent and slides down automatically on trouble.
  *
- *   L0 shadow      every proposal needs approval; settled decisions feed the
- *                  shadow ledger (true never-dispatch shadow needs a dispatch
- *                  hook — until then L0 gates like L1).
+ *   L0 shadow      proposals are recorded only (dispatch disposition hook):
+ *                  action-ledger status `shadow`, a shadow-ledger row, a
+ *                  digest line — no decision card, no WorkItem. The approve
+ *                  floor stays as a fail-safe if the hook is skipped.
  *   L1 approve-all every proposal needs approval.
  *   L2 supervised  today's behaviour (policy gate + charter floor + learned
  *                  floor that lifts after three human approvals). Default.
@@ -15,8 +16,17 @@
  *                  never_auto class or a policy approve, while the dot's
  *                  outcome success rate stays ≥ the promotion bar.
  *
- * The charter floor (`decisions.default_decision`) and the policy gate are
- * never lowered: the relaxer below only proposes, dot-dispatch clamps.
+ * The charter floor (`decisions.default_decision`) is never lowered. The policy
+ * gate is never lowered either, with ONE named exception: L4 notify → auto
+ * (`DOT_L4_NOTIFY_TO_AUTO_EXCEPTION`), which dot-dispatch re-verifies on the
+ * policy side in `dotNotifyToAutoExceptionApplies`. The relaxer only proposes.
+ *
+ * L0 agreement: a shadowed proposal has no human outcome, so its shadow row
+ * compares against the next level, L1, which asks the operator on every
+ * proposal — it cannot let anything through unasked, so the row agrees by
+ * construction. The human judgment for L0 → L1 is the promotion card itself,
+ * informed by the shadow proposals listed in the digest; outcome success is
+ * waived for that one step because nothing ran at L0.
  *
  * State `autonomy/<dot>.json`; shadow ledger `autonomy-shadow.jsonl` (what the
  * next level up would have decided vs. the human's outcome). The supervisor
@@ -62,12 +72,14 @@ import {
   dotQuietHours,
   type DotActionRecord,
 } from './dot-dispatch.js';
-import type {
-  DotDecisionRelaxer,
-  DotDigestSection,
-  DotExtCtx,
-  DotFloorContributor,
-  DotStatusSection,
+import {
+  DOT_L4_NOTIFY_TO_AUTO_EXCEPTION,
+  type DotDecisionRelaxer,
+  type DotDigestSection,
+  type DotDispositionOverride,
+  type DotExtCtx,
+  type DotFloorContributor,
+  type DotStatusSection,
 } from './dot-extensions.js';
 import { readDotFeedback, type DotFeedbackEntry } from './dot-feedback.js';
 import { dotOutcomeStats } from './dot-outcomes.js';
@@ -142,7 +154,10 @@ export interface DotAutonomyStateDoc extends DotAutonomyState {
   last_promotion_check_day?: string;
 }
 
-/** One settled human decision compared with what the next level up would have decided. */
+/**
+ * One settled human decision (or, at L0, one shadowed proposal) compared with
+ * what the next level up would have decided.
+ */
 export interface DotAutonomyShadowRow {
   dot_id: string;
   action_ref: string;
@@ -151,7 +166,12 @@ export interface DotAutonomyShadowRow {
   next_level: DotAutonomyLevel;
   would_have: DotDecisionLevel;
   actual_decision?: DotDecisionLevel;
-  human_outcome: 'approved' | 'rejected';
+  /** Absent for an L0 shadow row: the proposal was never shown to a human. */
+  human_outcome?: 'approved' | 'rejected';
+  /** `shadow` when the row was written at dispatch for an L0 record-only proposal. */
+  disposition?: 'shadow';
+  /** Proposal title (L0 shadow rows; surfaced in the digest). */
+  title?: string;
   /** False only when the next level would have proceeded on work the human rejected. */
   agree: boolean;
   settled_at: string;
@@ -382,9 +402,8 @@ export interface DotAutonomyDecisionInput {
 /**
  * Intended decision of a level. Never below the hard floor; never below the
  * policy decision except L4's notify → auto for an eligible action (a policy
- * approve is never relaxed). dot-dispatch currently clamps relaxations at the
- * policy gate too, so the L4 relaxation only takes effect once dispatch lets
- * it through.
+ * approve is never relaxed) — the same exception dot-dispatch enforces via
+ * `dotNotifyToAutoExceptionApplies`.
  */
 export function dotAutonomyDecisionAt(
   level: DotAutonomyLevel,
@@ -451,7 +470,9 @@ function executorIncidentsSince(c: DotCharter, since: number, deps: DotAutonomyD
   }).filter(
     (row) =>
       row?.dot_id === c.dot_id &&
-      (row.status === 'failed' || row.status === 'blocked') &&
+      // Only failures are incidents: `blocked` / escalated rows are by-design
+      // stops (mission-shaped guidance, cross-tenant denial), not misbehaviour.
+      row.status === 'failed' &&
       Date.parse(row.completed_at) >= since
   ).length;
 }
@@ -521,7 +542,7 @@ export function dotAutonomyMetrics(c: DotCharter, deps: DotAutonomyDeps = {}): D
 // gate hooks
 // ---------------------------------------------------------------------------
 
-/** L0 / L1: every proposal needs an operator decision. */
+/** L0 / L1: every proposal needs an operator decision (L0: fail-safe behind the shadow override). */
 export function dotAutonomyFloorContributor(): DotFloorContributor {
   return {
     id: 'autonomy',
@@ -551,8 +572,9 @@ function l4Eligible(
 
 /**
  * L3 / L4: lift the learned floor under the trusted release rule; L4 also asks
- * for auto on an eligible relaxable action. dot-dispatch clamps the answer to
- * the policy gate and the charter floor, so this can never lower either.
+ * for auto on an eligible relaxable action, claiming the named
+ * DOT_L4_NOTIFY_TO_AUTO_EXCEPTION. dot-dispatch clamps every other answer to
+ * the policy gate and the charter floor, and re-verifies the exception.
  */
 export function dotAutonomyDecisionRelaxer(
   deps: Omit<DotAutonomyDeps, 'rootDir' | 'now'> = {}
@@ -571,11 +593,58 @@ export function dotAutonomyDecisionRelaxer(
         return {
           decision: 'auto',
           reason: `autonomy ${level}: relaxable, reversible, outcomes on track`,
+          exception: DOT_L4_NOTIFY_TO_AUTO_EXCEPTION,
         };
       }
       return {
         decision: 'auto',
         reason: `autonomy ${level}: learned floor released (1 human approval or 7-day decay)`,
+      };
+    },
+  };
+}
+
+/**
+ * L0: record the proposal only. Appends the shadow-ledger row (what L1 would
+ * have decided; agrees by construction, see the module header) and tells
+ * dot-dispatch to write a `shadow` action row instead of routing it.
+ */
+export function dotAutonomyDispositionOverride(
+  deps: Omit<DotAutonomyDeps, 'rootDir' | 'now'> = {}
+): DotDispositionOverride {
+  return {
+    id: 'autonomy',
+    dispose(c, p, info, ctx) {
+      const d: DotAutonomyDeps = { ...deps, rootDir: ctx.rootDir, now: ctx.now };
+      const level = dotAutonomyLevel(c, d);
+      if (level !== 'L0') return undefined;
+      const next = nextLevel(c, level) ?? level;
+      const at = ctx.now().toISOString();
+      const row: DotAutonomyShadowRow = {
+        dot_id: c.dot_id,
+        action_ref: info.action_ref,
+        action_id: p.action_id,
+        level,
+        next_level: next,
+        would_have: dotAutonomyDecisionAt(next, {
+          policyDecision: info.gate.decision,
+          hardFloor: c.decisions?.default_decision,
+          learnedHolds: false,
+          l4Eligible: false,
+        }),
+        actual_decision: info.gate.decision,
+        disposition: 'shadow',
+        title: p.title.slice(0, 200),
+        agree: true,
+        settled_at: at,
+        recorded_at: at,
+      };
+      const file = abs(d, dotStatePath(c, DOT_AUTONOMY_SHADOW_FILE));
+      safeMkdir(path.dirname(file), { recursive: true });
+      appendJsonLine(file, row);
+      return {
+        disposition: 'shadow',
+        reason: `autonomy L0 shadow: recorded only (L1 would ask: ${row.would_have})`,
       };
     },
   };
@@ -711,7 +780,7 @@ export function dotAutonomyDemotionReason(
     return `${s.rejection_streak} rejections in a row`;
   }
   if (policy.demotion.on_incident && s.executor_incidents > 0) {
-    return `${s.executor_incidents} executor incident(s) (failed/blocked work)`;
+    return `${s.executor_incidents} executor incident(s) (failed work)`;
   }
   return undefined;
 }
@@ -723,11 +792,13 @@ export function dotAutonomyPromotionReady(
   const p = policy.promotion;
   const missing: string[] = [];
   if (!metrics.next_level) missing.push('at max level');
+  // Nothing runs at L0 (shadow), so there are no outcomes to judge yet.
+  const outcomesApply = metrics.level !== 'L0';
   if (metrics.decisions < p.min_decisions)
     missing.push(`decisions ${metrics.decisions}/${p.min_decisions}`);
   if (metrics.agreement_rate < p.min_agreement)
     missing.push(`agreement ${metrics.agreement_rate.toFixed(2)}<${p.min_agreement}`);
-  if (metrics.outcome_success_rate < p.min_outcome_success) {
+  if (outcomesApply && metrics.outcome_success_rate < p.min_outcome_success) {
     missing.push(
       `outcome success ${metrics.outcome_success_rate.toFixed(2)}<${p.min_outcome_success}`
     );
@@ -994,8 +1065,22 @@ export function dotAutonomyDigestLines(
   const changes = state.history.filter(
     (entry) => !since || Date.parse(entry.at) >= since.getTime()
   );
+  const shadowed = readDotAutonomyShadow(c, { rootDir: ctx.rootDir }).filter(
+    (row) =>
+      row.disposition === 'shadow' && (!since || Date.parse(row.recorded_at) >= since.getTime())
+  );
   return [
     ...changes.map((entry) => `Autonomy: now ${entry.level} — ${entry.reason}`),
+    ...(shadowed.length
+      ? [
+          `Autonomy L0 shadow: ${shadowed.length} proposal(s) recorded only — nothing was sent or started`,
+          ...shadowed
+            .slice(-5)
+            .map(
+              (row) => `- shadow: ${row.title ?? row.action_id} (L1 would ask: ${row.would_have})`
+            ),
+        ]
+      : []),
     ...(state.pending_promotion
       ? [`Autonomy: promotion to ${state.pending_promotion.to} is waiting on your decision`]
       : []),

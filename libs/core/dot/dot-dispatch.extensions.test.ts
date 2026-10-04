@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { randomUUID } from 'node:crypto';
 
 import { safeRmSync } from '../secure-io.js';
 import type {
@@ -21,13 +22,15 @@ import {
 import {
   DOT_DECISION_RELAXERS,
   DOT_DIGEST_SECTIONS,
+  DOT_DISPOSITION_OVERRIDES,
   DOT_FLOOR_CONTRIBUTORS,
   DOT_PRE_GATE_CHECKS,
 } from './dot-extension-registry.js';
+import { DOT_L4_NOTIFY_TO_AUTO_EXCEPTION } from './dot-extensions.js';
 import { recordDotFeedback } from './dot-feedback.js';
 import type { DotProposal } from './dot-proposals.js';
 
-const TEST_ROOT = 'active/shared/tmp/dot-dispatch-extension-tests';
+const TEST_ROOT = `active/shared/tmp/dot-dispatch-extension-tests-${randomUUID()}`;
 const RANK = { auto: 0, notify: 1, approve: 2 } as const;
 
 const CHARTER: DotCharter = {
@@ -52,7 +55,10 @@ const PROPOSAL: DotProposal = {
   work_shape: 'task_session',
 };
 
-function harness(base: AutonomousOpsGateResult['decision'] = 'auto') {
+function harness(
+  base: AutonomousOpsGateResult['decision'] = 'auto',
+  extra: Partial<AutonomousOpsGateResult> = {}
+) {
   const gateInputs: AutonomousOpsGateInput[] = [];
   const routed: RouteAutonomousDecisionInput[] = [];
   const items: CreateWorkItemInput[] = [];
@@ -75,6 +81,7 @@ function harness(base: AutonomousOpsGateResult['decision'] = 'auto') {
         shadow: false,
         escalations: [],
         highRiskPathMatches: [],
+        ...extra,
       } as AutonomousOpsGateResult;
     },
     route: (input): RoutedDecision => {
@@ -125,6 +132,7 @@ afterEach(() => {
   DOT_DECISION_RELAXERS.length = 0;
   DOT_PRE_GATE_CHECKS.length = 0;
   DOT_DIGEST_SECTIONS.length = 0;
+  DOT_DISPOSITION_OVERRIDES.length = 0;
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
 });
 
@@ -176,6 +184,98 @@ describe('dot-dispatch extension hooks', () => {
     ).toBe('approve');
   });
 
+  it('lets only the named L4 exception go below the policy gate, re-verified by dispatch', () => {
+    const claim = {
+      id: 'autonomy',
+      relax: () => ({
+        decision: 'auto' as const,
+        reason: 'L4 eligible',
+        exception: DOT_L4_NOTIFY_TO_AUTO_EXCEPTION,
+      }),
+    };
+    DOT_DECISION_RELAXERS.push(claim);
+    const relaxable = { relaxableActions: ['dot_delegate_work'] };
+    const notify = harness('notify', { vetoWindowMinutes: 60 });
+    const result = evaluateDotProposalGate(CHARTER, PROPOSAL, { ...notify.deps, ...relaxable });
+    expect(result.gate).toMatchObject({ decision: 'auto', allowed: true });
+    expect(result.gate.vetoWindowMinutes).toBeUndefined();
+    expect(result).toMatchObject({ floor: 'auto', relaxed_by: 'autonomy' });
+
+    // Proceeds without a card: a WorkItem, no veto park.
+    const run = harness('notify', { vetoWindowMinutes: 60 });
+    const { records } = dispatchDotProposals(CHARTER, [PROPOSAL], { ...run.deps, ...relaxable });
+    expect(records[0].status).toBe('dispatched');
+    expect(run.items).toHaveLength(1);
+
+    const decisionOf = (
+      deps: DotDispatchDeps,
+      charter: DotCharter = CHARTER,
+      proposal: DotProposal = PROPOSAL
+    ) => evaluateDotProposalGate(charter, proposal, deps).gate.decision;
+    // Not a relaxable action.
+    expect(decisionOf({ ...harness('notify').deps, relaxableActions: [] })).toBe('notify');
+    // Never below approve, a charter floor, or a hard escalation.
+    expect(decisionOf({ ...harness('approve').deps, ...relaxable })).toBe('approve');
+    expect(
+      decisionOf(
+        { ...harness('notify').deps, ...relaxable },
+        {
+          ...CHARTER,
+          decisions: { default_decision: 'notify' },
+        }
+      )
+    ).toBe('notify');
+    for (const extra of [
+      { escalations: ['never_auto'] },
+      { escalations: ['budget'] },
+      { highRiskPathMatches: ['libs/core/**'] },
+      { axes: { scope: 0, reversibility: 2, sensitivity: 0, confidence: 0 } },
+      { shadow: true },
+    ]) {
+      expect(
+        decisionOf({ ...harness('notify', extra).deps, ...relaxable }),
+        JSON.stringify(extra)
+      ).toBe('notify');
+    }
+    // Without the marker a relaxer is still clamped at the policy gate.
+    DOT_DECISION_RELAXERS.length = 0;
+    DOT_DECISION_RELAXERS.push({ id: 'plain', relax: () => ({ decision: 'auto', reason: 'x' }) });
+    expect(decisionOf({ ...harness('notify').deps, ...relaxable })).toBe('notify');
+  });
+
+  it('a shadow disposition records only; a throwing override is skipped', () => {
+    DOT_DISPOSITION_OVERRIDES.push(
+      {
+        id: 'boom',
+        dispose: () => {
+          throw new Error('exploded');
+        },
+      },
+      { id: 'autonomy', dispose: () => ({ disposition: 'shadow', reason: 'L0' }) }
+    );
+    const h = harness('approve');
+    const { records } = dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
+    expect(records[0]).toMatchObject({
+      status: 'shadow',
+      disposition_by: 'autonomy',
+      gate_decision: 'approve',
+      reason: 'autonomy: L0',
+    });
+    expect(h.routed).toHaveLength(0);
+    expect(h.items).toHaveLength(0);
+
+    DOT_DISPOSITION_OVERRIDES.length = 0;
+    DOT_DISPOSITION_OVERRIDES.push({
+      id: 'boom',
+      dispose: () => {
+        throw new Error('exploded');
+      },
+    });
+    const plain = harness('auto');
+    const second = dispatchDotProposals(CHARTER, [{ ...PROPOSAL, title: 'Other' }], plain.deps);
+    expect(second.records[0].status).toBe('dispatched');
+  });
+
   it('refuses on a pre-gate check failure before the gate runs', () => {
     DOT_PRE_GATE_CHECKS.push({ id: 'arbitration', check: () => ({ ok: false, reason: 'owned' }) });
     const h = harness('auto');
@@ -204,6 +304,39 @@ describe('dot-dispatch extension hooks', () => {
         check_id: 'arbitration',
         link: { action_ref: 'dact-other', dot_id: 'repo-guardian' },
       },
+    });
+  });
+
+  it('merged escalations keep every link and say only the primary one is superseded', () => {
+    DOT_PRE_GATE_CHECKS.push(
+      {
+        id: 'arbitration',
+        check: () => ({
+          ok: 'escalate',
+          reason: 'conflicts with a',
+          card_context: 'Conflicts with dact-a.',
+          link: { action_ref: 'dact-a', dot_id: 'dot-a' },
+        }),
+      },
+      {
+        id: 'second',
+        check: () => ({
+          ok: 'escalate',
+          reason: 'conflicts with b',
+          card_context: 'Conflicts with dact-b.',
+          link: { action_ref: 'dact-b', dot_id: 'dot-b' },
+        }),
+      }
+    );
+    const h = harness('auto');
+    const { records } = dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
+    expect(h.routed[0].question).toContain('On approve only dact-a (dot:dot-a) is superseded');
+    expect(records[0].escalation).toMatchObject({
+      link: { action_ref: 'dact-a', dot_id: 'dot-a' },
+      links: [
+        { action_ref: 'dact-a', dot_id: 'dot-a' },
+        { action_ref: 'dact-b', dot_id: 'dot-b' },
+      ],
     });
   });
 

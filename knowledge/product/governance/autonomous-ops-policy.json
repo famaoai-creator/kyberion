@@ -80,6 +80,7 @@
     "timezone": "Asia/Tokyo"
   },
   "autonomy": {
+    "description": "L0 records proposals only (shadow; digest line, no card, no WorkItem). relaxable_actions is the single exception below the policy gate: an eligible L4 dot may turn notify into auto for these actions; approve, never_auto, high-risk paths, budget escalations and charter floors are never relaxed.",
     "relaxable_actions": ["dot_delegate_work"],
     "promotion": {
       "min_decisions": 20,
