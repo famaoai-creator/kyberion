@@ -12,6 +12,7 @@
  * manifest read in `readFrontDeskSurfacePorts()`, which never throws.
  */
 import { loadSurfaceManifest } from './surface/surface-runtime.js';
+import { resolveSurfaceBrowserUrl } from './surface/surface-url.js';
 
 export type FrontDeskRole = 'owner' | 'approver' | 'operator' | 'viewer';
 
@@ -129,13 +130,15 @@ export function frontDeskRoleFromViewer(input: {
 export function resolveFrontDeskMenu(input: {
   currentSurface: FrontDeskSurfaceId;
   ports?: Partial<FrontDeskSurfacePorts>;
+  urls?: Partial<Record<FrontDeskSurfaceId, string>>;
   role?: FrontDeskRole;
 }): Array<FrontDeskMenuItem & { href: string; external: boolean; allowed: boolean }> {
   const ports: FrontDeskSurfacePorts = { ...DEFAULT_FRONT_DESK_PORTS, ...input.ports };
   const role = input.role ?? 'viewer';
   return FRONT_DESK_MENU.map((item) => {
     const external = item.surface !== input.currentSurface;
-    const href = external ? `http://127.0.0.1:${ports[item.surface]}${item.path}` : item.path;
+    const base = input.urls?.[item.surface] ?? `http://127.0.0.1:${ports[item.surface]}`;
+    const href = external ? base.replace(/\/+$/, '') + item.path : item.path;
     return {
       ...item,
       href,
@@ -172,4 +175,19 @@ export function readFrontDeskSurfacePorts(): FrontDeskSurfacePorts {
     // never fail because the runtime manifest hasn't been reconciled yet.
   }
   return ports;
+}
+
+/** Configured deployment bases use the same manifest urlEnv contract as all
+ * runtime clients. Local ports are fallback only; this never changes auth. */
+export function readFrontDeskSurfaceUrls(): Record<FrontDeskSurfaceId, string> {
+  const ports = readFrontDeskSurfacePorts();
+  const urls = {} as Record<FrontDeskSurfaceId, string>;
+  for (const id of Object.keys(ports) as FrontDeskSurfaceId[]) {
+    try {
+      urls[id] = resolveSurfaceBrowserUrl(id);
+    } catch {
+      urls[id] = `http://127.0.0.1:${ports[id]}`;
+    }
+  }
+  return urls;
 }

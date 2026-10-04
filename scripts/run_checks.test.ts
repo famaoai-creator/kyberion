@@ -89,4 +89,15 @@ describe('manifest-driven check runner', () => {
     await expect(main(['--scope'])).resolves.toBe(1);
     await expect(main(['--only'])).resolves.toBe(1);
   });
+
+  it('looks a named gate up in the full set when no scope is given', async () => {
+    const output: Array<{ scope?: string; error?: string }> = [];
+    await expect(
+      main(['--only', 'missing-gate', '--json'], (value) => output.push(value as never))
+    ).resolves.toBe(1);
+    expect(output[0]).toMatchObject({
+      scope: 'full',
+      error: 'gate(s) missing-gate are not registered for scope full',
+    });
+  });
 });

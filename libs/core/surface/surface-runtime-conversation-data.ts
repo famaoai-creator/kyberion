@@ -1,3 +1,11 @@
+import { deriveSurfaceSessionId } from '../mission/orchestrator-session.js';
+import { triggerBackgroundReviewFork } from '../workforce/background-review-runner.js';
+import {
+  assertScopedSurfaceCapabilitySupported,
+  assertScopedSurfaceDelegationSupported,
+  deriveSurfaceConversationPartitionKey,
+  SurfaceConversationCapabilityError,
+} from './surface-conversation-runtime-context.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { getRegisteredEnvText } from '../foundation/env.js';
@@ -68,12 +76,27 @@ export {
 
 export const surfaceRuntimeContextStore = new AsyncLocalStorage<SurfaceConversationInput>();
 
+function taskSessionMatchesConversation(
+  session: TaskSession,
+  input: SurfaceConversationInput | undefined
+): boolean {
+  if (input?.conversationKey === undefined) return true;
+  // Public correlation stays unchanged for Progress. Unbound legacy tasks
+  // are never inherited by a principal-scoped conversation, even if UUIDs collide.
+  return Boolean(
+    input.correlationId &&
+    session.correlation_id === input.correlationId &&
+    session.payload?.surface_conversation_partition === deriveSurfaceConversationPartitionKey(input)
+  );
+}
+
 export function getActiveTaskSessionForConversation(
   surface: TaskSession['surface'],
   correlationId?: string
 ): TaskSession | null {
   const session = getActiveTaskSession(surface);
-  if (!session) return null;
+  if (!session || !taskSessionMatchesConversation(session, surfaceRuntimeContextStore.getStore()))
+    return null;
   if (!session.correlation_id) return session;
   return correlationId && session.correlation_id === correlationId ? session : null;
 }
@@ -126,6 +149,7 @@ function sessionRuntimePath(namespace: string, sessionId: string, fileName: stri
 
 import type {
   SurfaceConversationInput,
+  SurfaceConversationMessageInput,
   SurfaceConversationResult,
 } from './channel-surface-types.js';
 import type { UserIntentFlow } from '../intent/intent-contract.js';
@@ -293,6 +317,7 @@ export async function handleSurfaceQueryRoute(
   context: SurfaceRuntimeRouteContext,
   resolved: ReturnType<typeof resolveSurfaceIntent>
 ): Promise<SurfaceConversationResult> {
+  assertScopedSurfaceCapabilitySupported(context.input, 'legacy_surface_query');
   const queryText = resolved.queryText || structuredSurfaceQueryText(context);
   const queryType = resolved.queryType || 'knowledge_search';
   const providerConfig = getSurfaceQueryProviderConfig({
@@ -431,6 +456,7 @@ export async function handleSurfaceQueryRoute(
 export async function handleTaskSessionRoute(
   context: SurfaceRuntimeRouteContext
 ): Promise<SurfaceConversationResult> {
+  assertScopedSurfaceCapabilitySupported(context.input, 'legacy_task_session_execution');
   const queryText = structuredSurfaceQueryText(context);
   const correctionDetected = isCorrectionUtterance(queryText);
   const surface = context.input.surface || surfaceChannelFromAgentId(context.input.agentId);
@@ -582,7 +608,7 @@ export async function handleTaskSessionRoute(
       const completedSession = context.input.correlationId
         ? getLatestCompletedTaskSession(surface, context.input.correlationId)
         : null;
-      if (completedSession) {
+      if (completedSession && taskSessionMatchesConversation(completedSession, context.input)) {
         const reopened = reopenTaskSession(completedSession.session_id, {
           reason: `correction utterance: ${queryText}`,
           status: completedSession.requirements?.missing?.length
@@ -621,7 +647,13 @@ export async function handleTaskSessionRoute(
       goal: intent.goal,
       projectContext: intent.projectContext,
       requirements: intent.requirements,
-      payload: intent.payload,
+      payload:
+        context.input.conversationKey === undefined
+          ? intent.payload
+          : {
+              ...intent.payload,
+              surface_conversation_partition: deriveSurfaceConversationPartitionKey(context.input),
+            },
     });
     saveTaskSession(session!);
   }
@@ -678,6 +710,7 @@ export async function handleTaskSessionRoute(
         })
       );
     } catch (error: any) {
+      if (error instanceof SurfaceConversationCapabilityError) throw error;
       logger.warn(
         `[SURFACE] capture_photo task-session execution failed for ${session.session_id}: ${error?.message || String(error)}`
       );
@@ -740,6 +773,7 @@ export async function handleTaskSessionRoute(
         })
       );
     } catch (error: any) {
+      if (error instanceof SurfaceConversationCapabilityError) throw error;
       logger.warn(
         `[SURFACE] Claude task-session execution failed for ${session.session_id}: ${error?.message || String(error)}`
       );
@@ -912,6 +946,7 @@ export async function handleTaskSessionRoute(
         })
       );
     } catch (error: any) {
+      if (error instanceof SurfaceConversationCapabilityError) throw error;
       logger.warn(`[SURFACE] fetch-external-data failed: ${error?.message || String(error)}`);
 
       // Update failure stats
@@ -1155,6 +1190,7 @@ export async function handleTaskSessionRoute(
         })
       );
     } catch (error: any) {
+      if (error instanceof SurfaceConversationCapabilityError) throw error;
       const sessionIntentId = (session.payload?.intent_id as string) || intent.intentId || '';
       logger.warn(
         `[SURFACE] Service operation execution failed for ${session.session_id}: ${error?.message || String(error)}`
@@ -1338,6 +1374,7 @@ export function buildSurfaceDelegationRequest(params: {
   intent: string;
   context?: Record<string, unknown>;
 }): Parameters<typeof a2aBridge.route>[0] {
+  assertScopedSurfaceDelegationSupported(surfaceRuntimeContextStore.getStore());
   const payload: Record<string, unknown> = {
     intent: params.intent,
     text: params.query,
@@ -1468,4 +1505,67 @@ export function buildSurfaceStructuredQuery(query: string, compiledFlow: UserInt
   ]
     .filter((item): item is string => typeof item === 'string')
     .join('\n');
+}
+
+/**
+ * HA-01: count one non-blocking worker turn per surface thread. The
+ * correlation id is per message, so derive the stable session key from the
+ * surface/channel/thread tuple instead.
+ */
+export async function startSurfaceBackgroundReview(
+  input: SurfaceConversationMessageInput
+): Promise<void> {
+  try {
+    // SO-02: single source of truth for this derivation lives in
+    // orchestrator-session.ts (deriveSurfaceSessionId) — kept byte-identical
+    // to what was inlined here so existing session ids never change.
+    const sessionId = deriveSurfaceSessionId(input.surface, input.channel, input.threadTs);
+    const trigger = triggerBackgroundReviewFork({
+      sessionId,
+      nudgeConfig: { turnThreshold: 10, toolThreshold: 10 },
+      surface: input.surface,
+      missionId: input.missionId,
+      ...(input.scope?.tenant_slug ? { tenantSlug: input.scope.tenant_slug } : {}),
+      approvalChannel: input.channel,
+      approvalThreadTs: input.threadTs,
+      snapshot: [
+        `surface=${input.surface}`,
+        `channel=${input.channel || 'default'}`,
+        `thread=${input.threadTs || 'default'}`,
+        `message:\n${input.text}`,
+        input.threadContext ? `thread_context:\n${input.threadContext}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
+    });
+    if (trigger.review_due && trigger.fork) {
+      logger.info(
+        `[HA-01] Background review reserved for surface session ${sessionId}; main response remains non-blocking.`
+      );
+      const fork = trigger.fork;
+      const handleForkFailure = (error: unknown) => {
+        // The runner normally converts failures to a result, but this final
+        // guard keeps a backend/serialization defect from becoming an
+        // unhandled rejection on the surface process.
+        logger.warn(
+          `[HA-01] Background review fork detached failure: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      };
+      if (input.awaitBackgroundReviewFork) {
+        // Local mission E2E may await the detached result to prove the full
+        // nudge→fork→approval path. Normal surface traffic remains detached.
+        await fork;
+      } else {
+        void fork.catch(handleForkFailure);
+      }
+    }
+  } catch (error) {
+    logger.warn(
+      `[HA-01] Background review nudge unavailable; continuing surface response: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
 }

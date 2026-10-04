@@ -745,16 +745,17 @@ describe('front-desk-routes.ts route wiring (FD-03 Deliverable 1)', () => {
   it('wires GET /api/ask-vocabulary and POST /api/conversation', () => {
     const source = readRepoFile('presence/displays/presence-studio/front-desk-routes.ts');
     expect(source).toContain("app.get('/api/ask-vocabulary'");
-    expect(source).toContain("app.post('/api/conversation'");
-
-    const conversationStart = source.indexOf("app.post('/api/conversation'");
-    const conversationRoute = source.slice(conversationStart, conversationStart + 6500);
+    expect(source).toContain('registerConversationRoutes(app)');
+    const conversationRoute = readRepoFile(
+      'presence/displays/presence-studio/conversation-routes.ts'
+    );
+    expect(conversationRoute).toContain("app.post('/api/conversation'");
     expect(conversationRoute).toContain('requirePresenceStudioLocalAdmin(');
-    expect(conversationRoute).toContain('presenceStudioConversationScope(');
+    expect(conversationRoute).toContain('frontDeskRuntimeScope(');
     expect(conversationRoute).toContain('viewFromIntentResolution(');
     expect(conversationRoute).toContain('checkAndRepairSurfaceUxContract(');
     expect(conversationRoute).toContain('runSurfaceMessageConversation(');
-    expect(conversationRoute).toContain("mode: 'unavailable'");
+    expect(conversationRoute).toMatch(/mode:\s*'unavailable'/);
   });
 });
 

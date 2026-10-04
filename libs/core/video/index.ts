@@ -25,6 +25,8 @@ export * from './video-render-runtime-policy.js';
 export * from './video-render-runtime.js';
 export * from './video-route.js';
 export * from './video-scene-composition.js';
+export * from './video-timeline-runtime.js';
+export * from './video-narration-timeline.js';
 export * from './video-visual-direction.js';
 export * from './ingest/video-brief.js';
 export * from './ingest/video-fetch.js';

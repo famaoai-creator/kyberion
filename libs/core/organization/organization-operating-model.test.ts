@@ -466,6 +466,40 @@ describe('organization operating model', () => {
     expect(
       listOrganizationOperationRuns({ organizationId, tier: 'confidential', tenantSlug })
     ).toEqual([operationRun]);
+    // Evidence is create-once: a closed run is never rewritten.
+    expect(() => saveOrganizationOperationRun({ ...operationRun, status: 'failed' })).toThrow(
+      /already exists/
+    );
+
+    // Governed execute records `started`, then closes it exactly once.
+    const startedRun: OrganizationOperationRun = {
+      run_id: 'monthly-billing-20260901',
+      operation_id: operation.operation_id,
+      organization_id: organizationId,
+      tier: 'confidential',
+      tenant_slug: tenantSlug,
+      status: 'started',
+      started_at: '2026-09-01T00:00:00.000Z',
+      recorded_at: '2026-09-01T00:00:00.000Z',
+    };
+    saveOrganizationOperationRun(startedRun);
+    expect(() => saveOrganizationOperationRun(startedRun)).toThrow(/already exists/);
+    const closedRun: OrganizationOperationRun = {
+      ...startedRun,
+      status: 'succeeded',
+      completed_at: '2026-09-01T00:10:00.000Z',
+      result_summary: 'Pipeline completed.',
+      recorded_at: '2026-09-01T00:10:00.000Z',
+    };
+    saveOrganizationOperationRun(closedRun);
+    expect(
+      listOrganizationOperationRuns({ organizationId, tier: 'confidential', tenantSlug }).find(
+        (run) => run.run_id === startedRun.run_id
+      )
+    ).toEqual(closedRun);
+    expect(() => saveOrganizationOperationRun({ ...closedRun, status: 'failed' })).toThrow(
+      /already exists/
+    );
 
     saveOrganizationOperation({
       ...operation,
