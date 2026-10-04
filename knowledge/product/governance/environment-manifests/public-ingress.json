@@ -1,0 +1,22 @@
+{
+  "$schema": "https://kyberion.local/schemas/environment-capability-manifest.schema.json",
+  "manifest_id": "public-ingress",
+  "version": "2026-10-05",
+  "description": "Optional public ingress for `pnpm kyberion ingress up --surface <id>`: exposes one opted-in loopback surface (e.g. event-intake for GitHub webhooks) at a public HTTPS URL through a provider declared in public-ingress-providers.json. Readiness and setup steps come from the provider resolver.",
+  "capabilities": [
+    {
+      "capability_id": "public-ingress.any-ready",
+      "kind": "binary",
+      "description": "A live public-ingress provider is ready on this host (default: Tailscale Funnel — client installed and logged in, HTTPS certificates enabled, funnel node attribute granted).",
+      "required_for": ["public-ingress", "event-intake-public-webhooks"],
+      "optional": true,
+      "probe": { "kind": "probe", "probe_id": "public-ingress.any-ready" },
+      "install": {
+        "operator_confirmed": true,
+        "instruction": "Tailscale Funnel: (1) install Tailscale (`brew install --cask tailscale-app` on macOS) and enable its CLI (menu > Settings > Install CLI, or set KYBERION_TAILSCALE_BIN); (2) log in; (3) in the tailnet admin console enable MagicDNS + HTTPS Certificates (DNS page) and grant the `funnel` node attribute (Access controls); (4) run `pnpm kyberion ingress probe`. See knowledge/public/procedures/expose-surface-public-ingress.md.",
+        "docs_url": "https://tailscale.com/kb/1223/funnel",
+        "retry_after_install": true
+      }
+    }
+  ]
+}

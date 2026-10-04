@@ -123,6 +123,8 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion egress report`                | `pnpm egress:report`              | Report egress warnings                                                               |
 | `pnpm kyberion history search`               | `pnpm history:search`             | Search history                                                                       |
 | `pnpm kyberion hooks discover`               |                                   | List project-local Claude/Codex hook configs and whether each is trusted.            |
+| `pnpm kyberion ingress probe`                |                                   | Check which public ingress providers are ready                                       |
+| `pnpm kyberion ingress status`               |                                   | Show surfaces exposed through public ingress                                         |
 | `pnpm kyberion intent trace`                 | `pnpm intent:trace`               | Trace intent resolution                                                              |
 | `pnpm kyberion knowledge rank`               |                                   | Rank knowledge for a context                                                         |
 | `pnpm kyberion knowledge scope-health`       |                                   | Report tenant knowledge scope health                                                 |
@@ -196,6 +198,8 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion generation schedule`           | `pnpm generation:schedule`          | Run the generation schedule tick                                                                    |
 | `pnpm kyberion gws meet-create`               |                                     | Create a Google Meet                                                                                |
 | `pnpm kyberion hooks trust`                   |                                     | Request human approval to trust one project hook config (bound to its content).                     |
+| `pnpm kyberion ingress down`                  |                                     | Withdraw a surface's public ingress                                                                 |
+| `pnpm kyberion ingress up`                    |                                     | Expose a surface at a public HTTPS URL (approval required)                                          |
 | `pnpm kyberion intent run`                    | `pnpm intent:run`                   | Dispatch a catalog intent as a task session                                                         |
 | `pnpm kyberion knowledge`                     | `pnpm knowledge`                    | Manage knowledge                                                                                    |
 | `pnpm kyberion knowledge cowork-sync`         | `pnpm knowledge:cowork-sync`        | Sync knowledge with Cowork                                                                          |

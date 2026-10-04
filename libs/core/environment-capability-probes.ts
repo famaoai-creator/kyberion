@@ -12,6 +12,7 @@
  *   repo-build.receipt           — libs/core/dist/ is fresh enough
  *   node-version.floor           — running Node satisfies package.json engines
  *   playwright.chromium-browser  — a Playwright browser cache is present
+ *   public-ingress.any-ready     — a live public-ingress provider is ready
  *
  * Importing this module triggers `installCoreEnvironmentProbes()` for
  * its side effect; tests that reset the probe registry can re-arm by
@@ -67,6 +68,7 @@ export function installCoreEnvironmentProbes(): void {
     ['repo-build.receipt', probeRepoBuild],
     ['node-version.floor', probeNodeVersionFloor],
     ['playwright.chromium-browser', probePlaywrightChromium],
+    ['public-ingress.any-ready', probePublicIngress],
   ];
   for (const [probeId, probe] of coreProbes) {
     if (!hasEnvironmentCapabilityProbe(probeId)) registerEnvironmentCapabilityProbe(probeId, probe);
@@ -372,6 +374,16 @@ async function probePlaywrightChromium(): Promise<{ available: boolean; reason?:
     available: false,
     reason: t('status:probe_playwright_revision_missing', { dir, revisions: missing.join(', ') }),
   };
+}
+
+/**
+ * At least one live public-ingress provider is ready. Loaded lazily: the
+ * ingress service pulls in surface/approval modules this file must not load
+ * at import time.
+ */
+async function probePublicIngress(): Promise<{ available: boolean; reason?: string }> {
+  const { probeAnyPublicIngressReady } = await import('./ingress/public-ingress-service.js');
+  return probeAnyPublicIngressReady();
 }
 
 /* ------------------------------------------------------------------ *

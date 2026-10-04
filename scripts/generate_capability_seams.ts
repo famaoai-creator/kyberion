@@ -89,6 +89,13 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     declaration: 'libs/core/ocr-bridge.ts',
     consumers: ['libs/core/ocr-bridge.ts'],
   },
+  'public-ingress-provider': {
+    declaration: 'libs/core/ingress/public-ingress-seam.ts',
+    consumers: [
+      'libs/core/ingress/public-ingress-provider-registry.ts',
+      'libs/core/ingress/public-ingress-service.ts',
+    ],
+  },
   'image-generation-provider': {
     declaration: 'libs/core/media/image-generation-bridge.ts',
     consumers: ['libs/core/media/image-generation-bridge.ts'],
