@@ -387,8 +387,21 @@ describe('operator schedule allowlist', () => {
     expect(scheduleAllowedByOperator('ai-audit', allowlist)).toBe(false);
   });
 
+  it('treats +ids as additive opt-ins that do not restrict other schedules', () => {
+    const additive = '+organization-standup, +organization-retro';
+    expect(scheduleAllowedByOperator('backup-daily', additive)).toBe(true);
+    expect(scheduleAllowedByOperator('organization-standup', additive)).toBe(true);
+    expect(scheduleExplicitlyOptedIn('organization-retro', additive)).toBe(true);
+    expect(scheduleExplicitlyOptedIn('organization-operation-tick', additive)).toBe(false);
+    // Mixed with plain ids, plain ids still restrict and +ids are allowed too.
+    const mixed = 'backup-daily,+organization-standup';
+    expect(scheduleAllowedByOperator('backup-daily', mixed)).toBe(true);
+    expect(scheduleAllowedByOperator('organization-standup', mixed)).toBe(true);
+    expect(scheduleAllowedByOperator('ai-audit', mixed)).toBe(false);
+  });
+
   it('fails closed when a set allowlist parses to no schedule ids', () => {
-    for (const allowlist of [',', '  ', ' , ,']) {
+    for (const allowlist of [',', '  ', ' , ,', '+', ' + , ']) {
       expect(scheduleAllowedByOperator('organization-daily-digest', allowlist), allowlist).toBe(
         false
       );
