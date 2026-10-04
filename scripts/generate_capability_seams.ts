@@ -46,6 +46,14 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
       'libs/core/reasoning/reasoning-bootstrap.ts',
     ],
   },
+  'voice.audio-playback': {
+    declaration: 'libs/core/voice/audio-playback.ts',
+    consumers: ['libs/core/voice/audio-playback.ts'],
+  },
+  'provider-backend-constructor': {
+    declaration: 'libs/core/provider/provider-backend-resolver.ts',
+    consumers: ['libs/core/provider/provider-backend-resolver.ts'],
+  },
   'actuator.capability-probe': {
     declaration: 'libs/core/actuator/actuator-capability.ts',
     consumers: ['libs/core/actuator/actuator-capability.ts'],

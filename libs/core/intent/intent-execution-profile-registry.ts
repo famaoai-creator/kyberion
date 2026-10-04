@@ -26,10 +26,10 @@ export interface IntentExecutionProfileProviderSelection {
     provider?: string;
   };
   meeting?: {
-    provider?: 'google_meet' | 'teams_pipeline' | 'zoom' | 'auto';
+    provider?: string;
     mode?: 'transcribe' | 'realtime';
     node?: 'local' | 'named-node';
-    audio_bridge?: 'blackhole' | 'pulseaudio' | 'none';
+    audio_bridge?: string;
     url_policy?: 'explicit_only' | 'explicit_or_detected';
   };
 }

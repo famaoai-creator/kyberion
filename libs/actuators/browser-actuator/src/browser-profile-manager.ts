@@ -12,7 +12,7 @@ import {
 import { pathResolver } from '@agent/core/path-resolver';
 import { readJsonIfPresent } from '@agent/core/foundation';
 
-export type BrowserProvider = 'chrome' | 'playwright' | 'firefox' | 'edge';
+export type BrowserProvider = string;
 
 export type BrowserProfileStatus = 'active' | 'idle' | 'locked';
 
@@ -215,6 +215,8 @@ export function listPlaywrightProfiles(customBaseDir?: string): BrowserProfile[]
         if (manifestData.name) name = manifestData.name;
         if (manifestData.email) email = manifestData.email;
         if (manifestData.metadata) metadata = manifestData.metadata;
+        if (typeof manifestData.engine === 'string')
+          metadata = { ...metadata, engine: manifestData.engine };
       }
 
       let status: BrowserProfileStatus = 'idle';

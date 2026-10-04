@@ -962,7 +962,10 @@ export class HerdrAgentPaneRuntimeBridge implements AgentPaneRuntimeBridge {
 export function registerHerdrAgentPaneRuntimeBridge(
   options: { bin?: string; exec?: HerdrExecFn } = {}
 ): () => void {
-  return registerAgentPaneRuntimeBridge(new HerdrAgentPaneRuntimeBridge(options));
+  return registerAgentPaneRuntimeBridge(new HerdrAgentPaneRuntimeBridge(options), {
+    provenance: 'builtin',
+    source: 'agent-pane-runtime-herdr',
+  });
 }
 
 registerHerdrAgentPaneRuntimeBridge();

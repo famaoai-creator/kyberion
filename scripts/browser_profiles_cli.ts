@@ -8,16 +8,18 @@
  *   pnpm kyberion browser open <url> [--profile <name|id|email>] [--provider chrome|playwright]
  */
 
-import { safeExecResultAsync } from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import {
-  listBrowserProfiles,
-  resolveBrowserProfile,
   createPlaywrightProfile,
   type BrowserProfile,
   type BrowserProvider,
 } from '../libs/actuators/browser-actuator/src/browser-profile-manager.js';
+import {
+  discoverBrowserProfiles,
+  resolveRegisteredBrowserProfile,
+  openRegisteredBrowserProfile,
+} from '../libs/actuators/browser-actuator/src/browser-profile-provider-registry.js';
 
 function formatTable(profiles: BrowserProfile[]): string {
   if (profiles.length === 0) {
@@ -50,62 +52,7 @@ export async function openProfileUrl(
   url: string,
   options: { print?: (msg: string) => void } = {}
 ): Promise<void> {
-  const print = options.print || console.log;
-
-  if (profile.provider === 'chrome') {
-    if (process.platform === 'darwin') {
-      const args = [
-        '-b',
-        'com.google.Chrome',
-        '--args',
-        `--profile-directory=${profile.profileDirectory || profile.id}`,
-        url,
-      ];
-      print(`[browser-cli] Opening ${url} in Chrome (${profile.name} [${profile.id}])...`);
-      const result = await safeExecResultAsync('open', args);
-      if (result.status !== 0) {
-        throw new Error(`Failed to open URL in Chrome: ${result.stderr}`);
-      }
-      return;
-    }
-
-    if (process.platform === 'win32') {
-      const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-      const args = [`--profile-directory=${profile.profileDirectory || profile.id}`, url];
-      print(`[browser-cli] Opening ${url} in Chrome (${profile.name})...`);
-      const result = await safeExecResultAsync(chromePath, args);
-      if (result.status !== 0) {
-        throw new Error(`Failed to open URL in Chrome: ${result.stderr}`);
-      }
-      return;
-    }
-
-    // Linux
-    const args = [`--profile-directory=${profile.profileDirectory || profile.id}`, url];
-    print(`[browser-cli] Opening ${url} in Chrome (${profile.name})...`);
-    const result = await safeExecResultAsync('google-chrome', args);
-    if (result.status !== 0) {
-      throw new Error(`Failed to open URL in Chrome: ${result.stderr}`);
-    }
-    return;
-  }
-
-  // Playwright managed profile
-  print(
-    `[browser-cli] Opening ${url} with Playwright profile (${profile.name} at ${profile.userDataDir})...`
-  );
-  // Dynamically load playwright to avoid strict dependency in non-browser environments
-  try {
-    const { chromium } = await import('@playwright/test');
-    const context = await chromium.launchPersistentContext(profile.userDataDir, {
-      headless: false,
-    });
-    const page = context.pages()[0] || (await context.newPage());
-    await page.goto(url);
-    print(`[browser-cli] URL opened in Playwright browser session.`);
-  } catch (err: any) {
-    throw new Error(`Failed to launch Playwright with profile: ${err.message}`);
-  }
+  await openRegisteredBrowserProfile(profile, url, options.print || console.log);
 }
 
 export async function main(argv: string[], print: (msg: string) => void): Promise<void> {
@@ -116,7 +63,7 @@ export async function main(argv: string[], print: (msg: string) => void): Promis
     .command('create <name>', 'Create a new isolated Playwright browser profile')
     .option('provider', {
       type: 'string',
-      description: 'Filter by provider (chrome, playwright, all)',
+      description: 'Filter by registered provider ID, or all',
       default: 'all',
     })
     .option('profile', {
@@ -181,7 +128,7 @@ export async function main(argv: string[], print: (msg: string) => void): Promis
 
     let targetProfile: BrowserProfile | undefined;
     if (profileQuery) {
-      targetProfile = resolveBrowserProfile({
+      targetProfile = await resolveRegisteredBrowserProfile({
         provider: provider !== 'all' ? provider : undefined,
         profile: profileQuery,
       });
@@ -193,7 +140,7 @@ export async function main(argv: string[], print: (msg: string) => void): Promis
       }
     } else {
       // Pick default profile or first available
-      const profiles = listBrowserProfiles({
+      const profiles = await discoverBrowserProfiles({
         provider: provider !== 'all' ? provider : undefined,
       });
       targetProfile = profiles.find((p) => p.isDefault) || profiles[0];
@@ -208,7 +155,7 @@ export async function main(argv: string[], print: (msg: string) => void): Promis
 
   // Default: list profiles
   const provider = parsed.provider as BrowserProvider | 'all';
-  const profiles = listBrowserProfiles({
+  const profiles = await discoverBrowserProfiles({
     provider: provider !== 'all' ? provider : undefined,
   });
 

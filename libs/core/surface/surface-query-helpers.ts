@@ -437,18 +437,63 @@ function finiteNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
+export interface SurfaceWeatherGeocodeResponseFields {
+  results_path?: string;
+  name_path?: string;
+  latitude_path?: string;
+  longitude_path?: string;
+  coerce_numeric_strings?: boolean;
+}
+
+export interface SurfaceWeatherForecastResponseFields {
+  current_path?: string;
+  temperature_path?: string;
+  weather_code_path?: string;
+  wind_speed_path?: string;
+  humidity_path?: string;
+  coerce_numeric_strings?: boolean;
+}
+
+function valueAtPath(value: unknown, path: string | undefined): unknown {
+  if (!path) return value;
+  let current: unknown = value;
+  for (const segment of path.split('.')) {
+    if (!current || typeof current !== 'object' || !Object.hasOwn(current, segment))
+      return undefined;
+    current = (current as Record<string, unknown>)[segment];
+  }
+  return current;
+}
+
+function mappedFiniteNumber(value: unknown, coerceNumericStrings = false): number | undefined {
+  const numeric = finiteNumber(value);
+  if (numeric !== undefined || !coerceNumericStrings || typeof value !== 'string') return numeric;
+  if (!value.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 export function parseSurfaceWeatherGeocodeResponse(
-  value: unknown
+  value: unknown,
+  fields: SurfaceWeatherGeocodeResponseFields = {}
 ): SurfaceWeatherGeocodeCandidate[] | undefined {
-  if (!isRecord(value) || !Array.isArray(value.results)) return undefined;
-  return value.results.flatMap((entry): SurfaceWeatherGeocodeCandidate[] => {
+  const entries = valueAtPath(value, fields.results_path ?? 'results');
+  if (!Array.isArray(entries)) return undefined;
+  return entries.flatMap((entry): SurfaceWeatherGeocodeCandidate[] => {
     if (!isRecord(entry)) return [];
-    const latitude = finiteNumber(entry.latitude);
-    const longitude = finiteNumber(entry.longitude);
+    const latitude = mappedFiniteNumber(
+      valueAtPath(entry, fields.latitude_path ?? 'latitude'),
+      fields.coerce_numeric_strings
+    );
+    const longitude = mappedFiniteNumber(
+      valueAtPath(entry, fields.longitude_path ?? 'longitude'),
+      fields.coerce_numeric_strings
+    );
     if (latitude === undefined || longitude === undefined) return [];
+    const name = valueAtPath(entry, fields.name_path ?? 'name');
     return [
       {
-        ...(typeof entry.name === 'string' && entry.name.trim() ? { name: entry.name } : {}),
+        ...(typeof name === 'string' && name.trim() ? { name } : {}),
         latitude,
         longitude,
       },
@@ -457,14 +502,28 @@ export function parseSurfaceWeatherGeocodeResponse(
 }
 
 export function parseSurfaceWeatherForecastResponse(
-  value: unknown
+  value: unknown,
+  fields: SurfaceWeatherForecastResponseFields = {}
 ): { current: SurfaceWeatherCurrent } | undefined {
-  if (!isRecord(value) || !isRecord(value.current)) return undefined;
+  const currentValue = valueAtPath(value, fields.current_path ?? 'current');
+  if (!isRecord(currentValue)) return undefined;
   const current: SurfaceWeatherCurrent = {};
-  const temperature = finiteNumber(value.current.temperature_2m);
-  const weatherCode = finiteNumber(value.current.weather_code);
-  const wind = finiteNumber(value.current.wind_speed_10m);
-  const humidity = finiteNumber(value.current.relative_humidity_2m);
+  const temperature = mappedFiniteNumber(
+    valueAtPath(currentValue, fields.temperature_path ?? 'temperature_2m'),
+    fields.coerce_numeric_strings
+  );
+  const weatherCode = mappedFiniteNumber(
+    valueAtPath(currentValue, fields.weather_code_path ?? 'weather_code'),
+    fields.coerce_numeric_strings
+  );
+  const wind = mappedFiniteNumber(
+    valueAtPath(currentValue, fields.wind_speed_path ?? 'wind_speed_10m'),
+    fields.coerce_numeric_strings
+  );
+  const humidity = mappedFiniteNumber(
+    valueAtPath(currentValue, fields.humidity_path ?? 'relative_humidity_2m'),
+    fields.coerce_numeric_strings
+  );
   if (temperature !== undefined) current.temperature_2m = temperature;
   if (weatherCode !== undefined) current.weather_code = weatherCode;
   if (wind !== undefined) current.wind_speed_10m = wind;
@@ -491,12 +550,14 @@ async function fetchWeatherSummary(queryText: string): Promise<string> {
         method: 'GET',
         url: geocodingUrl,
         params: {
-          name: locationHint,
-          count: 1,
-          language: resolveLocale(),
-          format: 'json',
+          ...(weatherConfig.geocoding?.query_values || {}),
+          [weatherConfig.geocoding?.query_keys?.query || 'name']: locationHint,
+          [weatherConfig.geocoding?.query_keys?.count || 'count']: 1,
+          [weatherConfig.geocoding?.query_keys?.language || 'language']: resolveLocale(),
+          [weatherConfig.geocoding?.query_keys?.format || 'format']: 'json',
         },
-      })
+      }),
+      weatherConfig.geocoding?.response_fields
     );
     const candidate = geocode?.[0];
     latitude = candidate?.latitude;
@@ -518,12 +579,21 @@ async function fetchWeatherSummary(queryText: string): Promise<string> {
       method: 'GET',
       url: forecastUrl,
       params: {
-        latitude,
-        longitude,
-        current: 'temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m',
-        timezone: 'auto',
+        ...(weatherConfig.forecast?.query_values || {}),
+        [weatherConfig.forecast?.query_keys?.latitude || 'latitude']: latitude,
+        [weatherConfig.forecast?.query_keys?.longitude || 'longitude']: longitude,
+        [weatherConfig.forecast?.query_keys?.current || 'current']: (
+          weatherConfig.forecast?.current_fields || [
+            'temperature_2m',
+            'weather_code',
+            'wind_speed_10m',
+            'relative_humidity_2m',
+          ]
+        ).join(','),
+        [weatherConfig.forecast?.query_keys?.timezone || 'timezone']: 'auto',
       },
-    })
+    }),
+    weatherConfig.forecast?.response_fields
   );
   const current = weather?.current || {};
   const temperature = current.temperature_2m;
@@ -533,34 +603,79 @@ async function fetchWeatherSummary(queryText: string): Promise<string> {
 
   return [
     `Weather for ${label}:`,
-    typeof temperature === 'number' ? `temperature ${temperature}°C` : 'temperature unavailable',
-    weatherCode !== undefined ? `code ${weatherCode}` : 'weather code unavailable',
-    typeof wind === 'number' ? `wind ${wind} km/h` : 'wind unavailable',
-    typeof humidity === 'number' ? `humidity ${humidity}%` : 'humidity unavailable',
+    typeof temperature === 'number'
+      ? `temperature ${temperature} ${weatherConfig.forecast?.display_units?.temperature || '°C'}`
+      : 'temperature unavailable',
+    weatherCode !== undefined
+      ? `code ${weatherConfig.forecast?.weather_code_labels?.[String(weatherCode)] || weatherCode}`
+      : 'weather code unavailable',
+    typeof wind === 'number'
+      ? `wind ${wind} ${weatherConfig.forecast?.display_units?.wind_speed || 'km/h'}`
+      : 'wind unavailable',
+    typeof humidity === 'number'
+      ? `humidity ${humidity} ${weatherConfig.forecast?.display_units?.humidity || '%'}`
+      : 'humidity unavailable',
   ].join(', ');
 }
 
+interface SurfaceWebSearchResult {
+  title: string;
+  url: string;
+  snippet?: string;
+}
+
+interface SurfaceWebSearchResponseFields {
+  results_path?: string;
+  title_path?: string;
+  url_path?: string;
+  snippet_path?: string;
+}
+
+function parseSurfaceWebSearchJson(
+  value: unknown,
+  fields: SurfaceWebSearchResponseFields,
+  limit: number
+): SurfaceWebSearchResult[] {
+  const results = valueAtPath(value, fields.results_path ?? 'results');
+  if (!Array.isArray(results)) return [];
+  return results
+    .flatMap((entry): SurfaceWebSearchResult[] => {
+      if (!isRecord(entry)) return [];
+      const title = valueAtPath(entry, fields.title_path ?? 'title');
+      const url = valueAtPath(entry, fields.url_path ?? 'url');
+      const snippet = valueAtPath(entry, fields.snippet_path ?? 'snippet');
+      if (typeof title !== 'string' || typeof url !== 'string') return [];
+      return [{ title, url, ...(typeof snippet === 'string' && snippet ? { snippet } : {}) }];
+    })
+    .slice(0, limit);
+}
+
 async function runWebSearch(queryText: string): Promise<string> {
-  const response = await secureFetch<string>({
+  const config = getSurfaceQueryProviderConfig({ scope: currentScope() }).web_search || {};
+  const responseFormat = config.response_format || 'duckduckgo_html';
+  const response = await secureFetch<unknown>({
     method: 'GET',
-    url: 'https://html.duckduckgo.com/html/',
+    url: config.url || 'https://html.duckduckgo.com/html/',
     params: {
-      q: queryText,
+      ...(config.query_values || {}),
+      [config.query_keys?.query || 'q']: queryText,
+      ...(config.query_keys?.limit ? { [config.query_keys.limit]: config.maxResults || 3 } : {}),
     },
   });
-  const results = extractDuckDuckGoResults(response, 3);
-  if (results.length === 0) {
-    return `No web search results were parsed for: ${queryText}`;
-  }
+  const limit = Math.max(1, Math.min(20, Math.floor(config.maxResults || 3)));
+  const results =
+    responseFormat === 'json'
+      ? parseSurfaceWebSearchJson(response, config.response_fields || {}, limit)
+      : extractDuckDuckGoResults(String(response ?? ''), limit);
+  if (results.length === 0) return 'No web search results were parsed for: ' + queryText;
   return [
-    `Web search results for: ${queryText}`,
+    'Web search results for: ' + queryText,
     ...results.map((result, index) => {
-      const snippet = result.snippet ? `\n  ${result.snippet}` : '';
-      return `${index + 1}. ${result.title}\n   ${result.url}${snippet}`;
+      const snippet = result.snippet ? '\n  ' + result.snippet : '';
+      return index + 1 + '. ' + result.title + '\n   ' + result.url + snippet;
     }),
   ].join('\n');
 }
-
 let knowledgeIndexPromise: Promise<KnowledgeHintIndex> | null = null;
 let _lastScope: KnowledgeScope | null = null;
 

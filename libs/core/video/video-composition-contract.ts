@@ -1,7 +1,7 @@
 export type VideoCompositionSceneRole = 'hook' | 'feature' | 'proof' | 'cta' | 'outro' | 'generic';
 export type VideoCompositionOutputFormat = 'mp4' | 'mov' | 'webm';
 export type VideoTemplateStatus = 'active' | 'shadow' | 'disabled';
-export type VideoRenderBackend = 'none' | 'hyperframes_cli';
+export type VideoRenderBackend = string;
 export type VideoRenderJobStatus =
   | 'queued'
   | 'validating_contract'

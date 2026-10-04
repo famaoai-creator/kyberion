@@ -29,3 +29,11 @@ if (isDirectEntry(import.meta.url, 'libs/actuators/network-actuator/src/index.ts
 export { handleAction };
 
 export { describeOps } from './op-catalog.js';
+export { registerA2ATransport, listA2ATransportMethods } from './a2a-transport.js';
+export type {
+  A2ATransport,
+  A2ATransportPacket,
+  A2ATransportOptions,
+  A2AEnvelope,
+  A2AInboxMessage,
+} from './a2a-transport.js';

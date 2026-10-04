@@ -104,6 +104,10 @@ Centralized defaults are acceptable when they are named, documented, and
 overrideable. A literal is not a configuration abstraction merely because it
 is declared in a local function.
 
+### Local playback providers
+
+Local audio output implementations register with the `voice.audio-playback` core seam. Each provider declares its backend ID, supported platforms, availability probe, command builder, and selection priority. `KYBERION_AUDIO_PLAYBACK_BACKEND` selects a registered ID explicitly; otherwise the highest-priority provider for the current platform is selected. The built-in afplay, aplay, and PowerShell adapters remain the defaults.
+
 ## Verification requirements
 
 Lifecycle tests should inject failures at each acquisition boundary and assert

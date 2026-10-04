@@ -57,4 +57,7 @@ export class ColabComputeDriver extends BaseComputeDriver {
 }
 
 // Auto-register Colab compute driver
-registerComputeDriver(new ColabComputeDriver());
+registerComputeDriver(new ColabComputeDriver(), {
+  provenance: 'builtin',
+  source: 'colab-compute-driver',
+});

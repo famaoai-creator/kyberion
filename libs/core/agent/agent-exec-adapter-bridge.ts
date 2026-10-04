@@ -6,7 +6,7 @@
  */
 
 import type { AgentAdapter } from './agent-adapter.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 export interface AgentExecAdapterRequest {
   provider: string;
@@ -36,16 +36,22 @@ const execAdapterSeam = createSeam<AgentExecAdapterBridge>({
 
 const registeredDisposers = new Map<string, () => void>();
 
-export function registerAgentExecAdapterBridge(bridge: AgentExecAdapterBridge): () => void {
+export function registerAgentExecAdapterBridge(
+  bridge: AgentExecAdapterBridge,
+  metadata: SeamProviderMetadata = {
+    provenance: 'plugin',
+    source: 'agent-exec-adapter-extension',
+  }
+): () => void {
   const id = String(bridge.bridge_id || '').trim();
   if (!id) throw new Error('AgentExecAdapterBridge.bridge_id is required');
-  registeredDisposers.get(id)?.();
-  const disposer = execAdapterSeam.register(id, bridge, {
-    provenance: 'builtin',
-    source: 'agent-exec-adapter-bridge',
-  });
-  registeredDisposers.set(id, disposer);
-  return disposer;
+  const disposeFromSeam = execAdapterSeam.register(id, bridge, metadata);
+  const dispose = () => {
+    disposeFromSeam();
+    if (registeredDisposers.get(id) === dispose) registeredDisposers.delete(id);
+  };
+  registeredDisposers.set(id, dispose);
+  return dispose;
 }
 
 export function resetAgentExecAdapterBridges(): void {
