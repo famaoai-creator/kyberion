@@ -753,6 +753,65 @@ export function safeCreateExclusiveFileSync(filePath: string, data: string | Buf
 }
 
 /**
+ * Publish a complete file at `filePath` exclusively. The content is written
+ * and fsynced to a unique sibling temp file first, then hard-linked into
+ * place: link() fails with EEXIST when the target exists, and a crash can
+ * never leave a zero-length or partial record at `filePath` (only an orphaned
+ * temp sibling). Filesystems without hard links fall back to the wx-create
+ * path of safeCreateExclusiveFileSync.
+ */
+export function safePublishExclusiveFileSync(filePath: string, data: string | Buffer): void {
+  assertSensitivePathAllowed(filePath, 'write', isSensitivePathMediated());
+  const resolved = pathResolver.resolve(filePath);
+  const guard = validateWritePermission(resolved);
+  if (!guard.allowed) throw new Error(guard.reason);
+  const dir = path.dirname(resolved);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  const temp = `${resolved}.${process.pid}.${createHash('sha256')
+    .update(`${Date.now()}:${Math.random()}`)
+    .digest('hex')
+    .slice(0, 12)}.tmp`;
+  const fd = fs.openSync(temp, 'wx');
+  try {
+    try {
+      if (data.length > 0) fs.writeFileSync(fd, data);
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+    try {
+      fs.linkSync(temp, resolved);
+    } catch (err: unknown) {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      if (code !== 'ENOTSUP' && code !== 'ENOSYS' && code !== 'EPERM' && code !== 'EXDEV')
+        throw err;
+      safeCreateExclusiveFileSync(filePath, data);
+    }
+  } finally {
+    try {
+      fs.unlinkSync(temp);
+    } catch (_) {
+      /* best-effort cleanup */
+    }
+  }
+}
+
+/**
+ * Milliseconds since `filePath` was last modified, or undefined when it does
+ * not exist. Used by lock recovery to age-bound reclaim of orphaned records.
+ */
+export function safeFileAgeMs(filePath: string): number | undefined {
+  try {
+    return Date.now() - safeStat(filePath).mtimeMs;
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return undefined;
+    throw err;
+  }
+}
+
+/**
  * Safely fsync an existing file for durability.
  */
 export function safeFsyncFile(filePath: string): void {
@@ -1466,6 +1525,9 @@ registerOptionalAuditIo('registerLockIo', {
   exists: safeExistsSync,
   mkdir: (dirPath) => safeMkdir(dirPath, { recursive: true }),
   createExclusive: (filePath, content) => safeCreateExclusiveFileSync(filePath, content),
+  publishExclusive: (filePath, content) => safePublishExclusiveFileSync(filePath, content),
+  ageMs: safeFileAgeMs,
+  rename: safeMoveSync,
   unlink: safeUnlinkSync,
   loadJson: secureLoadJson,
 });

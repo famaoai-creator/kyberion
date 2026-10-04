@@ -518,9 +518,10 @@ export function enforceApprovalGate(
   // requests) returned above and are never short-circuited. Hardened policies
   // (dual-key = tier-sensitive secrets, injection-suspected override) bypass
   // the cache entirely, and the descriptor must name this exact operation.
+  // Mandatory floors (incl. strict-posture-floor, which always sets
+  // mandatoryApproval) are never cache-eligible.
   const sessionCacheEligible =
     !policy.mandatoryApproval &&
-    policy.matchedRuleId !== 'strict-posture-floor' &&
     policy.matchedRuleId !== 'injection-suspected-override' &&
     !policy.missingRequirements.includes('dual_key_confirmation');
   const descriptor = params.actionDescriptor;

@@ -59,6 +59,12 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 1048576
+          },
+          "replay_window_hours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 720,
+            "description": "Payload-digest replay window in hours (default 24). Within it, a same-source event whose raw-body digest matches an earlier one is a duplicate regardless of its (unsigned) event type or delivery id. Senders that legitimately repeat identical bodies under different event types must lower it; 0 disables payload-digest dedupe, leaving only (source, delivery_id) dedupe."
           }
         }
       }
