@@ -431,9 +431,9 @@ export function buildApplySummary(
     `Summary: ${paths.summaryPath}`,
     '',
     'Next steps:',
-    '1. Run `pnpm pipeline vital-check` to verify the live ecosystem health.',
-    '2. Open Chronos to confirm the identity badge and tenant context.',
-    '3. Re-run `pnpm onboarding apply --json` if you need machine-readable output.',
+    `1. Export the persona in your shell: \`export KYBERION_PERSONA=${resolveInputPersona(input)}\` (.env.local is not loaded by pnpm scripts).`,
+    '2. Run `pnpm pipeline --input pipelines/baseline-check.json` and continue the onboarding flow from its status.',
+    '3. Open Chronos to confirm the identity badge and tenant context.',
   ];
   return lines.join('\n');
 }

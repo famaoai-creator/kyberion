@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Onboarding'
 tags: [governance, lifecycle, onboarding]
-last_updated: 2026-09-22
+last_updated: 2026-10-04
 runtime_stages: [intake, classification]
 ---
 
@@ -17,11 +17,15 @@ lifecycle phase から参照する短い runbook で、各項目の番号は標�
 
 ## ルートを決める
 
-| ルート              | 通る Step                                               |
-| ------------------- | ------------------------------------------------------- |
-| 1. 個人のみ         | 0 → 1 → 2 → 3 → 4 → 9                                   |
-| 2. AI 会社          | 0〜4 → 5〜8（`onboard company` で 5・6 をまとめる） → 9 |
-| 3. 既存テナント追加 | 0〜9 すべて                                             |
+| ルート              | 通る Step                                                    |
+| ------------------- | ------------------------------------------------------------ |
+| 1. 個人のみ         | 0 → 1 → 2 → 3 → 4 → 9                                        |
+| 2. AI 会社          | 0〜4 → 5〜8（`onboard company` で 5・6 をまとめる） → 9 → 10 |
+| 3. 既存テナント追加 | 0〜10 すべて                                                 |
+
+ルート 2 は `onboard company` の直後に company stance へ切り替え、その stance でも identity を
+保存する（mission start が `customer/<slug>/my-identity.json` などを要求するため）。順序の詳細は
+標準フローの「ルート 2（AI 会社）の実行順」を参照する。
 
 ## 実行順
 
@@ -51,6 +55,7 @@ pnpm onboarding
 # または（非対話）
 pnpm onboarding apply --identity <reviewed-identity-json> --dry-run
 pnpm onboarding apply --identity <reviewed-identity-json>
+export KYBERION_PERSONA=sovereign   # .env.local は自動では読み込まれない
 ```
 
 GUI では concierge（`http://127.0.0.1:3050`）の `/settings` から保存できる。メンバーと承認者も
@@ -85,6 +90,13 @@ pnpm onboarding:context first-work --customer-slug <customer-slug> \
 未登録、`suspended`、`archived`、または reserved scope 名の tenant は先へ進めない。
 activation receipt が `active` になるまで、first-work の apply と tenant に紐づく mission は
 fail-closed で停止する。オプションの詳細は標準フロー Step 5〜8 を参照する。
+
+### Step 10: 組織の運営（ルート 2・3）
+
+`pnpm organization status` で現状と次の行動を確認し、purpose → domain / service →
+cadence / decision → operation の順に governed facade で登録する。定常業務は
+`pnpm scope use` で scope を選んでから `operation run execute` / `operation tick` で回す。
+コマンド例は標準フロー Step 10 を参照する。
 
 ### Step 9: 完了確認
 

@@ -501,6 +501,14 @@ export function tenantGroupPath(groupId: string): string {
   return path.join(tenantGroupDir(), `${groupId}.json`);
 }
 
+/**
+ * Isolation every new tenant starts with: strict scope, no cross-tenant
+ * distillation. Tenant activation's memory_policy check requires exactly this.
+ */
+export const DEFAULT_TENANT_ISOLATION_POLICY: Readonly<
+  Required<NonNullable<TenantProfile['isolation_policy']>>
+> = Object.freeze({ strict_isolation: true, allow_cross_distillation: false });
+
 export function ensureDefaultTenantProfile(): TenantProfile {
   const file = tenantProfilePath('default');
   const existing = readTenantProfile('default');
@@ -513,10 +521,7 @@ export function ensureDefaultTenantProfile(): TenantProfile {
     display_name: 'Default Tenant',
     status: 'active',
     assigned_role: 'owner',
-    isolation_policy: {
-      strict_isolation: true,
-      allow_cross_distillation: false,
-    },
+    isolation_policy: { ...DEFAULT_TENANT_ISOLATION_POLICY },
     metadata: {
       bootstrap_source: 'tenant-registry.ensureDefaultTenantProfile',
       created_at: now,
