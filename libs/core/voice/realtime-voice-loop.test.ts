@@ -867,3 +867,190 @@ describe('realtime voice loop helpers', () => {
     ).toBe('   (1.2s captured, endpoint)');
   });
 });
+
+describe('conversation engine integration (CE)', () => {
+  const JA_AIZUCHI = new Set(['うん', 'うんうん', 'はい', 'なるほど', 'そうそう', 'へえ']);
+
+  type TraceEvent = { name: string } & Record<string, string | number | boolean>;
+  const makeTrace = () => {
+    const events: TraceEvent[] = [];
+    return {
+      events,
+      trace: {
+        addEvent: (name: string, attributes?: Record<string, string | number | boolean>) =>
+          events.push({ name, ...attributes }),
+      },
+    };
+  };
+
+  /**
+   * Streaming STT double that returns a different `final` per utterance feed
+   * (feed index = utterance index) and an optional constant partial.
+   */
+  function queuedStreamingStt(finals: string[], partial?: string): StreamingSpeechToTextBridge {
+    let feedIndex = -1;
+    return {
+      bridge_id: 'queued',
+      async *transcribeStream(audio) {
+        feedIndex += 1;
+        const final = finals[Math.min(feedIndex, finals.length - 1)];
+        for await (const _chunk of audio) {
+          if (partial) {
+            yield { utterance_id: 'u', is_final: false, text: partial, emitted_at: '' };
+          }
+        }
+        yield { utterance_id: 'u', is_final: true, text: final, emitted_at: '' };
+      },
+    };
+  }
+
+  it(
+    'emits an agent backchannel through the CE→output shortcut while the user talks, without a reasoning call',
+    { timeout: 60_000 },
+    async () => {
+      const synth: Array<{ segment: string; index: number }> = [];
+      const { events, trace } = makeTrace();
+      const turns: RealtimeVoiceLoopTurnResult[] = [];
+      let replyCalls = 0;
+
+      const handle = await startRealtimeVoiceLoop({
+        recordingDir: testDir,
+        consent: { requireRecordingConsent: false },
+        // 3s of paced speech so the engine has ticks to emit mid-utterance.
+        mic: {
+          command: micCommand([{ pacedSpeech: 3000 }, { pacedSilence: 1200 }]),
+          sampleRateHz: 16000,
+          chunkMs: 100,
+        },
+        vad: { rmsThreshold: 800, endpointMs: 700 },
+        maxTurns: 1,
+        streamingStt: queuedStreamingStt(['それで問題があるんです'], 'それでですね'),
+        interaction: {
+          backchannel: { minSpeechMs: 500, minIntervalMs: 1000, maxPerUtterance: 2 },
+        },
+        transcribe: async () => 'それで問題があるんです',
+        reply: async () => {
+          replyCalls += 1;
+          return 'なるほど、問題を整理しましょう。';
+        },
+        synthesizeSegment: async (segment, index) => {
+          synth.push({ segment, index });
+          return '/tmp/fake.wav';
+        },
+        play: () => immediateHandle(),
+        onTurn: (turn) => turns.push(turn),
+        trace,
+      });
+
+      const report = await handle.done;
+      expect(report.turns_completed).toBe(1);
+      expect(replyCalls).toBe(1);
+      // At least one CE backchannel was synthesized on the shortcut path
+      // (segment index -1), in Japanese, before the reply's own segments.
+      const reactions = synth.filter((call) => call.index === -1);
+      expect(reactions.length).toBeGreaterThanOrEqual(1);
+      expect(reactions.every((call) => JA_AIZUCHI.has(call.segment))).toBe(true);
+      const firstReplyIndex = synth.findIndex((call) => call.index >= 0);
+      const firstReactionIndex = synth.findIndex((call) => call.index === -1);
+      expect(firstReactionIndex).toBeGreaterThanOrEqual(0);
+      expect(firstReactionIndex).toBeLessThan(firstReplyIndex);
+      expect(events.some((e) => e.name === 'realtime_voice.backchannel')).toBe(true);
+      expect(turns[0].assistant_text).toBe('なるほど、問題を整理しましょう。');
+    }
+  );
+
+  it(
+    'answers a pure hold request (「ちょっと待って」) with an instant reaction — no reasoning call',
+    { timeout: 60_000 },
+    async () => {
+      const synth: string[] = [];
+      const { events, trace } = makeTrace();
+      const turns: RealtimeVoiceLoopTurnResult[] = [];
+      let replyCalls = 0;
+
+      const handle = await startRealtimeVoiceLoop({
+        recordingDir: testDir,
+        consent: { requireRecordingConsent: false },
+        // 「〜て」 trails off → EOT holds, then force-commits after maxHoldMs.
+        mic: {
+          command: micCommand([{ speech: 400 }, { pacedSilence: 3000 }]),
+          sampleRateHz: 16000,
+          chunkMs: 100,
+        },
+        vad: { rmsThreshold: 800, endpointMs: 700 },
+        maxTurns: 1,
+        streamingStt: queuedStreamingStt(['ちょっと待って']),
+        interaction: { intentShortcuts: true },
+        transcribe: async () => 'ちょっと待って',
+        reply: async () => {
+          replyCalls += 1;
+          return 'should-never-be-called';
+        },
+        synthesizeSegment: async (segment) => {
+          synth.push(segment);
+          return '/tmp/fake.wav';
+        },
+        play: () => immediateHandle(),
+        onTurn: (turn) => turns.push(turn),
+        trace,
+      });
+
+      const report = await handle.done;
+      expect(report.turns_completed).toBe(1);
+      expect(replyCalls).toBe(0);
+      expect(turns).toHaveLength(1);
+      expect(turns[0].user_text).toBe('ちょっと待って');
+      expect(JA_AIZUCHI.has(turns[0].assistant_text)).toBe(true);
+      expect(turns[0].metrics.llm_ms).toBe(0);
+      expect(synth.every((segment) => JA_AIZUCHI.has(segment))).toBe(true);
+      expect(events.some((e) => e.name === 'realtime_voice.intent_shortcut')).toBe(true);
+    }
+  );
+
+  it(
+    'drops a pure user backchannel (「うん」) but still answers the real question after it',
+    { timeout: 60_000 },
+    async () => {
+      const { events, trace } = makeTrace();
+      const turns: RealtimeVoiceLoopTurnResult[] = [];
+      let replyCalls = 0;
+
+      const handle = await startRealtimeVoiceLoop({
+        recordingDir: testDir,
+        consent: { requireRecordingConsent: false },
+        mic: {
+          command: micCommand([
+            { speech: 400 },
+            { pacedSilence: 1400 },
+            { speech: 400 },
+            { pacedSilence: 1400 },
+          ]),
+          sampleRateHz: 16000,
+          chunkMs: 100,
+        },
+        vad: { rmsThreshold: 800, endpointMs: 700 },
+        maxTurns: 1,
+        streamingStt: queuedStreamingStt(['うん', '明日の予定を教えてください']),
+        interaction: { intentShortcuts: true },
+        transcribe: async () => '明日の予定を教えてください',
+        reply: async (userText) => {
+          replyCalls += 1;
+          return `了解です (${userText})。`;
+        },
+        synthesizeSegment: async () => '/tmp/fake.wav',
+        play: () => immediateHandle(),
+        onTurn: (turn) => turns.push(turn),
+        trace,
+      });
+
+      const report = await handle.done;
+      // Only the substantive turn reached reasoning.
+      expect(replyCalls).toBe(1);
+      expect(turns).toHaveLength(1);
+      expect(turns[0].user_text).toBe('明日の予定を教えてください');
+      expect(
+        events.some((e) => e.name === 'realtime_voice.intent_drop' && e.intent === 'backchannel')
+      ).toBe(true);
+    }
+  );
+});
