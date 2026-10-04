@@ -4,7 +4,7 @@ import * as React from 'react';
 import './kyberion-ui-tokens.css';
 import './kyberion-ui.css';
 import './globals.css';
-import { readFrontDeskSurfacePorts } from '@agent/core/front-desk-nav';
+import { readFrontDeskSurfacePorts, readFrontDeskSurfaceUrls } from '@agent/core/front-desk-nav';
 import { THEME_BOOTSTRAP_SCRIPT } from '../lib/concierge-theme';
 import { ConciergeShell } from './concierge-shell';
 import { ConciergeHeader } from './concierge-header';
@@ -33,6 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // importing `@agent/core/front-desk-nav` itself (that module pulls in
   // `surface-runtime`/`secure-io`, which cannot be bundled for the browser).
   const frontDeskPorts = readFrontDeskSurfacePorts();
+  const frontDeskUrls = readFrontDeskSurfaceUrls();
 
   return (
     // `data-theme` (a pinned light/dark choice) and `lang` are set on the
@@ -53,8 +54,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           nav={<FrontDeskRail />}
           overlays={
             <>
-              <ConversationDock />
-              <CommandPalette frontDeskPorts={frontDeskPorts} />
+              <ConversationDock progressHref={frontDeskUrls['presence-studio'] + '/progress'} />
+              <CommandPalette frontDeskPorts={frontDeskPorts} frontDeskUrls={frontDeskUrls} />
             </>
           }
         >

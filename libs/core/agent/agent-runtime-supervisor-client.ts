@@ -309,6 +309,7 @@ export function computeSupervisorCodeStamp(): number {
 
 export interface AgentRuntimeSupervisorEnsurePayload {
   agentId: string;
+  manifestAgentId?: string;
   provider: string;
   modelId?: string;
   systemPrompt?: string;
@@ -742,6 +743,7 @@ export function toSupervisorEnsurePayload(
   }
   return {
     agentId: options.agentId!,
+    manifestAgentId: options.manifestAgentId,
     provider: options.provider,
     modelId: options.modelId,
     systemPrompt: options.systemPrompt,

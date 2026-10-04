@@ -43,8 +43,14 @@
     });
   }
 
+  function scopedUrl(path) {
+    return window.KyberionPrefs && window.KyberionPrefs.scopedUrl
+      ? window.KyberionPrefs.scopedUrl(path)
+      : path;
+  }
+
   function fetchJson(url) {
-    return fetch(url).then(function (response) {
+    return fetch(scopedUrl(url)).then(function (response) {
       return response.json();
     });
   }
@@ -147,7 +153,7 @@
         return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
       })
       .join('&');
-    window.location.href = query ? '/ask?' + query : '/ask';
+    window.location.href = scopedUrl(query ? '/ask?' + query : '/ask');
   }
 
   function wireAskBox(vocab) {
@@ -186,7 +192,7 @@
 
   function decideHref(nav) {
     var item = navItem(nav, 'decide');
-    return item ? item.href : '/';
+    return scopedUrl(item ? item.href : '/');
   }
 
   var DECIDE_TAG_KEY = {
@@ -239,7 +245,10 @@
       state: clear ? 'empty' : 'ready',
     };
     if (top) props.reason = renderTemplate(fd(vocab, 'home_recommend'), { title: top.title });
-    if (primary && primary.label) props.primary = primary;
+    if (primary && primary.label) {
+      primary.href = scopedUrl(primary.href);
+      props.primary = primary;
+    }
     draw(document.getElementById('home-next'), [
       { id: 'home-next-action', type: 'ui:next-action', props: props },
     ]);
@@ -324,7 +333,7 @@
   // FD-05: each row deep-links to its own item on the "進み具合" page (kept in
   // the URL hash there so a reload restores the selection).
   function progressHref(item) {
-    return '/progress#' + encodeURIComponent(item.id);
+    return scopedUrl('/progress#' + encodeURIComponent(item.id));
   }
 
   function renderProgressCard(vocab, home) {
@@ -337,7 +346,10 @@
       });
     }
     var moreLink = document.getElementById('progress-more');
-    if (moreLink) moreLink.textContent = fd(vocab, 'home_progress_more');
+    if (moreLink) {
+      moreLink.textContent = fd(vocab, 'home_progress_more');
+      moreLink.setAttribute('href', scopedUrl('/progress'));
+    }
 
     var items = (home.progress || []).slice(0, 4);
     var body = document.getElementById('progress-body');
@@ -364,7 +376,13 @@
             if (delivered) {
               var receive = fd(vocab, 'action_receive');
               if (receive) row.meta = receive;
-            } else if (typeof item.percent === 'number' && isFinite(item.percent)) {
+            } else if (
+              item.progress_basis === 'phase_estimate' &&
+              typeof item.percent === 'number' &&
+              isFinite(item.percent)
+            ) {
+              // Status order is an estimate, never a measured completion percentage.
+              row.meta = fd(vocab, 'progress_phase_estimate');
               row.progress = Math.max(0, Math.min(100, item.percent));
             }
             return row;
@@ -374,51 +392,42 @@
     ]);
   }
 
-  function storedTenantQuery() {
-    try {
-      var slug = window.localStorage.getItem('front-desk.tenant');
-      return slug ? '?tenant=' + encodeURIComponent(slug) : '';
-    } catch (err) {
-      return '';
-    }
-  }
-
   function mount() {
     var locale = currentLocale();
-    var navPromise =
-      window.FrontDeskRail && window.FrontDeskRail.nav
-        ? window.FrontDeskRail.nav()
-        : fetchJson('/api/front-desk/nav?locale=' + encodeURIComponent(locale));
-    Promise.all([
-      navPromise,
-      fetchJson('/api/home-vocabulary?locale=' + encodeURIComponent(locale)),
-    ])
-      .then(function (pair) {
-        var nav = pair[0];
-        var vocabResponse = pair[1];
-        if (!vocabResponse || !vocabResponse.ok) return undefined;
-        var vocab = vocabResponse.texts || {};
-        renderAskShell(vocab);
-        wireAskBox(vocab);
-        var tenantQuery = storedTenantQuery();
-        return Promise.all([
-          fetchJson('/api/home' + tenantQuery),
-          fetchJson('/api/me' + tenantQuery),
-        ]).then(function (pair2) {
-          var home = pair2[0];
-          var me = pair2[1];
-          if (home && home.ok && nav && nav.ok) {
-            renderNextAction(nav, vocab, home, locale);
-            renderMetrics(vocab, home);
-            renderDecideCard(nav, vocab, home, me);
-            renderProgressCard(vocab, home);
-          }
+    return Promise.resolve(window.FrontDeskRail && window.FrontDeskRail.ready).then(function () {
+      // Scope validation may invalidate the rail's cached navigation promise.
+      // Acquire it only after readiness so this page cannot retain an old scope.
+      var navPromise =
+        window.FrontDeskRail && window.FrontDeskRail.nav
+          ? window.FrontDeskRail.nav()
+          : fetchJson('/api/front-desk/nav?locale=' + encodeURIComponent(locale));
+      return Promise.all([
+        navPromise,
+        fetchJson('/api/home-vocabulary?locale=' + encodeURIComponent(locale)),
+      ])
+        .then(function (pair) {
+          var nav = pair[0];
+          var vocabResponse = pair[1];
+          if (!vocabResponse || !vocabResponse.ok) return undefined;
+          var vocab = vocabResponse.texts || {};
+          renderAskShell(vocab);
+          wireAskBox(vocab);
+          return Promise.all([fetchJson('/api/home'), fetchJson('/api/me')]).then(function (pair2) {
+            var home = pair2[0];
+            var me = pair2[1];
+            if (home && home.ok && nav && nav.ok) {
+              renderNextAction(nav, vocab, home, locale);
+              renderMetrics(vocab, home);
+              renderDecideCard(nav, vocab, home, me);
+              renderProgressCard(vocab, home);
+            }
+          });
+        })
+        .catch(function () {
+          // The home page is additive chrome around the rail — a fetch
+          // failure must never throw and break the rest of the page.
         });
-      })
-      .catch(function () {
-        // The home page is additive chrome around the rail — a fetch
-        // failure must never throw and break the rest of the page.
-      });
+    });
   }
 
   window.KyberionHome = { mount: mount };
