@@ -41,6 +41,73 @@
           }
         }
       ]
+    },
+    "keyResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kr_id", "title", "metric", "target", "direction"],
+      "properties": {
+        "kr_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "maxLength": 64 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "metric": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source", "probe"],
+              "properties": {
+                "source": { "const": "probe" },
+                "probe": { "$ref": "#/definitions/stateProbe" },
+                "aggregate": { "enum": ["value", "count"] }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source", "path", "json_path"],
+              "properties": {
+                "source": { "const": "file" },
+                "path": { "type": "string", "minLength": 1 },
+                "json_path": { "type": "string", "minLength": 1 },
+                "aggregate": { "enum": ["value", "count"] }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source", "signal"],
+              "properties": {
+                "source": { "const": "signal_ratio" },
+                "signal": { "type": "string", "minLength": 1, "maxLength": 300 },
+                "window_hours": { "type": "number", "exclusiveMinimum": 0, "maximum": 720 }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source", "metric"],
+              "properties": {
+                "source": { "const": "org_metric" },
+                "metric": {
+                  "enum": [
+                    "overdue_operations",
+                    "open_incidents",
+                    "pending_decisions",
+                    "unhealthy_services"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "target": { "type": "number" },
+        "direction": { "enum": ["increase", "decrease", "maintain"] },
+        "baseline": { "type": "number" },
+        "unit": { "type": "string", "maxLength": 40 },
+        "weight": { "type": "number", "exclusiveMinimum": 0 },
+        "every_s": { "type": "integer", "minimum": 60 },
+        "settle_minutes": { "type": "integer", "minimum": 0, "maximum": 10080 }
+      }
     }
   },
   "required": [
@@ -122,6 +189,18 @@
             "wall_clock_ms_per_wake": { "type": "integer", "minimum": 1000 },
             "token_cap_per_day": { "type": "integer", "minimum": 1 }
           }
+        },
+        "key_results": {
+          "type": "array",
+          "maxItems": 10,
+          "items": { "$ref": "#/definitions/keyResult" },
+          "description": "Quantified key results (metric, target, direction) measured by the resident sweep; drives goal-gap prompts and outcome checks."
+        },
+        "outcome_settle_minutes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10080,
+          "description": "Default minutes to wait after a delegated action completes before measuring its outcome (default 60)."
         }
       }
     },
@@ -182,6 +261,35 @@
                   "probe": { "$ref": "#/definitions/stateProbe" },
                   "every_s": { "type": "integer", "minimum": 10 }
                 }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "sources"],
+                "properties": {
+                  "kind": { "const": "event" },
+                  "sources": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" }
+                  },
+                  "types": {
+                    "type": "array",
+                    "maxItems": 50,
+                    "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+                  },
+                  "match": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["json_path"],
+                    "properties": {
+                      "json_path": { "type": "string", "minLength": 1 },
+                      "equals": {},
+                      "in": { "type": "array", "maxItems": 50 }
+                    }
+                  }
+                }
               }
             ]
           }
@@ -206,7 +314,13 @@
           "items": { "enum": ["mission", "task_session", "pipeline", "direct_reply"] },
           "description": "Work shapes the dot may dispatch. The dot itself never writes outside its authority role's scopes; substantive work is delegated as WorkItems."
         },
-        "max_concurrent_delegations": { "type": "integer", "minimum": 1 }
+        "max_concurrent_delegations": { "type": "integer", "minimum": 1 },
+        "allowed_pipelines": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "type": "string", "minLength": 1, "maxLength": 300 },
+          "description": "Repo-relative pipeline files the dot executor may run for pipeline-shaped work. Empty/absent means no pipeline execution."
+        }
       }
     },
     "decisions": {
@@ -283,10 +397,35 @@
           "description": "dot_ids allowed to hand work to this dot; a handoff wakes this dot through the dot inbox."
         },
         "goal_ref": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 200,
-          "description": "Organization-level goal this dot contributes to."
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["objective_id"],
+              "properties": {
+                "organization_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+                "objective_id": { "type": "string", "minLength": 1, "maxLength": 200 }
+              }
+            }
+          ],
+          "description": "Organization-level goal this dot contributes to: a free-text label, or a reference to an organization objective."
+        },
+        "owns": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "description": "Target patterns (path:<glob>, service:<id>, ...) this dot owns; the sole owner wins arbitration."
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Arbitration priority (default 50)."
         }
       }
     },
@@ -308,8 +447,41 @@
           "type": "integer",
           "minimum": 60000,
           "description": "Upper bound between wakes even when no trigger fires (self-check cadence)."
+        },
+        "cron_catch_up_hours": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 24,
+          "description": "How far back missed cron runs are coalesced into one catch-up wake after downtime (default 6)."
         }
       }
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "max_bytes": { "type": "integer", "minimum": 1024, "maximum": 65536 }
+      },
+      "description": "Per-dot working memory (notes, open items, hypotheses)."
+    },
+    "followups": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_pending": { "type": "integer", "minimum": 0, "maximum": 20 }
+      },
+      "description": "Self-scheduled follow-up wakes."
+    },
+    "autonomy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "initial_level": { "enum": ["L0", "L1", "L2", "L3", "L4"] },
+        "max_level": { "enum": ["L0", "L1", "L2", "L3", "L4"] },
+        "min_level": { "enum": ["L0", "L1", "L2", "L3", "L4"] }
+      },
+      "description": "Autonomy ladder bounds (L0 shadow .. L4 autonomous)."
     }
   }
 }

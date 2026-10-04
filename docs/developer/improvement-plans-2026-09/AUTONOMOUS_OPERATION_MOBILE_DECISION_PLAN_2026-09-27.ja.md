@@ -132,6 +132,8 @@ status: active
 | P4 上流計画の委任       | 包括委任、計画パネル、相談の自己解決(D)                                | 包括委任の範囲内のミッションが人の操作なしで開始される                                    |
 | P5 段階的な引き上げ     | 自律度の設定、指標、パスキー PWA(E)                                    | 指標に基づいて自律度が変更され、高リスク承認がパスキーで行える                            |
 
+補足(2026-10-05): resident dot の自律度 L0〜L4・指標・昇格(人間承認)・自動降格は DL-10、日次の予算上限は DL-07 で実装済み([DOT_ORG_LOOP_PLAN](../improvement-plans-2026-10/DOT_ORG_LOOP_PLAN_2026-10-04.ja.md))。パスキー PWA は対象外。
+
 ## P0 の結果(2026-09-27)
 
 ミッション `MSN-AUTONOMOUS-MOBILE-DECISION-20260927` で、人の介入を集計する `scripts/report_human_interventions.ts` を実装した(実行: `node dist/scripts/report_human_interventions.js [--since YYYY-MM-DD] [--json]`)。
@@ -264,6 +266,6 @@ P0 の結果から、P1 の最初に承認ストアを整える。これが済�
 ## 未決事項
 
 - 猶予時間の長さ(案: 中リスク PR は2時間、中リスクの計画は12時間)
-- 1日あたりの予算上限
+- 1日あたりの予算上限(resident dot については DL-07 の組織予算ガバナーが日次トークン上限を実装済み: [DOT_ORG_LOOP_PLAN](../improvement-plans-2026-10/DOT_ORG_LOOP_PLAN_2026-10-04.ja.md))
 - 包括委任の対象とする作業の種類の初期リスト
 - 試行モードから有効にするために必要な一致率

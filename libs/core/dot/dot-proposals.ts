@@ -32,7 +32,39 @@ export interface DotProposal {
   /** Hand the work to another dot instead of the worker pool. */
   handoff_to?: string;
   priority?: 'low' | 'normal' | 'high' | 'urgent';
+  /** pipeline-shaped work: repo-relative pipeline, must be in charter authority.allowed_pipelines to execute. */
+  pipeline_ref?: string;
+  /** What this action should move; the outcome check measures it after the settle window. */
+  expected_effect?: DotExpectedEffect;
+  /** Normalized target: path:<glob>, service:<id>, pr:<owner>/<repo>#<n>, work_item:<id>, org_operation:<id>. */
+  target?: string;
+  intent?: DotProposalIntent;
 }
+
+export interface DotExpectedEffect {
+  kr_id?: string;
+  signal?: string;
+  direction: 'increase' | 'decrease' | 'maintain';
+}
+
+export const DOT_PROPOSAL_INTENTS = [
+  'create',
+  'remove',
+  'enable',
+  'disable',
+  'increase',
+  'decrease',
+  'apply',
+  'revert',
+  'merge',
+  'close',
+  'update',
+] as const;
+export type DotProposalIntent = (typeof DOT_PROPOSAL_INTENTS)[number];
+
+const EFFECT_DIRECTIONS = ['increase', 'decrease', 'maintain'] as const;
+const TARGET_PATTERN =
+  /^(path:\S.*|service:[A-Za-z0-9][A-Za-z0-9._-]*|pr:[\w.-]+\/[\w.-]+#\d+|work_item:\S+|org_operation:\S+)$/;
 
 export const DOT_PROPOSE_TOOL_NAME = 'dot_propose_action';
 export const DOT_PROPOSALS_FENCE = 'dot-proposals';
@@ -42,6 +74,13 @@ export const DOT_HANDOFF_ACTION_ID = 'dot_handoff';
 export const DOT_ACTION_IDS: readonly string[] = [DEFAULT_DOT_ACTION_ID, DOT_HANDOFF_ACTION_ID];
 /** A wake that proposes more than this is cut off; the rest is reported as errors. */
 export const MAX_DOT_PROPOSALS_PER_WAKE = 10;
+/**
+ * No governed task-session executor ships yet (the executor has goal-control
+ * tools only), so dispatch refuses `task_session` before asking anyone and the
+ * executor blocks any legacy item. Shared by dispatch, executor and prompts.
+ */
+export const DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE =
+  'task_session is unavailable: no governed task-session executor is configured — propose a pipeline from your charter allowed_pipelines (pipeline_ref) or an advisory direct_reply, or ask the operator to do the work';
 
 const WORK_SHAPES: readonly DotWorkShape[] = [
   'mission',
@@ -66,12 +105,38 @@ export function buildDotProposeToolDefinition(): ToolDefinition {
           type: 'string',
           description: 'What the delegated worker should accomplish, with acceptance criteria.',
         },
-        work_shape: { type: 'string', enum: [...WORK_SHAPES] },
+        work_shape: {
+          type: 'string',
+          enum: [...WORK_SHAPES],
+          description:
+            'Use a shape your charter allows (listed in your bounds): pipeline with an allowed pipeline_ref, or direct_reply for advice. task_session is refused while no task-session executor is configured.',
+        },
         rationale: { type: 'string' },
         changed_paths: { type: 'array', items: { type: 'string' } },
         requested_decision: { type: 'string', enum: [...DECISIONS] },
         handoff_to: { type: 'string', description: 'dot_id to hand this work to.' },
         priority: { type: 'string', enum: [...PRIORITIES] },
+        pipeline_ref: {
+          type: 'string',
+          description:
+            'Repo-relative pipeline to run (pipeline work_shape; must be allowed by your charter).',
+        },
+        expected_effect: {
+          type: 'object',
+          description: 'The key result or signal this action should move, and in which direction.',
+          properties: {
+            kr_id: { type: 'string' },
+            signal: { type: 'string' },
+            direction: { type: 'string', enum: [...EFFECT_DIRECTIONS] },
+          },
+          required: ['direction'],
+        },
+        target: {
+          type: 'string',
+          description:
+            'What the action touches: path:<glob>, service:<id>, pr:<owner>/<repo>#<n>, work_item:<id>, or org_operation:<id>.',
+        },
+        intent: { type: 'string', enum: [...DOT_PROPOSAL_INTENTS] },
       },
       required: ['title', 'objective', 'work_shape'],
     },
@@ -109,6 +174,33 @@ export function normalizeDotProposal(value: unknown): DotProposal {
   if (priority !== undefined && !PRIORITIES.includes(priority as (typeof PRIORITIES)[number])) {
     throw new Error(`priority must be one of ${PRIORITIES.join(', ')}`);
   }
+  const pipelineRef = optionalText(raw.pipeline_ref, 300);
+  // expected_effect / target / intent are advisory metadata (outcome
+  // measurement, arbitration). A malformed value is dropped rather than
+  // discarding the whole proposal — the work itself is still valid.
+  let expectedEffect: DotExpectedEffect | undefined;
+  const effect = raw.expected_effect as Record<string, unknown> | null | undefined;
+  if (
+    effect &&
+    typeof effect === 'object' &&
+    !Array.isArray(effect) &&
+    EFFECT_DIRECTIONS.includes(effect.direction as (typeof EFFECT_DIRECTIONS)[number])
+  ) {
+    const krId = optionalText(effect.kr_id, 64);
+    const signal = optionalText(effect.signal, 300);
+    if (krId || signal) {
+      expectedEffect = {
+        ...(krId ? { kr_id: krId } : {}),
+        ...(signal ? { signal } : {}),
+        direction: effect.direction as DotExpectedEffect['direction'],
+      };
+    }
+  }
+  const rawTarget = optionalText(raw.target, 300);
+  const target = rawTarget !== undefined && TARGET_PATTERN.test(rawTarget) ? rawTarget : undefined;
+  const intent = DOT_PROPOSAL_INTENTS.includes(raw.intent as DotProposalIntent)
+    ? (raw.intent as DotProposalIntent)
+    : undefined;
   const changedPaths = Array.isArray(raw.changed_paths)
     ? raw.changed_paths
         .filter((entry): entry is string => typeof entry === 'string' && entry.trim() !== '')
@@ -124,6 +216,10 @@ export function normalizeDotProposal(value: unknown): DotProposal {
     ...(requested ? { requested_decision: requested as DotDecisionLevel } : {}),
     ...(handoffTo ? { handoff_to: handoffTo } : {}),
     ...(priority ? { priority: priority as DotProposal['priority'] } : {}),
+    ...(pipelineRef ? { pipeline_ref: pipelineRef } : {}),
+    ...(expectedEffect ? { expected_effect: expectedEffect } : {}),
+    ...(target ? { target } : {}),
+    ...(intent ? { intent } : {}),
   };
 }
 
@@ -174,12 +270,14 @@ export function dotProposalInstructions(mode: 'tool' | 'fence'): string {
   const how =
     mode === 'tool'
       ? `Call the ${DOT_PROPOSE_TOOL_NAME} tool once per action you want taken.`
-      : `End your reply with a fenced block \`\`\`${DOT_PROPOSALS_FENCE}\n[{"title": "...", "objective": "...", "work_shape": "task_session"}]\n\`\`\` listing every action you want taken (an empty array when none).`;
+      : `End your reply with a fenced block \`\`\`${DOT_PROPOSALS_FENCE}\n[{"title": "...", "objective": "...", "work_shape": "direct_reply"}]\n\`\`\` listing every action you want taken (an empty array when none).`;
   return [
     'You do not act directly. Every action is a proposal that the runtime governs:',
     'it is scored by the autonomous-ops gate, raised to your charter decision floor, and then',
     'delegated as a WorkItem, sent to the operator for a decision, or refused.',
     how,
     'Use handoff_to to give work to another dot that accepts your handoffs.',
+    'Use only a work_shape your bounds allow. Prefer pipeline (with an allowed pipeline_ref) for effects and direct_reply for analysis or advice; task_session is refused while no task-session executor is configured.',
+    'For pipeline work set pipeline_ref (it must be one your charter allows). Set expected_effect (kr_id or signal, direction) so the outcome is measured, and target + intent so conflicting proposals from other dots are arbitrated.',
   ].join('\n');
 }

@@ -69,6 +69,14 @@ describe('isCharterEligiblePolicy', () => {
     );
   });
   it('never carries hardened or hard-coded dangerous policies', () => {
+    expect(
+      isCharterEligiblePolicy({
+        requiresApproval: true,
+        missingRequirements: ['approval_confirmation'],
+        matchedRuleId: 'ordinary-policy',
+        mandatoryApproval: true,
+      })
+    ).toBe(false);
     for (const matchedRuleId of [
       'injection-suspected-override',
       'strict-posture-floor',
@@ -172,6 +180,19 @@ describe('runCharterGate', () => {
     });
     const out = run();
     expect(out.kind).toBe('require_approval');
+    expect(consume).not.toHaveBeenCalled();
+  });
+
+  it('strict posture on an ordinary base rule never consumes the charter budget', () => {
+    evaluate.mockReturnValue({ charter: CHARTER, decision: decision({}) });
+    policy.mockReturnValue({
+      requiresApproval: true,
+      missingRequirements: ['approval_confirmation'],
+      matchedRuleId: 'send-money',
+      mandatoryApproval: true,
+    });
+
+    expect(run().kind).toBe('require_approval');
     expect(consume).not.toHaveBeenCalled();
   });
 

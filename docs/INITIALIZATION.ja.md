@@ -167,6 +167,8 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
   - オフライン・テスト用: `stub`
 - **物理的変化**:
   - 対話モードで backend を選択した場合のみ、`.env.local` に `KYBERION_REASONING_BACKEND` が保存されます。
+  - API キーは `pnpm kyberion secret introduce <service-id> API_KEY` で登録できます。reasoning provider の service ID は `anthropic` / `gemini` / `grok` / `openrouter` / `nemotron` / `local-llm` / `ollama` / `vllm` / `lmstudio` / `llamacpp` / `mlx` / `localai` です。OpenAI 互換ローカル endpoint は認証が必要な場合のみキーを登録します。
+  - provider registry が宣言した secret を readiness probe と backend が使います。キー値は環境変数や起動コマンドへ出さないでください。
 - **既知の落とし穴（claude-cli のシャドウイング）**: repo 依存の `@anthropic-ai/claude-code` は postinstall 未承認のあいだ `node_modules/.bin/claude` に placeholder shim を置き、pnpm 環境ではこれが PATH 上で本物の `claude`（例: `~/.local/bin/claude`）を隠します。`claude` 実行時に `claude native binary not installed` と表示されたらこの状態です。対処: `pnpm approve-builds` で `@anthropic-ai/claude-code` を承認するか、`KYBERION_CLAUDE_CLI_BIN=$HOME/.local/bin/claude` を設定してください（probe は placeholder 検出時に `~/.local/bin` / `/opt/homebrew/bin` / `/usr/local/bin` などへ自動フォールバックしますが、明示設定が最も確実です）。
 
 #### 4d. 機能ごとの依存と system tool
