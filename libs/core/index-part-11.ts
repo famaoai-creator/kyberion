@@ -159,3 +159,4 @@ export * from './key-result-spec.js';
 export * from './dot/dot-extensions.js';
 export * from './dot/dot-extension-registry.js';
 export * from './dot/dot-wake-backend.js';
+export * from './dot/dot-key-results.js';

@@ -10,6 +10,7 @@
 
 import type { LoadedDotCharter } from '@agent/core/dot/dot-charter';
 import { createLogger } from '@agent/core/logger';
+import { measureActiveDotKeyResults } from '@agent/core/dot/dot-key-results';
 
 const logger = createLogger('dot-supervisor');
 
@@ -39,3 +40,11 @@ export async function runDotSupervisorExtensions(
   }
   return failed;
 }
+
+// DL-03 key-result measurement (dots' KRs + referenced organization objectives' KRs)
+DOT_SUPERVISOR_STEPS.push({
+  id: 'dot-kr-measure',
+  async run(_now, active) {
+    await measureActiveDotKeyResults(active.map((entry) => entry.charter));
+  },
+});
