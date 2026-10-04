@@ -53,6 +53,7 @@ import { safeMkdir, safeWriteFile } from '../secure-io.js';
 import { withUsageAttribution } from '../usage-accounting.js';
 import {
   claimWorkItem,
+  getWorkItem,
   listWorkItems,
   reapExpiredWorkLeases,
   releaseWorkItem,
@@ -68,7 +69,7 @@ import type { DotPromptSection, DotStatusSection } from './dot-extensions.js';
 import { readDotSignals } from './dot-feedback.js';
 import type { DotExtCtx } from './dot-extensions.js';
 import { appendDotInboxEntry, type DotInboxEntryInput } from './dot-inbox.js';
-import type { DotWorkShape } from './dot-proposals.js';
+import { DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE, type DotWorkShape } from './dot-proposals.js';
 import {
   DOT_EXECUTOR_REPORT_SOURCE,
   dotDailyTokenCapReached,
@@ -105,11 +106,36 @@ export const DOT_EXECUTOR_READ_ONLY_PREFIX = 'advisory result, effects are unver
 export const DOT_EXECUTOR_CROSS_TENANT_DENIAL =
   'denied: the WorkItem context tenant differs from the executing charter tenant — not claimed';
 export const DOT_EXECUTOR_MISSION_GUIDANCE =
-  'mission-shaped work needs `mission_controller start` by an operator — the dot executor never starts missions; re-propose as task_session or pipeline, or ask the operator to start a mission';
-export const DOT_EXECUTOR_TASK_SESSION_GUIDANCE =
-  'task_session execution is unavailable: no governed work-tool executor is configured — use an allowed pipeline, request an advisory direct_reply, or ask the operator to execute the work';
+  'mission-shaped work needs `mission_controller start` by an operator — the dot executor never starts missions; re-propose as a pipeline from your allowed_pipelines or an advisory direct_reply, or ask the operator to start a mission';
+export const DOT_EXECUTOR_TASK_SESSION_GUIDANCE = DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE;
+export const DOT_EXECUTOR_MISSING_SHAPE_GUIDANCE =
+  'WorkItem has no requested_work_shape — the dot re-proposes with a shape its charter allows';
+/** Audit-chain operation of a governed operator release (`pnpm kyberion dot release`). */
+export const DOT_OPERATOR_RELEASE_OPERATION = 'dot_work_item_operator_release';
+/** libs/core governed stores (WorkItems) write under this shared role, as in dispatch. */
+const GOVERNED_STORE_ROLE = 'infrastructure_sentinel';
 
 export type DotGoalMode = 'tool' | 'delegated' | { unavailable: string };
+
+/**
+ * Thrown by a port when it failed before it could cause any effect (no backend
+ * resolved, pipeline missing or invalid, goal driver threw before its first
+ * model call). The executor treats it as a retryable failure, not a quarantine.
+ */
+export class DotExecutorPreEffectError extends Error {
+  readonly preEffect = true;
+  constructor(message: string) {
+    super(message);
+    this.name = 'DotExecutorPreEffectError';
+  }
+}
+
+/** Duck-typed so a second module instance (src vs dist) still classifies it. */
+export function isDotExecutorPreEffectError(error: unknown): boolean {
+  return Boolean(
+    error && typeof error === 'object' && (error as { preEffect?: unknown }).preEffect === true
+  );
+}
 
 /**
  * Execution ports. Each receives an AbortSignal that fires when the charter's
@@ -165,6 +191,11 @@ export interface DotExecutorDeps {
   clock?: () => number;
   /** Per-sweep budget; defaults to {@link DOT_EXECUTOR_SWEEP_BUDGET_MS}. */
   sweepBudgetMs?: number;
+  /**
+   * Work-results rows per dot, read once per sweep and kept current by this
+   * module's own appends/marks. `runDotExecutorSweep` creates one per sweep.
+   */
+  resultsCache?: Map<string, DotWorkResultRow[]>;
 }
 
 export type DotExecutorPortsInput = DotExecutorPorts | ((c: DotCharter) => DotExecutorPorts);
@@ -212,7 +243,7 @@ export function listClaimableDotWorkItems(c: DotCharter, deps: DotExecutorDeps =
         item.status === 'ready' &&
         !item.lease_id &&
         addressedTo(c, item) &&
-        !terminal.has(item.item_id) &&
+        !activeTerminalResult(terminal, item) &&
         !hasUncertainAttempt(item)
     )
     .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.item_id.localeCompare(b.item_id));
@@ -273,6 +304,14 @@ export function readDotWorkResults(c: DotCharter, deps: DotExecutorDeps = {}): D
   }).filter((row) => row?.dot_id === c.dot_id && typeof row.work_item_id === 'string');
 }
 
+function resultsCacheKey(c: DotCharter): string {
+  return `${dotStatePath(c, DOT_WORK_RESULTS_FILE)}\u0000${c.dot_id}`;
+}
+
+function ownRows(c: DotCharter, rows: DotWorkResultRow[]): DotWorkResultRow[] {
+  return rows.filter((row) => row?.dot_id === c.dot_id && typeof row.work_item_id === 'string');
+}
+
 function appendWorkResult(c: DotCharter, row: DotWorkResultRow, deps: DotExecutorDeps): void {
   withExecutionContext(
     c.authority.authority_role,
@@ -287,6 +326,7 @@ function appendWorkResult(c: DotCharter, row: DotWorkResultRow, deps: DotExecuto
     c.scope.tenant_slug,
     c.scope.organization_id
   );
+  deps.resultsCache?.get(resultsCacheKey(c))?.push(row);
 }
 
 function workResultLock(file: string): string {
@@ -315,7 +355,8 @@ function markReportEnqueued(
   c: DotCharter,
   row: DotWorkResultRow,
   reportTo: string,
-  deps: DotExecutorDeps
+  deps: DotExecutorDeps,
+  suppressed?: DotWorkResultRow['report_suppressed']
 ): DotWorkResultRow {
   return withExecutionContext(
     c.authority.authority_role,
@@ -335,12 +376,16 @@ function markReportEnqueued(
             ...entry,
             report_to_dot_id: reportTo,
             report_enqueued_at: entry.report_enqueued_at ?? nowOf(deps).toISOString(),
+            ...(suppressed ? { report_suppressed: suppressed } : {}),
           };
           return marked;
         });
         if (!marked)
           throw new Error(`result missing while recording report receipt for ${row.work_item_id}`);
         safeWriteFile(file, updated.map((entry) => `${JSON.stringify(entry)}\n`).join(''));
+        if (deps.resultsCache?.has(resultsCacheKey(c))) {
+          deps.resultsCache.set(resultsCacheKey(c), ownRows(c, updated));
+        }
         return marked;
       });
     },
@@ -360,6 +405,22 @@ function enqueueExecutorReport(
   if (row.report_enqueued_at) return row;
   const reportTo = row.report_to_dot_id ?? (item ? meta(item, 'dot_id') : undefined) ?? c.dot_id;
   const escalated = row.status !== 'done';
+  if (row.reason_code === 'capability_unavailable') {
+    // Waking the dot for a capability this runtime lacks only invites a
+    // reworded re-proposal; it reads the result on its next natural wake.
+    try {
+      return markReportEnqueued(c, row, reportTo, deps, 'capability_unavailable');
+    } catch (error) {
+      logger.warn(
+        `report receipt pending for ${reportTo} — ${error instanceof Error ? error.message : String(error)} | next: the next sweep retries without waking the dot | evidence: ${dotStatePath(c, DOT_WORK_RESULTS_FILE)}`
+      );
+      return row;
+    }
+  }
+  const advice =
+    row.reason_code === 'pre_effect_failure'
+      ? ' — failed before any effect: fix the cause, then re-propose'
+      : ' — escalated: ask the operator to verify effects before re-proposing';
   try {
     (
       deps.appendInbox ??
@@ -371,7 +432,7 @@ function enqueueExecutorReport(
       channel: 'inbox',
       source: DOT_EXECUTOR_REPORT_SOURCE,
       idempotency_key: executorReportKey(row, reportTo),
-      text: `WorkItem ${row.work_item_id} ${row.status}${!c.scope.tenant_slug && item ? `: ${bounded(item.title, 120)}` : ''}${escalated ? ' — escalated: ask the operator to verify effects before re-proposing' : ''}`,
+      text: `WorkItem ${row.work_item_id} ${row.status}${!c.scope.tenant_slug && item ? `: ${bounded(item.title, 120)}` : ''}${escalated ? advice : ''}`,
       payload: {
         report_from: DOT_EXECUTOR_REPORT_SOURCE,
         work_item_id: row.work_item_id,
@@ -405,8 +466,13 @@ function reconcileExecutorReports(
   for (const { charter } of active) {
     try {
       const rows = scopedWorkResults(charter, deps);
+      // Rows without report_to_dot_id predate report recovery: their report was
+      // delivered inline, so they count as reported (no upgrade storm, no rewrite).
       for (const row of rows.filter(
-        (entry) => isTerminalWorkResult(entry) && !entry.report_enqueued_at
+        (entry) =>
+          isTerminalWorkResult(entry) &&
+          !entry.report_enqueued_at &&
+          Boolean(entry.report_to_dot_id)
       )) {
         const item = items.find(
           (entry) => entry.item_id === row.work_item_id && !dotItemTenantMismatch(charter, entry)
@@ -430,13 +496,17 @@ function isTerminalWorkResult(row: DotWorkResultRow): boolean {
 }
 
 function scopedWorkResults(c: DotCharter, deps: DotExecutorDeps): DotWorkResultRow[] {
-  return withExecutionContext(
+  const cached = deps.resultsCache?.get(resultsCacheKey(c));
+  if (cached) return cached;
+  const rows = withExecutionContext(
     c.authority.authority_role,
     () => readDotWorkResults(c, deps),
     undefined,
     c.scope.tenant_slug,
     c.scope.organization_id
   );
+  deps.resultsCache?.set(resultsCacheKey(c), rows);
+  return rows;
 }
 
 /** Terminal evidence is authoritative even if releasing the shared WorkItem failed. */
@@ -445,9 +515,60 @@ function terminalWorkResults(c: DotCharter, deps: DotExecutorDeps): Map<string, 
   return new Map(rows.filter(isTerminalWorkResult).map((row) => [row.work_item_id, row]));
 }
 
-/** Neither a read-only label nor an abort request proves that a crashed port had no effects. */
+/** Operator verification recorded by {@link releaseDotWorkItem}, if any. */
+export interface DotOperatorVerification {
+  operator_verified_at: string;
+  operator_verified_by: string;
+  operator_verified_reason: string;
+}
+
+function operatorVerification(item: WorkItem): DotOperatorVerification | undefined {
+  const executor = item.metadata?.dot_executor as Record<string, unknown> | undefined;
+  const at = executor?.operator_verified_at;
+  if (typeof at !== 'string' || !at) return undefined;
+  return {
+    operator_verified_at: at,
+    operator_verified_by: String(executor?.operator_verified_by ?? 'operator'),
+    operator_verified_reason: String(executor?.operator_verified_reason ?? ''),
+  };
+}
+
+/** Evidence recorded before an operator release no longer blocks the item. */
+function supersededByRelease(row: DotWorkResultRow, item: WorkItem): boolean {
+  const at = operatorVerification(item)?.operator_verified_at;
+  return Boolean(at && row.completed_at <= at);
+}
+
+/** The item's terminal result unless an operator release superseded it. */
+function activeTerminalResult(
+  terminal: Map<string, DotWorkResultRow>,
+  item: WorkItem
+): DotWorkResultRow | undefined {
+  const row = terminal.get(item.item_id);
+  return row && !supersededByRelease(row, item) ? row : undefined;
+}
+
+/**
+ * Neither a read-only label nor an abort request proves that a crashed port had
+ * no effects. Only an operator release clears the attempts that preceded it.
+ */
 function hasUncertainAttempt(item: WorkItem): boolean {
-  return Boolean(item.attempts?.some((attempt) => attempt.failure_reason === 'lease_expired'));
+  const releasedAt = operatorVerification(item)?.operator_verified_at ?? '';
+  return Boolean(
+    item.attempts?.some(
+      (attempt) =>
+        attempt.failure_reason === 'lease_expired' &&
+        (attempt.ended_at ?? attempt.started_at) > releasedAt
+    )
+  );
+}
+
+/** Attempts since the last operator release (bounds pre-effect retries). */
+function attemptsSinceRelease(item: WorkItem): number {
+  const releasedAt = operatorVerification(item)?.operator_verified_at ?? '';
+  return (item.attempts ?? []).filter(
+    (attempt) => !releasedAt || (attempt.started_at ?? '') > releasedAt
+  ).length;
 }
 
 /** IDs are immutable execution identities; a reused item needs operator reconciliation. */
@@ -523,6 +644,7 @@ interface Outcome {
   status: 'done' | 'blocked' | 'failed';
   summary: string;
   tokens?: number;
+  reason_code?: DotWorkResultRow['reason_code'];
 }
 
 async function routeItem(
@@ -533,7 +655,10 @@ async function routeItem(
   signal: AbortSignal,
   accountingId: string
 ): Promise<Outcome> {
-  const shape = (meta(item, 'requested_work_shape') ?? 'task_session') as DotWorkShape;
+  const shape = meta(item, 'requested_work_shape') as DotWorkShape | undefined;
+  if (!shape) {
+    return { mode: 'escalated', status: 'blocked', summary: DOT_EXECUTOR_MISSING_SHAPE_GUIDANCE };
+  }
   if (shape === 'mission') {
     return { mode: 'escalated', status: 'blocked', summary: DOT_EXECUTOR_MISSION_GUIDANCE };
   }
@@ -581,6 +706,7 @@ async function routeItem(
       mode: 'escalated',
       status: 'blocked',
       summary: ports.taskSessionUnavailable ?? DOT_EXECUTOR_TASK_SESSION_GUIDANCE,
+      reason_code: 'capability_unavailable',
     };
   }
   const budget = c.goal.budget;
@@ -737,7 +863,7 @@ export async function executeDotWorkItem(
   if (denyCrossTenantItem(c, item, deps)) {
     return skippedRow(c, item, startedAt, DOT_EXECUTOR_CROSS_TENANT_DENIAL, deps);
   }
-  if (terminalWorkResults(c, deps).has(item.item_id) || hasUncertainAttempt(item)) {
+  if (activeTerminalResult(terminalWorkResults(c, deps), item) || hasUncertainAttempt(item)) {
     return skippedRow(
       c,
       item,
@@ -746,9 +872,11 @@ export async function executeDotWorkItem(
       deps
     );
   }
-  const shape = meta(item, 'requested_work_shape') ?? 'task_session';
-  const goalMode: DotGoalMode =
-    shape === 'task_session' || shape === 'direct_reply' ? (ports.goalMode?.(c) ?? 'tool') : 'tool';
+  const shape = meta(item, 'requested_work_shape');
+  // A task_session the ports cannot run is closed as blocked without probing a backend.
+  const conversational =
+    shape === 'direct_reply' || (shape === 'task_session' && !ports.taskSessionUnavailable);
+  const goalMode: DotGoalMode = conversational ? (ports.goalMode?.(c) ?? 'tool') : 'tool';
   if (typeof goalMode === 'object') {
     return skippedRow(c, item, startedAt, `no backend: ${goalMode.unavailable}`, deps);
   }
@@ -817,6 +945,9 @@ export async function executeDotWorkItem(
           mode: failedMode,
           status: 'failed',
           summary: error instanceof Error ? error.message : String(error),
+          ...(isDotExecutorPreEffectError(error)
+            ? { reason_code: 'pre_effect_failure' as const }
+            : {}),
         })
       ),
       deadline,
@@ -826,7 +957,17 @@ export async function executeDotWorkItem(
     clearInterval(renewTimer);
   }
 
-  if (outcome.status === 'failed') {
+  const preEffect = outcome.status === 'failed' && outcome.reason_code === 'pre_effect_failure';
+  // A pre-effect failure goes back to `ready` until the attempt bound; then it
+  // ends as an escalated failure — never as an uncertain quarantine.
+  const retryable = preEffect && attemptsSinceRelease(claimed.item) < DOT_EXECUTOR_MAX_ATTEMPTS;
+  if (preEffect && !retryable) {
+    outcome = {
+      ...outcome,
+      mode: 'escalated',
+      summary: `failed before any effect in ${attemptsSinceRelease(claimed.item)} attempt(s) — ${outcome.summary}; fix the cause, then re-propose`,
+    };
+  } else if (outcome.status === 'failed' && !preEffect) {
     outcome = {
       ...outcome,
       status: 'blocked',
@@ -836,9 +977,9 @@ export async function executeDotWorkItem(
 
   // Escalations end terminal (archived) so they stop holding a delegation slot;
   // the real status lives in metadata.dot_executor, the result row and the report.
-  const escalated = outcome.status !== 'done';
+  const escalated = outcome.status !== 'done' && !retryable;
   const nextStatus: WorkItemStatus =
-    outcome.status === 'done' ? 'done' : DOT_EXECUTOR_ESCALATED_STATUS;
+    outcome.status === 'done' ? 'done' : retryable ? 'ready' : DOT_EXECUTOR_ESCALATED_STATUS;
   const summary = bounded(outcome.summary);
   const tenantBound = Boolean(c.scope.tenant_slug);
   const completedAt = nowOf(deps).toISOString();
@@ -854,6 +995,7 @@ export async function executeDotWorkItem(
     completed_at: completedAt,
     report_to_dot_id: meta(item, 'dot_id') ?? c.dot_id,
     ...(outcome.tokens !== undefined && outcome.tokens > 0 ? { tokens_used: outcome.tokens } : {}),
+    ...(outcome.reason_code ? { reason_code: outcome.reason_code } : {}),
     ...(krSnapshot ? { kr_snapshot: krSnapshot } : {}),
     ...(signalSnapshot ? { signal_snapshot: signalSnapshot } : {}),
   };
@@ -878,6 +1020,8 @@ export async function executeDotWorkItem(
           mode: outcome.mode,
           completed_at: completedAt,
           ...(escalated ? { escalated: true } : {}),
+          ...(retryable ? { retryable: true } : {}),
+          ...operatorVerification(item),
         },
       },
     });
@@ -917,7 +1061,114 @@ export async function executeDotWorkItem(
     },
     deps
   );
-  return enqueueExecutorReport(c, row, deps, item);
+  // A retryable pre-effect failure is not a result yet: no report, no wake.
+  return retryable ? row : enqueueExecutorReport(c, row, deps, item);
+}
+
+export interface ReleaseDotWorkItemInput {
+  workItemId: string;
+  /** Why the operator is satisfied that no unverified effect remains. Required. */
+  reason: string;
+  /** Operator identity recorded as `operator_verified_by`; defaults to `operator`. */
+  by?: string;
+}
+
+export interface ReleaseDotWorkItemDeps extends Pick<
+  DotExecutorDeps,
+  'rootDir' | 'now' | 'audit' | 'update' | 'resultsCache'
+> {
+  getItem?: (itemId: string) => WorkItem | null;
+}
+
+/**
+ * Governed operator release of a quarantined or escalated dot WorkItem
+ * (`pnpm kyberion dot release <dot_id> <work_item_id> --reason "<text>"`).
+ * Records `metadata.dot_executor.operator_verified_at/by/reason`, returns the
+ * item to `ready` and audits the release. Evidence (results, expired attempts)
+ * recorded before the release stops blocking, so the executor re-attempts the
+ * item under a NEW attempt id; anything after it still quarantines.
+ */
+export function releaseDotWorkItem(
+  c: DotCharter,
+  input: ReleaseDotWorkItemInput,
+  deps: ReleaseDotWorkItemDeps = {}
+): WorkItem {
+  const reason = input.reason?.trim();
+  if (!reason) throw new Error('[DOT_RELEASE_REASON] --reason "<what you verified>" is required');
+  const by = input.by?.trim() || 'operator';
+  const item = (deps.getItem ?? ((id: string) => getWorkItem(id)))(input.workItemId);
+  if (!item) throw new Error(`[DOT_RELEASE_NOT_FOUND] no WorkItem '${input.workItemId}'`);
+  if (!addressedTo(c, item)) {
+    throw new Error(
+      `[DOT_RELEASE_SCOPE] WorkItem '${item.item_id}' is not addressed to dot '${c.dot_id}'`
+    );
+  }
+  if (dotItemTenantMismatch(c, item)) {
+    throw new Error(
+      `[DOT_RELEASE_SCOPE] WorkItem '${item.item_id}' belongs to another tenant scope than dot '${c.dot_id}'`
+    );
+  }
+  if (item.lease_id || item.status === 'in_progress') {
+    throw new Error(
+      `[DOT_RELEASE_LEASED] WorkItem '${item.item_id}' is still leased — wait for the reaper to quarantine it`
+    );
+  }
+  if (item.status === 'done') {
+    throw new Error(
+      `[DOT_RELEASE_DONE] WorkItem '${item.item_id}' is already done — nothing to release`
+    );
+  }
+  const terminal = activeTerminalResult(terminalWorkResults(c, deps), item);
+  const escalated = Boolean(
+    (item.metadata?.dot_executor as Record<string, unknown> | undefined)?.escalated
+  );
+  if (!terminal && !hasUncertainAttempt(item) && !escalated) {
+    throw new Error(
+      `[DOT_RELEASE_NOTHING] WorkItem '${item.item_id}' carries no quarantine or escalation to release`
+    );
+  }
+  const verification: DotOperatorVerification = {
+    operator_verified_at: nowOf(deps).toISOString(),
+    operator_verified_by: by,
+    operator_verified_reason: bounded(reason, 300),
+  };
+  const priorExecutor = (item.metadata?.dot_executor as Record<string, unknown> | undefined) ?? {};
+  const updated = withExecutionContext(GOVERNED_STORE_ROLE, () =>
+    (deps.update ?? updateWorkItem)({
+      itemId: item.item_id,
+      expectedVersion: item.version,
+      status: 'ready',
+      metadata: {
+        ...item.metadata,
+        dot_executor: { ...priorExecutor, ...verification, released_from: item.status },
+      },
+    })
+  );
+  try {
+    (deps.audit ?? ((entry) => auditChain.record(entry)))({
+      agentId: by,
+      actor: { kind: 'human', id: by },
+      action: 'dot_action',
+      operation: DOT_OPERATOR_RELEASE_OPERATION,
+      result: 'allowed',
+      metadata: {
+        dot_id: c.dot_id,
+        work_item_id: item.item_id,
+        action_ref: meta(item, 'action_ref') ?? item.item_id,
+        released_from: item.status,
+        operator_verified_at: verification.operator_verified_at,
+        ...(terminal ? { superseded_result_status: terminal.status } : {}),
+        // Tenant prose stays out of the shared audit chain.
+        ...(c.scope.tenant_slug ? {} : { reason: verification.operator_verified_reason }),
+      },
+      ...(c.scope.tenant_slug ? { tenantSlug: c.scope.tenant_slug } : {}),
+    });
+  } catch (error) {
+    logger.warn(
+      `release audit failed for ${item.item_id} — ${error instanceof Error ? error.message : String(error)} | next: the WorkItem metadata still records the operator verification | evidence: ${item.item_id}`
+    );
+  }
+  return updated;
 }
 
 const isDotItem = (item: WorkItem): boolean =>
@@ -948,7 +1199,8 @@ export function reapStrandedDotWorkItems(
       maxErrorAttempts: DOT_EXECUTOR_MAX_ATTEMPTS,
       completedEvidence: (item) => {
         const executor = executorFor(item);
-        const row = executor ? evidence.get(executor.dot_id)?.get(item.item_id) : undefined;
+        const terminal = executor ? evidence.get(executor.dot_id) : undefined;
+        const row = terminal ? activeTerminalResult(terminal, item) : undefined;
         return row?.status === 'done' && resultMatchesAttempt(row, item);
       },
     });
@@ -980,7 +1232,8 @@ export function reapStrandedDotWorkItems(
   for (const item of reconcile.values()) {
     const executor = executorFor(item);
     if (!executor) continue;
-    const recorded = evidence.get(executor.dot_id)?.get(item.item_id);
+    const evidenceFor = evidence.get(executor.dot_id);
+    const recorded = evidenceFor ? activeTerminalResult(evidenceFor, item) : undefined;
     const terminal = recorded && resultMatchesAttempt(recorded, item) ? recorded : undefined;
     const conflict = Boolean(recorded && !terminal);
     const uncertain = hasUncertainAttempt(item);
@@ -1022,6 +1275,7 @@ export function reapStrandedDotWorkItems(
             ...(row.status !== 'done' ? { escalated: true } : {}),
             completed_at: row.completed_at,
             reason: 'reconciled durable result or quarantined an uncertain execution',
+            ...operatorVerification(item),
           },
         },
       });
@@ -1108,8 +1362,10 @@ function tokenCapReached(c: DotCharter, deps: DotExecutorDeps): boolean {
 export async function runDotExecutorSweep(
   active: readonly LoadedDotCharter[],
   ports: DotExecutorPortsInput,
-  deps: DotExecutorDeps & { maxPerSweep?: number } = {}
+  sweepDeps: DotExecutorDeps & { maxPerSweep?: number } = {}
 ): Promise<DotWorkResultRow[]> {
+  // Read each dot's work results once per sweep; this module keeps the cache current.
+  const deps = { ...sweepDeps, resultsCache: sweepDeps.resultsCache ?? new Map() };
   const rows: DotWorkResultRow[] = [];
   const max = Math.max(0, deps.maxPerSweep ?? 1);
   if (max === 0) return rows;

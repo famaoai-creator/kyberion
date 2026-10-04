@@ -15,7 +15,11 @@ import type {
 import type { DotCharter, LoadedDotCharter } from './dot-charter.js';
 import {
   DOT_EXECUTOR_CROSS_TENANT_DENIAL,
+  DOT_EXECUTOR_MAX_ATTEMPTS,
+  DOT_EXECUTOR_MISSING_SHAPE_GUIDANCE,
   DOT_EXECUTOR_MISSION_GUIDANCE,
+  DOT_EXECUTOR_TASK_SESSION_GUIDANCE,
+  DotExecutorPreEffectError,
   dotExecutorStatusSection,
   reapStrandedDotWorkItems,
   resetDotExecutorDenialAuditForTests,
@@ -820,5 +824,119 @@ describe('executor bounds and escalation', () => {
       escalations_total: 1,
       recent_escalations: [{ work_item_id: 'w1', status: 'blocked', mode: 'escalated' }],
     });
+  });
+});
+
+describe('capability, pre-effect and report recovery (PR #915 review)', () => {
+  it('closes an unavailable task_session as blocked without waking the dot', async () => {
+    const target = item('w1', {});
+    const h = harness([target]);
+    const p = ports({ taskSessionUnavailable: DOT_EXECUTOR_TASK_SESSION_GUIDANCE });
+    const row = await executeDotWorkItem(charter(), target, p, h.deps);
+    expect(row).toMatchObject({
+      status: 'blocked',
+      mode: 'escalated',
+      reason_code: 'capability_unavailable',
+      report_suppressed: 'capability_unavailable',
+    });
+    expect(p.runGoalTurn).not.toHaveBeenCalled();
+    expect(h.releases[0].nextStatus).toBe('archived');
+    expect(h.inbox).toHaveLength(0);
+    expect(results(charter())[0].report_enqueued_at).toBeDefined();
+  });
+
+  it('blocks an item without requested_work_shape instead of defaulting to task_session', async () => {
+    const target = item('w1', { requested_work_shape: undefined });
+    const h = harness([target]);
+    const p = ports();
+    const row = await executeDotWorkItem(charter(), target, p, h.deps);
+    expect(row).toMatchObject({ status: 'blocked', summary: DOT_EXECUTOR_MISSING_SHAPE_GUIDANCE });
+    expect(p.runGoalTurn).not.toHaveBeenCalled();
+  });
+
+  it('steers mission guidance to allowed pipelines or direct_reply, never task_session', () => {
+    expect(DOT_EXECUTOR_MISSION_GUIDANCE).not.toContain('task_session');
+    expect(DOT_EXECUTOR_MISSION_GUIDANCE).toContain('direct_reply');
+  });
+
+  it('returns a pre-effect failure to ready (no quarantine, no wake) until the attempt bound', async () => {
+    const target = item('w1', {
+      requested_work_shape: 'pipeline',
+      pipeline_ref: 'pipelines/ok.json',
+    });
+    const p = ports({
+      runPipeline: vi.fn(async () => {
+        throw new DotExecutorPreEffectError("pipeline 'pipelines/ok.json' could not be loaded");
+      }),
+    });
+    const first = harness([target], 1);
+    const row = await executeDotWorkItem(charter(), target, p, first.deps);
+    expect(row).toMatchObject({
+      status: 'failed',
+      mode: 'pipeline',
+      reason_code: 'pre_effect_failure',
+    });
+    expect(first.releases[0].nextStatus).toBe('ready');
+    expect(first.releases[0].metadata?.dot_executor).toMatchObject({ retryable: true });
+    expect(first.inbox).toHaveLength(0);
+    // Not terminal and not uncertain: the item stays claimable.
+    expect(listClaimableDotWorkItems(charter(), first.deps).map((i) => i.item_id)).toEqual(['w1']);
+
+    const last = harness([target], DOT_EXECUTOR_MAX_ATTEMPTS);
+    const final = await executeDotWorkItem(charter(), target, p, last.deps);
+    expect(final).toMatchObject({ status: 'failed', mode: 'escalated' });
+    expect(final.summary).toContain('failed before any effect');
+    expect(last.releases[0].nextStatus).toBe('archived');
+    expect(last.inbox[0].text).toContain('fix the cause, then re-propose');
+    expect(last.inbox[0].text).not.toContain('verify effects');
+  });
+
+  it('treats legacy rows without report_to_dot_id as reported, and recovers new ones once', async () => {
+    const c = charter();
+    const file = path.join(TEST_ROOT, dotStatePath(c, DOT_WORK_RESULTS_FILE));
+    safeMkdir(path.dirname(file), { recursive: true });
+    const base = {
+      dot_id: 'ops',
+      action_ref: 'dact',
+      mode: 'pipeline' as const,
+      status: 'done' as const,
+      summary: 's',
+      started_at: NOW.toISOString(),
+      completed_at: NOW.toISOString(),
+    };
+    for (let i = 0; i < 5; i += 1) appendJsonLine(file, { ...base, work_item_id: `legacy-${i}` });
+    appendJsonLine(file, { ...base, work_item_id: 'pending-1', report_to_dot_id: 'ops' });
+    const h = harness([]);
+    await runDotExecutorSweep([{ path: 'dots/ops.json', charter: c }], ports(), h.deps);
+    expect(h.inbox.map((entry) => entry.payload?.work_item_id)).toEqual(['pending-1']);
+    await runDotExecutorSweep([{ path: 'dots/ops.json', charter: c }], ports(), h.deps);
+    expect(h.inbox).toHaveLength(1);
+    expect(results(c).filter((row) => row.report_enqueued_at)).toHaveLength(1);
+  });
+
+  it('reads work results through the per-sweep cache', async () => {
+    const target = item('w1', {});
+    const h = harness([target]);
+    const cached: DotWorkResultRow = {
+      dot_id: 'ops',
+      work_item_id: 'w1',
+      action_ref: 'dact-w1',
+      mode: 'goal_turn',
+      status: 'done',
+      summary: 'done elsewhere',
+      started_at: NOW.toISOString(),
+      completed_at: NOW.toISOString(),
+      report_enqueued_at: NOW.toISOString(),
+    };
+    const resultsCache = new Map([
+      [`${dotStatePath(charter(), DOT_WORK_RESULTS_FILE)}\u0000ops`, [cached]],
+    ]);
+    const rows = await runDotExecutorSweep(
+      [{ path: 'dots/ops.json', charter: charter() }],
+      ports(),
+      { ...h.deps, resultsCache }
+    );
+    expect(rows).toEqual([]);
+    expect(h.claims).toHaveLength(0);
   });
 });

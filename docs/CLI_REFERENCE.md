@@ -188,6 +188,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion dot event`                     |                                     | Ingest a local test event into the dot event ledger (--source, --file)                              |
 | `pnpm kyberion dot inbox`                     |                                     | Append a wake-lane row to a resident dot's inbox                                                    |
 | `pnpm kyberion dot pause`                     |                                     | Pause an active dot (triggers stop firing)                                                          |
+| `pnpm kyberion dot release`                   |                                     | Release a quarantined dot WorkItem after verifying its effects (--reason)                           |
 | `pnpm kyberion dot retire`                    |                                     | Retire a dot charter permanently                                                                    |
 | `pnpm kyberion dot wake`                      |                                     | Run one bounded wake for a dot immediately                                                          |
 | `pnpm kyberion email archive-inbox`           |                                     | Archive processed inbox messages                                                                    |

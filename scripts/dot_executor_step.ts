@@ -21,6 +21,7 @@
 import type { DotCharter, LoadedDotCharter } from '@agent/core/dot/dot-charter';
 import {
   DOT_EXECUTOR_TASK_SESSION_GUIDANCE,
+  DotExecutorPreEffectError,
   runDotExecutorSweep,
   type DotExecutorDeps,
   type DotExecutorPorts,
@@ -113,6 +114,15 @@ async function defaultExecutePipeline(
   charter: DotCharter
 ): Promise<{ status: 'succeeded' | 'failed'; summary: string }> {
   const { executePipelineFile } = await import('./pipeline-execution-part-results.js');
+  try {
+    // Preflight: a missing or invalid pipeline fails before any step runs.
+    const { readValidatedWorkflowAdf } = await import('./refactor/adf-input.js');
+    await readValidatedWorkflowAdf(ref);
+  } catch (error) {
+    throw new DotExecutorPreEffectError(
+      `pipeline '${ref}' could not be loaded: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
   const result = await executePipelineFile(ref, {
     context: { ...ctx, dot_executor: true },
     quiet: true,
@@ -132,6 +142,25 @@ async function defaultExecutePipeline(
           failed[0] && 'error' in failed[0] && failed[0].error ? `: ${String(failed[0].error)}` : ''
         }`,
       };
+}
+
+/**
+ * Wrap the backend so the step can tell whether the goal driver reached the
+ * model at all: a throw before the first backend call cannot have caused effects.
+ */
+function observeBackendCalls<T extends object>(backend: T): { backend: T; called: () => boolean } {
+  let called = false;
+  const observed = new Proxy(backend, {
+    get(target, key, receiver) {
+      const value = Reflect.get(target, key, receiver);
+      if (typeof value !== 'function') return value;
+      return (...args: unknown[]) => {
+        called = true;
+        return (value as (...a: unknown[]) => unknown).apply(target, args);
+      };
+    },
+  });
+  return { backend: observed, called: () => called };
 }
 
 function goalModeOf(resolution: DotWakeBackendResolution): DotGoalMode {
@@ -156,15 +185,27 @@ export function buildDotExecutorPorts(
     taskSessionUnavailable: DOT_EXECUTOR_TASK_SESSION_GUIDANCE,
     goalMode: () => goalModeOf(resolution),
     async runGoalTurn(options) {
-      if (!resolved) throw new Error('no reasoning backend resolved for the goal turn');
-      const result = await drive({ ...options, backend: options.backend ?? resolved });
+      if (!resolved)
+        throw new DotExecutorPreEffectError('no reasoning backend resolved for the goal turn');
+      const observed = observeBackendCalls(options.backend ?? resolved);
+      let result: Awaited<ReturnType<typeof drive>>;
+      try {
+        result = await drive({ ...options, backend: observed.backend });
+      } catch (error) {
+        if (observed.called()) throw error;
+        throw new DotExecutorPreEffectError(
+          `goal driver failed before its first model call: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
       return {
         ...result,
         finalText: result.finalReport ?? result.goal.terminalReason,
       };
     },
     async delegateText(prompt, timeoutMs, signal) {
-      if (!resolved) throw new Error('no reasoning backend resolved for the delegated turn');
+      if (!resolved) {
+        throw new DotExecutorPreEffectError('no reasoning backend resolved for the delegated turn');
+      }
       return await delegateDotText(resolved, prompt, timeoutMs, signal);
     },
     runPipeline: (ref, ctx) => (deps.executePipeline ?? defaultExecutePipeline)(ref, ctx, charter),

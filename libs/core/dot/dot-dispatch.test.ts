@@ -20,6 +20,7 @@ import {
   currentDotActions,
   dispatchDotProposals,
   dotBoundsPromptLines,
+  effectiveDotWorkShapes,
   dotNotificationRoute,
   maybeSendDotDigest,
   runDotHousekeeping,
@@ -36,6 +37,7 @@ import {
 import { appendDotInboxEntry } from './dot-inbox.js';
 import { setDotBudgetThrottleForTests } from './dot-budget.js';
 import { evaluateDotTriggersDue } from './dot-runtime.js';
+import { DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE } from './dot-proposals.js';
 import type { DotProposal } from './dot-proposals.js';
 
 const TEST_ROOT = `active/shared/tmp/dot-dispatch-tests-${randomUUID()}`;
@@ -53,7 +55,7 @@ const CHARTER: DotCharter = {
   attention: { triggers: [{ kind: 'cron', cron: '0 9 * * *', timezone: 'UTC' }] },
   authority: {
     authority_role: 'organization_operator',
-    allowed_work_shapes: ['task_session', 'pipeline'],
+    allowed_work_shapes: ['direct_reply', 'pipeline'],
     max_concurrent_delegations: 2,
   },
   notification: { deliver_to: { surface: 'slack', channel: 'C-EXEC' } },
@@ -64,7 +66,7 @@ const PROPOSAL: DotProposal = {
   action_id: 'dot_delegate_work',
   title: 'Tick overdue operations',
   objective: 'Run the overdue operation tick.',
-  work_shape: 'task_session',
+  work_shape: 'direct_reply',
 };
 
 function gateResult(
@@ -269,7 +271,50 @@ describe('dispatchDotProposals — charter bounds', () => {
     expect(h.audits[0]).toMatchObject({ result: 'denied' });
   });
 
-  it('defaults to task_session/direct_reply when the charter declares no shapes', () => {
+  it('refuses task_session before the gate or any operator ask while no executor is configured', () => {
+    const h = harness('approve');
+    const charter = {
+      ...CHARTER,
+      authority: { ...CHARTER.authority, allowed_work_shapes: ['task_session', 'direct_reply'] },
+    } as DotCharter;
+    const { records } = dispatchDotProposals(
+      charter,
+      [{ ...PROPOSAL, work_shape: 'task_session' }],
+      h.deps
+    );
+    expect(records[0].status).toBe('refused');
+    expect(records[0].reason).toBe(DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE);
+    expect(h.gateInputs).toHaveLength(0);
+    expect(h.items).toHaveLength(0);
+    // Explicit opt-in: a configured task-session executor lets the declared shape through.
+    const opted = harness('auto', { taskSessionExecutorAvailable: true });
+    const allowed = dispatchDotProposals(
+      charter,
+      [{ ...PROPOSAL, work_shape: 'task_session' }],
+      opted.deps
+    );
+    expect(allowed.records[0].status).toBe('dispatched');
+  });
+
+  it('never defaults to task_session: an undeclared charter gets direct_reply only', () => {
+    const h = harness('auto');
+    const charter = {
+      ...CHARTER,
+      authority: { authority_role: 'organization_operator' },
+    } as DotCharter;
+    expect(effectiveDotWorkShapes(charter)).toEqual(['direct_reply']);
+    expect(effectiveDotWorkShapes(charter, { taskSessionExecutorAvailable: true })).toEqual([
+      'direct_reply',
+    ]);
+    const refused = dispatchDotProposals(
+      charter,
+      [{ ...PROPOSAL, work_shape: 'task_session' }],
+      h.deps
+    );
+    expect(refused.records[0].status).toBe('refused');
+  });
+
+  it('defaults to direct_reply when the charter declares no shapes', () => {
     const h = harness('auto');
     const charter = {
       ...CHARTER,
@@ -376,13 +421,18 @@ describe('dotBoundsPromptLines', () => {
         ...CHARTER,
         authority: {
           ...CHARTER.authority,
-          allowed_work_shapes: ['task_session'],
+          allowed_work_shapes: ['task_session', 'pipeline'],
+          allowed_pipelines: ['pipelines/baseline-check.json'],
           max_concurrent_delegations: 2,
         },
       },
       { rootDir: TEST_ROOT, countOpenWorkItems: () => 1, listCharters: () => [CHARTER, partner] }
     );
-    expect(lines.join('\n')).toContain('Allowed work_shape values: task_session.');
+    expect(lines.join('\n')).toContain('Allowed work_shape values: pipeline.');
+    expect(lines.join('\n')).toContain(
+      'Allowed pipeline_ref values: pipelines/baseline-check.json'
+    );
+    expect(lines.join('\n')).toContain(DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE);
     expect(lines.join('\n')).toContain('Delegation slots free: 1 of 2');
     expect(lines.join('\n')).toContain('accept your handoffs (handoff_to): repo-guardian');
   });
@@ -617,7 +667,7 @@ describe('settleDotParkedActions + learning', () => {
     h.approvals.set('req-1', approval('approved'));
     const narrowed: DotCharter = {
       ...CHARTER,
-      authority: { ...CHARTER.authority, allowed_work_shapes: ['direct_reply'] },
+      authority: { ...CHARTER.authority, allowed_work_shapes: ['pipeline'] },
     };
     const settled = settleDotParkedActions(narrowed, h.deps);
     expect(settled[0]).toMatchObject({ status: 'declined' });

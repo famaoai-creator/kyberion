@@ -8897,6 +8897,11 @@
         "en": "Ingest a local test event into the dot event ledger (--source, --file)",
         "ja": "ローカルのテストイベントを dot イベント台帳に取り込む（--source, --file）",
         "qps-ploc": "⟦Ïñɠėşŧ ȧ ŀőƈȧŀ ŧėşŧ ėṽėñŧ ïñŧő ŧħė ḓőŧ ėṽėñŧ ŀėḓɠėř (--şőůřƈė, --ƒïŀė) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "cli_cmd_script_dot_release": {
+        "en": "Release a quarantined dot WorkItem after verifying its effects (--reason)",
+        "ja": "効果を確認した上で隔離中の dot WorkItem を解放する（--reason）",
+        "qps-ploc": "⟦Řėŀėȧşė ȧ ɋůȧřȧñŧïñėḓ ḓőŧ ẆőřķÏŧėɱ ȧƒŧėř ṽėřïƒẏïñɠ ïŧş ėƒƒėƈŧş (--řėȧşőñ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
       }
     },
     "recorder": {

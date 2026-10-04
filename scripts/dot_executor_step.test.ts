@@ -14,6 +14,7 @@ import {
   runDotExecutorStep,
 } from './dot_executor_step.js';
 import { DOT_SUPERVISOR_STEPS } from './dot_supervisor_extensions.js';
+import { isDotExecutorPreEffectError } from '@agent/core/dot/dot-executor';
 
 const CHARTER: DotCharter = {
   kind: 'dot-charter',
@@ -68,9 +69,43 @@ describe('buildDotExecutorPorts', () => {
     expect(ports.goalMode?.(CHARTER)).toBe('tool');
     const result = await ports.runGoalTurn({ objective: 'x', toolRole: 'infrastructure_sentinel' });
     expect(goalDriver).toHaveBeenCalledWith(
-      expect.objectContaining({ objective: 'x', backend: toolBackend })
+      expect.objectContaining({ objective: 'x', backend: expect.anything() })
     );
     expect(result.finalText).toBe('did it');
+  });
+
+  it('classifies a goal driver that threw before any model call as a pre-effect failure', async () => {
+    const early = vi.fn(async () => {
+      throw new Error('driver config invalid');
+    });
+    const ports = buildDotExecutorPorts(CHARTER, {
+      backend: toolBackend,
+      goalDriver: early as never,
+    });
+    const error = await ports.runGoalTurn({ objective: 'x' }).catch((e: unknown) => e);
+    expect(isDotExecutorPreEffectError(error)).toBe(true);
+    expect(String(error)).toMatch(/before its first model call: driver config invalid/);
+
+    const late = vi.fn(async (options: { backend: ReasoningBackend }) => {
+      await options.backend.generateWithTools?.([] as never, [] as never);
+      throw new Error('crashed mid-turn');
+    });
+    const midTurn = buildDotExecutorPorts(CHARTER, {
+      backend: toolBackend,
+      goalDriver: late as never,
+    });
+    const uncertain = await midTurn.runGoalTurn({ objective: 'x' }).catch((e: unknown) => e);
+    expect(isDotExecutorPreEffectError(uncertain)).toBe(false);
+    expect(String(uncertain)).toMatch(/crashed mid-turn/);
+  });
+
+  it('classifies a missing pipeline as a pre-effect failure before any step runs', async () => {
+    const ports = buildDotExecutorPorts(CHARTER, { backend: textBackend });
+    const error = await ports
+      .runPipeline('pipelines/dot-executor-step-missing.json', {})
+      .catch((e: unknown) => e);
+    expect(isDotExecutorPreEffectError(error)).toBe(true);
+    expect(String(error)).toMatch(/could not be loaded/);
   });
 
   it('uses a bounded delegated turn when no live tool candidate exists', async () => {
@@ -162,6 +197,7 @@ describe('dot-executor supervisor step', () => {
         },
       } as unknown as WorkItem;
       const release = vi.fn(() => ({ item: target, lease: {} as never }));
+      const appendInbox = vi.fn();
       const rows = await runDotExecutorStep(
         new Date('2026-10-04T10:00:00Z'),
         [{ path: 'dots/step-dot.json', charter: CHARTER }],
@@ -175,7 +211,7 @@ describe('dot-executor supervisor step', () => {
           throttle: () => 'normal',
           tokenCapReached: () => false,
           reap: () => ({ expired: [], recovered: [], parked: [], replayed: [] }),
-          appendInbox: () => {},
+          appendInbox,
           audit: () => {},
         }
       );
@@ -183,10 +219,14 @@ describe('dot-executor supervisor step', () => {
         {
           status: 'blocked',
           mode: 'escalated',
-          summary: expect.stringContaining('no governed work-tool executor'),
+          reason_code: 'capability_unavailable',
+          report_suppressed: 'capability_unavailable',
+          summary: expect.stringContaining('no governed task-session executor'),
         },
       ]);
       expect(goalDriver).not.toHaveBeenCalled();
+      // Capability-unavailable results never wake the dot (no report-back inbox row).
+      expect(appendInbox).not.toHaveBeenCalled();
       expect(release).toHaveBeenCalledWith(expect.objectContaining({ nextStatus: 'archived' }));
     }
   );

@@ -69,7 +69,7 @@ optional; the full design is in
   },
   "authority": {
     "authority_role": "infrastructure_sentinel",
-    "allowed_work_shapes": ["task_session", "pipeline"],
+    "allowed_work_shapes": ["direct_reply", "pipeline"],
     "allowed_pipelines": ["pipelines/ok.json"]
   },
   "memory": { "enabled": true, "max_bytes": 8192 },
@@ -102,6 +102,33 @@ matching tools). State is kept under `active/shared/runtime/dot/`.
 4. Check `pnpm kyberion dot status` for the executor, KR, outcome, budget and
    autonomy sections. A promotion above L2 is only applied after a human
    approves its decision card.
+5. **Release a quarantined WorkItem** (see "Executor limitations" below):
+   inspect `pnpm kyberion dot work <dot_id>` and the WorkItem, verify on the
+   target system whether the earlier attempt had any effect (undo or finish it
+   by hand if needed), then run
+   `pnpm kyberion dot release <dot_id> <work_item_id> --reason "<what you verified>" [--by user:<member_id>]`.
+   This is audited (`dot_work_item_operator_release`), records
+   `metadata.dot_executor.operator_verified_at/by/reason`, and returns the item
+   to `ready`; the next sweep re-attempts it under a new attempt id. To close
+   it instead, leave it archived (or cancel it through the work board). Do not
+   reopen the item directly — a plain reopen is re-archived as a conflict.
+
+### Executor limitations
+
+- `task_session` is **not available**: no governed task-session executor
+  ships yet. It is not a default shape, and dispatch refuses a `task_session`
+  proposal before the gate or any operator ask, even when a charter declares
+  it. Use `pipeline` (with a `pipeline_ref` from `allowed_pipelines`) for
+  effects and `direct_reply` for advisory answers. A legacy `task_session`
+  item is closed as blocked (`reason_code: capability_unavailable`) without
+  waking the dot; the dot sees it in its work results on the next wake.
+- `direct_reply` asks the provider for advisory behavior; not every provider
+  enforces it mechanically, so its summary is prefixed as unverified.
+- A failure **before any effect** (no backend resolved, pipeline missing or
+  invalid, goal driver failing before its first model call) returns the item
+  to `ready` for up to 3 attempts, then ends as an escalated failure — never a
+  quarantine. Any other error, timeout or stranded claim is quarantined until
+  an operator releases it (step 5).
 
 ## Execution model
 

@@ -65,6 +65,7 @@ import { dotGoalRefLabel, listDotCharters, type DotCharter } from './dot-charter
 import { resolveTenant } from '../organization/tenant-registry.js';
 import {
   DOT_ACTION_IDS,
+  DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE,
   type DotDecisionLevel,
   type DotProposal,
   type DotWorkShape,
@@ -95,8 +96,13 @@ import {
 const logger = createLogger('dot-dispatch');
 
 export const DOT_ACTION_LEDGER_PATH = 'active/shared/runtime/dot-action-ledger.jsonl';
-/** Shapes a charter may dispatch when it declares no `allowed_work_shapes`. */
-export const DEFAULT_DOT_WORK_SHAPES: readonly DotWorkShape[] = ['task_session', 'direct_reply'];
+/**
+ * Shapes a charter may dispatch when it declares no `allowed_work_shapes`.
+ * `task_session` is not a default: no governed task-session executor exists,
+ * so a charter may only opt in explicitly and dispatch still refuses it unless
+ * {@link DotDispatchDeps.taskSessionExecutorAvailable} says one is configured.
+ */
+export const DEFAULT_DOT_WORK_SHAPES: readonly DotWorkShape[] = ['direct_reply'];
 /** Concurrency cap when a charter declares no `max_concurrent_delegations`. */
 export const DEFAULT_DOT_MAX_CONCURRENT_DELEGATIONS = 3;
 /** The same proposal is not re-dispatched or re-asked within this window. */
@@ -176,6 +182,20 @@ export interface DotDispatchDeps {
   feedback?: Omit<DotFeedbackDeps, 'rootDir' | 'now'>;
   /** Policy `autonomy.relaxable_actions`; defaults to the autonomous-ops policy. */
   relaxableActions?: readonly string[];
+  /**
+   * True only when a governed task-session executor is configured. Defaults to
+   * false: `task_session` proposals are refused before any gate or operator ask.
+   */
+  taskSessionExecutorAvailable?: boolean;
+}
+
+/** The charter's declared (or default) shapes, minus capabilities this runtime lacks. */
+export function effectiveDotWorkShapes(
+  charter: DotCharter,
+  deps: Pick<DotDispatchDeps, 'taskSessionExecutorAvailable'> = {}
+): DotWorkShape[] {
+  const declared = charter.authority.allowed_work_shapes ?? DEFAULT_DOT_WORK_SHAPES;
+  return declared.filter((shape) => shape !== 'task_session' || deps.taskSessionExecutorAvailable);
 }
 
 export function dotActorId(dotId: string): string {
@@ -290,7 +310,8 @@ function openDelegations(charter: DotCharter, deps: DotDispatchDeps): number {
  * them instead of spending proposals on refusals. Same sources as enforcement.
  */
 export function dotBoundsPromptLines(charter: DotCharter, deps: DotDispatchDeps = {}): string[] {
-  const shapes = charter.authority.allowed_work_shapes ?? DEFAULT_DOT_WORK_SHAPES;
+  const shapes = effectiveDotWorkShapes(charter, deps);
+  const pipelines = charter.authority.allowed_pipelines ?? [];
   const cap =
     charter.authority.max_concurrent_delegations ?? DEFAULT_DOT_MAX_CONCURRENT_DELEGATIONS;
   const free = Math.max(0, cap - openDelegations(charter, deps));
@@ -304,7 +325,20 @@ export function dotBoundsPromptLines(charter: DotCharter, deps: DotDispatchDeps 
     )
     .map((other) => other.dot_id);
   return [
-    `Allowed work_shape values: ${shapes.join(', ')}. Any other shape is refused.`,
+    shapes.length
+      ? `Allowed work_shape values: ${shapes.join(', ')}. Any other shape is refused.`
+      : 'No work_shape is available to you now; propose nothing and report status instead.',
+    ...(shapes.includes('pipeline')
+      ? [
+          pipelines.length
+            ? `Allowed pipeline_ref values: ${pipelines.join(', ')}.`
+            : 'No pipeline is allowed by your charter; do not propose pipeline work.',
+        ]
+      : []),
+    ...(!shapes.includes('task_session') &&
+    (charter.authority.allowed_work_shapes ?? []).includes('task_session')
+      ? [DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE]
+      : []),
     free > 0
       ? `Delegation slots free: ${free} of ${cap}. Propose at most ${free}, most important first; extra proposals are refused.`
       : `Delegation slots free: 0 of ${cap} (open work or decisions waiting on the operator). Propose nothing new; report status instead.`,
@@ -378,7 +412,10 @@ function checkDotProposalScope(
   if (!DOT_ACTION_IDS.includes(proposal.action_id)) {
     return { ok: false, reason: `action '${proposal.action_id}' is not a dot action` };
   }
-  const shapes = charter.authority.allowed_work_shapes ?? DEFAULT_DOT_WORK_SHAPES;
+  const shapes = effectiveDotWorkShapes(charter, deps);
+  if (proposal.work_shape === 'task_session' && !deps.taskSessionExecutorAvailable) {
+    return { ok: false, reason: DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE };
+  }
   if (!shapes.includes(proposal.work_shape)) {
     return {
       ok: false,

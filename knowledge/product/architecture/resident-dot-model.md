@@ -76,8 +76,9 @@ governs each one in the supervisor process, under the charter role
 
 1. **Charter bounds**: the policy action is derived, never chosen by the dot
    (`dot_handoff` with `handoff_to`, else `dot_delegate_work`), so a dot cannot
-   name a cheaper policy action. Then `allowed_work_shapes` (default `task_session`,
-   `direct_reply`), handoff acceptance, and `max_concurrent_delegations`
+   name a cheaper policy action. Then `allowed_work_shapes` (default
+   `direct_reply`; `task_session` is refused up-front while no governed
+   task-session executor is configured, even when declared), handoff acceptance, and `max_concurrent_delegations`
    (default 3). Open WorkItems and parked decisions both count toward the cap.
    A tenant-scoped dot also needs its tenant registered and operational, so
    the operator is never asked to approve work that cannot run. Every bound
@@ -156,16 +157,30 @@ wake ──proposal──▶ dispatch (gate ⊔ floors, arbitration) ──▶ W
   (`metadata.dot_id` or `handoff_to`) under the charter role, runs them by
   shape (`direct_reply` as a bounded text turn, `pipeline` only if listed in
   `authority.allowed_pipelines`, `mission` is escalated). The live
-  `task_session` adapter has no governed task tools yet and fails closed;
-  a model's declaration of completion is not evidence of an executed task.
+  `task_session` adapter has no governed task tools yet: dispatch refuses the
+  shape before asking anyone, and a legacy item is closed as blocked with
+  `reason_code: capability_unavailable` and no report-back wake (the dot reads
+  it in its work results), so propose → block → wake → re-propose cannot loop.
+  A model's declaration of completion is not evidence of an executed task.
   Result evidence, including the pre-work KR snapshot, is persisted before
   releasing the lease. Errors, timeouts and abandoned claims are quarantined
   rather than retried: an abort signal does not prove cancellation, and late
-  effects may still occur. Recovery reconciles the original action/attempt
-  without re-executing it. Terminal reports use an idempotent inbox identity
-  plus a durable result receipt (`payload.report_from = dot-executor`), so a
-  failed release, enqueue or receipt update can be reconciled. Legacy results
-  lacking a receipt may receive one recovery report.
+  effects may still occur. The exception is a provably pre-effect failure
+  (`DotExecutorPreEffectError`: no backend resolved, pipeline missing or
+  invalid, goal driver failing before its first model call), which returns the
+  item to `ready` for up to 3 attempts and then ends as an escalated failure.
+  Recovery reconciles the original action/attempt without re-executing it.
+  Quarantine ends only by a governed operator release —
+  `pnpm kyberion dot release <dot_id> <work_item_id> --reason "<text>"` —
+  which records `metadata.dot_executor.operator_verified_at/by/reason`, audits
+  `dot_work_item_operator_release`, and returns the item to `ready`; evidence
+  and expired attempts older than the release stop blocking, so the next sweep
+  re-attempts it under a new attempt id. A plain reopen is still re-archived as
+  a conflict. Terminal reports use an idempotent inbox identity plus a durable
+  result receipt (`payload.report_from = dot-executor`), so a failed release,
+  enqueue or receipt update can be reconciled. Results written before report
+  recovery existed (no `report_to_dot_id`) count as reported, so an upgrade
+  does not replay historic reports; work results are read once per sweep.
   The shared filesystem lock primitive conservatively retains unknown ownership
   and serializes stale cleanup. Restart competing workers on upgrade so they all
   use the repaired primitive in the same PID/filesystem namespace; uncertain or

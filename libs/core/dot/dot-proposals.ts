@@ -74,6 +74,13 @@ export const DOT_HANDOFF_ACTION_ID = 'dot_handoff';
 export const DOT_ACTION_IDS: readonly string[] = [DEFAULT_DOT_ACTION_ID, DOT_HANDOFF_ACTION_ID];
 /** A wake that proposes more than this is cut off; the rest is reported as errors. */
 export const MAX_DOT_PROPOSALS_PER_WAKE = 10;
+/**
+ * No governed task-session executor ships yet (the executor has goal-control
+ * tools only), so dispatch refuses `task_session` before asking anyone and the
+ * executor blocks any legacy item. Shared by dispatch, executor and prompts.
+ */
+export const DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE =
+  'task_session is unavailable: no governed task-session executor is configured — propose a pipeline from your charter allowed_pipelines (pipeline_ref) or an advisory direct_reply, or ask the operator to do the work';
 
 const WORK_SHAPES: readonly DotWorkShape[] = [
   'mission',
@@ -98,7 +105,12 @@ export function buildDotProposeToolDefinition(): ToolDefinition {
           type: 'string',
           description: 'What the delegated worker should accomplish, with acceptance criteria.',
         },
-        work_shape: { type: 'string', enum: [...WORK_SHAPES] },
+        work_shape: {
+          type: 'string',
+          enum: [...WORK_SHAPES],
+          description:
+            'Use a shape your charter allows (listed in your bounds): pipeline with an allowed pipeline_ref, or direct_reply for advice. task_session is refused while no task-session executor is configured.',
+        },
         rationale: { type: 'string' },
         changed_paths: { type: 'array', items: { type: 'string' } },
         requested_decision: { type: 'string', enum: [...DECISIONS] },
@@ -258,13 +270,14 @@ export function dotProposalInstructions(mode: 'tool' | 'fence'): string {
   const how =
     mode === 'tool'
       ? `Call the ${DOT_PROPOSE_TOOL_NAME} tool once per action you want taken.`
-      : `End your reply with a fenced block \`\`\`${DOT_PROPOSALS_FENCE}\n[{"title": "...", "objective": "...", "work_shape": "task_session"}]\n\`\`\` listing every action you want taken (an empty array when none).`;
+      : `End your reply with a fenced block \`\`\`${DOT_PROPOSALS_FENCE}\n[{"title": "...", "objective": "...", "work_shape": "direct_reply"}]\n\`\`\` listing every action you want taken (an empty array when none).`;
   return [
     'You do not act directly. Every action is a proposal that the runtime governs:',
     'it is scored by the autonomous-ops gate, raised to your charter decision floor, and then',
     'delegated as a WorkItem, sent to the operator for a decision, or refused.',
     how,
     'Use handoff_to to give work to another dot that accepts your handoffs.',
+    'Use only a work_shape your bounds allow. Prefer pipeline (with an allowed pipeline_ref) for effects and direct_reply for analysis or advice; task_session is refused while no task-session executor is configured.',
     'For pipeline work set pipeline_ref (it must be one your charter allows). Set expected_effect (kr_id or signal, direction) so the outcome is measured, and target + intent so conflicting proposals from other dots are arbitrated.',
   ].join('\n');
 }

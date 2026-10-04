@@ -55,6 +55,14 @@ export interface DotWorkResultRow {
   report_to_dot_id?: string;
   /** Durable inbox receipt observed; suppresses re-delivery after inbox retention. */
   report_enqueued_at?: string;
+  /** Reported without waking the dot (it reads the result on its next wake). */
+  report_suppressed?: 'capability_unavailable';
+  /**
+   * Why the item stopped: `capability_unavailable` (this runtime cannot run the
+   * shape — no wake), `pre_effect_failure` (failed before any port effect, so
+   * it is retryable rather than quarantined).
+   */
+  reason_code?: 'capability_unavailable' | 'pre_effect_failure';
   kr_snapshot?: Record<string, number>;
   /** Latest health (1 healthy / 0) per signal, captured at claim time — the "before" of a signal effect. */
   signal_snapshot?: Record<string, 0 | 1>;
