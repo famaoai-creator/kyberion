@@ -8,7 +8,9 @@ import {
   DOT_BUDGET_STATUS_SECTION,
   dotBudgetScope,
   dotBudgetThrottle,
+  evaluateDotBudget,
   resetDotBudgetCache,
+  setDotBudgetThrottleForTests,
 } from './dot-budget.js';
 import {
   DOT_DIGEST_SECTIONS,
@@ -60,6 +62,7 @@ function evaluation(
 }
 
 afterEach(() => {
+  setDotBudgetThrottleForTests(undefined);
   resetDotBudgetCache();
   resetOrgBudgetAlertState();
 });
@@ -128,5 +131,42 @@ describe('budget extensions', () => {
       now: () => NOW,
     });
     expect(DOT_BUDGET_FLOOR_CONTRIBUTOR.floor(CHARTER, PROPOSAL, ctx)).toBe('approve');
+  });
+});
+
+describe('budget hermeticity', () => {
+  it('evaluateDotBudget never alerts; only dotBudgetThrottle (daemon path) does', () => {
+    const alert = vi.fn();
+    const evaluate = () => evaluation(1200, 'hard');
+    expect(evaluateDotBudget(CHARTER, { evaluate, alert, now: () => NOW }).throttle).toBe('hard');
+    expect(alert).not.toHaveBeenCalled();
+    dotBudgetThrottle(CHARTER, { evaluate, alert, now: () => NOW });
+    expect(alert).toHaveBeenCalledTimes(1);
+  });
+
+  it('the floor contributor, status and digest read only the cache — no alert from the gate', () => {
+    const alert = vi.fn();
+    evaluateDotBudget(CHARTER, { evaluate: () => evaluation(850, 'soft'), alert, now: () => NOW });
+    const ctx = { now: () => NOW };
+    expect(DOT_BUDGET_FLOOR_CONTRIBUTOR.floor(CHARTER, PROPOSAL, ctx)).toBe('approve');
+    DOT_BUDGET_STATUS_SECTION.collect(CHARTER, ctx);
+    DOT_BUDGET_DIGEST_SECTION.lines(CHARTER, undefined, ctx);
+    expect(alert).not.toHaveBeenCalled();
+  });
+
+  it('setDotBudgetThrottleForTests replaces every read and suppresses alerts', () => {
+    const alert = vi.fn();
+    const evaluate = vi.fn(() => evaluation(1200, 'hard'));
+    setDotBudgetThrottleForTests(() => 'soft');
+    expect(dotBudgetThrottle(CHARTER, { evaluate, alert, now: () => NOW }).throttle).toBe('soft');
+    expect(DOT_BUDGET_FLOOR_CONTRIBUTOR.floor(CHARTER, PROPOSAL, { now: () => NOW })).toBe(
+      'approve'
+    );
+    setDotBudgetThrottleForTests(() => evaluation(10, 'normal'));
+    expect(
+      DOT_BUDGET_FLOOR_CONTRIBUTOR.floor(CHARTER, PROPOSAL, { now: () => NOW })
+    ).toBeUndefined();
+    expect(evaluate).not.toHaveBeenCalled();
+    expect(alert).not.toHaveBeenCalled();
   });
 });
