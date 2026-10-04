@@ -1,3 +1,4 @@
+import type { SurfaceConversationResult } from '@agent/core/surface/channel-surface';
 import {
   parseIntentResolutionContract,
   type IntentResolutionContract,
@@ -27,7 +28,7 @@ function hasSafeConversationTree(value: unknown): boolean {
 export type ConversationShape =
   'clarification' | 'execution_preview' | 'status_summary' | 'delivery_summary' | 'reply';
 
-export type ConversationMode = 'voice-hub' | 'orchestrator' | 'unavailable';
+export type ConversationMode = 'voice-hub' | 'orchestrator' | 'unavailable' | 'history';
 
 export interface ConversationNextAction {
   id: string;
@@ -45,6 +46,9 @@ export interface ConversationMessageRequest {
   locale?: string;
   /** Optional stable thread id so follow-ups (e.g. confirmations) stay in one conversation. */
   sessionId?: string;
+  tenant?: string;
+  organizationId?: string;
+  projectId?: string;
 }
 
 export interface ConversationMessageResponse {
@@ -56,6 +60,8 @@ export interface ConversationMessageResponse {
   intentResolution?: IntentResolutionContract;
   /** False means the reply ran, but its durable completion could not be saved. */
   historySaved?: boolean;
+  requestId?: string;
+  conversationRuntime?: SurfaceConversationResult['conversationRuntime'];
 }
 
 export interface VoiceHubConversationResponse {

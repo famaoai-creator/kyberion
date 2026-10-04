@@ -14,6 +14,7 @@ import {
   DEFAULT_FRONT_DESK_PORTS,
   FRONT_DESK_HELP_LINK,
   readFrontDeskSurfacePorts,
+  readFrontDeskSurfaceUrls,
   resolveFrontDeskMenu,
   type FrontDeskRole,
   type FrontDeskSurfacePorts,
@@ -65,14 +66,16 @@ export function buildFrontDeskNavPayload(
     ...DEFAULT_FRONT_DESK_PORTS,
     ...(input.ports ?? readFrontDeskSurfacePorts()),
   };
-  const menu = resolveFrontDeskMenu({ currentSurface: 'concierge', ports, role });
+  const urls = input.ports ? undefined : readFrontDeskSurfaceUrls();
+  const menu = resolveFrontDeskMenu({ currentSurface: 'concierge', ports, urls, role });
   const tr = (key: string) => t(key as VocabularyKey, undefined, locale);
   // `FRONT_DESK_HELP_LINK.surface` is a fixed presence-studio literal today,
   // but this stays a runtime string comparison (not a type narrowing) so it
   // keeps working if that ever changes.
   const helpExternal = (FRONT_DESK_HELP_LINK.surface as string) !== 'concierge';
   const helpHref = helpExternal
-    ? `http://127.0.0.1:${ports[FRONT_DESK_HELP_LINK.surface]}${FRONT_DESK_HELP_LINK.path}`
+    ? (urls?.[FRONT_DESK_HELP_LINK.surface] ??
+        `http://127.0.0.1:${ports[FRONT_DESK_HELP_LINK.surface]}`) + FRONT_DESK_HELP_LINK.path
     : FRONT_DESK_HELP_LINK.path;
 
   return {

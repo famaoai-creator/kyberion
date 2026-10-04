@@ -25,6 +25,9 @@
 
   var THEME_KEY = 'kyberion.ui.theme';
   var LOCALE_KEY = 'kyberion.ui.locale';
+  var TENANT_KEY = 'front-desk.tenant';
+  var selectedTenant =
+    new URLSearchParams(window.location.search).get('tenant') || read(TENANT_KEY) || null;
   // Server-side mirror of the language choice (front-desk-pages.ts).
   var LOCALE_COOKIE = 'kb-ui-locale';
   var RELOAD_GUARD_KEY = 'kyberion.ui.locale-sync';
@@ -105,6 +108,34 @@
   root.setAttribute('lang', locale);
 
   window.KyberionPrefs = {
+    tenant: function () {
+      return selectedTenant;
+    },
+    scopedUrl: function (path) {
+      var url = new URL(path, window.location.href);
+      var current = new URL(window.location.href);
+      ['organizationId', 'projectId'].forEach(function (key) {
+        var selected = current.searchParams.get(key);
+        if (selected) url.searchParams.set(key, selected);
+      });
+      if (selectedTenant) url.searchParams.set('tenant', selectedTenant);
+      return url.origin === window.location.origin
+        ? url.pathname + url.search + url.hash
+        : url.href;
+    },
+    setTenant: function (tenant) {
+      var changed = selectedTenant !== (tenant || null);
+      selectedTenant = tenant || null;
+      write(TENANT_KEY, selectedTenant);
+      var url = new URL(window.location.href);
+      if (changed) {
+        url.searchParams.delete('organizationId');
+        url.searchParams.delete('projectId');
+      }
+      if (selectedTenant) url.searchParams.set('tenant', selectedTenant);
+      else url.searchParams.delete('tenant');
+      window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+    },
     THEME_KEY: THEME_KEY,
     LOCALE_KEY: LOCALE_KEY,
     theme: function () {

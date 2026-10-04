@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
-import { deriveSurfaceSessionId } from '../mission/orchestrator-session.js';
 import { missionSteeringRouteHandler } from './surface-mission-steering.js';
 
 import { pathResolver } from '../path-resolver.js';
@@ -26,7 +25,6 @@ import {
 import { logger } from '../core.js';
 import { recordReasoningTierDeclaration } from '../reasoning/reasoning-tier-declaration.js';
 import type { AgentHandle } from '../agent/agent-lifecycle.js';
-import { triggerBackgroundReviewFork } from '../workforce/background-review-runner.js';
 import { ensureIsolatedSurfaceAgent } from './surface-tenant-isolation.js';
 import {
   checkAndRepairSurfaceUxContract,
@@ -39,6 +37,17 @@ import {
 } from '../mission/mission-team-plan-composer.js';
 import { ensureMissionTeamRuntimeViaSupervisor } from '../agent/agent-runtime-supervisor.js';
 import { buildSurfaceConversationInput } from './surface-interaction-model.js';
+import {
+  buildScopedSurfaceConversationPrompt,
+  assertScopedSurfaceDelegationSupported,
+  assertScopedSurfaceCapabilitySupported,
+  SurfaceConversationCapabilityError,
+  ensureScopedSurfaceConversationAgent,
+  prepareSurfaceConversationRuntime,
+  scopedSurfacePendingIntentKey,
+  withSurfaceConversationRuntime,
+  type ScopedSurfaceConversationRuntime,
+} from './surface-conversation-runtime-context.js';
 import { classifyTaskSessionIntent } from '../task/task-session.js';
 import { loadPendingIntent, savePendingIntent } from '../pending-intent-store.js';
 import { currentScope } from '../scope-context.js';
@@ -107,6 +116,7 @@ export {
 async function handleGovernedExecutionHint(
   context: SurfaceRuntimeRouteContext
 ): Promise<SurfaceConversationResult> {
+  assertScopedSurfaceCapabilitySupported(context.input, 'governed_cli_execution');
   const resolved =
     context.resolvedIntent ||
     resolveSurfaceIntent(context.input.surfaceText || context.structuredQuery, {
@@ -152,6 +162,7 @@ async function handleGovernedExecutionHint(
         });
       }
     } catch (error: any) {
+      if (error instanceof SurfaceConversationCapabilityError) throw error;
       if (intentId) {
         surfaceRuntimeData.recordLearningOutcomeSafely({
           intent_id: intentId,
@@ -220,6 +231,7 @@ async function handleGovernedExecutionHint(
         ].join('\n')
       );
     } catch (error: any) {
+      if (error instanceof SurfaceConversationCapabilityError) throw error;
       if (intentId) {
         surfaceRuntimeData.recordLearningOutcomeSafely({
           intent_id: intentId,
@@ -266,6 +278,7 @@ async function handleGovernedExecutionHint(
         });
       }
     } catch (error: any) {
+      if (error instanceof SurfaceConversationCapabilityError) throw error;
       if (intentId) {
         surfaceRuntimeData.recordLearningOutcomeSafely({
           intent_id: intentId,
@@ -335,6 +348,7 @@ async function handleGovernedExecutionHint(
         });
       }
     } catch (error: any) {
+      if (error instanceof SurfaceConversationCapabilityError) throw error;
       if (intentId) {
         surfaceRuntimeData.recordLearningOutcomeSafely({
           intent_id: intentId,
@@ -422,6 +436,7 @@ async function handleGovernedExecutionHint(
       });
     }
   } catch (error: any) {
+    if (error instanceof SurfaceConversationCapabilityError) throw error;
     if (intentId) {
       surfaceRuntimeData.recordLearningOutcomeSafely({
         intent_id: intentId,
@@ -624,6 +639,7 @@ async function escalateSurfaceTextIfNeeded(
     const escalatedText = extractSurfaceBlocks(escalatedRawText).text;
     return escalatedText || escalatedRawText;
   } catch (error: any) {
+    if (error instanceof SurfaceConversationCapabilityError) throw error;
     logger.warn(
       `[surface_reasoning_tier_escalation_failed] call_site=${callSite} escalation_reason=${escalationReason} error=${error?.message || String(error)}`
     );
@@ -732,6 +748,7 @@ async function processDelegations(
   senderAgentId: string,
   fallbackText: string
 ): Promise<SurfaceDelegationResult[]> {
+  assertScopedSurfaceDelegationSupported(surfaceRuntimeData.surfaceRuntimeContextStore.getStore());
   const delegationResults: SurfaceDelegationResult[] = [];
 
   for (const msg of a2aMessages) {
@@ -755,6 +772,7 @@ async function processDelegations(
         response: response.payload?.text || JSON.stringify(response.payload),
       });
     } catch (err: any) {
+      if (err instanceof SurfaceConversationCapabilityError) throw err;
       delegationResults.push({
         receiver: msg.header?.receiver,
         error: err.message,
@@ -771,6 +789,7 @@ async function routeForcedDelegation(
   senderAgentId: string,
   missionId?: string
 ): Promise<SurfaceDelegationResult[]> {
+  assertScopedSurfaceDelegationSupported(surfaceRuntimeData.surfaceRuntimeContextStore.getStore());
   try {
     const enrichedQuery =
       receiver === 'nerve-agent' && missionId
@@ -792,6 +811,7 @@ async function routeForcedDelegation(
       },
     ];
   } catch (err: any) {
+    if (err instanceof SurfaceConversationCapabilityError) throw err;
     return [
       {
         receiver,
@@ -808,6 +828,7 @@ async function routeSlackForcedDelegation(
   parsedSlackPrompt?: ParsedSlackSurfacePrompt | null,
   missionId?: string
 ): Promise<SurfaceDelegationResult[]> {
+  assertScopedSurfaceDelegationSupported(surfaceRuntimeData.surfaceRuntimeContextStore.getStore());
   const parsed = parsedSlackPrompt || parseSlackSurfacePrompt(query);
   if (!parsed) {
     return routeForcedDelegation(receiver, query, senderAgentId, missionId);
@@ -843,6 +864,7 @@ async function routeSlackForcedDelegation(
       },
     ];
   } catch (err: any) {
+    if (err instanceof SurfaceConversationCapabilityError) throw err;
     return [
       {
         receiver,
@@ -859,6 +881,7 @@ async function routeMissionTeamDelegation(
   query: string,
   senderAgentId: string
 ): Promise<SurfaceDelegationResult[]> {
+  assertScopedSurfaceDelegationSupported(surfaceRuntimeData.surfaceRuntimeContextStore.getStore());
   const plan = loadMissionTeamPlan(missionId);
   const isStandby = plan?.assignments.some(
     (assignment) => assignment.team_role === teamRole && assignment.status === 'standby'
@@ -901,6 +924,7 @@ async function routeNerveRoutingProposals(
   senderAgentId: string,
   missionId?: string
 ): Promise<SurfaceDelegationResult[]> {
+  assertScopedSurfaceDelegationSupported(surfaceRuntimeData.surfaceRuntimeContextStore.getStore());
   if (!missionId) return [];
   const results: SurfaceDelegationResult[] = [];
   for (const proposal of proposals) {
@@ -962,6 +986,7 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: surfaceRuntimeData.SurfaceRuntimeRouteHand
       try {
         return await handleGovernedExecutionHint(context);
       } catch (error: any) {
+        if (error instanceof SurfaceConversationCapabilityError) throw error;
         return emptySurfaceResult(`Governed execution failed: ${error?.message || String(error)}`);
       }
     },
@@ -986,6 +1011,7 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: surfaceRuntimeData.SurfaceRuntimeRouteHand
       try {
         return await surfaceRuntimeData.handleSurfaceQueryRoute(context, resolved);
       } catch (error: any) {
+        if (error instanceof SurfaceConversationCapabilityError) throw error;
         return emptySurfaceResult(`Query route failed: ${error?.message || String(error)}`);
       }
     },
@@ -1006,6 +1032,7 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: surfaceRuntimeData.SurfaceRuntimeRouteHand
         );
         return buildDelegatedSurfaceConversationResult(delegationResults);
       } catch (error: any) {
+        if (error instanceof SurfaceConversationCapabilityError) throw error;
         return emptySurfaceResult(`Browser route failed: ${error?.message || String(error)}`);
       }
     },
@@ -1049,6 +1076,7 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: surfaceRuntimeData.SurfaceRuntimeRouteHand
       try {
         return await surfaceRuntimeData.handleTaskSessionRoute(context);
       } catch (error: any) {
+        if (error instanceof SurfaceConversationCapabilityError) throw error;
         return emptySurfaceResult(`Task-session route failed: ${error?.message || String(error)}`);
       }
     },
@@ -1089,21 +1117,26 @@ function turnReplyLocale(input: {
 export async function runSurfaceConversation(
   input: SurfaceConversationInput
 ): Promise<SurfaceConversationResult> {
-  surfaceRuntimeData.surfaceRuntimeContextStore.enterWith(input);
-  // Scoped with run(), not enterWith(): the locale must end with the turn and
-  // never leak into the caller's continuation.
-  return runWithReplyLocale(
-    turnReplyLocale({
-      locale: input.locale,
-      text: input.surfaceText || input.query,
-      scope: input.scope,
-    }),
-    () => runSurfaceConversationTurn(input)
-  );
+  return withSurfaceConversationRuntime(input, async (runtime) => {
+    const turnInput = runtime ? { ...input, scope: runtime.scope } : input;
+    return surfaceRuntimeData.surfaceRuntimeContextStore.run(turnInput, async () => {
+      // Scoped with run(), not enterWith(): the locale ends with the turn.
+      const result = await runWithReplyLocale(
+        turnReplyLocale({
+          locale: turnInput.locale,
+          text: turnInput.surfaceText || turnInput.query,
+          scope: turnInput.scope,
+        }),
+        () => runSurfaceConversationTurn(turnInput, runtime)
+      );
+      return runtime ? { ...result, conversationRuntime: runtime.diagnostic } : result;
+    });
+  });
 }
 
 async function runSurfaceConversationTurn(
-  input: SurfaceConversationInput
+  input: SurfaceConversationInput,
+  runtime?: ScopedSurfaceConversationRuntime
 ): Promise<SurfaceConversationResult> {
   // Shared execution feedback is a write to a process-wide store with no
   // tenant attribution. Isolated, ask-only, and tenant-scoped speakers cannot
@@ -1113,6 +1146,7 @@ async function runSurfaceConversationTurn(
   const parsedExecutionFeedback =
     input.executionFeedback || parseExecutionFeedbackText(input.query);
   if (parsedExecutionFeedback && mayRecordSharedFeedback) {
+    assertScopedSurfaceCapabilitySupported(input, 'shared_feedback_recording');
     const record = recordExecutionFeedback({
       ...parsedExecutionFeedback,
       ...(input.correlationId && !parsedExecutionFeedback.correlation_id
@@ -1139,7 +1173,8 @@ async function runSurfaceConversationTurn(
   const routedSurfaceInput = surfaceRoutingText(input);
   const surface = input.surface || surfaceChannelFromAgentId(input.agentId);
   const originalText = (input.surfaceText || input.query || '').trim();
-  const pendingIntent = input.correlationId ? loadPendingIntent(input.correlationId) : null;
+  const pendingIntentKey = scopedSurfacePendingIntentKey(runtime, input.correlationId);
+  const pendingIntent = pendingIntentKey ? loadPendingIntent(pendingIntentKey) : null;
   const resolutionText = [pendingIntent?.source_text, originalText]
     .filter((part): part is string => Boolean(part?.trim()))
     .join('\n');
@@ -1215,9 +1250,9 @@ async function runSurfaceConversationTurn(
       : null;
 
   if (compiledFlow?.clarificationPacket) {
-    if (input.correlationId) {
+    if (pendingIntentKey) {
       savePendingIntent({
-        correlation_id: input.correlationId,
+        correlation_id: pendingIntentKey,
         intent_id:
           compiledFlow.intentContract?.intent_id || compiledFlow.executionBrief?.archetype_id,
         source_text: originalText,
@@ -1281,6 +1316,9 @@ async function runSurfaceConversationTurn(
     (handler) => (!askOnly || handler.askOnlySafe === true) && handler.matches(routeContext)
   );
   if (matchedRouteHandler) {
+    if (matchedRouteHandler === missionSteeringRouteHandler) {
+      assertScopedSurfaceCapabilitySupported(input, 'mission_steering');
+    }
     const routedResult = await matchedRouteHandler.handle(routeContext);
     return withIntentResolution(
       surfaceRuntimeData.attachExecutionFeedbackPrompt(
@@ -1291,8 +1329,13 @@ async function runSurfaceConversationTurn(
     );
   }
 
-  const handle = await ensureSurfaceAgent(input.agentId, input.cwd, input.isolation);
-  const firstResponse = await handle.ask(structuredQuery, { model_tier: 'fast' });
+  const handle = runtime
+    ? await ensureScopedSurfaceConversationAgent(runtime)
+    : await ensureSurfaceAgent(input.agentId, input.cwd, input.isolation);
+  const firstResponse = await handle.ask(
+    buildScopedSurfaceConversationPrompt(runtime, structuredQuery),
+    { model_tier: 'fast' }
+  );
   recordSurfaceReasoningTierDeclaration({ callSite: 'surface_main_ask', declaredTier: 'fast' });
   const firstBlocks = extractSurfaceBlocks(firstResponse);
   let delegationResults: SurfaceDelegationResult[] = [];
@@ -1461,73 +1504,24 @@ export async function runSurfaceMessageConversation(
   );
 }
 
-/**
- * HA-01: count one non-blocking worker turn per surface thread. The
- * correlation id is per message, so derive the stable session key from the
- * surface/channel/thread tuple instead.
- */
-async function startSurfaceBackgroundReview(input: SurfaceConversationMessageInput): Promise<void> {
-  try {
-    // SO-02: single source of truth for this derivation lives in
-    // orchestrator-session.ts (deriveSurfaceSessionId) — kept byte-identical
-    // to what was inlined here so existing session ids never change.
-    const sessionId = deriveSurfaceSessionId(input.surface, input.channel, input.threadTs);
-    const trigger = triggerBackgroundReviewFork({
-      sessionId,
-      nudgeConfig: { turnThreshold: 10, toolThreshold: 10 },
-      surface: input.surface,
-      missionId: input.missionId,
-      ...(input.scope?.tenant_slug ? { tenantSlug: input.scope.tenant_slug } : {}),
-      approvalChannel: input.channel,
-      approvalThreadTs: input.threadTs,
-      snapshot: [
-        `surface=${input.surface}`,
-        `channel=${input.channel || 'default'}`,
-        `thread=${input.threadTs || 'default'}`,
-        `message:\n${input.text}`,
-        input.threadContext ? `thread_context:\n${input.threadContext}` : '',
-      ]
-        .filter(Boolean)
-        .join('\n\n'),
-    });
-    if (trigger.review_due && trigger.fork) {
-      logger.info(
-        `[HA-01] Background review reserved for surface session ${sessionId}; main response remains non-blocking.`
-      );
-      const fork = trigger.fork;
-      const handleForkFailure = (error: unknown) => {
-        // The runner normally converts failures to a result, but this final
-        // guard keeps a backend/serialization defect from becoming an
-        // unhandled rejection on the surface process.
-        logger.warn(
-          `[HA-01] Background review fork detached failure: ${
-            error instanceof Error ? error.message : String(error)
-          }`
-        );
-      };
-      if (input.awaitBackgroundReviewFork) {
-        // Local mission E2E may await the detached result to prove the full
-        // nudge→fork→approval path. Normal surface traffic remains detached.
-        await fork;
-      } else {
-        void fork.catch(handleForkFailure);
-      }
-    }
-  } catch (error) {
-    logger.warn(
-      `[HA-01] Background review nudge unavailable; continuing surface response: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
-  }
-}
-
 async function runSurfaceMessageConversationTurn(
   input: SurfaceConversationMessageInput
 ): Promise<SurfaceConversationResult> {
   // Team Channel E: an isolated turn never feeds the background-review fork,
   // which runs on the general (tool-capable) backend with unscoped knowledge.
-  if (!input.isolation) await startSurfaceBackgroundReview(input);
+  if (input.conversationKey !== undefined) {
+    // Validate before any background side effect. The review runner cannot
+    // carry a viewer principal/full scope or constrain its knowledge lookup.
+    prepareSurfaceConversationRuntime({
+      ...input,
+      agentId: input.agentId || buildSurfaceConversationInput(input).agentId,
+    });
+    logger.warn(
+      '[SURFACE_CONVERSATION_BACKGROUND_REVIEW_UNSUPPORTED] Automatic review cannot preserve viewer scope | next: use an explicitly scoped review workflow | evidence: conversationKey mode'
+    );
+  } else if (!input.isolation) {
+    await surfaceRuntimeData.startSurfaceBackgroundReview(input);
+  }
   const result = await runSurfaceConversation(buildSurfaceConversationInput(input));
   // Enforce the surface UX contract on the outbound user-facing text. This is
   // the single chokepoint for all surface responses; validation is non-blocking

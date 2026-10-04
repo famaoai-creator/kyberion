@@ -6,6 +6,7 @@ import { frontDeskText, type ConciergeMessageKey, type FrontDeskMessageKey } fro
 // Type-only: erased at compile time (`isolatedModules`), so it never pulls
 // `@agent/core/front-desk-nav`'s Node-only runtime (`surface-runtime` /
 // `secure-io`) into this client bundle. See the `frontDeskPorts` prop below.
+import { withSelectedTenant } from '../lib/tenant-context';
 import type { FrontDeskSurfacePorts } from '@agent/core/front-desk-nav';
 
 /**
@@ -65,9 +66,10 @@ const PALETTE_ENTRIES: PaletteEntry[] = [
 export interface CommandPaletteProps {
   /** Manifest-resolved surface ports, read server-side by `layout.tsx`. */
   frontDeskPorts: FrontDeskSurfacePorts;
+  frontDeskUrls?: Record<keyof FrontDeskSurfacePorts, string>;
 }
 
-export function CommandPalette({ frontDeskPorts }: CommandPaletteProps) {
+export function CommandPalette({ frontDeskPorts, frontDeskUrls }: CommandPaletteProps) {
   const { locale, t } = useConciergeI18n();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
@@ -76,15 +78,16 @@ export function CommandPalette({ frontDeskPorts }: CommandPaletteProps) {
   const listRef = React.useRef<HTMLUListElement | null>(null);
 
   const frontDeskEntries = React.useMemo<PaletteEntry[]>(() => {
-    const presenceStudioPort = frontDeskPorts['presence-studio'];
+    const presenceStudioBase =
+      frontDeskUrls?.['presence-studio'] ?? `http://127.0.0.1:${frontDeskPorts['presence-studio']}`;
     const items: Array<{ id: string; labelKey: FrontDeskMessageKey; href: string }> = [
-      { id: 'home', labelKey: 'nav_home', href: `http://127.0.0.1:${presenceStudioPort}/` },
-      { id: 'ask', labelKey: 'nav_ask', href: `http://127.0.0.1:${presenceStudioPort}/ask` },
+      { id: 'home', labelKey: 'nav_home', href: `${presenceStudioBase}/` },
+      { id: 'ask', labelKey: 'nav_ask', href: `${presenceStudioBase}/ask` },
       { id: 'decide', labelKey: 'nav_decide', href: '/' },
       {
         id: 'progress',
         labelKey: 'nav_progress',
-        href: `http://127.0.0.1:${presenceStudioPort}/progress`,
+        href: `${presenceStudioBase}/progress`,
       },
       { id: 'settings', labelKey: 'nav_settings', href: '/settings' },
     ];
@@ -93,7 +96,7 @@ export function CommandPalette({ frontDeskPorts }: CommandPaletteProps) {
       label: frontDeskText(item.labelKey, locale),
       href: item.href,
     }));
-  }, [frontDeskPorts, locale]);
+  }, [frontDeskPorts, frontDeskUrls, locale]);
 
   const entries = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -129,7 +132,7 @@ export function CommandPalette({ frontDeskPorts }: CommandPaletteProps) {
             return;
           }
         }
-        window.location.href = entry.href;
+        window.location.href = withSelectedTenant(entry.href);
       }
     },
     [close]

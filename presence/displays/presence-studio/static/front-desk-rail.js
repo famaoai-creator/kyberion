@@ -58,7 +58,8 @@ let navPromise = null;
 /** `/api/front-desk/nav` for the viewer's locale (null on failure). */
 function loadNav() {
   if (!navPromise) {
-    navPromise = fetchJson('/api/front-desk/nav?locale=' + encodeURIComponent(locale))
+    const url = '/api/front-desk/nav?locale=' + encodeURIComponent(locale);
+    navPromise = fetchJson(prefs.scopedUrl ? prefs.scopedUrl(url) : url)
       .then((body) => (body && body.ok ? body : null))
       .catch(() => null);
   }
@@ -67,7 +68,7 @@ function loadNav() {
 
 function readStoredTenant() {
   try {
-    return window.localStorage.getItem(TENANT_STORAGE_KEY) || null;
+    return prefs.tenant ? prefs.tenant() : window.localStorage.getItem(TENANT_STORAGE_KEY) || null;
   } catch {
     return null;
   }
@@ -154,7 +155,7 @@ function railComponents(nav, me, current) {
       id: item.id,
       label: item.label,
       hint: item.sublabel,
-      href: item.href,
+      href: prefs.scopedUrl ? prefs.scopedUrl(item.href) : item.href,
       icon: NAV_ICONS[item.id],
       active: Boolean(current) && item.id === current,
     }));
@@ -178,9 +179,12 @@ function drawRail(el, nav, me, current) {
       if (!action || action.id !== TENANT_SWITCH_ACTION) return;
       const slug = action.payload && action.payload.value;
       if (typeof slug !== 'string' || !slug) return;
-      storeTenant(slug);
       loadMe(slug).then((next) => {
-        if (next) drawRail(el, nav, next, current);
+        if (!next || !next.viewing || next.viewing.tenant_slug !== slug) return;
+        storeTenant(slug);
+        if (prefs.setTenant) prefs.setTenant(slug);
+        // Reload every panel together; durable drafts/history remain scoped.
+        window.location.reload();
       });
     },
   });
@@ -230,7 +234,14 @@ function mount(el, options) {
   mountDisplayControls().catch(() => null);
   if (!el) return Promise.resolve(null);
   const current = (options && options.current) || null;
-  return Promise.all([loadNav(), loadMe(readStoredTenant())])
+  const ready = loadMe(readStoredTenant()).then((me) => {
+    const tenant = me && me.viewing ? me.viewing.tenant_slug : readStoredTenant();
+    if (prefs.setTenant) prefs.setTenant(tenant);
+    navPromise = null;
+    return loadNav().then((nav) => [nav, me]);
+  });
+  window.FrontDeskRail.ready = ready;
+  return ready
     .then(([nav, me]) => {
       if (!nav) return null;
       return drawRail(el, nav, me, current).then(() => nav);

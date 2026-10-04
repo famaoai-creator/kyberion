@@ -1,8 +1,12 @@
 // FD-05: `buildProgressPayload` / `buildProgressDetail` (presence-studio
 // "進み具合" page read models). Pure, no I/O — see `progress.ts` for the
 // documented artifact-record vs deliverable-inbox store gap this surface has.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@agent/core/surface/surface-url', () => ({ resolveSurfaceBrowserUrl: vi.fn() }));
+import { resolveSurfaceBrowserUrl } from '@agent/core/surface/surface-url';
 import {
+  resolveComputerSurfaceMirrorHref,
   buildProgressDetail,
   buildProgressPayload,
   estimateTaskSessionPercent,
@@ -219,6 +223,7 @@ describe('buildProgressPayload', () => {
       'art-changes',
     ]);
     expect(payload.done.every((item) => item.kind === 'artifact')).toBe(true);
+    expect(payload.done.map((item) => item.entry_id)).toEqual(['INBOX-3', 'INBOX-4', 'INBOX-5']);
   });
 });
 
@@ -227,6 +232,7 @@ describe('buildProgressDetail', () => {
     const detail = buildProgressDetail({ goal_summary: 'Draft the deck', status: 'planning' }, []);
 
     expect(detail).toEqual({
+      status: 'planning',
       requested: 'Draft the deck',
       now: 'planning',
       log: [],
@@ -291,5 +297,76 @@ describe('buildProgressDetail', () => {
     expect(detail.log).toHaveLength(8);
     expect(detail.log[0].text).toBe('Step 2');
     expect(detail.log[7].text).toBe('Step 9');
+  });
+});
+
+describe('concrete progress outcomes', () => {
+  it('retains failed, released, completed and all verdict states without presenting them as success', () => {
+    const payload = buildProgressPayload({
+      now: NOW,
+      mirrorHref: MIRROR_HREF,
+      taskSessions: ['completed', 'failed', 'released'].map((status) => ({
+        id: status,
+        title: status,
+        status,
+        correlation_id: 'request-' + status,
+      })),
+      artifacts: ['accepted', 'rejected', 'changes_requested'].map((status) => ({
+        id: status,
+        title: status,
+        kind: 'text',
+        inbox_status: status as ProgressArtifactInput['inbox_status'],
+      })),
+    });
+    expect(payload.done.map((item) => item.status)).toEqual([
+      'completed',
+      'failed',
+      'released',
+      'accepted',
+      'rejected',
+      'changes_requested',
+    ]);
+    expect(payload.done[1].correlation_id).toBe('request-failed');
+  });
+  it('marks numeric progress as an estimate and preserves only real request correlation', () => {
+    const payload = buildProgressPayload({
+      now: NOW,
+      mirrorHref: MIRROR_HREF,
+      artifacts: [],
+      taskSessions: [
+        { id: 'tracked', title: 'Tracked', status: 'planning', correlation_id: 'real-request' },
+        { id: 'untracked', title: 'Untracked', status: 'blocked' },
+      ],
+    });
+    expect(payload.active[0]).toMatchObject({
+      status: 'planning',
+      progress_basis: 'phase_estimate',
+      correlation_id: 'real-request',
+    });
+    expect(payload.active[1].progress_basis).toBeUndefined();
+    expect(payload.active[1].correlation_id).toBeUndefined();
+  });
+  it('does not offer a verdict when a status exists without its inbox entry id', () => {
+    const payload = buildProgressPayload({
+      now: NOW,
+      mirrorHref: MIRROR_HREF,
+      taskSessions: [],
+      artifacts: [{ id: 'orphan', title: 'Orphan', kind: 'text', inbox_status: 'read' }],
+    });
+    expect(payload.delivered[0]).toMatchObject({ status: 'read', can_verdict: false });
+  });
+});
+
+describe('resolveComputerSurfaceMirrorHref', () => {
+  it('uses the registered surface URL including configured HTTPS hosts and base paths', () => {
+    vi.mocked(resolveSurfaceBrowserUrl).mockReturnValue('https://screen.example.test/computer');
+    expect(resolveComputerSurfaceMirrorHref()).toBe('https://screen.example.test/computer/');
+    expect(resolveSurfaceBrowserUrl).toHaveBeenCalledWith('computer-surface');
+  });
+  it('keeps the documented fallback when the manifest cannot be resolved', () => {
+    vi.mocked(resolveSurfaceBrowserUrl).mockImplementation(() => {
+      throw new Error('missing manifest');
+    });
+    expect(resolveComputerSurfaceMirrorHref()).toBe(MIRROR_HREF);
   });
 });

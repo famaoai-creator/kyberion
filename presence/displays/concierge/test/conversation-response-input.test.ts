@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { parseConversationMessageResponse } from '../src/app/conversation-dock';
+import {
+  conversationFailurePolicy,
+  parseConversationMessageResponse,
+} from '../src/app/conversation-dock';
 
 const contract = {
   request_id: 'ir-test',
@@ -76,4 +79,36 @@ describe('concierge conversation response boundary', () => {
       error: 'The conversation response was invalid.',
     });
   });
+});
+
+it('keeps replayed history display-only even if action metadata is supplied', () => {
+  expect(
+    parseConversationMessageResponse({
+      reply: 'Old answer',
+      mode: 'history',
+      shape: 'execution_preview',
+      nextActions: [{ id: 'approve', label: 'Run' }],
+      promoted: { kind: 'mission', label: 'old' },
+    })
+  ).toEqual({ reply: 'Old answer', mode: 'history', shape: 'reply' });
+});
+
+it('invalidates only stale-scope conflicts and does not mark proven not-started work pending', () => {
+  expect(
+    conversationFailurePolicy(409, { error: 'conversation_scope_changed', retry_safe: true })
+  ).toMatchObject({ invalidateHistory: true, uncertain: false });
+  expect(
+    conversationFailurePolicy(409, { error: 'conversation_not_started', retry_safe: true })
+  ).toEqual({ invalidateHistory: false, uncertain: false, messageKey: 'conversation_not_started' });
+  expect(
+    conversationFailurePolicy(422, {
+      error: 'conversation_capability_unsupported',
+      retry_safe: false,
+    })
+  ).toMatchObject({
+    invalidateHistory: false,
+    uncertain: true,
+    messageKey: 'conversation_capability_unsupported',
+  });
+  expect(conversationFailurePolicy(503, {}).uncertain).toBe(true);
 });

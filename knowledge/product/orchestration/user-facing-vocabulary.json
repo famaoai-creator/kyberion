@@ -23073,6 +23073,91 @@
         "en": "Could not join: {detail}",
         "ja": "参加できませんでした: {detail}",
         "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ĵőïñ: {detail} ŀőřėɱ ï⟧"
+      },
+      "conversation_legacy_history": {
+        "en": "Earlier history on this browser (read only)",
+        "ja": "このブラウザに残っている以前の会話（閲覧のみ）",
+        "qps-ploc": "⟦Ėȧřŀïėř ħïşŧőřẏ őñ ŧħïş ƀřőẇşėř (řėȧḓ őñŀẏ) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "conversation_legacy_notice": {
+        "en": "This earlier tab history has no verified owner or tenant. It is kept only on this browser and is not sent as context or approval.",
+        "ja": "以前のタブ履歴には本人・テナントの確認情報がありません。このブラウザにのみ残し、会話の文脈や承認として送信しません。",
+        "qps-ploc": "⟦Ŧħïş ėȧřŀïėř ŧȧƀ ħïşŧőřẏ ħȧş ñő ṽėřïƒïėḓ őẇñėř őř ŧėñȧñŧ. Ïŧ ïş ķėṗŧ őñŀẏ őñ ŧħïş ƀřőẇşėř ȧñḓ ïş ñőŧ şėñŧ ȧş ƈőñŧėẋŧ őř ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗï⟧"
+      },
+      "progress_phase_estimate": {
+        "en": "Phase estimate",
+        "ja": "段階に基づく目安",
+        "qps-ploc": "⟦Ṗħȧşė ėşŧïɱȧŧė ŀőřė⟧"
+      },
+      "progress_history": {
+        "en": "History",
+        "ja": "履歴",
+        "qps-ploc": "⟦Ħïşŧőřẏ ŀőř⟧"
+      },
+      "progress_status_released": {
+        "en": "Released",
+        "ja": "終了（解放済み）",
+        "qps-ploc": "⟦Řėŀėȧşėḓ ŀőř⟧"
+      },
+      "progress_recovery": {
+        "en": "Discuss next steps",
+        "ja": "次の進め方を相談",
+        "qps-ploc": "⟦Ḓïşƈůşş ñėẋŧ şŧėṗş ŀőřėɱ⟧"
+      },
+      "progress_load_failed": {
+        "en": "Could not load progress. Try again.",
+        "ja": "進み具合を読み込めませんでした。もう一度お試しください。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ŀőȧḓ ṗřőɠřėşş. Ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "progress_action_failed": {
+        "en": "The decision outcome could not be confirmed. Refresh its status before trying again.",
+        "ja": "判断の保存結果を確認できませんでした。再試行する前に状態を更新してください。",
+        "qps-ploc": "⟦Ŧħė ḓėƈïşïőñ őůŧƈőɱė ƈőůŀḓ ñőŧ ƀė ƈőñƒïřɱėḓ. Řėƒřėşħ ïŧş şŧȧŧůş ƀėƒőřė ŧřẏïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "progress_request_pending": {
+        "en": "No tracked work is linked to this request yet.",
+        "ja": "この依頼に紐づく作業はまだありません。",
+        "qps-ploc": "⟦Ñő ŧřȧƈķėḓ ẇőřķ ïş ŀïñķėḓ ŧő ŧħïş řėɋůėşŧ ẏėŧ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "progress_refresh": {
+        "en": "Refresh",
+        "ja": "更新",
+        "qps-ploc": "⟦Řėƒřėşħ ŀőř⟧"
+      },
+      "progress_scope_required": {
+        "en": "Your decision scope could not be verified. Refresh before recording a decision.",
+        "ja": "判断に使用するアカウントと範囲を確認できませんでした。判断を記録する前に更新してください。",
+        "qps-ploc": "⟦Ẏőůř ḓėƈïşïőñ şƈőṗė ƈőůŀḓ ñőŧ ƀė ṽėřïƒïėḓ. Řėƒřėşħ ƀėƒőřė řėƈőřḓïñɠ ȧ ḓėƈïşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "progress_storage_required": {
+        "en": "This browser cannot keep the pending decision safe across reloads. Allow session storage before recording a decision.",
+        "ja": "このブラウザーでは判断の処理状況を再読み込み後も保持できません。判断を記録する前にセッションストレージを許可してください。",
+        "qps-ploc": "⟦Ŧħïş ƀřőẇşėř ƈȧññőŧ ķėėṗ ŧħė ṗėñḓïñɠ ḓėƈïşïőñ şȧƒė ȧƈřőşş řėŀőȧḓş. Ȧŀŀőẇ şėşşïőñ şŧőřȧɠė ƀėƒőřė řėƈőřḓïñɠ ȧ ḓėƈïşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
+      },
+      "conversation_storage_required": {
+        "en": "Saved request state could not be verified. Restore it before sending, so a reload cannot repeat uncertain work.",
+        "ja": "保存した依頼の状態を確認できませんでした。再読み込みによる重複実行を防ぐため、送信前に状態を読み込み直してください。",
+        "qps-ploc": "⟦Şȧṽėḓ řėɋůėşŧ şŧȧŧė ƈőůŀḓ ñőŧ ƀė ṽėřïƒïėḓ. Řėşŧőřė ïŧ ƀėƒőřė şėñḓïñɠ, şő ȧ řėŀőȧḓ ƈȧññőŧ řėṗėȧŧ ůñƈėřŧȧïñ ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "conversation_access_required": {
+        "en": "Requests require a local operator session and an allowed tenant. Check your session and selected tenant; remote views do not grant action access.",
+        "ja": "依頼の実行にはローカルの操作セッションと許可されたテナントが必要です。接続と選択中のテナントをご確認ください。リモート表示だけでは操作権限は付与されません。",
+        "qps-ploc": "⟦Řėɋůėşŧş řėɋůïřė ȧ ŀőƈȧŀ őṗėřȧŧőř şėşşïőñ ȧñḓ ȧñ ȧŀŀőẇėḓ ŧėñȧñŧ. Ƈħėƈķ ẏőůř şėşşïőñ ȧñḓ şėŀėƈŧėḓ ŧėñȧñŧ; řėɱőŧė ṽïėẇş ḓő ñőŧ ɠřȧñŧ ȧƈŧïőñ ȧƈƈėşş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ⟧"
+      },
+      "conversation_scope_selection_required": {
+        "en": "Choose a permitted tenant and, where restricted, one organization and project. No work has started.",
+        "ja": "許可されたテナントと、制限がある場合は組織・プロジェクトを一つ選んでください。作業は開始していません。",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ṗėřɱïŧŧėḓ ŧėñȧñŧ ȧñḓ, ẇħėřė řėşŧřïƈŧėḓ, őñė őřɠȧñïẑȧŧïőñ ȧñḓ ṗřőĵėƈŧ. Ñő ẇőřķ ħȧş şŧȧřŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "conversation_not_started": {
+        "en": "This request has not started. Check running work and runtime health before trying again.",
+        "ja": "この依頼の作業は開始していません。実行中の作業と実行環境の状態を確認してから、もう一度お試しください。",
+        "qps-ploc": "⟦Ŧħïş řėɋůėşŧ ħȧş ñőŧ şŧȧřŧėḓ. Ƈħėƈķ řůññïñɠ ẇőřķ ȧñḓ řůñŧïɱė ħėȧŀŧħ ƀėƒőřė ŧřẏïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "conversation_capability_unsupported": {
+        "en": "This operation cannot yet preserve your conversation’s access scope. Direct conversation is supported; delegation, managed execution, task steering, and shared personal queries require an explicitly scoped workflow. Your draft is kept. Check progress before continuing.",
+        "ja": "この操作は、会話のアクセス範囲を保って実行できません。直接の会話には対応していますが、委任・管理実行・作業の変更・共有個人情報の照会には、範囲を明示したワークフローが必要です。入力は保持しています。続行前に進み具合をご確認ください。",
+        "qps-ploc": "⟦Ŧħïş őṗėřȧŧïőñ ƈȧññőŧ ẏėŧ ṗřėşėřṽė ẏőůř ƈőñṽėřşȧŧïőñ’ş ȧƈƈėşş şƈőṗė. Ḓïřėƈŧ ƈőñṽėřşȧŧïőñ ïş şůṗṗőřŧėḓ; ḓėŀėɠȧŧïőñ, ɱȧñȧɠėḓ ėẋėƈůŧïőñ, ŧȧşķ şŧėėřïñɠ, ȧñḓ şħȧřėḓ ṗėřşőñȧŀ ɋůėřïėş řėɋůïřė ȧñ ėẋṗŀïƈïŧŀẏ şƈőṗėḓ ẇőřķƒŀőẇ. Ẏőůř ḓřȧƒŧ ïş ķėṗŧ. Ƈħėƈķ ṗřőɠřėşş ƀėƒőřė ƈőñŧïñůïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
       }
     },
     "operator": {

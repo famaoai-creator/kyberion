@@ -382,6 +382,28 @@ export interface SurfaceConversationAttachment {
 
 export type SurfaceWorkAuthority = 'full' | 'ask_only';
 
+export interface SurfaceConversationHistoryEntry {
+  role: 'user' | 'assistant';
+  text: string;
+}
+
+export type SurfaceConversationUnsupportedCapability =
+  | 'background_review'
+  | 'a2a_delegation'
+  | 'governed_cli_execution'
+  | 'legacy_task_session_execution'
+  | 'legacy_surface_query'
+  | 'mission_steering'
+  | 'shared_feedback_recording';
+
+export interface SurfaceConversationRuntimeDiagnostic {
+  runtimeLifetime: 'turn';
+  retainedHistoryMessages: number;
+  historyTruncated: boolean;
+  backgroundReview: 'unsupported';
+  unsupportedCapabilities: SurfaceConversationUnsupportedCapability[];
+}
+
 export interface SurfaceTenantIsolation {
   tenantSlug: string;
   /** Highest tier the turn may disclose; tenant knowledge is searched only at confidential. */
@@ -397,6 +419,12 @@ interface SurfaceConversationInputBase {
   surfaceText?: string;
   attachments?: SurfaceConversationAttachment[];
   threadContext?: string;
+  /** Server-owned SHA-256 of the authenticated conversation partition; never accept from a client. */
+  conversationKey?: string;
+  /** Completed transcript text only. Untrusted context, never executable state or approval evidence. */
+  conversationHistory?: SurfaceConversationHistoryEntry[];
+  /** Whether the server transcript projection already omitted older text. */
+  conversationHistoryTruncated?: boolean;
   cwd?: string;
   delegationSummaryInstruction?: string;
   forcedReceiver?: string;
@@ -436,6 +464,12 @@ interface SurfaceConversationMessageInputBase {
   senderAgentId: string;
   agentId?: string;
   threadContext?: string;
+  /** Server-owned SHA-256 of the authenticated conversation partition; never accept from a client. */
+  conversationKey?: string;
+  /** Completed transcript text only. Untrusted context, never executable state or approval evidence. */
+  conversationHistory?: SurfaceConversationHistoryEntry[];
+  /** Whether the server transcript projection already omitted older text. */
+  conversationHistoryTruncated?: boolean;
   cwd?: string;
   delegationSummaryInstruction?: string;
   forcedReceiver?: string;
@@ -470,6 +504,7 @@ export type SurfaceConversationMessageInput = SurfaceConversationMessageInputBas
 };
 
 export interface SurfaceConversationResult {
+  conversationRuntime?: SurfaceConversationRuntimeDiagnostic;
   text: string;
   a2uiMessages: A2UIMessage[];
   a2aMessages: A2AMessage[];

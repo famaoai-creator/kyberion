@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadSurfaceManifest } from '@agent/core/surface/surface-runtime';
+import { resolveSurfaceBrowserUrl } from '@agent/core/surface/surface-url';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
 
 /**
@@ -16,33 +16,18 @@ export const dynamic = 'force-dynamic';
 const CHRONOS_MIRROR_SURFACE_ID = 'chronos-mirror-v2';
 const CHRONOS_MIRROR_DEFAULT_PORT = 3000;
 
-function resolveChronosMirrorPort(): number {
-  try {
-    const manifest = loadSurfaceManifest();
-    const surface = manifest.surfaces.find((entry) => entry.id === CHRONOS_MIRROR_SURFACE_ID);
-    if (
-      surface &&
-      typeof surface.port === 'number' &&
-      Number.isFinite(surface.port) &&
-      surface.port > 0
-    ) {
-      return surface.port;
-    }
-  } catch {
-    // Manifest absent/invalid (e.g. first boot before reconcile) — the
-    // settings page still needs a link to render, so fall back rather than
-    // failing the route.
-  }
-  return CHRONOS_MIRROR_DEFAULT_PORT;
+function resolveChronosMirrorHref(): string {
+  try { return resolveSurfaceBrowserUrl(CHRONOS_MIRROR_SURFACE_ID) + '/'; }
+  catch { return `http://127.0.0.1:${CHRONOS_MIRROR_DEFAULT_PORT}/`; }
 }
 
 export function GET(req: NextRequest) {
   const resolved = resolveConciergeViewer(req);
   if (resolved.response) return resolved.response;
   try {
-    const chronosPort = resolveChronosMirrorPort();
+    const chronosHref = resolveChronosMirrorHref();
     return NextResponse.json(
-      { ok: true, chronos_url: `http://127.0.0.1:${chronosPort}/` },
+      { ok: true, chronos_url: chronosHref },
       { headers: { 'Cache-Control': 'no-store' } }
     );
   } catch (error) {
