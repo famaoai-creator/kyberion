@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { auditChain } from '../governance/audit-chain.js';
 import {
+  DEFAULT_TENANT_ISOLATION_POLICY,
   defaultTenantKnowledgeRoot,
   listTenantProfileSlugs,
   readTenantProfile,
@@ -63,7 +64,14 @@ function buildProfile(input: TenantMutationInput, current: TenantProfile | null)
     assigned_role: input.assignedRole?.trim() || current?.assigned_role || 'owner',
     knowledge_root:
       input.knowledgeRoot?.trim() || current?.knowledge_root || defaultTenantKnowledgeRoot(slug),
-    ...(current?.isolation_policy ? { isolation_policy: current.isolation_policy } : {}),
+    // New tenants start strictly isolated (the same default as the bootstrap
+    // `default` tenant): tenant activation's memory_policy check requires it,
+    // and no CLI flag exists to set it afterwards without editing the registry.
+    ...(current?.isolation_policy
+      ? { isolation_policy: current.isolation_policy }
+      : input.verb === 'create'
+        ? { isolation_policy: { ...DEFAULT_TENANT_ISOLATION_POLICY } }
+        : {}),
     ...(current?.allowed_reasoning_backends
       ? { allowed_reasoning_backends: current.allowed_reasoning_backends }
       : {}),

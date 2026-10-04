@@ -13,7 +13,8 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { revokeGrantsForTenantBestEffort } from '../task/task-scoped-grants.js';
-import { isRecord } from '../foundation/text.js';
+import { isRecord, readTextFile } from '../foundation/text.js';
+import { parseNhiId } from '../nhi-id.js';
 
 export const TENANT_ACTIVATION_CHECKS = [
   'registry',
@@ -125,6 +126,14 @@ function activationPath(input: TenantActivationScope, rootDir: string): string {
     ),
     { allowMissingLeaf: true, rootDir }
   );
+}
+
+/** Directory `pnpm tenant:activation probe` writes its evidence to, beside the receipt. */
+export function tenantActivationProbeEvidenceDir(
+  input: TenantActivationScope,
+  rootDir = pathResolver.rootDir()
+): string {
+  return path.join(path.dirname(activationPath(input, rootDir)), 'probes');
 }
 
 function activationPathForRecord(record: TenantActivationRecord, rootDir: string): string {
@@ -247,6 +256,56 @@ function isTenantActivationRecord(value: unknown): value is TenantActivationReco
   ].every((key) => typeof value.operation_contract?.[key] === 'boolean');
 }
 
+/** `kind` of the evidence file written by `pnpm tenant:activation probe`. */
+export const TENANT_ACTIVATION_PROBE_EVIDENCE_KIND = 'tenant_activation_probe_evidence';
+
+const EXTERNAL_REF_PATTERN = /^[a-z][a-z0-9+.-]*:\/\//i;
+
+/**
+ * Why a probe ref cannot be accepted, or null. A scheme ref (`probe://`,
+ * `audit://`, ...) is an external attestation the accepting human vouches for.
+ * A bare ref is a repository path: it must exist, and when it is probe
+ * evidence it must belong to this scope and record a passing result.
+ */
+function probeRefProblem(
+  check: TenantActivationProbeCheck,
+  ref: string,
+  input: TenantActivationInput,
+  rootDir: string
+): string | null {
+  if (EXTERNAL_REF_PATTERN.test(ref)) return null;
+  let filePath: string;
+  try {
+    filePath = assertSafeRepositoryPath(path.resolve(rootDir, ref), {
+      allowMissingLeaf: true,
+      rootDir,
+    });
+  } catch {
+    return `${check} probe ref '${ref}' is neither a <scheme>:// reference nor a repository path`;
+  }
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    return `${check} probe ref '${ref}' does not exist`;
+  }
+  let evidence: unknown;
+  try {
+    evidence = JSON.parse(readTextFile(filePath));
+  } catch {
+    return null; // a plain evidence file (e.g. saved command output)
+  }
+  if (!isRecord(evidence) || evidence.kind !== TENANT_ACTIVATION_PROBE_EVIDENCE_KIND) return null;
+  if (
+    evidence.tenant_slug !== input.tenantSlug ||
+    evidence.organization_id !== input.organizationId ||
+    evidence.customer_slug !== input.customerSlug
+  ) {
+    return `${check} probe evidence '${ref}' was recorded for a different scope`;
+  }
+  const results = isRecord(evidence.results) ? evidence.results : {};
+  const result = isRecord(results[check]) ? results[check] : null;
+  if (result?.passed !== true) return `${check} probe evidence '${ref}' did not pass`;
+  return null;
+}
+
 function buildChecks(
   input: TenantActivationInput,
   nhiIds: string[]
@@ -315,9 +374,25 @@ function buildChecks(
     checks[check] = asserted && Boolean(ref);
     if (!asserted) blockers.push(`${check} requires an explicit successful probe`);
     else if (!ref) blockers.push(`${check} requires an auditable probe reference`);
+    const refProblem = ref ? probeRefProblem(check, ref, input, rootDir) : null;
+    if (refProblem) {
+      checks[check] = false;
+      blockers.push(refProblem);
+    }
     if (check === 'nhi_provisioned' && checks[check] && nhiIds.length === 0) {
       checks[check] = false;
       blockers.push('nhi_provisioned requires at least one provisioned NHI id');
+    }
+    if (check === 'nhi_provisioned') {
+      for (const nhiId of nhiIds) {
+        const parsed = parseNhiId(nhiId);
+        if (!parsed || parsed.organization_id !== input.organizationId) {
+          checks[check] = false;
+          blockers.push(
+            `nhi_provisioned: '${nhiId}' is not an NHI id of organization '${input.organizationId}' (expected kyberion://agent/${input.organizationId}/<agent-slug>)`
+          );
+        }
+      }
     }
   }
   return { ownerId, checks, probeRefs, blockers: [...new Set(blockers)] };
