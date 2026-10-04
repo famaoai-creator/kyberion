@@ -22,6 +22,12 @@ import {
 } from './dot-key-results.js';
 import { dotMemoryPromptSection, dotUpdateMemoryTool } from './dot-memory.js';
 import { dotFollowupsPromptSection, dotScheduleFollowupTool } from './dot-followups.js';
+import {
+  DOT_BUDGET_DIGEST_SECTION,
+  DOT_BUDGET_FLOOR_CONTRIBUTOR,
+  DOT_BUDGET_STATUS_SECTION,
+} from './dot-budget.js';
+import { dotWorkResultsPromptSection } from './dot-executor.js';
 
 export const DOT_PROMPT_SECTIONS: DotPromptSection[] = [];
 export const DOT_FLOOR_CONTRIBUTORS: DotFloorContributor[] = [];
@@ -39,3 +45,9 @@ DOT_DIGEST_SECTIONS.push(DOT_KEY_RESULTS_DIGEST_SECTION);
 // DL-05 memory + DL-09 follow-ups
 DOT_WAKE_TOOLS.push(dotUpdateMemoryTool, dotScheduleFollowupTool);
 DOT_PROMPT_SECTIONS.push(dotMemoryPromptSection, dotFollowupsPromptSection);
+
+// DL-01 executor results + DL-07 budget wiring
+DOT_PROMPT_SECTIONS.push(dotWorkResultsPromptSection());
+DOT_FLOOR_CONTRIBUTORS.push(DOT_BUDGET_FLOOR_CONTRIBUTOR);
+DOT_STATUS_SECTIONS.push(DOT_BUDGET_STATUS_SECTION);
+DOT_DIGEST_SECTIONS.push(DOT_BUDGET_DIGEST_SECTION);

@@ -117,6 +117,11 @@ export interface DotActionRecord {
   handoff_to?: string;
   priority?: DotProposal['priority'];
   rationale?: string;
+  /** Carried from the proposal into the WorkItem metadata for the executor (DL-01). */
+  pipeline_ref?: DotProposal['pipeline_ref'];
+  expected_effect?: DotProposal['expected_effect'];
+  target?: DotProposal['target'];
+  intent?: DotProposal['intent'];
   request_id?: string;
   work_item_id?: string;
   reason?: string;
@@ -590,6 +595,10 @@ function executeDotAction(
           ...(record.request_id ? { approval_request_id: record.request_id } : {}),
           ...(record.handoff_to ? { handoff_to: record.handoff_to } : {}),
           ...(dotGoalRefLabel(charter) ? { goal_ref: dotGoalRefLabel(charter) } : {}),
+          ...(record.pipeline_ref ? { pipeline_ref: record.pipeline_ref } : {}),
+          ...(record.expected_effect ? { expected_effect: record.expected_effect } : {}),
+          ...(record.target ? { target: record.target } : {}),
+          ...(record.intent ? { intent: record.intent } : {}),
         },
       });
   } catch (error) {
@@ -687,6 +696,10 @@ export function dispatchDotProposals(
       ...(proposal.handoff_to ? { handoff_to: proposal.handoff_to } : {}),
       ...(proposal.priority ? { priority: proposal.priority } : {}),
       ...(proposal.rationale ? { rationale: proposal.rationale } : {}),
+      ...(proposal.pipeline_ref ? { pipeline_ref: proposal.pipeline_ref } : {}),
+      ...(proposal.expected_effect ? { expected_effect: proposal.expected_effect } : {}),
+      ...(proposal.target ? { target: proposal.target } : {}),
+      ...(proposal.intent ? { intent: proposal.intent } : {}),
       at: now.toISOString(),
     };
     try {

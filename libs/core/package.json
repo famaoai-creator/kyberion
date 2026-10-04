@@ -7107,6 +7107,22 @@
       "types": "./dist/dot/dot-key-results.d.ts",
       "default": "./dist/dot/dot-key-results.js"
     },
+    "./dot/dot-event-intake": {
+      "types": "./dist/dot/dot-event-intake.d.ts",
+      "default": "./dist/dot/dot-event-intake.js"
+    },
+    "./dot/dot-budget": {
+      "types": "./dist/dot/dot-budget.d.ts",
+      "default": "./dist/dot/dot-budget.js"
+    },
+    "./dot/dot-executor": {
+      "types": "./dist/dot/dot-executor.d.ts",
+      "default": "./dist/dot/dot-executor.js"
+    },
+    "./governance/org-budget-governor": {
+      "types": "./dist/governance/org-budget-governor.d.ts",
+      "default": "./dist/governance/org-budget-governor.js"
+    },
     "./state-probe": {
       "types": "./dist/state-probe.d.ts",
       "default": "./dist/state-probe.js"
