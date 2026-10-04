@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { nowIso } from '../foundation/time.js';
+import { safeExistsSync } from '../secure-io.js';
 
 import {
   validatorFor,
@@ -144,25 +145,34 @@ export function saveOrganizationOperationRun(
 ): string {
   assertRecordIdentity(record, options.rootDir);
   assertOrganizationId(record.run_id);
-  return saveValidated(
-    record,
-    OPERATION_RUN_SCHEMA_PATH,
-    path.join(
-      operationDirectory(
-        record.operation_id,
-        record.organization_id,
-        record.tier,
-        recordTenant(record),
-        options.rootDir
-      ),
-      'runs',
-      record.run_id,
-      OPERATION_RUN_FILE_NAME
+  const filePath = path.join(
+    operationDirectory(
+      record.operation_id,
+      record.organization_id,
+      record.tier,
+      recordTenant(record),
+      options.rootDir
     ),
-    'organization operation run',
-    // A run is evidence: it is created once and never overwritten.
-    { exclusive: true }
+    'runs',
+    record.run_id,
+    OPERATION_RUN_FILE_NAME
   );
+  // A run is evidence: it is created once and never overwritten — except the
+  // single transition that closes a `started` run (governed execute, or tick's
+  // stale-run recovery) with its terminal outcome. Without it every executed
+  // run would fail on completion and stay `started` forever.
+  const label = 'organization operation run';
+  const existing = safeExistsSync(filePath)
+    ? readJsonRecord<OrganizationOperationRun>(filePath, label)
+    : null;
+  const closesStartedRun =
+    existing?.status === 'started' &&
+    record.status !== 'started' &&
+    existing.operation_id === record.operation_id &&
+    existing.started_at === record.started_at;
+  return saveValidated(record, OPERATION_RUN_SCHEMA_PATH, filePath, label, {
+    exclusive: !closesStartedRun,
+  });
 }
 
 export function loadOrganizationOperation(

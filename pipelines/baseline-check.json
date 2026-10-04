@@ -18,6 +18,14 @@
       "params": {
         "export_as": "baseline_check"
       }
+    },
+    {
+      "id": "report-status",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "[BASELINE] status={{baseline_check.status}} failed_layer={{baseline_check.failed_layer}} — branch on status per AGENTS.md §3 (detail: node dist/scripts/run_baseline_check.js)"
+      }
     }
   ]
 }

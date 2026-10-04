@@ -37,10 +37,19 @@ describe('error-classifier', () => {
 
     it('classifies path-scope policy denials', () => {
       const c = classifyError(
-        "[POLICY_VIOLATION] Persona 'unknown' with authority role 'forks' is NOT authorized to write to '/x'."
+        "[POLICY_VIOLATION] Persona 'worker' with authority role 'forks' is NOT authorized to write to '/x'."
       );
       expect(c.category).toBe('permission_denied');
       expect(c.ruleId).toBe('kyberion.path-scope');
+    });
+
+    it('points an unset operator persona at the shell export', () => {
+      const c = classifyError(
+        "[POLICY_VIOLATION] Persona 'unknown' with authority role 'forks' is NOT authorized to write to '/x'."
+      );
+      expect(c.category).toBe('permission_denied');
+      expect(c.ruleId).toBe('kyberion.path-scope-persona-unset');
+      expect(c.remediation).toContain('export KYBERION_PERSONA=sovereign');
     });
 
     it('classifies project-root path violations', () => {
