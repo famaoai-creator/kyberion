@@ -38,15 +38,22 @@ vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(() => ({ status: 1, stdout: '', stderr: '' })),
 }));
 
-vi.mock('../path-resolver.js', () => ({
-  pathResolver: {
+vi.mock('../path-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../path-resolver.js')>();
+  return {
+    ...actual,
     rootResolve: (p: string) => `/repo/${p}`,
-    rootDir: () => '/repo',
-    shared: (p = '') => `/repo/active/shared/${p}`,
-    knowledge: (p = '') => `/repo/knowledge/${p}`,
     resolve: (p: string) => p,
-  },
-}));
+    pathResolver: {
+      ...actual.pathResolver,
+      rootResolve: (p: string) => `/repo/${p}`,
+      rootDir: () => '/repo',
+      shared: (p = '') => `/repo/active/shared/${p}`,
+      knowledge: (p = '') => `/repo/knowledge/${p}`,
+      resolve: (p: string) => p,
+    },
+  };
+});
 
 vi.mock('../secure-io.js', () => ({
   assertSafeRepositoryPath: (p: string) => p,
