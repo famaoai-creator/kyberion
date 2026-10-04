@@ -138,8 +138,12 @@ export function scoreEndOfTurn(text: string, lang: VoiceEotLang = 'auto'): EotSc
 export interface EotHoldAggregatorOptions {
   /** Commit immediately when the accumulated text scores at or above this. Default 0.5. */
   commitThreshold?: number;
-  /** Maximum time to hold an unfinished-looking turn before committing anyway. Default 1500ms. */
-  maxHoldMs?: number;
+  /**
+   * Maximum time to hold an unfinished-looking turn before committing
+   * anyway. Default 1500ms. A function is re-read on every `tick()` so a
+   * User Rhythm layer can adapt the budget mid-session.
+   */
+  maxHoldMs?: number | (() => number);
   /** Wall-clock source (injectable for tests). Default Date.now. */
   now?: () => number;
   /** Language passed through to `scoreEndOfTurn`. Default 'auto'. */
@@ -159,7 +163,7 @@ export interface EotHoldResult {
  */
 export class EotHoldAggregator {
   private readonly commitThreshold: number;
-  private readonly maxHoldMs: number;
+  private readonly maxHoldMs: () => number;
   private readonly now: () => number;
   private readonly lang: VoiceEotLang;
   private buffer = '';
@@ -167,7 +171,8 @@ export class EotHoldAggregator {
 
   constructor(options: EotHoldAggregatorOptions = {}) {
     this.commitThreshold = options.commitThreshold ?? 0.5;
-    this.maxHoldMs = options.maxHoldMs ?? 1500;
+    const maxHold = options.maxHoldMs ?? 1500;
+    this.maxHoldMs = typeof maxHold === 'function' ? maxHold : () => maxHold;
     this.now = options.now ?? (() => Date.now());
     this.lang = options.lang ?? 'auto';
   }
@@ -202,7 +207,7 @@ export class EotHoldAggregator {
    */
   tick(): EotHoldResult | null {
     if (this.buffer.length === 0 || this.heldSinceMs === null) return null;
-    if (this.now() - this.heldSinceMs < this.maxHoldMs) return null;
+    if (this.now() - this.heldSinceMs < this.maxHoldMs()) return null;
     return this.commitNow();
   }
 

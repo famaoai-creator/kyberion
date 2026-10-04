@@ -1,0 +1,25 @@
+{
+  "record_id": "mem-MSN-DOT910-FOLLOWUP-20261004-2026_10_04",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Resident loops need durable evidence across retry boundaries",
+  "summary": "Compose mandatory safety floors monotonically and reconcile uncertain execution, reports, monitoring and usage using durable scoped identities.",
+  "candidate_id": "mem-MSN-DOT910-FOLLOWUP-20261004-2026_10_04",
+  "evidence_refs": [
+    "active/missions/public/MSN-DOT910-FOLLOWUP-20261004/evidence/implementation-report.md",
+    "active/missions/public/MSN-DOT910-FOLLOWUP-20261004/evidence/test-report.md",
+    "active/missions/public/MSN-DOT910-FOLLOWUP-20261004/evidence/REVIEW-execution-implement.md"
+  ],
+  "created_at": "2026-10-04T15:15:36.051Z",
+  "applicability": [
+    "mission",
+    "mission:MSN-DOT910-FOLLOWUP-20261004"
+  ],
+  "reusable_steps": [
+    "Compose mandatory safety floors monotonically and reconcile uncertain execution, reports, monitoring and usage using durable scoped identities"
+  ],
+  "expected_outcome": "Apply this pattern when resident loops cross policy delegation, asynchronous execution, persistence or provider accounting boundaries. Resolve strict and injection floors before delegated allows or session grants, preserving stronger base requirements and ordinary delegation. A timeout does not prove cancellation: quarantine uncertain attempts and reconcile durable completion before retrying a lease. Completion and report delivery are separate durable facts; reconcile missing delivery markers using scoped idempotency receipts. Atomically replace monitoring followups so persistence failures neither lose the trigger nor activate two successors. Attribute SDK usage with trusted scope and per-attempt accounting IDs; reconcile actual usage against ledger estimates and retain late or failed responses. Test lost acknowledgements and failure between every durable step. Require outcome measurements at or after settlement deadlines and persistent monotonic memory IDs. Reject duplicate dot identities across all charter sources before status filtering, including manual entry points. Mutex guarantees require repaired code in every competitor and a shared PID/filesystem namespace; unknown ownership needs operator recovery. Explicitly disclose unsupported execution tools and environment-blocked IPC tests rather than treating them as complete.",
+  "source_branch": "test/dot-pr910-validation",
+  "source_commit": "2174dc33651416058784a62a921dcd2ec7577749"
+}

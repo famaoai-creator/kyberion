@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "description": "Japanese lexical cues for realtime voice turn-taking (EV-01/03/06). Linguistic data, not user-facing copy: continuation particles hold the turn, fillers are ignored for barge-in and the respond gate, commit endings close a turn.",
+  "version": 2,
+  "description": "Language-pack lexical cues for realtime turn-taking (EV-01/03/06, CE-03/04/05). Linguistic data, not user-facing copy: continuation markers hold the turn, fillers are ignored for barge-in and the respond gate, commit endings close a turn, correction/hold markers drive utterance-intent classification, agent_backchannels are phrases the assistant may emit itself. Each top-level language key is a language pack — adding a language is a data change, not a code change.",
   "ja": {
     "continuation_particles": [
       "けれど",
@@ -48,6 +48,94 @@
       "ええ",
       "んー",
       "ん"
-    ]
+    ],
+    "correction_markers": [
+      "いやいや",
+      "いや",
+      "違う違う",
+      "違う",
+      "ちがう",
+      "そうじゃなくて",
+      "じゃなくて",
+      "それは違う"
+    ],
+    "hold_markers": [
+      "ちょっと待って",
+      "ちょっとまって",
+      "まって",
+      "待って",
+      "ちょっと",
+      "少し待って"
+    ],
+    "agent_backchannels": ["うん", "うんうん", "はい", "なるほど", "そうそう", "へえ"],
+    "uses_word_spaces": false,
+    "question_endings": ["ますか", "ですか", "かな", "かい", "か"]
+  },
+  "en": {
+    "continuation_particles": ["and", "but", "so", "because", "or", "the", "a", "to", "with"],
+    "eot_fillers": [
+      "um",
+      "uh",
+      "uhh",
+      "umm",
+      "uhm",
+      "erm",
+      "er",
+      "hmm",
+      "hm",
+      "mm",
+      "mmm",
+      "ah",
+      "eh"
+    ],
+    "commit_endings": [],
+    "respond_gate_fillers": [
+      "um",
+      "uh",
+      "uhh",
+      "umm",
+      "uhm",
+      "erm",
+      "er",
+      "hmm",
+      "hm",
+      "mm",
+      "mmm",
+      "ah",
+      "eh"
+    ],
+    "barge_in_backchannels": [
+      "uh-huh",
+      "uhhuh",
+      "mhm",
+      "mm",
+      "yeah",
+      "yep",
+      "right",
+      "okay",
+      "ok",
+      "hmm"
+    ],
+    "correction_markers": [
+      "no no",
+      "no,",
+      "wrong",
+      "that's wrong",
+      "not that",
+      "actually",
+      "wait no"
+    ],
+    "hold_markers": [
+      "wait",
+      "hold on",
+      "hang on",
+      "one sec",
+      "one second",
+      "give me a sec",
+      "just a moment"
+    ],
+    "agent_backchannels": ["yeah", "uh-huh", "right", "I see", "okay", "got it"],
+    "uses_word_spaces": true,
+    "question_endings": []
   }
 }

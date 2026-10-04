@@ -31,8 +31,16 @@ export interface VoiceWorkbenchExpectation {
   hard_stops?: number;
   resumes?: number;
   max_eot_latency_ms?: number;
+  /** Lower bound on measured EOT latency (e.g. rhythm-adapted holds). */
+  min_eot_latency_ms?: number;
   cancelled_reasons?: VoiceTurnCancelReason[];
   speculative_aborts?: number;
+  /** emit_backchannel actions (CE-05). */
+  backchannels?: number;
+  /** Intent sequence of committed turns, in commit order (CE-04). */
+  commit_intents?: string[];
+  /** Intent sequence of hard stops, in order (CE-04). */
+  hard_stop_intents?: string[];
 }
 
 export interface VoiceWorkbenchScenario {
@@ -128,6 +136,9 @@ export function runVoiceWorkbenchScenario(
   let hardStops = 0;
   let resumes = 0;
   let speculativeAborts = 0;
+  let backchannels = 0;
+  const commitIntents: string[] = [];
+  const hardStopIntents: string[] = [];
   let lastSilenceAt: number | null = null;
   let firstCommitAt: number | null = null;
   let ttfa: number | null = null;
@@ -142,6 +153,7 @@ export function runVoiceWorkbenchScenario(
       switch (action.type) {
         case 'commit':
           commits.push(action.text);
+          commitIntents.push(action.intent ?? 'substantive');
           if (firstCommitAt === null) firstCommitAt = input.at_ms;
           if (lastSilenceAt !== null) eotLatencies.push(input.at_ms - lastSilenceAt);
           break;
@@ -150,6 +162,7 @@ export function runVoiceWorkbenchScenario(
           break;
         case 'hard_stop':
           hardStops += 1;
+          hardStopIntents.push(action.intent ?? 'unknown');
           cancelled.push('barge_in');
           break;
         case 'resume_tts':
@@ -158,6 +171,9 @@ export function runVoiceWorkbenchScenario(
         case 'abort_speculative':
           speculativeAborts += 1;
           cancelled.push(action.reason);
+          break;
+        case 'emit_backchannel':
+          backchannels += 1;
           break;
         default:
           break;
@@ -182,6 +198,7 @@ export function runVoiceWorkbenchScenario(
     ['hard_stops', hardStops],
     ['resumes', resumes],
     ['speculative_aborts', speculativeAborts],
+    ['backchannels', backchannels],
   ];
   for (const [key, actual] of counts) {
     const expected = expect[key];
@@ -193,6 +210,25 @@ export function runVoiceWorkbenchScenario(
     failures.push(
       `cancelled_reasons: expected ${JSON.stringify(expect.cancelled_reasons)}, got ${JSON.stringify(cancelled)}`
     );
+  }
+  if (expect.commit_intents && !sameList(commitIntents, expect.commit_intents)) {
+    failures.push(
+      `commit_intents: expected ${JSON.stringify(expect.commit_intents)}, got ${JSON.stringify(commitIntents)}`
+    );
+  }
+  if (expect.hard_stop_intents && !sameList(hardStopIntents, expect.hard_stop_intents)) {
+    failures.push(
+      `hard_stop_intents: expected ${JSON.stringify(expect.hard_stop_intents)}, got ${JSON.stringify(hardStopIntents)}`
+    );
+  }
+  if (expect.min_eot_latency_ms !== undefined) {
+    if (metrics.eot_latency_ms === null) {
+      failures.push('min_eot_latency_ms: no committed turn to measure');
+    } else if (metrics.eot_latency_ms < expect.min_eot_latency_ms) {
+      failures.push(
+        `min_eot_latency_ms: expected >= ${expect.min_eot_latency_ms}, got ${metrics.eot_latency_ms}`
+      );
+    }
   }
   if (expect.max_eot_latency_ms !== undefined) {
     if (metrics.eot_latency_ms === null) {

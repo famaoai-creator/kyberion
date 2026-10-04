@@ -1,0 +1,36 @@
+{
+  "id": "hold-intent-commit",
+  "description": "「ちょっと待って」 is held by EOT (trailing て) then force-commits with intent 'holding' (CE-04).",
+  "timeline": [
+    {
+      "at_ms": 0,
+      "event": {
+        "type": "vad_start",
+        "rms": 3000
+      }
+    },
+    {
+      "at_ms": 400,
+      "event": {
+        "type": "stt_final",
+        "text": "ちょっと待って"
+      }
+    },
+    {
+      "at_ms": 600,
+      "event": {
+        "type": "vad_silence"
+      }
+    }
+  ],
+  "expect": {
+    "commits": ["ちょっと待って"],
+    "commit_intents": ["holding"],
+    "hard_stops": 0
+  },
+  "options": {
+    "interaction": {
+      "intent": true
+    }
+  }
+}

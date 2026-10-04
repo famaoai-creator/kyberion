@@ -497,3 +497,49 @@ two-sentence speech budget still applies. The opt-in first-phrase cache
 `active/shared/runtime/voice-first-phrase-cache`. It is keyed by engine,
 voice profile, a profile-record revision fingerprint, a
 language/personal-voice settings fingerprint, and the text.
+
+## 14. Conversation Engine (2026-10-04)
+
+The turn-taking machine is a voice adapter over the generic Interaction
+Controller in `libs/core/interaction/` (`ConversationEngine`). The engine
+consumes modality-neutral events (`speech_onset`, `speech_offset`,
+`transcript_partial`, `transcript_final`, `output_started`, `output_ended`,
+`reaction_started`, `reaction_ended`, `tick`; legacy `vad_*`/`stt_*`/`tts_*`
+names map onto them) and emits actions. Its deciders are injected — the
+voice adapter wires `TwoStageBargeIn`, `EotHoldAggregator`, the respond gate
+and the speculative policy — so the same machine can drive non-voice
+channels. The engine additionally owns:
+
+- **InteractionState**: one legible turn state — `listening`, `holding`,
+  `backchannel`, `taking`, `speaking`, `yielding` — derived from internals,
+  never stored.
+- **Continuous signals**: `end_of_turn_probability`,
+  `interruption_probability`, `backchannel_probability`, `user_engagement`
+  in [0, 1], recomputed per event (`InteractionSignalsTracker`).
+- **Utterance intent**: `classifyUtteranceIntent` returns `backchannel`,
+  `correcting`, `holding`, `questioning`, `thinking_aloud`, or
+  `substantive` plus a `pure` flag. Intent metadata rides on `commit`,
+  `hold`, `drop`, and `hard_stop` actions when `intent` is enabled.
+- **Language packs**: all lexical cues (continuation markers, fillers,
+  commit endings, user backchannels, correction/hold markers, agent
+  backchannels) come from `LanguagePack`s built out of the governed
+  `turn-taking-lexicon.json` — adding a language is a data change.
+- **Agent backchannels**: `emit_backchannel` actions while the remote party
+  holds the floor, bounded by `BackchannelPolicy` (min speech, min interval,
+  per-utterance cap, suppression over corrections/holds). The loop speaks
+  them through the CE→output shortcut — streaming TTS or a one-off artifact
+  — with no reasoning call, and emits them as `assistant_text_delta` media
+  events from source `interaction-backchannel`.
+- **User rhythm**: `UserRhythm` observes utterance durations, gaps, speech
+  rate and backchannel rate; after a sample floor it adjusts `maxHoldMs`,
+  tentative-silence and backchannel interval, clamped to [0.5×, 2×] of the
+  base values.
+
+Loop integration is opt-in via `RealtimeVoiceLoopOptions.interaction`
+(`--conversation-engine`, `--backchannel`, `--intent-shortcuts`,
+`--rhythm`). Intent shortcuts answer a pure hold request (`ちょっと待って`)
+with an instant reaction and drop pure user backchannels without a
+reasoning call. The legacy turn-taking paths described in §13 remain the
+authoritative decision path in this release; the engine consumes the same
+events and only new actions are applied — full migration of the loop to
+engine decisions is a follow-up.

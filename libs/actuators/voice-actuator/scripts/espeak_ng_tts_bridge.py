@@ -30,19 +30,24 @@ def _generate(params: dict) -> dict:
     out.parent.mkdir(parents=True, exist_ok=True)
 
     temp_wav = out if out.suffix.lower() == ".wav" else out.with_suffix(".wav")
-    espeak_args = ["espeak-ng"]
-    if voice:
-        espeak_args.extend(["-v", voice])
-    elif language.startswith("ja"):
-        espeak_args.extend(["-v", "ja"])
-    else:
-        espeak_args.extend(["-v", language])
-    if rate:
-        espeak_args.extend(["-s", rate])
-    espeak_args.extend(["-w", str(temp_wav), text])
+    language_voice = "ja" if language.startswith("ja") else language
+
+    def build_args(selected_voice: str) -> list:
+        espeak_args = ["espeak-ng", "-v", selected_voice]
+        if rate:
+            espeak_args.extend(["-s", rate])
+        espeak_args.extend(["-w", str(temp_wav), text])
+        return espeak_args
 
     try:
-        subprocess.run(espeak_args, check=True, capture_output=True, text=True)
+        try:
+            subprocess.run(build_args(voice or language_voice), check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as exc:
+            # Shared TTS config names host voices (e.g. macOS "Kyoko") that espeak-ng
+            # does not ship; fall back to the language voice instead of failing.
+            if not voice or "does not exist" not in (exc.stderr or ""):
+                raise
+            subprocess.run(build_args(language_voice), check=True, capture_output=True, text=True)
         if out.suffix.lower() != ".wav":
             subprocess.run(["ffmpeg", "-y", "-i", str(temp_wav), str(out)], check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as exc:
