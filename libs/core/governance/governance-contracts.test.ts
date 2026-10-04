@@ -766,6 +766,15 @@ const CASES: GovernanceSchemaCase[] = [
       tool_routes: [],
     },
   },
+  {
+    name: 'event-intake-policy',
+    schemaPath: 'knowledge/product/schemas/event-intake-policy.schema.json',
+    dataPath: 'knowledge/product/governance/event-intake-policy.json',
+    invalidPayload: {
+      version: '1.0.0',
+      sources: { github: { enabled: true, secret_key: 'GITHUB_TOKEN' } },
+    },
+  },
 ];
 
 describe('governance contracts', () => {

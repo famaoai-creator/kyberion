@@ -1330,6 +1330,24 @@
       "default": "0"
     },
     {
+      "name": "KYBERION_EVENT_INTAKE_HOST",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Bind host for the DL-08 event intake surface (scripts/event_intake_surface.ts); the default is loopback 127.0.0.1 — expose it only through an explicitly secured reverse proxy or tunnel, never by binding a public interface.",
+      "documented": true,
+      "subsystem": "dot"
+    },
+    {
+      "name": "KYBERION_EVENT_INTAKE_PORT",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Local TCP port for the DL-08 event intake surface; the default is 8791. Every intake source stays disabled until enabled in event-intake-policy.json with its HMAC secret stored.",
+      "documented": true,
+      "subsystem": "dot"
+    },
+    {
       "name": "KYBERION_EXTERNAL_HOOKS",
       "category": "flag",
       "type": "string",
