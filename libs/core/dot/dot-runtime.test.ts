@@ -588,7 +588,7 @@ describe('runtime reliability (DL-02)', () => {
   );
 
   it.each(['native', 'fenced'] as const)(
-    'records a %s follow-up persist failure after dispatch as a tool error, never a retry',
+    'records a %s follow-up persist failure as a tool error and keeps the parent pending (backoff, no immediate retry)',
     async (mode) => {
       DOT_WAKE_TOOLS.push(dotScheduleFollowupTool);
       const charter: DotCharter = { ...CHARTER, followups: { max_pending: 1 } };
@@ -647,14 +647,39 @@ describe('runtime reliability (DL-02)', () => {
         ]);
         expect(dispatched).toEqual(['Fix main']);
         expect(readDotWakeLedger(deps)).toMatchObject([
-          { trigger_key: trigger.key, outcome: 'delivered' },
+          { trigger_key: trigger.key, outcome: 'delivered', trigger_retained: true },
         ]);
-        // The next sweep has nothing to re-fire, so nothing is re-dispatched.
-        now = new Date('2026-10-04T10:30:00Z');
+        // The chain is not lost: the parent stays pending, but backs off — the
+        // same sweep window never re-fires (nor re-dispatches) it.
+        expect(listPendingDotFollowups(charter, deps).map((row) => row.reason)).toEqual([
+          'original',
+        ]);
         expect(evaluateDotFollowupsDue(charter, deps)).toEqual([]);
         expect(evaluateDotTriggersDue(charter, deps).some((t) => t.key === trigger.key)).toBe(
           false
         );
+        write.mockRestore();
+        // After the backoff the parent wakes again and its successor persists.
+        now = new Date('2026-10-04T10:30:00Z');
+        expect(evaluateDotFollowupsDue(charter, deps).map((t) => t.key)).toEqual([trigger.key]);
+        const retry = await runDotWake(
+          { path: `${TEST_ROOT}/dots/dot.json`, charter },
+          {
+            ...deps,
+            trigger,
+            hasRole: () => true,
+            dispatch: () => [],
+            runLoop: async (options: DotWakeLoopOptions) => {
+              options.executeTool!({ name: 'dot_schedule_followup', input: replacement });
+              return fakeResult(1, 5);
+            },
+          }
+        );
+        expect(retry.tool_errors).toBeUndefined();
+        expect(listPendingDotFollowups(charter, deps).map((row) => row.reason)).toEqual([
+          'successor',
+        ]);
+        expect(evaluateDotFollowupsDue(charter, deps)).toEqual([]);
       } finally {
         write.mockRestore();
       }

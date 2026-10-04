@@ -7,15 +7,14 @@ const mocks = vi.hoisted(() => ({
   wake: vi.fn(async () => ({ dot_id: 'collision', outcome: 'delivered' })),
   install: vi.fn(),
   appendInbox: vi.fn((entry: Record<string, unknown>) => entry),
-  release: vi.fn((_charter: unknown, input: { workItemId: string }) => ({
-    item_id: input.workItemId,
-    status: 'ready',
-    metadata: { dot_executor: { operator_verified_by: 'user:ops' } },
+  release: vi.fn(() => ({
+    request: { id: 'apr-1', expiresAt: '2026-10-08T00:00:00.000Z' },
+    reused: false,
   })),
 }));
 vi.mock('@agent/core/dot/dot-executor', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/dot/dot-executor')>()),
-  releaseDotWorkItem: mocks.release,
+  requestDotWorkItemRelease: mocks.release,
 }));
 vi.mock('@agent/core/dot/dot-charter', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/dot/dot-charter')>();
@@ -138,7 +137,8 @@ describe('dot charter CLI identity resolution', () => {
     'reports every colliding path through %s while retaining valid siblings',
     async (command) => {
       const first = writeCharter(CHARTER, 'first', 'acme');
-      // Two established (active + paused) tenant charters across tenants: no owner.
+      // Two established tenant charters across tenants: the earliest-activated
+      // (no lifecycle history: file age, then path) keeps the id.
       const second = writeCharter({ ...CHARTER, status: 'paused' }, 'second', 'globex');
       writeCharter({ ...CHARTER, dot_id: 'unique', status: 'draft' }, 'unique');
       const broken = `${TEST_ROOT}/dots/broken.json`;
@@ -149,14 +149,16 @@ describe('dot charter CLI identity resolution', () => {
         path: string;
         error: string;
       }>;
-      expect(errors.map((entry) => entry.path).sort()).toEqual([first, second, broken].sort());
-      for (const filePath of [first, second]) {
-        expect(errors.find((entry) => entry.path === filePath)?.error).toContain(
-          "Duplicate dot_id 'collision'"
-        );
-      }
+      expect(errors.map((entry) => entry.path).sort()).toEqual([second, broken].sort());
+      expect(errors.find((entry) => entry.path === second)?.error).toContain(
+        "Duplicate dot_id 'collision'"
+      );
+      expect(errors.find((entry) => entry.path === second)?.error).toContain(
+        `${first} keeps the id`
+      );
       expect(errors.find((entry) => entry.path === broken)?.error).toMatch(/JSON/);
-      expect(report?.dots ?? report?.results).toMatchObject([{ dot_id: 'unique' }]);
+      const listed = (report?.dots ?? report?.results) as Array<{ dot_id: string }>;
+      expect(listed.map((entry) => entry.dot_id).sort()).toEqual(['collision', 'unique']);
     }
   );
 
@@ -178,7 +180,7 @@ describe('dot charter CLI identity resolution', () => {
 });
 
 describe('dot release', () => {
-  it('releases a work item for the resolved charter with the operator reason', async () => {
+  it('only requests a human-approved release for the resolved charter', async () => {
     writeCharter(CHARTER, 'one');
     const report = await runDotCharters([
       'release',
@@ -193,7 +195,13 @@ describe('dot release', () => {
     ]);
     expect(report).toMatchObject({
       ok: true,
-      released: { dot_id: 'collision', work_item_id: 'wi-1', status: 'ready' },
+      release_requested: {
+        dot_id: 'collision',
+        work_item_id: 'wi-1',
+        approval_request_id: 'apr-1',
+        reused: false,
+        next: expect.stringContaining('pnpm kyberion approvals --approve apr-1'),
+      },
     });
     expect(mocks.release).toHaveBeenCalledWith(expect.objectContaining({ dot_id: 'collision' }), {
       workItemId: 'wi-1',

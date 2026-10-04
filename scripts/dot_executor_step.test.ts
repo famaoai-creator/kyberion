@@ -68,9 +68,14 @@ describe('buildDotExecutorPorts', () => {
     });
     expect(ports.goalMode?.(CHARTER)).toBe('tool');
     const result = await ports.runGoalTurn({ objective: 'x', toolRole: 'infrastructure_sentinel' });
-    expect(goalDriver).toHaveBeenCalledWith(
-      expect.objectContaining({ objective: 'x', backend: expect.anything() })
-    );
+    expect(goalDriver).toHaveBeenCalledWith(expect.objectContaining({ objective: 'x' }));
+    // A narrow observer over the resolved backend itself: everything not a model
+    // call is the original backend's own member.
+    const passed = (goalDriver.mock.calls[0] as unknown as [{ backend: ReasoningBackend }])[0]
+      .backend;
+    expect(Object.getPrototypeOf(passed)).toBe(toolBackend);
+    expect(passed.name).toBe(toolBackend.name);
+    expect(passed.divergePersonas).toBe(toolBackend.divergePersonas);
     expect(result.finalText).toBe('did it');
   });
 
@@ -97,6 +102,40 @@ describe('buildDotExecutorPorts', () => {
     const uncertain = await midTurn.runGoalTurn({ objective: 'x' }).catch((e: unknown) => e);
     expect(isDotExecutorPreEffectError(uncertain)).toBe(false);
     expect(String(uncertain)).toMatch(/crashed mid-turn/);
+
+    // Non-model members do not count as a model call; model calls keep `this`.
+    const thisSeen: unknown[] = [];
+    const bound: ReasoningBackend = {
+      ...toolBackend,
+      generateWithTools: async function (this: unknown) {
+        thisSeen.push(this);
+        return { text: '', toolCalls: [] } as never;
+      },
+    };
+    const readsOnly = vi.fn(async (options: { backend: ReasoningBackend }) => {
+      void options.backend.name;
+      options.backend.getRuntimeInstructions?.();
+      throw new Error('gave up before the model');
+    });
+    const before = await buildDotExecutorPorts(CHARTER, {
+      backend: bound,
+      goalDriver: readsOnly as never,
+    })
+      .runGoalTurn({ objective: 'x' })
+      .catch((e: unknown) => e);
+    expect(isDotExecutorPreEffectError(before)).toBe(true);
+    const calls = vi.fn(async (options: { backend: ReasoningBackend }) => {
+      await options.backend.generateWithTools?.([] as never, [] as never);
+      throw new Error('after the model');
+    });
+    const after = await buildDotExecutorPorts(CHARTER, {
+      backend: bound,
+      goalDriver: calls as never,
+    })
+      .runGoalTurn({ objective: 'x' })
+      .catch((e: unknown) => e);
+    expect(isDotExecutorPreEffectError(after)).toBe(false);
+    expect(thisSeen).toEqual([bound]);
   });
 
   it('classifies a missing pipeline as a pre-effect failure before any step runs', async () => {

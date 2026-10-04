@@ -10,8 +10,8 @@
  *   pnpm kyberion dot wake <dot_id>              # run one bounded wake now
  *   pnpm kyberion dot status [<dot_id>]          # wakes, tokens, actions, waiting decisions, signals, feedback
  *   pnpm kyberion dot memory|followups|kr|autonomy|outcomes|work <dot_id>   # read-only views
- *   pnpm kyberion dot release <dot_id> <work_item_id> --reason "<text>" [--by <operator>]
- *                                                # operator-verified release of a quarantined item
+ *   pnpm kyberion dot release <dot_id> <work_item_id> --reason "<text>" [--by <requester>]
+ *                                                # request a human-approved release of a quarantined item
  *   pnpm kyberion dot event ingest --source <s> --file <json> [--type <t>]   # local test event
  *   pnpm kyberion dot inbox append --channel <ch> [--dot-id <id>] [--text <s>]
  *                                                # append a wake-lane row (manual/testing)
@@ -40,7 +40,7 @@ import {
   readDotAutonomyState,
 } from '@agent/core/dot/dot-autonomy';
 import { dotOutcomeStats, readDotOutcomes } from '@agent/core/dot/dot-outcomes';
-import { readDotWorkResults, releaseDotWorkItem } from '@agent/core/dot/dot-executor';
+import { readDotWorkResults, requestDotWorkItemRelease } from '@agent/core/dot/dot-executor';
 import { ingestLocalEvent } from '@agent/core/dot/dot-event-intake';
 import { safeReadFile } from '@agent/core/secure-io';
 import { parseSafeJsonObjectInput } from '@agent/core/foundation';
@@ -331,13 +331,15 @@ function reportView(
 }
 
 /**
- * `dot release <dot_id> <work_item_id> --reason "<text>" [--by <operator>]` —
- * the operator has verified a quarantined/escalated item's effects; record
- * that (audited) and return the item to `ready` for a fresh attempt.
+ * `dot release <dot_id> <work_item_id> --reason "<text>" [--by <requester>]` —
+ * asks a human to release a quarantined/escalated item. Only an approval
+ * request is created (visible in `pnpm kyberion approvals`); the executor
+ * sweep returns the item to `ready` once an authenticated human approves it,
+ * recording the approver (not `--by`) as the verifier.
  */
 function reportRelease(argv: string[]) {
   const usage =
-    'usage: pnpm kyberion dot release <dot_id> <work_item_id> --reason "<what you verified>" [--by <operator>]';
+    'usage: pnpm kyberion dot release <dot_id> <work_item_id> --reason "<what you verified>" [--by <requester>]';
   const flag = (name: string): string | undefined => {
     const index = argv.indexOf(`--${name}`);
     return index >= 0 ? argv[index + 1] : undefined;
@@ -350,14 +352,20 @@ function reportRelease(argv: string[]) {
   const reason = flag('reason');
   if (!dotId || !workItemId || !reason) throw new Error(usage);
   const { charter } = findDot(dotId);
-  const item = releaseDotWorkItem(charter, { workItemId, reason, by: flag('by') });
+  const { request, reused } = requestDotWorkItemRelease(charter, {
+    workItemId,
+    reason,
+    by: flag('by'),
+  });
   return {
     ok: true,
-    released: {
+    release_requested: {
       dot_id: dotId,
-      work_item_id: item.item_id,
-      status: item.status,
-      dot_executor: item.metadata?.dot_executor,
+      work_item_id: workItemId,
+      approval_request_id: request.id,
+      reused,
+      expires_at: request.expiresAt,
+      next: `pnpm kyberion approvals --approve ${request.id}  (a human decision; the executor applies it on its next sweep)`,
     },
   };
 }
@@ -491,8 +499,8 @@ function printReport(report: Record<string, unknown>, print: (line: string) => v
     }
   } else if (report.ingested) {
     print(JSON.stringify(report.ingested));
-  } else if (report.released) {
-    print(JSON.stringify(report.released));
+  } else if (report.release_requested) {
+    print(JSON.stringify(report.release_requested));
   } else if (report.status || report.outcome) {
     print(JSON.stringify(report));
   }
