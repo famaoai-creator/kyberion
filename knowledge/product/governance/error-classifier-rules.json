@@ -55,6 +55,14 @@
       "repairAction": "Analyze the step parameters and the expected input for this actuator. Fix any mismatched key names or invalid paths in the pipeline ADF."
     },
     {
+      "id": "kyberion.path-scope-persona-unset",
+      "category": "permission_denied",
+      "label": "Operator persona not set in this shell",
+      "remediation": "No operator persona is set for this process. `pnpm onboarding apply` records `KYBERION_PERSONA` in `.env.local`, but pnpm scripts do not load that file — run `export KYBERION_PERSONA=sovereign` in this shell, then rerun the same command.",
+      "patterns": ["POLICY_VIOLATION\\] Persona 'unknown'"],
+      "repairAction": "Export KYBERION_PERSONA for the operator shell and rerun the same command."
+    },
+    {
       "id": "kyberion.path-scope",
       "category": "permission_denied",
       "label": "Path scope policy denied write",
