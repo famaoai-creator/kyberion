@@ -6,12 +6,26 @@ authority: reference
 phase: [alignment, execution]
 tags: [computer-use, browser, actuator, runtime, governance]
 owner: ecosystem_architect
-last_updated: 2026-09-25
+last_updated: 2026-10-04
 ---
 
 # Computer Use Runtime Model
 
 This note captures what Kyberion should adopt from "computer use" style systems without copying a provider-specific implementation.
+
+## Status and operational entry point
+
+This is an architecture/reference note: statements using "should", the preferred
+vocabulary, and the near-term list are design direction, not an inventory of
+implemented end-to-end behavior. The step contract and physical executors exist;
+their presence does not establish universal automatic verification, durable resume,
+or exactly-once execution. Check each selected executor's supported contract.
+
+For current operator procedure, use the canonical
+[Browser Automation Operating Checklist](../orchestration/browser-automation-best-practices.md),
+including fresh observations, unique targets, bounded state waits, approval boundaries,
+postcondition readback, and uncertainty-aware resumption. Its conceptual certainty
+labels do not replace the existing receipt schema statuses.
 
 ## Core Thesis
 
@@ -46,7 +60,8 @@ Kyberion already contains much of the substrate:
 
 The missing part is not raw clicking.
 
-The missing part is a first-class **computer interaction loop**.
+The design goal is a first-class **computer interaction loop** across these parts;
+this note alone does not establish the current completeness of that integration.
 
 ## The Loop
 
@@ -196,7 +211,7 @@ Kyberion should expose computer use through distinct surfaces:
    `system-actuator` (OS / desktop apps), `terminal-actuator` (PTY) — all speaking
    the same `computer_interaction` contract (`target.executor`). They are not
    duplicates and are not merged; see `orchestration/action-playbook.md`.
-2. Add `computer-interaction.schema.json` as the provider-neutral step contract.
+2. Use the existing `computer-interaction.schema.json` as the provider-neutral step contract.
 3. Create a `computer-surface` runtime that displays:
    - latest screenshot
    - action trail
