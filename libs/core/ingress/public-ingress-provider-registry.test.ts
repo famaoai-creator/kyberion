@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { compileSchema } from '../foundation/schema.js';
 import { readJson } from '../foundation/json.js';
 import { pathResolver } from '../path-resolver.js';
@@ -32,6 +32,10 @@ function fakeProvider(id: string, readiness: Partial<IngressReadiness>): PublicI
     status: vi.fn(),
   };
 }
+
+beforeEach(() => {
+  vi.stubEnv('KYBERION_INGRESS_PROVIDER', '');
+});
 
 afterEach(() => {
   resetPublicIngressProviders();
