@@ -2202,6 +2202,50 @@
       "native_help": true
     },
     {
+      "id": "script.ingress.probe",
+      "module": "scripts/ingress.ts",
+      "args": ["probe"],
+      "command": "ingress probe",
+      "noun": "ingress",
+      "verb": "probe",
+      "audience": "operator",
+      "description": "cli_cmd_script_ingress_probe",
+      "group": "inspect"
+    },
+    {
+      "id": "script.ingress.status",
+      "module": "scripts/ingress.ts",
+      "args": ["status"],
+      "command": "ingress status",
+      "noun": "ingress",
+      "verb": "status",
+      "audience": "operator",
+      "description": "cli_cmd_script_ingress_status",
+      "group": "inspect"
+    },
+    {
+      "id": "script.ingress.up",
+      "module": "scripts/ingress.ts",
+      "args": ["up"],
+      "command": "ingress up",
+      "noun": "ingress",
+      "verb": "up",
+      "audience": "operator",
+      "description": "cli_cmd_script_ingress_up",
+      "group": "operate"
+    },
+    {
+      "id": "script.ingress.down",
+      "module": "scripts/ingress.ts",
+      "args": ["down"],
+      "command": "ingress down",
+      "noun": "ingress",
+      "verb": "down",
+      "audience": "operator",
+      "description": "cli_cmd_script_ingress_down",
+      "group": "operate"
+    },
+    {
       "id": "script.kyberion",
       "script": "kyberion",
       "command": "kyberion default",

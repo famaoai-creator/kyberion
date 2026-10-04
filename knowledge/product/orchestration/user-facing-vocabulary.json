@@ -7918,6 +7918,26 @@
         "ja": "ボールトのマウントを片付け",
         "qps-ploc": "⟦Ƈŀėȧñ ůṗ ṽȧůŀŧ ɱőůñŧş ŀőřėɱ ⟧"
       },
+      "cli_cmd_script_ingress_probe": {
+        "en": "Check which public ingress providers are ready",
+        "ja": "公開イングレスのプロバイダ準備状況を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ẇħïƈħ ṗůƀŀïƈ ïñɠřėşş ṗřőṽïḓėřş ȧřė řėȧḓẏ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "cli_cmd_script_ingress_status": {
+        "en": "Show surfaces exposed through public ingress",
+        "ja": "公開イングレスで公開中のサーフェスを表示",
+        "qps-ploc": "⟦Şħőẇ şůřƒȧƈėş ėẋṗőşėḓ ŧħřőůɠħ ṗůƀŀïƈ ïñɠřėşş ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "cli_cmd_script_ingress_up": {
+        "en": "Expose a surface at a public HTTPS URL (approval required)",
+        "ja": "サーフェスを公開 HTTPS URL で公開（承認が必要）",
+        "qps-ploc": "⟦Ėẋṗőşė ȧ şůřƒȧƈė ȧŧ ȧ ṗůƀŀïƈ ĦŦŦṖŞ ŮŘĿ (ȧṗṗřőṽȧŀ řėɋůïřėḓ) ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "cli_cmd_script_ingress_down": {
+        "en": "Withdraw a surface's public ingress",
+        "ja": "サーフェスの公開イングレスを取り下げ",
+        "qps-ploc": "⟦Ẇïŧħḓřȧẇ ȧ şůřƒȧƈė'ş ṗůƀŀïƈ ïñɠřėşş ŀőřėɱ ïṗşůɱ⟧"
+      },
       "cli_cmd_script_kyberion": {
         "en": "The kyberion CLI itself",
         "ja": "kyberion CLI 本体",
