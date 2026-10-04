@@ -16,6 +16,8 @@
  *   estimate and summed SDK usage. Unmatched/legacy SDK usage still counts;
  *   actor labels alone never prove a ledger charge. Cost always comes from
  *   metrics (the dot ledger carries no cost).
+ * - interactive: unattributed operator CLI sessions (Claude Code hook rows) —
+ *   report-only, so interactive work never throttles resident dots.
  * - generation: generation-quota units, report-only — never part of the
  *   token total nor the throttle.
  */
@@ -64,8 +66,10 @@ export interface BudgetUsage {
   /**
    * dots / missions are tokens; generation is generation-quota units — report
    * only: never added to `tokens` and never an input to the throttle.
+   * interactive (present when non-zero) is unattributed operator CLI session
+   * tokens — report only, likewise never part of `tokens`/`cost_usd`.
    */
-  by_source: { dots: number; missions: number; generation: number };
+  by_source: { dots: number; missions: number; generation: number; interactive?: number };
 }
 
 export type BudgetThrottle = 'normal' | 'soft' | 'hard';
@@ -221,9 +225,57 @@ function metricsRowScope(e: Record<string, any>): OrgBudgetScope {
 }
 
 const DOT_ACTOR_PATTERN = /^dot:/;
-/** More torn history lines than this, dated today or undatable, make cost unknown. */
+/** More torn history lines than this that belong to today make cost unknown. */
 const MAX_TODAY_MALFORMED = 2;
 const MALFORMED_DAY_PATTERN = /"timestamp"\s*:\s*"(\d{4}-\d{2}-\d{2})/;
+/**
+ * Interactive operator CLI producers (front-CLI session hooks such as
+ * recordCliUsage). Their unattributed rows are reported, never a cap input.
+ */
+const INTERACTIVE_CLI_PRODUCERS = new Set(['claude-code-cli']);
+
+function isInteractiveCliRow(e: Record<string, unknown>): boolean {
+  return [e.agent, e.component].some(
+    (value) => typeof value === 'string' && INTERACTIVE_CLI_PRODUCERS.has(value)
+  );
+}
+
+interface MalformedHistoryLine {
+  line: number;
+  /** UTC day parsed from the torn line's timestamp, if any survived. */
+  day?: string;
+}
+
+/**
+ * Line numbers of torn history lines that belong to `day`: dated today, or
+ * undatable but positioned after the first today-dated line (the history is
+ * append-only). Well-formed entries carry no line number, so the first
+ * today-dated entry's line is reconstructed from the malformed line numbers;
+ * blank lines are ignored, which can only place it earlier (fail closed).
+ */
+function todayMalformedLines(
+  entries: Array<Record<string, any>>,
+  malformed: MalformedHistoryLine[],
+  day: string
+): number[] {
+  if (malformed.length === 0) return [];
+  let firstToday = Number.POSITIVE_INFINITY;
+  const firstIndex = entries.findIndex(
+    (e) => typeof e?.timestamp === 'string' && e.timestamp.slice(0, 10) === day
+  );
+  if (firstIndex >= 0) {
+    let line = firstIndex + 1;
+    for (const m of [...malformed].sort((a, b) => a.line - b.line)) {
+      if (m.line <= line) line += 1;
+      else break;
+    }
+    firstToday = line;
+  }
+  for (const m of malformed) if (m.day === day) firstToday = Math.min(firstToday, m.line);
+  return malformed
+    .filter((m) => m.day === day || (m.day === undefined && m.line > firstToday))
+    .map((m) => m.line);
+}
 
 /** Dot identity is an attribution label, never proof that a ledger charge exists. */
 function metricsDotId(e: Record<string, unknown>): string | undefined {
@@ -327,27 +379,34 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
   //   Ordinary unscoped producers (operator CLI sessions, estimated CLI
   //   metering, SDK calls outside a tenant context) never pause a tenant.
   // - Torn history lines are skipped; only more than MAX_TODAY_MALFORMED lines
-  //   dated today (or undatable) make the day's cost unknown.
+  //   belonging to today (dated today, or undatable after the first today-dated
+  //   line) make the day's cost unknown.
+  // - Unattributed interactive CLI rows (operator Claude Code sessions) are
+  //   reported in by_source.interactive only — never tokens, cost or status.
   let missions = 0;
+  let interactive = 0;
   let cost = 0;
   let costUnknown = false;
   let costPartial = false;
-  let malformedToday = 0;
+  const malformed: MalformedHistoryLine[] = [];
   const measuredDotTokens = new Map<string, number>();
   try {
     const entries = deps.readMetricsHistory
       ? deps.readMetricsHistory()
       : metrics.loadHistory({
           strict: true,
-          onMalformed: (_line, raw) => {
-            const dated = MALFORMED_DAY_PATTERN.exec(raw)?.[1];
-            if (!dated || dated === day) malformedToday += 1;
+          onMalformed: (line, raw) => {
+            malformed.push({ line, day: MALFORMED_DAY_PATTERN.exec(raw)?.[1] });
           },
         });
-    if (malformedToday > MAX_TODAY_MALFORMED) {
-      costUnknown = true;
+    const malformedToday = todayMalformedLines(entries, malformed, day);
+    if (malformedToday.length > 0) {
+      const shown = malformedToday.slice(0, 10).join(', ');
+      const more = malformedToday.length > 10 ? ` (+${malformedToday.length - 10} more)` : '';
+      const unknown = malformedToday.length > MAX_TODAY_MALFORMED;
+      if (unknown) costUnknown = true;
       logger.warn(
-        `metrics history has ${malformedToday} malformed line(s) for ${day} — cost treated as unknown | next: repair active/shared metrics history.jsonl | evidence: threshold ${MAX_TODAY_MALFORMED}`
+        `metrics history has ${malformedToday.length} malformed line(s) for ${day} — ${unknown ? 'cost treated as unknown' : `skipped (cost unknown above ${MAX_TODAY_MALFORMED})`} | next: repair active/shared metrics history.jsonl | evidence: lines ${shown}${more}`
       );
     }
     for (const e of entries) {
@@ -381,6 +440,10 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
         continue;
       }
       const tokens = metricsTokens(e);
+      if (!attributable && isInteractiveCliRow(e)) {
+        interactive += tokens;
+        continue;
+      }
       const accountingId = nonEmpty(e.accounting_id);
       if (dotId && accountingId) {
         const key = accountingKey(dotId, accountingId, rowScope, day);
@@ -435,7 +498,12 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
       : costPartial
         ? { cost_status: 'partial' as const }
         : {}),
-    by_source: { dots, missions, generation: Number(generation) || 0 },
+    by_source: {
+      dots,
+      missions,
+      generation: Number(generation) || 0,
+      ...(interactive > 0 ? { interactive } : {}),
+    },
   };
 }
 
