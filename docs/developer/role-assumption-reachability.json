@@ -123,6 +123,28 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/dot/dot-charter.ts#listTenantDotCharterSources",
+      "roles": ["chronos_tenant_runner"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/dot/dot-charter.ts#loadDotCharterSource",
+      "roles": ["chronos_tenant_runner"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/dot/dot-dispatch.ts#dispatchDotProposals (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": [
         "chronos_gateway",
@@ -138,6 +160,20 @@
       "site": "libs/core/dot/dot-dispatch.ts#expirePendingDecision (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
+    },
+    {
+      "site": "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+      "roles": [],
+      "unresolved": [
+        "role argument `charter.authority.authority_role` could not be resolved at libs/core/dot/dot-executor.ts#runDotExecutorSweep"
+      ]
+    },
+    {
+      "site": "libs/core/dot/dot-key-results.ts#runAsDotCharter",
+      "roles": [],
+      "unresolved": [
+        "role argument `c.authority.authority_role` could not be resolved at libs/core/dot/dot-key-results.ts#runAsDotCharter"
+      ]
     },
     {
       "site": "libs/core/dot/dot-lifecycle.ts#transitionDotCharterStatus",
@@ -548,6 +584,18 @@
     {
       "site": "libs/core/operational-learning.ts#enqueueOperationalLearningSignal",
       "roles": ["operational_learning_writer"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/organization-standup.ts#persistOrganizationCadenceReport (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
       "unresolved": []
     },
     {
@@ -1709,6 +1757,13 @@
       "unresolved": []
     },
     {
+      "site": "scripts/dot_charters.ts#asCharter",
+      "roles": [],
+      "unresolved": [
+        "role argument `charter.authority.authority_role` could not be resolved at scripts/dot_charters.ts#asCharter"
+      ]
+    },
+    {
       "site": "scripts/dot_charters.ts#reportWake",
       "roles": [],
       "unresolved": [
@@ -1906,6 +1961,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked",
+      "roles": ["organization_operator"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/peer_network_register.ts#main",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -2046,6 +2106,12 @@
     ],
     "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
+    ],
+    "libs/core/dot/dot-executor.ts#runDotExecutorSweep": [
+      "role argument `charter.authority.authority_role` could not be resolved at libs/core/dot/dot-executor.ts#runDotExecutorSweep"
+    ],
+    "libs/core/dot/dot-key-results.ts#runAsDotCharter": [
+      "role argument `c.authority.authority_role` could not be resolved at libs/core/dot/dot-key-results.ts#runAsDotCharter"
     ],
     "libs/core/environment-capability.ts#runProbe": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved",
@@ -2461,11 +2527,9 @@
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "chronos_localadmin": {
@@ -2476,6 +2540,16 @@
         "chronos_operator": {
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/lib/viewer-context.ts#withViewerExecutionContext"
+          ]
+        },
+        "chronos_tenant_runner": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-charter.ts#listDotCharters",
+            "libs/core/dot/dot-charter.ts#listDotCharterSources",
+            "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
         "chronos_token_registry_reader": {
@@ -2507,11 +2581,9 @@
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -2551,6 +2623,20 @@
             "libs/core/operational-learning.ts#enqueueOperationalLearningSignal"
           ]
         },
+        "organization_operator": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "reconcile_config_fallbacks": {
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/agent/chronos-quick-action-helpers.ts#runScheduleQuickAction",
@@ -2582,11 +2668,9 @@
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "sovereign_concierge": {
@@ -2607,11 +2691,9 @@
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         }
       },
@@ -2622,6 +2704,8 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/media/native-tts.ts#probeNativeTts",
@@ -2708,6 +2792,22 @@
       "reachable_roles": {
         "chronos_gateway": {
           "example_path": [
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "chronos_tenant_runner": {
+          "example_path": [
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
@@ -2717,10 +2817,9 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "libs/core/dot/dot-charter.ts#listDotCharters",
+            "libs/core/dot/dot-charter.ts#listDotCharterSources",
+            "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
         "ecosystem_architect": {
@@ -2744,6 +2843,7 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
@@ -2752,11 +2852,9 @@
             "scripts/pipeline-execution-part-results.ts#main",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -2793,6 +2891,24 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "organization_operator": {
+          "example_path": [
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "libs/core/mission/mission-orchestration-worker.ts#<module>",
@@ -2816,6 +2932,7 @@
         },
         "slack_bridge": {
           "example_path": [
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
@@ -2824,11 +2941,9 @@
             "scripts/pipeline-execution-part-results.ts#main",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "sovereign_concierge": {
@@ -2840,6 +2955,7 @@
         },
         "surface_runtime": {
           "example_path": [
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
@@ -2848,11 +2964,9 @@
             "scripts/pipeline-execution-part-results.ts#main",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         }
       },
@@ -2862,6 +2976,8 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
@@ -3114,11 +3230,22 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "chronos_tenant_runner": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "libs/core/dot/dot-charter.ts#listDotCharters",
+            "libs/core/dot/dot-charter.ts#listDotCharterSources",
+            "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
         "chronos_token_registry_reader": {
@@ -3157,11 +3284,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "ingest_commit": {
@@ -3190,6 +3315,20 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "organization_operator": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "presence/displays/concierge/src/lib/front-desk-nav.ts#buildFrontDeskNavPayload",
@@ -3206,11 +3345,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "sovereign_concierge": {
@@ -3227,11 +3364,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         }
       },
@@ -3241,6 +3376,8 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
@@ -3325,11 +3462,25 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "chronos_tenant_runner": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "libs/core/dot/dot-charter.ts#listDotCharters",
+            "libs/core/dot/dot-charter.ts#listDotCharterSources",
+            "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
         "ecosystem_architect": {
@@ -3356,11 +3507,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -3394,6 +3543,29 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "organization_operator": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
@@ -3412,11 +3584,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "sovereign_concierge": {
@@ -3429,11 +3599,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "surface_runtime": {
@@ -3446,11 +3614,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         }
       },
@@ -3460,6 +3626,8 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
@@ -3490,6 +3658,37 @@
         "scripts/refactor/adf-input.ts#readWorkflowModuleInput"
       ],
       "policy_roles_not_reachable": []
+    },
+    "event_intake_surface": {
+      "entries": ["scripts/event_intake_surface.ts"],
+      "reviewed_infeasible": [],
+      "child_process_entries": [],
+      "reachable_roles": {
+        "chronos_tenant_runner": {
+          "example_path": [
+            "scripts/event_intake_surface.ts#<module>",
+            "libs/core/dot/dot-event-intake.ts#<module>",
+            "libs/core/dot/dot-runtime.ts#<module>",
+            "libs/core/dot/dot-extension-registry.ts#<module>",
+            "libs/core/dot/dot-arbitration.ts#dotArbitrationPreGateCheck",
+            "libs/core/dot/dot-arbitration.ts#checkDotArbitration",
+            "libs/core/dot/dot-arbitration.ts#dotArbitrationConflicts",
+            "libs/core/dot/dot-arbitration.ts#charterList",
+            "libs/core/dot/dot-charter.ts#listDotCharters",
+            "libs/core/dot/dot-charter.ts#listDotCharterSources",
+            "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
+          ]
+        }
+      },
+      "unresolved_sites": [],
+      "policy_roles_not_reachable": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "knowledge_steward",
+        "scope_locale_reader",
+        "slack_bridge",
+        "surface_runtime"
+      ]
     },
     "imessage_bridge": {
       "entries": ["satellites/imessage-bridge/src/index.ts"],
@@ -3545,11 +3744,27 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "chronos_tenant_runner": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "libs/core/dot/dot-charter.ts#listDotCharters",
+            "libs/core/dot/dot-charter.ts#listDotCharterSources",
+            "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
         "ecosystem_architect": {
@@ -3580,11 +3795,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -3622,6 +3835,31 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "organization_operator": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "satellites/imessage-bridge/src/index.ts#buildIMessageChannelAdapter",
@@ -3643,11 +3881,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "sovereign_concierge": {
@@ -3662,11 +3898,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "surface_runtime": {
@@ -3681,11 +3915,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         }
       },
@@ -3695,6 +3927,8 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
@@ -3778,25 +4012,39 @@
             "scripts/pipeline-execution-part-results.ts#main",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "chronos_tenant_runner": {
+          "example_path": [
+            "scripts/mcp_server.ts#<module>",
+            "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
+            "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
+            "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "libs/core/dot/dot-charter.ts#listDotCharters",
+            "libs/core/dot/dot-charter.ts#listDotCharterSources",
+            "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
         "ecosystem_architect": {
           "example_path": [
-            "scripts/run_mission_orchestration_event_worker.ts#main",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
-            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
-            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
-            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
-            "libs/core/mission/mission-orchestration-worker.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
-            "scripts/mission_controller.ts#main [child process]",
-            "scripts/mission_controller.ts#mainImpl",
+            "scripts/mcp_server.ts#<module>",
+            "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
+            "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
+            "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/agent_runtime_supervisor_daemon.ts#main",
             "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
             "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
             "libs/core/actuator/deployment-adapter.ts#installShellDeploymentAdapterFromConfigIfAvailable",
@@ -3813,11 +4061,9 @@
             "scripts/pipeline-execution-part-results.ts#main",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -3855,6 +4101,20 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "organization_operator": {
+          "example_path": [
+            "scripts/mcp_server.ts#<module>",
+            "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
+            "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
+            "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
@@ -3880,11 +4140,9 @@
             "scripts/pipeline-execution-part-results.ts#main",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "sovereign_concierge": {
@@ -3897,11 +4155,9 @@
             "scripts/pipeline-execution-part-results.ts#main",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "surface_runtime": {
@@ -3919,6 +4175,8 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
@@ -4057,18 +4315,44 @@
             "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction"
           ]
         },
+        "chronos_tenant_runner": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/agent-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/agent-actuator/src/agent-actuator-helpers.ts#handleAction",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-charter.ts#listDotCharters",
+            "libs/core/dot/dot-charter.ts#listDotCharterSources",
+            "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
-            "scripts/run_mission_orchestration_event_worker.ts#main",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
-            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
-            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
-            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
-            "libs/core/mission/mission-orchestration-worker.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
-            "scripts/mission_controller.ts#main [child process]",
-            "scripts/mission_controller.ts#mainImpl",
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/agent-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/agent-actuator/src/agent-actuator-helpers.ts#handleAction",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/agent_runtime_supervisor_daemon.ts#main",
             "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
             "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
             "libs/core/actuator/deployment-adapter.ts#installShellDeploymentAdapterFromConfigIfAvailable",
@@ -4154,6 +4438,30 @@
             "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#<module>",
             "scripts/run_baseline_check.ts#runBaselineCheck",
             "libs/core/operational-learning.ts#enqueueOperationalLearningSignal"
+          ]
+        },
+        "organization_operator": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/approval-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
           ]
         },
         "reconcile_config_fallbacks": {
@@ -4250,6 +4558,8 @@
         "libs/core/command-runner.ts#runGovernedCommand",
         "libs/core/command-runner.ts#runGovernedShellScript",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/media/native-tts.ts#probeNativeTts",
@@ -4401,6 +4711,22 @@
       "reachable_roles": {
         "chronos_gateway": {
           "example_path": [
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "chronos_tenant_runner": {
+          "example_path": [
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
@@ -4410,10 +4736,9 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "libs/core/dot/dot-charter.ts#listDotCharters",
+            "libs/core/dot/dot-charter.ts#listDotCharterSources",
+            "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
         "chronos_token_registry_reader": {
@@ -4426,24 +4751,7 @@
         },
         "ecosystem_architect": {
           "example_path": [
-            "scripts/run_mission_orchestration_event_worker.ts#main",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
-            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
-            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
-            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
-            "libs/core/mission/mission-orchestration-worker.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
-            "scripts/mission_controller.ts#main [child process]",
-            "scripts/mission_controller.ts#mainImpl",
-            "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
-            "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
-            "libs/core/actuator/deployment-adapter.ts#installShellDeploymentAdapterFromConfigIfAvailable",
-            "libs/core/actuator/deployment-adapter.ts#loadShellDeploymentAdapterConfig"
-          ]
-        },
-        "infrastructure_sentinel": {
-          "example_path": [
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
@@ -4452,11 +4760,28 @@
             "scripts/pipeline-execution-part-results.ts#main",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/agent_runtime_supervisor_daemon.ts#main",
+            "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
+            "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
+            "libs/core/actuator/deployment-adapter.ts#installShellDeploymentAdapterFromConfigIfAvailable",
+            "libs/core/actuator/deployment-adapter.ts#loadShellDeploymentAdapterConfig"
+          ]
+        },
+        "infrastructure_sentinel": {
+          "example_path": [
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -4496,6 +4821,24 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "organization_operator": {
+          "example_path": [
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
@@ -4513,6 +4856,7 @@
         },
         "slack_bridge": {
           "example_path": [
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
@@ -4521,11 +4865,9 @@
             "scripts/pipeline-execution-part-results.ts#main",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "sovereign_concierge": {
@@ -4537,6 +4879,7 @@
         },
         "surface_runtime": {
           "example_path": [
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
@@ -4545,11 +4888,9 @@
             "scripts/pipeline-execution-part-results.ts#main",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         }
       },
@@ -4559,6 +4900,8 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
@@ -4644,11 +4987,30 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "chronos_tenant_runner": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "libs/core/dot/dot-charter.ts#listDotCharters",
+            "libs/core/dot/dot-charter.ts#listDotCharterSources",
+            "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
         "chronos_token_registry_reader": {
@@ -4693,11 +5055,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -4738,6 +5098,34 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "organization_operator": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "scripts/personal-pads/server.ts#createPersonalPadsServer",
@@ -4762,11 +5150,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "sovereign_concierge": {
@@ -4791,11 +5177,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         }
       },
@@ -4805,6 +5189,8 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
@@ -4899,11 +5285,23 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "chronos_tenant_runner": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "libs/core/dot/dot-charter.ts#listDotCharters",
+            "libs/core/dot/dot-charter.ts#listDotCharterSources",
+            "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
         "ecosystem_architect": {
@@ -4923,11 +5321,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -4957,6 +5353,20 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "organization_operator": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/presence-studio-runtime-data.ts#<module>",
+            "libs/core/in-room-minutes-recorder.ts#startInRoomMinutesSession",
+            "libs/core/in-room-minutes-recorder.ts#defaultRunMinutesPipeline",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
@@ -4973,11 +5383,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "sovereign_concierge": {
@@ -4996,11 +5404,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         }
       },
@@ -5010,6 +5416,8 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
@@ -5099,11 +5507,26 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "chronos_tenant_runner": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "libs/core/dot/dot-charter.ts#listDotCharters",
+            "libs/core/dot/dot-charter.ts#listDotCharterSources",
+            "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
         "ecosystem_architect": {
@@ -5132,11 +5555,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -5172,6 +5593,30 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "organization_operator": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
@@ -5192,11 +5637,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "sovereign_concierge": {
@@ -5210,11 +5653,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "surface_runtime": {
@@ -5228,11 +5669,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         }
       },
@@ -5242,6 +5681,8 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
@@ -5377,25 +5818,31 @@
             "scripts/pipeline-execution-part-results.ts#main",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "chronos_tenant_runner": {
+          "example_path": [
+            "scripts/run_pipeline.ts#<module>",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "libs/core/dot/dot-charter.ts#listDotCharters",
+            "libs/core/dot/dot-charter.ts#listDotCharterSources",
+            "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
         "ecosystem_architect": {
           "example_path": [
-            "scripts/run_mission_orchestration_event_worker.ts#main",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
-            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
-            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
-            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
-            "libs/core/mission/mission-orchestration-worker.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
-            "scripts/mission_controller.ts#main [child process]",
-            "scripts/mission_controller.ts#mainImpl",
+            "scripts/run_pipeline.ts#<module>",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/agent_runtime_supervisor_daemon.ts#main",
             "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
             "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
             "libs/core/actuator/deployment-adapter.ts#installShellDeploymentAdapterFromConfigIfAvailable",
@@ -5408,11 +5855,9 @@
             "scripts/pipeline-execution-part-results.ts#main",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -5446,6 +5891,16 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "organization_operator": {
+          "example_path": [
+            "scripts/run_pipeline.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
@@ -5467,11 +5922,9 @@
             "scripts/pipeline-execution-part-results.ts#main",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "sovereign_concierge": {
@@ -5480,11 +5933,9 @@
             "scripts/pipeline-execution-part-results.ts#main",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "surface_runtime": {
@@ -5493,11 +5944,9 @@
             "scripts/pipeline-execution-part-results.ts#main",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         }
       },
@@ -5507,6 +5956,8 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
@@ -5590,11 +6041,25 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "chronos_tenant_runner": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "libs/core/dot/dot-charter.ts#listDotCharters",
+            "libs/core/dot/dot-charter.ts#listDotCharterSources",
+            "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
         "ecosystem_architect": {
@@ -5621,11 +6086,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -5659,6 +6122,29 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "organization_operator": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
@@ -5677,11 +6163,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "sovereign_concierge": {
@@ -5694,11 +6178,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "surface_runtime": {
@@ -5711,11 +6193,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         }
       },
@@ -5725,6 +6205,8 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
@@ -5809,25 +6291,33 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "chronos_tenant_runner": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "libs/core/dot/dot-charter.ts#listDotCharters",
+            "libs/core/dot/dot-charter.ts#listDotCharterSources",
+            "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
         "ecosystem_architect": {
           "example_path": [
-            "scripts/run_mission_orchestration_event_worker.ts#main",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
-            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
-            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
-            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
-            "libs/core/mission/mission-orchestration-worker.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
-            "scripts/mission_controller.ts#main [child process]",
-            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/agent_runtime_supervisor_daemon.ts#main",
             "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
             "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
             "libs/core/actuator/deployment-adapter.ts#installShellDeploymentAdapterFromConfigIfAvailable",
@@ -5841,11 +6331,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -5880,6 +6368,26 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "organization_operator": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
@@ -5902,11 +6410,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "sovereign_concierge": {
@@ -5916,11 +6422,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "surface_runtime": {
@@ -5930,11 +6434,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         }
       },
@@ -5944,6 +6446,8 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/mesh/acp-mediator.ts#<module>",
@@ -6022,25 +6526,33 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "chronos_tenant_runner": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "libs/core/dot/dot-charter.ts#listDotCharters",
+            "libs/core/dot/dot-charter.ts#listDotCharterSources",
+            "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
         "ecosystem_architect": {
           "example_path": [
-            "scripts/run_mission_orchestration_event_worker.ts#main",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
-            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
-            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
-            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
-            "libs/core/mission/mission-orchestration-worker.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
-            "scripts/mission_controller.ts#main [child process]",
-            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/agent_runtime_supervisor_daemon.ts#main",
             "libs/core/reasoning/reasoning-bootstrap.ts#installReasoningBackends",
             "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
             "libs/core/actuator/deployment-adapter.ts#installShellDeploymentAdapterFromConfigIfAvailable",
@@ -6054,11 +6566,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -6093,6 +6603,26 @@
             "libs/core/agent/agent-identity.ts#appendGoverned"
           ]
         },
+        "organization_operator": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "scope_locale_reader": {
           "example_path": [
             "satellites/voice-hub/server.ts#<module>",
@@ -6108,11 +6638,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "sovereign_concierge": {
@@ -6122,11 +6650,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "surface_runtime": {
@@ -6136,11 +6662,9 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/dot/dot-wake-orchestration.ts#runDotWakeWithGoalDriver",
-            "libs/core/dot/dot-runtime.ts#runDotWake",
-            "libs/core/dot/dot-runtime.ts#governProposals",
-            "libs/core/dot/dot-dispatch.ts#dispatchDotProposals"
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         }
       },
@@ -6150,6 +6674,8 @@
         "libs/core/agent/agent-adapter.ts#runCliProcess",
         "libs/core/agent/agent-codex-app-server-adapter.ts#CodexAppServerAdapter",
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
+        "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
+        "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runProbe",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder",
         "libs/core/media/native-speech-listen-bridge.ts#listenNativeSpeech",
