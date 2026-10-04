@@ -7210,6 +7210,22 @@
     "./state-probe": {
       "types": "./dist/state-probe.d.ts",
       "default": "./dist/state-probe.js"
+    },
+    "./ingress/public-ingress-contract": {
+      "types": "./dist/ingress/public-ingress-contract.d.ts",
+      "default": "./dist/ingress/public-ingress-contract.js"
+    },
+    "./ingress/public-ingress-seam": {
+      "types": "./dist/ingress/public-ingress-seam.d.ts",
+      "default": "./dist/ingress/public-ingress-seam.js"
+    },
+    "./ingress/public-ingress-provider-registry": {
+      "types": "./dist/ingress/public-ingress-provider-registry.d.ts",
+      "default": "./dist/ingress/public-ingress-provider-registry.js"
+    },
+    "./ingress/providers/tailscale-funnel": {
+      "types": "./dist/ingress/providers/tailscale-funnel.d.ts",
+      "default": "./dist/ingress/providers/tailscale-funnel.js"
     }
   },
   "dependencies": {

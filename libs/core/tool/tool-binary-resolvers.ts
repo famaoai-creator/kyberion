@@ -109,6 +109,11 @@ export function resolveLightpandaBin(): string {
   return resolveExternalToolBin('lightpanda', ['KYBERION_LIGHTPANDA_BIN'], 'lightpanda');
 }
 
+/** Tailscale CLI for the public-ingress provider `tailscale-funnel`. */
+export function resolveTailscaleBin(): string {
+  return resolveExternalToolBin('tailscale', ['KYBERION_TAILSCALE_BIN'], 'tailscale');
+}
+
 /** yt-dlp video fetcher for libs/core/video-ingest (never self-updated). */
 export function resolveYtDlpBin(): string {
   return resolveExternalToolBin('yt_dlp', ['KYBERION_YTDLP_BIN'], 'yt-dlp');

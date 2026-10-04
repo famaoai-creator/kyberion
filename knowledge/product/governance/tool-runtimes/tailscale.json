@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "tailscale",
+      "display_name": "Tailscale CLI",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "tailscale",
+        "args": ["version"],
+        "description": "Probe Tailscale CLI availability without changing tailnet or serve state."
+      },
+      "install_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["install", "--cask", "tailscale-app"],
+        "description": "Install the Tailscale macOS app through Homebrew, then enable its CLI (Settings > Install CLI) and log in."
+      },
+      "install_backend_platform_overrides": {
+        "linux": {
+          "kind": "system",
+          "command": "tailscale",
+          "args": ["version"],
+          "description": "Linux hosts install Tailscale from the upstream package repository (https://tailscale.com/download/linux), then run `sudo tailscale up`."
+        }
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "tailscale",
+        "args": ["version"],
+        "description": "Re-check the installed Tailscale CLI."
+      },
+      "managed_env_subpath": "tool-runtimes/tailscale",
+      "notes": "Runtime for the public-ingress provider `tailscale-funnel`. Override the binary with KYBERION_TAILSCALE_BIN (for example /Applications/Tailscale.app/Contents/MacOS/Tailscale when the app's CLI is not on PATH)."
+    }
+  ]
+}

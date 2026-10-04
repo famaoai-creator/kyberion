@@ -1708,6 +1708,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_INGRESS_PROVIDER",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Public ingress provider id from public-ingress-providers.json (e.g. `tailscale-funnel`) used by `pnpm kyberion ingress up` when --provider is omitted. When unset, the first live provider whose readiness is ready is chosen; a named provider that is not ready fails with its reason instead of falling back.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
       "name": "KYBERION_INJECTION_SCOPE",
       "category": "runtime",
       "type": "string",
@@ -3799,6 +3808,15 @@
       "description": "Fallback role selector for surface-query provider resolution; a request or server-resolved context role takes precedence and this value does not grant authorization.",
       "documented": true,
       "subsystem": "surface"
+    },
+    {
+      "name": "KYBERION_TAILSCALE_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional executable path override for the Tailscale CLI used by the `tailscale-funnel` public-ingress provider (e.g. /Applications/Tailscale.app/Contents/MacOS/Tailscale); when unset, the governed tool-runtime registry command (`tailscale`) is used.",
+      "documented": true,
+      "subsystem": "runtime"
     },
     {
       "name": "KYBERION_TASK_GRANTS_PATH",
