@@ -69,13 +69,13 @@ describe('buildDotExecutorPorts', () => {
     expect(ports.goalMode?.(CHARTER)).toBe('tool');
     const result = await ports.runGoalTurn({ objective: 'x', toolRole: 'infrastructure_sentinel' });
     expect(goalDriver).toHaveBeenCalledWith(expect.objectContaining({ objective: 'x' }));
-    // A narrow observer over the resolved backend itself: everything not a model
-    // call is the original backend's own member.
+    // An observer over the resolved backend: data members read through, every
+    // method is an explicit wrapper (never inherited through a prototype).
     const passed = (goalDriver.mock.calls[0] as unknown as [{ backend: ReasoningBackend }])[0]
       .backend;
-    expect(Object.getPrototypeOf(passed)).toBe(toolBackend);
     expect(passed.name).toBe(toolBackend.name);
-    expect(passed.divergePersonas).toBe(toolBackend.divergePersonas);
+    expect(passed.divergePersonas).not.toBe(toolBackend.divergePersonas);
+    expect(passed.divergePersonas).toBe(passed.divergePersonas);
     expect(result.finalText).toBe('did it');
   });
 
@@ -136,6 +136,46 @@ describe('buildDotExecutorPorts', () => {
       .catch((e: unknown) => e);
     expect(isDotExecutorPreEffectError(after)).toBe(false);
     expect(thisSeen).toEqual([bound]);
+  });
+
+  it('fails closed: a backend member outside the non-model denylist counts as a model call', async () => {
+    const thisSeen: unknown[] = [];
+    const backend: ReasoningBackend = {
+      ...toolBackend,
+      divergePersonas: async function (this: unknown) {
+        thisSeen.push(this);
+        return [];
+      },
+    };
+    const metadataOnly = vi.fn(async (options: { backend: ReasoningBackend }) => {
+      options.backend.getRuntimeProviderName?.();
+      options.backend.requiresNativeSubagent?.();
+      await options.backend.resetSession?.();
+      throw new Error('gave up before the model');
+    });
+    const before = await buildDotExecutorPorts(CHARTER, {
+      backend,
+      goalDriver: metadataOnly as never,
+    })
+      .runGoalTurn({ objective: 'x' })
+      .catch((e: unknown) => e);
+    expect(isDotExecutorPreEffectError(before)).toBe(true);
+
+    // divergePersonas is not on any allowlist: reaching it means the failure is
+    // uncertain (quarantined), never retried as pre-effect.
+    const unlisted = vi.fn(async (options: { backend: ReasoningBackend }) => {
+      await options.backend.divergePersonas({} as never);
+      throw new Error('crashed after diverging');
+    });
+    const uncertain = await buildDotExecutorPorts(CHARTER, {
+      backend,
+      goalDriver: unlisted as never,
+    })
+      .runGoalTurn({ objective: 'x' })
+      .catch((e: unknown) => e);
+    expect(isDotExecutorPreEffectError(uncertain)).toBe(false);
+    expect(String(uncertain)).toMatch(/crashed after diverging/);
+    expect(thisSeen).toEqual([backend]);
   });
 
   it('classifies a missing pipeline as a pre-effect failure before any step runs', async () => {
