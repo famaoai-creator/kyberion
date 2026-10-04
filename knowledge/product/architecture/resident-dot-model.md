@@ -139,6 +139,87 @@ store, so distill can propose a reviewed improvement. Recent feedback and
 into the next wake prompt and the `digest_cron` digest, and are shown in
 `kyberion dot status`.
 
+## The closed organization loop (landed MSN-DOT-ORG-LOOP-20261004, DL-01..11)
+
+A wake used to end at "WorkItem created". The loop now closes: work is
+executed, measured against key results, judged, remembered, and fed back into
+the next wake and the dot's autonomy level.
+
+```
+wake ──proposal──▶ dispatch (gate ⊔ floors, arbitration) ──▶ WorkItem
+  ▲                                                             │
+  │ report-back inbox row / follow-up / event / cron catch-up    ▼
+  └──────── outcome verdict ◀── KR re-measure ◀── executor (claim → run → release)
+```
+
+- **Executor (DL-01)**: each sweep claims `ready` WorkItems addressed to the dot
+  (`metadata.dot_id` or `handoff_to`) under the charter role, runs them by
+  shape (`task_session` / `direct_reply` as a bounded goal turn, `pipeline`
+  only if listed in `authority.allowed_pipelines`, `mission` is escalated),
+  releases the lease with a result and appends a row to `work-results.jsonl`
+  carrying the KR snapshot taken before the work. Failures retry up to 3
+  attempts; a stranded claim is reaped. Terminal results are escalated
+  (archived, so the delegation slot frees) and reported to the dot's inbox
+  (`payload.report_from = dot-executor`), which makes that dot due again.
+- **Key results (DL-03)**: `goal.key_results` are measured per sweep
+  (`probe`, `file`, `signal_ratio`, `org_metric`) into `kr-ledger.jsonl`; gaps
+  to target are injected into the wake prompt. Organization objectives roll up
+  from the org-scope ledger.
+- **Outcomes (DL-04)**: a proposal's `expected_effect` ({kr_id|signal,
+  direction}) is stored on the WorkItem. After the settle window
+  (`outcome_settle_minutes`, default 60) the KR is re-measured and a verdict
+  `improved | no_change | regressed | unmeasurable` lands in `outcomes.jsonl`;
+  `regressed` feeds execution feedback. Recent verdicts enter the next prompt.
+- **Memory (DL-05)**: `memory/<dot>.json` (notes, open items, hypotheses;
+  8 KB, deterministic eviction), edited through the `dot_update_memory` tool /
+  `dot-memory` fence and distilled weekly.
+- **Follow-ups and catch-up (DL-09)**: `dot_schedule_followup` / `dot-followup`
+  (5 min to 7 days, 3 pending) writes `followups.jsonl`; a due follow-up is a
+  `followup:<id>` wake. Missed cron minutes within
+  `runtime.cron_catch_up_hours` (default 6, max 24) coalesce into one wake.
+- **Events (DL-08)**: a charter trigger `{kind: 'event', sources, types?,
+match?}` wakes on an authenticated inbound event. The loopback-only
+  `event-intake` surface verifies an HMAC-SHA256 signature (secret from the
+  secret store), dedups by delivery id and appends to `events.jsonl`; the
+  tenant comes from `event-intake-policy.json`, never the payload. Every
+  source ships disabled.
+- **Budget governor (DL-07)**: `org-budget-governor` aggregates daily token
+  usage per tenant/organization (`spend-policy.json` `org_budget`): `soft`
+  (80 %) forces proposals to `approve` (propose-only), `hard` (100 %) stops
+  wakes and the executor while housekeeping continues. The cost cap inherits
+  `daily_cap_usd`. A broken governor fails open.
+- **Autonomy L0-L4 (DL-10)**: L0 shadow (decisions recorded, nothing acts),
+  L1 approve-all, **L2 supervised (default, today's behavior)**, L3 trusted
+  (one human approval releases a learned floor; decays in 7 days), L4
+  autonomous (policy-listed reversible actions only, outcome success >= 0.8).
+  Charter floors and a gate `approve` are never relaxed. Promotion needs 20
+  decisions, >= 90 % agreement, >= 80 % outcome success and zero incidents in
+  30 days, and is applied only after a human approves the decision card;
+  demotion is automatic. The default ceiling is L3 (`autonomy.max_level`).
+- **Arbitration (DL-11)**: proposals carry a normalized `target` and `intent`;
+  `team.owns` and `team.priority` rank the contenders. A conflicting
+  parked/dispatched action of another dot within 6 h is resolved by owner,
+  then priority gap >= 10, otherwise merged into one decision card
+  (`arbitration.jsonl`; the superseded action is declined as `superseded`
+  without raising a learned floor).
+- **Cadences (DL-06)**: organization operation tick, standup and retro run as
+  pipelines that ship `enabled: false`; hosts opt in per id through
+  `KYBERION_CHRONOS_SCHEDULES`.
+
+**State domain**: all loop state lives under `active/shared/runtime/dot/`
+(`work-results`, `kr-ledger`, `outcomes`, `outcome-pending`, `followups`,
+`events`, `memory/`, `autonomy/`, `arbitration`), addressed only through
+`dotStatePath(charter, ...parts)` (`libs/core/dot/dot-state-paths.ts`). An
+untenanted dot writes `active/shared/runtime/dot/<file>`; a tenant dot writes
+the tenant's physical namespace (`physicalScopedPath`). Tenant prose (memory,
+follow-up reasons, event bodies, results) never lands in a system-floor file:
+the pre-existing flat ledgers (`dot-wake-ledger`, `dot-action-ledger`,
+`dot-inbox`) stay shared, so tenant dots write only category-level text there.
+See [runtime-storage-layout](./runtime-storage-layout.md).
+
+The loop is hermetically tested end to end in
+`libs/core/dot/dot-loop.integration.test.ts`.
+
 ## Hard-won constraint from MSN-RESIDENT-DOT-20261002
 
 The autonomy substrate only works if the _alert path itself_ is authorized:
