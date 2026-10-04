@@ -36,7 +36,20 @@
           "controlPlane": { "type": "string", "enum": ["presence", "chronos"] },
           "remediationCommand": { "type": "string", "minLength": 1 },
           "operatorNotesKey": { "type": "string", "minLength": 1 },
-          "bestForKey": { "type": "string", "minLength": 1 }
+          "bestForKey": { "type": "string", "minLength": 1 },
+          "ingress": {
+            "type": "object",
+            "description": "Public ingress opt-in. Only a surface with allowed=true can be exposed by `pnpm kyberion ingress up`; path_prefix is the only public path published.",
+            "required": ["allowed"],
+            "properties": {
+              "allowed": { "type": "boolean" },
+              "path_prefix": {
+                "type": "string",
+                "pattern": "^/(?:[A-Za-z0-9._~-]+(?:/[A-Za-z0-9._~-]+)*)?$"
+              }
+            },
+            "additionalProperties": false
+          }
         },
         "additionalProperties": false
       }

@@ -173,3 +173,4 @@ export * from './dot/dot-autonomy.js';
 export * from './ingress/public-ingress-contract.js';
 export * from './ingress/public-ingress-seam.js';
 export * from './ingress/public-ingress-provider-registry.js';
+export * from './ingress/public-ingress-service.js';
