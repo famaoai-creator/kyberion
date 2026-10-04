@@ -81,6 +81,7 @@ import { dotFeedbackPromptLines, dotSignalStatusLines } from './dot-feedback.js'
 import { dotStatePath } from './dot-state-paths.js';
 import { DOT_PROMPT_SECTIONS, DOT_WAKE_TOOLS } from './dot-extension-registry.js';
 import type { DotExtCtx } from './dot-extensions.js';
+import { DOT_FOLLOWUP_TOOL_NAME } from './dot-followups.js';
 import {
   dotBackendIsUnconfiguredStub,
   isDotToolBackendUnavailableError,
@@ -179,6 +180,12 @@ export interface DotWakeLedgerEntry {
   tokens_used?: number;
   /** The dot's own words (proposal block removed), so "why did it propose nothing?" is answerable. */
   summary?: string;
+  /**
+   * Delivered, but the trigger stays pending: the follow-up this wake was
+   * completing could not persist its successor, so the parent follow-up is
+   * retried (with failure backoff) instead of silently ending the chain.
+   */
+  trigger_retained?: boolean;
 }
 
 function escapeRegExp(value: string): string {
@@ -283,6 +290,7 @@ export function recordDotWakeOutcome(
     turns_run?: number;
     tokens_used?: number;
     summary?: string;
+    trigger_retained?: boolean;
   } = {}
 ): void {
   const now = deps.now?.() ?? new Date();
@@ -305,6 +313,7 @@ export function recordDotWakeOutcome(
       ...(deps.turns_run !== undefined ? { turns_run: deps.turns_run } : {}),
       ...(deps.tokens_used !== undefined ? { tokens_used: deps.tokens_used } : {}),
       ...(deps.summary ? { summary: deps.summary } : {}),
+      ...(deps.trigger_retained && outcome === 'delivered' ? { trigger_retained: true } : {}),
     } satisfies DotWakeLedgerEntry,
     deps
   );
@@ -512,10 +521,12 @@ export function buildDotDueChecker(
   const failures = new Map<string, { count: number; lastAt: number }>();
   for (const row of readDotWakeLedger(deps)) {
     if (row.dot_id !== charter.dot_id) continue;
-    if (row.outcome === 'delivered' || row.outcome === 'rejected') {
+    if ((row.outcome === 'delivered' && !row.trigger_retained) || row.outcome === 'rejected') {
       consumed.add(row.trigger_key);
       failures.delete(row.trigger_key);
-    } else if (row.outcome === 'failed') {
+    } else if (row.outcome === 'failed' || row.outcome === 'delivered') {
+      // A retained delivery backs off like a failure, so a persistent store
+      // error cannot turn the parent follow-up into a wake every sweep.
       const at = Date.parse(row.fired_at);
       const prior = failures.get(row.trigger_key);
       failures.set(row.trigger_key, {
@@ -1149,7 +1160,9 @@ export function parseDotWakeToolFences(text: string): {
 export function applyDotWakeOutputs(
   charter: DotCharter,
   collected: DotWakeToolOutputs,
-  ctx: DotExtCtx
+  ctx: DotExtCtx,
+  /** Receives the names of tools whose apply threw (nothing was persisted for them). */
+  failedTools?: Set<string>
 ): string[] {
   const errors: string[] = [];
   for (const tool of DOT_WAKE_TOOLS) {
@@ -1159,12 +1172,25 @@ export function applyDotWakeOutputs(
       errors.push(...tool.apply(charter, values, ctx).map((error) => `${tool.name}: ${error}`));
     } catch (error) {
       extensionFailure('wake tool', tool.name, charter.dot_id, error);
+      failedTools?.add(tool.name);
       errors.push(
         `${tool.name}: apply failed (${error instanceof Error ? error.message : String(error)})`
       );
     }
   }
   return errors;
+}
+
+/**
+ * A follow-up wake whose successor schedule failed to persist keeps its parent
+ * follow-up pending (retried with backoff) rather than ending the chain; the
+ * governed proposals of the delivered wake are never re-dispatched by that.
+ */
+function followupSuccessorLost(
+  trigger: DueDotTrigger | undefined,
+  failedTools: ReadonlySet<string>
+): boolean {
+  return trigger?.trigger.kind === 'followup' && failedTools.has(DOT_FOLLOWUP_TOOL_NAME);
 }
 
 /** One dot must never run two wakes concurrently, whatever the trigger mix. */
@@ -1223,9 +1249,10 @@ async function runFencedWake(
   const parsed = parseDotProposalsFromText(text);
   const wakeTools = parseDotWakeToolFences(text);
   const actions = governProposals(current, parsed.proposals, deps);
+  const failedTools = new Set<string>();
   const toolErrors = [
     ...wakeTools.errors,
-    ...applyDotWakeOutputs(current, wakeTools.outputs, dotExtCtx(deps, deps.trigger)),
+    ...applyDotWakeOutputs(current, wakeTools.outputs, dotExtCtx(deps, deps.trigger), failedTools),
   ];
   if (deps.trigger?.trigger.kind === 'watch') {
     recordWatchSnapshotFromKey(current, deps.trigger, deps);
@@ -1235,6 +1262,7 @@ async function runFencedWake(
     reason: `${labels.ledgerReason}; proposals ${parsed.proposals.length}`,
     turns_run: 1,
     tokens_used: tokens,
+    trigger_retained: followupSuccessorLost(deps.trigger, failedTools),
     // The wake ledger is a shared system-floor file: tenant prose stays out.
     ...(current.scope.tenant_slug ? {} : { summary: dotWakeSummary(text) }),
   });
@@ -1480,7 +1508,10 @@ export async function runDotWake(
       recordDotTokenUsage(current.dot_id, tokens, { ...deps, accounting_id });
       const collected = collectDotProposals(proposalInputs);
       const actions = governProposals(current, collected.proposals, deps);
-      toolErrors.push(...applyDotWakeOutputs(current, toolOutputs, dotExtCtx(deps, deps.trigger)));
+      const failedTools = new Set<string>();
+      toolErrors.push(
+        ...applyDotWakeOutputs(current, toolOutputs, dotExtCtx(deps, deps.trigger), failedTools)
+      );
       if (deps.trigger?.trigger.kind === 'watch') {
         recordWatchSnapshotFromKey(current, deps.trigger, deps);
       }
@@ -1488,6 +1519,7 @@ export async function runDotWake(
         ...deps,
         turns_run: result.turnsRun,
         tokens_used: tokens,
+        trigger_retained: followupSuccessorLost(deps.trigger, failedTools),
       });
       return {
         dot_id: current.dot_id,

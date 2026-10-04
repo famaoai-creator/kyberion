@@ -41,7 +41,7 @@
   },
   "authority": {
     "authority_role": "infrastructure_sentinel",
-    "allowed_work_shapes": ["direct_reply", "mission", "pipeline", "task_session"],
+    "allowed_work_shapes": ["direct_reply", "mission", "pipeline"],
     "max_concurrent_delegations": 1
   },
   "decisions": {

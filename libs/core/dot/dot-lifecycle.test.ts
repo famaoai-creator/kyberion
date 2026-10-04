@@ -40,7 +40,7 @@ function writeCharter(charter: unknown, name = 'dot.json'): string {
   return filePath;
 }
 
-function writeTenantCharter(slug: string, charter: DotCharter): string {
+function writeTenantCharter(slug: string, charter: DotCharter, name = 'dot.json'): string {
   const profiles = `${TEST_ROOT}/knowledge/personal/tenants`;
   safeMkdir(profiles, { recursive: true });
   safeWriteFile(
@@ -54,7 +54,7 @@ function writeTenantCharter(slug: string, charter: DotCharter): string {
   );
   const dir = `${TEST_ROOT}/knowledge/confidential/${slug}/dots`;
   safeMkdir(dir, { recursive: true });
-  const filePath = `${dir}/dot.json`;
+  const filePath = `${dir}/${name}`;
   safeWriteFile(
     filePath,
     JSON.stringify({
@@ -93,9 +93,18 @@ describe('transitionDotCharterStatus', () => {
     expect(loadDotCharter(tenantPath).status).toBe('draft');
   });
 
-  it('rejects a transition for an identity shared by two tenants', () => {
+  it('transitions only the owner of an identity shared by two tenants', () => {
     const first = writeTenantCharter('acme', { ...DRAFT, status: 'active' });
     const second = writeTenantCharter('globex', { ...DRAFT, status: 'active' });
+    // No lifecycle history: the earliest-activated established charter owns the id.
+    expect(transitionDotCharterStatus(DRAFT.dot_id, 'paused', deps).status).toBe('paused');
+    expect(loadDotCharter(first).status).toBe('paused');
+    expect(loadDotCharter(second).status).toBe('active');
+  });
+
+  it('rejects a transition for an identity two files in one tenant declare', () => {
+    const first = writeTenantCharter('acme', { ...DRAFT, status: 'active' });
+    const second = writeTenantCharter('acme', { ...DRAFT, status: 'active' }, 'second.json');
     expect(() => transitionDotCharterStatus(DRAFT.dot_id, 'paused', deps)).toThrow(
       /Duplicate dot_id 'repo-guardian'/
     );

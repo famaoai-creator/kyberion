@@ -20,8 +20,15 @@ vi.mock('../secure-io.js', async (importOriginal) => {
   };
 });
 
-import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '../secure-io.js';
 import {
+  safeAppendFileSync,
+  safeMkdir,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from '../secure-io.js';
+import {
+  DOT_CHARTER_LIFECYCLE_AUDIT_PATH,
   listDotCharterPaths,
   listDotCharterSources,
   dotGoalRefLabel,
@@ -178,9 +185,9 @@ describe('dot charter identity collisions', () => {
       owner: 1,
     },
     {
-      label: 'two established tenant charters have no owner',
+      label: 'of two established tenant charters the earliest-activated keeps the id',
       locations: [{ slug: 'acme' }, { slug: 'globex', status: 'paused' }] as Location[],
-      owner: undefined,
+      owner: 0,
     },
     {
       label: 'two repo files have no owner (and outrank tenants)',
@@ -238,6 +245,73 @@ describe('dot charter identity collisions', () => {
     }
     // Strict listing (dot validate) still reports any collision.
     expect(() => listDotCharters(TEST_ROOT)).toThrow(/Duplicate dot_id 'collision'/);
+  });
+
+  function auditActivation(dotId: string, filePath: string): void {
+    const file = `${TEST_ROOT}/${DOT_CHARTER_LIFECYCLE_AUDIT_PATH}`;
+    safeMkdir(file.replace(/\/[^/]+$/, ''), { recursive: true });
+    safeAppendFileSync(
+      file,
+      `${JSON.stringify({ event: 'dot_status_transition', dot_id: dotId, from: 'draft', to: 'active', path: filePath })}\n`
+    );
+  }
+
+  it('reads the same lifecycle audit the lifecycle writes', async () => {
+    const { DOT_LIFECYCLE_AUDIT_PATH } = await import('./dot-lifecycle.js');
+    expect(DOT_CHARTER_LIFECYCLE_AUDIT_PATH).toBe(DOT_LIFECYCLE_AUDIT_PATH);
+  });
+
+  it('the first-activated tenant keeps the id even when paused or later than a newcomer on disk', () => {
+    seedTenant('acme');
+    seedTenant('globex');
+    const globexPath = writeTenantCharter('globex', 'shared.json', {
+      ...tenantCharter('globex', 'shared-dot'),
+      status: 'paused',
+    });
+    auditActivation('shared-dot', globexPath);
+    const acmePath = writeTenantCharter('acme', 'shared.json', tenantCharter('acme', 'shared-dot'));
+    const errors: DotCharterLoadError[] = [];
+    expect(listDotCharters(TEST_ROOT, { errors }).map((entry) => entry.path)).toEqual([globexPath]);
+    expect(errors).toEqual([
+      expect.objectContaining({
+        path: acmePath,
+        error: expect.stringContaining("first activated by tenant 'globex'"),
+      }),
+    ]);
+    expect(findDotCharter('shared-dot', TEST_ROOT)?.path).toBe(globexPath);
+    // The owner's audit identity is the tenant, not the newcomer's activation order.
+    auditActivation('shared-dot', acmePath);
+    expect(listDotCharters(TEST_ROOT, { errors: [] }).map((entry) => entry.path)).toEqual([
+      globexPath,
+    ]);
+  });
+
+  it("never hands a removed tenant dot's id to another tenant", () => {
+    seedTenant('acme');
+    seedTenant('globex');
+    auditActivation(
+      'moved-dot',
+      `${TEST_ROOT}/knowledge/confidential/globex/dots/moved.json` // since removed
+    );
+    const acmePath = writeTenantCharter('acme', 'moved.json', tenantCharter('acme', 'moved-dot'));
+    const errors: DotCharterLoadError[] = [];
+    expect(listDotCharters(TEST_ROOT, { errors })).toEqual([]);
+    expect(errors).toEqual([
+      expect.objectContaining({
+        path: acmePath,
+        dot_id: 'moved-dot',
+        error: expect.stringMatching(/rejected — first activated by tenant 'globex'.*new dot_id/),
+      }),
+    ]);
+    expect(() => listDotCharters(TEST_ROOT)).toThrow(/never moves between tenants/);
+    // The original tenant may bring its own dot back.
+    const globexPath = writeTenantCharter('globex', 'moved.json', {
+      ...tenantCharter('globex', 'moved-dot'),
+      status: 'paused',
+    });
+    expect(listDotCharters(TEST_ROOT, { errors: [] }).map((entry) => entry.path)).toEqual([
+      globexPath,
+    ]);
   });
 
   it.each(['draft', 'paused', 'retired'] as const)(

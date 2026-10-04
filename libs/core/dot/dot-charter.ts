@@ -312,22 +312,101 @@ export interface DotCharterLoadError {
   dot_id?: string;
 }
 
+/** Mirrors `DOT_LIFECYCLE_AUDIT_PATH` (dot-lifecycle imports this module; no cycle). */
+export const DOT_CHARTER_LIFECYCLE_AUDIT_PATH = 'active/shared/runtime/dot-lifecycle-audit.jsonl';
+const TENANT_CHARTER_PATH =
+  /(?:^|[\\/])knowledge[\\/]confidential[\\/]([^\\/]+)[\\/]dots[\\/][^\\/]+\.json$/;
+
+/** Governed activation history, from the lifecycle audit (append order = time order). */
+interface DotActivationHistory {
+  /** Scope of the first recorded activation of an id: a tenant slug, or '' for repo `dots/`. */
+  firstScope: Map<string, string>;
+  /** Order of the first activation of each charter path (absolute). */
+  pathOrder: Map<string, number>;
+}
+
+function readDotActivationHistory(rootDir: string): DotActivationHistory {
+  const history: DotActivationHistory = { firstScope: new Map(), pathOrder: new Map() };
+  let raw = '';
+  try {
+    const file = path.join(rootDir, DOT_CHARTER_LIFECYCLE_AUDIT_PATH);
+    if (!safeExistsSync(file)) return history;
+    raw = safeReadFile(file, { encoding: 'utf8' }) as string;
+  } catch (error) {
+    // Unreadable history falls back to file age; the rule still never rejects all.
+    logger.debug(
+      `dot lifecycle audit unreadable — ${error instanceof Error ? error.message : error}`
+    );
+    return history;
+  }
+  for (const [index, line] of raw.split(/\r?\n/).entries()) {
+    let row: Record<string, unknown>;
+    try {
+      row = line.trim() ? parseSafeJsonObjectInput(line, 'dot lifecycle audit row') : {};
+    } catch {
+      continue;
+    }
+    if (row.event !== 'dot_status_transition' || row.to !== 'active') continue;
+    if (typeof row.dot_id !== 'string' || typeof row.path !== 'string') continue;
+    const scope = TENANT_CHARTER_PATH.exec(row.path)?.[1] ?? '';
+    if (!history.firstScope.has(row.dot_id)) history.firstScope.set(row.dot_id, scope);
+    const key = path.resolve(row.path);
+    if (!history.pathOrder.has(key)) history.pathOrder.set(key, index);
+  }
+  return history;
+}
+
+/** Earliest-activated first: lifecycle audit order, then file mtime, then path. */
+function activationOrder(
+  entries: LoadedDotCharter[],
+  history: DotActivationHistory
+): LoadedDotCharter[] {
+  const mtime = (entry: LoadedDotCharter): number => {
+    try {
+      return safeLstat(entry.path).mtimeMs;
+    } catch {
+      return Number.POSITIVE_INFINITY;
+    }
+  };
+  const rank = (entry: LoadedDotCharter): [number, number] => [
+    history.pathOrder.get(path.resolve(entry.path)) ?? Number.POSITIVE_INFINITY,
+    mtime(entry),
+  ];
+  return [...entries].sort((a, b) => {
+    const [ra, rb] = [rank(a), rank(b)];
+    return ra[0] - rb[0] || ra[1] - rb[1] || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  });
+}
+
+interface DotIdOwnership {
+  owner?: LoadedDotCharter;
+  /** Why the others are rejected (appended to the error). */
+  reason: string;
+}
+
 /**
- * Resolve one dot_id collision group to its owner, or none. Dot IDs key shared
- * runtime stores, so only one charter per ID may load. The rule never lets a
- * scope take another scope's dot offline:
+ * Resolve one dot_id group to its owner. Dot IDs key shared runtime stores
+ * (inbox, WorkItems, approvals), so only one charter per ID may load, and the
+ * rule never lets one tenant disable or inherit another tenant's dot:
  * - two charters for one ID in the same scope (repo `dots/`, or one tenant's
  *   `dots/`) are an author error there — all of that scope's are rejected;
  * - a repo-level charter owns its ID: every tenant-level duplicate is rejected
  *   (and if the repo itself is ambiguous, nothing owns the ID);
- * - with no repo owner, a tenant-level ID shared across tenants belongs to the
- *   single established (`active` or `paused`) charter among them — a draft or
- *   retired duplicate never unseats a running (or resumable) dot; with zero or
- *   several established ones, all are rejected.
- * Collision checks run before status filtering.
+ * - a tenant-level ID belongs to the tenant whose charter was activated first
+ *   (lifecycle audit). Ownership never moves to another tenant — not while the
+ *   first owner is paused or retired, nor after its file is removed (its inbox
+ *   rows and WorkItems still carry the ID): another tenant's charter is
+ *   rejected and must use a new ID;
+ * - without audit history, the earliest-activated established (`active` /
+ *   `paused`) charter keeps the ID (file mtime, then path) — a later or draft
+ *   duplicate never unseats it. With no established one, all are rejected.
+ * Every rejected charter is reported through `errors` (the supervisor alerts).
  */
-function resolveDotIdOwner(group: LoadedDotCharter[]): LoadedDotCharter | undefined {
-  if (group.length === 1) return group[0];
+function resolveDotIdOwner(
+  dotId: string,
+  group: LoadedDotCharter[],
+  history: DotActivationHistory
+): DotIdOwnership {
   const byScope = new Map<string, LoadedDotCharter[]>();
   for (const entry of group) {
     const key = entry.tenant_slug ?? '';
@@ -337,13 +416,24 @@ function resolveDotIdOwner(group: LoadedDotCharter[]): LoadedDotCharter | undefi
     const entries = byScope.get(key);
     return entries?.length === 1 ? entries[0] : undefined;
   };
-  if (byScope.has('')) return single('');
-  if (byScope.size === 1) return undefined;
+  if (byScope.has('')) return { owner: single(''), reason: 'the repo-level charter owns it' };
+  const firstScope = history.firstScope.get(dotId);
+  if (firstScope) {
+    return {
+      owner: single(firstScope),
+      reason: `first activated by tenant '${firstScope}'; a dot id never moves between tenants — use a new dot_id`,
+    };
+  }
+  if (group.length === 1) return { owner: group[0], reason: '' };
+  if (byScope.size === 1) return { owner: undefined, reason: 'one scope declares it twice' };
   const established = group.filter(
     (entry) => entry.charter.status === 'active' || entry.charter.status === 'paused'
   );
-  if (established.length !== 1) return undefined;
-  return single(established[0].tenant_slug ?? '');
+  const earliest = activationOrder(established, history)[0];
+  return {
+    owner: earliest ? single(earliest.tenant_slug ?? '') : undefined,
+    reason: 'the earliest-activated charter keeps it',
+  };
 }
 
 /**
@@ -351,7 +441,7 @@ function resolveDotIdOwner(group: LoadedDotCharter[]): LoadedDotCharter | undefi
  * collision throws (the CLI uses that for `dot validate`/`dot list`
  * reporting). Pass `options.errors` to collect failures instead — resident
  * consumers (the supervisor sweep, the watchdog union) must never let one bad
- * charter starve the rest; a colliding duplicate is then reported there while
+ * charter starve the rest; a rejected duplicate is then reported there while
  * the ID's owner (see {@link resolveDotIdOwner}) stays loaded.
  */
 export function listDotCharters(
@@ -366,27 +456,30 @@ export function listDotCharters(
     try {
       charter = loadDotCharterSource(source);
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       if (!options.errors) throw error;
-      options.errors.push({
-        path: filePath,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      options.errors.push({ path: filePath, error: message });
       continue;
     }
     const loaded = { ...source, charter };
     charters.push(loaded);
     byId.set(charter.dot_id, [...(byId.get(charter.dot_id) ?? []), loaded]);
   }
+  const history = charters.some((entry) => entry.tenant_slug)
+    ? readDotActivationHistory(rootDir)
+    : { firstScope: new Map<string, string>(), pathOrder: new Map<string, number>() };
   const rejected = new Set<LoadedDotCharter>();
   for (const [dotId, group] of byId) {
-    if (group.length < 2) continue;
+    const { owner, reason } = resolveDotIdOwner(dotId, group, history);
+    if (group.length < 2 && owner === group[0]) continue;
     const paths = group.map((entry) => entry.path).join(', ');
-    if (!options.errors)
-      throw new Error(`Duplicate dot_id '${dotId}' across dot charters: ${paths}`);
-    const owner = resolveDotIdOwner(group);
-    const error = owner
-      ? `Duplicate dot_id '${dotId}' across dot charters: ${paths} — rejected; ${owner.path} keeps the id`
-      : `Duplicate dot_id '${dotId}' across dot charters: ${paths} — no owner, all rejected`;
+    const error =
+      group.length < 2
+        ? `dot_id '${dotId}' at ${paths} rejected — ${reason}`
+        : owner
+          ? `Duplicate dot_id '${dotId}' across dot charters: ${paths} — rejected; ${owner.path} keeps the id (${reason})`
+          : `Duplicate dot_id '${dotId}' across dot charters: ${paths} — no owner, all rejected (${reason})`;
+    if (!options.errors) throw new Error(error);
     for (const entry of group) {
       if (entry === owner) continue;
       rejected.add(entry);

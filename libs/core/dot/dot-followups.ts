@@ -34,6 +34,8 @@ export const DOT_FOLLOWUP_MAX_DELAY_MINUTES = 7 * 24 * 60;
 export const DOT_FOLLOWUP_DEFAULT_MAX_PENDING = 3;
 export const DOT_FOLLOWUPS_PER_WAKE = 2;
 export const DOT_FOLLOWUP_REASON_MAX = 300;
+/** Wake tool that schedules (and, from a follow-up wake, replaces) follow-ups. */
+export const DOT_FOLLOWUP_TOOL_NAME = 'dot_schedule_followup';
 export const DOT_CRON_CATCH_UP_DEFAULT_HOURS = 6;
 export const DOT_CRON_CATCH_UP_MAX_HOURS = 24;
 
@@ -61,10 +63,11 @@ function dueChecker(rows: DotWakeLedgerEntry[], now: Date): (key: string) => boo
   const consumed = new Set<string>();
   const failures = new Map<string, { count: number; lastAt: number }>();
   for (const row of rows) {
-    if (row.outcome === 'delivered' || row.outcome === 'rejected') {
+    if ((row.outcome === 'delivered' && !row.trigger_retained) || row.outcome === 'rejected') {
       consumed.add(row.trigger_key);
       failures.delete(row.trigger_key);
-    } else if (row.outcome === 'failed') {
+    } else if (row.outcome === 'failed' || row.outcome === 'delivered') {
+      // A retained delivery (successor not persisted) backs off like a failure.
       const at = Date.parse(row.fired_at);
       const prior = failures.get(row.trigger_key);
       failures.set(row.trigger_key, {
@@ -115,7 +118,7 @@ export function listPendingDotFollowups(
 ): DotFollowupRow[] {
   const consumed = new Set(
     readLedger(c, deps)
-      .filter((r) => r.outcome === 'delivered' || r.outcome === 'rejected')
+      .filter((r) => (r.outcome === 'delivered' && !r.trigger_retained) || r.outcome === 'rejected')
       .map((r) => r.trigger_key)
   );
   const rows = readFollowups(c, deps);
@@ -163,11 +166,11 @@ export function parseDotFollowup(
 }
 
 export const dotScheduleFollowupTool: DotWakeTool = {
-  name: 'dot_schedule_followup',
+  name: DOT_FOLLOWUP_TOOL_NAME,
   fence: 'dot-followup',
   maxPerWake: DOT_FOLLOWUPS_PER_WAKE,
   definition: {
-    name: 'dot_schedule_followup',
+    name: DOT_FOLLOWUP_TOOL_NAME,
     description:
       'Ask to be woken again later to re-check something (5 minutes to 7 days). Few pending follow-ups are allowed; state the reason so the next wake knows what to verify.',
     inputSchema: {

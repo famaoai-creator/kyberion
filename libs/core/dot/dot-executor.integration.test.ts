@@ -9,7 +9,15 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readJsonLines } from '../foundation/json.js';
 import type { AutonomousOpsGateResult } from '../governance/autonomous-ops-gate.js';
-import { safeMkdir, safeRmSync } from '../secure-io.js';
+import { AUTONOMY_APPROVAL_CHANNEL } from '../governance/approval-decision-card.js';
+import {
+  approvalStoreRoots,
+  decideApprovalRequest,
+  loadApprovalRequest,
+} from '../governance/approval-store.js';
+import { withExecutionContext } from '../authority.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeExistsSync, safeMkdir, safeRmSync } from '../secure-io.js';
 import * as secureIo from '../secure-io.js';
 import {
   claimWorkItem,
@@ -30,7 +38,9 @@ import {
 import { setDotBudgetThrottleForTests } from './dot-budget.js';
 import {
   readDotWorkResults,
-  releaseDotWorkItem,
+  applyApprovedDotReleases,
+  DOT_RELEASE_EXPIRY_MINUTES,
+  requestDotWorkItemRelease,
   runDotExecutorSweep,
   type DotExecutorPorts,
 } from './dot-executor.js';
@@ -149,6 +159,12 @@ afterEach(() => {
   clearWorkCoordinationStore();
   clearWorkCoordinationNamespace();
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
+  withExecutionContext('infrastructure_sentinel', () => {
+    for (const root of Object.values(approvalStoreRoots())) {
+      const dir = pathResolver.rootResolve(`${root}/${AUTONOMY_APPROVAL_CHANNEL}`);
+      if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('dot executor end to end', () => {
@@ -440,15 +456,14 @@ describe('dot executor end to end', () => {
     expect(p.runPipeline).not.toHaveBeenCalled();
   });
 
-  it('re-attempts a quarantined item under a new attempt id only after an operator release', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
+  async function quarantined(actionRef: string) {
     const created = createWorkItem({
       title: 'Unknown effect',
       description: 'Worker crashed after starting',
       status: 'ready',
       metadata: {
         dot_id: 'exec-it',
-        action_ref: 'dact-release',
+        action_ref: actionRef,
         requested_work_shape: 'pipeline',
         pipeline_ref: 'pipelines/ok.json',
       },
@@ -461,54 +476,200 @@ describe('dot executor end to end', () => {
     });
     vi.setSystemTime(Date.now() + 10);
     const p = ports();
-    const loaded = [{ path: 'dots/exec-it.json', charter: CHARTER }];
-    expect(await runDotExecutorSweep(loaded, p, { rootDir: TEST_ROOT })).toEqual([]);
-    const quarantined = getWorkItem(created.item_id)!;
-    expect(quarantined.status).toBe('archived');
-    const firstAttempt = quarantined.attempts?.at(-1)?.run_id;
-
+    expect(await runDotExecutorSweep(LOADED, p, { rootDir: TEST_ROOT })).toEqual([]);
+    const item = getWorkItem(created.item_id)!;
+    expect(item.status).toBe('archived');
     vi.setSystemTime(Date.now() + 10);
-    const audits: Array<Record<string, unknown>> = [];
+    return { item, p };
+  }
+
+  const LOADED = [{ path: 'dots/exec-it.json', charter: CHARTER }];
+
+  function decide(requestId: string, decision: 'approved' | 'rejected') {
+    const record = loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, requestId)!;
+    return decideApprovalRequest('mission_controller', {
+      channel: record.channel,
+      storageChannel: record.storageChannel,
+      requestId,
+      decision,
+      decidedBy: 'Ops Lead',
+      decidedByRole: 'sovereign',
+      authMethod: 'manual',
+      decidedByType: 'human',
+      authenticated: true,
+      effectBinding: record.accountability?.effectBinding,
+    });
+  }
+
+  it('a release request alone changes nothing; a human approval re-attempts under a new attempt id', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { item, p } = await quarantined('dact-release');
+    const firstAttempt = item.attempts?.at(-1)?.run_id;
     expect(() =>
-      releaseDotWorkItem(
+      requestDotWorkItemRelease(
         CHARTER,
-        { workItemId: created.item_id, reason: ' ' },
+        { workItemId: item.item_id, reason: ' ' },
         { rootDir: TEST_ROOT }
       )
     ).toThrow(/DOT_RELEASE_REASON/);
-    const released = releaseDotWorkItem(
+    const { request, reused } = requestDotWorkItemRelease(
       CHARTER,
-      { workItemId: created.item_id, reason: 'checked: no partial deploy', by: 'user:ops-lead' },
-      { rootDir: TEST_ROOT, audit: (entry) => void audits.push(entry as never) }
+      { workItemId: item.item_id, reason: 'checked: no partial deploy', by: 'user:ops-lead' },
+      { rootDir: TEST_ROOT }
     );
-    expect(released.status).toBe('ready');
-    expect(released.metadata?.dot_executor).toMatchObject({
-      operator_verified_by: 'user:ops-lead',
-      operator_verified_reason: 'checked: no partial deploy',
-      operator_verified_at: expect.any(String),
+    expect(reused).toBe(false);
+    expect(request).toMatchObject({
+      status: 'pending',
+      storageChannel: AUTONOMY_APPROVAL_CHANNEL,
+      accountability: { finalDecision: 'human_only' },
+      details: expect.stringContaining('checked: no partial deploy'),
     });
-    expect(audits[0]).toMatchObject({
-      operation: 'dot_work_item_operator_release',
-      actor: { kind: 'human', id: 'user:ops-lead' },
-    });
+    expect(request.details).toContain(`work item: ${item.item_id}`);
+    expect(request.details).toContain('attempts: 1');
+    // Asking again reuses the pending request.
+    expect(
+      requestDotWorkItemRelease(
+        CHARTER,
+        { workItemId: item.item_id, reason: 'again' },
+        { rootDir: TEST_ROOT }
+      )
+    ).toMatchObject({ reused: true, request: { id: request.id } });
 
+    // The request alone releases nothing.
+    expect(await runDotExecutorSweep(LOADED, p, { rootDir: TEST_ROOT })).toEqual([]);
+    expect(getWorkItem(item.item_id)!.status).toBe('archived');
+    expect(p.runPipeline).not.toHaveBeenCalled();
+
+    decide(request.id, 'approved');
     vi.setSystemTime(Date.now() + 10);
-    const rows = await runDotExecutorSweep(loaded, p, { rootDir: TEST_ROOT });
+    const audits: Array<Record<string, unknown>> = [];
+    const rows = await runDotExecutorSweep(LOADED, p, {
+      rootDir: TEST_ROOT,
+      audit: (entry) => void audits.push(entry as never),
+    });
     expect(rows).toMatchObject([{ status: 'done', mode: 'pipeline' }]);
     expect(rows[0].attempt_id).toBeDefined();
     expect(rows[0].attempt_id).not.toBe(firstAttempt);
     expect(p.runPipeline).toHaveBeenCalledTimes(1);
-    const done = getWorkItem(created.item_id)!;
+    const done = getWorkItem(item.item_id)!;
     expect(done.status).toBe('done');
-    expect(done.metadata?.dot_executor).toMatchObject({ operator_verified_by: 'user:ops-lead' });
+    // The verifier is the approving human, never the requester's --by.
+    expect(done.metadata?.dot_executor).toMatchObject({
+      operator_verified_by: 'Ops Lead',
+      operator_verified_reason: 'checked: no partial deploy',
+      operator_verified_approval_id: request.id,
+    });
+    expect(audits.find((a) => a.operation === 'dot_work_item_operator_release')).toMatchObject({
+      actor: { kind: 'human', id: 'Ops Lead' },
+    });
+    expect(loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, request.id)?.applyResult).toMatchObject({
+      result: 'success',
+    });
     // Closed items cannot be released again.
     expect(() =>
-      releaseDotWorkItem(
+      requestDotWorkItemRelease(
         CHARTER,
-        { workItemId: created.item_id, reason: 'again' },
+        { workItemId: item.item_id, reason: 'again' },
         { rootDir: TEST_ROOT }
       )
     ).toThrow(/DOT_RELEASE_DONE/);
+  });
+
+  it('a rejected release request never releases', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { item, p } = await quarantined('dact-reject');
+    const { request } = requestDotWorkItemRelease(
+      CHARTER,
+      { workItemId: item.item_id, reason: 'looked fine' },
+      { rootDir: TEST_ROOT }
+    );
+    decide(request.id, 'rejected');
+    expect(await runDotExecutorSweep(LOADED, p, { rootDir: TEST_ROOT })).toEqual([]);
+    expect(getWorkItem(item.item_id)!.status).toBe('archived');
+    expect(p.runPipeline).not.toHaveBeenCalled();
+  });
+
+  it('an expired release request cannot be approved and never releases', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { item, p } = await quarantined('dact-expire');
+    const { request } = requestDotWorkItemRelease(
+      CHARTER,
+      { workItemId: item.item_id, reason: 'looked fine' },
+      { rootDir: TEST_ROOT }
+    );
+    vi.setSystemTime(Date.now() + DOT_RELEASE_EXPIRY_MINUTES * 60_000 + 1);
+    expect(() => decide(request.id, 'approved')).toThrow(/expired/);
+    expect(await runDotExecutorSweep(LOADED, p, { rootDir: TEST_ROOT })).toEqual([]);
+    expect(getWorkItem(item.item_id)!.status).toBe('archived');
+  });
+
+  it('refuses approved requests not decided by an authenticated human, or for another tenant', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { item, p } = await quarantined('dact-forged');
+    const { request } = requestDotWorkItemRelease(
+      CHARTER,
+      { workItemId: item.item_id, reason: 'looked fine' },
+      { rootDir: TEST_ROOT }
+    );
+    const approved = {
+      ...request,
+      status: 'approved' as const,
+      decidedBy: 'someone',
+      decidedAt: new Date().toISOString(),
+      decidedByType: 'human' as const,
+      authenticated: true,
+    };
+    const forged = [
+      { ...approved, id: 'r-agent', decidedByType: 'ai_agent' as const },
+      { ...approved, id: 'r-unauth', authenticated: false },
+      {
+        ...approved,
+        id: 'r-veto',
+        veto: { windowMinutes: 1 } as never,
+      },
+      {
+        ...approved,
+        id: 'r-late',
+        decidedAt: new Date(Date.parse(request.expiresAt!) + 1).toISOString(),
+      },
+      {
+        ...approved,
+        id: 'r-tenant',
+        scope: { tier: 'public', tenant_slug: 'other-tenant', scope_kind: 'tenant' } as never,
+      },
+    ];
+    const settled: Array<[string, string | undefined]> = [];
+    const released = applyApprovedDotReleases(LOADED, {
+      rootDir: TEST_ROOT,
+      audit: () => {},
+      listApprovals: () => forged,
+      markApplied: (record, applyResult) => {
+        settled.push([record.id, applyResult.result]);
+        return record;
+      },
+    });
+    expect(released).toEqual([]);
+    expect(settled).toEqual(forged.map((record) => [record.id, 'failed']));
+    expect(getWorkItem(item.item_id)!.status).toBe('archived');
+    expect(await runDotExecutorSweep(LOADED, p, { rootDir: TEST_ROOT })).toEqual([]);
+    expect(p.runPipeline).not.toHaveBeenCalled();
+  });
+
+  it('refuses a release requested for an item of another tenant', () => {
+    const created = createWorkItem({
+      title: 'Tenant item',
+      description: 'x',
+      status: 'archived',
+      context: { tenant_slug: 'acme' } as never,
+      metadata: { dot_id: 'exec-it', action_ref: 'dact-t', dot_executor: { escalated: true } },
+    });
+    expect(() =>
+      requestDotWorkItemRelease(
+        CHARTER,
+        { workItemId: created.item_id, reason: 'fine' },
+        { rootDir: TEST_ROOT }
+      )
+    ).toThrow(/DOT_RELEASE_SCOPE/);
   });
 
   it('does not replay an effect when result persistence fails before release', async () => {

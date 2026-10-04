@@ -170,21 +170,29 @@ wake ──proposal──▶ dispatch (gate ⊔ floors, arbitration) ──▶ W
   invalid, goal driver failing before its first model call), which returns the
   item to `ready` for up to 3 attempts and then ends as an escalated failure.
   Recovery reconciles the original action/attempt without re-executing it.
-  Quarantine ends only by a governed operator release —
-  `pnpm kyberion dot release <dot_id> <work_item_id> --reason "<text>"` —
-  which records `metadata.dot_executor.operator_verified_at/by/reason`, audits
-  `dot_work_item_operator_release`, and returns the item to `ready`; evidence
-  and expired attempts older than the release stop blocking, so the next sweep
-  re-attempts it under a new attempt id. A plain reopen is still re-archived as
+  Quarantine ends only by a human-approved release:
+  `pnpm kyberion dot release <dot_id> <work_item_id> --reason "<text>"` only
+  creates a human-only approval request (autonomy channel, shown by
+  `pnpm kyberion approvals`, 72 h expiry) describing item, tenant, attempts and
+  reason, bound to the item's current version. The executor sweep applies it
+  once an authenticated human approved it — never a veto window, agent or
+  service; the request tenant must match the item's and the charter's, and the
+  item must be unchanged — recording `metadata.dot_executor.operator_verified_*`
+  from the approver (not the requester's `--by`), auditing
+  `dot_work_item_operator_release`, marking the request applied (or failed with
+  the refusal) and returning the item to `ready`; evidence and expired attempts
+  older than the release stop blocking, so the next sweep re-attempts it under
+  a new attempt id. A plain reopen is still re-archived as
   a conflict. Terminal reports use an idempotent inbox identity plus a durable
   result receipt (`payload.report_from = dot-executor`), so a failed release,
   enqueue or receipt update can be reconciled. Results written before report
   recovery existed (no `report_to_dot_id`) count as reported, so an upgrade
   does not replay historic reports; work results are read once per sweep.
-  The shared filesystem lock primitive conservatively retains unknown ownership
-  and serializes stale cleanup. Restart competing workers on upgrade so they all
-  use the repaired primitive in the same PID/filesystem namespace; uncertain or
-  orphaned lock markers require explicit operator inspection and recovery.
+  The shared filesystem lock primitive publishes lock records atomically and
+  serializes stale cleanup; an unreadable record or an orphaned cleanup guard
+  is reclaimed automatically after 30 s, never a live holder's lock. Restart
+  competing workers on upgrade so they all use the repaired primitive in the
+  same PID/filesystem namespace.
 - **Key results (DL-03)**: `goal.key_results` are measured per sweep
   (`probe`, `file`, `signal_ratio`, `org_metric`) into `kr-ledger.jsonl`; gaps
   to target are injected into the wake prompt. Organization objectives roll up
@@ -204,7 +212,10 @@ wake ──proposal──▶ dispatch (gate ⊔ floors, arbitration) ──▶ W
   (5 min to 7 days, 3 pending) writes `followups.jsonl`; a due follow-up is a
   `followup:<id>` wake. A follow-up can atomically replace itself at capacity;
   deterministic successors survive failed wake-ledger writes without duplicate
-  rearming, and a failed replacement leaves the original retryable. Missed cron minutes within
+  rearming. If the replacement cannot be persisted, the wake is recorded
+  delivered with `trigger_retained: true` (proposals are not re-dispatched)
+  and the parent stays pending, re-firing after the failure backoff so the
+  chain is not lost. Missed cron minutes within
   `runtime.cron_catch_up_hours` (default 6, max 24) coalesce into one wake.
 - **Events (DL-08)**: a charter trigger `{kind: 'event', sources, types?,
 match?}` wakes on an authenticated inbound event. The loopback-only
@@ -253,6 +264,19 @@ follow-up reasons, event bodies, results) never lands in a system-floor file:
 the pre-existing flat ledgers (`dot-wake-ledger`, `dot-action-ledger`,
 `dot-inbox`) stay shared, so tenant dots write only category-level text there.
 See [runtime-storage-layout](./runtime-storage-layout.md).
+
+**One owner per `dot_id`**: those shared ledgers, the inbox, WorkItems and
+approvals are keyed by `dot_id`, so exactly one charter may load per ID
+(`listDotCharters`). A repo-level `dots/` charter owns its ID over any tenant
+duplicate. A tenant-level ID belongs to the tenant whose charter was
+activated first (`dot-lifecycle-audit.jsonl`); it never moves to another
+tenant — not while that owner is paused or retired, nor after its file is
+removed — so one tenant can neither disable nor inherit another tenant's dot
+(the newcomer must pick a new `dot_id`). Without audit history the
+earliest-activated established (`active`/`paused`) charter keeps the ID (file
+mtime, then path); two charters for one ID in the same scope load neither.
+Every rejected charter is a load error that the supervisor sweep warns about
+and carries in its heartbeat; `dot validate` fails on it.
 
 The loop is hermetically tested end to end in
 `libs/core/dot/dot-loop.integration.test.ts`.
