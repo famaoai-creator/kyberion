@@ -53,10 +53,12 @@ beforeEach(() => {
   fixtures.viewer.principalId = 'human:alice';
 });
 describe('Concierge intake through the real shared store', () => {
-  it('keeps A and B across calls and restores a persisted clarification without model execution', async () => {
+  it('records A and B through the runtime and answers status from the persisted index', async () => {
     const first = await say('Aの報告書を作って', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
-    expect(first.body).toMatchObject({ mode: 'intake', historySaved: true });
-    expect((await say('Bの旅行計画を作って')).body.mode).toBe('intake');
+    expect(first.body).toMatchObject({ mode: 'orchestrator', reply: 'Chat reply' });
+    expect((await say('Bの旅行計画を作って')).body.mode).toBe('orchestrator');
+    expect(fixtures.run).toHaveBeenCalledTimes(2);
+    fixtures.run.mockClear();
     const named = await say('Aの件どう？');
     expect(named.body).toMatchObject({ mode: 'intake', shape: 'status_summary' });
     expect(named.body.reply).toContain('A');
@@ -71,15 +73,22 @@ describe('Concierge intake through the real shared store', () => {
     expect(replay.body).toMatchObject({ mode: 'history', replayed: true, reply: first.body.reply });
     expect(fixtures.run).not.toHaveBeenCalled();
   });
-  it('isolates a different principal and preserves ordinary chat routing', async () => {
+  it('isolates a different principal and leaves its unmatched reference to chat', async () => {
     await say('Aの報告書を作って');
     fixtures.viewer.principalId = 'human:bob';
+    fixtures.run.mockClear();
     const absent = await say('Aの件どう？');
-    expect(absent.body.shape).toBe('clarification');
-    expect(absent.body.reply).not.toContain('Aの報告書');
-    expect(fixtures.run).not.toHaveBeenCalled();
-    const chat = await say('hello');
-    expect(chat.body).toMatchObject({ mode: 'orchestrator', reply: 'Chat reply' });
+    expect(absent.body).toMatchObject({ mode: 'orchestrator', reply: 'Chat reply' });
     expect(fixtures.run).toHaveBeenCalledOnce();
   });
+  it.each(['はい', '進めて', 'ok', 'What happened in 1945?', '2'])(
+    'passes a conversational reply through to the runtime with a recorded request: %s',
+    async (text) => {
+      await say('Aの報告書を作って');
+      fixtures.run.mockClear();
+      const reply = await say(text);
+      expect(reply.body).toMatchObject({ mode: 'orchestrator', reply: 'Chat reply' });
+      expect(fixtures.run).toHaveBeenCalledOnce();
+    }
+  );
 });

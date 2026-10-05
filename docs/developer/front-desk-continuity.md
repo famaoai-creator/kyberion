@@ -56,8 +56,18 @@ DOM doubles and handler tests do not prove rendering, mobile layout, or accessib
 The shared front-desk store classifies each newly reserved user turn into a new
 request, follow-up, status question, approval candidate, cancellation candidate,
 chat, or clarification. Classification is deterministic and advisory; it grants
-no authority. Concierge and Presence consume a local intake reply before model
-or task execution. General chat continues through the existing scoped runtime.
+no authority.
+
+Only three decisions carry a local intake reply that Concierge and Presence
+return instead of calling the scoped runtime: a status question that resolves to
+a recorded request, an approval or cancellation that names a recorded request,
+and the selection question (and its answer) for an ambiguous status/control
+reference. New requests and explicitly named follow-ups are recorded silently and
+still go to the runtime, so it answers them exactly as before. Everything else,
+including unmatched or unknown references, mixed clauses, bare confirmations such
+as “はい” or “ok”, ordinals without a pending question, and implicit amendments
+such as “make it shorter”, stays ordinary chat. Bare confirmations must reach the
+runtime because they may answer its own execution preview.
 
 The server-owned transcript now keeps a separate request index. Request IDs are
 server-bound turn IDs; normal replies use readable titles. The index survives
@@ -69,17 +79,19 @@ never promoted into a task or an approval.
 A named unique request can be selected. When several requests could match
 “さっきの件どう？”, the reply lists their titles and asks which one. The original
 question and exact candidates are persisted, so a subsequent title or ordinal
-selection can recover after reload. Mixed requests are explicitly clarified
-rather than silently dropping a clause. Capacity exhaustion preserves existing
-requests and asks the user to narrow the input; it never silently evicts work.
+selection can recover after reload. Mixed requests are passed whole to the
+runtime and are not partially recorded. At capacity, new requests and follow-ups
+are simply not recorded; existing requests are never evicted and chat is never
+blocked.
 
 The index is bounded to 64 requests, 64 follow-up notes per request and 4 MiB of
 encoded state. Original redacted request text is retained separately from the
 bounded display title. This slice does not add archival or task execution.
 
-A request record is intake evidence only: recorded, execution not started.
-Completing a conversation response does not complete that request. Status replies
-cannot claim actual execution progress or outcomes. This slice neither scans nor
+A request record is intake evidence only; it does not track execution. The
+runtime may act on the same turn, so status replies say the record does not
+track execution and never claim that work has or has not started. Completing a
+conversation response does not complete that request. This slice neither scans nor
 executes legacy global TaskSession records, and does not implement a task worker.
 The existing scoped unsupported-capability boundaries remain in place. Approval
 and cancellation candidates do not change execution state or grant permission;
@@ -96,7 +108,9 @@ never becomes an invitation to retry a possibly completed operation.
 
 Regression coverage includes the real Presence handler through the shared store,
 Concierge handler boundary tests, isolation, duplicate IDs, transcript eviction,
-malformed state, secret redaction and non-authoritative approval/cancellation.
+malformed state, secret redaction, non-authoritative approval/cancellation, and
+ordinary chat that resembles intake grammar (for example “What happened in 1945?”,
+“宿題終わった？”, “はい”, a bare “2”) reaching the runtime.
 
 Deploy the updated store with both front-desk processes. Older binaries reject v2
 transcripts instead of silently overwriting the new request index. Back up the

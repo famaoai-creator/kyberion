@@ -258,8 +258,10 @@ describe('request continuity at the actual front-desk ingress', () => {
   it('records A and B, answers named A, clarifies an ambiguous reference, and recovers the selection', async () => {
     const a = await say('Aの報告書を作って', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
     const b = await say('Bの旅行計画を作って', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
-    expect(a.body).toMatchObject({ ok: true, mode: 'intake', historySaved: true });
-    expect(b.body).toMatchObject({ ok: true, mode: 'intake', historySaved: true });
+    expect(a.body).toMatchObject({ ok: true, mode: 'orchestrator', reply: 'A real reply' });
+    expect(b.body).toMatchObject({ ok: true, mode: 'orchestrator', reply: 'A real reply' });
+    expect(fixtures.run).toHaveBeenCalledTimes(2);
+    fixtures.run.mockClear();
     const status = await say('Aの件どう？');
     expect(status.body).toMatchObject({ mode: 'intake', shape: 'status_summary' });
     expect(status.body.reply).toContain('A');
@@ -275,12 +277,20 @@ describe('request continuity at the actual front-desk ingress', () => {
     expect(replay.body).toMatchObject({ mode: 'history', replayed: true, reply: a.body.reply });
     expect(fixtures.run).not.toHaveBeenCalled();
   });
-  it('clarifies combined requests and leaves approval/cancel as non-executing intake', async () => {
+  it('leaves combined requests and bare confirmations to the runtime', async () => {
     await say('Aの報告書を作って');
+    fixtures.run.mockClear();
     const mixed = await say('Aの件どう？ それとBの旅行計画を作って');
-    expect(mixed.body).toMatchObject({ mode: 'intake', shape: 'clarification' });
-    await say('Aの件を承認');
-    await say('Aの件をキャンセル');
+    expect(mixed.body).toMatchObject({ mode: 'orchestrator', reply: 'A real reply' });
+    expect((await say('はい')).body.mode).toBe('orchestrator');
+    expect((await say('進めて')).body.mode).toBe('orchestrator');
+    expect(fixtures.run).toHaveBeenCalledTimes(3);
+  });
+  it('answers named approval/cancel locally as non-executing intake', async () => {
+    await say('Aの報告書を作って');
+    fixtures.run.mockClear();
+    expect((await say('Aの報告書を承認')).body).toMatchObject({ mode: 'intake' });
+    expect((await say('Aの報告書をキャンセル')).body).toMatchObject({ mode: 'intake' });
     expect(fixtures.run).not.toHaveBeenCalled();
   });
 });

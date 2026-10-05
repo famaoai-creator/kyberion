@@ -21,6 +21,7 @@ const task = (n: number, title = 'Request ' + n): ConversationTaskRecord => ({
 const route = (state: ConversationTaskState, text: string, n = 99, locale?: 'en' | 'ja') =>
   routeConversationTaskTurn(state, text, id(n), 1000 + n, locale);
 const two = (): ConversationTaskState => ({ tasks: [task(1, 'Aの報告書'), task(2, 'Bの報告書')] });
+const CHAT = { kind: 'chat', taskIds: [], confidence: 'unknown', authority: 'none' };
 
 describe('bounded conversation task intake', () => {
   it.each([
@@ -28,12 +29,14 @@ describe('bounded conversation task intake', () => {
     ['Aの報告書を作って', 'Aの報告書'],
     ['Please prepare a report', 'a report'],
     ['Can you research Tokyo hotels?', 'Tokyo hotels?'],
-  ])('records a new request without starting execution: %s', (text, title) => {
+    ['Can you summarize this article for me?', 'this article for me?'],
+  ])('records a new request and leaves the answer to the runtime: %s', (text, title) => {
     const input: ConversationTaskState = { tasks: [] };
     const out = route(input, text, 1);
-    expect(out.decision).toMatchObject({
+    expect(out.decision).toEqual({
       kind: 'new_request',
       taskIds: [id(1)],
+      confidence: 'rule',
       authority: 'none',
     });
     expect(out.state.tasks[0]).toMatchObject({
@@ -91,60 +94,83 @@ describe('bounded conversation task intake', () => {
     }
   );
   it.each(['Bの件どう？', 'status of B', 'status of "' + id(2) + '"'])(
-    'does not route an unknown named target to sole task A: %s',
+    'leaves an unknown named target to the runtime instead of sole task A: %s',
     (text) => {
       const input = { tasks: [task(1, 'Aの報告書')] };
       const out = route(input, text);
-      expect(out.decision.kind).toBe('clarification');
+      expect(out.decision).toEqual(CHAT);
       expect(out.state).toEqual(input);
     }
   );
-  it('answers an unambiguous deictic status honestly', () => {
+  it('answers an unambiguous deictic status without claiming execution state', () => {
     const out = route({ tasks: [task(1)] }, 'Any updates?', 99, 'en');
-    expect(out.decision.reply).toContain('This conversation has not started execution');
-    expect(out.decision.reply).toContain('Actual progress and results have not been verified');
+    expect(out.decision.reply).toContain('does not track execution');
+    expect(out.decision.reply).toContain('actual progress and results have not been verified');
+    expect(out.decision.reply).not.toContain('has not started');
     expect(out.state.tasks[0].state).toBe('recorded');
   });
-  it('stores the original amendment when clarification is answered', () => {
-    const ask = route(two(), '表を追加して', 3);
-    const out = route(ask.state, '2つ目', 4);
-    expect(out.decision).toMatchObject({ kind: 'followup', taskIds: [id(2)] });
-    expect(out.state.tasks[0].updates).toEqual([]);
-    expect(out.state.tasks[1].updates).toEqual(['表を追加して']);
+  it.each([
+    ['Aの報告書に表を追加して', two(), id(1)],
+    ['Add a chart to Request 1', { tasks: [task(1)] }, id(1)],
+  ])('records an explicitly named follow-up without a local reply: %s', (text, input, target) => {
+    const out = route(input, text);
+    expect(out.decision).toEqual({
+      kind: 'followup',
+      taskIds: [target],
+      confidence: 'rule',
+      authority: 'none',
+    });
+    expect(out.state.tasks.find((entry) => entry.id === target)!.updates).toEqual([text]);
   });
   it.each([
     'Make it shorter',
     'Add "confidential" to the title',
     'Change the title to "Q4 report"',
-  ])('keeps amendment content distinct from task selectors: %s', (text) => {
-    const out = route({ tasks: [task(1)] }, text);
-    expect(out.decision.kind).toBe('followup');
-    expect(out.state.tasks[0].updates).toEqual([text]);
+    'Add a chart',
+    '表を追加して',
+    '続けて',
+  ])('leaves implicit amendments to the runtime: %s', (text) => {
+    const input = { tasks: [task(1)] };
+    const out = route(input, text);
+    expect(out.decision).toEqual(CHAT);
+    expect(out.state).toEqual(input);
   });
   it.each(['はい', 'yes', 'okay!'])(
     'does not use a vague confirmation to pick an ambiguous task: %s',
     (text) => {
-      const ask = route(two(), '表を追加して', 3);
+      const ask = route(two(), 'さっきの件どう？', 3);
       const out = route(ask.state, text, 4);
       expect(out.decision.kind).toBe('clarification');
       expect(out.state).toEqual(ask.state);
     }
   );
-  it.each(['Approve Request 1', 'Cancel Request 1', '承認します', '止めて'])(
-    'classifies controls without conferring authority: %s',
+  it.each(['Approve Request 1', 'Cancel Request 1', 'Aの報告書を承認', 'Aの報告書をキャンセル'])(
+    'answers controls on a named request without conferring authority: %s',
     (text) => {
-      const input = { tasks: [task(1)] };
+      const input = { tasks: [task(1), task(2, 'Aの報告書')] };
       const out = route(input, text);
       expect(['approval', 'cancellation']).toContain(out.decision.kind);
       expect(out.decision.authority).toBe('none');
+      expect(out.decision.reply).toBeDefined();
       expect(out.state).toEqual(input);
     }
   );
-  it('resolves approval ambiguity without granting approval', () => {
-    const ask = route(two(), '承認します', 3);
+  it.each(['承認します', '止めて', 'はい', 'お願いします', '進めて', 'ok', 'proceed', 'cancel'])(
+    'leaves bare confirmations and cancellations to the runtime preview: %s',
+    (text) => {
+      const input = { tasks: [task(1)] };
+      const out = route(input, text);
+      expect(out.decision).toEqual(CHAT);
+      expect(out.state).toEqual(input);
+    }
+  );
+  it('resolves approval ambiguity between duplicate titles without granting approval', () => {
+    const input = { tasks: [task(1, 'Report'), task(2, 'Report')] };
+    const ask = route(input, 'Approve Report', 3);
+    expect(ask.decision.kind).toBe('clarification');
     const out = route(ask.state, '2', 4);
     expect(out.decision).toMatchObject({ kind: 'approval', authority: 'none', taskIds: [id(2)] });
-    expect(out.state.tasks).toEqual(two().tasks);
+    expect(out.state.tasks).toEqual(input.tasks);
   });
   it.each([
     'Create A and find B',
@@ -153,16 +179,17 @@ describe('bounded conversation task intake', () => {
     '資料を作って、それと旅行を調べて',
     '進捗は？それから資料を作って',
     '1つ目。それと資料を作って',
-  ])('refuses mixed requests without changing state: %s', (text) => {
+    'Aの件どう？ それとBの旅行計画を作って',
+  ])('leaves mixed requests whole to the runtime without changing state: %s', (text) => {
     const input = two();
     const out = route(input, text);
-    expect(out.decision.kind).toBe('clarification');
+    expect(out.decision).toEqual(CHAT);
     expect(out.state).toEqual(input);
   });
   it('does not consume a pending selection with a new clause', () => {
-    const ask = route(two(), '表を追加して', 3);
+    const ask = route(two(), 'さっきの件どう？', 3);
     const out = route(ask.state, '1つ目。それと資料を作って', 4);
-    expect(out.decision.kind).toBe('clarification');
+    expect(out.decision).toEqual(CHAT);
     expect(out.state.tasks).toEqual(ask.state.tasks);
     expect(out.state.clarification).toBeUndefined();
   });
@@ -172,22 +199,30 @@ describe('bounded conversation task intake', () => {
     'How is the weather?',
     'Do not cancel the report',
     'What does approve mean?',
+    'What happened in 1945?',
+    'How is it going?',
+    '宿題終わった？',
+    'その服どう？',
+    '静かにして',
+    '心配するのはやめて',
+    '2',
+    'Yes, please proceed.',
+    'No, please hold off.',
+    'はい、進めてください。',
+    'いいえ、見送ってください。',
   ])('preserves ordinary conversation: %s', (text) => {
-    const out = route({ tasks: [task(1)] }, text);
-    expect(out.decision).toEqual({
-      kind: 'chat',
-      taskIds: [],
-      confidence: 'unknown',
-      authority: 'none',
-    });
+    for (const input of [{ tasks: [] }, { tasks: [task(1)] }, two()]) {
+      const out = route(input, text);
+      expect(out.decision).toEqual(CHAT);
+      expect(out.state).toEqual(input);
+    }
   });
   it('invalidates an old selection after unrelated chat', () => {
-    const ask = route(two(), '表を追加して', 3);
+    const ask = route(two(), 'さっきの件どう？', 3);
     const chat = route(ask.state, 'hello there', 4);
     expect(chat.state.clarification).toBeUndefined();
     const out = route(chat.state, '1', 5);
-    expect(out.decision.kind).toBe('clarification');
-    expect(out.state.tasks.every((entry) => entry.updates.length === 0)).toBe(true);
+    expect(out.decision).toEqual(CHAT);
   });
   it('keeps duplicate titles ambiguous', () => {
     const input = { tasks: [task(1, 'Report'), task(2, 'Report')] };
@@ -196,10 +231,10 @@ describe('bounded conversation task intake', () => {
     expect(out.decision.kind).toBe('clarification');
     expect(out.state.tasks).toEqual(input.tasks);
   });
-  it('rejects new requests at capacity without evicting old ones', () => {
+  it('stops recording at capacity without evicting old requests or blocking chat', () => {
     const input = { tasks: Array.from({ length: 64 }, (_, n) => task(n + 1)) };
     const out = route(input, 'Create another report', 100);
-    expect(out.decision.kind).toBe('clarification');
+    expect(out.decision).toEqual(CHAT);
     expect(out.state).toEqual(input);
   });
   it('round-trips max-count/max-title clarification replies', () => {
@@ -213,12 +248,12 @@ describe('bounded conversation task intake', () => {
       out.decision
     );
   });
-  it('refuses an amendment at its count limit without removing earlier instructions', () => {
+  it('skips an amendment at its count limit without removing earlier instructions', () => {
     const input = {
       tasks: [{ ...task(1), updates: Array.from({ length: 64 }, () => 'existing') }],
     };
-    const out = route(input, 'Add a chart');
-    expect(out.decision.kind).toBe('clarification');
+    const out = route(input, 'Add a chart to Request 1');
+    expect(out.decision).toEqual(CHAT);
     expect(out.state).toEqual(input);
   });
   it('bounds escaped JSON bytes and rolls back an over-budget transition', () => {
@@ -234,7 +269,7 @@ describe('bounded conversation task intake', () => {
     );
     expect(parseConversationTaskState(input)).toBeDefined();
     const out = route(input, 'Add ' + '\u0000'.repeat(8168) + ' to last target', 100);
-    expect(out.decision.kind).toBe('clarification');
+    expect(out.decision).toEqual(CHAT);
     expect(out.state).toEqual(input);
     const oversized = structuredClone(input);
     oversized.tasks[1].updates.push(update);
@@ -265,6 +300,15 @@ describe('strict inert state and decision parsing', () => {
         candidateIds: [id(3)],
       },
     },
+    {
+      tasks: [task(1)],
+      clarification: {
+        kind: 'followup',
+        sourceTurnId: id(2),
+        sourceText: 'add a chart',
+        candidateIds: [id(1)],
+      },
+    },
     { tasks: [task(1)], approval: true },
   ])('fails closed on malformed persisted state %#', (input) => {
     expect(parseConversationTaskState(input)).toBeUndefined();
@@ -289,34 +333,42 @@ describe('strict inert state and decision parsing', () => {
     ])
       expect(parseConversationTaskDecision({ ...valid, ...change })).toBeUndefined();
   });
+  it('rejects a local reply on record-only decisions', () => {
+    const recorded = route({ tasks: [] }, 'Create a report', 1).decision;
+    expect(parseConversationTaskDecision(recorded)).toEqual(recorded);
+    expect(parseConversationTaskDecision({ ...recorded, reply: 'Recorded.' })).toBeUndefined();
+    expect(
+      parseConversationTaskDecision({ ...recorded, kind: 'followup', reply: 'Added.' })
+    ).toBeUndefined();
+  });
 });
 
 // Unknown target names must never inherit the only task.
 describe('positive implicit-reference admission', () => {
   it.each(['Please tell me the status of B', 'Add a chart to B', 'status of ' + 'B'.repeat(200)])(
-    'rejects an unbound named target: %s',
+    'leaves an unbound named target to the runtime: %s',
     (text) => {
       const input = { tasks: [task(1, 'A report')] };
       const out = route(input, text);
-      expect(out.decision.kind).toBe('clarification');
+      expect(out.decision).toEqual(CHAT);
       expect(out.state).toEqual(input);
     }
   );
 });
 
 describe('superseded task selection', () => {
-  it('does not apply an old amendment after a different mixed request', () => {
-    const ask = route(two(), '表を追加して', 3);
+  it('drops an old selection question after a different mixed request', () => {
+    const ask = route(two(), 'さっきの件どう？', 3);
     const mixed = route(ask.state, 'Create X and find Y', 4);
     expect(mixed.state.clarification).toBeUndefined();
     const out = route(mixed.state, '1', 5);
-    expect(out.decision.kind).toBe('clarification');
+    expect(out.decision).toEqual(CHAT);
     expect(out.state.tasks.every((t) => t.updates.length === 0)).toBe(true);
   });
   it('does not treat amendment content as its named destination', () => {
     const input = { tasks: [task(1, 'A report')] };
     const out = route(input, 'Add A report to B');
-    expect(out.decision.kind).toBe('clarification');
+    expect(out.decision).toEqual(CHAT);
     expect(out.state).toEqual(input);
   });
 });
@@ -330,12 +382,8 @@ describe('bounded implicit amendment grammar', () => {
   ])('never guesses a target for %s', (text) => {
     const input = { tasks: [task(1, 'A report')] };
     const out = route(input, text);
-    expect(out.decision.kind).toBe('clarification');
+    expect(out.decision).toEqual(CHAT);
     expect(out.state).toEqual(input);
-  });
-  it('binds an explicitly named Japanese follow-up', () => {
-    const out = route(two(), 'Aの報告書に表を追加して');
-    expect(out.decision).toMatchObject({ kind: 'followup', taskIds: [id(1)] });
   });
 });
 
@@ -347,7 +395,7 @@ describe('whole quoted target', () => {
   ])('never discards additional targets: %s', (text) => {
     const input = { tasks: [task(1, 'A report'), task(2, 'B report')] };
     const out = route(input, text);
-    expect(out.decision.kind).toBe('clarification');
+    expect(out.decision).toEqual(CHAT);
     expect(out.state).toEqual(input);
   });
   it('matches exactly one whole quoted target', () => {
