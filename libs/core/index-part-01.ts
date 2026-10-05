@@ -407,6 +407,7 @@ export * from './governance/autonomous-ops-gate.js';
 export * from './pipeline/patch-decision.js';
 export * from './governance/approval-veto-window.js';
 export * from './governance/operations-halt.js';
+export * from './governance/pr-shadow.js';
 
 export * from './governance/approval-decision-card.js';
 

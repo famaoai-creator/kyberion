@@ -3196,6 +3196,28 @@
       "group": "operate"
     },
     {
+      "id": "script.pr.shadow-observe",
+      "module": "scripts/pr_shadow.ts",
+      "command": "pr shadow-observe",
+      "noun": "pr",
+      "verb": "shadow-observe",
+      "audience": "operator",
+      "args": ["observe"],
+      "description": "cli_cmd_script_pr_shadow_observe",
+      "group": "operate"
+    },
+    {
+      "id": "script.pr.shadow-report",
+      "module": "scripts/pr_shadow.ts",
+      "command": "pr shadow-report",
+      "noun": "pr",
+      "verb": "shadow-report",
+      "audience": "operator",
+      "args": ["report"],
+      "description": "cli_cmd_script_pr_shadow_report",
+      "group": "inspect"
+    },
+    {
       "id": "script.conversation.report",
       "module": "scripts/conversation_report.ts",
       "command": "conversation report",

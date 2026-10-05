@@ -626,6 +626,11 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
 
     return (await domainOps()).runInlineAccountabilityReport(step, params, ctx);
   },
+  'core:pr_shadow_observe': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return (await domainOps()).runInlinePrShadowObserve(step, params, ctx);
+  },
   'core:decision_digest': async (dctx) => {
     const { step, params, ctx } = dctx;
 

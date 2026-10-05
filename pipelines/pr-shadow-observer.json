@@ -1,0 +1,30 @@
+{
+  "action": "pipeline",
+  "name": "pr-shadow-observer",
+  "version": "1.0.0",
+  "description": "Shadow-mode observer for pull-request autonomy: every 30 minutes, record what the autonomy gate would do with each open PR (risk tier, CI, whether it would auto-merge) and settle the PRs that were merged or closed. Read-only toward GitHub (gh pr list|view|checks); it never merges, comments or edits a PR. Read the result with `pnpm kyberion pr shadow-report`. Opt-in: needs the gh CLI authenticated on the host, so enable it with KYBERION_CHRONOS_SCHEDULES=pr-shadow-observer-30min.",
+  "_refs": {
+    "plan": "docs/developer/improvement-plans-2026-09/AUTONOMOUS_OPERATION_MOBILE_DECISION_PLAN_2026-09-27.ja.md",
+    "cli": "node dist/scripts/pr_shadow.js observe"
+  },
+  "schedule": {
+    "id": "pr-shadow-observer-30min",
+    "cron": "*/30 * * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": false
+  },
+  "steps": [
+    {
+      "id": "observe",
+      "role": "source",
+      "op": "core:pr_shadow_observe",
+      "params": {
+        "export_as": "pr_shadow_observation"
+      },
+      "produces": {
+        "channel": "pr_shadow_observation",
+        "type": "Json"
+      }
+    }
+  ]
+}

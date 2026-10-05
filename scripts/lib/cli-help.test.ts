@@ -88,7 +88,8 @@ describe('CU-04 unknown command hints', () => {
   it('suggests close registered commands', () => {
     expect(editDistance('aks', 'ask')).toBe(1);
     expect(suggestCommands('doctr', manifest)).toEqual(['doctor']);
-    expect(suggestCommands('pr crate', manifest)).toEqual(['pr create']);
+    // The closest registered command comes first, however many siblings (`pr shadow-*`) also match.
+    expect(suggestCommands('pr crate', manifest)[0]).toBe('pr create');
     expect(suggestCommands('aks hello world', manifest)).toContain('ask');
     expect(suggestCommands('zzzzzzzz', manifest)).toEqual([]);
   });
