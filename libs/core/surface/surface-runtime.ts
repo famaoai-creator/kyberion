@@ -54,6 +54,16 @@ export interface SurfaceRuntimeDefinition {
   /** Vocabulary keys (`domain:key`) for operator-facing text. */
   operatorNotesKey?: string;
   bestForKey?: string;
+  /** Public ingress opt-in (`pnpm kyberion ingress up`); absent = never exposed. */
+  ingress?: SurfaceIngressPolicy;
+}
+
+export interface SurfaceIngressPolicy {
+  allowed: boolean;
+  /** The only public path published for this surface (default `/`). */
+  path_prefix?: string;
+  /** Registered env var that can move the listener; must agree with `port`. */
+  port_env?: string;
 }
 
 export interface SurfaceRuntimeManifest {

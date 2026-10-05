@@ -36,6 +36,11 @@
       {
         "kind": "wake",
         "channels": ["slack", "inbox"]
+      },
+      {
+        "kind": "event",
+        "sources": ["github"],
+        "types": ["workflow_run", "check_suite", "pull_request", "issues"]
       }
     ]
   },

@@ -54,8 +54,10 @@ const mockExpireRequest = vi.mocked(expireApprovalRequest);
 const mockLookupSessionCache = vi.mocked(lookupSessionApprovalCache);
 const mockRecordSessionCacheAutoApproval = vi.mocked(recordSessionCacheAutoApproval);
 const mockAuditRecord = vi.mocked(auditChain.record);
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
+type WithDefault<T> = T & { default?: T };
+const Ajv = (AjvModule as WithDefault<typeof AjvModule>).default ?? AjvModule;
+const addFormats =
+  (addFormatsModule as WithDefault<typeof addFormatsModule>).default ?? addFormatsModule;
 
 const baseParams = {
   operationId: 'secret:set',
@@ -232,6 +234,25 @@ describe('enforceApprovalGate', () => {
       mockCreateRequest.mockReturnValue(asRecord({ id: 'req-fresh' }));
     };
 
+    it('reports a still-binding rejected request as requestStatus rejected', () => {
+      requireApproval();
+      mockListRequests.mockReturnValue([
+        asRecord({
+          id: 'req-old',
+          correlationId: 'corr-123',
+          status: 'rejected',
+          expiresAt: future(),
+        }),
+      ]);
+      const result = enforceApprovalGate({ ...baseParams, expiresAt: future() });
+      expect(result).toMatchObject({
+        allowed: false,
+        requestId: 'req-old',
+        requestStatus: 'rejected',
+      });
+      expect(mockCreateRequest).not.toHaveBeenCalled();
+    });
+
     it('opens a fresh request once a rejected request has lapsed', () => {
       requireApproval();
       mockListRequests.mockReturnValue([
@@ -244,7 +265,11 @@ describe('enforceApprovalGate', () => {
       ]);
       const expiresAt = future();
       const result = enforceApprovalGate({ ...baseParams, expiresAt });
-      expect(result).toMatchObject({ allowed: false, requestId: 'req-fresh' });
+      expect(result).toMatchObject({
+        allowed: false,
+        requestId: 'req-fresh',
+        requestStatus: 'created',
+      });
       expect(mockCreateRequest).toHaveBeenCalledWith(
         'mission_controller',
         expect.objectContaining({ correlationId: 'corr-123', expiresAt })
@@ -402,6 +427,7 @@ describe('enforceApprovalGate', () => {
     expect(result.allowed).toBe(false);
     expect(result.status).toBe('pending');
     expect(result.requestId).toBe('req-new');
+    expect(result.requestStatus).toBe('created');
     expect(mockCreateRequest).toHaveBeenCalledTimes(1);
     expect(mockCreateRequest).toHaveBeenCalledWith(
       'mission_controller',

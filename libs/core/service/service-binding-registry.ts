@@ -6,6 +6,16 @@ import {
 } from './service-binding-owner.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import {
+  resolveTenantAlias,
+  validateContextSecurityScope,
+  type ContextSecurityScope,
+} from '../context-security-scope.js';
+import { loadProjectRecord } from '../project/project-registry.js';
+import { resolveTenant } from '../organization/tenant-registry.js';
+import { findMissionPath } from '../path-resolver.js';
+import { loadMissionStateAtPath } from '../mission/mission-state-reader.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -31,6 +41,90 @@ export interface ServiceBindingRecord {
   service_id?: string;
   auth_mode?: 'none' | 'secret-guard' | 'session';
   metadata?: Record<string, unknown>;
+}
+
+export interface TenantServiceBindingAuthorization {
+  bindingId: string;
+  approvalRequired: boolean;
+}
+
+/** Resolve one tenant-owned binding and reject scope/action/policy mismatches. */
+export function authorizeTenantServiceAction(input: {
+  serviceId: string;
+  action: string;
+  securityScope: ContextSecurityScope;
+  bindingId?: string;
+}): TenantServiceBindingAuthorization {
+  const scopeErrors = validateContextSecurityScope(input.securityScope);
+  if (scopeErrors.length > 0) {
+    throw new Error(`[POLICY_VIOLATION] Invalid service security_scope: ${scopeErrors.join('; ')}`);
+  }
+  const activeMissionId = String(getRegisteredEnvText('MISSION_ID') || '').trim();
+  if (!activeMissionId || input.securityScope.mission_id !== activeMissionId) {
+    throw new Error('[POLICY_VIOLATION] Service security_scope is not bound to the active mission');
+  }
+  const tenantSlug = resolveTenantAlias(input.securityScope);
+  if (!tenantSlug)
+    throw new Error('[POLICY_VIOLATION] Tenant service binding requires tenant scope');
+  resolveTenant(tenantSlug);
+  const projectId = String(input.securityScope.project_id || '').trim();
+  const missionPath = findMissionPath(activeMissionId);
+  const mission = missionPath ? loadMissionStateAtPath(`${missionPath}/mission-state.json`) : null;
+  if (!mission || mission.status !== 'active') {
+    throw new Error('[POLICY_VIOLATION] Active service mission is missing or inactive');
+  }
+  const missionTenant = mission.tenant_slug || mission.tenant_id;
+  if (missionTenant && missionTenant !== tenantSlug) {
+    throw new Error('[POLICY_VIOLATION] Service tenant does not match the active mission tenant');
+  }
+  const missionProjectId = mission.relationships?.project?.project_id;
+  if ((missionProjectId || projectId) && missionProjectId !== projectId) {
+    throw new Error('[POLICY_VIOLATION] Service project does not match the active mission project');
+  }
+  if (!missionTenant && (!projectId || !missionProjectId)) {
+    throw new Error(
+      '[POLICY_VIOLATION] Tenant service binding requires tenant or matching project scope on the active mission'
+    );
+  }
+  const requestedBindingId = String(input.bindingId || '').trim();
+
+  let projectBindingIds: string[] | undefined;
+  if (projectId) {
+    const project = loadProjectRecord(projectId);
+    if (!project || project.status !== 'active') {
+      throw new Error(`[POLICY_VIOLATION] Project '${projectId}' is missing or inactive`);
+    }
+    if (project.tenant_slug !== tenantSlug) {
+      throw new Error('[POLICY_VIOLATION] Project tenant does not match service security_scope');
+    }
+    projectBindingIds = project.service_bindings || [];
+  }
+
+  const records = listServiceBindingRecords().filter((record) => {
+    if (record.owner_kind !== 'organization' || record.tenant_slug !== tenantSlug) return false;
+    if ((record.service_id || record.service_type) !== input.serviceId) return false;
+    if (!record.allowed_actions.includes(input.action)) return false;
+    if (record.project_id && record.project_id !== projectId) return false;
+    if (projectBindingIds && !projectBindingIds.includes(record.binding_id)) return false;
+    if (requestedBindingId && record.binding_id !== requestedBindingId) return false;
+    return true;
+  });
+
+  if (records.length !== 1) {
+    throw new Error(
+      records.length === 0
+        ? `[POLICY_VIOLATION] No tenant/project service binding authorizes ${input.serviceId}:${input.action}`
+        : `[POLICY_VIOLATION] Multiple service bindings match ${input.serviceId}:${input.action}; select service_binding_id explicitly`
+    );
+  }
+  const binding = records[0]!;
+  const decision = binding.approval_policy[input.action] ?? 'denied';
+  if (decision === 'denied') {
+    throw new Error(
+      `[POLICY_VIOLATION] Service binding '${binding.binding_id}' denies ${input.action}`
+    );
+  }
+  return { bindingId: binding.binding_id, approvalRequired: decision === 'approval_required' };
 }
 
 const BINDING_SCHEMA_PATH = pathResolver.knowledge(

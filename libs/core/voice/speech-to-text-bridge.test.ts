@@ -117,6 +117,113 @@ describe('speech-to-text-bridge', () => {
     vi.mocked(discoverLocalSttBackends).mockReturnValue([]);
   });
 
+  it.each([
+    {
+      label: 'local model directory and explicit device, compute type and language',
+      env: {
+        KYBERION_STT_MODEL_DIR: 'local-model-日本語',
+        KYBERION_STT_MODEL: 'ignored-model',
+        KYBERION_STT_DEVICE: 'cuda',
+        KYBERION_STT_COMPUTE_TYPE: 'float32',
+        KYBERION_STT_LANGUAGE: 'ja',
+      },
+      inputLanguage: undefined,
+      expected: {
+        model: 'local-model-日本語',
+        device: 'cuda',
+        compute_type: 'float32',
+        language: 'ja',
+      },
+    },
+    {
+      label: 'model name, GPU compute default and per-request language precedence',
+      env: {
+        KYBERION_STT_MODEL: 'configured-model',
+        KYBERION_STT_DEVICE: 'cuda',
+        KYBERION_STT_LANGUAGE: 'ja',
+      },
+      inputLanguage: 'en',
+      expected: {
+        model: 'configured-model',
+        device: 'cuda',
+        compute_type: 'float16',
+        language: 'en',
+      },
+    },
+    {
+      label: 'unconfigured bridge defaults',
+      env: {},
+      inputLanguage: undefined,
+      expected: { model: 'small', device: 'cpu', compute_type: 'int8', language: null },
+    },
+  ])(
+    'passes $label to the actual Python subprocess',
+    async ({ env, inputLanguage, expected }, context) => {
+      const python = ['python3', 'python'].find((command) => {
+        const probe = secureIo.safeExecResult(command, ['--version']);
+        return !probe.error && probe.status === 0 && probe.stdout.startsWith('Python 3.');
+      });
+      if (!python) return context.skip();
+      const relative = 'libs/actuators/voice-actuator/scripts';
+      const fixtureDir = path.join(tmpDir, relative);
+      secureIo.safeMkdir(fixtureDir, { recursive: true });
+      for (const name of ['faster_whisper_stt_bridge.py', 'json_boundary.py']) {
+        secureIo.safeWriteFile(
+          path.join(fixtureDir, name),
+          safeReadFile(path.join(pathResolver.rootDir(), relative, name))
+        );
+      }
+      // Run the production Python bridge without installing a model, using a
+      // hermetic model module to expose the configuration it actually receives.
+      secureIo.safeWriteFile(
+        path.join(fixtureDir, 'faster_whisper.py'),
+        [
+          'import json, os',
+          'from types import SimpleNamespace',
+          'class WhisperModel:',
+          '    def __init__(self, model, device, compute_type):',
+          '        self.config = dict(model=model, device=device, compute_type=compute_type)',
+          '    def transcribe(self, audio_path, language=None, vad_filter=True):',
+          "        self.config.update(language=language, secret=os.environ.get('OPENAI_API_KEY'))",
+          '        text = json.dumps(self.config, ensure_ascii=False)',
+          '        return [SimpleNamespace(text=text, start=0, end=1)], SimpleNamespace(language=language or "auto")',
+          '',
+        ].join('\n')
+      );
+      const audio = path.join(tmpDir, 'configured.wav');
+      secureIo.safeWriteFile(audio, 'audio fixture');
+      vi.mocked(discoverLocalSttBackends).mockReturnValue([
+        {
+          backend: 'faster_whisper',
+          display_name: 'fixture',
+          priority: 90,
+          verification: 'python-module',
+          python_bin: python,
+          source: 'managed-runtime',
+          detail: 'hermetic subprocess fixture',
+          connection: {},
+        },
+      ]);
+      vi.stubEnv('OPENAI_API_KEY', 'must-not-reach-stt-child');
+      try {
+        expect(
+          installManagedFasterWhisperSpeechToTextBridgeIfAvailable({
+            ...env,
+            OPENAI_API_KEY: 'must-not-be-forwarded-from-config',
+          })
+        ).toBe(true);
+        const bridge = getSpeechToTextBridges().find(
+          (candidate) => candidate.name === 'faster_whisper'
+        )!;
+        const result = await bridge.transcribe({ audioPath: audio, language: inputLanguage });
+        expect(JSON.parse(result.text)).toEqual({ ...expected, secret: null });
+        expect(safeReadFile(result.written_to!)).toBe(result.text + '\n');
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    }
+  );
+
   it('does not install an unavailable managed faster-whisper runtime or override an explicit command', () => {
     vi.mocked(discoverLocalSttBackends).mockReturnValue([]);
     expect(installManagedFasterWhisperSpeechToTextBridgeIfAvailable({})).toBe(false);

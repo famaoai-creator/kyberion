@@ -1056,8 +1056,10 @@ describe('speaker notes', () => {
         if (!name.endsWith('.xml') && !name.endsWith('.rels')) continue;
         const errors: string[] = [];
         new DOMParser({
-          onError: (_level: string, msg: string) => errors.push(msg),
-        } as any).parseFromString(xml, 'text/xml');
+          onError: (_level: string, msg: string) => {
+            errors.push(msg);
+          },
+        }).parseFromString(xml, 'text/xml');
         expect(errors, name).toEqual([]);
       }
     } finally {

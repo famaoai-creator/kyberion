@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   safeAppendFileSync,
   safeExistsSync,
@@ -10,6 +10,7 @@ import {
 } from '../secure-io.js';
 import type { DotCharter } from './dot-charter.js';
 import {
+  applyEventIntakeHostOptIn,
   DOT_EVENT_LOOKBACK_MS,
   DOT_EVENT_PAYLOAD_MAX_BYTES,
   DOT_EVENT_SCAN_TAIL_BYTES,
@@ -23,6 +24,7 @@ import {
   parseEventJsonPath,
   processInboundEventRequest,
   readDotInboundEvents,
+  resolveEventIntakeSecret,
   verifyInboundSignature,
   type EventIntakePolicy,
 } from './dot-event-intake.js';
@@ -475,9 +477,34 @@ describe('match helpers', () => {
   });
 });
 
+describe('resolveEventIntakeSecret', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('resolves the introduced secret through the event-intake service identity', () => {
+    const source = loadEventIntakePolicy().sources.github;
+    expect(source.secret_key).toBe('EVENT_INTAKE_GITHUB_SECRET');
+    vi.stubEnv('EVENT_INTAKE_GITHUB_SECRET', 'introduced-secret-value-0123456789');
+    expect(resolveEventIntakeSecret(source)).toBe('introduced-secret-value-0123456789');
+    vi.stubEnv('EVENT_INTAKE_GITHUB_SECRET', '');
+    expect(resolveEventIntakeSecret(source, () => 'injected')).toBe('injected');
+  });
+});
+
 describe('loadEventIntakePolicy', () => {
+  it('enables declared sources per host through KYBERION_EVENT_INTAKE_SOURCES only', () => {
+    const shipped = loadEventIntakePolicy({ hostOptIn: '' });
+    const opted = applyEventIntakeHostOptIn(shipped, ' github , nope ');
+    expect(opted.sources.github.enabled).toBe(true);
+    expect(opted.sources.ci.enabled).toBe(false);
+    expect(Object.keys(opted.sources)).not.toContain('nope');
+    expect(shipped.sources.github.enabled).toBe(false);
+    expect(loadEventIntakePolicy({ hostOptIn: 'github' }).sources.github.enabled).toBe(true);
+  });
+
   it('ships every source disabled and fails closed on an invalid policy file', () => {
-    const shipped = loadEventIntakePolicy();
+    const shipped = loadEventIntakePolicy({ hostOptIn: '' });
     expect(Object.keys(shipped.sources).sort()).toEqual(['ci', 'custom', 'email', 'github']);
     expect(Object.values(shipped.sources).every((s) => s.enabled === false)).toBe(true);
 
