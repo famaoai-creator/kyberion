@@ -17,6 +17,8 @@ import { runHealthDegradationWatch } from './health_degradation_watch.js';
 import { collectUiUxGovernanceReport } from './check_ui_ux_governance.js';
 import { runTenantDriftWatch } from './watch_tenant_drift.js';
 import { runDecisionDigest } from './approval_inbox.js';
+import { createGhPrPort } from './pr_shadow.js';
+import { observePullRequests, DEFAULT_IGNORED_CHECKS } from '@agent/core/governance/pr-shadow';
 import { runApprovalStoreHygieneSweeps } from './approval_store_hygiene.js';
 import { runAutoCheckpoint } from './auto_checkpoint.js';
 import { createBackup, runRestoreDrill } from './backup.js';
@@ -993,6 +995,26 @@ export function runInlineAccountabilityReport(
     },
     ctx
   );
+}
+
+/**
+ * core:pr_shadow_observe — one shadow-mode pass over the open pull requests:
+ * record what the autonomy gate would do with each and settle the ones that
+ * were merged or closed. Read-only toward GitHub (`gh pr list|view|checks`);
+ * it never merges, comments or edits a PR.
+ */
+export function runInlinePrShadowObserve(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Record<string, unknown> {
+  const extra = resolveVars(params.ignored_checks ?? [], ctx);
+  const ignoredChecks = [
+    ...DEFAULT_IGNORED_CHECKS,
+    ...(Array.isArray(extra) ? extra.map((name) => String(name)) : []),
+  ];
+  const result = observePullRequests(createGhPrPort(), { ignoredChecks });
+  return exportValue(params, step, { ...result }, ctx);
 }
 
 /**
