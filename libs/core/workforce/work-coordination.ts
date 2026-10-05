@@ -18,6 +18,7 @@ import {
 } from '../secure-io.js';
 import { buildWorkItemHandoffPacket, type HandoffPacket } from '../mesh/handoff-packet.js';
 import { auditChain } from '../governance/audit-chain.js';
+import { getOperationsHaltState } from '../governance/operations-halt.js';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { WorkCoordinationError } from './work-coordination-error.js';
@@ -967,6 +968,16 @@ export function claimWorkItem(input: ClaimWorkItemInput): { item: WorkItem; leas
 }
 
 function claimWorkItemInternal(input: ClaimWorkItemInput): { item: WorkItem; lease: WorkLease } {
+  // P1-9: a write claim is how an agent gains the right to change anything, so
+  // a halted system hands out no new ones (existing leases are left to expire).
+  const halt = getOperationsHaltState();
+  if (halt.halted) {
+    throw new WorkCoordinationError(
+      'validation_error',
+      `operations are halted${halt.by ? ` by ${halt.by}` : ''} — no new work claims | next: pnpm kyberion halt resume`,
+      { item_id: input.itemId }
+    );
+  }
   // NI-02: the claimant actor is no longer an unverified free string. warn
   // (default) audits unregistered/inactive actors and allows; enforce rejects.
   enforceNhiActorPolicy(input.actorPeerId, 'work-coordination.claimWorkItem');
