@@ -8,7 +8,10 @@ import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.
  * Role authoring remains implemented in its focused module, but callers no
  * longer need a second top-level `org` entrypoint to reach it.
  */
-export async function main(args: string[] = currentProcessArgv().slice(2)): Promise<void> {
+export async function main(
+  args: string[] = currentProcessArgv().slice(2),
+  print: (value: unknown) => void = () => undefined
+): Promise<void> {
   if (args[0] === 'role') {
     await organizationRolesMain(args);
     return;
@@ -25,6 +28,16 @@ export async function main(args: string[] = currentProcessArgv().slice(2)): Prom
     await executeOrganizationOperation(args.slice(3));
     return;
   }
+  if (args[0] === 'objective' && args[1] === 'kr' && args[2] === 'measure') {
+    const { measureOrganizationObjectives } = await import('./organization_objective_measure.js');
+    await measureOrganizationObjectives(args.slice(3), print);
+    return;
+  }
+  if (args[0] === 'objective' && args[1] === 'kr' && args[2] === 'record') {
+    const { recordOrganizationObjectiveKr } = await import('./organization_objective_measure.js');
+    recordOrganizationObjectiveKr(args.slice(3), print);
+    return;
+  }
   if (args[0] === 'operation' && args[1] === 'tick') {
     await import('./run_pipeline.js');
     const { tickOrganizationOperations } = await import('./organization_operation_execute.js');
@@ -37,7 +50,7 @@ export async function main(args: string[] = currentProcessArgv().slice(2)): Prom
 export const runOrganization = defineScript({
   name: 'organization',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 
 if (

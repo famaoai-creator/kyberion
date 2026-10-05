@@ -954,6 +954,7 @@ export function buildOrganizationProjectLineage(
           project.active_tracks || (project.default_track_id ? [project.default_track_id] : []),
         mission_ids: project.active_missions || [],
         task_session_ids: project.active_task_sessions || [],
+        ...(project.objective_ids?.length ? { objective_ids: project.objective_ids } : {}),
       };
     })
     .sort((a, b) => a.project_id.localeCompare(b.project_id));

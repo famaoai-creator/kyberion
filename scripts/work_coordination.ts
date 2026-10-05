@@ -185,7 +185,11 @@ function discoverReadableMissionStates(): Array<{ missionId: string; state: any 
 
 async function runMain(args: string[] = []): Promise<void> {
   const yargs = createStandardYargs(['node', 'work_coordination', ...args])
-    .command('create-item', 'Create a new work item', () => undefined)
+    .command(
+      'create-item',
+      'Create a new work item (requires --item-id, --title, --description)',
+      () => undefined
+    )
     .command('create-board', 'Create or update a board', () => undefined)
     .command('list-board', 'List board items or boards', () => undefined)
     .command('claim-item', 'Claim a work item lease', () => undefined)
@@ -194,7 +198,11 @@ async function runMain(args: string[] = []): Promise<void> {
     .command('renew-lease', 'Renew a work item lease', () => undefined)
     .command('update-status', 'Update work item fields', () => undefined)
     .command('record-event', 'Append a coordination event', () => undefined)
-    .command('list-items', 'List work items', () => undefined)
+    .command(
+      'list-items',
+      'List work items [--project-id] [--organization-id] [--tenant-slug] [--status] [--board-id]',
+      () => undefined
+    )
     .command(
       'project-next-tasks',
       'Project canonical Work Graph into NEXT_TASKS.json',
@@ -319,7 +327,17 @@ async function runMain(args: string[] = []): Promise<void> {
       break;
     }
     case 'list-items':
-      print({ items: listWorkItems() });
+      print({
+        items: listWorkItems({
+          ...(argv['project-id'] ? { projectId: String(argv['project-id']) } : {}),
+          ...(argv['board-id'] ? { boardId: String(argv['board-id']) } : {}),
+          ...(argv['organization-id']
+            ? { organizationIds: [String(argv['organization-id'])] }
+            : {}),
+          ...(argv['tenant-slug'] ? { tenantSlugs: [String(argv['tenant-slug'])] } : {}),
+          ...(argv.status ? { status: String(argv.status) as WorkItemStatus } : {}),
+        }),
+      });
       break;
     case 'project-next-tasks': {
       const missionId = String(argv['mission-id'] || argv['project-id'] || '').trim();

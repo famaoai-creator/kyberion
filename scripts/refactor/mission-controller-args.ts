@@ -9,6 +9,7 @@ import {
 } from '@agent/core/mission/mission-execution-surface';
 import { validateWritePermission } from '@agent/core/tier-guard';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync } from '@agent/core/secure-io';
 import {
   extractMissionControllerPositionalArgs,
   extractMissionStartCreateOptionsFromArgv,
@@ -182,9 +183,6 @@ export function validateMissionStartCreateInput(
   if (!missionId) return input;
   const project = input.relationships?.project;
   const track = input.relationships?.track;
-  if (project?.project_id && !project.project_path) {
-    throw new Error(`${actionName} ${missionId}: --project-id requires --project-path`);
-  }
   if (project?.project_path && !project.project_id) {
     throw new Error(`${actionName} ${missionId}: --project-path requires --project-id`);
   }
@@ -254,6 +252,31 @@ export function validateMissionStartCreateInput(
         input.organizationId = projectOrganization;
       }
     }
+    if (!project.project_path && projectScope && projectRecord) {
+      // The project-os location is determined by the project record, so
+      // `--project-id` alone is enough; `--project-path` only overrides it.
+      const derived =
+        projectRecord.project_os_path ||
+        pathResolver.projectOsDir(project.project_id, projectScope.tier, projectScope.tenant);
+      if (!safeExistsSync(pathResolver.rootResolve(derived))) {
+        throw new Error(
+          `${actionName} ${missionId}: project ${project.project_id} has no project-os at ` +
+            `${path.relative(pathResolver.rootDir(), pathResolver.rootResolve(derived))}. ` +
+            `Create it with \`pnpm project scaffold ${project.project_id}\`, or pass --project-path.`
+        );
+      }
+      project.project_path = path.relative(
+        pathResolver.rootDir(),
+        pathResolver.rootResolve(derived)
+      );
+      input.ledgerTargets = {
+        markdown: resolveProjectLedgerPath(project.project_path),
+        json: resolveProjectLedgerJsonPath(project.project_path),
+      };
+    }
+  }
+  if (project?.project_id && !project.project_path && !argv.includes('--dry-run')) {
+    throw new Error(`${actionName} ${missionId}: --project-id requires --project-path`);
   }
   if (project?.project_path && input.ledgerTargets) {
     const markdownGuard = validateWritePermission(input.ledgerTargets.markdown);
