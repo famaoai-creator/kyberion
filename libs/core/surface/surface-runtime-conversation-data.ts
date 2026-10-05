@@ -40,6 +40,7 @@ import { truncateTextWithCount } from '../text-truncation.js';
 import { buildCompletionNextAction, formatCompletionNextAction } from '../next-action.js';
 import { getSurfaceQueryProviderConfig } from './surface-query.js';
 import { currentScope } from '../scope-context.js';
+import { recordTurnOutcomeSignal } from './surface-conversation-signals.js';
 import { isCorrectionUtterance } from '../correction-detection.js';
 import {
   surfaceChannelFromAgentId,
@@ -1297,6 +1298,7 @@ export function recordLearningOutcomeSafely(
     // Team Channel E: an isolated turn's replies may carry tenant-confidential
     // excerpts; they never enter the shared intent-learning store.
     if (surfaceInput?.isolation) return;
+    recordTurnOutcomeSignal(surfaceInput, params);
     recordIntentContractOutcome({
       ...params,
       ...(params.scope ? {} : { scope: currentScope() }),
