@@ -5131,6 +5131,10 @@
       "types": "./dist/organization/organization-operating-model-persistence.d.ts",
       "default": "./dist/organization/organization-operating-model-persistence.js"
     },
+    "./organization/organization-objective-progress": {
+      "types": "./dist/organization/organization-objective-progress.d.ts",
+      "default": "./dist/organization/organization-objective-progress.js"
+    },
     "./organization/organization-operating-model": {
       "types": "./dist/organization/organization-operating-model.d.ts",
       "default": "./dist/organization/organization-operating-model.js"

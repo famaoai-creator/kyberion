@@ -275,6 +275,8 @@ export function usage(): string {
     '  pnpm organization purpose set --organization-id <id> --name <name> --tier <tier> [--tenant-slug <slug>] --purpose <text> --owner-role <role> [--principle <p>]... [--approval-state <state>]',
     '  pnpm organization objective add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --objective-id <id> --title <title> [--description <text>] [--horizon <h>] [--owner-role <role>]',
     '  pnpm organization objective kr add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --objective-id <id> --kr-id <id> --title <title> --metric-json <json> --target <n> --direction <increase|decrease|maintain> [--baseline <n>] [--unit <u>] [--weight <n>]',
+    '      --metric-json shapes: {"source":"org_metric","metric":"open_incidents|overdue_operations|pending_decisions|unhealthy_services"} | {"source":"file","path":"<repo-relative json>","json_path":"<key>"} | {"source":"probe","probe":{...}} | {"source":"signal_ratio","signal":"<name>"}',
+    '  pnpm organization objective kr measure --organization-id <id> --tier <tier> [--tenant-slug <slug>] --dry-run|--apply [--json] (measures due KRs without a dot; status then shows progress)',
     '  pnpm organization objective kr list --organization-id <id> --tier <tier> [--tenant-slug <slug>] [--objective-id <id>]',
     '  pnpm organization objective kr remove --organization-id <id> --tier <tier> [--tenant-slug <slug>] --objective-id <id> --kr-id <id>',
     '  pnpm organization domain add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --domain-id <id> --name <name> --owner-role <role> [--purpose <text>]',
