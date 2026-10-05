@@ -33,6 +33,11 @@ export async function main(
     await measureOrganizationObjectives(args.slice(3), print);
     return;
   }
+  if (args[0] === 'objective' && args[1] === 'kr' && args[2] === 'record') {
+    const { recordOrganizationObjectiveKr } = await import('./organization_objective_measure.js');
+    recordOrganizationObjectiveKr(args.slice(3), print);
+    return;
+  }
   if (args[0] === 'operation' && args[1] === 'tick') {
     await import('./run_pipeline.js');
     const { tickOrganizationOperations } = await import('./organization_operation_execute.js');
