@@ -37,6 +37,7 @@ import {
 } from '@agent/core/governance/approval-store';
 import { findMissionPath as resolveMissionPath, rootDir } from '@agent/core/path-resolver';
 import { evaluateAutonomousOpsAction } from '@agent/core/governance/autonomous-ops-gate';
+import { observeMandateCoverage } from '@agent/core/governance/mandate-shadow';
 import { buildDecisionCard, type DecisionCard } from '@agent/core/governance/decision-card';
 import {
   loadMissionBriefAtPath,
@@ -176,6 +177,10 @@ export function openAlignmentApproval(
     accountability: { finalDecision: 'human_only', payloadHash },
     decisionCard: buildAlignmentDecisionCard(brief, briefPath),
   });
+
+  // Shadow mode (P4): record whether a standing mandate would have covered this
+  // brief. Record-only — the gate above stays human_only whatever this says.
+  observeMandateCoverage(missionId, brief);
 
   return { missionId, created: true, requestId: record.id, payloadHash, briefPath };
 }
