@@ -341,6 +341,10 @@ describe('bounded artifact revision contract', () => {
     for (const extra of [
       { path: 'anything' },
       { format: 'html' },
+      { format: ['compact'] },
+      { format: ['readable'] },
+      { format: { value: 'compact' } },
+      { format: null },
       { revision: 0 },
       { sha256: 'bad' },
       { approved: true },

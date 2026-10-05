@@ -418,6 +418,10 @@ describe('explicit diagnostic receipt revision route', () => {
     { ...revisionInput, revision: 0 },
     { ...revisionInput, sha256: 'invalid' },
     { ...revisionInput, format: 'html' },
+    { ...revisionInput, format: ['compact'] },
+    { ...revisionInput, format: ['readable'] },
+    { ...revisionInput, format: { value: 'compact' } },
+    { ...revisionInput, format: null },
   ])('rejects malformed target %j without falling through to chat', async (artifactRevision) => {
     const response = await POST(request({ text: 'hello', artifactRevision }));
     expect(response.status).toBe(400);
