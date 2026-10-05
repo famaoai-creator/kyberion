@@ -144,7 +144,7 @@ describe('durable Ask HTTP handlers', () => {
     ).toBe(409);
     expect(fixtures.run).not.toHaveBeenCalled();
     const request_id = '12345678-1234-4234-8234-123456789abc';
-    await request('POST', { text: 'first', request_id });
+    await request('POST', { text: 'hello there', request_id });
     expect((await request('POST', { text: 'other', request_id })).statusCode).toBe(409);
     expect(fixtures.run).toHaveBeenCalledTimes(1);
   });
@@ -244,4 +244,54 @@ it('refuses incomplete project lineage before reserving or executing', async () 
   });
   expect(fixtures.run).not.toHaveBeenCalled();
   expect(fixtures.files.size).toBe(0);
+});
+
+describe('request continuity at the actual front-desk ingress', () => {
+  async function say(text: string, request_id?: string) {
+    return request('POST', {
+      text,
+      locale: 'ja',
+      tenant: 'alpha-team',
+      ...(request_id ? { request_id } : {}),
+    });
+  }
+  it('records A and B, answers named A, clarifies an ambiguous reference, and recovers the selection', async () => {
+    const a = await say('Aの報告書を作って', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    const b = await say('Bの旅行計画を作って', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+    expect(a.body).toMatchObject({ ok: true, mode: 'orchestrator', reply: 'A real reply' });
+    expect(b.body).toMatchObject({ ok: true, mode: 'orchestrator', reply: 'A real reply' });
+    expect(fixtures.run).toHaveBeenCalledTimes(2);
+    fixtures.run.mockClear();
+    const status = await say('Aの件どう？');
+    expect(status.body).toMatchObject({ mode: 'intake', shape: 'status_summary' });
+    expect(status.body.reply).toContain('回答済み');
+    expect(status.body.reply).toContain('A real reply');
+    const vague = await say('さっきの件どう？');
+    expect(vague.body).toMatchObject({ mode: 'intake', shape: 'clarification' });
+    expect(vague.body.reply).toContain('A');
+    expect(vague.body.reply).toContain('B');
+    const selected = await say('1つ目');
+    expect(selected.body).toMatchObject({ mode: 'intake', shape: 'status_summary' });
+    expect(selected.body.reply).toContain('A');
+    expect(fixtures.run).not.toHaveBeenCalled();
+    const replay = await say('Aの報告書を作って', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    expect(replay.body).toMatchObject({ mode: 'history', replayed: true, reply: a.body.reply });
+    expect(fixtures.run).not.toHaveBeenCalled();
+  });
+  it('leaves combined requests and bare confirmations to the runtime', async () => {
+    await say('Aの報告書を作って');
+    fixtures.run.mockClear();
+    const mixed = await say('Aの件どう？ それとBの旅行計画を作って');
+    expect(mixed.body).toMatchObject({ mode: 'orchestrator', reply: 'A real reply' });
+    expect((await say('はい')).body.mode).toBe('orchestrator');
+    expect((await say('進めて')).body.mode).toBe('orchestrator');
+    expect(fixtures.run).toHaveBeenCalledTimes(3);
+  });
+  it('answers named approval/cancel locally as non-executing intake', async () => {
+    await say('Aの報告書を作って');
+    fixtures.run.mockClear();
+    expect((await say('Aの報告書を承認')).body).toMatchObject({ mode: 'intake' });
+    expect((await say('Aの報告書をキャンセル')).body).toMatchObject({ mode: 'intake' });
+    expect(fixtures.run).not.toHaveBeenCalled();
+  });
 });

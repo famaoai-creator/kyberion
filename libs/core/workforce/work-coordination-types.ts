@@ -229,6 +229,8 @@ export interface AppendCoordinationEventInput {
 }
 
 export interface ClaimWorkItemInput {
+  /** Executors require fresh ownership; an idempotent retry must never execute twice. */
+  requireNewLease?: boolean;
   itemId: string;
   actorPeerId: string;
   actorUserId?: string;

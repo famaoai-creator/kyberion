@@ -749,22 +749,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/front-desk-conversation-store.ts#completeConversationTurn (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": ["sovereign_concierge"],
-      "unresolved": []
-    },
-    {
-      "site": "libs/core/surface/front-desk-conversation-store.ts#markConversationTurnNotStarted (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": ["sovereign_concierge"],
-      "unresolved": []
-    },
-    {
-      "site": "libs/core/surface/front-desk-conversation-store.ts#markConversationTurnUncertain (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": ["sovereign_concierge"],
-      "unresolved": []
-    },
-    {
-      "site": "libs/core/surface/front-desk-conversation-store.ts#reserveConversationTurn (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/surface/front-desk-conversation-store.ts#publishTranscript (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -1124,12 +1109,12 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/workforce/work-coordination.ts#clearWorkCoordinationStore",
+      "site": "libs/core/workforce/work-coordination.ts#ensureDefaultWorkCoordinationCatalog",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
     {
-      "site": "libs/core/workforce/work-coordination.ts#ensureDefaultWorkCoordinationCatalog",
+      "site": "libs/core/workforce/work-coordination.ts#withCoordinationMutation",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },

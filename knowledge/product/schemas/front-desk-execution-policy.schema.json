@@ -1,0 +1,135 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Opt-in bounded front-desk diagnostic receipt mapping",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "mappings"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": 1
+    },
+    "mappings": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "viewer", "dotId", "exactCommand", "pipeline"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+          },
+          "dotId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+          },
+          "viewer": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "principalId",
+              "role",
+              "source",
+              "tenantSlugs",
+              "organizationIds",
+              "projectIds",
+              "tierAccess"
+            ],
+            "properties": {
+              "principalId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "memberId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "registrationLabel": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "role": {
+                "enum": ["readonly", "localadmin"]
+              },
+              "source": {
+                "enum": ["token", "loopback"]
+              },
+              "tenantSlugs": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+                }
+              },
+              "organizationIds": {
+                "oneOf": [
+                  {
+                    "const": "all"
+                  },
+                  {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 1,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+                    }
+                  }
+                ]
+              },
+              "projectIds": {
+                "oneOf": [
+                  {
+                    "const": "all"
+                  },
+                  {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 1,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+                    }
+                  }
+                ]
+              },
+              "tierAccess": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "items": {
+                  "const": "public"
+                }
+              }
+            }
+          },
+          "exactCommand": {
+            "const": "Create a local diagnostic request receipt artifact."
+          },
+          "pipeline": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "version"],
+            "properties": {
+              "path": {
+                "const": "pipelines/front-desk-request-receipt.json"
+              },
+              "version": {
+                "const": "receipt-v1"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

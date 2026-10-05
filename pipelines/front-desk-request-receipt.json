@@ -1,0 +1,17 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "front-desk-request-receipt",
+  "version": "1.0.0",
+  "description": "Opt-in diagnostic vertical slice: materialize the server-bound request receipt. No provider calls or external service actions. The executor verifies and publishes the scoped artifact.",
+  "steps": [
+    {
+      "id": "write-request-receipt",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{front_desk_output_path}}",
+        "content": "{{front_desk_artifact_content}}"
+      }
+    }
+  ]
+}

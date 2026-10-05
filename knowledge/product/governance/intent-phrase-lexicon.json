@@ -1413,6 +1413,307 @@
           "phrases": ["dissatisfied"]
         }
       }
+    },
+    "conversation_task.new_request": {
+      "description": "Explicit bounded intake request; classification never starts execution.",
+      "locales": {
+        "en": {
+          "patterns": [
+            "(?:^|[.;\\n]|\\band\\s+)\\s*(?:please\\s+)?(?:(?:can|could|would) you\\s+)?(?:create|write|prepare|draft|build|research|investigate|find|design|make(?!\\s+it\\b)|summarize)\\b"
+          ]
+        },
+        "ja": {
+          "patterns": [
+            "(?:作って|作成して|作成をお願い|調べて|調査して|探して|まとめて|用意して|準備して|実装して)(?:ください|くれる|ほしい)?(?:[。！？!?\\s]|$)"
+          ]
+        }
+      }
+    },
+    "conversation_task.followup": {
+      "description": "Follow-up amendment or continuation of a recorded request.",
+      "locales": {
+        "en": {
+          "patterns": [
+            "(?:^|[.;\\n]|\\band\\s+)(?:please\\s+)?(?:also\\s+)?(?:add|change|revise|amend|continue|update)\\b",
+            "\\b(?:instead|make it|same request|that request)\\b"
+          ]
+        },
+        "ja": {
+          "patterns": [
+            "(?:追加して|加えて|変更して|修正して|変えて|続けて|にして)(?:ください|ほしい|くれる)?(?:[。！？!?\\s]|$)"
+          ]
+        }
+      }
+    },
+    "conversation_task.status": {
+      "description": "Read-only question about recorded requests, excluding generic how-questions unless a known task is matched.",
+      "locales": {
+        "en": {
+          "patterns": [
+            "\\b(?:any updates?|what happened|progress on|status of|status on|is it done|are you done)\\b",
+            "^\\s*(?:status|progress)\\s*[?! .]*$",
+            "\\bhow(?:'s| is| are)\\s+(?:it|that|this|the (?:request|task|work)|(?:my|our) (?:request|task|work))\\b"
+          ]
+        },
+        "ja": {
+          "patterns": [
+            "(?:進捗|状況)(?:は|どう|を教えて|教えて|確認)",
+            "(?:どうなった|どうなってる|できた|終わった)[？?。!！\\s]*$",
+            "(?:件|依頼)(?:は)?どう[？?。!！\\s]*$",
+            "(?:さっき|先ほど|前の|その|あの|例の).{0,200}どう[？?。!！\\s]*$"
+          ]
+        }
+      }
+    },
+    "conversation_task.approval": {
+      "description": "Approval-shaped text only, never an authorization grant.",
+      "locales": {
+        "en": {
+          "patterns": [
+            "(?:^|[.;\\n]|\\band\\s+)\\s*(?:please\\s+)?(?:approve|approved|go ahead|proceed)\\b",
+            "^\\s*(?:yes|ok|okay)\\s*[!.]*$"
+          ]
+        },
+        "ja": {
+          "patterns": [
+            "(?:承認|了承)(?:して|します|する)?(?:[。！？!?\\s]|$)",
+            "^(?:はい|いいよ|お願いします|進めて|進めてください)[。！？!?\\s]*$"
+          ]
+        }
+      }
+    },
+    "conversation_task.cancellation": {
+      "description": "Cancellation-shaped text only; no executor is cancelled.",
+      "locales": {
+        "en": {
+          "patterns": [
+            "(?:^|[.;\\n]|\\band\\s+)\\s*(?:please\\s+)?(?:cancel|stop|abort|never mind|nevermind)\\b"
+          ]
+        },
+        "ja": {
+          "patterns": [
+            "(?:キャンセル|中止|取り消し|止めて|やめて)(?:して|します|する|ください)?(?:[。！？!?\\s]|$)"
+          ]
+        }
+      }
+    },
+    "conversation_task.mixed": {
+      "description": "Multiple clauses require restatement before task-intake mutation.",
+      "locales": {
+        "en": {
+          "patterns": [
+            "[;\\n]",
+            "\\b(?:and then|and also|also create|also write|also prepare|also research|and create|and write|and prepare|and research|and cancel|and stop|and approve)\\b"
+          ]
+        },
+        "ja": {
+          "phrases": ["それと", "それから", "その後", "別件も", "ついでに"],
+          "patterns": ["[;；\\n]"]
+        }
+      }
+    },
+    "conversation_task.vague_confirmation": {
+      "description": "Bare yes/no cannot select among pending task candidates.",
+      "match": "exact",
+      "locales": {
+        "en": {
+          "patterns": ["\\s*(?:yes|no|ok|okay|sure)\\s*[!.]*"]
+        },
+        "ja": {
+          "patterns": ["(?:はい|いいえ|うん|お願いします|それで)[。！？!?\\s]*"]
+        }
+      }
+    },
+    "conversation_task.ordinal": {
+      "description": "Whole-message numeric choice, interpreted only against the persisted candidate list.",
+      "locales": {
+        "und": {
+          "patterns": ["^\\s*([1-9][0-9]?)\\s*[.!?]*$"]
+        },
+        "en": {
+          "patterns": ["^\\s*(?:number\\s+)?([1-9][0-9]?)(?:st|nd|rd|th)?\\s*[.!?]*$"]
+        },
+        "ja": {
+          "patterns": ["^\\s*([1-9][0-9]?)(?:つ目|番目|番)\\s*[。！？!?]*$"]
+        }
+      }
+    },
+    "conversation_task.first": {
+      "description": "Whole-message first choice.",
+      "match": "exact",
+      "locales": {
+        "en": {
+          "patterns": ["\\s*(?:the )?first(?: one)?\\s*[.!?]*"]
+        },
+        "ja": {
+          "patterns": ["(?:一つ目|最初の|一番目)[。！？!?\\s]*"]
+        }
+      }
+    },
+    "conversation_task.second": {
+      "description": "Whole-message second choice.",
+      "match": "exact",
+      "locales": {
+        "en": {
+          "patterns": ["\\s*(?:the )?second(?: one)?\\s*[.!?]*"]
+        },
+        "ja": {
+          "patterns": ["(?:二つ目|二番目)[。！？!?\\s]*"]
+        }
+      }
+    },
+    "conversation_task.third": {
+      "description": "Whole-message third choice.",
+      "match": "exact",
+      "locales": {
+        "en": {
+          "patterns": ["\\s*(?:the )?third(?: one)?\\s*[.!?]*"]
+        },
+        "ja": {
+          "patterns": ["(?:三つ目|三番目)[。！？!?\\s]*"]
+        }
+      }
+    },
+    "conversation_task.title": {
+      "description": "Display title extracted from explicit intake wording; no executable contract.",
+      "locales": {
+        "en": {
+          "patterns": [
+            "^\\s*(?:please\\s+)?(?:(?:can|could|would) you\\s+)?(?:create|write|prepare|draft|build|research|investigate|find|design|make|summarize)\\s+(.{1,512})"
+          ]
+        },
+        "ja": {
+          "patterns": [
+            "^(.{1,512}?)(?:を)?(?:作って|作成して|作成をお願い|調べて|調査して|探して|まとめて|用意して|準備して|実装して)(?:ください|くれる|ほしい)?[。！？!?\\s]*$"
+          ]
+        }
+      }
+    },
+    "conversation_task.named_reference": {
+      "description": "Explicit task topic; unknown named topics cannot fall back to the only task.",
+      "locales": {
+        "ja": {
+          "patterns": [
+            "^(.{1,120}?)の(?:件|依頼)(?:は|について)?(?:どう|進捗|状況)",
+            "^(.{1,120}?)の(?:進捗|状況)(?:は|どう|を教えて|教えて)",
+            "^(.{1,120}?)を(?:キャンセル|中止|止めて|承認)",
+            "^(.{1,8192}?)に(?:表|グラフ|図|要約|まとめ)を(?:追加して|加えて)"
+          ]
+        },
+        "en": {
+          "patterns": [
+            "^(?:what(?:'s| is) the )?(?:status|progress)(?: of| on| for)?\\s+(.{1,120}?)\\s*[?!.]*$",
+            "^how(?:'s| is| are)\\s+(.{1,120}?)\\s*[?!.]*$",
+            "^(?:please\\s+)?(?:cancel|stop|approve)\\s+(?:the\\s+)?(.{1,120}?)\\s*[?!.]*$",
+            "^(?:please\\s+)?add\\b.{1,8192}\\s+to\\s+(.{1,8192}?)\\s*[?!.]*$"
+          ]
+        }
+      }
+    },
+    "conversation_task.deictic": {
+      "description": "Whole reference denoting current or previous work, never a named foreign task.",
+      "match": "exact",
+      "locales": {
+        "ja": {
+          "phrases": [
+            "さっき",
+            "先ほど",
+            "前",
+            "その",
+            "あの",
+            "例",
+            "それ",
+            "これ",
+            "この",
+            "前の",
+            "さっきの",
+            "先ほどの",
+            "その件",
+            "その依頼"
+          ]
+        },
+        "en": {
+          "phrases": [
+            "it",
+            "this",
+            "that",
+            "this request",
+            "that request",
+            "the request",
+            "the earlier request",
+            "earlier request",
+            "previous request",
+            "my request",
+            "the work",
+            "the task",
+            "that task",
+            "this task"
+          ]
+        }
+      }
+    },
+    "conversation_task.task_topic": {
+      "description": "Leading topic before Japanese possessive wording for unique named-reference matching.",
+      "locales": {
+        "ja": {
+          "patterns": ["^(.{1,120}?)の.{1,512}$"]
+        }
+      }
+    },
+    "conversation_task.status_question": {
+      "description": "Generic question shape used only when a recorded task name is independently matched.",
+      "locales": {
+        "en": {
+          "patterns": ["^how(?:'s| is| are)\\s+"]
+        }
+      }
+    },
+    "conversation_task.implicit_reference": {
+      "description": "Whole-message allowlist of bounded implicit-target phrases. Complex unmatched instructions require clarification.",
+      "locales": {
+        "en": {
+          "patterns": [
+            "^\\s*(?:any updates?|status|progress|what happened|is it done|are you done|go ahead|proceed|approve|approved|cancel|stop|abort|never mind|nevermind|yes|ok|okay)\\s*[?!.]*$",
+            "^\\s*(?:please\\s+)?(?:also\\s+)?add\\s+(?:a chart|a table|an appendix|a summary|a conclusion)\\s*[?!.]*$",
+            "^\\s*(?:please\\s+)?make it\\s+(?:shorter|longer|more concise|more detailed)\\s*[?!.]*$",
+            "^\\s*(?:please\\s+)?(?:change|revise|update)\\s+(?:the|its)\\s+(?:title|heading)\\s+to\\s+(?:\\\"[^\\\"\\n]{1,8000}\\\"|'[^'\\n]{1,8000}')\\s*[?!.]*$",
+            "^\\s*(?:please\\s+)?add\\s+(?:\\\"[^\\\"\\n]{1,8000}\\\"|'[^'\\n]{1,8000}')\\s+to\\s+(?:the|its)\\s+(?:title|heading)\\s*[?!.]*$",
+            "^\\s*(?:please\\s+)?continue\\s*[?!.]*$"
+          ]
+        },
+        "ja": {
+          "patterns": [
+            "^(?:進捗|状況)(?:は|どう|を教えて|教えて|確認して)?[？?。!！\\s]*$",
+            "^(?:どうなった|どうなってる|できた|終わった|承認します|承認して|承認|はい|いいよ|お願いします|進めて|中止して|キャンセルして|止めて|やめて)[？?。!！\\s]*$",
+            "^(?:それに|その依頼に)?(?:表|グラフ|図|要約|まとめ)を(?:追加して|加えて)(?:ください|ほしい|くれる)?[？?。!！\\s]*$",
+            "^(?:英語|日本語|短く|長く)に?して(?:ください|ほしい|くれる)?[？?。!！\\s]*$",
+            "^続けて(?:ください|ほしい|くれる)?[？?。!！\\s]*$"
+          ]
+        }
+      }
+    },
+    "conversation_task.amendment_field": {
+      "description": "Whole amendment-field reference, distinct from a named task.",
+      "match": "exact",
+      "locales": {
+        "en": {
+          "patterns": ["(?:the|its) (?:title|heading|report|document|table)"]
+        }
+      }
+    },
+    "conversation_task.quoted_reference": {
+      "description": "Exactly one whole quoted task name; never selects the first of multiple quoted targets.",
+      "match": "exact",
+      "locales": {
+        "und": {
+          "patterns": [
+            "^\"([^\"\\n]{1,8192})\"$",
+            "^'([^'\\n]{1,8192})'$",
+            "^「([^」\\n]{1,8192})」$",
+            "^『([^』\\n]{1,8192})』$"
+          ]
+        }
+      }
     }
   }
 }
