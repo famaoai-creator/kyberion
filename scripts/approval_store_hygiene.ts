@@ -98,9 +98,14 @@ export function formatApprovalStoreHygieneReport(report: ApprovalStoreHygieneRep
 export function runApprovalStoreHygieneSweeps(options: {
   dryRun: boolean;
   staleAfterDays: number;
+  /** false skips the trash move (it needs the sovereign persona); expiry still runs. */
+  purgeFixtures?: boolean;
 }): ApprovalStoreHygieneReport {
   const records = withExecutionContext('mission_controller', () => listApprovalRequests());
-  const fixturePurge = purgeFixtureApprovals({ dryRun: options.dryRun, records });
+  const fixturePurge =
+    options.purgeFixtures === false
+      ? { candidates: [], applied: [], errors: [], dryRun: options.dryRun }
+      : purgeFixtureApprovals({ dryRun: options.dryRun, records });
   const trashed = new Set(fixturePurge.applied);
   const pendingExpiry = sweepExpirablePendingApprovals({
     dryRun: options.dryRun,

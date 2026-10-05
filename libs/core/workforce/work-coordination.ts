@@ -5,7 +5,6 @@ import { withLockSync } from '../foundation/lock-utils.js';
 import { slugify } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-
 import { withExecutionContext } from '../authority.js';
 import { enforceNhiActorPolicy } from '../nhi-actor-verification.js';
 import {
@@ -20,7 +19,7 @@ import { buildWorkItemHandoffPacket, type HandoffPacket } from '../mesh/handoff-
 import { auditChain } from '../governance/audit-chain.js';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
-import { WorkCoordinationError } from './work-coordination-error.js';
+import { WorkCoordinationError, assertWorkClaimsAllowed } from './work-coordination-error.js';
 import {
   assertOriginalWorkItemIdentity,
   buildWorkItemCreation,
@@ -967,6 +966,7 @@ export function claimWorkItem(input: ClaimWorkItemInput): { item: WorkItem; leas
 }
 
 function claimWorkItemInternal(input: ClaimWorkItemInput): { item: WorkItem; lease: WorkLease } {
+  assertWorkClaimsAllowed(input.itemId);
   // NI-02: the claimant actor is no longer an unverified free string. warn
   // (default) audits unregistered/inactive actors and allows; enforce rejects.
   enforceNhiActorPolicy(input.actorPeerId, 'work-coordination.claimWorkItem');

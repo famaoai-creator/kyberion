@@ -16,6 +16,8 @@ import { runDependencyVulnerabilityScanOnce } from './scan_dependency_vulns.js';
 import { runHealthDegradationWatch } from './health_degradation_watch.js';
 import { collectUiUxGovernanceReport } from './check_ui_ux_governance.js';
 import { runTenantDriftWatch } from './watch_tenant_drift.js';
+import { runDecisionDigest } from './approval_inbox.js';
+import { runApprovalStoreHygieneSweeps } from './approval_store_hygiene.js';
 import { runAutoCheckpoint } from './auto_checkpoint.js';
 import { createBackup, runRestoreDrill } from './backup.js';
 import { generateSoftwareQualityArtifacts } from './software_quality_report.js';
@@ -988,6 +990,77 @@ export function runInlineAccountabilityReport(
       charters: entries.length,
       sent: entries.filter((entry) => entry.sent).length,
       text: entries.map((entry) => entry.text).join('\n\n'),
+    },
+    ctx
+  );
+}
+
+/**
+ * core:decision_digest — the operator's "what needs me?" digest (decisions
+ * waiting, veto windows about to proceed, what agents did on their own, quiet
+ * waits). `send: true` pushes it through the `decision_digest` route.
+ */
+export function runInlineDecisionDigest(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Record<string, unknown> {
+  const rawLocale = String(resolveVars(params.locale ?? '', ctx)).trim();
+  const locale = rawLocale ? normalizeLocale(rawLocale) : null;
+  if (rawLocale && !locale) {
+    throw new Error(`core:decision_digest: unsupported locale ${rawLocale}`);
+  }
+  const hoursRaw = Number(resolveVars(params.hours ?? 12, ctx));
+  const hours = Number.isFinite(hoursRaw) && hoursRaw > 0 ? hoursRaw : 12;
+  const send = resolveVars(params.send ?? false, ctx) === true;
+  const result = runDecisionDigest({
+    now: Date.now(),
+    hours,
+    locale: locale?.startsWith('en') ? 'en' : 'ja',
+    send,
+  });
+  return exportValue(
+    params,
+    step,
+    {
+      needs_decision: result.digest.counts.decide,
+      veto_pending: result.digest.counts.veto,
+      stale: result.digest.counts.stale,
+      sent: result.sent,
+      text: result.text,
+    },
+    ctx
+  );
+}
+
+/**
+ * core:approval_store_hygiene — expire pending approvals nobody will act on.
+ * Fixture trashing needs the sovereign persona, so it is opt-in
+ * (`purge_fixtures: true`) and off for the scheduled run.
+ */
+export function runInlineApprovalStoreHygiene(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Record<string, unknown> {
+  const staleRaw = Number(resolveVars(params.stale_days ?? 14, ctx));
+  const staleAfterDays = Number.isInteger(staleRaw) && staleRaw >= 1 ? staleRaw : 14;
+  const apply = resolveVars(params.apply ?? false, ctx) === true;
+  const purgeFixtures = resolveVars(params.purge_fixtures ?? false, ctx) === true;
+  const report = runApprovalStoreHygieneSweeps({
+    dryRun: !apply,
+    staleAfterDays,
+    purgeFixtures,
+  });
+  return exportValue(
+    params,
+    step,
+    {
+      dry_run: report.dryRun,
+      expired: report.pendingExpiry.applied.length,
+      expirable: report.pendingExpiry.candidates.length,
+      fixtures_trashed: report.fixturePurge.applied.length,
+      errors: [...report.pendingExpiry.errors, ...report.fixturePurge.errors],
     },
     ctx
   );

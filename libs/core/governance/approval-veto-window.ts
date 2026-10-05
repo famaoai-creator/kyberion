@@ -1,3 +1,4 @@
+import { isOperationsHalted } from './operations-halt.js';
 import {
   appendGovernedArtifactJsonl,
   writeGovernedArtifactJson,
@@ -278,6 +279,9 @@ export function tickVetoWindows(
     fellBack: [],
     errors: [],
   };
+  // P1-9: a halt freezes the clock's consequences — silent consent must not
+  // turn into action while the operator has stopped everything.
+  if (isOperationsHalted()) return result;
   const pending = listApprovalRequests({
     status: 'pending',
     ...(params.storageChannels ? { storageChannels: params.storageChannels } : {}),
