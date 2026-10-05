@@ -1,0 +1,24 @@
+{
+  "record_id": "mem-MSN-BROWSER-LLM-20260917-2026_09_16-R1",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Browser-actuator verification: dedicated CDP profile, data-field consistency, honest partial results",
+  "summary": "Failure+recovery lessons from LLM-driven browser-loop verification.",
+  "candidate_id": "mem-MSN-BROWSER-LLM-20260917-2026_09_16-R1",
+  "evidence_refs": [
+    "active/missions/public/MSN-BROWSER-LLM-20260917/evidence/ledger.jsonl",
+    "active/missions/public/MSN-BROWSER-LLM-20260917/evidence/intent-snapshots.jsonl"
+  ],
+  "created_at": "2026-10-05T13:30:26.454Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "Verification initially rejected: browser-actuator observe/decide/act ran, but the extension sidepanel execution path and a renderer data-field mismatch remained, so the original extension completion criteria were unmet. Recovery: fixed the data-field inconsistency, then ran fill_ref twice against a dedicated Chrome instance over CDP and confirmed both inputs landed in the composed preview — without touching the default Chrome profile or keychain. Transferable rules: (1) always verify browser actuation on an isolated Chrome/CDP profile so user state is never mutated; (2) a renderer data-field mismatch is a silent blocker for composed preview — check field bindings before blaming the actuator; (3) on partial verification, fix the in-scope defect, re-run the deterministic checks, and record the residual scope (e.g. profile-scoped Native Messaging, LLM computer loop) as an explicit follow-up with prior evidence rather than stretching 'done'."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-BROWSER-LLM-20260917/evidence/ledger.jsonl",
+    "active/missions/public/MSN-BROWSER-LLM-20260917/evidence/intent-snapshots.jsonl"
+  ],
+  "source_branch": "fix/voice-media-session-id-20261005",
+  "source_commit": "3914948b3e61c1a44cc2ec7e79234920b20756a7"
+}

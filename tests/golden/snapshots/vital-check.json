@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-08-28T13:16:52.969Z",
+  "generated_at": "2026-10-05T14:02:44.657Z",
   "pipeline_id": "vital-check",
   "pipeline_path": "pipelines/vital-check.json",
-  "result_hash": "c22f030d38c55c748275ef2d411f1121895b9995c07f06123f7a23b75ea999ff",
+  "result_hash": "ecb67cb168a7f179d8ef0d5c7d7fc0010cd19d4a6dac1a5795eeb25baba7deef",
   "result": {
     "status": "succeeded",
     "results": [
@@ -90,13 +90,13 @@
       },
       "p_identity": {
         "path": "my-identity.json",
-        "exists": false,
-        "kind": "unknown"
+        "exists": true,
+        "kind": "file"
       },
       "p_vision": {
         "path": "my-vision.md",
-        "exists": false,
-        "kind": "unknown"
+        "exists": true,
+        "kind": "file"
       },
       "trace_summary": "ok"
     }
