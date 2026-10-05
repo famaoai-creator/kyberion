@@ -427,7 +427,7 @@ describe('durable scoped request routing', () => {
             title: string;
             updates: string[];
             state: string;
-            execution: string;
+            result?: { turnId: string; excerpt: string; at: number };
           }>;
         };
       }
@@ -446,9 +446,7 @@ describe('durable scoped request routing', () => {
     const selected = intake('1つ目');
     expect(selected.routing).toMatchObject({ kind: 'status', taskIds: [a], authority: 'none' });
     expect(state().tasks).toHaveLength(2);
-    expect(
-      state().tasks.every((task) => task.state === 'recorded' && task.execution === 'not_started')
-    ).toBe(true);
+    expect(state().tasks.every((task) => task.state === 'recorded')).toBe(true);
   });
   it('replays a decision without duplicating intake or changing request state on completion', () => {
     const first = intake('Aの報告書を作って', a);
@@ -497,7 +495,46 @@ describe('durable scoped request routing', () => {
     expect(readConversationHistory(viewer).pending).toBe(1);
     completeConversationTurn(viewer, turn.id, 'Done, deployed and completed!');
     expect(JSON.stringify(state())).not.toContain('do-not-store');
-    expect(state().tasks[0]).toMatchObject({ state: 'recorded', execution: 'not_started' });
+    expect(state().tasks[0].state).toBe('recorded');
+    expect(state().tasks[0].result).toBeUndefined();
+  });
+  it('completes a request answered in place and reports it through status', () => {
+    const turn = reserveConversationTurn(viewer, 'Aの報告書を作って', a, Date.now(), 'ja');
+    completeConversationTurn(viewer, turn.id, 'Aの報告書の下書きです。', 'answered');
+    expect(state().tasks[0]).toMatchObject({
+      state: 'completed',
+      result: { turnId: a, excerpt: 'Aの報告書の下書きです。' },
+    });
+    const status = intake('Aの件どう？');
+    expect(status.routing?.reply).toContain('回答済み');
+    expect(status.routing?.reply).toContain('Aの報告書の下書きです。');
+  });
+  it('marks a request needing work beyond the conversation and applies a named follow-up', () => {
+    const turn = reserveConversationTurn(viewer, 'Aの報告書を作って', a, Date.now(), 'ja');
+    completeConversationTurn(viewer, turn.id, '承認が必要です。', 'needs_execution');
+    expect(state().tasks[0].state).toBe('needs_execution');
+    const followup = reserveConversationTurn(
+      viewer,
+      'Aの報告書に表を追加して',
+      b,
+      Date.now(),
+      'ja'
+    );
+    expect(followup.routing).toMatchObject({ kind: 'followup', taskIds: [a] });
+    completeConversationTurn(viewer, followup.id, '表を追加しました。', 'answered');
+    expect(state().tasks[0]).toMatchObject({
+      state: 'completed',
+      updates: ['Aの報告書に表を追加して'],
+      result: { turnId: b, excerpt: '表を追加しました。' },
+    });
+  });
+  it('never applies an outcome to chat or local intake turns', () => {
+    intake('Aの報告書を作って', a);
+    const chat = reserveConversationTurn(viewer, 'hello');
+    completeConversationTurn(viewer, chat.id, 'hello back', 'answered');
+    const status = reserveConversationTurn(viewer, 'Aの件どう？', undefined, Date.now(), 'ja');
+    completeConversationTurn(viewer, status.id, status.routing!.reply!, 'answered');
+    expect(state().tasks[0].state).toBe('recorded');
   });
 });
 

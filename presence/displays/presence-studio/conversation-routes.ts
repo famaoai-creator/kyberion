@@ -14,6 +14,7 @@ import {
   readConversationHistory,
   reserveConversationTurn,
   completeConversationTurn,
+  classifyConversationTurnOutcome,
   markConversationTurnUncertain,
   frontDeskRuntimeScope,
   presenceFrontDeskConversationViewer,
@@ -251,7 +252,12 @@ export function registerConversationRoutes(app: express.Express): void {
         : undefined;
       let historySaved = true;
       try {
-        completeConversationTurn(viewer, turn.id, reply);
+        completeConversationTurn(
+          viewer,
+          turn.id,
+          reply,
+          classifyConversationTurnOutcome(conversation)
+        );
       } catch {
         historySaved = false;
       }

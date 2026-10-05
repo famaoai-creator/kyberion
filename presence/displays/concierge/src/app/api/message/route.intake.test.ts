@@ -61,7 +61,9 @@ describe('Concierge intake through the real shared store', () => {
     fixtures.run.mockClear();
     const named = await say('Aの件どう？');
     expect(named.body).toMatchObject({ mode: 'intake', shape: 'status_summary' });
-    expect(named.body.reply).toContain('A');
+    expect(named.body.reply).toContain('Aの報告書');
+    expect(named.body.reply).toContain('回答済み');
+    expect(named.body.reply).toContain('Chat reply');
     const vague = await say('さっきの件どう？');
     expect(vague.body.shape).toBe('clarification');
     expect(vague.body.reply).toContain('A');

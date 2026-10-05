@@ -12,14 +12,18 @@ import {
 } from '../intent/intent-phrase-lexicon.js';
 import { detectTextLocale, type SupportedLocale } from '../locale-normalize.js';
 import { t } from '../t.js';
+import type { IntentResolutionContract } from '../intent/intent-resolution-contract-parser.js';
 
 export const CONVERSATION_TASK_MAX_TASKS = 64;
 export const CONVERSATION_TASK_MAX_TITLE = 512;
 export const CONVERSATION_TASK_MAX_UPDATES = 64;
 export const CONVERSATION_TASK_MAX_TEXT = 8192;
 export const CONVERSATION_TASK_MAX_STATE_BYTES = 4 * 1024 * 1024;
+export const CONVERSATION_TASK_MAX_EXCERPT = 280;
 const MAX_REPLY = 32768;
 const ID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+const WORK_ITEM_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const STATUSES = ['recorded', 'completed', 'awaiting_input', 'needs_execution'] as const;
 const KINDS = [
   'new_request',
   'followup',
@@ -37,14 +41,27 @@ const CLARIFIABLE_KINDS = ['status', 'approval', 'cancellation'] as const;
 export type ConversationTaskKind = (typeof KINDS)[number];
 export type ConversationTaskTargetKind = (typeof TARGET_KINDS)[number];
 export type ConversationTaskClarifiableKind = (typeof CLARIFIABLE_KINDS)[number];
+/**
+ * `completed` means the conversation runtime answered the request in place.
+ * `needs_execution` marks work the scoped conversation cannot finish; a governed
+ * executor may later link it through `workItemId`.
+ */
+export type ConversationTaskStatus = (typeof STATUSES)[number];
+export type ConversationTurnOutcome = 'answered' | 'awaiting_input' | 'needs_execution';
+export interface ConversationTaskResult {
+  turnId: string;
+  excerpt: string;
+  at: number;
+}
 export interface ConversationTaskRecord {
   id: string;
   title: string;
   requestText: string;
   createdAt: number;
   updates: string[];
-  state: 'recorded';
-  execution: 'not_started';
+  state: ConversationTaskStatus;
+  result?: ConversationTaskResult;
+  workItemId?: string;
 }
 export interface ConversationTaskState {
   tasks: ConversationTaskRecord[];
@@ -78,6 +95,17 @@ function textValue(value: unknown, max: number): value is string {
 function id(value: unknown): value is string {
   return typeof value === 'string' && ID_PATTERN.test(value);
 }
+function taskResult(value: unknown): value is ConversationTaskResult {
+  return (
+    record(value) &&
+    keys(value, ['turnId', 'excerpt', 'at']) &&
+    id(value.turnId) &&
+    textValue(value.excerpt, CONVERSATION_TASK_MAX_EXCERPT) &&
+    typeof value.at === 'number' &&
+    Number.isFinite(value.at) &&
+    value.at >= 0
+  );
+}
 function ids(value: unknown): value is string[] {
   return (
     Array.isArray(value) &&
@@ -108,6 +136,9 @@ export function parseConversationTaskState(value: unknown): ConversationTaskStat
         'createdAt',
         'updates',
         'state',
+        'result',
+        'workItemId',
+        // Accepted from earlier v2 writers and dropped; it never tracked execution.
         'execution',
       ]) ||
       !id(candidate.id) ||
@@ -116,8 +147,13 @@ export function parseConversationTaskState(value: unknown): ConversationTaskStat
       typeof candidate.createdAt !== 'number' ||
       !Number.isFinite(candidate.createdAt) ||
       candidate.createdAt < 0 ||
-      candidate.state !== 'recorded' ||
-      candidate.execution !== 'not_started' ||
+      !STATUSES.includes(candidate.state as ConversationTaskStatus) ||
+      (candidate.execution !== undefined && candidate.execution !== 'not_started') ||
+      (candidate.result !== undefined && !taskResult(candidate.result)) ||
+      (candidate.state === 'completed' && candidate.result === undefined) ||
+      (candidate.workItemId !== undefined &&
+        (typeof candidate.workItemId !== 'string' ||
+          !WORK_ITEM_ID_PATTERN.test(candidate.workItemId))) ||
       !Array.isArray(candidate.updates) ||
       candidate.updates.length > CONVERSATION_TASK_MAX_UPDATES ||
       !candidate.updates.every((update) => textValue(update, CONVERSATION_TASK_MAX_TEXT))
@@ -125,14 +161,18 @@ export function parseConversationTaskState(value: unknown): ConversationTaskStat
       return undefined;
     encodedBytes += Buffer.byteLength(JSON.stringify(candidate)) + (tasks.length ? 1 : 0);
     if (encodedBytes > CONVERSATION_TASK_MAX_STATE_BYTES) return undefined;
+    const result = candidate.result as ConversationTaskResult | undefined;
     tasks.push({
       id: candidate.id,
       title: candidate.title,
       requestText: candidate.requestText,
       createdAt: candidate.createdAt,
       updates: [...candidate.updates] as string[],
-      state: 'recorded',
-      execution: 'not_started',
+      state: candidate.state as ConversationTaskStatus,
+      ...(result
+        ? { result: { turnId: result.turnId, excerpt: result.excerpt, at: result.at } }
+        : {}),
+      ...(typeof candidate.workItemId === 'string' ? { workItemId: candidate.workItemId } : {}),
     });
   }
   if (new Set(tasks.map((task) => task.id)).size !== tasks.length) return undefined;
@@ -248,6 +288,61 @@ function result(
     },
   };
 }
+function statusReply(task: ConversationTaskRecord, locale?: SupportedLocale): string {
+  const key = {
+    recorded: 'front_desk:task_status',
+    completed: 'front_desk:task_status_completed',
+    awaiting_input: 'front_desk:task_status_awaiting_input',
+    needs_execution: 'front_desk:task_status_needs_execution',
+  } as const;
+  return t(key[task.state], { title: task.title, excerpt: task.result?.excerpt ?? '' }, locale);
+}
+/**
+ * How a runtime turn ended, judged only from structured signals. A reply that
+ * needs approval, input, or execution beyond the conversation is not an answer.
+ */
+export function classifyConversationTurnOutcome(conversation: {
+  intentResolution?: Pick<IntentResolutionContract, 'authority_level' | 'resolution_shape'>;
+  missionProposals?: readonly unknown[];
+  approvalRequests?: readonly unknown[];
+}): ConversationTurnOutcome {
+  const contract = conversation.intentResolution;
+  if (contract?.authority_level === 'human_clarification_required') return 'awaiting_input';
+  if (
+    contract?.authority_level === 'approval_required' ||
+    (contract !== undefined && contract.resolution_shape !== 'direct_answer') ||
+    (conversation.missionProposals?.length ?? 0) > 0 ||
+    (conversation.approvalRequests?.length ?? 0) > 0
+  )
+    return 'needs_execution';
+  return 'answered';
+}
+/**
+ * Applies a completed runtime turn to the request it recorded or amended.
+ * Returns the input unchanged when the outcome would exceed the state bounds.
+ */
+export function applyConversationTurnOutcome(
+  input: ConversationTaskState,
+  taskId: string,
+  outcome: ConversationTurnOutcome,
+  turnId: string,
+  reply: string,
+  at: number
+): ConversationTaskState {
+  const state = parseConversationTaskState(input);
+  if (!state) throw new Error('[CONVERSATION_TASK_INPUT_INVALID]');
+  const task = state.tasks.find((entry) => entry.id === taskId);
+  if (!task) return state;
+  if (outcome === 'answered') {
+    const excerpt = reply.trim().slice(0, CONVERSATION_TASK_MAX_EXCERPT);
+    if (!excerpt) return state;
+    task.state = 'completed';
+    task.result = { turnId, excerpt, at };
+  } else {
+    task.state = outcome;
+  }
+  return parseConversationTaskState(state) ?? parseConversationTaskState(input)!;
+}
 /** Pure state transition except governed read-only phrase/copy catalogs. Persist
  * state and decision atomically with the turn reservation before any model call. */
 export function routeConversationTaskTurn(
@@ -292,8 +387,8 @@ export function routeConversationTaskTurn(
   };
   const answer = (kind: ConversationTaskClarifiableKind, task: ConversationTaskRecord) => {
     delete state.clarification;
+    if (kind === 'status') return finish(kind, [task.id], statusReply(task, replyLocale));
     const key = {
-      status: 'front_desk:task_status',
       approval: 'front_desk:task_approval',
       cancellation: 'front_desk:task_cancellation',
     } as const;
@@ -354,7 +449,6 @@ export function routeConversationTaskTurn(
       createdAt: at,
       updates: [],
       state: 'recorded',
-      execution: 'not_started',
     });
     delete state.clarification;
     return finish(kind, [turnId]);

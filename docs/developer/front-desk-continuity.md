@@ -88,10 +88,24 @@ The index is bounded to 64 requests, 64 follow-up notes per request and 4 MiB of
 encoded state. Original redacted request text is retained separately from the
 bounded display title. This slice does not add archival or task execution.
 
-A request record is intake evidence only; it does not track execution. The
-runtime may act on the same turn, so status replies say the record does not
-track execution and never claim that work has or has not started. Completing a
-conversation response does not complete that request. This slice neither scans nor
+A request record carries one status. `recorded` means no reply has completed.
+When the runtime turn that recorded or amended the request completes, the front
+desk passes an outcome derived only from the runtime's structured result
+(`classifyConversationTurnOutcome`), never from reply text:
+
+- `completed`: answered in place (a direct answer needing no approval, input or
+  further execution). The record keeps the answering turn ID, a 280-character
+  excerpt and the time, and status replies quote that excerpt.
+- `awaiting_input`: the runtime asked for clarification.
+- `needs_execution`: approval, a mission proposal, or a non-direct resolution
+  shape. The scoped conversation cannot run this work. The optional
+  `workItemId` field is reserved for a governed executor (the planned
+  front-desk intake dot) to link the WorkItem it creates; nothing sets it yet,
+  and status replies say the hand-off is not automated.
+
+Local intake replies and ordinary chat never change a record. Earlier v2 records
+with `execution: "not_started"` are read and that field is dropped. This slice
+neither scans nor
 executes legacy global TaskSession records, and does not implement a task worker.
 The existing scoped unsupported-capability boundaries remain in place. Approval
 and cancellation candidates do not change execution state or grant permission;

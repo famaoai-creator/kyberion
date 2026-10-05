@@ -11,11 +11,17 @@ import { narrowSurfaceViewerScope, type SurfaceViewerScope } from './surface-mut
 import type { EventScopeInput } from '../event-scope.js';
 import type { SupportedLocale } from '../locale-normalize.js';
 import {
+  applyConversationTurnOutcome,
   routeConversationTaskTurn,
   parseConversationTaskState,
   parseConversationTaskDecision,
   type ConversationTaskState,
   type ConversationTaskDecision,
+  type ConversationTurnOutcome,
+} from './conversation-task-routing.js';
+export {
+  classifyConversationTurnOutcome,
+  type ConversationTurnOutcome,
 } from './conversation-task-routing.js';
 
 /** Server-owned authorization projection. No client identity/session can select a transcript. */
@@ -370,10 +376,13 @@ export function reserveConversationTurn(
   );
 }
 
+/** `outcome` comes from the runtime's structured result, never from reply text;
+ * omit it when the reply did not come from the conversation runtime. */
 export function completeConversationTurn(
   viewer: FrontDeskConversationViewer,
   id: string,
-  reply: string
+  reply: string,
+  outcome?: ConversationTurnOutcome
 ): void {
   if (!validText(reply, CONVERSATION_MAX_REPLY)) throw new ConversationStoreError('invalid_text');
   const ref = conversationRef(viewer);
@@ -392,6 +401,21 @@ export function completeConversationTurn(
       turn.reply = boundedReply;
       delete turn.uncertain;
       delete turn.retryable;
+      const taskId = turn.routing?.taskIds[0];
+      if (
+        outcome &&
+        taskId &&
+        (turn.routing?.kind === 'new_request' || turn.routing?.kind === 'followup')
+      ) {
+        transcript.taskState = applyConversationTurnOutcome(
+          transcript.taskState ?? { tasks: [] },
+          taskId,
+          outcome,
+          id,
+          boundedReply,
+          Date.now()
+        );
+      }
       writeGovernedArtifactJson('sovereign_concierge', ref.path, transcript);
     })
   );

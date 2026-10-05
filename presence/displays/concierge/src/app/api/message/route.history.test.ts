@@ -124,7 +124,7 @@ describe('server-owned durable conversation API', () => {
         },
       })
     );
-    expect(mocks.complete).toHaveBeenCalledWith(mocks.viewer, REQUEST_ID, 'Completed.');
+    expect(mocks.complete).toHaveBeenCalledWith(mocks.viewer, REQUEST_ID, 'Completed.', 'answered');
   });
   it('restores completed transcript context after restart without routing/action metadata', async () => {
     const history = [
@@ -326,7 +326,7 @@ describe('conversation recovery and truthful execution states', () => {
 });
 
 describe('intake routing boundary', () => {
-  it.each(['new_request', 'status', 'clarification', 'approval', 'cancellation'])(
+  it.each(['status', 'clarification', 'approval', 'cancellation'])(
     'returns durable %s reply without executing an orchestrator',
     async (kind) => {
       mocks.begin.mockReturnValue({
@@ -352,7 +352,8 @@ describe('intake routing boundary', () => {
       expect(mocks.complete).toHaveBeenCalledWith(
         mocks.viewer,
         REQUEST_ID,
-        'Recorded request; execution has not started.'
+        'Recorded request; execution has not started.',
+        undefined
       );
     }
   );
