@@ -101,7 +101,9 @@ desk passes an outcome derived only from the runtime's structured result
   shape. The scoped conversation cannot run this work. The optional
   `workItemId` field is reserved for a governed executor (the planned
   front-desk intake dot) to link the WorkItem it creates; nothing sets it yet,
-  and status replies say the hand-off is not automated.
+  and status replies say the hand-off is not automated. The queue and executor
+  design is in the
+  [front desk intake queue plan](./improvement-plans-2026-10/FRONT_DESK_INTAKE_QUEUE_PLAN_2026-10-05.ja.md).
 
 Local intake replies and ordinary chat never change a record. Earlier v2 records
 with `execution: "not_started"` are read and that field is dropped. This slice
