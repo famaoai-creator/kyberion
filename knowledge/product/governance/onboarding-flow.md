@@ -52,12 +52,14 @@ Step 1〜2 → Step 3（個人 identity） → Step 4 → Step 5（onboard compa
 
 ### 操作シェルの前提（全ルート共通）
 
-governed facade（`onboarding company`、`onboarding:context`、`tenant:activation`、
-`organization` の書き込み系）は操作者 persona で書き込み権限を判定する（`stance:create` は
-`customer/` への書き込みだけを許可されているので persona なしで動く）。`pnpm onboarding apply` は
-`KYBERION_PERSONA` を `.env.local` に記録するが、**pnpm script は `.env.local` を読み込まない**。
-identity を保存した後は、操作シェルで次を実行しておく（未設定だと
-`Operator persona not set in this shell` で拒否される）。
+オンボーディングの governed facade（`stance:create`、`onboarding company`、`onboarding:context`、
+`tenant:activation`）は、それぞれ必要な権限（tenant registry を扱う onboarding 権限など）を
+自分で持つので、操作者 persona を設定しなくても動く。mission の作成も同様である。
+
+persona が要るのは Step 10 の `pnpm organization` の書き込み系だけである。これは組織の運営状態を
+変える操作なので、操作者を明示する。`pnpm onboarding apply` は `KYBERION_PERSONA` を `.env.local` に
+記録するが、**pnpm script は `.env.local` を読み込まない**ため、組織を運営するシェルでは次を実行する
+（tenant を限定したい場合は `MISSION_ROLE=organization_operator` と `KYBERION_TENANT=<tenant>`）。
 
 ```bash
 export KYBERION_PERSONA=sovereign
@@ -185,8 +187,6 @@ pnpm onboarding
 pnpm onboarding apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run
 pnpm onboarding apply --identity <reviewed-identity-json>
 
-# 保存後、操作シェルで persona を有効にする（.env.local は自動では読まれない）
-export KYBERION_PERSONA=sovereign
 ```
 
 TTY の無い環境（エージェント、CI）で `pnpm onboarding` を実行すると exit 2 で停止する。
@@ -352,10 +352,11 @@ pnpm tenant:activation probe --customer-slug <customer-slug> --tenant-slug <tena
   記録され、その probe が `passed: true` でなければならない。
 - `--nhi-id` は `kyberion://agent/<organization-id>/<agent-slug>` の形式で、この組織のものでなければならない。
 
-**NHI について**: NHI は mission が agent を staffing したときに ledger へ記録され、発行専用の CLI は
-無い。新しい組織では ledger が空のため `nhi_provisioned` は通らない。既に同じ組織で mission を
-動かした NHI があればそれを指定する。無い場合は、外部の証跡（`--probe-ref nhi_provisioned=audit://...`）
-を人間が確認して受け入れる。
+**NHI について**: `onboard company` は、宣言した AI worker（`ceo-operator`）の NHI
+`kyberion://agent/<organization-id>/ceo-operator` を責任者付きで ledger に発行する（結果の
+`workerNhiId`）。そのため新しい組織でもそのまま `--nhi-id` に指定すれば `nhi_provisioned` が通る。
+個別コマンドで登録したルート 3 では、同じ組織で mission が staffing した NHI を指定するか、外部の
+証跡（`--probe-ref nhi_provisioned=audit://...`）を人間が確認して受け入れる。
 
 `plan` の `blockers` が空になるまで `activate` しない。
 
@@ -456,6 +457,7 @@ governed facade で登録して回す。状態ファイル（`active/organizatio
 （引数なしの `pnpm organization` は運営モデルのカタログ JSON を出す）。
 
 ```bash
+export KYBERION_PERSONA=sovereign   # organization の書き込みに必要（操作シェルの前提を参照）
 O="--organization-id <organization-id> --tier confidential --tenant-slug <tenant-slug>"
 
 # 1. 現状を見る（未登録の項目と次の行動が出る）
