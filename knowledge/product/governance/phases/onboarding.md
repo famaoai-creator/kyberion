@@ -102,8 +102,9 @@ cadence / decision → operation の順に governed facade で登録する。定
 ### Step 11: 目標から作業へ（ルート 2・3）
 
 目標に計測できる KR を付け（`organization objective kr add`）、`organization objective kr measure`
-で計測して `organization status` で進捗を見る。目標のための project を作り（`project create` →
-`scaffold` → `update-status --status active`）、その下で `mission kickoff --project-id`（業務は
+で計測して（外で測った値は `organization objective kr record`）`organization status` で進捗を見る。
+目標のための project を `--objective-ids` 付きで作り（`project create` → `scaffold` →
+`update-status --status active`）、その下で `mission kickoff --project-id`（業務は
 `--mission-type` を明示）、backlog は `work create-item` → `work project-next-tasks --apply` で
 mission の task に取り込む。コマンド例は標準フロー Step 11 を参照する。
 

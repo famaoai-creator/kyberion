@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatObjectiveProgress,
   measureOrganizationObjectives,
+  recordOrganizationObjectiveKr,
 } from './organization_objective_measure.js';
 
 describe('organization objective kr measure', () => {
@@ -52,5 +53,42 @@ describe('organization objective kr measure', () => {
         print
       )
     ).rejects.toThrow('A tenant is required');
+  });
+
+  it('records a key result value only with a finite --value and an explicit mode', () => {
+    const lines: unknown[] = [];
+    const print = (value: unknown) => lines.push(value);
+    const scope = ['--organization-id', 'acme', '--tier', 'public'];
+    const kr = ['--objective-id', 'obj-a', '--kr-id', 'kr-1'];
+    expect(() =>
+      recordOrganizationObjectiveKr([...scope, ...kr, '--value', 'ten', '--apply'], print)
+    ).toThrow('kr record');
+    expect(() => recordOrganizationObjectiveKr([...scope, ...kr, '--value', '3'], print)).toThrow(
+      '--dry-run|--apply'
+    );
+    recordOrganizationObjectiveKr([...scope, ...kr, '--value', '-2', '--dry-run'], print);
+    expect(lines).toEqual(['Would record obj-a/kr-1 = -2']);
+    const calls: unknown[] = [];
+    recordOrganizationObjectiveKr([...scope, ...kr, '--value', '3', '--apply'], print, {
+      record: (recordScope, input) => {
+        calls.push([recordScope, input]);
+        return {
+          scope: 'org',
+          organization_id: 'acme',
+          objective_id: 'obj-a',
+          kr_id: 'kr-1',
+          value: 3,
+          progress: 0.5,
+          measured_at: '2026-10-05T00:00:00.000Z',
+        };
+      },
+    });
+    expect(calls).toEqual([
+      [
+        { organizationId: 'acme', tier: 'public' },
+        { objectiveId: 'obj-a', krId: 'kr-1', value: 3 },
+      ],
+    ]);
+    expect(lines[1]).toBe('Recorded obj-a/kr-1 = 3 (50% of target).');
   });
 });

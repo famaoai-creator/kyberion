@@ -509,32 +509,40 @@ pnpm organization operation run list $O --operation-id <op-id>
 ```text
 organization ─ purpose ─ objective ─ key result（計測できる指標）
      │
-     ├─ project（organization_id で組織に属する）
+     ├─ project（organization_id で組織に属し、objective_ids で目標を指す）
      │     ├─ mission（--project-id でプロジェクトに属する）── task（NEXT_TASKS.json）
      │     └─ work item（project の backlog。project-next-tasks で mission の task に取り込む）
      └─ dot（常駐エージェント。goal_ref で objective を指し、KR を自動で計測・改善提案する）
 ```
 
-project / mission / work item には objective への参照欄が無い。目標と作業を直接つなぐのは dot
-だけで、手動で回す場合は project の summary や mission の goal に目標を書いて対応を示す。
+目標と作業をつなぐのは project の `objective_ids`（`--objective-ids`）である。mission と work item は
+project を通して目標にたどれる。指定した objective はその組織の purpose に存在するかが検証され、
+`organization status` は目標の行の下に、その目標を指す project を並べる。
 
 ```bash
 export KYBERION_PERSONA=sovereign
 O="--organization-id <organization-id> --tier confidential --tenant-slug <tenant-slug>"
 
-# 1. 目標に key result（KR）を付ける。KR は自動で計測できる指標に限られる
+# 1. 目標に key result（KR）を付ける。自動で計測する指標
 #    （org_metric: open_incidents / overdue_operations / pending_decisions / unhealthy_services、
-#     file: リポジトリ内 JSON の値、probe、signal_ratio）。形式は pnpm organization help を参照
+#     file: リポジトリ内 JSON の値、probe、signal_ratio）か、人が値を記録する manual を選ぶ。
+#    形式は pnpm organization help を参照
 pnpm organization objective kr add $O --objective-id <obj-id> --kr-id <kr-id> --title "<指標>" \
   --metric-json '{"source":"org_metric","metric":"open_incidents"}' --target 0 --direction decrease --apply
+pnpm organization objective kr add $O --objective-id <obj-id> --kr-id <kr-id> --title "<アンケートなど>" \
+  --metric-json '{"source":"manual"}' --target 40 --direction increase --apply
 
-# 2. KR を計測し、status で目標ごとの進捗を見る（dot が無い組織でもこれで進捗が動く）
+# 2. KR を計測し、status で目標ごとの進捗を見る（dot が無い組織でもこれで進捗が動く）。
+#    Kyberion の外で測った値（manual の KR、ファイルの無い file の KR など）は record で記録する
 pnpm organization objective kr measure $O --apply
+pnpm organization objective kr record $O --objective-id <obj-id> --kr-id <kr-id> --value 30 --apply
 pnpm organization status $O        # Objective: <目標> — 50% (kr-a 100%, kr-b 0%)
 
-# 3. 目標のための project を作り、作業場所（project-os）を用意して active にする
-pnpm project create --project-id PRJ-<ID> --name "<名前>" --summary "<どの目標のためか>" \
-  --tier confidential --organization-id <organization-id> --tenant-slug <tenant-slug>
+# 3. 目標のための project を作り、作業場所（project-os）を用意して active にする。
+#    --objective-ids で目標を指す（後から pnpm project update PRJ-<ID> --objective-ids でも付けられる）
+pnpm project create --project-id PRJ-<ID> --name "<名前>" --summary "<何をするか>" \
+  --tier confidential --organization-id <organization-id> --tenant-slug <tenant-slug> \
+  --objective-ids <obj-id>
 pnpm project scaffold PRJ-<ID>
 pnpm project update-status PRJ-<ID> --status active
 
@@ -558,6 +566,8 @@ pnpm work project-next-tasks --mission-id MSN-<...> --project-id PRJ-<ID> --tena
 
 - `file` 型の KR は、参照する JSON ファイルが存在しないと計測できない（`measure` が警告を出し、
   その目標は「unmeasured」のままになる。KR が 1 つでも未計測なら目標全体の進捗も出ない）。
+  ファイルを用意できないうちは `objective kr record` で値を記録すれば進捗が出る。
+- `manual` 型の KR は `measure` では計測されない。`record` で記録した値が最新の計測値になる。
 - mission は company stance の identity を要求する（`--organization-id` が `customer/<org>/` の
   stance を選ぶため）。Step 5 の後に stance で `onboarding apply` を済ませておく。
 - 朝会（`pipelines/organization-standup.json`）と振り返り（`organization-retro.json`）は、
@@ -619,7 +629,7 @@ identity をやり直す場合は `pnpm onboarding reset` を使い、生成物�
 - （Step 10）purpose と少なくとも一つの service / operation / cadence が登録され、
   `pnpm organization status` に次の行動が明示されている
 - （Step 11）目標に計測できる KR があり、`organization status` に進捗が出ていて、
-  目標のための project が active で mission が紐付いている
+  目標を `objective_ids` で指す project が active で mission が紐付いている
 
 ## 関連文書
 

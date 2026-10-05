@@ -31,6 +31,8 @@ export interface ProjectRecord {
   service_bindings?: string[];
   vault_refs?: string[];
   pipeline_refs?: string[];
+  /** Organization purpose objectives this project advances. */
+  objective_ids?: string[];
   active_missions?: string[];
   active_task_sessions?: string[];
   project_os_path?: string;

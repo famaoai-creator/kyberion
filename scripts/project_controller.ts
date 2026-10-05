@@ -70,7 +70,7 @@ function printProjectList(): void {
 
 function printHelp(): void {
   printOutput(
-    `Project controller\n\nCommands:\n  list [--json]\n  show <PROJECT_ID> [--json]\n  create --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--project-path <PATH>] [--pipeline-refs <CSV>] [--status <STATUS>] [--primary-locale <LOCALE>] [--dry-run] [--json]\n  scaffold <PROJECT_ID> [--json]\n  track create --track-id <ID> --project-id <ID> --name <NAME> --summary <TEXT> [--track-type <TYPE>] [--lifecycle-model <MODEL>] [--status <STATUS>] [--release-id <ID>] [--required-artifacts <CSV>] [--json]\n  track update --track-id <ID> --tenant-slug <SLUG> [--json]\n  update|update-status <PROJECT_ID> [--name <NAME>] [--summary <TEXT>] [--status <STATUS>] [--primary-locale <LOCALE>] [--pipeline-refs <CSV>] [--metadata <JSON>] [--json]\n  archive <PROJECT_ID> [--reason <TEXT>] [--json]\n  reconcile [PROJECT_ID] [--dry-run|--apply] [--cross-scope] [--json]\n  bootstrap --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--utterance <TEXT>] [--track-id <ID>] [--track-name <NAME>] [--pipeline-refs <CSV>] [--service-bindings <CSV>] [--json]\n\nReconcile defaults to dry-run; pass --apply to repair registry and operational state. Pass --cross-scope as sovereign to audit state records outside the project's tenant/tier.`
+    `Project controller\n\nCommands:\n  list [--json]\n  show <PROJECT_ID> [--json]\n  create --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--project-path <PATH>] [--pipeline-refs <CSV>] [--objective-ids <CSV>] [--status <STATUS>] [--primary-locale <LOCALE>] [--dry-run] [--json]\n  scaffold <PROJECT_ID> [--json]\n  track create --track-id <ID> --project-id <ID> --name <NAME> --summary <TEXT> [--track-type <TYPE>] [--lifecycle-model <MODEL>] [--status <STATUS>] [--release-id <ID>] [--required-artifacts <CSV>] [--json]\n  track update --track-id <ID> --tenant-slug <SLUG> [--json]\n  update|update-status <PROJECT_ID> [--name <NAME>] [--summary <TEXT>] [--status <STATUS>] [--primary-locale <LOCALE>] [--pipeline-refs <CSV>] [--objective-ids <CSV>] [--metadata <JSON>] [--json]\n  archive <PROJECT_ID> [--reason <TEXT>] [--json]\n  reconcile [PROJECT_ID] [--dry-run|--apply] [--cross-scope] [--json]\n  bootstrap --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--utterance <TEXT>] [--track-id <ID>] [--track-name <NAME>] [--pipeline-refs <CSV>] [--service-bindings <CSV>] [--json]\n\nReconcile defaults to dry-run; pass --apply to repair registry and operational state. Pass --cross-scope as sovereign to audit state records outside the project's tenant/tier.`
   );
 }
 
@@ -241,6 +241,9 @@ async function mainImpl(args: string[] = []): Promise<void> {
         ...(csvOption(argv, '--pipeline-refs')
           ? { pipeline_refs: csvOption(argv, '--pipeline-refs') }
           : {}),
+        ...(csvOption(argv, '--objective-ids')
+          ? { objective_ids: csvOption(argv, '--objective-ids') }
+          : {}),
       };
       const record = hasFlag(argv, '--dry-run')
         ? buildManagedProjectRecord(input)
@@ -264,6 +267,9 @@ async function mainImpl(args: string[] = []): Promise<void> {
           : {}),
         ...(csvOption(argv, '--pipeline-refs')
           ? { pipeline_refs: csvOption(argv, '--pipeline-refs') }
+          : {}),
+        ...(csvOption(argv, '--objective-ids')
+          ? { objective_ids: csvOption(argv, '--objective-ids') }
           : {}),
         ...(metadataRaw ? { metadata: parseProjectMetadata(metadataRaw) } : {}),
       };

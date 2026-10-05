@@ -139,22 +139,43 @@ function objectiveStatusLines(
     tier: scope.tier as OrganizationTier,
     ...(scope.tenantSlug ? { tenantSlug: scope.tenantSlug } : {}),
   };
+  // Projects that name an objective are listed under it, so the status shows
+  // which work is meant to move which goal.
+  const withProjects = (objectiveIds: string[], lines: string[]) =>
+    lines.flatMap((line, index) => {
+      const projects = view.solution_projects.filter(
+        (project) =>
+          project.status !== 'archived' && project.objective_ids?.includes(objectiveIds[index]!)
+      );
+      return projects.length
+        ? [
+            line,
+            `  Projects: ${projects.map((project) => `${project.name} (${project.status})`).join(', ')}`,
+          ]
+        : [line];
+    });
   try {
-    const lines = formatObjectiveProgress(
-      rollUpObjectiveProgress(progressScope, {
-        readMeasurements: (s) => readOrganizationKrMeasurements(s),
-        loadPurpose: () => purpose,
-      })
-    );
+    const progress = rollUpObjectiveProgress(progressScope, {
+      readMeasurements: (s) => readOrganizationKrMeasurements(s),
+      loadPurpose: () => purpose,
+    });
+    const lines = formatObjectiveProgress(progress);
     const unmeasured = lines.some((line) => line.includes('unmeasured'));
+    const withLinks = withProjects(
+      progress.objectives.map((objective) => objective.objective_id),
+      lines
+    );
     return unmeasured
       ? [
-          ...lines,
+          ...withLinks,
           'Next: measure objective key results with pnpm organization objective kr measure ... --apply',
         ]
-      : lines;
+      : withLinks;
   } catch {
-    return active.map((objective) => `Objective: ${objective.title}`);
+    return withProjects(
+      active.map((objective) => objective.objective_id),
+      active.map((objective) => `Objective: ${objective.title}`)
+    );
   }
 }
 
