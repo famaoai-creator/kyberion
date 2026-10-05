@@ -505,9 +505,9 @@
     },
     {
       "file": "scripts/run_realtime_voice_conversation.ts",
-      "count": 1,
+      "count": 2,
       "classification": "migrate-candidate",
-      "note": "conversation recordings; session-scoped artifacts"
+      "note": "conversation recordings (session-scoped artifacts, migrate-candidate) + STT warmup clip (consumable intermediate, legit-tmp)"
     },
     {
       "file": "scripts/screenshot-annotate/server.ts",
