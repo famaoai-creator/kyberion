@@ -294,6 +294,7 @@
         "organization_digest",
         "organization_retro",
         "organization_standup",
+        "pr_shadow_observe",
         "run_first_win_lifecycle",
         "run_health_degradation_watch",
         "run_tenant_drift_watch",
