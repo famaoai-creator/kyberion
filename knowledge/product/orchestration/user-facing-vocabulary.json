@@ -8623,6 +8623,16 @@
         "ja": "停止していた自律運用を再開する。",
         "qps-ploc": "⟦Řėşůɱė ȧůŧőñőɱőůş őṗėřȧŧïőñş ȧƒŧėř ȧ ħȧŀŧ. ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
+      "cli_cmd_script_pr_shadow_observe": {
+        "en": "Shadow mode: read open pull requests and record what the autonomy gate would do with each (never merges or comments).",
+        "ja": "試行モード: 開いている PR を読み取り、自律ゲートなら各 PR をどうしたかを記録する(マージもコメントもしない)。",
+        "qps-ploc": "⟦Şħȧḓőẇ ɱőḓė: řėȧḓ őṗėñ ṗůŀŀ řėɋůėşŧş ȧñḓ řėƈőřḓ ẇħȧŧ ŧħė ȧůŧőñőɱẏ ɠȧŧė ẇőůŀḓ ḓő ẇïŧħ ėȧƈħ (ñėṽėř ɱėřɠėş őř ƈőɱɱėñŧş). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
+      },
+      "cli_cmd_script_pr_shadow_report": {
+        "en": "Compare the gate's shadow verdicts on pull requests with what the operator actually did.",
+        "ja": "PR に対する自律ゲートの試行判定と、オペレーターの実際の判断を比較する。",
+        "qps-ploc": "⟦Ƈőɱṗȧřė ŧħė ɠȧŧė'ş şħȧḓőẇ ṽėřḓïƈŧş őñ ṗůŀŀ řėɋůėşŧş ẇïŧħ ẇħȧŧ ŧħė őṗėřȧŧőř ȧƈŧůȧŀŀẏ ḓïḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
       "cli_cmd_script_conversation_report": {
         "en": "Report how the conversation is going: turn outcomes per intent, unanswered clarifications and repeated misses worth adding to the eval corpus.",
         "ja": "会話の状況を報告する: 意図ごとの結果、答えのない確認質問、評価コーパスに加える価値のある繰り返しの失敗。",
