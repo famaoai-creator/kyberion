@@ -19,7 +19,17 @@
     "last_updated": { "type": "string" },
     "kind": {
       "type": "string",
-      "enum": ["governance", "standard", "architecture", "capability", "role", "playbook", "incident", "reference"]
+      "enum": [
+        "governance",
+        "standard",
+        "architecture",
+        "capability",
+        "role",
+        "playbook",
+        "incident",
+        "reference",
+        "evergreen"
+      ]
     },
     "scope": {
       "type": "string",
