@@ -121,6 +121,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion dot validate`                 |                                   | Validate dot charters against schema and the activation gate                         |
 | `pnpm kyberion dot work`                     |                                   | Show recent delegated-work results executed for a resident dot                       |
 | `pnpm kyberion egress report`                | `pnpm egress:report`              | Report egress warnings                                                               |
+| `pnpm kyberion halt status`                  |                                   | Show whether autonomous operations are halted, since when and by whom.               |
 | `pnpm kyberion history search`               | `pnpm history:search`             | Search history                                                                       |
 | `pnpm kyberion hooks discover`               |                                   | List project-local Claude/Codex hook configs and whether each is trusted.            |
 | `pnpm kyberion ingress probe`                |                                   | Check which public ingress providers are ready                                       |
@@ -197,6 +198,8 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion email workflow`                | `pnpm email:workflow`               | Run the email workflow                                                                              |
 | `pnpm kyberion generation schedule`           | `pnpm generation:schedule`          | Run the generation schedule tick                                                                    |
 | `pnpm kyberion gws meet-create`               |                                     | Create a Google Meet                                                                                |
+| `pnpm kyberion halt engage`                   |                                     | Halt all autonomous operations (work claims, dot wakes, auto-proceed) until resumed.                |
+| `pnpm kyberion halt resume`                   |                                     | Resume autonomous operations after a halt.                                                          |
 | `pnpm kyberion hooks trust`                   |                                     | Request human approval to trust one project hook config (bound to its content).                     |
 | `pnpm kyberion ingress down`                  |                                     | Withdraw a surface's public ingress                                                                 |
 | `pnpm kyberion ingress up`                    |                                     | Expose a surface at a public HTTPS URL (approval required)                                          |
