@@ -1,3 +1,9 @@
+---
+title: 'Intent Outcome Patterns'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # Intent Outcome Patterns
 
 ## Purpose

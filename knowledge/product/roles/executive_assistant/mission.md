@@ -4,7 +4,8 @@ category: Roles
 tags: [roles, executive_assistant, mission, protocol]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # Executive Assistant (エグゼクティブ・アシスタント / 秘書) ミッション声明

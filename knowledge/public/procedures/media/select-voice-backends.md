@@ -1,3 +1,8 @@
+---
+title: '手順: Presence Studio で TTS / STT を選択する'
+last_updated: 2026-10-05
+---
+
 # 手順: Presence Studio で TTS / STT を選択する
 
 ## 目的

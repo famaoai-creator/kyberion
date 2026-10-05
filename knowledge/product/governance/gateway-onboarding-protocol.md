@@ -4,7 +4,7 @@ category: Governance
 tags: [gateway, onboarding, security, messenger]
 importance: 9
 author: Kyberion Ecosystem Architect
-last_updated: 2026-05-04
+last_updated: 2026-10-05
 ---
 
 # Gateway連携オンボーディング・プロトコル (Gateway Onboarding Protocol)

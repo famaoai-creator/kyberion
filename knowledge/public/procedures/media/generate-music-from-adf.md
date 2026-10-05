@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Generate Music From ADF'
+last_updated: 2026-10-05
+---
+
 # Procedure: Generate Music From ADF
 
 ## 1. Goal

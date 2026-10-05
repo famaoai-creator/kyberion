@@ -4,7 +4,8 @@ category: Architecture
 tags: [architecture, runtime, mission, worker, coordination]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-04-05
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # Mission Runtime Primitives

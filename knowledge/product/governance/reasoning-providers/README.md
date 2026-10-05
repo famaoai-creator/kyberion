@@ -1,3 +1,8 @@
+---
+title: 'Reasoning Provider Registry Canonical Directory'
+last_updated: 2026-10-05
+---
+
 # Reasoning Provider Registry Canonical Directory
 
 Canonical source for reasoning provider descriptors (RSP-20).

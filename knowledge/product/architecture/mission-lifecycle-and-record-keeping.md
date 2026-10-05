@@ -1,11 +1,12 @@
 ---
 title: Mission Lifecycle and Record Keeping
-kind: architecture
+kind: evergreen
 scope: repository
 authority: reference
 phase: [alignment, execution, review]
 tags: [mission, lifecycle, kanban, a2a, transport, evidence, record-keeping]
 owner: ecosystem_architect
+last_updated: 2026-10-05
 ---
 
 # Mission Lifecycle and Record Keeping

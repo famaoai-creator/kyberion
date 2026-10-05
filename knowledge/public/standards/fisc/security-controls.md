@@ -5,6 +5,7 @@ tags: [standards, fisc, security, controls]
 importance: 10
 author: Ecosystem Architect
 last_updated: 2026-03-06
+review_by: 2026-10-12
 ---
 
 # FISC-Aligned Security Standard (Cloud Infrastructure)

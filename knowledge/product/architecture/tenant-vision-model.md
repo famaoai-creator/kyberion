@@ -4,7 +4,8 @@ category: Architecture
 tags: [architecture, tenant, vision, model]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # Tenant-Aware Vision-Mission Model

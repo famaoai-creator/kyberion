@@ -4,7 +4,8 @@ category: Standards
 tags: [standards, qa, screen, transition]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # Screen Transition & State Machine Testing Standards
@@ -14,30 +15,33 @@ last_updated: 2026-03-06
 ## 1. 遷移網羅の 3 レベル (Coverage Levels)
 
 ### Level 1: 画面網羅 (Node Coverage)
+
 - **定義**: アプリケーション内の全ての画面（View/Activity）を最低 1 回は訪問する。
 - **目的**: 画面のクラッシュや基本的な表示不備を検知する。
 
 ### Level 2: 遷移網羅 (Edge Coverage)
+
 - **定義**: 全ての画面遷移ボタン、リンク、スワイプ操作による「矢印」を最低 1 回は実行する。
 - **目的**: ボタンの反応なしや、リンク切れを検知する。
 
 ### Level 3: パス網羅 (Logic Path Coverage)
+
 - **定義**: 特定の業務ロジックに基づいた連続する遷移を検証する。
-    - **A -> B -> C**: 正常系。
-    - **A -> B -> A**: 戻る操作の検証（状態が保持されているか）。
-    - **A -> B -> (Error) -> A**: 異常系からの復帰。
-    - **A -> B -> C -> A**: 循環パス（再エントリー時の不整合がないか）。
+  - **A -> B -> C**: 正常系。
+  - **A -> B -> A**: 戻る操作の検証（状態が保持されているか）。
+  - **A -> B -> (Error) -> A**: 異常系からの復帰。
+  - **A -> B -> C -> A**: 循環パス（再エントリー時の不整合がないか）。
 
 ## 2. 状態遷移マトリクス (State Transition Matrix)
 
 複雑な遷移を整理するために、マトリクスを使用して「現在の画面」から「遷移可能な画面」を定義する。
 
-| From \ To | Home | Detail | Settings | Login |
-| :--- | :---: | :---: | :---: | :---: |
-| **Home** | - | ○ | ○ | △ (非ログイン時) |
-| **Detail** | ○ (Back) | - | - | - |
-| **Settings**| ○ (Save) | - | - | ○ (Logout) |
-| **Login** | ○ (Success)| - | - | - |
+| From \ To    |    Home     | Detail | Settings |      Login       |
+| :----------- | :---------: | :----: | :------: | :--------------: |
+| **Home**     |      -      |   ○    |    ○     | △ (非ログイン時) |
+| **Detail**   |  ○ (Back)   |   -    |    -     |        -         |
+| **Settings** |  ○ (Save)   |   -    |    -     |    ○ (Logout)    |
+| **Login**    | ○ (Success) |   -    |    -     |        -         |
 
 ## 3. サイクリック・テストの重要性 (A -> B -> A)
 
@@ -50,10 +54,13 @@ last_updated: 2026-03-06
 ## 4. 自動化戦略 (Maestro & Playwright)
 
 ### Maestro: サブフローの活用
+
 共通の遷移（例：ログイン、設定への遷移）を個別の YAML ファイルに切り出し、`runFlow` で呼び出すことで、複雑なパス（A->B->A->C）を簡潔に記述する。
 
 ### 状態リセット
+
 各テストケースの開始前に、アプリの状態（DB、キャッシュ、ログインセッション）を「クリーン」にするか「特定の状態」から始めるかを明示する。
 
 ---
-*Created by Kyberion Ecosystem Architect - 2026-02-28*
+
+_Created by Kyberion Ecosystem Architect - 2026-02-28_

@@ -1,12 +1,20 @@
+---
+title: 'Procedure: Physical File Organization & Curation'
+last_updated: 2026-10-05
+---
+
 # Procedure: Physical File Organization & Curation
 
 ## 1. Goal
+
 Organize, rename, and manage the physical placement of project assets, datasets, and evidence files.
 
 ## 2. Dependencies
+
 - **Actuator**: `File-Actuator`
 
 ## 3. Step-by-Step Instructions
+
 1.  **Inventory**: List all files in the source directory using `File-Actuator`.
 2.  **Curation**: Identify redundant or temporary files (`.tmp`, `.log`) for deletion.
 3.  **Relocation**:
@@ -14,4 +22,5 @@ Organize, rename, and manage the physical placement of project assets, datasets,
 4.  **Metadata Update**: Update any pointers or index files using `File-Actuator` to reflect the new file locations.
 
 ## 4. Expected Output
+
 A lean, organized, and standardized filesystem state.

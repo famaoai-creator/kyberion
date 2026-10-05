@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Email Triage and Reply Draft'
+review_by: 2026-10-12
+---
+
 # Procedure: Email Triage and Reply Draft
 
 ## 1. Goal

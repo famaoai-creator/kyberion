@@ -282,7 +282,7 @@
 - [Reasoning Provider Registry Canonical Directory](./product/governance/reasoning-providers/README.md) (public | Unknown)
 
 ## 📁 product/governance/retrospectives
-- [🧠 Retrospective: 2026-03-13 (Onboarding & First Mission)](./product/governance/retrospectives/2026-03-13_onboarding_review.md) (public | Unknown)
+- [Retrospective: 2026-03-13 (Onboarding & First Mission)](./product/governance/retrospectives/2026-03-13_onboarding_review.md) (public | Unknown)
 
 ## 📁 product/governance/service-runtimes
 - [Service Runtime Registry Canonical Directory](./product/governance/service-runtimes/README.md) (public | Unknown)

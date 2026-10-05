@@ -1,3 +1,9 @@
+---
+title: 'Capability Lifecycle Procedure'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # Capability Lifecycle Procedure
 
 Kyberion における、`provider` / `gateway` / `platform` のような lifecycle-bearing object を共通の骨格で扱うための手順定義。

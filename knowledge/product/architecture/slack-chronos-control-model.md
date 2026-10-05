@@ -4,7 +4,8 @@ category: Architecture
 tags: [architecture, slack, chronos, control-plane, observability]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-03-15
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # Slack and Chronos Control Model

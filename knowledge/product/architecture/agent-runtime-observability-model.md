@@ -1,3 +1,9 @@
+---
+title: 'Agent Runtime Observability Model'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # Agent Runtime Observability Model
 
 ## Goal
@@ -12,14 +18,15 @@ Provide a consistent control and observability layer for all live agents so the 
 ## Control Layers
 
 1. `agent-lifecycle`
-Owns spawn, shutdown, refresh, restart, and per-agent execution metrics.
+   Owns spawn, shutdown, refresh, restart, and per-agent execution metrics.
 
 2. `runtime-supervisor`
-Owns resource registration, idle reaping, and process-level ownership metadata.
+   Owns resource registration, idle reaping, and process-level ownership metadata.
 
 3. `provider runtime`
-Owns provider-native session or thread state.
-Examples:
+   Owns provider-native session or thread state.
+   Examples:
+
 - ACP session ids
 - Codex app-server thread ids
 - Claude session ids when configured
@@ -30,10 +37,10 @@ always be visible in the trace and execution receipt when a native runtime
 is used.
 
 4. `surface / control API`
-Exposes snapshots and recovery controls to Chronos Mirror v2 and other operator surfaces.
+   Exposes snapshots and recovery controls to Chronos Mirror v2 and other operator surfaces.
 
 5. `surface runtime controller`
-Owns durable startup, PID tracking, and reconcile semantics for long-running gateways and control surfaces such as Slack Bridge, Chronos Mirror, Nexus Daemon, and Terminal Bridge.
+   Owns durable startup, PID tracking, and reconcile semantics for long-running gateways and control surfaces such as Slack Bridge, Chronos Mirror, Nexus Daemon, and Terminal Bridge.
 
 ## Snapshot Contract
 
@@ -85,16 +92,17 @@ Kyberion governance.
 There are three refresh modes:
 
 1. `soft`
-The provider keeps the process alive but starts a fresh conversational context.
-Examples:
+   The provider keeps the process alive but starts a fresh conversational context.
+   Examples:
+
 - ACP `newSession`
 - Codex app-server `thread/start`
 
 2. `stateless`
-The provider is already effectively stateless per request, so no special refresh is needed.
+   The provider is already effectively stateless per request, so no special refresh is needed.
 
 3. `restart`
-Used when soft refresh is not supported or when the runtime is unhealthy.
+   Used when soft refresh is not supported or when the runtime is unhealthy.
 
 ## Resilience Rules
 

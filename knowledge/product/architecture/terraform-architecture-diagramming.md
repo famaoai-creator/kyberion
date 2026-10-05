@@ -1,9 +1,17 @@
+---
+title: 'Terraform Architecture Diagramming'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # Terraform Architecture Diagramming
 
 ## Goal
+
 Represent Terraform-based infrastructure as architecture diagrams without leaking renderer-specific implementation details into the public contract.
 
 ## Core Concept
+
 Use `architecture-adf` as the stable interface between:
 
 - source analysis
@@ -13,6 +21,7 @@ Use `architecture-adf` as the stable interface between:
 The renderer may become highly native, but the contract should remain human-readable and backend-independent.
 
 ## Recommended Pipeline
+
 1. Analyze Terraform structure.
 2. Build `architecture-adf`.
 3. Render with `media-actuator`.
@@ -22,6 +31,7 @@ The preferred long-term flow is:
 `terraform source -> architecture-adf -> drawio | mermaid | d2`
 
 ## Why This Matters
+
 Directly drawing from Terraform blocks tends to produce:
 
 - flat resource lists
@@ -37,6 +47,7 @@ Directly drawing from Terraform blocks tends to produce:
 - synthetic infrastructure hints when the source is incomplete
 
 ## Rendering Model
+
 For AWS architecture diagrams, the renderer should support:
 
 - boundary containers:
@@ -58,6 +69,7 @@ For AWS architecture diagrams, the renderer should support:
 - AWS group icons for containers
 
 ## Terraform Module Handling
+
 Terraform modules are not runtime infrastructure boundaries.
 
 They should be represented as:
@@ -69,6 +81,7 @@ They should be represented as:
 This avoids the common mistake of drawing each module directory as a separate AWS environment.
 
 ## Current Kyberion Direction
+
 The current `media-actuator` draw.io renderer is evolving toward:
 
 - richer AWS-aware boundary rendering
@@ -87,6 +100,7 @@ The Terraform-to-`architecture-adf` step is still a candidate for formal actuato
   - `d2_render`
 
 ## Design Guardrails
+
 - Keep renderer-specific XML out of the public contract.
 - Prefer semantic tiers over directory-shaped grouping.
 - Prefer runtime AWS topology over Terraform file layout.

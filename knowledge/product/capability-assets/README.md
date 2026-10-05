@@ -3,7 +3,7 @@ title: Legacy Capability Resources
 tags: [reference, capability, legacy, migration]
 importance: 6
 author: Ecosystem Architect
-last_updated: 2026-03-15
+last_updated: 2026-10-05
 kind: reference
 scope: repository
 authority: advisory

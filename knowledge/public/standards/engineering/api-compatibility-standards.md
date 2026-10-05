@@ -4,7 +4,8 @@ category: Standards
 tags: [standards, engineering, api, compatibility]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # API Compatibility & Evolution Standards
@@ -45,4 +46,5 @@ GraphQLでは、スキーマの「追加のみ」を原則とする。
 - **Null性の考慮**: フィールドを Non-Null (`!`) に設定すると、後からの変更が難しくなるため、初期設計では Nullable を基本とする。
 
 ---
-*Created by Kyberion Ecosystem Architect - 2026-02-28*
+
+_Created by Kyberion Ecosystem Architect - 2026-02-28_

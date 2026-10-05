@@ -1,3 +1,9 @@
+---
+title: 'Working Philosophy — Frontier-Model Operating Rules for Every Tier'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # Working Philosophy — Frontier-Model Operating Rules for Every Tier
 
 **Purpose**: capture _how_ a frontier model (Fable-class) actually works — the

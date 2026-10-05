@@ -5,6 +5,7 @@ tags: [standards, knowledge, management]
 importance: 10
 author: Ecosystem Architect
 last_updated: 2026-03-06
+review_by: 2026-10-12
 ---
 
 # Knowledge Management Standard (Semantic Indexing) v1.1

@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Executive Reporting & Communication'
+last_updated: 2026-10-05
+---
+
 # Procedure: Executive Reporting & Communication
 
 ## 1. Goal

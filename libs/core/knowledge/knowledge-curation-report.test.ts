@@ -286,7 +286,13 @@ describe('computeCurationReport — SLO thresholds come from config', () => {
     const config = loadCurationSloConfig();
     expect(config).toEqual({
       low_yield_delivery_threshold: 5,
-      freshness_days_by_kind: { governance: 90, playbook: 60, knowledge_hint: 30 },
+      freshness_days_by_kind: {
+        governance: 90,
+        playbook: 60,
+        knowledge_hint: 30,
+        reference: 120,
+        evergreen: 365,
+      },
       default_freshness_days: 180,
     });
   });
@@ -458,6 +464,8 @@ describe('knowledge-curation-slo.json config file', () => {
       knowledge_hint: 30,
       // DA-08: ingested cards (typically kind: reference) join the SLO cycle.
       reference: 120,
+      // Timeless concept docs re-verify on a yearly cycle.
+      evergreen: 365,
     });
     expect(raw.default_freshness_days).toBe(180);
   });

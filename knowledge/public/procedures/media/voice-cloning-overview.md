@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Voice Cloning Overview'
+last_updated: 2026-10-05
+---
+
 # Procedure: Voice Cloning Overview
 
 ## Goal

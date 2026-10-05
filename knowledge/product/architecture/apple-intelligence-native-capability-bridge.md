@@ -6,6 +6,7 @@ authority: reference
 phase: [alignment, execution]
 tags: [apple-intelligence, macos, vision, voice, computer-use, governance]
 owner: ecosystem_architect
+last_updated: 2026-10-05
 ---
 
 # Apple Intelligence Native Capability Bridge

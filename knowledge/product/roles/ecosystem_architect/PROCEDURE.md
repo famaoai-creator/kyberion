@@ -1,3 +1,8 @@
+---
+title: 'Role Procedure: Ecosystem Architect (Senior Partner)'
+last_updated: 2026-10-05
+---
+
 # Role Procedure: Ecosystem Architect (Senior Partner)
 
 ## 🎯 Role Definition

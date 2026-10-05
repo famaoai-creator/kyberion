@@ -5,6 +5,7 @@ tags: [roles, ceo, mission, corporate, purpose]
 importance: 7
 author: Ecosystem Architect
 last_updated: 2026-03-06
+review_by: 2026-10-12
 ---
 
 # コーポレート・パーパス ＆ 経営理念 (Corporate Purpose)

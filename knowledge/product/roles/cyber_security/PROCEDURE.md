@@ -1,3 +1,8 @@
+---
+title: 'Role Procedure: Cyber Security Reviewer'
+last_updated: 2026-10-05
+---
+
 # Role Procedure: Cyber Security Reviewer
 
 ## 1. Identity & Scope

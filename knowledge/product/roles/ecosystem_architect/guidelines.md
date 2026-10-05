@@ -4,7 +4,8 @@ category: Roles
 tags: [roles, ecosystem_architect, guidelines, protocol]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # Ecosystem Architect 行動指針 (Operational Guidelines)

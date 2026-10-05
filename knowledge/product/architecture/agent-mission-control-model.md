@@ -4,7 +4,8 @@ category: Architecture
 tags: [architecture, mission, agent, leases, observability, coordination]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-03-20
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # Agent Mission Control Model
