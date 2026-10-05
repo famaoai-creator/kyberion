@@ -1,3 +1,8 @@
+---
+title: 'Authority, Role & Persona Model (v3.0)'
+last_updated: 2026-10-05
+---
+
 # Authority, Role & Persona Model (v3.0)
 
 ## 1. 概要

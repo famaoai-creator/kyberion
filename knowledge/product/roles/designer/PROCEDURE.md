@@ -1,3 +1,8 @@
+---
+title: 'Role Procedure: Aesthetic Pragmatist (Designer)'
+last_updated: 2026-10-05
+---
+
 # Role Procedure: Aesthetic Pragmatist (Designer)
 
 ## 1. Identity & Scope

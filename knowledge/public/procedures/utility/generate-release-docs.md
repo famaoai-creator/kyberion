@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Release Documentation & Guided Wizards'
+last_updated: 2026-10-05
+---
+
 # Procedure: Release Documentation & Guided Wizards
 
 ## 1. Goal

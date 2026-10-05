@@ -1,3 +1,9 @@
+---
+title: 'DOCX Markdown Ingestion Model'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # DOCX Markdown Ingestion Model
 
 This note records the concepts adopted from Markdown-to-DOCX converters and aligns them with Kyberion's existing PPTX/XLSX-native design approach.

@@ -1,3 +1,9 @@
+---
+title: 'OS Automation Bridge Model'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # OS Automation Bridge Model
 
 ## Intent

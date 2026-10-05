@@ -1,5 +1,5 @@
 ---
-title: MISSION: Organizational Map & Approval History
+title: 'MISSION: Organizational Map & Approval History'
 category: Orchestration
 tags: [orchestration, onboarding-directives, manager, steward]
 importance: 8

@@ -1,5 +1,5 @@
 ---
-title: MISSION: Competitive Edge & ROI Benchmarking
+title: 'MISSION: Competitive Edge & ROI Benchmarking'
 category: Orchestration
 tags: [orchestration, onboarding-directives, sol, steward]
 importance: 8

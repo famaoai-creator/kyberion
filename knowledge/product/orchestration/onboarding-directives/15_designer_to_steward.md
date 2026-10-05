@@ -1,5 +1,5 @@
 ---
-title: MISSION: UI/UX Asset & Persona Templates
+title: 'MISSION: UI/UX Asset & Persona Templates'
 category: Orchestration
 tags: [orchestration, onboarding-directives, designer, steward]
 importance: 8

@@ -1,5 +1,5 @@
 ---
-kind: architecture
+kind: evergreen
 scope: repository
 authority: reference
 phase: execution
@@ -17,6 +17,7 @@ tags:
   - lifecycle
   - surface
   - gateway
+last_updated: 2026-10-05
 ---
 
 # Runtime Surface Lifecycle Model

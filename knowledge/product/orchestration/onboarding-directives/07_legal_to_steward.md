@@ -1,5 +1,5 @@
 ---
-title: MISSION: Legal Guardrails & IP Portfolio
+title: 'MISSION: Legal Guardrails & IP Portfolio'
 category: Orchestration
 tags: [orchestration, onboarding-directives, legal, steward]
 importance: 8

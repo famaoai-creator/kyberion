@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Run Generation Schedule Daemon'
+last_updated: 2026-10-05
+---
+
 # Procedure: Run Generation Schedule Daemon
 
 ## 1. Goal

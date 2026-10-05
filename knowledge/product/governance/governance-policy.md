@@ -4,7 +4,7 @@ category: Governance
 tags: [governance, safety, platform, restriction]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
 ---
 
 # Dynamic Capability and Actuator Governance Policy v1.0

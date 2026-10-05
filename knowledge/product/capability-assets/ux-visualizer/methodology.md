@@ -1,10 +1,10 @@
 ---
-title: Methodology: High-Fidelity SPA Reverse Engineering
+title: 'Methodology: High-Fidelity SPA Reverse Engineering'
 category: Skills
 tags: [skills, ux-visualizer, methodology, protocol]
 importance: 5
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
 ---
 
 # Methodology: High-Fidelity SPA Reverse Engineering

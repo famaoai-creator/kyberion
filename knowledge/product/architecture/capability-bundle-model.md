@@ -1,3 +1,9 @@
+---
+title: 'Capability Bundle Model'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # Capability Bundle Model
 
 Kyberion does not need a new umbrella schema immediately for the concept

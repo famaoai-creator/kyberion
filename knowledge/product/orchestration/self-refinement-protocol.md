@@ -1,5 +1,5 @@
 ---
-title: Self-Refinement Protocol: The Path to Perpetual Growth
+title: 'Self-Refinement Protocol: The Path to Perpetual Growth'
 category: Orchestration
 tags: [orchestration, self, refinement, protocol, ace]
 importance: 8

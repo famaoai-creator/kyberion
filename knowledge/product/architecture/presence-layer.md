@@ -1,5 +1,5 @@
 ---
-title: Presence Layer: Sensors, Displays, and Intervention
+title: 'Presence Layer: Sensors, Displays, and Intervention'
 category: Architecture
 tags: [architecture, presence, layer]
 importance: 8

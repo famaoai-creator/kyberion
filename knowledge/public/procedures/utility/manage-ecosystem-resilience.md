@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Ecosystem Health & Resilience Management'
+last_updated: 2026-10-05
+---
+
 # Procedure: Ecosystem Health & Resilience Management
 
 ## 1. Goal

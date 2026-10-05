@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Generate Files from Templates'
+last_updated: 2026-10-05
+---
+
 # Procedure: Generate Files from Templates
 
 ## 1. Goal

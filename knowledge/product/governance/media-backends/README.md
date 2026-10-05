@@ -1,3 +1,8 @@
+---
+title: 'Media Backend Registry Canonical Directory'
+last_updated: 2026-10-05
+---
+
 # Media Backend Registry Canonical Directory
 
 Canonical source for media backend records (RSP-19).

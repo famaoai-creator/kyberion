@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Compose Video From ADF'
+last_updated: 2026-10-05
+---
+
 # Procedure: Compose Video From ADF
 
 ## 1. Goal

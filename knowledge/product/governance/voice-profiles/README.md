@@ -1,3 +1,8 @@
+---
+title: 'Voice Profile Directory'
+last_updated: 2026-10-05
+---
+
 # Voice Profile Directory
 
 This directory is the canonical source for governed voice profiles.

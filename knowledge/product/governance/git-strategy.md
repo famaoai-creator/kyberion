@@ -1,10 +1,10 @@
 ---
-title: GIT Strategy: Sovereign Hierarchical Synchronization
+title: 'GIT Strategy: Sovereign Hierarchical Synchronization'
 category: Governance
 tags: [governance, git, strategy]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
 ---
 
 # GIT Strategy: Sovereign Hierarchical Synchronization
@@ -15,11 +15,11 @@ last_updated: 2026-03-06
 
 情報の機密レベルに応じて、異なる Git 同期戦略を適用する。
 
-| ティア | ディレクトリ | 機密レベル | Git 同期戦略 |
-| :--- | :--- | :--- | :--- |
-| **Public** | `knowledge/` | 公開可能 | **メインモノレポ**: コミュニティ全体で共有される標準知識。 |
-| **Confidential** | `knowledge/confidential/` | 組織内秘 | **Sovereign-Sync**: 独立したプライベート・リポジトリと個別に同期。 |
-| **Personal** | `knowledge/personal/` | 個人専用 | **完全隔離**: `.gitignore` により Git 管理から除外。ローカルのみに存在。 |
+| ティア           | ディレクトリ              | 機密レベル | Git 同期戦略                                                             |
+| :--------------- | :------------------------ | :--------- | :----------------------------------------------------------------------- |
+| **Public**       | `knowledge/`              | 公開可能   | **メインモノレポ**: コミュニティ全体で共有される標準知識。               |
+| **Confidential** | `knowledge/confidential/` | 組織内秘   | **Sovereign-Sync**: 独立したプライベート・リポジトリと個別に同期。       |
+| **Personal**     | `knowledge/personal/`     | 個人専用   | **完全隔離**: `.gitignore` により Git 管理から除外。ローカルのみに存在。 |
 
 ## 2. Sovereign-Sync プロトコル
 

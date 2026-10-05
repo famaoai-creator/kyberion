@@ -4,7 +4,7 @@ category: Standards
 tags: [standards, adr, standard, ace]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
 ---
 
 # Architecture Decision Record (ADR) Standard

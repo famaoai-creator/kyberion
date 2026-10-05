@@ -1,3 +1,9 @@
+---
+title: 'Kyberion Concept Map'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # Kyberion Concept Map
 
 Kyberion does not suffer from "too many concepts" as much as it suffers from `multiple layers of concepts becoming visible at the same time`.

@@ -4,7 +4,8 @@ category: Roles
 tags: [roles, reliability_engineer, mission]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # Reliability Engineer (SRE/運用責任者) ミッション声明

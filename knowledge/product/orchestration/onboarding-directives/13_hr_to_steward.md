@@ -1,5 +1,5 @@
 ---
-title: MISSION: Culture Archetypes & Talent Specs
+title: 'MISSION: Culture Archetypes & Talent Specs'
 category: Orchestration
 tags: [orchestration, onboarding-directives, steward]
 importance: 8
