@@ -626,6 +626,16 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
 
     return (await domainOps()).runInlineAccountabilityReport(step, params, ctx);
   },
+  'core:decision_digest': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return (await domainOps()).runInlineDecisionDigest(step, params, ctx);
+  },
+  'core:approval_store_hygiene': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return (await domainOps()).runInlineApprovalStoreHygiene(step, params, ctx);
+  },
   'core:organization_record_run': async (dctx) => {
     const { step, params, ctx } = dctx;
 

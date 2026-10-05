@@ -7123,6 +7123,10 @@
       "types": "./dist/governance/approval-veto-window.d.ts",
       "default": "./dist/governance/approval-veto-window.js"
     },
+    "./governance/operations-halt": {
+      "types": "./dist/governance/operations-halt.d.ts",
+      "default": "./dist/governance/operations-halt.js"
+    },
     "./governance/decision-card": {
       "types": "./dist/governance/decision-card.d.ts",
       "default": "./dist/governance/decision-card.js"
