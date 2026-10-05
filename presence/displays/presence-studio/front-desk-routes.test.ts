@@ -846,7 +846,11 @@ describe('FD-08 removed presence-studio dashboard panels', () => {
     // scripts/control_plane_cli.ts still call these on this surface.
     expect(serverSource).toContain("presenceStudioData.app.get('/api/projects'");
     expect(serverSource).toContain("presenceStudioData.app.get('/api/project-tracks'");
-    expect(serverSource).toContain("presenceStudioData.app.get('/api/service-bindings'");
+    expect(serverSource).toContain('registerServiceBindingsRoute({');
+    expect(serverSource).toContain('app: presenceStudioData.app,');
+    expect(readRepoFile('presence/displays/presence-studio/service-bindings-route.ts')).toContain(
+      "input.app.get('/api/service-bindings'"
+    );
     expect(serverSource).toContain("presenceStudioData.app.get('/api/mission-seeds'");
     // Kept because index.html's Work Detail / Requested Work / Latest
     // Outcomes "learned" links still resolve through these.

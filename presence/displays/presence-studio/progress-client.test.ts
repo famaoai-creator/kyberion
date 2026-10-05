@@ -762,8 +762,8 @@ describe('progress browser-script contracts', () => {
   });
 });
 
-describe('home browser-script scope and estimate contracts', () => {
-  it('waits for scope validation and preserves scope across counts, decision, work and request links', async () => {
+describe('work home browser-script scope readiness', () => {
+  it('waits for scope validation and preserves scope on explicit new-request navigation', async () => {
     const ready = deferred<void>();
     const h = harness({
       page: 'home',
@@ -774,43 +774,28 @@ describe('home browser-script scope and estimate contracts', () => {
         if (path === '/api/home')
           return response({
             ok: true,
-            date: '2026-10-04',
-            counts: { decide: 1, progress: 1, delivered: 0 },
-            decide: [{ id: 'decision', title: 'Decision' }],
-            progress: [
-              {
-                id: 'work',
-                title: 'Work',
-                kind: 'in_progress',
-                percent: 65,
-                progress_basis: 'phase_estimate',
-              },
-            ],
+            work_home: {
+              version: 1,
+              scope_id: 'scope-alpha',
+              observed_at: '2026-10-05T00:00:00Z',
+              coverage: 'supported_sources_ready',
+              sources: [],
+              items: [],
+              attention: [],
+              updates: [],
+              counts: { all: 0, attention: 0, active: 0, answered: 0, verified: 0 },
+            },
           });
         return response({ ok: true });
       },
     });
-    const nav = vi.spyOn(h.window.FrontDeskRail, 'nav');
     const mounted = h.window.KyberionHome.mount();
     await flush();
     expect(h.fetch).not.toHaveBeenCalled();
-    expect(nav).not.toHaveBeenCalled();
     ready.resolve();
     await mounted;
-    expect(nav).toHaveBeenCalledTimes(1);
     expect(h.fetch.mock.calls.some(([url]) => url === '/api/home?tenant=alpha')).toBe(true);
-    expect(h.elements['decide-more'].attributes.href).toBe(
-      'https://decide.example.test/decide?tenant=alpha'
-    );
-    expect(h.elements['progress-more'].attributes.href).toBe('/progress?tenant=alpha');
-    const list = h.renders.find((entry) => entry.container === h.elements['progress-body'])!
-      .components[0];
-    const props = list.props as { items: Array<Record<string, unknown>> };
-    expect(props.items[0]).toMatchObject({
-      href: '/progress?tenant=alpha#work',
-      meta: 'Phase estimate',
-      progress: 65,
-    });
+    expect(h.fetch.mock.calls.every(([, options]) => options?.method !== 'POST')).toBe(true);
     h.elements['ask-input'].value = 'Prepare my request';
     h.elements['ask-form'].fire('submit');
     expect(h.window.location.href).toBe(

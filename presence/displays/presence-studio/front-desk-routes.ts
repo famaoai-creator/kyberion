@@ -8,6 +8,7 @@
 import type express from 'express';
 import * as path from 'node:path';
 import { registerConversationRoutes } from './conversation-routes.js';
+import { readWorkHome } from './work-home-source.js';
 import {
   conversationRef,
   presenceFrontDeskConversationViewer,
@@ -33,7 +34,6 @@ import {
 } from '@agent/core/personal-identity-reader';
 import { withExecutionContext } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
-import { listApprovalRequests } from '@agent/core/governance/approval-store';
 import { listArtifactRecords } from '@agent/core/workforce/artifact-record';
 import {
   acceptInboxEntryWithHumanReceipt,
@@ -58,12 +58,6 @@ import {
   type PresenceStudioViewerContext,
 } from './security.js';
 import { presenceAvailableOperations } from './headless.js';
-import {
-  buildHomePayload,
-  type HomeArtifactInput,
-  type HomeDecideCandidateInput,
-  type HomeTaskSessionInput,
-} from './home.js';
 import {
   buildProgressDetail,
   buildProgressPayload,
@@ -336,62 +330,7 @@ export function registerFrontDeskRoutes(app: express.Express): void {
   // FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md §2.1 / FD-02.
   app.get('/api/home', (req, res) => {
     try {
-      const viewer = resolvePresenceStudioViewerContext(req);
-      const requestedTenant = readSurfaceStringParam(req.query.tenant);
-      // Same rule as the headless overview (`presenceStudioRecordInScope`):
-      // `?tenant=` only narrows, and records with no tenant are denied for a
-      // scoped viewer rather than shown to everyone.
-      const scopedViewer = narrowPresenceStudioScope(viewer, {
-        tenant: requestedTenant,
-        organizationId: readSurfaceStringParam(req.query.organizationId),
-        projectId: readSurfaceStringParam(req.query.projectId),
-      });
-
-      const approvals: HomeDecideCandidateInput[] = listApprovalRequests({ status: 'pending' })
-        .filter((record) => presenceStudioRecordInScope(scopedViewer, record))
-        .map((record) => ({
-          id: record.id,
-          title: record.title,
-          tenant_slug: record.scope?.tenant_slug,
-          when: record.requestedAt,
-        }));
-
-      const heldActions: HomeDecideCandidateInput[] = presenceStudioData.cloudflareOsSurface
-        .snapshot(undefined, viewer)
-        .heldActions.filter((item) => item.status === 'pending')
-        .filter((item) =>
-          presenceStudioRecordInScope(scopedViewer, { tenant_slug: item.tenantSlug })
-        )
-        .map((item) => ({
-          id: item.id,
-          title: item.op || item.id,
-          tenant_slug: item.tenantSlug,
-          when: item.submittedAt,
-        }));
-
-      const taskSessions: HomeTaskSessionInput[] = listTaskSessions('presence')
-        .filter((session) => presenceStudioRecordInScope(scopedViewer, session))
-        .map((session) => ({
-          id: session.session_id,
-          title: session.goal?.summary || session.session_id,
-          status: session.status,
-          when: session.updated_at,
-        }));
-
-      const artifacts: HomeArtifactInput[] = listArtifactRecords()
-        .filter((record) => presenceStudioRecordInScope(scopedViewer, record))
-        .map((record) => ({
-          id: record.artifact_id,
-          title: deriveHomeArtifactTitle(record),
-        }));
-
-      const payload = buildHomePayload({
-        now: new Date(),
-        approvals,
-        heldActions,
-        taskSessions,
-        artifacts,
-      });
+      const payload = readWorkHome(req);
       res.setHeader('Cache-Control', 'no-store');
       res.json(payload);
     } catch (error) {

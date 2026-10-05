@@ -97,13 +97,27 @@
             </form>
           </section>
 
+          <div class="home-work-toolbar">
+            <button id="home-refresh" type="button" class="kb-btn kb-btn--secondary">
+              {{t:front_desk:work_home_refresh}}
+            </button>
+            <label for="home-detail-mode">{{t:front_desk:work_home_detail_mode}}</label>
+            <select id="home-detail-mode" class="kb-input">
+              <option value="quiet">{{t:front_desk:work_home_quiet}}</option>
+              <option value="detailed">{{t:front_desk:work_home_detailed}}</option>
+            </select>
+          </div>
+          <p id="home-error" class="kb-callout" role="alert" hidden>
+            {{t:front_desk:work_home_load_failed}}
+          </p>
+          <div id="home-sources" role="status" aria-live="polite"></div>
           <div id="home-metrics"></div>
 
           <div class="kb-grid home-columns" data-columns="2" data-gap="lg">
             <section class="kb-section" id="decide-card">
               <header class="kb-section__header">
                 <div class="kb-section__heading">
-                  <h2 class="kb-section__title">{{t:front_desk:home_decide_title}}</h2>
+                  <h2 class="kb-section__title">{{t:front_desk:work_home_attention_title}}</h2>
                 </div>
                 <div class="kb-section__actions">
                   <span class="kb-badge" id="decide-count" hidden></span>
@@ -121,17 +135,12 @@
                   <span class="kb-skeleton__line" aria-hidden="true"></span>
                 </div>
               </div>
-              <div>
-                <a class="kb-btn kb-btn--ghost home-more" id="decide-more" href="#"
-                  >{{t:front_desk:home_decide_more}}</a
-                >
-              </div>
             </section>
 
             <section class="kb-section" id="progress-card">
               <header class="kb-section__header">
                 <div class="kb-section__heading">
-                  <h2 class="kb-section__title">{{t:front_desk:home_progress_title}}</h2>
+                  <h2 class="kb-section__title">{{t:front_desk:work_home_all_title}}</h2>
                   <p class="kb-section__description" id="progress-summary"></p>
                 </div>
               </header>
@@ -146,11 +155,6 @@
                   <span class="kb-skeleton__line" aria-hidden="true"></span>
                   <span class="kb-skeleton__line" aria-hidden="true"></span>
                 </div>
-              </div>
-              <div>
-                <a class="kb-btn kb-btn--ghost home-more" id="progress-more" href="/progress"
-                  >{{t:front_desk:home_progress_more}}</a
-                >
               </div>
             </section>
           </div>
