@@ -909,7 +909,12 @@ export async function startRealtimeVoiceLoop(
       const flushed = await Promise.race([
         feed.finals,
         new Promise<null>((resolve) => setTimeout(resolve, STREAMING_STT_FLUSH_TIMEOUT_MS, null)),
-      ]);
+      ]).catch((err: unknown) => {
+        const reason = err instanceof Error ? err.message : String(err);
+        logger.warn(`[realtime-voice-loop] streaming STT flush failed: ${reason}`);
+        options.onEvent?.({ kind: 'degraded', what: 'streaming-stt', reason });
+        return null;
+      });
       if (flushed) {
         userText = flushed;
         sttMode = 'streaming';
@@ -922,8 +927,16 @@ export async function startRealtimeVoiceLoop(
       }
     }
     if (!userText) {
-      userText = (await options.transcribe(audioPath)).trim();
-      sttMode = 'batch';
+      try {
+        userText = (await options.transcribe(audioPath)).trim();
+        sttMode = 'batch';
+      } catch (err: unknown) {
+        // An STT failure on one utterance (noise blip, backend hiccup) must
+        // not kill the session — degrade to the empty-transcript path.
+        const reason = err instanceof Error ? err.message : String(err);
+        logger.warn(`[realtime-voice-loop] transcribe failed for turn ${turnIndex + 1}: ${reason}`);
+        options.onEvent?.({ kind: 'degraded', what: 'stt', reason });
+      }
     }
     const sttMs = Date.now() - sttStartedAt;
     if (!userText) {
