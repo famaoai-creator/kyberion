@@ -28,9 +28,14 @@ import {
 } from './knowledge/memory-promotion-queue.js';
 
 const HEURISTICS_ROOT = 'knowledge/confidential/heuristics';
-const HEURISTIC_SCHEMA_PATH = assertSafeRepositoryPath(
-  pathResolver.knowledge('product/schemas/heuristic-entry.schema.json')
-);
+
+// Resolved on use, not at import: importing this module (the mission retrospective
+// does) must not touch the filesystem or fail where the knowledge root is not mounted.
+function heuristicSchemaPath(): string {
+  return assertSafeRepositoryPath(
+    pathResolver.knowledge('product/schemas/heuristic-entry.schema.json')
+  );
+}
 
 export interface HeuristicEntry {
   id: string;
@@ -84,7 +89,7 @@ function heuristicCatalog(filePath: string) {
   return defineCatalog<HeuristicEntry>({
     id: 'heuristic-entry',
     path: filePath,
-    schema: HEURISTIC_SCHEMA_PATH,
+    schema: heuristicSchemaPath(),
   });
 }
 
@@ -228,4 +233,75 @@ export function queueHeuristicMemoryCandidate(input: {
   });
   enqueueMemoryPromotionCandidate(candidate);
   return candidate;
+}
+
+const SUCCESSFUL_ITEM_STATUSES = ['done', 'completed', 'accepted'];
+
+/** A heuristic that scored at least this well is offered for ratification as durable memory. */
+export const HEURISTIC_PROMOTION_THRESHOLD = 0.75;
+
+/**
+ * Derive a mission's outcome from its measured work items, deterministically:
+ * every item done and no finish-gate failure is `success`, no item done is
+ * `failure`, anything between is `partial`. A mission with no items has no
+ * outcome to score against, so it returns null.
+ */
+export function deriveMissionOutcome(input: {
+  missionId: string;
+  itemStatuses: readonly string[];
+  finishGateFailures: number;
+  completedAt?: string;
+}): MissionOutcome | null {
+  if (input.itemStatuses.length === 0) return null;
+  const done = input.itemStatuses.filter((status) =>
+    SUCCESSFUL_ITEM_STATUSES.includes(String(status).toLowerCase())
+  ).length;
+  const result: MissionOutcome['result'] =
+    done === input.itemStatuses.length && input.finishGateFailures === 0
+      ? 'success'
+      : done === 0
+        ? 'failure'
+        : 'partial';
+  return {
+    mission_id: input.missionId,
+    completed_at: input.completedAt ?? nowIso(),
+    result,
+    metric_score: round(done / input.itemStatuses.length),
+  };
+}
+
+export interface MissionHeuristicValidationResult {
+  validated: string[];
+  /** Subset of `validated` offered to the memory-promotion queue (ratification still required). */
+  queued: string[];
+  errors: string[];
+}
+
+/**
+ * Close the heuristic "learn" loop for one finished mission: every captured
+ * intuition that surfaced during it and has not been scored yet is stamped with
+ * the mission's outcome, and the ones that held up are offered to the
+ * memory-promotion queue, where a steward ratifies them before they can reach
+ * a future worker. Already-validated entries are left alone, so a mission that
+ * is finished twice does not restamp or re-queue anything.
+ */
+export function validateMissionHeuristics(
+  outcome: MissionOutcome
+): MissionHeuristicValidationResult {
+  const result: MissionHeuristicValidationResult = { validated: [], queued: [], errors: [] };
+  const missionId = outcome.mission_id.toUpperCase();
+  for (const entry of listHeuristics()) {
+    if (entry.validation || String(entry.mission_id ?? '').toUpperCase() !== missionId) continue;
+    try {
+      const validated = validateHeuristic({ entryId: entry.id, outcome });
+      result.validated.push(entry.id);
+      if ((validated.validation?.validity_score ?? 0) >= HEURISTIC_PROMOTION_THRESHOLD) {
+        queueHeuristicMemoryCandidate({ entryId: entry.id });
+        result.queued.push(entry.id);
+      }
+    } catch (error) {
+      result.errors.push(`${entry.id}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  return result;
 }
