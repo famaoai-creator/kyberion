@@ -1,14 +1,22 @@
+---
+title: 'Procedure: Generate a Proposal PPTX'
+last_updated: 2026-10-05
+---
+
 # Procedure: Generate a Proposal PPTX
 
 ## 1. Goal
+
 Generate a proposal deck from a canonical `document-brief` and a knowledge-owned presentation theme.
 
 ## 2. Dependencies
+
 - **Actuator**: `Media-Actuator`
 - **Schema**: `knowledge/product/schemas/document-brief.schema.json`
 - **Theme Catalog**: `knowledge/public/design-patterns/media-templates/themes/`
 
 ## 3. Principle
+
 Separate the proposal into:
 
 - canonical document contract: `document-brief`
@@ -19,6 +27,7 @@ Separate the proposal into:
 - visual selection: `layout_template_id`
 
 ## 4. Step-by-Step Instructions
+
 1. Prepare a `document-brief` JSON file.
 2. Set:
    - `artifact_family: presentation`
@@ -40,4 +49,5 @@ node dist/libs/actuators/media-actuator/src/index.js --input libs/actuators/medi
 ```
 
 ## 5. Expected Output
+
 A governed proposal deck that keeps business semantics in the brief and visual variation in knowledge-owned theme selection.

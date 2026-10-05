@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Generate Video From ADF'
+last_updated: 2026-10-05
+---
+
 # Procedure: Generate Video From ADF
 
 ## 1. Goal

@@ -1,10 +1,10 @@
 ---
-title: Incident Report: security-scanner
+title: 'Incident Report: security-scanner'
 category: Incidents
 tags: [incidents, incident, unknown, security, scanner, 1771099820673]
 importance: 5
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
 ---
 
 # Incident Report: security-scanner

@@ -1,3 +1,8 @@
+---
+title: 'Intent Coverage Matrix'
+last_updated: 2026-10-05
+---
+
 # Intent Coverage Matrix
 
 ## Purpose

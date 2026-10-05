@@ -1,3 +1,8 @@
+---
+title: 'Role Procedure: Integration Steward'
+last_updated: 2026-10-05
+---
+
 # Role Procedure: Integration Steward
 
 ## 1. Identity & Scope

@@ -4,7 +4,8 @@ category: Roles
 tags: [roles, ceo, planning, frameworks]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # 事業計画 ＆ 戦略フレームワーク (Planning Frameworks)

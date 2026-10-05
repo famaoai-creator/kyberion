@@ -1128,6 +1128,7 @@ function _defaultRankingMetadata(relSource: string, kind?: string): KnowledgeRan
     playbook: { doc_authority: 'recipe', scope: 'mission' },
     incident: { doc_authority: 'reference', scope: 'repository' },
     reference: { doc_authority: 'reference', scope: 'global' },
+    evergreen: { doc_authority: 'reference', scope: 'repository' },
   };
   if (kind && kindDefaults[kind]) return kindDefaults[kind];
   if (normalized.includes('product/governance/'))

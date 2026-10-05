@@ -4,7 +4,8 @@ category: Architecture
 tags: [architecture, actuators, capabilities, contracts]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-03-23
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # Actuator Operation Taxonomy

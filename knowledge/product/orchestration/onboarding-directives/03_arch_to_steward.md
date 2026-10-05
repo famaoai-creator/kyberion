@@ -1,5 +1,5 @@
 ---
-title: MISSION: Skill Usage & Performance Audit
+title: 'MISSION: Skill Usage & Performance Audit'
 category: Orchestration
 tags: [orchestration, onboarding-directives, arch, steward]
 importance: 8

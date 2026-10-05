@@ -1,10 +1,10 @@
 ---
-title: Incident Report: quality-scorer
+title: 'Incident Report: quality-scorer'
 category: Incidents
 tags: [incidents, incident, unknown, quality, scorer, 1771099808128]
 importance: 5
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
 ---
 
 # Incident Report: quality-scorer

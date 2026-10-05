@@ -1,3 +1,8 @@
+---
+title: 'LLM Invocation Rubric — どのポイントで LLM に頼むか'
+last_updated: 2026-10-05
+---
+
 # LLM Invocation Rubric — どのポイントで LLM に頼むか
 
 > **正本** (LC-05, LOOP_CLOSURE_PLAN 2026-07-13)。pipeline / ADF / ワーカータスクを設計するとき、

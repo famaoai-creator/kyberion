@@ -3,8 +3,10 @@ title: AI-Run Meetings — Follow-up Hardening (Ops-3 / HR-2 / HR-3 / Compliance
 mission_id: MSN-MTG-FOLLOWUP-20260427
 date: 2026-04-27
 category: Incidents
-tags: [meeting, action-items, partial-state, restricted-actions, manager-cc, speaker-fairness, distill]
+tags:
+  [meeting, action-items, partial-state, restricted-actions, manager-cc, speaker-fairness, distill]
 importance: 8
+last_updated: 2026-10-05
 ---
 
 # Follow-up Hardening for the AI-Led Meeting Facilitator
@@ -17,19 +19,19 @@ remaining four findings + two UX gaps in one wave.
 
 ## Findings closed in this round
 
-| Finding | Severity | Mechanism |
-|---|---|---|
-| **Ops-3 partial-state fail-closed** | critical | New boolean field `partial_state` on `ActionItem`. The bridge sets it on `listen` whenever the capture window did not complete (timeout, dropped audio, empty transcript). `extract_action_items` propagates it onto every derived item. `isEligibleForExecution()` short-circuits to false when `partial_state=true`, so neither `execute_self_action_items` nor `track_pending_action_items` will fire on items extracted from a degraded transcript. Operators clear via `clearPartialState`. |
-| **Compliance-2 restricted-action-kinds + approval-gate** | high | Pattern policy at `knowledge/product/governance/restricted-action-kinds-policy.json`. `extract_action_items` runs each title/summary through `matchRestrictedAction()` and tags hits with `restricted=true` + `restriction_rule_id`. `execute_self_action_items` skips restricted items unless `KYBERION_RESTRICTED_APPROVED_ITEMS` lists the item id (or sudo). |
-| **HR-2 chain-of-command CC** | medium | `attendees[].manager_handle` propagates onto each item. `generate_reminder_message` emits a `cc[]` whenever priority=must, the item is restricted, or the per-recipient nag count crossed `KYBERION_REMINDER_CC_AFTER_N` (default 3). `track_pending_action_items` records a separate reminder line per CC channel. |
-| **HR-3 speaker fairness audit** | medium | New op `wisdom:audit_speaker_fairness` aggregates `provenance.speaker_label` across the mission and emits a share-of-voice report. Default thresholds: warn when a single speaker drives >60% of total items or >70% of `must` items. Wired into the meeting-facilitation pipeline as a final step. |
+| Finding                                                  | Severity | Mechanism                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| -------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Ops-3 partial-state fail-closed**                      | critical | New boolean field `partial_state` on `ActionItem`. The bridge sets it on `listen` whenever the capture window did not complete (timeout, dropped audio, empty transcript). `extract_action_items` propagates it onto every derived item. `isEligibleForExecution()` short-circuits to false when `partial_state=true`, so neither `execute_self_action_items` nor `track_pending_action_items` will fire on items extracted from a degraded transcript. Operators clear via `clearPartialState`. |
+| **Compliance-2 restricted-action-kinds + approval-gate** | high     | Pattern policy at `knowledge/product/governance/restricted-action-kinds-policy.json`. `extract_action_items` runs each title/summary through `matchRestrictedAction()` and tags hits with `restricted=true` + `restriction_rule_id`. `execute_self_action_items` skips restricted items unless `KYBERION_RESTRICTED_APPROVED_ITEMS` lists the item id (or sudo).                                                                                                                                 |
+| **HR-2 chain-of-command CC**                             | medium   | `attendees[].manager_handle` propagates onto each item. `generate_reminder_message` emits a `cc[]` whenever priority=must, the item is restricted, or the per-recipient nag count crossed `KYBERION_REMINDER_CC_AFTER_N` (default 3). `track_pending_action_items` records a separate reminder line per CC channel.                                                                                                                                                                              |
+| **HR-3 speaker fairness audit**                          | medium   | New op `wisdom:audit_speaker_fairness` aggregates `provenance.speaker_label` across the mission and emits a share-of-voice report. Default thresholds: warn when a single speaker drives >60% of total items or >70% of `must` items. Wired into the meeting-facilitation pipeline as a final step.                                                                                                                                                                                              |
 
 ## UX / driver improvements
 
-| Item | Mechanism |
-|---|---|
-| Voice consent capture CLI | `pnpm meeting:consent grant|revoke|status --mission MSN-…`. Writes `evidence/voice-consent.json` and emits a `voice_consent.<verb>` audit event. Refuses overwrite of an existing grant unless `--force`. Source: `scripts/voice_consent.ts`. |
-| Bridge driver hardening | `meeting-bridge.py` rewritten: per-platform host allow-list, `zoommtg://` / `msteams:/` schemes when possible, structured error envelopes, partial-state detection on `listen` (elapsed-time + empty-transcript checks), `chat`/`status` actions, cross-platform speech (macOS `say`, Linux `espeak`, Windows PowerShell). |
+| Item                      | Mechanism                                                                                                                                                                                                                                                                                                                  |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Voice consent capture CLI | `pnpm meeting:consent grant                                                                                                                                                                                                                                                                                                | revoke | status --mission MSN-…`. Writes `evidence/voice-consent.json`and emits a`voice_consent.<verb>`audit event. Refuses overwrite of an existing grant unless`--force`. Source: `scripts/voice_consent.ts`. |
+| Bridge driver hardening   | `meeting-bridge.py` rewritten: per-platform host allow-list, `zoommtg://` / `msteams:/` schemes when possible, structured error envelopes, partial-state detection on `listen` (elapsed-time + empty-transcript checks), `chat`/`status` actions, cross-platform speech (macOS `say`, Linux `espeak`, Windows PowerShell). |
 
 ## Why these matter in this order
 

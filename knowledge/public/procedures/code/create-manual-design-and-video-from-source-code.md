@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Create Manual, Design Spec, And Video From Source Code'
+last_updated: 2026-10-05
+---
+
 # Procedure: Create Manual, Design Spec, And Video From Source Code
 
 ## 1. Goal

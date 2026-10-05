@@ -1,15 +1,23 @@
+---
+title: 'Procedure: Generate an Invoice PDF'
+last_updated: 2026-10-05
+---
+
 # Procedure: Generate an Invoice PDF
 
 ## 1. Goal
+
 Generate an invoice PDF from a canonical `document-brief` and a knowledge-owned media layout template.
 
 ## 2. Dependencies
+
 - **Actuator**: `Media-Actuator`
 - **Schema**: `knowledge/product/schemas/document-brief.schema.json`
 - **Layout Catalog**: `knowledge/public/design-patterns/media-templates/document-layouts.json`
 - **Profile Catalog**: `knowledge/public/design-patterns/media-templates/document-composition-presets/` and `knowledge/public/design-patterns/media-templates/artifact-library/`
 
 ## 3. Principle
+
 Separate the invoice into:
 
 - canonical document contract: `document-brief`
@@ -17,6 +25,7 @@ Separate the invoice into:
 - business rule profile: `document_profile`
 
 ## 4. Step-by-Step Instructions
+
 1. Prepare a `document-brief` JSON file.
 2. Set:
    - `artifact_family: document`
@@ -33,4 +42,5 @@ node dist/libs/actuators/media-actuator/src/index.js --input libs/actuators/medi
 ```
 
 ## 5. Expected Output
+
 A governed invoice PDF that can switch visual format by updating knowledge templates instead of actuator code. The semantic contract remains stable even when the visual template changes.

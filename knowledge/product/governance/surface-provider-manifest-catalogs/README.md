@@ -1,3 +1,8 @@
+---
+title: 'Surface Provider Manifest Catalog Directory'
+last_updated: 2026-10-05
+---
+
 # Surface Provider Manifest Catalog Directory
 
 This directory is the canonical source for surface provider manifest catalog entries.
