@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { CloudflareOsControlPlane } from './cloudflare-os-control-plane.js';
 import { CloudflareOsReadOnlySurface, CloudflareOsSurface } from './cloudflare-os-surface.js';
 
@@ -140,5 +140,32 @@ describe('Cloudflare OS operator surface adapter', () => {
         tenantSlugs: ['tenant-a'],
       }).observations
     ).toEqual([]);
+  });
+});
+
+describe('pure held-action snapshot', () => {
+  it('reads summaries without invoking approval reconciliation or persistence', () => {
+    const control = new CloudflareOsControlPlane({ persist: false });
+    control.submitHeldAction(action({ id: 'pure-held', tenantSlug: 'tenant-a' }));
+    const reconcile = vi.spyOn(control, 'listHeldActionSummaries').mockImplementation(() => {
+      throw new Error('must not reconcile on read');
+    });
+    const observations = vi.spyOn(control, 'listObservations').mockImplementation(() => {
+      throw new Error('must not refresh observation journal');
+    });
+    const decide = vi.spyOn(control, 'decideHeldAction');
+    const apply = vi.spyOn(control, 'applyHeldAction');
+    const access = { principalId: 'human:reader', tenantSlugs: ['tenant-a'] };
+    const surface = new CloudflareOsSurface(control);
+    expect(
+      surface.snapshot(undefined, access, { readOnly: true, includeObservations: false })
+        .heldActions
+    ).toMatchObject([{ id: 'pure-held', status: 'pending' }]);
+
+    expect(reconcile).not.toHaveBeenCalled();
+    expect(observations).not.toHaveBeenCalled();
+    expect(decide).not.toHaveBeenCalled();
+    expect(apply).not.toHaveBeenCalled();
+    expect(control.getHeldAction('pure-held')?.status).toBe('pending');
   });
 });

@@ -17,6 +17,7 @@ import {
   type FrontDeskExecutionProjection,
 } from './front-desk-execution-contract.js';
 import { projectFrontDeskExecution } from './front-desk-execution-status.js';
+import { getWorkItem } from '../workforce/work-coordination.js';
 import { withExecutionContext } from '../authority.js';
 import { withLockSync } from '../lock-utils.js';
 import { physicalScopedPath } from '../physical-namespace.js';
@@ -35,6 +36,8 @@ import {
   parseConversationTaskState,
   parseConversationTaskDecision,
   CONVERSATION_TASK_MAX_TASKS,
+  CONVERSATION_TASK_MAX_TITLE,
+  CONVERSATION_TASK_MAX_EXCERPT,
   type ConversationTaskState,
   type ConversationTaskDecision,
   type ConversationTurnOutcome,
@@ -313,68 +316,342 @@ function storedText(text: string, limit: number): string {
   );
 }
 
-export function readConversationHistory(viewer: FrontDeskConversationViewer): ConversationHistory {
+/**
+ * Legacy callers retain durable report synchronization. HTTP display/resume
+ * reads opt into a fresh in-memory snapshot without locks or publications.
+ */
+export function readConversationHistory(
+  viewer: FrontDeskConversationViewer,
+  options: { readOnly?: boolean } = {}
+): ConversationHistory {
   const ref = conversationRef(viewer);
-  return asStore(viewer, () =>
-    withLockSync(`concierge-history-${ref.key}`, () => {
+  return asStore(viewer, () => {
+    const read = () => {
       const transcript = load(ref);
-      if (syncExecutionReports(viewer, transcript)) publishTranscript(ref, transcript);
-      const messages: ConversationHistoryMessage[] = transcript.turns.flatMap((turn) => [
-        {
-          id: `${turn.id}-user`,
-          role: 'user' as const,
-          createdAt: turn.createdAt,
-          text: storedText(turn.text, CONVERSATION_MAX_INPUT),
-        },
-        ...(turn.reply === undefined
-          ? []
-          : [
-              {
-                id: `${turn.id}-secretary`,
-                role: 'secretary' as const,
-                createdAt: turn.createdAt,
-                text: storedText(turn.reply, CONVERSATION_MAX_REPLY),
-              },
-            ]),
-      ]);
-      for (const report of transcript.executionReports ?? []) {
+      if (!options.readOnly && syncExecutionReports(viewer, transcript))
+        publishTranscript(ref, transcript);
+      return projectConversationHistory(viewer, transcript, options.readOnly === true);
+    };
+    return options.readOnly ? read() : withLockSync(`concierge-history-${ref.key}`, read);
+  });
+}
+
+/** Status-only copy never forwards an internal artifact path or executor error. */
+function readOnlyExecutionHistoryText(projection?: FrontDeskExecutionProjection): string {
+  switch (projection?.status) {
+    case 'queued':
+      return t('front_desk:execution_queued');
+    case 'awaiting_approval':
+      return t('front_desk:execution_awaiting_approval');
+    case 'running':
+      return t('front_desk:execution_running');
+    case 'blocked':
+      return t('front_desk:execution_blocked', { reason: '' }).trim();
+    case 'cancel_requested':
+      return t('front_desk:execution_cancel_requested');
+    case 'work_completed':
+      if (projection.artifactPath && /^[a-f0-9]{64}$/.test(projection.artifactSha256 ?? ''))
+        return t('front_desk:work_home_status_work_completed');
+      return t('front_desk:execution_unverified');
+    default:
+      return t('front_desk:execution_unverified');
+  }
+}
+
+function projectConversationHistory(
+  viewer: FrontDeskConversationViewer,
+  transcript: Transcript,
+  freshReports: boolean
+): ConversationHistory {
+  const liveProjections = new Map<string, FrontDeskExecutionProjection | undefined>();
+  if (freshReports) {
+    for (const request of transcript.executionRequests ?? [])
+      liveProjections.set(request.binding.request_id, executionProjection(viewer, request));
+  }
+  const replyText = (turn: Turn): string => {
+    const requestId = turn.routing?.kind === 'status' ? turn.routing.taskIds[0] : undefined;
+    // Earlier status-question replies persisted the same execution text as the
+    // reports. Project those too, rather than resurfacing paths or stale success.
+    return requestId && liveProjections.has(requestId)
+      ? readOnlyExecutionHistoryText(liveProjections.get(requestId))
+      : (turn.reply ?? '');
+  };
+  const messages: ConversationHistoryMessage[] = transcript.turns.flatMap((turn) => [
+    {
+      id: `${turn.id}-user`,
+      role: 'user' as const,
+      createdAt: turn.createdAt,
+      text: storedText(turn.text, CONVERSATION_MAX_INPUT),
+    },
+    ...(turn.reply === undefined
+      ? []
+      : [
+          {
+            id: `${turn.id}-secretary`,
+            role: 'secretary' as const,
+            createdAt: turn.createdAt,
+            text: storedText(replyText(turn), CONVERSATION_MAX_REPLY),
+          },
+        ]),
+  ]);
+  // Read-only history never inherits a persisted success claim. Missing or
+  // revoked execution evidence becomes an explicitly unverified message, and
+  // orphaned reports have no current request from which to establish authority.
+  const reports = freshReports
+    ? (transcript.executionRequests ?? []).map((request) => {
+        const projection = liveProjections.get(request.binding.request_id);
+        const previous = transcript.executionReports?.find(
+          (report) => report.requestId === request.binding.request_id
+        );
+        const report: FrontDeskExecutionReport = {
+          id: projection?.reportId ?? 'front-desk-status-' + request.binding.request_id,
+          requestId: request.binding.request_id,
+          status: projection?.status ?? 'uncertain',
+          text: readOnlyExecutionHistoryText(projection),
+          // Anchor display ordering to a durable record, not a fabricated
+          // execution completion time on each refresh.
+          createdAt: previous?.createdAt ?? request.createdAt,
+        };
+        return { report, request, projection };
+      })
+    : (transcript.executionReports ?? []).map((report) => {
         const request = transcript.executionRequests?.find(
           (entry) => entry.binding.request_id === report.requestId
         );
-        const projection = request ? executionProjection(viewer, request) : undefined;
-        const binding = request?.binding;
-        const artifact =
-          binding && projection?.status === 'work_completed' && projection.artifactSha256
+        return {
+          report,
+          request,
+          projection: request ? executionProjection(viewer, request) : undefined,
+        };
+      });
+  for (const { report, request, projection } of reports) {
+    const binding = request?.binding;
+    const artifact =
+      binding &&
+      projection?.status === 'work_completed' &&
+      projection.artifactSha256 &&
+      (!freshReports ||
+        (projection.artifactPath && /^[a-f0-9]{64}$/.test(projection.artifactSha256)))
+        ? {
+            requestId: binding.request_id,
+            revision: binding.revision,
+            sha256: projection.artifactSha256,
+            format: binding.receipt_format ?? ('readable' as const),
+            canRevise:
+              (transcript.taskState?.tasks.length ?? 0) < CONVERSATION_TASK_MAX_TASKS &&
+              binding.revision < CONVERSATION_TASK_MAX_TASKS &&
+              !(transcript.executionRequests ?? []).some(
+                (entry) => entry.binding.parent_request_id === binding.request_id
+              ),
+          }
+        : undefined;
+    messages.push({
+      id: report.id,
+      role: 'secretary',
+      createdAt: report.createdAt,
+      text: storedText(report.text, CONVERSATION_MAX_REPLY),
+      ...(artifact ? { artifact } : {}),
+    });
+  }
+  messages.sort((a, b) => a.createdAt - b.createdAt);
+  return {
+    sessionId: transcript.sessionId,
+    pending: transcript.turns.filter((turn) => turn.reply === undefined && !turn.retryable).length,
+    messages: messages.slice(-CONVERSATION_MAX_TURNS * 2),
+  };
+}
+
+/** Display-only work state. An answered conversation is never completed execution. */
+export interface FrontDeskConversationWorkTask {
+  id: string;
+  title: string;
+  sourceStatus: 'recorded' | 'answered' | 'awaiting_input' | 'needs_execution';
+  createdAt: number;
+  lastRecordedAt: number;
+  resultExcerpt?: string;
+  turnState: 'settled' | 'pending' | 'uncertain' | 'not_started' | 'unknown';
+  executionStatus?: FrontDeskExecutionProjection['status'] | 'unknown';
+  /** Present only for an existing, scope- and binding-matched governed item. */
+  workItemId?: string;
+  /** Checked now, not an inferred completion time or a persisted report timestamp. */
+  verifiedAt?: number;
+  artifact?: FrontDeskConversationWorkArtifact;
+}
+export interface FrontDeskConversationWorkArtifact {
+  requestId: string;
+  revision: number;
+  format: 'compact' | 'readable';
+  parentRequestId?: string;
+  parentRevision?: number;
+  /** The revision protocol records a format change, never the user's motivation. */
+  changeReason?: 'format_change';
+  verification: 'verified' | 'pending' | 'unknown';
+  currentness: 'latest_verified' | 'older_verified' | 'requested_pending' | 'requested_unknown';
+  sha256?: string;
+  verifiedAt?: number;
+}
+export interface FrontDeskConversationWork {
+  sessionId: string;
+  tasks: FrontDeskConversationWorkTask[];
+}
+
+/** The reserved binding is not proof that an executor created a WorkItem. */
+function existingExecutionWorkItemId(
+  viewer: FrontDeskConversationViewer,
+  request: FrontDeskExecutionRequest
+): string | undefined {
+  try {
+    const binding = request.binding;
+    const mapping = getFrontDeskExecutionMapping(binding);
+    if (!mapping || !frontDeskExecutionViewerMatches(viewer, mapping)) return undefined;
+    const item = getWorkItem(binding.work_item_id);
+    const bound = item?.metadata?.front_desk_execution as FrontDeskExecutionBinding | undefined;
+    if (
+      !item ||
+      !bound ||
+      item.item_id !== binding.work_item_id ||
+      (Object.keys(binding) as Array<keyof FrontDeskExecutionBinding>).some(
+        (key) => binding[key] !== bound[key]
+      )
+    )
+      return undefined;
+    const scope = frontDeskRuntimeScope(viewer);
+    if (
+      item.context?.tenant_slug !== scope.tenant_slug ||
+      item.context?.organization_id !== scope.organization_id ||
+      item.context?.project_id !== (scope.project_id ?? 'default')
+    )
+      return undefined;
+    return item.item_id;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Load precisely this server-owned viewer key. This read does not acquire a
+ * mutation lock, enumerate configured conversation partitions, sync reports,
+ * publish a transcript, dispatch work, or restore approval. Atomic transcript
+ * publication supplies a bounded snapshot; execution is freshly projected.
+ */
+export function readFrontDeskConversationWork(
+  viewer: FrontDeskConversationViewer,
+  locale?: SupportedLocale
+): FrontDeskConversationWork {
+  const ref = conversationRef(viewer);
+  return asStore(viewer, () => {
+    const transcript = load(ref);
+    const requests = new Map(
+      (transcript.executionRequests ?? []).map((request) => [request.binding.request_id, request])
+    );
+    const tasks: FrontDeskConversationWorkTask[] = (transcript.taskState?.tasks ?? []).map(
+      (task) => {
+        const turns = transcript.turns.filter((turn) => turn.routing?.taskIds.includes(task.id));
+        const workTurns = turns.filter(
+          (turn) => turn.routing?.kind === 'new_request' || turn.routing?.kind === 'followup'
+        );
+        const incomplete = workTurns.filter((turn) => turn.reply === undefined);
+        const turnState: FrontDeskConversationWorkTask['turnState'] = incomplete.some(
+          (turn) => turn.uncertain
+        )
+          ? 'uncertain'
+          : incomplete.some((turn) => !turn.retryable)
+            ? 'pending'
+            : incomplete.length > 0
+              ? 'not_started'
+              : workTurns.length > 0 || task.result
+                ? 'settled'
+                : 'unknown';
+        const request = requests.get(task.id);
+        // Persisted report text may describe a receipt that has since vanished.
+        // Its timestamp is a recorded event only; its success is never reused.
+        const reports = (transcript.executionReports ?? []).filter(
+          (report) => report.requestId === task.id
+        );
+        const row: FrontDeskConversationWorkTask = {
+          id: task.id,
+          title: storedText(task.title, CONVERSATION_TASK_MAX_TITLE),
+          sourceStatus: task.state === 'completed' ? 'answered' : task.state,
+          createdAt: task.createdAt,
+          lastRecordedAt: Math.max(
+            task.createdAt,
+            task.result?.at ?? 0,
+            request?.createdAt ?? 0,
+            ...turns.map((turn) => turn.createdAt),
+            ...reports.map((report) => report.createdAt)
+          ),
+          turnState,
+          ...(!request && task.result
+            ? { resultExcerpt: storedText(task.result.excerpt, CONVERSATION_TASK_MAX_EXCERPT) }
+            : {}),
+        };
+        if (!request) return row;
+        const projection = executionProjection(viewer, request, locale);
+        const verified =
+          projection?.status === 'work_completed' &&
+          typeof projection.artifactSha256 === 'string' &&
+          /^[a-f0-9]{64}$/.test(projection.artifactSha256) &&
+          Boolean(projection.artifactPath);
+        row.executionStatus =
+          projection?.status === 'work_completed' && !verified
+            ? 'uncertain'
+            : (projection?.status ?? 'unknown');
+        const workItemId = existingExecutionWorkItemId(viewer, request);
+        if (workItemId) row.workItemId = workItemId;
+        const pending = ['queued', 'awaiting_approval', 'running'].includes(row.executionStatus);
+        const binding = request.binding;
+        row.artifact = {
+          requestId: binding.request_id,
+          revision: binding.revision,
+          format: binding.receipt_format ?? 'readable',
+          ...(binding.parent_request_id
             ? {
-                requestId: binding.request_id,
-                revision: binding.revision,
-                sha256: projection.artifactSha256,
-                format: binding.receipt_format ?? ('readable' as const),
-                canRevise:
-                  (transcript.taskState?.tasks.length ?? 0) < CONVERSATION_TASK_MAX_TASKS &&
-                  binding.revision < CONVERSATION_TASK_MAX_TASKS &&
-                  !(transcript.executionRequests ?? []).some(
-                    (entry) => entry.binding.parent_request_id === binding.request_id
-                  ),
+                parentRequestId: binding.parent_request_id,
+                parentRevision: binding.parent_revision,
+                changeReason: 'format_change' as const,
               }
-            : undefined;
-        messages.push({
-          id: report.id,
-          role: 'secretary',
-          createdAt: report.createdAt,
-          text: storedText(report.text, CONVERSATION_MAX_REPLY),
-          ...(artifact ? { artifact } : {}),
-        });
+            : {}),
+          verification: verified ? 'verified' : pending ? 'pending' : 'unknown',
+          currentness: verified
+            ? 'latest_verified'
+            : pending
+              ? 'requested_pending'
+              : 'requested_unknown',
+        };
+        if (verified) {
+          row.verifiedAt = Date.now();
+          row.artifact.sha256 = projection!.artifactSha256;
+          row.artifact.verifiedAt = row.verifiedAt;
+        }
+        // Deliberately omit projection.text: success and failure summaries may
+        // contain internal artifact paths. The adapter localizes typed statuses.
+        return row;
       }
-      messages.sort((a, b) => a.createdAt - b.createdAt);
-      return {
-        sessionId: ref.sessionId,
-        pending: transcript.turns.filter((turn) => turn.reply === undefined && !turn.retryable)
-          .length,
-        messages: messages.slice(-CONVERSATION_MAX_TURNS * 2),
-      };
-    })
-  );
+    );
+    const byId = new Map(tasks.map((task) => [task.id, task]));
+    for (const task of tasks) {
+      if (task.artifact?.verification !== 'verified') continue;
+      let child = requests.get(task.id);
+      const visited = new Set<string>([task.id]);
+      while (child?.binding.parent_request_id) {
+        const parentId = child.binding.parent_request_id;
+        const parent = requests.get(parentId);
+        if (
+          !parent ||
+          visited.has(parentId) ||
+          parent.binding.revision !== child.binding.parent_revision ||
+          parent.binding.config_digest !== child.binding.config_digest ||
+          parent.binding.mapping_id !== child.binding.mapping_id
+        )
+          break;
+        visited.add(parentId);
+        const artifact = byId.get(parentId)?.artifact;
+        if (artifact?.verification === 'verified') artifact.currentness = 'older_verified';
+        child = parent;
+      }
+    }
+    return { sessionId: ref.sessionId, tasks };
+  });
 }
 
 export function beginConversationTurn(viewer: FrontDeskConversationViewer, text: string): string {

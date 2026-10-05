@@ -93,7 +93,7 @@ export function registerConversationRoutes(app: express.Express): void {
       );
       return res.json({
         ok: true,
-        ...readConversationHistory(viewer),
+        ...readConversationHistory(viewer, { readOnly: true }),
         next_action: { kind: 'inspect_setup', href: setupHref() },
       });
     } catch (error) {
