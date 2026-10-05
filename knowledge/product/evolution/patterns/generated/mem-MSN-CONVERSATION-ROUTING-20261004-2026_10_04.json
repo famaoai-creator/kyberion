@@ -1,0 +1,22 @@
+{
+  "record_id": "mem-MSN-CONVERSATION-ROUTING-20261004-2026_10_04",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Scoped conversation intake is separate from execution authority",
+  "summary": "Retain multiple conversation requests with server-owned scope and inert routing receipts; ambiguous classification never authorizes execution.",
+  "candidate_id": "mem-MSN-CONVERSATION-ROUTING-20261004-2026_10_04",
+  "evidence_refs": [
+    "active/missions/public/MSN-CONVERSATION-ROUTING-20261004/evidence/distillation.md",
+    "active/missions/public/MSN-CONVERSATION-ROUTING-20261004/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-CONVERSATION-ROUTING-20261004/evidence/test-report.md"
+  ],
+  "created_at": "2026-10-05T03:06:08.340Z",
+  "applicability": ["mission", "mission:MSN-CONVERSATION-ROUTING-20261004"],
+  "reusable_steps": [
+    "Retain multiple conversation requests with server-owned scope and inert routing receipts; ambiguous classification never authorizes execution"
+  ],
+  "expected_outcome": "Keep request intake state separate from task execution. Partition persisted requests by the complete authenticated viewer scope, retain original request text independently of bounded transcript history, and resolve only explicit or positively identified references. Preserve a clarification source and candidate set across reload, but invalidate it when the conversation changes. Atomically persist deterministic intake replies with routing receipts so retries never duplicate updates and crashes cannot strand known results. Bound both rendered choices and total encoded state before publication. Reject older-writer state loss with a versioned format. Status must distinguish recorded intake from verified progress, and approval or cancellation wording remains non-authoritative until a supported scoped execution contract exists. Never remove a capability guard or scan global task state merely to improve conversational recall. Intake must not replace the conversation runtime's answer for turns it previously handled: record new requests and follow-ups silently, answer locally only when a reference positively resolves to a recorded request, and send unresolved, mixed, or bare-confirmation turns to the runtime as ordinary chat, because short replies such as \"yes\" may answer the runtime's own execution preview.",
+  "source_branch": "feat/conversation-task-routing-20261004",
+  "source_commit": "3610d2395df31bd238ea7f6ec07b37322af3e0f1"
+}

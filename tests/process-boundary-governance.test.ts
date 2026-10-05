@@ -14,6 +14,10 @@ const allowedManagedProcessConsumers = [
   'libs/core/blackhole-audio-bus.ts',
   'libs/core/coreaudio-output-bridge.ts',
   'libs/core/managed-process.watch.test.ts',
+  // Real child-process races validate atomic WorkItem persistence and claims.
+  'libs/core/workforce/work-coordination.atomic.test.ts',
+  // Fresh executor process verifies durable intake restart and completed-work dedupe.
+  'scripts/front_desk_execution_step.test.ts',
   'libs/actuators/service-actuator/src/reconcile-integration.test.ts',
   'libs/actuators/service-actuator/src/service-actuator-helpers.ts',
   'libs/core/mesh/acp-mediator.ts',

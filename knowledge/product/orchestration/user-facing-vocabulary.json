@@ -23183,6 +23183,101 @@
         "en": "This operation cannot yet preserve your conversation’s access scope. Direct conversation is supported; delegation, managed execution, task steering, and shared personal queries require an explicitly scoped workflow. Your draft is kept. Check progress before continuing.",
         "ja": "この操作は、会話のアクセス範囲を保って実行できません。直接の会話には対応していますが、委任・管理実行・作業の変更・共有個人情報の照会には、範囲を明示したワークフローが必要です。入力は保持しています。続行前に進み具合をご確認ください。",
         "qps-ploc": "⟦Ŧħïş őṗėřȧŧïőñ ƈȧññőŧ ẏėŧ ṗřėşėřṽė ẏőůř ƈőñṽėřşȧŧïőñ’ş ȧƈƈėşş şƈőṗė. Ḓïřėƈŧ ƈőñṽėřşȧŧïőñ ïş şůṗṗőřŧėḓ; ḓėŀėɠȧŧïőñ, ɱȧñȧɠėḓ ėẋėƈůŧïőñ, ŧȧşķ şŧėėřïñɠ, ȧñḓ şħȧřėḓ ṗėřşőñȧŀ ɋůėřïėş řėɋůïřė ȧñ ėẋṗŀïƈïŧŀẏ şƈőṗėḓ ẇőřķƒŀőẇ. Ẏőůř ḓřȧƒŧ ïş ķėṗŧ. Ƈħėƈķ ṗřőɠřėşş ƀėƒőřė ƈőñŧïñůïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "task_status": {
+        "en": "“{title}” is recorded in this conversation, but no reply to it has been completed yet.",
+        "ja": "「{title}」はこの会話に記録されていますが、まだ回答は完了していません。",
+        "qps-ploc": "⟦“{title}” ïş řėƈőřḓėḓ ïñ ŧħïş ƈőñṽėřşȧŧïőñ, ƀůŧ ñő řėṗŀẏ ŧő ïŧ ħȧş ƀėėñ ƈőɱṗŀėŧėḓ ẏėŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "task_status_completed": {
+        "en": "“{title}” was answered in this conversation. The reply began: {excerpt}",
+        "ja": "「{title}」はこの会話で回答済みです。回答の冒頭: {excerpt}",
+        "qps-ploc": "⟦“{title}” ẇȧş ȧñşẇėřėḓ ïñ ŧħïş ƈőñṽėřşȧŧïőñ. Ŧħė řėṗŀẏ ƀėɠȧñ: {excerpt} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "task_status_awaiting_input": {
+        "en": "“{title}” is waiting for your input. Please answer the last question about it.",
+        "ja": "「{title}」はあなたの入力を待っています。直前の確認に答えてください。",
+        "qps-ploc": "⟦“{title}” ïş ẇȧïŧïñɠ ƒőř ẏőůř ïñṗůŧ. Ṗŀėȧşė ȧñşẇėř ŧħė ŀȧşŧ ɋůėşŧïőñ ȧƀőůŧ ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "task_status_needs_execution": {
+        "en": "“{title}” needs work beyond this conversation, such as approval or a mission. It is recorded for execution; handing it to an executor is not automated yet.",
+        "ja": "「{title}」は承認やミッションなど、この会話の外での作業が必要です。実行対象として記録済みですが、実行への受け渡しはまだ自動化されていません。",
+        "qps-ploc": "⟦“{title}” ñėėḓş ẇőřķ ƀėẏőñḓ ŧħïş ƈőñṽėřşȧŧïőñ, şůƈħ ȧş ȧṗṗřőṽȧŀ őř ȧ ɱïşşïőñ. Ïŧ ïş řėƈőřḓėḓ ƒőř ėẋėƈůŧïőñ; ħȧñḓïñɠ ïŧ ŧő ȧñ ėẋėƈůŧőř ïş ñőŧ ȧůŧőɱȧŧėḓ ẏėŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőř⟧"
+      },
+      "task_approval": {
+        "en": "I linked the approval-shaped message to “{title}”. This message did not grant approval or start anything. Use the governed approval flow for the actual action.",
+        "ja": "承認に関する発言を「{title}」に紐付けました。この発言で承認や実行は行っていません。実行する操作の正式な承認手続きを使ってください。",
+        "qps-ploc": "⟦Ï ŀïñķėḓ ŧħė ȧṗṗřőṽȧŀ-şħȧṗėḓ ɱėşşȧɠė ŧő “{title}”. Ŧħïş ɱėşşȧɠė ḓïḓ ñőŧ ɠřȧñŧ ȧṗṗřőṽȧŀ őř şŧȧřŧ ȧñẏŧħïñɠ. Ůşė ŧħė ɠőṽėřñėḓ ȧṗṗřőṽȧŀ ƒŀőẇ ƒőř ŧħė ȧƈŧůȧŀ ȧƈŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ⟧"
+      },
+      "task_cancellation": {
+        "en": "I linked the cancellation request to “{title}”. This message did not stop any running work. Use the governed control for the actual work to stop it.",
+        "ja": "中止の依頼を「{title}」に紐付けました。この発言で実行中の処理は停止していません。実際に止めるには、その作業の正式な操作を使ってください。",
+        "qps-ploc": "⟦Ï ŀïñķėḓ ŧħė ƈȧñƈėŀŀȧŧïőñ řėɋůėşŧ ŧő “{title}”. Ŧħïş ɱėşşȧɠė ḓïḓ ñőŧ şŧőṗ ȧñẏ řůññïñɠ ẇőřķ. Ůşė ŧħė ɠőṽėřñėḓ ƈőñŧřőŀ ƒőř ŧħė ȧƈŧůȧŀ ẇőřķ ŧő şŧőṗ ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀ⟧"
+      },
+      "task_choose": {
+        "en": "Which recorded request do you mean? Reply with its number or exact title.\n{choices}",
+        "ja": "どの依頼についてですか？番号か正確な件名で教えてください。\n{choices}",
+        "qps-ploc": "⟦Ẇħïƈħ řėƈőřḓėḓ řėɋůėşŧ ḓő ẏőů ɱėȧñ? Řėṗŀẏ ẇïŧħ ïŧş ñůɱƀėř őř ėẋȧƈŧ ŧïŧŀė.\n{choices} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "task_no_match": {
+        "en": "I cannot identify a single recorded request. Please name the request or choose a number from the last task list. Nothing has been approved, stopped, or started.",
+        "ja": "対象の依頼を一つに特定できません。依頼名か直前の候補一覧の番号を教えてください。承認・停止・実行は行っていません。",
+        "qps-ploc": "⟦Ï ƈȧññőŧ ïḓėñŧïƒẏ ȧ şïñɠŀė řėƈőřḓėḓ řėɋůėşŧ. Ṗŀėȧşė ñȧɱė ŧħė řėɋůėşŧ őř ƈħőőşė ȧ ñůɱƀėř ƒřőɱ ŧħė ŀȧşŧ ŧȧşķ ŀïşŧ. Ñőŧħïñɠ ħȧş ƀėėñ ȧṗṗřőṽėḓ, şŧőṗṗėḓ, őř şŧȧřŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ⟧"
+      },
+      "task_capacity": {
+        "en": "The recorded-request storage is full, so I could not keep this question. Existing requests are preserved; please name one request directly.",
+        "ja": "依頼の記録容量が上限に達したため、この確認を保持できませんでした。既存の記録は保持しています。依頼名を直接教えてください。",
+        "qps-ploc": "⟦Ŧħė řėƈőřḓėḓ-řėɋůėşŧ şŧőřȧɠė ïş ƒůŀŀ, şő Ï ƈőůŀḓ ñőŧ ķėėṗ ŧħïş ɋůėşŧïőñ. Ėẋïşŧïñɠ řėɋůėşŧş ȧřė ṗřėşėřṽėḓ; ṗŀėȧşė ñȧɱė őñė řėɋůėşŧ ḓïřėƈŧŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñ⟧"
+      },
+      "execution_acknowledged": {
+        "en": "The local diagnostic request receipt is queued. Execution still requires explicit human approval; this acknowledgement does not mean the work is completed.",
+        "ja": "ローカル診断用の依頼受付票をキューに登録しました。実行には人による明示的な承認が必要です。この応答は作業の完了を意味しません。",
+        "qps-ploc": "⟦Ŧħė ŀőƈȧŀ ḓïȧɠñőşŧïƈ řėɋůėşŧ řėƈėïṗŧ ïş ɋůėůėḓ. Ėẋėƈůŧïőñ şŧïŀŀ řėɋůïřėş ėẋṗŀïƈïŧ ħůɱȧñ ȧṗṗřőṽȧŀ; ŧħïş ȧƈķñőẇŀėḓɠėɱėñŧ ḓőėş ñőŧ ɱėȧñ ŧħė ẇőřķ ïş ƈőɱṗŀėŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőř⟧"
+      },
+      "execution_cancel_requested": {
+        "en": "Cancellation requested for the diagnostic receipt. Pending authority is invalidated; an already running effect may still finish.",
+        "ja": "診断用受付票のキャンセルを依頼として記録し、未実行の権限を無効にしました。すでに実行中の処理は完了する場合があります。",
+        "qps-ploc": "⟦Ƈȧñƈėŀŀȧŧïőñ řėɋůėşŧėḓ ƒőř ŧħė ḓïȧɠñőşŧïƈ řėƈėïṗŧ. Ṗėñḓïñɠ ȧůŧħőřïŧẏ ïş ïñṽȧŀïḓȧŧėḓ; ȧñ ȧŀřėȧḓẏ řůññïñɠ ėƒƒėƈŧ ɱȧẏ şŧïŀŀ ƒïñïşħ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗï⟧"
+      },
+      "execution_invalidated": {
+        "en": "The request was changed, so its prior execution authority is invalid. No work completion has been verified for this revision.",
+        "ja": "依頼が変更されたため、以前の実行権限は無効です。この改訂版の作業完了は確認されていません。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ẇȧş ƈħȧñɠėḓ, şő ïŧş ṗřïőř ėẋėƈůŧïőñ ȧůŧħőřïŧẏ ïş ïñṽȧŀïḓ. Ñő ẇőřķ ƈőɱṗŀėŧïőñ ħȧş ƀėėñ ṽėřïƒïėḓ ƒőř ŧħïş řėṽïşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "execution_awaiting_approval": {
+        "en": "The diagnostic receipt is queued for explicit approval. Work has not completed.",
+        "ja": "診断用受付票は明示的な承認を待っています。作業はまだ完了していません。",
+        "qps-ploc": "⟦Ŧħė ḓïȧɠñőşŧïƈ řėƈėïṗŧ ïş ɋůėůėḓ ƒőř ėẋṗŀïƈïŧ ȧṗṗřőṽȧŀ. Ẇőřķ ħȧş ñőŧ ƈőɱṗŀėŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "execution_queued": {
+        "en": "The diagnostic receipt is approved and waiting for its executor. Work has not completed.",
+        "ja": "診断用受付票は承認され、実行担当の処理を待っています。作業はまだ完了していません。",
+        "qps-ploc": "⟦Ŧħė ḓïȧɠñőşŧïƈ řėƈėïṗŧ ïş ȧṗṗřőṽėḓ ȧñḓ ẇȧïŧïñɠ ƒőř ïŧş ėẋėƈůŧőř. Ẇőřķ ħȧş ñőŧ ƈőɱṗŀėŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "execution_running": {
+        "en": "The executor is producing and checking the diagnostic receipt. Work has not completed.",
+        "ja": "実行担当が診断用受付票を作成して内容を確認しています。作業はまだ完了していません。",
+        "qps-ploc": "⟦Ŧħė ėẋėƈůŧőř ïş ṗřőḓůƈïñɠ ȧñḓ ƈħėƈķïñɠ ŧħė ḓïȧɠñőşŧïƈ řėƈėïṗŧ. Ẇőřķ ħȧş ñőŧ ƈőɱṗŀėŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "execution_blocked": {
+        "en": "The diagnostic request is blocked or has an uncertain outcome. No automatic retry will be made. {reason}",
+        "ja": "診断用の依頼は進められないか、実行結果が未確定です。自動で再実行はしません。{reason}",
+        "qps-ploc": "⟦Ŧħė ḓïȧɠñőşŧïƈ řėɋůėşŧ ïş ƀŀőƈķėḓ őř ħȧş ȧñ ůñƈėřŧȧïñ őůŧƈőɱė. Ñő ȧůŧőɱȧŧïƈ řėŧřẏ ẇïŀŀ ƀė ɱȧḓė. {reason} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "execution_unverified": {
+        "en": "The saved receipt cannot currently be verified. Completion is not confirmed and the work will not be rerun automatically.",
+        "ja": "保存済みの受付票を現在確認できません。完了は未確認で、作業を自動で再実行することはありません。",
+        "qps-ploc": "⟦Ŧħė şȧṽėḓ řėƈėïṗŧ ƈȧññőŧ ƈůřřėñŧŀẏ ƀė ṽėřïƒïėḓ. Ƈőɱṗŀėŧïőñ ïş ñőŧ ƈőñƒïřɱėḓ ȧñḓ ŧħė ẇőřķ ẇïŀŀ ñőŧ ƀė řėřůñ ȧůŧőɱȧŧïƈȧŀŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "execution_completed": {
+        "en": "The diagnostic receipt artifact is complete and its saved content has been verified. Artifact: {path}",
+        "ja": "診断用受付票の成果物が完成し、保存内容を検証しました。成果物: {path}",
+        "qps-ploc": "⟦Ŧħė ḓïȧɠñőşŧïƈ řėƈėïṗŧ ȧřŧïƒȧƈŧ ïş ƈőɱṗŀėŧė ȧñḓ ïŧş şȧṽėḓ ƈőñŧėñŧ ħȧş ƀėėñ ṽėřïƒïėḓ. Ȧřŧïƒȧƈŧ: {path} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "execution_not_executed": {
+        "en": "The diagnostic request has not been executed. {reason}",
+        "ja": "診断用の依頼は実行されていません。{reason}",
+        "qps-ploc": "⟦Ŧħė ḓïȧɠñőşŧïƈ řėɋůėşŧ ħȧş ñőŧ ƀėėñ ėẋėƈůŧėḓ. {reason} ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
       }
     },
     "operator": {

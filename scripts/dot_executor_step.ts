@@ -18,6 +18,11 @@
  * An unconfigured stub backend leaves conversational items unclaimed.
  */
 
+import { getWorkItem } from '@agent/core/workforce/work-coordination';
+import {
+  FRONT_DESK_RECEIPT_PIPELINE,
+  prepareFrontDeskExecution,
+} from '@agent/core/surface/front-desk-execution';
 import type { DotCharter, LoadedDotCharter } from '@agent/core/dot/dot-charter';
 import {
   DOT_EXECUTOR_TASK_SESSION_GUIDANCE,
@@ -114,7 +119,8 @@ export async function delegateDotText(
 async function defaultExecutePipeline(
   ref: string,
   ctx: Record<string, unknown>,
-  charter: DotCharter
+  charter: DotCharter,
+  deps: DotExecutorStepDeps = {}
 ): Promise<{ status: 'succeeded' | 'failed'; summary: string }> {
   const { executePipelineFile } = await import('./pipeline-execution-part-results.js');
   try {
@@ -125,6 +131,16 @@ async function defaultExecutePipeline(
     throw new DotExecutorPreEffectError(
       `pipeline '${ref}' could not be loaded: ${error instanceof Error ? error.message : String(error)}`
     );
+  }
+  if (ref === FRONT_DESK_RECEIPT_PIPELINE) {
+    const item = typeof ctx.work_item_id === 'string' ? getWorkItem(ctx.work_item_id) : null;
+    if (!item) throw new DotExecutorPreEffectError('bound front-desk WorkItem missing');
+    const prepared = prepareFrontDeskExecution(charter, item, deps);
+    if (
+      ctx.front_desk_output_path !== prepared.outputPath ||
+      ctx.front_desk_artifact_content !== prepared.expectedContent
+    )
+      throw new DotExecutorPreEffectError('front-desk pipeline input binding changed');
   }
   const result = await executePipelineFile(ref, {
     context: { ...ctx, dot_executor: true },
@@ -237,7 +253,10 @@ export function buildDotExecutorPorts(
       }
       return await delegateDotText(resolved, prompt, timeoutMs, signal);
     },
-    runPipeline: (ref, ctx) => (deps.executePipeline ?? defaultExecutePipeline)(ref, ctx, charter),
+    runPipeline: (ref, ctx) =>
+      deps.executePipeline
+        ? deps.executePipeline(ref, ctx, charter)
+        : defaultExecutePipeline(ref, ctx, charter, deps),
   };
 }
 

@@ -7258,6 +7258,18 @@
     "./surface/surface-conversation-runtime-context": {
       "types": "./dist/surface/surface-conversation-runtime-context.d.ts",
       "default": "./dist/surface/surface-conversation-runtime-context.js"
+    },
+    "./surface/front-desk-execution": {
+      "types": "./dist/surface/front-desk-execution.d.ts",
+      "default": "./dist/surface/front-desk-execution.js"
+    },
+    "./surface/front-desk-execution-contract": {
+      "types": "./dist/surface/front-desk-execution-contract.d.ts",
+      "default": "./dist/surface/front-desk-execution-contract.js"
+    },
+    "./surface/front-desk-execution-status": {
+      "types": "./dist/surface/front-desk-execution-status.d.ts",
+      "default": "./dist/surface/front-desk-execution-status.js"
     }
   },
   "dependencies": {

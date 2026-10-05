@@ -1,0 +1,5 @@
+{
+  "$schema": "../schemas/front-desk-execution-policy.schema.json",
+  "version": 1,
+  "mappings": []
+}

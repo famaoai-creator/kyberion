@@ -26,6 +26,7 @@ export {
   migrateLegacyWorkItemContexts,
   listWorkItemAttempts,
   createWorkItem,
+  createWorkItemIfAbsent,
   updateWorkItem,
   listBoards,
   getBoard,

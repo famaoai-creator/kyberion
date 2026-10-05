@@ -3,6 +3,8 @@ export {
   beginConversationTurn,
   reserveConversationTurn,
   completeConversationTurn,
+  classifyConversationTurnOutcome,
+  type ConversationTurnOutcome,
   markConversationTurnUncertain,
   markConversationTurnNotStarted,
   completedConversationContext,
