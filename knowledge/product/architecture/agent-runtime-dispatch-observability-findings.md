@@ -6,6 +6,7 @@ authority: reference
 phase: [alignment, execution, review]
 tags: [agent-runtime, dispatch, a2a, supervisor, observability, evidence]
 owner: ecosystem_architect
+last_updated: 2026-10-05
 ---
 
 # Agent Runtime Dispatch Observability Findings

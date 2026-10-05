@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Knowledge Refinement & Sanitization'
+last_updated: 2026-10-05
+---
+
 # Procedure: Knowledge Refinement & Sanitization
 
 ## 1. Goal

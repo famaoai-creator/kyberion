@@ -1,5 +1,5 @@
 ---
-title: MISSION: Executive Support & Templates
+title: 'MISSION: Executive Support & Templates'
 category: Orchestration
 tags: [orchestration, onboarding-directives, assistant, steward]
 importance: 8

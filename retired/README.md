@@ -76,6 +76,23 @@ Restore the data with its loader, never alone.
 | `governance/operator-learning-scenario-pack.json` + schema                           | `libs-core/surface/operator-learning.ts`         |
 | `governance/dynamic-policies.json` + `schemas/dynamic-permission-policy.schema.json` | `libs-core/dynamic-permission-guard.ts`          |
 
+## Conversation learning consolidation (2026-10-05)
+
+`libs/core/contextual-intent-learning.ts` was a write-only store: its one writer (the calendar agenda
+turn) logged confirmed utterances, and nothing ever read them back — the read side of that
+learning already lives in `contextual-intent-memory.ts` (`recordSchedulePreference`). It was
+retired together with its schemas, seed document and contract test when the conversation signal
+ledger (`libs/core/intent/conversation-signals.ts`) became the one place conversation outcomes are
+recorded. Restore the data with its loader, never alone.
+
+| Retired path                                                            | Original path                                                           | Reason                                                                                          | Origin plan                                  |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `libs-core/contextual-intent-learning.ts` (+test)                       | `libs/core/contextual-intent-learning.ts`                               | Write-only; replaced by the conversation signal ledger (agenda turn now records `turn_*` there) | JA-INTENT-50/51 (Japanese contextual intent) |
+| `knowledge/product/schemas/contextual-intent-learning.schema.json`      | `knowledge/product/schemas/contextual-intent-learning.schema.json`      | Schema of the retired store                                                                     | same                                         |
+| `knowledge/product/schemas/contextual-intent-learning-seed.schema.json` | `knowledge/product/schemas/contextual-intent-learning-seed.schema.json` | Schema of a documentation-only seed with no reader                                              | same                                         |
+| `knowledge/product/governance/contextual-intent-learning-seed.json`     | `knowledge/product/governance/contextual-intent-learning-seed.json`     | `documentation_only` seed referenced only by its own contract test                              | same                                         |
+| `tests/contextual-intent-learning-seed-contract.test.ts`                | `tests/contextual-intent-learning-seed-contract.test.ts`                | Contract test of the retired seed                                                               | same                                         |
+
 ## libs/core wave 3 (2026-10-01, orphan triage)
 
 Decision table: [`ORPHAN_DECISIONS_2026-10-01.md`](../docs/developer/improvement-plans-2026-10/ORPHAN_DECISIONS_2026-10-01.md)

@@ -1,3 +1,8 @@
+---
+title: 'BlackHole 2ch TTS loopback 手順'
+last_updated: 2026-10-05
+---
+
 # BlackHole 2ch TTS loopback 手順
 
 この手順は、会議へ参加する前に `TTS → BlackHole 2ch → capture → STT` の音声経路を自己検証するためのものです。検証音声は既定で保存せず、receipt と品質指標だけを残します。

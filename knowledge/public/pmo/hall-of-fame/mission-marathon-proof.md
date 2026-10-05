@@ -1,5 +1,5 @@
 ---
-title: Hall of Fame: Ecosystem Viability Marathon
+title: 'Hall of Fame: Ecosystem Viability Marathon'
 category: Pmo
 tags: [pmo, hall-of-fame, mission, marathon, proof]
 importance: 5

@@ -4,7 +4,8 @@ category: Architecture
 tags: [architecture, approvals, secrets, governance, surfaces]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-03-25
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # Secret Mutation Approval Model

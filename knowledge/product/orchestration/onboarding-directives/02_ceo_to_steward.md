@@ -1,5 +1,5 @@
 ---
-title: MISSION: Strategic Vision Harvesting
+title: 'MISSION: Strategic Vision Harvesting'
 category: Orchestration
 tags: [orchestration, onboarding-directives, ceo, steward]
 importance: 8

@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Produce Narrated Video'
+last_updated: 2026-10-05
+---
+
 # Procedure: Produce Narrated Video
 
 ## 1. Goal

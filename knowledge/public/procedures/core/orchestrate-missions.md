@@ -1,13 +1,21 @@
+---
+title: 'Procedure: Mission Orchestration & Self-Healing'
+last_updated: 2026-10-05
+---
+
 # Procedure: Mission Orchestration & Self-Healing
 
 ## 1. Goal
+
 Execute complex multi-step missions based on JSON ADF pipelines and automatically recover from technical failures.
 
 ## 2. Dependencies
+
 - **Actuator**: `Orchestrator-Actuator`
 - **Actuator**: `Code-Actuator` (for physical repairs)
 
 ## 3. Step-by-Step Instructions
+
 1.  **Preparation**: Define the mission objective and select the appropriate pipeline (`pipelines/*.json`).
 2.  **Execution**: Run the built pipeline runner against the selected ADF.
     ```json
@@ -20,4 +28,5 @@ Execute complex multi-step missions based on JSON ADF pipelines and automaticall
 5.  **Checkpointing**: Use `Orchestrator-Actuator` with `checkpoint` after each successful repair.
 
 ## 4. Expected Output
+
 A successfully completed mission with a hash-verified audit trail of all actions and repairs.

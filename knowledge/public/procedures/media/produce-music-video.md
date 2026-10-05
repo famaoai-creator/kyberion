@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Produce Music Video'
+last_updated: 2026-10-05
+---
+
 # Procedure: Produce Music Video
 
 ## 1. Goal

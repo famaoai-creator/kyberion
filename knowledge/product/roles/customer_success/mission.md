@@ -4,7 +4,8 @@ category: Roles
 tags: [roles, customer_success, mission]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # Customer Success (カスタマーサクセス) ミッション声明

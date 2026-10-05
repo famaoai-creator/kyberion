@@ -1,3 +1,9 @@
+---
+title: 'OpenHarness調査に基づく改善ポイント（2026-04-29）'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # OpenHarness調査に基づく改善ポイント（2026-04-29）
 
 ## 背景

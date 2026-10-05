@@ -1,3 +1,8 @@
+---
+title: 'Role Procedure: Cultural Weaver (Talent & Culture)'
+last_updated: 2026-10-05
+---
+
 # Role Procedure: Cultural Weaver (Talent & Culture)
 
 ## 1. Identity & Scope

@@ -4,7 +4,8 @@ category: Roles
 tags: [roles, software_developer, mission]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # Software Developer (ソフトウェア開発者) ミッション声明

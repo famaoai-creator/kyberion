@@ -4,7 +4,7 @@ category: Procedures
 tags: [procedures, service, design, documentation, testing, delivery]
 importance: 8
 author: Kyberion
-last_updated: 2026-03-21
+last_updated: 2026-10-05
 ---
 
 # Deliver Design Spec And Test Pack
