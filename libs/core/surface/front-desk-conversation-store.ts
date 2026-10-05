@@ -9,6 +9,14 @@ import {
 } from '../workforce/artifact-store.js';
 import { narrowSurfaceViewerScope, type SurfaceViewerScope } from './surface-mutation-guard.js';
 import type { EventScopeInput } from '../event-scope.js';
+import type { SupportedLocale } from '../locale-normalize.js';
+import {
+  routeConversationTaskTurn,
+  parseConversationTaskState,
+  parseConversationTaskDecision,
+  type ConversationTaskState,
+  type ConversationTaskDecision,
+} from './conversation-task-routing.js';
 
 /** Server-owned authorization projection. No client identity/session can select a transcript. */
 export type FrontDeskConversationViewer = SurfaceViewerScope;
@@ -56,8 +64,10 @@ type Turn = {
   uncertain?: boolean;
   retryable?: boolean;
   requestDigest?: string;
+  routing?: ConversationTaskDecision;
 };
 export type ReservedConversationTurn = {
+  routing?: ConversationTaskDecision;
   id: string;
   created: boolean;
   reply?: string;
@@ -65,9 +75,10 @@ export type ReservedConversationTurn = {
 };
 const PENDING_RETENTION_MS = 24 * 60 * 60 * 1000;
 type Transcript = {
-  version: 1;
+  version: 2;
   sessionId: string;
   turns: Turn[];
+  taskState?: ConversationTaskState;
   droppedRequests?: Array<{ id: string; createdAt: number }>;
 };
 const MAX_DROPPED_REQUESTS = 1024;
@@ -135,11 +146,13 @@ function validText(value: unknown, limit: number): value is string {
 
 function load(ref: ReturnType<typeof conversationRef>): Transcript {
   const value = readGovernedArtifactJson<unknown>(ref.path);
-  if (value === null) return { version: 1, sessionId: ref.sessionId, turns: [] };
+  if (value === null)
+    return { version: 2, sessionId: ref.sessionId, turns: [], taskState: { tasks: [] } };
   if (!value || typeof value !== 'object') throw new ConversationStoreError('invalid_history');
   const record = value as Record<string, unknown>;
   if (
-    record.version !== 1 ||
+    (record.version !== 1 && record.version !== 2) ||
+    (record.version === 2 && record.taskState === undefined) ||
     record.sessionId !== ref.sessionId ||
     !Array.isArray(record.turns) ||
     record.turns.length > CONVERSATION_MAX_TURNS
@@ -166,8 +179,12 @@ function load(ref: ReturnType<typeof conversationRef>): Transcript {
     ) {
       throw new ConversationStoreError('invalid_history');
     }
+    const routing =
+      turn.routing === undefined ? undefined : parseConversationTaskDecision(turn.routing);
+    if (turn.routing !== undefined && !routing) throw new ConversationStoreError('invalid_history');
     ids.add(turn.id);
     return {
+      ...(routing ? { routing } : {}),
       id: turn.id,
       text: turn.text,
       createdAt: turn.createdAt,
@@ -177,6 +194,12 @@ function load(ref: ReturnType<typeof conversationRef>): Transcript {
       ...(typeof turn.requestDigest === 'string' ? { requestDigest: turn.requestDigest } : {}),
     };
   });
+  const taskState =
+    record.taskState === undefined ? { tasks: [] } : parseConversationTaskState(record.taskState);
+  if (!taskState) throw new ConversationStoreError('invalid_history');
+  const taskIds = new Set(taskState.tasks.map((task) => task.id));
+  if (turns.some((turn) => turn.routing?.taskIds.some((id) => !taskIds.has(id))))
+    throw new ConversationStoreError('invalid_history');
   const dropped = record.droppedRequests ?? [];
   if (
     !Array.isArray(dropped) ||
@@ -193,9 +216,10 @@ function load(ref: ReturnType<typeof conversationRef>): Transcript {
   )
     throw new ConversationStoreError('invalid_history');
   return {
-    version: 1,
+    version: 2,
     sessionId: ref.sessionId,
     turns,
+    taskState,
     droppedRequests: dropped.map((entry) => ({ id: entry.id, createdAt: entry.createdAt })),
   };
 }
@@ -257,7 +281,8 @@ export function reserveConversationTurn(
   viewer: FrontDeskConversationViewer,
   text: string,
   requestId: string = randomUUID(),
-  requestCreatedAt = Date.now()
+  requestCreatedAt = Date.now(),
+  locale?: SupportedLocale
 ): ReservedConversationTurn {
   if (
     !Number.isFinite(requestCreatedAt) ||
@@ -287,13 +312,14 @@ export function reserveConversationTurn(
         if (existing.retryable && !existing.uncertain && existing.reply === undefined) {
           delete existing.retryable;
           writeGovernedArtifactJson('sovereign_concierge', ref.path, transcript);
-          return { id: existing.id, created: true };
+          return { id: existing.id, created: true, routing: existing.routing };
         }
         return {
           id: existing.id,
           created: false,
           reply: existing.reply,
           uncertain: existing.uncertain,
+          routing: existing.routing,
         };
       }
       const id = requestId;
@@ -311,14 +337,35 @@ export function reserveConversationTurn(
         }
         transcript.turns.splice(completed, 1);
       }
+      // Intake classification is advisory only. Bind to this server-owned partition,
+      // never to global TaskSession state or text recovered from old assistant replies.
+      const routed = routeConversationTaskTurn(
+        transcript.taskState ?? { tasks: [] },
+        storedText(text, CONVERSATION_MAX_INPUT),
+        id,
+        Date.now(),
+        locale
+      );
+      // Validate before publication too: a generated oversized/malformed reply must
+      // never poison the durable transcript and make every subsequent read fail.
+      if (
+        !parseConversationTaskState(routed.state) ||
+        !parseConversationTaskDecision(routed.decision)
+      )
+        throw new ConversationStoreError('invalid_history');
+      transcript.taskState = routed.state;
       transcript.turns.push({
+        routing: routed.decision,
+        // Pure intake replies have no external execution. Publish their known
+        // result atomically, so a crash cannot strand a replay as pending.
+        ...(routed.decision.reply ? { reply: routed.decision.reply } : {}),
         id,
         text: storedText(text, CONVERSATION_MAX_INPUT),
         createdAt: Date.now(),
         requestDigest: createHash('sha256').update(text).digest('hex'),
       });
       writeGovernedArtifactJson('sovereign_concierge', ref.path, transcript);
-      return { id, created: true };
+      return { id, created: true, routing: routed.decision };
     })
   );
 }
@@ -334,8 +381,15 @@ export function completeConversationTurn(
     withLockSync(`concierge-history-${ref.key}`, () => {
       const transcript = load(ref);
       const turn = transcript.turns.find((entry) => entry.id === id);
+      const boundedReply = storedText(reply, CONVERSATION_MAX_REPLY);
+      if (
+        turn?.routing?.reply &&
+        turn.reply === boundedReply &&
+        turn.routing.reply === boundedReply
+      )
+        return; // The inert intake result was already committed by reservation.
       if (!turn || turn.reply !== undefined) throw new ConversationStoreError('invalid_history');
-      turn.reply = storedText(reply, CONVERSATION_MAX_REPLY);
+      turn.reply = boundedReply;
       delete turn.uncertain;
       delete turn.retryable;
       writeGovernedArtifactJson('sovereign_concierge', ref.path, transcript);

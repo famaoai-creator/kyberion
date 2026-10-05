@@ -153,7 +153,13 @@ export function registerConversationRoutes(app: express.Express): void {
     const requestId = parsed.data.request_id ?? randomUUID();
     let turn: ReturnType<typeof reserveConversationTurn>;
     try {
-      turn = reserveConversationTurn(viewer, text, requestId, parsed.data.request_created_at);
+      turn = reserveConversationTurn(
+        viewer,
+        text,
+        requestId,
+        parsed.data.request_created_at,
+        locale
+      );
     } catch (error) {
       const conflict =
         error instanceof ConversationStoreError &&
@@ -181,6 +187,28 @@ export function registerConversationRoutes(app: express.Express): void {
         ...unavailable(locale, requestId),
         error: turn.uncertain ? 'conversation_execution_uncertain' : 'conversation_pending',
         pending: true,
+      });
+    }
+    if (turn.routing?.reply) {
+      let historySaved = true;
+      try {
+        completeConversationTurn(viewer, turn.id, turn.routing.reply);
+      } catch {
+        historySaved = false;
+      }
+      return res.json({
+        ok: true,
+        reply: turn.routing.reply,
+        mode: 'intake',
+        shape:
+          turn.routing.kind === 'clarification'
+            ? 'clarification'
+            : turn.routing.kind === 'status'
+              ? 'status_summary'
+              : 'reply',
+        request_id: requestId,
+        session_id: ref.sessionId,
+        historySaved,
       });
     }
     try {

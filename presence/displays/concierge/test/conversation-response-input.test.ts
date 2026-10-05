@@ -112,3 +112,14 @@ it('invalidates only stale-scope conflicts and does not mark proven not-started 
   });
   expect(conversationFailurePolicy(503, {}).uncertain).toBe(true);
 });
+
+it('accepts a non-executing intake response without synthesizing control actions', () => {
+  const parsed = parseConversationMessageResponse({
+    reply: 'Request recorded. Execution has not started.',
+    mode: 'intake',
+    shape: 'status_summary',
+  });
+  expect(parsed).toMatchObject({ mode: 'intake', shape: 'status_summary' });
+  expect(parsed.nextActions).toBeUndefined();
+  expect(parsed.promoted).toBeUndefined();
+});

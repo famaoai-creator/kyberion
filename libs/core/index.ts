@@ -44,3 +44,5 @@ export {
   SurfaceConversationAdmissionError,
   SurfaceConversationCapabilityError,
 } from './surface/surface-conversation-runtime-context.js';
+
+export * from './surface/conversation-task-routing.js';

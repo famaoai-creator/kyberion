@@ -50,3 +50,55 @@ Follow QUICKSTART's managed reconcile, status, and setup-report sequence. Enable
 - Lock publication/reclamation: lock-utils-contention.test.ts
 
 DOM doubles and handler tests do not prove rendering, mobile layout, or accessibility behavior. Actual visual/browser end-to-end verification was unavailable in the review environment. Local daemon IPC was permission-blocked and was not retried. GitHub Linux CI on commit 46c4a0f passed all 17 supervisor-daemon tests, covering real Unix forwarding with mocked runtimes; this is separate from model-provider execution. No actual model-provider request was used to validate this change.
+
+## Conversation request routing (bounded intake slice)
+
+The shared front-desk store classifies each newly reserved user turn into a new
+request, follow-up, status question, approval candidate, cancellation candidate,
+chat, or clarification. Classification is deterministic and advisory; it grants
+no authority. Concierge and Presence consume a local intake reply before model
+or task execution. General chat continues through the existing scoped runtime.
+
+The server-owned transcript now keeps a separate request index. Request IDs are
+server-bound turn IDs; normal replies use readable titles. The index survives
+bounded transcript eviction and is partitioned by the same principal, member,
+role, source, tenant, organization, project and tier restrictions. Existing v1
+transcripts remain readable and migrate to v2 on their next write; older assistant text is
+never promoted into a task or an approval.
+
+A named unique request can be selected. When several requests could match
+“さっきの件どう？”, the reply lists their titles and asks which one. The original
+question and exact candidates are persisted, so a subsequent title or ordinal
+selection can recover after reload. Mixed requests are explicitly clarified
+rather than silently dropping a clause. Capacity exhaustion preserves existing
+requests and asks the user to narrow the input; it never silently evicts work.
+
+The index is bounded to 64 requests, 64 follow-up notes per request and 4 MiB of
+encoded state. Original redacted request text is retained separately from the
+bounded display title. This slice does not add archival or task execution.
+
+A request record is intake evidence only: recorded, execution not started.
+Completing a conversation response does not complete that request. Status replies
+cannot claim actual execution progress or outcomes. This slice neither scans nor
+executes legacy global TaskSession records, and does not implement a task worker.
+The existing scoped unsupported-capability boundaries remain in place. Approval
+and cancellation candidates do not change execution state or grant permission;
+the user must use a supported scoped workflow with its existing confirmation.
+
+Reservation, request-index changes, clarification and the immutable routing
+decision and its inert reply are written atomically under the existing conversation lock.
+A crash before HTTP reply delivery can replay that known result without execution.
+Model/chat turns keep the existing pending/uncertain rules. Replaying
+one request ID returns its recorded response/decision without adding another task
+or update. Same-ID/different-text conflicts remain rejected. Intake replies use
+the same durable completion handling as conversation replies; an unsaved reply
+never becomes an invitation to retry a possibly completed operation.
+
+Regression coverage includes the real Presence handler through the shared store,
+Concierge handler boundary tests, isolation, duplicate IDs, transcript eviction,
+malformed state, secret redaction and non-authoritative approval/cancellation.
+
+Deploy the updated store with both front-desk processes. Older binaries reject v2
+transcripts instead of silently overwriting the new request index. Back up the
+scoped transcript before any deliberate downgrade; never drop the index to bypass
+that version check.

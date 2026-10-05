@@ -320,7 +320,8 @@ export async function POST(req: NextRequest) {
         viewer,
         text,
         typeof body.requestId === 'string' ? body.requestId : undefined,
-        typeof body.requestCreatedAt === 'number' ? body.requestCreatedAt : undefined
+        typeof body.requestCreatedAt === 'number' ? body.requestCreatedAt : undefined,
+        locale
       );
     } catch (error) {
       const conflict =
@@ -359,17 +360,31 @@ export async function POST(req: NextRequest) {
     }
     let payload: ConversationMessageResponse;
     try {
-      const history = completedConversationContext(viewer);
-      payload = await replyViaOrchestrator(
-        text,
-        speaker,
-        sessionId,
-        locale,
-        scope,
-        turn.id,
-        ref.key,
-        history
-      );
+      if (turn.routing?.reply) {
+        // Server-owned intake state is not task execution or an approval grant.
+        payload = {
+          reply: turn.routing.reply,
+          mode: 'intake',
+          shape:
+            turn.routing.kind === 'clarification'
+              ? 'clarification'
+              : turn.routing.kind === 'status'
+                ? 'status_summary'
+                : 'reply',
+        };
+      } else {
+        const history = completedConversationContext(viewer);
+        payload = await replyViaOrchestrator(
+          text,
+          speaker,
+          sessionId,
+          locale,
+          scope,
+          turn.id,
+          ref.key,
+          history
+        );
+      }
     } catch (error) {
       if (error instanceof SurfaceConversationAdmissionError) {
         try {
