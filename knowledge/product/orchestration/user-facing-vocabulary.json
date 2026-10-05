@@ -8623,6 +8623,11 @@
         "ja": "停止していた自律運用を再開する。",
         "qps-ploc": "⟦Řėşůɱė ȧůŧőñőɱőůş őṗėřȧŧïőñş ȧƒŧėř ȧ ħȧŀŧ. ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
+      "cli_cmd_script_conversation_report": {
+        "en": "Report how the conversation is going: turn outcomes per intent, unanswered clarifications and repeated misses worth adding to the eval corpus.",
+        "ja": "会話の状況を報告する: 意図ごとの結果、答えのない確認質問、評価コーパスに加える価値のある繰り返しの失敗。",
+        "qps-ploc": "⟦Řėṗőřŧ ħőẇ ŧħė ƈőñṽėřşȧŧïőñ ïş ɠőïñɠ: ŧůřñ őůŧƈőɱėş ṗėř ïñŧėñŧ, ůñȧñşẇėřėḓ ƈŀȧřïƒïƈȧŧïőñş ȧñḓ řėṗėȧŧėḓ ɱïşşėş ẇőřŧħ ȧḓḓïñɠ ŧő ŧħė ėṽȧŀ ƈőřṗůş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
+      },
       "cli_cmd_script_tenant_export": {
         "en": "Export one tenant's governed data as a portable bundle.",
         "ja": "テナント 1 件分の管理データを持ち出し用バンドルとして書き出す。",
