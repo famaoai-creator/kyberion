@@ -754,6 +754,8 @@ export const presenceStudioConversationSchema = z
       .optional(),
     request_id: z.string().uuid().optional(),
     request_created_at: z.number().finite().nonnegative().optional(),
+    // Validated with the shared exact revision parser in the authenticated route.
+    artifactRevision: z.unknown().optional(),
     organizationId: z.string().trim().min(1).max(128).optional(),
     projectId: z.string().trim().min(1).max(128).optional(),
     tenant: z.string().trim().min(1).max(32).optional(),

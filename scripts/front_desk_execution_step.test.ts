@@ -35,6 +35,7 @@ import {
   conversationRef,
 } from '@agent/core/surface/front-desk-conversation-store';
 import {
+  frontDeskArtifactRevisionCommand,
   FRONT_DESK_RECEIPT_COMMAND,
   FRONT_DESK_RECEIPT_PIPELINE,
 } from '@agent/core/surface/front-desk-execution-contract';
@@ -79,6 +80,9 @@ const deps = () => ({
   assertTenant: () => undefined,
   notify: () => false,
   audit: () => undefined,
+  // Keep the real rejection ledger; the unrelated distillation hook must not
+  // write this isolated fixture into the repository-wide feedback store.
+  feedback: { onRejection: () => undefined },
 });
 
 beforeEach(() => {
@@ -109,7 +113,10 @@ beforeEach(() => {
     runtime: { heartbeat_id: 'fixture' },
   };
   validateDotCharter(charter, 'isolated diagnostic fixture');
-  fixture.charters = [{ charter, path: 'isolated-test-fixture.json' }];
+  fixture.charters = [{ charter, path: root + '/dots/' + charter.dot_id + '.json' }];
+  withExecutionContext('infrastructure_sentinel', () =>
+    safeWriteFile(fixture.charters[0].path, JSON.stringify(charter))
+  );
   fixture.policy = {
     version: 1,
     mappings: [
@@ -412,5 +419,197 @@ describe('durable diagnostic intake vertical slice', () => {
     ).toBe('uncertain');
     await runExecutor();
     expect(executePipeline).toHaveBeenCalledTimes(1);
+  }, 60000);
+});
+
+async function queueRevision(format: 'compact' | 'readable' = 'compact') {
+  const parent = listConfiguredFrontDeskExecutions().at(-1)!.binding;
+  const projection = originalProjection(viewer(), parent, { rootDir: root })!;
+  expect(projection.status).toBe('work_completed');
+  const input = {
+    requestId: parent.request_id,
+    revision: parent.revision,
+    sha256: projection.artifactSha256!,
+    format,
+  };
+  const id = randomUUID();
+  const text = frontDeskArtifactRevisionCommand(format);
+  reserveConversationTurn(viewer(), text, id, Date.now(), undefined, input);
+  const child = listConfiguredFrontDeskExecutions().at(-1)!.binding;
+  await runFrontDeskExecutionIntake(fixture.charters, deps());
+  const action = currentDotActions(charter.dot_id, deps()).at(-1)!;
+  expect(action.status).toBe('parked');
+  expect(action.front_desk_execution).toMatchObject({
+    request_id: id,
+    parent_sha256: input.sha256,
+  });
+  expect(getWorkItem(child.work_item_id)).toBeNull();
+  return { parent, child, input, id, text, action };
+}
+function decideRevision(
+  action: ReturnType<typeof currentDotActions>[number],
+  decision: 'approved' | 'rejected' = 'approved'
+) {
+  const approval = loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, action.request_id!)!;
+  decideApprovalRequest('mission_controller', {
+    channel: approval.channel,
+    storageChannel: approval.storageChannel,
+    requestId: approval.id,
+    decision,
+    decidedBy: 'isolated-test-human',
+    decidedByRole: 'sovereign',
+    decidedByType: 'human',
+    authMethod: 'manual',
+    authenticated: true,
+    effectBinding: approval.accountability?.effectBinding,
+  });
+  settleDotParkedActions(charter, deps());
+}
+describe('real immutable artifact feedback regeneration', () => {
+  it('resumes the newly approved revision in a fresh process and preserves its parent', async () => {
+    const first = await admitAndApprove();
+    const v1 = prepareFrontDeskExecution(charter, first.item, deps());
+    await runExecutor();
+    const bytes = safeReadFile(v1.artifactPath);
+    const revision = await queueRevision();
+    decideRevision(revision.action);
+    expect((await resumeInFreshProcess())[0]).toMatchObject({ status: 'done' });
+    expect(getWorkItem(revision.child.work_item_id)?.status).toBe('done');
+    expect(
+      readConversationHistory(viewer()).messages.find((m) => m.artifact?.requestId === revision.id)
+        ?.artifact?.revision
+    ).toBe(2);
+    expect(await resumeInFreshProcess()).toEqual([]);
+    expect(safeReadFile(v1.artifactPath)).toBe(bytes);
+  }, 120000);
+  it('quarantines an unknown revision outcome without retry or parent overwrite', async () => {
+    const first = await admitAndApprove();
+    const v1 = prepareFrontDeskExecution(charter, first.item, deps());
+    await runExecutor();
+    const bytes = safeReadFile(v1.artifactPath);
+    const revision = await queueRevision();
+    decideRevision(revision.action);
+    executePipeline.mockRejectedValueOnce(new Error('unknown outcome after starting revision'));
+    expect((await runExecutor())[0].status).toBe('blocked');
+    await runExecutor();
+    readConversationHistory(viewer());
+    await runFrontDeskExecutionIntake(fixture.charters, deps());
+    await runExecutor();
+    expect(executePipeline).toHaveBeenCalledTimes(2);
+    expect(safeReadFile(v1.artifactPath)).toBe(bytes);
+  }, 60000);
+  it('recovers a missing revision report without regenerating either version', async () => {
+    await admitAndApprove();
+    await runExecutor();
+    const revision = await queueRevision();
+    decideRevision(revision.action);
+    await runExecutor({
+      appendInbox: () => {
+        throw new Error('revision report transport failure');
+      },
+    });
+    expect(getWorkItem(revision.child.work_item_id)?.status).toBe('done');
+    await runExecutor({ appendInbox: () => undefined });
+    expect(executePipeline).toHaveBeenCalledTimes(2);
+    expect(readConversationExecutionReports(viewer())).toHaveLength(2);
+  }, 60000);
+  it('creates separately approved V2, preserves V1 bytes, returns lineage, and never reruns for retry or report refresh', async () => {
+    const first = await admitAndApprove();
+    const v1 = prepareFrontDeskExecution(charter, first.item, deps());
+    expect((await runExecutor())[0].status).toBe('done');
+    const oldBytes = safeReadFile(v1.artifactPath);
+    const revision = await queueRevision();
+    expect(listWorkItems()).toHaveLength(1);
+    await runExecutor();
+    expect(executePipeline).toHaveBeenCalledTimes(1);
+    decideRevision(revision.action);
+    const item = getWorkItem(revision.child.work_item_id)!;
+    const v2 = prepareFrontDeskExecution(charter, item, deps());
+    expect(v2.artifactPath).not.toBe(v1.artifactPath);
+    expect(v2.outputPath).not.toBe(v1.outputPath);
+    expect((await runExecutor())[0]).toMatchObject({
+      status: 'done',
+      front_desk_verification: { revision: 2 },
+    });
+    expect(safeReadFile(v1.artifactPath)).toBe(oldBytes);
+    expect(safeReadFile(v2.artifactPath)).toBe(v2.expectedContent);
+    expect(v2.expectedContent).not.toContain('\n');
+    expect(JSON.parse(v2.expectedContent)).toMatchObject({
+      parent_request_id: first.binding.request_id,
+      parent_sha256: revision.input.sha256,
+    });
+    const history = readConversationHistory(viewer());
+    expect(
+      history.messages.find((m) => m.artifact?.requestId === first.binding.request_id)?.artifact
+        ?.canRevise
+    ).toBe(false);
+    expect(
+      history.messages.find((m) => m.artifact?.requestId === revision.id)?.artifact
+    ).toMatchObject({ revision: 2, format: 'compact', canRevise: true });
+    expect(
+      reserveConversationTurn(
+        viewer(),
+        revision.text,
+        revision.id,
+        Date.now(),
+        undefined,
+        revision.input
+      ).created
+    ).toBe(false);
+    await runFrontDeskExecutionIntake(fixture.charters, deps());
+    await runExecutor();
+    readConversationHistory(viewer());
+    expect(executePipeline).toHaveBeenCalledTimes(2);
+    expect(readConversationExecutionReports(viewer())).toHaveLength(2);
+    expect(await resumeInFreshProcess()).toEqual([]);
+    expect(safeReadFile(v1.artifactPath)).toBe(oldBytes);
+  }, 60000);
+  it('rejects new approval without creating or overwriting an artifact', async () => {
+    const first = await admitAndApprove();
+    const v1 = prepareFrontDeskExecution(charter, first.item, deps());
+    await runExecutor();
+    const bytes = safeReadFile(v1.artifactPath);
+    const revision = await queueRevision();
+    decideRevision(revision.action, 'rejected');
+    await runExecutor();
+    expect(getWorkItem(revision.child.work_item_id)).toBeNull();
+    expect(executePipeline).toHaveBeenCalledTimes(1);
+    expect(safeReadFile(v1.artifactPath)).toBe(bytes);
+  }, 60000);
+  it('blocks parent digest mismatch after approval before a second pipeline can run', async () => {
+    const first = await admitAndApprove();
+    const v1 = prepareFrontDeskExecution(charter, first.item, deps());
+    await runExecutor();
+    const revision = await queueRevision();
+    decideRevision(revision.action);
+    withExecutionContext('infrastructure_sentinel', () =>
+      safeWriteFile(v1.artifactPath, 'tampered fixture')
+    );
+    const results = await runExecutor();
+    expect(results[0].status).toBe('blocked');
+    expect(executePipeline).toHaveBeenCalledTimes(1);
+    expect(safeReadFile(v1.artifactPath)).toBe('tampered fixture');
+  }, 60000);
+  it('rechecks parent bytes after the pipeline and refuses late publication', async () => {
+    const first = await admitAndApprove();
+    const v1 = prepareFrontDeskExecution(charter, first.item, deps());
+    await runExecutor();
+    const revision = await queueRevision();
+    decideRevision(revision.action);
+    const childItem = getWorkItem(revision.child.work_item_id)!;
+    const v2 = prepareFrontDeskExecution(charter, childItem, deps());
+    const real = executePipeline.getMockImplementation()!;
+    executePipeline.mockImplementationOnce(async (...args) => {
+      const result = await real(...args);
+      withExecutionContext('infrastructure_sentinel', () =>
+        safeWriteFile(v1.artifactPath, 'changed after execution')
+      );
+      return result;
+    });
+    const results = await runExecutor();
+    expect(results[0].status).not.toBe('done');
+    expect(safeExistsSync(v2.artifactPath)).toBe(false);
+    await runExecutor();
+    expect(executePipeline).toHaveBeenCalledTimes(2);
   }, 60000);
 });

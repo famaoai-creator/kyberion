@@ -46,6 +46,8 @@ vi.mock('../foundation/governed-catalog.js', async (importOriginal) => {
   };
 });
 import {
+  parseFrontDeskArtifactRevisionInput,
+  frontDeskArtifactRevisionDigest,
   loadFrontDeskExecutionPolicy,
   frontDeskMappingDigest,
   getFrontDeskExecutionMapping,
@@ -324,5 +326,58 @@ describe('protected mappings are never downgraded', () => {
     expect(frontDeskExecutionViewerFingerprint(protectedMapping.viewer)).not.toBe(
       frontDeskExecutionViewerFingerprint(mapping().viewer)
     );
+  });
+});
+
+describe('bounded artifact revision contract', () => {
+  const input = {
+    requestId: '00000000-0000-4000-8000-000000000001',
+    revision: 1,
+    sha256: 'b'.repeat(64),
+    format: 'compact' as const,
+  };
+  it('accepts only complete bounded version targets and binds every selection field', () => {
+    expect(parseFrontDeskArtifactRevisionInput(input)).toEqual(input);
+    for (const extra of [
+      { path: 'anything' },
+      { format: 'html' },
+      { format: ['compact'] },
+      { format: ['readable'] },
+      { format: { value: 'compact' } },
+      { format: null },
+      { revision: 0 },
+      { sha256: 'bad' },
+      { approved: true },
+    ])
+      expect(parseFrontDeskArtifactRevisionInput({ ...input, ...extra })).toBeUndefined();
+    expect(frontDeskArtifactRevisionDigest(input)).not.toBe(
+      frontDeskArtifactRevisionDigest({ ...input, format: 'readable' })
+    );
+  });
+  it('requires a distinct child and parent-bound digest; formatting creates exact alternate bytes', () => {
+    const child = {
+      ...binding(),
+      request_id: '00000000-0000-4000-8000-000000000002',
+      revision: 2,
+      request_digest: frontDeskArtifactRevisionDigest(input),
+      parent_request_id: input.requestId,
+      parent_revision: input.revision,
+      parent_sha256: input.sha256,
+      receipt_format: input.format,
+    };
+    expect(parseFrontDeskExecutionBinding(child)).toEqual(child);
+    expect(
+      parseFrontDeskExecutionBinding({ ...child, parent_sha256: 'c'.repeat(64) })
+    ).toBeUndefined();
+    expect(
+      parseFrontDeskExecutionBinding({ ...child, request_id: input.requestId })
+    ).toBeUndefined();
+    const content = frontDeskExecutionExpectedContent(child, mapping(), 'session');
+    expect(content).not.toContain('\n');
+    expect(JSON.parse(content)).toMatchObject({
+      revision: 2,
+      parent_sha256: input.sha256,
+      receipt_format: 'compact',
+    });
   });
 });

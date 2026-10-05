@@ -295,3 +295,48 @@ describe('request continuity at the actual front-desk ingress', () => {
     expect(fixtures.run).not.toHaveBeenCalled();
   });
 });
+
+const receiptRevision = {
+  requestId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  revision: 1,
+  sha256: 'a'.repeat(64),
+  format: 'compact',
+};
+describe('Presence explicit receipt revision boundary', () => {
+  it.each([
+    null,
+    {},
+    { ...receiptRevision, outputPath: 'out.json' },
+    { ...receiptRevision, principalId: 'human:owner' },
+    { ...receiptRevision, tier: 'personal' },
+    { ...receiptRevision, approved: true },
+    { ...receiptRevision, format: 'html' },
+  ])(
+    'rejects malformed revision %j without ordinary conversation execution',
+    async (artifactRevision) => {
+      const result = await request('POST', { text: 'hello', artifactRevision });
+      expect(result.statusCode).toBe(400);
+      expect(result.body.error).toBe('conversation_invalid_revision');
+      expect(fixtures.run).not.toHaveBeenCalled();
+    }
+  );
+  it('does not execute or leak a missing or cross-scope target', async () => {
+    const result = await request('POST', {
+      text: 'Create a compact JSON revision of this diagnostic receipt.',
+      artifactRevision: receiptRevision,
+    });
+    expect(result.statusCode).toBe(409);
+    expect(result.body).toMatchObject({
+      error: 'conversation_revision_target_unavailable',
+      retry_safe: true,
+    });
+    expect(fixtures.run).not.toHaveBeenCalled();
+    const denied = await request('POST', {
+      text: 'Create a compact JSON revision of this diagnostic receipt.',
+      artifactRevision: receiptRevision,
+      tenant: 'other',
+    });
+    expect(denied.statusCode).toBe(403);
+    expect(fixtures.run).not.toHaveBeenCalled();
+  });
+});

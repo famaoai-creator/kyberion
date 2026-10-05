@@ -28,3 +28,19 @@ export function frontDeskExecutionArtifactPath(
     binding.request_id + '-r' + binding.revision + '.json',
   ].join('/');
 }
+
+/** Same server-owned partition, with only validated immutable parent identity substituted. */
+export function frontDeskExecutionParentArtifactPath(
+  binding: FrontDeskExecutionBinding,
+  mapping: FrontDeskExecutionMapping
+): string | undefined {
+  if (!binding.parent_request_id) return undefined;
+  const path = frontDeskExecutionArtifactPath(binding, mapping);
+  return (
+    path.slice(0, path.lastIndexOf('/') + 1) +
+    binding.parent_request_id +
+    '-r' +
+    binding.parent_revision +
+    '.json'
+  );
+}
