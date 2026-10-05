@@ -263,6 +263,23 @@ describe('voice runtime helpers', () => {
     });
   });
 
+  it('runs Japanese Python TTS with UTF-8 standard streams', async () => {
+    const { runPythonTtsBridge } = await import('./voice-runtime-helpers.js');
+    await runPythonTtsBridge(
+      'libs/actuators/voice-actuator/scripts/kokoro_tts_bridge.py',
+      'こんにちは。',
+      '/tmp/utf8-tts.wav',
+      'ja',
+      undefined,
+      'kokoro_tts'
+    );
+    expect(mocks.safeExecResult).toHaveBeenCalledWith(
+      expect.any(String),
+      ['-X', 'utf8', 'libs/actuators/voice-actuator/scripts/kokoro_tts_bridge.py'],
+      expect.objectContaining({ input: expect.stringContaining('こんにちは。') })
+    );
+  });
+
   it('accepts a successful local STT response', async () => {
     const { parseVoiceSttBridgeResponse } = await import('./voice-runtime-helpers.js');
     expect(

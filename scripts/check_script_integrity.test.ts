@@ -12,6 +12,7 @@ import {
   findDirectScriptGuardViolations,
   findScriptHarnessViolations,
   readScriptIntegrityTextFile,
+  isArchivedScriptDocumentation,
 } from './check_script_integrity.js';
 
 const FIXTURE_DIR = pathResolver.sharedTmp('check-script-integrity');
@@ -28,6 +29,14 @@ function writeJson(relativePath: string, payload: unknown): string {
 }
 
 describe('check_script_integrity', () => {
+  it.each([
+    'docs/developer/improvement-plans-archive/2026-08/old.md',
+    'docs/developer/improvement-plans-2026-08/reviews/old.md',
+  ])('preserves archive exclusion for %s on Windows', (file) => {
+    expect(isArchivedScriptDocumentation(`/repo/${file}`)).toBe(true);
+    expect(isArchivedScriptDocumentation(`C:\\repo\\${file.replaceAll('/', '\\')}`)).toBe(true);
+    expect(isArchivedScriptDocumentation('C:\\repo\\docs\\QUICKSTART.md')).toBe(false);
+  });
   afterEach(() => {
     if (safeExistsSync(FIXTURE_DIR)) {
       safeRmSync(FIXTURE_DIR, { recursive: true, force: true });

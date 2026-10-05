@@ -10,6 +10,7 @@ import { generateIndex } from './generate_knowledge_index.js';
 import {
   expectedKyberionThemeEntries,
   extractKyberionTokenBlock,
+  normalizeDesignTokenLineEndings,
   extractKyberionUiTokenBlock,
   concatKyberionUiStylesheetSources,
   KB_UI_STYLESHEET_SOURCE,
@@ -787,7 +788,7 @@ function validateDesignTokenCatalog(violations: string[]) {
       );
       continue;
     }
-    const actual = readCatalogTextFile(filePath).trim();
+    const actual = normalizeDesignTokenLineEndings(readCatalogTextFile(filePath)).trim();
     if (filePath.endsWith('globals.css')) {
       const tokenBlock = extractKyberionTokenBlock(actual);
       if (tokenBlock !== expectedTokenBlock) {
@@ -840,7 +841,7 @@ function validateDesignTokenCatalog(violations: string[]) {
     const filePath = pathResolver.rootResolve(relativePath);
     if (!safeExistsSync(filePath)) {
       violations.push(`design-tokens: missing file ${relativePath}`);
-    } else if (readCatalogTextFile(filePath) !== expected) {
+    } else if (normalizeDesignTokenLineEndings(readCatalogTextFile(filePath)) !== expected) {
       violations.push(`design-tokens: generated UI stylesheet drift in ${relativePath}`);
     }
   }
@@ -851,7 +852,7 @@ function validateDesignTokenCatalog(violations: string[]) {
   if (!safeExistsSync(tailwindPath)) {
     violations.push('design-tokens: missing tailwind.config.cjs');
   } else {
-    const tailwindText = readCatalogTextFile(tailwindPath);
+    const tailwindText = normalizeDesignTokenLineEndings(readCatalogTextFile(tailwindPath));
     if (!tailwindText.includes(expectedTailwindBlock)) {
       violations.push('design-tokens: kyberion tailwind color block drift');
     }

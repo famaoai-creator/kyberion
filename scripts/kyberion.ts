@@ -10,6 +10,7 @@ import {
 } from './check_cli_manifest.js';
 import { assertGovernedExec, buildSafeExecEnv, safeExecResultAsync } from '@agent/core/secure-io';
 import { constants as osConstants } from 'node:os';
+import { pathToFileURL } from 'node:url';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { pathResolver } from '@agent/core/path-resolver';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
@@ -139,7 +140,7 @@ async function runScriptCommand(
   const childArgs = scriptCommand.module
     ? [
         '--import',
-        pathResolver.rootResolve('scripts/ts-loader.mjs'),
+        pathToFileURL(pathResolver.rootResolve('scripts/ts-loader.mjs')).href,
         resolveCliModulePath(scriptCommand.module),
         ...(scriptCommand.args || []),
         ...commandArgs,
@@ -171,7 +172,7 @@ async function runScriptCommand(
         process.execPath,
         [
           '--import',
-          pathResolver.rootResolve('scripts/ts-loader.mjs'),
+          pathToFileURL(pathResolver.rootResolve('scripts/ts-loader.mjs')).href,
           resolveCliModulePath(scriptCommand.module),
           ...(scriptCommand.args || []),
           ...commandArgs,

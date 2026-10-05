@@ -14,6 +14,7 @@ import {
   updateThemesJson,
   replaceTokenBlock,
   replaceUiTokenBlock,
+  normalizeDesignTokenLineEndings,
 } from './design-token-utils.js';
 
 const ROOT = pathResolver.rootDir();
@@ -68,10 +69,17 @@ export function readDesignTokenTextFile(filePath: string): string {
   return readTextFile(filePath);
 }
 
-function renderUpdatedFile(filePath: string, content: string): GeneratedFile | undefined {
+export function renderUpdatedFile(filePath: string, content: string): GeneratedFile | undefined {
   if (!safeExistsSync(filePath)) return;
   const source = readDesignTokenTextFile(filePath);
-  return content === source ? undefined : { path: filePath, content };
+  return normalizeDesignTokenLineEndings(content) === normalizeDesignTokenLineEndings(source)
+    ? undefined
+    : {
+        path: filePath,
+        content: source.includes('\r\n')
+          ? normalizeDesignTokenLineEndings(content).replace(/\n/gu, '\r\n')
+          : content,
+      };
 }
 
 function renderTokenSurface(
@@ -88,7 +96,7 @@ function renderTokenSurface(
 }
 
 function renderWholeFile(filePath: string, content: string): GeneratedFile | undefined {
-  if (safeExistsSync(filePath) && readDesignTokenTextFile(filePath) === content) return;
+  if (safeExistsSync(filePath)) return renderUpdatedFile(filePath, content);
   return { path: filePath, content };
 }
 

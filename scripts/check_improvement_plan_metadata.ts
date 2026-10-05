@@ -60,6 +60,7 @@ function read(filePath: string): string {
 }
 
 export function parseFrontmatter(markdown: string): Record<string, string> | null {
+  markdown = markdown.replace(/\r\n/gu, '\n');
   if (!markdown.startsWith('---\n')) return null;
   const end = markdown.indexOf('\n---\n', 4);
   if (end < 0) return null;
@@ -126,6 +127,8 @@ export function normalizePlanFrontmatter(
 ): string {
   if (!parseFrontmatter(markdown))
     return addPlanFrontmatter(markdown, title, lastUpdated, defaults);
+  const newline = markdown.includes('\r\n') ? '\r\n' : '\n';
+  markdown = markdown.replace(/\r\n/gu, '\n');
   const end = markdown.indexOf('\n---\n', 4);
   const header = markdown.slice(0, end);
   const fields = parseFrontmatter(markdown) || {};
@@ -143,7 +146,7 @@ export function normalizePlanFrontmatter(
   let normalizedHeader = header.replace(/^status:\s*.*$/mu, `status: ${normalizedStatus}`);
   if (!fields.status) additions.push(`status: ${normalizedStatus}`);
   if (additions.length) normalizedHeader = `${normalizedHeader}\n${additions.join('\n')}`;
-  return `${normalizedHeader}\n---${markdown.slice(end + '\n---'.length)}`;
+  return `${normalizedHeader}\n---${markdown.slice(end + '\n---'.length)}`.replace(/\n/gu, newline);
 }
 
 /** Discover current and future monthly plans, plus the single archive tree. */

@@ -1,0 +1,22 @@
+{
+  "record_id": "mem-MSN-WINDOWS-REVIEW-FIXES-20261005-2026_10_05",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Verify managed speech configuration at the child process boundary",
+  "summary": "Forward explicit non-secret configuration narrowly and test what the real child receives; validate healthy lock diagnostics with an ENOENT-preserving fixture.",
+  "candidate_id": "mem-MSN-WINDOWS-REVIEW-FIXES-20261005-2026_10_05",
+  "evidence_refs": [
+    "active/missions/public/MSN-WINDOWS-REVIEW-FIXES-20261005/evidence/implementation-report.md",
+    "active/missions/public/MSN-WINDOWS-REVIEW-FIXES-20261005/evidence/test-report.md",
+    "active/missions/public/MSN-WINDOWS-REVIEW-FIXES-20261005/evidence/REVIEW-permission-cleanup.md"
+  ],
+  "created_at": "2026-10-05T04:06:53.970Z",
+  "applicability": ["mission", "mission:MSN-WINDOWS-REVIEW-FIXES-20261005"],
+  "reusable_steps": [
+    "Forward explicit non-secret configuration narrowly and test what the real child receives; validate healthy lock diagnostics with an ENOENT-preserving fixture"
+  ],
+  "expected_outcome": "When a managed backend replaces a direct command, audit every configuration value consumed by its child. Forward only the named model directory/name, device, compute type and language settings through safeExecResult overrides. Keep the shared environment policy unchanged and preserve request-level precedence. Execute the production Python bridge against a hermetic fake model to verify actual child configuration, Unicode, defaults and exclusion of a non-allowlisted credential; a mocked spawn call alone cannot establish that boundary. This verifies configuration plumbing, not GPU execution, speech accuracy or native Windows behavior.\n\nTest diagnostic APIs according to their contract: a free or verifiably owned lock has no recovery diagnostic. Use an IO fixture that preserves ENOENT for missing cleanup guards, and keep real-I/O acquisition, contention, owner record, release and reacquisition coverage. A wrapped missing-file error can falsely pass an assertion about a live owner. Do not redesign the lock protocol to fix a test.\n\nA filename in a prefix-based permission policy is not inherently an exact-file grant. Revoke one-time authoring grants after the requested artifact exists, verify descendants and neighboring paths are denied, and avoid shipping broader continuing authority.",
+  "source_branch": "fix/windows-speech-config-20261005",
+  "source_commit": "e5241dc60473aa619eede5bf5199af3664dcc969"
+}
