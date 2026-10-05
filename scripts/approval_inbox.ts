@@ -96,6 +96,33 @@ function operatorTimezone(): string | undefined {
   }
 }
 
+/**
+ * Build (and optionally push) the operator's decision digest. Shared by the
+ * `digest` CLI command and the scheduled `core:decision_digest` pipeline op so
+ * both behave identically.
+ */
+export function runDecisionDigest(options: {
+  now: number;
+  hours: number;
+  locale: 'en' | 'ja';
+  send: boolean;
+}): { digest: DecisionDigest; text: string; sent: boolean } {
+  const digest = collectDecisionDigest({ now: options.now, hours: options.hours });
+  const text = renderDecisionDigestText(digest, {
+    locale: options.locale,
+    timezone: operatorTimezone(),
+  });
+  let sent = false;
+  if (options.send) {
+    sent = notifyOperatorSync('decision_digest', {
+      title: text.split('\n')[0] ?? 'decision digest',
+      body: text.split('\n').slice(1).join('\n'),
+      correlation_id: `decision-digest:${new Date(options.now).toISOString().slice(0, 13)}`,
+    });
+  }
+  return { digest, text, sent };
+}
+
 export function formatVetoTick(result: VetoWindowTickResult): string {
   const lines = [
     `Veto windows — proceeded: ${result.proceeded.length}, fell back to a decision: ${result.fellBack.length}, shadow elapsed: ${result.shadowElapsed.length}`,
@@ -164,21 +191,17 @@ export const runApprovalInbox = defineScript({
         `Unknown approval-inbox command: ${command} (digest | charter | tick)`
       );
     }
-    const digest = collectDecisionDigest({ now, hours: readHours(context.argv) });
     const locale = coerceLocale(
       readFlag(context.argv, '--locale') ?? resolveLocale(),
       ['en', 'ja'] as const,
       'en'
     );
-    const text = renderDecisionDigestText(digest, { locale, timezone: operatorTimezone() });
-    let sent = false;
-    if (context.argv.includes('--send')) {
-      sent = notifyOperatorSync('decision_digest', {
-        title: text.split('\n')[0] ?? 'decision digest',
-        body: text.split('\n').slice(1).join('\n'),
-        correlation_id: `decision-digest:${new Date(now).toISOString().slice(0, 13)}`,
-      });
-    }
+    const { digest, text, sent } = runDecisionDigest({
+      now,
+      hours: readHours(context.argv),
+      locale,
+      send: context.argv.includes('--send'),
+    });
     context.print(context.json ? JSON.stringify({ ...digest, sent }, null, 2) : text);
     return { ...digest, sent };
   },

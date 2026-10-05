@@ -22,6 +22,7 @@ import {
   buildVetoWindow,
   markApprovalNotificationDelivered,
 } from './approval-veto-window.js';
+import { isOperationsHalted } from './operations-halt.js';
 import { getAutonomousOpsPolicy, type AutonomousOpsGateResult } from './autonomous-ops-gate.js';
 import { buildDecisionCard, type DecisionCardEvidence } from './decision-card.js';
 import type { EventScopeInput } from '../event-scope.js';
@@ -133,6 +134,12 @@ export function routeAutonomousDecision(input: RouteAutonomousDecisionInput): Ro
   const level = resolveInterventionLevel(input.gate);
   const timing = resolveInterventionTiming(level, { blocking: input.blocking });
   const shadow = input.gate.shadow;
+
+  // P1-9: while the operator has halted operations nothing proceeds on its own,
+  // whatever the gate said — the action is parked, without a card or a ping.
+  if (isOperationsHalted()) {
+    return { level, timing, proceed: false, parked: true, shadow, notified: false };
+  }
 
   if (level === 'none' || level === 'fyi') {
     // Shadow actions never execute, so there is nothing to report as done.
