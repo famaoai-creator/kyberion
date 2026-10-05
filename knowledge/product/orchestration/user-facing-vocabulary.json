@@ -23185,9 +23185,24 @@
         "qps-ploc": "⟦Ŧħïş őṗėřȧŧïőñ ƈȧññőŧ ẏėŧ ṗřėşėřṽė ẏőůř ƈőñṽėřşȧŧïőñ’ş ȧƈƈėşş şƈőṗė. Ḓïřėƈŧ ƈőñṽėřşȧŧïőñ ïş şůṗṗőřŧėḓ; ḓėŀėɠȧŧïőñ, ɱȧñȧɠėḓ ėẋėƈůŧïőñ, ŧȧşķ şŧėėřïñɠ, ȧñḓ şħȧřėḓ ṗėřşőñȧŀ ɋůėřïėş řėɋůïřė ȧñ ėẋṗŀïƈïŧŀẏ şƈőṗėḓ ẇőřķƒŀőẇ. Ẏőůř ḓřȧƒŧ ïş ķėṗŧ. Ƈħėƈķ ṗřőɠřėşş ƀėƒőřė ƈőñŧïñůïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
       },
       "task_status": {
-        "en": "“{title}” is recorded in this conversation. This record does not track execution, so actual progress and results have not been verified.",
-        "ja": "「{title}」はこの会話に記録されています。この記録は実行状況を追跡していないため、実際の進捗や結果は未確認です。",
-        "qps-ploc": "⟦“{title}” ïş řėƈőřḓėḓ ïñ ŧħïş ƈőñṽėřşȧŧïőñ. Ŧħïş řėƈőřḓ ḓőėş ñőŧ ŧřȧƈķ ėẋėƈůŧïőñ, şő ȧƈŧůȧŀ ṗřőɠřėşş ȧñḓ řėşůŀŧş ħȧṽė ñőŧ ƀėėñ ṽėřïƒïėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈï⟧"
+        "en": "“{title}” is recorded in this conversation, but no reply to it has been completed yet.",
+        "ja": "「{title}」はこの会話に記録されていますが、まだ回答は完了していません。",
+        "qps-ploc": "⟦“{title}” ïş řėƈőřḓėḓ ïñ ŧħïş ƈőñṽėřşȧŧïőñ, ƀůŧ ñő řėṗŀẏ ŧő ïŧ ħȧş ƀėėñ ƈőɱṗŀėŧėḓ ẏėŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "task_status_completed": {
+        "en": "“{title}” was answered in this conversation. The reply began: {excerpt}",
+        "ja": "「{title}」はこの会話で回答済みです。回答の冒頭: {excerpt}",
+        "qps-ploc": "⟦“{title}” ẇȧş ȧñşẇėřėḓ ïñ ŧħïş ƈőñṽėřşȧŧïőñ. Ŧħė řėṗŀẏ ƀėɠȧñ: {excerpt} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "task_status_awaiting_input": {
+        "en": "“{title}” is waiting for your input. Please answer the last question about it.",
+        "ja": "「{title}」はあなたの入力を待っています。直前の確認に答えてください。",
+        "qps-ploc": "⟦“{title}” ïş ẇȧïŧïñɠ ƒőř ẏőůř ïñṗůŧ. Ṗŀėȧşė ȧñşẇėř ŧħė ŀȧşŧ ɋůėşŧïőñ ȧƀőůŧ ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "task_status_needs_execution": {
+        "en": "“{title}” needs work beyond this conversation, such as approval or a mission. It is recorded for execution; handing it to an executor is not automated yet.",
+        "ja": "「{title}」は承認やミッションなど、この会話の外での作業が必要です。実行対象として記録済みですが、実行への受け渡しはまだ自動化されていません。",
+        "qps-ploc": "⟦“{title}” ñėėḓş ẇőřķ ƀėẏőñḓ ŧħïş ƈőñṽėřşȧŧïőñ, şůƈħ ȧş ȧṗṗřőṽȧŀ őř ȧ ɱïşşïőñ. Ïŧ ïş řėƈőřḓėḓ ƒőř ėẋėƈůŧïőñ; ħȧñḓïñɠ ïŧ ŧő ȧñ ėẋėƈůŧőř ïş ñőŧ ȧůŧőɱȧŧėḓ ẏėŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőř⟧"
       },
       "task_approval": {
         "en": "I linked the approval-shaped message to “{title}”. This message did not grant approval or start anything. Use the governed approval flow for the actual action.",

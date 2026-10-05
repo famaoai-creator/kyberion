@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   CONVERSATION_TASK_MAX_STATE_BYTES,
+  applyConversationTurnOutcome,
+  classifyConversationTurnOutcome,
   parseConversationTaskDecision,
   parseConversationTaskState,
   routeConversationTaskTurn,
@@ -16,7 +18,6 @@ const task = (n: number, title = 'Request ' + n): ConversationTaskRecord => ({
   createdAt: n,
   updates: [],
   state: 'recorded',
-  execution: 'not_started',
 });
 const route = (state: ConversationTaskState, text: string, n = 99, locale?: 'en' | 'ja') =>
   routeConversationTaskTurn(state, text, id(n), 1000 + n, locale);
@@ -39,10 +40,12 @@ describe('bounded conversation task intake', () => {
       confidence: 'rule',
       authority: 'none',
     });
-    expect(out.state.tasks[0]).toMatchObject({
+    expect(out.state.tasks[0]).toEqual({
+      id: id(1),
       title,
       requestText: text,
-      execution: 'not_started',
+      createdAt: 1001,
+      updates: [],
       state: 'recorded',
     });
     expect(input.tasks).toEqual([]);
@@ -104,10 +107,23 @@ describe('bounded conversation task intake', () => {
   );
   it('answers an unambiguous deictic status without claiming execution state', () => {
     const out = route({ tasks: [task(1)] }, 'Any updates?', 99, 'en');
-    expect(out.decision.reply).toContain('does not track execution');
-    expect(out.decision.reply).toContain('actual progress and results have not been verified');
+    expect(out.decision.reply).toContain('no reply to it has been completed yet');
     expect(out.decision.reply).not.toContain('has not started');
     expect(out.state.tasks[0].state).toBe('recorded');
+  });
+  it.each([
+    ['completed', 'was answered in this conversation. The reply began: Draft ready'],
+    ['awaiting_input', 'is waiting for your input'],
+    ['needs_execution', 'needs work beyond this conversation'],
+  ] as const)('reports the %s status from the record', (status, expected) => {
+    const record: ConversationTaskRecord = {
+      ...task(1),
+      state: status,
+      ...(status === 'completed'
+        ? { result: { turnId: id(5), excerpt: 'Draft ready', at: 5 } }
+        : {}),
+    };
+    expect(route({ tasks: [record] }, 'Any updates?', 99, 'en').decision.reply).toContain(expected);
   });
   it.each([
     ['Aの報告書に表を追加して', two(), id(1)],
@@ -286,7 +302,11 @@ describe('strict inert state and decision parsing', () => {
     { tasks: 'x' },
     { tasks: [{}] },
     { tasks: [{ ...task(1), state: 'completed' }] },
+    { tasks: [{ ...task(1), state: 'executing' }] },
     { tasks: [{ ...task(1), execution: 'executing' }] },
+    { tasks: [{ ...task(1), workItemId: '../escape' }] },
+    { tasks: [{ ...task(1), result: { turnId: 'x', excerpt: 'ok', at: 1 } }] },
+    { tasks: [{ ...task(1), result: { turnId: id(2), excerpt: 'x'.repeat(281), at: 1 } }] },
     { tasks: [{ ...task(1), requestText: undefined }] },
     { tasks: [{ ...task(1), createdAt: Infinity }] },
     { tasks: [{ ...task(1), title: 'x'.repeat(513) }] },
@@ -312,6 +332,20 @@ describe('strict inert state and decision parsing', () => {
     { tasks: [task(1)], approval: true },
   ])('fails closed on malformed persisted state %#', (input) => {
     expect(parseConversationTaskState(input)).toBeUndefined();
+  });
+  it('reads the legacy execution field from earlier v2 writers and drops it', () => {
+    expect(
+      parseConversationTaskState({ tasks: [{ ...task(1), execution: 'not_started' }] })
+    ).toEqual({ tasks: [task(1)] });
+  });
+  it('accepts a result and a linked work item', () => {
+    const record = {
+      ...task(1),
+      state: 'needs_execution' as const,
+      result: { turnId: id(2), excerpt: 'Earlier answer', at: 2 },
+      workItemId: 'WI-CONVERSATION-1',
+    };
+    expect(parseConversationTaskState({ tasks: [record] })).toEqual({ tasks: [record] });
   });
   it('clones state and nested records', () => {
     const input = two();
@@ -403,5 +437,57 @@ describe('whole quoted target', () => {
       route({ tasks: [task(1, 'A report'), task(2, 'B report')] }, 'status of \"A report\"')
         .decision
     ).toMatchObject({ kind: 'status', taskIds: [id(1)] });
+  });
+});
+
+describe('runtime turn outcome', () => {
+  const contract = (
+    authority_level: 'autonomous' | 'approval_required' | 'human_clarification_required',
+    resolution_shape: 'direct_answer' | 'task_session' | 'mission' | 'project_bootstrap'
+  ) => ({ intentResolution: { authority_level, resolution_shape } });
+  it.each([
+    [{}, 'answered'],
+    [contract('autonomous', 'direct_answer'), 'answered'],
+    [contract('human_clarification_required', 'direct_answer'), 'awaiting_input'],
+    [contract('human_clarification_required', 'mission'), 'awaiting_input'],
+    [contract('approval_required', 'direct_answer'), 'needs_execution'],
+    [contract('autonomous', 'task_session'), 'needs_execution'],
+    [contract('autonomous', 'mission'), 'needs_execution'],
+    [{ missionProposals: [{ intent: 'create_mission' }] }, 'needs_execution'],
+    [{ approvalRequests: [{}] }, 'needs_execution'],
+  ] as const)('classifies %j as %s', (conversation, expected) => {
+    expect(classifyConversationTurnOutcome(conversation)).toBe(expected);
+  });
+  it('completes a request answered in place with a bounded excerpt', () => {
+    const input = { tasks: [task(1)] };
+    const out = applyConversationTurnOutcome(input, id(1), 'answered', id(2), 'y'.repeat(400), 7);
+    expect(out.tasks[0]).toMatchObject({
+      state: 'completed',
+      result: { turnId: id(2), excerpt: 'y'.repeat(280), at: 7 },
+    });
+    expect(input.tasks[0].state).toBe('recorded');
+  });
+  it.each(['awaiting_input', 'needs_execution'] as const)(
+    'marks %s and keeps an earlier answer',
+    (outcome) => {
+      const done = applyConversationTurnOutcome(
+        { tasks: [task(1)] },
+        id(1),
+        'answered',
+        id(2),
+        'A',
+        3
+      );
+      const out = applyConversationTurnOutcome(done, id(1), outcome, id(4), 'Needs approval', 5);
+      expect(out.tasks[0]).toMatchObject({
+        state: outcome,
+        result: { turnId: id(2), excerpt: 'A', at: 3 },
+      });
+    }
+  );
+  it('leaves unknown requests and blank replies unchanged', () => {
+    const input = { tasks: [task(1)] };
+    expect(applyConversationTurnOutcome(input, id(9), 'answered', id(2), 'A', 3)).toEqual(input);
+    expect(applyConversationTurnOutcome(input, id(1), 'answered', id(2), '   ', 3)).toEqual(input);
   });
 });

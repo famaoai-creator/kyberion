@@ -61,7 +61,7 @@ describe('server-owned durable conversation', () => {
     });
   });
 
-  it('records a recognized request while leaving its reply to the conversation runtime', () => {
+  it('records a recognized request and completes it when the runtime answers in place', () => {
     const text = 'Prepare the report tomorrow';
     const id = '00000000-0000-4000-8000-000000000001';
     const turn = reserveConversationTurn(viewer, text, id, Date.now(), 'en');
@@ -76,10 +76,10 @@ describe('server-owned durable conversation', () => {
     });
     expect(files.get(conversationRef(viewer).path)).toMatchObject({
       taskState: {
-        tasks: [{ id, state: 'recorded', execution: 'not_started', requestText: text }],
+        tasks: [{ id, state: 'recorded', requestText: text }],
       },
     });
-    completeConversationTurn(viewer, id, 'The report is ready');
+    completeConversationTurn(viewer, id, 'The report is ready', 'answered');
     expect(readConversationHistory(viewer)).toMatchObject({
       pending: 0,
       messages: [
@@ -94,7 +94,9 @@ describe('server-owned durable conversation', () => {
       routing: turn.routing,
     });
     expect(files.get(conversationRef(viewer).path)).toMatchObject({
-      taskState: { tasks: [{ id, state: 'recorded', execution: 'not_started' }] },
+      taskState: {
+        tasks: [{ id, state: 'completed', result: { turnId: id, excerpt: 'The report is ready' } }],
+      },
     });
   });
 

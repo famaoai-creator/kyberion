@@ -264,7 +264,8 @@ describe('request continuity at the actual front-desk ingress', () => {
     fixtures.run.mockClear();
     const status = await say('Aの件どう？');
     expect(status.body).toMatchObject({ mode: 'intake', shape: 'status_summary' });
-    expect(status.body.reply).toContain('A');
+    expect(status.body.reply).toContain('回答済み');
+    expect(status.body.reply).toContain('A real reply');
     const vague = await say('さっきの件どう？');
     expect(vague.body).toMatchObject({ mode: 'intake', shape: 'clarification' });
     expect(vague.body.reply).toContain('A');
