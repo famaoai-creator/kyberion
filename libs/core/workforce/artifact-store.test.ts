@@ -7,12 +7,17 @@
  * so nothing here ever touches the real active/ tree. Raw fs is used only to
  * seed/inspect the temp root (registered in tests/core-fs-exception-boundary).
  */
-import fs from 'node:fs';
+import * as fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return { ...actual, linkSync: vi.fn(actual.linkSync) };
+});
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
@@ -623,5 +628,57 @@ describe('writeScopedArtifact (AL-02)', () => {
     expect(() => store.readScopedArtifactIndex({ mission: 'M-AL02-E' })).toThrow(
       /must be a regular file/
     );
+  });
+
+  describe('exclusive scoped artifact publication', () => {
+    it('refuses a collision atomically without replacing the winning bytes or indexing the loser', () => {
+      const link = vi.mocked(fs.linkSync).getMockImplementation()!;
+      let destination = '';
+      const name = 'exclusive-race-' + randomUUID() + '.txt';
+      const spy = vi.mocked(fs.linkSync).mockImplementation((source, target) => {
+        if (String(target).endsWith(name)) {
+          destination = String(target);
+          fs.writeFileSync(target, 'concurrent winner');
+        }
+        return link(source, target);
+      });
+      try {
+        expect(() =>
+          store.writeScopedArtifact({
+            scope: { system: true },
+            tier: 'public',
+            artifact_class: 'report',
+            name,
+            content: 'losing bytes',
+            create_only: true,
+          })
+        ).toThrow(/EEXIST/);
+        expect(fs.readFileSync(destination, 'utf8')).toBe('concurrent winner');
+      } finally {
+        spy.mockImplementation(link);
+      }
+    });
+    it('preserves an already published version under subsequent exclusive writes', () => {
+      const name = 'exclusive-existing-' + randomUUID() + '.txt';
+      const result = store.writeScopedArtifact({
+        scope: { system: true },
+        tier: 'public',
+        artifact_class: 'report',
+        name,
+        content: 'V1',
+        create_only: true,
+      });
+      expect(() =>
+        store.writeScopedArtifact({
+          scope: { system: true },
+          tier: 'public',
+          artifact_class: 'report',
+          name,
+          content: 'V2',
+          create_only: true,
+        })
+      ).toThrow(/EEXIST/);
+      expect(fs.readFileSync(result.absolute_path, 'utf8')).toBe('V1');
+    });
   });
 });

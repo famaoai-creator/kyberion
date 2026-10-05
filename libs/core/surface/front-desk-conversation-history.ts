@@ -1,9 +1,27 @@
+import {
+  parseFrontDeskArtifactRevisionInput,
+  type FrontDeskReceiptFormat,
+} from './front-desk-artifact-revision-contract.js';
+export {
+  parseFrontDeskArtifactRevisionInput,
+  frontDeskArtifactRevisionCommand,
+  type FrontDeskArtifactRevisionInput,
+  type FrontDeskReceiptFormat,
+} from './front-desk-artifact-revision-contract.js';
+export interface FrontDeskConversationArtifact {
+  requestId: string;
+  revision: number;
+  sha256: string;
+  format: FrontDeskReceiptFormat;
+  canRevise: boolean;
+}
 /** Display-only history. Restoring a transcript never restores an approval action. */
 export interface ConversationHistoryMessage {
   id: string;
   role: 'user' | 'secretary';
   text: string;
   createdAt?: number;
+  artifact?: FrontDeskConversationArtifact;
 }
 
 export interface ConversationHistory {
@@ -42,11 +60,32 @@ export function parseConversationHistory(value: unknown): ConversationHistory | 
       item.text.length > CONVERSATION_MAX_REPLY
     )
       return undefined;
-    // Explicit projection drops executable metadata even if supplied by a server.
+    let artifact: FrontDeskConversationArtifact | undefined;
+    if (item.artifact !== undefined) {
+      const candidate = item.artifact as Record<string, unknown>;
+      if (
+        !candidate ||
+        typeof candidate !== 'object' ||
+        Array.isArray(candidate) ||
+        Object.keys(candidate).length !== 5 ||
+        typeof candidate.canRevise !== 'boolean'
+      )
+        return undefined;
+      const target = parseFrontDeskArtifactRevisionInput({
+        requestId: candidate.requestId,
+        revision: candidate.revision,
+        sha256: candidate.sha256,
+        format: candidate.format,
+      });
+      if (!target || item.role !== 'secretary') return undefined;
+      artifact = { ...target, canRevise: candidate.canRevise };
+    }
+    // Version selection is inert. Restored history never carries an approval action.
     messages.push({
       id: item.id,
       role: item.role,
       text: item.text,
+      ...(artifact ? { artifact } : {}),
       ...(typeof item.createdAt === 'number' && Number.isFinite(item.createdAt)
         ? { createdAt: item.createdAt }
         : {}),

@@ -214,6 +214,8 @@ export interface ScopedArtifactPublication {
 export type ScopedArtifactFormat = 'json' | 'text' | 'buffer';
 
 export interface WriteScopedArtifactInput {
+  /** Atomically refuse an existing target, including a concurrent creator. */
+  create_only?: boolean;
   scope: ScopedArtifactScope;
   artifact_class: RetentionArtifactClass;
   /**
@@ -657,7 +659,7 @@ export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScope
   const performWrite = (): void => {
     if (!safeExistsSync(targetDir)) safeMkdir(targetDir, { recursive: true });
     ensureRegularScopedArtifactIndex(indexPath);
-    safeWriteFile(absolutePath, data);
+    safeWriteFile(absolutePath, data, input.create_only ? { createOnly: true } : undefined);
     appendJsonLine(indexPath, validatedEntry);
     if (input.publish) {
       artifactId = publishScopedArtifact(input, repoRelative, root);
