@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as nodePath from 'node:path';
+import { readJsonLines } from '../foundation/json.js';
+import * as dispatchLifecycle from './mission-dispatch-lifecycle.js';
 
 import {
   appendArtifactOwnershipRecord,
@@ -15,6 +17,7 @@ import {
 import { AgyCliBackend, type AgyHarnessSession } from '../provider/agy-cli-backend.js';
 import {
   clearWorkCoordinationStore,
+  describeWorkCoordinationStore,
   createWorkItem as createCanonicalWorkItem,
   getWorkItem,
   listWorkItems,
@@ -2857,6 +2860,160 @@ describe('mission work item dispatch', () => {
     ).toBe(false);
   });
 });
+
+describe.each(['cli_subagent', 'agent_runtime'] as const)(
+  'task_result finalization on %s',
+  (surface) => {
+    function seedValidationItem() {
+      return createWorkItem({
+        title: 'Validate the task result before completing work',
+        description: 'Return and validate a structured task result before closing this work item.',
+        status: 'ready',
+        source: 'local',
+        sourceRef: 'mission:' + missionId + ':validation-' + surface,
+        projectId: missionId,
+        assigneePeerId: 'sovereign-brain',
+        labels: ['mission:' + missionId, 'team_role:product_strategist', 'ticket:workitem'],
+        metadata: {
+          mission_id: missionId,
+          team_role: 'product_strategist',
+          deliverable: 'evidence/validated-result.md',
+          target_path: 'evidence/validated-result.md',
+          risk: 'low',
+          estimated_scope: 'S',
+          execution_surface: surface,
+        },
+      });
+    }
+
+    function statusHistory(itemId: string): string[] {
+      return readJsonLines<{ item_id: string; status: string }>(
+        String(describeWorkCoordinationStore().items_path)
+      )
+        .filter((item) => item.item_id === itemId)
+        .map((item) => item.status);
+    }
+
+    function adaptersFor(responses: string[]) {
+      const execute = vi.fn(async () => responses.shift() || '');
+      const adapters =
+        surface === 'cli_subagent'
+          ? { delegateTask: execute }
+          : {
+              routeA2A: vi.fn(async (envelope: any) => ({
+                a2a_version: '1.0',
+                header: {
+                  msg_id: 'RES-' + envelope.header.msg_id,
+                  sender: envelope.header.receiver,
+                  receiver: 'kyberion:workitem-dispatcher',
+                  performative: 'result' as const,
+                  timestamp: new Date().toISOString(),
+                },
+                payload: { runtime_id: 'validation-runtime', text: await execute() },
+              })),
+            };
+      return { execute, adapters };
+    }
+
+    const validResult = () =>
+      makeTaskResultText({
+        summary: 'Validated the structured task result and recorded the evidence.',
+        artifacts: [{ path: 'evidence/validated-result.md', kind: 'markdown' }],
+        verification_done: ['Verified the task result contract and recorded the outcome.'],
+        gaps: [],
+        needs: [],
+      });
+
+    it('keeps transport success in review through one parse retry, then finalizes done', async () => {
+      const item = seedValidationItem();
+      const { execute, adapters } = adaptersFor(['unstructured first response', validResult()]);
+      const manifest = await dispatchMissionWorkItems(
+        makeMissionState(),
+        { mode: 'subagent', finalStatus: 'done' },
+        adapters
+      );
+      expect(execute).toHaveBeenCalledTimes(2);
+      expect(manifest.records[0].work_item_status_after).toBe('done');
+      expect(getWorkItem(item.item_id)).toMatchObject({ status: 'done', version: 6 });
+      expect(statusHistory(item.item_id)).toEqual([
+        'ready',
+        'in_progress',
+        'review',
+        'in_progress',
+        'review',
+        'done',
+      ]);
+    });
+
+    it('keeps both transport successes in review and blocks unresolved needs after one retry', async () => {
+      const item = seedValidationItem();
+      const unresolved = makeTaskResultText({
+        summary: 'The task needs additional project context before it can be completed.',
+        artifacts: [],
+        verification_done: ['Recorded the missing project context.'],
+        gaps: ['The project brief is missing.'],
+        needs: ['project_brief'],
+      });
+      const { execute, adapters } = adaptersFor([unresolved, unresolved]);
+      const manifest = await dispatchMissionWorkItems(
+        makeMissionState(),
+        { mode: 'subagent', finalStatus: 'done' },
+        adapters
+      );
+      expect(execute).toHaveBeenCalledTimes(2);
+      expect(manifest.records[0]).toMatchObject({
+        work_item_status_after: 'blocked',
+        clarification_packet: { interaction_type: 'clarification' },
+      });
+      expect(statusHistory(item.item_id)).toEqual([
+        'ready',
+        'in_progress',
+        'review',
+        'in_progress',
+        'review',
+        'blocked',
+      ]);
+    });
+
+    it('does not record done or auto-redispatch after a post-validation persistence failure', async () => {
+      const item = seedValidationItem();
+      const { execute, adapters } = adaptersFor([validResult()]);
+      const write = dispatchLifecycle.writeDispatchArtifact;
+      const observed: string[] = [];
+      const fault = vi
+        .spyOn(dispatchLifecycle, 'writeDispatchArtifact')
+        .mockImplementation((file, payload, options) => {
+          if (file.endsWith('workitem-dispatch-' + item.item_id + '.json')) {
+            observed.push(String(getWorkItem(item.item_id)?.status));
+            throw new Error('simulated result persistence interruption');
+          }
+          return write(file, payload, options);
+        });
+      try {
+        await expect(
+          dispatchMissionWorkItems(
+            makeMissionState(),
+            { mode: 'subagent', finalStatus: 'done' },
+            adapters
+          )
+        ).rejects.toThrow('simulated result persistence interruption');
+      } finally {
+        fault.mockRestore();
+      }
+      expect(observed).toEqual(['review']);
+      expect(statusHistory(item.item_id)).toEqual(['ready', 'in_progress', 'review']);
+      expect(getWorkItem(item.item_id)).not.toHaveProperty('lease_id');
+      const resumed = await dispatchMissionWorkItems(
+        makeMissionState(),
+        { mode: 'subagent', finalStatus: 'done' },
+        adapters
+      );
+      expect(resumed.records).toHaveLength(0);
+      expect(execute).toHaveBeenCalledTimes(1);
+      expect(getWorkItem(item.item_id)?.status).toBe('review');
+    });
+  }
+);
 
 describe('mission WorkItem canonical scope resolution', () => {
   it('uses typed mission context even when stale metadata and labels disagree', () => {

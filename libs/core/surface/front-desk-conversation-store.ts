@@ -1,3 +1,4 @@
+import { frontDeskExecutionArtifactPath } from './front-desk-execution-artifact.js';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   loadFrontDeskExecutionPolicy,
@@ -6,7 +7,6 @@ import {
   frontDeskExecutionViewerMatches,
   isFrontDeskExecutionPublicViewer,
   parseFrontDeskExecutionBinding,
-  frontDeskExecutionArtifactPath,
   frontDeskExecutionExpectedContent,
   type FrontDeskExecutionBinding,
   type FrontDeskExecutionMapping,

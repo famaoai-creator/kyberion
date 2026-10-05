@@ -1,3 +1,4 @@
+import { frontDeskExecutionArtifactPath } from './front-desk-execution-artifact.js';
 /** Viewer-authorized, readback-verified projection. This module cannot execute work. */
 import { t } from '../t.js';
 import type { SupportedLocale } from '../locale-normalize.js';
@@ -12,7 +13,6 @@ import type { SurfaceViewerScope } from './surface-mutation-guard.js';
 import {
   getFrontDeskExecutionMapping,
   frontDeskExecutionViewerMatches,
-  frontDeskExecutionArtifactPath,
   frontDeskExecutionExpectedContent,
   type FrontDeskExecutionBinding,
   type FrontDeskExecutionProjection,

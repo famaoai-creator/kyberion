@@ -1,3 +1,4 @@
+import { frontDeskExecutionArtifactPath } from './front-desk-execution-artifact.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   FrontDeskExecutionMapping,
@@ -50,7 +51,6 @@ import {
   getFrontDeskExecutionMapping,
   frontDeskExecutionViewerMatches,
   frontDeskExecutionViewerFingerprint,
-  frontDeskExecutionArtifactPath,
   frontDeskExecutionExpectedContent,
   parseFrontDeskExecutionBinding,
   FRONT_DESK_RECEIPT_COMMAND,
