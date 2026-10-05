@@ -21369,6 +21369,436 @@
       }
     },
     "front_desk": {
+      "work_home_decision_scope_unavailable": {
+        "en": "The existing decision screen cannot keep this selected scope. Keep this item pending and review it from its original authorized context.",
+        "ja": "既存の判断画面ではこの範囲を維持できません。保留のまま、元の権限範囲の画面で確認してください。",
+        "qps-ploc": "⟦Ŧħė ėẋïşŧïñɠ ḓėƈïşïőñ şƈřėėñ ƈȧññőŧ ķėėṗ ŧħïş şėŀėƈŧėḓ şƈőṗė. Ķėėṗ ŧħïş ïŧėɱ ṗėñḓïñɠ ȧñḓ řėṽïėẇ ïŧ ƒřőɱ ïŧş őřïɠïñȧŀ ȧůŧħőřïẑėḓ ƈőñŧėẋŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈï⟧"
+      },
+      "work_home_version_unknown": {
+        "en": "Version history unknown",
+        "ja": "版の履歴は未確認",
+        "qps-ploc": "⟦Ṽėřşïőñ ħïşŧőřẏ ůñķñőẇñ ŀőřėɱ ï⟧"
+      },
+      "work_home_refresh": {
+        "en": "Refresh status",
+        "ja": "状況を更新",
+        "qps-ploc": "⟦Řėƒřėşħ şŧȧŧůş ŀőřė⟧"
+      },
+      "work_home_detail_mode": {
+        "en": "Detail shown here",
+        "ja": "この画面の詳しさ",
+        "qps-ploc": "⟦Ḓėŧȧïŀ şħőẇñ ħėřė ŀőřėɱ⟧"
+      },
+      "work_home_quiet": {
+        "en": "Quiet",
+        "ja": "簡潔",
+        "qps-ploc": "⟦Ɋůïėŧ ŀőř⟧"
+      },
+      "work_home_detailed": {
+        "en": "Detailed",
+        "ja": "詳しく",
+        "qps-ploc": "⟦Ḓėŧȧïŀėḓ ŀőř⟧"
+      },
+      "work_home_attention_title": {
+        "en": "Needs your attention",
+        "ja": "あなたの対応待ち",
+        "qps-ploc": "⟦Ñėėḓş ẏőůř ȧŧŧėñŧïőñ ŀőřėɱ ⟧"
+      },
+      "work_home_all_title": {
+        "en": "Your work",
+        "ja": "仕事の一覧",
+        "qps-ploc": "⟦Ẏőůř ẇőřķ ŀőř⟧"
+      },
+      "work_home_verified_title": {
+        "en": "Verified results",
+        "ja": "確認済みの成果",
+        "qps-ploc": "⟦Ṽėřïƒïėḓ řėşůŀŧş ŀőřėɱ⟧"
+      },
+      "work_home_overview": {
+        "en": "Your work at a glance",
+        "ja": "仕事の状況",
+        "qps-ploc": "⟦Ẏőůř ẇőřķ ȧŧ ȧ ɠŀȧñƈė ŀőřėɱ ⟧"
+      },
+      "work_home_partial": {
+        "en": "Some work sources are unavailable",
+        "ja": "確認できない情報があります",
+        "qps-ploc": "⟦Şőɱė ẇőřķ şőůřƈėş ȧřė ůñȧṽȧïŀȧƀŀė ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "work_home_coverage_note": {
+        "en": "Shows supported requests, decisions and results in this scope. Login issues and other work may still need their original screen.",
+        "ja": "この範囲で取得できた依頼・判断待ち・成果物を表示します。ログインの問題や他の仕事は元の画面で確認してください。",
+        "qps-ploc": "⟦Şħőẇş şůṗṗőřŧėḓ řėɋůėşŧş, ḓėƈïşïőñş ȧñḓ řėşůŀŧş ïñ ŧħïş şƈőṗė. Ŀőɠïñ ïşşůėş ȧñḓ őŧħėř ẇőřķ ɱȧẏ şŧïŀŀ ñėėḓ ŧħėïř őřïɠïñȧŀ şƈřėėñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗï⟧"
+      },
+      "work_home_resume_readonly": {
+        "en": "Open the recorded context. Opening or refreshing never retries the work.",
+        "ja": "記録した内容を開きます。開く・更新する操作で仕事を再実行することはありません。",
+        "qps-ploc": "⟦Őṗėñ ŧħė řėƈőřḓėḓ ƈőñŧėẋŧ. Őṗėñïñɠ őř řėƒřėşħïñɠ ñėṽėř řėŧřïėş ŧħė ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "work_home_request_unavailable": {
+        "en": "This request is not available in the current conversation. Nothing was replayed.",
+        "ja": "この会話では対象の依頼を確認できません。再実行はしていません。",
+        "qps-ploc": "⟦Ŧħïş řėɋůėşŧ ïş ñőŧ ȧṽȧïŀȧƀŀė ïñ ŧħė ƈůřřėñŧ ƈőñṽėřşȧŧïőñ. Ñőŧħïñɠ ẇȧş řėṗŀȧẏėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "work_home_resume_context": {
+        "en": "Recorded context and next step",
+        "ja": "記録と次の操作",
+        "qps-ploc": "⟦Řėƈőřḓėḓ ƈőñŧėẋŧ ȧñḓ ñėẋŧ şŧėṗ ŀőřėɱ ïṗşů⟧"
+      },
+      "work_home_source": {
+        "en": "Source",
+        "ja": "情報元",
+        "qps-ploc": "⟦Şőůřƈė ŀőř⟧"
+      },
+      "work_home_last_recorded": {
+        "en": "Last recorded",
+        "ja": "最終記録",
+        "qps-ploc": "⟦Ŀȧşŧ řėƈőřḓėḓ ŀőřė⟧"
+      },
+      "work_home_last_verified": {
+        "en": "Verified at",
+        "ja": "確認した時刻",
+        "qps-ploc": "⟦Ṽėřïƒïėḓ ȧŧ ŀőř⟧"
+      },
+      "work_home_not_verified": {
+        "en": "No current verification",
+        "ja": "現在の状態は未確認",
+        "qps-ploc": "⟦Ñő ƈůřřėñŧ ṽėřïƒïƈȧŧïőñ ŀőřėɱ ï⟧"
+      },
+      "work_home_time_unknown": {
+        "en": "Time unknown",
+        "ja": "時刻不明",
+        "qps-ploc": "⟦Ŧïɱė ůñķñőẇñ ŀőř⟧"
+      },
+      "work_home_unknown": {
+        "en": "Still unknown",
+        "ja": "未確認",
+        "qps-ploc": "⟦Şŧïŀŀ ůñķñőẇñ ŀőřė⟧"
+      },
+      "work_home_revision": {
+        "en": "Version",
+        "ja": "版",
+        "qps-ploc": "⟦Ṽėřşïőñ ŀőř⟧"
+      },
+      "work_home_version_state": {
+        "en": "Version status",
+        "ja": "版の状態",
+        "qps-ploc": "⟦Ṽėřşïőñ şŧȧŧůş ŀőřė⟧"
+      },
+      "work_home_change_reason": {
+        "en": "Change",
+        "ja": "変更内容",
+        "qps-ploc": "⟦Ƈħȧñɠė ŀőř⟧"
+      },
+      "work_home_format_change": {
+        "en": "Receipt format changed to",
+        "ja": "確認記録の形式を変更：",
+        "qps-ploc": "⟦Řėƈėïṗŧ ƒőřɱȧŧ ƈħȧñɠėḓ ŧő ŀőřėɱ ïṗ⟧"
+      },
+      "work_home_grouped_updates": {
+        "en": "Updates are grouped by work. Quiet view keeps decisions and uncertainty visible.",
+        "ja": "仕事ごとに状況をまとめています。簡潔表示でも対応待ちや未確認の状態は表示します。",
+        "qps-ploc": "⟦Ůṗḓȧŧėş ȧřė ɠřőůṗėḓ ƀẏ ẇőřķ. Ɋůïėŧ ṽïėẇ ķėėṗş ḓėƈïşïőñş ȧñḓ ůñƈėřŧȧïñŧẏ ṽïşïƀŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "work_home_attention_empty": {
+        "en": "No attention items in the sources checked.",
+        "ja": "確認できた情報に対応待ちはありません。",
+        "qps-ploc": "⟦Ñő ȧŧŧėñŧïőñ ïŧėɱş ïñ ŧħė şőůřƈėş ƈħėƈķėḓ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "work_home_attention_unknown": {
+        "en": "Attention items cannot all be checked.",
+        "ja": "対応待ちをすべて確認できていません。",
+        "qps-ploc": "⟦Ȧŧŧėñŧïőñ ïŧėɱş ƈȧññőŧ ȧŀŀ ƀė ƈħėƈķėḓ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "work_home_work_empty": {
+        "en": "No work in the sources checked.",
+        "ja": "確認できた情報に仕事はありません。",
+        "qps-ploc": "⟦Ñő ẇőřķ ïñ ŧħė şőůřƈėş ƈħėƈķėḓ. ŀőřėɱ ïṗşů⟧"
+      },
+      "work_home_work_unknown": {
+        "en": "Some work could not be loaded.",
+        "ja": "一部の仕事を取得できませんでした。",
+        "qps-ploc": "⟦Şőɱė ẇőřķ ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. ŀőřėɱ ïṗşů⟧"
+      },
+      "work_home_load_failed": {
+        "en": "Status could not be checked. Refresh before acting; no work has been retried.",
+        "ja": "状況を確認できませんでした。操作前に更新してください。仕事は再実行していません。",
+        "qps-ploc": "⟦Şŧȧŧůş ƈőůŀḓ ñőŧ ƀė ƈħėƈķėḓ. Řėƒřėşħ ƀėƒőřė ȧƈŧïñɠ; ñő ẇőřķ ħȧş ƀėėñ řėŧřïėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "work_home_source_conversation": {
+        "en": "Conversation requests",
+        "ja": "会話からの依頼",
+        "qps-ploc": "⟦Ƈőñṽėřşȧŧïőñ řėɋůėşŧş ŀőřėɱ ⟧"
+      },
+      "work_home_source_approval": {
+        "en": "Approval",
+        "ja": "承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ŀőř⟧"
+      },
+      "work_home_source_approvals": {
+        "en": "Approvals",
+        "ja": "承認待ち",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş ŀőř⟧"
+      },
+      "work_home_source_held_action": {
+        "en": "Held action",
+        "ja": "保留中の操作",
+        "qps-ploc": "⟦Ħėŀḓ ȧƈŧïőñ ŀőř⟧"
+      },
+      "work_home_source_held_actions": {
+        "en": "Held actions",
+        "ja": "保留中の操作",
+        "qps-ploc": "⟦Ħėŀḓ ȧƈŧïőñş ŀőř⟧"
+      },
+      "work_home_source_task_session": {
+        "en": "Requested work",
+        "ja": "依頼した仕事",
+        "qps-ploc": "⟦Řėɋůėşŧėḓ ẇőřķ ŀőřė⟧"
+      },
+      "work_home_source_task_sessions": {
+        "en": "Requested work",
+        "ja": "依頼した仕事",
+        "qps-ploc": "⟦Řėɋůėşŧėḓ ẇőřķ ŀőřė⟧"
+      },
+      "work_home_source_artifact": {
+        "en": "Result record",
+        "ja": "成果物の記録",
+        "qps-ploc": "⟦Řėşůŀŧ řėƈőřḓ ŀőřė⟧"
+      },
+      "work_home_source_artifacts": {
+        "en": "Result records",
+        "ja": "成果物の記録",
+        "qps-ploc": "⟦Řėşůŀŧ řėƈőřḓş ŀőřė⟧"
+      },
+      "work_home_source_state_partial": {
+        "en": "Partially available",
+        "ja": "一部のみ確認可能",
+        "qps-ploc": "⟦Ṗȧřŧïȧŀŀẏ ȧṽȧïŀȧƀŀė ŀőřėɱ ⟧"
+      },
+      "work_home_source_state_unavailable": {
+        "en": "Unavailable",
+        "ja": "確認できません",
+        "qps-ploc": "⟦Ůñȧṽȧïŀȧƀŀė ŀőř⟧"
+      },
+      "work_home_link_conversation": {
+        "en": "Open conversation",
+        "ja": "会話を開く",
+        "qps-ploc": "⟦Őṗėñ ƈőñṽėřşȧŧïőñ ŀőřėɱ⟧"
+      },
+      "work_home_link_progress": {
+        "en": "Open progress",
+        "ja": "進み具合を開く",
+        "qps-ploc": "⟦Őṗėñ ṗřőɠřėşş ŀőřė⟧"
+      },
+      "work_home_link_artifact": {
+        "en": "Open result",
+        "ja": "成果物を開く",
+        "qps-ploc": "⟦Őṗėñ řėşůŀŧ ŀőř⟧"
+      },
+      "work_home_link_approval": {
+        "en": "Review decision",
+        "ja": "判断内容を確認",
+        "qps-ploc": "⟦Řėṽïėẇ ḓėƈïşïőñ ŀőřė⟧"
+      },
+      "work_home_link_held_action": {
+        "en": "Review held action",
+        "ja": "保留中の操作を確認",
+        "qps-ploc": "⟦Řėṽïėẇ ħėŀḓ ȧƈŧïőñ ŀőřėɱ⟧"
+      },
+      "work_home_version_latest_verified": {
+        "en": "Latest verified version",
+        "ja": "確認済みの最新版",
+        "qps-ploc": "⟦Ŀȧŧėşŧ ṽėřïƒïėḓ ṽėřşïőñ ŀőřėɱ ï⟧"
+      },
+      "work_home_version_older_verified": {
+        "en": "Older verified version",
+        "ja": "確認済みの旧版",
+        "qps-ploc": "⟦Őŀḓėř ṽėřïƒïėḓ ṽėřşïőñ ŀőřėɱ ï⟧"
+      },
+      "work_home_version_requested_pending": {
+        "en": "New version requested, still pending",
+        "ja": "新版を依頼済み・処理待ち",
+        "qps-ploc": "⟦Ñėẇ ṽėřşïőñ řėɋůėşŧėḓ, şŧïŀŀ ṗėñḓïñɠ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "work_home_version_requested_unknown": {
+        "en": "New version requested, status unknown",
+        "ja": "新版を依頼済み・状況未確認",
+        "qps-ploc": "⟦Ñėẇ ṽėřşïőñ řėɋůėşŧėḓ, şŧȧŧůş ůñķñőẇñ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "work_home_status_recorded": {
+        "en": "Recorded",
+        "ja": "記録済み",
+        "qps-ploc": "⟦Řėƈőřḓėḓ ŀőř⟧"
+      },
+      "work_home_status_intake": {
+        "en": "Received",
+        "ja": "受付済み",
+        "qps-ploc": "⟦Řėƈėïṽėḓ ŀőř⟧"
+      },
+      "work_home_status_queued": {
+        "en": "Queued",
+        "ja": "実行待ち",
+        "qps-ploc": "⟦Ɋůėůėḓ ŀőř⟧"
+      },
+      "work_home_status_awaiting_input": {
+        "en": "Waiting for your input",
+        "ja": "入力待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ẏőůř ïñṗůŧ ŀőřėɱ ï⟧"
+      },
+      "work_home_status_awaiting_approval": {
+        "en": "Waiting for approval",
+        "ja": "承認待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ȧṗṗřőṽȧŀ ŀőřėɱ ⟧"
+      },
+      "work_home_status_running": {
+        "en": "In progress",
+        "ja": "実行中",
+        "qps-ploc": "⟦Ïñ ṗřőɠřėşş ŀőř⟧"
+      },
+      "work_home_status_verifying": {
+        "en": "Checking result",
+        "ja": "結果を確認中",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ řėşůŀŧ ŀőřė⟧"
+      },
+      "work_home_status_blocked": {
+        "en": "Needs a decision",
+        "ja": "判断が必要",
+        "qps-ploc": "⟦Ñėėḓş ȧ ḓėƈïşïőñ ŀőřėɱ⟧"
+      },
+      "work_home_status_unknown": {
+        "en": "Status unknown",
+        "ja": "状況未確認",
+        "qps-ploc": "⟦Şŧȧŧůş ůñķñőẇñ ŀőřė⟧"
+      },
+      "work_home_status_answered": {
+        "en": "Answered in conversation",
+        "ja": "会話で回答済み",
+        "qps-ploc": "⟦Ȧñşẇėřėḓ ïñ ƈőñṽėřşȧŧïőñ ŀőřėɱ ï⟧"
+      },
+      "work_home_status_work_completed": {
+        "en": "Result verified",
+        "ja": "成果を確認済み",
+        "qps-ploc": "⟦Řėşůŀŧ ṽėřïƒïėḓ ŀőřė⟧"
+      },
+      "work_home_status_completion_unverified": {
+        "en": "Reported complete, not verified",
+        "ja": "完了の記録あり・未確認",
+        "qps-ploc": "⟦Řėṗőřŧėḓ ƈőɱṗŀėŧė, ñőŧ ṽėřïƒïėḓ ŀőřėɱ ïṗşů⟧"
+      },
+      "work_home_status_failed": {
+        "en": "Needs recovery",
+        "ja": "復旧が必要",
+        "qps-ploc": "⟦Ñėėḓş řėƈőṽėřẏ ŀőřė⟧"
+      },
+      "work_home_status_released": {
+        "en": "Stopped or released",
+        "ja": "停止・終了した仕事",
+        "qps-ploc": "⟦Şŧőṗṗėḓ őř řėŀėȧşėḓ ŀőřėɱ ⟧"
+      },
+      "work_home_status_artifact_recorded": {
+        "en": "Result recorded",
+        "ja": "成果物の記録あり",
+        "qps-ploc": "⟦Řėşůŀŧ řėƈőřḓėḓ ŀőřė⟧"
+      },
+      "work_home_status_cancel_requested": {
+        "en": "Stop requested",
+        "ja": "停止を依頼済み",
+        "qps-ploc": "⟦Şŧőṗ řėɋůėşŧėḓ ŀőřė⟧"
+      },
+      "work_home_next_provide_input": {
+        "en": "Open the request and provide the missing input.",
+        "ja": "依頼を開いて不足している情報を入力してください。",
+        "qps-ploc": "⟦Őṗėñ ŧħė řėɋůėşŧ ȧñḓ ṗřőṽïḓė ŧħė ɱïşşïñɠ ïñṗůŧ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "work_home_next_review_approval": {
+        "en": "Review the existing approval and its scope.",
+        "ja": "既存の承認内容と対象範囲を確認してください。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ėẋïşŧïñɠ ȧṗṗřőṽȧŀ ȧñḓ ïŧş şƈőṗė. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "work_home_next_review_held_action": {
+        "en": "Review the held action in its original screen.",
+        "ja": "元の画面で保留中の操作を確認してください。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ħėŀḓ ȧƈŧïőñ ïñ ïŧş őřïɠïñȧŀ şƈřėėñ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "work_home_next_review_blocker": {
+        "en": "Inspect the blocker before deciding what to do.",
+        "ja": "止まっている理由を確認してから次の操作を決めてください。",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ŧħė ƀŀőƈķėř ƀėƒőřė ḓėƈïḓïñɠ ẇħȧŧ ŧő ḓő. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "work_home_next_inspect_status": {
+        "en": "Check the current status before taking another action.",
+        "ja": "別の操作をする前に現在の状況を確認してください。",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė ƈůřřėñŧ şŧȧŧůş ƀėƒőřė ŧȧķïñɠ ȧñőŧħėř ȧƈŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "work_home_next_arrange_execution": {
+        "en": "Open the request to check what execution is available.",
+        "ja": "依頼を開いて実行できる手順を確認してください。",
+        "qps-ploc": "⟦Őṗėñ ŧħė řėɋůėşŧ ŧő ƈħėƈķ ẇħȧŧ ėẋėƈůŧïőñ ïş ȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "work_home_next_follow_progress": {
+        "en": "Open progress for the latest recorded context.",
+        "ja": "進み具合を開いて最新の記録を確認できます。",
+        "qps-ploc": "⟦Őṗėñ ṗřőɠřėşş ƒőř ŧħė ŀȧŧėşŧ řėƈőřḓėḓ ƈőñŧėẋŧ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "work_home_next_verify_result": {
+        "en": "Check the result before treating this as complete.",
+        "ja": "完了とみなす前に成果を確認してください。",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė řėşůŀŧ ƀėƒőřė ŧřėȧŧïñɠ ŧħïş ȧş ƈőɱṗŀėŧė. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "work_home_next_review_result": {
+        "en": "Open the verified result and review it.",
+        "ja": "確認済みの成果物を開いて内容を確認してください。",
+        "qps-ploc": "⟦Őṗėñ ŧħė ṽėřïƒïėḓ řėşůŀŧ ȧñḓ řėṽïėẇ ïŧ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "work_home_next_open_artifact": {
+        "en": "Open the result in its existing view.",
+        "ja": "既存の画面で成果物を開いてください。",
+        "qps-ploc": "⟦Őṗėñ ŧħė řėşůŀŧ ïñ ïŧş ėẋïşŧïñɠ ṽïėẇ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "work_home_next_resume_conversation": {
+        "en": "Return to the recorded conversation.",
+        "ja": "記録した会話に戻れます。",
+        "qps-ploc": "⟦Řėŧůřñ ŧő ŧħė řėƈőřḓėḓ ƈőñṽėřşȧŧïőñ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "work_home_unknown_recorded_time_unknown": {
+        "en": "The recording time is unavailable.",
+        "ja": "記録時刻を確認できません。",
+        "qps-ploc": "⟦Ŧħė řėƈőřḓïñɠ ŧïɱė ïş ůñȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "work_home_unknown_verification_unknown": {
+        "en": "Current result verification is unavailable.",
+        "ja": "現在の成果の確認情報がありません。",
+        "qps-ploc": "⟦Ƈůřřėñŧ řėşůŀŧ ṽėřïƒïƈȧŧïőñ ïş ůñȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "work_home_unknown_completion_not_verified": {
+        "en": "A completion record is not current verification.",
+        "ja": "完了の記録だけでは現在の成果を確認できません。",
+        "qps-ploc": "⟦Ȧ ƈőɱṗŀėŧïőñ řėƈőřḓ ïş ñőŧ ƈůřřėñŧ ṽėřïƒïƈȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "work_home_unknown_execution_state_unknown": {
+        "en": "Execution may have started; check before retrying.",
+        "ja": "実行済みの可能性があります。再実行する前に確認してください。",
+        "qps-ploc": "⟦Ėẋėƈůŧïőñ ɱȧẏ ħȧṽė şŧȧřŧėḓ; ƈħėƈķ ƀėƒőřė řėŧřẏïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "work_home_unknown_version_unknown": {
+        "en": "Version history is unavailable.",
+        "ja": "版の履歴を確認できません。",
+        "qps-ploc": "⟦Ṽėřşïőñ ħïşŧőřẏ ïş ůñȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşů⟧"
+      },
+      "work_home_unknown_artifact_time_unknown": {
+        "en": "The result time is unavailable.",
+        "ja": "成果物の時刻を確認できません。",
+        "qps-ploc": "⟦Ŧħė řėşůŀŧ ŧïɱė ïş ůñȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşů⟧"
+      },
+      "work_home_unknown_source_unavailable": {
+        "en": "This information source is unavailable.",
+        "ja": "この情報元を確認できません。",
+        "qps-ploc": "⟦Ŧħïş ïñƒőřɱȧŧïőñ şőůřƈė ïş ůñȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "work_home_unknown_source_partial": {
+        "en": "Only part of this information source was returned.",
+        "ja": "この情報元は一部のみ取得できました。",
+        "qps-ploc": "⟦Őñŀẏ ṗȧřŧ őƒ ŧħïş ïñƒőřɱȧŧïőñ şőůřƈė ẇȧş řėŧůřñėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
       "nav_home": {
         "en": "Home",
         "ja": "ホーム",
