@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, autonomy, resident-agent, dots, charter, supervision]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-10-04
+last_updated: 2026-10-05
 ---
 
 # Resident Dot Model
@@ -14,6 +14,16 @@ holds an ongoing responsibility, owns a cloud computer and browser, connects to
 apps, delegates heavy work to Codex/Work tasks, and messages the human only
 when a decision is needed. This document maps that shape onto Kyberion's
 existing primitives and defines the missing piece: the **dot charter**.
+
+## Inactive starter team
+
+For a bounded three-role proposal covering intake, completion coordination,
+independent verification, operations triage and knowledge curation, see the
+[starter playbook](../orchestration/dot-team-starter-playbook.ja.md). Its three
+charter templates are drafts outside resident discovery; they do not activate
+workers, add authority, or replace the existing repo-guardian and org-operations
+charters. The playbook distinguishes quality acceptance from action approval
+and documents the current handoff and executor limitations.
 
 ## Element mapping
 

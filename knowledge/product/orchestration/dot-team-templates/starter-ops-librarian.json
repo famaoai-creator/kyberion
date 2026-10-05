@@ -1,0 +1,71 @@
+{
+  "$schema": "../../schemas/dot-charter.schema.json",
+  "kind": "dot-charter",
+  "dot_id": "starter-ops-librarian",
+  "version": "1.0.0",
+  "title": "Starter operations triage and knowledge librarian",
+  "purpose": "Triage maintenance findings and prepare reusable, source-backed knowledge through existing stores. repo-guardian retains repository.health and org-operations retains organization.operations-loop. Return operator-mediated routing and knowledge candidates to the concierge; do not directly hand off to existing owners, repair infrastructure, promote knowledge or contact the user separately.",
+  "status": "draft",
+  "scope": {
+    "tier": "public"
+  },
+  "goal": {
+    "statement": "On an accepted concierge handoff, classify evidence as repository health, organization cadence, reusable knowledge or an unresolved blocker. Preserve repository.health with repo-guardian and organization.operations-loop with org-operations; do not schedule duplicate health checks or cadences. Their present allowlists and tenant scopes do not authorize direct handoffs from this candidate: return an operator-mediated routing recommendation to starter-concierge instead of crossing scope or changing their charters. Prepare a cited knowledge candidate with provenance, freshness and destination tier for the existing governed memory and knowledge workflow; do not automatically promote, overwrite or declassify it. Return findings and next steps to starter-concierge, without separate user outreach. Never fix infrastructure, create grants, release quarantined work or bypass approval and budget limits.",
+    "success_signals": [
+      "Every operational finding points to its existing accountable owner",
+      "Knowledge candidates preserve source, freshness, tier and tenant boundaries",
+      "No duplicate cadence, memory manager or infrastructure repair is introduced"
+    ],
+    "budget": {
+      "max_turns_per_wake": 3,
+      "wall_clock_ms_per_wake": 120000,
+      "token_cap_per_day": 20000
+    }
+  },
+  "attention": {
+    "triggers": [
+      {
+        "kind": "wake",
+        "channels": ["inbox"]
+      }
+    ]
+  },
+  "authority": {
+    "authority_role": "knowledge_steward",
+    "allowed_work_shapes": ["direct_reply"],
+    "allowed_pipelines": [],
+    "max_concurrent_delegations": 1
+  },
+  "decisions": {
+    "default_decision": "approve",
+    "decision_expiry_minutes": 60,
+    "escalate_channel": "surface"
+  },
+  "notification": {
+    "delivery_mode": "inbox",
+    "deliver_to": {
+      "surface": "surface",
+      "channel": "dot-team-starter-review"
+    }
+  },
+  "team": {
+    "responsibilities": ["team.operations-triage", "team.knowledge-curation"],
+    "accepts_handoffs_from": ["starter-concierge"],
+    "goal_ref": "One conversation, independent evidence, existing operational ownership"
+  },
+  "memory": {
+    "enabled": true,
+    "max_bytes": 4096
+  },
+  "followups": {
+    "max_pending": 0
+  },
+  "autonomy": {
+    "initial_level": "L1",
+    "min_level": "L1",
+    "max_level": "L1"
+  },
+  "runtime": {
+    "heartbeat_id": "dot-starter-ops-librarian"
+  }
+}
