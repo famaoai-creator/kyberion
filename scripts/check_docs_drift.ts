@@ -103,7 +103,12 @@ export interface DocsDriftFinding {
 }
 
 export const findingKey = (finding: DocsDriftFinding): string =>
-  `${finding.rule}|${finding.file}|${finding.detail}`;
+  `${finding.rule}|${finding.file.replace(/\\/gu, '/')}|${finding.detail}`;
+
+export function isExcludedDocsDriftPath(file: string): boolean {
+  const normalized = file.replace(/\\/gu, '/');
+  return EXCLUDED_FRAGMENTS.some((fragment) => normalized.includes(fragment));
+}
 
 function isRegularFile(filePath: string): boolean {
   try {
@@ -125,9 +130,7 @@ export function docFiles(): string[] {
     if (name.endsWith('.md') && !EXCLUDED_FILES.has(name) && isRegularFile(abs)) files.push(abs);
   }
   files.push(pathResolver.rootResolve('pipelines/README.md'));
-  return [...new Set(files)]
-    .filter((f) => !EXCLUDED_FRAGMENTS.some((frag) => f.includes(frag)))
-    .sort();
+  return [...new Set(files)].filter((f) => !isExcludedDocsDriftPath(f)).sort();
 }
 
 /** Service units, launchd plists and workflows under docs/ and .github that may run `pnpm <script>`. */
@@ -140,7 +143,7 @@ export function configFiles(): string[] {
       ...getAllFiles(abs).filter(
         (f) =>
           CONFIG_EXTENSIONS.some((ext) => f.endsWith(ext)) &&
-          !EXCLUDED_FRAGMENTS.some((frag) => f.includes(frag)) &&
+          !isExcludedDocsDriftPath(f) &&
           isRegularFile(f)
       )
     );
@@ -460,11 +463,18 @@ export async function collectDocsDrift(
   const findings: DocsDriftFinding[] = [];
   for (const file of docFiles()) {
     // the generated reference lists deprecated aliases on purpose
-    if (path.relative(root, file) === CLI_REFERENCE_FILE) continue;
-    findings.push(...checkCommandInvocations(path.relative(root, file), readTextFile(file), index));
+    const relative = path.relative(root, file).replace(/\\/gu, '/');
+    if (relative === CLI_REFERENCE_FILE) continue;
+    findings.push(...checkCommandInvocations(relative, readTextFile(file), index));
   }
   for (const file of configFiles()) {
-    findings.push(...checkConfigInvocations(path.relative(root, file), readTextFile(file), index));
+    findings.push(
+      ...checkConfigInvocations(
+        path.relative(root, file).replace(/\\/gu, '/'),
+        readTextFile(file),
+        index
+      )
+    );
   }
   const pipelineDir = pathResolver.rootResolve('pipelines');
   const names = safeReaddir(pipelineDir)
@@ -493,7 +503,7 @@ export async function collectDocsDrift(
       findings.push({
         rule: 'links',
         severity: 'error',
-        file: file ?? '',
+        file: (file ?? '').replace(/\\/gu, '/'),
         detail: rest.join(': '),
       });
     }

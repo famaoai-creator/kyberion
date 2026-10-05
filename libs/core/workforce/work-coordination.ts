@@ -1,10 +1,10 @@
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
-import type { ValidateFunction } from 'ajv';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { slugify } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
-import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
 
 import { withExecutionContext } from '../authority.js';
 import { enforceNhiActorPolicy } from '../nhi-actor-verification.js';
@@ -19,10 +19,16 @@ import {
 import { buildWorkItemHandoffPacket, type HandoffPacket } from '../mesh/handoff-packet.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { pathResolver } from '../path-resolver.js';
-import { compileSchema } from '../foundation/ajv.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
-import { resolveTenant } from '../organization/tenant-registry.js';
 import { WorkCoordinationError } from './work-coordination-error.js';
+import {
+  assertOriginalWorkItemIdentity,
+  buildWorkItemCreation,
+  canReplayWorkItemClaim,
+  isTerminalStatus,
+  normalizeWorkItemContext,
+  validateWorkItem,
+} from './work-coordination-identity.js';
 export { WorkCoordinationError } from './work-coordination-error.js';
 import type {
   AppendCoordinationEventInput,
@@ -78,23 +84,9 @@ export type {
   WorkLeaseStatus,
 } from './work-coordination-types.js';
 
-const WORK_ITEM_SCHEMA_PATH = pathResolver.rootResolve(
-  'knowledge/product/schemas/governed-work-item.schema.json'
-);
 const WORK_BOARD_CATALOG_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/work-board-catalog.schema.json'
 );
-let workItemValidator: ValidateFunction | null = null;
-
-function validateWorkItem(value: unknown): void {
-  workItemValidator ??= compileSchema(WORK_ITEM_SCHEMA_PATH);
-  if (workItemValidator(value)) return;
-  const errors = (workItemValidator.errors || [])
-    .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-    .join('; ');
-  throw new WorkCoordinationError('validation_error', `work-item schema violation: ${errors}`);
-}
-
 const STORE_ROOT = 'active/shared/runtime/work-coordination';
 const OBS_ROOT = 'active/shared/observability/work-coordination';
 
@@ -123,20 +115,6 @@ function withCoordinationRoot<T>(rootDir: string | undefined, fn: () => T): T {
   } finally {
     coordinationRootOverride = previousRoot;
   }
-}
-
-function normalizeWorkItemContext(
-  input: WorkItemContext,
-  fallbackProjectId?: string
-): WorkItemContext {
-  const context: WorkItemContext = {};
-  if (input.tenant_slug) context.tenant_slug = input.tenant_slug;
-  if (input.organization_id) context.organization_id = input.organization_id;
-  context.project_id = input.project_id || fallbackProjectId || 'default';
-  if (input.mission_id) context.mission_id = input.mission_id;
-  if (input.task_id) context.task_id = input.task_id;
-  context.work_shape = input.work_shape || 'routine_operation';
-  return context;
 }
 
 function randomId(prefix: string): string {
@@ -172,6 +150,14 @@ function runtimeRoot(): string {
   return assertSafeRepositoryPath(
     path.resolve(base, namespace ? `${STORE_ROOT}/${namespace}` : STORE_ROOT),
     { allowMissingLeaf: true }
+  );
+}
+
+/** All item/lease read-modify-write transitions share one inter-process fence. */
+function withCoordinationMutation<T>(fn: () => T): T {
+  const key = crypto.createHash('sha256').update(runtimeRoot()).digest('hex');
+  return withExecutionContext('infrastructure_sentinel', () =>
+    withLockSync(`work-coordination:${key}`, fn)
   );
 }
 
@@ -235,10 +221,6 @@ function latestById<T extends Record<string, any>>(records: T[], key: string): T
     }
   }
   return Array.from(index.values());
-}
-
-function isTerminalStatus(status: WorkItemStatus): boolean {
-  return status === 'done' || status === 'archived';
 }
 
 function normalizeArray(value?: string | string[]): string[] {
@@ -577,7 +559,7 @@ function sortItems(items: WorkItem[], sortBy: WorkBoard['sort_by'] = 'updated_at
 }
 
 export function clearWorkCoordinationStore(): void {
-  withExecutionContext('infrastructure_sentinel', () => {
+  withCoordinationMutation(() => {
     safeRmSync(runtimeRoot(), { recursive: true, force: true });
     safeRmSync(observabilityRoot(), { recursive: true, force: true });
   });
@@ -643,7 +625,12 @@ export function migrateLegacyWorkItemContexts(options: { apply?: boolean } = {})
       remaining.push(item.item_id);
       continue;
     }
-    updateWorkItem({ itemId: item.item_id, context, metadata: metadataUpdate });
+    updateWorkItem({
+      itemId: item.item_id,
+      expectedVersion: item.version,
+      context,
+      metadata: metadataUpdate,
+    });
     migrated.push(item.item_id);
   }
   return { migrated, remaining, migrated_context: remaining.length };
@@ -656,50 +643,41 @@ export function listWorkItemAttempts(itemId: string): WorkItemAttempt[] {
 }
 
 export function createWorkItem(input: CreateWorkItemInput): WorkItem {
-  return withCoordinationRoot(input.rootDir, () => createWorkItemInternal(input));
+  return withCoordinationRoot(input.rootDir, () =>
+    withCoordinationMutation(() => createWorkItemInternal(input))
+  );
+}
+
+/**
+ * Atomically create or replay the original creation identity under the store fence.
+ * A committed snapshot survives event/audit interruption without duplicate creation.
+ */
+export function createWorkItemIfAbsent(input: CreateWorkItemInput & { itemId: string }): WorkItem {
+  return withCoordinationRoot(input.rootDir, () =>
+    withCoordinationMutation(() => {
+      if (!input.itemId?.trim()) {
+        throw new WorkCoordinationError('validation_error', 'itemId is required');
+      }
+      const candidate = buildWorkItemCreation(input, coordinationRootOverride || undefined);
+      const records = readJsonl<WorkItem>(itemsPath()).filter(
+        (item) => item.item_id === input.itemId
+      );
+      if (records.length === 0) return createWorkItemInternal(input);
+      assertOriginalWorkItemIdentity(records, candidate);
+      return records[records.length - 1];
+    })
+  );
 }
 
 function createWorkItemInternal(input: CreateWorkItemInput): WorkItem {
-  const title = String(input.title || '').trim();
-  const description = String(input.description || '').trim();
-  if (!title) {
-    throw new WorkCoordinationError('validation_error', 'title is required');
+  const item = buildWorkItemCreation(input, coordinationRootOverride || undefined);
+  if (currentWorkItem(item.item_id)) {
+    throw new WorkCoordinationError(
+      'idempotency_conflict',
+      `work item already exists: ${item.item_id}`,
+      { item_id: item.item_id }
+    );
   }
-  if (!description) {
-    throw new WorkCoordinationError('validation_error', 'description is required');
-  }
-  const now = nowIso();
-  const context = normalizeWorkItemContext(input.context || {}, input.projectId);
-  if (
-    context.tenant_slug &&
-    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !isVitestProcess())
-  ) {
-    resolveTenant(context.tenant_slug, {
-      rootDir: coordinationRootOverride || undefined,
-      env: process.env,
-    });
-  }
-  const item: WorkItem = {
-    item_id: input.itemId || randomId('witem'),
-    title,
-    description,
-    status: input.status || 'backlog',
-    priority: input.priority || 'normal',
-    source: input.source || 'local',
-    source_ref: input.sourceRef || input.itemId || randomId('src'),
-    project_id: input.projectId || 'default',
-    ...(input.assigneePeerId ? { assignee_peer_id: input.assigneePeerId } : {}),
-    ...(input.assigneeUserId ? { assignee_user_id: input.assigneeUserId } : {}),
-    labels: [...(input.labels || [])],
-    dependencies: [...(input.dependencies || [])],
-    version: 1,
-    created_at: now,
-    updated_at: now,
-    ...(input.currentAttemptId ? { current_attempt_id: input.currentAttemptId } : {}),
-    ...(input.attempts ? { attempts: input.attempts.map((attempt) => ({ ...attempt })) } : {}),
-    context,
-    ...(input.metadata ? { metadata: input.metadata } : {}),
-  };
   appendItemSnapshot(item);
   appendEvent({
     eventType: 'item_created',
@@ -767,7 +745,9 @@ function updateItemSnapshot(
 }
 
 export function updateWorkItem(input: UpdateWorkItemInput): WorkItem {
-  return withCoordinationRoot(input.rootDir, () => updateWorkItemInternal(input));
+  return withCoordinationRoot(input.rootDir, () =>
+    withCoordinationMutation(() => updateWorkItemInternal(input))
+  );
 }
 
 function updateWorkItemInternal(input: UpdateWorkItemInput): WorkItem {
@@ -983,6 +963,10 @@ function appendLeaseEvent(
 }
 
 export function claimWorkItem(input: ClaimWorkItemInput): { item: WorkItem; lease: WorkLease } {
+  return withCoordinationMutation(() => claimWorkItemInternal(input));
+}
+
+function claimWorkItemInternal(input: ClaimWorkItemInput): { item: WorkItem; lease: WorkLease } {
   // NI-02: the claimant actor is no longer an unverified free string. warn
   // (default) audits unregistered/inactive actors and allows; enforce rejects.
   enforceNhiActorPolicy(input.actorPeerId, 'work-coordination.claimWorkItem');
@@ -993,7 +977,7 @@ export function claimWorkItem(input: ClaimWorkItemInput): { item: WorkItem; leas
   assertVersion(current, input.expectedVersion);
   const existingLease = activeLeaseForItem(current.item_id);
   const idempotencyKey = input.idempotencyKey?.trim();
-  if (existingLease && idempotencyKey && existingLease.idempotency_key === idempotencyKey) {
+  if (existingLease && canReplayWorkItemClaim(current, existingLease, input)) {
     return { item: current, lease: existingLease };
   }
   if (existingLease) {
@@ -1004,6 +988,14 @@ export function claimWorkItem(input: ClaimWorkItemInput): { item: WorkItem; leas
         item_id: current.item_id,
         lease_id: existingLease.lease_id,
       }
+    );
+  }
+
+  if (isTerminalStatus(current.status)) {
+    throw new WorkCoordinationError(
+      'validation_error',
+      `cannot claim terminal work item: ${current.item_id}`,
+      { item_id: current.item_id }
     );
   }
 
@@ -1069,6 +1061,13 @@ export function claimWorkItem(input: ClaimWorkItemInput): { item: WorkItem; leas
 }
 
 export function releaseWorkItem(input: ReleaseWorkItemInput): { item: WorkItem; lease: WorkLease } {
+  return withCoordinationMutation(() => releaseWorkItemInternal(input));
+}
+
+function releaseWorkItemInternal(input: ReleaseWorkItemInput): {
+  item: WorkItem;
+  lease: WorkLease;
+} {
   const current = currentWorkItem(input.itemId);
   if (!current) {
     throw new WorkCoordinationError('item_not_found', `item not found: ${input.itemId}`);
@@ -1152,6 +1151,10 @@ export function releaseWorkItem(input: ReleaseWorkItemInput): { item: WorkItem; 
 }
 
 export function renewWorkItemLease(input: RenewWorkItemLeaseInput): WorkLease {
+  return withCoordinationMutation(() => renewWorkItemLeaseInternal(input));
+}
+
+function renewWorkItemLeaseInternal(input: RenewWorkItemLeaseInput): WorkLease {
   const current = currentLeaseById(input.leaseId);
   if (!current) {
     throw new WorkCoordinationError('lease_not_found', `lease not found: ${input.leaseId}`);
@@ -1190,6 +1193,10 @@ export function renewWorkItemLease(input: RenewWorkItemLeaseInput): WorkLease {
 }
 
 export function expireWorkItemLeases(now: string = nowIso()): WorkLease[] {
+  return withCoordinationMutation(() => expireWorkItemLeasesInternal(now));
+}
+
+function expireWorkItemLeasesInternal(now: string): WorkLease[] {
   const nowMs = new Date(now).getTime();
   const expired: WorkLease[] = [];
   for (const lease of currentLeaseRecords()) {
@@ -1245,10 +1252,14 @@ export const DEFAULT_MAX_ERROR_ATTEMPTS = 3;
  * in_progress forever, and a crash-looping item is re-claimed indefinitely.
  */
 export function reapExpiredWorkLeases(options: ReapWorkLeasesOptions = {}): ReapWorkLeasesResult {
+  return withCoordinationMutation(() => reapExpiredWorkLeasesInternal(options));
+}
+
+function reapExpiredWorkLeasesInternal(options: ReapWorkLeasesOptions): ReapWorkLeasesResult {
   const now = options.now ?? nowIso();
   const maxClaims = options.maxClaimAttempts ?? DEFAULT_MAX_CLAIM_ATTEMPTS;
   const maxErrors = options.maxErrorAttempts ?? DEFAULT_MAX_ERROR_ATTEMPTS;
-  const expired = expireWorkItemLeases(now);
+  const expired = expireWorkItemLeasesInternal(now);
   const recovered: WorkItem[] = [];
   const parked: WorkItem[] = [];
   const replayed: WorkItem[] = [];
@@ -1365,6 +1376,14 @@ export function handoffWorkItem(input: HandoffWorkItemInput): {
   fromLease: WorkLease;
   toLease: WorkLease;
 } {
+  return withCoordinationMutation(() => handoffWorkItemInternal(input));
+}
+
+function handoffWorkItemInternal(input: HandoffWorkItemInput): {
+  item: WorkItem;
+  fromLease: WorkLease;
+  toLease: WorkLease;
+} {
   // NI-02: verify the receiving actor BEFORE releasing the from-lease — in
   // enforce mode a rejected toPeerId must not leave the item released and
   // unclaimed (the inner claimWorkItem would reject only after the release).
@@ -1397,7 +1416,7 @@ export function handoffWorkItem(input: HandoffWorkItemInput): {
     ...(input.metadata || {}),
     handoff_packet: packet,
   };
-  const released = releaseWorkItem({
+  const released = releaseWorkItemInternal({
     itemId: input.itemId,
     leaseId: input.fromLeaseId,
     actorPeerId: input.fromPeerId,
@@ -1415,7 +1434,7 @@ export function handoffWorkItem(input: HandoffWorkItemInput): {
     note: `handoff packet written for ${input.itemId}`,
     payload: { handoff_packet: packet, next_status: 'ready' },
   });
-  const claimed = claimWorkItem({
+  const claimed = claimWorkItemInternal({
     itemId: input.itemId,
     actorPeerId: input.toPeerId,
     actorUserId: input.toUserId,
@@ -1465,48 +1484,50 @@ export function importExternalWorkItem(input: {
   context?: WorkItemContext;
   metadata?: Record<string, unknown>;
 }): WorkItem {
-  const existing = listWorkItems({ source: input.source }).find(
-    (item) => item.source_ref === input.sourceRef
-  );
-  if (existing) {
-    return updateWorkItem({
-      itemId: existing.item_id,
-      expectedVersion: existing.version,
+  return withCoordinationMutation(() => {
+    const existing = listWorkItems({ source: input.source }).find(
+      (item) => item.source_ref === input.sourceRef
+    );
+    if (existing) {
+      return updateWorkItemInternal({
+        itemId: existing.item_id,
+        expectedVersion: existing.version,
+        title: input.title,
+        description: input.description,
+        status: input.status,
+        priority: input.priority || existing.priority,
+        projectId: input.projectId || existing.project_id,
+        assigneePeerId: input.assigneePeerId,
+        assigneeUserId: input.assigneeUserId,
+        labels: input.labels || existing.labels,
+        dependencies: input.dependencies || existing.dependencies,
+        context: input.context || existing.context,
+        metadata: input.metadata || existing.metadata,
+      });
+    }
+    const item = createWorkItemInternal({
       title: input.title,
       description: input.description,
       status: input.status,
-      priority: input.priority || existing.priority,
-      projectId: input.projectId || existing.project_id,
+      priority: input.priority,
+      source: input.source,
+      sourceRef: input.sourceRef,
+      projectId: input.projectId,
       assigneePeerId: input.assigneePeerId,
       assigneeUserId: input.assigneeUserId,
-      labels: input.labels || existing.labels,
-      dependencies: input.dependencies || existing.dependencies,
-      context: input.context || existing.context,
-      metadata: input.metadata || existing.metadata,
+      labels: input.labels,
+      dependencies: input.dependencies,
+      context: input.context,
+      metadata: input.metadata,
     });
-  }
-  const item = createWorkItem({
-    title: input.title,
-    description: input.description,
-    status: input.status,
-    priority: input.priority,
-    source: input.source,
-    sourceRef: input.sourceRef,
-    projectId: input.projectId,
-    assigneePeerId: input.assigneePeerId,
-    assigneeUserId: input.assigneeUserId,
-    labels: input.labels,
-    dependencies: input.dependencies,
-    context: input.context,
-    metadata: input.metadata,
+    appendEvent({
+      eventType: 'item_imported',
+      itemId: item.item_id,
+      status: item.status,
+      payload: { source: input.source, source_ref: input.sourceRef },
+    });
+    return item;
   });
-  appendEvent({
-    eventType: 'item_imported',
-    itemId: item.item_id,
-    status: item.status,
-    payload: { source: input.source, source_ref: input.sourceRef },
-  });
-  return item;
 }
 
 export function normalizeWorkItemLabels(labels: string[] | undefined): string[] {

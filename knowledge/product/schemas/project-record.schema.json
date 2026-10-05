@@ -49,6 +49,11 @@
       "type": "array",
       "items": { "type": "string" }
     },
+    "objective_ids": {
+      "type": "array",
+      "description": "Organization purpose objectives this project advances (objective_id values of the owning organization).",
+      "items": { "type": "string", "minLength": 1 }
+    },
     "active_missions": {
       "type": "array",
       "items": { "type": "string" }

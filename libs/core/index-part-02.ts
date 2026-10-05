@@ -281,6 +281,7 @@ export {
   createBoard,
   createDefaultWorkBoard,
   createWorkItem,
+  createWorkItemIfAbsent,
   describeWorkCoordinationStore,
   expireWorkItemLeases,
   getBoard,

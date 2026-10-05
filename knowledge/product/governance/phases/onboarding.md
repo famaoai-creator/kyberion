@@ -17,11 +17,11 @@ lifecycle phase から参照する短い runbook で、各項目の番号は標�
 
 ## ルートを決める
 
-| ルート              | 通る Step                                                    |
-| ------------------- | ------------------------------------------------------------ |
-| 1. 個人のみ         | 0 → 1 → 2 → 3 → 4 → 9                                        |
-| 2. AI 会社          | 0〜4 → 5〜8（`onboard company` で 5・6 をまとめる） → 9 → 10 |
-| 3. 既存テナント追加 | 0〜10 すべて                                                 |
+| ルート              | 通る Step                                                         |
+| ------------------- | ----------------------------------------------------------------- |
+| 1. 個人のみ         | 0 → 1 → 2 → 3 → 4 → 9                                             |
+| 2. AI 会社          | 0〜4 → 5〜8（`onboard company` で 5・6 をまとめる） → 9 → 10 → 11 |
+| 3. 既存テナント追加 | 0〜11 すべて                                                      |
 
 ルート 2 は `onboard company` の直後に company stance へ切り替え、その stance でも identity を
 保存する（mission start が `customer/<slug>/my-identity.json` などを要求するため）。順序の詳細は
@@ -55,8 +55,10 @@ pnpm onboarding
 # または（非対話）
 pnpm onboarding apply --identity <reviewed-identity-json> --dry-run
 pnpm onboarding apply --identity <reviewed-identity-json>
-export KYBERION_PERSONA=sovereign   # .env.local は自動では読み込まれない
 ```
+
+オンボーディングのコマンドは persona なしで動く。`pnpm organization` の書き込み（Step 10）だけは
+`export KYBERION_PERSONA=sovereign` が要る（`.env.local` は自動では読み込まれない）。
 
 GUI では concierge（`http://127.0.0.1:3050`）の `/settings` から保存できる。メンバーと承認者も
 ここで登録する。この段階では外部効果や mission を開始しない。
@@ -96,6 +98,15 @@ fail-closed で停止する。オプションの詳細は標準フロー Step 5�
 cadence / decision → operation の順に governed facade で登録する。定常業務は
 `pnpm scope use` で scope を選んでから `operation run execute` / `operation tick` で回す。
 コマンド例は標準フロー Step 10 を参照する。
+
+### Step 11: 目標から作業へ（ルート 2・3）
+
+目標に計測できる KR を付け（`organization objective kr add`）、`organization objective kr measure`
+で計測して（外で測った値は `organization objective kr record`）`organization status` で進捗を見る。
+目標のための project を `--objective-ids` 付きで作り（`project create` → `scaffold` →
+`update-status --status active`）、その下で `mission kickoff --project-id`（業務は
+`--mission-type` を明示）、backlog は `work create-item` → `work project-next-tasks --apply` で
+mission の task に取り込む。コマンド例は標準フロー Step 11 を参照する。
 
 ### Step 9: 完了確認
 

@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   safeAppendFileSync,
   safeExistsSync,
@@ -24,6 +24,7 @@ import {
   parseEventJsonPath,
   processInboundEventRequest,
   readDotInboundEvents,
+  resolveEventIntakeSecret,
   verifyInboundSignature,
   type EventIntakePolicy,
 } from './dot-event-intake.js';
@@ -473,6 +474,21 @@ describe('match helpers', () => {
       })
     ).toBe(false);
     expect(dotEventMatchesTrigger(event, { kind: 'event', sources: ['ci'] })).toBe(false);
+  });
+});
+
+describe('resolveEventIntakeSecret', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('resolves the introduced secret through the event-intake service identity', () => {
+    const source = loadEventIntakePolicy().sources.github;
+    expect(source.secret_key).toBe('EVENT_INTAKE_GITHUB_SECRET');
+    vi.stubEnv('EVENT_INTAKE_GITHUB_SECRET', 'introduced-secret-value-0123456789');
+    expect(resolveEventIntakeSecret(source)).toBe('introduced-secret-value-0123456789');
+    vi.stubEnv('EVENT_INTAKE_GITHUB_SECRET', '');
+    expect(resolveEventIntakeSecret(source, () => 'injected')).toBe('injected');
   });
 });
 

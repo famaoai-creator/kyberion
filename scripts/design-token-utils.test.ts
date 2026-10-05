@@ -21,6 +21,27 @@ import {
 } from './design-token-utils.js';
 
 describe('canonical design-token generation', () => {
+  it('extracts, replaces and inserts token blocks on CRLF without changing surrounding CSS', () => {
+    const tokens = readKyberionDesignTokens();
+    const legacy = renderKyberionDesignTokenBlock(tokens);
+    const ui = renderKyberionUiTokenBlock(tokens);
+    const source = `/* before */\n${legacy}\n\n${ui}\n/* after */\n`.replaceAll('\n', '\r\n');
+    expect(extractKyberionTokenBlock(source)).toBe(legacy);
+    expect(extractKyberionUiTokenBlock(source)).toBe(ui);
+    expect(replaceTokenBlock(source, legacy)).toBe(source);
+    expect(replaceUiTokenBlock(source, ui)).toBe(source);
+    const withoutUi = `/* before */\n${legacy}\n/* after */\n`.replaceAll('\n', '\r\n');
+    expect(replaceUiTokenBlock(withoutUi, ui)).toBe(source);
+    const changed = legacy.replace('--kb-blur: blur(12px)', '--kb-blur: blur(14px)');
+    expect(replaceTokenBlock(source, changed)).toBe(source.replace('blur(12px)', 'blur(14px)'));
+  });
+
+  it('renders identical canonical component CSS from LF and CRLF sources', () => {
+    const source = `${KB_UI_STATUS_TONES_PLACEHOLDER}\n.rule {\n  display: block;\n}\n`;
+    expect(renderKyberionUiStylesheet(source.replaceAll('\n', '\r\n'))).toBe(
+      renderKyberionUiStylesheet(source)
+    );
+  });
   it('renders semantic tokens for automatic and explicit themes', () => {
     const block = renderKyberionDesignTokenBlock(readKyberionDesignTokens());
     expect(block).toContain('--kb-surface:');

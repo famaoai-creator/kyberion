@@ -806,6 +806,13 @@ describe('mission lifecycle finish gate', () => {
     );
     safeWriteFile(`${missionPath}/NEXT_TASKS.json`, JSON.stringify([], null, 2));
 
+    const nestedArtifact = 'evidence/nested/windows-archive.txt';
+    safeWriteFile(path.join(missionPath, nestedArtifact), 'nested archive survives', {
+      mkdir: true,
+    });
+    const archivePath = path.dirname(archivedStatePath());
+    safeWriteFile(path.join(archivePath, 'stale.txt'), 'old archive', { mkdir: true });
+
     await finishMission(missionId, false, {
       archiveDir: pathResolver.rootResolve('active/shared/tmp/mission-archives'),
       agentRuntimeEventPath: `${missionPath}/runtime-events.jsonl`,
@@ -818,6 +825,9 @@ describe('mission lifecycle finish gate', () => {
     const archivedState = JSON.parse(
       safeReadFile(archivedStatePath(), { encoding: 'utf8' }) as string
     );
+    expect(safeExistsSync(missionPath)).toBe(false);
+    expect(safeReadFile(path.join(archivePath, nestedArtifact))).toBe('nested archive survives');
+    expect(safeExistsSync(path.join(archivePath, 'stale.txt'))).toBe(false);
     expect(archivedState.status).toBe('archived');
     expect(
       archivedState.history.some((entry: { event?: string }) => entry.event === 'FINISH')

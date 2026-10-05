@@ -28,6 +28,9 @@ import {
   loadOrganizationIncident,
   saveOrganizationIncident,
 } from '@agent/core/organization/organization-operating-model-operations';
+import { readOrganizationKrMeasurements } from '@agent/core/dot/dot-key-results';
+import { rollUpObjectiveProgress } from '@agent/core/organization/organization-objective-progress';
+import { formatObjectiveProgress } from './organization_objective_measure.js';
 import {
   loadOrganizationOperatingModelCatalog,
   resolveOrganizationWork,
@@ -119,6 +122,63 @@ function emit(value: unknown, json: boolean): void {
   activePrint(JSON.stringify(value, null, 2));
 }
 
+/**
+ * Active objectives with their latest key-result progress. Measurements come
+ * from `pnpm organization objective kr measure` or from dots attached to the
+ * objective; a ledger that cannot be read degrades to the titles alone.
+ */
+function objectiveStatusLines(
+  view: OrganizationManagementView,
+  scope: { tier: string; tenantSlug?: string }
+): string[] {
+  const active = (view.purpose?.objectives || []).filter((entry) => entry.status === 'active');
+  if (!active.length || !view.purpose) return [];
+  const purpose = { ...view.purpose, objectives: active };
+  const progressScope = {
+    organizationId: view.organization_id,
+    tier: scope.tier as OrganizationTier,
+    ...(scope.tenantSlug ? { tenantSlug: scope.tenantSlug } : {}),
+  };
+  // Projects that name an objective are listed under it, so the status shows
+  // which work is meant to move which goal.
+  const withProjects = (objectiveIds: string[], lines: string[]) =>
+    lines.flatMap((line, index) => {
+      const projects = view.solution_projects.filter(
+        (project) =>
+          project.status !== 'archived' && project.objective_ids?.includes(objectiveIds[index]!)
+      );
+      return projects.length
+        ? [
+            line,
+            `  Projects: ${projects.map((project) => `${project.name} (${project.status})`).join(', ')}`,
+          ]
+        : [line];
+    });
+  try {
+    const progress = rollUpObjectiveProgress(progressScope, {
+      readMeasurements: (s) => readOrganizationKrMeasurements(s),
+      loadPurpose: () => purpose,
+    });
+    const lines = formatObjectiveProgress(progress);
+    const unmeasured = lines.some((line) => line.includes('unmeasured'));
+    const withLinks = withProjects(
+      progress.objectives.map((objective) => objective.objective_id),
+      lines
+    );
+    return unmeasured
+      ? [
+          ...withLinks,
+          'Next: measure objective key results with pnpm organization objective kr measure ... --apply',
+        ]
+      : withLinks;
+  } catch {
+    return withProjects(
+      active.map((objective) => objective.objective_id),
+      active.map((objective) => `Objective: ${objective.title}`)
+    );
+  }
+}
+
 function printStatus(
   view: OrganizationManagementView,
   scope: { tier: string; tenantSlug?: string },
@@ -145,9 +205,7 @@ function printStatus(
   activePrint(
     `Work: ${accounting.active_projects} active / ${view.solution_projects.filter((project) => project.status === 'draft').length} draft projects, ${accounting.active_operations} operations, ${accounting.open_incidents} open incidents, ${accounting.pending_decisions} pending decisions`
   );
-  for (const objective of view.purpose?.objectives || []) {
-    if (objective.status === 'active') activePrint(`Objective: ${objective.title}`);
-  }
+  for (const line of objectiveStatusLines(view, scope)) activePrint(line);
   for (const project of view.solution_projects.filter(
     (entry) => entry.status === 'active' || entry.status === 'draft'
   )) {

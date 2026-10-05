@@ -434,7 +434,7 @@ describe('secure-io core', () => {
 
     it('should handle empty or null input', () => {
       expect(sanitizePath('')).toBe('');
-      expect(sanitizePath(null as any)).toBe('');
+      expect(sanitizePath(null as unknown as string)).toBe('');
     });
   });
 
@@ -478,6 +478,20 @@ describe('secure-io core', () => {
   });
 
   describe('buildSafeExecEnv', () => {
+    it('preserves Windows executable discovery variables without inheriting secrets', () => {
+      vi.stubEnv('PATHEXT', '.EXE;.CMD;.BAT');
+      vi.stubEnv('SystemRoot', 'C:\\Windows');
+      vi.stubEnv('UNREGISTERED_TEST_SECRET', 'hidden');
+      try {
+        const env = buildSafeExecEnv();
+        expect(env.PATHEXT).toBe('.EXE;.CMD;.BAT');
+        expect(env.SystemRoot).toBe('C:\\Windows');
+        expect(env.UNREGISTERED_TEST_SECRET).toBeUndefined();
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
     it('should only inherit allowlisted variables by default', () => {
       process.env.OPENAI_API_KEY = 'secret-openai-key';
       process.env.PATH = process.env.PATH || '/usr/bin';

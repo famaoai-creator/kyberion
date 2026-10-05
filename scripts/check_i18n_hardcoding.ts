@@ -179,7 +179,7 @@ export function scanFileForKanaLiterals(text: string, repoRelativePath: string):
         ? ts.ScriptKind.JS
         : ts.ScriptKind.TS
   );
-  const lines = text.split('\n');
+  const lines = text.split(/\r?\n/u);
 
   let count = 0;
   let exemptions = 0;

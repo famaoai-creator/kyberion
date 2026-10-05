@@ -68,6 +68,7 @@ import {
   projectScopeOf,
 } from './project-mission-index.js';
 import { resolveTenant } from '../organization/tenant-registry.js';
+import { assertProjectObjectiveLinks } from './project-objective-links.js';
 import {
   loadOrganizationOperationalState,
   saveOrganizationOperationalState,
@@ -174,6 +175,7 @@ export interface ManagedProjectCreateInput {
   project_path?: string;
   metadata?: Record<string, unknown>;
   pipeline_refs?: string[];
+  objective_ids?: string[];
   rootDir?: string;
 }
 
@@ -590,6 +592,7 @@ export function buildManagedProjectRecord(input: ManagedProjectCreateInput): Pro
       : {}),
     ...(input.metadata ? { metadata: input.metadata } : {}),
     ...(input.pipeline_refs ? { pipeline_refs: sortedUnique(input.pipeline_refs) } : {}),
+    ...(input.objective_ids?.length ? { objective_ids: sortedUnique(input.objective_ids) } : {}),
   };
 }
 
@@ -605,6 +608,7 @@ function createManagedProjectInternal(
   if (loadProjectRecord(projectId, { rootDir: input.rootDir }))
     throw new Error(`Project already exists: ${projectId}`);
   const record = buildManagedProjectRecord(input);
+  assertProjectObjectiveLinks(record, input.rootDir);
   const enforceEntityGovernance =
     kyberionEnv('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !isVitestProcess();
   const organizationState =
@@ -672,7 +676,13 @@ export function updateManagedProject(
   patch: Partial<
     Pick<
       ProjectRecord,
-      'name' | 'summary' | 'status' | 'primary_locale' | 'metadata' | 'pipeline_refs'
+      | 'name'
+      | 'summary'
+      | 'status'
+      | 'primary_locale'
+      | 'metadata'
+      | 'pipeline_refs'
+      | 'objective_ids'
     >
   >
 ): ProjectRecord {
@@ -687,7 +697,9 @@ export function updateManagedProject(
     ...current,
     ...patch,
     ...(patch.metadata ? { metadata: { ...(current.metadata || {}), ...patch.metadata } } : {}),
+    ...(patch.objective_ids ? { objective_ids: sortedUnique(patch.objective_ids) } : {}),
   } satisfies ProjectRecord;
+  if (patch.objective_ids) assertProjectObjectiveLinks(next);
   saveProjectRecord(next);
   auditChain.record({
     agentId: kyberionEnv('KYBERION_PERSONA') || 'project_controller',

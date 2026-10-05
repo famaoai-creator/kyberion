@@ -50,7 +50,17 @@ import {
   type ApprovalRequestRecord,
 } from '../governance/approval-store.js';
 import { auditChain } from '../governance/audit-chain.js';
-import { createWorkItem, listWorkItems } from '../workforce/work-coordination.js';
+import {
+  createWorkItem,
+  createWorkItemIfAbsent,
+  listWorkItems,
+} from '../workforce/work-coordination.js';
+
+import {
+  getFrontDeskExecutionMapping,
+  type FrontDeskExecutionBinding,
+} from '../surface/front-desk-execution-contract.js';
+import type { EventScopeInput } from '../event-scope.js';
 import type { CreateWorkItemInput, WorkItem } from '../workforce/work-coordination-types.js';
 import {
   notifyOperatorSync,
@@ -118,6 +128,7 @@ const OPEN_WORK_ITEM_STATUSES = ['backlog', 'ready', 'in_progress', 'blocked', '
 export type DotActionStatus = 'dispatched' | 'parked' | 'refused' | 'shadow' | 'declined';
 
 export interface DotActionRecord {
+  front_desk_execution?: FrontDeskExecutionBinding;
   action_ref: string;
   dot_id: string;
   actor_id: string;
@@ -251,6 +262,7 @@ export function dotProposalHash(dotId: string, proposal: DotProposal): string {
         proposal.action_id,
         proposal.title,
         proposal.objective,
+        ...(proposal.front_desk_execution ? [proposal.front_desk_execution] : []),
         proposal.handoff_to ?? '',
         // Appended only when set, so hashes of proposals without these fields
         // (and their dedupe windows) are unchanged.
@@ -753,6 +765,38 @@ function workItemDescription(charter: DotCharter, record: DotActionRecord): stri
     .join('\n');
 }
 
+/** Admission and the executor own request revisions. Dispatch retains only references,
+ * and rechecks current mapping/charter scope before creating or settling an approval. */
+function frontDeskDispatchScope(
+  binding: FrontDeskExecutionBinding,
+  charter: DotCharter
+): EventScopeInput {
+  const mapping = getFrontDeskExecutionMapping(binding);
+  if (!mapping || mapping.dotId !== charter.dot_id || charter.status !== 'active')
+    throw new Error('front-desk configuration changed');
+  const viewer = mapping.viewer;
+  const tenant = viewer.tenantSlugs === 'all' ? undefined : viewer.tenantSlugs[0];
+  const organization = viewer.organizationIds === 'all' ? undefined : viewer.organizationIds[0];
+  const project = viewer.projectIds === 'all' ? undefined : viewer.projectIds[0];
+  const tier = viewer.tierAccess.includes('confidential') ? 'confidential' : 'public';
+  if (
+    !tenant ||
+    charter.scope.tenant_slug !== tenant ||
+    charter.scope.organization_id !== organization ||
+    charter.scope.project_id !== project ||
+    charter.scope.tier !== tier
+  )
+    throw new Error('front-desk mapping scope changed');
+  return {
+    scope_kind: project ? 'project' : organization ? 'organization' : 'tenant',
+    tier,
+    tenant_slug: tenant,
+    viewer_principal: viewer.principalId,
+    ...(organization ? { organization_id: organization } : {}),
+    ...(project ? { project_id: project } : {}),
+  };
+}
+
 /** Perform an allowed action: WorkItem (+ inbox wake for a handoff), audit, ledger. */
 function executeDotAction(
   charter: DotCharter,
@@ -763,6 +807,7 @@ function executeDotAction(
   const actor = dotActorId(charter.dot_id);
   let item: WorkItem;
   try {
+    if (record.front_desk_execution) frontDeskDispatchScope(record.front_desk_execution, charter);
     const find =
       deps.findWorkItemByActionRef ??
       (deps.createWorkItem
@@ -771,7 +816,16 @@ function executeDotAction(
     const existing = options.reuseExisting ? find?.(record.action_ref) : undefined;
     item =
       existing ??
-      (deps.createWorkItem ?? createWorkItem)({
+      (
+        deps.createWorkItem ??
+        (record.front_desk_execution ? createWorkItemIfAbsent : createWorkItem)
+      )({
+        ...(record.front_desk_execution
+          ? {
+              itemId: record.front_desk_execution.work_item_id,
+              sourceRef: record.front_desk_execution.request_digest,
+            }
+          : {}),
         title: record.title,
         description: workItemDescription(charter, record),
         status: 'ready',
@@ -786,6 +840,9 @@ function executeDotAction(
           work_shape: 'routine_operation',
         },
         metadata: {
+          ...(record.front_desk_execution
+            ? { front_desk_execution: record.front_desk_execution }
+            : {}),
           dot_id: charter.dot_id,
           actor_id: actor,
           action_ref: record.action_ref,
@@ -889,7 +946,12 @@ export function dispatchDotProposals(
       continue;
     }
     const base: DotActionRecord = {
-      action_ref: `dact-${charter.dot_id}-${hash}-${now.getTime().toString(36)}-${index}`,
+      action_ref: proposal.front_desk_execution
+        ? `frontdesk-${proposal.front_desk_execution.work_item_id}`
+        : `dact-${charter.dot_id}-${hash}-${now.getTime().toString(36)}-${index}`,
+      ...(proposal.front_desk_execution
+        ? { front_desk_execution: proposal.front_desk_execution }
+        : {}),
       dot_id: charter.dot_id,
       actor_id: actor,
       action_id: proposal.action_id,
@@ -908,6 +970,12 @@ export function dispatchDotProposals(
       at: now.toISOString(),
     };
     try {
+      const admissionScope = proposal.front_desk_execution
+        ? frontDeskDispatchScope(proposal.front_desk_execution, charter)
+        : undefined;
+      // Server-bound requests never lower the human-approval floor.
+      if (proposal.front_desk_execution && proposal.requested_decision !== 'approve')
+        throw new Error('front-desk request requires explicit human approval');
       const bounds = checkDotProposalBounds(charter, proposal, deps);
       if (bounds.ok === false) {
         recordAudit(charter, proposal.action_id, 'denied', { reason: bounds.reason }, deps);
@@ -983,6 +1051,7 @@ export function dispatchDotProposals(
               },
             }
           : {}),
+        ...(admissionScope ? { scope: admissionScope } : {}),
         now: now.getTime(),
       });
       const decided: DotActionRecord = {
