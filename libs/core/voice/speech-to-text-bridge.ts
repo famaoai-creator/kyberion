@@ -893,7 +893,14 @@ export function installManagedFasterWhisperSpeechToTextBridgeIfAvailable(
               ...(input.language ? { language: input.language } : {}),
             },
           }),
-
+          // Forward only the bridge's non-secret configuration, never the caller's full env.
+          env: {
+            KYBERION_STT_MODEL_DIR: envText(env, 'KYBERION_STT_MODEL_DIR'),
+            KYBERION_STT_MODEL: envText(env, 'KYBERION_STT_MODEL'),
+            KYBERION_STT_DEVICE: envText(env, 'KYBERION_STT_DEVICE'),
+            KYBERION_STT_COMPUTE_TYPE: envText(env, 'KYBERION_STT_COMPUTE_TYPE'),
+            KYBERION_STT_LANGUAGE: envText(env, 'KYBERION_STT_LANGUAGE'),
+          },
           timeoutMs: 120_000,
           maxOutputMB: 2,
         });

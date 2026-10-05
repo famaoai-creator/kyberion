@@ -7,6 +7,7 @@ import {
   safeExistsSync,
   safeMkdir,
   safePublishExclusiveFileSync,
+  safeReadFile,
   safeReaddir,
   safeUnlinkSync,
   safeWriteFile,
@@ -44,7 +45,10 @@ describe('lock utilities', () => {
     await expect(acquireLock(key, 1)).resolves.toBe(true);
     expect(safeExistsSync(lockPath(filename))).toBe(true);
     await expect(acquireLock(key, 1)).resolves.toBe(false);
-    expect(inspectLockRecovery(key)).toMatchObject({ state: 'live' });
+    expect(JSON.parse(String(safeReadFile(lockPath(filename))))).toMatchObject({
+      pid: process.pid,
+      id: key,
+    });
     releaseLock(key);
     expect(safeExistsSync(lockPath(filename))).toBe(false);
     expect(withLockSync(key, () => 'locked')).toBe('locked');

@@ -8,6 +8,7 @@ export const RISKY_OPS = {
   CLAUDE_DOCUMENT_GENERATION: 'claude:document_generation',
   BROWSER_EXTENSION_EXECUTE: 'browser:extension_execute',
   DESKTOP_DESTRUCTIVE_ACTION: 'desktop:destructive_action',
+  INGRESS_EXPOSE: 'ingress:expose',
 } as const;
 
 export type RiskyOpId = (typeof RISKY_OPS)[keyof typeof RISKY_OPS];

@@ -35,6 +35,7 @@ import '../libs/core/meeting/meeting-join-driver.js';
 import '../libs/core/mission/mission-llm.js';
 import '../libs/core/mission/mission-orchestration-worker-dispatch-port.js';
 import '../libs/core/ocr-bridge.js';
+import '../libs/core/ingress/public-ingress-seam.js';
 import '../libs/core/reasoning/reasoning-backend.js';
 import '../libs/core/risky-op-approval-port.js';
 import '../libs/core/secret/secret-resolver.js';

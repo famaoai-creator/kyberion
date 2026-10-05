@@ -141,6 +141,10 @@ How each stage maps to a step of the standard flow:
 
 #### 4b. External service setup and preflight
 
+For adding a **new service integration** to Kyberion (catalog contract,
+generated registries, validation, and security boundaries), follow the
+[Service Integration and Connection Guide](../knowledge/product/orchestration/service-integration-guide.md).
+
 - **Command**: `pnpm service:setup`
 - **Purpose**: for service presets such as GitHub, Google Workspace, Slack, Notion and Jira, show the required secrets, CLI alternatives, and where customer/personal connections live. Nothing is changed.
 - **Check right before use**: `pnpm service:preflight -- --service <service-id>`. `service:setup` is "preparation"; `service:preflight` is "can I use it now". It fails if auth is missing.

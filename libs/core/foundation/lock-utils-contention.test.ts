@@ -79,7 +79,7 @@ beforeEach(() => {
     },
     readdir: (dir) =>
       [...files.keys()].filter((file) => path.dirname(file) === dir).map((f) => path.basename(f)),
-    loadJson: <T,>(file: string): T => {
+    loadJson: <T>(file: string): T => {
       if (denied.has(file)) throw error('EACCES');
       const cell = files.get(file);
       if (!cell) {
@@ -99,6 +99,24 @@ afterEach(() => {
 });
 
 describe('lock publication and cleanup interleavings', () => {
+  it.each([
+    ['writer-lease-path:abc', 'writer-lease-path%3Aabc'],
+    ['../nested\\key', '..%2Fnested%5Ckey'],
+    ['CON', '%43ON'],
+    ['nul.txt', '%6Eul.txt'],
+  ])('reports no recovery for a healthy portable lock %s', (key, filename) => {
+    const file = path.join(path.dirname(lock), filename + '.lock');
+    // This IO fixture preserves ENOENT for the absent cleanup guard.
+    expect(inspectLockRecovery(key)).toBeUndefined();
+    withLockSync(key, () => {
+      expect(files.has(file)).toBe(true);
+      expect(inspectLockRecovery(key)).toBeUndefined();
+      expect(() => withLockSync(key, () => undefined, 1)).toThrow('[LOCK_TIMEOUT]');
+    });
+    expect(files.has(file)).toBe(false);
+    expect(inspectLockRecovery(key)).toBeUndefined();
+  });
+
   it('does not enter or delete another writer during its partial publication', () => {
     let innerRan = false;
     let nested = false;
@@ -252,7 +270,7 @@ describe('lock publication and cleanup interleavings', () => {
         files.set(file, { text, mtime: now });
       },
       unlink: (file) => void files.delete(file),
-      loadJson: <T,>(file: string): T => {
+      loadJson: <T>(file: string): T => {
         const cell = files.get(file);
         if (!cell) throw error('ENOENT');
         seen.push(cell.text);
@@ -397,7 +415,7 @@ describe('identity-checked removal', () => {
         files.set(file, { text, mtime: now });
       },
       unlink: (file) => void files.delete(file),
-      loadJson: <T,>(file: string): T => {
+      loadJson: <T>(file: string): T => {
         const cell = files.get(file);
         if (!cell) throw error('ENOENT');
         return JSON.parse(cell.text) as T;

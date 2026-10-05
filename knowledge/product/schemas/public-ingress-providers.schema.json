@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "public-ingress-providers.schema.json",
+  "title": "Public Ingress Provider Registry",
+  "description": "Declarative descriptors for public ingress providers. Descriptors carry identity, status, adapter, runtime tool and privacy metadata only — never secrets (secret_refs are secret-store key names), shell fragments or URLs.",
+  "type": "object",
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "providers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "provider_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "display_name": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "enum": ["live", "planned", "disabled"] },
+          "adapter": { "type": "string", "enum": ["cli"] },
+          "module": {
+            "type": "string",
+            "pattern": "^@agent/core/ingress/providers/[a-z0-9][a-z0-9-]*$"
+          },
+          "fallback_path": {
+            "type": "string",
+            "pattern": "^libs/core/dist/ingress/providers/[a-z0-9][a-z0-9-]*\\.js$"
+          },
+          "tool_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+          "stable_url": { "type": "boolean" },
+          "network_class": {
+            "type": "string",
+            "enum": ["public_internet", "tailnet_only", "local_only"]
+          },
+          "secret_refs": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" }
+          },
+          "config_requirements": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+          },
+          "platforms": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["darwin", "linux", "win32"] }
+          },
+          "notes": { "type": "string" }
+        },
+        "required": [
+          "provider_id",
+          "display_name",
+          "status",
+          "adapter",
+          "tool_id",
+          "stable_url",
+          "network_class",
+          "secret_refs",
+          "platforms"
+        ],
+        "if": { "properties": { "status": { "const": "live" } } },
+        "then": { "required": ["module"] },
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["version", "providers"],
+  "additionalProperties": false
+}
