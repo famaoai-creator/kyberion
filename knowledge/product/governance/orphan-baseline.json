@@ -60,7 +60,12 @@
       "reason": "Data-driven extension module: public-ingress-provider-registry resolves it dynamically via the public-ingress-providers.json catalog (provider_id 'tailscale-funnel') and the @agent/core/ingress/providers/tailscale-funnel package export, so no static in-repo caller exists."
     }
   ],
-  "scripts": [],
+  "scripts": [
+    {
+      "id": "scripts/dev_oidc_idp.ts",
+      "reason": "Operator-run local dev tool: a loopback-only throw-away OIDC IdP for trying the surface /login flow without a Google or Entra client. Started by hand per docs/developer/SURFACE_OIDC_LOGIN_OPERATIONS.ja.md (no package script, to stay under the SX-05 script ratchet); unit-tested by scripts/dev_oidc_idp.test.ts."
+    }
+  ],
   "pipelines": [],
   "documented_only": [
     {
