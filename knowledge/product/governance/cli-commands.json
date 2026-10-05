@@ -3163,6 +3163,39 @@
       "group": "operate"
     },
     {
+      "id": "script.halt.status",
+      "module": "scripts/operations_halt.ts",
+      "command": "halt status",
+      "noun": "halt",
+      "verb": "status",
+      "audience": "operator",
+      "args": ["status"],
+      "description": "cli_cmd_script_halt_status",
+      "group": "inspect"
+    },
+    {
+      "id": "script.halt.engage",
+      "module": "scripts/operations_halt.ts",
+      "command": "halt engage",
+      "noun": "halt",
+      "verb": "engage",
+      "audience": "operator",
+      "args": ["engage"],
+      "description": "cli_cmd_script_halt_engage",
+      "group": "operate"
+    },
+    {
+      "id": "script.halt.resume",
+      "module": "scripts/operations_halt.ts",
+      "command": "halt resume",
+      "noun": "halt",
+      "verb": "resume",
+      "audience": "operator",
+      "args": ["resume"],
+      "description": "cli_cmd_script_halt_resume",
+      "group": "operate"
+    },
+    {
       "id": "script.tenant.export",
       "module": "scripts/tenant_export.ts",
       "command": "tenant export",
