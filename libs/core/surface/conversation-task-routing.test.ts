@@ -320,15 +320,6 @@ describe('strict inert state and decision parsing', () => {
         candidateIds: [id(3)],
       },
     },
-    {
-      tasks: [task(1)],
-      clarification: {
-        kind: 'followup',
-        sourceTurnId: id(2),
-        sourceText: 'add a chart',
-        candidateIds: [id(1)],
-      },
-    },
     { tasks: [task(1)], approval: true },
   ])('fails closed on malformed persisted state %#', (input) => {
     expect(parseConversationTaskState(input)).toBeUndefined();
@@ -367,13 +358,16 @@ describe('strict inert state and decision parsing', () => {
     ])
       expect(parseConversationTaskDecision({ ...valid, ...change })).toBeUndefined();
   });
-  it('rejects a local reply on record-only decisions', () => {
+  it('reads legacy record-only replies as inert display receipts', () => {
     const recorded = route({ tasks: [] }, 'Create a report', 1).decision;
     expect(parseConversationTaskDecision(recorded)).toEqual(recorded);
-    expect(parseConversationTaskDecision({ ...recorded, reply: 'Recorded.' })).toBeUndefined();
+    expect(parseConversationTaskDecision({ ...recorded, reply: 'Recorded.' })).toMatchObject({
+      authority: 'none',
+      reply: 'Recorded.',
+    });
     expect(
       parseConversationTaskDecision({ ...recorded, kind: 'followup', reply: 'Added.' })
-    ).toBeUndefined();
+    ).toMatchObject({ authority: 'none', reply: 'Added.' });
   });
 });
 
@@ -489,5 +483,23 @@ describe('runtime turn outcome', () => {
     const input = { tasks: [task(1)] };
     expect(applyConversationTurnOutcome(input, id(9), 'answered', id(2), 'A', 3)).toEqual(input);
     expect(applyConversationTurnOutcome(input, id(1), 'answered', id(2), '   ', 3)).toEqual(input);
+  });
+});
+
+describe('legacy follow-up clarification migration', () => {
+  it('clears a valid earlier v2 selection without applying or replaying its amendment', () => {
+    const restored = parseConversationTaskState({
+      tasks: [task(1)],
+      clarification: {
+        kind: 'followup',
+        sourceTurnId: id(2),
+        sourceText: 'add a chart',
+        candidateIds: [id(1)],
+      },
+    })!;
+    expect(restored).toEqual({ tasks: [task(1)] });
+    const next = route(restored, '1', 3);
+    expect(next.decision).toEqual(CHAT);
+    expect(next.state.tasks[0].updates).toEqual([]);
   });
 });

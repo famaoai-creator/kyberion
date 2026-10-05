@@ -302,6 +302,9 @@ async function measureSpec(
       if (value === undefined) throw new Error(`organization metric ${metric.metric} unavailable`);
       return value;
     }
+    case 'manual':
+      // Recorded by a person through recordOrganizationKeyResult; nothing to sweep.
+      return undefined;
   }
 }
 
@@ -539,6 +542,57 @@ export async function measureOrganizationKeyResults(
     return [];
   }
   return rows;
+}
+
+/**
+ * Records a value for one organization key result, as measured outside
+ * Kyberion (a survey, a spreadsheet, a meeting). Any KR source accepts a
+ * recorded value; it is the KR's latest measurement until the next sweep.
+ */
+export function recordOrganizationKeyResult(
+  scope: ObjectiveProgressScope,
+  input: { objectiveId: string; krId: string; value: number; measuredAt?: string },
+  deps: Pick<DotKeyResultDeps, 'rootDir' | 'loadPurpose' | 'now'> = {}
+): KrMeasurementRow {
+  if (!Number.isFinite(input.value)) {
+    throw new Error(`Key result value must be a finite number (got ${input.value}).`);
+  }
+  const measuredAt = input.measuredAt ?? (deps.now?.() ?? new Date()).toISOString();
+  if (Number.isNaN(Date.parse(measuredAt))) {
+    throw new Error(`--measured-at must be an ISO-8601 timestamp (got ${measuredAt}).`);
+  }
+  const purpose = (
+    deps.loadPurpose ??
+    ((s) =>
+      loadOrganizationPurpose(s.organizationId, {
+        tier: s.tier,
+        tenantSlug: s.tenantSlug,
+        rootDir: deps.rootDir,
+      }))
+  )(scope);
+  const objective = purpose?.objectives?.find((entry) => entry.objective_id === input.objectiveId);
+  if (!objective) {
+    throw new Error(`Objective not found in ${scope.organizationId}: ${input.objectiveId}`);
+  }
+  const spec = objective.key_results?.find((entry) => entry.kr_id === input.krId);
+  if (!spec) {
+    throw new Error(`Key result not found in ${input.objectiveId}: ${input.krId}`);
+  }
+  const row: KrMeasurementRow = {
+    scope: 'org',
+    organization_id: scope.organizationId,
+    objective_id: input.objectiveId,
+    kr_id: input.krId,
+    value: input.value,
+    progress: keyResultProgress(spec, input.value),
+    measured_at: new Date(measuredAt).toISOString(),
+  };
+  appendLedger(
+    orgKrLedgerPath({ tenantSlug: scope.tenantSlug, organizationId: scope.organizationId }),
+    [row],
+    deps.rootDir
+  );
+  return row;
 }
 
 // ---------------------------------------------------------------------------

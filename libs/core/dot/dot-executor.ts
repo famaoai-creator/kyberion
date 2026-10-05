@@ -42,6 +42,12 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import {
+  FRONT_DESK_RECEIPT_PIPELINE,
+  prepareFrontDeskExecution,
+  verifyFrontDeskExecution,
+} from '../surface/front-desk-execution.js';
+import type { FrontDeskArtifactVerification } from './dot-state-paths.js';
 import { withExecutionContextAsync } from '../authority.js';
 import { createLogger } from '../logger.js';
 import { withUsageAttribution } from '../usage-accounting.js';
@@ -240,6 +246,7 @@ function executorObjective(item: WorkItem): string {
 }
 
 interface Outcome {
+  front_desk_verification?: FrontDeskArtifactVerification;
   mode: DotWorkResultRow['mode'];
   status: 'done' | 'blocked' | 'failed';
   summary: string;
@@ -253,7 +260,8 @@ async function routeItem(
   ports: DotExecutorPorts,
   goalMode: DotGoalMode,
   signal: AbortSignal,
-  accountingId: string
+  accountingId: string,
+  deps: DotExecutorDeps
 ): Promise<Outcome> {
   const shape = meta(item, 'requested_work_shape') as DotWorkShape | undefined;
   if (!shape) {
@@ -274,12 +282,30 @@ async function routeItem(
           : 'pipeline-shaped work without pipeline_ref — the dot must re-propose with pipeline_ref',
       };
     }
+    let prepared: ReturnType<typeof prepareFrontDeskExecution> | undefined;
+    if (item.metadata?.front_desk_execution || ref === FRONT_DESK_RECEIPT_PIPELINE) {
+      try {
+        prepared = prepareFrontDeskExecution(c, item, deps);
+      } catch (error) {
+        return {
+          mode: 'escalated',
+          status: 'blocked',
+          summary: `front-desk execution refused before effects: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
     const result = await ports.runPipeline(
       ref,
       {
         dot_id: c.dot_id,
         actor_id: actorOf(c),
         work_item_id: item.item_id,
+        ...(prepared
+          ? {
+              front_desk_output_path: prepared.outputPath,
+              front_desk_artifact_content: prepared.expectedContent,
+            }
+          : {}),
         action_ref: meta(item, 'action_ref'),
         ...(c.scope.tenant_slug ? { tenant_slug: c.scope.tenant_slug } : {}),
         ...(c.scope.organization_id ? { organization_id: c.scope.organization_id } : {}),
@@ -288,7 +314,17 @@ async function routeItem(
       },
       signal
     );
+    // The pipeline may outlive the executor deadline. Never publish a new
+    // deliverable after quarantine, or under a request revoked while it ran.
+    if (prepared && result.status === 'succeeded') {
+      if (signal.aborted)
+        throw new Error('diagnostic execution deadline passed before publication');
+      prepared = prepareFrontDeskExecution(c, item, deps);
+    }
+    const verified =
+      prepared && result.status === 'succeeded' ? verifyFrontDeskExecution(prepared) : undefined;
     return {
+      ...(verified ? { front_desk_verification: verified } : {}),
       mode: 'pipeline',
       status: result.status === 'succeeded' ? 'done' : 'failed',
       summary: `pipeline ${ref} ${result.status}: ${result.summary}`,
@@ -460,6 +496,7 @@ export async function executeDotWorkItem(
       purpose: 'dot executor',
       ttlMs,
       idempotencyKey: actionRef,
+      requireNewLease: true,
       expectedVersion: item.version,
       metadata: { dot_id: c.dot_id, action_ref: actionRef },
     });
@@ -509,7 +546,7 @@ export async function executeDotWorkItem(
   let outcome: Outcome;
   try {
     outcome = await Promise.race([
-      routeItem(c, item, ports, goalMode, controller.signal, accountingId).catch(
+      routeItem(c, claimed.item, ports, goalMode, controller.signal, accountingId, deps).catch(
         (error): Outcome => ({
           mode: failedMode,
           status: 'failed',
@@ -560,6 +597,9 @@ export async function executeDotWorkItem(
     mode: outcome.mode,
     status: outcome.status,
     summary,
+    ...(outcome.front_desk_verification
+      ? { front_desk_verification: outcome.front_desk_verification }
+      : {}),
     started_at: startedAt,
     completed_at: completedAt,
     report_to_dot_id: meta(item, 'dot_id') ?? c.dot_id,

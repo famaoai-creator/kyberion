@@ -1,3 +1,5 @@
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathResolver } from '@agent/core/path-resolver';
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -58,7 +60,7 @@ describe('kyberion script-command dispatch', () => {
     expect(mocks.safeExecResultAsync).not.toHaveBeenCalled();
     expect(mocks.spawnManagedProcess).toHaveBeenCalledTimes(1);
     const spec = mocks.spawnManagedProcess.mock.calls[0]?.[0];
-    expect(spec.command).toBe('pnpm');
+    expect(spec.command).toBe(process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm');
     expect(spec.args).toEqual(['run', 'tui']);
     expect(spec.spawnOptions.stdio).toBe('inherit');
     expect(spec).not.toHaveProperty('timeoutMs');
@@ -90,6 +92,25 @@ describe('kyberion script-command dispatch', () => {
     ]) {
       expect(streamed, command).toContain(command);
     }
+  });
+
+  it('passes a file URL to Node --import for buffered script dispatch', async () => {
+    await main(['docs', 'check'], () => undefined);
+    const args = mocks.safeExecResultAsync.mock.calls[0][1];
+    expect(args[0]).toBe('--import');
+    expect(args[1]).toBe(pathToFileURL(pathResolver.rootResolve('scripts/ts-loader.mjs')).href);
+    expect(fileURLToPath(args[1])).toBe(pathResolver.rootResolve('scripts/ts-loader.mjs'));
+    expect(args[2]).toMatch(/check_docs_drift\.ts$/u);
+  });
+
+  it('passes a file URL to Node --import for the streamed PR publisher', async () => {
+    mocks.spawnManagedProcess.mockImplementation(() => ({ child: fakeChild(0) }));
+    await main(['pr', 'create', '--help'], () => undefined);
+    const args = mocks.spawnManagedProcess.mock.calls[0][0].args;
+    expect(args[0]).toBe('--import');
+    expect(args[1]).toBe(pathToFileURL(pathResolver.rootResolve('scripts/ts-loader.mjs')).href);
+    expect(fileURLToPath(args[1])).toBe(pathResolver.rootResolve('scripts/ts-loader.mjs'));
+    expect(args[2]).toMatch(/publish_pull_request\.ts$/u);
   });
 
   it('keeps short commands buffered through the printer', async () => {

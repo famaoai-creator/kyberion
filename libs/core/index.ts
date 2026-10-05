@@ -46,3 +46,16 @@ export {
 } from './surface/surface-conversation-runtime-context.js';
 
 export * from './surface/conversation-task-routing.js';
+
+export * from './surface/front-desk-execution-contract.js';
+export {
+  runFrontDeskExecutionIntake,
+  prepareFrontDeskExecution,
+  verifyFrontDeskExecution,
+} from './surface/front-desk-execution.js';
+export { projectFrontDeskExecution } from './surface/front-desk-execution-status.js';
+export {
+  listConfiguredFrontDeskExecutions,
+  inspectFrontDeskExecution,
+  readConversationExecutionReports,
+} from './surface/front-desk-conversation-store.js';

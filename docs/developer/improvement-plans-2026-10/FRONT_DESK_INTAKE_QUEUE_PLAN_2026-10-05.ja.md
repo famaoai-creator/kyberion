@@ -10,6 +10,10 @@ status: active
 - 前提: PR #929（会話内の依頼記録と結果の反映）、[Resident dot 自律組織ループ計画](./DOT_ORG_LOOP_PLAN_2026-10-04.ja.md)
 - 関連: [会話エンジン計画](./CONVERSATION_ENGINE_PLAN_2026-10-04.ja.md)、[front-desk-continuity](../front-desk-continuity.md)、[resident-dot-model](../../../knowledge/product/architecture/resident-dot-model.md)
 
+## 最初の限定実装
+
+[診断用受付成果物の縦切り](./FRONT_DESK_DIAGNOSTIC_EXECUTION_2026-10-05.ja.md)で、厳密な opt-in コマンド、明示 human approval、既存 dot executor、artifact readback、元の会話への report を接続する。一般の needs_execution の自動実行は未対応。以下の FQ-01〜08 は一般化の計画であり、全項目の実装完了を意味しない。
+
 ## 背景
 
 PR #929 で、会話の中の依頼は viewer スコープの transcript に記録され、その場で回答できたもの（runtime が `direct_answer` かつ `autonomous` と判定したもの）は `completed` として回答の抜粋を残すようになった。

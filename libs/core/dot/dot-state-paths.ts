@@ -39,7 +39,17 @@ export const dotAutonomyStatePath = (charter: DotCharter): string =>
   dotStatePath(charter, DOT_AUTONOMY_DIR, `${charter.dot_id}.json`);
 
 /** DL-01: one executed (or refused) delegated work item. */
+export interface FrontDeskArtifactVerification {
+  artifact_path: string;
+  sha256: string;
+  request_digest: string;
+  revision: number;
+  verified_at: string;
+}
+
 export interface DotWorkResultRow {
+  /** Readback evidence, persisted before releasing the request WorkItem. */
+  front_desk_verification?: FrontDeskArtifactVerification;
   dot_id: string;
   work_item_id: string;
   action_ref: string;

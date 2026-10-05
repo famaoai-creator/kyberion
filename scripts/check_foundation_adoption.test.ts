@@ -10,6 +10,14 @@ import {
 } from './check_foundation_adoption.js';
 
 describe('checkFoundationAdoption', () => {
+  it('accepts the canonical foundation Ajv constructors on every platform', () => {
+    expect(
+      checkFoundationAdoption([
+        pathResolver.rootResolve('libs/core/foundation/ajv.ts'),
+        pathResolver.rootResolve('libs/core/foundation/ajv-build-free.mjs'),
+      ])
+    ).toEqual([]);
+  });
   it('rejects a directory replacement before source inspection', () => {
     expect(() => readFoundationAdoptionTextFile(pathResolver.rootResolve('scripts'))).toThrow(
       'must be a regular file'

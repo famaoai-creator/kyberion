@@ -88,6 +88,28 @@
         "stt_local_only": true
       },
       "detail": "Kyberion native Apple Speech file bridge is available; permissions and model readiness are checked at use time."
+    },
+    {
+      "backend_id": "faster_whisper",
+      "display_name": "Managed faster-whisper",
+      "status": "active",
+      "priority": 90,
+      "platforms": ["win32", "linux"],
+      "source": "managed-runtime",
+      "verification": "python-module",
+      "probe": {
+        "kind": "managed_python_module",
+        "commands": ["faster_whisper"],
+        "module": "faster_whisper",
+        "tool_id": "faster_whisper"
+      },
+      "connection": {
+        "stt_backend": "faster_whisper",
+        "whisper_python_bin": "{{python_bin}}",
+        "stt_source": "{{source}}",
+        "stt_local_only": true
+      },
+      "detail": "faster_whisper is importable from the governed managed runtime."
     }
   ]
 }

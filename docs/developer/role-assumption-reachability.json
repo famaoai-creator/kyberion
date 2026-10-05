@@ -749,22 +749,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/front-desk-conversation-store.ts#completeConversationTurn (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": ["sovereign_concierge"],
-      "unresolved": []
-    },
-    {
-      "site": "libs/core/surface/front-desk-conversation-store.ts#markConversationTurnNotStarted (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": ["sovereign_concierge"],
-      "unresolved": []
-    },
-    {
-      "site": "libs/core/surface/front-desk-conversation-store.ts#markConversationTurnUncertain (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": ["sovereign_concierge"],
-      "unresolved": []
-    },
-    {
-      "site": "libs/core/surface/front-desk-conversation-store.ts#reserveConversationTurn (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/surface/front-desk-conversation-store.ts#publishTranscript (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -1124,12 +1109,12 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/workforce/work-coordination.ts#clearWorkCoordinationStore",
+      "site": "libs/core/workforce/work-coordination.ts#ensureDefaultWorkCoordinationCatalog",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
     {
-      "site": "libs/core/workforce/work-coordination.ts#ensureDefaultWorkCoordinationCatalog",
+      "site": "libs/core/workforce/work-coordination.ts#withCoordinationMutation",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -1790,6 +1775,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/company_onboarding.ts#onboardAiCompany",
+      "roles": ["mission_controller", "sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/config_mission.ts#cmdApply (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -1974,6 +1964,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/onboarding_context.ts#<module>",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/onboarding_runbook_skill.ts#generateOnboardingRunbookSkill",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -2125,6 +2120,11 @@
     },
     {
       "site": "scripts/tenant.ts#main",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/tenant_activation.ts#main",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
