@@ -392,6 +392,37 @@
     return action.label;
   }
 
+  function selectedRequest() {
+    try {
+      return new URLSearchParams(window.location.search).get('request') || '';
+    } catch (err) {
+      return '';
+    }
+  }
+
+  function focusSelectedRequest() {
+    if (state.historyState !== 'ready') return;
+    var request = selectedRequest();
+    if (!request) return;
+    var match = state.turns.some(function (turn) {
+      return turn.id === request + '-user';
+    });
+    var notice = document.getElementById('conversation-selection');
+    if (notice) {
+      notice.hidden = false;
+      notice.textContent = vt(
+        state.vocab,
+        match ? 'front_desk:work_home_resume_readonly' : 'front_desk:work_home_request_unavailable'
+      );
+    }
+    state.focusedRequest = request;
+    var target = document.getElementById('ask-turn-' + request + '-user');
+    if (match && target) {
+      if (target.focus) target.focus({ preventScroll: true });
+      if (target.scrollIntoView) target.scrollIntoView({ block: 'center' });
+    }
+  }
+
   function turnHtml(turn) {
     var roleClass = turn.role === 'user' ? 'ask-turn-user' : 'ask-turn-companion';
     var shapeLabel = vt(state.vocab, turnShapeLabelKey(turn.shape)) || humanizeSlug(turn.shape);
@@ -420,7 +451,9 @@
     return (
       '<li class="ask-turn ' +
       roleClass +
-      '"><div class="ask-bubble">' +
+      '" id="ask-turn-' +
+      escapeHtml(turn.id || '') +
+      '" tabindex="-1"><div class="ask-bubble">' +
       escapeHtml(turn.text) +
       '</div>' +
       shapeHtml +
@@ -461,12 +494,14 @@
       listEl.innerHTML = '';
       emptyEl.textContent = vt(state.vocab, 'front_desk:ask_empty');
       emptyEl.classList.remove('hidden');
+      focusSelectedRequest();
       return;
     }
     emptyEl.classList.add('hidden');
     listEl.innerHTML = state.turns.map(turnHtml).join('');
     wireQuickReplies();
-    scrollConversationToBottom();
+    if (selectedRequest() && state.focusedRequest !== selectedRequest()) focusSelectedRequest();
+    else scrollConversationToBottom();
   }
 
   function render() {
@@ -1293,6 +1328,8 @@
   function applyUrlPrefill() {
     try {
       var params = new URLSearchParams(window.location.search);
+      // A resume URL is always read-only, even when unrelated prefill parameters are present.
+      if (params.has('request')) return;
       var ask = params.get('ask');
       var mic = params.get('mic') === '1';
       if (ask) {
