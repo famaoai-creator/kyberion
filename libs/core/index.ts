@@ -33,9 +33,13 @@ export {
   presenceFrontDeskConversationViewer,
   ConversationStoreError,
   readConversationHistory as readFrontDeskConversationHistory,
+  readFrontDeskConversationWork,
 } from './surface/front-desk-conversation-store.js';
 export type {
   FrontDeskConversationViewer,
+  FrontDeskConversationWork,
+  FrontDeskConversationWorkTask,
+  FrontDeskConversationWorkArtifact,
   ReservedConversationTurn,
 } from './surface/front-desk-conversation-store.js';
 export * from './surface/front-desk-conversation-history.js';

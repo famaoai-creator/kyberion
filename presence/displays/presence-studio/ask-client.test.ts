@@ -8,6 +8,8 @@ class Element {
   innerHTML = '';
   textContent = '';
   disabled = false;
+  focus = vi.fn();
+  scrollIntoView = vi.fn();
   attributes: Record<string, string> = {};
   listeners: Record<string, (event: { preventDefault: () => void }) => void> = {};
   classList = { add: vi.fn(), remove: vi.fn(), toggle: vi.fn() };
@@ -47,6 +49,7 @@ function harness(
     post?: (body: Record<string, unknown>) => Promise<ReturnType<typeof response>>;
     history?: Record<string, unknown>;
     historyStatus?: number;
+    query?: string;
   } = {}
 ) {
   const elements = new Map(
@@ -57,6 +60,7 @@ function harness(
       'turns',
       'ask-empty',
       'conversation-status',
+      'conversation-selection',
       'conversation-reload',
       'conversation-legacy',
       'conversation-legacy-turns',
@@ -67,7 +71,7 @@ function harness(
     href: 'http://localhost/ask?tenant=alpha',
     origin: 'http://localhost',
     pathname: '/ask',
-    search: '?tenant=alpha',
+    search: options.query ?? '?tenant=alpha',
     hash: '',
   };
   const scopedUrl = (path: string) => {
@@ -294,4 +298,63 @@ it('carries explicit organization and project selection into the request', async
     organizationId: 'org-a',
     projectId: 'project-a',
   });
+});
+
+describe('work-home inert conversation selection', () => {
+  it('selects the exact retained request without sending even with auto-send parameters', async () => {
+    const id = '11111111-1111-4111-8111-111111111111';
+    const h = harness({
+      query: '?tenant=alpha&request=' + id + '&ask=retry&send=1',
+      history: {
+        messages: [{ id: id + '-user', role: 'user', text: 'First request', createdAt: 1 }],
+      },
+    });
+    await flush();
+    expect(h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
+    expect(h.elements.get('conversation-selection')!.textContent).toBe(
+      'front_desk:work_home_resume_readonly'
+    );
+    expect(h.elements.get('turns')!.innerHTML).toContain('ask-turn-' + id + '-user');
+  });
+
+  it('reports an unavailable request rather than selecting another or replaying it', async () => {
+    const h = harness({
+      query: '?request=missing',
+      history: {
+        messages: [{ id: 'another-user', role: 'user', text: 'Other request', createdAt: 1 }],
+      },
+    });
+    await flush();
+    expect(h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
+    expect(h.elements.get('conversation-selection')!.textContent).toBe(
+      'front_desk:work_home_request_unavailable'
+    );
+  });
+
+  it('retains uncertainty and sends nothing when the selected history is unavailable', async () => {
+    const h = harness({ query: '?request=missing&ask=retry&send=1', historyStatus: 503 });
+    await flush();
+    expect(h.fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
+    expect(h.elements.get('ask-send')!.disabled).toBe(true);
+  });
+});
+
+it('focuses a resumed request once after hydration, then leaves new messages visible', async () => {
+  const id = '22222222-2222-4222-8222-222222222222';
+  const h = harness({
+    query: '?request=' + id,
+    history: {
+      messages: [{ id: id + '-user', role: 'user', text: 'Prior request', createdAt: 1 }],
+    },
+  });
+  const target = new Element();
+  h.elements.set('ask-turn-' + id + '-user', target);
+  await flush();
+  expect(target.focus).toHaveBeenCalledTimes(1);
+  h.elements.get('ask-input')!.value = 'A new message';
+  h.elements.get('ask-form')!.fire('submit');
+  await flush();
+  expect(target.focus).toHaveBeenCalledTimes(1);
+  expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
+  expect(h.elements.get('turns')!.innerHTML).toContain('A new message');
 });

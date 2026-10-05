@@ -182,253 +182,301 @@
     });
   }
 
-  function navItem(nav, id) {
-    var items = (nav && nav.items) || [];
-    for (var i = 0; i < items.length; i += 1) {
-      if (items[i].id === id) return items[i];
+  var view = { vocab: {}, home: null, mode: 'quiet', generation: 0, scope: '', wired: false };
+
+  function text(key) {
+    return fd(view.vocab, 'work_home_' + key);
+  }
+  function element(tag, value, className) {
+    var node = document.createElement(tag);
+    if (value) node.textContent = value;
+    if (className) node.className = className;
+    return node;
+  }
+  function safeHref(value) {
+    if (typeof value !== 'string' || value.charAt(0) !== '/' || value.slice(0, 2) === '//')
+      return null;
+    try {
+      var url = new URL(value, window.location.href);
+      if (
+        url.origin !== window.location.origin ||
+        !/^\/(ask|progress|work|api\/artifacts|api\/conversation\/artifacts)(\/|$)/.test(
+          url.pathname
+        )
+      )
+        return null;
+      if (
+        url.searchParams.has('send') ||
+        url.searchParams.has('mic') ||
+        url.searchParams.has('ask')
+      )
+        return null;
+      return url.pathname + url.search + url.hash;
+    } catch (err) {
+      return null;
     }
-    return null;
   }
-
-  function decideHref(nav) {
-    var item = navItem(nav, 'decide');
-    return scopedUrl(item ? item.href : '/');
+  function linkFor(link) {
+    var href = safeHref(link.href);
+    if (!href) return null;
+    var node = element('a', text('link_' + link.kind), 'kb-btn kb-btn--secondary');
+    node.setAttribute('href', href);
+    return node;
   }
-
-  var DECIDE_TAG_KEY = {
-    approval: 'tag_approval',
-    exception: 'tag_exception',
-    stalled: 'tag_stalled',
-    memory: 'tag_memory',
-  };
-
-  // Tenant names only make sense when the viewer can look at more than one
-  // tenant, and they show the tenant's display name, never its slug.
-  function tenantNameFor(me, slug) {
-    if (!me || !me.ok || !me.can_switch || !slug) return '';
-    var name = slug;
-    (me.tenants || []).forEach(function (tenant) {
-      if (tenant.tenant_slug === slug && tenant.display_name) name = tenant.display_name;
+  function field(host, label, value) {
+    if (!value) return;
+    host.appendChild(element('dt', label));
+    host.appendChild(element('dd', value));
+  }
+  function date(value) {
+    if (!value || !Number.isFinite(Date.parse(value))) return text('time_unknown');
+    return new Date(value).toLocaleString(currentLocale() === 'ja' ? 'ja-JP' : 'en-US');
+  }
+  function row(item, compact) {
+    var card = element('article', '', 'kb-section home-work-item');
+    card.setAttribute('data-work-id', item.id);
+    card.appendChild(element('h3', item.title, 'kb-section__title'));
+    var label = item.status_key || item.status;
+    card.appendChild(element('span', vt(view.vocab, label), 'kb-badge'));
+    card.appendChild(element('p', vt(view.vocab, item.next_step_key)));
+    (item.unknowns || []).forEach(function (unknown) {
+      card.appendChild(element('p', text('unknown_' + unknown)));
     });
-    return name;
-  }
-
-  function mutedText(id, text) {
-    return { id: id, type: 'ui:text', props: { text: text, variant: 'muted' } };
-  }
-
-  // The briefing as the page's single "next action": the day's summary, the
-  // recommended first item, and one button to where that work happens.
-  function renderNextAction(nav, vocab, home, locale) {
-    var counts = home.counts || {};
-    var decide = counts.decide || 0;
-    var progress = counts.progress || 0;
-    var delivered = counts.delivered || 0;
-    var clear = decide === 0 && progress === 0 && delivered === 0;
-    var top = (home.decide || [])[0];
-    var primary = null;
-    if (decide > 0) {
-      primary = { label: fd(vocab, 'home_decide_more'), href: decideHref(nav) };
-    } else if (progress > 0 || delivered > 0) {
-      primary = { label: fd(vocab, 'home_progress_more'), href: '/progress' };
-    } else {
-      var ask = navItem(nav, 'ask');
-      if (ask && ask.allowed !== false) {
-        primary = { label: vt(vocab, 'presence_studio:home_next_ask'), href: ask.href };
+    if (item.artifact)
+      card.appendChild(element('p', text('version_' + item.artifact.currentness), 'kb-badge'));
+    if (!compact) {
+      var details = element('details', '', 'home-work-details');
+      details.open = view.mode === 'detailed';
+      details.appendChild(element('summary', text('resume_context')));
+      var facts = element('dl');
+      field(facts, text('source'), text('source_' + item.source));
+      field(facts, text('last_recorded'), date(item.last_recorded_at));
+      field(
+        facts,
+        text('last_verified'),
+        item.last_verified_at ? date(item.last_verified_at) : text('not_verified')
+      );
+      (item.unknowns || []).forEach(function (unknown) {
+        field(facts, text('unknown'), text('unknown_' + unknown));
+      });
+      if (item.artifact) {
+        if (item.artifact.revision !== undefined)
+          field(facts, text('revision'), String(item.artifact.revision));
+        field(facts, text('version_state'), text('version_' + item.artifact.currentness));
+        if (item.artifact.change_reason === 'format_change')
+          field(facts, text('change_reason'), text('format_change') + ' ' + item.artifact.format);
       }
+      details.appendChild(facts);
+      var group = (view.home.updates || []).find(function (entry) {
+        return entry.item_id === item.id;
+      });
+      if (group) {
+        var updates = element('ol');
+        group.entries.forEach(function (entry) {
+          if (entry.text) updates.appendChild(element('li', entry.text));
+        });
+        if (updates.children.length) details.appendChild(updates);
+      }
+      card.appendChild(details);
     }
-    var props = {
-      eyebrow: formatHomeDate(home.date, locale),
-      title: clear
-        ? fd(vocab, 'home_briefing_clear')
-        : renderTemplate(fd(vocab, 'home_briefing'), counts),
-      state: clear ? 'empty' : 'ready',
-    };
-    if (top) props.reason = renderTemplate(fd(vocab, 'home_recommend'), { title: top.title });
-    if (primary && primary.label) {
-      primary.href = scopedUrl(primary.href);
-      props.primary = primary;
+    var links = element('div', '', 'home-work-links');
+    var seenLinks = new Set();
+    (item.links || []).forEach(function (link) {
+      if (seenLinks.has(link.href)) return;
+      seenLinks.add(link.href);
+      var node = linkFor(link);
+      if (node) links.appendChild(node);
+    });
+    card.appendChild(links);
+    return card;
+  }
+  function fill(id, items, compact, emptyKey) {
+    var host = document.getElementById(id);
+    if (!host) return;
+    host.textContent = '';
+    if (!items.length) host.appendChild(element('p', text(emptyKey)));
+    items.forEach(function (item) {
+      host.appendChild(row(item, compact));
+    });
+  }
+  function preferenceKey() {
+    return view.home && view.home.scope_id
+      ? 'kyberion.work-home.detail.' + view.home.scope_id
+      : null;
+  }
+  function renderWork() {
+    var home = view.home;
+    if (!home) return;
+    var error = document.getElementById('home-error');
+    if (error) error.hidden = true;
+    var partial = home.coverage !== 'supported_sources_ready';
+    var counts = home.counts;
+    var sources = document.getElementById('home-sources');
+    if (sources) {
+      sources.textContent = '';
+      sources.appendChild(element('p', text('coverage_note')));
+      home.sources.forEach(function (source) {
+        if (source.state !== 'available')
+          sources.appendChild(
+            element('p', text('source_' + source.id) + ': ' + text('source_state_' + source.state))
+          );
+      });
     }
     draw(document.getElementById('home-next'), [
-      { id: 'home-next-action', type: 'ui:next-action', props: props },
+      {
+        id: 'work-home-next',
+        type: 'ui:next-action',
+        props: {
+          eyebrow: date(home.observed_at),
+          title: text(partial ? 'partial' : counts.attention ? 'attention_title' : 'overview'),
+          reason: text('resume_readonly'),
+          state: partial ? 'blocked' : 'ready',
+        },
+      },
     ]);
-  }
-
-  function renderMetrics(vocab, home) {
-    var counts = home.counts || {};
     draw(document.getElementById('home-metrics'), [
       {
-        id: 'home-metrics-grid',
+        id: 'work-counts',
         type: 'ui:grid',
         props: { columns: 3, gap: 'md' },
-        children: ['home-metric-decide', 'home-metric-active', 'home-metric-delivered'],
+        children: ['work-all', 'work-attention', 'work-verified'],
       },
       {
-        id: 'home-metric-decide',
+        id: 'work-all',
         type: 'ui:metric',
-        props: {
-          label: vt(vocab, 'presence_studio:home_metric_decide'),
-          value: String(counts.decide || 0),
-          tone: counts.decide ? 'warning' : undefined,
-        },
+        props: { label: text('all_title'), value: String(counts.all) },
       },
       {
-        id: 'home-metric-active',
+        id: 'work-attention',
         type: 'ui:metric',
-        props: { label: fd(vocab, 'tag_in_progress'), value: String(counts.progress || 0) },
+        props: { label: text('attention_title'), value: String(counts.attention) },
       },
       {
-        id: 'home-metric-delivered',
+        id: 'work-verified',
         type: 'ui:metric',
-        props: {
-          label: fd(vocab, 'progress_delivered_title'),
-          value: String(counts.delivered || 0),
-        },
+        props: { label: text('verified_title'), value: String(counts.verified) },
       },
     ]);
-  }
-
-  function renderDecideCard(nav, vocab, home, me) {
-    var href = decideHref(nav);
-    var moreLink = document.getElementById('decide-more');
-    if (moreLink) {
-      moreLink.textContent = fd(vocab, 'home_decide_more');
-      moreLink.setAttribute('href', href);
+    fill('decide-body', home.attention, true, partial ? 'attention_unknown' : 'attention_empty');
+    fill('progress-body', home.items, false, partial ? 'work_unknown' : 'work_empty');
+    var count = document.getElementById('decide-count');
+    if (count) {
+      count.textContent = String(counts.attention);
+      count.hidden = false;
     }
-    var countEl = document.getElementById('decide-count');
-    if (countEl) {
-      countEl.textContent = renderTemplate(fd(vocab, 'count_items') || '{count}', {
-        count: (home.counts && home.counts.decide) || 0,
+    var mode = document.getElementById('home-detail-mode');
+    if (mode) mode.value = view.mode;
+    var summary = document.getElementById('progress-summary');
+    if (summary) summary.textContent = text('grouped_updates');
+  }
+  function showFailure() {
+    view.home = null;
+    var error = document.getElementById('home-error');
+    if (error) error.hidden = false;
+    var count = document.getElementById('decide-count');
+    if (count) {
+      count.hidden = true;
+      count.textContent = '';
+    }
+    var summary = document.getElementById('progress-summary');
+    if (summary) summary.textContent = '';
+    ['home-next', 'home-metrics', 'home-sources', 'decide-body', 'progress-body'].forEach(
+      function (id) {
+        var host = document.getElementById(id);
+        if (host) host.textContent = '';
+      }
+    );
+    var host = document.getElementById('home-next');
+    if (host && !error) host.appendChild(element('p', text('load_failed'), 'kb-callout'));
+  }
+  function refresh() {
+    var generation = ++view.generation;
+    var scope = scopedUrl('/api/home');
+    if (view.scope && view.scope !== scope) showFailure();
+    view.scope = scope;
+    var button = document.getElementById('home-refresh');
+    if (button) button.disabled = true;
+    return fetch(scope, { cache: 'no-store' })
+      .then(function (response) {
+        if (!response.ok) throw new Error('read unavailable');
+        return response.json();
+      })
+      .then(function (body) {
+        if (generation !== view.generation) return;
+        if (scope !== scopedUrl('/api/home')) {
+          showFailure();
+          return refresh();
+        }
+        var home = body && body.work_home;
+        if (
+          !body.ok ||
+          !home ||
+          home.version !== 1 ||
+          !Array.isArray(home.items) ||
+          !Array.isArray(home.attention) ||
+          !Array.isArray(home.sources) ||
+          !home.counts
+        )
+          throw new Error('read unavailable');
+        var previousScope = view.home && view.home.scope_id;
+        view.home = home;
+        if (previousScope !== home.scope_id) view.mode = 'quiet';
+        try {
+          if (preferenceKey() && window.localStorage.getItem(preferenceKey()) === 'detailed')
+            view.mode = 'detailed';
+        } catch (err) {
+          /* Display preference is optional. */
+        }
+        renderWork();
+      })
+      .catch(function () {
+        if (generation === view.generation) showFailure();
+      })
+      .finally(function () {
+        if (generation === view.generation && button) button.disabled = false;
       });
-      countEl.hidden = false;
-    }
-    var items = (home.decide || []).slice(0, 3);
-    var body = document.getElementById('decide-body');
-    if (!items.length) {
-      draw(body, [mutedText('decide-empty', fd(vocab, 'home_decide_empty'))]);
-      return;
-    }
-    draw(body, [
-      {
-        id: 'decide-list',
-        type: 'ui:list',
-        props: {
-          items: items.map(function (item) {
-            var tag = fd(vocab, DECIDE_TAG_KEY[item.kind] || 'tag_approval') || item.kind;
-            var tenant = tenantNameFor(me, item.tenant_slug);
-            // UI-06: the kind (approval / exception / ...) is the pill text,
-            // so the row reads "what kind of decision" at a glance.
-            var row = { title: item.title, href: href, status: 'pending' };
-            if (tag) row.status_label = tag;
-            if (tenant) row.meta = tenant;
-            return row;
-          }),
-        },
-      },
-    ]);
   }
-
-  var PROGRESS_TAG_KEY = { in_progress: 'tag_in_progress', delivered: 'tag_delivered' };
-
-  // FD-05: each row deep-links to its own item on the "進み具合" page (kept in
-  // the URL hash there so a reload restores the selection).
-  function progressHref(item) {
-    return scopedUrl('/progress#' + encodeURIComponent(item.id));
-  }
-
-  function renderProgressCard(vocab, home) {
-    var counts = home.counts || {};
-    var summaryEl = document.getElementById('progress-summary');
-    if (summaryEl) {
-      summaryEl.textContent = renderTemplate(fd(vocab, 'home_progress_summary'), {
-        active: counts.progress || 0,
-        delivered: counts.delivered || 0,
-      });
-    }
-    var moreLink = document.getElementById('progress-more');
-    if (moreLink) {
-      moreLink.textContent = fd(vocab, 'home_progress_more');
-      moreLink.setAttribute('href', scopedUrl('/progress'));
-    }
-
-    var items = (home.progress || []).slice(0, 4);
-    var body = document.getElementById('progress-body');
-    if (!items.length) {
-      draw(body, [mutedText('progress-empty', fd(vocab, 'home_progress_empty'))]);
-      return;
-    }
-    draw(body, [
-      {
-        id: 'progress-list',
-        type: 'ui:list',
-        props: {
-          items: items.map(function (item) {
-            var delivered = item.kind === 'delivered';
-            var tag = fd(vocab, PROGRESS_TAG_KEY[item.kind] || 'tag_in_progress') || item.kind;
-            var row = {
-              title: item.title,
-              href: progressHref(item),
-              status: delivered ? 'completed' : 'active',
-            };
-            // UI-06: the front-desk wording (進行中 / できました) on the pill,
-            // and the percent as the shared `ui:list` progress meter.
-            if (tag) row.status_label = tag;
-            if (delivered) {
-              var receive = fd(vocab, 'action_receive');
-              if (receive) row.meta = receive;
-            } else if (
-              item.progress_basis === 'phase_estimate' &&
-              typeof item.percent === 'number' &&
-              isFinite(item.percent)
-            ) {
-              // Status order is an estimate, never a measured completion percentage.
-              row.meta = fd(vocab, 'progress_phase_estimate');
-              row.progress = Math.max(0, Math.min(100, item.percent));
-            }
-            return row;
-          }),
-        },
-      },
-    ]);
-  }
-
   function mount() {
-    var locale = currentLocale();
-    return Promise.resolve(window.FrontDeskRail && window.FrontDeskRail.ready).then(function () {
-      // Scope validation may invalidate the rail's cached navigation promise.
-      // Acquire it only after readiness so this page cannot retain an old scope.
-      var navPromise =
-        window.FrontDeskRail && window.FrontDeskRail.nav
-          ? window.FrontDeskRail.nav()
-          : fetchJson('/api/front-desk/nav?locale=' + encodeURIComponent(locale));
-      return Promise.all([
-        navPromise,
-        fetchJson('/api/home-vocabulary?locale=' + encodeURIComponent(locale)),
-      ])
-        .then(function (pair) {
-          var nav = pair[0];
-          var vocabResponse = pair[1];
-          if (!vocabResponse || !vocabResponse.ok) return undefined;
-          var vocab = vocabResponse.texts || {};
-          renderAskShell(vocab);
-          wireAskBox(vocab);
-          return Promise.all([fetchJson('/api/home'), fetchJson('/api/me')]).then(function (pair2) {
-            var home = pair2[0];
-            var me = pair2[1];
-            if (home && home.ok && nav && nav.ok) {
-              renderNextAction(nav, vocab, home, locale);
-              renderMetrics(vocab, home);
-              renderDecideCard(nav, vocab, home, me);
-              renderProgressCard(vocab, home);
-            }
-          });
-        })
-        .catch(function () {
-          // The home page is additive chrome around the rail — a fetch
-          // failure must never throw and break the rest of the page.
+    if (!view.retryWired) {
+      view.retryWired = true;
+      var retry = document.getElementById('home-refresh');
+      if (retry)
+        retry.addEventListener('click', function () {
+          return Object.keys(view.vocab).length ? refresh() : mount();
         });
-    });
+    }
+    return Promise.resolve(window.FrontDeskRail && window.FrontDeskRail.ready)
+      .then(function () {
+        return fetchJson('/api/home-vocabulary?locale=' + encodeURIComponent(currentLocale()));
+      })
+      .then(function (response) {
+        if (!response || !response.ok) throw new Error('copy unavailable');
+        view.vocab = response.texts || {};
+        renderAskShell(view.vocab);
+        if (!view.wired) {
+          view.wired = true;
+          wireAskBox(view.vocab);
+          var mode = document.getElementById('home-detail-mode');
+          if (mode)
+            mode.addEventListener('change', function () {
+              view.mode = mode.value === 'detailed' ? 'detailed' : 'quiet';
+              try {
+                if (preferenceKey()) window.localStorage.setItem(preferenceKey(), view.mode);
+              } catch (err) {
+                /* Keep this tab usable. */
+              }
+              renderWork();
+            });
+          if (window.addEventListener) {
+            window.addEventListener('popstate', refresh);
+            window.addEventListener('pageshow', function () {
+              if (view.home) refresh();
+            });
+          }
+        }
+        return refresh();
+      })
+      .catch(showFailure);
   }
-
-  window.KyberionHome = { mount: mount };
+  window.KyberionHome = { mount: mount, refresh: refresh };
 })();

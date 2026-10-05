@@ -39,3 +39,38 @@
 .home-more.kb-btn {
   padding-left: 0;
 }
+
+.home-work-toolbar,
+.home-work-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+}
+.home-work-toolbar {
+  margin-block: var(--kb-ui-space-4);
+}
+.home-work-toolbar select {
+  width: auto;
+}
+.home-work-item {
+  margin-block: var(--kb-ui-space-3);
+  overflow-wrap: anywhere;
+}
+.home-work-details {
+  margin-block: var(--kb-ui-space-2);
+}
+.home-work-details summary {
+  cursor: pointer;
+}
+.home-work-details dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--kb-ui-space-2);
+}
+.home-work-details dd {
+  margin: 0;
+}
+.home-work-details dt {
+  font-weight: 600;
+}
