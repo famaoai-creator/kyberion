@@ -83,6 +83,27 @@ surface ──Set-Cookie: kyberion_session=kys1.…──▶ browser   (HttpOnly
 
 IdP への通信は `secureFetch`(egress policy と監査)を通ります。Google(`accounts.google.com` / `oauth2.googleapis.com` / `www.googleapis.com`)と Microsoft(`login.microsoftonline.com`)のホストは、`knowledge/product/governance/egress-policy.json` の `manual_allowed_domains` に**既定で登録済み**です。別の IdP(Keycloak、Okta など)を使う場合は、そのホストを同じ一覧に追加してください(`mode: enforce` ではこれが無いとログインできません)。
 
+## ローカル検証用の開発 IdP
+
+Google / Entra のクライアントを作らずに、ローカルで `/login` を試すための使い捨て IdP です(`scripts/dev_oidc_idp.ts`)。誰が来ても固定の subject(既定 `dev-user`)としてサインインさせるため、**`127.0.0.1` にしかバインドせず**、リダイレクト先も `http://localhost:<port>/auth/callback` に限定し、`NODE_ENV=production` では起動しません。検証専用で、リモート公開には使えません。
+
+```bash
+# 1. 開発 IdP を起動(別ターミナルで起動したままにする)
+node --import ./scripts/ts-loader.mjs scripts/dev_oidc_idp.ts
+#   --port 9099  --client-id kyberion-dev  --subject dev-user  --email <任意>
+
+# 2. 表示された export を、サーフェスを起動するシェルに貼り付けて起動
+export KYBERION_OIDC_ISSUER=http://localhost:9099
+export KYBERION_OIDC_CLIENT_ID=kyberion-dev
+export KYBERION_OIDC_PROVIDER_LABEL='Dev IdP'
+export KYBERION_SESSION_SECRET=<表示された値>
+
+# 3. この subject を自分の member に紐付ける(初回のみ)
+pnpm organization member link-identity <member-id> --issuer http://localhost:9099 --subject dev-user
+```
+
+`http://localhost:<サーフェスのポート>/` を開くと `/login` に誘導され、ボタンから開発 IdP の確認画面 → サインインできます。`KYBERION_SESSION_SECRET` は全サーフェスで同じ値にしてください(`KYBERION_SESSION_SECRET` を先に設定して起動すれば、その値が使われます)。紐付けていない場合は「このアカウントは登録されていません」になります(fail-closed は本番と同じ)。
+
 ## Google
 
 1. [Google Cloud Console](https://console.cloud.google.com/) → API とサービス → 認証情報 → **OAuth クライアント ID**(種類: ウェブ アプリケーション)。
