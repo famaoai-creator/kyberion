@@ -1,0 +1,44 @@
+---
+record_id: mem-MSN-CHRONOS-TOKEN-REGISTRY-20260927-2026_09_26-R1
+kind: sop_candidate
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-CHRONOS-TOKEN-REGISTRY-20260927-2026_09_26-R1
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-10-05T13:32:10.117Z
+source_branch: fix/voice-media-session-id-20261005
+source_commit: 3914948b3e61c1a44cc2ec7e79234920b20756a7
+---
+
+# Single-file read access: mint a narrow role, never broaden the surface role
+
+SOP for giving a surface access to exactly one file in a tier it cannot normally read.
+
+## Procedure Steps
+
+1. When a surface's role is denied a tier but needs one file from it (e.g. Chronos reading the personal-tier viewer token registry at knowledge/personal/connections/chronos-access.json): (1) Create a dedicated role whose allow_read lists exactly that file and whose allow_write is empty — chronos_token_registry_reader is the reference. (2) Add the role only to the may_assume of the roles that actually perform the read; surfaces that pass registrations:null never get it. (3) Readers wrap the access in withExecutionContext(<narrow role>) at the call site (viewer-context/api-guard, authn-providers). (4) E2E: seed the registry in a hermetic root and authenticate with a registered token in both launch modes. (5) Write infrastructure artifacts (e.g. the stimuli journal) as infrastructure_sentinel so they don't depend on the caller's assumption. Never widen an existing broad role for a single file.
+
+## Safety Notes
+
+- Require approval before irreversible or high-risk actions.
+- Capture evidence before and after the action.
+
+## Escalation Conditions
+
+- Unexpected runtime failure
+- Policy or approval mismatch
+- Result does not match the expected state
+
+## Evidence
+
+- active/missions/public/MSN-CHRONOS-TOKEN-REGISTRY-20260927/evidence/design-spec.json
+- active/missions/public/MSN-CHRONOS-TOKEN-REGISTRY-20260927/evidence/implementation-report.md
+- active/missions/public/MSN-CHRONOS-TOKEN-REGISTRY-20260927/evidence/distillation.md
+
+## Artifacts

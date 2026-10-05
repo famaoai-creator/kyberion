@@ -30,3 +30,12 @@ evidence_refs:
 Reusable weekly review note for the mission closure checklist.
 
 source_ref: MEM-MR7DQZAJ-B0069E94
+
+## MEM-MUUD7UQL-0DE50456 (2026-10-05)
+
+Weekly review face — candidate for knowledge distillation
+
+source_ref: MEM-MUUD7UQL-0DE50456
+evidence_refs:
+
+- /Volumes/data/forcheck/kyberion/active/personal/weekly/2026-W40.md

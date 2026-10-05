@@ -1,0 +1,43 @@
+---
+record_id: mem-MSN-AUTONOMOUS-MOBILE-DECISION-20260927-2026_09_27-R1
+kind: knowledge_hint
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-AUTONOMOUS-MOBILE-DECISION-20260927-2026_09_27-R1
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-10-05T13:32:34.948Z
+source_branch: fix/voice-media-session-id-20261005
+source_commit: 3914948b3e61c1a44cc2ec7e79234920b20756a7
+---
+
+# Decision rights need evidence first: read-only census, attribution traps, operator-approved matrix
+
+Method for changing autonomy levels: measure human load, classify honestly, separate approved scope from deferred follow-ups.
+
+## Hint Scope
+
+mission
+
+## Trigger Phrases
+
+- Before changing decision rights or autonomy tiers: (1) Build a read-only census that counts, per category, human vs agent decisions and unresolved waits — human decisions live in git merge authors (an agent merging with the operator's token counts as human; squash merges are unattributed), silent waits live in planned/paused mission state, and the approval store needs fixture-detection rules (test/fixture tokens, qm<N>- channels) shared with any cleanup tool. (2) Exclude fixtures before counting; missing decider type is unattributed, never 'agent'. (3) Put policy choices (active hours, veto windows, budget caps) to the operator as a versioned decision matrix and record the approval — don't infer them. (4) The gate must derive the risk tier from what the change touches, never from a caller-supplied label; a single maximal axis forces approve and the veto window fails closed. (5) Separate P0 delivery from P1/P2 follow-ups so verification states precisely what was approved and what remains deferred.
+
+## Recommended References
+
+- active/missions/public/MSN-AUTONOMOUS-MOBILE-DECISION-20260927/evidence/decision-rights-matrix-proposal.json
+- active/missions/public/MSN-AUTONOMOUS-MOBILE-DECISION-20260927/evidence/human-intervention-census.txt
+- active/missions/public/MSN-AUTONOMOUS-MOBILE-DECISION-20260927/evidence/operator-decision.md
+
+## Evidence
+
+- active/missions/public/MSN-AUTONOMOUS-MOBILE-DECISION-20260927/evidence/decision-rights-matrix-proposal.json
+- active/missions/public/MSN-AUTONOMOUS-MOBILE-DECISION-20260927/evidence/human-intervention-census.txt
+- active/missions/public/MSN-AUTONOMOUS-MOBILE-DECISION-20260927/evidence/operator-decision.md
+
+## Artifacts
