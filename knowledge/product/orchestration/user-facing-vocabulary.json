@@ -23183,6 +23183,56 @@
         "en": "This operation cannot yet preserve your conversation’s access scope. Direct conversation is supported; delegation, managed execution, task steering, and shared personal queries require an explicitly scoped workflow. Your draft is kept. Check progress before continuing.",
         "ja": "この操作は、会話のアクセス範囲を保って実行できません。直接の会話には対応していますが、委任・管理実行・作業の変更・共有個人情報の照会には、範囲を明示したワークフローが必要です。入力は保持しています。続行前に進み具合をご確認ください。",
         "qps-ploc": "⟦Ŧħïş őṗėřȧŧïőñ ƈȧññőŧ ẏėŧ ṗřėşėřṽė ẏőůř ƈőñṽėřşȧŧïőñ’ş ȧƈƈėşş şƈőṗė. Ḓïřėƈŧ ƈőñṽėřşȧŧïőñ ïş şůṗṗőřŧėḓ; ḓėŀėɠȧŧïőñ, ɱȧñȧɠėḓ ėẋėƈůŧïőñ, ŧȧşķ şŧėėřïñɠ, ȧñḓ şħȧřėḓ ṗėřşőñȧŀ ɋůėřïėş řėɋůïřė ȧñ ėẋṗŀïƈïŧŀẏ şƈőṗėḓ ẇőřķƒŀőẇ. Ẏőůř ḓřȧƒŧ ïş ķėṗŧ. Ƈħėƈķ ṗřőɠřėşş ƀėƒőřė ƈőñŧïñůïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "task_recorded": {
+        "en": "Recorded “{title}” as a separate request. Execution has not started; this conversation currently records and links requests only.",
+        "ja": "「{title}」を別の依頼として記録しました。実行は開始していません。この会話では依頼の記録と紐付けまで対応しています。",
+        "qps-ploc": "⟦Řėƈőřḓėḓ “{title}” ȧş ȧ şėṗȧřȧŧė řėɋůėşŧ. Ėẋėƈůŧïőñ ħȧş ñőŧ şŧȧřŧėḓ; ŧħïş ƈőñṽėřşȧŧïőñ ƈůřřėñŧŀẏ řėƈőřḓş ȧñḓ ŀïñķş řėɋůėşŧş őñŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗï⟧"
+      },
+      "task_followup": {
+        "en": "Added this follow-up to “{title}”. The request is recorded; execution has not started.",
+        "ja": "「{title}」に追加の指示を記録しました。依頼は記録済みで、実行は開始していません。",
+        "qps-ploc": "⟦Ȧḓḓėḓ ŧħïş ƒőŀŀőẇ-ůṗ ŧő “{title}”. Ŧħė řėɋůėşŧ ïş řėƈőřḓėḓ; ėẋėƈůŧïőñ ħȧş ñőŧ şŧȧřŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "task_status": {
+        "en": "“{title}” is recorded. This conversation has not started execution. Actual progress and results have not been verified.",
+        "ja": "「{title}」は記録済みです。この会話では実行を開始していません。実際の進捗や結果は未確認です。",
+        "qps-ploc": "⟦“{title}” ïş řėƈőřḓėḓ. Ŧħïş ƈőñṽėřşȧŧïőñ ħȧş ñőŧ şŧȧřŧėḓ ėẋėƈůŧïőñ. Ȧƈŧůȧŀ ṗřőɠřėşş ȧñḓ řėşůŀŧş ħȧṽė ñőŧ ƀėėñ ṽėřïƒïėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "task_approval": {
+        "en": "I linked the approval-shaped message to “{title}”. No approval was granted and no execution started. Use the governed approval flow for the actual action.",
+        "ja": "承認に関する発言を「{title}」に紐付けました。実際の承認や実行は行っていません。実行する操作の正式な承認手続きを使ってください。",
+        "qps-ploc": "⟦Ï ŀïñķėḓ ŧħė ȧṗṗřőṽȧŀ-şħȧṗėḓ ɱėşşȧɠė ŧő “{title}”. Ñő ȧṗṗřőṽȧŀ ẇȧş ɠřȧñŧėḓ ȧñḓ ñő ėẋėƈůŧïőñ şŧȧřŧėḓ. Ůşė ŧħė ɠőṽėřñėḓ ȧṗṗřőṽȧŀ ƒŀőẇ ƒőř ŧħė ȧƈŧůȧŀ ȧƈŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőř⟧"
+      },
+      "task_cancellation": {
+        "en": "I linked the cancellation request to “{title}”. No running work was stopped. This recorded request has not started executing.",
+        "ja": "中止の依頼を「{title}」に紐付けました。実行中の処理を停止したわけではありません。この記録上の依頼は実行を開始していません。",
+        "qps-ploc": "⟦Ï ŀïñķėḓ ŧħė ƈȧñƈėŀŀȧŧïőñ řėɋůėşŧ ŧő “{title}”. Ñő řůññïñɠ ẇőřķ ẇȧş şŧőṗṗėḓ. Ŧħïş řėƈőřḓėḓ řėɋůėşŧ ħȧş ñőŧ şŧȧřŧėḓ ėẋėƈůŧïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "task_choose": {
+        "en": "Which recorded request do you mean? Reply with its number or exact title.\n{choices}",
+        "ja": "どの依頼についてですか？番号か正確な件名で教えてください。\n{choices}",
+        "qps-ploc": "⟦Ẇħïƈħ řėƈőřḓėḓ řėɋůėşŧ ḓő ẏőů ɱėȧñ? Řėṗŀẏ ẇïŧħ ïŧş ñůɱƀėř őř ėẋȧƈŧ ŧïŧŀė.\n{choices} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "task_no_match": {
+        "en": "I cannot identify a single recorded request. Please name the request or choose a number from the last task list. Nothing has been approved, stopped, or started.",
+        "ja": "対象の依頼を一つに特定できません。依頼名か直前の候補一覧の番号を教えてください。承認・停止・実行は行っていません。",
+        "qps-ploc": "⟦Ï ƈȧññőŧ ïḓėñŧïƒẏ ȧ şïñɠŀė řėƈőřḓėḓ řėɋůėşŧ. Ṗŀėȧşė ñȧɱė ŧħė řėɋůėşŧ őř ƈħőőşė ȧ ñůɱƀėř ƒřőɱ ŧħė ŀȧşŧ ŧȧşķ ŀïşŧ. Ñőŧħïñɠ ħȧş ƀėėñ ȧṗṗřőṽėḓ, şŧőṗṗėḓ, őř şŧȧřŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ⟧"
+      },
+      "task_mixed": {
+        "en": "This message appears to combine requests or task controls. Please state one request or one existing-task action at a time. Nothing has changed.",
+        "ja": "複数の依頼や操作が含まれているようです。新しい依頼か既存の依頼への指示を、一つずつ教えてください。記録は変更していません。",
+        "qps-ploc": "⟦Ŧħïş ɱėşşȧɠė ȧṗṗėȧřş ŧő ƈőɱƀïñė řėɋůėşŧş őř ŧȧşķ ƈőñŧřőŀş. Ṗŀėȧşė şŧȧŧė őñė řėɋůėşŧ őř őñė ėẋïşŧïñɠ-ŧȧşķ ȧƈŧïőñ ȧŧ ȧ ŧïɱė. Ñőŧħïñɠ ħȧş ƈħȧñɠėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
+      },
+      "task_capacity": {
+        "en": "The recorded-request list is full. I have kept all existing requests and have not added or started this one.",
+        "ja": "依頼の記録件数が上限に達しています。既存の記録は保持し、この依頼の追加や実行は行っていません。",
+        "qps-ploc": "⟦Ŧħė řėƈőřḓėḓ-řėɋůėşŧ ŀïşŧ ïş ƒůŀŀ. Ï ħȧṽė ķėṗŧ ȧŀŀ ėẋïşŧïñɠ řėɋůėşŧş ȧñḓ ħȧṽė ñőŧ ȧḓḓėḓ őř şŧȧřŧėḓ ŧħïş őñė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
+      },
+      "task_update_capacity": {
+        "en": "This request has reached its follow-up limit. Existing instructions are preserved; the new instruction was not added or executed.",
+        "ja": "この依頼への追加指示が上限に達しています。既存の指示は保持し、新しい指示の追加や実行は行っていません。",
+        "qps-ploc": "⟦Ŧħïş řėɋůėşŧ ħȧş řėȧƈħėḓ ïŧş ƒőŀŀőẇ-ůṗ ŀïɱïŧ. Ėẋïşŧïñɠ ïñşŧřůƈŧïőñş ȧřė ṗřėşėřṽėḓ; ŧħė ñėẇ ïñşŧřůƈŧïőñ ẇȧş ñőŧ ȧḓḓėḓ őř ėẋėƈůŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗï⟧"
       }
     },
     "operator": {

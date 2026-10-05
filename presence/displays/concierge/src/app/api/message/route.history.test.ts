@@ -324,3 +324,50 @@ describe('conversation recovery and truthful execution states', () => {
     expect(mocks.run).toHaveBeenCalledOnce();
   });
 });
+
+describe('intake routing boundary', () => {
+  it.each(['new_request', 'status', 'clarification', 'approval', 'cancellation'])(
+    'returns durable %s reply without executing an orchestrator',
+    async (kind) => {
+      mocks.begin.mockReturnValue({
+        id: REQUEST_ID,
+        created: true,
+        routing: {
+          kind,
+          taskIds: [],
+          confidence: 'rule',
+          authority: 'none',
+          reply: 'Recorded request; execution has not started.',
+        },
+      });
+      const response = await POST(request({ text: 'A request', requestId: REQUEST_ID }));
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        mode: 'intake',
+        historySaved: true,
+        reply: 'Recorded request; execution has not started.',
+      });
+      expect(mocks.run).not.toHaveBeenCalled();
+      expect(mocks.context).not.toHaveBeenCalled();
+      expect(mocks.complete).toHaveBeenCalledWith(
+        mocks.viewer,
+        REQUEST_ID,
+        'Recorded request; execution has not started.'
+      );
+    }
+  );
+  it('does not invite retry if a direct intake completion could not be saved', async () => {
+    mocks.begin.mockReturnValue({
+      id: REQUEST_ID,
+      created: true,
+      routing: { kind: 'status', reply: 'Execution has not started.' },
+    });
+    mocks.complete.mockImplementation(() => {
+      throw new Error('disk unavailable');
+    });
+    const response = await POST(request({ text: 'status' }));
+    expect(await response.json()).toMatchObject({ mode: 'intake', historySaved: false });
+    expect(mocks.run).not.toHaveBeenCalled();
+    expect(mocks.notStarted).not.toHaveBeenCalled();
+  });
+});

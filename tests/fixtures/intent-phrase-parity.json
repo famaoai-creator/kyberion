@@ -1998,7 +1998,7 @@
         "来週の会議を前倒ししたい",
         "今週のアポイントを後ろにずらして",
         "午後の会議を別日に移して",
-        "来月の会議を見直して",
+        "来月の会議を見��して",
         "明日の会議を確認して",
         "3Blue1Brownみたいな数学解説動画を作って",
         "confidential dossier をまとめて",
@@ -4049,6 +4049,125 @@
         "朝イチの予定だけ教えて",
         "明日の会議予定を見て"
       ]
+    },
+    "conversation_task.new_request": {
+      "old_regex": "new contract: conversation task new_request",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": [
+        "資料を作って",
+        "調査をお願いします。作成して",
+        "Please prepare a report",
+        "Can you research Tokyo hotels?"
+      ],
+      "no_match": ["hello", "How do I write a report?"]
+    },
+    "conversation_task.followup": {
+      "old_regex": "new contract: conversation task followup",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": ["表を追加して", "Please add a chart", "Make it shorter"],
+      "no_match": ["hello", "Any update?"]
+    },
+    "conversation_task.status": {
+      "old_regex": "new contract: conversation task status",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": ["さっきの件どう？", "Aの件どう？", "進捗は？", "Any updates?", "How is the task?"],
+      "no_match": ["資料を作って", "Create a status report", "How are you?", "How is the weather?"]
+    },
+    "conversation_task.approval": {
+      "old_regex": "new contract: conversation task approval",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": ["はい", "承認します", "Go ahead", "Please approve the report"],
+      "no_match": ["hello", "いいえ"]
+    },
+    "conversation_task.cancellation": {
+      "old_regex": "new contract: conversation task cancellation",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": ["止めて", "キャンセルして", "Cancel the report", "stop"],
+      "no_match": ["hello", "unstoppable"]
+    },
+    "conversation_task.mixed": {
+      "old_regex": "new contract: conversation task mixed",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": ["資料を作って、それと調べて", "write report and research travel"],
+      "no_match": ["write report", "資料を作って"]
+    },
+    "conversation_task.vague_confirmation": {
+      "old_regex": "new contract: conversation task vague_confirmation",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": ["はい", "お願いします", "yes", "okay!"],
+      "no_match": ["yes and add a chart", "いいえ、二番目"]
+    },
+    "conversation_task.ordinal": {
+      "old_regex": "new contract: conversation task ordinal",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": ["1", "2nd", "2つ目", "number 3"],
+      "no_match": ["zero", "2つ目に表を追加して"]
+    },
+    "conversation_task.first": {
+      "old_regex": "new contract: conversation task first",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": ["first", "the first one", "一つ目"],
+      "no_match": ["first add a chart", "一つ目に追加"]
+    },
+    "conversation_task.second": {
+      "old_regex": "new contract: conversation task second",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": ["second", "二番目"],
+      "no_match": ["second draft please", "二番目に追加"]
+    },
+    "conversation_task.third": {
+      "old_regex": "new contract: conversation task third",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": ["third", "三つ目"],
+      "no_match": ["third place", "三つ目に追加"]
+    },
+    "conversation_task.title": {
+      "old_regex": "new contract: conversation task title",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": ["Prepare report", "資料を作って"],
+      "no_match": ["hello", "status?"]
+    },
+    "conversation_task.named_reference": {
+      "old_regex": "new contract: conversation task named_reference",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": ["Aの件どう？", "status of B", "How is report?", "cancel the report"],
+      "no_match": ["any updates?", "hello"]
+    },
+    "conversation_task.deictic": {
+      "old_regex": "new contract: conversation task deictic",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": ["さっき", "その", "it", "that request"],
+      "no_match": ["A", "B", "the report"]
+    },
+    "conversation_task.task_topic": {
+      "old_regex": "new contract: conversation task task_topic",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": ["Aの報告書", "営業の資料"],
+      "no_match": ["report", "資料"]
+    },
+    "conversation_task.status_question": {
+      "old_regex": "new contract: conversation task status_question",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": ["How is report?", "How are you?"],
+      "no_match": ["status?", "hello"]
+    },
+    "conversation_task.implicit_reference": {
+      "old_regex": "new contract: positive implicit task reference",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": ["Any updates?", "Add a chart", "表を追加して", "進捗は？", "Make it shorter"],
+      "no_match": ["Add a chart to B", "Please tell me the status of B", "Bの件どう？"]
+    },
+    "conversation_task.amendment_field": {
+      "old_regex": "new contract: amendment field reference",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": ["the title", "its document"],
+      "no_match": ["B", "my project", "the weather"]
+    },
+    "conversation_task.quoted_reference": {
+      "old_regex": "new contract: single whole quoted task target",
+      "sites": ["libs/core/surface/conversation-task-routing.ts"],
+      "match": ["\"A report\"", "「Aの報告書」"],
+      "no_match": ["\"A report\" and \"B report\"", "「A」か「B」", "A report"]
     }
   }
 }

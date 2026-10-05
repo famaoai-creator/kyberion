@@ -28,7 +28,7 @@ function hasSafeConversationTree(value: unknown): boolean {
 export type ConversationShape =
   'clarification' | 'execution_preview' | 'status_summary' | 'delivery_summary' | 'reply';
 
-export type ConversationMode = 'voice-hub' | 'orchestrator' | 'unavailable' | 'history';
+export type ConversationMode = 'voice-hub' | 'orchestrator' | 'unavailable' | 'history' | 'intake';
 
 export interface ConversationNextAction {
   id: string;
