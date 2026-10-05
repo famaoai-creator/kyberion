@@ -1,5 +1,5 @@
 /* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
@@ -56,7 +56,8 @@ import { installTenVadBackend } from '@agent/core/ten-vad-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
 import { probeAudioPlayback } from '@agent/core/voice/audio-playback';
 import { playPcmAudioStream, probePcmAudioStreaming } from '@agent/core/streaming-voice-playback';
-import { probeMicCapture } from '@agent/core/mic-capture';
+import { probeMicCapture, resolveMicDevice } from '@agent/core/mic-capture';
+import { resolveFfmpegBin } from '@agent/core/tool/tool-binary-resolvers';
 import { recordVadTurn, type VadTurnState } from '@agent/core/voice/vad-turn-recorder';
 import { resolveManagedToolPythonBin } from '@agent/core/tool/tool-runtime-registry';
 import { resolveVadBackend } from '@agent/core/voice/vad-registry';
@@ -567,6 +568,25 @@ export function resolveSpeculativeReplyGuards(
   };
 }
 
+/** Resolve the capture device to a human-readable name when the OS can list it. */
+function describeMicDevice(explicit?: string): string {
+  const device = resolveMicDevice(explicit);
+  const idx = /^:(\d+)$/u.exec(device)?.[1];
+  if (idx === undefined || process.platform !== 'darwin') return device;
+  try {
+    const probe = spawnSync(
+      resolveFfmpegBin(),
+      ['-hide_banner', '-f', 'avfoundation', '-list_devices', 'true', '-i', ''],
+      { encoding: 'utf8' }
+    );
+    const listing = `${probe.stdout || ''}\n${probe.stderr || ''}`;
+    const name = new RegExp(`\\[${idx}\\]\\s+(.+?)\\s*$`, 'um').exec(listing)?.[1];
+    return name ? `${name.trim()} (${device})` : device;
+  } catch {
+    return device;
+  }
+}
+
 export async function runRealtimeVoiceConversationLoop(
   options: RealtimeVoiceConversationCliOptions,
   print: (value: unknown) => void = () => undefined
@@ -739,9 +759,15 @@ export async function runRealtimeVoiceConversationLoop(
   });
   print(
     `\n=== Realtime voice loop — session ${session.session_id} ` +
-      `(vad=${vadBackend.backend_id}, barge-in=${bargeInMode}, ` +
-      `stt=${streamingStt ? 'streaming' : 'batch'}) ===`
+      `(mic=${describeMicDevice(options.micDevice)}, vad=${vadBackend.backend_id}, ` +
+      `barge-in=${bargeInMode}, stt=${streamingStt ? 'streaming' : 'batch'}) ===`
   );
+  if (bargeInMode === 'two_stage' && !streamingStt) {
+    // i18n-exempt: JA voice demo script output
+    print(
+      '   注意: two_stage の「言葉確認」は streaming STT の partial が必要です。batch STT ではエコーと実際の発話を区別できず、スピーカー環境では自分の再生音が割り込みとして返答を止めることがあります。--streaming-stt またはヘッドセットを使ってください。'
+    );
+  }
   if (bargeInMode !== 'off') {
     // i18n-exempt: JA voice demo script output
     print('   barge-in はスピーカーのエコーで誤動作することがあります。ヘッドセット推奨です。');
