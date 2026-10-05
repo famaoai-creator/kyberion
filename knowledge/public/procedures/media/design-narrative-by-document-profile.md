@@ -1,3 +1,8 @@
+---
+title: 'Design Narrative By Document Profile'
+last_updated: 2026-10-05
+---
+
 # Design Narrative By Document Profile
 
 Kyberion now separates three concerns for document-like media generation:

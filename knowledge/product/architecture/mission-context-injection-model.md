@@ -1,11 +1,12 @@
 ---
 title: Mission Context Injection Model
-kind: architecture
+kind: evergreen
 scope: repository
 authority: reference
 phase: [alignment, execution, review]
 tags: [mission, context, injection, pack, tier, tenant, knowledge]
 owner: ecosystem_architect
+last_updated: 2026-10-05
 ---
 
 # Mission Context Injection Model

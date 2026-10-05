@@ -1,3 +1,8 @@
+---
+title: 'Gateway Capability Registry Canonical Directory'
+last_updated: 2026-10-05
+---
+
 # Gateway Capability Registry Canonical Directory
 
 Canonical source for assimilated gateway capabilities (RSP-14).

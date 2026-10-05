@@ -1,3 +1,8 @@
+---
+title: 'Entity Governance Implementation Evidence'
+last_updated: 2026-10-05
+---
+
 # Entity Governance Implementation Evidence
 
 Mission: `MSN-EG-20260809B`

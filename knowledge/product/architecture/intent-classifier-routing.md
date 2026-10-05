@@ -1,3 +1,9 @@
+---
+title: 'Architecture: Intent Classifier Routing'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # Architecture: Intent Classifier Routing
 
 ## 1. Purpose

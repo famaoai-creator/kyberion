@@ -4231,6 +4231,10 @@
       "types": "./dist/intent/intent-contract-learning.d.ts",
       "default": "./dist/intent/intent-contract-learning.js"
     },
+    "./intent/conversation-signals": {
+      "types": "./dist/intent/conversation-signals.d.ts",
+      "default": "./dist/intent/conversation-signals.js"
+    },
     "./intent/intent-contract-types": {
       "types": "./dist/intent/intent-contract-types.d.ts",
       "default": "./dist/intent/intent-contract-types.js"

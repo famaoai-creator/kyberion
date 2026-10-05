@@ -1,3 +1,8 @@
+---
+title: 'Governance Body Registry Canonical Directory'
+last_updated: 2026-10-05
+---
+
 # Governance Body Registry Canonical Directory
 
 Canonical source for governance body definitions (RSP-16).

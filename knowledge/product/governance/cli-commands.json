@@ -3218,6 +3218,16 @@
       "group": "inspect"
     },
     {
+      "id": "script.conversation.report",
+      "module": "scripts/conversation_report.ts",
+      "command": "conversation report",
+      "noun": "conversation",
+      "verb": "report",
+      "audience": "operator",
+      "description": "cli_cmd_script_conversation_report",
+      "group": "inspect"
+    },
+    {
       "id": "script.tenant.export",
       "module": "scripts/tenant_export.ts",
       "command": "tenant export",

@@ -1,3 +1,8 @@
+---
+title: 'Marketing And Video Workload'
+last_updated: 2026-10-05
+---
+
 # Marketing And Video Workload
 
 ## Responsibility Boundaries

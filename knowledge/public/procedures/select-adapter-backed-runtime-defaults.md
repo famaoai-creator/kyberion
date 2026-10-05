@@ -3,6 +3,7 @@ title: Select adapter-backed runtime defaults
 category: system
 tags: [onboarding, adapter, runtime, media, security, operations]
 audience: [operator, developer]
+last_updated: 2026-10-05
 ---
 
 # Adapter-backed runtime の既定値を選択する手順

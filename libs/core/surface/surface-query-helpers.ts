@@ -15,7 +15,7 @@ import {
   recordSchedulePreference,
   resolveDefaultScheduleSource,
 } from '../contextual-intent-memory.js';
-import { recordContextualIntentLearning } from '../contextual-intent-learning.js';
+import { recordConversationSignal } from '../intent/conversation-signals.js';
 import { extractSurfaceBlocks } from './surface-response-blocks.js';
 import { resolveSurfaceIntent } from '../router-contract.js';
 import type { IntentResolutionPacket } from '../intent/intent-resolution.js';
@@ -211,6 +211,32 @@ async function listCalendarEvents(params: {
   return Array.isArray(parsed) ? parsed : [];
 }
 
+/** The read-only agenda turn's outcome, in the conversation signal ledger. */
+function recordAgendaSignal(
+  kind: 'turn_succeeded' | 'turn_failed',
+  utterance: string,
+  clarificationNeeded: boolean,
+  detail: Record<string, string | number>
+): void {
+  let tenant: string | undefined;
+  try {
+    tenant = currentScope().tenant_slug;
+  } catch {
+    tenant = undefined;
+  }
+  recordConversationSignal({
+    kind,
+    utterance,
+    intentId: 'schedule-read-agenda',
+    scope: { tenant_slug: tenant },
+    detail: {
+      shape: 'calendar_agenda_summary',
+      clarification_needed: clarificationNeeded,
+      ...detail,
+    },
+  });
+}
+
 async function readScheduleAgenda(
   queryText: string,
   contextualFrame?: ContextualIntentFrame
@@ -257,27 +283,14 @@ async function readScheduleAgenda(
       events: Array.isArray(events) ? events : [],
       assumption,
     });
-    recordContextualIntentLearning({
-      utterance: queryText,
-      intentId: 'schedule-read-agenda',
-      frame,
-      clarificationNeeded: clarificationDecision.shouldClarify,
-      confirmed: true,
-      tier: 'personal',
-      responseShape: 'calendar_agenda_summary',
-      notes: `read-only agenda returned ${Array.isArray(events) ? events.length : 0} event(s); omitted_count=${agendaReply.omitted_count}`,
+    recordAgendaSignal('turn_succeeded', queryText, clarificationDecision.shouldClarify, {
+      events: Array.isArray(events) ? events.length : 0,
+      omitted: agendaReply.omitted_count,
     });
     return agendaReply.text;
   } catch (error: any) {
-    recordContextualIntentLearning({
-      utterance: queryText,
-      intentId: 'schedule-read-agenda',
-      frame,
-      clarificationNeeded: clarificationDecision.shouldClarify,
-      confirmed: false,
-      tier: 'personal',
-      responseShape: 'calendar_agenda_summary',
-      notes: `calendar-actuator read failed: ${error?.message || String(error)}`,
+    recordAgendaSignal('turn_failed', queryText, clarificationDecision.shouldClarify, {
+      error: error?.message || String(error),
     });
     if (frame.source_binding.selected) {
       recordSchedulePreference({

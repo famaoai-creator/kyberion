@@ -1,3 +1,8 @@
+---
+title: 'Capability Bundle Registry Canonical Directory'
+last_updated: 2026-10-05
+---
+
 # Capability Bundle Registry Canonical Directory
 
 This directory is the canonical source for capability bundle entries (RSP-11).

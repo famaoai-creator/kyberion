@@ -1,3 +1,8 @@
+---
+title: 'Tool Runtime Registry Canonical Directory'
+last_updated: 2026-10-05
+---
+
 # Tool Runtime Registry Canonical Directory
 
 Canonical source for tool runtime records (RSP-17).

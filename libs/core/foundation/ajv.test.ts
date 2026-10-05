@@ -89,8 +89,6 @@ describe('shared Ajv instances carry the standard format vocabulary', () => {
     'calendar-action',
     'knowledge-package',
     'production-evidence-register',
-    'contextual-intent-learning',
-    'contextual-intent-learning-seed',
     'onboarding-context-binding',
     'onboarding-first-work',
   ];

@@ -4,7 +4,8 @@ category: Architecture
 tags: [architecture, enterprise, intent, approval, execution, accountability, learning]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-03-29
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # Enterprise Operating Kernel

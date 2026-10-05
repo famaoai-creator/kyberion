@@ -1,5 +1,5 @@
 ---
-title: MISSION: External System Connection Mapping
+title: 'MISSION: External System Connection Mapping'
 category: Orchestration
 tags: [orchestration, onboarding-directives, steward, self, map]
 importance: 8

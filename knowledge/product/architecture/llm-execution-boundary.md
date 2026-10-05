@@ -1,3 +1,9 @@
+---
+title: 'LLM Execution Boundary'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # LLM Execution Boundary
 
 Kyberion separates the role of the LLM from the role of deterministic execution.

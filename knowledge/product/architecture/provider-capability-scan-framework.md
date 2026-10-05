@@ -1,3 +1,9 @@
+---
+title: 'Provider Capability Scan Framework'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # Provider Capability Scan Framework
 
 Kyberion は、プロバイダー固有のツール機能を `ADF` に直書きせず、`registry + scan policy + adapter registry` の 3 層で扱う。
@@ -18,6 +24,7 @@ Kyberion は、プロバイダー固有のツール機能を `ADF` に直書き�
    - scan で見つかった capability は、ここに adapter があるかで governed execution へ進める。
 
 See also:
+
 - [Capability Lifecycle Procedure](./capability-lifecycle-procedure.md)
 - [Capability Lifecycle Eligibility Checklist](./capability-lifecycle-eligibility-checklist.md)
 

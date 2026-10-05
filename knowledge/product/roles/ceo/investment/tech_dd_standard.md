@@ -4,7 +4,8 @@ category: Roles
 tags: [roles, ceo, investment, tech, standard]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # 技術デューデリジェンス (Tech DD) 標準基準

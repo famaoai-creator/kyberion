@@ -1,3 +1,9 @@
+---
+title: 'Provider Native Capability Bridge'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # Provider Native Capability Bridge
 
 ## Goal

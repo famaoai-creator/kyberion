@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Register Voice Profile'
+last_updated: 2026-10-05
+---
+
 # Procedure: Register Voice Profile
 
 ## 1. Goal

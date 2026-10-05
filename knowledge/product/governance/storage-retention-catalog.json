@@ -99,6 +99,13 @@
       "note": "Per-process operations-halt flags written by test runs (operations-halt.ts under vitest). Isolated so a test that engages a halt never stops the live system."
     },
     {
+      "path": "active/shared/runtime/conversation-signals",
+      "artifact_class": "log",
+      "ttl_days": 90,
+      "action": "delete",
+      "note": "Conversation signal ledger (libs/core/intent/conversation-signals.ts): one JSONL file per month of turn outcomes — metadata and a short excerpt, never a tenant turn. Read by the conversation report."
+    },
+    {
       "path": "active/shared/runtime/a2a-conversations",
       "artifact_class": "log",
       "ttl_days": 30,

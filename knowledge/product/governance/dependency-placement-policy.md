@@ -3,7 +3,7 @@ title: Dependency Placement Policy
 category: Governance
 tags: [dependency, runtime, pnpm, uv, venv, policy]
 importance: 9
-last_updated: 2026-07-02
+last_updated: 2026-10-05
 ---
 
 # Dependency Placement Policy
@@ -12,16 +12,16 @@ Kyberion separates dependency placement by lifecycle, ownership, and persistence
 
 ## Canonical Placement Matrix
 
-| Kind | Canonical owner | Canonical location | Installation path |
-|---|---|---|---|
-| Workspace Node dependencies | repo workspace | repo root `node_modules/` | `pnpm install` at repo root |
-| Managed tool runtimes | tool-runtime registry | `active/shared/runtime/tool-runtimes/<tool-id>/` | tool-runtime policy + registry |
-| Managed service runtimes | service-runtime registry | `active/shared/runtime/service-runtimes/<service-id>/` | service-runtime policy + registry |
-| Runtime state / receipts | runtime layer | `active/shared/runtime/**/state.json` and readiness receipts | runtime layer / `env:bootstrap` |
-| Shared caches | runtime policy | `active/shared/tmp/*-cache/` | runtime layer |
+| Kind                             | Canonical owner                | Canonical location                                                                                                       | Installation path                  |
+| -------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
+| Workspace Node dependencies      | repo workspace                 | repo root `node_modules/`                                                                                                | `pnpm install` at repo root        |
+| Managed tool runtimes            | tool-runtime registry          | `active/shared/runtime/tool-runtimes/<tool-id>/`                                                                         | tool-runtime policy + registry     |
+| Managed service runtimes         | service-runtime registry       | `active/shared/runtime/service-runtimes/<service-id>/`                                                                   | service-runtime policy + registry  |
+| Runtime state / receipts         | runtime layer                  | `active/shared/runtime/**/state.json` and readiness receipts                                                             | runtime layer / `env:bootstrap`    |
+| Shared caches                    | runtime policy                 | `active/shared/tmp/*-cache/`                                                                                             | runtime layer                      |
 | Large downloaded models / assets | owning tool or service runtime | `active/shared/runtime/tool-runtimes/<tool-id>/models/` or `active/shared/runtime/service-runtimes/<service-id>/models/` | governed bootstrap / runtime layer |
-| Temporary working files | pipeline / mission | `active/shared/tmp/` or mission evidence dirs | pipeline / mission controller |
-| Secrets / credentials | connection tiers | `knowledge/personal/`, customer overlays, or secret guard | service binding flow |
+| Temporary working files          | pipeline / mission             | `active/shared/tmp/` or mission evidence dirs                                                                            | pipeline / mission controller      |
+| Secrets / credentials            | connection tiers               | `knowledge/personal/`, customer overlays, or secret guard                                                                | service binding flow               |
 
 ## Non-Canonical Locations
 

@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Generate Image From ADF'
+last_updated: 2026-10-05
+---
+
 # Procedure: Generate Image From ADF
 
 ## 1. Goal

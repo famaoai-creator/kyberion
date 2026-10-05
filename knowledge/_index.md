@@ -222,6 +222,7 @@
 - [Gateway Onboarding Protocol](./product/governance/gateway-onboarding-protocol.md) (public | Kyberion Ecosystem Architect)
 - [Governance: Tiered Consensus & Experimental Branches](./product/governance/tiered-consensus-and-experimental-branches.md) (public | Unknown)
 - [Independent Validation Evidence Package](./product/governance/independent-validation-evidence-package.md) (public | Unknown)
+- [Knowledge Curation Report](./product/governance/CURATION_REPORT.md) (public | Unknown)
 - [Kyberion Development Practices — Hard-Won Rules for Changing This Repo](./product/governance/kyberion-development-practices.md) (public | Unknown)
 - [LLM Invocation Rubric — どのポイントで LLM に頼むか](./product/governance/llm-invocation-rubric.md) (public | Unknown)
 - [Logging Policy: console and file logs humans and LLMs can act on](./product/governance/logging-policy.md) (public | Unknown)
@@ -281,7 +282,7 @@
 - [Reasoning Provider Registry Canonical Directory](./product/governance/reasoning-providers/README.md) (public | Unknown)
 
 ## 📁 product/governance/retrospectives
-- [🧠 Retrospective: 2026-03-13 (Onboarding & First Mission)](./product/governance/retrospectives/2026-03-13_onboarding_review.md) (public | Unknown)
+- [Retrospective: 2026-03-13 (Onboarding & First Mission)](./product/governance/retrospectives/2026-03-13_onboarding_review.md) (public | Unknown)
 
 ## 📁 product/governance/service-runtimes
 - [Service Runtime Registry Canonical Directory](./product/governance/service-runtimes/README.md) (public | Unknown)
@@ -389,6 +390,7 @@
 - [Media Structured-Content Extension Guide](./product/orchestration/media-structured-content-extension.md) (public | Unknown)
 - [Meeting Facilitation Workflow Simplification Proposal](./product/orchestration/meeting-facilitation-workflow-simplification-proposal.md) (public | Unknown)
 - [Meeting Operations Playbook](./product/orchestration/meeting-operations-playbook.md) (public | Unknown)
+- [Memory Promotion Queue Recovery Playbook — draining a stuck candidate backlog](./product/orchestration/memory-promotion-queue-recovery-playbook.md) (public | Unknown)
 - [Memory Snapshot Protocol](./product/orchestration/memory-snapshot-protocol.md) (public | Ecosystem Architect)
 - [Mesh Hub Inspection](./product/orchestration/mesh-hub-inspection.md) (public | Unknown)
 - [Mission Kickoff Playbook — friction-free mission start for repo-internal work](./product/orchestration/mission-kickoff-playbook.md) (public | Unknown)
@@ -973,8 +975,9 @@
 ## 📁 public/standards
 - [AWS FISC (金融機関向け安全対策基準) 準拠ガイド](./public/standards/aws_fisc_standard.md) (public | Ecosystem Architect)
 - [AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド](./public/standards/blea_fisc_reference.md) (public | Ecosystem Architect)
-- [Knowledge Management Standard (Semantic Indexing) v1.0](./public/standards/knowledge_management.md) (public | Ecosystem Architect)
+- [Knowledge Management Standard (Semantic Indexing) v1.1](./public/standards/knowledge_management.md) (public | Ecosystem Architect)
 - [Standard: moltbook Compatibility Protocol (MCP) v1.0](./public/standards/moltbook-compatibility.md) (public | Unknown)
+- [官公庁 生成AIガイドライン索引 (Japanese Government GenAI Guidelines)](./public/standards/japan-gov-genai-guidelines-index.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/adr
 - [Architecture Decision Record (ADR) Standard](./public/standards/adr/adr_standard.md) (public | Ecosystem Architect)

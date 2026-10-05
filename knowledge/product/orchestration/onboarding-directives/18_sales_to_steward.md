@@ -1,5 +1,5 @@
 ---
-title: MISSION: Sales Pipelines & Deal Insights
+title: 'MISSION: Sales Pipelines & Deal Insights'
 category: Orchestration
 tags: [orchestration, onboarding-directives, sales, steward]
 importance: 8

@@ -12,7 +12,7 @@ describe('intent learning seed cache plan contract', () => {
     expect(doc).toContain('libs/actuators/orchestrator-actuator/src/super-nerve/resolver.ts');
     expect(doc).toContain('knowledge/product/governance/standard-intents.json');
     expect(doc).toContain('libs/core/contextual-intent-frame.ts');
-    expect(doc).toContain('libs/core/contextual-intent-learning.ts');
+    expect(doc).toContain('libs/core/intent/conversation-signals.ts');
     expect(doc).toContain('deterministic static pipeline mappings');
     expect(doc).toContain('start-service and stop-service');
     expect(doc).toContain('source: seed');

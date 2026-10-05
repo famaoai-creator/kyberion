@@ -1,3 +1,8 @@
+---
+title: 'Adapter-First Extension Policy'
+last_updated: 2026-10-05
+---
+
 # Adapter-First Extension Policy
 
 **Status**: Beta governance policy

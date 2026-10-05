@@ -1,3 +1,8 @@
+---
+title: '手順書: 音声クローン学習用レコーディング＆処理プロセス'
+last_updated: 2026-10-05
+---
+
 # 手順書: 音声クローン学習用レコーディング＆処理プロセス
 
 (Procedure: Voice Cloning & Recording Guidance)

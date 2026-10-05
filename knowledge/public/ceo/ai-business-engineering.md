@@ -1,5 +1,5 @@
 ---
-title: AI-Driven Business Engineering: The Kyberion Strategy
+title: 'AI-Driven Business Engineering: The Kyberion Strategy'
 category: Ceo
 tags: [ceo, business, engineering, security]
 importance: 5

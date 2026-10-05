@@ -1,11 +1,12 @@
 ---
 title: Mission Orchestration Control Plane
-kind: architecture
+kind: evergreen
 scope: repository
 authority: reference
 phase: [alignment, execution, review]
 tags: [mission, orchestration, events, a2a, supervisor, control-plane]
 owner: ecosystem_architect
+last_updated: 2026-10-05
 ---
 
 # Mission Orchestration Control Plane

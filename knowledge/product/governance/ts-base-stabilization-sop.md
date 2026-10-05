@@ -1,10 +1,10 @@
 ---
-title: SOP: TypeScript Core Base Stabilization
+title: 'SOP: TypeScript Core Base Stabilization'
 category: Governance
 tags: [governance, base, stabilization, sop]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-03-21
+last_updated: 2026-10-05
 ---
 
 # SOP: TypeScript Core Base Stabilization

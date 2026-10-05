@@ -4,7 +4,7 @@ category: Procedures
 tags: [procedures, service, mobile, design, build, test]
 importance: 9
 author: Kyberion
-last_updated: 2026-03-21
+last_updated: 2026-10-05
 ---
 
 # Design Clone And Build Mobile

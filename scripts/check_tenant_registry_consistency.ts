@@ -9,13 +9,14 @@
  *       tree is a stance facet only and never changes registry authority,
  *   (b) knowledge/confidential/tenants/index.json (design override index),
  *   (c) customer/{customer}/tenants/{tenant}.json profile facets,
- *   (d) project registry — NOT APPLICABLE: libs/core/project/project-registry.ts
- *       ProjectRecord carries no tenant slug field (verified 2026-07-28), so
- *       there is nothing to cross-check; reported as a note.
+ *   (d) project registry — ProjectRecord.tenant_slug fields on non-archived
+ *       records are cross-checked; archived projects keep historical tenant
+ *       references and are excluded from the live consistency check.
  *
  * Consistency rule: every slug known to (b) or (c) must either have a tenant
- * profile in (a) — which must resolve via resolveTenant() — or be listed in
- * the documented exception allowlist:
+ * profile in (a) — which must resolve via resolveTenant() for active tenants;
+ * suspended/archived profiles are expected to be non-resolvable — or be listed
+ * in the documented exception allowlist:
  *
  *   knowledge/product/governance/tenant-registry-exceptions.json
  *   { "exceptions": [ { "slug": "...", "reason": "one-line reason" } ] }
@@ -30,7 +31,11 @@
  */
 import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { listTenantProfileSlugs, resolveTenant } from '@agent/core/organization/tenant-registry';
+import {
+  listTenantProfileSlugs,
+  readTenantProfile,
+  resolveTenant,
+} from '@agent/core/organization/tenant-registry';
 import { loadTenantDesignOverrideIndex } from '@agent/core/organization/tenant-design-resolver';
 import { isValidTenantSlug, TENANT_SLUG_PATTERN } from '@agent/core/foundation/scope';
 import { listProjectRecords } from '@agent/core/project/project-registry';
@@ -160,12 +165,13 @@ export function collectTenantSystems(options: CheckOptions = {}): TenantSystemsS
   const projectTenants =
     path.resolve(rootDir) === path.resolve(pathResolver.rootDir())
       ? listProjectRecords()
+          .filter((record) => record.status !== 'archived')
           .map((record) => record.tenant_slug)
           .filter((slug): slug is string => Boolean(slug && slug !== 'shared'))
           .sort()
       : [];
   notes.push(
-    '(d) project registry tenant_slug fields are included in the tenant spine cross-check'
+    '(d) project registry tenant_slug fields are included in the tenant spine cross-check (archived projects excluded — their tenant references are historical)'
   );
 
   return { profiles, confidentialIndex, customerTenantProfiles, projectTenants, notes };
@@ -261,6 +267,19 @@ export function evaluateTenantConsistency(
       warnings.push(
         `'${row.slug}' has both a tenant profile and an exception — the exception is redundant`
       );
+    }
+    let profile: ReturnType<typeof readTenantProfile> = null;
+    try {
+      profile = readTenantProfile(row.slug, options);
+    } catch {
+      // Schema-invalid/corrupt profiles fall through to the resolveTenant
+      // check below, which reports them as resolution failures.
+      profile = null;
+    }
+    if (profile && profile.status !== 'active') {
+      // Suspended/archived tenants intentionally fail resolveTenant — that is
+      // what non-active means; the check only verifies the profile exists.
+      continue;
     }
     try {
       resolveTenant(row.slug, options);

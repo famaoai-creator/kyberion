@@ -46,6 +46,11 @@
       "description": "Supplemental reference material that informs but does not directly govern execution.",
       "default_authority": "reference",
       "default_scope": "global"
+    },
+    "evergreen": {
+      "description": "Timeless concepts, invariants, and definitions whose accuracy decays slowly; reviewed on a long cycle rather than the default freshness SLO.",
+      "default_authority": "reference",
+      "default_scope": "repository"
     }
   },
   "directory_defaults": [

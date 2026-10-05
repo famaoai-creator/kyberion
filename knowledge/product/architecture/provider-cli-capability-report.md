@@ -1,3 +1,8 @@
+---
+title: 'Provider CLI Capability Report'
+last_updated: 2026-10-05
+---
+
 # Provider CLI Capability Report
 
 ## Summary

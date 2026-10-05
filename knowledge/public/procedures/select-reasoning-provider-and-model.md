@@ -3,6 +3,7 @@ title: Select a reasoning provider and model
 category: system
 tags: [onboarding, reasoning, provider, model, adapter, security, operations]
 audience: [operator, developer]
+last_updated: 2026-10-05
 ---
 
 # Reasoning プロバイダとモデルの選択手順

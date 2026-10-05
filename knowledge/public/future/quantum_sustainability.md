@@ -1,5 +1,5 @@
 ---
-title: Future-Proofing: Quantum-Safe & Sustainability
+title: 'Future-Proofing: Quantum-Safe & Sustainability'
 category: Future
 tags: [future, quantum, sustainability]
 importance: 5

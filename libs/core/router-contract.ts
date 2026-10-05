@@ -9,6 +9,7 @@ import {
 } from './intent/intent-resolution.js';
 import { pathResolver } from './path-resolver.js';
 import { recordUnhandledIntent } from './unhandled-intent-registry.js';
+import { recordConversationSignal } from './intent/conversation-signals.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 
 export interface SurfaceIntentResolution {
@@ -101,6 +102,11 @@ export function resolveSurfaceIntent(
 
   if (!selectedIntentId) {
     recordUnhandledIntent({ missType: 'unrecognized', utterance });
+    recordConversationSignal({
+      kind: 'route_unrecognized',
+      utterance,
+      scope: { tenant_slug: options.tenantId },
+    });
   }
 
   if (selectedIntentId === 'knowledge-query' || selectedIntentId === 'query-knowledge') {
@@ -186,6 +192,13 @@ export function resolveSurfaceIntent(
   // 'direct_reply'-routed intents are handled by the orchestrator without a pipeline/mission entry — not a gap.
   if (selectedIntentId && routeFamily !== 'direct_reply') {
     recordUnhandledIntent({ missType: 'unrouted', intentId: selectedIntentId, shape, utterance });
+    recordConversationSignal({
+      kind: 'route_unrouted',
+      utterance,
+      intentId: selectedIntentId,
+      scope: { tenant_slug: options.tenantId },
+      detail: { ...(shape ? { shape } : {}), route_family: routeFamily ?? 'unknown' },
+    });
   }
 
   return {

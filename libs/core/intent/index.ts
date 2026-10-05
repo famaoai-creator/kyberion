@@ -3,6 +3,7 @@ export * from './intent-clarification-format.js';
 export * from './intent-compilation-events.js';
 export * from './intent-compiler.js';
 export * from './intent-contract-learning.js';
+export * from './conversation-signals.js';
 export * from './intent-contract-types.js';
 export {
   parseIntentModelJsonObject,

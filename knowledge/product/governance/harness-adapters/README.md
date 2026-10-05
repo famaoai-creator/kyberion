@@ -1,3 +1,8 @@
+---
+title: 'Harness Adapter Registry Canonical Directory'
+last_updated: 2026-10-05
+---
+
 # Harness Adapter Registry Canonical Directory
 
 Canonical source for harness adapter profiles (RSP-13).

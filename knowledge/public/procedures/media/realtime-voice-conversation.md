@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Realtime Voice Conversation'
+last_updated: 2026-10-05
+---
+
 # Procedure: Realtime Voice Conversation
 
 ## Goal

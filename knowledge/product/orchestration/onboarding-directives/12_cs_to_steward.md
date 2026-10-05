@@ -1,5 +1,5 @@
 ---
-title: MISSION: Voice of Customer (VoC) Data Collection
+title: 'MISSION: Voice of Customer (VoC) Data Collection'
 category: Orchestration
 tags: [orchestration, onboarding-directives, steward]
 importance: 8
