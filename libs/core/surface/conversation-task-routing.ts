@@ -181,7 +181,7 @@ export function parseConversationTaskState(value: unknown): ConversationTaskStat
   if (
     !record(pending) ||
     !keys(pending, ['kind', 'sourceTurnId', 'sourceText', 'candidateIds']) ||
-    !CLARIFIABLE_KINDS.includes(pending.kind as ConversationTaskClarifiableKind) ||
+    ![...CLARIFIABLE_KINDS, 'followup'].includes(pending.kind as ConversationTaskClarifiableKind) ||
     !id(pending.sourceTurnId) ||
     !textValue(pending.sourceText, CONVERSATION_TASK_MAX_TEXT) ||
     !ids(pending.candidateIds) ||
@@ -189,6 +189,8 @@ export function parseConversationTaskState(value: unknown): ConversationTaskStat
     pending.candidateIds.some((candidateId) => !tasks.some((task) => task.id === candidateId))
   )
     return undefined;
+  // Earlier v2 writers asked follow-up selections. Discard them rather than replaying amendments.
+  if (pending.kind === 'followup') return { tasks };
   encodedBytes += Buffer.byteLength(JSON.stringify(pending)) + ',"clarification":'.length;
   if (encodedBytes > CONVERSATION_TASK_MAX_STATE_BYTES) return undefined;
   return {
@@ -219,7 +221,8 @@ export function parseConversationTaskDecision(
     if (value.taskIds.length !== 0 || value.reply !== undefined || value.confidence !== 'unknown')
       return undefined;
   } else if (RECORD_ONLY_KINDS.includes(value.kind as (typeof RECORD_ONLY_KINDS)[number])) {
-    if (value.reply !== undefined) return undefined;
+    // Earlier v2 reply receipts and opt-in queued acknowledgements are display-only.
+    // Their presence never grants execution or resumes a legacy request.
   } else if (!textValue(value.reply, MAX_REPLY)) return undefined;
   if (value.kind !== 'chat' && value.kind !== 'clarification' && value.taskIds.length !== 1)
     return undefined;

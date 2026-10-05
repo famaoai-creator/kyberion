@@ -91,8 +91,9 @@ matching tools). State is kept under `active/shared/runtime/dot/`.
    `KYBERION_EVENT_INTAKE_SOURCES=<id>[,<id>]` (or `enabled: true` in
    `knowledge/product/governance/event-intake-policy.json` for every host; bind a
    `tenant_slug` for tenant sources) and register its HMAC secret under the
-   source's `secret_key` (for example `EVENT_INTAKE_CI_SECRET`):
-   `pnpm kyberion secret introduce <service-id> <secret-key>`. The intake
+   source's `secret_key` (for example `EVENT_INTAKE_CI_SECRET`) by introducing
+   it under the `event-intake` service without the prefix:
+   `pnpm kyberion secret introduce event-intake CI_SECRET --from-file <file>`. The intake
    surface listens on `127.0.0.1` (`KYBERION_EVENT_INTAKE_PORT` /
    `KYBERION_EVENT_INTAKE_HOST`) at `POST /events/<source>`.
    To receive webhooks from the internet (e.g. GitHub), expose only `/events`

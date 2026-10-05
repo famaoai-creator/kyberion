@@ -48,7 +48,10 @@ describe('AI company onboarding', () => {
     expect(result.nextCommands).toContain(
       'pnpm onboarding:context bind --customer-slug acme-ai --tenant-slug <registered-tenant> --organization-id <organization> --apply --json'
     );
-    expect(result.nextCommands.join('\n')).toContain('--probe-ref viewer_scope=<audit-ref>');
+    expect(result.nextCommands.join('\n')).toContain(
+      '--nhi-id kyberion://agent/acme-ai/ceo-operator'
+    );
+    expect(result.nextCommands.join('\n')).toContain('pnpm tenant:activation probe');
     expect(result.nextCommands.join('\n')).not.toContain('pnpm mission --start');
   });
 
@@ -123,6 +126,12 @@ describe('AI company onboarding', () => {
 
     expect(result.seededDomains).toEqual(
       expect.arrayContaining(['leadership', 'engineering', 'growth', 'governance'])
+    );
+    // The declared AI worker's NHI id is returned for tenant activation (the
+    // ledger write itself is refused on the shared journal under vitest).
+    expect(result.workerNhiId).toBe('kyberion://agent/acme-ai/ceo-operator');
+    expect(result.nextCommands.join('\n')).toContain(
+      'pnpm tenant:activation probe --customer-slug acme-ai --tenant-slug acme-prod --organization-id acme-ai --nhi-id kyberion://agent/acme-ai/ceo-operator'
     );
     const tenant = JSON.parse(readTextFile(`${rootDir}/knowledge/personal/tenants/acme-prod.json`));
     expect(tenant.isolation_policy).toEqual({

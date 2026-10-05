@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { safeRmSync } from '@agent/core/secure-io';
+import { safeMkdir, safeRmSync } from '@agent/core/secure-io';
 import { projectRecordPath, saveProjectRecord } from '@agent/core/project/project-registry';
 import { validateMissionStartCreateInput } from './mission-controller-args.js';
 
@@ -38,7 +38,44 @@ afterEach(() => {
   process.env.MISSION_ROLE = savedEnv.role;
 });
 
+function argvWithoutPath(): string[] {
+  return [
+    'node',
+    'mission_controller.js',
+    'create',
+    'MSN-LINK-ARGS',
+    '--tier',
+    'public',
+    '--project-id',
+    PROJECT_ID,
+  ];
+}
+
 describe('mission → project link validation', () => {
+  it('derives --project-path from the project record when it is omitted', () => {
+    saveProjectRecord({
+      project_id: PROJECT_ID,
+      name: 'Link args test',
+      summary: 'Path derivation.',
+      status: 'active',
+      tier: 'public',
+      project_os_path: PROJECT_PATH,
+    } as Parameters<typeof saveProjectRecord>[0]);
+
+    expect(() =>
+      validateMissionStartCreateInput('create', 'MSN-LINK-ARGS', argvWithoutPath())
+    ).toThrow(`Create it with \`pnpm project scaffold ${PROJECT_ID}\`, or pass --project-path.`);
+
+    safeMkdir(PROJECT_PATH, { recursive: true });
+    try {
+      const input = validateMissionStartCreateInput('create', 'MSN-LINK-ARGS', argvWithoutPath());
+      expect(input.relationships?.project?.project_path).toBe(PROJECT_PATH);
+      expect(input.ledgerTargets?.markdown).toContain('mission-ledger.md');
+    } finally {
+      safeRmSync(PROJECT_PATH, { recursive: true, force: true });
+    }
+  });
+
   it('rejects a link to a project that does not exist', () => {
     expect(() => validateMissionStartCreateInput('create', 'MSN-LINK-ARGS', argv())).toThrow(
       `[PROJECT_LINK_INVALID] create MSN-LINK-ARGS: project not found: ${PROJECT_ID}`

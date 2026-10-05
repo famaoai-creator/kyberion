@@ -24,4 +24,14 @@ describe('role-assumption workspace entry points', () => {
       'presence/displays/terminal-hud/src/index.ts',
     ]);
   });
+
+  it('follows the app sources when a surface launches the workspace Next.js binary', () => {
+    const files = collectSystemRoleEntries(ws).get('concierge') ?? [];
+    expect(files.length).toBeGreaterThan(0);
+    expect(files.every((file) => ws.rel(file).startsWith('presence/displays/concierge/'))).toBe(
+      true
+    );
+    expect(files.some((file) => ws.rel(file).includes('/src/app/'))).toBe(true);
+    expect(files.some((file) => ws.rel(file).includes('node_modules/'))).toBe(false);
+  });
 });
