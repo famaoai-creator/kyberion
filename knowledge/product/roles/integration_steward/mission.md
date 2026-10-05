@@ -1,5 +1,5 @@
 ---
-title: Role: Integration Steward
+title: 'Role: Integration Steward'
 category: Roles
 tags: [roles, integration_steward, mission]
 importance: 7

@@ -1,5 +1,5 @@
 ---
-title: Procedure: Web Automation & Navigation
+title: 'Procedure: Web Automation & Navigation'
 tags: [capability, browser, procedure, web-automation, playwright]
 importance: 8
 author: Ecosystem Architect

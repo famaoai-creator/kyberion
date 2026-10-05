@@ -1,5 +1,5 @@
 ---
-title: ポストモーテム: モノレポ安定化失敗と負の連鎖 (2026-02-28)
+title: 'ポストモーテム: モノレポ安定化失敗と負の連鎖 (2026-02-28)'
 category: Incidents
 tags: [incidents, post, mortem, 20260228]
 importance: 5

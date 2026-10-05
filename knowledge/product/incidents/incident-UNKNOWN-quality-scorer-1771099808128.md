@@ -1,5 +1,5 @@
 ---
-title: Incident Report: quality-scorer
+title: 'Incident Report: quality-scorer'
 category: Incidents
 tags: [incidents, incident, unknown, quality, scorer, 1771099808128]
 importance: 5

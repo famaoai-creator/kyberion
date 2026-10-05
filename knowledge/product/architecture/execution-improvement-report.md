@@ -1,7 +1,9 @@
 ---
 title: 'Execution Improvement Report'
-review_by: 2026-10-12
+last_updated: 2026-10-05
 ---
+
+> **Point-in-time snapshot.** Status report of one improvement iteration, first committed 2026-03-29; annotated 2026-10-05. "Addressed In This Iteration" and "Remaining Gaps" describe the codebase as of that iteration and are preserved as written — they are not the current gap list. For later iterations see `docs/developer/improvement-plans-*/` and `docs/developer/improvement-plans-archive/`.
 
 # Execution Improvement Report
 

@@ -1,5 +1,5 @@
 ---
-title: MISSION: Financial P&L & Cost Analysis
+title: 'MISSION: Financial P&L & Cost Analysis'
 category: Orchestration
 tags: [orchestration, onboarding-directives, finance, steward]
 importance: 8

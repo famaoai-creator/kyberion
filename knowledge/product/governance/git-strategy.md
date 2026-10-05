@@ -1,5 +1,5 @@
 ---
-title: GIT Strategy: Sovereign Hierarchical Synchronization
+title: 'GIT Strategy: Sovereign Hierarchical Synchronization'
 category: Governance
 tags: [governance, git, strategy]
 importance: 10

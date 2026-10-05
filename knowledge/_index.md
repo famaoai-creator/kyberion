@@ -975,7 +975,7 @@
 ## 📁 public/standards
 - [AWS FISC (金融機関向け安全対策基準) 準拠ガイド](./public/standards/aws_fisc_standard.md) (public | Ecosystem Architect)
 - [AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド](./public/standards/blea_fisc_reference.md) (public | Ecosystem Architect)
-- [Knowledge Management Standard (Semantic Indexing) v1.0](./public/standards/knowledge_management.md) (public | Ecosystem Architect)
+- [Knowledge Management Standard (Semantic Indexing) v1.1](./public/standards/knowledge_management.md) (public | Ecosystem Architect)
 - [Standard: moltbook Compatibility Protocol (MCP) v1.0](./public/standards/moltbook-compatibility.md) (public | Unknown)
 
 ## 📁 public/standards/adr

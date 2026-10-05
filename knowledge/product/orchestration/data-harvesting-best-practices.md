@@ -1,5 +1,5 @@
 ---
-title: Data Harvesting Best Practices: URL Resolution & Secure Download
+title: 'Data Harvesting Best Practices: URL Resolution & Secure Download'
 category: Orchestration
 tags: [orchestration, data, harvesting, best, practices]
 importance: 8

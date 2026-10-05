@@ -1,9 +1,13 @@
 ---
 title: 'portfolio-status'
-review_by: 2026-10-12
+last_updated: 2026-10-05
 ---
 
-Scope: workspace evidence only; `{{portfolio_evidence}}` was not populated. Current portfolio snapshot on 2026-05-03: 31 open missions in `active/missions` (`24 active`, `4 distilling`, `3 planned`). `21` are idle since before 2026-04-03, `13` since before 2026-03-19.
+> **Dated snapshot — all figures below are as of 2026-05-03 and have not been refreshed.** Treat this file as a historical record of the portfolio state on that date, not as current status.
+>
+> This snapshot was captured manually from workspace evidence. The automated equivalent is the `mission-portfolio-auditor` pipeline template (`knowledge/product/pipeline-templates/mission-portfolio-auditor.json`), which collects `TASK_BOARD.md` / `trace.json` artifacts into its `portfolio_evidence` channel, runs a `reasoning:analyze` step, and writes the result to `knowledge/confidential/governance/portfolio-status.md` (confidential tier, requires `mission_tier=confidential`). The `{{portfolio_evidence}}` template variable that previously appeared in this file was never populated by a pipeline run and has been removed.
+
+Portfolio snapshot on 2026-05-03: 31 open missions in `active/missions` (`24 active`, `4 distilling`, `3 planned`). `21` are idle since before 2026-04-03, `13` since before 2026-03-19.
 
 Stall points: almost every open mission shows no task-board execution progress (`31/32` visible `TASK_BOARD.md` files are `0/9`; the remaining board is empty). The main long-stalled actives are `MSN-FINAL-VERIFICATION`, `MSN-PRODUCT-LIVE`, `MSN-PRODUCT-LIVE-2`, `MSN-SYSTEM-SENSORY-HUB`, the Slack/marketing leaves, and malformed missions `--HELP` / `--ID`. Distillation backlog is concentrated in `MSN-FULL-CYCLE-001`, `MSN-SMOKE-R2-20260429`, `MSN-SMOKE-R3-20260429`, and `OTHELLO-HTML-SIM`.
 
@@ -11,7 +15,7 @@ Resource overlaps: staffing is heavily multiplexed. Unique mission load by agent
 
 Strategic misalignments: `17/31` open missions still run on `main`, violating mission-branch isolation. Mission creation hygiene is degraded: malformed IDs (`--HELP`, `--ID`), invalid tier fields (`MSN-MARKETING-GEN-1`, `MSN-INTENT-SIM-20260429`), `4` missions missing `mission_type`, `24` missing `outcome_contract`, and another `7` using only the generic fallback outcome contract. Runtime control state is also stale: focus is pinned to `MSN-EXECUTIVE-PIPELINES`, while `mission_queue.jsonl` still carries `TIME-ATTENDANCE-SYSTEM` and malformed `--HELP`.
 
-CEO-ranked interventions:
+CEO-ranked interventions (as of 2026-05-03):
 
 1. Freeze new mission intake until mission creation is repaired: valid IDs, canonical tier, required `mission_type` and `outcome_contract`, mandatory `mission/*` branches.
 2. Run a hard portfolio triage this week: archive, merge, or explicitly cancel all open missions idle 30+ days, starting with duplicate Slack/marketing leaves.
@@ -20,4 +24,4 @@ CEO-ranked interventions:
 5. Rebalance staffing: the same five agents are carrying nearly every mission, so either cut WIP sharply or assign dedicated owners by program.
 6. Clean mission control state: reconcile `current_mission_focus.json`, purge stale queue entries, and remove malformed missions from active coordination paths.
 
-Bottom line: the issue is not insufficient mission generation. It is uncontrolled WIP, duplicated demand, and governance drift. The highest-value CEO move is a portfolio reset before authorizing more work.
+Bottom line (as of 2026-05-03): the issue is not insufficient mission generation. It is uncontrolled WIP, duplicated demand, and governance drift. The highest-value CEO move is a portfolio reset before authorizing more work.

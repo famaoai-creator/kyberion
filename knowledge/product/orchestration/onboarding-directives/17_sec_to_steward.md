@@ -1,5 +1,5 @@
 ---
-title: MISSION: Threat Intelligence & Vulnerability Feed
+title: 'MISSION: Threat Intelligence & Vulnerability Feed'
 category: Orchestration
 tags: [orchestration, onboarding-directives, sec, steward, security]
 importance: 8

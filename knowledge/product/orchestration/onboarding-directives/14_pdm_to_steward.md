@@ -1,5 +1,5 @@
 ---
-title: MISSION: Product Roadmap & Feature Backlog
+title: 'MISSION: Product Roadmap & Feature Backlog'
 category: Orchestration
 tags: [orchestration, onboarding-directives, pdm, steward]
 importance: 8

@@ -1,5 +1,5 @@
 ---
-title: Role Procedure: Solution Architect
+title: 'Role Procedure: Solution Architect'
 tags: [role, solution-architect, procedure, architecture, adf]
 importance: 8
 author: Ecosystem Architect

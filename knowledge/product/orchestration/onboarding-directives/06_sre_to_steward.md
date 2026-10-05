@@ -1,5 +1,5 @@
 ---
-title: MISSION: Incident Response & SRE Wisdom
+title: 'MISSION: Incident Response & SRE Wisdom'
 category: Orchestration
 tags: [orchestration, onboarding-directives, sre, steward]
 importance: 8

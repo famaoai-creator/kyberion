@@ -1,5 +1,5 @@
 ---
-title: Blueprint: Design Clone Request Intake
+title: 'Blueprint: Design Clone Request Intake'
 category: Templates
 tags: [templates, blueprints, design, intake, web, mobile]
 importance: 7

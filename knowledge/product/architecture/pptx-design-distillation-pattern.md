@@ -1,5 +1,5 @@
 ---
-title: Wisdom: PowerPoint Design Distillation & Heritage Sync
+title: 'Wisdom: PowerPoint Design Distillation & Heritage Sync'
 category: Architecture
 tags: [architecture, pptx, design, distillation, pattern]
 importance: 8

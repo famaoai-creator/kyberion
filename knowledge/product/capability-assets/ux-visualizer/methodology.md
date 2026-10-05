@@ -1,5 +1,5 @@
 ---
-title: Methodology: High-Fidelity SPA Reverse Engineering
+title: 'Methodology: High-Fidelity SPA Reverse Engineering'
 category: Skills
 tags: [skills, ux-visualizer, methodology, protocol]
 importance: 5
