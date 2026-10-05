@@ -22,7 +22,9 @@ export type KeyResultMetric =
   | { source: 'file'; path: string; json_path: string; aggregate?: KeyResultAggregate }
   /** Percent of recent dot-signal-ledger rows that were healthy. */
   | { source: 'signal_ratio'; signal: string; window_hours?: number }
-  | { source: 'org_metric'; metric: KeyResultOrgMetric };
+  | { source: 'org_metric'; metric: KeyResultOrgMetric }
+  /** Organization KRs only: a person records the value (`objective kr record`); sweeps skip it. */
+  | { source: 'manual' };
 
 export type KeyResultDirection = 'increase' | 'decrease' | 'maintain';
 
