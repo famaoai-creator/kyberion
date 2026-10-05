@@ -52,6 +52,8 @@ describe('actuator-op-registry', () => {
   it('classifies every built-in core leaf op from the core registry domain', () => {
     const captureOps = [
       'accountability_report',
+      'approval_store_hygiene',
+      'decision_digest',
       'organization_digest',
       'organization_retro',
       'organization_standup',
@@ -97,7 +99,7 @@ describe('actuator-op-registry', () => {
       'validate_productivity_dry_run',
       'wait',
     ];
-    expect(captureOps).toHaveLength(9);
+    expect(captureOps).toHaveLength(11);
     expect(transformOps).toHaveLength(3);
     expect(applyOps).toHaveLength(33);
     for (const op of captureOps) expect(determineActuatorStepType('core', op)).toBe('capture');
@@ -108,7 +110,7 @@ describe('actuator-op-registry', () => {
       ...(registeredCoreOps.capture || []),
       ...(registeredCoreOps.transform || []),
       ...(registeredCoreOps.apply || []),
-    ]).toHaveLength(45);
+    ]).toHaveLength(47);
   });
 
   it('prefers apply semantics when provider ops overlap', () => {
