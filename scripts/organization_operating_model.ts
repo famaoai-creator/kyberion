@@ -28,6 +28,9 @@ import {
   loadOrganizationIncident,
   saveOrganizationIncident,
 } from '@agent/core/organization/organization-operating-model-operations';
+import { readOrganizationKrMeasurements } from '@agent/core/dot/dot-key-results';
+import { rollUpObjectiveProgress } from '@agent/core/organization/organization-objective-progress';
+import { formatObjectiveProgress } from './organization_objective_measure.js';
 import {
   loadOrganizationOperatingModelCatalog,
   resolveOrganizationWork,
@@ -119,6 +122,42 @@ function emit(value: unknown, json: boolean): void {
   activePrint(JSON.stringify(value, null, 2));
 }
 
+/**
+ * Active objectives with their latest key-result progress. Measurements come
+ * from `pnpm organization objective kr measure` or from dots attached to the
+ * objective; a ledger that cannot be read degrades to the titles alone.
+ */
+function objectiveStatusLines(
+  view: OrganizationManagementView,
+  scope: { tier: string; tenantSlug?: string }
+): string[] {
+  const active = (view.purpose?.objectives || []).filter((entry) => entry.status === 'active');
+  if (!active.length || !view.purpose) return [];
+  const purpose = { ...view.purpose, objectives: active };
+  const progressScope = {
+    organizationId: view.organization_id,
+    tier: scope.tier as OrganizationTier,
+    ...(scope.tenantSlug ? { tenantSlug: scope.tenantSlug } : {}),
+  };
+  try {
+    const lines = formatObjectiveProgress(
+      rollUpObjectiveProgress(progressScope, {
+        readMeasurements: (s) => readOrganizationKrMeasurements(s),
+        loadPurpose: () => purpose,
+      })
+    );
+    const unmeasured = lines.some((line) => line.includes('unmeasured'));
+    return unmeasured
+      ? [
+          ...lines,
+          'Next: measure objective key results with pnpm organization objective kr measure ... --apply',
+        ]
+      : lines;
+  } catch {
+    return active.map((objective) => `Objective: ${objective.title}`);
+  }
+}
+
 function printStatus(
   view: OrganizationManagementView,
   scope: { tier: string; tenantSlug?: string },
@@ -145,9 +184,7 @@ function printStatus(
   activePrint(
     `Work: ${accounting.active_projects} active / ${view.solution_projects.filter((project) => project.status === 'draft').length} draft projects, ${accounting.active_operations} operations, ${accounting.open_incidents} open incidents, ${accounting.pending_decisions} pending decisions`
   );
-  for (const objective of view.purpose?.objectives || []) {
-    if (objective.status === 'active') activePrint(`Objective: ${objective.title}`);
-  }
+  for (const line of objectiveStatusLines(view, scope)) activePrint(line);
   for (const project of view.solution_projects.filter(
     (entry) => entry.status === 'active' || entry.status === 'draft'
   )) {

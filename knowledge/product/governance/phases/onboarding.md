@@ -17,11 +17,11 @@ lifecycle phase から参照する短い runbook で、各項目の番号は標�
 
 ## ルートを決める
 
-| ルート              | 通る Step                                                    |
-| ------------------- | ------------------------------------------------------------ |
-| 1. 個人のみ         | 0 → 1 → 2 → 3 → 4 → 9                                        |
-| 2. AI 会社          | 0〜4 → 5〜8（`onboard company` で 5・6 をまとめる） → 9 → 10 |
-| 3. 既存テナント追加 | 0〜10 すべて                                                 |
+| ルート              | 通る Step                                                         |
+| ------------------- | ----------------------------------------------------------------- |
+| 1. 個人のみ         | 0 → 1 → 2 → 3 → 4 → 9                                             |
+| 2. AI 会社          | 0〜4 → 5〜8（`onboard company` で 5・6 をまとめる） → 9 → 10 → 11 |
+| 3. 既存テナント追加 | 0〜11 すべて                                                      |
 
 ルート 2 は `onboard company` の直後に company stance へ切り替え、その stance でも identity を
 保存する（mission start が `customer/<slug>/my-identity.json` などを要求するため）。順序の詳細は
@@ -98,6 +98,14 @@ fail-closed で停止する。オプションの詳細は標準フロー Step 5�
 cadence / decision → operation の順に governed facade で登録する。定常業務は
 `pnpm scope use` で scope を選んでから `operation run execute` / `operation tick` で回す。
 コマンド例は標準フロー Step 10 を参照する。
+
+### Step 11: 目標から作業へ（ルート 2・3）
+
+目標に計測できる KR を付け（`organization objective kr add`）、`organization objective kr measure`
+で計測して `organization status` で進捗を見る。目標のための project を作り（`project create` →
+`scaffold` → `update-status --status active`）、その下で `mission kickoff --project-id`（業務は
+`--mission-type` を明示）、backlog は `work create-item` → `work project-next-tasks --apply` で
+mission の task に取り込む。コマンド例は標準フロー Step 11 を参照する。
 
 ### Step 9: 完了確認
 
