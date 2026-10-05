@@ -63,6 +63,7 @@ const ROOT_RELATIVE_PREFIXES = [
 function isVendoredDocumentation(sourcePath: string): boolean {
   return path
     .relative(pathResolver.rootDir(), sourcePath)
+    .replace(/\\/gu, '/')
     .startsWith('knowledge/public/external-wisdom/');
 }
 
@@ -108,8 +109,8 @@ export function checkDocumentationLinks(files = markdownFiles()): string[] {
       const candidates = resolveDocumentationTargets(filePath, decodedTarget);
       if (
         !candidates.some((candidate) =>
-          candidate.includes('/knowledge/personal/') ||
-          candidate.includes('/knowledge/confidential/')
+          candidate.replace(/\\/gu, '/').includes('/knowledge/personal/') ||
+          candidate.replace(/\\/gu, '/').includes('/knowledge/confidential/')
             ? true
             : safeExistsSync(candidate)
         )

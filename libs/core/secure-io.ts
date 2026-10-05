@@ -45,6 +45,9 @@ export const DEFAULT_MAX_FILE_SIZE_MB = 100;
 export const DEFAULT_TIMEOUT_MS = 30000;
 const SAFE_EXEC_ENV_ALLOWLIST = [
   'PATH',
+  // Windows executable discovery needs extensions; native programs need the OS root.
+  'PATHEXT',
+  'SystemRoot',
   'HOME',
   'USER',
   'LOGNAME',

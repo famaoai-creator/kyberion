@@ -86,7 +86,14 @@ export const LOCK_LIVE_GUARD_RECOVERY_AGE_MS = 10 * 60_000;
 const LOCK_SWEEP_LIMIT = 32;
 
 function lockPath(resourceId: string): string {
-  return path.join(LOCK_ROOT, `${resourceId}.lock`);
+  // Resource IDs are logical keys, not paths. Escape '%' as well so keys such
+  // as 'path:abc' and 'path%3Aabc' cannot accidentally share a mutex.
+  let filename = encodeURIComponent(resourceId);
+  // Windows reserves device names even when they have a file extension.
+  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(filename)) {
+    filename = `%${filename.charCodeAt(0).toString(16).toUpperCase()}${filename.slice(1)}`;
+  }
+  return path.join(LOCK_ROOT, `${filename}.lock`);
 }
 
 function ownerRecord(resourceId: string): string {

@@ -11,6 +11,21 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { readImprovementPlanTextFile } from './check_improvement_plan_metadata.js';
 
 describe('improvement plan metadata', () => {
+  it('recognizes CRLF frontmatter without duplicating it', () => {
+    const source =
+      '---\r\ntitle: Existing\r\ntags: [plan]\r\nlast_updated: 2026-10-05\r\nstatus: active\r\n---\r\n\r\n# Plan';
+    expect(parseFrontmatter(source)).toMatchObject({ title: 'Existing', status: 'active' });
+    expect(addPlanFrontmatter(source, 'ignored')).toBe(source);
+  });
+
+  it('preserves CRLF body and delimiters while normalizing metadata', async () => {
+    const { normalizePlanFrontmatter } = await import('./check_improvement_plan_metadata.js');
+    const source =
+      '---\r\ntitle: Existing\r\ntags: [plan]\r\nlast_updated: 2026-10-05\r\nstatus: implemented\r\n---\r\n\r\n# Plan\r\nBody\r\n';
+    expect(normalizePlanFrontmatter(source, 'ignored')).toBe(
+      source.replace('status: implemented', 'status: completed')
+    );
+  });
   it('rejects a directory replacement before metadata parsing', () => {
     expect(() => readImprovementPlanTextFile(pathResolver.rootResolve('scripts'))).toThrow(
       'must be a regular file'

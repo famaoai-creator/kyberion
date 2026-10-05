@@ -232,6 +232,7 @@ interface SurfaceManifestEntry {
   id?: string;
   command?: string;
   args?: string[];
+  cwd?: string;
 }
 
 function nextAppEntries(ws: Workspace, appDir: string): string[] {
@@ -255,6 +256,15 @@ function rootPackageScript(ws: Workspace, name: string): string | null {
 
 function entriesForCommand(ws: Workspace, entry: SurfaceManifestEntry): string[] {
   const args = entry.args ?? [];
+  // Workspace Next.js launchers execute dependency code, but authority belongs
+  // to the app sources in their declared working directory.
+  if (
+    entry.command === 'node' &&
+    args[0]?.replace(/\\/g, '/') === 'node_modules/next/dist/bin/next' &&
+    entry.cwd
+  ) {
+    return nextAppEntries(ws, ws.abs(entry.cwd));
+  }
   if (entry.command === 'pnpm') {
     const dirIndex = args.indexOf('--dir');
     if (dirIndex >= 0 && args[dirIndex + 1]) {

@@ -11,8 +11,26 @@ import {
   extractCodeSnippets,
   extractPnpmInvocations,
   findingKey,
+  isExcludedDocsDriftPath,
 } from './check_docs_drift.js';
 import { buildCliReferenceRows, renderCliReference } from './generate_cli_reference.js';
+
+describe('portable documentation paths', () => {
+  it.each([
+    'docs/improvement-plans-archive/plan.md',
+    'knowledge/public/external-wisdom/README.md',
+    'docs/archive/old.md',
+  ])('preserves existing exclusions for %s', (file) => {
+    expect(isExcludedDocsDriftPath(`/repo/${file}`)).toBe(true);
+    expect(isExcludedDocsDriftPath(`C:\\repo\\${file.replaceAll('/', '\\')}`)).toBe(true);
+  });
+  it('keeps current docs scanned and baseline keys portable', () => {
+    expect(isExcludedDocsDriftPath('C:\\repo\\docs\\QUICKSTART.md')).toBe(false);
+    expect(
+      findingKey({ rule: 'command', severity: 'error', file: 'docs\\guide.md', detail: 'missing' })
+    ).toBe('command|docs/guide.md|missing');
+  });
+});
 
 const manifest: CliManifest = {
   version: 1,

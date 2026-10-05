@@ -23,6 +23,15 @@ export type KyberionDesignTokens = BrandTokens;
 export type KyberionColorTokens = BrandTokenColors;
 export type KyberionFontTokens = BrandTokenFonts;
 
+/** Checkout line endings do not change generated CSS semantics. */
+export function normalizeDesignTokenLineEndings(text: string): string {
+  return text.replace(/\r\n/gu, '\n');
+}
+
+function preserveLineEndings(text: string, source: string): string {
+  return source.includes('\r\n') ? text.replace(/\n/gu, '\r\n') : text;
+}
+
 export interface KyberionThemeEntry {
   name: string;
   colors: {
@@ -244,15 +253,19 @@ export function expectedKyberionThemeEntries(
 }
 
 export function replaceTokenBlock(sourceText: string, tokenBlock: string): string {
+  const original = sourceText;
+  sourceText = normalizeDesignTokenLineEndings(sourceText);
+  tokenBlock = normalizeDesignTokenLineEndings(tokenBlock);
   const pattern =
     /:root\s*{\s*[\s\S]*?\n}\n\n@media\s*\(prefers-color-scheme:\s*dark\)\s*{\s*\n\s*:root\s*{\s*[\s\S]*?\n\s*}\n}(?:\n\n\[data-theme='light'\]\s*{[\s\S]*?\n}\n\n\[data-theme='dark'\]\s*{[\s\S]*?\n})?/m;
   if (!pattern.test(sourceText)) {
     throw new Error('Failed to locate Kyberion token block in source file');
   }
-  return sourceText.replace(pattern, tokenBlock);
+  return preserveLineEndings(sourceText.replace(pattern, tokenBlock), original);
 }
 
 export function extractKyberionTokenBlock(sourceText: string): string | null {
+  sourceText = normalizeDesignTokenLineEndings(sourceText);
   const pattern =
     /:root\s*{\s*[\s\S]*?\n}\n\n@media\s*\(prefers-color-scheme:\s*dark\)\s*{\s*\n\s*:root\s*{\s*[\s\S]*?\n\s*}\n}(?:\n\n\[data-theme='light'\]\s*{[\s\S]*?\n}\n\n\[data-theme='dark'\]\s*{[\s\S]*?\n})?/m;
   const match = sourceText.match(pattern);
@@ -297,7 +310,7 @@ export function listKyberionUiStylesheetSources(): string[] {
 /** Concatenate every authored stylesheet (base first) for `renderKyberionUiStylesheet`. */
 export function concatKyberionUiStylesheetSources(read: (relativePath: string) => string): string {
   return `${listKyberionUiStylesheetSources()
-    .map((relativePath) => read(relativePath).trimEnd())
+    .map((relativePath) => normalizeDesignTokenLineEndings(read(relativePath)).trimEnd())
     .join('\n\n')}\n`;
 }
 
@@ -488,6 +501,7 @@ function uiTokenBlockRange(sourceText: string): [number, number] | null {
 }
 
 export function extractKyberionUiTokenBlock(sourceText: string): string | null {
+  sourceText = normalizeDesignTokenLineEndings(sourceText);
   const range = uiTokenBlockRange(sourceText);
   return range ? sourceText.slice(range[0], range[1]) : null;
 }
@@ -497,14 +511,24 @@ export function extractKyberionUiTokenBlock(sourceText: string): string | null {
  * Kyberion token block when the file does not carry one yet.
  */
 export function replaceUiTokenBlock(sourceText: string, uiBlock: string): string {
+  const original = sourceText;
+  sourceText = normalizeDesignTokenLineEndings(sourceText);
+  uiBlock = normalizeDesignTokenLineEndings(uiBlock);
   const range = uiTokenBlockRange(sourceText);
-  if (range) return `${sourceText.slice(0, range[0])}${uiBlock}${sourceText.slice(range[1])}`;
+  if (range)
+    return preserveLineEndings(
+      `${sourceText.slice(0, range[0])}${uiBlock}${sourceText.slice(range[1])}`,
+      original
+    );
   const legacy = extractKyberionTokenBlock(sourceText);
   if (legacy === null) {
     throw new Error('Failed to locate Kyberion token block to anchor the UI token block');
   }
   const at = sourceText.indexOf(legacy) + legacy.length;
-  return `${sourceText.slice(0, at)}\n\n${uiBlock}${sourceText.slice(at)}`;
+  return preserveLineEndings(
+    `${sourceText.slice(0, at)}\n\n${uiBlock}${sourceText.slice(at)}`,
+    original
+  );
 }
 
 /** Status-pill tone rules, generated from the catalog's status → tone map. */
@@ -593,6 +617,7 @@ export function renderStatusFamilyGlyphRules(): string[] {
 
 /** Assemble the generated `kyberion-ui.css` from the authored source stylesheet. */
 export function renderKyberionUiStylesheet(sourceCss: string): string {
+  sourceCss = normalizeDesignTokenLineEndings(sourceCss);
   if (!sourceCss.includes(KB_UI_STATUS_TONES_PLACEHOLDER)) {
     throw new Error(`${KB_UI_STYLESHEET_SOURCE} must contain ${KB_UI_STATUS_TONES_PLACEHOLDER}`);
   }

@@ -37,6 +37,7 @@ import {
   safeExec,
   safeExistsSync,
   safeMkdir,
+  safeMoveSync,
   safeRmSync,
 } from '../secure-io.js';
 import { recordMissionGateOverride, writeMissionGateRecord } from './mission-gate-engine.js';
@@ -1219,9 +1220,8 @@ export async function finishMission(
     allowMissingLeaf: true,
   });
   traceCtx.startSpan('mission:archive');
-  if (safeExistsSync(archivePath)) safeExec('rm', ['-rf', archivePath]);
-  safeExec('cp', ['-r', missionDir, archivePath]);
-  safeExec('rm', ['-rf', missionDir]);
+  if (safeExistsSync(archivePath)) safeRmSync(archivePath, { recursive: true, force: true });
+  safeMoveSync(missionDir, archivePath);
   traceCtx.endSpan('ok');
 
   state.status = args.transitionStatus(state.status, 'archived');
