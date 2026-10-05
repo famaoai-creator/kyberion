@@ -42,16 +42,16 @@ beforeEach(() => files.clear());
 
 describe('server-owned durable conversation', () => {
   it('restores a pending request without executing it; completes the same turn later', () => {
-    const id = beginConversationTurn(viewer, 'Prepare the report tomorrow');
+    const id = beginConversationTurn(viewer, 'Hello from Alice');
     expect(readConversationHistory(viewer)).toMatchObject({
       pending: 1,
-      messages: [{ role: 'user', text: 'Prepare the report tomorrow' }],
+      messages: [{ role: 'user', text: 'Hello from Alice' }],
     });
     completeConversationTurn(viewer, id, 'The report is ready for review');
     expect(readConversationHistory(viewer)).toMatchObject({
       pending: 0,
       messages: [
-        { role: 'user', text: 'Prepare the report tomorrow' },
+        { role: 'user', text: 'Hello from Alice' },
         { role: 'secretary', text: 'The report is ready for review' },
       ],
     });
@@ -94,14 +94,14 @@ describe('server-owned durable conversation', () => {
   });
 
   it('matches replies to their turn even when requests finish in reverse order', () => {
-    const first = beginConversationTurn(viewer, 'first');
-    const second = beginConversationTurn(viewer, 'second');
+    const first = beginConversationTurn(viewer, 'earlier greeting');
+    const second = beginConversationTurn(viewer, 'later greeting');
     completeConversationTurn(viewer, second, 'second reply');
     completeConversationTurn(viewer, first, 'first reply');
     expect(readConversationHistory(viewer).messages.map((message) => message.text)).toEqual([
-      'first',
+      'earlier greeting',
       'first reply',
-      'second',
+      'later greeting',
       'second reply',
     ]);
   });
@@ -309,7 +309,7 @@ describe('independent continuity review regressions', () => {
     try {
       const first = reserveConversationTurn(
         viewer,
-        'first',
+        'earlier greeting',
         undefined,
         now - 24 * 60 * 60 * 1000 + 60000
       );
@@ -319,7 +319,9 @@ describe('independent continuity review regressions', () => {
         completeConversationTurn(viewer, next.id, 'done');
       }
       clock.mockReturnValue(now + 120000);
-      expect(() => reserveConversationTurn(viewer, 'first', first.id)).toThrow('request_conflict');
+      expect(() => reserveConversationTurn(viewer, 'earlier greeting', first.id)).toThrow(
+        'request_conflict'
+      );
     } finally {
       clock.mockRestore();
     }
@@ -406,4 +408,190 @@ describe('bounded scoped execution context', () => {
     expect(() => markConversationTurnNotStarted(viewer, first.id)).toThrow('invalid_history');
     expect(readConversationHistory(viewer).messages).toHaveLength(1);
   });
+});
+
+describe('durable scoped request routing', () => {
+  const a = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const b = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  function intake(text: string, id?: string) {
+    const turn = reserveConversationTurn(viewer, text, id, Date.now(), 'ja');
+    completeConversationTurn(viewer, turn.id, turn.routing?.reply ?? 'A chat reply');
+    return turn;
+  }
+  function state() {
+    return (
+      files.get(conversationRef(viewer).path) as {
+        taskState: {
+          tasks: Array<{
+            id: string;
+            title: string;
+            updates: string[];
+            state: string;
+            result?: { turnId: string; excerpt: string; at: number };
+          }>;
+        };
+      }
+    ).taskState;
+  }
+  it('retains two requests and resolves named and clarified status after persisted reload', () => {
+    expect(intake('Aの報告書を作って', a).routing?.kind).toBe('new_request');
+    expect(intake('Bの旅行計画を作って', b).routing?.kind).toBe('new_request');
+    const named = intake('Aの件どう？');
+    expect(named.routing).toMatchObject({ kind: 'status', taskIds: [a], authority: 'none' });
+    expect(named.routing?.reply).toContain('A');
+    const vague = intake('さっきの件どう？');
+    expect(vague.routing?.kind).toBe('clarification');
+    expect(vague.routing?.reply).toContain('A');
+    expect(vague.routing?.reply).toContain('B');
+    const selected = intake('1つ目');
+    expect(selected.routing).toMatchObject({ kind: 'status', taskIds: [a], authority: 'none' });
+    expect(state().tasks).toHaveLength(2);
+    expect(state().tasks.every((task) => task.state === 'recorded')).toBe(true);
+  });
+  it('replays a decision without duplicating intake or changing request state on completion', () => {
+    const first = intake('Aの報告書を作って', a);
+    const replay = reserveConversationTurn(viewer, 'Aの報告書を作って', a, Date.now(), 'ja');
+    expect(replay).toMatchObject({ created: false, routing: first.routing });
+    expect(state().tasks).toHaveLength(1);
+    expect(() => reserveConversationTurn(viewer, 'Bの報告書を作って', a)).toThrow(
+      'request_conflict'
+    );
+  });
+  it('keeps intake requests after transcript eviction and never reconstructs from assistant text', () => {
+    intake('Aの報告書を作って', a);
+    for (let i = 0; i < 55; i++) intake('hello');
+    expect(
+      readConversationHistory(viewer).messages.some((message) => message.id === a + '-user')
+    ).toBe(false);
+    expect(intake('Aの件どう？').routing?.taskIds).toEqual([a]);
+    expect(state().tasks).toHaveLength(1);
+  });
+  it.each([
+    { principalId: 'human:bob' },
+    { memberId: 'member-b' },
+    { tenantSlugs: ['tenant-b'] },
+    { organizationIds: ['org-b'] },
+    { projectIds: ['project-b'] },
+    { tierAccess: ['public'] },
+    { role: 'readonly' },
+    { source: 'loopback' },
+  ])('does not associate requests from another authorization partition: %j', (change) => {
+    intake('Aの報告書を作って', a);
+    const other = { ...viewer, ...change } as ConciergeViewerContext;
+    expect(reserveConversationTurn(other, 'Aの件どう？').routing?.taskIds).toEqual([]);
+  });
+  it('rejects corrupt persisted state and dangling binding IDs without global fallback', () => {
+    intake('Aの報告書を作って', a);
+    const path = conversationRef(viewer).path;
+    const value = structuredClone(files.get(path)) as { taskState: { tasks: unknown[] } };
+    value.taskState.tasks = [];
+    files.set(path, value);
+    expect(() => readConversationHistory(viewer)).toThrow('invalid_history');
+  });
+  it('stores redacted request summaries and cannot infer execution from an assistant promise', () => {
+    const turn = reserveConversationTurn(viewer, 'Create a report with password=do-not-store', a);
+    expect(turn.routing).toMatchObject({ kind: 'new_request', taskIds: [a] });
+    expect(turn.routing?.reply).toBeUndefined();
+    expect(readConversationHistory(viewer).pending).toBe(1);
+    completeConversationTurn(viewer, turn.id, 'Done, deployed and completed!');
+    expect(JSON.stringify(state())).not.toContain('do-not-store');
+    expect(state().tasks[0].state).toBe('recorded');
+    expect(state().tasks[0].result).toBeUndefined();
+  });
+  it('completes a request answered in place and reports it through status', () => {
+    const turn = reserveConversationTurn(viewer, 'Aの報告書を作って', a, Date.now(), 'ja');
+    completeConversationTurn(viewer, turn.id, 'Aの報告書の下書きです。', 'answered');
+    expect(state().tasks[0]).toMatchObject({
+      state: 'completed',
+      result: { turnId: a, excerpt: 'Aの報告書の下書きです。' },
+    });
+    const status = intake('Aの件どう？');
+    expect(status.routing?.reply).toContain('回答済み');
+    expect(status.routing?.reply).toContain('Aの報告書の下書きです。');
+  });
+  it('marks a request needing work beyond the conversation and applies a named follow-up', () => {
+    const turn = reserveConversationTurn(viewer, 'Aの報告書を作って', a, Date.now(), 'ja');
+    completeConversationTurn(viewer, turn.id, '承認が必要です。', 'needs_execution');
+    expect(state().tasks[0].state).toBe('needs_execution');
+    const followup = reserveConversationTurn(
+      viewer,
+      'Aの報告書に表を追加して',
+      b,
+      Date.now(),
+      'ja'
+    );
+    expect(followup.routing).toMatchObject({ kind: 'followup', taskIds: [a] });
+    completeConversationTurn(viewer, followup.id, '表を追加しました。', 'answered');
+    expect(state().tasks[0]).toMatchObject({
+      state: 'completed',
+      updates: ['Aの報告書に表を追加して'],
+      result: { turnId: b, excerpt: '表を追加しました。' },
+    });
+  });
+  it('never applies an outcome to chat or local intake turns', () => {
+    intake('Aの報告書を作って', a);
+    const chat = reserveConversationTurn(viewer, 'hello');
+    completeConversationTurn(viewer, chat.id, 'hello back', 'answered');
+    const status = reserveConversationTurn(viewer, 'Aの件どう？', undefined, Date.now(), 'ja');
+    completeConversationTurn(viewer, status.id, status.routing!.reply!, 'answered');
+    expect(state().tasks[0].state).toBe('recorded');
+  });
+});
+
+it('atomically publishes an inert intake reply, recoverable after a crash before completion', () => {
+  const request = reserveConversationTurn(viewer, 'Aの報告書を作って', undefined, Date.now(), 'ja');
+  completeConversationTurn(viewer, request.id, 'A chat reply');
+  const id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const first = reserveConversationTurn(viewer, 'Aの件どう？', id, Date.now(), 'ja');
+  expect(first.routing).toMatchObject({ kind: 'status', taskIds: [request.id] });
+  const replay = reserveConversationTurn(viewer, 'Aの件どう？', id, Date.now(), 'ja');
+  expect(replay).toMatchObject({
+    created: false,
+    reply: first.routing?.reply,
+    routing: first.routing,
+  });
+  expect(readConversationHistory(viewer).pending).toBe(0);
+  expect(() => completeConversationTurn(viewer, id, first.routing!.reply!)).not.toThrow();
+  expect(() => completeConversationTurn(viewer, id, 'unrelated reply')).toThrow('invalid_history');
+  expect(files.get(conversationRef(viewer).path)).toMatchObject({ version: 2 });
+});
+
+it('retains original request details beyond the title after transcript eviction', () => {
+  const text = 'Create a report ' + 'x'.repeat(1500) + ' with final constraint';
+  const id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const first = reserveConversationTurn(viewer, text, id);
+  expect(first.routing?.kind).toBe('new_request');
+  for (let index = 0; index < 55; index++) {
+    const chat = reserveConversationTurn(viewer, 'hello');
+    completeConversationTurn(viewer, chat.id, 'hello back');
+  }
+  const stored = files.get(conversationRef(viewer).path) as {
+    taskState: { tasks: Array<{ requestText: string; title: string }> };
+  };
+  expect(stored.taskState.tasks[0].requestText).toBe(text);
+  expect(stored.taskState.tasks[0].title.length).toBeLessThanOrEqual(512);
+});
+
+it('migrates legacy v1 without inventing tasks and rejects missing v2 state', () => {
+  const ref = conversationRef(viewer);
+  files.set(ref.path, { version: 1, sessionId: ref.sessionId, turns: [] });
+  expect(readConversationHistory(viewer).messages).toEqual([]);
+  expect(files.get(ref.path)).toMatchObject({ version: 1 });
+  reserveConversationTurn(viewer, 'hello');
+  expect(files.get(ref.path)).toMatchObject({ version: 2, taskState: { tasks: [] } });
+  files.set(ref.path, { version: 2, sessionId: ref.sessionId, turns: [] });
+  expect(() => readConversationHistory(viewer)).toThrow('invalid_history');
+});
+
+it('a late chat completion preserves requests reserved while that chat was pending', () => {
+  const chat = reserveConversationTurn(viewer, 'hello');
+  const request = reserveConversationTurn(viewer, 'Aの報告書を作って');
+  completeConversationTurn(viewer, chat.id, 'hello back');
+  const persisted = files.get(conversationRef(viewer).path) as {
+    taskState: { tasks: Array<{ id: string }> };
+  };
+  expect(persisted.taskState.tasks.map((task) => task.id)).toEqual([request.id]);
+  expect(readConversationHistory(viewer).pending).toBe(1);
+  completeConversationTurn(viewer, request.id, 'Report draft');
+  expect(readConversationHistory(viewer).pending).toBe(0);
 });

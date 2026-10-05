@@ -29,6 +29,7 @@ import {
   completeConversationTurn,
   conversationRef,
   readConversationHistory,
+  reserveConversationTurn,
 } from './conversation-store';
 
 const viewer: ConciergeViewerContext = {
@@ -45,18 +46,57 @@ beforeEach(() => files.clear());
 
 describe('server-owned durable conversation', () => {
   it('restores a pending request without executing it; completes the same turn later', () => {
-    const id = beginConversationTurn(viewer, 'Prepare the report tomorrow');
+    const id = beginConversationTurn(viewer, 'Hello from Alice');
     expect(readConversationHistory(viewer)).toMatchObject({
       pending: 1,
-      messages: [{ role: 'user', text: 'Prepare the report tomorrow' }],
+      messages: [{ role: 'user', text: 'Hello from Alice' }],
     });
     completeConversationTurn(viewer, id, 'The report is ready for review');
     expect(readConversationHistory(viewer)).toMatchObject({
       pending: 0,
       messages: [
-        { role: 'user', text: 'Prepare the report tomorrow' },
+        { role: 'user', text: 'Hello from Alice' },
         { role: 'secretary', text: 'The report is ready for review' },
       ],
+    });
+  });
+
+  it('records a recognized request and completes it when the runtime answers in place', () => {
+    const text = 'Prepare the report tomorrow';
+    const id = '00000000-0000-4000-8000-000000000001';
+    const turn = reserveConversationTurn(viewer, text, id, Date.now(), 'en');
+    expect(turn).toMatchObject({
+      created: true,
+      routing: { kind: 'new_request', authority: 'none', taskIds: [id] },
+    });
+    expect(turn.routing?.reply).toBeUndefined();
+    expect(readConversationHistory(viewer)).toMatchObject({
+      pending: 1,
+      messages: [{ role: 'user', text }],
+    });
+    expect(files.get(conversationRef(viewer).path)).toMatchObject({
+      taskState: {
+        tasks: [{ id, state: 'recorded', requestText: text }],
+      },
+    });
+    completeConversationTurn(viewer, id, 'The report is ready', 'answered');
+    expect(readConversationHistory(viewer)).toMatchObject({
+      pending: 0,
+      messages: [
+        { role: 'user', text },
+        { role: 'secretary', text: 'The report is ready' },
+      ],
+    });
+    expect(reserveConversationTurn(viewer, text, id, Date.now(), 'en')).toMatchObject({
+      created: false,
+      id,
+      reply: 'The report is ready',
+      routing: turn.routing,
+    });
+    expect(files.get(conversationRef(viewer).path)).toMatchObject({
+      taskState: {
+        tasks: [{ id, state: 'completed', result: { turnId: id, excerpt: 'The report is ready' } }],
+      },
     });
   });
 
@@ -97,14 +137,14 @@ describe('server-owned durable conversation', () => {
   });
 
   it('matches replies to their turn even when requests finish in reverse order', () => {
-    const first = beginConversationTurn(viewer, 'first');
-    const second = beginConversationTurn(viewer, 'second');
+    const first = beginConversationTurn(viewer, 'earlier greeting');
+    const second = beginConversationTurn(viewer, 'later greeting');
     completeConversationTurn(viewer, second, 'second reply');
     completeConversationTurn(viewer, first, 'first reply');
     expect(readConversationHistory(viewer).messages.map((message) => message.text)).toEqual([
-      'first',
+      'earlier greeting',
       'first reply',
-      'second',
+      'later greeting',
       'second reply',
     ]);
   });

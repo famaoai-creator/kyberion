@@ -18,6 +18,8 @@ import {
   frontDeskRuntimeScope,
   narrowFrontDeskConversationViewer,
   completeConversationTurn,
+  classifyConversationTurnOutcome,
+  type ConversationTurnOutcome,
   conversationRef,
   readConversationHistory,
   ConversationStoreError,
@@ -145,7 +147,7 @@ async function replyViaOrchestrator(
   requestId: string,
   conversationKey: string,
   history: ReturnType<typeof completedConversationContext>
-): Promise<ConversationMessageResponse> {
+): Promise<{ payload: ConversationMessageResponse; outcome: ConversationTurnOutcome }> {
   const [channelSurface, pathResolverModule] = await Promise.all([
     import('@agent/core/surface/channel-surface'),
     import('@agent/core/path-resolver'),
@@ -174,14 +176,17 @@ async function replyViaOrchestrator(
       ? viewFromIntentResolution(conversation.intentResolution)
       : undefined;
   return {
-    reply,
-    mode: 'orchestrator',
-    ...(conversation.conversationRuntime
-      ? { conversationRuntime: conversation.conversationRuntime }
-      : {}),
-    ...view,
-    ...(conversation.intentResolution ? { intentResolution: conversation.intentResolution } : {}),
-    ...(intentView || {}),
+    payload: {
+      reply,
+      mode: 'orchestrator',
+      ...(conversation.conversationRuntime
+        ? { conversationRuntime: conversation.conversationRuntime }
+        : {}),
+      ...view,
+      ...(conversation.intentResolution ? { intentResolution: conversation.intentResolution } : {}),
+      ...(intentView || {}),
+    },
+    outcome: classifyConversationTurnOutcome(conversation),
   };
 }
 
@@ -320,7 +325,8 @@ export async function POST(req: NextRequest) {
         viewer,
         text,
         typeof body.requestId === 'string' ? body.requestId : undefined,
-        typeof body.requestCreatedAt === 'number' ? body.requestCreatedAt : undefined
+        typeof body.requestCreatedAt === 'number' ? body.requestCreatedAt : undefined,
+        locale
       );
     } catch (error) {
       const conflict =
@@ -358,18 +364,33 @@ export async function POST(req: NextRequest) {
       );
     }
     let payload: ConversationMessageResponse;
+    let outcome: ConversationTurnOutcome | undefined;
     try {
-      const history = completedConversationContext(viewer);
-      payload = await replyViaOrchestrator(
-        text,
-        speaker,
-        sessionId,
-        locale,
-        scope,
-        turn.id,
-        ref.key,
-        history
-      );
+      if (turn.routing?.reply) {
+        // Server-owned intake state is not task execution or an approval grant.
+        payload = {
+          reply: turn.routing.reply,
+          mode: 'intake',
+          shape:
+            turn.routing.kind === 'clarification'
+              ? 'clarification'
+              : turn.routing.kind === 'status'
+                ? 'status_summary'
+                : 'reply',
+        };
+      } else {
+        const history = completedConversationContext(viewer);
+        ({ payload, outcome } = await replyViaOrchestrator(
+          text,
+          speaker,
+          sessionId,
+          locale,
+          scope,
+          turn.id,
+          ref.key,
+          history
+        ));
+      }
     } catch (error) {
       if (error instanceof SurfaceConversationAdmissionError) {
         try {
@@ -424,7 +445,7 @@ export async function POST(req: NextRequest) {
     }
     let historySaved = true;
     try {
-      completeConversationTurn(viewer, turn.id, payload.reply);
+      completeConversationTurn(viewer, turn.id, payload.reply, outcome);
     } catch {
       // Execution may have completed. Return the real reply, never invite a blind retry.
       historySaved = false;

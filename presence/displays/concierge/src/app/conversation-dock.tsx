@@ -788,6 +788,7 @@ export function parseConversationMessageResponse(
   const mode =
     raw.mode === 'voice-hub' ||
     raw.mode === 'orchestrator' ||
+    raw.mode === 'intake' ||
     raw.mode === 'unavailable' ||
     raw.mode === 'history'
       ? raw.mode

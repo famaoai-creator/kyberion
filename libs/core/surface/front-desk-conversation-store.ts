@@ -1,4 +1,18 @@
+import { frontDeskExecutionArtifactPath } from './front-desk-execution-artifact.js';
 import { createHash, randomUUID } from 'node:crypto';
+import {
+  loadFrontDeskExecutionPolicy,
+  frontDeskMappingDigest,
+  getFrontDeskExecutionMapping,
+  frontDeskExecutionViewerMatches,
+  isFrontDeskExecutionPublicViewer,
+  parseFrontDeskExecutionBinding,
+  frontDeskExecutionExpectedContent,
+  type FrontDeskExecutionBinding,
+  type FrontDeskExecutionMapping,
+  type FrontDeskExecutionProjection,
+} from './front-desk-execution-contract.js';
+import { projectFrontDeskExecution } from './front-desk-execution-status.js';
 import { withExecutionContext } from '../authority.js';
 import { withLockSync } from '../lock-utils.js';
 import { physicalScopedPath } from '../physical-namespace.js';
@@ -9,6 +23,22 @@ import {
 } from '../workforce/artifact-store.js';
 import { narrowSurfaceViewerScope, type SurfaceViewerScope } from './surface-mutation-guard.js';
 import type { EventScopeInput } from '../event-scope.js';
+import type { SupportedLocale } from '../locale-normalize.js';
+import { t } from '../t.js';
+import {
+  applyConversationTurnOutcome,
+  routeConversationTaskTurn,
+  parseConversationTaskState,
+  parseConversationTaskDecision,
+  CONVERSATION_TASK_MAX_TASKS,
+  type ConversationTaskState,
+  type ConversationTaskDecision,
+  type ConversationTurnOutcome,
+} from './conversation-task-routing.js';
+export {
+  classifyConversationTurnOutcome,
+  type ConversationTurnOutcome,
+} from './conversation-task-routing.js';
 
 /** Server-owned authorization projection. No client identity/session can select a transcript. */
 export type FrontDeskConversationViewer = SurfaceViewerScope;
@@ -56,8 +86,10 @@ type Turn = {
   uncertain?: boolean;
   retryable?: boolean;
   requestDigest?: string;
+  routing?: ConversationTaskDecision;
 };
 export type ReservedConversationTurn = {
+  routing?: ConversationTaskDecision;
   id: string;
   created: boolean;
   reply?: string;
@@ -65,11 +97,30 @@ export type ReservedConversationTurn = {
 };
 const PENDING_RETENTION_MS = 24 * 60 * 60 * 1000;
 type Transcript = {
-  version: 1;
+  version: 2 | 3;
   sessionId: string;
   turns: Turn[];
+  taskState?: ConversationTaskState;
   droppedRequests?: Array<{ id: string; createdAt: number }>;
+  executionRequests?: FrontDeskExecutionRequest[];
+  executionReports?: FrontDeskExecutionReport[];
 };
+export interface FrontDeskExecutionRequest {
+  binding: FrontDeskExecutionBinding;
+  viewer: FrontDeskConversationViewer;
+  sessionId: string;
+  revision: number;
+  requestDigest: string;
+  status: 'pending' | 'invalidated' | 'cancel_requested';
+  createdAt: number;
+}
+export interface FrontDeskExecutionReport {
+  id: string;
+  requestId: string;
+  status: FrontDeskExecutionProjection['status'];
+  text: string;
+  createdAt: number;
+}
 const MAX_DROPPED_REQUESTS = 1024;
 export const CONVERSATION_RETRY_WINDOW_MS = PENDING_RETENTION_MS;
 
@@ -135,11 +186,13 @@ function validText(value: unknown, limit: number): value is string {
 
 function load(ref: ReturnType<typeof conversationRef>): Transcript {
   const value = readGovernedArtifactJson<unknown>(ref.path);
-  if (value === null) return { version: 1, sessionId: ref.sessionId, turns: [] };
+  if (value === null)
+    return { version: 2, sessionId: ref.sessionId, turns: [], taskState: { tasks: [] } };
   if (!value || typeof value !== 'object') throw new ConversationStoreError('invalid_history');
   const record = value as Record<string, unknown>;
   if (
-    record.version !== 1 ||
+    (record.version !== 1 && record.version !== 2 && record.version !== 3) ||
+    ((record.version === 2 || record.version === 3) && record.taskState === undefined) ||
     record.sessionId !== ref.sessionId ||
     !Array.isArray(record.turns) ||
     record.turns.length > CONVERSATION_MAX_TURNS
@@ -166,8 +219,12 @@ function load(ref: ReturnType<typeof conversationRef>): Transcript {
     ) {
       throw new ConversationStoreError('invalid_history');
     }
+    const routing =
+      turn.routing === undefined ? undefined : parseConversationTaskDecision(turn.routing);
+    if (turn.routing !== undefined && !routing) throw new ConversationStoreError('invalid_history');
     ids.add(turn.id);
     return {
+      ...(routing ? { routing } : {}),
       id: turn.id,
       text: turn.text,
       createdAt: turn.createdAt,
@@ -177,6 +234,12 @@ function load(ref: ReturnType<typeof conversationRef>): Transcript {
       ...(typeof turn.requestDigest === 'string' ? { requestDigest: turn.requestDigest } : {}),
     };
   });
+  const taskState =
+    record.taskState === undefined ? { tasks: [] } : parseConversationTaskState(record.taskState);
+  if (!taskState) throw new ConversationStoreError('invalid_history');
+  const taskIds = new Set(taskState.tasks.map((task) => task.id));
+  if (turns.some((turn) => turn.routing?.taskIds.some((id) => !taskIds.has(id))))
+    throw new ConversationStoreError('invalid_history');
   const dropped = record.droppedRequests ?? [];
   if (
     !Array.isArray(dropped) ||
@@ -193,11 +256,26 @@ function load(ref: ReturnType<typeof conversationRef>): Transcript {
   )
     throw new ConversationStoreError('invalid_history');
   return {
-    version: 1,
+    version: record.version === 3 ? 3 : 2,
     sessionId: ref.sessionId,
     turns,
+    taskState,
     droppedRequests: dropped.map((entry) => ({ id: entry.id, createdAt: entry.createdAt })),
+    executionRequests: parseExecutionRequests(record.executionRequests, ref, taskState),
+    executionReports: parseExecutionReports(record.executionReports),
   };
+}
+
+/** All publications share this version fence. A legacy v2 front desk rejects
+ * v3 before it can rewrite the transcript and silently discard durable work. */
+function publishTranscript(ref: ReturnType<typeof conversationRef>, transcript: Transcript): void {
+  if (
+    transcript.version === 3 ||
+    (transcript.executionRequests?.length ?? 0) > 0 ||
+    (transcript.executionReports?.length ?? 0) > 0
+  )
+    transcript.version = 3;
+  writeGovernedArtifactJson('sovereign_concierge', ref.path, transcript);
 }
 
 /** Known/registered credentials are redacted; arbitrary passwords cannot be inferred. */
@@ -220,13 +298,11 @@ function storedText(text: string, limit: number): string {
 
 export function readConversationHistory(viewer: FrontDeskConversationViewer): ConversationHistory {
   const ref = conversationRef(viewer);
-  return asStore(viewer, () => {
-    const transcript = load(ref);
-    return {
-      sessionId: ref.sessionId,
-      pending: transcript.turns.filter((turn) => turn.reply === undefined && !turn.retryable)
-        .length,
-      messages: transcript.turns.flatMap((turn) => [
+  return asStore(viewer, () =>
+    withLockSync(`concierge-history-${ref.key}`, () => {
+      const transcript = load(ref);
+      if (syncExecutionReports(viewer, transcript)) publishTranscript(ref, transcript);
+      const messages = transcript.turns.flatMap((turn) => [
         {
           id: `${turn.id}-user`,
           role: 'user' as const,
@@ -239,12 +315,27 @@ export function readConversationHistory(viewer: FrontDeskConversationViewer): Co
               {
                 id: `${turn.id}-secretary`,
                 role: 'secretary' as const,
+                createdAt: turn.createdAt,
                 text: storedText(turn.reply, CONVERSATION_MAX_REPLY),
               },
             ]),
-      ]),
-    };
-  });
+      ]);
+      for (const report of transcript.executionReports ?? [])
+        messages.push({
+          id: report.id,
+          role: 'secretary',
+          createdAt: report.createdAt,
+          text: storedText(report.text, CONVERSATION_MAX_REPLY),
+        });
+      messages.sort((a, b) => a.createdAt - b.createdAt);
+      return {
+        sessionId: ref.sessionId,
+        pending: transcript.turns.filter((turn) => turn.reply === undefined && !turn.retryable)
+          .length,
+        messages: messages.slice(-CONVERSATION_MAX_TURNS * 2),
+      };
+    })
+  );
 }
 
 export function beginConversationTurn(viewer: FrontDeskConversationViewer, text: string): string {
@@ -257,7 +348,8 @@ export function reserveConversationTurn(
   viewer: FrontDeskConversationViewer,
   text: string,
   requestId: string = randomUUID(),
-  requestCreatedAt = Date.now()
+  requestCreatedAt = Date.now(),
+  locale?: SupportedLocale
 ): ReservedConversationTurn {
   if (
     !Number.isFinite(requestCreatedAt) ||
@@ -265,7 +357,10 @@ export function reserveConversationTurn(
     Date.now() - requestCreatedAt >= CONVERSATION_RETRY_WINDOW_MS
   )
     throw new ConversationStoreError('request_expired');
-  if (!/^[a-f0-9-]{36}$/.test(requestId)) throw new ConversationStoreError('invalid_text');
+  // New reservations must satisfy both transcript and executable-binding identity contracts.
+  // The loader deliberately retains its older permissive ID check for inert legacy history.
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(requestId))
+    throw new ConversationStoreError('invalid_text');
   if (!validText(text, CONVERSATION_MAX_INPUT)) throw new ConversationStoreError('invalid_text');
   const ref = conversationRef(viewer);
   return asStore(viewer, () =>
@@ -286,16 +381,21 @@ export function reserveConversationTurn(
         if (!matches) throw new ConversationStoreError('request_conflict');
         if (existing.retryable && !existing.uncertain && existing.reply === undefined) {
           delete existing.retryable;
-          writeGovernedArtifactJson('sovereign_concierge', ref.path, transcript);
-          return { id: existing.id, created: true };
+          publishTranscript(ref, transcript);
+          return { id: existing.id, created: true, routing: existing.routing };
         }
         return {
           id: existing.id,
           created: false,
           reply: existing.reply,
           uncertain: existing.uncertain,
+          routing: existing.routing,
         };
       }
+      // Executable request identity outlives display turns and their retry tombstones.
+      // A fresh timestamp must never recreate or reset an already bound task/revision.
+      if (transcript.executionRequests?.some((entry) => entry.binding.request_id === requestId))
+        throw new ConversationStoreError('request_conflict');
       const id = requestId;
       // Do not evict a pending turn that another process is still completing.
       if (transcript.turns.length === CONVERSATION_MAX_TURNS) {
@@ -311,22 +411,75 @@ export function reserveConversationTurn(
         }
         transcript.turns.splice(completed, 1);
       }
+      // Intake classification is advisory only. Bind to this server-owned partition,
+      // never to global TaskSession state or text recovered from old assistant replies.
+      let routed = routeConversationTaskTurn(
+        transcript.taskState ?? { tasks: [] },
+        storedText(text, CONVERSATION_MAX_INPUT),
+        id,
+        Date.now(),
+        locale
+      );
+      // Only this exact configured diagnostic command reserves executable work.
+      // The request, outbox reference and queued answer share this one atomic write.
+      const admission = executionAdmission(viewer, text, id, ref, routed.state, locale);
+      if (admission) {
+        routed = admission.routed;
+        transcript.executionRequests = [...(transcript.executionRequests ?? []), admission.request];
+      } else {
+        const request = transcript.executionRequests?.find(
+          (entry) => entry.binding.request_id === routed.decision.taskIds[0]
+        );
+        if (
+          request &&
+          (routed.decision.kind === 'followup' || routed.decision.kind === 'cancellation')
+        ) {
+          request.revision += 1;
+          request.status =
+            routed.decision.kind === 'cancellation' ? 'cancel_requested' : 'invalidated';
+          request.requestDigest = createHash('sha256')
+            .update(JSON.stringify({ previous: request.requestDigest, text }))
+            .digest('hex');
+          if (routed.decision.kind === 'cancellation') {
+            routed.decision.reply = t('front_desk:execution_cancel_requested', undefined, locale);
+          }
+        }
+        if (request && routed.decision.kind === 'status')
+          routed.decision.reply =
+            executionProjection(viewer, request, locale)?.text ?? routed.decision.reply;
+      }
+      syncExecutionReports(viewer, transcript);
+      // Validate before publication too: a generated oversized/malformed reply must
+      // never poison the durable transcript and make every subsequent read fail.
+      if (
+        !parseConversationTaskState(routed.state) ||
+        !parseConversationTaskDecision(routed.decision)
+      )
+        throw new ConversationStoreError('invalid_history');
+      transcript.taskState = routed.state;
       transcript.turns.push({
+        routing: routed.decision,
+        // Pure intake replies have no external execution. Publish their known
+        // result atomically, so a crash cannot strand a replay as pending.
+        ...(routed.decision.reply ? { reply: routed.decision.reply } : {}),
         id,
         text: storedText(text, CONVERSATION_MAX_INPUT),
         createdAt: Date.now(),
         requestDigest: createHash('sha256').update(text).digest('hex'),
       });
-      writeGovernedArtifactJson('sovereign_concierge', ref.path, transcript);
-      return { id, created: true };
+      publishTranscript(ref, transcript);
+      return { id, created: true, routing: routed.decision };
     })
   );
 }
 
+/** `outcome` comes from the runtime's structured result, never from reply text;
+ * omit it when the reply did not come from the conversation runtime. */
 export function completeConversationTurn(
   viewer: FrontDeskConversationViewer,
   id: string,
-  reply: string
+  reply: string,
+  outcome?: ConversationTurnOutcome
 ): void {
   if (!validText(reply, CONVERSATION_MAX_REPLY)) throw new ConversationStoreError('invalid_text');
   const ref = conversationRef(viewer);
@@ -334,11 +487,33 @@ export function completeConversationTurn(
     withLockSync(`concierge-history-${ref.key}`, () => {
       const transcript = load(ref);
       const turn = transcript.turns.find((entry) => entry.id === id);
+      const boundedReply = storedText(reply, CONVERSATION_MAX_REPLY);
+      if (
+        turn?.routing?.reply &&
+        turn.reply === boundedReply &&
+        turn.routing.reply === boundedReply
+      )
+        return; // The inert intake result was already committed by reservation.
       if (!turn || turn.reply !== undefined) throw new ConversationStoreError('invalid_history');
-      turn.reply = storedText(reply, CONVERSATION_MAX_REPLY);
+      turn.reply = boundedReply;
       delete turn.uncertain;
       delete turn.retryable;
-      writeGovernedArtifactJson('sovereign_concierge', ref.path, transcript);
+      const taskId = turn.routing?.taskIds[0];
+      if (
+        outcome &&
+        taskId &&
+        (turn.routing?.kind === 'new_request' || turn.routing?.kind === 'followup')
+      ) {
+        transcript.taskState = applyConversationTurnOutcome(
+          transcript.taskState ?? { tasks: [] },
+          taskId,
+          outcome,
+          id,
+          boundedReply,
+          Date.now()
+        );
+      }
+      publishTranscript(ref, transcript);
     })
   );
 }
@@ -357,7 +532,7 @@ export function markConversationTurnUncertain(
       if (!turn || turn.reply !== undefined) throw new ConversationStoreError('invalid_history');
       turn.uncertain = true;
       delete turn.retryable;
-      writeGovernedArtifactJson('sovereign_concierge', ref.path, transcript);
+      publishTranscript(ref, transcript);
     })
   );
 }
@@ -445,7 +620,396 @@ export function markConversationTurnNotStarted(
       if (!turn || turn.reply !== undefined || turn.uncertain)
         throw new ConversationStoreError('invalid_history');
       turn.retryable = true;
-      writeGovernedArtifactJson('sovereign_concierge', ref.path, transcript);
+      publishTranscript(ref, transcript);
     })
   );
+}
+
+function objectValue(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+function validExecutionViewer(value: unknown): value is FrontDeskConversationViewer {
+  if (
+    !objectValue(value) ||
+    !['token', 'loopback'].includes(String(value.source)) ||
+    !['localadmin', 'readonly'].includes(String(value.role)) ||
+    !validText(value.principalId, 256) ||
+    (value.memberId !== undefined && !validText(value.memberId, 256))
+  )
+    return false;
+  for (const key of ['tenantSlugs', 'organizationIds', 'projectIds', 'tierAccess']) {
+    const values = value[key];
+    if (values === 'all' && key !== 'tierAccess') continue;
+    if (
+      !Array.isArray(values) ||
+      values.length > 64 ||
+      !values.every((entry) => validText(entry, 256))
+    )
+      return false;
+  }
+  return (value.tierAccess as string[]).every((tier) =>
+    ['public', 'confidential', 'personal'].includes(tier)
+  );
+}
+function parseExecutionRequests(
+  value: unknown,
+  ref: ReturnType<typeof conversationRef>,
+  state: ConversationTaskState
+): FrontDeskExecutionRequest[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > CONVERSATION_TASK_MAX_TASKS)
+    throw new ConversationStoreError('invalid_history');
+  const ids = new Set<string>();
+  return value.map((row) => {
+    if (
+      !objectValue(row) ||
+      Object.keys(row).some(
+        (key) =>
+          ![
+            'binding',
+            'viewer',
+            'sessionId',
+            'revision',
+            'requestDigest',
+            'status',
+            'createdAt',
+          ].includes(key)
+      )
+    )
+      throw new ConversationStoreError('invalid_history');
+    const binding = parseFrontDeskExecutionBinding(row.binding);
+    if (
+      !binding ||
+      !validExecutionViewer(row.viewer) ||
+      row.sessionId !== ref.sessionId ||
+      binding.conversation_key !== ref.key ||
+      conversationRef(row.viewer).key !== ref.key ||
+      !Number.isSafeInteger(row.revision) ||
+      (row.revision as number) < binding.revision ||
+      typeof row.requestDigest !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(row.requestDigest) ||
+      !['pending', 'invalidated', 'cancel_requested'].includes(String(row.status)) ||
+      typeof row.createdAt !== 'number' ||
+      !Number.isFinite(row.createdAt) ||
+      row.createdAt < 0 ||
+      !state.tasks.some(
+        (task) => task.id === binding.request_id && task.workItemId === binding.work_item_id
+      ) ||
+      ids.has(binding.request_id)
+    )
+      throw new ConversationStoreError('invalid_history');
+    ids.add(binding.request_id);
+    return {
+      binding,
+      viewer: structuredClone(row.viewer),
+      sessionId: ref.sessionId,
+      revision: row.revision as number,
+      requestDigest: row.requestDigest,
+      status: row.status as FrontDeskExecutionRequest['status'],
+      createdAt: row.createdAt,
+    };
+  });
+}
+function parseExecutionReports(value: unknown): FrontDeskExecutionReport[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > CONVERSATION_TASK_MAX_TASKS)
+    throw new ConversationStoreError('invalid_history');
+  const ids = new Set<string>();
+  const parsed = value.map((row) => {
+    if (
+      !objectValue(row) ||
+      Object.keys(row).some(
+        (key) => !['id', 'requestId', 'status', 'text', 'createdAt'].includes(key)
+      ) ||
+      !validText(row.id, 256) ||
+      ids.has(row.id) ||
+      typeof row.requestId !== 'string' ||
+      !/^[a-f0-9-]{36}$/.test(row.requestId) ||
+      ![
+        'queued',
+        'awaiting_approval',
+        'running',
+        'work_completed',
+        'blocked',
+        'cancel_requested',
+        'uncertain',
+      ].includes(String(row.status)) ||
+      !validText(row.text, CONVERSATION_MAX_REPLY) ||
+      typeof row.createdAt !== 'number' ||
+      !Number.isFinite(row.createdAt) ||
+      row.createdAt < 0
+    )
+      throw new ConversationStoreError('invalid_history');
+    ids.add(row.id);
+    return {
+      id: row.id,
+      requestId: row.requestId,
+      status: row.status as FrontDeskExecutionProjection['status'],
+      text: row.text,
+      createdAt: row.createdAt,
+    };
+  });
+  // Earlier receipts could append a correction for the same request. The last
+  // persisted row is its latest projection; retain one bounded slot per request.
+  return [...new Map(parsed.map((report) => [report.requestId, report])).values()];
+}
+function executionAdmission(
+  viewer: FrontDeskConversationViewer,
+  text: string,
+  requestId: string,
+  ref: ReturnType<typeof conversationRef>,
+  state: ConversationTaskState,
+  locale?: SupportedLocale
+):
+  | {
+      routed: { state: ConversationTaskState; decision: ConversationTaskDecision };
+      request: FrontDeskExecutionRequest;
+    }
+  | undefined {
+  if (!isFrontDeskExecutionPublicViewer(viewer)) return undefined;
+  const mapping = loadFrontDeskExecutionPolicy().mappings.find(
+    (entry) => text === entry.exactCommand && frontDeskExecutionViewerMatches(viewer, entry)
+  );
+  if (!mapping || !isFrontDeskExecutionPublicViewer(mapping.viewer)) return undefined;
+  let digest: string;
+  try {
+    if (!frontDeskRuntimeScope(viewer).tenant_slug) return undefined;
+    digest = frontDeskMappingDigest(mapping);
+  } catch {
+    return undefined;
+  }
+  let task = state.tasks.find((entry) => entry.id === requestId);
+  if (!task) {
+    if (state.tasks.length >= CONVERSATION_TASK_MAX_TASKS) return undefined;
+    task = {
+      id: requestId,
+      title: storedText(text, 512),
+      requestText: storedText(text, CONVERSATION_MAX_INPUT),
+      createdAt: Date.now(),
+      updates: [],
+      state: 'needs_execution',
+    };
+    state.tasks.push(task);
+  }
+  const requestDigest = createHash('sha256').update(text).digest('hex');
+  const binding: FrontDeskExecutionBinding = {
+    mapping_id: mapping.id,
+    config_digest: digest,
+    conversation_key: ref.key,
+    request_id: requestId,
+    revision: 1,
+    request_digest: requestDigest,
+    work_item_id:
+      'WI-FD-' +
+      createHash('sha256')
+        .update(JSON.stringify([mapping.id, digest, ref.key, requestId, 1, requestDigest]))
+        .digest('hex')
+        .slice(0, 48),
+  };
+  task.workItemId = binding.work_item_id;
+  task.state = 'needs_execution';
+  delete task.result;
+  delete state.clarification;
+  return {
+    routed: {
+      state,
+      decision: {
+        kind: 'new_request',
+        taskIds: [requestId],
+        confidence: 'rule',
+        authority: 'none',
+        reply: t('front_desk:execution_acknowledged', undefined, locale),
+      },
+    },
+    request: {
+      binding,
+      viewer: structuredClone(viewer),
+      sessionId: ref.sessionId,
+      revision: 1,
+      requestDigest,
+      status: 'pending',
+      createdAt: Date.now(),
+    },
+  };
+}
+function executionProjection(
+  viewer: FrontDeskConversationViewer,
+  request: FrontDeskExecutionRequest,
+  locale?: SupportedLocale
+): FrontDeskExecutionProjection | undefined {
+  if (request.status === 'cancel_requested')
+    return {
+      status: 'cancel_requested',
+      text: t('front_desk:execution_cancel_requested', undefined, locale),
+    };
+  if (request.status === 'invalidated')
+    return { status: 'blocked', text: t('front_desk:execution_invalidated', undefined, locale) };
+  try {
+    return projectFrontDeskExecution(viewer, request.binding, { locale });
+  } catch {
+    return undefined;
+  } // A report read failure never retries or re-dispatches work.
+}
+function syncExecutionReports(
+  viewer: FrontDeskConversationViewer,
+  transcript: Transcript
+): boolean {
+  const reports = transcript.executionReports ?? [];
+  let changed = false;
+  for (const request of transcript.executionRequests ?? []) {
+    const projection = executionProjection(viewer, request);
+    if (
+      !projection?.reportId ||
+      !validText(projection.reportId, 256) ||
+      !validText(projection.text, CONVERSATION_MAX_REPLY)
+    )
+      continue;
+    const index = reports.findIndex((report) => report.requestId === request.binding.request_id);
+    const previous = index < 0 ? undefined : reports[index];
+    if (previous?.id === projection.reportId && previous.status === projection.status) continue;
+    if (
+      reports.some(
+        (report) =>
+          report.id === projection.reportId && report.requestId !== request.binding.request_id
+      )
+    )
+      continue;
+    const report: FrontDeskExecutionReport = {
+      id: projection.reportId,
+      requestId: request.binding.request_id,
+      status: projection.status,
+      text: storedText(projection.text, CONVERSATION_MAX_REPLY),
+      createdAt: Date.now(),
+    };
+    // A correction replaces this request's slot, so every admitted request can
+    // always acquire its own receipt without an unbounded history of corrections.
+    if (index >= 0) reports[index] = report;
+    else if (reports.length < CONVERSATION_TASK_MAX_TASKS) reports.push(report);
+    else continue;
+    changed = true;
+  }
+  if (changed) transcript.executionReports = reports;
+  return changed;
+}
+
+/** Front-desk-owned projection only. Executors never write transcripts. */
+export function readConversationExecutionReports(
+  viewer: FrontDeskConversationViewer
+): FrontDeskExecutionReport[] {
+  const ref = conversationRef(viewer);
+  return asStore(viewer, () =>
+    withLockSync(`concierge-history-${ref.key}`, () => {
+      const transcript = load(ref);
+      if (syncExecutionReports(viewer, transcript)) publishTranscript(ref, transcript);
+      return structuredClone(transcript.executionReports ?? []);
+    })
+  );
+}
+/** Enumerate only explicitly configured partitions. No global transcript scan or bodies. */
+export function listConfiguredFrontDeskExecutions(): Array<{
+  mapping: FrontDeskExecutionMapping;
+  binding: FrontDeskExecutionBinding;
+  request: Omit<FrontDeskExecutionRequest, 'binding' | 'viewer'>;
+}> {
+  const found: Array<{
+    mapping: FrontDeskExecutionMapping;
+    binding: FrontDeskExecutionBinding;
+    request: Omit<FrontDeskExecutionRequest, 'binding' | 'viewer'>;
+  }> = [];
+  for (const mapping of loadFrontDeskExecutionPolicy().mappings) {
+    if (!isFrontDeskExecutionPublicViewer(mapping.viewer)) continue;
+    try {
+      const ref = conversationRef(mapping.viewer);
+      asStore(mapping.viewer, () => {
+        for (const request of load(ref).executionRequests ?? []) {
+          if (request.binding.mapping_id !== mapping.id) continue;
+          const { binding, viewer: _viewer, ...summary } = request;
+          found.push({ mapping, binding, request: summary });
+        }
+      });
+    } catch {
+      /* A malformed or inaccessible partition never gains execution authority. */
+    }
+  }
+  return found;
+}
+/** Fresh pre-effect authorization check; does not write or consume request state. */
+export function inspectFrontDeskExecution(
+  binding: FrontDeskExecutionBinding,
+  charter: {
+    dot_id: string;
+    status: string;
+    scope: {
+      tier: 'public' | 'confidential' | 'personal';
+      tenant_slug?: string;
+      organization_id?: string;
+      project_id?: string;
+    };
+  }
+):
+  | {
+      ok: true;
+      mapping: FrontDeskExecutionMapping;
+      requestText: string;
+      artifactPath: string;
+      expectedContent: string;
+    }
+  | { ok: false; reason: string } {
+  const blocked = (reason: string) => ({ ok: false as const, reason });
+  const mapping = getFrontDeskExecutionMapping(binding);
+  if (!mapping) return blocked('configuration_changed');
+  if (!isFrontDeskExecutionPublicViewer(mapping.viewer)) return blocked('protected_scope');
+  if (charter.dot_id !== mapping.dotId || charter.status !== 'active')
+    return blocked('dot_unavailable');
+  try {
+    const scope = frontDeskRuntimeScope(mapping.viewer);
+    if (
+      charter.scope.tier !== scope.tier ||
+      charter.scope.tenant_slug !== scope.tenant_slug ||
+      charter.scope.organization_id !== scope.organization_id ||
+      charter.scope.project_id !== scope.project_id
+    )
+      return blocked('scope_mismatch');
+    const ref = conversationRef(mapping.viewer);
+    if (binding.conversation_key !== ref.key) return blocked('conversation_mismatch');
+    return asStore(mapping.viewer, () => {
+      const transcript = load(ref);
+      const request = transcript.executionRequests?.find(
+        (entry) => entry.binding.request_id === binding.request_id
+      );
+      if (
+        !request ||
+        (Object.keys(binding) as Array<keyof FrontDeskExecutionBinding>).some(
+          (key) => request.binding[key] !== binding[key]
+        )
+      )
+        return blocked('request_mismatch');
+      if (
+        !frontDeskExecutionViewerMatches(request.viewer, mapping) ||
+        request.sessionId !== ref.sessionId
+      )
+        return blocked('viewer_mismatch');
+      if (request.status !== 'pending') return blocked(request.status);
+      if (request.revision !== binding.revision || request.requestDigest !== binding.request_digest)
+        return blocked('revision_changed');
+      const task = transcript.taskState?.tasks.find((entry) => entry.id === binding.request_id);
+      if (
+        !task ||
+        task.workItemId !== binding.work_item_id ||
+        task.requestText !== mapping.exactCommand ||
+        task.updates.length !== 0 ||
+        createHash('sha256').update(task.requestText).digest('hex') !== binding.request_digest
+      )
+        return blocked('request_changed');
+      return {
+        ok: true as const,
+        mapping,
+        requestText: task.requestText,
+        artifactPath: frontDeskExecutionArtifactPath(binding, mapping),
+        expectedContent: frontDeskExecutionExpectedContent(binding, mapping, request.sessionId),
+      };
+    });
+  } catch {
+    return blocked('request_unavailable');
+  }
 }

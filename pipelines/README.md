@@ -108,6 +108,10 @@ For discovery work (browser exploration, media generation, PPTX/doc/video/web de
 | `reconcile-unclassified-errors` | Write rule-proposal stubs for errors that matched no classification rule         |
 | `reconcile-unhandled-intents`   | Write routing proposals for unrouted or unrecognized surface intents             |
 
+### Front-desk Diagnostic Contract
+
+- [front-desk-request-receipt](./front-desk-request-receipt.json): opt-in local diagnostic receipt only. The supervised executor supplies its bound inputs after explicit human approval, then verifies and publishes the artifact. Not a general task executor; do not invoke it with arbitrary caller-supplied paths. Production mapping defaults to empty. See the [bounded execution contract](../docs/developer/improvement-plans-2026-10/FRONT_DESK_DIAGNOSTIC_EXECUTION_2026-10-05.ja.md).
+
 ### Onboarding & Provisioning
 
 | Pipeline                         | pnpm shortcut | Description                                                                                                                                   |
