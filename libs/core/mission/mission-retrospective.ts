@@ -13,6 +13,7 @@ import {
 import { logger } from '../core.js';
 import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
 import { notifyOperator } from '../surface/operator-notifications.js';
+import { deriveMissionOutcome, validateMissionHeuristics } from '../heuristic-feedback.js';
 import { recordAgentRoleOutcomes } from '../agent/agent-performance-index.js';
 import { recordModelRoleOutcomes } from '../reasoning/model-performance-index.js';
 import { MetricsCollector, resolveCostRates } from '../metrics.js';
@@ -677,6 +678,26 @@ export async function runMissionRetrospective(
   } catch (err) {
     logger.warn(
       `[mission-retrospective] performance index update failed: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+
+  // Close the heuristic learn loop: score the intuitions captured during this
+  // mission against how it actually went (ratification still gates promotion).
+  try {
+    const outcome = deriveMissionOutcome({
+      missionId,
+      itemStatuses: stats.item_outcomes.map((item) => item.final_status),
+      finishGateFailures: stats.finish_gate_failures.length,
+    });
+    if (outcome) {
+      const validation = validateMissionHeuristics(outcome);
+      for (const message of validation.errors) {
+        logger.warn(`[mission-retrospective] heuristic validation skipped — ${message}`);
+      }
+    }
+  } catch (err) {
+    logger.warn(
+      `[mission-retrospective] heuristic validation failed: ${err instanceof Error ? err.message : String(err)}`
     );
   }
 
