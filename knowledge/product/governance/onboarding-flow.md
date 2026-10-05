@@ -25,6 +25,7 @@ B. 主体と identity  stance を決める → identity を保存 → baseline �
 C. テナント運用     tenant registry → context binding → activation → first-work
 D. 完了確認         vital-check → baseline-check
 E. 組織の運営       purpose → service / operation → cadence / decision → 定常実行と状態確認
+                    → 目標と KR → project → mission / work item → 進捗の計測
 ```
 
 | ルート                  | 使い方                                      | 通るブロック                                        |
@@ -500,6 +501,72 @@ pnpm organization operation run list $O --operation-id <op-id>
 出さなくなるまで埋める。運営の定期確認は `pnpm organization status $O` と
 `pnpm organization reconcile $O --dry-run` で行う。
 
+### Step 11: 目標から作業へ（E）
+
+組織の目標（objective）を測れる形にし、その目標のための仕事を project → mission → task / work item
+の順に流す。各要素がどこにぶら下がるかは次のとおりである。
+
+```text
+organization ─ purpose ─ objective ─ key result（計測できる指標）
+     │
+     ├─ project（organization_id で組織に属する）
+     │     ├─ mission（--project-id でプロジェクトに属する）── task（NEXT_TASKS.json）
+     │     └─ work item（project の backlog。project-next-tasks で mission の task に取り込む）
+     └─ dot（常駐エージェント。goal_ref で objective を指し、KR を自動で計測・改善提案する）
+```
+
+project / mission / work item には objective への参照欄が無い。目標と作業を直接つなぐのは dot
+だけで、手動で回す場合は project の summary や mission の goal に目標を書いて対応を示す。
+
+```bash
+export KYBERION_PERSONA=sovereign
+O="--organization-id <organization-id> --tier confidential --tenant-slug <tenant-slug>"
+
+# 1. 目標に key result（KR）を付ける。KR は自動で計測できる指標に限られる
+#    （org_metric: open_incidents / overdue_operations / pending_decisions / unhealthy_services、
+#     file: リポジトリ内 JSON の値、probe、signal_ratio）。形式は pnpm organization help を参照
+pnpm organization objective kr add $O --objective-id <obj-id> --kr-id <kr-id> --title "<指標>" \
+  --metric-json '{"source":"org_metric","metric":"open_incidents"}' --target 0 --direction decrease --apply
+
+# 2. KR を計測し、status で目標ごとの進捗を見る（dot が無い組織でもこれで進捗が動く）
+pnpm organization objective kr measure $O --apply
+pnpm organization status $O        # Objective: <目標> — 50% (kr-a 100%, kr-b 0%)
+
+# 3. 目標のための project を作り、作業場所（project-os）を用意して active にする
+pnpm project create --project-id PRJ-<ID> --name "<名前>" --summary "<どの目標のためか>" \
+  --tier confidential --organization-id <organization-id> --tenant-slug <tenant-slug>
+pnpm project scaffold PRJ-<ID>
+pnpm project update-status PRJ-<ID> --status active
+
+# 4. project の下で mission を始める（--project-path は project から自動で決まる）。
+#    業務の仕事は --mission-type を明示する（development / operations /
+#    operations_report / meeting_facilitation。省略すると開発用の 8 段階タスクになる）
+pnpm mission kickoff MSN-<TOPIC>-<YYYYMMDD> --tier confidential --tenant-slug <tenant-slug> \
+  --organization-id <organization-id> --project-id PRJ-<ID> --mission-type operations \
+  --goal "<この mission で達成すること>" --success-condition "<受け入れ条件>"
+
+# 5. project の backlog に work item を積み、mission の task に取り込む
+pnpm work create-item --item-id WI-<ID> --title "<作業>" --description "<目的と完了条件>" \
+  --project-id PRJ-<ID> --organization-id <organization-id> --tenant-slug <tenant-slug> \
+  --mission-id MSN-<...> --work-shape solution_project
+pnpm work list-items --project-id PRJ-<ID>
+pnpm work project-next-tasks --mission-id MSN-<...> --project-id PRJ-<ID> --tenant-slug <tenant-slug>          # 差分を確認
+pnpm work project-next-tasks --mission-id MSN-<...> --project-id PRJ-<ID> --tenant-slug <tenant-slug> --apply  # 取り込む
+```
+
+注意点:
+
+- `file` 型の KR は、参照する JSON ファイルが存在しないと計測できない（`measure` が警告を出し、
+  その目標は「unmeasured」のままになる。KR が 1 つでも未計測なら目標全体の進捗も出ない）。
+- mission は company stance の identity を要求する（`--organization-id` が `customer/<org>/` の
+  stance を選ぶため）。Step 5 の後に stance で `onboarding apply` を済ませておく。
+- 朝会（`pipelines/organization-standup.json`）と振り返り（`organization-retro.json`）は、
+  運用・決定・目標の変化を組織ごとにまとめて `active/organizations/.../artifacts/report/` に保存する。
+  動きの無い組織は出力されない。
+- 目標を自動で追いかけさせたい場合は dot charter（`dots/README.md`、
+  `knowledge/product/architecture/resident-dot-model.md`）で `goal.goal_ref` に objective を指定する。
+  稼働中の dot は KR を定期的に計測し、改善の work item を提案する。
+
 ## 4. オンボーディング後の調整（任意）
 
 次のものはオンボーディングの必須手順ではない。必要になったときに使う。
@@ -551,6 +618,8 @@ identity をやり直す場合は `pnpm onboarding reset` を使い、生成物�
 - 最初の外部効果が人間の承認の内側にある
 - （Step 10）purpose と少なくとも一つの service / operation / cadence が登録され、
   `pnpm organization status` に次の行動が明示されている
+- （Step 11）目標に計測できる KR があり、`organization status` に進捗が出ていて、
+  目標のための project が active で mission が紐付いている
 
 ## 関連文書
 
