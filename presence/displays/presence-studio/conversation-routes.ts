@@ -1,6 +1,7 @@
 /** Shared durable front-desk conversation. The outer surface guard still owns
  * authentication, CSRF and rate limits; mutations remain loopback-only. */
 import type express from 'express';
+import { parseFrontDeskArtifactRevisionInput } from '@agent/core/surface/front-desk-execution-contract';
 import { randomUUID } from 'node:crypto';
 import { t } from '@agent/core/t';
 import { normalizeLocale } from '@agent/core/locale-normalize';
@@ -119,6 +120,13 @@ export function registerConversationRoutes(app: express.Express): void {
         .status(400)
         .json({ ok: false, error: 'invalid_conversation_request', retry_safe: true });
     const { text, tenant } = parsed.data;
+    const artifactRevision = parseFrontDeskArtifactRevisionInput(parsed.data.artifactRevision);
+    if (parsed.data.artifactRevision !== undefined && !artifactRevision)
+      return res.status(400).json({
+        ok: false,
+        error: 'conversation_invalid_revision',
+        retry_safe: true,
+      });
     const locale = normalizeLocale(parsed.data.locale) ?? 'en';
     let viewer: ReturnType<typeof viewerFor>;
     try {
@@ -159,18 +167,32 @@ export function registerConversationRoutes(app: express.Express): void {
         text,
         requestId,
         parsed.data.request_created_at,
-        locale
+        locale,
+        artifactRevision
       );
     } catch (error) {
+      const revisionError =
+        error instanceof ConversationStoreError &&
+        ['revision_conflict', 'revision_target_unavailable', 'invalid_revision'].includes(
+          error.code
+        )
+          ? error.code
+          : undefined;
       const conflict =
         error instanceof ConversationStoreError &&
         (error.code === 'request_conflict' || error.code === 'request_expired');
-      return res.status(conflict ? 409 : 503).json({
-        ok: false,
-        error: conflict ? 'conversation_request_conflict' : 'conversation_history_unavailable',
-        request_id: requestId,
-        retry_safe: !conflict,
-      });
+      return res
+        .status(revisionError === 'invalid_revision' ? 400 : revisionError || conflict ? 409 : 503)
+        .json({
+          ok: false,
+          error: revisionError
+            ? 'conversation_' + revisionError
+            : conflict
+              ? 'conversation_request_conflict'
+              : 'conversation_history_unavailable',
+          request_id: requestId,
+          retry_safe: Boolean(revisionError) || !conflict,
+        });
     }
     if (!turn.created) {
       // History replay is display-only: never replay approval actions or execute again.

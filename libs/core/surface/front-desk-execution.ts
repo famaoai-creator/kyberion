@@ -40,6 +40,10 @@ export function frontDeskBindingsEqual(a: FrontDeskExecutionBinding, b: unknown)
       'revision',
       'request_digest',
       'work_item_id',
+      'parent_request_id',
+      'parent_revision',
+      'parent_sha256',
+      'receipt_format',
     ] as const
   ).every((key) => a[key] === other[key]);
 }
@@ -58,12 +62,22 @@ export function frontDeskExecutionProposal(binding: FrontDeskExecutionBinding): 
       binding.request_digest +
       ', configuration digest ' +
       binding.config_digest +
-      '.',
+      (binding.parent_request_id
+        ? ', parent request ' +
+          binding.parent_request_id +
+          ', parent revision ' +
+          binding.parent_revision +
+          ', parent SHA-256 ' +
+          binding.parent_sha256 +
+          ', requested JSON format ' +
+          binding.receipt_format +
+          '. Preserve the old artifact; create a separately approved revision.'
+        : '.'),
     work_shape: 'pipeline',
     pipeline_ref: FRONT_DESK_RECEIPT_PIPELINE,
     requested_decision: 'approve',
     target: 'work_item:' + binding.work_item_id,
-    intent: 'create',
+    intent: binding.parent_request_id ? 'update' : 'create',
     front_desk_execution: binding,
   };
 }
@@ -82,7 +96,7 @@ export async function runFrontDeskExecutionIntake(
       // Serialize admission/reconciliation across supervisors. Stable action refs and
       // atomic WorkItem creation independently cover crashes after either write.
       withLockSync('front-desk-dispatch-' + entry.binding.work_item_id, () => {
-        const admission = inspectFrontDeskExecution(entry.binding, charter);
+        const admission = inspectFrontDeskExecution(entry.binding, charter, deps);
         if (admission.ok === false) return;
         const existing = getWorkItem(entry.binding.work_item_id);
         if (existing) return; // A terminal/uncertain item is never new work.
@@ -115,7 +129,7 @@ export function prepareFrontDeskExecution(
 ): PreparedFrontDeskExecution {
   const binding = item.metadata?.front_desk_execution as FrontDeskExecutionBinding | undefined;
   if (!binding || binding.work_item_id !== item.item_id) throw new Error('request binding missing');
-  const admission = inspectFrontDeskExecution(binding, charter);
+  const admission = inspectFrontDeskExecution(binding, charter, deps);
   if (admission.ok === false) throw new Error(admission.reason);
   const { mapping } = admission;
   const scope = frontDeskRuntimeScope(mapping.viewer);
@@ -213,7 +227,23 @@ export function verifyFrontDeskExecution(
   if (content !== prepared.expectedContent)
     throw new Error('pipeline receipt content does not match the bound request');
   const { binding } = prepared;
+  // Publication is create-only by version. A report retry cannot overwrite prior bytes.
+  if (safeExistsSync(prepared.artifactPath)) {
+    if (
+      !safeLstat(prepared.artifactPath).isFile() ||
+      safeReadFile(prepared.artifactPath, { encoding: 'utf8' }) !== prepared.expectedContent
+    )
+      throw new Error('immutable artifact already exists with different bytes');
+    return {
+      artifact_path: prepared.artifactPath,
+      sha256: createHash('sha256').update(prepared.expectedContent).digest('hex'),
+      request_digest: binding.request_digest,
+      revision: binding.revision,
+      verified_at: new Date().toISOString(),
+    };
+  }
   const published = writeScopedArtifact({
+    create_only: true,
     scope: { tenant: prepared.tenant },
     tier: prepared.tier,
     artifact_class: 'report',

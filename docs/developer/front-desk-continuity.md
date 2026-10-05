@@ -132,3 +132,7 @@ Deploy the updated store with both front-desk processes. Older binaries reject v
 transcripts instead of silently overwriting the new request index. Back up the
 scoped transcript before any deliberate downgrade; never drop the index to bypass
 that version check.
+
+## Diagnostic receipt revisions
+
+Verified public diagnostic receipts can request a compact/readable JSON revision through the existing authenticated message route. Each revision binds its parent version and SHA-256, reserves a new request, requires fresh scoped human approval, and writes a distinct verified artifact without overwriting the parent. Restored version-selection metadata never restores approval. See [the bounded revision contract](improvement-plans-2026-10/FRONT_DESK_RECEIPT_REVISION_2026-10-05.ja.md) for concurrency, recovery, and explicit exclusions.

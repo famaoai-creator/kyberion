@@ -1,3 +1,4 @@
+import type { FrontDeskArtifactRevisionInput } from '@agent/core/surface/front-desk-conversation-history';
 import type { SurfaceConversationResult } from '@agent/core/surface/channel-surface';
 import {
   parseIntentResolutionContract,
@@ -43,6 +44,7 @@ export interface ConversationPromotion {
 
 export interface ConversationMessageRequest {
   text: string;
+  artifactRevision?: FrontDeskArtifactRevisionInput;
   locale?: string;
   /** Optional stable thread id so follow-ups (e.g. confirmations) stay in one conversation. */
   sessionId?: string;

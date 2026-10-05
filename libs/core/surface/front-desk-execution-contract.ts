@@ -12,6 +12,24 @@ export const FRONT_DESK_RECEIPT_PIPELINE = 'pipelines/front-desk-request-receipt
 export const FRONT_DESK_RECEIPT_VERSION = 'receipt-v1';
 // i18n-exempt: Exact opt-in protocol command, never natural-language intent inference.
 export const FRONT_DESK_RECEIPT_COMMAND = 'Create a local diagnostic request receipt artifact.';
+import {
+  parseFrontDeskArtifactRevisionInput,
+  type FrontDeskArtifactRevisionInput,
+  type FrontDeskReceiptFormat,
+} from './front-desk-artifact-revision-contract.js';
+export {
+  parseFrontDeskArtifactRevisionInput,
+  frontDeskArtifactRevisionCommand,
+  type FrontDeskArtifactRevisionInput,
+  type FrontDeskReceiptFormat,
+} from './front-desk-artifact-revision-contract.js';
+export function frontDeskArtifactRevisionDigest(input: FrontDeskArtifactRevisionInput): string {
+  const parsed = parseFrontDeskArtifactRevisionInput(input);
+  if (!parsed) throw new Error('front_desk_revision_invalid');
+  return createHash('sha256')
+    .update(JSON.stringify({ kind: 'diagnostic-receipt-format-revision', ...parsed }))
+    .digest('hex');
+}
 export interface FrontDeskExecutionBinding {
   mapping_id: string;
   config_digest: string;
@@ -20,6 +38,10 @@ export interface FrontDeskExecutionBinding {
   revision: number;
   request_digest: string;
   work_item_id: string;
+  parent_request_id?: string;
+  parent_revision?: number;
+  parent_sha256?: string;
+  receipt_format?: FrontDeskReceiptFormat;
 }
 export interface FrontDeskExecutionMapping {
   id: string;
@@ -47,6 +69,7 @@ export interface FrontDeskExecutionProjection {
   text: string;
   reportId?: string;
   artifactPath?: string;
+  artifactSha256?: string;
 }
 const policyCatalog = defineCatalog<FrontDeskExecutionPolicy>({
   id: 'front-desk-execution-policy',
@@ -198,9 +221,32 @@ export function parseFrontDeskExecutionBinding(
     'request_digest',
     'work_item_id',
   ];
+  const revisionFields = [
+    'parent_request_id',
+    'parent_revision',
+    'parent_sha256',
+    'receipt_format',
+  ];
+  const hasRevision = revisionFields.some((key) => row[key] !== undefined);
+  const revisionInput = hasRevision
+    ? parseFrontDeskArtifactRevisionInput({
+        requestId: row.parent_request_id,
+        revision: row.parent_revision,
+        sha256: row.parent_sha256,
+        format: row.receipt_format,
+      })
+    : undefined;
   if (
-    Object.keys(row).length !== fields.length ||
-    Object.keys(row).some((key) => !fields.includes(key)) ||
+    Object.keys(row).length !== fields.length + (hasRevision ? 4 : 0) ||
+    Object.keys(row).some(
+      (key) => !fields.includes(key) && !(hasRevision && revisionFields.includes(key))
+    ) ||
+    (hasRevision &&
+      (!revisionInput ||
+        row.revision !== revisionInput.revision + 1 ||
+        row.request_id === revisionInput.requestId ||
+        row.request_digest !== frontDeskArtifactRevisionDigest(revisionInput))) ||
+    (!hasRevision && row.revision !== 1) ||
     typeof row.mapping_id !== 'string' ||
     !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(row.mapping_id) ||
     typeof row.work_item_id !== 'string' ||
@@ -209,6 +255,7 @@ export function parseFrontDeskExecutionBinding(
     !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(row.request_id) ||
     !Number.isSafeInteger(row.revision) ||
     (row.revision as number) < 1 ||
+    (row.revision as number) > 64 ||
     ['config_digest', 'conversation_key', 'request_digest'].some(
       (key) => typeof row[key] !== 'string' || !/^[a-f0-9]{64}$/.test(row[key] as string)
     )
@@ -244,8 +291,16 @@ export function frontDeskExecutionExpectedContent(
       request_digest: binding.request_digest,
       revision: binding.revision,
       request_text: mapping.exactCommand,
+      ...(binding.parent_request_id
+        ? {
+            parent_request_id: binding.parent_request_id,
+            parent_revision: binding.parent_revision,
+            parent_sha256: binding.parent_sha256,
+            receipt_format: binding.receipt_format,
+          }
+        : {}),
     },
     null,
-    2
+    binding.receipt_format === 'compact' ? undefined : 2
   );
 }

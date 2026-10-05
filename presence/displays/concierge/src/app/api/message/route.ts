@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { parseFrontDeskArtifactRevisionInput } from '@agent/core/surface/front-desk-execution-contract';
 import type { SurfaceConversationResult } from '@agent/core/surface/channel-surface';
 import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract-parser';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
@@ -206,6 +207,7 @@ export async function POST(req: NextRequest) {
     'sessionId',
     'requestId',
     'requestCreatedAt',
+    'artifactRevision',
     'tenant',
     'organizationId',
     'projectId',
@@ -223,6 +225,13 @@ export async function POST(req: NextRequest) {
     );
   }
   const { body } = parsedBody;
+  const artifactRevision = parseFrontDeskArtifactRevisionInput(body.artifactRevision);
+  if (body.artifactRevision !== undefined && !artifactRevision) {
+    return NextResponse.json(
+      { ok: false, error: 'conversation_invalid_revision', retry_safe: true },
+      { status: 400, headers: NO_STORE }
+    );
+  }
   const locale = resolveConciergeLocale(
     typeof body?.locale === 'string' ? body.locale : req.headers.get('accept-language') || undefined
   );
@@ -326,21 +335,35 @@ export async function POST(req: NextRequest) {
         text,
         typeof body.requestId === 'string' ? body.requestId : undefined,
         typeof body.requestCreatedAt === 'number' ? body.requestCreatedAt : undefined,
-        locale
+        locale,
+        artifactRevision
       );
     } catch (error) {
+      const revisionError =
+        error instanceof ConversationStoreError &&
+        ['revision_conflict', 'revision_target_unavailable', 'invalid_revision'].includes(
+          error.code
+        )
+          ? error.code
+          : undefined;
       const conflict =
         error instanceof ConversationStoreError &&
         (error.code === 'request_conflict' || error.code === 'request_expired');
       return NextResponse.json(
         {
           ok: false,
-          error: conflict
-            ? 'conversation_request_conflict'
-            : conciergeText('api.history_unavailable', locale),
-          retry_safe: !conflict,
+          error: revisionError
+            ? 'conversation_' + revisionError
+            : conflict
+              ? 'conversation_request_conflict'
+              : conciergeText('api.history_unavailable', locale),
+          retry_safe: Boolean(revisionError) || !conflict,
         },
-        { status: conflict ? 409 : 503, headers: NO_STORE }
+        {
+          status:
+            revisionError === 'invalid_revision' ? 400 : revisionError || conflict ? 409 : 503,
+          headers: NO_STORE,
+        }
       );
     }
     if (!turn.created) {
