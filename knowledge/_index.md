@@ -977,6 +977,7 @@
 - [AWS 金融リファレンスアーキテクチャ (BLEA for FSI) 活用ガイド](./public/standards/blea_fisc_reference.md) (public | Ecosystem Architect)
 - [Knowledge Management Standard (Semantic Indexing) v1.1](./public/standards/knowledge_management.md) (public | Ecosystem Architect)
 - [Standard: moltbook Compatibility Protocol (MCP) v1.0](./public/standards/moltbook-compatibility.md) (public | Unknown)
+- [官公庁 生成AIガイドライン索引 (Japanese Government GenAI Guidelines)](./public/standards/japan-gov-genai-guidelines-index.md) (public | Ecosystem Architect)
 
 ## 📁 public/standards/adr
 - [Architecture Decision Record (ADR) Standard](./public/standards/adr/adr_standard.md) (public | Ecosystem Architect)
