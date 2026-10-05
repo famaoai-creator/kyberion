@@ -23278,6 +23278,61 @@
         "en": "The diagnostic request has not been executed. {reason}",
         "ja": "診断用の依頼は実行されていません。{reason}",
         "qps-ploc": "⟦Ŧħė ḓïȧɠñőşŧïƈ řėɋůėşŧ ħȧş ñőŧ ƀėėñ ėẋėƈůŧėḓ. {reason} ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "artifact_revision_acknowledged": {
+        "en": "Receipt revision {revision} is queued for a new human approval. The previous version is preserved.",
+        "ja": "受付控えの第{revision}版を新たな承認待ちとして受け付けました。旧版は保持されます。",
+        "qps-ploc": "⟦Řėƈėïṗŧ řėṽïşïőñ {revision} ïş ɋůėůėḓ ƒőř ȧ ñėẇ ħůɱȧñ ȧṗṗřőṽȧŀ. Ŧħė ṗřėṽïőůş ṽėřşïőñ ïş ṗřėşėřṽėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "artifact_revision_action": {
+        "en": "Change receipt format",
+        "ja": "受付控えの表示形式を変更",
+        "qps-ploc": "⟦Ƈħȧñɠė řėƈėïṗŧ ƒőřɱȧŧ ŀőřėɱ ⟧"
+      },
+      "artifact_revision_format": {
+        "en": "Receipt format",
+        "ja": "受付控えの表示形式",
+        "qps-ploc": "⟦Řėƈėïṗŧ ƒőřɱȧŧ ŀőřė⟧"
+      },
+      "artifact_revision_compact": {
+        "en": "Compact",
+        "ja": "コンパクト",
+        "qps-ploc": "⟦Ƈőɱṗȧƈŧ ŀőř⟧"
+      },
+      "artifact_revision_readable": {
+        "en": "Readable",
+        "ja": "読みやすい形式",
+        "qps-ploc": "⟦Řėȧḓȧƀŀė ŀőř⟧"
+      },
+      "artifact_revision_submit": {
+        "en": "Create revised receipt",
+        "ja": "新版の受付控えを作成",
+        "qps-ploc": "⟦Ƈřėȧŧė řėṽïşėḓ řėƈėïṗŧ ŀőřėɱ ï⟧"
+      },
+      "artifact_revision_cancel": {
+        "en": "Cancel",
+        "ja": "キャンセル",
+        "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
+      },
+      "artifact_revision_retry": {
+        "en": "Retry receipt revision",
+        "ja": "新版の受付を再確認",
+        "qps-ploc": "⟦Řėŧřẏ řėƈėïṗŧ řėṽïşïőñ ŀőřėɱ ï⟧"
+      },
+      "conversation_revision_conflict": {
+        "en": "This receipt has changed. Refresh the conversation before revising it.",
+        "ja": "この受付控えは更新されています。会話を更新してから新版を作成してください。",
+        "qps-ploc": "⟦Ŧħïş řėƈėïṗŧ ħȧş ƈħȧñɠėḓ. Řėƒřėşħ ŧħė ƈőñṽėřşȧŧïőñ ƀėƒőřė řėṽïşïñɠ ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "conversation_revision_target_unavailable": {
+        "en": "This receipt cannot be revised. Refresh the conversation to check its status.",
+        "ja": "この受付控えは改訂できません。会話を更新して状態を確認してください。",
+        "qps-ploc": "⟦Ŧħïş řėƈėïṗŧ ƈȧññőŧ ƀė řėṽïşėḓ. Řėƒřėşħ ŧħė ƈőñṽėřşȧŧïőñ ŧő ƈħėƈķ ïŧş şŧȧŧůş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "conversation_invalid_revision": {
+        "en": "Choose a valid receipt format and version.",
+        "ja": "有効な受付控えの版と表示形式を選んでください。",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ṽȧŀïḓ řėƈėïṗŧ ƒőřɱȧŧ ȧñḓ ṽėřşïőñ. ŀőřėɱ ïṗşůɱ ḓő⟧"
       }
     },
     "operator": {

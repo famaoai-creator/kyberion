@@ -133,6 +133,8 @@ export interface SafeReadOptions {
 }
 
 export interface SafeWriteOptions {
+  /** Publish complete bytes without replacing any existing target; fails closed if hard links are unsupported. */
+  createOnly?: boolean;
   mkdir?: boolean;
   encoding?: BufferEncoding;
   mode?: number;
@@ -523,7 +525,10 @@ export function safeWriteFile(
       fs.fsyncSync(fd);
       fs.closeSync(fd);
       fd = null;
-      fs.renameSync(tempPath, resolved);
+      if (options.createOnly) {
+        fs.linkSync(tempPath, resolved);
+        fs.unlinkSync(tempPath);
+      } else fs.renameSync(tempPath, resolved);
     } catch (atomicErr) {
       if (fd !== null)
         try {

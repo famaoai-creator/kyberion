@@ -1,4 +1,7 @@
-import { frontDeskExecutionArtifactPath } from './front-desk-execution-artifact.js';
+import {
+  frontDeskExecutionArtifactPath,
+  frontDeskExecutionParentArtifactPath,
+} from './front-desk-execution-artifact.js';
 /** Viewer-authorized, readback-verified projection. This module cannot execute work. */
 import { t } from '../t.js';
 import type { SupportedLocale } from '../locale-normalize.js';
@@ -69,7 +72,7 @@ export function projectFrontDeskExecution(
     return { status: 'queued', text: t('front_desk:execution_queued', {}, options.locale) };
   if (item.status === 'in_progress')
     return { status: 'running', text: t('front_desk:execution_running', {}, options.locale) };
-  const charter = listDotCharters().find(
+  const charter = listDotCharters(options.rootDir).find(
     (value) => value.charter.dot_id === mapping.dotId
   )?.charter;
   if (
@@ -120,11 +123,21 @@ export function projectFrontDeskExecution(
         frontDeskExecutionExpectedContent(binding, mapping, 'concierge-' + binding.conversation_key)
     )
       throw new Error('readback differs');
+    const parentPath = frontDeskExecutionParentArtifactPath(binding, mapping);
+    if (
+      parentPath &&
+      (!safeExistsSync(parentPath) ||
+        !safeLstat(parentPath).isFile() ||
+        createHash('sha256').update(safeReadFile(parentPath)).digest('hex') !==
+          binding.parent_sha256)
+    )
+      throw new Error('parent readback differs');
     return {
       status: 'work_completed',
       text: t('front_desk:execution_completed', { path: expectedPath }, options.locale),
       reportId,
       artifactPath: expectedPath,
+      artifactSha256: evidence.sha256,
     };
   } catch {
     return {

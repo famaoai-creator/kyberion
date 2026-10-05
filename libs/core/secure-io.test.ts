@@ -292,6 +292,24 @@ describe('secure-io core', () => {
   });
 
   describe('safeWriteFile', () => {
+    it('create-only retains full policy-engine checks and does not replace bytes', async () => {
+      const testFile = path.join(tmpDir, 'exclusive.txt');
+      safeWriteFile(testFile, 'first', { createOnly: true });
+      expect(() => safeWriteFile(testFile, 'second', { createOnly: true })).toThrow(/EEXIST/);
+      expect(safeReadFile(testFile)).toBe('first');
+      const { policyEngine } = await import('./governance/policy-engine.js');
+      const spy = vi.spyOn(policyEngine, 'evaluate').mockImplementation(() => {
+        throw new Error('policy file parse failure');
+      });
+      try {
+        expect(() =>
+          safeWriteFile(path.join(tmpDir, 'exclusive-denied.txt'), 'data', { createOnly: true })
+        ).toThrow('Policy engine unavailable');
+        expect(fs.existsSync(path.join(tmpDir, 'exclusive-denied.txt'))).toBe(false);
+      } finally {
+        spy.mockRestore();
+      }
+    });
     it('should perform atomic write and clean up temp files', () => {
       const testFile = path.join(tmpDir, 'atomic.txt');
       safeWriteFile(testFile, 'initial');
