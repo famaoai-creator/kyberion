@@ -88,6 +88,27 @@ node dist/scripts/run_realtime_voice_conversation.js \
 `external` など)はループのイベントと trace の
 `realtime_voice.turn_cancelled` に出る。
 
+### 実機検証の知見(2026-10-05、スピーカー + 会議マイク環境)
+
+- **マイクは起動バナーに表示される**(`mic=<name> (:N)`)。自動検出は
+  ffmpeg の avfoundation リストで最初の物理デバイスを選ぶ —
+  iPhone Continuity マイクや外付け機器が先に出ることがあるので、
+  意図しないデバイスが選ばれたら `--mic-device ':N'` で固定する。
+  仮想デバイス(BlackHole 等)は自動選択から除外される。
+- **`two_stage` は streaming STT が必須(スピーカー環境)**。batch STT
+  には再生中の partial がないので「言葉確認」が効かず、自分の TTS
+  エコーの持続エネルギーが hard stop まで進み、返答ごと消される
+  (実測で再現)。`--streaming-stt`(managed mlx_whisper 等)で partial
+  確認が働くと、エコーは `no_words` resume、実際の声だけが
+  hard stop になる。
+- **エコー起因の一時停止が多い環境では
+  `--barge-in-threshold-multiplier` を上げる**(既定 2)。
+  下げすぎ(1.3)はエコーで連続 pause/resume になる;実声とエコーの
+  エネルギー差があれば 1.5〜1.8 程度で分離できる。
+- **初回の batch 文字起こしはモデルロードで数十秒かかる**
+  (実測 99 秒 → 2 回目以降 6 秒)。スクリプトは VAD キャリブレーション
+  中に短い合成音声で backend を温めるので、その間はまだ話さない。
+
 `two_stage` の一時停止は、既定のプレイヤー(afplay/aplay)では POSIX の
 SIGSTOP/SIGCONT でプレイヤー process をその場で止めて再開するため、再開時に
 今の文が最初から再生し直されることはない。win32、またはカスタム `play()` が
