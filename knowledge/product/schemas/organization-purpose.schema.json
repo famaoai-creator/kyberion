@@ -96,6 +96,17 @@
                   ]
                 }
               }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source"],
+              "description": "Recorded by hand with pnpm organization objective kr record; sweeps never measure it.",
+              "properties": {
+                "source": {
+                  "const": "manual"
+                }
+              }
             }
           ]
         },

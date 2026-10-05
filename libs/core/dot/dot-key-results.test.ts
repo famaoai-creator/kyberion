@@ -10,6 +10,7 @@ import {
   measureOrganizationKeyResults,
   readLatestDotKeyResults,
   readOrganizationKrMeasurements,
+  recordOrganizationKeyResult,
   DOT_GOAL_GAP_PROMPT_SECTION,
   DOT_KEY_RESULTS_STATUS_SECTION,
 } from './dot-key-results.js';
@@ -173,6 +174,73 @@ describe('dot key results', () => {
       loadPurpose: () => purpose,
     });
     expect(rolled.objectives[0].progress).toBeCloseTo(0.5);
+    safeRmSync('active/shared/runtime/dot/tenants/acme', { recursive: true, force: true });
+  });
+
+  it('records a manual KR value that sweeps leave alone', async () => {
+    const scope = { organizationId: 'org-m', tenantSlug: 'acme', tier: 'confidential' as const };
+    const purpose = {
+      objectives: [
+        {
+          objective_id: 'o1',
+          title: 'O1',
+          key_results: [
+            {
+              kr_id: 'nps',
+              title: 'NPS',
+              metric: { source: 'manual' },
+              target: 40,
+              direction: 'increase',
+            },
+          ],
+        },
+      ],
+    } as never;
+    expect(
+      await measureOrganizationKeyResults(scope, { now: at(0), loadPurpose: () => purpose })
+    ).toEqual([]);
+    const row = recordOrganizationKeyResult(
+      scope,
+      { objectiveId: 'o1', krId: 'nps', value: 30 },
+      { now: at(5), loadPurpose: () => purpose }
+    );
+    expect(row).toMatchObject({
+      scope: 'org',
+      organization_id: 'org-m',
+      objective_id: 'o1',
+      kr_id: 'nps',
+      value: 30,
+    });
+    expect(row.progress).toBeCloseTo(0.75);
+    expect(readOrganizationKrMeasurements(scope)).toEqual([row]);
+    expect(() =>
+      recordOrganizationKeyResult(
+        scope,
+        { objectiveId: 'o1', krId: 'nope', value: 1 },
+        { loadPurpose: () => purpose }
+      )
+    ).toThrow('Key result not found');
+    expect(() =>
+      recordOrganizationKeyResult(
+        scope,
+        { objectiveId: 'o9', krId: 'nps', value: 1 },
+        { loadPurpose: () => purpose }
+      )
+    ).toThrow('Objective not found');
+    expect(() =>
+      recordOrganizationKeyResult(
+        scope,
+        { objectiveId: 'o1', krId: 'nps', value: Number.NaN },
+        { loadPurpose: () => purpose }
+      )
+    ).toThrow('finite number');
+    expect(() =>
+      recordOrganizationKeyResult(
+        scope,
+        { objectiveId: 'o1', krId: 'nps', value: 1, measuredAt: 'yesterday' },
+        { loadPurpose: () => purpose }
+      )
+    ).toThrow('ISO-8601');
     safeRmSync('active/shared/runtime/dot/tenants/acme', { recursive: true, force: true });
   });
 
