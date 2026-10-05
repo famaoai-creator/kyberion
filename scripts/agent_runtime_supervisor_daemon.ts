@@ -66,6 +66,7 @@ import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration
 import { runDotHousekeeping } from '@agent/core/dot/dot-dispatch';
 import '@agent/core/dot/dot-extension-bootstrap';
 import { dotBudgetThrottle, type DotBudgetThrottle } from '@agent/core/dot/dot-budget';
+import { notifyDotBudgetStopOnce } from './dot_budget_alert.js';
 import { tickVetoWindows } from '@agent/core/governance/approval-veto-window';
 import { getOperationsHaltState } from '@agent/core/governance/operations-halt';
 import { AUTONOMY_APPROVAL_CHANNEL } from '@agent/core/governance/approval-decision-card';
@@ -422,6 +423,7 @@ export async function runDotSweepOnce(
       // doesn't burn a warn + 'failed' receipt every tick — but they still
       // heartbeat, or the watchdog would page a dot that is healthy-but-capped.
       if (dotDailyTokenCapReached(loaded.charter, { now: () => now })) {
+        notifyDotBudgetStopOnce(loaded.charter, 'token-cap', now);
         recordDaemonHeartbeat(loaded.charter.runtime.heartbeat_id, {
           status: 'running',
           details: { dot_id: loaded.charter.dot_id, trigger: 'token-cap' },
@@ -442,6 +444,7 @@ export async function runDotSweepOnce(
         );
       }
       if (budgetThrottle === 'hard') {
+        notifyDotBudgetStopOnce(loaded.charter, 'budget-hard', now);
         recordDaemonHeartbeat(loaded.charter.runtime.heartbeat_id, {
           status: 'running',
           details: { dot_id: loaded.charter.dot_id, trigger: 'budget-hard' },
