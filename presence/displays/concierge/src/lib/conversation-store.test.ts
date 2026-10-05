@@ -61,39 +61,38 @@ describe('server-owned durable conversation', () => {
     });
   });
 
-  it('atomically records recognized intake without implying execution or permitting a fabricated result', () => {
+  it('records a recognized request while leaving its reply to the conversation runtime', () => {
     const text = 'Prepare the report tomorrow';
     const id = '00000000-0000-4000-8000-000000000001';
     const turn = reserveConversationTurn(viewer, text, id, Date.now(), 'en');
-    expect(turn.routing).toMatchObject({ kind: 'new_request', authority: 'none' });
-    if (typeof turn.routing?.reply !== 'string') {
-      throw new Error('Expected deterministic intake receipt');
-    }
-    const reply = turn.routing.reply;
-    const history = readConversationHistory(viewer);
-    expect(history).toMatchObject({
-      pending: 0,
-      messages: [
-        { role: 'user', text },
-        { role: 'secretary', text: reply },
-      ],
+    expect(turn).toMatchObject({
+      created: true,
+      routing: { kind: 'new_request', authority: 'none', taskIds: [id] },
+    });
+    expect(turn.routing?.reply).toBeUndefined();
+    expect(readConversationHistory(viewer)).toMatchObject({
+      pending: 1,
+      messages: [{ role: 'user', text }],
     });
     expect(files.get(conversationRef(viewer).path)).toMatchObject({
       taskState: {
         tasks: [{ id, state: 'recorded', execution: 'not_started', requestText: text }],
       },
     });
+    completeConversationTurn(viewer, id, 'The report is ready');
+    expect(readConversationHistory(viewer)).toMatchObject({
+      pending: 0,
+      messages: [
+        { role: 'user', text },
+        { role: 'secretary', text: 'The report is ready' },
+      ],
+    });
     expect(reserveConversationTurn(viewer, text, id, Date.now(), 'en')).toMatchObject({
       created: false,
       id,
+      reply: 'The report is ready',
       routing: turn.routing,
     });
-    expect(readConversationHistory(viewer)).toEqual(history);
-    expect(() => completeConversationTurn(viewer, id, 'The report is ready')).toThrow(
-      'invalid_history'
-    );
-    completeConversationTurn(viewer, id, reply);
-    expect(readConversationHistory(viewer)).toEqual(history);
     expect(files.get(conversationRef(viewer).path)).toMatchObject({
       taskState: { tasks: [{ id, state: 'recorded', execution: 'not_started' }] },
     });

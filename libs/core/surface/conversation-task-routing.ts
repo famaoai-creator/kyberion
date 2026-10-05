@@ -1,6 +1,8 @@
 /**
  * Bounded front-desk intake routing. Records requests and resolves references,
  * without starting, verifying, approving, cancelling, or steering execution.
+ * Only decisions carrying a reply replace the conversation runtime's answer;
+ * everything else, including every unresolved reference, stays ordinary chat.
  * Callers supply server-owned state and already-redacted display text.
  */
 import {
@@ -28,8 +30,13 @@ const KINDS = [
   'clarification',
 ] as const;
 const TARGET_KINDS = ['followup', 'status', 'approval', 'cancellation'] as const;
+/** Kinds that only record state; the turn still goes to the conversation runtime. */
+const RECORD_ONLY_KINDS = ['new_request', 'followup'] as const;
+/** Kinds answered locally, and therefore the only ones that may ask a selection question. */
+const CLARIFIABLE_KINDS = ['status', 'approval', 'cancellation'] as const;
 export type ConversationTaskKind = (typeof KINDS)[number];
 export type ConversationTaskTargetKind = (typeof TARGET_KINDS)[number];
+export type ConversationTaskClarifiableKind = (typeof CLARIFIABLE_KINDS)[number];
 export interface ConversationTaskRecord {
   id: string;
   title: string;
@@ -42,7 +49,7 @@ export interface ConversationTaskRecord {
 export interface ConversationTaskState {
   tasks: ConversationTaskRecord[];
   clarification?: {
-    kind: ConversationTaskTargetKind;
+    kind: ConversationTaskClarifiableKind;
     sourceTurnId: string;
     sourceText: string;
     candidateIds: string[];
@@ -134,7 +141,7 @@ export function parseConversationTaskState(value: unknown): ConversationTaskStat
   if (
     !record(pending) ||
     !keys(pending, ['kind', 'sourceTurnId', 'sourceText', 'candidateIds']) ||
-    !TARGET_KINDS.includes(pending.kind as ConversationTaskTargetKind) ||
+    !CLARIFIABLE_KINDS.includes(pending.kind as ConversationTaskClarifiableKind) ||
     !id(pending.sourceTurnId) ||
     !textValue(pending.sourceText, CONVERSATION_TASK_MAX_TEXT) ||
     !ids(pending.candidateIds) ||
@@ -147,7 +154,7 @@ export function parseConversationTaskState(value: unknown): ConversationTaskStat
   return {
     tasks,
     clarification: {
-      kind: pending.kind as ConversationTaskTargetKind,
+      kind: pending.kind as ConversationTaskClarifiableKind,
       sourceTurnId: pending.sourceTurnId,
       sourceText: pending.sourceText,
       candidateIds: [...pending.candidateIds],
@@ -171,6 +178,8 @@ export function parseConversationTaskDecision(
   if (value.kind === 'chat') {
     if (value.taskIds.length !== 0 || value.reply !== undefined || value.confidence !== 'unknown')
       return undefined;
+  } else if (RECORD_ONLY_KINDS.includes(value.kind as (typeof RECORD_ONLY_KINDS)[number])) {
+    if (value.reply !== undefined) return undefined;
   } else if (!textValue(value.reply, MAX_REPLY)) return undefined;
   if (value.kind !== 'chat' && value.kind !== 'clarification' && value.taskIds.length !== 1)
     return undefined;
@@ -259,43 +268,32 @@ export function routeConversationTaskTurn(
     throw new Error('[CONVERSATION_TASK_INPUT_INVALID]');
   const replyLocale = locale ?? detectTextLocale(text) ?? undefined;
   const originalState = structuredClone(state);
+  // Record-only and unmatched turns return no reply, so the existing scoped
+  // conversation runtime still answers them. Over-budget growth is not recorded.
+  const chat = () => {
+    delete originalState.clarification;
+    return result(originalState, 'chat', []);
+  };
   const finish = (
     kind: ConversationTaskKind,
     taskIds: string[],
     reply?: string
   ): ConversationTaskRoutingResult => {
-    if (!parseConversationTaskState(state))
+    if (!parseConversationTaskState(state)) {
+      if (reply === undefined) return chat();
       return result(
         originalState,
         'clarification',
         [],
         t('front_desk:task_capacity', undefined, replyLocale)
       );
+    }
     return result(state, kind, taskIds, reply);
   };
-  const clarify = (
-    key: 'task_mixed' | 'task_capacity' | 'task_no_match' | 'task_update_capacity',
-    taskIds: string[] = []
-  ) =>
-    finish(
-      'clarification',
-      taskIds,
-      t(('front_desk:' + key) as Parameters<typeof t>[0], undefined, replyLocale)
-    );
-  const bind = (
-    kind: ConversationTaskTargetKind,
-    task: ConversationTaskRecord,
-    sourceText: string
-  ) => {
-    if (kind === 'followup') {
-      if (task.updates.length >= CONVERSATION_TASK_MAX_UPDATES)
-        return clarify('task_update_capacity', [task.id]);
-      task.updates.push(sourceText);
-    }
+  const answer = (kind: ConversationTaskClarifiableKind, task: ConversationTaskRecord) => {
     delete state.clarification;
     const key = {
       status: 'front_desk:task_status',
-      followup: 'front_desk:task_followup',
       approval: 'front_desk:task_approval',
       cancellation: 'front_desk:task_cancellation',
     } as const;
@@ -307,9 +305,13 @@ export function routeConversationTaskTurn(
       state.tasks.find((task) => task.id === candidateId)!
     );
     const selected = exactSelection(text, candidates);
-    if (selected.length === 1) return bind(pending.kind, selected[0], pending.sourceText);
+    if (selected.length === 1) return answer(pending.kind, selected[0]);
     if (selected.length > 1 || match(text, 'vague_confirmation') || selectionOrdinal(text) > 0)
-      return clarify('task_no_match', pending.candidateIds);
+      return finish(
+        'clarification',
+        pending.candidateIds,
+        t('front_desk:task_no_match', undefined, replyLocale)
+      );
     // A different message supersedes the old selection question, including
     // refusal/capacity paths. Rollback must not resurrect that question.
     delete state.clarification;
@@ -334,16 +336,12 @@ export function routeConversationTaskTurn(
   const newPattern = getIntentPhraseMatcher().regExp('conversation_task.new_request');
   const newMatches = text.matchAll(new RegExp(newPattern.source, newPattern.flags + 'g'));
   const multipleNewRequests = !newMatches.next().done && !newMatches.next().done;
-  if (signals.length > 1 || multipleNewRequests || (signals.length > 0 && match(text, 'mixed')))
-    return clarify('task_mixed');
-  if (signals.length === 0) {
-    if (selectionOrdinal(text) > 0) return clarify('task_no_match');
-    delete state.clarification;
-    return finish('chat', []);
-  }
+  // Combined clauses are left whole to the conversation runtime rather than
+  // half-recorded or answered locally.
+  if (signals.length !== 1 || multipleNewRequests || match(text, 'mixed')) return chat();
   const kind = signals[0];
   if (kind === 'new_request') {
-    if (state.tasks.length >= CONVERSATION_TASK_MAX_TASKS) return clarify('task_capacity');
+    if (state.tasks.length >= CONVERSATION_TASK_MAX_TASKS) return chat();
     if (state.tasks.some((task) => task.id === turnId))
       throw new Error('[CONVERSATION_TASK_DUPLICATE_TURN]');
     const title = (captureIntentPhrase(text, 'conversation_task.title') || text)
@@ -359,7 +357,7 @@ export function routeConversationTaskTurn(
       execution: 'not_started',
     });
     delete state.clarification;
-    return finish(kind, [turnId], t('front_desk:task_recorded', { title }, replyLocale));
+    return finish(kind, [turnId]);
   }
   const query = normalized(text);
   // Quoted amendment content is not a task reference. Only explicit named
@@ -375,7 +373,7 @@ export function routeConversationTaskTurn(
     (quoted !== undefined &&
       !state.tasks.some((task) => normalized(task.title) === normalized(quoted)))
   )
-    return clarify('task_no_match');
+    return chat();
   const namedQuery =
     namedHint === undefined ||
     match(namedHint, 'deictic') ||
@@ -390,13 +388,24 @@ export function routeConversationTaskTurn(
           namedQuery
       : mentionedIds.includes(task.id)
   );
-  if (namedQuery !== undefined && explicit.length === 0) return clarify('task_no_match');
+  if (namedQuery !== undefined && explicit.length === 0) return chat();
+  if (kind === 'followup') {
+    // Implicit amendments ("make it shorter") usually refer to the latest reply,
+    // so only an explicitly named, unique request receives the note.
+    const target = explicit.length === 1 ? explicit[0] : undefined;
+    if (!target || target.updates.length >= CONVERSATION_TASK_MAX_UPDATES) return chat();
+    target.updates.push(text);
+    delete state.clarification;
+    return finish(kind, [target.id]);
+  }
+  // Bare confirmations and cancellations may answer the runtime's own preview,
+  // so approval/cancellation never fall back to an implicit target.
   const implicitTarget =
-    match(text, 'implicit_reference') || (namedHint !== undefined && match(namedHint, 'deictic'));
-  if (explicit.length === 0 && !implicitTarget) return clarify('task_no_match');
-  const candidates = explicit.length ? explicit : state.tasks;
-  if (candidates.length === 1) return bind(kind, candidates[0], text);
-  if (candidates.length === 0) return clarify('task_no_match');
+    kind === 'status' &&
+    (match(text, 'implicit_reference') || (namedHint !== undefined && match(namedHint, 'deictic')));
+  const candidates = explicit.length ? explicit : implicitTarget ? state.tasks : [];
+  if (candidates.length === 0) return chat();
+  if (candidates.length === 1) return answer(kind, candidates[0]);
   state.clarification = {
     kind,
     sourceTurnId: turnId,

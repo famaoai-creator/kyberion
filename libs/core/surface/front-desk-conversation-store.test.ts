@@ -492,18 +492,22 @@ describe('durable scoped request routing', () => {
   });
   it('stores redacted request summaries and cannot infer execution from an assistant promise', () => {
     const turn = reserveConversationTurn(viewer, 'Create a report with password=do-not-store', a);
-    expect(() =>
-      completeConversationTurn(viewer, turn.id, 'Done, deployed and completed!')
-    ).toThrow('invalid_history');
+    expect(turn.routing).toMatchObject({ kind: 'new_request', taskIds: [a] });
+    expect(turn.routing?.reply).toBeUndefined();
+    expect(readConversationHistory(viewer).pending).toBe(1);
+    completeConversationTurn(viewer, turn.id, 'Done, deployed and completed!');
     expect(JSON.stringify(state())).not.toContain('do-not-store');
     expect(state().tasks[0]).toMatchObject({ state: 'recorded', execution: 'not_started' });
   });
 });
 
 it('atomically publishes an inert intake reply, recoverable after a crash before completion', () => {
+  const request = reserveConversationTurn(viewer, 'Aの報告書を作って', undefined, Date.now(), 'ja');
+  completeConversationTurn(viewer, request.id, 'A chat reply');
   const id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
-  const first = reserveConversationTurn(viewer, 'Aの報告書を作って', id, Date.now(), 'ja');
-  const replay = reserveConversationTurn(viewer, 'Aの報告書を作って', id, Date.now(), 'ja');
+  const first = reserveConversationTurn(viewer, 'Aの件どう？', id, Date.now(), 'ja');
+  expect(first.routing).toMatchObject({ kind: 'status', taskIds: [request.id] });
+  const replay = reserveConversationTurn(viewer, 'Aの件どう？', id, Date.now(), 'ja');
   expect(replay).toMatchObject({
     created: false,
     reply: first.routing?.reply,
@@ -550,5 +554,7 @@ it('a late chat completion preserves requests reserved while that chat was pendi
     taskState: { tasks: Array<{ id: string }> };
   };
   expect(persisted.taskState.tasks.map((task) => task.id)).toEqual([request.id]);
+  expect(readConversationHistory(viewer).pending).toBe(1);
+  completeConversationTurn(viewer, request.id, 'Report draft');
   expect(readConversationHistory(viewer).pending).toBe(0);
 });
