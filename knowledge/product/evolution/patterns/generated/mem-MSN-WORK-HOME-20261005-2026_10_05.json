@@ -1,0 +1,24 @@
+{
+  "record_id": "mem-MSN-WORK-HOME-20261005-2026_10_05",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Unified work views preserve source authority and read-only evidence",
+  "summary": "A unified work home must retain each source’s viewer boundary, project current evidence without hidden writes, distinguish answers from execution, and state incomplete coverage explicitly.",
+  "candidate_id": "mem-MSN-WORK-HOME-20261005-2026_10_05",
+  "evidence_refs": [
+    "active/missions/public/MSN-WORK-HOME-20261005/evidence/REVIEW-contract_authoring-ux-contract.md",
+    "active/missions/public/MSN-WORK-HOME-20261005/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-WORK-HOME-20261005/evidence/design-spec.json",
+    "active/missions/public/MSN-WORK-HOME-20261005/evidence/implementation-report.md",
+    "active/missions/public/MSN-WORK-HOME-20261005/evidence/test-report.md"
+  ],
+  "created_at": "2026-10-05T15:31:30.653Z",
+  "applicability": ["mission", "mission:MSN-WORK-HOME-20261005"],
+  "reusable_steps": [
+    "A unified work home must retain each source’s viewer boundary, project current evidence without hidden writes, distinguish answers from execution, and state incomplete coverage explicitly"
+  ],
+  "expected_outcome": "# Unified work views preserve source authority and read-only evidence\n\nA work dashboard is a projection of existing work, not a new execution or approval engine. Preserve the strictest source-specific access boundary when combining sources. A remote-safe aggregate must not expose a localadmin-only conversation. Validate tenant, organization, project and tier claims before titles, associations or links; conflicting legacy claims fail closed.\n\nRead-only is a behavioral property, not an HTTP verb. Existing readers may publish synchronized reports, reconcile approvals or refresh observation journals. Use explicit pure projections for Home and Resume, and verify that those paths do not write, decide, apply or replay work.\n\nKeep conversation answers separate from executed results. Pending amendments override retained answers. Only current matched execution and byte/hash evidence justify verified completion; record time and checked-at time are distinct. An unverified new revision never replaces the latest verified parent.\n\nIncomplete source windows and failed readers are not empty queues. Report partial or unavailable coverage, including capped windows that contain no pending rows. Do not silently broaden a selected scope when an existing decision screen cannot preserve it; retain the item with an unavailable-destination explanation.\n\nQuiet display can reduce detail while retaining decisions, uncertainty and version currentness. Store only the display enum under a server-scoped fingerprint. Navigation remains inert; historical focus is one-shot after hydration. Keep source/DOM checks, actual browser validation, aggregate gates and environment-limited tests distinct in delivery evidence.",
+  "source_branch": "feat/work-home-attention-hub",
+  "source_commit": "dedc20181fd580295c86e9fcda926bad8775fef0"
+}
