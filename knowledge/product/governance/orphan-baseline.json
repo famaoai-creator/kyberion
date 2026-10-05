@@ -54,6 +54,10 @@
     {
       "id": "libs/core/meeting/driver-modules/in-room.ts",
       "reason": "Data-driven extension module: meeting-driver-module-loader resolves it dynamically via the meeting-join-driver-modules.json catalog (driver_id 'in-room') and the @agent/core/meeting/driver-modules/in-room package export, so no static in-repo caller exists."
+    },
+    {
+      "id": "libs/core/ingress/providers/tailscale-funnel.ts",
+      "reason": "Data-driven extension module: public-ingress-provider-registry resolves it dynamically via the public-ingress-providers.json catalog (provider_id 'tailscale-funnel') and the @agent/core/ingress/providers/tailscale-funnel package export, so no static in-repo caller exists."
     }
   ],
   "scripts": [],

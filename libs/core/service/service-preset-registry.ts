@@ -11,6 +11,7 @@ export interface ServicePresetRecord {
   name?: string;
   description?: string;
   auth_strategy?: string;
+  tenant_binding_required?: boolean;
   setup_hint?: string;
   allow_unsafe_cli?: boolean;
   allow_local_network?: boolean;

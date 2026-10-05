@@ -96,6 +96,9 @@ vi.mock('@agent/core/pipeline/pipeline-contract', () => ({
 vi.mock('@agent/core/service/service-binding', () => ({
   resolveServiceBinding: mocks.resolveServiceBinding,
 }));
+vi.mock('./service-actuator-tenant-binding.js', () => ({
+  authorizeTenantServiceBinding: vi.fn(() => ({ approvalRequired: false })),
+}));
 vi.mock('@agent/core/path-resolver', () => ({
   ...mocks.pathResolver,
   pathResolver: mocks.pathResolver,

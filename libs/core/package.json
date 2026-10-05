@@ -5671,6 +5671,10 @@
       "types": "./dist/service/service-engine.d.ts",
       "default": "./dist/service/service-engine.js"
     },
+    "./service/service-engine-admission": {
+      "types": "./dist/service/service-engine-admission.d.ts",
+      "default": "./dist/service/service-engine-admission.js"
+    },
     "./service/service-harness": {
       "types": "./dist/service/service-harness.d.ts",
       "default": "./dist/service/service-harness.js"
@@ -7218,6 +7222,26 @@
     "./state-probe": {
       "types": "./dist/state-probe.d.ts",
       "default": "./dist/state-probe.js"
+    },
+    "./ingress/public-ingress-contract": {
+      "types": "./dist/ingress/public-ingress-contract.d.ts",
+      "default": "./dist/ingress/public-ingress-contract.js"
+    },
+    "./ingress/public-ingress-seam": {
+      "types": "./dist/ingress/public-ingress-seam.d.ts",
+      "default": "./dist/ingress/public-ingress-seam.js"
+    },
+    "./ingress/public-ingress-provider-registry": {
+      "types": "./dist/ingress/public-ingress-provider-registry.d.ts",
+      "default": "./dist/ingress/public-ingress-provider-registry.js"
+    },
+    "./ingress/public-ingress-service": {
+      "types": "./dist/ingress/public-ingress-service.d.ts",
+      "default": "./dist/ingress/public-ingress-service.js"
+    },
+    "./ingress/providers/tailscale-funnel": {
+      "types": "./dist/ingress/providers/tailscale-funnel.d.ts",
+      "default": "./dist/ingress/providers/tailscale-funnel.js"
     },
     "./surface/front-desk-conversation-history": {
       "types": "./dist/surface/front-desk-conversation-history.d.ts",

@@ -87,13 +87,19 @@ matching tools). State is kept under `active/shared/runtime/dot/`.
 
 ### Operator steps
 
-1. **Event intake (off by default)**: set `enabled: true` for the source in
-   `knowledge/product/governance/event-intake-policy.json` (bind a
+1. **Event intake (off by default)**: enable the source on this host with
+   `KYBERION_EVENT_INTAKE_SOURCES=<id>[,<id>]` (or `enabled: true` in
+   `knowledge/product/governance/event-intake-policy.json` for every host; bind a
    `tenant_slug` for tenant sources) and register its HMAC secret under the
-   source's `secret_key` (for example `EVENT_INTAKE_CI_SECRET`):
-   `pnpm kyberion secret introduce <service-id> <secret-key>`. The intake
+   source's `secret_key` (for example `EVENT_INTAKE_CI_SECRET`) by introducing
+   it under the `event-intake` service without the prefix:
+   `pnpm kyberion secret introduce event-intake CI_SECRET --from-file <file>`. The intake
    surface listens on `127.0.0.1` (`KYBERION_EVENT_INTAKE_PORT` /
    `KYBERION_EVENT_INTAKE_HOST`) at `POST /events/<source>`.
+   To receive webhooks from the internet (e.g. GitHub), expose only `/events`
+   through public ingress: `pnpm kyberion ingress up --surface event-intake`
+   (approval-gated; Tailscale Funnel by default) — see
+   [expose-surface-public-ingress](../knowledge/public/procedures/expose-surface-public-ingress.md).
 2. **Cadence pipelines (opt-in)**: `organization-operation-tick`,
    `organization-standup` and `organization-retro` ship `enabled: false`.
    Enable per host with

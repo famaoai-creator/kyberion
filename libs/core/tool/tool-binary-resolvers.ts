@@ -109,6 +109,42 @@ export function resolveLightpandaBin(): string {
   return resolveExternalToolBin('lightpanda', ['KYBERION_LIGHTPANDA_BIN'], 'lightpanda');
 }
 
+/**
+ * macOS locations of the Tailscale CLI, most specific first: the symlink the
+ * app's "Install CLI" creates, a Homebrew formula, then the binary inside the
+ * app bundle (`brew install --cask tailscale-app`), which works as the CLI
+ * without the extra install step.
+ */
+export const TAILSCALE_DARWIN_CANDIDATES = [
+  '/usr/local/bin/tailscale',
+  '/opt/homebrew/bin/tailscale',
+  '/Applications/Tailscale.app/Contents/MacOS/Tailscale',
+] as const;
+
+/** Tailscale CLI for the public-ingress provider `tailscale-funnel`. */
+export function resolveTailscaleBin(
+  deps: { platform?: NodeJS.Platform; exists?: (candidate: string) => boolean } = {}
+): string {
+  const override = firstConfiguredEnv('KYBERION_TAILSCALE_BIN');
+  if (override) return override;
+  const managed = managedBinary('tailscale');
+  if (managed) return managed;
+  if ((deps.platform ?? process.platform) === 'darwin') {
+    const exists =
+      deps.exists ??
+      ((candidate: string) => {
+        try {
+          return safeExistsSync(candidate);
+        } catch {
+          return false;
+        }
+      });
+    const found = TAILSCALE_DARWIN_CANDIDATES.find((candidate) => exists(candidate));
+    if (found) return found;
+  }
+  return registryCommand('tailscale') ?? 'tailscale';
+}
+
 /** yt-dlp video fetcher for libs/core/video-ingest (never self-updated). */
 export function resolveYtDlpBin(): string {
   return resolveExternalToolBin('yt_dlp', ['KYBERION_YTDLP_BIN'], 'yt-dlp');

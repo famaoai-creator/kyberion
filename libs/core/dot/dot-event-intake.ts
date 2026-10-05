@@ -34,9 +34,12 @@ import { appendJsonLine, readJson } from '../foundation/json.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { withLockSync } from '../foundation/lock-utils.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
 import { createLogger } from '../logger.js';
 import { physicalScopedPath } from '../physical-namespace.js';
-import { getSecret as secretGuardGetSecret } from '../secret/secret-guard.js';
+import { getSecretForIdentity, getSecret as secretGuardGetSecret } from '../secret/secret-guard.js';
+import { parseEnvSecretName } from '../secret/secret-identity.js';
+
 import type { DotCharter, DotTrigger } from './dot-charter.js';
 import { DOT_EVENTS_FILE, DOT_STATE_ROOT, type DotInboundEvent } from './dot-state-paths.js';
 import {
@@ -45,6 +48,9 @@ import {
   type DotRuntimeDeps,
   type DueDotTrigger,
 } from './dot-runtime.js';
+
+/** Secret service id for intake HMAC secrets (`secret introduce event-intake <KEY>`). */
+export const EVENT_INTAKE_SECRET_SERVICE_ID = 'event-intake';
 
 const logger = createLogger('dot-event-intake');
 
@@ -110,11 +116,46 @@ const eventIntakePolicyCatalog = defineCatalog<EventIntakePolicy>({
     ),
 });
 
+/**
+ * Host opt-in: KYBERION_EVENT_INTAKE_SOURCES lists source ids (comma-separated)
+ * this host accepts in addition to the policy's `enabled` flags, so enabling a
+ * source on one machine is an env change, not an edit to the shared governed
+ * policy. Only sources the policy declares can be enabled; unknown ids are
+ * ignored with a warning. The HMAC secret is still required per request.
+ */
+export function applyEventIntakeHostOptIn(
+  policy: EventIntakePolicy,
+  optIn = getRegisteredEnvText('KYBERION_EVENT_INTAKE_SOURCES')
+): EventIntakePolicy {
+  const ids = (optIn ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  if (ids.length === 0) return policy;
+  const sources = { ...policy.sources };
+  for (const id of ids) {
+    if (!Object.prototype.hasOwnProperty.call(sources, id)) {
+      logger.warn(
+        `event intake host opt-in ignored — source '${id}' is not declared in ${EVENT_INTAKE_POLICY_PATH} | next: declare it in the policy or fix KYBERION_EVENT_INTAKE_SOURCES`
+      );
+      continue;
+    }
+    sources[id] = { ...sources[id], enabled: true };
+  }
+  return { ...policy, sources };
+}
+
 /** Load the governed intake policy; `path` overrides the location (tests). */
-export function loadEventIntakePolicy(options: { path?: string } = {}): EventIntakePolicy {
-  if (!options.path) return eventIntakePolicyCatalog.load();
+export function loadEventIntakePolicy(
+  options: { path?: string; hostOptIn?: string } = {}
+): EventIntakePolicy {
+  const optIn = options.hostOptIn ?? getRegisteredEnvText('KYBERION_EVENT_INTAKE_SOURCES');
+  if (!options.path) return applyEventIntakeHostOptIn(eventIntakePolicyCatalog.load(), optIn);
   try {
-    return eventIntakePolicyCatalog.validate(readJson<unknown>(options.path), options.path);
+    return applyEventIntakeHostOptIn(
+      eventIntakePolicyCatalog.validate(readJson<unknown>(options.path), options.path),
+      optIn
+    );
   } catch (error) {
     logger.warn(
       `event intake policy unavailable — every source stays disabled | fix ${options.path} | ${error instanceof Error ? error.message : String(error)}`
@@ -159,11 +200,17 @@ export function verifyInboundSignature(input: {
 /** Shared-secret lookup for one source; the value never leaves this module's callers. */
 export function resolveEventIntakeSecret(
   source: EventIntakeSourcePolicy,
-  getSecret: (key: string) => string | null = (key) =>
-    secretGuardGetSecret(key, undefined, 'event_intake.verify')
+  getSecret?: (key: string) => string | null
 ): string | null {
   try {
-    return getSecret(source.secret_key);
+    if (getSecret) return getSecret(source.secret_key);
+    // `pnpm kyberion secret introduce event-intake GITHUB_SECRET` stores the
+    // value under the service identity (env EVENT_INTAKE_GITHUB_SECRET or the
+    // keychain item event-intake/…), so resolve through the identity rather
+    // than the process env alone.
+    const identity = parseEnvSecretName(source.secret_key, EVENT_INTAKE_SECRET_SERVICE_ID);
+    if (identity) return getSecretForIdentity(identity, 'event_intake.verify');
+    return secretGuardGetSecret(source.secret_key, undefined, 'event_intake.verify');
   } catch {
     return null;
   }

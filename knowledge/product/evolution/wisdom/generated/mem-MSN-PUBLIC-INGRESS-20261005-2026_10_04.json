@@ -1,0 +1,20 @@
+{
+  "record_id": "mem-MSN-PUBLIC-INGRESS-20261005-2026_10_04",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Public ingress: host-wide provider state, fail-closed ownership, effect-keyed approval",
+  "summary": "Rules from the public-ingress capability: always ask the provider about host-wide tunnel state, compare full targets and fail closed before removing mappings, key approvals by effect, verify target identity, roll back created side effects, and declare planned providers visibly.",
+  "candidate_id": "mem-MSN-PUBLIC-INGRESS-20261005-2026_10_04",
+  "evidence_refs": ["active/missions/public/MSN-PUBLIC-INGRESS-20261005/evidence/distillation.md"],
+  "created_at": "2026-10-04T18:04:31.335Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "Lessons from adding a provider-independent public ingress capability (Tailscale Funnel first):\n\n1. Host-wide external config vs per-checkout records: tunnel/serve configuration (Tailscale serve/funnel) is global to the host, while Kyberion runtime state is per checkout. down/status must always ask the provider about the live mapping. Never answer 'not exposed' from a local record alone, because worktrees and lost state make that false. That claim is a security statement.\n2. Ownership checks must fail closed and compare the full target. Compare the parsed scheme, host, port and path, not just the port. If the provider's status cannot be read, refuse to remove anything; otherwise a blind 'off' can delete a mapping someone else made.\n3. Exposing a port is an external effect. Gate it as a risky op with approval keyed to the effect: put a digest of provider, port and prefix in the correlation id, so a changed effect makes a new request rather than an unreachable 'effect_mismatch'. Verify the target's identity (the /health service id), not just that some process answers on the port.\n4. Roll back an external side effect that this run created when its post-check or record write fails, and audit failures too.\n5. Adapter-first catalogs: declare planned providers as visible 'unsupported' entries. A provider that runs a long-lived foreground process (cloudflared, ngrok) needs a managed-process lifecycle in the contract before it goes live; the daemon-configuring style (Tailscale) does not.\n6. Tests that read a provider-selection env var must stub it in beforeEach, or a developer's shell breaks them."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-PUBLIC-INGRESS-20261005/evidence/distillation.md"
+  ],
+  "source_branch": "feat/public-ingress-20261005",
+  "source_commit": "4d3820548ca077ca886e73f8307c24696b36edb4"
+}

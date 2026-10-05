@@ -30,7 +30,8 @@ describe('Config mission contract', () => {
       f.endsWith('.json')
     );
 
-    expect(files.length).toBeGreaterThanOrEqual(4);
+    expect(files.length).toBeGreaterThanOrEqual(3);
+    expect(files).not.toContain('new-service-integration.json');
 
     for (const file of files) {
       const preset = JSON.parse(read(path.join(PRESET_DIR, file)));
@@ -56,13 +57,9 @@ describe('Config mission contract', () => {
 
   it('declares global surface exposure separately from tenant-scoped configuration', () => {
     const surface = JSON.parse(read(`${PRESET_DIR}/surface-registration.json`));
-    const service = JSON.parse(read(`${PRESET_DIR}/new-service-integration.json`));
     expect(surface.target_kind).toBe('system');
     expect(surface.scope_kind).toBe('system');
     expect(surface.tier).toBe('public');
-    expect(service.target_kind).toBe('tenant');
-    expect(service.scope_kind).toBe('tenant');
-    expect(service.tier).toBe('confidential');
   });
 
   it('each preset declares authority_role as system_configurator', () => {
@@ -110,7 +107,7 @@ describe('Config mission contract', () => {
       f.endsWith('.json')
     );
 
-    expect(files.length).toBeGreaterThanOrEqual(4);
+    expect(files.length).toBeGreaterThanOrEqual(3);
 
     for (const file of files) {
       const pipeline = JSON.parse(read(path.join(PIPELINE_CONFIG_DIR, file)));
