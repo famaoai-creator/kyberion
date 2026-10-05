@@ -1,3 +1,8 @@
+---
+title: 'Harness Capability Registry Canonical Directory'
+last_updated: 2026-10-05
+---
+
 # Harness Capability Registry Canonical Directory
 
 Canonical source for harness capability entries (RSP-12).

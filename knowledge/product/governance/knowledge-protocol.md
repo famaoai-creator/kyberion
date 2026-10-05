@@ -4,7 +4,7 @@ category: Governance
 tags: [governance, knowledge, protocol, tiering]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
 kind: governance
 scope: global
 authority: policy
@@ -47,3 +47,10 @@ status: active
 ## 3. クライアント・コンテキストの切り替え
 
 - `mission-control` に対し「Client X として実行せよ」と命じることで、`knowledge/confidential/clients/ClientX/` がコンテキストの最上位にセットされる。
+
+## 4. 鮮度管理と `evergreen` kind
+
+- `last_updated` は「最終検証日」の意味で運用する。週次キュレーション (`wisdom:curation_report`) の freshness SLO は**再確認期限**を示すのであって、削除・陳腐化の宣告ではない (KM-03: 自動削除はしない)。
+- `knowledge-curation-slo.json` の `freshness_days_by_kind` で kind 別の再確認周期を定義する。未設定の kind は `default_freshness_days` (180日)。
+- **`kind: evergreen`**: 概念・定義・不変量・設計原理など真価の減衰が遅い文書に frontmatter で明示する (365日周期)。安易な evergreen 付与は「二度と見直されない文書」を生むため、概念文書であることを読んで確認してから付けること。
+- `review_by: <日付>` は明示的な再確認期限 (期限切れで `review_due` として報告される)。内容改訂が必要な文書に近い日付を付けてレビューレーンへ送る。

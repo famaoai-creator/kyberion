@@ -1,12 +1,20 @@
+---
+title: 'Procedure: Detect File Specifications (Format, Encoding, Language)'
+last_updated: 2026-10-05
+---
+
 # Procedure: Detect File Specifications (Format, Encoding, Language)
 
 ## 1. Goal
+
 Determine the physical and logical characteristics of a file, such as its format (MIME), encoding (UTF-8, etc.), and programming language.
 
 ## 2. Dependencies
+
 - **Actuator**: `File-Actuator`
 
 ## 3. Step-by-Step Instructions
+
 1.  Use `File-Actuator` with the `stat` action to get file size and basic metadata.
     ```json
     {
@@ -21,4 +29,5 @@ Determine the physical and logical characteristics of a file, such as its format
 4.  Consolidate the findings into a single characteristic report.
 
 ## 4. Expected Output
+
 A JSON summary of the file's technical specifications.

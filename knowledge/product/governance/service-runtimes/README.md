@@ -1,3 +1,8 @@
+---
+title: 'Service Runtime Registry Canonical Directory'
+last_updated: 2026-10-05
+---
+
 # Service Runtime Registry Canonical Directory
 
 Canonical source for service runtime records (RSP-18).

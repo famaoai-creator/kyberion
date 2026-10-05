@@ -1,3 +1,8 @@
+---
+title: 'Web Session Handoff'
+last_updated: 2026-10-05
+---
+
 # Web Session Handoff
 
 Web アプリが debug-only hook を使って browser session を export し、Browser-Actuator がその state を import/export して後続試験へ引き継ぐための手順です。

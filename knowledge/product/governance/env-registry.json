@@ -930,14 +930,6 @@
       "documented": true
     },
     {
-      "name": "KYBERION_CONTEXTUAL_INTENT_LEARNING_PATH",
-      "category": "path",
-      "type": "path",
-      "required": false,
-      "description": "Optional path override for contextual intent learning path; keep it inside governed repository or runtime storage.",
-      "documented": true
-    },
-    {
       "name": "KYBERION_CONTEXTUAL_INTENT_MEMORY_PATH",
       "category": "path",
       "type": "path",

@@ -1,3 +1,9 @@
+---
+title: 'Analysis Execution Boundary'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # Analysis Execution Boundary
 
 Kyberion's analysis and review flows should follow the same principle as media generation:

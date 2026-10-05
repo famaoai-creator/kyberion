@@ -1,3 +1,8 @@
+---
+title: 'Voice Engines'
+last_updated: 2026-10-05
+---
+
 # Voice Engines
 
 Canonical per-engine registry entries for the voice engine catalog.
@@ -12,6 +17,7 @@ Each file must contain exactly one `engines` entry and must match the file name:
 - `irodori_tts.json`
 - `kokoro.json`
 - `pocket_tts.json`
+- `gemini_tts.json`
 
 `voice-engine-registry.json` remains the compatibility snapshot until all consumers are migrated.
 

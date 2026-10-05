@@ -1,3 +1,8 @@
+---
+title: 'Mobile WebView Session Handoff'
+last_updated: 2026-10-05
+---
+
 # Mobile WebView Session Handoff
 
 モバイル native context で確立した認証状態を、governed artifact として browser/WebView automation に受け渡すための手順です。

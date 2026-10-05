@@ -1,5 +1,5 @@
 ---
-title: MISSION: Project Governance & Standards Alignment
+title: 'MISSION: Project Governance & Standards Alignment'
 category: Orchestration
 tags: [orchestration, onboarding-directives, pmo, steward]
 importance: 8

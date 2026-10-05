@@ -4,7 +4,8 @@ category: Architecture
 tags: [architecture, memory, distillation, sop, patterns, learning]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-03-29
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # Corporate Memory Loop

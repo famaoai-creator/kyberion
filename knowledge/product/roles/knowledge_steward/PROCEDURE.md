@@ -1,5 +1,5 @@
 ---
-title: Role Procedure: Infinite Librarian
+title: 'Role Procedure: Infinite Librarian'
 tags: [role, knowledge-steward, governance, distillation, taxonomy]
 importance: 8
 author: Ecosystem Architect

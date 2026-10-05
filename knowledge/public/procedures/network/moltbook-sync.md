@@ -1,13 +1,21 @@
+---
+title: 'Procedure: Moltbook API Integration'
+last_updated: 2026-10-05
+---
+
 # Procedure: Moltbook API Integration
 
 ## 1. Goal
+
 Interact with the Moltbook protocol to fetch home feeds, notifications, and manage posts/comments.
 
 ## 2. Dependencies
+
 - **Actuator**: `Network-Actuator`
 - **Secrets**: `MOLTBOOK_API_KEY` (Retrieved via `secretGuard`)
 
 ## 3. Step-by-Step Instructions
+
 1.  **Sense (Check Home)**:
     - Target: `GET https://www.moltbook.com/api/v1/home`
     - Use `Network-Actuator` with the Authorization header.
@@ -19,4 +27,5 @@ Interact with the Moltbook protocol to fetch home feeds, notifications, and mana
     - Send the cleaned payload via `Network-Actuator`.
 
 ## 4. Expected Output
+
 High-fidelity interaction logs and state updates from the Moltbook network.

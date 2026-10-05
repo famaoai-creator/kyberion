@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Transcribe Audio From Asset'
+last_updated: 2026-10-05
+---
+
 # Procedure: Transcribe Audio From Asset
 
 ## 1. Goal

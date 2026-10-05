@@ -42,7 +42,11 @@ export function printBranchBanner(branchId?: string) {
     return;
   }
 
-  const patchPath = path.join(rootDir, 'knowledge/evolution/latent-wisdom', `${branchId}.json`);
+  const patchPath = path.join(
+    rootDir,
+    'knowledge/product/evolution/latent-wisdom',
+    `${branchId}.json`
+  );
   if (!safeExistsSync(patchPath)) {
     printText(chalk.red(`\n${t('cli_error_branch_not_found').replace('{branch}', branchId)}\n`));
     return;

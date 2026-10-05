@@ -1,5 +1,5 @@
 ---
-title: MISSION: Technical Blueprint Discovery
+title: 'MISSION: Technical Blueprint Discovery'
 category: Orchestration
 tags: [orchestration, onboarding-directives, dev, steward]
 importance: 8

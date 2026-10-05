@@ -1,3 +1,8 @@
+---
+title: 'Role: Infrastructure Sentinel'
+last_updated: 2026-10-05
+---
+
 # Role: Infrastructure Sentinel
 
 ## 役割: 基盤神経系の守護者 (Guardian of Neural Infrastructure)

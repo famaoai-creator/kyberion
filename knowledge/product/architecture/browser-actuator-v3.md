@@ -1,11 +1,12 @@
 ---
 title: Browser Actuator v3
-kind: architecture
+kind: evergreen
 scope: repository
 authority: reference
 phase: [alignment, execution]
 tags: [browser, actuator, playwright, snapshot, ref, testing]
 owner: ecosystem_architect
+last_updated: 2026-10-05
 ---
 
 # Browser Actuator v3

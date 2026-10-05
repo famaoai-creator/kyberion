@@ -1,5 +1,5 @@
 ---
-title: Blueprint: Onboarding Guide
+title: 'Blueprint: Onboarding Guide'
 category: Templates
 tags: [templates, blueprints, onboarding, guide]
 importance: 4

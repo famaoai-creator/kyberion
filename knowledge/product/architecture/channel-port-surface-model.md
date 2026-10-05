@@ -4,8 +4,8 @@ category: Architecture
 tags: [architecture, channels, ports, surface-agents, slack, chronos]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-03-15
-kind: architecture
+last_updated: 2026-10-05
+kind: evergreen
 scope: repository
 authority: reference
 phase: [alignment, execution]

@@ -1,3 +1,8 @@
+---
+title: 'Role Procedure: Rigorous Validator (QA Lead)'
+last_updated: 2026-10-05
+---
+
 # Role Procedure: Rigorous Validator (QA Lead)
 
 ## 1. Identity & Scope
