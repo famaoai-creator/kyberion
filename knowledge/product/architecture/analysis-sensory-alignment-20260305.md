@@ -1,12 +1,17 @@
 ---
-title: Analysis: Sensory Bridge Alignment (2026-03-05)
+title: 'Analysis: Sensory Bridge Alignment (2026-03-05)'
 category: Architecture
 tags: [architecture, analysis, sensory, alignment, 20260305]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-03-06
-review_by: 2026-10-12
+last_updated: 2026-10-05
 ---
+
+> **Status (2026-10-05): resolved.** Point-in-time snapshot — the analysis below is preserved as written on 2026-03-05, when it was still `PENDING_ALIGNMENT`. The open questions in §2 have since been settled:
+>
+> - **§2.1 Storage location** → decided by [Runtime Storage Layout](./runtime-storage-layout.md): runtime data is placed by purpose on dedicated floors under `active/shared/` (scratch → `tmp/`, inbound → `staging/`, re-generable → `cache/`, durable state → `runtime/`), partitioned `system/` or `<tier>/<tenant|shared>/`, with deliverables going through `writeScopedArtifact` + `publish`.
+> - **§2.2 Decoupling** → presence stayed in this repository as satellites (`satellites/`, `presence/`) under the [multi-provider co-execution contract](../governance/multi-provider-coexecution-contract.md) and the [presence-layer](./presence-layer.md) model — separation by contract and satellite boundary, not by repository split.
+> - **§2.3 Secret handling** → secrets enter and change only through governed approval flows: [secret-introduction-model](./secret-introduction-model.md), [secret-mutation-approval-model](./secret-mutation-approval-model.md), and the env registry (`knowledge/product/governance/env-registry.json`). No vault-mount or repo-split sharing scheme was adopted.
 
 # Analysis: Sensory Bridge Alignment (2026-03-05)
 

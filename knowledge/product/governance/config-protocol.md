@@ -1,5 +1,5 @@
 ---
-title: Config Protocol: The Sovereign Rule of System State
+title: 'Config Protocol: The Sovereign Rule of System State'
 category: Governance
 tags: [governance, config, protocol]
 importance: 10

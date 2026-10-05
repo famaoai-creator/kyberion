@@ -1,5 +1,5 @@
 ---
-title: SOP: TypeScript Core Base Stabilization
+title: 'SOP: TypeScript Core Base Stabilization'
 category: Governance
 tags: [governance, base, stabilization, sop]
 importance: 10

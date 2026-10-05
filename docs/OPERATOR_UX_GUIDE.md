@@ -292,7 +292,7 @@ For Google Workspace email and Meet work:
 - `gws auth login --services gmail`
   - use for reply draft creation and send actions
 - If `gws auth login` reports `No OAuth client configured`, provide one of:
-  - `/Users/famao/.config/gws/client_secret.json`
+  - `~/.config/gws/client_secret.json`
   - `GOOGLE_WORKSPACE_CLI_CLIENT_ID` and `GOOGLE_WORKSPACE_CLI_CLIENT_SECRET`
   - `gws auth setup --project <gcp-project-id> --login` when `gcloud` is available
 - `gws auth status`

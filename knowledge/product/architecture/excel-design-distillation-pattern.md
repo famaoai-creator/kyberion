@@ -1,5 +1,5 @@
 ---
-title: Wisdom: Excel Design Distillation & AI-Native Replication
+title: 'Wisdom: Excel Design Distillation & AI-Native Replication'
 category: Architecture
 tags: [architecture, excel, design, distillation, pattern, protocol]
 importance: 8

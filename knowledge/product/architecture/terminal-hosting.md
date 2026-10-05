@@ -1,5 +1,5 @@
 ---
-title: Terminal Hosting: The Institutional Gateway
+title: 'Terminal Hosting: The Institutional Gateway'
 category: Architecture
 tags: [architecture, terminal, hosting]
 importance: 8

@@ -1,5 +1,5 @@
 ---
-title: Sovereign Approval Protocol: Push & Passkey (2026-03-04)
+title: 'Sovereign Approval Protocol: Push & Passkey (2026-03-04)'
 category: Architecture
 tags: [architecture, passkey, push, protocol]
 importance: 8

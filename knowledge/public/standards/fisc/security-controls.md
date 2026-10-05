@@ -4,8 +4,7 @@ category: Standards
 tags: [standards, fisc, security, controls]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-03-06
-review_by: 2026-10-12
+last_updated: 2026-10-05
 ---
 
 # FISC-Aligned Security Standard (Cloud Infrastructure)
@@ -37,4 +36,6 @@ review_by: 2026-10-12
 
 ---
 
-_Reference: Synthesized from FISC Security Standards 9th Edition_
+_Reference: Synthesized from FISC Security Standards (安全対策基準・実務基準), 第13版._
+
+_Note: 第13版の主な追加点はサイバーセキュリティ対策の強化（標的型攻撃・サプライチェーンリスクへの能動的監視）、AI/生成AI利用への対応、およびクラウド責任共有モデルの再定義とされる（`../aws_fisc_standard.md` 参照）。本書に引用されている統制番号（実務 3-1-1, 設備 2-2-4, 実務 4-2-1 等）が第13版の条文番号と一致するかは未検証のため、個別統制の対応関係はドメイン確認を要する。_

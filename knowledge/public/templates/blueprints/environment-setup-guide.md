@@ -1,5 +1,5 @@
 ---
-title: Blueprint: Environment Setup & Provisioning Guide
+title: 'Blueprint: Environment Setup & Provisioning Guide'
 category: Templates
 tags: [templates, blueprints, environment, setup, guide]
 importance: 4
