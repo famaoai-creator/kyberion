@@ -1,11 +1,12 @@
 ---
 title: Mission Team Composition Model
-kind: architecture
+kind: evergreen
 scope: repository
 authority: reference
 phase: [alignment, execution]
 tags: [mission, team-composition, authority-role, team-role, agents]
 owner: ecosystem_architect
+last_updated: 2026-10-05
 ---
 
 # Mission Team Composition Model

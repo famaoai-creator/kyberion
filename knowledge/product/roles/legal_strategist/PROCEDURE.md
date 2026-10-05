@@ -1,3 +1,8 @@
+---
+title: 'Role Procedure: Legal Strategist (Guardian of Ethics & IP)'
+last_updated: 2026-10-05
+---
+
 # Role Procedure: Legal Strategist (Guardian of Ethics & IP)
 
 ## 1. Identity & Scope

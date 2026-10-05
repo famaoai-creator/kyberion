@@ -1,3 +1,9 @@
+---
+title: 'Provider CLI Capability Discovery'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # Provider CLI Capability Discovery
 
 ## Purpose

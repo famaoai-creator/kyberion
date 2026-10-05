@@ -68,6 +68,8 @@ const DEFAULT_SLO_CONFIG: CurationSloConfig = {
     governance: 90,
     playbook: 60,
     knowledge_hint: 30,
+    reference: 120,
+    evergreen: 365,
   },
   default_freshness_days: 180,
 };

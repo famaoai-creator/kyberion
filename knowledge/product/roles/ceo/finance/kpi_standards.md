@@ -4,7 +4,8 @@ category: Roles
 tags: [roles, ceo, finance, kpi, standards]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # 財務KPI標準基準 (Financial KPI Standards)

@@ -4,7 +4,8 @@ category: Standards
 tags: [standards, security, owasp, llm, top10, ace]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # OWASP Top 10 for LLM Applications

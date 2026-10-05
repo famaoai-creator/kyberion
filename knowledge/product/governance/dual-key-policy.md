@@ -4,7 +4,7 @@ category: Governance
 tags: [ace, protocol, role-management, safety]
 importance: 10
 related_roles: [Ecosystem Architect, Engineering]
-last_updated: 2026-03-06
+last_updated: 2026-10-05
 ---
 
 # Dual-Key Policy: ロール管理と決定権限の標準規約

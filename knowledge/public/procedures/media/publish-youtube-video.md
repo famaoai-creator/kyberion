@@ -1,3 +1,8 @@
+---
+title: 'Publish a Narrated Video to YouTube'
+last_updated: 2026-10-05
+---
+
 # Publish a Narrated Video to YouTube
 
 Use this procedure after the video has already been rendered and approved for upload preparation.

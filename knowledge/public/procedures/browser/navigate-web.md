@@ -3,7 +3,7 @@ title: Procedure: Web Automation & Navigation
 tags: [capability, browser, procedure, web-automation, playwright]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-03-15
+last_updated: 2026-10-05
 kind: capability
 scope: global
 authority: recipe
@@ -17,6 +17,7 @@ status: active
 # Procedure: Web Automation & Navigation
 
 ## 1. Goal
+
 Interact with web applications, extract content, and execute complex browser scenarios using Playwright.
 
 Current direction:
@@ -26,9 +27,11 @@ Current direction:
 - durable browser automation should be exportable into ADF and Playwright test skeletons
 
 ## 2. Dependencies
+
 - **Actuator**: `Browser-Actuator`
 
 ## 3. Step-by-Step Instructions
+
 1.  **Simple Extraction**: Use `extract` to retrieve the HTML or text content of a page.
     ```json
     {
@@ -60,7 +63,9 @@ Current direction:
 Selector-based steps are still acceptable for deterministic engineering automation, but `snapshot + ref` is the preferred contract for agent-driven interaction.
 
 ## 4. Expected Output
+
 State changes within the web application, extracted content, or visual evidence (screenshots).
 
 ## 5. Reference
+
 - `knowledge/product/architecture/browser-actuator-v3.md`

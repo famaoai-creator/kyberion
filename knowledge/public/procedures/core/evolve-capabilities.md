@@ -1,14 +1,22 @@
+---
+title: 'Procedure: Self-Evolution & Prompt Optimization'
+last_updated: 2026-10-05
+---
+
 # Procedure: Self-Evolution & Prompt Optimization
 
 ## 1. Goal
+
 Continuously improve the agent's reasoning capabilities by optimizing prompts and generating new, verified procedures.
 
 ## 2. Dependencies
+
 - **Actuator**: `Wisdom-Actuator` (Alignment/Audit)
 - **Actuator**: `Code-Actuator` (Refactoring/Verification)
 - **Actuator**: `Orchestrator-Actuator` (Evolution Workflow)
 
 ## 3. Step-by-Step Instructions
+
 1.  **Drift Detection**: Use `Wisdom-Actuator` (mirror) to identify areas where the current Persona or Procedure is failing.
 2.  **Optimization Drafting**:
     - Use `Code-Actuator` (analyze) to read the target actuator manifest, procedure, or knowledge card.
@@ -20,4 +28,5 @@ Continuously improve the agent's reasoning capabilities by optimizing prompts an
 5.  **Wisdom Vaulting**: Register the successful evolution into the `Wisdom Vault`.
 
 ## 4. Expected Output
+
 An upgraded cognitive layer with higher efficiency and lower token consumption.

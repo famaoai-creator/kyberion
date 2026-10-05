@@ -3,7 +3,7 @@ title: Role Procedure: Solution Architect
 tags: [role, solution-architect, procedure, architecture, adf]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-03-15
+last_updated: 2026-10-05
 kind: role
 scope: global
 authority: advisory

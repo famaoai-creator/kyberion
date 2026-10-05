@@ -3,7 +3,7 @@ title: Independent Validation Evidence Package
 category: Governance
 tags: [validation, sr-11-7, audit, model-risk, regulated-finance, evidence]
 importance: 8
-last_updated: 2026-04-27
+last_updated: 2026-10-05
 ---
 
 # Independent Validation Evidence Package
