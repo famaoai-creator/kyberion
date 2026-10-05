@@ -1,0 +1,64 @@
+{
+  "version": "1.0.0",
+  "description": "Standing mandates (包括委任): kinds of work the operator pre-approves. SHADOW MODE: mandate-shadow.ts only records whether a mission brief WOULD be covered; it never opens the plan gate (alignment approval stays human_only).",
+  "default_expiry_days": 90,
+  "external_effect_patterns": [
+    "publish",
+    "deploy",
+    "release",
+    "send email",
+    "post to",
+    "production",
+    "公開",
+    "配信",
+    "本番",
+    "外部送信"
+  ],
+  "mandates": [
+    {
+      "id": "test-strengthening",
+      "title": "Strengthen tests",
+      "work_type_patterns": [
+        "add test",
+        "strengthen test",
+        "test coverage",
+        "テスト強化",
+        "テスト追加",
+        "カバレッジ"
+      ],
+      "allowed_path_globs": ["**/*.test.ts", "**/*.test.tsx", "tests/**", "tests_ai/**"],
+      "max_risk_level": 2,
+      "expires_at": "2027-01-05T00:00:00.000Z"
+    },
+    {
+      "id": "docs-update",
+      "title": "Update documentation",
+      "work_type_patterns": [
+        "documentation",
+        "update docs",
+        "docs update",
+        "readme",
+        "ドキュメント",
+        "文書更新"
+      ],
+      "allowed_path_globs": ["docs/**", "**/*.md", "changelog.d/**"],
+      "max_risk_level": 2,
+      "expires_at": "2027-01-05T00:00:00.000Z"
+    },
+    {
+      "id": "lint-type-fix",
+      "title": "Fix lint and type errors",
+      "work_type_patterns": [
+        "lint fix",
+        "fix lint",
+        "type error",
+        "typecheck",
+        "型エラー",
+        "lint 修正"
+      ],
+      "allowed_path_globs": ["libs/**", "scripts/**", "**/*.test.ts"],
+      "max_risk_level": 2,
+      "expires_at": "2027-01-05T00:00:00.000Z"
+    }
+  ]
+}
