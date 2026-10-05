@@ -1,3 +1,4 @@
+import { summarizeHeldAction } from './cloudflare-os-held-support.js';
 import { sharedControlPlane } from './cloudflare-os-shared.js';
 import {
   type OsKnowledgeTier,
@@ -40,29 +41,35 @@ export class CloudflareOsSurface {
 
   snapshot(
     missionId: string | undefined,
-    access: CloudflareOsSurfaceAccess
+    access: CloudflareOsSurfaceAccess,
+    options: { readOnly?: boolean; includeObservations?: boolean } = {}
   ): CloudflareOsSurfaceSnapshot {
     assertSurfaceAccess(access);
     const normalizedMissionId = normalizeOptionalMissionId(missionId);
     return {
       ...(normalizedMissionId ? { missionId: normalizedMissionId } : {}),
-      heldActions: this.controlPlane
-        .listHeldActionSummaries(normalizedMissionId)
+      heldActions: (options.readOnly
+        ? this.controlPlane.listHeldActions(normalizedMissionId).map(summarizeHeldAction)
+        : this.controlPlane.listHeldActionSummaries(normalizedMissionId)
+      )
         .filter((item) => isHeldActionVisible(item, access))
         .slice(-MAX_SURFACE_ITEMS)
         .reverse(),
-      observations: this.controlPlane
-        .listObservations(normalizedMissionId)
-        .filter((item) => isObservationVisible(item, access))
-        .map((item) => ({
-          ...item,
-          service: redactSurfaceObservationField(item.service, 80),
-          resourceRef: redactSurfaceObservationField(item.resourceRef),
-          purpose: redactSurfaceObservationField(item.purpose, 160),
-          summary: redactSurfaceObservationField(item.summary),
-        }))
-        .slice(-MAX_SURFACE_ITEMS)
-        .reverse(),
+      observations:
+        options.includeObservations === false
+          ? []
+          : this.controlPlane
+              .listObservations(normalizedMissionId)
+              .filter((item) => isObservationVisible(item, access))
+              .map((item) => ({
+                ...item,
+                service: redactSurfaceObservationField(item.service, 80),
+                resourceRef: redactSurfaceObservationField(item.resourceRef),
+                purpose: redactSurfaceObservationField(item.purpose, 160),
+                summary: redactSurfaceObservationField(item.summary),
+              }))
+              .slice(-MAX_SURFACE_ITEMS)
+              .reverse(),
     };
   }
 
