@@ -32,11 +32,18 @@ import {
   viewDecisionCard,
 } from '../governance/approval-decision-card.js';
 import type { DecisionCard } from '../governance/decision-card.js';
+import { engageOperationsHalt } from '../governance/operations-halt.js';
 
 /** MO-11 S-2: `brief` = the mission-brief HTML review surface (report-review). */
 export type SurfaceApproval = 'slack' | 'telegram' | 'discord' | 'imessage' | 'presence' | 'brief';
 export type SurfaceApprovalDecision = 'approved' | 'rejected';
 export type SurfaceApprovalAskWhyCategory = RejectionReasonCategory | 'skip';
+
+// P1-9: explicit tokens only — a bare "stop" in ordinary conversation must not
+// halt the system. Stopping is the safe direction, so it needs no `canDecide`.
+const HALT_TOKEN = /^(?:\/halt|\/stop-all|全停止|緊急停止)$/iu;
+// Resuming is the risky direction: it stays a CLI act, and chat only says so.
+const RESUME_TOKEN = /^(?:\/resume|運用再開)$/iu;
 
 const DECISION_TOKEN = /^appr:([0-9a-f-]{36}):(approve|approved|reject|rejected)$/iu;
 // `revise` is accepted as an alias of `changes`. The free text after the token
@@ -633,6 +640,23 @@ export function resolveSurfaceApprovalReply(params: {
     reply: t('bridge:approval_not_authorized', undefined, params.locale),
   };
   const mayDecide = () => (params.canDecide ? params.canDecide() : true);
+  if (HALT_TOKEN.test(text)) {
+    const change = engageOperationsHalt({
+      by: `${params.surface}:${params.decidedBy}`,
+      reason: `halt requested from ${params.surface}`,
+    });
+    return {
+      handled: true,
+      reply: t(
+        change.changed ? 'bridge:ops_halt_engaged' : 'bridge:ops_halt_already',
+        undefined,
+        params.locale
+      ),
+    };
+  }
+  if (RESUME_TOKEN.test(text)) {
+    return { handled: true, reply: t('bridge:ops_halt_resume_cli', undefined, params.locale) };
+  }
   const cardToken = text.match(CARD_TOKEN);
   if (cardToken) {
     const instruction = text.slice(cardToken[0].length).trim();

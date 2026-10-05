@@ -92,6 +92,13 @@
       "note": "Approval requests and events written by test runs (approval-store.ts approvalStoreRoots under vitest). Isolated from the live approval store so fixtures never count as operator decisions."
     },
     {
+      "path": "active/shared/runtime/vitest-operations-halt",
+      "artifact_class": "tmp",
+      "ttl_days": 1,
+      "action": "delete",
+      "note": "Per-process operations-halt flags written by test runs (operations-halt.ts under vitest). Isolated so a test that engages a halt never stops the live system."
+    },
+    {
       "path": "active/shared/runtime/a2a-conversations",
       "artifact_class": "log",
       "ttl_days": 30,

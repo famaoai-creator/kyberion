@@ -8608,6 +8608,21 @@
         "ja": "放置された承認依頼を期限切れにし、テスト用レコードを退避する(既定はドライラン)。",
         "qps-ploc": "⟦Ėẋṗïřė şŧȧŀė ṗėñḓïñɠ ȧṗṗřőṽȧŀş ȧñḓ ɱőṽė ŧėşŧ-ƒïẋŧůřė řėƈőřḓş őůŧ őƒ ŧħė şŧőřė (ḓřẏ-řůñ ƀẏ ḓėƒȧůŀŧ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
       },
+      "cli_cmd_script_halt_status": {
+        "en": "Show whether autonomous operations are halted, since when and by whom.",
+        "ja": "自律運用が停止中かどうか、いつ誰が止めたかを表示する。",
+        "qps-ploc": "⟦Şħőẇ ẇħėŧħėř ȧůŧőñőɱőůş őṗėřȧŧïőñş ȧřė ħȧŀŧėḓ, şïñƈė ẇħėñ ȧñḓ ƀẏ ẇħőɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "cli_cmd_script_halt_engage": {
+        "en": "Halt all autonomous operations (work claims, dot wakes, auto-proceed) until resumed.",
+        "ja": "自律運用(作業の取得、dot の起動、自動進行)をすべて停止する。再開するまで続く。",
+        "qps-ploc": "⟦Ħȧŀŧ ȧŀŀ ȧůŧőñőɱőůş őṗėřȧŧïőñş (ẇőřķ ƈŀȧïɱş, ḓőŧ ẇȧķėş, ȧůŧő-ṗřőƈėėḓ) ůñŧïŀ řėşůɱėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "cli_cmd_script_halt_resume": {
+        "en": "Resume autonomous operations after a halt.",
+        "ja": "停止していた自律運用を再開する。",
+        "qps-ploc": "⟦Řėşůɱė ȧůŧőñőɱőůş őṗėřȧŧïőñş ȧƒŧėř ȧ ħȧŀŧ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
       "cli_cmd_script_tenant_export": {
         "en": "Export one tenant's governed data as a portable bundle.",
         "ja": "テナント 1 件分の管理データを持ち出し用バンドルとして書き出す。",
@@ -10748,6 +10763,21 @@
         "en": "Changes requested: {title}. The agent will send a revised card.",
         "ja": "修正を指示しました: {title}。直した案が新しいカードで届きます。",
         "qps-ploc": "⟦Ƈħȧñɠėş řėɋůėşŧėḓ: {title}. Ŧħė ȧɠėñŧ ẇïŀŀ şėñḓ ȧ řėṽïşėḓ ƈȧřḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ops_halt_engaged": {
+        "en": "All autonomous operations are halted. Agents stop claiming work, dots stop waking, and nothing proceeds on its own. Resume from the terminal: pnpm kyberion halt resume",
+        "ja": "自律運用をすべて停止しました。エージェントは新しい作業を取らず、dot は起動せず、何も自動では進みません。再開はターミナルで: pnpm kyberion halt resume",
+        "qps-ploc": "⟦Ȧŀŀ ȧůŧőñőɱőůş őṗėřȧŧïőñş ȧřė ħȧŀŧėḓ. Ȧɠėñŧş şŧőṗ ƈŀȧïɱïñɠ ẇőřķ, ḓőŧş şŧőṗ ẇȧķïñɠ, ȧñḓ ñőŧħïñɠ ṗřőƈėėḓş őñ ïŧş őẇñ. Řėşůɱė ƒřőɱ ŧħė ŧėřɱïñȧŀ: ṗñṗɱ ķẏƀėřïőñ ħȧŀŧ řėşůɱė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ï⟧"
+      },
+      "ops_halt_already": {
+        "en": "Operations are already halted. Resume from the terminal: pnpm kyberion halt resume",
+        "ja": "すでに停止中です。再開はターミナルで: pnpm kyberion halt resume",
+        "qps-ploc": "⟦Őṗėřȧŧïőñş ȧřė ȧŀřėȧḓẏ ħȧŀŧėḓ. Řėşůɱė ƒřőɱ ŧħė ŧėřɱïñȧŀ: ṗñṗɱ ķẏƀėřïőñ ħȧŀŧ řėşůɱė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "ops_halt_resume_cli": {
+        "en": "Resuming is done from the terminal, not from chat: pnpm kyberion halt resume",
+        "ja": "再開はチャットからではなくターミナルで行います: pnpm kyberion halt resume",
+        "qps-ploc": "⟦Řėşůɱïñɠ ïş ḓőñė ƒřőɱ ŧħė ŧėřɱïñȧŀ, ñőŧ ƒřőɱ ƈħȧŧ: ṗñṗɱ ķẏƀėřïőñ ħȧŀŧ řėşůɱė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
       },
       "decision_card_changes_modal_title": {
         "en": "Request changes",
