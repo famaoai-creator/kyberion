@@ -22,7 +22,8 @@ export function parseFrontDeskArtifactRevisionInput(
     (row.revision as number) > 64 ||
     typeof row.sha256 !== 'string' ||
     !/^[a-f0-9]{64}$/.test(row.sha256) ||
-    !['compact', 'readable'].includes(String(row.format))
+    typeof row.format !== 'string' ||
+    !['compact', 'readable'].includes(row.format)
   )
     return undefined;
   return {
