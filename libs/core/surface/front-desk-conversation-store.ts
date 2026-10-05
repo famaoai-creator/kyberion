@@ -8,6 +8,10 @@ import {
   isFrontDeskExecutionPublicViewer,
   parseFrontDeskExecutionBinding,
   frontDeskExecutionExpectedContent,
+  parseFrontDeskArtifactRevisionInput,
+  frontDeskArtifactRevisionCommand,
+  frontDeskArtifactRevisionDigest,
+  type FrontDeskArtifactRevisionInput,
   type FrontDeskExecutionBinding,
   type FrontDeskExecutionMapping,
   type FrontDeskExecutionProjection,
@@ -76,6 +80,7 @@ import {
   CONVERSATION_MAX_REPLY,
   CONVERSATION_MAX_TURNS,
   type ConversationHistory,
+  type ConversationHistoryMessage,
 } from './front-desk-conversation-history.js';
 
 type Turn = {
@@ -97,7 +102,7 @@ export type ReservedConversationTurn = {
 };
 const PENDING_RETENTION_MS = 24 * 60 * 60 * 1000;
 type Transcript = {
-  version: 2 | 3;
+  version: 2 | 3 | 4;
   sessionId: string;
   turns: Turn[];
   taskState?: ConversationTaskState;
@@ -133,6 +138,9 @@ export class ConversationStoreError extends Error {
       | 'request_conflict'
       | 'request_expired'
       | 'scope_selection_required'
+      | 'invalid_revision'
+      | 'revision_target_unavailable'
+      | 'revision_conflict'
   ) {
     super(code);
   }
@@ -191,8 +199,12 @@ function load(ref: ReturnType<typeof conversationRef>): Transcript {
   if (!value || typeof value !== 'object') throw new ConversationStoreError('invalid_history');
   const record = value as Record<string, unknown>;
   if (
-    (record.version !== 1 && record.version !== 2 && record.version !== 3) ||
-    ((record.version === 2 || record.version === 3) && record.taskState === undefined) ||
+    (record.version !== 1 &&
+      record.version !== 2 &&
+      record.version !== 3 &&
+      record.version !== 4) ||
+    ((record.version === 2 || record.version === 3 || record.version === 4) &&
+      record.taskState === undefined) ||
     record.sessionId !== ref.sessionId ||
     !Array.isArray(record.turns) ||
     record.turns.length > CONVERSATION_MAX_TURNS
@@ -256,7 +268,7 @@ function load(ref: ReturnType<typeof conversationRef>): Transcript {
   )
     throw new ConversationStoreError('invalid_history');
   return {
-    version: record.version === 3 ? 3 : 2,
+    version: record.version === 4 ? 4 : record.version === 3 ? 3 : 2,
     sessionId: ref.sessionId,
     turns,
     taskState,
@@ -266,10 +278,15 @@ function load(ref: ReturnType<typeof conversationRef>): Transcript {
   };
 }
 
-/** All publications share this version fence. A legacy v2 front desk rejects
- * v3 before it can rewrite the transcript and silently discard durable work. */
+/** All publications share this version fence. Legacy v2 writers reject durable
+ * v3 work; legacy v3 writers reject v4 lineage rather than silently discard it. */
 function publishTranscript(ref: ReturnType<typeof conversationRef>, transcript: Transcript): void {
   if (
+    transcript.version === 4 ||
+    transcript.executionRequests?.some((request) => request.binding.parent_request_id)
+  )
+    transcript.version = 4;
+  else if (
     transcript.version === 3 ||
     (transcript.executionRequests?.length ?? 0) > 0 ||
     (transcript.executionReports?.length ?? 0) > 0
@@ -302,7 +319,7 @@ export function readConversationHistory(viewer: FrontDeskConversationViewer): Co
     withLockSync(`concierge-history-${ref.key}`, () => {
       const transcript = load(ref);
       if (syncExecutionReports(viewer, transcript)) publishTranscript(ref, transcript);
-      const messages = transcript.turns.flatMap((turn) => [
+      const messages: ConversationHistoryMessage[] = transcript.turns.flatMap((turn) => [
         {
           id: `${turn.id}-user`,
           role: 'user' as const,
@@ -320,13 +337,35 @@ export function readConversationHistory(viewer: FrontDeskConversationViewer): Co
               },
             ]),
       ]);
-      for (const report of transcript.executionReports ?? [])
+      for (const report of transcript.executionReports ?? []) {
+        const request = transcript.executionRequests?.find(
+          (entry) => entry.binding.request_id === report.requestId
+        );
+        const projection = request ? executionProjection(viewer, request) : undefined;
+        const binding = request?.binding;
+        const artifact =
+          binding && projection?.status === 'work_completed' && projection.artifactSha256
+            ? {
+                requestId: binding.request_id,
+                revision: binding.revision,
+                sha256: projection.artifactSha256,
+                format: binding.receipt_format ?? ('readable' as const),
+                canRevise:
+                  (transcript.taskState?.tasks.length ?? 0) < CONVERSATION_TASK_MAX_TASKS &&
+                  binding.revision < CONVERSATION_TASK_MAX_TASKS &&
+                  !(transcript.executionRequests ?? []).some(
+                    (entry) => entry.binding.parent_request_id === binding.request_id
+                  ),
+              }
+            : undefined;
         messages.push({
           id: report.id,
           role: 'secretary',
           createdAt: report.createdAt,
           text: storedText(report.text, CONVERSATION_MAX_REPLY),
+          ...(artifact ? { artifact } : {}),
         });
+      }
       messages.sort((a, b) => a.createdAt - b.createdAt);
       return {
         sessionId: ref.sessionId,
@@ -349,8 +388,21 @@ export function reserveConversationTurn(
   text: string,
   requestId: string = randomUUID(),
   requestCreatedAt = Date.now(),
-  locale?: SupportedLocale
+  locale?: SupportedLocale,
+  artifactRevision?: FrontDeskArtifactRevisionInput
 ): ReservedConversationTurn {
+  const revisionInput =
+    artifactRevision === undefined
+      ? undefined
+      : parseFrontDeskArtifactRevisionInput(artifactRevision);
+  if (
+    artifactRevision !== undefined &&
+    (!revisionInput || text !== frontDeskArtifactRevisionCommand(revisionInput.format))
+  )
+    throw new ConversationStoreError('invalid_revision');
+  const turnDigest = createHash('sha256')
+    .update(revisionInput ? JSON.stringify({ text, artifactRevision: revisionInput }) : text)
+    .digest('hex');
   if (
     !Number.isFinite(requestCreatedAt) ||
     requestCreatedAt > Date.now() + 60_000 ||
@@ -376,7 +428,7 @@ export function reserveConversationTurn(
         // Legacy turns have no digest: only their exact stored display text can
         // replay. New turns bind the full input before redaction or truncation.
         const matches = existing.requestDigest
-          ? existing.requestDigest === createHash('sha256').update(text).digest('hex')
+          ? existing.requestDigest === turnDigest
           : existing.text === text;
         if (!matches) throw new ConversationStoreError('request_conflict');
         if (existing.retryable && !existing.uncertain && existing.reply === undefined) {
@@ -413,16 +465,22 @@ export function reserveConversationTurn(
       }
       // Intake classification is advisory only. Bind to this server-owned partition,
       // never to global TaskSession state or text recovered from old assistant replies.
-      let routed = routeConversationTaskTurn(
-        transcript.taskState ?? { tasks: [] },
-        storedText(text, CONVERSATION_MAX_INPUT),
-        id,
-        Date.now(),
-        locale
-      );
+      const revisionAdmission = revisionInput
+        ? admitArtifactRevision(viewer, text, id, ref, transcript, revisionInput, locale)
+        : undefined;
+      let routed =
+        revisionAdmission?.routed ??
+        routeConversationTaskTurn(
+          transcript.taskState ?? { tasks: [] },
+          storedText(text, CONVERSATION_MAX_INPUT),
+          id,
+          Date.now(),
+          locale
+        );
       // Only this exact configured diagnostic command reserves executable work.
       // The request, outbox reference and queued answer share this one atomic write.
-      const admission = executionAdmission(viewer, text, id, ref, routed.state, locale);
+      const admission =
+        revisionAdmission ?? executionAdmission(viewer, text, id, ref, routed.state, locale);
       if (admission) {
         routed = admission.routed;
         transcript.executionRequests = [...(transcript.executionRequests ?? []), admission.request];
@@ -465,7 +523,7 @@ export function reserveConversationTurn(
         id,
         text: storedText(text, CONVERSATION_MAX_INPUT),
         createdAt: Date.now(),
-        requestDigest: createHash('sha256').update(text).digest('hex'),
+        requestDigest: turnDigest,
       });
       publishTranscript(ref, transcript);
       return { id, created: true, routing: routed.decision };
@@ -832,10 +890,120 @@ function executionAdmission(
     },
   };
 }
+/** Reserve one immutable child under the transcript lock. Feedback never edits its parent. */
+function admitArtifactRevision(
+  viewer: FrontDeskConversationViewer,
+  text: string,
+  requestId: string,
+  ref: ReturnType<typeof conversationRef>,
+  transcript: Transcript,
+  input: FrontDeskArtifactRevisionInput,
+  locale?: SupportedLocale
+): NonNullable<ReturnType<typeof executionAdmission>> {
+  const parent = transcript.executionRequests?.find(
+    (entry) => entry.binding.request_id === input.requestId
+  );
+  if (
+    !parent ||
+    parent.status !== 'pending' ||
+    parent.binding.revision !== input.revision ||
+    parent.revision !== input.revision
+  )
+    throw new ConversationStoreError('revision_target_unavailable');
+  if (
+    (transcript.executionRequests ?? []).some(
+      (entry) => entry.binding.parent_request_id === input.requestId
+    )
+  )
+    throw new ConversationStoreError('revision_conflict');
+  const mapping = getFrontDeskExecutionMapping(parent.binding);
+  if (!mapping || !frontDeskExecutionViewerMatches(viewer, mapping))
+    throw new ConversationStoreError('revision_target_unavailable');
+  const projection = executionProjection(viewer, parent, locale);
+  if (
+    projection?.status !== 'work_completed' ||
+    projection.artifactSha256 !== input.sha256 ||
+    !projection.artifactPath
+  )
+    throw new ConversationStoreError('revision_target_unavailable');
+  if ((parent.binding.receipt_format ?? 'readable') === input.format)
+    throw new ConversationStoreError('invalid_revision');
+  const state = transcript.taskState ?? { tasks: [] };
+  if (
+    state.tasks.length >= CONVERSATION_TASK_MAX_TASKS ||
+    input.revision >= CONVERSATION_TASK_MAX_TASKS
+  )
+    throw new ConversationStoreError('revision_conflict');
+  const requestDigest = frontDeskArtifactRevisionDigest(input);
+  const binding: FrontDeskExecutionBinding = {
+    mapping_id: mapping.id,
+    config_digest: frontDeskMappingDigest(mapping),
+    conversation_key: ref.key,
+    request_id: requestId,
+    revision: input.revision + 1,
+    request_digest: requestDigest,
+    work_item_id:
+      'WI-FD-' +
+      createHash('sha256')
+        .update(
+          JSON.stringify([
+            mapping.id,
+            parent.binding.config_digest,
+            ref.key,
+            requestId,
+            input.revision + 1,
+            requestDigest,
+          ])
+        )
+        .digest('hex')
+        .slice(0, 48),
+    parent_request_id: input.requestId,
+    parent_revision: input.revision,
+    parent_sha256: input.sha256,
+    receipt_format: input.format,
+  };
+  state.tasks.push({
+    id: requestId,
+    title: text,
+    requestText: text,
+    createdAt: Date.now(),
+    updates: [],
+    state: 'needs_execution',
+    workItemId: binding.work_item_id,
+  });
+  delete state.clarification;
+  return {
+    routed: {
+      state,
+      decision: {
+        kind: 'new_request',
+        taskIds: [requestId],
+        confidence: 'rule',
+        authority: 'none',
+        reply: t(
+          'front_desk:artifact_revision_acknowledged',
+          { revision: binding.revision },
+          locale
+        ),
+      },
+    },
+    request: {
+      binding,
+      viewer: structuredClone(viewer),
+      sessionId: ref.sessionId,
+      revision: binding.revision,
+      requestDigest,
+      status: 'pending',
+      createdAt: Date.now(),
+    },
+  };
+}
+
 function executionProjection(
   viewer: FrontDeskConversationViewer,
   request: FrontDeskExecutionRequest,
-  locale?: SupportedLocale
+  locale?: SupportedLocale,
+  rootDir?: string
 ): FrontDeskExecutionProjection | undefined {
   if (request.status === 'cancel_requested')
     return {
@@ -845,7 +1013,7 @@ function executionProjection(
   if (request.status === 'invalidated')
     return { status: 'blocked', text: t('front_desk:execution_invalidated', undefined, locale) };
   try {
-    return projectFrontDeskExecution(viewer, request.binding, { locale });
+    return projectFrontDeskExecution(viewer, request.binding, { locale, rootDir });
   } catch {
     return undefined;
   } // A report read failure never retries or re-dispatches work.
@@ -945,7 +1113,8 @@ export function inspectFrontDeskExecution(
       organization_id?: string;
       project_id?: string;
     };
-  }
+  },
+  options: { rootDir?: string } = {}
 ):
   | {
       ok: true;
@@ -996,11 +1165,40 @@ export function inspectFrontDeskExecution(
       if (
         !task ||
         task.workItemId !== binding.work_item_id ||
-        task.requestText !== mapping.exactCommand ||
+        task.requestText !==
+          (binding.receipt_format
+            ? frontDeskArtifactRevisionCommand(binding.receipt_format)
+            : mapping.exactCommand) ||
         task.updates.length !== 0 ||
-        createHash('sha256').update(task.requestText).digest('hex') !== binding.request_digest
+        (!binding.parent_request_id &&
+          createHash('sha256').update(task.requestText).digest('hex') !== binding.request_digest)
       )
         return blocked('request_changed');
+      if (binding.parent_request_id) {
+        const parent = transcript.executionRequests?.find(
+          (entry) => entry.binding.request_id === binding.parent_request_id
+        );
+        if (
+          !parent ||
+          parent.status !== 'pending' ||
+          parent.binding.revision !== binding.parent_revision ||
+          parent.revision !== binding.parent_revision ||
+          parent.binding.config_digest !== binding.config_digest
+        )
+          return blocked('parent_revision_changed');
+        const projection = executionProjection(mapping.viewer, parent, undefined, options.rootDir);
+        if (
+          projection?.status !== 'work_completed' ||
+          projection.artifactSha256 !== binding.parent_sha256
+        )
+          return blocked('parent_artifact_unverified');
+        const children =
+          transcript.executionRequests?.filter(
+            (entry) => entry.binding.parent_request_id === binding.parent_request_id
+          ) ?? [];
+        if (children.length !== 1 || children[0].binding.request_id !== binding.request_id)
+          return blocked('revision_conflict');
+      }
       return {
         ok: true as const,
         mapping,

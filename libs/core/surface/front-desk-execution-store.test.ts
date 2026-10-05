@@ -42,6 +42,8 @@ vi.mock('./front-desk-execution-contract.js', async (importOriginal) => {
   };
 });
 import {
+  frontDeskArtifactRevisionCommand,
+  frontDeskArtifactRevisionDigest,
   FRONT_DESK_RECEIPT_COMMAND,
   FRONT_DESK_RECEIPT_PIPELINE,
   FRONT_DESK_RECEIPT_VERSION,
@@ -605,4 +607,129 @@ describe('execution transcript version fence', () => {
     completeConversationTurn(viewer, id(1), 'ordinary answer');
     expect(transcript().version).toBe(3);
   });
+});
+
+describe('immutable diagnostic artifact revision reservations', () => {
+  const target = () => ({
+    requestId: id(1),
+    revision: 1,
+    sha256: 'b'.repeat(64),
+    format: 'compact' as const,
+  });
+  function completedParent() {
+    reserve();
+    state.projections.set(id(1), {
+      status: 'work_completed',
+      text: 'Verified receipt',
+      reportId: 'parent-report',
+      artifactPath: 'verified-parent.json',
+      artifactSha256: 'b'.repeat(64),
+    });
+  }
+  const revise = (n = 2, input = target()) =>
+    reserveConversationTurn(
+      viewer,
+      frontDeskArtifactRevisionCommand(input.format),
+      id(n),
+      Date.now(),
+      undefined,
+      input
+    );
+  it('atomically records fresh child authority and immutable parent lineage with a v4 writer fence', () => {
+    completedParent();
+    const parent = structuredClone(current());
+    const writes = state.writes;
+    const turn = revise();
+    expect(state.writes).toBe(writes + 1);
+    expect(turn.routing?.authority).toBe('none');
+    const entries = listConfiguredFrontDeskExecutions();
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toEqual(parent);
+    expect(entries[1].binding).toMatchObject({
+      revision: 2,
+      parent_request_id: id(1),
+      parent_revision: 1,
+      parent_sha256: target().sha256,
+      receipt_format: 'compact',
+      request_digest: frontDeskArtifactRevisionDigest(target()),
+    });
+    expect(entries[1].binding.work_item_id).not.toBe(parent.binding.work_item_id);
+    expect(transcript().version).toBe(4);
+    expect(inspectFrontDeskExecution(entries[1].binding, charter)).toMatchObject({ ok: true });
+    const artifact = readConversationHistory(viewer).messages.find(
+      (m) => m.id === 'parent-report'
+    )?.artifact;
+    expect(artifact).toMatchObject({ requestId: id(1), revision: 1, canRevise: false });
+  });
+  it('replays an exact retry without another child and rejects changed payload or concurrent feedback', () => {
+    completedParent();
+    const first = revise();
+    expect(revise()).toMatchObject({ created: false, id: first.id });
+    expect(() => revise(2, { ...target(), sha256: 'c'.repeat(64) })).toThrow('request_conflict');
+    expect(() => revise(3)).toThrow('revision_conflict');
+    expect(listConfiguredFrontDeskExecutions()).toHaveLength(2);
+  });
+  it('fails closed on stale, unauthorized, unverified, same-format and malformed targets without mutating the parent', () => {
+    completedParent();
+    const before = structuredClone(transcript());
+    expect(() => revise(2, { ...target(), revision: 2 })).toThrow('revision_target_unavailable');
+    expect(() => revise(2, { ...target(), sha256: 'c'.repeat(64) })).toThrow(
+      'revision_target_unavailable'
+    );
+    expect(() =>
+      reserveConversationTurn(
+        { ...viewer, principalId: 'human:other' },
+        frontDeskArtifactRevisionCommand('compact'),
+        id(2),
+        Date.now(),
+        undefined,
+        target()
+      )
+    ).toThrow('revision_target_unavailable');
+    expect(() => revise(2, { ...target(), format: 'readable' as 'compact' })).toThrow(
+      'invalid_revision'
+    );
+    expect(() =>
+      reserveConversationTurn(
+        viewer,
+        'arbitrary instructions',
+        id(2),
+        Date.now(),
+        undefined,
+        target()
+      )
+    ).toThrow('invalid_revision');
+    expect(transcript()).toEqual(before);
+  });
+  it('rechecks parent verification before execution and never accepts unknown parent outcomes', () => {
+    completedParent();
+    revise();
+    const child = listConfiguredFrontDeskExecutions()[1].binding;
+    state.projections.set(id(1), { status: 'uncertain', text: 'Unknown outcome' });
+    expect(inspectFrontDeskExecution(child, charter)).toMatchObject({
+      ok: false,
+      reason: 'parent_artifact_unverified',
+    });
+  });
+  it('keeps the new writer fence after unrelated conversation publications', () => {
+    completedParent();
+    revise();
+    reserveConversationTurn(viewer, 'Hello', id(3));
+    expect(transcript().version).toBe(4);
+  });
+});
+
+it('stops offering revisions at the bounded request capacity without hiding completed artifacts', () => {
+  for (let n = 1; n <= 64; n++) reserve(n);
+  state.projections.set(id(1), {
+    status: 'work_completed',
+    text: 'Verified receipt',
+    reportId: 'capacity-report',
+    artifactPath: 'verified.json',
+    artifactSha256: 'b'.repeat(64),
+  });
+  const artifact = readConversationHistory(viewer).messages.find(
+    (m) => m.id === 'capacity-report'
+  )?.artifact;
+  expect(artifact).toMatchObject({ revision: 1, canRevise: false });
 });

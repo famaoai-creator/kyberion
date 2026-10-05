@@ -1,6 +1,22 @@
 'use client';
 
 import * as React from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import {
+  frontDeskArtifactRevisionCommand,
+  type FrontDeskArtifactRevisionInput,
+  type FrontDeskConversationArtifact,
+  type FrontDeskReceiptFormat,
+} from '@agent/core/surface/front-desk-conversation-history';
+import {
+  artifactRevisionForMessage,
+  sameArtifactRevision,
+  sameConversationRequestScope,
+  prepareConversationRequest,
+  parsePendingConversationRequest,
+  type ConversationRequestScope,
+  type PendingConversationRequest,
+} from '../lib/conversation-request';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { useVoice } from '../lib/use-voice';
 import { DockAvatar } from './dock-avatar';
@@ -29,6 +45,7 @@ type DockMessage = {
   role: 'user' | 'secretary';
   text: string;
   createdAt?: number;
+  artifact?: FrontDeskConversationArtifact;
   shape?: ConversationShape;
   promoted?: ConversationPromotion;
   nextActions?: ConversationNextAction[];
@@ -79,14 +96,41 @@ function newMessageId(): string {
   return `msg-${Date.now()}-${crypto.randomUUID().replace(/-/g, '').slice(0, 6)}`;
 }
 
-export function ConversationDock({ progressHref = '/progress' }: { progressHref?: string } = {}) {
+function currentRequestScope(sessionId: string, tenant: string | null): ConversationRequestScope {
+  const query = new URL(window.location.href).searchParams;
+  return {
+    sessionId,
+    tenant: tenant || undefined,
+    organizationId: query.get('organizationId') || undefined,
+    projectId: query.get('projectId') || undefined,
+  };
+}
+
+export function ConversationDock(props: { progressHref?: string } = {}) {
+  return (
+    <React.Suspense fallback={null}>
+      <ConversationDockContent {...props} />
+    </React.Suspense>
+  );
+}
+
+function ConversationDockContent({ progressHref = '/progress' }: { progressHref?: string }) {
   const { locale, t } = useConciergeI18n();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const navigationKey = pathname + '?' + searchParams.toString();
+  const previousNavigation = React.useRef(navigationKey);
   const [open, setOpen] = React.useState(false);
   const [messages, setMessages] = React.useState<DockMessage[]>([]);
   const [draft, setDraft] = React.useState('');
   const [tenant, setTenant] = React.useState<string | null>(readSelectedTenant);
   const scopeEpoch = React.useRef(0);
-  const pendingRequest = React.useRef<{ id: string; text: string; createdAt: number } | null>(null);
+  const sendEpoch = React.useRef(0);
+  const pendingRequest = React.useRef<PendingConversationRequest | null>(null);
+  const [revisionSelection, setRevisionSelection] = React.useState<{
+    messageId: string;
+    format: FrontDeskReceiptFormat;
+  } | null>(null);
   const inFlight = React.useRef(false);
   const [busy, setBusy] = React.useState(false);
   const [historyState, setHistoryState] = React.useState<'loading' | 'ready' | 'failed'>('loading');
@@ -98,11 +142,39 @@ export function ConversationDock({ progressHref = '/progress' }: { progressHref?
   const [voiceSettingsOpen, setVoiceSettingsOpen] = React.useState(false);
   const { speakText, notifyServerSpeech, unlockSpeechAudio } = voice;
   const sessionIdRef = React.useRef<string | null>(null);
+  const restoredScope = React.useRef<ConversationRequestScope | null>(null);
   const preserveDraftOnRestore = React.useRef(false);
   const logRef = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
+    if (previousNavigation.current === navigationKey) return;
+    previousNavigation.current = navigationKey;
+    scopeEpoch.current += 1;
+    sessionIdRef.current = null;
+    restoredScope.current = null;
+    pendingRequest.current = null;
+    inFlight.current = false;
+    setRevisionSelection(null);
+    setDraft('');
+    setMessages([]);
+    setBusy(false);
+    setPendingTurns(0);
+    setStorageVerified(false);
+    setHistoryState('loading');
+    setTenant(readSelectedTenant());
+  }, [navigationKey]);
+
+  const closeDock = () => {
+    scopeEpoch.current += 1;
+    inFlight.current = false;
+    setBusy(false);
+    setRevisionSelection(null);
+    setOpen(false);
+  };
+
+  React.useEffect(() => {
     if (!open) return;
+    const epoch = scopeEpoch.current;
     const controller = new AbortController();
     const timeout = setTimeout(() => {
       setHistoryState('failed');
@@ -118,24 +190,25 @@ export function ConversationDock({ progressHref = '/progress' }: { progressHref?
         if (!response.ok) throw new Error('history_unavailable');
         const history = parseConversationHistory(await response.json());
         if (!history) throw new Error('invalid_history');
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || epoch !== scopeEpoch.current) return;
         sessionIdRef.current = history.sessionId;
+        restoredScope.current = currentRequestScope(history.sessionId, tenant);
         try {
           const raw = window.sessionStorage.getItem('front-desk.request.' + history.sessionId);
-          const saved = raw === null ? null : JSON.parse(raw);
-          if (
-            raw !== null &&
-            (!saved ||
-              typeof saved !== 'object' ||
-              Array.isArray(saved) ||
-              typeof saved.id !== 'string' ||
-              !/^[a-f0-9-]{36}$/.test(saved.id) ||
-              typeof saved.text !== 'string' ||
-              typeof saved.createdAt !== 'number' ||
-              !Number.isFinite(saved.createdAt))
-          )
-            throw new Error('invalid saved request');
-          if (saved) pendingRequest.current = saved;
+          const saved =
+            raw === null
+              ? null
+              : parsePendingConversationRequest(
+                  JSON.parse(raw),
+                  currentRequestScope(history.sessionId, tenant),
+                  locale
+                );
+          if (raw !== null && !saved) throw new Error('invalid saved request');
+          const completed =
+            saved && history.messages.some((message) => message.id === saved.id + '-secretary');
+          pendingRequest.current = completed ? null : saved || null;
+          if (completed)
+            window.sessionStorage.removeItem('front-desk.request.' + history.sessionId);
           const savedDraft =
             window.sessionStorage.getItem('front-desk.draft.' + history.sessionId) || '';
           if (!preserveDraftOnRestore.current) setDraft(savedDraft);
@@ -145,6 +218,7 @@ export function ConversationDock({ progressHref = '/progress' }: { progressHref?
           setStorageVerified(false);
         }
         setMessages(history.messages);
+        setRevisionSelection(null);
         setPendingTurns(history.pending);
         setHistoryState('ready');
       } catch {
@@ -157,7 +231,7 @@ export function ConversationDock({ progressHref = '/progress' }: { progressHref?
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [open, historyAttempt, tenant]);
+  }, [open, historyAttempt, tenant, navigationKey]);
 
   React.useEffect(() => {
     const change = (event: Event) => {
@@ -166,9 +240,11 @@ export function ConversationDock({ progressHref = '/progress' }: { progressHref?
       preserveDraftOnRestore.current = false;
       scopeEpoch.current += 1;
       sessionIdRef.current = null;
+      restoredScope.current = null;
       pendingRequest.current = null;
       inFlight.current = false;
       setDraft('');
+      setRevisionSelection(null);
       setMessages([]);
       setBusy(false);
       setPendingTurns(0);
@@ -204,7 +280,7 @@ export function ConversationDock({ progressHref = '/progress' }: { progressHref?
   }, []);
 
   const send = React.useCallback(
-    async (text: string) => {
+    async (text: string, artifactRevision?: FrontDeskArtifactRevisionInput) => {
       const trimmed = text.trim();
       if (
         !trimmed ||
@@ -220,22 +296,54 @@ export function ConversationDock({ progressHref = '/progress' }: { progressHref?
       // now so the avatar's reply audio may play (autoplay policy).
       void unlockSpeechAudio();
       const epoch = scopeEpoch.current;
-      const waiting = messages.find(
-        (message) =>
-          message.role === 'user' &&
-          message.text === trimmed &&
-          message.id.endsWith('-user') &&
-          !messages.some((reply) => reply.id === message.id.replace(/-user$/, '-secretary'))
+      const navigation = window.location.pathname + window.location.search;
+      const scope = currentRequestScope(sessionIdRef.current, tenant);
+      if (!restoredScope.current || !sameConversationRequestScope(restoredScope.current, scope))
+        return;
+      const retained = pendingRequest.current;
+      // A pending revision can only be retried with its complete original selection.
+      if (
+        retained?.payload.artifactRevision &&
+        (retained.text !== trimmed ||
+          !sameArtifactRevision(retained.payload.artifactRevision, artifactRevision))
+      )
+        return;
+      const retryingRevision = Boolean(
+        artifactRevision &&
+        retained &&
+        retained.text === trimmed &&
+        sameArtifactRevision(retained.payload.artifactRevision, artifactRevision) &&
+        sameConversationRequestScope(retained.payload, scope)
       );
-      const request = waiting
-        ? {
-            id: waiting.id.replace(/-user$/, ''),
-            text: trimmed,
-            createdAt: waiting.createdAt ?? Date.now(),
-          }
-        : pendingRequest.current?.text === trimmed
-          ? pendingRequest.current
-          : { id: crypto.randomUUID(), text: trimmed, createdAt: Date.now() };
+      if (
+        artifactRevision &&
+        !retryingRevision &&
+        !messages.some((message) =>
+          sameArtifactRevision(
+            artifactRevisionForMessage(message, artifactRevision.format),
+            artifactRevision
+          )
+        )
+      )
+        return;
+      const waiting =
+        !artifactRevision &&
+        messages.find(
+          (message) =>
+            message.role === 'user' &&
+            message.text === trimmed &&
+            message.id.endsWith('-user') &&
+            !messages.some((reply) => reply.id === message.id.replace(/-user$/, '-secretary'))
+        );
+      const request = prepareConversationRequest(
+        trimmed,
+        scope,
+        locale,
+        waiting ? waiting.id.replace(/-user$/, '') : crypto.randomUUID(),
+        waiting ? (waiting.createdAt ?? Date.now()) : Date.now(),
+        pendingRequest.current,
+        artifactRevision
+      );
       try {
         const key = 'front-desk.request.' + sessionIdRef.current;
         const serialized = JSON.stringify(request);
@@ -247,8 +355,18 @@ export function ConversationDock({ progressHref = '/progress' }: { progressHref?
         return;
       }
       pendingRequest.current = request;
+      const sequence = ++sendEpoch.current;
       inFlight.current = true;
       setBusy(true);
+      setRevisionSelection(null);
+      if (artifactRevision)
+        setMessages((current) =>
+          current.map((message) =>
+            message.artifact?.requestId === artifactRevision.requestId
+              ? { ...message, artifact: { ...message.artifact, canRevise: false } }
+              : message
+          )
+        );
       setMessages((prev) =>
         prev.some((message) => message.id === request.id + '-user')
           ? prev
@@ -264,24 +382,18 @@ export function ConversationDock({ progressHref = '/progress' }: { progressHref?
       );
       let outcomeUncertain = true;
       try {
-        const selectedScope = new URL(window.location.href).searchParams;
         const response = await fetch('/api/message', {
           method: 'POST',
           cache: 'no-store',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: trimmed,
-            locale,
-            sessionId: sessionIdRef.current,
-            requestId: request.id,
-            requestCreatedAt: request.createdAt,
-            tenant: tenant || undefined,
-            organizationId: selectedScope.get('organizationId') || undefined,
-            projectId: selectedScope.get('projectId') || undefined,
-          }),
+          body: JSON.stringify(request.payload),
         });
         const rawPayload: unknown = await response.json();
-        if (epoch !== scopeEpoch.current) return;
+        if (
+          epoch !== scopeEpoch.current ||
+          navigation !== window.location.pathname + window.location.search
+        )
+          return;
         if (!response.ok || response.status === 202) {
           const raw =
             rawPayload && typeof rawPayload === 'object'
@@ -289,10 +401,29 @@ export function ConversationDock({ progressHref = '/progress' }: { progressHref?
               : {};
           const failure = conversationFailurePolicy(response.status, raw);
           outcomeUncertain = failure.uncertain;
+          if (
+            artifactRevision &&
+            [
+              'conversation_revision_conflict',
+              'conversation_revision_target_unavailable',
+              'conversation_invalid_revision',
+            ].includes(String(raw.error))
+          ) {
+            pendingRequest.current = null;
+            setRevisionSelection(null);
+            try {
+              window.sessionStorage.removeItem('front-desk.request.' + request.payload.sessionId);
+            } catch {
+              /* Optional. */
+            }
+            setHistoryState('failed');
+          }
           if (failure.invalidateHistory) {
             preserveDraftOnRestore.current = true;
             sessionIdRef.current = null;
+            restoredScope.current = null;
             pendingRequest.current = null;
+            setRevisionSelection(null);
             setMessages([]);
             setHistoryState('failed');
             throw new Error(t('dock.history.failed'));
@@ -325,6 +456,33 @@ export function ConversationDock({ progressHref = '/progress' }: { progressHref?
           },
         ]);
         pendingRequest.current = null;
+        // Re-read only verified version metadata, preserving live clarification/approval cards.
+        void (async () => {
+          try {
+            const response = await fetch(withSelectedTenant('/api/message', tenant), {
+              cache: 'no-store',
+            });
+            if (!response.ok) return;
+            const history = parseConversationHistory(await response.json());
+            if (
+              !history ||
+              history.sessionId !== request.payload.sessionId ||
+              sequence !== sendEpoch.current ||
+              epoch !== scopeEpoch.current ||
+              navigation !== window.location.pathname + window.location.search
+            )
+              return;
+            setMessages((current) =>
+              current.map((message) => ({
+                ...message,
+                artifact: history.messages.find((entry) => entry.id === message.id)?.artifact,
+              }))
+            );
+            setPendingTurns(history.pending);
+          } catch {
+            /* A failed refresh never enables a new artifact action. */
+          }
+        })();
         try {
           window.sessionStorage.removeItem('front-desk.request.' + sessionIdRef.current);
         } catch {
@@ -349,7 +507,11 @@ export function ConversationDock({ progressHref = '/progress' }: { progressHref?
           speakText(reply);
         }
       } catch (error) {
-        if (epoch !== scopeEpoch.current) return;
+        if (
+          epoch !== scopeEpoch.current ||
+          navigation !== window.location.pathname + window.location.search
+        )
+          return;
         if (outcomeUncertain) setPendingTurns((count) => Math.max(count, 1));
         setMessages((prev) => [
           ...prev,
@@ -485,7 +647,7 @@ export function ConversationDock({ progressHref = '/progress' }: { progressHref?
           type="button"
           className="dock-collapse"
           aria-label={t('dock.close')}
-          onClick={() => setOpen(false)}
+          onClick={closeDock}
         >
           –
         </button>
@@ -612,6 +774,77 @@ export function ConversationDock({ progressHref = '/progress' }: { progressHref?
                   ) : null}
                 </section>
               ) : null}
+              {message.role === 'secretary' && message.artifact?.canRevise ? (
+                <div className="button-row">
+                  <button
+                    type="button"
+                    className="action-button secondary"
+                    disabled={
+                      busy ||
+                      historyState !== 'ready' ||
+                      !storageVerified ||
+                      Boolean(pendingRequest.current?.payload.artifactRevision)
+                    }
+                    onClick={() =>
+                      setRevisionSelection({
+                        messageId: message.id,
+                        format: message.artifact?.format === 'compact' ? 'readable' : 'compact',
+                      })
+                    }
+                  >
+                    {frontDeskText('artifact_revision_action', locale)}
+                  </button>
+                </div>
+              ) : null}
+              {revisionSelection?.messageId === message.id ? (
+                <form
+                  className="dock-intent-resolution"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const selected = artifactRevisionForMessage(message, revisionSelection.format);
+                    if (selected)
+                      void send(frontDeskArtifactRevisionCommand(selected.format), selected);
+                  }}
+                >
+                  <label>
+                    {frontDeskText('artifact_revision_format', locale)}
+                    <select
+                      value={revisionSelection.format}
+                      disabled={busy}
+                      onChange={(event) => {
+                        const format = event.target.value;
+                        if (format === 'compact' || format === 'readable')
+                          setRevisionSelection({ messageId: message.id, format });
+                      }}
+                    >
+                      <option value="compact">
+                        {frontDeskText('artifact_revision_compact', locale)}
+                      </option>
+                      <option value="readable">
+                        {frontDeskText('artifact_revision_readable', locale)}
+                      </option>
+                    </select>
+                  </label>
+                  <div className="button-row">
+                    <button
+                      type="submit"
+                      className="action-button"
+                      disabled={
+                        busy || !artifactRevisionForMessage(message, revisionSelection.format)
+                      }
+                    >
+                      {frontDeskText('artifact_revision_submit', locale)}
+                    </button>
+                    <button
+                      type="button"
+                      className="action-button secondary"
+                      onClick={() => setRevisionSelection(null)}
+                    >
+                      {frontDeskText('artifact_revision_cancel', locale)}
+                    </button>
+                  </div>
+                </form>
+              ) : null}
               {actionable && actions.length > 0 ? (
                 <div className="button-row">
                   {actions.map((action) => (
@@ -729,6 +962,22 @@ export function ConversationDock({ progressHref = '/progress' }: { progressHref?
           ))}
         </div>
       ) : null}
+      {pendingRequest.current?.payload.artifactRevision ? (
+        <div className="button-row">
+          <button
+            type="button"
+            className="action-button secondary"
+            disabled={busy || historyState !== 'ready' || !storageVerified}
+            onClick={() => {
+              const pending = pendingRequest.current;
+              if (pending?.payload.artifactRevision)
+                void send(pending.text, pending.payload.artifactRevision);
+            }}
+          >
+            {frontDeskText('artifact_revision_retry', locale)}
+          </button>
+        </div>
+      ) : null}
       <form className="dock-input-row" onSubmit={submitDraft}>
         {voice.supported ? (
           <button
@@ -763,12 +1012,20 @@ export function ConversationDock({ progressHref = '/progress' }: { progressHref?
           aria-label={t('dock.placeholder')}
           onChange={(event) => storeDraft(event.target.value)}
           maxLength={8192}
-          disabled={historyState !== 'ready'}
+          disabled={
+            historyState !== 'ready' || Boolean(pendingRequest.current?.payload.artifactRevision)
+          }
         />
         <button
           type="submit"
           className="action-button"
-          disabled={busy || historyState !== 'ready' || !storageVerified || !draft.trim()}
+          disabled={
+            busy ||
+            historyState !== 'ready' ||
+            !storageVerified ||
+            !draft.trim() ||
+            Boolean(pendingRequest.current?.payload.artifactRevision)
+          }
         >
           {t('dock.send')}
         </button>
@@ -869,7 +1126,10 @@ export function conversationFailurePolicy(
   const messageKey =
     raw.error === 'conversation_not_started' ||
     raw.error === 'conversation_scope_selection_required' ||
-    raw.error === 'conversation_capability_unsupported'
+    raw.error === 'conversation_capability_unsupported' ||
+    raw.error === 'conversation_revision_conflict' ||
+    raw.error === 'conversation_revision_target_unavailable' ||
+    raw.error === 'conversation_invalid_revision'
       ? raw.error
       : undefined;
   return {

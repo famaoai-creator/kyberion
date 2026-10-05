@@ -3194,6 +3194,7 @@
         "presence/displays/concierge/src/lib/concierge-theme.ts",
         "presence/displays/concierge/src/lib/connection-view.ts",
         "presence/displays/concierge/src/lib/conversation-history.ts",
+        "presence/displays/concierge/src/lib/conversation-request.ts",
         "presence/displays/concierge/src/lib/conversation-store.ts",
         "presence/displays/concierge/src/lib/conversation-types.ts",
         "presence/displays/concierge/src/lib/decide-view.ts",

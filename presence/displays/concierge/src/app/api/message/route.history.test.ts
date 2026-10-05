@@ -1,3 +1,5 @@
+import { ConversationStoreError } from '@agent/core/surface/front-desk-conversation-store';
+import { frontDeskArtifactRevisionCommand } from '@agent/core/surface/front-desk-conversation-history';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import {
@@ -370,5 +372,97 @@ describe('intake routing boundary', () => {
     expect(await response.json()).toMatchObject({ mode: 'intake', historySaved: false });
     expect(mocks.run).not.toHaveBeenCalled();
     expect(mocks.notStarted).not.toHaveBeenCalled();
+  });
+});
+
+const revisionInput = {
+  requestId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  revision: 1,
+  sha256: 'a'.repeat(64),
+  format: 'compact' as const,
+};
+describe('explicit diagnostic receipt revision route', () => {
+  it('passes only the validated target alongside the authenticated viewer', async () => {
+    mocks.begin.mockReturnValue({
+      id: REQUEST_ID,
+      created: true,
+      routing: { kind: 'status', reply: 'Queued' },
+    });
+    const response = await POST(
+      request({
+        text: frontDeskArtifactRevisionCommand('compact'),
+        sessionId: 'server-thread',
+        requestId: REQUEST_ID,
+        requestCreatedAt: 1234,
+        artifactRevision: revisionInput,
+        speaker: 'human:forged',
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(mocks.begin).toHaveBeenCalledWith(
+      mocks.viewer,
+      frontDeskArtifactRevisionCommand('compact'),
+      REQUEST_ID,
+      1234,
+      'en',
+      revisionInput
+    );
+    expect(mocks.run).not.toHaveBeenCalled();
+  });
+  it.each([
+    null,
+    {},
+    { ...revisionInput, path: '/private/receipt.json' },
+    { ...revisionInput, approved: true },
+    { ...revisionInput, tenant: 'other' },
+    { ...revisionInput, revision: 0 },
+    { ...revisionInput, sha256: 'invalid' },
+    { ...revisionInput, format: 'html' },
+    { ...revisionInput, format: ['compact'] },
+    { ...revisionInput, format: ['readable'] },
+    { ...revisionInput, format: { value: 'compact' } },
+    { ...revisionInput, format: null },
+  ])('rejects malformed target %j without falling through to chat', async (artifactRevision) => {
+    const response = await POST(request({ text: 'hello', artifactRevision }));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: 'conversation_invalid_revision',
+      retry_safe: true,
+    });
+    expect(mocks.begin).not.toHaveBeenCalled();
+    expect(mocks.run).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['revision_conflict', 409],
+    ['revision_target_unavailable', 409],
+    ['invalid_revision', 400],
+  ] as const)('maps %s without execution', async (code, status) => {
+    mocks.begin.mockImplementationOnce(() => {
+      throw new ConversationStoreError(code);
+    });
+    const response = await POST(
+      request({
+        text: frontDeskArtifactRevisionCommand('compact'),
+        artifactRevision: revisionInput,
+      })
+    );
+    expect(response.status).toBe(status);
+    expect(await response.json()).toMatchObject({
+      error: 'conversation_' + code,
+      retry_safe: true,
+    });
+    expect(mocks.run).not.toHaveBeenCalled();
+  });
+  it('still denies a widened scope before reserving a revision', async () => {
+    const response = await POST(
+      request({
+        text: frontDeskArtifactRevisionCommand('compact'),
+        artifactRevision: revisionInput,
+        tenant: 'other',
+      })
+    );
+    expect(response.status).toBe(403);
+    expect(mocks.begin).not.toHaveBeenCalled();
+    expect(mocks.run).not.toHaveBeenCalled();
   });
 });
