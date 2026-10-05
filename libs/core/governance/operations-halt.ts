@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { auditChain } from './audit-chain.js';
+import { isVitestProcess } from '../foundation/env.js';
 import { readJson, writeJson } from '../foundation/json.js';
 import { createLogger } from '../logger.js';
 import * as pathResolver from '../path-resolver.js';
@@ -32,10 +33,17 @@ export interface OperationsHaltState {
 
 const HALT_REL = 'runtime/governance/operations-halt.json';
 
+/**
+ * Test runs get a per-process flag: a test that engages a halt must never stop
+ * the live system, nor the test files running beside it in other workers.
+ */
+const VITEST_HALT_REL = 'runtime/vitest-operations-halt';
+
 function haltPath(rootDir?: string): string {
-  return assertSafeRepositoryPath(rootDir ?? path.join(pathResolver.shared(HALT_REL)), {
-    allowMissingLeaf: true,
-  });
+  const defaultPath = isVitestProcess()
+    ? path.join(pathResolver.shared(VITEST_HALT_REL), `${process.pid}.json`)
+    : pathResolver.shared(HALT_REL);
+  return assertSafeRepositoryPath(rootDir ?? defaultPath, { allowMissingLeaf: true });
 }
 
 export function getOperationsHaltState(options: { rootDir?: string } = {}): OperationsHaltState {
