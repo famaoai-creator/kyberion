@@ -445,6 +445,8 @@ export interface OrganizationProjectLineage {
   track_ids: string[];
   mission_ids: string[];
   task_session_ids: string[];
+  /** Organization objectives the project record says it advances. */
+  objective_ids?: string[];
 }
 
 export interface OrganizationLineage {
