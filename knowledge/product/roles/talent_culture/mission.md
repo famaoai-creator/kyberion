@@ -4,7 +4,8 @@ category: Roles
 tags: [roles, talent_culture, mission]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # Talent & Culture (採用 & 組織文化) ミッション声明

@@ -4,7 +4,7 @@ category: Roles
 tags: [roles, performance_engineer, knowledge, base]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
 ---
 
 # Performance Evaluation Knowledge Base

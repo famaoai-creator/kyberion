@@ -1,3 +1,9 @@
+---
+title: 'Capability Lifecycle Eligibility Checklist'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # Capability Lifecycle Eligibility Checklist
 
 Kyberion で管理する必要があるものに対して、`Capability Lifecycle Procedure` を適用するかどうかを判定するための短い基準。

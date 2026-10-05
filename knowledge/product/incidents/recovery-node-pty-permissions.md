@@ -6,7 +6,7 @@ knowledge_type: explicit
 intelligence_layer: methodology
 importance: 8
 author: Sovereign Concierge
-last_updated: 2026-03-06
+last_updated: 2026-10-05
 ---
 
 # node-pty Permission Recovery Procedure
@@ -14,10 +14,12 @@ last_updated: 2026-03-06
 macOS (特に ARM64) 環境において、`node-pty` が `posix_spawnp failed` エラーでクラッシュする場合の物理的復旧手順.
 
 ## 1. 事象
+
 - ターミナル起動時に `Error: posix_spawnp failed` が発生する.
 - `npm rebuild` を行っても解消しない.
 
 ## 2. 原因
+
 `node-pty` が内部で使用するネイティブバイナリ（`pty.node`）およびヘルパーバイナリ（`spawn-helper`）の実行権限（x）が欠落している、あるいは macOS の隔離フラグが付与されている.
 
 ## 3. 復旧手順 (Manual Recovery)
@@ -33,7 +35,9 @@ find node_modules/.pnpm/node-pty@* -name "pty.node" -o -name "spawn-helper" | xa
 ```
 
 ## 4. 恒久対策
+
 Kyberion の `libs/core/reflex-terminal.ts` は **Self-Healing Edition (v3.0)** にアップデートされている. これにより、物理的な故障が発生しても `child_process` エミュレーションモードへ自動フォールバックするため、システム全体のクラッシュは回避される.
 
 ---
-*Created by M-LEARN-OPENCLAW-ANALYSIS*
+
+_Created by M-LEARN-OPENCLAW-ANALYSIS_

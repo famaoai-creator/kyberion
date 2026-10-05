@@ -1,3 +1,9 @@
+---
+title: 'Stale Doc Cleanup Rationale'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # Stale Doc Cleanup Rationale
 
 This note records why some planning documents in `docs/` can be removed after their core ideas have already landed in code or in more canonical knowledge artifacts.

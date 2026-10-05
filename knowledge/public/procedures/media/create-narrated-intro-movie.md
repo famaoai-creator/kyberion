@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Create Narrated Intro Movie'
+last_updated: 2026-10-05
+---
+
 # Procedure: Create Narrated Intro Movie
 
 ## 1. Goal

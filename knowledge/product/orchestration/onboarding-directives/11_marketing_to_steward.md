@@ -1,5 +1,5 @@
 ---
-title: MISSION: Brand Assets & Trend Harvesting
+title: 'MISSION: Brand Assets & Trend Harvesting'
 category: Orchestration
 tags: [orchestration, onboarding-directives, marketing, steward]
 importance: 8

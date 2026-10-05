@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Promote Voice Profile'
+last_updated: 2026-10-05
+---
+
 # Procedure: Promote Voice Profile
 
 ## Goal

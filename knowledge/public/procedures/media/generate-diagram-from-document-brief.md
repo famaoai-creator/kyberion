@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Generate a Diagram From Document Brief'
+last_updated: 2026-10-05
+---
+
 # Procedure: Generate a Diagram From Document Brief
 
 ## 1. Goal

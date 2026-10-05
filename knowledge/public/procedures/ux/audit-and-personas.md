@@ -1,3 +1,8 @@
+---
+title: 'Procedure: UI/UX Audit & Persona Generation'
+last_updated: 2026-10-05
+---
+
 # Procedure: UI/UX Audit & Persona Generation
 
 ## 1. Goal

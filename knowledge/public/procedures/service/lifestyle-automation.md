@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Lifestyle & IoT Automation (Rakuten, SwitchBot)'
+last_updated: 2026-10-05
+---
+
 # Procedure: Lifestyle & IoT Automation (Rakuten, SwitchBot)
 
 ## 1. Goal

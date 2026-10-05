@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Render Terraform Architecture Diagram'
+last_updated: 2026-10-05
+---
+
 # Procedure: Render Terraform Architecture Diagram
 
 ## 1. Goal

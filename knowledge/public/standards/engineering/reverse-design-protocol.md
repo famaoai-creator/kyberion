@@ -4,7 +4,8 @@ category: Standards
 tags: [standards, engineering, reverse, design, protocol]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # Reverse Design Protocol (RDP)

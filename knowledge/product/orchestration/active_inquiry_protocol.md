@@ -1,5 +1,5 @@
 ---
-title: Active Inquiry Protocol: The Power of Questioning
+title: 'Active Inquiry Protocol: The Power of Questioning'
 category: Orchestration
 tags: [orchestration, active, inquiry, protocol]
 importance: 8

@@ -1,3 +1,9 @@
+---
+title: 'Media Document Generation Boundary'
+kind: evergreen
+last_updated: 2026-10-05
+---
+
 # Media Document Generation Boundary
 
 Kyberion's document generation model is not "LLM writes files directly".

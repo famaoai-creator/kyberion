@@ -1,5 +1,5 @@
 ---
-title: Incident Knowledge Loop: Learning from Failures
+title: 'Incident Knowledge Loop: Learning from Failures'
 category: Operations
 tags: [operations, incident, knowledge, loop]
 importance: 5

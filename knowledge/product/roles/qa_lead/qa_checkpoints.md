@@ -4,7 +4,7 @@ category: Roles
 tags: [roles, qa_lead, checkpoints]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
 ---
 
 # QA/QC 重点チェックポイント：非同期通信と物理制約
