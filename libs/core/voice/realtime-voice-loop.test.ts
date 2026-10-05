@@ -246,6 +246,36 @@ describe('realtime voice loop', () => {
     expect(mediaEvents.filter((event) => event === 'speech_ended')).toHaveLength(2);
   }, 60_000);
 
+  it('skips a turn whose transcribe call throws instead of ending the session', async () => {
+    const turns: RealtimeVoiceLoopTurnResult[] = [];
+    let transcriptionCalls = 0;
+    let replyCalls = 0;
+    const handle = await startRealtimeVoiceLoop({
+      recordingDir: testDir,
+      consent: { requireRecordingConsent: false },
+      mic: { command: twoUtteranceCommand(), sampleRateHz: 16000, chunkMs: 100 },
+      vad: { rmsThreshold: 800, endpointMs: 700 },
+      maxTurns: 1,
+      transcribe: async () => {
+        transcriptionCalls += 1;
+        if (transcriptionCalls === 1) throw new Error('backend returned empty text');
+        return '二回目の発話';
+      },
+      reply: async () => {
+        replyCalls += 1;
+        return '了解です。';
+      },
+      synthesizeSegment: async () => '/tmp/fake.wav',
+      play: () => immediateHandle(),
+      onTurn: (turn) => turns.push(turn),
+    });
+
+    const report = await handle.done;
+    expect(report.turns_completed).toBe(1);
+    expect(replyCalls).toBe(1);
+    expect(turns[0].user_text).toBe('二回目の発話');
+  }, 60_000);
+
   it(
     'publishes streamed PCM output on the canonical media session event sink',
     {

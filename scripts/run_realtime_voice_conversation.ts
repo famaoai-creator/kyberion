@@ -9,7 +9,10 @@ import {
   buildSafeExecEnv,
   safeExistsSync,
   safeMkdir,
+  safeWriteFile,
 } from '@agent/core/secure-io';
+import { pcmToWav } from '@agent/core/pcm-wav';
+import { loadVoiceTurnTakingLexicon } from '@agent/core/voice/voice-turn-taking-lexicon';
 import { checkMeetingParticipationConsent } from '@agent/core/meeting/meeting-participation-coordinator';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { createVoiceActuatorServeClient } from '@agent/core/actuator/actuator-serve-client';
@@ -568,7 +571,6 @@ export async function runRealtimeVoiceConversationLoop(
       'Realtime interactive voice requires a real STT backend. Set KYBERION_STT_COMMAND or register a SpeechToTextBridge before using --interactive.'
     );
   }
-
   const micProbe = probeMicCapture({
     ...(options.micDevice ? { device: options.micDevice } : {}),
   });
@@ -739,8 +741,40 @@ export async function runRealtimeVoiceConversationLoop(
     print('   barge-in はスピーカーのエコーで誤動作することがあります。ヘッドセット推奨です。');
   }
 
+  // Warm the STT backend while the VAD calibrates — the first real
+  // transcription otherwise pays the backend's model-load cost in-band
+  // (observed ~99s on the first batch call vs ~6s steady-state). A silent
+  // clip exits via the no-speech path without loading the model, so the
+  // warmup uses a short synthesized utterance and falls back to silence
+  // when TTS is unavailable. Best-effort: never blocks the loop.
+  const sttWarmupPath = pathResolver.sharedTmp(`realtime-voice-warmup-${options.sessionId}.wav`);
+  void (async () => {
+    try {
+      // Warmup text comes from the lexicon's agent backchannels for the
+      // session language — no hardcoded per-language literals.
+      const warmupText =
+        loadVoiceTurnTakingLexicon().languages[language]?.agent_backchannels?.[0] ?? 'hello';
+      const clip = await synthesizeSegment(warmupText, -2, 0).catch(() => '');
+      const warmupPath =
+        clip ||
+        (() => {
+          safeWriteFile(sttWarmupPath, pcmToWav(Buffer.alloc(16000 * 2 * 0.25), 16000));
+          return sttWarmupPath;
+        })();
+      await sttBridge.transcribe({
+        audioPath: warmupPath,
+        ...(options.language ? { language: options.language } : {}),
+      });
+    } catch {
+      /* warmup is best-effort */
+    }
+  })();
+
   try {
     const handle = await startRealtimeVoiceLoop({
+      // Same id as the media-event buffer — otherwise every published event
+      // is rejected with a session_id mismatch.
+      sessionId: session.session_id,
       recordingDir: options.recordOutputDir,
       mic: {
         sampleRateHz: 16000,
