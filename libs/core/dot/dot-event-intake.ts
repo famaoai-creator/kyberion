@@ -37,7 +37,9 @@ import { withLockSync } from '../foundation/lock-utils.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { createLogger } from '../logger.js';
 import { physicalScopedPath } from '../physical-namespace.js';
-import { getSecret as secretGuardGetSecret } from '../secret/secret-guard.js';
+import { getSecretForIdentity, getSecret as secretGuardGetSecret } from '../secret/secret-guard.js';
+import { parseEnvSecretName } from '../secret/secret-identity.js';
+
 import type { DotCharter, DotTrigger } from './dot-charter.js';
 import { DOT_EVENTS_FILE, DOT_STATE_ROOT, type DotInboundEvent } from './dot-state-paths.js';
 import {
@@ -46,6 +48,9 @@ import {
   type DotRuntimeDeps,
   type DueDotTrigger,
 } from './dot-runtime.js';
+
+/** Secret service id for intake HMAC secrets (`secret introduce event-intake <KEY>`). */
+export const EVENT_INTAKE_SECRET_SERVICE_ID = 'event-intake';
 
 const logger = createLogger('dot-event-intake');
 
@@ -195,11 +200,17 @@ export function verifyInboundSignature(input: {
 /** Shared-secret lookup for one source; the value never leaves this module's callers. */
 export function resolveEventIntakeSecret(
   source: EventIntakeSourcePolicy,
-  getSecret: (key: string) => string | null = (key) =>
-    secretGuardGetSecret(key, undefined, 'event_intake.verify')
+  getSecret?: (key: string) => string | null
 ): string | null {
   try {
-    return getSecret(source.secret_key);
+    if (getSecret) return getSecret(source.secret_key);
+    // `pnpm kyberion secret introduce event-intake GITHUB_SECRET` stores the
+    // value under the service identity (env EVENT_INTAKE_GITHUB_SECRET or the
+    // keychain item event-intake/…), so resolve through the identity rather
+    // than the process env alone.
+    const identity = parseEnvSecretName(source.secret_key, EVENT_INTAKE_SECRET_SERVICE_ID);
+    if (identity) return getSecretForIdentity(identity, 'event_intake.verify');
+    return secretGuardGetSecret(source.secret_key, undefined, 'event_intake.verify');
   } catch {
     return null;
   }
