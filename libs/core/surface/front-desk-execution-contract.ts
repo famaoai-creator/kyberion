@@ -4,7 +4,6 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
-import { STORAGE_FLOOR_ROOTS, storagePartitionSegments } from '../storage-layout.js';
 import type { SurfaceViewerScope } from './surface-mutation-guard.js';
 
 export const FRONT_DESK_EXECUTION_POLICY_PATH =
@@ -230,27 +229,6 @@ export function getFrontDeskExecutionMapping(
   } catch {
     return undefined;
   }
-}
-export function frontDeskExecutionArtifactPath(
-  binding: FrontDeskExecutionBinding,
-  mapping: FrontDeskExecutionMapping
-): string {
-  if (
-    !parseFrontDeskExecutionBinding(binding) ||
-    !isFrontDeskExecutionPublicViewer(mapping.viewer) ||
-    mapping.viewer.tenantSlugs === 'all' ||
-    mapping.viewer.tenantSlugs.length !== 1
-  )
-    throw new Error('front_desk_scope_invalid');
-  const tier = 'public';
-  return [
-    STORAGE_FLOOR_ROOTS.artifact,
-    ...storagePartitionSegments({ kind: 'tier', tier, tenant: mapping.viewer.tenantSlugs[0] }),
-    'report',
-    'front-desk',
-    binding.conversation_key,
-    binding.request_id + '-r' + binding.revision + '.json',
-  ].join('/');
 }
 export function frontDeskExecutionExpectedContent(
   binding: FrontDeskExecutionBinding,

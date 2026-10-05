@@ -5,6 +5,9 @@
   "additionalProperties": false,
   "required": ["version", "mappings"],
   "properties": {
+    "$schema": {
+      "type": "string"
+    },
     "version": {
       "const": 1
     },
