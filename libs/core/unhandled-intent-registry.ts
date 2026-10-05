@@ -110,8 +110,16 @@ export function recordUnhandledIntent(opts: {
   intentId?: string;
   shape?: string;
   utterance: string;
+  /**
+   * Set for tenant-scoped turns. The registry lives in the shared tmp tier, so a
+   * tenant turn never contributes utterance text: an unrecognized tenant turn is
+   * not recorded at all and an unrouted one keeps only its intent ID.
+   */
+  tenantId?: string;
 }): void {
   try {
+    if (opts.tenantId && opts.missType === 'unrecognized') return;
+    if (opts.tenantId) opts = { ...opts, utterance: '' };
     const utteranceExcerpt = opts.utterance.slice(0, UTTERANCE_EXCERPT_LEN);
     const key = dedupeKey(opts.missType, opts.intentId, utteranceExcerpt);
     const now = Date.now();
@@ -135,6 +143,7 @@ export function recordUnhandledIntent(opts: {
       existing.occurrence_count += 1;
       existing.last_seen = timestamp;
       if (
+        utteranceExcerpt &&
         !existing.utterance_samples.includes(utteranceExcerpt) &&
         existing.utterance_samples.length < MAX_UTTERANCE_SAMPLES
       ) {
@@ -145,7 +154,7 @@ export function recordUnhandledIntent(opts: {
         miss_type: opts.missType,
         ...(opts.intentId !== undefined ? { intent_id: opts.intentId } : {}),
         ...(opts.shape !== undefined ? { shape: opts.shape } : {}),
-        utterance_samples: [utteranceExcerpt],
+        utterance_samples: utteranceExcerpt ? [utteranceExcerpt] : [],
         first_seen: timestamp,
         last_seen: timestamp,
         occurrence_count: 1,
