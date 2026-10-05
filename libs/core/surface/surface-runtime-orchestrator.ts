@@ -51,6 +51,7 @@ import {
 import { classifyTaskSessionIntent } from '../task/task-session.js';
 import { loadPendingIntent, savePendingIntent } from '../pending-intent-store.js';
 import { currentScope } from '../scope-context.js';
+import { recordClarificationSignal, recordFeedbackSignal } from './surface-conversation-signals.js';
 import {
   deriveSlackExecutionModeFromProviderPolicy,
   deriveSurfaceIntentLabelFromProviderPolicy,
@@ -1154,6 +1155,7 @@ async function runSurfaceConversationTurn(
         : {}),
       ...(input.surface && !parsedExecutionFeedback.surface ? { surface: input.surface } : {}),
     });
+    recordFeedbackSignal(input, record);
     return {
       ...emptySurfaceResult(surfaceRuntimeData.buildFeedbackAcknowledgement(record)),
       executionFeedbackRecord: record,
@@ -1175,6 +1177,12 @@ async function runSurfaceConversationTurn(
   const originalText = (input.surfaceText || input.query || '').trim();
   const pendingIntentKey = scopedSurfacePendingIntentKey(runtime, input.correlationId);
   const pendingIntent = pendingIntentKey ? loadPendingIntent(pendingIntentKey) : null;
+  if (pendingIntent && pendingIntentKey) {
+    recordClarificationSignal('answered', input, {
+      key: pendingIntentKey,
+      intentId: pendingIntent.intent_id,
+    });
+  }
   const resolutionText = [pendingIntent?.source_text, originalText]
     .filter((part): part is string => Boolean(part?.trim()))
     .join('\n');
@@ -1251,6 +1259,11 @@ async function runSurfaceConversationTurn(
 
   if (compiledFlow?.clarificationPacket) {
     if (pendingIntentKey) {
+      recordClarificationSignal('asked', input, {
+        key: pendingIntentKey,
+        intentId:
+          compiledFlow.intentContract?.intent_id || compiledFlow.executionBrief?.archetype_id,
+      });
       savePendingIntent({
         correlation_id: pendingIntentKey,
         intent_id:

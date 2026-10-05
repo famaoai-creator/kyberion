@@ -38,7 +38,6 @@ const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
     ],
   ],
   ['tests/approval-gate-summary.test.ts', ['../libs/core/governance/approval-gate-summary.js']],
-  ['tests/contextual-intent-learning-seed-contract.test.ts', ['../libs/core/schema-loader.js']],
   ['tests/email-triage-workflow-contract.test.ts', ['../libs/core/schema-loader.js']],
   [
     'tests/email-workflow-draft-fallback.test.ts',
