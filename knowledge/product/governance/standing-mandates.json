@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/standing-mandates.schema.json",
   "version": "1.0.0",
   "description": "Standing mandates (包括委任): kinds of work the operator pre-approves. SHADOW MODE: mandate-shadow.ts only records whether a mission brief WOULD be covered; it never opens the plan gate (alignment approval stays human_only).",
   "default_expiry_days": 90,

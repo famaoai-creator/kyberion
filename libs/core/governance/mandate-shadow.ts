@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { isVitestProcess } from '../foundation/env.js';
-import { appendJsonLine, readJson, readJsonLines } from '../foundation/json.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { createLogger } from '../logger.js';
 import * as pathResolver from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from '../secure-io.js';
@@ -55,7 +56,11 @@ export interface MandateEvaluation {
 const CATALOG_REL = 'product/governance/standing-mandates.json';
 
 export function loadMandateCatalog(): MandateCatalog {
-  return readJson<MandateCatalog>(pathResolver.knowledge(CATALOG_REL));
+  return defineCatalog<MandateCatalog>({
+    id: 'standing-mandates',
+    path: pathResolver.knowledge(CATALOG_REL),
+    schema: pathResolver.knowledge('product/schemas/standing-mandates.schema.json'),
+  }).load();
 }
 
 function riskLevelOf(brief: MandateBriefInput): number {
