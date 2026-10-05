@@ -67,6 +67,7 @@ import { runDotHousekeeping } from '@agent/core/dot/dot-dispatch';
 import '@agent/core/dot/dot-extension-bootstrap';
 import { dotBudgetThrottle, type DotBudgetThrottle } from '@agent/core/dot/dot-budget';
 import { tickVetoWindows } from '@agent/core/governance/approval-veto-window';
+import { getOperationsHaltState } from '@agent/core/governance/operations-halt';
 import { AUTONOMY_APPROVAL_CHANNEL } from '@agent/core/governance/approval-decision-card';
 import { isRecord } from '@agent/core/foundation/text';
 import { logger } from '@agent/core/core';
@@ -400,6 +401,18 @@ export async function runDotSweepOnce(
       for (const message of housekeeping.errors) {
         logger.warn(`[dot-sweep] housekeeping for ${loaded.charter.dot_id} — ${message}`);
       }
+    }
+    // P1-9: a halted system runs housekeeping only. Dots still heartbeat so the
+    // watchdog does not page a dot that is healthy-but-stopped.
+    const halt = getOperationsHaltState();
+    if (halt.halted) {
+      for (const loaded of active) {
+        recordDaemonHeartbeat(loaded.charter.runtime.heartbeat_id, {
+          status: 'running',
+          details: { dot_id: loaded.charter.dot_id, trigger: 'halted' },
+        });
+      }
+      return 0;
     }
     // Registered per-sweep steps (executor, KR measurement, …) run after
     // housekeeping and before wakes; each step is isolated.
