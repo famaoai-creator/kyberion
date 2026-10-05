@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 vi.mock('./path-resolver.js', async () => {
@@ -26,6 +25,7 @@ vi.mock('./knowledge/memory-promotion-queue.js', async () => {
 });
 
 import { pathResolver, rootResolve } from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   deriveMissionOutcome,
   readHeuristic,
@@ -38,20 +38,20 @@ describe('heuristic mission validation', () => {
 
   beforeEach(() => {
     tmpDir = pathResolver.sharedTmp(`heuristic-mission-${process.pid}`);
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-    fs.mkdirSync(tmpDir, { recursive: true });
+    safeRmSync(tmpDir, { recursive: true, force: true });
+    safeMkdir(tmpDir, { recursive: true });
     mockResolve.mockImplementation((rel: string) => path.join(tmpDir, rel));
     enqueue.mockReset();
   });
 
   afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    safeRmSync(tmpDir, { recursive: true, force: true });
   });
 
   function seed(id: string, extra: Record<string, unknown> = {}) {
     const dir = path.join(tmpDir, 'knowledge/confidential/heuristics');
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(
       path.join(dir, `${id}.json`),
       JSON.stringify({
         id,
