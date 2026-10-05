@@ -1180,8 +1180,8 @@ export async function delegateSubagentTask(input: {
         ...(delegationIdentity ? { agent_id: delegationIdentity } : {}),
         security_scope: input.securityScope,
         context_mode: input.contextMode,
-        success_status:
-          input.purpose === 'review' || isIndependentReviewRequired(input.item) ? 'review' : 'done',
+        // Transport success still awaits task_result validation and final reflection.
+        success_status: 'review',
         instruction: input.prompt,
         context_refs: [delegationContextRef, JSON.stringify(input.routingOptions)],
         idempotency_key: `${delegationContext}:${input.item.item_id}:${input.item.version}`,
@@ -1429,10 +1429,8 @@ export async function routeToAgentOrSubagent(input: {
         agent_id: input.assigneePeerId,
         security_scope: runtimeSecurityScope,
         context_mode: input.contextMode,
-        success_status:
-          surfacePurpose === 'review' || isIndependentReviewRequired(input.item)
-            ? 'review'
-            : 'done',
+        // Transport success still awaits task_result validation and final reflection.
+        success_status: 'review',
         instruction: prompt,
         context_refs: [JSON.stringify(input.taskModelHint), JSON.stringify(routingOptions)],
         idempotency_key: `agent-runtime:${surfacePurpose}:${input.item.item_id}:${input.item.version}`,
