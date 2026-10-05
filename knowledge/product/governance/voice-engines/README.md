@@ -1,6 +1,6 @@
 ---
 title: 'Voice Engines'
-review_by: 2026-10-12
+last_updated: 2026-10-05
 ---
 
 # Voice Engines
@@ -17,6 +17,7 @@ Each file must contain exactly one `engines` entry and must match the file name:
 - `irodori_tts.json`
 - `kokoro.json`
 - `pocket_tts.json`
+- `gemini_tts.json`
 
 `voice-engine-registry.json` remains the compatibility snapshot until all consumers are migrated.
 

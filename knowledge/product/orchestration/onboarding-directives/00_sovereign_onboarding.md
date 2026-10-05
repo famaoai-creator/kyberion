@@ -1,5 +1,5 @@
 ---
-title: Directive: Sovereign Onboarding (シミュレーション開始指令)
+title: 'Directive: Sovereign Onboarding (シミュレーション開始指令)'
 category: Orchestration
 tags: [orchestration, onboarding-directives, sovereign, onboarding, protocol]
 importance: 8

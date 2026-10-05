@@ -1,6 +1,7 @@
 ---
 title: 'Procedure: Email Triage and Reply Draft'
-review_by: 2026-10-12
+tags: [procedure, email, gmail, triage]
+last_updated: 2026-10-05
 ---
 
 # Procedure: Email Triage and Reply Draft
@@ -23,7 +24,7 @@ This workflow is split into two surfaces:
 
 1. Check `gws auth status`.
 2. If no OAuth client is configured, provide either:
-   - `/Users/famao/.config/gws/client_secret.json`
+   - `~/.config/gws/client_secret.json` (the default `gws` OAuth client location under your home directory)
    - `GOOGLE_WORKSPACE_CLI_CLIENT_ID` and `GOOGLE_WORKSPACE_CLI_CLIENT_SECRET`
 3. Authenticate:
    - `gws auth login --services gmail --readonly` for triage only

@@ -1,5 +1,5 @@
 ---
-title: MISSION: Infrastructure & Environment Mapping
+title: 'MISSION: Infrastructure & Environment Mapping'
 category: Orchestration
 tags: [orchestration, onboarding-directives, eng, steward]
 importance: 8

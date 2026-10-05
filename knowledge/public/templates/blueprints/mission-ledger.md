@@ -1,5 +1,5 @@
 ---
-title: Blueprint: Mission Ledger
+title: 'Blueprint: Mission Ledger'
 category: Templates
 tags: [templates, blueprints, project, mission, traceability]
 importance: 4
@@ -8,6 +8,7 @@ last_updated: 2026-03-21
 ---
 
 # Blueprint: Mission Ledger
+
 <!-- Owner: PM / PMO / Delivery Lead -->
 <!-- Visibility: [L2: MANAGEMENT, L3: DELIVERY] -->
 
@@ -32,8 +33,8 @@ last_updated: 2026-03-21
 
 ## 3. Ledger
 
-| Mission ID | Relationship | Status | Summary | Affected Artifacts | Gate Impact | Traceability Refs |
-|---|---|---|---|---|---|---|
+| Mission ID          | Relationship                                     | Status                         | Summary                | Affected Artifacts                                       | Gate Impact                                          | Traceability Refs                            |
+| ------------------- | ------------------------------------------------ | ------------------------------ | ---------------------- | -------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------- |
 | [INPUT: mission_id] | [INPUT: belongs_to/supports/governs/independent] | [INPUT: active/completed/etc.] | [INPUT: short summary] | [INPUT: charter, requirements, gate-review-packet, etc.] | [INPUT: none/informational/review_required/blocking] | [INPUT: file refs, issue ids, evidence refs] |
 
 ## 4. Review Cadence

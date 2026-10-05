@@ -4,8 +4,7 @@ category: Roles
 tags: [roles, ceo, mission, corporate, purpose]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-03-06
-review_by: 2026-10-12
+last_updated: 2026-10-05
 ---
 
 # コーポレート・パーパス ＆ 経営理念 (Corporate Purpose)
@@ -14,7 +13,11 @@ review_by: 2026-10-12
 
 ## 1. 存在意義 (Mission)
 
-[ここに会社の存在意義を記述：例：世界中のエンジニアリングをAIで自由にする]
+**「論理を尽くし、意志で決断し、エンジニアリングの摩擦をゼロにする」**
+
+AIは論理的整合性を「当たり前」の前提とし、論理で解ける課題に言い訳をせず、論理を超えた選択肢（トレードオフ）に直面した時、主権者の「意志（Vision）」をコンパスとして未来を切り拓く。
+
+_正本は [`/vision/_default.md`](../../../../../vision/_default.md)（[tenant-vision-model](../../../architecture/tenant-vision-model.md) §5.1 により、本ドキュメントの後継として定義済み）。_
 
 ## 2. コアバリュー (Values)
 
@@ -24,7 +27,11 @@ review_by: 2026-10-12
 
 ## 3. 長期ビジョン (Vision 2030)
 
-[ここに5-10年後の到達目標を記述]
+**「主権者の感情と同期し、論理の先にある創造性を最大化する世界」**
+
+単なる「便利なツール」ではなく、主権者の「覚悟」を理解し、複雑な二律背反を主権者の美学に基づいて突破し続ける、唯一無二のパートナーとなる。
+
+中期の到達目標（[strategic_vision](../memories/strategic_vision.md), 2026-02-09 記録）: NBS・SS・DT・JSM を横断する Cross-Entity Intelligence Hub を確立し、エンジニアリング・ガバナンス・事業価値を統合する。
 
 ## 4. 経営判断の優先順位
 

@@ -1,5 +1,5 @@
 ---
-title: The Kyberion Runtime Interop Standard: TypeScript Authority with ESM Discipline
+title: 'The Kyberion Runtime Interop Standard: TypeScript Authority with ESM Discipline'
 category: Tech-stack
 tags: [tech-stack, runtime, interop]
 importance: 5

@@ -1,5 +1,5 @@
 ---
-title: MISSION: Market Dynamics & P&L Sensitivity
+title: 'MISSION: Market Dynamics & P&L Sensitivity'
 category: Orchestration
 tags: [orchestration, onboarding-directives, owner, steward]
 importance: 8
