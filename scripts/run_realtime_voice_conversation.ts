@@ -763,8 +763,8 @@ export async function runRealtimeVoiceConversationLoop(
       `barge-in=${bargeInMode}, stt=${streamingStt ? 'streaming' : 'batch'}) ===`
   );
   if (bargeInMode === 'two_stage' && !streamingStt) {
-    // i18n-exempt: JA voice demo script output
     print(
+      // i18n-exempt: JA voice demo script output
       '   注意: two_stage の「言葉確認」は streaming STT の partial が必要です。batch STT ではエコーと実際の発話を区別できず、スピーカー環境では自分の再生音が割り込みとして返答を止めることがあります。--streaming-stt またはヘッドセットを使ってください。'
     );
   }
