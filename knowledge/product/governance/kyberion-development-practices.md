@@ -1,3 +1,8 @@
+---
+title: 'Kyberion Development Practices — Hard-Won Rules for Changing This Repo'
+last_updated: 2026-10-05
+---
+
 # Kyberion Development Practices — Hard-Won Rules for Changing This Repo
 
 **Purpose**: the repo-specific disciplines that changing Kyberion itself

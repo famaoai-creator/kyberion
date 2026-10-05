@@ -4,8 +4,8 @@ category: Public
 tags: [public, standards, aws, fisc, standard, security]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-03-06
-kind: standard
+last_updated: 2026-10-05
+kind: evergreen
 scope: repository
 authority: standard
 phase: [alignment, execution, review]

@@ -1,12 +1,20 @@
+---
+title: 'Procedure: OS Peripheral Control'
+review_by: 2026-10-12
+---
+
 # Procedure: OS Peripheral Control
 
 ## 1. Goal
+
 Interact with the host operating system using physical peripheral emulation (keyboard, mouse), voice-input toggles, and sensory outputs (voice, notifications).
 
 ## 2. Dependencies
+
 - **Actuator**: `System-Actuator`
 
 ## 3. Step-by-Step Instructions
+
 1.  **Identify Action**: Determine if the task requires keyboard injection, mouse movement, dictation/voice-input toggling, voice synthesis, or an OS notification.
 2.  **Keyboard Injection**:
     ```json
@@ -48,4 +56,5 @@ Interact with the host operating system using physical peripheral emulation (key
     ```
 
 ## 4. Expected Output
+
 Physical execution of the requested peripheral action on the host OS.

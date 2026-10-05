@@ -1,3 +1,8 @@
+---
+title: 'Procedure: Create Blog Post From Brief'
+last_updated: 2026-10-05
+---
+
 # Procedure: Create Blog Post From Brief
 
 ## 1. Goal

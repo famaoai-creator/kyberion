@@ -4,7 +4,7 @@ category: Standards
 tags: [standards, contract, negotiation, guardrails, ace]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
 ---
 
 # Contract & SLA Negotiation Guardrails

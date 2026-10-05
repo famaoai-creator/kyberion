@@ -4,7 +4,8 @@ category: Standards
 tags: [standards, data, governance]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-05
+kind: evergreen
 ---
 
 # Data Engineering & Governance Standards
@@ -23,6 +24,7 @@ last_updated: 2026-03-06
 ## 2. データ・リネージ (Data Lineage)
 
 データがどこから来て、どのように加工され、どこへ行くのかという「家系図」を記録・追跡する。
+
 - **目的**: 障害発生時の影響範囲の特定、およびデータの信頼性証明。
 
 ## 3. ETL/ELT パイプラインの設計
@@ -36,4 +38,5 @@ last_updated: 2026-03-06
 データの所在、定義、所有者、機密レベルをメタデータとして集中管理し、データ活用を民主化する。
 
 ---
-*Created by Kyberion Ecosystem Architect - 2026-02-28*
+
+_Created by Kyberion Ecosystem Architect - 2026-02-28_

@@ -5,6 +5,7 @@ tags: [governance, organization, team-template, catalog, overlay]
 importance: 7
 author: Ecosystem Architect
 last_updated: 2026-05-31
+review_by: 2026-10-12
 ---
 
 # Organization Team Template Catalogs
