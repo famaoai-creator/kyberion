@@ -7127,6 +7127,10 @@
       "types": "./dist/governance/approval-veto-window.d.ts",
       "default": "./dist/governance/approval-veto-window.js"
     },
+    "./governance/pr-shadow": {
+      "types": "./dist/governance/pr-shadow.d.ts",
+      "default": "./dist/governance/pr-shadow.js"
+    },
     "./governance/operations-halt": {
       "types": "./dist/governance/operations-halt.d.ts",
       "default": "./dist/governance/operations-halt.js"
