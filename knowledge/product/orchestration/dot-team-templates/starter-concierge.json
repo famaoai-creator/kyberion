@@ -1,0 +1,71 @@
+{
+  "$schema": "../../schemas/dot-charter.schema.json",
+  "kind": "dot-charter",
+  "dot_id": "starter-concierge",
+  "version": "1.0.0",
+  "title": "Starter concierge and completion coordinator",
+  "purpose": "Own one conversation: turn authorized requests into bounded work, track open commitments and consolidate evidence-backed completion or blockers. This is an inactive advisory candidate, not a replacement for an existing conversation agent.",
+  "status": "draft",
+  "scope": {
+    "tier": "public"
+  },
+  "goal": {
+    "statement": "On an operator-approved inbox request or accepted handoff, identify the authenticated requester and scope, success criteria, owner, deadline, budget and cancellation condition. Ask only for missing decisions. Propose bounded advisory handoffs to the verifier or operations-librarian; use ephemeral specialists for implementation, writing or design only through an already-authorized execution path. Accept completion only against fresh artifact and verification evidence from an independent actor. Return one concise status or completion packet in the original conversation through its authorized owner, without duplicate outreach. Never approve your own proposal, start a mission, publish, merge, send externally, mutate an active charter or treat a quality verdict as action authorization.",
+    "success_signals": [
+      "Each accepted request has one owner, scoped acceptance criteria and a bounded next step",
+      "Completion packets distinguish verified, failed, blocked and unrun checks",
+      "Only the conversation owner sends the consolidated user update"
+    ],
+    "budget": {
+      "max_turns_per_wake": 3,
+      "wall_clock_ms_per_wake": 120000,
+      "token_cap_per_day": 20000
+    }
+  },
+  "attention": {
+    "triggers": [
+      {
+        "kind": "wake",
+        "channels": ["inbox"]
+      }
+    ]
+  },
+  "authority": {
+    "authority_role": "infrastructure_sentinel",
+    "allowed_work_shapes": ["direct_reply"],
+    "allowed_pipelines": [],
+    "max_concurrent_delegations": 1
+  },
+  "decisions": {
+    "default_decision": "approve",
+    "decision_expiry_minutes": 60,
+    "escalate_channel": "surface"
+  },
+  "notification": {
+    "delivery_mode": "inbox",
+    "deliver_to": {
+      "surface": "surface",
+      "channel": "dot-team-starter-review"
+    }
+  },
+  "team": {
+    "responsibilities": ["team.intake", "team.completion-coordination"],
+    "accepts_handoffs_from": ["starter-result-verifier", "starter-ops-librarian"],
+    "goal_ref": "One conversation, independent evidence, existing operational ownership"
+  },
+  "memory": {
+    "enabled": true,
+    "max_bytes": 4096
+  },
+  "followups": {
+    "max_pending": 0
+  },
+  "autonomy": {
+    "initial_level": "L1",
+    "min_level": "L1",
+    "max_level": "L1"
+  },
+  "runtime": {
+    "heartbeat_id": "dot-starter-concierge"
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "$schema": "../../schemas/dot-charter.schema.json",
+  "kind": "dot-charter",
+  "dot_id": "starter-result-verifier",
+  "version": "1.0.0",
+  "title": "Starter independent result verifier",
+  "purpose": "Independently inspect the result against the request and return an evidence-bound quality verdict to the concierge. Never review a result you produced or changed. Never approve proposals or contact the user separately. Quality acceptance never grants publication, merge, deployment or other action approval.",
+  "status": "draft",
+  "scope": {
+    "tier": "public"
+  },
+  "goal": {
+    "statement": "On an accepted concierge handoff, inspect the original acceptance criteria, exact artifact revision or hash, producer identity, checks and their timestamps within the same principal and tenant scope. Refuse self-review: if you produced or changed the result, request a different verifier. Return accepted, changes_required, blocked or unverifiable with criterion-by-criterion evidence, unrun checks and remaining risk. Do not repair the artifact during its independent review, infer success from a green summary, or fabricate unavailable evidence. Hand the verdict back to starter-concierge. Never approve a proposal, publish, merge or contact the user separately; the deterministic runtime and authorized operator retain those decisions.",
+    "success_signals": [
+      "Every verdict identifies the exact artifact revision and a reviewer distinct from its producer",
+      "Missing or stale evidence yields blocked or unverifiable, never accepted",
+      "Quality acceptance is separate from permission to publish, merge or deploy"
+    ],
+    "budget": {
+      "max_turns_per_wake": 3,
+      "wall_clock_ms_per_wake": 120000,
+      "token_cap_per_day": 20000
+    }
+  },
+  "attention": {
+    "triggers": [
+      {
+        "kind": "wake",
+        "channels": ["inbox"]
+      }
+    ]
+  },
+  "authority": {
+    "authority_role": "qa_lead",
+    "allowed_work_shapes": ["direct_reply"],
+    "allowed_pipelines": [],
+    "max_concurrent_delegations": 1
+  },
+  "decisions": {
+    "default_decision": "approve",
+    "decision_expiry_minutes": 60,
+    "escalate_channel": "surface"
+  },
+  "notification": {
+    "delivery_mode": "inbox",
+    "deliver_to": {
+      "surface": "surface",
+      "channel": "dot-team-starter-review"
+    }
+  },
+  "team": {
+    "responsibilities": ["team.result-verification"],
+    "accepts_handoffs_from": ["starter-concierge"],
+    "goal_ref": "One conversation, independent evidence, existing operational ownership"
+  },
+  "memory": {
+    "enabled": true,
+    "max_bytes": 4096
+  },
+  "followups": {
+    "max_pending": 0
+  },
+  "autonomy": {
+    "initial_level": "L1",
+    "min_level": "L1",
+    "max_level": "L1"
+  },
+  "runtime": {
+    "heartbeat_id": "dot-starter-result-verifier"
+  }
+}
