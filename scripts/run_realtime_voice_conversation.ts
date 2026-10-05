@@ -1,5 +1,5 @@
 /* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
@@ -9,7 +9,10 @@ import {
   buildSafeExecEnv,
   safeExistsSync,
   safeMkdir,
+  safeWriteFile,
 } from '@agent/core/secure-io';
+import { pcmToWav } from '@agent/core/pcm-wav';
+import { loadVoiceTurnTakingLexicon } from '@agent/core/voice/voice-turn-taking-lexicon';
 import { checkMeetingParticipationConsent } from '@agent/core/meeting/meeting-participation-coordinator';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { createVoiceActuatorServeClient } from '@agent/core/actuator/actuator-serve-client';
@@ -53,7 +56,8 @@ import { installTenVadBackend } from '@agent/core/ten-vad-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
 import { probeAudioPlayback } from '@agent/core/voice/audio-playback';
 import { playPcmAudioStream, probePcmAudioStreaming } from '@agent/core/streaming-voice-playback';
-import { probeMicCapture } from '@agent/core/mic-capture';
+import { probeMicCapture, resolveMicDevice } from '@agent/core/mic-capture';
+import { resolveFfmpegBin } from '@agent/core/tool/tool-binary-resolvers';
 import { recordVadTurn, type VadTurnState } from '@agent/core/voice/vad-turn-recorder';
 import { resolveManagedToolPythonBin } from '@agent/core/tool/tool-runtime-registry';
 import { resolveVadBackend } from '@agent/core/voice/vad-registry';
@@ -122,6 +126,12 @@ export interface RealtimeVoiceConversationCliOptions {
    * low_latency and streaming STT is available, otherwise off.
    */
   bargeInMode?: RealtimeVoiceBargeInMode;
+  /**
+   * Scales the speech threshold while the assistant speaks (default 2 in the
+   * loop). Speaker setups may need a lower value — the TTS echo raises the
+   * floor but a user across the room may still not cross 2x.
+   */
+  bargeInThresholdMultiplier?: number;
   /** Start reasoning speculatively on tentative silence (unset: KYBERION_VOICE_SPECULATIVE_REPLY). */
   speculativeReply?: boolean;
   /** Cache the synthesized first phrase of replies under shared/runtime. */
@@ -558,6 +568,25 @@ export function resolveSpeculativeReplyGuards(
   };
 }
 
+/** Resolve the capture device to a human-readable name when the OS can list it. */
+function describeMicDevice(explicit?: string): string {
+  const device = resolveMicDevice(explicit);
+  const idx = /^:(\d+)$/u.exec(device)?.[1];
+  if (idx === undefined || process.platform !== 'darwin') return device;
+  try {
+    const probe = spawnSync(
+      resolveFfmpegBin(),
+      ['-hide_banner', '-f', 'avfoundation', '-list_devices', 'true', '-i', ''],
+      { encoding: 'utf8' }
+    );
+    const listing = `${probe.stdout || ''}\n${probe.stderr || ''}`;
+    const name = new RegExp(`\\[${idx}\\]\\s+(.+?)\\s*$`, 'um').exec(listing)?.[1];
+    return name ? `${name.trim()} (${device})` : device;
+  } catch {
+    return device;
+  }
+}
+
 export async function runRealtimeVoiceConversationLoop(
   options: RealtimeVoiceConversationCliOptions,
   print: (value: unknown) => void = () => undefined
@@ -568,7 +597,6 @@ export async function runRealtimeVoiceConversationLoop(
       'Realtime interactive voice requires a real STT backend. Set KYBERION_STT_COMMAND or register a SpeechToTextBridge before using --interactive.'
     );
   }
-
   const micProbe = probeMicCapture({
     ...(options.micDevice ? { device: options.micDevice } : {}),
   });
@@ -731,16 +759,54 @@ export async function runRealtimeVoiceConversationLoop(
   });
   print(
     `\n=== Realtime voice loop — session ${session.session_id} ` +
-      `(vad=${vadBackend.backend_id}, barge-in=${bargeInMode}, ` +
-      `stt=${streamingStt ? 'streaming' : 'batch'}) ===`
+      `(mic=${describeMicDevice(options.micDevice)}, vad=${vadBackend.backend_id}, ` +
+      `barge-in=${bargeInMode}, stt=${streamingStt ? 'streaming' : 'batch'}) ===`
   );
+  if (bargeInMode === 'two_stage' && !streamingStt) {
+    print(
+      // i18n-exempt: JA voice demo script output
+      '   注意: two_stage の「言葉確認」は streaming STT の partial が必要です。batch STT ではエコーと実際の発話を区別できず、スピーカー環境では自分の再生音が割り込みとして返答を止めることがあります。--streaming-stt またはヘッドセットを使ってください。'
+    );
+  }
   if (bargeInMode !== 'off') {
     // i18n-exempt: JA voice demo script output
     print('   barge-in はスピーカーのエコーで誤動作することがあります。ヘッドセット推奨です。');
   }
 
+  // Warm the STT backend while the VAD calibrates — the first real
+  // transcription otherwise pays the backend's model-load cost in-band
+  // (observed ~99s on the first batch call vs ~6s steady-state). A silent
+  // clip exits via the no-speech path without loading the model, so the
+  // warmup uses a short synthesized utterance and falls back to silence
+  // when TTS is unavailable. Best-effort: never blocks the loop.
+  const sttWarmupPath = pathResolver.sharedTmp(`realtime-voice-warmup-${options.sessionId}.wav`);
+  void (async () => {
+    try {
+      // Warmup text comes from the lexicon's agent backchannels for the
+      // session language — no hardcoded per-language literals.
+      const warmupText =
+        loadVoiceTurnTakingLexicon().languages[language]?.agent_backchannels?.[0] ?? 'hello';
+      const clip = await synthesizeSegment(warmupText, -2, 0).catch(() => '');
+      const warmupPath =
+        clip ||
+        (() => {
+          safeWriteFile(sttWarmupPath, pcmToWav(Buffer.alloc(16000 * 2 * 0.25), 16000));
+          return sttWarmupPath;
+        })();
+      await sttBridge.transcribe({
+        audioPath: warmupPath,
+        ...(options.language ? { language: options.language } : {}),
+      });
+    } catch {
+      /* warmup is best-effort */
+    }
+  })();
+
   try {
     const handle = await startRealtimeVoiceLoop({
+      // Same id as the media-event buffer — otherwise every published event
+      // is rejected with a session_id mismatch.
+      sessionId: session.session_id,
       recordingDir: options.recordOutputDir,
       mic: {
         sampleRateHz: 16000,
@@ -754,7 +820,12 @@ export async function runRealtimeVoiceConversationLoop(
           vadBackend.create({ rmsThreshold: threshold, endpointMs: options.vadEndpointMs }),
         ...(vadBackend.needsCalibration ? {} : { skipCalibration: true }),
       },
-      bargeIn: { mode: bargeInMode },
+      bargeIn: {
+        mode: bargeInMode,
+        ...(options.bargeInThresholdMultiplier !== undefined
+          ? { thresholdMultiplier: options.bargeInThresholdMultiplier }
+          : {}),
+      },
       eotHold: { enabled: options.eotHold ?? true },
       respondGate: { enabled: options.respondGate ?? true },
       speculativeReply: {
@@ -992,6 +1063,9 @@ export function parseRealtimeVoiceConversationCli(
     ...(argv['mic-device'] ? { micDevice: String(argv['mic-device']) } : {}),
     bargeIn: Boolean(argv['barge-in']),
     ...(bargeInMode ? { bargeInMode } : {}),
+    ...(argv['barge-in-threshold-multiplier'] !== undefined
+      ? { bargeInThresholdMultiplier: Number(argv['barge-in-threshold-multiplier']) }
+      : {}),
     ...(argv['speculative-reply'] !== undefined
       ? { speculativeReply: Boolean(argv['speculative-reply']) }
       : {}),
@@ -1131,6 +1205,11 @@ export async function main(
       choices: ['off', 'legacy', 'two_stage'] as const,
       describe:
         'Barge-in mode. two_stage pauses playback on speech and stops only when streaming STT hears words (resumes on echo/noise). Default: two_stage with low_latency + streaming STT, else off. KYBERION_VOICE_BARGE_IN_MODE overrides',
+    })
+    .option('barge-in-threshold-multiplier', {
+      type: 'number',
+      describe:
+        'Scales the speech threshold while the assistant speaks (default 2). Speaker setups may need ~1.3 — TTS echo raises the floor but a user across the room can stay under 2x and never trigger a barge-in',
     })
     .option('speculative-reply', {
       type: 'boolean',
