@@ -125,6 +125,12 @@ export interface RealtimeVoiceConversationCliOptions {
    * low_latency and streaming STT is available, otherwise off.
    */
   bargeInMode?: RealtimeVoiceBargeInMode;
+  /**
+   * Scales the speech threshold while the assistant speaks (default 2 in the
+   * loop). Speaker setups may need a lower value — the TTS echo raises the
+   * floor but a user across the room may still not cross 2x.
+   */
+  bargeInThresholdMultiplier?: number;
   /** Start reasoning speculatively on tentative silence (unset: KYBERION_VOICE_SPECULATIVE_REPLY). */
   speculativeReply?: boolean;
   /** Cache the synthesized first phrase of replies under shared/runtime. */
@@ -788,7 +794,12 @@ export async function runRealtimeVoiceConversationLoop(
           vadBackend.create({ rmsThreshold: threshold, endpointMs: options.vadEndpointMs }),
         ...(vadBackend.needsCalibration ? {} : { skipCalibration: true }),
       },
-      bargeIn: { mode: bargeInMode },
+      bargeIn: {
+        mode: bargeInMode,
+        ...(options.bargeInThresholdMultiplier !== undefined
+          ? { thresholdMultiplier: options.bargeInThresholdMultiplier }
+          : {}),
+      },
       eotHold: { enabled: options.eotHold ?? true },
       respondGate: { enabled: options.respondGate ?? true },
       speculativeReply: {
@@ -1026,6 +1037,9 @@ export function parseRealtimeVoiceConversationCli(
     ...(argv['mic-device'] ? { micDevice: String(argv['mic-device']) } : {}),
     bargeIn: Boolean(argv['barge-in']),
     ...(bargeInMode ? { bargeInMode } : {}),
+    ...(argv['barge-in-threshold-multiplier'] !== undefined
+      ? { bargeInThresholdMultiplier: Number(argv['barge-in-threshold-multiplier']) }
+      : {}),
     ...(argv['speculative-reply'] !== undefined
       ? { speculativeReply: Boolean(argv['speculative-reply']) }
       : {}),
@@ -1165,6 +1179,11 @@ export async function main(
       choices: ['off', 'legacy', 'two_stage'] as const,
       describe:
         'Barge-in mode. two_stage pauses playback on speech and stops only when streaming STT hears words (resumes on echo/noise). Default: two_stage with low_latency + streaming STT, else off. KYBERION_VOICE_BARGE_IN_MODE overrides',
+    })
+    .option('barge-in-threshold-multiplier', {
+      type: 'number',
+      describe:
+        'Scales the speech threshold while the assistant speaks (default 2). Speaker setups may need ~1.3 — TTS echo raises the floor but a user across the room can stay under 2x and never trigger a barge-in',
     })
     .option('speculative-reply', {
       type: 'boolean',
