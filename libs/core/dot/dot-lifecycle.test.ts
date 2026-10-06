@@ -4,6 +4,7 @@ import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-
 import { loadDotCharter, type DotCharter } from './dot-charter.js';
 import {
   DOT_LIFECYCLE_AUDIT_PATH,
+  createDraftDotCharter,
   checkDotActivationReadiness,
   isDotStatusTerminal,
   transitionDotCharterStatus,
@@ -236,5 +237,37 @@ describe('checkDotActivationReadiness', () => {
     );
     expect(check.ready).toBe(false);
     expect(check.errors[0]).toContain('ghost_role');
+  });
+});
+
+describe('create public draft charter', () => {
+  it('creates a complete draft and leaves activation explicit', () => {
+    const value = createDraftDotCharter(DRAFT, deps);
+    expect(value.status).toBe('draft');
+    expect(loadDotCharter(TEST_ROOT + '/dots/' + DRAFT.dot_id + '.json').status).toBe('draft');
+    expect(transitionDotCharterStatus(DRAFT.dot_id, 'active', deps).status).toBe('active');
+  });
+  it('does not overwrite an existing identity or destination', () => {
+    writeCharter(DRAFT, 'different-file.json');
+    expect(() => createDraftDotCharter(DRAFT, deps)).toThrow('DOT_CREATE_EXISTS');
+    expect(safeExistsSync(TEST_ROOT + '/dots/' + DRAFT.dot_id + '.json')).toBe(false);
+  });
+  it('rejects active and non-public creation', () => {
+    expect(() => createDraftDotCharter({ ...DRAFT, status: 'active' }, deps)).toThrow(
+      'DOT_CREATE_DRAFT'
+    );
+    expect(() =>
+      createDraftDotCharter(
+        { ...DRAFT, scope: { tier: 'confidential', tenant_slug: 'test-tenant' } },
+        deps
+      )
+    ).toThrow();
+  });
+  it('does not replace a draft on a repeated create', () => {
+    createDraftDotCharter(DRAFT, deps);
+    expect(() => createDraftDotCharter({ ...DRAFT, title: 'changed' }, deps)).toThrow(
+      'DOT_CREATE_EXISTS'
+    );
+    expect(loadDotCharter(TEST_ROOT + '/dots/' + DRAFT.dot_id + '.json').title).toBe(DRAFT.title);
   });
 });

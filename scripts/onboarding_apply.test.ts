@@ -184,7 +184,10 @@ describe('onboarding_apply', () => {
       }
     );
 
-    expect(summary).toContain('Onboarding applied successfully.');
+    expect(summary).toContain('Onboarding profile applied successfully.');
+    expect(summary).toContain('Execution and human approval are separate setup steps.');
+    expect(summary).toContain('/first-job');
+    expect(summary).toContain('pnpm onboarding first-job --tenant');
     expect(summary).toContain('Identity: Famao (agent-001)');
     expect(summary).toContain('Reasoning: real_backend_detected');
     expect(summary).toContain('Next steps:');

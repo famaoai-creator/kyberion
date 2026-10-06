@@ -16,10 +16,14 @@ import {
   type AdfStepHooks,
 } from '@agent/core/pipeline/adf-engine';
 import {
-  fireLifecycleHooks,
-  getDefaultLifecycleHookEngine,
-} from '@agent/core/lifecycle-hook-engine';
-import { getDefaultWorkerEventStream } from '@agent/core/workforce/worker-event-stream';
+  assertDiagnosticPipelineProfile,
+  firePipelineLifecycleHooks,
+  DIAGNOSTIC_OPERATOR_GUIDANCE,
+} from './pipeline-diagnostic-profile.js';
+import {
+  getDefaultWorkerEventStream,
+  assertBuiltinOnlyWorkerEventStream,
+} from '@agent/core/workforce/worker-event-stream';
 import {
   withActuatorForwardingPort,
   type ActuatorForwardRequest,
@@ -104,6 +108,19 @@ export async function runWithRepair(
   stepPolicy: ReasoningStepPolicy,
   attemptOnce: () => Promise<Record<string, unknown> | AdfSkippedStep>
 ): Promise<Record<string, unknown> | AdfSkippedStep> {
+  if (opts.executionMode) {
+    // runSteps validated the original ADF before the engine added its internal
+    // type/resolved-parameter fields. Never classify or repair this attempt.
+    if (opts.executionMode !== 'front_desk_diagnostic')
+      throw new Error('Invalid bounded diagnostic execution mode');
+    try {
+      return await attemptOnce();
+    } catch (error) {
+      throw new Error(
+        String(error instanceof Error ? error.message : error) + '; ' + DIAGNOSTIC_OPERATOR_GUIDANCE
+      );
+    }
+  }
   let attempt = 0;
   let lastError: any = null;
   while (attempt < 2) {
@@ -193,6 +210,7 @@ export async function runSteps(
   results: RunStepResult[];
   context: Record<string, unknown>;
 }> {
+  assertDiagnosticPipelineProfile(opts.executionMode, opts.pipelinePath, steps);
   const rootDir = pathResolver.rootDir();
   const shellBin: SafeShell = 'bash';
   const forwardingPort: ActuatorForwardingPort = {
@@ -1218,6 +1236,7 @@ export async function runStepsInternal(
     beforeStep: (rawStep, stepNumber) => {
       const step = rawStep as unknown as PipelineAdfStep;
       stepRefStack.push(step);
+      if (opts.executionMode) assertBuiltinOnlyWorkerEventStream(eventStream);
       eventStream.emit('step_begin', {
         op: step.op,
         step_number: stepNumber,
@@ -1281,6 +1300,7 @@ export async function runStepsInternal(
             }
           : {}),
       });
+      if (opts.executionMode) assertBuiltinOnlyWorkerEventStream(eventStream);
       eventStream.emit('step_end', {
         op: normalizedOp,
         step_number: stepNumber,
@@ -1291,8 +1311,8 @@ export async function runStepsInternal(
       });
       let postToolHookOutcome: { resultPatch: Record<string, unknown> };
       try {
-        postToolHookOutcome = await fireLifecycleHooks(
-          getDefaultLifecycleHookEngine(),
+        postToolHookOutcome = await firePipelineLifecycleHooks(
+          opts.executionMode,
           outcome.status === 'failed' ? 'post_tool_use_failure' : 'post_tool_use',
           {
             matcher_value: normalizedOp,
@@ -1468,11 +1488,10 @@ export async function runStepsInternal(
         resolveVars: (value: any, c: any) => resolveVars(value, c),
         // KC-04: pre_tool_use hooks can block a step; a block aborts the run.
         stepGate: async (step, _stepNumber) => {
-          const outcome = await fireLifecycleHooks(
-            getDefaultLifecycleHookEngine(),
-            'pre_tool_use',
-            { matcher_value: String(step.op), op: String(step.op) }
-          );
+          const outcome = await firePipelineLifecycleHooks(opts.executionMode, 'pre_tool_use', {
+            matcher_value: String(step.op),
+            op: String(step.op),
+          });
           return outcome.blocked ? { blocked: true, reasons: outcome.reasons } : undefined;
         },
       },

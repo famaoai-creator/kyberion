@@ -11,12 +11,22 @@ import {
   FRONT_DESK_TEMPLATE_FILE_REDIRECTS,
   frontDeskTemplateRedirect,
   registerFrontDeskHomeWorkPages,
+  registerFrontDeskAuxPages,
+  FIRST_JOB_VOCABULARY_KEYS,
+  PRESENCE_STUDIO_VOCABULARY_KEYS,
   renderFrontDeskPageTemplate,
   resolveFrontDeskPageLocale,
 } from './front-desk-pages.js';
 
 const STATIC_DIR = 'presence/displays/presence-studio/static';
-const PAGES = ['home.html', 'ask.html', 'progress.html', 'help.html', 'index.html'];
+const PAGES = [
+  'home.html',
+  'ask.html',
+  'progress.html',
+  'help.html',
+  'index.html',
+  'first-job.html',
+];
 
 function readStatic(file: string): string {
   return String(
@@ -134,6 +144,7 @@ describe('raw template files are never served unrendered', () => {
         middleware.push(handler),
     };
     registerFrontDeskHomeWorkPages(app as never, pathResolver.rootResolve(STATIC_DIR));
+    registerFrontDeskAuxPages(app as never, pathResolver.rootResolve(STATIC_DIR));
     return { routes, middleware };
   }
 
@@ -208,6 +219,20 @@ describe('raw template files are never served unrendered', () => {
     }
     expect(runGuard(middleware, '/ui-gallery.html', fakeRes())).toBe(true);
     // The canonical routes still render the template (no placeholder left).
+    const firstJob = fakeRes();
+    routes.get('/first-job')!({ headers: { 'accept-language': 'ja' } }, firstJob);
+    expect(String(firstJob.sent)).toContain('<html lang="ja"');
+    expect(String(firstJob.sent)).not.toMatch(/{{(t|partial|locale)[:}]/);
+    expect(String(firstJob.sent)).toContain('#first-job-approval-panel');
+    expect(String(firstJob.sent)).toContain('/login?next=%2Ffirst-job');
+    expect(String(firstJob.sent)).not.toContain('/work#approval-panel');
+    expect(String(firstJob.sent)).not.toContain('first-job-new-request');
+    expect(String(firstJob.sent)).toContain(
+      'pnpm onboarding first-job --tenant &lt;test-tenant&gt;'
+    );
+    expect(readStatic('home.html')).toContain('href="/first-job"');
+    for (const key of FIRST_JOB_VOCABULARY_KEYS)
+      expect(PRESENCE_STUDIO_VOCABULARY_KEYS).toContain(key);
     const home = fakeRes();
     routes.get('/')!({ headers: { 'accept-language': 'ja' } }, home);
     expect(String(home.sent)).toContain('<html lang="ja"');

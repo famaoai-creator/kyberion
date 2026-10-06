@@ -14,6 +14,8 @@
  */
 
 import * as path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
+import { isValidTenantSlug } from '../entity-scope.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -155,6 +157,8 @@ export interface DotCharter {
    */
   operations_cadence?: DotOperationsCadence;
   runtime: {
+    /** Restrictive receipt-only mode; grants no execution. */
+    execution_mode?: 'front_desk_diagnostic';
     heartbeat_id: string;
     reasoning_backend?: string;
     max_idle_wake_ms?: number;
@@ -220,6 +224,7 @@ export function validateDotCharter(value: unknown, sourcePath = '<inline>'): Dot
       .join('; ');
     throw new Error(`Invalid dot charter at ${sourcePath}: ${errors}`);
   }
+  isFrontDeskDiagnosticDot(candidate as DotCharter);
   assertOperationsCadenceTimezones(candidate as DotCharter, sourcePath);
   return candidate as DotCharter;
 }
@@ -544,4 +549,80 @@ export function findDotCharter(
   const collision = errors.find((entry) => entry.dot_id === dotId);
   if (collision) throw new Error(collision.error);
   return undefined;
+}
+
+/** The one deterministic pipeline supported by the opt-in first-job diagnostic. */
+export const FRONT_DESK_DIAGNOSTIC_PIPELINE = 'pipelines/front-desk-request-receipt.json';
+
+/**
+ * Narrow a diagnostic charter's existing authority; never grant any. Approval,
+ * dispatch, WorkItem execution and verification remain on their normal paths.
+ * Also used by runtime ports that receive an in-memory charter: a malformed
+ * marker must fail closed rather than quietly restore generic model wakes.
+ */
+export function assertFrontDeskDiagnosticDotCharter(charter: DotCharter): void {
+  const exact = (values: readonly string[] | undefined, only: string): boolean =>
+    Array.isArray(values) && values.length === 1 && values[0] === only;
+  const failures: string[] = [];
+  if (charter.runtime.execution_mode !== 'front_desk_diagnostic')
+    failures.push('runtime.execution_mode must be front_desk_diagnostic');
+  if (charter.scope.tier !== 'public' || !isValidTenantSlug(charter.scope.tenant_slug ?? ''))
+    failures.push('scope must be public and name one valid, non-reserved tenant');
+  if (charter.authority.authority_role !== 'infrastructure_sentinel')
+    failures.push('authority_role must be infrastructure_sentinel');
+  if (!exact(charter.authority.allowed_work_shapes, 'pipeline'))
+    failures.push('allowed_work_shapes must contain only pipeline');
+  if (!exact(charter.authority.allowed_pipelines, FRONT_DESK_DIAGNOSTIC_PIPELINE))
+    failures.push('allowed_pipelines must contain only the front-desk receipt pipeline');
+  if (charter.decisions?.default_decision !== 'approve')
+    failures.push('default_decision must be approve');
+  if (charter.decisions?.escalate_channel && charter.decisions.escalate_channel !== 'surface')
+    failures.push('external escalation is not supported');
+  if (
+    charter.attention.triggers.length ||
+    charter.goal.signal_probes?.length ||
+    charter.goal.key_results?.length ||
+    charter.team?.accepts_handoffs_from?.length ||
+    charter.team?.goal_ref !== undefined ||
+    charter.operations_cadence !== undefined ||
+    charter.notification.digest_cron !== undefined
+  )
+    failures.push('autonomous triggers, probes, cadences and handoffs are not supported');
+  const notification = charter.notification;
+  if (
+    notification.delivery_mode !== 'inbox' ||
+    notification.deliver_to.surface !== 'surface' ||
+    notification.deliver_to.channel !== 'inbox' ||
+    notification.deliver_to.thread_ts !== undefined ||
+    notification.deliver_to.template !== undefined
+  )
+    failures.push('notification must use only local inbox delivery');
+  if (failures.length)
+    throw new Error(`Invalid front_desk_diagnostic dot charter: ${failures.join('; ')}`);
+}
+
+/** Absent mode preserves generic dots. Unknown or broadened diagnostic modes are rejected. */
+export function isFrontDeskDiagnosticDot(charter: DotCharter): boolean {
+  if (charter.runtime.execution_mode === undefined) return false;
+  assertFrontDeskDiagnosticDotCharter(charter);
+  return true;
+}
+
+/** Revalidate the exact active diagnostic snapshot before every effect/publication. */
+export function requireCurrentFrontDeskDiagnosticDot(
+  charter: DotCharter,
+  rootDir?: string
+): DotCharter {
+  assertFrontDeskDiagnosticDotCharter(charter);
+  const current = findDotCharter(charter.dot_id, rootDir)?.charter;
+  if (
+    !current ||
+    current.status !== 'active' ||
+    !isFrontDeskDiagnosticDot(current) ||
+    !isDeepStrictEqual(current, charter)
+  )
+    throw new Error(
+      'current diagnostic charter was paused, removed or revised; operator review required'
+    );
+  return current;
 }

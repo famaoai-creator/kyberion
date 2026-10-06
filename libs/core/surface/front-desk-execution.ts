@@ -1,3 +1,12 @@
+import { assertBuiltinOnlyWorkerEventStream } from '../workforce/worker-event-stream.js';
+import {
+  isFrontDeskDiagnosticDot,
+  requireCurrentFrontDeskDiagnosticDot,
+} from '../dot/dot-charter.js';
+import {
+  hasVerifiedFirstJobDecision,
+  hasFirstJobDiagnosticProvenance,
+} from './first-job-approval-proof.js';
 /** Opt-in diagnostic intake consumer. No generic task execution or authority inference. */
 import { createHash } from 'node:crypto';
 import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
@@ -34,6 +43,7 @@ export function frontDeskBindingsEqual(a: FrontDeskExecutionBinding, b: unknown)
   return (
     [
       'mapping_id',
+      'diagnostic_protocol',
       'config_digest',
       'conversation_key',
       'request_id',
@@ -87,11 +97,25 @@ export async function runFrontDeskExecutionIntake(
   active: readonly LoadedDotCharter[],
   deps: DotDispatchDeps = {}
 ): Promise<void> {
-  for (const entry of listConfiguredFrontDeskExecutions()) {
+  const matches = (
+    charter: DotCharter,
+    mapping: import('./front-desk-execution-contract.js').FrontDeskExecutionMapping
+  ): boolean => {
+    if (charter.status !== 'active' || charter.dot_id !== mapping.dotId) return false;
+    if (isFrontDeskDiagnosticDot(charter) && !deps.assertTenant) return false;
+    const scope = frontDeskRuntimeScope(mapping.viewer);
+    return (['tenant_slug', 'organization_id', 'project_id', 'tier'] as const).every(
+      (key) => (charter.scope[key] ?? undefined) === (scope[key] ?? undefined)
+    );
+  };
+  for (const entry of listConfiguredFrontDeskExecutions((mapping) =>
+    active.some(({ charter }) => matches(charter, mapping))
+  )) {
     if (entry.request.status !== 'pending') continue;
-    const loaded = active.find((value) => value.charter.dot_id === entry.mapping.dotId);
+    const loaded = active.find((value) => matches(value.charter, entry.mapping));
     if (!loaded) continue;
     const charter = loaded.charter;
+    if (isFrontDeskDiagnosticDot(charter)) assertBuiltinOnlyWorkerEventStream();
     await runAsDotCharter(charter, async () => {
       // Serialize admission/reconciliation across supervisors. Stable action refs and
       // atomic WorkItem creation independently cover crashes after either write.
@@ -125,7 +149,7 @@ export interface PreparedFrontDeskExecution {
 export function prepareFrontDeskExecution(
   charter: DotCharter,
   item: WorkItem,
-  deps: Pick<DotDispatchDeps, 'rootDir' | 'now' | 'gate'> = {}
+  deps: Pick<DotDispatchDeps, 'rootDir' | 'now' | 'gate' | 'assertTenant'> = {}
 ): PreparedFrontDeskExecution {
   const binding = item.metadata?.front_desk_execution as FrontDeskExecutionBinding | undefined;
   if (!binding || binding.work_item_id !== item.item_id) throw new Error('request binding missing');
@@ -133,6 +157,14 @@ export function prepareFrontDeskExecution(
   if (admission.ok === false) throw new Error(admission.reason);
   const { mapping } = admission;
   const scope = frontDeskRuntimeScope(mapping.viewer);
+  if (isFrontDeskDiagnosticDot(charter)) {
+    assertBuiltinOnlyWorkerEventStream();
+    if (!deps.assertTenant) throw new Error('diagnostic_requires_bounded_first_job_tick');
+    deps.assertTenant(scope.tenant_slug!, {
+      charter,
+      proposal: frontDeskExecutionProposal(binding),
+    });
+  }
   if (
     charter.status !== 'active' ||
     !charter.authority.allowed_work_shapes?.includes('pipeline') ||
@@ -167,13 +199,20 @@ export function prepareFrontDeskExecution(
   )
     throw new Error('approved dispatch evidence missing');
   const approval = loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, row.request_id);
+  const diagnostic =
+    isFrontDeskDiagnosticDot(charter) || hasFirstJobDiagnosticProvenance(binding, approval);
+  if (diagnostic) requireCurrentFrontDeskDiagnosticDot(charter, deps.rootDir);
+  // Diagnostic authority expires on the live clock, never a captured sweep timestamp.
+  const authorizationNow = diagnostic ? Date.now() : (deps.now?.() ?? new Date()).getTime();
   if (
     !approval ||
     !['approved', 'applied'].includes(approval.status) ||
     approval.decidedByType !== 'human' ||
-    isApprovalRequestExpired(approval, (deps.now?.() ?? new Date()).getTime())
+    isApprovalRequestExpired(approval, authorizationNow)
   )
     throw new Error('current human approval required');
+  if (diagnostic && !hasVerifiedFirstJobDecision(approval, charter, binding, authorizationNow))
+    throw new Error('verified first-job human approval required');
   if (approval.requestedBy !== 'dot:' + charter.dot_id)
     throw new Error('approval requester mismatch');
   for (const key of [

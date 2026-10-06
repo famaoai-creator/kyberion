@@ -18,6 +18,8 @@ import {
 import { readSafeJsonValueFile } from '../lib/json-input.js';
 
 export interface AdfInputOptions {
+  /** Trusted JSON snapshot validator, invoked before any pipeline effect. */
+  onValidatedInput?: (pipeline: unknown, sourceText: string) => void;
   /** Set false for pre-trust callers; project-local pipeline resources are not read. */
   trustResolved?: boolean;
   /** Durable human approval for the exact project-local resource being loaded. */
@@ -227,9 +229,17 @@ export async function readValidatedWorkflowAdf<T = any>(
   options: AdfInputOptions = {}
 ): Promise<T> {
   assertPipelineResourceTrust(inputPath, options);
-  const raw = isWorkflowModulePath(inputPath)
-    ? await readWorkflowModuleInput<T>(inputPath)
-    : readJsonInput<T>(inputPath);
+  if (options.onValidatedInput && isWorkflowModulePath(inputPath))
+    throw new Error('A bounded JSON pipeline snapshot is required');
+  const sourceText = options.onValidatedInput
+    ? readAdfInputTextFile(resolveAdfInputPath(inputPath))
+    : undefined;
+  const raw =
+    sourceText !== undefined
+      ? parseSafeJsonInput(sourceText, 'validated pipeline snapshot')
+      : isWorkflowModulePath(inputPath)
+        ? await readWorkflowModuleInput<T>(inputPath)
+        : readJsonInput<T>(inputPath);
   const pipeline = validatePipelineAdf(raw);
   const expanded = expandPipelineIncludesForGuardrails(pipeline, options);
   const guardrails = validatePipelineGuardrails(expanded as any, inputPath, {
@@ -242,5 +252,6 @@ export async function readValidatedWorkflowAdf<T = any>(
       .join('; ');
     throw new Error(`Invalid pipeline ADF guardrails: ${details}`);
   }
+  if (sourceText !== undefined) options.onValidatedInput!(pipeline, sourceText);
   return pipeline as T;
 }
