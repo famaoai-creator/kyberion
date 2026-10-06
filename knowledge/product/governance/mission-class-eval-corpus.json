@@ -821,6 +821,67 @@
         "VENDOR_INTEGRITY",
         "ASSUMPTIONS_EXPLICIT"
       ]
+    },
+    {
+      "case_id": "neg-dataacq-en",
+      "split": "dev",
+      "utterance": "Improve the data acquisition pipeline",
+      "expected_class": "code_change",
+      "forbidden_gates": [
+        "FINANCIAL_CONTROLS",
+        "PEOPLE_DATA_PROTECTION",
+        "LEGAL_REVIEW",
+        "VENDOR_INTEGRITY",
+        "ASSUMPTIONS_EXPLICIT"
+      ]
+    },
+    {
+      "case_id": "neg-leadtime-en",
+      "split": "dev",
+      "utterance": "Reduce lead time for changes",
+      "expected_class": "code_change",
+      "forbidden_gates": [
+        "FINANCIAL_CONTROLS",
+        "PEOPLE_DATA_PROTECTION",
+        "LEGAL_REVIEW",
+        "VENDOR_INTEGRITY",
+        "ASSUMPTIONS_EXPLICIT"
+      ]
+    },
+    {
+      "case_id": "neg-datawh-ja",
+      "split": "dev",
+      "utterance": "データ倉庫のクエリを高速化して",
+      "expected_class": "code_change",
+      "forbidden_gates": [
+        "FINANCIAL_CONTROLS",
+        "PEOPLE_DATA_PROTECTION",
+        "LEGAL_REVIEW",
+        "VENDOR_INTEGRITY",
+        "ASSUMPTIONS_EXPLICIT"
+      ]
+    },
+    {
+      "case_id": "neg-custonboard-ja",
+      "split": "dev",
+      "utterance": "顧客オンボーディングを進めて",
+      "expected_class": "customer_engagement",
+      "forbidden_gates": [
+        "FINANCIAL_CONTROLS",
+        "PEOPLE_DATA_PROTECTION",
+        "LEGAL_REVIEW",
+        "VENDOR_INTEGRITY",
+        "ASSUMPTIONS_EXPLICIT"
+      ]
+    },
+    {
+      "case_id": "ppl-vendoronboard-ja",
+      "split": "dev",
+      "utterance": "ベンダーのオンボーディングを進めて",
+      "expected_class": "procurement_and_supply",
+      "expected_intent_id": "supplier-onboarding",
+      "expected_team_template": "procurement_supply",
+      "required_gates": ["VENDOR_INTEGRITY"]
     }
   ]
 }
