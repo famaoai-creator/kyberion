@@ -8,6 +8,7 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
+  safeStat,
   safeWriteFile,
 } from '../secure-io.js';
 import { withLockSync } from '../foundation/lock-utils.js';
@@ -17,6 +18,9 @@ import { ARTIFACT_KINDS, type ArtifactKind } from './artifact-kind.generated.js'
 const ARTIFACT_REGISTRY_LOCK = 'artifact-ownership-registry';
 /** Generous: a concurrent compaction rewrite must never fail a publication. */
 const APPEND_LOCK_TIMEOUT_MS = 30_000;
+const ARTIFACT_SNAPSHOT_CACHE_MAX_BYTES = 4 * 1024 * 1024;
+let artifactSnapshotCache:
+  { path: string; stamp: string; rows: ArtifactOwnershipRecord[] } | undefined;
 export { ARTIFACT_KINDS, type ArtifactKind } from './artifact-kind.generated.js';
 
 export interface ArtifactOwnershipRecord {
@@ -182,11 +186,35 @@ export function appendArtifactOwnershipRecord(
 export function listArtifactOwnershipRecords(): ArtifactOwnershipRecord[] {
   const registryPath = artifactRegistryPath();
   if (!safeExistsSync(registryPath)) return [];
-  ensureArtifactRegistryFile(registryPath);
+  const lstat = safeLstat(registryPath);
+  if (lstat.isSymbolicLink()) {
+    artifactSnapshotCache = undefined;
+    throw new Error(
+      `[RESOURCE_PATH_SYMLINK] artifact registry cannot be a symbolic link: ${registryPath}`
+    );
+  }
+  if (!lstat.isFile()) {
+    artifactSnapshotCache = undefined;
+    throw new Error(`[ARTIFACT_REGISTRY] registry must be a regular file: ${registryPath}`);
+  }
+  const stat = safeStat(registryPath);
+  const stamp = `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}`;
+  if (
+    stat.size <= ARTIFACT_SNAPSHOT_CACHE_MAX_BYTES &&
+    artifactSnapshotCache?.path === registryPath &&
+    artifactSnapshotCache.stamp === stamp
+  ) {
+    return structuredClone(artifactSnapshotCache.rows);
+  }
+  artifactSnapshotCache = undefined;
   try {
-    return readJsonLines<ArtifactOwnershipRecord>(registryPath, {
+    const rows = readJsonLines<ArtifactOwnershipRecord>(registryPath, {
       map: (value) => artifactOwnershipCatalog(registryPath).validate(value, registryPath),
     });
+    if (stat.size <= ARTIFACT_SNAPSHOT_CACHE_MAX_BYTES) {
+      artifactSnapshotCache = { path: registryPath, stamp, rows };
+    }
+    return structuredClone(rows);
   } catch (error) {
     // The registry is shared runtime state. A concurrent cleanup can remove it
     // after the existence check; treat that race like an empty registry.

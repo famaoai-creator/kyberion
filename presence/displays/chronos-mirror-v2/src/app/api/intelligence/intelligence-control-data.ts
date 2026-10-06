@@ -87,18 +87,35 @@ export function parseControlEventRecord(value: unknown): Record<string, unknown>
   return event;
 }
 
-function readSafeObservationRecords(filePath: string): Record<string, unknown>[] {
+export type IntelligenceObservationReadCache = Map<string, Record<string, unknown>[]>;
+
+export function createIntelligenceObservationReadCache(): IntelligenceObservationReadCache {
+  return new Map();
+}
+
+function readSafeObservationRecords(
+  filePath: string,
+  cache?: IntelligenceObservationReadCache
+): Record<string, unknown>[] {
+  const cached = cache?.get(filePath);
+  if (cached) return cached;
   try {
     const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
-    if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return [];
-    return readJsonLines<Record<string, unknown>>(safePath, {
+    if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
+      cache?.set(filePath, []);
+      return [];
+    }
+    const records = readJsonLines<Record<string, unknown>>(safePath, {
       map: (value) => {
         if (!isRecord(value)) throw new Error('observation JSONL entry must be an object');
         return value;
       },
       onMalformed: 'skip',
     });
+    cache?.set(filePath, records);
+    return records;
   } catch {
+    cache?.set(filePath, []);
     return [];
   }
 }
@@ -117,7 +134,8 @@ function controlPayloadText(event: Record<string, unknown>, key: string): string
 
 export function collectRecentEvents(
   tenantSlugs: intelligenceData.TenantScope = 'all',
-  tierAccess?: readonly string[]
+  tierAccess?: readonly string[],
+  observationCache?: IntelligenceObservationReadCache
 ) {
   const files = [
     pathResolver.shared('observability/channels/slack/missions.jsonl'),
@@ -125,7 +143,7 @@ export function collectRecentEvents(
   ];
   const lines: Array<{ ts: string; decision: string; mission_id?: string; why?: string }> = [];
   for (const file of files) {
-    for (const event of readSafeObservationRecords(file)) {
+    for (const event of readSafeObservationRecords(file, observationCache)) {
       const controlEvent = parseControlEventRecord(event);
       if (!controlEvent) continue;
       const ts = controlEventTimestamp(controlEvent);
@@ -151,12 +169,13 @@ export function collectRecentEvents(
 }
 export function collectControlActions(
   tenantSlugs: intelligenceData.TenantScope = 'all',
-  tierAccess?: readonly string[]
+  tierAccess?: readonly string[],
+  observationCache?: IntelligenceObservationReadCache
 ): intelligenceData.ControlActionSummary[] {
   const file = pathResolver.shared('observability/mission-control/orchestration-events.jsonl');
   const lifecycle = new Map<string, intelligenceData.ControlActionSummary>();
 
-  for (const record of readSafeObservationRecords(file)) {
+  for (const record of readSafeObservationRecords(file, observationCache)) {
     const event = parseControlEventRecord(record);
     if (!event) continue;
     const decision = controlEventText(event, 'decision') || controlEventText(event, 'event_type');
