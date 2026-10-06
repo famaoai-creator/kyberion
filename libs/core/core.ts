@@ -21,8 +21,12 @@ import {
   LOG_LEVELS,
   emitConsoleLine,
   isQuietProcess as sharedIsQuietProcess,
+  recordLogLine,
   resolveLogThreshold,
 } from './logger.js';
+import { installProcessLogFileSink } from './process-logger.js';
+
+installProcessLogFileSink();
 
 /**
  * Shared Utility Core for Kyberion (TypeScript Edition)
@@ -83,13 +87,15 @@ function renderLogLine(level: string, msg: string): string {
 
 export const logger = {
   _log: (level: string, msg: string) => {
+    recordLogLine({ level, name: 'core', msg });
     if (isQuietProcess() && level !== 'error') return;
     if (getRegisteredEnvText('NODE_ENV') === 'test' && level !== 'error') return;
     const rank = LOG_LEVELS[level] ?? LOG_LEVELS.info;
     if (rank < resolveLogThreshold()) return;
     const line = renderLogLine(level, msg);
-    const stream = level === 'error' || level === 'warn' ? 'stderr' : 'stdout';
-    emitConsoleLine(stream, line, {
+    // Every level goes to stderr: stdout carries a command's own output (JSON,
+    // reports) and must stay parseable when a parent process reads it.
+    emitConsoleLine('stderr', line, {
       key: `${level} ${msg}`,
       // Anomalies are never compressed; routine lines dedupe on the key
       // (level+msg) so timestamps do not defeat streak detection.

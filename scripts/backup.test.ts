@@ -394,6 +394,14 @@ describe('backup cli', () => {
     );
   });
 
+  it('reports a bad invocation as a usage error (exit 2, no stack trace)', () => {
+    for (const argv of [['status'], ['list', '--bogus'], ['create', '--scope', 'nope']]) {
+      expect(() => parseBackupArgs(argv)).toThrow(
+        expect.objectContaining({ name: 'ScriptExitError', code: 2 })
+      );
+    }
+  });
+
   it('parses retention options for prune', () => {
     expect(
       parseBackupArgs(['prune', '--dir', 'active/shared/tmp/backups', '--retain-daily', '3'])
