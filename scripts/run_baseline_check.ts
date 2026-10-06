@@ -947,7 +947,16 @@ export async function runBaselineCheck() {
     const distPath = pathResolver.rootResolve('dist/scripts');
     if (!safeExistsSync(distPath)) return false;
     const { checkDistWorkspaceImports } = await import('./check_dist_workspace_imports.js');
-    distImportViolations = checkDistWorkspaceImports();
+    try {
+      distImportViolations = checkDistWorkspaceImports();
+    } catch (error) {
+      // A throwing scan (e.g. a malformed package.json under libs/) must not
+      // leave L2 failed with an empty report — surface the error as the
+      // violation so the hint still names something actionable.
+      distImportViolations = [
+        `scan failed: ${error instanceof Error ? error.message : String(error)}`,
+      ];
+    }
     return distImportViolations.length === 0;
   });
 
@@ -1035,7 +1044,7 @@ export async function runBaselineCheck() {
       // LC-01a (iii): warn-only, never a status input.
       ops_alert_channel_configured: opsAlertChannel.configured
         ? null
-        : `no ops-alert delivery channel configured — alerts are recorded to active/shared/observability/ops-alerts.jsonl but never delivered; set ${opsAlertChannel.env_var}=<webhook url> or configure knowledge/personal/notification-preferences.json (then run \`pnpm ops:alerts -- --redeliver\`)`,
+        : `no ops-alert push channel configured — alerts are delivered to the local inbox (pnpm kyberion inbox) and recorded to active/shared/observability/ops-alerts.jsonl; for an external channel set ${opsAlertChannel.env_var}=<webhook url> or configure knowledge/personal/notification-preferences.json (then run \`pnpm ops:alerts -- --redeliver\`)`,
       dist_import_violations: distImportViolations.length
         ? `${distImportViolations.length} dist file(s) import workspace subpaths that don't resolve — run \`pnpm run build\` to rebuild; first: ${distImportViolations[0]}`
         : null,
