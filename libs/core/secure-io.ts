@@ -62,6 +62,11 @@ const SAFE_EXEC_ENV_ALLOWLIST = [
   'SHLVL',
   'NODE_ENV',
   'CI',
+  // Test-run markers: a child spawned by a test resolves live operational
+  // stores into the same vitest-live sandbox as its parent (path-resolver).
+  // Unset outside Vitest, so production children are unaffected.
+  'VITEST',
+  'VITEST_POOL_ID',
   // Non-secret CI metadata: detached checkouts (PR merge refs) cannot resolve
   // a branch via git, so runners spawned through safeExec (vitest workers,
   // pipelines) need these to bind git-bound scaffolds. Never add GITHUB_TOKEN
