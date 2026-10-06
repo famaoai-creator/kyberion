@@ -703,9 +703,28 @@
       ]
     },
     "vcs": {
-      "capture": ["diff", "log", "status"],
+      "capture": [
+        "diff",
+        "gh_status",
+        "log",
+        "pr_checks",
+        "pr_list",
+        "pr_view",
+        "repo_view",
+        "status"
+      ],
       "transform": [],
-      "apply": ["branch", "commit", "pr_create"]
+      "apply": [
+        "branch",
+        "checkout",
+        "commit",
+        "fetch",
+        "pr_create",
+        "pr_merge",
+        "pull",
+        "push",
+        "worktree"
+      ]
     },
     "video-composition": {
       "capture": [
