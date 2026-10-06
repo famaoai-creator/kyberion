@@ -40,6 +40,7 @@ const realFsSecureIo = vi.hoisted(() => ({
   },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
   safeLstat: (filePath: string) => fs.lstatSync(filePath),
+  safeStat: (filePath: string) => fs.statSync(filePath),
   safeReaddir: (dirPath: string) => fs.readdirSync(dirPath),
   safeMkdir: (dirPath: string, options?: { recursive?: boolean }) =>
     fs.mkdirSync(dirPath, { recursive: options?.recursive !== false }),
@@ -306,6 +307,123 @@ describe('mission retrospective loop', () => {
     });
     expect(stats.token_usage.prompt_tokens).toBe(130);
     expect(stats.token_usage.completion_tokens).toBe(53);
+  });
+
+  it('reports evidence timing: closing bursts and deliverables edited after record', () => {
+    // Mission ran ~2h (history span); all evidence was recorded inside a
+    // 4-minute closing window, and one deliverable was edited after its
+    // record-evidence call — the retrofit signature this stat exists to catch.
+    const base = Date.parse('2026-10-06T10:00:00.000Z');
+    // T-1's deliverable was written before its record (normal); T-2's was
+    // modified after its record ts — the current file mtime vs the frozen
+    // ledger stamp is what flags it.
+    fs.writeFileSync(path.join(missionDir, 'evidence', 'T-1.md'), '# t1\n');
+    fs.writeFileSync(path.join(missionDir, 'evidence', 'T-2.md'), '# t2\n');
+    fs.utimesSync(
+      path.join(missionDir, 'evidence', 'T-1.md'),
+      new Date(base + 2 * 3600_000 - 60_000),
+      new Date(base + 2 * 3600_000 - 60_000)
+    );
+    fs.utimesSync(
+      path.join(missionDir, 'evidence', 'T-2.md'),
+      new Date(base + 2 * 3600_000 + 180_000),
+      new Date(base + 2 * 3600_000 + 180_000)
+    );
+    const ledger = [
+      {
+        ts: new Date(base + 2 * 3600_000).toISOString(),
+        event_type: 'evidence_recorded',
+        task_id: 'T-1',
+        payload: {
+          deliverable_path: 'evidence/T-1.md',
+          deliverable_mtime: new Date(base + 2 * 3600_000 - 60_000).toISOString(),
+        },
+      },
+      {
+        ts: new Date(base + 2 * 3600_000 + 120_000).toISOString(),
+        event_type: 'evidence_recorded',
+        task_id: 'T-2',
+        payload: {
+          deliverable_path: 'evidence/T-2.md',
+          deliverable_mtime: new Date(base + 2 * 3600_000 - 30_000).toISOString(),
+        },
+      },
+      {
+        ts: new Date(base + 2 * 3600_000 + 240_000).toISOString(),
+        event_type: 'evidence_recorded',
+        task_id: 'T-3',
+        payload: {},
+      },
+    ];
+    fs.writeFileSync(
+      path.join(missionDir, 'execution-ledger.jsonl'),
+      ledger.map((entry) => JSON.stringify(entry)).join('\n') + '\n'
+    );
+    fs.writeFileSync(
+      path.join(missionDir, 'mission-state.json'),
+      JSON.stringify({
+        mission_id: MISSION,
+        tier: 'public',
+        status: 'archived',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'worker',
+        confidence_score: 1,
+        git: {
+          branch: 'mission-retrospective-test',
+          start_commit: 'abc123',
+          latest_commit: 'abc123',
+          checkpoints: [],
+        },
+        history: [
+          { ts: new Date(base).toISOString(), event: 'ACTIVATE', note: 'activated' },
+          {
+            ts: new Date(base + 2 * 3600_000 + 300_000).toISOString(),
+            event: 'ARCHIVE',
+            note: 'archived',
+          },
+        ],
+        context: {},
+      })
+    );
+
+    const stats = mod.collectMissionExecutionStats(MISSION);
+    expect(stats.evidence_timing.events).toBe(3);
+    expect(stats.evidence_timing.span_ms).toBe(240_000);
+    expect(stats.evidence_timing.mission_active_ms).toBe(2 * 3600_000 + 300_000);
+    expect(stats.evidence_timing.densest_window_share).toBe(1);
+    expect(stats.evidence_timing.closing_burst).toBe(true);
+    expect(stats.evidence_timing.edited_after_record).toEqual(['T-2']);
+  });
+
+  it('does not flag a closing burst for a short mission', () => {
+    const base = Date.parse('2026-10-06T10:00:00.000Z');
+    fs.writeFileSync(
+      path.join(missionDir, 'execution-ledger.jsonl'),
+      [
+        {
+          ts: new Date(base + 60_000).toISOString(),
+          event_type: 'evidence_recorded',
+          task_id: 'T-1',
+          payload: {},
+        },
+        {
+          ts: new Date(base + 240_000).toISOString(),
+          event_type: 'evidence_recorded',
+          task_id: 'T-2',
+          payload: {},
+        },
+      ]
+        .map((entry) => JSON.stringify(entry))
+        .join('\n') + '\n'
+    );
+    const stats = mod.collectMissionExecutionStats(MISSION);
+    expect(stats.evidence_timing.events).toBe(2);
+    expect(stats.evidence_timing.densest_window_share).toBe(1);
+    // 2 events is too few to call it bookkeeping collapse, and the mission's
+    // own duration is unknown (no history) — no burst flag.
+    expect(stats.evidence_timing.closing_burst).toBe(false);
+    expect(stats.evidence_timing.edited_after_record).toEqual([]);
   });
 
   it('does not derive lifecycle stats from a schema-invalid mission state', () => {
