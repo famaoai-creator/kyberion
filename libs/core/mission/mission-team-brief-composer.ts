@@ -9,6 +9,10 @@ import {
   type MissionWorkflowDesign,
 } from './mission-workflow-catalog.js';
 import { resolveMissionReviewDesign, type MissionReviewDesign } from './mission-review-gates.js';
+import {
+  summarizeMissionClassPlaybook,
+  type MissionClassPlaybookSummary,
+} from './mission-class-playbook.js';
 import { composeMissionTeamPlan, type MissionTeamPlan } from './mission-team-plan-composer.js';
 import { type OrganizationProfile } from '../organization/organization-profile.js';
 import {
@@ -42,6 +46,7 @@ export interface MissionTeamCompositionBrief {
   mission_classification: MissionClassification;
   workflow_design: MissionWorkflowDesign;
   review_design: MissionReviewDesign;
+  class_playbook: MissionClassPlaybookSummary;
   team_plan: MissionTeamPlan;
   team_governance: MissionTeamPlan['team_governance'];
   recommended_optional_roles: string[];
@@ -127,6 +132,11 @@ export function composeMissionTeamBrief(
     stage: missionClassification.stage,
   });
 
+  const classPlaybook = summarizeMissionClassPlaybook(
+    missionClassification.mission_class,
+    missionClassification.stage
+  );
+
   const assignedRoles = new Set(teamPlan.assignments.map((entry) => entry.team_role));
   const recommendedOptionalRoles = inferOptionalRoleHints(request).filter(
     (role) => !assignedRoles.has(role)
@@ -140,6 +150,7 @@ export function composeMissionTeamBrief(
     mission_classification: missionClassification,
     workflow_design: workflowDesign,
     review_design: reviewDesign,
+    class_playbook: classPlaybook,
     team_plan: teamPlan,
     team_governance: teamPlan.team_governance,
     recommended_optional_roles: recommendedOptionalRoles,
@@ -148,6 +159,7 @@ export function composeMissionTeamBrief(
       `Mission class resolved as ${missionClassification.mission_class} at stage ${missionClassification.stage}.`,
       `Workflow ${workflowDesign.workflow_id} selected for execution shape ${input.executionShape || 'mission'}.`,
       `Review mode ${reviewDesign.review_mode} selected with ${reviewDesign.required_gate_ids.length} required gate(s).`,
+      `Class playbook ${classPlaybook.class_id} applies posture ${classPlaybook.posture}: ${classPlaybook.posture_description}`,
     ],
   };
 }
