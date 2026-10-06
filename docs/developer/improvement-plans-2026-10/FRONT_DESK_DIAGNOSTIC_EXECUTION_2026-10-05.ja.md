@@ -65,3 +65,17 @@ Mappings は空のまま両方の front desk と supervisor / executor / WorkIte
 - 合成 fixture の API・UI テストは実ユーザーの OIDC ログイン証拠ではない。実ログインを伴う一連の操作は、認証済みブラウザー環境で別途確認する。
 
 パス検査は既存の repository path guard に従う。検査後に悪意あるローカルプロセスが親ディレクトリを差し替える場合まで、ファイルシステム操作全体を原子的に防ぐという保証はしない。ここでの同一 bytes 保証は、検証した buffer を表示用に使い、検証後の配信目的の再読込みをしないことを指す。
+
+## 未実行を確認できる保留依頼の終了
+
+- 記録済みの approved / applied 承認を現在の実行根拠として検証できない場合でも、その承認を書き換えたり再署名したりしない。現在の本人のブラウザーセッション、owner / approver 所属、同じ tenant・mapping・request digest を検証したうえで、専用の終了操作だけを提示する。
+- 終了候補の GET は読み取りのみ。action、WorkItem、lease、coordination event、work result の保存済み履歴を厳密に検査する。過去・終了済み・別 ID の関連行も対象にし、artifact / runtime output があれば終了しない。ファイル欠落、壊れた行、読み取り不能、曖昧な関連は「未実行」の証拠にしない。
+- dispatch は最新の pending 状態・binding・scope・request digest を確認して tombstone の再実行を防ぐ。親 artifact と sibling の完全な lineage 検証は intake と executor の実行準備で行う。承認後に親の内容が変わると WorkItem が作られた後で実行前に止まる場合があり、その依頼は本復旧の対象に戻さない。
+- 初期環境では、まだ作られていない履歴ファイルのために操作を提示できない場合がある。空ファイルを作って条件を満たしてはいけない。この変更は保存証拠が揃っているケースだけを扱い、不明な実行や汎用 retry を回復するものではない。
+- 本人が対象と digest を確認して終了ボタンを押した時だけ POST する。intake / dispatch / settlement と同じ work-item fence、coordination fence、conversation history fence、result fence の順で保護し、最後に本人の認証を再確認する。
+- transcript v5 に terminated_unstarted と変更不能の recovery receipt を先に保存し、次に同じ action を declined にする。receipt は完全な binding、旧承認と action の hash、本人・session、確認した digest と日時を保持する。元の承認と旧依頼の UUID は残す。
+- 途中で停止した場合は、同じ receipt の終了処理だけを明示的に再確認できる。GET、再サインイン、ページ再表示、結果不明の再読込みでは何も実行しない。両方の terminal 記録と保存証拠を読み戻して初めて終了と表示する。
+- 「新しい依頼」は別ボタン。終了済みの全対象を現在の状態と照合してから新しい UUID を発行し、別の人間承認を要求する。旧 UUID の再送は仕事を作り直さない。First job の新規 root は既存依頼の安全な終了が確認できた場合だけで、確認済み成果物の形式変更は従来の revision 操作を使う。
+- 形式変更の依頼を終了した場合は、同じ親にある過去の子依頼がすべて厳密に終了確認できた時だけ、親の canRevise を戻す。別の UUID と別承認で新しい子を作り、親の revision・hash を再検証する。古い子は消さず、同じ親に未終了の子を複数作らない。表示上の revision が同じでも request UUID と成果物パスは別になる。
+- 保証の範囲は、保存済みの governed 履歴と同じ PID / filesystem namespace の更新済み writer。全履歴を悪意あるローカル actor が削除・改ざんした状況や、guard 検査後の親ディレクトリ差し替えを原子的に防ぐ保証ではない。
+- 合成セッション・DOM・実ファイル・複数 process の検証は、実ユーザーの OIDC ログインや画面目視確認の代わりにはならない。実環境の承認者・tenant・provider 設定は作成しない。

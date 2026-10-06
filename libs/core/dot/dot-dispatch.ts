@@ -1,3 +1,23 @@
+import {
+  DOT_ACTION_LEDGER_PATH,
+  appendActionRecord,
+  currentDotActions,
+  dotProposalHash,
+  type DotActionRecord,
+  type DotActionStatus,
+} from './dot-action-ledger.js';
+export {
+  DOT_ACTION_LEDGER_PATH,
+  readDotActionLedger,
+  readDotActionLedgerStrict,
+  dotActionRecordHash,
+  declineRecoveredDotAction,
+  currentDotActions,
+  latestDotActions,
+  dotProposalHash,
+  type DotActionStatus,
+  type DotActionRecord,
+} from './dot-action-ledger.js';
 import { assertBuiltinOnlyWorkerEventStream } from '../workforce/worker-event-stream.js';
 import {
   firstJobApprovalEffect,
@@ -32,9 +52,11 @@ import {
  */
 
 import * as path from 'node:path';
-import { createHash } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir } from '../secure-io.js';
+import { withFrontDeskDispatchLock } from '../surface/front-desk-dispatch-lock.js';
+import { inspectFrontDeskPendingRequest as inspectPendingRequest } from '../surface/front-desk-conversation-persistence.js';
+import { recoveryEvidenceHash } from '../surface/front-desk-recovery-receipt.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { matchesCron, getZonedDateParts } from '../pipeline/cron-utils.js';
 import {
@@ -117,7 +139,6 @@ import {
 
 const logger = createLogger('dot-dispatch');
 
-export const DOT_ACTION_LEDGER_PATH = 'active/shared/runtime/dot-action-ledger.jsonl';
 /**
  * Shapes a charter may dispatch when it declares no `allowed_work_shapes`.
  * `task_session` is not a default: no governed task-session executor exists,
@@ -136,48 +157,6 @@ const GOVERNED_STORE_ROLE = 'infrastructure_sentinel';
 
 const DECISION_RANK: Record<DotDecisionLevel, number> = { auto: 0, notify: 1, approve: 2 };
 const OPEN_WORK_ITEM_STATUSES = ['backlog', 'ready', 'in_progress', 'blocked', 'review'] as const;
-
-export type DotActionStatus = 'dispatched' | 'parked' | 'refused' | 'shadow' | 'declined';
-
-export interface DotActionRecord {
-  front_desk_execution?: FrontDeskExecutionBinding;
-  action_ref: string;
-  dot_id: string;
-  actor_id: string;
-  action_id: string;
-  title: string;
-  objective: string;
-  work_shape: DotWorkShape;
-  status: DotActionStatus;
-  proposal_hash: string;
-  decision?: DotDecisionLevel;
-  gate_decision?: DotDecisionLevel;
-  floor?: DotDecisionLevel;
-  handoff_to?: string;
-  priority?: DotProposal['priority'];
-  rationale?: string;
-  /** Carried from the proposal into the WorkItem metadata for the executor (DL-01). */
-  pipeline_ref?: DotProposal['pipeline_ref'];
-  expected_effect?: DotProposal['expected_effect'];
-  target?: DotProposal['target'];
-  intent?: DotProposal['intent'];
-  request_id?: string;
-  work_item_id?: string;
-  reason?: string;
-  /** Set when the action was declined as `superseded` by another dot's approved action (DL-11). */
-  superseded_by?: { dot_id: string; action_ref: string };
-  /** Disposition override that recorded this action as `shadow` only (L0). */
-  disposition_by?: string;
-  /** Set when a pre-gate check forced an operator decision. */
-  escalation?: {
-    check_id: string;
-    reason: string;
-    link?: { action_ref: string; dot_id: string };
-    /** All linked conflicts when several escalations merged; only `link` is superseded on approve. */
-    links?: Array<{ action_ref: string; dot_id: string }>;
-  };
-  at: string;
-}
 
 export interface DotDispatchDeps {
   rootDir?: string;
@@ -236,64 +215,6 @@ export function dotActorId(dotId: string): string {
 
 function nowOf(deps: DotDispatchDeps): Date {
   return deps.now?.() ?? new Date();
-}
-
-function ledgerFile(deps: DotDispatchDeps): string {
-  return path.join(deps.rootDir ?? pathResolver.rootDir(), DOT_ACTION_LEDGER_PATH);
-}
-
-export function readDotActionLedger(deps: DotDispatchDeps = {}): DotActionRecord[] {
-  return readJsonLines<DotActionRecord>(ledgerFile(deps), { onMalformed: 'skip' }).filter(
-    (row) => typeof row?.action_ref === 'string' && typeof row.dot_id === 'string'
-  );
-}
-
-function appendActionRecord(record: DotActionRecord, deps: DotDispatchDeps): DotActionRecord {
-  const filePath = ledgerFile(deps);
-  safeMkdir(path.dirname(filePath), { recursive: true });
-  appendJsonLine(filePath, record);
-  return record;
-}
-
-/** Latest state per action_ref for one dot (insertion order preserved). */
-export function currentDotActions(dotId: string, deps: DotDispatchDeps = {}): DotActionRecord[] {
-  const latest = new Map<string, DotActionRecord>();
-  for (const row of readDotActionLedger(deps)) {
-    if (row.dot_id === dotId) latest.set(row.action_ref, row);
-  }
-  return [...latest.values()];
-}
-
-/**
- * Latest state per action_ref across every dot (insertion order preserved).
- * Callers comparing dots must apply their own tenant-scope filter.
- */
-export function latestDotActions(deps: DotDispatchDeps = {}): DotActionRecord[] {
-  const latest = new Map<string, DotActionRecord>();
-  for (const row of readDotActionLedger(deps)) latest.set(row.action_ref, row);
-  return [...latest.values()];
-}
-
-/** Identity of a proposal for dedupe: includes pipeline, target and intent so opposing proposals never collapse. */
-export function dotProposalHash(dotId: string, proposal: DotProposal): string {
-  return createHash('sha256')
-    .update(
-      JSON.stringify([
-        dotId,
-        proposal.action_id,
-        proposal.title,
-        proposal.objective,
-        ...(proposal.front_desk_execution ? [proposal.front_desk_execution] : []),
-        proposal.handoff_to ?? '',
-        // Appended only when set, so hashes of proposals without these fields
-        // (and their dedupe windows) are unchanged.
-        ...(proposal.pipeline_ref || proposal.target || proposal.intent
-          ? [proposal.pipeline_ref ?? '', proposal.target ?? '', proposal.intent ?? '']
-          : []),
-      ])
-    )
-    .digest('hex')
-    .slice(0, 16);
 }
 
 function strictest(...levels: Array<DotDecisionLevel | undefined>): DotDecisionLevel | undefined {
@@ -835,6 +756,49 @@ function executeDotAction(
   deps: DotDispatchDeps,
   options: { reuseExisting?: boolean } = {}
 ): DotActionRecord {
+  const binding = record.front_desk_execution;
+  if (!binding) return executeDotActionUnlocked(charter, record, deps, options);
+  return withFrontDeskDispatchLock(binding, () => {
+    const latest = currentDotActions(charter.dot_id, deps).find(
+      (row) => row.action_ref === record.action_ref
+    );
+    if (latest && latest.status !== 'parked') return latest;
+    if (
+      options.reuseExisting &&
+      (!latest ||
+        latest.request_id !== record.request_id ||
+        latest.proposal_hash !== record.proposal_hash ||
+        recoveryEvidenceHash(latest.front_desk_execution) !== recoveryEvidenceHash(binding))
+    )
+      return latest ?? record;
+    const admission = inspectPendingRequest(binding, charter, deps);
+    if (!admission.ok) return latest ?? record;
+    const approval = record.request_id
+      ? (deps.loadApproval ?? ((id: string) => loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, id)))(
+          record.request_id
+        )
+      : null;
+    if (isFrontDeskDiagnosticDot(charter) || hasFirstJobDiagnosticProvenance(binding, approval)) {
+      if (
+        !deps.assertTenant ||
+        !isFrontDeskDiagnosticDot(charter) ||
+        !approval ||
+        !hasVerifiedFirstJobDecision(approval, charter, binding, Date.now())
+      )
+        return latest ?? record;
+      requireCurrentFrontDeskDiagnosticDot(charter, deps.rootDir);
+      assertBuiltinOnlyWorkerEventStream();
+    }
+    return executeDotActionUnlocked(charter, record, deps, options);
+  });
+}
+
+function executeDotActionUnlocked(
+  charter: DotCharter,
+  record: DotActionRecord,
+  deps: DotDispatchDeps,
+  options: { reuseExisting?: boolean } = {}
+): DotActionRecord {
   const actor = dotActorId(charter.dot_id);
   let item: WorkItem;
   try {
@@ -951,6 +915,38 @@ export interface DotDispatchResult {
 
 /** Govern every proposal from one wake. Never throws for a single bad proposal. */
 export function dispatchDotProposals(
+  charter: DotCharter,
+  proposals: readonly DotProposal[],
+  deps: DotDispatchDeps = {}
+): DotDispatchResult {
+  if (!proposals.some((proposal) => proposal.front_desk_execution))
+    return dispatchDotProposalsUnlocked(charter, proposals, deps);
+  const result: DotDispatchResult = { records: [], duplicates: [] };
+  for (const proposal of proposals) {
+    const dispatch = () => {
+      if (proposal.front_desk_execution) {
+        const admission = inspectPendingRequest(proposal.front_desk_execution, charter, deps);
+        if (!admission.ok) return;
+        const prior = currentDotActions(charter.dot_id, deps).find(
+          (row) => row.action_ref === 'frontdesk-' + proposal.front_desk_execution!.work_item_id
+        );
+        if (prior) {
+          result.duplicates.push(prior.action_ref);
+          return;
+        }
+      }
+      const next = dispatchDotProposalsUnlocked(charter, [proposal], deps);
+      result.records.push(...next.records);
+      result.duplicates.push(...next.duplicates);
+    };
+    if (proposal.front_desk_execution)
+      withFrontDeskDispatchLock(proposal.front_desk_execution, dispatch);
+    else dispatch();
+  }
+  return result;
+}
+
+function dispatchDotProposalsUnlocked(
   charter: DotCharter,
   proposals: readonly DotProposal[],
   deps: DotDispatchDeps = {}
@@ -1251,6 +1247,23 @@ export function supersedeDotParkedAction(
   supersededBy: { dot_id: string; action_ref: string },
   deps: DotDispatchDeps = {}
 ): DotActionRecord | undefined {
+  const candidate = currentDotActions(charter.dot_id, deps).find(
+    (row) => row.action_ref === actionRef
+  );
+  if (!candidate?.front_desk_execution)
+    return supersedeDotParkedActionUnlocked(charter, actionRef, supersededBy, deps);
+  return withFrontDeskDispatchLock(candidate.front_desk_execution, () => {
+    if (!inspectPendingRequest(candidate.front_desk_execution!, charter, deps).ok) return undefined;
+    return supersedeDotParkedActionUnlocked(charter, actionRef, supersededBy, deps);
+  });
+}
+
+function supersedeDotParkedActionUnlocked(
+  charter: DotCharter,
+  actionRef: string,
+  supersededBy: { dot_id: string; action_ref: string },
+  deps: DotDispatchDeps = {}
+): DotActionRecord | undefined {
   const row = currentDotActions(charter.dot_id, deps).find(
     (candidate) => candidate.action_ref === actionRef
   );
@@ -1308,89 +1321,103 @@ export function settleDotParkedActions(
     deps.loadApproval ??
     ((requestId: string) => loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, requestId));
   const feedbackDeps = { rootDir: deps.rootDir, now: deps.now, ...(deps.feedback ?? {}) };
-  for (const row of currentDotActions(charter.dot_id, deps)) {
-    if (row.status !== 'parked' || !row.request_id) continue;
-    let approval: ApprovalRequestRecord | null;
-    try {
-      approval = load(row.request_id);
-    } catch (error) {
-      logger.warn(
-        `[dot-dispatch] approval ${row.request_id} unreadable for ${charter.dot_id} — ${error instanceof Error ? error.message : error} | next: retried on the next sweep`
+  for (const candidate of currentDotActions(charter.dot_id, deps)) {
+    const settle = () => {
+      const row = currentDotActions(charter.dot_id, deps).find(
+        (value) => value.action_ref === candidate.action_ref
       );
-      continue;
-    }
-    const diagnostic =
-      isFrontDeskDiagnosticDot(charter) ||
-      hasFirstJobDiagnosticProvenance(row.front_desk_execution, approval);
-    if (diagnostic) {
-      if (!deps.assertTenant || !isFrontDeskDiagnosticDot(charter)) continue;
+      if (!row) return;
+      if (
+        row.front_desk_execution &&
+        !inspectPendingRequest(row.front_desk_execution, charter, deps).ok
+      )
+        return;
+      if (row.status !== 'parked' || !row.request_id) return;
+      let approval: ApprovalRequestRecord | null;
       try {
-        requireCurrentFrontDeskDiagnosticDot(charter, deps.rootDir);
-      } catch {
-        continue;
+        approval = load(row.request_id);
+      } catch (error) {
+        logger.warn(
+          `[dot-dispatch] approval ${row.request_id} unreadable for ${charter.dot_id} — ${error instanceof Error ? error.message : error} | next: retried on the next sweep`
+        );
+        return;
       }
-      assertBuiltinOnlyWorkerEventStream();
-    }
-    // Preserve old/forged approved evidence without treating it as authority.
-    if (
-      approval &&
-      (approval.status === 'approved' || approval.status === 'applied') &&
-      diagnostic &&
-      (!row.front_desk_execution ||
-        !hasVerifiedFirstJobDecision(approval, charter, row.front_desk_execution, Date.now()))
-    )
-      continue;
-    if (approval?.status === 'pending' && dotDecisionExpired(charter, row, approval, deps)) {
-      approval = expirePendingDecision(approval, deps);
-    }
-    const outcome = approval ? SETTLED_STATUS[approval.status] : 'cancelled';
-    if (!outcome) continue;
-    const decidedBy = approval?.decidedBy;
-    if (!hasDotFeedbackFor(charter.dot_id, row.action_ref, feedbackDeps)) {
-      recordDotFeedback(
-        {
-          dot_id: charter.dot_id,
-          action_id: row.action_id,
-          action_ref: row.action_ref,
-          outcome,
-          title: row.title,
-          ...(decidedBy ? { decided_by: decidedBy } : {}),
-          ...(approval?.decidedByType ? { decided_by_type: approval.decidedByType } : {}),
-          ...(approval?.changeRequest
-            ? { note: JSON.stringify(approval.changeRequest).slice(0, 300) }
-            : {}),
-        },
-        feedbackDeps
-      );
-    }
-    if (outcome !== 'approved') {
+      const diagnostic =
+        isFrontDeskDiagnosticDot(charter) ||
+        hasFirstJobDiagnosticProvenance(row.front_desk_execution, approval);
+      if (diagnostic) {
+        if (!deps.assertTenant || !isFrontDeskDiagnosticDot(charter)) return;
+        try {
+          requireCurrentFrontDeskDiagnosticDot(charter, deps.rootDir);
+        } catch {
+          return;
+        }
+        assertBuiltinOnlyWorkerEventStream();
+      }
+      // Preserve old/forged approved evidence without treating it as authority.
+      if (
+        approval &&
+        (approval.status === 'approved' || approval.status === 'applied') &&
+        diagnostic &&
+        (!row.front_desk_execution ||
+          !hasVerifiedFirstJobDecision(approval, charter, row.front_desk_execution, Date.now()))
+      )
+        return;
+      if (approval?.status === 'pending' && dotDecisionExpired(charter, row, approval, deps)) {
+        approval = expirePendingDecision(approval, deps);
+      }
+      const outcome = approval ? SETTLED_STATUS[approval.status] : 'cancelled';
+      if (!outcome) return;
+      const decidedBy = approval?.decidedBy;
+      if (!hasDotFeedbackFor(charter.dot_id, row.action_ref, feedbackDeps)) {
+        recordDotFeedback(
+          {
+            dot_id: charter.dot_id,
+            action_id: row.action_id,
+            action_ref: row.action_ref,
+            outcome,
+            title: row.title,
+            ...(decidedBy ? { decided_by: decidedBy } : {}),
+            ...(approval?.decidedByType ? { decided_by_type: approval.decidedByType } : {}),
+            ...(approval?.changeRequest
+              ? { note: JSON.stringify(approval.changeRequest).slice(0, 300) }
+              : {}),
+          },
+          feedbackDeps
+        );
+      }
+      if (outcome !== 'approved') {
+        settled.push(
+          declineParked(
+            charter,
+            row,
+            approval ? `approval ${approval.status}` : 'approval request missing',
+            deps
+          )
+        );
+        return;
+      }
+      const scope = checkDotProposalScope(charter, row, deps);
+      if (scope.ok === false) {
+        settled.push(
+          declineParked(charter, row, `approved but no longer in scope: ${scope.reason}`, deps)
+        );
+        return;
+      }
       settled.push(
-        declineParked(
+        executeDotAction(
           charter,
-          row,
-          approval ? `approval ${approval.status}` : 'approval request missing',
-          deps
+          { ...row, reason: `approved by ${decidedBy ?? 'operator'}` },
+          deps,
+          {
+            reuseExisting: true,
+          }
         )
       );
-      continue;
-    }
-    const scope = checkDotProposalScope(charter, row, deps);
-    if (scope.ok === false) {
-      settled.push(
-        declineParked(charter, row, `approved but no longer in scope: ${scope.reason}`, deps)
-      );
-      continue;
-    }
-    settled.push(
-      executeDotAction(
-        charter,
-        { ...row, reason: `approved by ${decidedBy ?? 'operator'}` },
-        deps,
-        {
-          reuseExisting: true,
-        }
-      )
-    );
+    };
+    if (candidate.front_desk_execution)
+      withFrontDeskDispatchLock(candidate.front_desk_execution, settle);
+    else settle();
   }
   return settled;
 }

@@ -1,3 +1,7 @@
+import {
+  readFirstJobRecoveries,
+  terminateFirstJobRequest,
+} from '@agent/core/surface/first-job-recovery';
 import { normalizeLocale } from '@agent/core/locale-normalize';
 /** Local-only typed diagnostic intake; outer authentication and rate limits remain installed. */
 import type express from 'express';
@@ -6,6 +10,7 @@ import {
   parseFirstJobReadRequest,
   parseFirstJobArtifactReadRequest,
   parseFirstJobApprovalDecisionRequest,
+  parseFirstJobRecoveryRequest,
 } from '@agent/core/surface/first-job-contract';
 import {
   FIRST_JOB_NEXT_ACTION,
@@ -107,7 +112,18 @@ export function registerFirstJobRoutes(app: express.Express): void {
       const input = parseFirstJobReadRequest(req.query);
       if (!input || (input.locale !== undefined && !normalizeLocale(input.locale)))
         return failure(res, 400, 'first_job_invalid_request', true);
-      return res.json(readFirstJobApprovals(viewer, credentialFor(req), input));
+      const approvals = readFirstJobApprovals(viewer, credentialFor(req), input);
+      const recovery_requests =
+        approvals.auth.status === 'ready' && approvals.readiness.ready
+          ? readFirstJobRecoveries(viewer, credentialFor(req), input)
+          : [];
+      return res.json({
+        ...approvals,
+        recovery_requests,
+        held_requests: approvals.held_requests.filter(
+          (held) => !recovery_requests.some((row) => row.request_id === held.request_id)
+        ),
+      });
     } catch (error) {
       return failure(
         res,
@@ -140,6 +156,26 @@ export function registerFirstJobRoutes(app: express.Express): void {
       if (error instanceof PresenceStudioViewerError)
         return failure(res, error.status, 'first_job_access_denied', true);
       return failure(res, 503, 'first_job_decision_uncertain', false);
+    }
+  });
+
+  app.post('/api/first-job/recovery/:requestId', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    try {
+      const viewer = viewerFor(req);
+      if (!sameOrigin(req)) return failure(res, 403, 'first_job_origin_denied', true);
+      const input = parseFirstJobRecoveryRequest(req.body);
+      if (!input || Object.keys(req.query).length !== 0 || typeof req.params.requestId !== 'string')
+        return failure(res, 400, 'first_job_invalid_request', true);
+      return res.json(
+        terminateFirstJobRequest(viewer, credentialFor(req), req.params.requestId, input)
+      );
+    } catch (error) {
+      if (error instanceof FirstJobApprovalError)
+        return failure(res, error.status, error.message, false);
+      if (error instanceof PresenceStudioViewerError)
+        return failure(res, error.status, 'first_job_access_denied', false);
+      return failure(res, 503, 'first_job_recovery_uncertain', false);
     }
   });
 

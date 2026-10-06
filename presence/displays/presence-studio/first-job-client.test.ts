@@ -14,7 +14,13 @@ class Element {
   type = '';
   attributes: Record<string, string> = {};
   listeners: Record<string, () => void> = {};
-  constructor(readonly tagName = 'div') {}
+  constructor(
+    readonly tagName = 'div',
+    private onFocus?: (element: Element) => void
+  ) {}
+  focus() {
+    this.onFocus?.(this);
+  }
   get textContent(): string {
     return this.ownText + this.children.map((child) => child.textContent).join(' ');
   }
@@ -92,12 +98,14 @@ function harness(
     storageThrows?: boolean;
     cryptoMissing?: boolean;
     approvalReady?: boolean;
+    recoveryRequests?: Array<Record<string, unknown>>;
     heldRequests?: Array<{ request_id: string; status: string; recovery: string }>;
     ready?: Promise<void>;
     hidden?: boolean;
     get?: () => ReturnType<typeof reply> | Promise<ReturnType<typeof reply>>;
+    approvals?: () => ReturnType<typeof reply> | Promise<ReturnType<typeof reply>>;
     body?: (query: URLSearchParams) => ReturnType<typeof reply> | Promise<ReturnType<typeof reply>>;
-    post?: (body: Record<string, unknown>) => Promise<ReturnType<typeof reply>>;
+    post?: (body: Record<string, unknown>, url?: string) => Promise<ReturnType<typeof reply>>;
     vocabularyFails?: boolean;
   } = {}
 ) {
@@ -109,9 +117,14 @@ function harness(
       'tick',
       'setup',
       'start',
+      'restart',
+      'restart-note',
       'refresh',
       'retry',
       'approval',
+      ...['readiness', 'signin', 'refresh', 'error', 'status', 'items'].map(
+        (id) => 'approval-' + id
+      ),
       'status',
       'error',
       'history',
@@ -165,12 +178,14 @@ function harness(
         onChange: (status: {
           ready: boolean;
           busy: boolean;
+          recoveryRequests?: Array<Record<string, unknown>>;
           heldRequests?: Array<{ request_id: string; status: string; recovery: string }>;
         }) => void;
       }) =>
         context.onChange({
           ready: options.approvalReady !== false,
           busy: false,
+          recoveryRequests: options.recoveryRequests,
           heldRequests: options.heldRequests,
         }),
       invalidate: vi.fn(),
@@ -182,13 +197,15 @@ function harness(
   const fetch = vi.fn(async (url: string, init?: { method?: string; body?: string }) => {
     if (init?.method === 'POST')
       return options.post
-        ? options.post(JSON.parse(init.body!))
+        ? options.post(JSON.parse(init.body!), url)
         : reply(snapshot({ historySaved: true }));
     if (url.startsWith('/api/ui-vocabulary')) {
       if (options.vocabularyFails) throw new Error('offline');
       const texts = new Proxy({}, { get: (_target, key) => String(key) });
       return reply({ ok: true, texts });
     }
+    if (url.startsWith('/api/first-job/approvals?'))
+      return options.approvals ? options.approvals() : reply({ ok: false });
     if (url.startsWith('/api/first-job/artifact?')) {
       const query = new URLSearchParams(url.split('?')[1]);
       return options.body
@@ -208,6 +225,7 @@ function harness(
     throw new Error('Unexpected fetch ' + url);
   });
   const document = {
+    activeElement: null as Element | null,
     hidden: options.hidden === true,
     visibilityState: options.hidden ? 'hidden' : 'visible',
     addEventListener: (event: string, handler: () => void) => {
@@ -215,8 +233,20 @@ function harness(
     },
     documentElement: { getAttribute: () => 'en' },
     getElementById: (id: string) => elements.get(id.replace('first-job-', '')) ?? null,
-    createElement: (tag: string) => new Element(tag),
+    createElement: (tag: string) =>
+      new Element(tag, (element) => {
+        document.activeElement = element;
+      }),
   };
+  if (options.approvals)
+    runInNewContext(
+      String(
+        safeReadFile('presence/displays/presence-studio/static/first-job-approval.js', {
+          encoding: 'utf8',
+        })
+      ),
+      { window, document, fetch, URLSearchParams }
+    );
   runInNewContext(
     String(
       safeReadFile('presence/displays/presence-studio/static/first-job.js', { encoding: 'utf8' })
@@ -1374,5 +1404,549 @@ describe('Approval read coordination remains bounded', () => {
     expect(h.reads()).toHaveLength(2);
     expect(h.timers.size).toBe(0);
     expect(h.posts()).toHaveLength(0);
+  });
+});
+
+describe('Explicit new-request action after authoritative terminal recovery', () => {
+  const terminalRecovery = (overrides: Record<string, unknown> = {}) => ({
+    request_id: first,
+    approval_request_id: second,
+    session_id: session,
+    status: 'terminated_unstarted',
+    display_digest: 'd'.repeat(64),
+    revision: 1,
+    tenant: 'onboarding-test',
+    ...overrides,
+  });
+  const terminalTask = (overrides: Record<string, unknown> = {}) => ({
+    id: first,
+    turnState: 'settled',
+    executionStatus: 'terminated_unstarted',
+    ...overrides,
+  });
+  const terminalSnapshot = (overrides: Record<string, unknown> = {}) =>
+    snapshot({
+      scope: { tier: 'public', tenant: 'onboarding-test' },
+      tasks: [terminalTask()],
+      messages: [
+        { id: first + '-user', role: 'user' },
+        { id: first + '-secretary', role: 'secretary' },
+      ],
+      ...overrides,
+    });
+  it('creates a different UUID only after a separate explicit click, without reusing any approval', async () => {
+    const h = harness({
+      get: () => reply(terminalSnapshot()),
+      recoveryRequests: [terminalRecovery()],
+    });
+    await flush();
+    expect(h.posts()).toHaveLength(0);
+    expect(h.get('start').disabled).toBe(true);
+    expect(h.get('restart').hidden).toBe(false);
+    expect(h.get('restart').disabled).toBe(false);
+    h.get('restart').fire();
+    h.get('restart').fire();
+    await flush();
+    expect(h.posts()).toHaveLength(1);
+    const body = JSON.parse(h.posts()[0][1]!.body!);
+    expect(body).toEqual({
+      action: 'start',
+      request_id: expect.any(String),
+      session_id: session,
+      locale: 'en',
+    });
+    expect(body.request_id).not.toBe(first);
+    expect(body.request_id).not.toBe(second);
+  });
+  it.each([
+    { status: 'eligible' },
+    { tenant: 'another-tenant' },
+    { session_id: 'concierge-' + 'b'.repeat(64) },
+    { revision: 0 },
+    { display_digest: 'bad' },
+    { request_id: second },
+  ])(
+    'does not replace a request based on unmatched/incomplete recovery evidence: %j',
+    async (override) => {
+      const h = harness({
+        get: () => reply(terminalSnapshot()),
+        recoveryRequests: [terminalRecovery(override)],
+      });
+      await flush();
+      expect(h.get('restart').disabled).toBe(true);
+      h.get('restart').fire();
+      expect(h.posts()).toHaveLength(0);
+    }
+  );
+  it.each([
+    {
+      tasks: [
+        terminalTask({
+          artifact: artifact({
+            revision: 2,
+            verification: 'unknown',
+            currentness: 'older_requested',
+          }),
+        }),
+      ],
+    },
+    { tasks: [terminalTask({ turnState: 'uncertain' })] },
+    { tasks: [terminalTask({ turnState: 'pending' })] },
+    {
+      tasks: [
+        terminalTask({
+          executionStatus: 'queued',
+          artifact: artifact({ verification: 'unknown', currentness: 'requested_pending' }),
+        }),
+      ],
+    },
+    { tasks: [terminalTask({ executionStatus: 'running' })] },
+    { tasks: [terminalTask({ executionStatus: 'awaiting_approval' })] },
+    {
+      tasks: [
+        terminalTask({
+          artifact: artifact({ verification: 'unknown', currentness: 'requested_unknown' }),
+        }),
+      ],
+    },
+    { tasks: [terminalTask(), { id: second, turnState: 'settled', executionStatus: 'blocked' }] },
+    { pending: 1 },
+    { messages: [{ id: second + '-user', role: 'user' }] },
+    {
+      messages: [
+        { id: first + '-secretary', role: 'secretary', artifact: artifact({ canRevise: true }) },
+      ],
+    },
+  ])('fails closed until all task/transcript state is terminal: %j', async (override) => {
+    const h = harness({
+      get: () => reply(terminalSnapshot(override)),
+      recoveryRequests: [terminalRecovery()],
+    });
+    await flush();
+    expect(h.get('restart').disabled).toBe(true);
+    h.get('restart').fire();
+    expect(h.posts()).toHaveLength(0);
+  });
+  it('does not offer restart for missing recovery readback, held proof, or lost authentication', async () => {
+    for (const extra of [
+      {},
+      { recoveryRequests: [terminalRecovery()], approvalReady: false },
+      {
+        recoveryRequests: [terminalRecovery()],
+        heldRequests: [
+          {
+            request_id: first,
+            status: 'approval_verification_failed',
+            recovery: 'operator_recovery',
+          },
+        ],
+      },
+    ]) {
+      const h = harness({ get: () => reply(terminalSnapshot()), ...extra });
+      await flush();
+      expect(h.get('restart').disabled).toBe(true);
+      h.get('restart').fire();
+      expect(h.posts()).toHaveLength(0);
+    }
+  });
+  it('requires fresh read-only verification after Back/Forward and ignores clicks while hidden', async () => {
+    const read = deferred<ReturnType<typeof reply>>();
+    let next = false;
+    const h = harness({
+      get: () => (next ? read.promise : reply(terminalSnapshot())),
+      recoveryRequests: [terminalRecovery()],
+    });
+    await flush();
+    expect(h.get('restart').disabled).toBe(false);
+    h.page('pagehide');
+    h.get('restart').fire();
+    expect(h.posts()).toHaveLength(0);
+    next = true;
+    h.page('pageshow');
+    await flush();
+    expect(h.get('restart').disabled).toBe(true);
+    h.get('restart').fire();
+    expect(h.posts()).toHaveLength(0);
+    read.resolve(reply(terminalSnapshot()));
+    await flush();
+    expect(h.get('restart').disabled).toBe(false);
+    expect(h.posts()).toHaveLength(0);
+  });
+  it('combines both scripts: ending only reads back, then a separate click creates a new request', async () => {
+    let ended = false;
+    const h = harness({
+      get: () =>
+        reply(
+          terminalSnapshot({
+            tasks: [
+              terminalTask({
+                executionStatus: ended ? 'terminated_unstarted' : 'queued',
+                ...(ended
+                  ? {}
+                  : {
+                      artifact: artifact({
+                        verification: 'unknown',
+                        currentness: 'requested_pending',
+                      }),
+                    }),
+              }),
+            ],
+          })
+        ),
+      approvals: () =>
+        reply({
+          ok: true,
+          auth: { status: 'ready' },
+          readiness: { ready: true, status: 'ready' },
+          approvals: [],
+          recovery_requests: [
+            terminalRecovery({ status: ended ? 'terminated_unstarted' : 'eligible' }),
+          ],
+        }),
+      post: async (body, url) => {
+        if (url!.startsWith('/api/first-job/recovery/')) {
+          ended = true;
+          return reply({ ok: true, request_id: first, status: 'terminated_unstarted' });
+        }
+        return reply(
+          terminalSnapshot({
+            tasks: [
+              {
+                id: body.request_id,
+                turnState: 'settled',
+                executionStatus: 'awaiting_approval',
+                artifact: artifact({
+                  requestId: body.request_id,
+                  verification: 'pending',
+                  currentness: 'requested_pending',
+                }),
+              },
+            ],
+          })
+        );
+      },
+    });
+    const buttons = () =>
+      h
+        .get('approval-items')
+        .descendants()
+        .filter((node) => node.tagName === 'button');
+    await flush();
+    expect(h.get('restart').disabled).toBe(true);
+    buttons()[0].fire();
+    buttons()[0].fire();
+    await flush();
+    expect(h.posts()).toHaveLength(1);
+    expect(h.reads()).toHaveLength(2);
+    expect(h.get('restart').disabled).toBe(false);
+    expect(h.get('approval-items').textContent).toContain('recovery_terminated');
+    h.get('restart').fire();
+    await flush();
+    expect(h.posts()).toHaveLength(2);
+    expect(h.posts()[1][0]).toBe('/api/first-job');
+    const request = JSON.parse(h.posts()[1][1]!.body!);
+    expect(request.action).toBe('start');
+    expect(request.request_id).not.toBe(first);
+    expect(request.approval_request_id).toBeUndefined();
+  });
+  it('requires the main snapshot read after a lost POST even if approval-only refresh confirms termination', async () => {
+    let ended = false;
+    const h = harness({
+      get: () =>
+        reply(
+          terminalSnapshot({
+            tasks: [terminalTask({ executionStatus: ended ? 'terminated_unstarted' : 'queued' })],
+          })
+        ),
+      approvals: () =>
+        reply({
+          ok: true,
+          auth: { status: 'ready' },
+          readiness: { ready: true, status: 'ready' },
+          approvals: [],
+          recovery_requests: [
+            terminalRecovery({ status: ended ? 'terminated_unstarted' : 'eligible' }),
+          ],
+        }),
+      post: async () => {
+        ended = true;
+        throw new Error('response lost');
+      },
+    });
+    const buttons = () =>
+      h
+        .get('approval-items')
+        .descendants()
+        .filter((node) => node.tagName === 'button');
+    await flush();
+    buttons()[0].fire();
+    buttons()[0].fire();
+    await flush();
+    expect(h.posts()).toHaveLength(1);
+    expect(h.reads()).toHaveLength(1);
+    h.get('approval-refresh').fire();
+    await flush();
+    expect(h.get('restart').disabled).toBe(true);
+    expect(h.posts()).toHaveLength(1);
+    h.get('refresh').fire();
+    await flush();
+    expect(h.get('restart').disabled).toBe(false);
+    expect(h.posts()).toHaveLength(1);
+  });
+  it('discards a late terminal mutation after navigation and a newly unauthenticated read', async () => {
+    const pending = deferred<ReturnType<typeof reply>>();
+    let signedOut = false;
+    const h = harness({
+      get: () => reply(terminalSnapshot({ tasks: [terminalTask({ executionStatus: 'queued' })] })),
+      approvals: () =>
+        reply({
+          ok: true,
+          auth: { status: signedOut ? 'authentication_required' : 'ready' },
+          readiness: { ready: !signedOut, status: signedOut ? 'authentication_required' : 'ready' },
+          approvals: [],
+          recovery_requests: [terminalRecovery({ status: 'eligible' })],
+        }),
+      post: async () => pending.promise,
+    });
+    const buttons = () =>
+      h
+        .get('approval-items')
+        .descendants()
+        .filter((node) => node.tagName === 'button');
+    await flush();
+    buttons()[0].fire();
+    buttons()[0].fire();
+    h.page('pagehide');
+    signedOut = true;
+    h.page('pageshow');
+    await flush();
+    pending.resolve(reply({ ok: true, request_id: first, status: 'terminated_unstarted' }));
+    await flush();
+    expect(h.get('restart').disabled).toBe(true);
+    expect(h.get('approval-items').textContent).not.toContain(first);
+    expect(h.get('history').textContent).not.toContain(first);
+    expect(h.posts()).toHaveLength(1);
+    expect(h.reads()).toHaveLength(2);
+  });
+  it('clears cached verified receipt text when approval refresh discovers sign-out', async () => {
+    let signedOut = false;
+    const receipt = artifact();
+    const h = harness({
+      get: () =>
+        reply(
+          terminalSnapshot({
+            tasks: [
+              {
+                id: first,
+                turnState: 'settled',
+                executionStatus: 'work_completed',
+                artifact: receipt,
+              },
+            ],
+            messages: [
+              {
+                id: first + '-secretary',
+                role: 'secretary',
+                artifact: { ...receipt, canRevise: true },
+              },
+            ],
+          })
+        ),
+      approvals: () =>
+        signedOut
+          ? reply({ ok: false }, 401)
+          : reply({
+              ok: true,
+              auth: { status: 'ready' },
+              readiness: { ready: true, status: 'ready' },
+              approvals: [],
+              recovery_requests: [],
+            }),
+    });
+    await flush();
+    expect(h.get('body-content').textContent).toContain('diagnostic');
+    signedOut = true;
+    h.get('approval-refresh').fire();
+    await flush();
+    expect(h.get('body-content').textContent).not.toContain('diagnostic');
+    expect(h.get('body-content').hidden).toBe(true);
+    expect(h.get('history').textContent).not.toContain(first);
+    expect(h.get('restart').disabled).toBe(true);
+    expect(h.posts()).toHaveLength(0);
+  });
+  it('keeps automatic polling read-only and paused for eligible parked requests', async () => {
+    const h = harness({
+      get: () => reply(terminalSnapshot({ tasks: [terminalTask({ executionStatus: 'queued' })] })),
+      recoveryRequests: [terminalRecovery({ status: 'eligible' })],
+    });
+    await flush();
+    await h.advance(60000);
+    expect(h.reads()).toHaveLength(1);
+    expect(h.posts()).toHaveLength(0);
+    expect(h.get('advance').hidden).toBe(true);
+  });
+});
+
+describe('Fresh revision after all prior sibling requests are safely terminated', () => {
+  const sibling = '33333333-3333-4333-8333-333333333333';
+  const approval = '44444444-4444-4444-8444-444444444444';
+  const child = (id: string, overrides: Record<string, unknown> = {}) => ({
+    id,
+    turnState: 'settled',
+    executionStatus: 'terminated_unstarted',
+    ...overrides,
+  });
+  const recovery = (id: string, overrides: Record<string, unknown> = {}) => ({
+    request_id: id,
+    approval_request_id: approval,
+    session_id: session,
+    tenant: 'onboarding-test',
+    status: 'terminated_unstarted',
+    revision: 2,
+    display_digest: 'd'.repeat(64),
+    ...overrides,
+  });
+  const parentView = (children: Array<Record<string, unknown>>, canRevise = true) =>
+    snapshot({
+      scope: { tier: 'public', tenant: 'onboarding-test' },
+      tasks: [
+        {
+          id: first,
+          turnState: 'settled',
+          executionStatus: 'work_completed',
+          artifact: artifact(),
+        },
+        ...children,
+      ],
+      messages: [
+        { id: first + '-user', role: 'user' },
+        { id: first + '-secretary', role: 'secretary', artifact: artifact({ canRevise }) },
+        ...children.flatMap((task) => [
+          { id: task.id + '-user', role: 'user' },
+          { id: task.id + '-secretary', role: 'secretary' },
+        ]),
+      ],
+    });
+  const revisionButtons = (h: ReturnType<typeof harness>) =>
+    h
+      .get('history')
+      .descendants()
+      .filter((node) => node.tagName === 'button');
+  it('keeps the verified parent selectable and submits a new UUID against its exact identity only on a separate revise click', async () => {
+    const children = [child(second), child(sibling)];
+    const h = harness({
+      get: () => reply(parentView(children)),
+      recoveryRequests: children.map((task) => recovery(task.id)),
+    });
+    await flush();
+    expect(h.posts()).toHaveLength(0);
+    expect(h.get('restart').hidden).toBe(true);
+    expect(revisionButtons(h)).toHaveLength(1);
+    expect(revisionButtons(h)[0].disabled).toBe(false);
+    h.get('refresh').fire();
+    await flush();
+    expect(h.posts()).toHaveLength(0);
+    const revise = revisionButtons(h)[0];
+    revise.fire();
+    revise.fire();
+    await flush();
+    expect(h.posts()).toHaveLength(1);
+    const request = JSON.parse(h.posts()[0][1]!.body!);
+    expect(request).toEqual({
+      action: 'revise',
+      request_id: expect.any(String),
+      session_id: session,
+      locale: 'en',
+      artifactRevision: { requestId: first, revision: 1, sha256, format: 'compact' },
+    });
+    expect([first, second, sibling, approval]).not.toContain(request.request_id);
+    expect(request.approval_request_id).toBeUndefined();
+  });
+  it.each([
+    { status: 'eligible', task: { executionStatus: 'blocked' }, canRevise: true },
+    { status: 'eligible', task: { executionStatus: 'queued' }, canRevise: true },
+    {
+      status: 'terminated_unstarted',
+      task: { executionStatus: 'uncertain', turnState: 'uncertain' },
+      canRevise: true,
+    },
+    { status: 'terminated_unstarted', task: { turnState: 'pending' }, canRevise: true },
+    { status: 'terminated_unstarted', task: {}, canRevise: false },
+  ])(
+    'blocks automatic and explicit replacement while a sibling/parent read is not ready: %j',
+    async ({ status, task, canRevise }) => {
+      const h = harness({
+        get: () => reply(parentView([child(second), child(sibling, task)], canRevise)),
+        recoveryRequests: [recovery(second), recovery(sibling, { status })],
+      });
+      await flush();
+      const buttons = revisionButtons(h);
+      expect(buttons.every((button) => button.disabled)).toBe(true);
+      buttons.forEach((button) => button.fire());
+      h.get('restart').fire();
+      await flush();
+      expect(h.posts()).toHaveLength(0);
+    }
+  );
+  it('blocks an incomplete sibling held for operator review even when a parent display is still cached as revisable', async () => {
+    const h = harness({
+      get: () => reply(parentView([child(second), child(sibling, { executionStatus: 'blocked' })])),
+      recoveryRequests: [recovery(second)],
+      heldRequests: [
+        {
+          request_id: sibling,
+          status: 'approval_verification_failed',
+          recovery: 'operator_recovery',
+        },
+      ],
+    });
+    await flush();
+    expect(revisionButtons(h)).toHaveLength(1);
+    expect(revisionButtons(h)[0].disabled).toBe(true);
+    revisionButtons(h)[0].fire();
+    await flush();
+    expect(h.posts()).toHaveLength(0);
+  });
+  it('does not revise automatically when recovery readback makes the parent revisable again', async () => {
+    let ended = false;
+    const h = harness({
+      get: () =>
+        reply(
+          parentView(
+            [child(second, { executionStatus: ended ? 'terminated_unstarted' : 'blocked' })],
+            ended
+          )
+        ),
+      approvals: () =>
+        reply({
+          ok: true,
+          auth: { status: 'ready' },
+          readiness: { ready: true, status: 'ready' },
+          approvals: [],
+          recovery_requests: [
+            recovery(second, { status: ended ? 'terminated_unstarted' : 'eligible' }),
+          ],
+        }),
+      post: async (_body, url) => {
+        expect(url).toBe('/api/first-job/recovery/' + second);
+        ended = true;
+        return reply({ ok: true, request_id: second, status: 'terminated_unstarted' });
+      },
+    });
+    await flush();
+    expect(revisionButtons(h)).toHaveLength(0);
+    const recoveryButtons = () =>
+      h
+        .get('approval-items')
+        .descendants()
+        .filter((node) => node.tagName === 'button');
+    recoveryButtons()[0].fire();
+    recoveryButtons()[0].fire();
+    await flush();
+    expect(h.posts()).toHaveLength(1);
+    expect(h.reads()).toHaveLength(2);
+    expect(revisionButtons(h)).toHaveLength(1);
+    expect(revisionButtons(h)[0].disabled).toBe(false);
+    expect(h.get('restart').hidden).toBe(true);
   });
 });
