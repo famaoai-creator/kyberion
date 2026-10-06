@@ -23,15 +23,17 @@ import type { KnowledgeHint } from './knowledge-index.js';
  * the knowledge index re-injects into later work. Nothing is promoted here: a
  * human or a mission still approves the proposal.
  *
- * Scope: a harvest processes the platform scope (records with no tenant) and,
- * when one is active, the active tenant. Each scope keeps its own cursor and
- * cluster state in its own partition (`system/` or `confidential/<tenant>/`),
- * so records of a tenant that is not active stay unread until a harvest runs
- * inside that tenant.
+ * Scope: a harvest with no active tenant processes platform records (no
+ * tenant); a harvest inside a tenant processes only that tenant's records.
+ * Each scope keeps its own cursor and cluster state in its own partition
+ * (`system/` or `confidential/<tenant>/`), so records of another scope stay
+ * unread until a harvest runs in that scope.
  *
  * Privacy: a source with a `hintCategory` must build keys and titles from
  * closed vocabularies only (kinds, categories, op names, error codes — see
  * `closedToken` / `errorCode`), because hints are read by every later run.
+ * The built-in sources keep every key closed, hint or not, since many logs
+ * carry no tenant tag.
  * Tenant clusters never become hints.
  */
 
@@ -219,7 +221,9 @@ export function harvestLearningSignals(
   const stateRoot = options.stateRoot || defaultLearningHarvestStateRoot();
   const lookbackMs = (options.initialLookbackDays ?? DEFAULT_LOOKBACK_DAYS) * DAY_MS;
   const activeTenant = resolveIdentityContext().tenantSlug?.trim() || '';
-  const scopes: ScopeRun[] = ['', ...(activeTenant ? [activeTenant] : [])].map((tenantSlug) => {
+  // A run inside a tenant harvests only that tenant; platform records wait for
+  // a run with no tenant, so their candidates never land under a tenant.
+  const scopes: ScopeRun[] = [activeTenant].map((tenantSlug) => {
     const statePath = learningHarvestStatePath(stateRoot, tenantSlug);
     return { tenantSlug, statePath, state: loadScopeState(statePath) };
   });
@@ -228,8 +232,8 @@ export function harvestLearningSignals(
 
   for (const source of options.sources) {
     const cursorMs = (scope: ScopeRun): number => {
-      const cursor = scope.state.cursors[source.id];
-      return cursor ? Date.parse(cursor) : nowMs - lookbackMs;
+      const cursor = Date.parse(scope.state.cursors[source.id] || '');
+      return Number.isFinite(cursor) ? cursor : nowMs - lookbackMs;
     };
     const sinceMs = Math.min(...scopes.map((scope) => cursorMs(scope) - CURSOR_OVERLAP_MS));
     const window = { since: new Date(sinceMs), until: now };
@@ -272,7 +276,12 @@ export function harvestLearningSignals(
       }
       if (ts <= cursorMs(scope) - CURSOR_OVERLAP_MS) continue;
       const seen = (scope.state.seen[source.id] ||= {});
-      if (seen[obs.ref]) continue;
+      if (seen[obs.ref]) {
+        // A ref re-reported with a later timestamp (an ongoing finding) stays
+        // remembered for as long as it keeps being reported.
+        if (obs.ts > seen[obs.ref]) seen[obs.ref] = obs.ts;
+        continue;
+      }
       seen[obs.ref] = obs.ts;
       report.observed += 1;
 
@@ -456,36 +465,36 @@ export function stringField(record: Record<string, unknown>, ...keys: string[]):
   return '';
 }
 
-/**
- * Collapse a free-form error into a structural class for signal-only sources:
- * quoted values, anything path-like, ids and digits are removed. Not closed
- * vocabulary — hint sources use `errorCode` instead.
- */
-export function errorClass(message: string, max = 60): string {
-  const normalized = message
-    .split(/\n|; /)[0]
-    .replace(/\[([A-Z0-9_]+)\]/, '$1 ')
-    .replace(/(['"`])[^'"`]*\1/g, '<value>')
-    .replace(/\S*[\\/]\S*/g, (token) =>
-      /^[\w-]+(\/\d+)*\/[\w-]+:?$/.test(token) ? token : '<path>'
-    )
-    .replace(/\b[0-9a-f]{8,}\b/gi, '<id>')
-    .replace(/\d+/g, '<n>')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return (normalized || 'unknown').slice(0, max);
-}
-
 /** A closed-vocabulary token (op name, kind, category) or `fallback` when the value is free text. */
 export function closedToken(value: string, fallback = 'other'): string {
   const trimmed = value.trim();
-  return /^[A-Za-z][A-Za-z0-9_.:-]{0,47}$/.test(trimmed) ? trimmed : fallback;
+  return /^[A-Za-z][A-Za-z0-9_:-]{0,47}$/.test(trimmed) ? trimmed : fallback;
 }
 
+const ERRNO_CODES = [
+  'EACCES',
+  'EADDRINUSE',
+  'EAI_AGAIN',
+  'ECONNABORTED',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EEXIST',
+  'EISDIR',
+  'EMFILE',
+  'ENOENT',
+  'ENOSPC',
+  'ENOTDIR',
+  'ENOTEMPTY',
+  'ENOTFOUND',
+  'EPERM',
+  'EPIPE',
+  'ETIMEDOUT',
+];
+
 const ERROR_CODE_PATTERNS: Array<[RegExp, (match: RegExpMatchArray) => string]> = [
-  [/\[([A-Z][A-Z0-9_]{2,47})\]/, (m) => m[1]],
-  [/^([A-Z][A-Z0-9_]{2,47}):/, (m) => m[1]],
-  [/\b(E[A-Z]{3,15})\b/, (m) => m[1]],
+  // Kyberion's own `[UPPER_SNAKE]` diagnostic codes always carry an underscore.
+  [/\[([A-Z][A-Z0-9]*_[A-Z0-9_]{1,46})\]/, (m) => m[1]],
+  [new RegExp(`\\b(${ERRNO_CODES.join('|')})\\b`), (m) => m[1]],
   [/\b(?:status|HTTP)\s*:?\s*([1-5]\d\d)\b/i, (m) => `http_${m[1]}`],
   [/^([1-5]\d\d)\b/, (m) => `http_${m[1]}`],
   [/timed?\s*-?out|timeout/i, () => 'timeout'],
