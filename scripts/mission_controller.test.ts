@@ -698,6 +698,13 @@ describe('mission_controller argument parsing', () => {
     expect(help).toContain('scope-approve <ID> [--goal <TEXT>] [--reason <TEXT>]');
   });
 
+  it('prints `mission list --json` as a JSON array even when nothing matches', async () => {
+    const output: unknown[] = [];
+    await main(['list', 'no-such-status', '--json'], (value) => output.push(value));
+    expect(output).toHaveLength(1);
+    expect(JSON.parse(String(output[0]))).toEqual([]);
+  });
+
   it('routes early help output through the injected script printer', async () => {
     const output: unknown[] = [];
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});

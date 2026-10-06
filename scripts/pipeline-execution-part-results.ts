@@ -389,7 +389,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
     .option('json', {
       type: 'boolean',
       default: false,
-      describe: 'Emit machine-readable JSON for dry-run output',
+      describe: 'Emit a machine-readable JSON summary (dry-run report or run result) on stdout',
     })
     .option('resume', {
       type: 'string',
@@ -738,6 +738,25 @@ export async function main(args?: string[], print: Print = () => undefined) {
       nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path;
     logger.info(`   [PIPELINE] Trace: ${result.context.trace_persisted_path}`);
     activeRunJournal.append('run_finished', { status: pipelineStatus });
+    if (argv.json) {
+      // Run summary only — never the full pipeline context, which can carry
+      // tier-scoped data. Logs stay on stderr / the process log file.
+      print({
+        pipeline_id: pipelineId,
+        input: String(argv.input),
+        status: pipelineStatus,
+        recovered,
+        run_id: runId,
+        ...(missionId ? { mission_id: missionId } : {}),
+        trace_path: result.context.trace_persisted_path,
+        steps: result.results.map((entry) => ({
+          op: entry.op,
+          status: entry.status,
+          ...(entry.error ? { error: entry.error } : {}),
+        })),
+        ...(failure && !recovered ? { failure: failure.summary } : {}),
+      });
+    }
     getDefaultWorkerEventStream().emit(
       'turn_end',
       { kind: 'pipeline', pipeline_id: pipelineId, status: pipelineStatus, recovered },
