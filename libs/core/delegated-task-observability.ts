@@ -116,6 +116,11 @@ export type DelegatedTaskWorkerHandler = (wake: DelegatedTaskWorkerWake) => Prom
 // Tests namespace the trace/store via KYBERION_DELEGATION_TRACE_PATH /
 // KYBERION_DELEGATION_STORE_DIR so parallel suites never clobber the real
 // observability files (resolved lazily per call).
+/** Where delegation traces are appended (honours the test override). */
+export function delegatedTaskTracePath(): string {
+  return resolveTracePath();
+}
+
 function resolveTracePath(): string {
   const override = getRegisteredEnvText('KYBERION_DELEGATION_TRACE_PATH')?.trim();
   const candidate = override

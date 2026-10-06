@@ -30,7 +30,13 @@
     },
     "source_type": {
       "type": "string",
-      "enum": ["incident_review", "routine_exception", "project_closure", "governance_decision"]
+      "enum": [
+        "incident_review",
+        "routine_exception",
+        "project_closure",
+        "governance_decision",
+        "runtime_signal"
+      ]
     },
     "source_ref": { "type": "string", "minLength": 1 },
     "title": { "type": "string", "minLength": 1 },
