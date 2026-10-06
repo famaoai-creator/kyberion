@@ -548,7 +548,11 @@ pnpm project update-status PRJ-<ID> --status active
 
 # 4. project の下で mission を始める（--project-path は project から自動で決まる）。
 #    業務の仕事は --mission-type を明示する（development / operations /
-#    operations_report / meeting_facilitation。省略すると開発用の 8 段階タスクになる）
+#    operations_report / meeting_facilitation / document_production /
+#    presentation_production / video_production。省略すると開発用の 8 段階タスク
+#    (code-change-aidlc) になり、文書仕事でも build・PR 前提の受入条件が付く。
+#    文書・マニュアル類は document_production、スライドは presentation_production、
+#    動画は video_production を選ぶ）
 pnpm mission kickoff MSN-<TOPIC>-<YYYYMMDD> --tier confidential --tenant-slug <tenant-slug> \
   --organization-id <organization-id> --project-id PRJ-<ID> --mission-type operations \
   --goal "<この mission で達成すること>" --success-condition "<受け入れ条件>"
