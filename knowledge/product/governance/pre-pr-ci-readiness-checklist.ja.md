@@ -86,6 +86,12 @@ gh pr checks <number> --watch
   **ミッション作業の PR では使わない**。Knowledge 検査を通らないため、必ず `pnpm kyberion pr create` で作る。
 - **CI の pending を成功と数えない**。macOS smoke などが concurrency で cancel された場合は
   `gh run rerun <run-id> --failed` で再実行し、結果を待つ。
+- **外部サービスの quota 失敗はコード失敗と混同しない**。`Code scanning AI findings`（GitHub
+  Copilot code scanning）の 402 quota 超過のようなインフラ起因失敗は、diff を直しても緑にならない。
+  判別法: ジョブログに quota/billing/rate-limit 系のエラータイプがあるかを確認する。対応は
+  (a) クォータ回復を待つ、(b) リポジトリ管理者が必須チェックから一時除外する、のどちらかであり、
+  コード側の workaround を書かない。失敗が外部起因だと確認できたら、その旨を PR にコメントして
+  追跡しやすくする。
 - **レビュー修正は同じ worktree・同じ branch で行う**。マージ後は `git worktree remove` で片付ける。
 
 ## エージェント必須手順

@@ -44,7 +44,11 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
 const ROOT = pathResolver.rootDir();
 
 const DEFAULT_PACKAGE_SCAN_ROOTS = ['libs', 'presence', 'satellites'];
-const DEFAULT_SCAN_ROOTS = ['dist/presence', 'dist/satellites', 'dist/scripts'];
+// `dist/libs` is covered too: actuator code compiled by `build:actuators` lands
+// there and is imported by pipeline ADF ops at runtime — a stale build from a
+// different branch (e.g. one importing a since-removed @agent/core subpath)
+// fails pipelines with ERR_PACKAGE_PATH_NOT_EXPORTED far from the cause.
+const DEFAULT_SCAN_ROOTS = ['dist/presence', 'dist/satellites', 'dist/scripts', 'dist/libs'];
 
 const STATIC_FROM_IMPORT_RE =
   /(?:^|\n)[^\n]*?\b(?:import|export)\b[^\n]*?\bfrom\s*['"]([^'"]+)['"]/g;
@@ -211,6 +215,14 @@ export interface DistWorkspaceImportsOptions {
   packageScanRoots?: string[];
   /** Overrides `OPTIONAL_THIRD_PARTY_IMPORT_ALLOWLIST`; test-only escape hatch. */
   thirdPartyAllowlist?: ReadonlySet<string>;
+  /**
+   * Scan roots where only workspace-scoped imports are checked (third-party
+   * specifiers skipped). Use for trees like `dist/libs` whose files are
+   * loaded both directly (ADF steps) and through their package's own
+   * node_modules — where a third-party dependency declared on the actuator
+   * package is legitimately resolvable only via the latter path.
+   */
+  workspaceOnlyScanRoots?: string[];
 }
 
 export function checkDistWorkspaceImports(options: DistWorkspaceImportsOptions = {}): string[] {
@@ -220,9 +232,11 @@ export function checkDistWorkspaceImports(options: DistWorkspaceImportsOptions =
   );
   const allowlist = options.thirdPartyAllowlist ?? OPTIONAL_THIRD_PARTY_IMPORT_ALLOWLIST;
   const scanRoots = options.scanRoots ?? DEFAULT_SCAN_ROOTS;
+  const workspaceOnlyRoots = new Set(options.workspaceOnlyScanRoots ?? ['dist/libs']);
   const violations: string[] = [];
 
   for (const root of scanRoots) {
+    const workspaceOnly = workspaceOnlyRoots.has(root);
     const absoluteRoot = pathResolver.rootResolve(root);
     if (!safeExistsSync(absoluteRoot)) continue;
 
@@ -245,6 +259,8 @@ export function checkDistWorkspaceImports(options: DistWorkspaceImportsOptions =
           }
           continue;
         }
+
+        if (workspaceOnly) continue;
 
         if (isNodeBuiltinSpecifier(specifier)) continue;
 
