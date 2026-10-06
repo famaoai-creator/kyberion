@@ -155,33 +155,29 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/dot-inbox.jsonl',
   'shared/runtime/peer-messaging/',
   // Internal runtime state a full test run otherwise leaves in the operator's
-  // tree (fake task sessions, run graphs, work coordination, tenants, …).
+  // tree (orchestration, run graphs, pipeline runs, …). Not yet listed, because
+  // their tests seed or assert the live paths directly: task-sessions,
+  // work-coordination, feedback-loop, tenants, service-receipts, logs/traces —
+  // the leak guard still reports them.
   'shared/coordination/orchestration/',
   'shared/coordination/agent-runtime/',
   'shared/coordination/connection-reviews/',
   'shared/coordination/deliverable-reviews/',
   'shared/coordination/chronos/',
-  'shared/observability/work-coordination/',
   'shared/observability/chronos/',
   'shared/observability/peer-messaging/',
   'shared/observability/mission-control/',
   'shared/observability/protocol-services/',
-  'shared/logs/traces/',
   'shared/logs/worker-events/',
   'shared/logs/agent-runtime-supervisor/',
   'shared/exports/intent-contract-memory-sync/',
-  'shared/runtime/task-sessions/',
   'shared/runtime/pipeline-runs/',
   'shared/runtime/run-graphs/',
   'shared/runtime/artifacts/',
   'shared/runtime/distill-candidates/',
-  'shared/runtime/feedback-loop/',
-  'shared/runtime/work-coordination/',
   'shared/runtime/reports/',
   'shared/runtime/service-bindings/',
-  'shared/runtime/service-receipts/',
   'shared/runtime/health/',
-  'shared/runtime/tenants/',
   'shared/runtime/reasoning-failover-events.jsonl',
 ];
 export const VITEST_LIVE_SANDBOX_ROOT = 'active/shared/runtime/vitest-live';
