@@ -239,9 +239,10 @@ function errorsFrom(validate: ValidateFunction): string[] {
 }
 
 function taskSessionDir(rootDir = pathResolver.rootDir()): string {
-  return assertSafeRepositoryPath(path.resolve(rootDir, 'active/shared/runtime/task-sessions'), {
-    allowMissingLeaf: true,
-  });
+  return assertSafeRepositoryPath(
+    pathResolver.vitestLivePath(path.resolve(rootDir, 'active/shared/runtime/task-sessions')),
+    { allowMissingLeaf: true }
+  );
 }
 
 export function taskSessionPath(sessionId: string, rootDir = pathResolver.rootDir()): string {

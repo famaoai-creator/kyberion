@@ -64,8 +64,10 @@ describe('audit_verify', () => {
       // this test must not depend on a developer's local queue state.
       const resolved = String(filePath || '');
       return (
-        !resolved.includes('/active/shared/runtime/tenants') &&
-        !resolved.endsWith('/active/shared/runtime/memory/promotion-queue.jsonl')
+        // Match the sub-path, not '/active/…': under Vitest these resolve
+        // into the vitest-live sandbox (path-resolver).
+        !resolved.includes('/shared/runtime/tenants') &&
+        !resolved.endsWith('/shared/runtime/memory/promotion-queue.jsonl')
       );
     });
   });

@@ -88,8 +88,8 @@ describe('knowledge feedback policy', () => {
 
     expect(knowledgeDeliveryLogDir()).not.toContain('/tmp/external-knowledge-delivery');
     expect(knowledgeUsageAggregatePath()).not.toContain('/tmp/external-knowledge-usage.json');
-    expect(knowledgeDeliveryLogDir()).toContain('active/shared/runtime/feedback-loop');
-    expect(knowledgeUsageAggregatePath()).toContain('active/shared/runtime/feedback-loop');
+    expect(knowledgeDeliveryLogDir()).toContain('/runtime/feedback-loop');
+    expect(knowledgeUsageAggregatePath()).toContain('/runtime/feedback-loop');
   });
 
   it('loads governed defaults and tenant overrides, then rejects invalid policy input', () => {
