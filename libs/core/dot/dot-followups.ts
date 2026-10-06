@@ -22,7 +22,7 @@ import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
 import { getZonedDateParts, matchesCron } from '../pipeline/cron-utils.js';
 import { safeMkdir, safeWriteFile } from '../secure-io.js';
-import type { DotCharter } from './dot-charter.js';
+import { isFrontDeskDiagnosticDot, type DotCharter } from './dot-charter.js';
 import type { DotExtCtx, DotPromptSection, DotWakeTool } from './dot-extensions.js';
 import type { DotWakeLedgerEntry, DueDotTrigger } from './dot-runtime.js';
 import { DOT_FOLLOWUPS_FILE, dotStatePath, type DotFollowupRow } from './dot-state-paths.js';
@@ -274,6 +274,7 @@ export function evaluateDotFollowupsDue(
   c: DotCharter,
   deps: DotFollowupDeps = {}
 ): DueDotTrigger[] {
+  if (isFrontDeskDiagnosticDot(c)) return [];
   const now = deps.now?.() ?? new Date();
   const rows = listPendingDotFollowups(c, deps);
   if (rows.length === 0) return [];
@@ -301,6 +302,7 @@ export function dotCronMinuteKey(date: Date, timezone?: string): string {
  * cron history, nor when the current minute fires normally.
  */
 export function evaluateDotCronCatchUp(c: DotCharter, deps: DotFollowupDeps = {}): DueDotTrigger[] {
+  if (isFrontDeskDiagnosticDot(c)) return [];
   const now = deps.now?.() ?? new Date();
   const hours = Math.min(
     DOT_CRON_CATCH_UP_MAX_HOURS,

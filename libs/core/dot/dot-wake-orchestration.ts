@@ -39,24 +39,28 @@ export async function runDotWakeWithGoalDriver(
   deps: DotWakeOrchestrationDeps = {}
 ): Promise<DotWakeReceipt> {
   const { backendFor, goalDriver, ...runtimeDeps } = deps;
-  const backend =
-    deps.backend ?? (await import('../reasoning/reasoning-backend.js')).getReasoningBackend();
-  const resolution = resolveDotWakeBackend(loaded.charter, backend, {
-    injected: deps.backend !== undefined,
-    ...(backendFor ? { backendFor } : {}),
-  });
-  if (resolution.mode === 'unavailable') {
-    return runDotWake(loaded, { ...runtimeDeps, backendUnavailable: resolution.reason });
-  }
-  const drive = goalDriver ?? runGoalDrivenLoop;
   return runDotWake(loaded, {
     ...runtimeDeps,
-    backend: resolution.backend,
-    ...(resolution.mode === 'tool'
-      ? {
-          runLoop: (options) =>
-            drive({ ...options, backend: options.backend ?? resolution.backend }),
-        }
-      : {}),
+    // The runtime re-reads and gates the charter first, including revisions and
+    // malformed modes. No provider resolution happens for diagnostic wakes.
+    resolveWakeExecution: async (current) => {
+      const backend =
+        deps.backend ?? (await import('../reasoning/reasoning-backend.js')).getReasoningBackend();
+      const resolution = resolveDotWakeBackend(current, backend, {
+        injected: deps.backend !== undefined,
+        ...(backendFor ? { backendFor } : {}),
+      });
+      if (resolution.mode === 'unavailable') return { backendUnavailable: resolution.reason };
+      const drive = goalDriver ?? runGoalDrivenLoop;
+      return {
+        backend: resolution.backend,
+        ...(resolution.mode === 'tool'
+          ? {
+              runLoop: (options) =>
+                drive({ ...options, backend: options.backend ?? resolution.backend }),
+            }
+          : {}),
+      };
+    },
   });
 }

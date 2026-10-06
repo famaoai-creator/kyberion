@@ -19,9 +19,10 @@
  */
 
 import * as path from 'node:path';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { isDeepStrictEqual } from 'node:util';
 import { pathResolver } from '../path-resolver.js';
-import { safeMkdir, safeReadFile, safeWriteFile } from '../secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '../secure-io.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { withExecutionContext } from '../authority.js';
 import { recordDaemonHeartbeat } from '../daemon-heartbeat.js';
@@ -113,6 +114,36 @@ function auditTransition(entry: Record<string, unknown>, deps: DotLifecycleDeps)
     actor: deps.actor ?? 'operator',
     ...entry,
   });
+}
+
+/** Create only a public draft; activation remains a separate governed transition. */
+export function createDraftDotCharter(input: unknown, deps: DotLifecycleDeps = {}): DotCharter {
+  const charter = validateDotCharter(input);
+  if (charter.status !== 'draft' || charter.scope.tier !== 'public')
+    throw new Error('[DOT_CREATE_DRAFT] only a public draft may be created');
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(charter.dot_id))
+    throw new Error('[DOT_CREATE_ID] invalid dot id');
+  const filePath = path.join(
+    deps.rootDir ?? pathResolver.rootDir(),
+    'dots',
+    charter.dot_id + '.json'
+  );
+  return withExecutionContext(
+    CHARTER_WRITER_ROLE,
+    () =>
+      withLockSync('dot-charter-create:' + filePath, () => {
+        if (findDotCharter(charter.dot_id, deps.rootDir) || safeExistsSync(filePath))
+          throw new Error('[DOT_CREATE_EXISTS] dot identity or destination already exists');
+        safeWriteFile(filePath, JSON.stringify(charter, null, 2) + '\n', { createOnly: true });
+        auditTransition(
+          { event: 'dot_draft_created', dot_id: charter.dot_id, to: 'draft', path: filePath },
+          deps
+        );
+        return charter;
+      }),
+    undefined,
+    charter.scope.tenant_slug
+  );
 }
 
 /**

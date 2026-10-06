@@ -8,6 +8,8 @@ import {
   approvalStoreRoots,
   computeApprovalPayloadHash,
   createApprovalRequest,
+  cancelApprovalRequest,
+  loadApprovalRequest,
   decideApprovalRequest,
   expireApprovalRequest,
   listApprovalRequests,
@@ -82,6 +84,62 @@ describe('approval-store test isolation', () => {
     expect(listApprovalRequests({ storageChannels: [channel] }).map((r) => r.id)).toEqual([
       record.id,
     ]);
+  });
+
+  it.each(['rejected', 'cancelled', 'expired'] as const)(
+    'CAS preserves a concurrent %s transition',
+    (transition) => {
+      const record = createApprovalRequest('mission_controller', {
+        channel,
+        threadTs: '1',
+        correlationId: 'cas-probe',
+        requestedBy: 'test',
+        draft: { title: 'CAS', summary: 'Fixture only' },
+      });
+      const expectedRecordHash = computeApprovalPayloadHash({ record });
+      if (transition === 'rejected')
+        decideApprovalRequest('mission_controller', {
+          channel,
+          requestId: record.id,
+          decision: 'rejected',
+          decidedBy: 'user:owner',
+        });
+      else if (transition === 'cancelled')
+        cancelApprovalRequest('mission_controller', { channel, requestId: record.id });
+      else expireApprovalRequest('mission_controller', { channel, requestId: record.id });
+      expect(() =>
+        decideApprovalRequest('mission_controller', {
+          channel,
+          requestId: record.id,
+          decision: 'approved',
+          decidedBy: 'user:owner',
+          expectedRecordHash,
+        })
+      ).toThrow('changed since review');
+      expect(loadApprovalRequest(channel, record.id)?.status).toBe(transition);
+    }
+  );
+  it('commits an unchanged CAS snapshot and never overwrites it with later cancellation/expiry', () => {
+    const record = createApprovalRequest('mission_controller', {
+      channel,
+      threadTs: '1',
+      correlationId: 'cas-commit',
+      requestedBy: 'test',
+      draft: { title: 'CAS', summary: 'Fixture only' },
+    });
+    decideApprovalRequest('mission_controller', {
+      channel,
+      requestId: record.id,
+      decision: 'approved',
+      decidedBy: 'user:owner',
+      expectedRecordHash: computeApprovalPayloadHash({ record }),
+    });
+    expect(
+      cancelApprovalRequest('mission_controller', { channel, requestId: record.id }).status
+    ).toBe('approved');
+    expect(
+      expireApprovalRequest('mission_controller', { channel, requestId: record.id }).status
+    ).toBe('approved');
   });
 
   it('refuses to decide a request that was expired without an expiresAt', () => {

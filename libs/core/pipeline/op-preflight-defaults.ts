@@ -13,6 +13,7 @@ import { checkProviderEgress } from '../provider/provider-egress-gate.js';
 import {
   listOpGuards,
   listOpPreflightListeners,
+  opPreflightHasOutcomeObservers,
   registerOpGuard,
   registerOpPreflightListener,
   type OpPreflightCall,
@@ -240,6 +241,24 @@ function effectResult(call: OpPreflightCall, input: RecordLike): OpPreflightList
   };
 }
 
+const builtinListenerFunctions = new Map<string, unknown>();
+const builtinGuardFunctions = new Map<string, unknown>();
+
+/** Refuse an unbounded extension; never silently bypass a possibly mandatory guard. */
+export function assertBuiltinOnlyOpPreflight(): void {
+  ensureDefaultOpPreflight();
+  if (
+    opPreflightHasOutcomeObservers() ||
+    listOpPreflightListeners().some(
+      (entry) => builtinListenerFunctions.get(entry.id) !== entry.run
+    ) ||
+    listOpGuards().some((entry) => builtinGuardFunctions.get(entry.id) !== entry.check)
+  )
+    throw new Error(
+      'Diagnostic requires builtin-only operation preflight; use normal governed execution for custom policy'
+    );
+}
+
 /** Install the standard listeners after a test/worker reset or during boot. */
 export function ensureDefaultOpPreflight(): void {
   const listenerIds = new Set(listOpPreflightListeners().map((listener) => listener.id));
@@ -253,6 +272,7 @@ export function ensureDefaultOpPreflight(): void {
     { id: DEFAULT_LISTENER_IDS[6], order: 130, run: providerEgressResult },
   ];
   for (const registration of registrations) {
+    builtinListenerFunctions.set(registration.id, registration.run);
     if (!listenerIds.has(registration.id)) {
       registerOpPreflightListener(registration);
     }
@@ -279,5 +299,9 @@ export function ensureDefaultOpPreflight(): void {
         }
       },
     });
+    builtinGuardFunctions.set(
+      DEFAULT_GUARD_IDS[0],
+      listOpGuards().find((entry) => entry.id === DEFAULT_GUARD_IDS[0])?.check
+    );
   }
 }

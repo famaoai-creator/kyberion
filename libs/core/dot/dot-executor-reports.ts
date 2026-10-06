@@ -1,3 +1,4 @@
+import type { DotDispatchDeps } from './dot-dispatch.js';
 /**
  * Dot executor work results and report-back (split from `dot-executor.ts`).
  *
@@ -53,6 +54,10 @@ export const DOT_WORK_RESULTS_PROMPT_LIMIT = 5;
 export const GOVERNED_STORE_ROLE = 'infrastructure_sentinel';
 
 export interface DotExecutorDeps {
+  /** Explicit bounded tenant assertion; absent means diagnostic work stays pending. */
+  assertTenant?: DotDispatchDeps['assertTenant'];
+  /** Bounded pass must not run the globally mutating lease reaper. */
+  scopeToActiveCharters?: boolean;
   /** Dot state root (results / KR ledger). WorkItems are addressed by the coordination namespace. */
   rootDir?: string;
   now?: () => Date;

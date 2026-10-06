@@ -4,6 +4,18 @@
   "description": "RN-02 call-level reachability of in-process role assumptions per SYSTEM_ROLE. Regenerate with `node --import ./scripts/ts-loader.mjs scripts/analyze_role_assumptions.ts`; see knowledge/product/governance/AUTHORITY_MODEL.md section 3.B2.",
   "assumption_sites": [
     {
+      "site": "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
       "site": "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": [
         "chronos_gateway",
@@ -88,12 +100,27 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
+      "site": "libs/core/cloudflare-os-held-lifecycle.ts#prepareCancellation (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/cloudflare-os-held-lifecycle.ts#prepareCancellation (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/cloudflare-os-held-lifecycle.ts#reconcileLinkedApprovals (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -154,6 +181,11 @@
         "sovereign_concierge",
         "surface_runtime"
       ],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/dot/dot-dispatch.ts#expirePendingDecision (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
     {
@@ -219,6 +251,11 @@
       ]
     },
     {
+      "site": "libs/core/dot/dot-lifecycle.ts#createDraftDotCharter",
+      "roles": ["dot_lifecycle_writer"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/dot/dot-lifecycle.ts#transitionDotCharterStatus",
       "roles": ["dot_lifecycle_writer"],
       "unresolved": []
@@ -234,13 +271,28 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/governance/approval-cowork-adapter.ts#decideApprovalFromCowork (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/governance/approval-cowork-adapter.ts#decideApprovalFromCowork (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
     {
+      "site": "libs/core/governance/approval-gate.ts#enforceApprovalGate (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/governance/approval-gate.ts#enforceApprovalGate (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/approval-store-hygiene.ts#sweepExpirablePendingApprovals (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
     {
@@ -719,6 +771,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/secret/secret-introduction.ts#proposeSecretIntroduction (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/secret/secret-introduction.ts#proposeSecretIntroduction (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -741,6 +798,36 @@
     {
       "site": "libs/core/surface/channel-memory-store.ts#writeFile (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["chronos_gateway", "slack_bridge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/first-job-approval-proof.ts#firstJobApprovalEffect",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/first-job-approval-proof.ts#hasVerifiedFirstJobDecision",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/first-job-approval.ts#decideFirstJobApproval",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/first-job-approval.ts#decideFirstJobApproval (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/first-job-approval.ts#decideFirstJobApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/first-job-approval.ts#ownerViewer",
+      "roles": ["sovereign_concierge"],
       "unresolved": []
     },
     {
@@ -769,6 +856,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
@@ -784,7 +876,17 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/surface-approval-ui.ts#resolveDecisionCardToken (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/surface-approval-ui.ts#resolveDecisionCardToken (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
     },
@@ -1169,6 +1271,11 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module> (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["chronos_gateway"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module> (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["chronos_gateway"],
       "unresolved": []
@@ -1235,6 +1342,11 @@
     {
       "site": "presence/displays/computer-surface/server.ts#<module>",
       "roles": ["ecosystem_architect"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["sovereign_concierge"],
       "unresolved": []
     },
     {
@@ -1364,6 +1476,11 @@
     },
     {
       "site": "presence/displays/concierge/src/app/api/plugins/[id]/route.ts#POST",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/plugins/[id]/route.ts#POST (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -1533,6 +1650,11 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/presence-studio/server.ts#<module> (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/presence-studio/server.ts#<module> (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["surface_runtime"],
       "unresolved": []
@@ -1580,6 +1702,11 @@
       ]
     },
     {
+      "site": "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
@@ -1591,6 +1718,11 @@
     },
     {
       "site": "scripts/approval_inbox.ts#<module>",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/approval_inbox.ts#<module> (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1874,6 +2006,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/kyberion_home.ts#handleApprovalsSubcommand (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/kyberion_home.ts#handleApprovalsSubcommand (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -1966,6 +2103,21 @@
     {
       "site": "scripts/onboarding_context.ts#<module>",
       "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/onboarding_first_job.ts#applyFirstJob",
+      "roles": ["ecosystem_architect"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/onboarding_first_job.ts#readOwnedTenant",
+      "roles": ["ecosystem_architect"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/onboarding_first_job_tenant_status.ts#createFirstJobTenantStatusAssertion",
+      "roles": ["first_job_tenant_status_reader"],
       "unresolved": []
     },
     {
@@ -2697,6 +2849,7 @@
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
@@ -2866,13 +3019,17 @@
       "reachable_roles": {
         "chronos_gateway": {
           "example_path": [
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
@@ -2882,12 +3039,17 @@
         },
         "chronos_tenant_runner": {
           "example_path": [
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
@@ -2917,13 +3079,17 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
@@ -2947,13 +3113,17 @@
         },
         "mission_controller": {
           "example_path": [
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
@@ -2967,12 +3137,23 @@
         },
         "organization_operator": {
           "example_path": [
-            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
@@ -3006,13 +3187,17 @@
         },
         "slack_bridge": {
           "example_path": [
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
@@ -3029,13 +3214,17 @@
         },
         "surface_runtime": {
           "example_path": [
-            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
-            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
-            "libs/core/governance/approval-store.ts#decideApprovalRequest",
-            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
-            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
-            "scripts/run_pipeline.ts#<module> [child process]",
-            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
@@ -3398,6 +3587,7 @@
           "example_path": [
             "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
@@ -3639,6 +3829,7 @@
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
@@ -3923,6 +4114,7 @@
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
@@ -4535,6 +4727,7 @@
             "libs/actuators/approval-actuator/src/index.ts#<module> [child process]",
             "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
@@ -4801,6 +4994,7 @@
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
@@ -4816,6 +5010,7 @@
           "example_path": [
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
@@ -4841,6 +5036,7 @@
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
@@ -4860,6 +5056,7 @@
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
@@ -4893,6 +5090,7 @@
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
@@ -4916,6 +5114,7 @@
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
@@ -4946,6 +5145,7 @@
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
@@ -4969,6 +5169,7 @@
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
@@ -5207,6 +5408,7 @@
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
@@ -5706,6 +5908,7 @@
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
@@ -6246,6 +6449,7 @@
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
@@ -6493,6 +6697,7 @@
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
@@ -6732,6 +6937,7 @@
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
             "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
             "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
             "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
             "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
             "scripts/run_pipeline.ts#<module> [child process]",
