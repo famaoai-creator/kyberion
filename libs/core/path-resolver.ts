@@ -122,8 +122,45 @@ export function vision(subPath = '') {
 export function capabilityAssets(subPath = '') {
   return path.join(KNOWLEDGE_ROOT, 'product/capability-assets', subPath);
 }
+/**
+ * Live operational subtrees a Vitest run must never write to: delivery
+ * outboxes (a running daemon would send fixture messages), audit evidence,
+ * ops alerts, inboxes and peer mailboxes. Under Vitest, paths below these
+ * prefixes resolve into a per-worker sandbox instead — reads and writes
+ * alike, so code under test still round-trips through the same API.
+ * Same pattern as approvalStoreRoots(); tests/vitest-active-leak-guard.ts
+ * reports anything still leaking.
+ */
+const VITEST_LIVE_SUBTREES = [
+  'shared/coordination/channels/',
+  'shared/observability/channels/',
+  'shared/logs/audit/',
+  'audit/',
+  'shared/observability/ops-alerts.jsonl',
+  'shared/inbox/',
+  'shared/runtime/dot-inbox.jsonl',
+  'shared/runtime/peer-messaging/',
+];
+export const VITEST_LIVE_SANDBOX_ROOT = 'active/shared/runtime/vitest-live';
+
+/** Map an absolute path inside a live subtree to the Vitest sandbox; other paths pass through. */
+export function vitestLivePath(absolutePath: string): string {
+  if (!getProcessEnv('VITEST')) return absolutePath;
+  // A test that points KYBERION_ROOT at its own fixture root is already isolated.
+  const envRoot = getProcessEnv('KYBERION_ROOT');
+  if (envRoot && path.resolve(envRoot) !== path.resolve(process.cwd())) return absolutePath;
+  const relative = path.relative(ACTIVE_ROOT, absolutePath).split(path.sep).join('/');
+  if (relative.startsWith('..') || path.isAbsolute(relative)) return absolutePath;
+  const hit = VITEST_LIVE_SUBTREES.some((prefix) =>
+    prefix.endsWith('/') ? `${relative}/`.startsWith(prefix) : relative === prefix
+  );
+  if (!hit) return absolutePath;
+  const pool = (getProcessEnv('VITEST_POOL_ID') || '0').replace(/[^\w-]/g, '');
+  return path.join(PROJECT_ROOT_DIR, VITEST_LIVE_SANDBOX_ROOT, `pool-${pool}`, relative);
+}
+
 export function shared(subPath = '') {
-  return path.join(ACTIVE_SHARED_ROOT, subPath);
+  return vitestLivePath(path.join(ACTIVE_SHARED_ROOT, subPath));
 }
 export function sharedTmp(subPath = '') {
   const base = path.join(ACTIVE_SHARED_ROOT, 'tmp');
@@ -623,11 +660,15 @@ export function resolve(logicalPath: string) {
   if (logicalPath.startsWith('active/shared/')) {
     return shared(logicalPath.replace('active/shared/', ''));
   }
-  return path.isAbsolute(logicalPath) ? logicalPath : path.resolve(PROJECT_ROOT_DIR, logicalPath);
+  return vitestLivePath(
+    path.isAbsolute(logicalPath) ? logicalPath : path.resolve(PROJECT_ROOT_DIR, logicalPath)
+  );
 }
 
 export function rootResolve(relativePath: string) {
-  return path.isAbsolute(relativePath) ? relativePath : path.join(PROJECT_ROOT_DIR, relativePath);
+  return vitestLivePath(
+    path.isAbsolute(relativePath) ? relativePath : path.join(PROJECT_ROOT_DIR, relativePath)
+  );
 }
 
 /**

@@ -1,6 +1,6 @@
 ---
 title: 'Kyberion Development Practices — Hard-Won Rules for Changing This Repo'
-last_updated: 2026-10-05
+last_updated: 2026-10-06
 ---
 
 # Kyberion Development Practices — Hard-Won Rules for Changing This Repo
@@ -125,6 +125,22 @@ leftovers. A test may not depend on:
   audit chain redirects to the injected test IO. `vi.mock` of secure-io does
   not intercept foundation JSON IO, so an unguarded writer leaked test traces
   into production and skewed work-inventory demand signals;
+- **live operational subtrees, whoever the writer is** — under Vitest,
+  `path-resolver` maps delivery outboxes and channel logs
+  (`coordination/channels`, `observability/channels`), audit evidence
+  (`logs/audit`, `active/audit`), ops alerts, the inbox, the dot inbox and peer
+  mailboxes into `active/shared/runtime/vitest-live/pool-<n>/` (reads and
+  writes alike; skipped when a test sets its own `KYBERION_ROOT`). The
+  per-writer gates above leaked again as new writers appeared — a full run
+  still grew the live inbox, audit log and Telegram/Discord outboxes — so
+  the sandbox sits at the path layer instead. Assert paths with
+  `pathResolver` (or a sub-path such as `/coordination/channels/…`), never
+  `path.join(root, 'active/…')` plus raw `fs`;
+- **leaks are reported, not silent** — `tests/vitest-active-leak-guard.ts`
+  (Vitest `globalSetup`) lists every file a run created or grew in live
+  `active/` outside `active/shared/tmp`, `active/shared/cache` and
+  `vitest-*` roots, in `active/shared/tmp/vitest-active-leaks.json`;
+  `KYBERION_TEST_LEAK_STRICT=1` fails the run. Check it after a full run;
 - **the calendar** — absolute dates in fixtures rot; freeze
   `vi.useFakeTimers({ now, toFake: ['Date'] })` for the WHOLE flow, not
   just the assertion phase.

@@ -435,12 +435,8 @@ describe('surface coordination outbox recovery', () => {
     createdOutboxFiles.push(firstPath, secondPath);
 
     expect(secondPath).not.toBe(firstPath);
-    expect(firstPath).toContain(
-      `/active/shared/coordination/channels/${testSurface}/tenants/tenant-a/outbox/`
-    );
-    expect(secondPath).toContain(
-      `/active/shared/coordination/channels/${testSurface}/tenants/tenant-b/outbox/`
-    );
+    expect(firstPath).toContain(`/coordination/channels/${testSurface}/tenants/tenant-a/outbox/`);
+    expect(secondPath).toContain(`/coordination/channels/${testSurface}/tenants/tenant-b/outbox/`);
     expect(listSurfaceOutboxMessages(testSurface, { scope: scopeA })).toContainEqual(
       expect.objectContaining({ text: 'tenant a', scope: scopeA })
     );

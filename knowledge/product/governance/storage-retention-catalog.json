@@ -92,6 +92,13 @@
       "note": "Approval requests and events written by test runs (approval-store.ts approvalStoreRoots under vitest). Isolated from the live approval store so fixtures never count as operator decisions."
     },
     {
+      "path": "active/shared/runtime/vitest-live",
+      "artifact_class": "tmp",
+      "ttl_days": 1,
+      "action": "delete",
+      "note": "Delivery outboxes, audit logs, ops alerts, inboxes and peer mailboxes written by test runs (path-resolver vitestLivePath under vitest). Kept out of the live operational tree so fixtures are never delivered or counted as evidence."
+    },
+    {
       "path": "active/shared/runtime/vitest-operations-halt",
       "artifact_class": "tmp",
       "ttl_days": 1,
