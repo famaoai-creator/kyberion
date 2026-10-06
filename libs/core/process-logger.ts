@@ -1,4 +1,6 @@
 import { appendJsonLine } from './foundation/json.js';
+import { getRegisteredEnvBool, getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
+import { setLogFileSink, type LogRecord } from './logger.js';
 import { nowIso } from './foundation/time.js';
 import * as nodePath from 'node:path';
 import { sharedLogsProcess } from './path-resolver.js';
@@ -133,4 +135,43 @@ export function createProcessLogger(
 
 export function resetProcessLoggerRegistry(): void {
   REGISTRY.clear();
+}
+
+/**
+ * Stream name for this process's log file: the entry script's basename
+ * (`dist/scripts/run_doctor.js` → `run_doctor`), so each command keeps its own
+ * rotated file under `active/shared/logs/process/`.
+ */
+export function processLogNameFromArgv(argv: readonly string[] = process.argv): string {
+  const entry = argv[1] ? nodePath.basename(argv[1]).replace(/\.(c|m)?(j|t)s$/u, '') : '';
+  const safe = entry.replace(/[^A-Za-z0-9._-]/gu, '_').replace(/^\.+/u, '');
+  return safe || 'node';
+}
+
+function toProcessLogLevel(level: string): ProcessLogLevel {
+  if (level === 'success') return 'info';
+  return level in LEVEL_RANK ? (level as ProcessLogLevel) : 'info';
+}
+
+/**
+ * Tee every logger line of this process into
+ * `active/shared/logs/process/<entry>.log` (JSONL, size-rotated). Skipped in
+ * tests and when `KYBERION_PROCESS_LOG` is `0`/`false`/`off`.
+ */
+export function installProcessLogFileSink(): void {
+  if (getRegisteredEnvBool('KYBERION_PROCESS_LOG', { defaultValue: true }) === false) return;
+  if (isVitestProcess() || getRegisteredEnvText('NODE_ENV') === 'test') return;
+  let log: ProcessLogger | null = null;
+  setLogFileSink((record: LogRecord) => {
+    // Resolve lazily: launchers such as run_built.mjs rewrite argv before import.
+    log ??= createProcessLogger(processLogNameFromArgv());
+    const missionId = getRegisteredEnvText('MISSION_ID');
+    const meta = {
+      pid: process.pid,
+      emitter: record.name,
+      ...(missionId ? { mission: missionId } : {}),
+      ...(record.data !== undefined ? { data: record.data } : {}),
+    };
+    log[toProcessLogLevel(record.level)](record.msg, meta);
+  });
 }

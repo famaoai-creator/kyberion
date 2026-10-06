@@ -15,7 +15,7 @@
         "CLIENT_SECRET": "{{clientSecret}}",
         "REDIRECT_URI": "{{redirectUri}}"
       },
-      "health_check": "npx -y @xdevplatform/xurl auth status",
+      "health_check": "npx --offline --no @xdevplatform/xurl auth status",
       "description": "Check whether xurl has a usable X OAuth session cached for MCP use."
     },
     "auth_oauth2_headless": {
