@@ -103,6 +103,13 @@ export function _resetTenantKnowledgeWarningsForTests(): void {
   warnedTenants.clear();
 }
 
+/** Linear-time trailing-slash trim (a `/\/+$/` regex is quadratic on long slash runs). */
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') end -= 1;
+  return value.slice(0, end);
+}
+
 /**
  * Build the positive allowlist of index scopes for one tenant. Returns null
  * (fail-open for retrieval, fail-closed for isolation — nothing gets scanned)
@@ -126,7 +133,7 @@ export function buildTenantKnowledgeScopeSet(
     return null;
   }
 
-  const knowledgeRoot = resolved.knowledge_root.replace(/\\/g, '/').replace(/\/+$/, '');
+  const knowledgeRoot = trimTrailingSlashes(resolved.knowledge_root.replace(/\\/g, '/'));
   if (!knowledgeRoot.startsWith(TENANT_CONFIDENTIAL_PREFIX)) {
     // A root outside knowledge/confidential/ has no single-subtree scope in
     // the index; refusing to scan is the fail-closed choice.
