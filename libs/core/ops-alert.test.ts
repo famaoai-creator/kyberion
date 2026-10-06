@@ -1,4 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// Hermetic: the real loader reads knowledge/personal/notification-preferences.json
+// — on machines that have it, route resolution diverges from the unconfigured
+// path these tests assert. Stub to "no route" and a delivery that fails, which
+// exercises the same receipt/envelope contract as an unconfigured environment.
+vi.mock('./surface/operator-notifications.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./surface/operator-notifications.js')>();
+  return {
+    ...actual,
+    loadNotificationPreferences: () => ({}),
+    resolveOperatorNotificationRoute: () => null,
+    notifyOperatorSync: () => false,
+  };
+});
+
 import {
   acknowledgeOpsAlerts,
   parseOpsAlertLog,
@@ -113,6 +128,35 @@ describe('ops-alert', () => {
     expect(
       selectOutstandingUndeliveredOpsAlerts(readOpsAlertLogRecords(ALERT_TEST_LOG))
     ).toHaveLength(0);
+  });
+
+  it('falls back to the local inbox when no channel is configured, and still queues a retryable envelope on failure', () => {
+    safeRmSync(pathResolver.sharedTmp('ops-alert-test'), { recursive: true, force: true });
+    // Under vitest notifyOperatorSync is intentionally a no-op (returns false),
+    // so the inbox fallback registers as attempted-but-undelivered and leaves
+    // the retryable envelope — the same contract the old null-route path had.
+    const receipt = sendOpsAlert(
+      {
+        severity: 'critical',
+        title: 'Daemon heartbeat stale',
+        context: { daemon_id: 'chronos-daemon' },
+        recommendation: 'Restart the unit.',
+        dedupe_key: 'chronos:inbox-fallback-test',
+      },
+      {
+        alertLogPath: ALERT_TEST_LOG,
+        now: new Date('2026-07-04T00:00:00.000Z'),
+        webhookUrl: '',
+      }
+    );
+
+    expect(receipt.operator_attempted).toBe(true);
+    expect(receipt.operator_delivered).toBe(false);
+    const outstanding = selectOutstandingUndeliveredOpsAlerts(
+      readOpsAlertLogRecords(ALERT_TEST_LOG)
+    );
+    expect(outstanding).toHaveLength(1);
+    expect(outstanding[0]!.raw.reason).toBe('inbox_delivery_failed');
   });
 });
 

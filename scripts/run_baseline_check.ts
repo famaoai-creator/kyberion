@@ -937,10 +937,18 @@ export async function runBaselineCheck() {
     return res.valid;
   });
 
-  // L2: Skeletal Layer (Directories & Build)
+  // L2: Skeletal Layer (Directories & Build) — also fails when dist artifacts
+  // import workspace subpaths the current manifests don't export (a stale dist
+  // from a different branch). That used to surface as a fatal_error inside a
+  // pipeline step, far from the actual cause; here it lands in needs_recovery
+  // with `pnpm run build` as the fix.
+  let distImportViolations: string[] = [];
   sentinel.registerLayer('L2', async () => {
     const distPath = pathResolver.rootResolve('dist/scripts');
-    return safeExistsSync(distPath);
+    if (!safeExistsSync(distPath)) return false;
+    const { checkDistWorkspaceImports } = await import('./check_dist_workspace_imports.js');
+    distImportViolations = checkDistWorkspaceImports();
+    return distImportViolations.length === 0;
   });
 
   // L3: Identity Layer (Soul)
@@ -1028,6 +1036,9 @@ export async function runBaselineCheck() {
       ops_alert_channel_configured: opsAlertChannel.configured
         ? null
         : `no ops-alert delivery channel configured — alerts are recorded to active/shared/observability/ops-alerts.jsonl but never delivered; set ${opsAlertChannel.env_var}=<webhook url> or configure knowledge/personal/notification-preferences.json (then run \`pnpm ops:alerts -- --redeliver\`)`,
+      dist_import_violations: distImportViolations.length
+        ? `${distImportViolations.length} dist file(s) import workspace subpaths that don't resolve — run \`pnpm run build\` to rebuild; first: ${distImportViolations[0]}`
+        : null,
     },
     // LC-01: scheduler liveness observation surface (L10).
     scheduler: {
