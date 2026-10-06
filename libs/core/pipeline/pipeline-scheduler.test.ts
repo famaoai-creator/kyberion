@@ -18,6 +18,7 @@ import {
   getSchedulesDueNow,
   isScheduledPipelineDue,
   loadScheduleRegistry,
+  reconcileScheduledPipelines,
   registerScheduledPipeline,
   saveScheduleRegistry,
 } from './pipeline-scheduler.js';
@@ -196,6 +197,52 @@ describe('pipeline scheduler', () => {
     expect(registry.schedules[0]?.name).toBe('Daily routine (updated)');
     expect(registry.schedules[0]?.lastRun).toBe(claimed?.runLock?.acquiredAt);
     expect(registry.schedules[0]?.runLock?.token).toBe(claimed?.runLock?.token);
+  });
+
+  it('reconciles a managed source with one write and leaves no-op ticks untouched', () => {
+    const rootDir = makeRootDir();
+    const registryPath = path.join(rootDir, 'active/shared/runtime/pipeline-schedules.json');
+    const managed = {
+      id: 'daily-managed',
+      name: 'Daily managed',
+      pipelinePath: 'pipelines/daily-managed.json',
+      actuator: 'run_pipeline',
+      trigger: { type: 'cron' as const, cron: '0 6 * * *' },
+      enabled: true,
+    };
+    const manual = {
+      id: 'manual-schedule',
+      name: 'Manual schedule',
+      pipelinePath: 'pipelines/manual.json',
+      actuator: 'run_pipeline',
+      trigger: { type: 'cron' as const, cron: '0 8 * * *' },
+      enabled: true,
+    };
+
+    registerScheduledPipeline(manual, { rootDir });
+    expect(reconcileScheduledPipelines('chronos_adf', [managed], { rootDir })).toMatchObject({
+      added: 1,
+      updated: 0,
+      removed: 0,
+    });
+    const firstMtime = fs.statSync(registryPath, { bigint: true }).mtimeNs;
+
+    expect(reconcileScheduledPipelines('chronos_adf', [managed], { rootDir })).toMatchObject({
+      added: 0,
+      updated: 0,
+      removed: 0,
+      unchanged: 1,
+    });
+    expect(fs.statSync(registryPath, { bigint: true }).mtimeNs).toBe(firstMtime);
+
+    expect(reconcileScheduledPipelines('chronos_adf', [], { rootDir })).toMatchObject({
+      added: 0,
+      updated: 0,
+      removed: 1,
+    });
+    expect(loadScheduleRegistry({ rootDir }).schedules.map((schedule) => schedule.id)).toEqual([
+      'manual-schedule',
+    ]);
   });
 
   describe('QM-02 registry portability', () => {

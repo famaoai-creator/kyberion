@@ -13,7 +13,7 @@ import {
 } from '../../../lib/viewer-context';
 import { readChronosJsonObject, readChronosOptionalStringParam } from '../../../lib/request-input';
 import { memoryCandidateVisibleToViewer } from '../../../lib/knowledge-scope';
-import { collectA2AHandoffs, collectAgentMessages } from '../../../lib/agent-message-feed';
+import { collectAgentActivity } from '../../../lib/agent-message-feed';
 import {
   collectBrowserConversationSessions,
   collectBrowserSessions,
@@ -97,10 +97,11 @@ export async function GET(req: NextRequest) {
       controlActions
     );
     const missionProgress = intelligenceData.collectMissionProgress(activeMissions);
-    const agentMessages = collectAgentMessages().filter((message) =>
+    const agentActivity = collectAgentActivity();
+    const agentMessages = agentActivity.messages.filter((message) =>
       intelligenceData.missionVisibleToScope(message.missionId, tenantSlugs, tierAccess)
     );
-    const a2aHandoffs = collectA2AHandoffs().filter((handoff) =>
+    const a2aHandoffs = agentActivity.handoffs.filter((handoff) =>
       intelligenceData.missionVisibleToScope(handoff.missionId, tenantSlugs, tierAccess)
     );
     let managedRuntimes: Array<{

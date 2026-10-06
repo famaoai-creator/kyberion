@@ -4,6 +4,7 @@ import path from 'node:path';
 
 const mockFiles = vi.hoisted(() => new Map<string, string>());
 const mockLstatIsFile = vi.hoisted(() => vi.fn(() => true));
+const mockIndexWrites = vi.hoisted(() => ({ count: 0 }));
 
 vi.mock('../secure-io.js', () => ({
   assertSafeRepositoryPath: (filePath: string) => filePath,
@@ -14,7 +15,10 @@ vi.mock('../secure-io.js', () => ({
   safeMkdir: () => {},
   safeReadFile: (filePath: string) => mockFiles.get(filePath) || '',
   loadJson: (filePath: string) => JSON.parse(mockFiles.get(filePath) || 'null'),
-  safeWriteFile: (filePath: string, data: string) => mockFiles.set(filePath, data),
+  safeWriteFile: (filePath: string, data: string) => {
+    if (filePath.endsWith('/model-performance.json')) mockIndexWrites.count += 1;
+    mockFiles.set(filePath, data);
+  },
 }));
 
 describe('model performance index', () => {
@@ -22,6 +26,7 @@ describe('model performance index', () => {
 
   beforeEach(async () => {
     mockFiles.clear();
+    mockIndexWrites.count = 0;
     mockLstatIsFile.mockReturnValue(true);
     vi.resetModules();
     const { registerFoundationIo } = await import('../foundation/io.js');
@@ -61,6 +66,7 @@ describe('model performance index', () => {
 
   afterEach(() => {
     mockFiles.clear();
+    mockIndexWrites.count = 0;
     mockLstatIsFile.mockReset();
   });
 
@@ -114,12 +120,35 @@ describe('model performance index', () => {
     };
 
     mod.recordModelRoleOutcomes([outcome]);
+    const writesAfterFirstRecord = mockIndexWrites.count;
     mod.recordModelRoleOutcomes([outcome]);
 
     expect(mod.getModelRolePerformance(outcome.model_id, outcome.team_role)).toMatchObject({
       samples: 1,
       success: 1,
     });
+    expect(writesAfterFirstRecord).toBe(1);
+    expect(mockIndexWrites.count).toBe(writesAfterFirstRecord);
+  });
+
+  it('rebuilds the projection for a replay when the index is missing', () => {
+    const outcome = {
+      mission_id: 'MSN-REPLAY-INDEX-001',
+      task_id: 'T-1',
+      team_role: 'reviewer',
+      model_id: 'openai:gpt-5.6-luna',
+      final_status: 'done',
+      recorded_at: new Date().toISOString(),
+    };
+
+    mod.recordModelRoleOutcomes([outcome]);
+    expect(mockIndexWrites.count).toBe(1);
+    mockFiles.delete(mod.modelPerformanceIndexPath());
+
+    mod.recordModelRoleOutcomes([outcome]);
+
+    expect(mockIndexWrites.count).toBe(2);
+    expect(mockFiles.has(mod.modelPerformanceIndexPath())).toBe(true);
   });
 
   it('rejects oversized feedback fields before writing', () => {

@@ -261,7 +261,23 @@ export function recordModelRoleOutcomes(outcomes: ModelRoleOutcome[]): void {
     );
   });
   appendJsonl(outcomesPath, append, catalog);
-  if (validated.length > 0) rebuildModelPerformanceIndex();
+  if (append.length > 0) {
+    rebuildModelPerformanceIndex();
+    return;
+  }
+
+  // Replays are common, but still repair a missing or invalid projection just
+  // as the previous unconditional rebuild did.
+  const indexPath = modelPerformanceIndexPath();
+  if (!safeExistsSync(indexPath)) {
+    rebuildModelPerformanceIndex();
+    return;
+  }
+  try {
+    loadModelPerformanceIndexAtPath(indexPath);
+  } catch {
+    rebuildModelPerformanceIndex();
+  }
 }
 
 export function recordModelRoleFeedback(input: {
