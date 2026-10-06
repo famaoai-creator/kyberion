@@ -73,6 +73,8 @@ export interface FrontDeskExecutionProjection {
   reportId?: string;
   artifactPath?: string;
   artifactSha256?: string;
+  /** Exact bytes decoded as UTF-8 from the successful readback, opt-in only. */
+  artifactBody?: string;
 }
 const policyCatalog = defineCatalog<FrontDeskExecutionPolicy>({
   id: 'front-desk-execution-policy',

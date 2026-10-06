@@ -37,6 +37,40 @@ export function parseFirstJobReadRequest(value: unknown): FirstJobReadRequest | 
     return undefined;
   return readFields(value);
 }
+export interface FirstJobArtifactReadRequest {
+  session_id: string;
+  request_id: string;
+  revision: number;
+  sha256: string;
+}
+/** A version selector, never a filesystem path or an authorization claim. */
+export function parseFirstJobArtifactReadRequest(
+  value: unknown
+): FirstJobArtifactReadRequest | undefined {
+  if (
+    !object(value) ||
+    Object.keys(value).length !== 4 ||
+    Object.keys(value).some(
+      (key) => !['session_id', 'request_id', 'revision', 'sha256'].includes(key)
+    ) ||
+    typeof value.session_id !== 'string' ||
+    !FIRST_JOB_SESSION_PATTERN.test(value.session_id) ||
+    typeof value.request_id !== 'string' ||
+    !UUID_PATTERN.test(value.request_id) ||
+    typeof value.revision !== 'string' ||
+    !/^[1-9][0-9]{0,8}$/.test(value.revision) ||
+    typeof value.sha256 !== 'string' ||
+    !/^[a-f0-9]{64}$/.test(value.sha256)
+  )
+    return undefined;
+  return {
+    session_id: value.session_id,
+    request_id: value.request_id,
+    revision: Number(value.revision),
+    sha256: value.sha256,
+  };
+}
+
 export function parseFirstJobRequest(value: unknown): FirstJobRequest | undefined {
   if (!object(value)) return undefined;
   const allowed =

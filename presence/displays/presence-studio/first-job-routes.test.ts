@@ -79,12 +79,20 @@ import { registerFirstJobRoutes } from './first-job-routes.js';
 import {
   resolveFirstJobViewer,
   readFirstJobSnapshot,
+  readFirstJobArtifact,
   type FirstJobSnapshot,
 } from '@agent/core/surface/first-job';
 type TestBody = Omit<Partial<FirstJobSnapshot>, 'ok'> & {
   ok?: boolean;
   error?: string;
   replayed?: boolean;
+  artifact?: {
+    body: string;
+    revision: number;
+    requestId: string;
+    sha256: string;
+    currentness: string;
+  };
 };
 import {
   reserveConversationTurn,
@@ -124,6 +132,7 @@ async function request(
   method = 'GET',
   body: unknown = {},
   options: {
+    path?: string;
     query?: Record<string, unknown>;
     address?: string;
     headers?: Record<string, string | undefined>;
@@ -153,7 +162,7 @@ async function request(
       return this;
     },
   };
-  await handlers.get(method + ' /api/first-job')!(
+  await handlers.get(method + ' ' + (options.path ?? '/api/first-job'))!(
     req,
     response as unknown as express.Response,
     vi.fn()
@@ -519,5 +528,153 @@ describe('first-job local diagnostic boundary', () => {
     expect(result.body.messages).toEqual([]);
     expect(result.body.tasks).toEqual([]);
     expect(JSON.stringify(result.body)).not.toContain('/internal');
+  });
+});
+
+describe('read-only diagnostic artifact body route', () => {
+  const selector = (n = 1, revision = 1, hash = 'b') => ({
+    session_id: conversationRef(viewer).sessionId,
+    request_id: id(n),
+    revision: String(revision),
+    sha256: hash.repeat(64),
+  });
+  const artifact = (
+    query: Record<string, unknown>,
+    options: { address?: string; headers?: Record<string, string> } = {}
+  ) => request('GET', {}, { path: '/api/first-job/artifact', query, ...options });
+  async function completed() {
+    await request('POST', { action: 'start', request_id: id() });
+    state.projections.set(id(), {
+      status: 'work_completed',
+      text: 'private path must not leak',
+      artifactPath: '/private/path',
+      artifactSha256: 'b'.repeat(64),
+      artifactBody: '{\n  "diagnostic": true\n}\n',
+    });
+  }
+  it('returns the exact verified body and immutable identity without locking or writing', async () => {
+    await completed();
+    const writes = state.writes,
+      locks = state.locks,
+      files = JSON.stringify([...state.files]);
+    const result = await artifact(selector());
+    expect(result.statusCode).toBe(200);
+    expect(result.body).toMatchObject({
+      ok: true,
+      sessionId: conversationRef(viewer).sessionId,
+      artifact: {
+        requestId: id(),
+        revision: 1,
+        sha256: 'b'.repeat(64),
+        verification: 'verified',
+        currentness: 'latest_verified',
+        body: '{\n  "diagnostic": true\n}\n',
+      },
+    });
+    expect(JSON.stringify(result.body)).not.toContain('/private/path');
+    expect(result.headers).toMatchObject({
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    expect(JSON.stringify((await request()).body)).not.toContain('"body"');
+    await artifact(selector());
+    expect(state.writes).toBe(writes);
+    expect(state.locks).toBe(locks);
+    expect(JSON.stringify([...state.files])).toBe(files);
+    expect(state.run).not.toHaveBeenCalled();
+  });
+  it('keeps an older verified revision readable after a new immutable revision completes', async () => {
+    await completed();
+    await request('POST', {
+      action: 'revise',
+      request_id: id(2),
+      artifactRevision: { requestId: id(), revision: 1, sha256: 'b'.repeat(64), format: 'compact' },
+    });
+    state.projections.set(id(2), {
+      status: 'work_completed',
+      text: 'done',
+      artifactPath: '/private/new',
+      artifactSha256: 'c'.repeat(64),
+      artifactBody: '{"diagnostic":true}',
+    });
+    expect((await artifact(selector())).body.artifact).toMatchObject({
+      requestId: id(),
+      currentness: 'older_verified',
+      body: '{\n  "diagnostic": true\n}\n',
+    });
+    expect((await artifact(selector(2, 2, 'c'))).body.artifact).toMatchObject({
+      requestId: id(2),
+      currentness: 'latest_verified',
+      body: '{"diagnostic":true}',
+    });
+  });
+  it('rejects missing, stale, revoked and cross-conversation selectors without body', async () => {
+    await completed();
+    for (const query of [
+      selector(9),
+      selector(1, 2),
+      selector(1, 1, 'c'),
+      { ...selector(), session_id: 'concierge-' + 'f'.repeat(64) },
+    ]) {
+      const result = await artifact(query);
+      expect(result.statusCode).toBe(404);
+      expect(result.body.artifact).toBeUndefined();
+    }
+    state.projections.set(id(), { status: 'uncertain', text: 'unverified' });
+    expect((await artifact(selector())).statusCode).toBe(404);
+    await completed();
+    state.mappings = [];
+    expect((await artifact(selector())).statusCode).toBe(404);
+  });
+  it('cannot read another principal, member, tenant, project or protected-tier receipt', async () => {
+    await completed();
+    const input = { ...selector(), revision: 1 };
+    for (const change of [
+      { principalId: 'human:other' },
+      { memberId: 'other' },
+      { tenantSlugs: ['other'] },
+      { organizationIds: ['other'] },
+      { projectIds: ['other'] },
+      { tierAccess: ['confidential' as const] },
+      { source: 'token' as const },
+      { role: 'readonly' as const },
+    ])
+      expect(readFirstJobArtifact({ ...viewer, ...change }, input)).toBeUndefined();
+  });
+  it('fails closed on unreadable history without serving cached body or creating a retry', async () => {
+    await completed();
+    expect((await artifact(selector())).statusCode).toBe(200);
+    for (const key of state.files.keys()) state.files.set(key, { version: 999 });
+    const writes = state.writes,
+      locks = state.locks;
+    const result = await artifact(selector());
+    expect(result.statusCode).toBe(503);
+    expect(result.body.artifact).toBeUndefined();
+    expect(state.writes).toBe(writes);
+    expect(state.locks).toBe(locks);
+    expect(state.run).not.toHaveBeenCalled();
+  });
+  it('rejects path/scope selectors, nonlocal sockets and hostile hosts', async () => {
+    for (const extra of [
+      { path: '/etc/passwd' },
+      { artifactPath: '../private' },
+      { tenant: 'other' },
+      { tier: 'personal' },
+      { approved: true },
+    ])
+      expect((await artifact({ ...selector(), ...extra })).statusCode).toBe(400);
+    expect(
+      (
+        await artifact(selector(), {
+          address: '192.0.2.1',
+          headers: { 'x-forwarded-for': '127.0.0.1' },
+        })
+      ).statusCode
+    ).toBe(403);
+    expect((await artifact(selector(), { headers: { host: 'evil.example' } })).statusCode).toBe(
+      403
+    );
+    expect(state.writes).toBe(0);
+    expect(state.locks).toBe(0);
   });
 });

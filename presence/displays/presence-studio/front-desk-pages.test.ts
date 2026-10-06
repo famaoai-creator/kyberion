@@ -239,3 +239,33 @@ describe('raw template files are never served unrendered', () => {
     expect(String(home.sent)).not.toMatch(/\{\{(t|partial|locale)[:}]/);
   });
 });
+
+describe('First-job receipt viewer chrome', () => {
+  it('labels each exact-body selector and scrollable plain-text pane in all supported locales', () => {
+    const source = readStatic('first-job.html');
+    for (const locale of ['en', 'ja'] as const) {
+      const html = renderFrontDeskPageTemplate(source, locale, readStatic);
+      expect(html).not.toMatch(/\{\{(t|partial|locale)[:}]/);
+      for (const slot of ['body', 'left', 'right']) {
+        expect(html).toContain('for="first-job-' + slot + '-select"');
+        expect(html).toContain('id="first-job-' + slot + '-select"');
+        expect(html).toMatch(new RegExp('<pre\\s+id="first-job-' + slot + '-content"'));
+        expect(html).toContain('id="first-job-' + slot + '-metadata"');
+      }
+      for (const part of ['last-checked', 'refresh-mode', 'refresh-error', 'compare-status'])
+        expect(html).toContain('id="first-job-' + part + '"');
+      expect(html).not.toMatch(/file:\/\/|href="[^" ]*artifact_path/);
+    }
+    for (const match of source.matchAll(/\{\{t:(front_desk:first_job_[a-z0-9_]+)\}\}/g)) {
+      expect(FIRST_JOB_VOCABULARY_KEYS).toContain(match[1]);
+    }
+    for (const key of FIRST_JOB_VOCABULARY_KEYS) {
+      for (const locale of ['en', 'ja', 'qps-ploc'] as const) {
+        expect(catalogT(key, undefined, locale)).not.toBe(key);
+        expect(catalogT(key, undefined, locale)).not.toBe('');
+      }
+    }
+    expect(readStatic('home.css')).toContain('@media (max-width: 48rem)');
+    expect(readStatic('home.css')).toContain('white-space: pre-wrap');
+  });
+});

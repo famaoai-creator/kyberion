@@ -73,6 +73,17 @@ vi.mock('../secure-io.js', async (importOriginal) => {
   const artifactPath = (path: unknown) => String(path).includes('/front-desk/');
   return {
     ...original,
+    assertSafeRepositoryPath: (
+      path: string,
+      options?: Parameters<typeof original.assertSafeRepositoryPath>[1]
+    ) => (artifactPath(path) ? path : original.assertSafeRepositoryPath(path, options)),
+    safeReadFileRange: (path: string, position: number, length: number) => {
+      if (!artifactPath(path)) return original.safeReadFileRange(path, position, length);
+      state.artifactReads.push(path);
+      const value = state.artifactBytes.get(path);
+      if (value === undefined) throw new Error('missing artifact');
+      return Buffer.from(value).subarray(position, position + length);
+    },
     safeExistsSync: (path: string) =>
       artifactPath(path) ? state.artifactBytes.has(path) : original.safeExistsSync(path),
     safeLstat: (path: string) =>

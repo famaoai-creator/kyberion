@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseFirstJobRequest, parseFirstJobReadRequest } from './first-job-contract.js';
+import {
+  parseFirstJobRequest,
+  parseFirstJobReadRequest,
+  parseFirstJobArtifactReadRequest,
+} from './first-job-contract.js';
 const request_id = '00000000-0000-4000-8000-000000000001';
 const artifactRevision = {
   requestId: request_id,
@@ -56,5 +60,44 @@ describe('bounded first-job protocol', () => {
     { session_id: 'x' },
   ])('does not accept authority or malformed GET fields %#', (value) => {
     expect(parseFirstJobReadRequest(value)).toBeUndefined();
+  });
+});
+
+describe('bounded diagnostic artifact selectors', () => {
+  const selector = {
+    session_id: 'concierge-' + 'a'.repeat(64),
+    request_id,
+    revision: '1',
+    sha256: 'b'.repeat(64),
+  };
+  it('parses the exact immutable identity only', () => {
+    expect(parseFirstJobArtifactReadRequest(selector)).toEqual({ ...selector, revision: 1 });
+  });
+  it.each([
+    { path: '/etc/passwd' },
+    { artifactPath: '../private' },
+    { tenant: 'other' },
+    { tier: 'personal' },
+    { locale: 'en' },
+    { revision: '0' },
+    { revision: '-1' },
+    { revision: '1.0' },
+    { revision: '01' },
+    { revision: '1e2' },
+    { revision: 1 },
+    { revision: ['1'] },
+    { revision: '9999999999' },
+    { request_id: '../secret' },
+    { sha256: 'abc' },
+    { session_id: ['concierge-' + 'a'.repeat(64)] },
+  ])('rejects extra authority, paths and malformed identity %#', (override) => {
+    expect(parseFirstJobArtifactReadRequest({ ...selector, ...override })).toBeUndefined();
+  });
+  it('requires all fields', () => {
+    for (const key of Object.keys(selector)) {
+      const missing = { ...selector } as Record<string, unknown>;
+      delete missing[key];
+      expect(parseFirstJobArtifactReadRequest(missing)).toBeUndefined();
+    }
   });
 });
