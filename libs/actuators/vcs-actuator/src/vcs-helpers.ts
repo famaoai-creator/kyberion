@@ -2,11 +2,15 @@ import { logger } from '@agent/core/core';
 import { createAjv } from '@agent/core/foundation';
 import * as pathResolver from '@agent/core/path-resolver';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
-import { safeExec, safeExecResult } from '@agent/core/secure-io';
+import { safeExecResult } from '@agent/core/secure-io';
 import {
   ghAuthStatus,
   gitAddAll,
+  gitBranch,
   gitCommit,
+  gitDiff,
+  gitLog,
+  gitStatus,
   ghPrChecks,
   ghPrChecksWait,
   ghPrCreate,
@@ -138,18 +142,6 @@ function resolveCwd(params: VcsParams): string {
   return params.cwd || pathResolver.rootResolve('.');
 }
 
-function runGit(args: string[], cwd: string): string {
-  try {
-    return safeExec('git', args, { cwd });
-  } catch (error: unknown) {
-    throw asActionableError(
-      error,
-      'git',
-      'Install git from https://git-scm.com/downloads and ensure it is on PATH.'
-    );
-  }
-}
-
 const runGhResult = safeExecResult;
 
 function assertOk(
@@ -181,33 +173,31 @@ export async function handleAction(action: VcsAction): Promise<unknown> {
 
   switch (valid.op) {
     case 'status': {
-      const args = params.short ? ['status', '--short'] : ['status'];
-      return { op: valid.op, cwd, output: runGit(args, cwd) };
+      const result = gitStatus(cwd, { short: params.short });
+      assertOk(result, 'git status');
+      return { op: valid.op, cwd, output: result.stdout };
     }
     case 'diff': {
-      const args = ['diff'];
-      if (params.stat) args.push('--stat');
-      if (params.ref?.trim()) args.push(params.ref.trim());
-      return { op: valid.op, cwd, output: runGit(args, cwd) };
+      const result = gitDiff(cwd, { stat: params.stat, ref: params.ref });
+      assertOk(result, 'git diff');
+      return { op: valid.op, cwd, output: result.stdout };
     }
     case 'log': {
-      const args = ['log'];
-      if (params.oneline) args.push('--oneline');
-      if (Number.isInteger(params.limit) && Number(params.limit) > 0) {
-        args.push('-n', String(params.limit));
-      }
-      return { op: valid.op, cwd, output: runGit(args, cwd) };
+      const result = gitLog(cwd, { limit: params.limit, oneline: params.oneline });
+      assertOk(result, 'git log');
+      return { op: valid.op, cwd, output: result.stdout };
     }
     case 'branch': {
-      const branchAction = params.action as 'list' | 'create' | 'delete';
-      if (branchAction === 'list') {
-        return { op: valid.op, cwd, output: runGit(['branch', '--list'], cwd) };
+      // `action` is shared with the worktree op — branch only accepts
+      // list/create/delete; 'add'/'remove'/'prune' must NOT fall through to
+      // `git branch -d` (destructive on an "add" intent).
+      const branchAction = params.action;
+      if (!['list', 'create', 'delete'].includes(branchAction as string)) {
+        throw new Error('vcs-actuator: branch requires params.action (list|create|delete)');
       }
-      const branchName = params.name?.trim() as string;
-      if (branchAction === 'create') {
-        return { op: valid.op, cwd, output: runGit(['branch', branchName], cwd) };
-      }
-      return { op: valid.op, cwd, output: runGit(['branch', '-d', branchName], cwd) };
+      const result = gitBranch(cwd, branchAction as 'list' | 'create' | 'delete', params.name);
+      assertOk(result, 'git branch');
+      return { op: valid.op, cwd, output: result.stdout };
     }
     case 'commit': {
       if (params.add) {
