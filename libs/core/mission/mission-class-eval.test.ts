@@ -56,6 +56,12 @@ describe('mission class evaluation corpus', () => {
     expect(new Set(cases.map((entry) => entry.case_id)).size).toBe(cases.length);
   });
 
+  it('checks every dimension on at least one case (no vacuous 100%)', () => {
+    for (const [dimension, score] of Object.entries(report.scores)) {
+      expect(score.checked, dimension).toBeGreaterThan(0);
+    }
+  });
+
   it('keeps classification, workflow, team, and gate selection above the quality floors', () => {
     expect(report.scores.class.rate, detail).toBeGreaterThanOrEqual(FLOORS.class);
     expect(report.scores.team.rate, detail).toBeGreaterThanOrEqual(FLOORS.team);
