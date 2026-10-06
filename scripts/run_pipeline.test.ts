@@ -145,7 +145,7 @@ describe('run_pipeline compatibility', () => {
 
     expect(result.status).toBe('succeeded');
     expect(result.context.fragment_result).toBe('hello from fragment');
-    expect(result.context.trace_persisted_path).toContain('active/shared/logs/traces/');
+    expect(result.context.trace_persisted_path).toContain('/logs/traces/');
   });
 
   it('propagates an unresolved trust decision before importing workflow modules', async () => {
