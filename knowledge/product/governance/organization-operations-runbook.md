@@ -1,12 +1,14 @@
 ---
 title: Organization Operations Runbook
 tags: [organization, operation, incident, decision, governance]
-last_updated: 2026-10-05
+last_updated: 2026-10-06
 ---
 
 # Organization operations
 
 Use `pnpm organization` for organization state changes. Select a tenant and organization scope first, and include `--tier confidential --tenant-slug <slug>` for confidential operations. Writes require an explicit `--apply` and either the sovereign persona or the least-privilege `MISSION_ROLE=organization_operator` with `KYBERION_TENANT=<slug>` (own tenant's confidential/public organization state only); inspect the same command with `--dry-run` first.
+
+Setting up an organization for the first time? Follow the [Organization Lifecycle Verification Playbook](./organization-lifecycle-verification-playbook.md) end to end first (formation, domain and service, operation, cadence and decision, project, run, incident and learning, reconcile), then use this runbook for routine operation.
 
 ## Routine operations
 
@@ -42,6 +44,22 @@ Create an Incident with `incident add`, then advance it with `incident transitio
 Create a Decision as `proposed`, then advance it with `decision transition`. Approval or rejection requires a `channel:id` approval reference whose record has a strongly authenticated human decision, `human_only` accountability, the same organization and tenant scope, and an effect binding of `organization:decision:<id>:approved` or `organization:decision:<id>:rejected`. An approved Decision needs a chosen option; `implemented` needs a follow-up reference.
 
 Chronos shows tenant-scoped CLI commands beside organization intervention points. The HTTP view remains read-only; the commands enter through the governed organization facade.
+
+## Objectives and key results
+
+Attach key results to an objective with `objective add` and `objective kr add`. A KR measures itself (`--metric-json` source `org_metric`, `file`, `probe` or `signal_ratio`) or takes values recorded by people (`manual`); `pnpm organization help` lists the shapes. KRs are measured automatically only while an active dot charter references the objective, so an organization run by hand measures on demand:
+
+```bash
+pnpm organization objective kr measure --organization-id ORG --tier confidential --tenant-slug TENANT --apply
+pnpm organization objective kr record --organization-id ORG --tier confidential --tenant-slug TENANT \
+  --objective-id OBJ --kr-id KR --value 30 --apply
+```
+
+`status` shows each objective's progress and the projects that point at it through `--objective-ids`. The walkthrough from objective to project is Step 11 of the [onboarding flow](./onboarding-flow.md).
+
+## Members and roles
+
+Link a chat or IdP identity to an existing member so team channels resolve the speaker: `pnpm organization member link-identity <member-id> --slack <user-id>` (or `--issuer <iss> --subject <sub>`; `unlink-identity` reverses it). Author roles with `pnpm organization role create --name <name> --domain <domain>` and grant authority with `role promote --role <role-id> --authority <authority-role-id>`.
 
 ## Subsidiaries
 
