@@ -469,7 +469,7 @@ export function buildOrganizationLearningCandidate(
     const details = validationErrors(validatorFor(LEARNING_SCHEMA_PATH));
     const enumHint =
       details.includes('source_type') || details.includes('target_kind')
-        ? ' (source_type must be one of incident_review|routine_exception|project_closure|governance_decision; ' +
+        ? ' (source_type must be one of incident_review|routine_exception|project_closure|governance_decision|runtime_signal; ' +
           'target_kind must be one of pattern|sop_candidate|knowledge_hint|report_template)'
         : '';
     throw new Error(`Invalid organization learning candidate: ${details}${enumHint}`);

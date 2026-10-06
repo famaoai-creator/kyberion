@@ -1,0 +1,52 @@
+---
+record_id: mem-MSN-LEARNING-SIGNAL-ADAPTER-20261005-2026_10_06
+kind: pattern
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-LEARNING-SIGNAL-ADAPTER-20261005-2026_10_06
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-10-06T00:30:49.141Z
+source_branch: feat/learning-signal-adapter-20261005
+source_commit: c76f7c62f6027326d25635fd32c59224ae97164f
+---
+
+# Route runtime failure logs into the improvement loop through the learning-signal adapter
+
+Register a LearningSignalSource instead of a bespoke reader; keep keys closed-vocabulary, tag tenants, give each record a stable ref.
+
+## Applicability
+
+- mission
+- mission:MSN-LEARNING-SIGNAL-ADAPTER-20261005
+
+## Reusable Steps
+
+1. Register a LearningSignalSource instead of a bespoke reader; keep keys closed-vocabulary, tag tenants, give each record a stable ref
+
+## Expected Outcome
+
+When a subsystem writes a runtime log whose failures should improve later work, register a `LearningSignalSource` in `libs/core/knowledge/learning-signal-sources.ts` instead of building a separate reader, queue or report. The adapter (`learning-signal-adapter.ts`) clusters observations, proposes recurring clusters as `runtime_signal` organization learning candidates, and turns tenant-free clusters into feedback-loop hints that the knowledge index re-injects. Baseline runs it; `pnpm kyberion learning harvest --dry-run` shows what it would propose.
+
+Rules learned from three review rounds:
+
+1. Keys and titles are closed vocabulary only. Build them with `closedToken` (op, kind, category names; rejects spaces, paths, dots, quotes) and `errorCode` (underscored `[CODE]`, an errno allow-list, HTTP status, fixed classes). Free-form error text, pipeline names and paths leaked tenant words into product-tier hints in the first draft.
+2. Tag every tenant record with `tenantSlug`. Each scope (`system/` or `confidential/<tenant>/`) has its own cursor and cluster state, and a run inside a tenant harvests only that tenant. A single global cursor permanently dropped other tenants' records.
+3. Give each observation a unique, stable `ref`. The adapter re-reads a 10-minute overlap and keeps a counted ref for as long as a harvest still reports it, keyed by the harvest time it was last reported. Pruning by the record's own timestamp recounted hourly findings such as runtime-health trends.
+4. Select files of writers that name a file after their start day (worker events) by modification time, not by the date in the name.
+5. Advance a cluster only when the learning queue accepted the proposal, and make each re-proposal a new candidate id so a reviewed candidate is never overwritten.
+
+Routes still outside the loop: CI failures and post-delivery edits of deliverables (no local record exists), and the a2a conversation store (no failure field).
+
+## Evidence
+
+- active/missions/public/MSN-LEARNING-SIGNAL-ADAPTER-20261005/evidence/REVIEW-execution-implement.md
+- active/missions/public/MSN-LEARNING-SIGNAL-ADAPTER-20261005/evidence/design-spec.json
+- active/missions/public/MSN-LEARNING-SIGNAL-ADAPTER-20261005/evidence/test-report.md
+
+## Artifacts

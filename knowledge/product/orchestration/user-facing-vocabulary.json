@@ -8123,6 +8123,11 @@
         "ja": "Chronos の launchd アンインストール手順を表示",
         "qps-ploc": "⟦Şħőẇ Ƈħřőñőş ŀȧůñƈħḓ ůñïñşŧȧŀŀ şŧėṗş ŀőřėɱ ïṗşůɱ ⟧"
       },
+      "cli_cmd_script_learning_harvest": {
+        "en": "Propose recurring runtime failures as learning candidates",
+        "ja": "繰り返す実行時の失敗を学習候補として提案",
+        "qps-ploc": "⟦Ṗřőṗőşė řėƈůřřïñɠ řůñŧïɱė ƒȧïŀůřėş ȧş ŀėȧřñïñɠ ƈȧñḓïḓȧŧėş ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
       "cli_cmd_script_ops_alerts": {
         "en": "Triage undelivered alerts",
         "ja": "未配信アラートを確認",

@@ -17,6 +17,7 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
+import { formatDiagnostic } from '@agent/core/logger';
 import { withExecutionContext } from '@agent/core/authority';
 import { loadServiceEndpointsCatalog } from '@agent/core/service/service-endpoint-registry';
 import { killSwitch } from '@agent/core/governance/kill-switch';
@@ -875,6 +876,36 @@ export async function runBaselineCheck() {
     } catch (err: any) {
       logger.warn(
         `[BASELINE] scheduler ops-alert escalation failed (non-fatal): ${err?.message ?? String(err)}`
+      );
+    }
+  }
+
+  // LS-04: propose recurring failures from every runtime log the improvement
+  // loop used to miss (conversation, approvals, audit, traces, ...). Never
+  // blocks the baseline; the cursor makes repeated runs cheap and idempotent.
+  if (!isVitestProcess()) {
+    try {
+      // Loaded lazily: the sources pull in many stores the rest of baseline never needs.
+      const { harvestLearningSignals } =
+        await import('@agent/core/knowledge/learning-signal-adapter');
+      const { builtinLearningSignalSources } =
+        await import('@agent/core/knowledge/learning-signal-sources');
+      const harvest = harvestLearningSignals({ sources: builtinLearningSignalSources() });
+      const failed = harvest.sources
+        .filter((source) => source.error)
+        .map((source) => source.source);
+      logger.debug(
+        `[BASELINE] learning-signal harvest: ${harvest.signals} signal(s), ${harvest.hints} hint(s)` +
+          (failed.length > 0 ? `, unreadable: ${failed.join(', ')}` : '')
+      );
+    } catch (err: any) {
+      logger.warn(
+        formatDiagnostic({
+          component: 'baseline',
+          what: 'learning-signal harvest failed (non-fatal)',
+          why: err?.message ?? String(err),
+          next: 'run `pnpm kyberion learning harvest --dry-run` to see which source fails',
+        })
       );
     }
   }
