@@ -88,12 +88,14 @@ function harness(
     get?: () => Promise<ReturnType<typeof response>> | ReturnType<typeof response>;
     post?: (body: Record<string, unknown>) => Promise<ReturnType<typeof response>>;
     snapshot?: Record<string, unknown>;
+    signal?: AbortSignal;
   } = {}
 ) {
   const elements = new Map(
     ['readiness', 'signin', 'refresh', 'error', 'status', 'items'].map((id) => [id, new Element()])
   );
   const context = {
+    signal: options.signal,
     snapshot: {
       sessionId: session,
       scope: { tenant: 'test-tenant', tier: 'public' },
@@ -108,7 +110,12 @@ function harness(
   const fetch = vi.fn(
     async (
       url: string,
-      init?: { method?: string; body?: string; headers?: Record<string, string> }
+      init?: {
+        method?: string;
+        body?: string;
+        headers?: Record<string, string>;
+        signal?: AbortSignal;
+      }
     ) => {
       if (init?.method === 'POST')
         return options.post
@@ -124,6 +131,9 @@ function harness(
     }
   );
   const window = {
+    AbortController,
+    setTimeout: (handler: () => void, delay: number) => setTimeout(handler, delay),
+    clearTimeout: (timer: ReturnType<typeof setTimeout>) => clearTimeout(timer),
     KyberionFirstJobApproval: undefined as
       undefined | { check: (context: unknown) => Promise<void>; invalidate: () => void },
   };
@@ -155,7 +165,7 @@ function harness(
   };
 }
 
-beforeEach(() => vi.useFakeTimers({ now, toFake: ['Date'] }));
+beforeEach(() => vi.useFakeTimers({ now, toFake: ['Date', 'setTimeout', 'clearTimeout'] }));
 afterEach(() => vi.useRealTimers());
 
 describe('Dedicated diagnostic approval UI with inert fixtures', () => {
@@ -448,4 +458,58 @@ describe('Dedicated diagnostic approval UI with inert fixtures', () => {
     expect(h.context.onChange).toHaveBeenLastCalledWith({ ready: false, busy: false });
     expect(h.posts()).toHaveLength(0);
   });
+});
+
+describe('Read-only approval fetch timeout and cancellation', () => {
+  it('aborts a hung GET at the read deadline and keeps explicit decision POST behavior untouched', async () => {
+    const pending = deferred<ReturnType<typeof response>>();
+    let firstRead = true;
+    const h = harness({
+      get: () => (firstRead ? ((firstRead = false), pending.promise) : response(view())),
+    });
+    await flush();
+    const signal = h.fetch.mock.calls[0][1]!.signal!;
+    expect(signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(15000);
+    await flush();
+    expect(signal.aborted).toBe(true);
+    expect(h.get('refresh').disabled).toBe(false);
+    expect(h.get('error').textContent).toContain('approval_failed');
+    expect(h.buttons()).toHaveLength(0);
+    expect(h.posts()).toHaveLength(0);
+    await h.refresh();
+    pending.resolve(response(view({ approvals: [item({ display_digest: 'e'.repeat(64) })] })));
+    await flush();
+    h.buttons()[0].fire();
+    await flush();
+    expect(h.posts()).toHaveLength(1);
+    expect(h.posts()[0][1]!.signal).toBeUndefined();
+    expect(JSON.parse(h.posts()[0][1]!.body!).display_digest).toBe(displayDigest);
+  });
+
+  it.each(['parent', 'invalidate', 'replace'])(
+    'cancels the old GET on %s and ignores its late approval data',
+    async (kind) => {
+      const pending = deferred<ReturnType<typeof response>>();
+      const controller = new AbortController();
+      let firstRead = true;
+      const h = harness({
+        signal: controller.signal,
+        get: () =>
+          firstRead ? ((firstRead = false), pending.promise) : response(view({ approvals: [] })),
+      });
+      await flush();
+      const signal = h.fetch.mock.calls[0][1]!.signal!;
+      if (kind === 'parent') controller.abort();
+      else if (kind === 'invalidate') h.window.KyberionFirstJobApproval!.invalidate();
+      else await h.refresh();
+      await flush();
+      expect(signal.aborted).toBe(true);
+      pending.resolve(response(view()));
+      await flush();
+      expect(h.buttons()).toHaveLength(0);
+      expect(h.posts()).toHaveLength(0);
+      expect(vi.getTimerCount()).toBe(0);
+    }
+  );
 });

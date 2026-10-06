@@ -24268,6 +24268,136 @@
         "en": "This old request cannot execute with its recorded approval. An operator must recover the held workflow before it can continue. Signing in again, refreshing, or submitting another request does not clear this held action. Existing records and receipts remain unchanged.",
         "ja": "この古い依頼は、記録済みの承認では実行できません。続けるには運用者による回復処理が必要です。再サインイン、画面の更新、新しい依頼の送信では、この保留状態は解消されません。既存の記録と診断記録はそのまま残ります。",
         "qps-ploc": "⟦Ŧħïş őŀḓ řėɋůėşŧ ƈȧññőŧ ėẋėƈůŧė ẇïŧħ ïŧş řėƈőřḓėḓ ȧṗṗřőṽȧŀ. Ȧñ őṗėřȧŧőř ɱůşŧ řėƈőṽėř ŧħė ħėŀḓ ẇőřķƒŀőẇ ƀėƒőřė ïŧ ƈȧñ ƈőñŧïñůė. Şïɠñïñɠ ïñ ȧɠȧïñ, řėƒřėşħïñɠ, őř şůƀɱïŧŧïñɠ ȧñőŧħėř řėɋůėşŧ ḓőėş ñőŧ ƈŀėȧř ŧħïş ħėŀḓ ȧƈŧïőñ. Ėẋïşŧïñɠ řėƈőřḓş ȧñḓ řėƈėïṗŧş řėɱȧïñ ůñƈħȧñɠėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+      },
+      "first_job_body_title": {
+        "en": "Diagnostic JSON body",
+        "ja": "診断JSONの本文",
+        "qps-ploc": "⟦Ḓïȧɠñőşŧïƈ ĴŞŐÑ ƀőḓẏ ŀőřėɱ ⟧"
+      },
+      "first_job_body_notice": {
+        "en": "Read-only display of the exact verified JSON bytes. Selecting a version does not start or approve work.",
+        "ja": "検証済みのJSONを、そのまま閲覧できます。版を選んでも、作業の開始や承認は行いません。",
+        "qps-ploc": "⟦Řėȧḓ-őñŀẏ ḓïşṗŀȧẏ őƒ ŧħė ėẋȧƈŧ ṽėřïƒïėḓ ĴŞŐÑ ƀẏŧėş. Şėŀėƈŧïñɠ ȧ ṽėřşïőñ ḓőėş ñőŧ şŧȧřŧ őř ȧṗṗřőṽė ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "first_job_body_select": {
+        "en": "Version to read",
+        "ja": "表示する版",
+        "qps-ploc": "⟦Ṽėřşïőñ ŧő řėȧḓ ŀőřė⟧"
+      },
+      "first_job_body_empty": {
+        "en": "No verified diagnostic body is available yet.",
+        "ja": "閲覧できる確認済みの診断本文はまだありません。",
+        "qps-ploc": "⟦Ñő ṽėřïƒïėḓ ḓïȧɠñőşŧïƈ ƀőḓẏ ïş ȧṽȧïŀȧƀŀė ẏėŧ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "first_job_body_loading": {
+        "en": "Loading this exact version…",
+        "ja": "この版の本文を読み込み中…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ŧħïş ėẋȧƈŧ ṽėřşïőñ… ŀőřėɱ ïṗ⟧"
+      },
+      "first_job_body_ready": {
+        "en": "Verified body loaded.",
+        "ja": "確認済みの本文を読み込みました。",
+        "qps-ploc": "⟦Ṽėřïƒïėḓ ƀőḓẏ ŀőȧḓėḓ. ŀőřėɱ ⟧"
+      },
+      "first_job_body_unavailable": {
+        "en": "This exact version is unavailable or no longer matches the verified record. Choose another version or refresh.",
+        "ja": "この版の本文を取得できないか、確認済みの記録と一致しません。別の版を選ぶか、更新してください。",
+        "qps-ploc": "⟦Ŧħïş ėẋȧƈŧ ṽėřşïőñ ïş ůñȧṽȧïŀȧƀŀė őř ñő ŀőñɠėř ɱȧŧƈħėş ŧħė ṽėřïƒïėḓ řėƈőřḓ. Ƈħőőşė ȧñőŧħėř ṽėřşïőñ őř řėƒřėşħ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "first_job_body_forbidden": {
+        "en": "Access to this body could not be verified. Check your sign-in and allowed scope, then retry.",
+        "ja": "この本文へのアクセス権を確認できません。サインインと許可された範囲を確認してから、再読み込みしてください。",
+        "qps-ploc": "⟦Ȧƈƈėşş ŧő ŧħïş ƀőḓẏ ƈőůŀḓ ñőŧ ƀė ṽėřïƒïėḓ. Ƈħėƈķ ẏőůř şïɠñ-ïñ ȧñḓ ȧŀŀőẇėḓ şƈőṗė, ŧħėñ řėŧřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "first_job_body_failed": {
+        "en": "This body could not be read. Retry when the connection is available.",
+        "ja": "本文を読み込めませんでした。接続を確認してから、再読み込みしてください。",
+        "qps-ploc": "⟦Ŧħïş ƀőḓẏ ƈőůŀḓ ñőŧ ƀė řėȧḓ. Řėŧřẏ ẇħėñ ŧħė ƈőññėƈŧïőñ ïş ȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "first_job_body_retry": {
+        "en": "Retry unavailable bodies",
+        "ja": "取得できなかった本文を再読み込み",
+        "qps-ploc": "⟦Řėŧřẏ ůñȧṽȧïŀȧƀŀė ƀőḓïėş ŀőřėɱ ï⟧"
+      },
+      "first_job_compare_title": {
+        "en": "Compare verified versions",
+        "ja": "確認済みの版を比較",
+        "qps-ploc": "⟦Ƈőɱṗȧřė ṽėřïƒïėḓ ṽėřşïőñş ŀőřėɱ ïṗ⟧"
+      },
+      "first_job_compare_notice": {
+        "en": "Compare the exact stored JSON side by side. Earlier receipts stay unchanged. The initial selection is the earliest and latest verified version; your selections stay fixed during refresh.",
+        "ja": "保存済みのJSONを並べて比較します。以前の記録は変更しません。最初は最も古い版と最新の確認済みの版を表示し、更新後も選択した版を保ちます。",
+        "qps-ploc": "⟦Ƈőɱṗȧřė ŧħė ėẋȧƈŧ şŧőřėḓ ĴŞŐÑ şïḓė ƀẏ şïḓė. Ėȧřŀïėř řėƈėïṗŧş şŧȧẏ ůñƈħȧñɠėḓ. Ŧħė ïñïŧïȧŀ şėŀėƈŧïőñ ïş ŧħė ėȧřŀïėşŧ ȧñḓ ŀȧŧėşŧ ṽėřïƒïėḓ ṽėřşïőñ; ẏőůř şėŀėƈŧïőñş şŧȧẏ ƒïẋėḓ ḓůřïñɠ řėƒřėşħ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "first_job_compare_left": {
+        "en": "Version A",
+        "ja": "比較する版A",
+        "qps-ploc": "⟦Ṽėřşïőñ Ȧ ŀőř⟧"
+      },
+      "first_job_compare_right": {
+        "en": "Version B",
+        "ja": "比較する版B",
+        "qps-ploc": "⟦Ṽėřşïőñ Ƀ ŀőř⟧"
+      },
+      "first_job_compare_empty": {
+        "en": "Two verified versions are needed for comparison.",
+        "ja": "比較するには確認済みの版が2つ必要です。",
+        "qps-ploc": "⟦Ŧẇő ṽėřïƒïėḓ ṽėřşïőñş ȧřė ñėėḓėḓ ƒőř ƈőɱṗȧřïşőñ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "first_job_compare_same_version": {
+        "en": "Both sides show the same version. Select a different version to compare.",
+        "ja": "左右で同じ版を選んでいます。比較するには別の版を選んでください。",
+        "qps-ploc": "⟦Ƀőŧħ şïḓėş şħőẇ ŧħė şȧɱė ṽėřşïőñ. Şėŀėƈŧ ȧ ḓïƒƒėřėñŧ ṽėřşïőñ ŧő ƈőɱṗȧřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "first_job_compare_same": {
+        "en": "The exact JSON bodies are identical.",
+        "ja": "JSON本文は完全に一致しています。",
+        "qps-ploc": "⟦Ŧħė ėẋȧƈŧ ĴŞŐÑ ƀőḓïėş ȧřė ïḓėñŧïƈȧŀ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "first_job_compare_different": {
+        "en": "The JSON bodies differ. Whitespace and formatting are included in this comparison.",
+        "ja": "JSON本文に違いがあります。空白や書式の違いも含みます。",
+        "qps-ploc": "⟦Ŧħė ĴŞŐÑ ƀőḓïėş ḓïƒƒėř. Ẇħïŧėşṗȧƈė ȧñḓ ƒőřɱȧŧŧïñɠ ȧřė ïñƈŀůḓėḓ ïñ ŧħïş ƈőɱṗȧřïşőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "first_job_compare_wait": {
+        "en": "Comparison is available once both selected bodies are loaded.",
+        "ja": "選択した両方の本文を読み込むと比較できます。",
+        "qps-ploc": "⟦Ƈőɱṗȧřïşőñ ïş ȧṽȧïŀȧƀŀė őñƈė ƀőŧħ şėŀėƈŧėḓ ƀőḓïėş ȧřė ŀőȧḓėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "first_job_last_checked": {
+        "en": "Status last checked",
+        "ja": "状況の最終確認",
+        "qps-ploc": "⟦Şŧȧŧůş ŀȧşŧ ƈħėƈķėḓ ŀőřėɱ ⟧"
+      },
+      "first_job_not_checked": {
+        "en": "Not checked yet",
+        "ja": "まだ確認していません",
+        "qps-ploc": "⟦Ñőŧ ƈħėƈķėḓ ẏėŧ ŀőřė⟧"
+      },
+      "first_job_refresh_active": {
+        "en": "Checking progress automatically while this page is visible and work is queued or running. This only reads status.",
+        "ja": "この画面を表示している間、実行待ち・実行中の状況を自動で確認します。状況の読み取りのみを行います。",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ṗřőɠřėşş ȧůŧőɱȧŧïƈȧŀŀẏ ẇħïŀė ŧħïş ṗȧɠė ïş ṽïşïƀŀė ȧñḓ ẇőřķ ïş ɋůėůėḓ őř řůññïñɠ. Ŧħïş őñŀẏ řėȧḓş şŧȧŧůş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+      },
+      "first_job_refresh_hidden": {
+        "en": "Automatic progress checks are paused while this page is hidden.",
+        "ja": "画面を表示していない間は、自動確認を一時停止します。",
+        "qps-ploc": "⟦Ȧůŧőɱȧŧïƈ ṗřőɠřėşş ƈħėƈķş ȧřė ṗȧůşėḓ ẇħïŀė ŧħïş ṗȧɠė ïş ħïḓḓėñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "first_job_refresh_paused": {
+        "en": "Automatic progress checks are paused. Use Refresh to check again; approvals and execution steps still need your action.",
+        "ja": "自動確認は停止しています。「更新」で再確認できます。承認や実行を進める操作は、引き続き手動で行ってください。",
+        "qps-ploc": "⟦Ȧůŧőɱȧŧïƈ ṗřőɠřėşş ƈħėƈķş ȧřė ṗȧůşėḓ. Ůşė Řėƒřėşħ ŧő ƈħėƈķ ȧɠȧïñ; ȧṗṗřőṽȧŀş ȧñḓ ėẋėƈůŧïőñ şŧėṗş şŧïŀŀ ñėėḓ ẏőůř ȧƈŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "first_job_refresh_backoff": {
+        "en": "The last check failed. Retrying status reads less frequently while work remains queued or running.",
+        "ja": "直近の確認に失敗しました。実行待ち・実行中の間は、間隔を空けて状況を再確認します。",
+        "qps-ploc": "⟦Ŧħė ŀȧşŧ ƈħėƈķ ƒȧïŀėḓ. Řėŧřẏïñɠ şŧȧŧůş řėȧḓş ŀėşş ƒřėɋůėñŧŀẏ ẇħïŀė ẇőřķ řėɱȧïñş ɋůėůėḓ őř řůññïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "first_job_refresh_failed": {
+        "en": "Progress could not be checked. The last successful check time is shown above; displayed records may be out of date.",
+        "ja": "状況を確認できませんでした。最後に確認できた日時を上に表示しています。表示中の記録は古い可能性があります。",
+        "qps-ploc": "⟦Ṗřőɠřėşş ƈőůŀḓ ñőŧ ƀė ƈħėƈķėḓ. Ŧħė ŀȧşŧ şůƈƈėşşƒůŀ ƈħėƈķ ŧïɱė ïş şħőẇñ ȧƀőṽė; ḓïşṗŀȧẏėḓ řėƈőřḓş ɱȧẏ ƀė őůŧ őƒ ḓȧŧė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
       }
     },
     "operator": {

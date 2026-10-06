@@ -6,7 +6,7 @@ import {
 import { t } from '../t.js';
 import type { SupportedLocale } from '../locale-normalize.js';
 import { createHash } from 'node:crypto';
-import { safeExistsSync, safeLstat, safeReadFile } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeLstat, safeReadFileRange } from '../secure-io.js';
 import { getWorkItem } from '../workforce/work-coordination.js';
 import { currentDotActions } from '../dot/dot-dispatch.js';
 import { listDotCharters } from '../dot/dot-charter.js';
@@ -21,10 +21,21 @@ import {
   type FrontDeskExecutionProjection,
 } from './front-desk-execution-contract.js';
 
+const MAX_RECEIPT_BYTES = 64 * 1024;
+/** Bound the actual read, not just a pathname stat that may become stale. */
+function readReceiptBytes(filePath: string): Buffer {
+  const resolved = assertSafeRepositoryPath(filePath);
+  const stat = safeLstat(resolved);
+  if (!stat.isFile() || stat.size > MAX_RECEIPT_BYTES) throw new Error('invalid receipt file');
+  const bytes = safeReadFileRange(resolved, 0, MAX_RECEIPT_BYTES + 1);
+  if (bytes.length > MAX_RECEIPT_BYTES) throw new Error('receipt too large');
+  return bytes;
+}
+
 export function projectFrontDeskExecution(
   viewer: SurfaceViewerScope,
   binding: FrontDeskExecutionBinding,
-  options: { rootDir?: string; locale?: SupportedLocale } = {}
+  options: { rootDir?: string; locale?: SupportedLocale; includeArtifactBody?: boolean } = {}
 ): FrontDeskExecutionProjection | undefined {
   const mapping = getFrontDeskExecutionMapping(binding);
   if (!mapping || !frontDeskExecutionViewerMatches(viewer, mapping)) return undefined;
@@ -77,6 +88,7 @@ export function projectFrontDeskExecution(
   )?.charter;
   if (
     !charter ||
+    charter.scope.tier !== 'public' ||
     charter.scope.tenant_slug !== tenant ||
     charter.scope.organization_id !== org ||
     charter.scope.project_id !== project
@@ -111,25 +123,30 @@ export function projectFrontDeskExecution(
       !evidence ||
       evidence.request_digest !== binding.request_digest ||
       evidence.revision !== binding.revision ||
-      evidence.artifact_path !== expectedPath ||
-      !safeExistsSync(expectedPath) ||
-      !safeLstat(expectedPath).isFile()
+      evidence.artifact_path !== expectedPath
     )
       throw new Error('evidence missing');
-    const content = safeReadFile(expectedPath, { encoding: 'utf8' });
+    const bytes = readReceiptBytes(expectedPath);
+    const content = bytes.toString('utf8');
     if (
-      createHash('sha256').update(content).digest('hex') !== evidence.sha256 ||
-      content !==
-        frontDeskExecutionExpectedContent(binding, mapping, 'concierge-' + binding.conversation_key)
+      createHash('sha256').update(bytes).digest('hex') !== evidence.sha256 ||
+      !bytes.equals(
+        Buffer.from(
+          frontDeskExecutionExpectedContent(
+            binding,
+            mapping,
+            'concierge-' + binding.conversation_key
+          ),
+          'utf8'
+        )
+      )
     )
       throw new Error('readback differs');
     const parentPath = frontDeskExecutionParentArtifactPath(binding, mapping);
     if (
       parentPath &&
-      (!safeExistsSync(parentPath) ||
-        !safeLstat(parentPath).isFile() ||
-        createHash('sha256').update(safeReadFile(parentPath)).digest('hex') !==
-          binding.parent_sha256)
+      createHash('sha256').update(readReceiptBytes(parentPath)).digest('hex') !==
+        binding.parent_sha256
     )
       throw new Error('parent readback differs');
     return {
@@ -138,6 +155,7 @@ export function projectFrontDeskExecution(
       reportId,
       artifactPath: expectedPath,
       artifactSha256: evidence.sha256,
+      ...(options.includeArtifactBody ? { artifactBody: content } : {}),
     };
   } catch {
     return {

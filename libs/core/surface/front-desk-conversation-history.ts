@@ -1,3 +1,4 @@
+import type { FrontDeskExecutionProjection } from './front-desk-execution-contract.js';
 import {
   parseFrontDeskArtifactRevisionInput,
   type FrontDeskReceiptFormat,
@@ -92,4 +93,56 @@ export function parseConversationHistory(value: unknown): ConversationHistory | 
     });
   }
   return { sessionId: record.sessionId, messages, pending: record.pending as number };
+}
+
+/** Display-only work state. An answered conversation is never completed execution. */
+export interface FrontDeskConversationWorkTask {
+  id: string;
+  title: string;
+  sourceStatus: 'recorded' | 'answered' | 'awaiting_input' | 'needs_execution';
+  createdAt: number;
+  lastRecordedAt: number;
+  resultExcerpt?: string;
+  turnState: 'settled' | 'pending' | 'uncertain' | 'not_started' | 'unknown';
+  executionStatus?: FrontDeskExecutionProjection['status'] | 'unknown';
+  /** Present only for an existing, scope- and binding-matched governed item. */
+  workItemId?: string;
+  /** Checked now, not an inferred completion time or a persisted report timestamp. */
+  verifiedAt?: number;
+  artifact?: FrontDeskConversationWorkArtifact;
+}
+export interface FrontDeskConversationWorkArtifact {
+  requestId: string;
+  revision: number;
+  format: 'compact' | 'readable';
+  parentRequestId?: string;
+  parentRevision?: number;
+  /** The revision protocol records a format change, never the user's motivation. */
+  changeReason?: 'format_change';
+  verification: 'verified' | 'pending' | 'unknown';
+  currentness: 'latest_verified' | 'older_verified' | 'requested_pending' | 'requested_unknown';
+  sha256?: string;
+  verifiedAt?: number;
+}
+export interface FrontDeskConversationWork {
+  sessionId: string;
+  tasks: FrontDeskConversationWorkTask[];
+}
+
+export class ConversationStoreError extends Error {
+  constructor(
+    public readonly code:
+      | 'identity_required'
+      | 'invalid_history'
+      | 'invalid_text'
+      | 'request_conflict'
+      | 'request_expired'
+      | 'scope_selection_required'
+      | 'invalid_revision'
+      | 'revision_target_unavailable'
+      | 'revision_conflict'
+      | 'diagnostic_admission_required'
+  ) {
+    super(code);
+  }
 }

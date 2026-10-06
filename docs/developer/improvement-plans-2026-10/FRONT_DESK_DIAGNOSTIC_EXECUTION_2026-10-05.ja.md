@@ -54,3 +54,14 @@ Mappings は空のまま両方の front desk と supervisor / executor / WorkIte
 許可済み候補が一つなので model を呼ばず決定的に選ぶ。binding と設定 digest が根拠になる。複数候補では既存 judgment-assist の有限候補 choice と baseline fallback / calibration を再利用できる。新しい judge framework は作らない。judgment は mandatory work-scope floor、承認、tenant boundary、artifact readback、uncertain-effect 隔離を緩める権限ではない。外部 JEV API への情報送信も有効化していない。
 
 隔離された模擬 human / mapping / charter で、実 ADF、artifact readback、fresh process での再開と再起動後の二重実行抑止、設定変更、成果物不足・改変、通知失敗、実 process の WorkItem 競合を検証する。production 承認を偽造しない。正確な最終件数と gate 結果は PR の検証欄を参照。
+
+## First job の本文表示・新旧比較・進捗更新
+
+- First job の本文取得は既存のローカル認証と viewer mapping に従う診断 JSON 専用 GET。session ID、request ID、revision、SHA-256 の完全一致で一つの保存版を選ぶ。クライアントからのファイルパス、tenant、tier は受け付けない。
+- 本文は実行結果の hash・期待内容・親版を検証した同じ readback から返す。検証後にパスを開き直さない。欠落・改変・symlink・対象外 scope・64 KiB 超過は本文を返さない。表示用の本文は status history に保存しない。
+- 比較欄は選んだ版の request ID・revision・hash を保持する。新しい版が届いても選択を勝手に最新へ置き換えない。古い検証済み版は older_verified として読める。表示した本文の検証と latest/older の区別は取得時点の観測であり、永続的な保証ではない。
+- 進捗の自動更新は画面表示中の queued/running に限定する読み取り。非表示、終了、保留では止まり、失敗は間隔を延ばして表示する。最終確認時刻は成果物の生成時刻とは別。GET から tick、承認、作成、再実行を呼ばない。
+- 修正は既存の compact/readable 形式変更と個別の人間承認のまま。自由文編集、汎用 artifact browser、保留仕事の復旧、新しい provider・権限・member はこの範囲に含めない。
+- 合成 fixture の API・UI テストは実ユーザーの OIDC ログイン証拠ではない。実ログインを伴う一連の操作は、認証済みブラウザー環境で別途確認する。
+
+パス検査は既存の repository path guard に従う。検査後に悪意あるローカルプロセスが親ディレクトリを差し替える場合まで、ファイルシステム操作全体を原子的に防ぐという保証はしない。ここでの同一 bytes 保証は、検証した buffer を表示用に使い、検証後の配信目的の再読込みをしないことを指す。
