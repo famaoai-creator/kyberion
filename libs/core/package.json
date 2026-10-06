@@ -7278,6 +7278,14 @@
     "./surface/front-desk-execution-status": {
       "types": "./dist/surface/front-desk-execution-status.d.ts",
       "default": "./dist/surface/front-desk-execution-status.js"
+    },
+    "./knowledge/learning-signal-adapter": {
+      "types": "./dist/knowledge/learning-signal-adapter.d.ts",
+      "default": "./dist/knowledge/learning-signal-adapter.js"
+    },
+    "./knowledge/learning-signal-sources": {
+      "types": "./dist/knowledge/learning-signal-sources.d.ts",
+      "default": "./dist/knowledge/learning-signal-sources.js"
     }
   },
   "dependencies": {

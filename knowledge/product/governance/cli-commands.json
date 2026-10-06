@@ -2663,6 +2663,16 @@
       "native_help": true
     },
     {
+      "id": "script.learning.harvest",
+      "script": "learning:harvest",
+      "command": "learning harvest",
+      "noun": "learning",
+      "verb": "harvest",
+      "audience": "operator",
+      "description": "cli_cmd_script_learning_harvest",
+      "group": "inspect"
+    },
+    {
       "id": "script.ops.alerts",
       "script": "ops:alerts",
       "command": "ops alerts",
