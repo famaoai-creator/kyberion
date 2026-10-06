@@ -132,6 +132,20 @@ export const FIRST_JOB_VOCABULARY_KEYS = [
   'front_desk:first_job_approval_validity',
   'front_desk:first_job_approval_held',
   'front_desk:first_job_approval_held_detail',
+  'front_desk:first_job_status_terminated_unstarted',
+  'front_desk:first_job_recovery_eligible',
+  'front_desk:first_job_recovery_effect',
+  'front_desk:first_job_recovery_review',
+  'front_desk:first_job_recovery_confirm',
+  'front_desk:first_job_recovery_cancel',
+  'front_desk:first_job_recovery_confirm_detail',
+  'front_desk:first_job_recovery_terminated',
+  'front_desk:first_job_recovery_terminated_detail',
+  'front_desk:first_job_recovery_readback',
+  'front_desk:first_job_recovery_uncertain',
+  'front_desk:first_job_recovery_changed',
+  'front_desk:first_job_restart',
+  'front_desk:first_job_restart_detail',
 ] as const satisfies readonly VocabularyKey[];
 
 export const PRESENCE_STUDIO_VOCABULARY_KEYS = [
