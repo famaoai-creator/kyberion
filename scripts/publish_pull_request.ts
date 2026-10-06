@@ -13,6 +13,7 @@ import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/founda
 import { safeExec, safeReadFile } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { createLogger, formatDiagnostic } from '@agent/core/logger';
+import { ghMust } from '@agent/core/vcs';
 import {
   checkPrKnowledgeReadiness,
   GIT_REF_NAME_PATTERN,
@@ -50,14 +51,19 @@ function readCurrentBranch(): string {
 }
 
 /** Credentials are explicit overrides for gh only, never general child inheritance. */
+function ghCredentialsEnv(): Record<string, string | undefined> {
+  return {
+    GH_TOKEN: getRegisteredEnvText('GH_TOKEN'),
+    GITHUB_TOKEN: getRegisteredEnvText('GITHUB_TOKEN'),
+  };
+}
+
+function ghOpts() {
+  return { cwd: pathResolver.rootDir(), env: ghCredentialsEnv() };
+}
+
 function runGithubCli(args: string[]): string {
-  return safeExec('gh', args, {
-    cwd: pathResolver.rootDir(),
-    env: {
-      GH_TOKEN: getRegisteredEnvText('GH_TOKEN'),
-      GITHUB_TOKEN: getRegisteredEnvText('GITHUB_TOKEN'),
-    },
-  });
+  return ghMust(args, ghOpts());
 }
 
 function readDefaultBranch(): string {

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-04T15:00:21.435Z",
+  "generated_at": "2026-10-06T17:23:00.342Z",
   "generator_note": "Baseline of actuator extension-point surfaces for semver enforcement. See docs/developer/EXTENSION_POINTS.md. Update via `pnpm check:contract-semver -- --rebaseline`.",
   "actuators": [
     {
@@ -302,10 +302,28 @@
     },
     {
       "actuator_id": "vcs-actuator",
-      "version": "1.0.0",
-      "ops": ["branch", "commit", "diff", "log", "pr_create", "status"],
+      "version": "1.1.0",
+      "ops": [
+        "branch",
+        "checkout",
+        "commit",
+        "diff",
+        "fetch",
+        "gh_status",
+        "log",
+        "pr_checks",
+        "pr_create",
+        "pr_list",
+        "pr_merge",
+        "pr_view",
+        "pull",
+        "push",
+        "repo_view",
+        "status",
+        "worktree"
+      ],
       "contract_schema": "knowledge/product/schemas/vcs-action.schema.json",
-      "contract_schema_sha256": "dcbd335865f6137abb185860fb86c44d421099db11395fa47c036a846346a507"
+      "contract_schema_sha256": "a5304515a3c3d3c5cef597ebe1a140ab22d2c715961deef883fb4efb990dea1f"
     },
     {
       "actuator_id": "video-composition-actuator",
