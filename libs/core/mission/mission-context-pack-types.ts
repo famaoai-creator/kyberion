@@ -320,6 +320,8 @@ export interface BuildMissionContextPackInput {
    */
   estimatedScope?: 'S' | 'M' | 'L';
   facets?: FacetRequest;
+  /** DA-07 test seam: repo root holding fixture tenant profiles for the common-prefix grant. */
+  tenantKnowledgeRootDir?: string;
 }
 
 export interface ResolveMissionContextPackInput {

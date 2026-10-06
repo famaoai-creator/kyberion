@@ -9,6 +9,11 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
+import { evaluateContextFragment } from '../context-security-scope.js';
+import {
+  commonKnowledgeGrantTenant,
+  knowledgeHintFragment,
+} from './mission-context-pack-knowledge.js';
 import {
   deriveGovernancePhaseFromMissionState,
   loadKnowledgeHintsIfPossible,
@@ -315,6 +320,78 @@ describe('DA-07 (1)(2): tenant knowledge reaches the pack; other tenants never d
   });
 });
 
+describe('KO-01: org/project-placed tenant knowledge reaches the pack', () => {
+  const ORG = 'org-alpha';
+  const PROJECT = `PRJ-DA07-${PID}`;
+  const PROJECT_DOC = `knowledge/confidential/tenant-x/organizations/${ORG}/projects/${PROJECT}/quantum-billing-project-runbook.md`;
+  const SIBLING_DOC = `knowledge/confidential/tenant-x/organizations/${ORG}/projects/PRJ-SIBLING/quantum-billing-sibling.md`;
+
+  it('delivers the mission project subtree and never a sibling project', async () => {
+    writeDoc(PROJECT_DOC, 'Project quantum billing runbook');
+    writeDoc(SIBLING_DOC, 'Sibling quantum billing quantum billing reconciliation');
+
+    const hints = await loadKnowledgeHintsIfPossible({
+      missionState: makeMissionState({
+        tenant_slug: 'tenant-x',
+        relationships: { project: { project_id: PROJECT, organization_id: ORG } },
+      }),
+      workItem: makeWorkItem(),
+      knowledgeSlicesPath: `${slicesDir}/does-not-exist.json`,
+      tenantKnowledgeRootDir: fixtureRoot,
+      estimatedScope: 'L',
+    });
+
+    const paths = hints.map((h) => h.path);
+    expect(paths).toContain(PROJECT_DOC);
+    expect(paths).toContain(TENANT_DOC);
+    expect(paths).not.toContain(SIBLING_DOC);
+  });
+});
+
+describe('confidential/common grant at the pack scope gate', () => {
+  const commonHint = { path: COMMON_DOC, title: 'Common', excerpt: 'shared', tags: [] };
+  const scopeFor = (tenant: string) => ({
+    tenant_slug: tenant,
+    mission_id: 'MSN-COMMON-GATE',
+    read_tiers: ['public' as const, 'confidential' as const],
+    write_tier: 'confidential' as const,
+    purpose: 'mission-execution',
+  });
+
+  it('grants common only to a registered non-strict tenant on a confidential mission', () => {
+    const grant = (tenantSlug: string, tier: 'public' | 'confidential' = 'confidential') =>
+      commonKnowledgeGrantTenant({ tier, tenantSlug, tenantKnowledgeRootDir: fixtureRoot });
+    expect(grant('tenant-x')).toBe('tenant-x');
+    expect(grant('tenant-strict')).toBeUndefined();
+    expect(grant('tenant-unregistered')).toBeUndefined();
+    expect(grant('tenant-x', 'public')).toBeUndefined();
+  });
+
+  it('admits a granted common doc for that tenant only, and rejects it without a grant', () => {
+    const granted = knowledgeHintFragment(commonHint, 0, { commonGrantTenant: 'tenant-x' });
+    expect(evaluateContextFragment(scopeFor('tenant-x'), granted)).toBeNull();
+    expect(evaluateContextFragment(scopeFor('tenant-y'), granted)?.code).toBe(
+      'TENANT_SCOPE_MISMATCH'
+    );
+    const ungranted = knowledgeHintFragment(commonHint, 0);
+    expect(evaluateContextFragment(scopeFor('tenant-x'), ungranted)?.code).toBe(
+      'TENANT_SCOPE_MISMATCH'
+    );
+  });
+
+  it('a grant never relabels another tenant subtree', () => {
+    const otherTenant = knowledgeHintFragment(
+      { path: 'knowledge/confidential/tenant-y/x.md', title: 'Y', excerpt: 'y', tags: [] },
+      0,
+      { commonGrantTenant: 'tenant-x' }
+    );
+    expect(otherTenant.tenant_slug).toBe('tenant-y');
+    expect(evaluateContextFragment(scopeFor('tenant-x'), otherTenant)?.code).toBe(
+      'TENANT_SCOPE_MISMATCH'
+    );
+  });
+});
+
 describe('DA-07 (3): tenant slice dimension applies pinned/exclude', () => {
   it('a tenant-matched slice pins first and excludes tenant docs by glob', async () => {
     const slicesPath = writeSlices('tenant-slice.json', {
@@ -496,6 +573,32 @@ describe('DA-07 (1)(5) E2E: provisionTaskKnowledge delivers and records tenant d
     const aggregate = loadKnowledgeUsageAggregate(deliveryScope);
     const entry = aggregate.find((e) => e.document_path === TENANT_DOC);
     expect(entry).toMatchObject({ delivered_count: 1 });
+  });
+
+  it('KO-01: a project-placed doc survives the pack scope gate end to end', async () => {
+    const projectDoc = `knowledge/confidential/tenant-x/organizations/org-alpha/projects/PRJ-DA07-${PID}/quantum-billing-project-runbook.md`;
+    writeDoc(projectDoc, 'Project quantum billing runbook');
+    const result = await provisionTaskKnowledge({
+      form: 'pack',
+      missionId,
+      tier: 'confidential',
+      missionState: makeMissionState({
+        mission_id: missionId,
+        tenant_slug: 'tenant-x',
+        relationships: {
+          project: { project_id: `PRJ-DA07-${PID}`, organization_id: 'org-alpha' },
+        },
+      }),
+      workItem: makeWorkItem(),
+      provider: 'claude',
+      tenantKnowledgeRootDir: fixtureRoot,
+    });
+
+    const hintPaths = (result.pack!.knowledge_hints ?? []).map((h) => h.path);
+    expect(hintPaths).toContain(projectDoc);
+    // confidential/common is granted to this non-strict tenant at the gate.
+    expect(hintPaths).toContain(COMMON_DOC);
+    expect(result.pack!.scope_audit).toBeUndefined();
   });
 
   it('delivery log line records the tenant doc path verbatim (repo-relative, not dropped)', async () => {
