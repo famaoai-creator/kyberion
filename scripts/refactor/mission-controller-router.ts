@@ -317,7 +317,7 @@ export interface MissionControllerRoutingContext {
   reenterMissionFromReview: (missionId: string) => Awaitable<unknown>;
   purgeMissions: (dryRun?: boolean) => Awaitable<void>;
   archiveMissions: (options: { missionId?: string; execute?: boolean }) => Awaitable<void>;
-  listMissions: (filterStatus?: string) => Awaitable<void>;
+  listMissions: (filterStatus?: string, jsonOutput?: boolean) => Awaitable<void>;
   listOrganizationCatalogs: (
     organizationId?: string,
     jsonOutput?: boolean,
@@ -1187,7 +1187,7 @@ export async function runMissionControllerAction(
       });
       break;
     case 'list':
-      await context.listMissions(arg1);
+      await context.listMissions(arg1, context.argv.includes('--json'));
       break;
     case 'organization-catalogs':
       await context.listOrganizationCatalogs(
