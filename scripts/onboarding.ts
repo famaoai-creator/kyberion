@@ -19,6 +19,11 @@ export async function main(
   if (!ONBOARD_CLI.subcommands?.includes(args[0] ?? '') && guardCliArgs(args, ONBOARD_CLI, print)) {
     return;
   }
+  if (args[0] === 'first-job') {
+    const { main: firstJobMain } = await import('./onboarding_first_job.js');
+    await firstJobMain(args.slice(1), print);
+    return;
+  }
   if (args[0] === 'apply') {
     await applyOnboardingMain(args.slice(1), print);
     return;

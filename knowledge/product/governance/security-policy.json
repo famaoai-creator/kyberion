@@ -708,6 +708,10 @@
         "active/shared/runtime/",
         "active/shared/tmp/"
       ]
+    },
+    "first_job_tenant_status_reader": {
+      "allow_read": ["knowledge/personal/tenants/${KYBERION_TENANT}.json"],
+      "allow_write": []
     }
   },
   "authority_permissions": {

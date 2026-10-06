@@ -52,6 +52,64 @@ afterEach(() => {
 });
 
 describe('buildDotExecutorPorts', () => {
+  it('keeps the diagnostic pipeline port provider-free and refuses every conversational port', async () => {
+    const c: DotCharter = {
+      ...CHARTER,
+      scope: { tier: 'public', tenant_slug: 'acme' },
+      attention: { triggers: [] },
+      authority: {
+        authority_role: 'infrastructure_sentinel',
+        allowed_work_shapes: ['pipeline'],
+        allowed_pipelines: ['pipelines/front-desk-request-receipt.json'],
+      },
+      decisions: { default_decision: 'approve' },
+      notification: {
+        delivery_mode: 'inbox',
+        deliver_to: { surface: 'surface', channel: 'inbox' },
+      },
+      runtime: { ...CHARTER.runtime, execution_mode: 'front_desk_diagnostic' },
+    };
+    const goalDriver = vi.fn();
+    const executePipeline = vi.fn(async () => ({
+      status: 'succeeded' as const,
+      summary: 'verified',
+    }));
+    const ports = buildDotExecutorPorts(c, {
+      get backend(): never {
+        throw new Error('diagnostic must not resolve a provider');
+      },
+      goalDriver,
+      executePipeline,
+    });
+    expect(ports.goalMode?.(c)).toEqual({
+      unavailable: expect.stringContaining('no model execution'),
+    });
+    await expect(ports.runGoalTurn({ objective: 'do work' })).rejects.toThrow(
+      'no reasoning backend'
+    );
+    await expect(ports.delegateText('do work', 1000)).rejects.toThrow('no reasoning backend');
+    expect(goalDriver).not.toHaveBeenCalled();
+    expect(
+      await ports.runPipeline('pipelines/front-desk-request-receipt.json', { approved: true })
+    ).toEqual({ status: 'succeeded', summary: 'verified' });
+    expect(executePipeline).toHaveBeenCalledOnce();
+    await expect(ports.runPipeline('pipelines/other.json', {})).rejects.toThrow(
+      'only the front-desk receipt pipeline'
+    );
+    expect(executePipeline).toHaveBeenCalledOnce();
+    const malformed = {
+      ...c,
+      runtime: { ...c.runtime, execution_mode: 'unknown' },
+    } as unknown as DotCharter;
+    expect(() =>
+      buildDotExecutorPorts(malformed, {
+        get backend(): never {
+          throw new Error('provider must stay untouched');
+        },
+      })
+    ).toThrow('Invalid front_desk_diagnostic');
+  });
+
   it('drives the goal loop with the resolved tool backend and surfaces the final report', async () => {
     const goalDriver = vi.fn(async () => ({
       goalId: 'g',

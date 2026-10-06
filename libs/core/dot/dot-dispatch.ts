@@ -1,3 +1,9 @@
+import { assertBuiltinOnlyWorkerEventStream } from '../workforce/worker-event-stream.js';
+import {
+  firstJobApprovalEffect,
+  hasFirstJobDiagnosticProvenance,
+  hasVerifiedFirstJobDecision,
+} from '../surface/first-job-approval-proof.js';
 /**
  * Dot dispatch — the single enforcement point between a dot's proposals and
  * the world.
@@ -71,7 +77,13 @@ import {
   type OperatorNotificationPayload,
 } from '../surface/operator-notifications.js';
 import { appendDotInboxEntry, type DotInboxEntryInput } from './dot-inbox.js';
-import { dotGoalRefLabel, listDotCharters, type DotCharter } from './dot-charter.js';
+import {
+  isFrontDeskDiagnosticDot,
+  requireCurrentFrontDeskDiagnosticDot,
+  dotGoalRefLabel,
+  listDotCharters,
+  type DotCharter,
+} from './dot-charter.js';
 import { resolveTenant } from '../organization/tenant-registry.js';
 import {
   DOT_ACTION_IDS,
@@ -179,7 +191,16 @@ export interface DotDispatchDeps {
   findWorkItemByActionRef?: (actionRef: string) => WorkItem | undefined;
   listCharters?: () => DotCharter[];
   /** Throws when the tenant cannot take tenant-bound work (unregistered or not operational). */
-  assertTenant?: (tenantSlug: string) => void;
+  assertTenant?: (
+    tenantSlug: string,
+    diagnostic?: {
+      charter: DotCharter;
+      proposal: Pick<
+        DotProposal,
+        'action_id' | 'work_shape' | 'handoff_to' | 'pipeline_ref' | 'front_desk_execution'
+      >;
+    }
+  ) => void;
   appendInbox?: (input: DotInboxEntryInput) => void;
   notify?: (
     event: OperatorEvent,
@@ -418,7 +439,10 @@ function sameDotHandoffScope(from: DotCharter, to: DotCharter): boolean {
 /** What the proposal may be at all: action, shape, handoff target. Re-checked at settlement. */
 function checkDotProposalScope(
   charter: DotCharter,
-  proposal: Pick<DotProposal, 'action_id' | 'work_shape' | 'handoff_to'>,
+  proposal: Pick<
+    DotProposal,
+    'action_id' | 'work_shape' | 'handoff_to' | 'pipeline_ref' | 'front_desk_execution'
+  >,
   deps: DotDispatchDeps
 ): DotBoundsVerdict {
   if (!DOT_ACTION_IDS.includes(proposal.action_id)) {
@@ -437,9 +461,16 @@ function checkDotProposalScope(
   const tenantSlug = charter.scope.tenant_slug;
   if (tenantSlug) {
     try {
-      (deps.assertTenant ?? ((slug) => void resolveTenant(slug, { rootDir: deps.rootDir })))(
-        tenantSlug
-      );
+      if (deps.assertTenant) {
+        deps.assertTenant(
+          tenantSlug,
+          charter.runtime.execution_mode === 'front_desk_diagnostic'
+            ? { charter, proposal }
+            : undefined
+        );
+      } else {
+        resolveTenant(tenantSlug, { rootDir: deps.rootDir });
+      }
     } catch (error) {
       return {
         ok: false,
@@ -1029,6 +1060,15 @@ export function dispatchDotProposals(
         );
         continue;
       }
+      let accountability: RouteAutonomousDecisionInput['accountability'];
+      if (
+        isFrontDeskDiagnosticDot(charter) ||
+        hasFirstJobDiagnosticProvenance(proposal.front_desk_execution)
+      ) {
+        if (!proposal.front_desk_execution) throw new Error('diagnostic request binding required');
+        const effect = firstJobApprovalEffect(charter, proposal.front_desk_execution);
+        accountability = { payloadHash: effect.payloadHash, effectBinding: effect.effectBinding };
+      }
       const question = `${charter.title} proposes: ${proposal.title} — ${proposal.objective.slice(0, 500)}`;
       const routed = (deps.route ?? routeAutonomousDecision)({
         role: GOVERNED_STORE_ROLE,
@@ -1038,6 +1078,7 @@ export function dispatchDotProposals(
         recommendation: proposal.rationale ?? proposal.objective,
         requestedBy: actor,
         source: { agentId: actor },
+        ...(accountability ? { accountability } : {}),
         dedupeKey: `${charter.dot_id}-${hash}`,
         notificationRoute: dotNotificationRoute(charter),
         quietHours: dotQuietHours(charter),
@@ -1278,6 +1319,27 @@ export function settleDotParkedActions(
       );
       continue;
     }
+    const diagnostic =
+      isFrontDeskDiagnosticDot(charter) ||
+      hasFirstJobDiagnosticProvenance(row.front_desk_execution, approval);
+    if (diagnostic) {
+      if (!deps.assertTenant || !isFrontDeskDiagnosticDot(charter)) continue;
+      try {
+        requireCurrentFrontDeskDiagnosticDot(charter, deps.rootDir);
+      } catch {
+        continue;
+      }
+      assertBuiltinOnlyWorkerEventStream();
+    }
+    // Preserve old/forged approved evidence without treating it as authority.
+    if (
+      approval &&
+      (approval.status === 'approved' || approval.status === 'applied') &&
+      diagnostic &&
+      (!row.front_desk_execution ||
+        !hasVerifiedFirstJobDecision(approval, charter, row.front_desk_execution, Date.now()))
+    )
+      continue;
     if (approval?.status === 'pending' && dotDecisionExpired(charter, row, approval, deps)) {
       approval = expirePendingDecision(approval, deps);
     }
@@ -1352,6 +1414,12 @@ export async function runDotHousekeeping(
   } = {}
 ): Promise<DotHousekeepingResult> {
   const result: DotHousekeepingResult = { settled: [], signals: 0, digest: false, errors: [] };
+  // The general supervisor cannot consume a CLI-only diagnostic request.
+  // Leave its pending decisions untouched until the explicit bounded tick.
+  if (charter.runtime.execution_mode === 'front_desk_diagnostic' && !deps.assertTenant) {
+    result.errors.push('diagnostic_requires_bounded_first_job_tick');
+    return result;
+  }
   const fail = (step: string, error: unknown) =>
     result.errors.push(`${step}: ${error instanceof Error ? error.message : String(error)}`);
   try {

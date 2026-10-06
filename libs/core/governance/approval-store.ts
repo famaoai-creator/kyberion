@@ -1,4 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { withExecutionContext } from '../authority.js';
+import { withLockSync } from '../lock-utils.js';
+import type { FirstJobDecisionProof } from '../surface/first-job-approval-proof.js';
 import { auditChain } from './audit-chain.js';
 import type { HeldEffectSteeringAction } from './held-effect-bridge.js';
 import {
@@ -215,6 +218,8 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   track_name?: string;
   work_loop?: OrganizationWorkLoopSummary;
   accountability?: ApprovalAccountability;
+  /** Optional server attestation, accepted only by the bounded diagnostic consumers. */
+  diagnosticDecision?: FirstJobDecisionProof;
   /** Canonical authority scope of the effect being approved. */
   scope?: EventScope;
   /**
@@ -617,8 +622,26 @@ export function isApprovalRequestExpired(
   return !Number.isFinite(expiresAt) || expiresAt <= now;
 }
 
+/** Serialize competing decision/cancellation/expiry transitions for one canonical record. */
+function withApprovalRecordLock<T>(
+  role: GovernedArtifactRole,
+  params: { channel: string; storageChannel?: string; requestId: string },
+  fn: () => T
+): T {
+  const channel = normalizeApprovalChannel(params.storageChannel || params.channel);
+  const id = normalizeApprovalRequestId(params.requestId);
+  return withExecutionContext(role, () =>
+    withLockSync('approval-record-' + channel + '-' + id, fn)
+  );
+}
 /** Persist the terminal expiry transition exactly once. */
 export function expireApprovalRequest(
+  role: GovernedArtifactRole,
+  params: Parameters<typeof expireApprovalRequestUnlocked>[1]
+): ApprovalRequestRecord {
+  return withApprovalRecordLock(role, params, () => expireApprovalRequestUnlocked(role, params));
+}
+function expireApprovalRequestUnlocked(
   role: GovernedArtifactRole,
   params: {
     channel: string;
@@ -659,6 +682,12 @@ export function expireApprovalRequest(
 
 /** KC-03: persist the terminal cancellation transition exactly once (mirrors expiry). */
 export function cancelApprovalRequest(
+  role: GovernedArtifactRole,
+  params: Parameters<typeof cancelApprovalRequestUnlocked>[1]
+): ApprovalRequestRecord {
+  return withApprovalRecordLock(role, params, () => cancelApprovalRequestUnlocked(role, params));
+}
+function cancelApprovalRequestUnlocked(
   role: GovernedArtifactRole,
   params: {
     channel: string;
@@ -866,6 +895,12 @@ export function listApprovalRequests(params?: {
 
 export function decideApprovalRequest(
   role: GovernedArtifactRole,
+  params: Parameters<typeof decideApprovalRequestUnlocked>[1]
+): ApprovalRequestRecord {
+  return withApprovalRecordLock(role, params, () => decideApprovalRequestUnlocked(role, params));
+}
+function decideApprovalRequestUnlocked(
+  role: GovernedArtifactRole,
   params: {
     channel: string;
     storageChannel?: string;
@@ -889,6 +924,9 @@ export function decideApprovalRequest(
     sessionCache?: ApprovalActionDescriptor;
     /** Only with `rejected` — the requester should revise and re-submit. */
     changeInstruction?: string;
+    diagnosticDecision?: FirstJobDecisionProof;
+    /** Compare the exact reviewed snapshot under the canonical transition lock. */
+    expectedRecordHash?: string;
   }
 ): ApprovalRequestRecord {
   const changeInstruction = params.changeInstruction?.trim();
@@ -905,6 +943,13 @@ export function decideApprovalRequest(
   const storageChannel = params.storageChannel || params.channel;
   const record = loadApprovalRequest(normalizeApprovalChannel(storageChannel), params.requestId);
   if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+
+  if (
+    params.expectedRecordHash !== undefined &&
+    params.expectedRecordHash !== computeApprovalPayloadHash({ record })
+  ) {
+    throw new Error('[POLICY_VIOLATION] Approval request changed since review');
+  }
 
   if (record.status === 'cancelled') {
     throw new Error(
@@ -939,7 +984,7 @@ export function decideApprovalRequest(
   }
 
   if (record.status === 'pending' && isApprovalRequestExpired(record)) {
-    expireApprovalRequest(role, {
+    expireApprovalRequestUnlocked(role, {
       channel: record.channel,
       storageChannel,
       requestId: record.id,
@@ -1019,6 +1064,7 @@ export function decideApprovalRequest(
     ...(params.decidedByType ? { decidedByType: params.decidedByType } : {}),
     ...(params.authenticated !== undefined ? { authenticated: params.authenticated } : {}),
     ...(params.authMethod ? { decidedAuthMethod: params.authMethod } : {}),
+    ...(params.diagnosticDecision ? { diagnosticDecision: params.diagnosticDecision } : {}),
     ...(changeInstruction
       ? {
           changeRequest: {

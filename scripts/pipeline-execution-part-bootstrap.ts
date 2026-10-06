@@ -39,6 +39,7 @@ import { type PipelineFailure } from './pipeline-result-reporting.js';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { buildPipelinePromptVisibilityContext } from './pipeline-reasoning-visibility.js';
+import type { PipelineExecutionMode } from './pipeline-diagnostic-profile.js';
 
 export function registeredEnv(name: string): string | undefined {
   return getRegisteredEnv<string>(name) as string | undefined;
@@ -182,7 +183,7 @@ export function tryPermissionFallback(
 export function finalizePipelineTrace(
   trace: TraceContext,
   recovered = false,
-  opts?: { dir?: string }
+  opts?: { dir?: string; localOnly?: boolean }
 ) {
   if (!recovered) return finalizeAndPersist(trace, opts);
   const finalized = trace.finalize();
@@ -515,6 +516,10 @@ export const dispatchCache: Record<string, DispatchFunc> = {};
 export const moduleCache: Record<string, any> = {};
 
 export interface RunStepsOptions {
+  /** Trusted restrictive mode; never read from ADF/context. */
+  executionMode?: PipelineExecutionMode;
+  /** Current diagnostic approval/configuration check immediately before the write. */
+  validateDiagnosticEffect?: () => void;
   trace?: TraceContext;
   _includeStack?: ReadonlySet<string>;
   pipelinePath?: string;

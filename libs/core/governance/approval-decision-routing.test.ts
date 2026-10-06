@@ -178,6 +178,30 @@ describe('routeAutonomousDecision', () => {
     expect(stored?.veto?.deliveredAt).toBeTruthy();
   });
 
+  it('cannot lower the human-only floor through extra runtime accountability fields', () => {
+    const forged = {
+      payloadHash: 'a'.repeat(64),
+      effectBinding: 'fixture-effect',
+      finalDecision: 'ai_only',
+    };
+    const routed = routeAutonomousDecision({
+      role: 'mission_controller',
+      gate: gate({ decision: 'approve', allowed: false }),
+      title: 'Fixture',
+      question: 'Fixed effect?',
+      recommendation: 'Review',
+      requestedBy: 'dot:fixture',
+      accountability: forged,
+    });
+    expect(
+      loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, routed.requestId!)?.accountability
+    ).toEqual({
+      payloadHash: forged.payloadHash,
+      effectBinding: forged.effectBinding,
+      finalDecision: 'human_only',
+    });
+  });
+
   it('keeps a decide request a human-only decision that expires instead of hanging', () => {
     const routed = route({
       decision: 'approve',
