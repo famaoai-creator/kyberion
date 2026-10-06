@@ -115,7 +115,7 @@
       "requirements": {
         "bin": ["git"]
       },
-      "effect": "write"
+      "effect": "egress"
     },
     {
       "op": "fetch",
@@ -160,7 +160,7 @@
       "requirements": {
         "bin": ["gh"]
       },
-      "effect": "write"
+      "effect": "egress"
     }
   ]
 }

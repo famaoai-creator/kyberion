@@ -90,9 +90,10 @@ export async function runStandardPrLifecycle(
         `[PR_LIFECYCLE_COMMAND_FAILED] gh pr checks: ${error instanceof Error ? error.message : String(error)}`
       );
     }
-    // Original semantics: `gh pr checks` exits non-zero on pending OR failed,
-    // and the old code threw on both — merge only proceeds on success/none.
-    if (checks.state === 'failure' || checks.state === 'pending') {
+    // Fail closed: merge only on an explicit success. 'none' (no checks
+    // reported) refuses too — matching the old code, which threw on any
+    // non-zero `gh pr checks` exit rather than merge with zero CI evidence.
+    if (checks.state !== 'success') {
       throw new Error(
         `[PR_LIFECYCLE_CHECKS_FAILED] auto-merge refused; checks state=${checks.state}` +
           (checks.failing.length ? `; failing: ${checks.failing.join(', ')}` : '') +
