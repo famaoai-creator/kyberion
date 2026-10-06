@@ -12,13 +12,27 @@ const VCS_PROPERTIES = {
   stat: { type: 'boolean' },
   limit: { type: 'integer', minimum: 1 },
   oneline: { type: 'boolean' },
-  action: { type: 'string', enum: ['list', 'create', 'delete'] },
+  action: { type: 'string', enum: ['list', 'create', 'delete', 'add', 'remove', 'prune'] },
   name: { type: 'string' },
   message: { type: 'string' },
   add: { type: 'boolean' },
   title: { type: 'string' },
   body: { type: 'string' },
   base: { type: 'string' },
+  remote: { type: 'string' },
+  set_upstream: { type: 'boolean' },
+  create_branch: { type: 'boolean' },
+  path: { type: 'string' },
+  state: { type: 'string', enum: ['open', 'closed', 'merged', 'all'] },
+  fields: { type: 'string' },
+  method: { type: 'string', enum: ['merge', 'squash', 'rebase'] },
+  delete_branch: { type: 'boolean' },
+  watch: { type: 'boolean' },
+  interval_ms: { type: 'integer', minimum: 1000 },
+  timeout_ms: { type: 'integer', minimum: 1000 },
+  ignore_checks: { type: 'array', items: { type: 'string' } },
+  draft: { type: 'boolean' },
+  head: { type: 'string' },
 };
 
 const VCS_SCHEMA = {
@@ -34,25 +48,59 @@ const VCS_EXAMPLES = {
   branch: [{ action: 'list' }],
   commit: [{ message: 'Checkpoint mission progress', add: true }],
   pr_create: [{ title: 'Add vcs-actuator', base: 'main' }],
+  push: [{ remote: 'origin', ref: 'feat/x', set_upstream: true }],
+  fetch: [{ remote: 'origin' }],
+  pull: [{ remote: 'origin', ref: 'main' }],
+  checkout: [{ ref: 'main', create_branch: false }],
+  worktree: [{ action: 'add', path: '../wt', ref: 'feat/x' }],
+  pr_view: [{ ref: '123', fields: 'number,title,state,url' }],
+  pr_list: [{ state: 'open', limit: 50 }],
+  pr_checks: [{ ref: '123', watch: true, timeout_ms: 1200000, interval_ms: 15000 }],
+  pr_merge: [{ ref: '123', method: 'merge', delete_branch: true }],
+  repo_view: [{}],
+  gh_status: [{}],
 };
 
-export const VCS_ACTUATOR_CAPTURE_OPS = ['status', 'diff', 'log'] as const;
+export const VCS_ACTUATOR_CAPTURE_OPS = [
+  'status',
+  'diff',
+  'log',
+  'pr_view',
+  'pr_list',
+  'pr_checks',
+  'repo_view',
+  'gh_status',
+] as const;
 
 export const VCS_ACTUATOR_TRANSFORM_OPS = [] as const;
 
-// branch lives here (not capture): action=create/delete mutates the working
-// tree, so the op is classified apply/write even though action=list is read-only.
-export const VCS_ACTUATOR_APPLY_OPS = ['branch', 'commit', 'pr_create'] as const;
+// Everything mutating repo/remote state (incl. fetch/pull writes to .git refs,
+// branch create/delete, worktree add/remove) is classified apply/write.
+export const VCS_ACTUATOR_APPLY_OPS = [
+  'branch',
+  'commit',
+  'pr_create',
+  'push',
+  'fetch',
+  'pull',
+  'checkout',
+  'worktree',
+  'pr_merge',
+] as const;
+
+const REQUIRED = {
+  commit: ['message'],
+  pr_create: ['title'],
+  branch: ['action'],
+  checkout: ['ref'],
+  worktree: ['action'],
+  pr_view: ['ref'],
+  pr_checks: ['ref'],
+  pr_merge: ['ref'],
+} as const;
 
 function toSpec(op: string, kind: PipelineStepType) {
-  const required =
-    op === 'commit'
-      ? ['message']
-      : op === 'pr_create'
-        ? ['title']
-        : op === 'branch'
-          ? ['action']
-          : [];
+  const required = (REQUIRED as Record<string, readonly string[]>)[op] || [];
   return {
     op,
     kind,

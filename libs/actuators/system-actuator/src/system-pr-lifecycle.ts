@@ -2,6 +2,18 @@
 import { safeExecResult, safeWriteFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { logger } from '@agent/core/core';
+import {
+  ghPrChecks,
+  ghPrMerge,
+  gitAdd,
+  gitCheckRefFormat,
+  gitCheckout,
+  gitCommit,
+  gitDiffChangedPaths,
+  gitPull,
+  gitPush,
+  type VcsCommandResult,
+} from '@agent/core/vcs';
 import { main as publishPullRequest } from '../../../../scripts/publish_pull_request.js';
 
 export interface StandardPrLifecycleParams {
@@ -17,6 +29,14 @@ export interface PrLifecycleDependencies {
   publish: typeof publishPullRequest;
 }
 
+function assertOk(result: VcsCommandResult, label: string): void {
+  if (result.error || result.status !== 0) {
+    throw new Error(
+      `[PR_LIFECYCLE_COMMAND_FAILED] ${label}: ${result.stderr || result.error?.message || `exit ${result.status}`}`
+    );
+  }
+}
+
 export async function runStandardPrLifecycle(
   params: StandardPrLifecycleParams,
   deps: PrLifecycleDependencies = {
@@ -29,30 +49,23 @@ export async function runStandardPrLifecycle(
     throw new Error('[PR_LIFECYCLE_INVALID_BRANCH] A dedicated branch name is required.');
   }
   const cwd = pathResolver.rootDir();
-  const run = (command: string, args: string[]): string => {
-    const result = deps.exec(command, args, { cwd });
-    if (result.status !== 0 || result.error) {
-      throw new Error(
-        '[PR_LIFECYCLE_COMMAND_FAILED] ' +
-          command +
-          ' ' +
-          args[0] +
-          ': ' +
-          (result.stderr || result.error?.message || result.status)
-      );
-    }
-    return result.stdout;
-  };
-  run('git', ['check-ref-format', '--branch', params.branch_name]);
-  run('git', ['checkout', '-b', params.branch_name]);
-  const paths = run('git', ['diff', '--name-only', '-z', '--diff-filter=ACMRTUXB'])
-    .split('\0')
-    .filter(Boolean);
-  for (const file of paths) run('git', ['add', '--', file]);
-  if (run('git', ['diff', '--cached', '--name-only', '-z'])) {
-    run('git', ['commit', '-m', params.commit_message]);
+  const exec = deps.exec;
+  assertOk(gitCheckRefFormat(cwd, params.branch_name, exec), 'git check-ref-format');
+  assertOk(gitCheckout(cwd, params.branch_name, { createBranch: true }, exec), 'git checkout -b');
+  const unstaged = gitDiffChangedPaths(cwd, { diffFilter: 'ACMRTUXB' }, exec);
+  assertOk(unstaged.result, 'git diff');
+  for (const addResult of gitAdd(cwd, unstaged.paths, exec)) {
+    assertOk(addResult, 'git add');
   }
-  run('git', ['push', '-u', 'origin', params.branch_name]);
+  const staged = gitDiffChangedPaths(cwd, { cached: true }, exec);
+  assertOk(staged.result, 'git diff --cached');
+  if (staged.paths.length > 0) {
+    assertOk(gitCommit(cwd, params.commit_message, exec), 'git commit -m');
+  }
+  assertOk(
+    gitPush(cwd, { remote: 'origin', ref: params.branch_name, setUpstream: true }, exec),
+    'git push'
+  );
   const bodyFile = pathResolver.rootResolve(
     'active/shared/tmp/standard-pr-lifecycle/' + encodeURIComponent(params.branch_name) + '.md'
   );
@@ -69,10 +82,29 @@ export async function runStandardPrLifecycle(
   if (!url)
     throw new Error('[PR_LIFECYCLE_URL_MISSING] Governed publisher did not return a PR URL.');
   if (params.auto_merge === true) {
-    run('gh', ['pr', 'checks', url]);
-    run('gh', ['pr', 'merge', url, '--merge', '--delete-branch']);
-    run('git', ['checkout', 'main']);
-    run('git', ['pull', '--ff-only', 'origin', 'main']);
+    let checks;
+    try {
+      checks = ghPrChecks({ ref: url, cwd }, exec);
+    } catch (error) {
+      throw new Error(
+        `[PR_LIFECYCLE_COMMAND_FAILED] gh pr checks: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+    // Original semantics: `gh pr checks` exits non-zero on pending OR failed,
+    // and the old code threw on both — merge only proceeds on success/none.
+    if (checks.state === 'failure' || checks.state === 'pending') {
+      throw new Error(
+        `[PR_LIFECYCLE_CHECKS_FAILED] auto-merge refused; checks state=${checks.state}` +
+          (checks.failing.length ? `; failing: ${checks.failing.join(', ')}` : '') +
+          (checks.pending.length ? `; pending: ${checks.pending.join(', ')}` : '')
+      );
+    }
+    assertOk(
+      ghPrMerge({ ref: url, method: 'merge', deleteBranch: true, cwd }, exec),
+      'gh pr merge'
+    );
+    assertOk(gitCheckout(cwd, 'main', {}, exec), 'git checkout main');
+    assertOk(gitPull(cwd, { remote: 'origin', ref: 'main' }, exec), 'git pull --ff-only');
   }
   return { stdout: url, status: 0 };
 }
