@@ -109,7 +109,7 @@ describe('standard PR lifecycle with fully mocked effects', () => {
     const deps = setup();
     await runStandardPrLifecycle({ ...params, auto_merge: true }, deps);
     expect(deps.exec.mock.calls.slice(-4).map(([c, a]) => [c, a])).toEqual([
-      ['gh', ['pr', 'checks', url]],
+      ['gh', ['pr', 'checks', url, '--json', 'name,state,bucket,link']],
       ['gh', ['pr', 'merge', url, '--merge', '--delete-branch']],
       ['git', ['checkout', 'main']],
       ['git', ['pull', '--ff-only', 'origin', 'main']],
