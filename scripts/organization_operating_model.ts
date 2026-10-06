@@ -19,6 +19,7 @@ import {
   buildOrganizationScaffold,
   buildOrganizationServiceAddition,
   buildOrganizationServiceState,
+  ensureOrganizationOperationalState,
   enqueueOrganizationLearningCandidate,
   loadOrganizationOperation,
   listOrganizationOperationRuns,
@@ -1030,6 +1031,33 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
     );
     return;
   },
+  'state ensure': (ctx) => {
+    const { parsed, organizationId } = ctx;
+
+    if (!organizationId) throw new Error('--organization-id is required for state ensure.');
+    requireFlags('state ensure', { '--tier': parsed.tier });
+    const mode = resolveWriteMode(parsed, 'state ensure');
+    const result = ensureOrganizationOperationalState({
+      organizationId,
+      name: parsed.name,
+      tier: parsed.tier!,
+      tenantSlug: parsed.tenantSlug,
+    });
+    const savedPaths =
+      mode === 'apply' && !result.already_present
+        ? [saveOrganizationOperationalState(result.state)]
+        : [];
+    emit(
+      {
+        mode,
+        already_present: result.already_present,
+        state: result.state,
+        saved_paths: savedPaths,
+      },
+      parsed.json
+    );
+    return;
+  },
   'service state set': (ctx) => {
     const { parsed, organizationId } = ctx;
 
@@ -1059,20 +1087,39 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
     const { parsed, organizationId } = ctx;
 
     if (!organizationId) throw new Error('--organization-id is required for operation add.');
+    // Presets shrink the required flag surface for the common shapes (dogfood
+    // showed a first `operation add` needed 8+ flags). `runbook`: an
+    // event-driven op whose execution target is a governed runbook doc —
+    // --execution-ref stays required (validated against the operation scope).
+    const preset = parsed.preset?.trim().toLowerCase();
+    if (preset && preset !== 'runbook') {
+      throw new Error(`Unknown --preset '${parsed.preset}'. Supported: runbook`);
+    }
+    const presetDefaults =
+      preset === 'runbook'
+        ? {
+            operationType: 'event_driven' as const,
+            ownerRole: 'operator',
+            executionKind: 'runbook' as const,
+          }
+        : {};
+    const operationType = parsed.operationType ?? presetDefaults.operationType;
+    const ownerRole = parsed.ownerRole ?? presetDefaults.ownerRole;
+    const executionKind = parsed.executionKind ?? presetDefaults.executionKind;
     requireFlags('operation add', {
       '--tier': parsed.tier,
       '--operation-id': parsed.operationId,
       '--name': parsed.name,
-      '--operation-type': parsed.operationType,
-      '--owner-role': parsed.ownerRole,
+      '--operation-type': operationType,
+      '--owner-role': ownerRole,
     });
     const mode = resolveWriteMode(parsed, 'operation add');
     const record = buildOrganizationOperationRecord({
       organizationId,
       operationId: parsed.operationId!,
       name: parsed.name!,
-      operationType: parsed.operationType!,
-      ownerRole: parsed.ownerRole!,
+      operationType: operationType!,
+      ownerRole: ownerRole!,
       tier: parsed.tier!,
       tenantSlug: parsed.tenantSlug,
       serviceId: parsed.serviceId,
@@ -1088,7 +1135,7 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
               time: parsed.deadlineTime!,
             }
           : undefined,
-      executionKind: parsed.executionKind,
+      executionKind,
       executionRef: parsed.executionRef,
       evidenceOutputs: parsed.evidenceOutputs,
       allowedActions: parsed.allowedActions,
