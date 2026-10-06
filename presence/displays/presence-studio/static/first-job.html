@@ -99,6 +99,15 @@
             <p id="first-job-status" role="status" aria-live="polite">
               {{t:front_desk:first_job_loading}}
             </p>
+            <p id="first-job-last-checked">{{t:front_desk:first_job_not_checked}}</p>
+            <p id="first-job-refresh-mode" role="status" aria-live="polite"></p>
+            <p
+              id="first-job-refresh-error"
+              class="kb-callout"
+              role="status"
+              aria-live="polite"
+              hidden
+            ></p>
             <p id="first-job-error" class="kb-callout" role="alert" hidden>
               {{t:front_desk:first_job_load_failed}}
             </p>
@@ -132,6 +141,68 @@
               {{t:front_desk:first_job_approval_refresh}}
             </button>
             <div id="first-job-approval-items"></div>
+          </section>
+          <section class="kb-section" aria-labelledby="first-job-body-title">
+            <h2 class="kb-section__title" id="first-job-body-title">
+              {{t:front_desk:first_job_body_title}}
+            </h2>
+            <p>{{t:front_desk:first_job_body_notice}}</p>
+            <div class="first-job-receipt-pane">
+              <label for="first-job-body-select">{{t:front_desk:first_job_body_select}}</label>
+              <select id="first-job-body-select" class="kb-input" disabled></select>
+              <div id="first-job-body-metadata" class="first-job-receipt-metadata"></div>
+              <p id="first-job-body-status" role="status" aria-live="polite"></p>
+              <pre
+                id="first-job-body-content"
+                class="first-job-receipt-body"
+                tabindex="0"
+                aria-label="{{t:front_desk:first_job_body_select}}"
+                hidden
+              ></pre>
+            </div>
+            <button
+              type="button"
+              id="first-job-body-retry"
+              class="kb-btn kb-btn--secondary"
+              disabled
+            >
+              {{t:front_desk:first_job_body_retry}}
+            </button>
+          </section>
+          <section class="kb-section" aria-labelledby="first-job-compare-title">
+            <h2 class="kb-section__title" id="first-job-compare-title">
+              {{t:front_desk:first_job_compare_title}}
+            </h2>
+            <p>{{t:front_desk:first_job_compare_notice}}</p>
+            <p id="first-job-compare-status" role="status" aria-live="polite"></p>
+            <div class="first-job-comparison">
+              <div class="first-job-receipt-pane">
+                <label for="first-job-left-select">{{t:front_desk:first_job_compare_left}}</label>
+                <select id="first-job-left-select" class="kb-input" disabled></select>
+                <div id="first-job-left-metadata" class="first-job-receipt-metadata"></div>
+                <p id="first-job-left-status" role="status" aria-live="polite"></p>
+                <pre
+                  id="first-job-left-content"
+                  class="first-job-receipt-body"
+                  tabindex="0"
+                  aria-label="{{t:front_desk:first_job_compare_left}}"
+                  hidden
+                ></pre>
+              </div>
+              <div class="first-job-receipt-pane">
+                <label for="first-job-right-select">{{t:front_desk:first_job_compare_right}}</label>
+                <select id="first-job-right-select" class="kb-input" disabled></select>
+                <div id="first-job-right-metadata" class="first-job-receipt-metadata"></div>
+                <p id="first-job-right-status" role="status" aria-live="polite"></p>
+                <pre
+                  id="first-job-right-content"
+                  class="first-job-receipt-body"
+                  tabindex="0"
+                  aria-label="{{t:front_desk:first_job_compare_right}}"
+                  hidden
+                ></pre>
+              </div>
+            </div>
           </section>
           <section class="kb-section" aria-labelledby="first-job-history-title">
             <h2 class="kb-section__title" id="first-job-history-title">
