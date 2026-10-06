@@ -129,19 +129,32 @@ describe('learning-signal adapter (LS-01)', () => {
   });
 
   it('counts an ongoing finding once while it keeps being re-reported', () => {
-    // Like runtime health: one ref per day whose timestamp follows the latest sample.
+    // Like runtime health: hourly samples, one ref per day, timestamp = latest sample,
+    // harvested half an hour after each sample and once more in between.
     let latest = hours(1);
     const src = source(() => [obs('trend', latest, { ref: 'trend:day-1' })], { minOccurrences: 1 });
-    harvest([src], hours(1.1));
-    for (const at of [2, 3, 4]) {
-      latest = hours(at);
-      const run = harvest([src], hours(at + 0.1));
+    harvest([src], hours(1.5));
+    for (const at of [1.75, 2.5, 3.5, 4.5]) {
+      latest = hours(Math.floor(at));
+      const run = harvest([src], hours(at));
       expect(run.sources[0].observed).toBe(0);
     }
     const state = readJsonIfPresent<{ clusters: Record<string, { total: number }> }>(
       learningHarvestStatePath(stateRoot)
     );
     expect(state?.clusters['test-source|trend'].total).toBe(1);
+  });
+
+  it('forgets a ref once its source stops reporting it', () => {
+    let rows = [obs('a', hours(1))];
+    const src = source(() => rows);
+    harvest([src], hours(1.05));
+    rows = [];
+    harvest([src], hours(2));
+    const state = readJsonIfPresent<{ seen: Record<string, Record<string, string>> }>(
+      learningHarvestStatePath(stateRoot)
+    );
+    expect(state?.seen['test-source']).toEqual({});
   });
 
   it('falls back to the lookback when a stored cursor is unreadable', () => {

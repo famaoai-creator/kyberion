@@ -98,7 +98,7 @@ interface ScopeState {
   version: 2;
   cursors: Record<string, string>;
   clusters: Record<string, ClusterState>;
-  /** Refs seen inside the re-read overlap, per source, so late appends are counted once. */
+  /** Counted refs a source still reports, per source, with the harvest time they were last reported. */
   seen: Record<string, Record<string, string>>;
 }
 
@@ -274,15 +274,16 @@ export function harvestLearningSignals(
         report.skipped_scope += 1;
         continue;
       }
-      if (ts <= cursorMs(scope) - CURSOR_OVERLAP_MS) continue;
+      // A ref already counted stays remembered for as long as some harvest
+      // keeps reporting it (an ongoing finding, or a record re-read inside the
+      // overlap); the value is the harvest time it was last reported.
       const seen = (scope.state.seen[source.id] ||= {});
       if (seen[obs.ref]) {
-        // A ref re-reported with a later timestamp (an ongoing finding) stays
-        // remembered for as long as it keeps being reported.
-        if (obs.ts > seen[obs.ref]) seen[obs.ref] = obs.ts;
+        seen[obs.ref] = now.toISOString();
         continue;
       }
-      seen[obs.ref] = obs.ts;
+      if (ts <= cursorMs(scope) - CURSOR_OVERLAP_MS) continue;
+      seen[obs.ref] = now.toISOString();
       report.observed += 1;
 
       const id = `${source.id}|${obs.key}`;
@@ -386,10 +387,12 @@ export function harvestLearningSignals(
     }
     for (const scope of scopes) {
       scope.state.cursors[source.id] = now.toISOString();
+      // Drop refs this harvest no longer reported: their records fell behind
+      // the overlap, or the ongoing finding ended.
       const seen = scope.state.seen[source.id] || {};
-      const keepAfter = nowMs - CURSOR_OVERLAP_MS;
+      const reportedAt = now.toISOString();
       scope.state.seen[source.id] = Object.fromEntries(
-        Object.entries(seen).filter(([, ts]) => Date.parse(ts) > keepAfter)
+        Object.entries(seen).filter(([, lastReported]) => lastReported === reportedAt)
       );
     }
   }
