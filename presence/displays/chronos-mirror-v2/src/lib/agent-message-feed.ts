@@ -161,7 +161,10 @@ function appendObservedA2AHandoffs(
   }
 }
 
-export function collectAgentMessages(options: AgentMessageFeedOptions = {}): AgentMessageSummary[] {
+export function collectAgentActivity(options: AgentMessageFeedOptions = {}): {
+  messages: AgentMessageSummary[];
+  handoffs: A2AHandoffSummary[];
+} {
   const runtimeLeases = listAgentRuntimeLeaseSummaries();
   const runtimeSnapshots = listAgentRuntimeSnapshots();
   const leaseByAgent = new Map(runtimeLeases.map((lease) => [lease.agent_id, lease]));
@@ -175,7 +178,11 @@ export function collectAgentMessages(options: AgentMessageFeedOptions = {}): Age
   // Feed oldest-first so a bounded buffer retains the newest messages rather
   // than the oldest tail of an already descending list.
   for (const message of messages.sort((a, b) => a.ts.localeCompare(b.ts))) bounded.push(message);
-  return bounded.toArray().reverse().slice(0, 40);
+  return { messages: bounded.toArray().reverse().slice(0, 40), handoffs };
+}
+
+export function collectAgentMessages(options: AgentMessageFeedOptions = {}): AgentMessageSummary[] {
+  return collectAgentActivity(options).messages;
 }
 
 export function collectA2AHandoffs(options: AgentMessageFeedOptions = {}): A2AHandoffSummary[] {
