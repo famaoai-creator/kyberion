@@ -144,6 +144,51 @@ export function emitConsoleLine(
   }
 }
 
+// --- file sink ---------------------------------------------------------------
+// Console streams are for people; a log file is for after the fact. Every log
+// line that passes the level threshold is also handed to an optional file sink
+// (installed by process-logger.ts), even when the console is quiet (`--json`,
+// `--quiet`, `LOG_LEVEL=silent`), so reserving stdout for data never loses logs.
+
+export interface LogRecord {
+  level: string;
+  /** Emitter name: the createLogger name, or `core` for the core.ts facade. */
+  name: string;
+  msg: string;
+  data?: unknown;
+}
+
+let logFileSink: ((record: LogRecord) => void) | null = null;
+let recordingLogLine = false;
+
+/** Install (or with `null`, remove) the process-wide log file sink. */
+export function setLogFileSink(sink: ((record: LogRecord) => void) | null): void {
+  logFileSink = sink;
+}
+
+/**
+ * Threshold for the file sink. `silent` only mutes the console (the harness
+ * sets it for `--json`), so the file keeps recording at `info`.
+ */
+function fileLogThreshold(): number {
+  const level = getRegisteredEnvText('LOG_LEVEL');
+  return level === 'silent' ? LOG_LEVELS.info : resolveLogThreshold(level);
+}
+
+/** Hand one log line to the file sink. Never throws and never recurses. */
+export function recordLogLine(record: LogRecord): void {
+  if (!logFileSink || recordingLogLine) return;
+  if ((LOG_LEVELS[record.level] ?? LOG_LEVELS.info) < fileLogThreshold()) return;
+  recordingLogLine = true;
+  try {
+    logFileSink(record);
+  } catch {
+    // A broken log file must never break the process that is logging.
+  } finally {
+    recordingLogLine = false;
+  }
+}
+
 // --- diagnostic format -----------------------------------------------------
 // warn/error convention: one line that an LLM or human can act on directly.
 // [component] what — why | next: <action> | evidence: <path>
@@ -186,6 +231,7 @@ export function createLogger(name: string, options: LoggerOptions = {}) {
   }
 
   function _log(lvl: string, msg: string, data: any) {
+    recordLogLine({ level: lvl, name, msg, ...(data !== undefined ? { data } : {}) });
     if (isQuietProcess() && lvl !== 'error') return;
     const rank = LOG_LEVELS[lvl] ?? LOG_LEVELS.info;
     if (rank < levelAt()) return;

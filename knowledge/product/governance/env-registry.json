@@ -2957,6 +2957,16 @@
       "documented": true
     },
     {
+      "name": "KYBERION_PROCESS_LOG",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Tee every logger line of a process into active/shared/logs/process/<entry>.log (JSONL, size-rotated), including runs whose console is quiet (--json, --quiet). On by default; set to 0/false/off to disable. Never active under Vitest.",
+      "documented": true,
+      "default": "true",
+      "subsystem": "observability"
+    },
+    {
       "name": "KYBERION_PROJECT_ID",
       "category": "runtime",
       "type": "string",

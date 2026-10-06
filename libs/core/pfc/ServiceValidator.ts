@@ -117,7 +117,18 @@ export async function validateServiceAuth(
   return inspection.valid ? { valid: true } : { valid: false, reason: inspection.reason };
 }
 
-export function inspectServiceAuth(serviceId: string, presetPath?: string): ServiceAuthInspection {
+/**
+ * Upper bound for one CLI auth health check. These run synchronously inside
+ * read-only reports (`setup report`, `service:setup`), so a CLI that hangs on
+ * the network must not stall the whole report.
+ */
+export const SERVICE_HEALTH_CHECK_TIMEOUT_MS = 10_000;
+
+export function inspectServiceAuth(
+  serviceId: string,
+  presetPath?: string,
+  options: { healthCheckTimeoutMs?: number } = {}
+): ServiceAuthInspection {
   let resolvedPresetPath: string | undefined;
   if (presetPath) {
     try {
@@ -230,7 +241,9 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
         const parts = String(alternative.health_check).trim().split(/\s+/);
         const bin = parts[0];
         const args = parts.slice(1);
-        safeExec(bin, args);
+        safeExec(bin, args, {
+          timeoutMs: options.healthCheckTimeoutMs ?? SERVICE_HEALTH_CHECK_TIMEOUT_MS,
+        });
         return {
           serviceId,
           presetPath: resolvedPresetPath,
