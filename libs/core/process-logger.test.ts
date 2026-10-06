@@ -47,6 +47,7 @@ vi.mock('./foundation/io.js', () => ({
 import {
   ProcessLogger,
   createProcessLogger,
+  processLogNameFromArgv,
   resetProcessLoggerRegistry,
 } from './process-logger.js';
 
@@ -136,5 +137,10 @@ describe('ProcessLogger', () => {
     const log = new ProcessLogger('../outside');
     expect(() => log.info('must remain contained')).not.toThrow();
     expect(fs.readdirSync(logsProcessDir)).toEqual([]);
+  });
+  it('names the process log after the entry script', () => {
+    expect(processLogNameFromArgv(['node', '/repo/dist/scripts/run_doctor.js'])).toBe('run_doctor');
+    expect(processLogNameFromArgv(['node', 'scripts/backup.ts'])).toBe('backup');
+    expect(processLogNameFromArgv(['node'])).toBe('node');
   });
 });

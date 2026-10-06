@@ -1,7 +1,7 @@
 ---
 title: 'Logging Policy: console and file logs humans and LLMs can act on'
 tags: [governance, logging, observability, console-output, jsonl]
-last_updated: 2026-09-30
+last_updated: 2026-10-06
 ---
 
 # Logging Policy
@@ -16,10 +16,16 @@ happens, both humans and LLM agents must be able to tell **what**, **why**, and
 
 Two emitters share one engine (`libs/core/logger.ts`):
 
-| Emitter                 | Surface                                                                     | Use for                               |
-| ----------------------- | --------------------------------------------------------------------------- | ------------------------------------- |
-| `logger` from `core.js` | stdout (info/debug/success), stderr (warn/error), colored, mission-prefixed | Human-facing CLI progress             |
-| `createLogger(name)`    | stderr, `[ts] [LEVEL] [name] msg`                                           | Named components, daemons, subsystems |
+| Emitter                 | Surface                                        | Use for                               |
+| ----------------------- | ---------------------------------------------- | ------------------------------------- |
+| `logger` from `core.js` | stderr (all levels), colored, mission-prefixed | Human-facing CLI progress             |
+| `createLogger(name)`    | stderr, `[ts] [LEVEL] [name] msg`              | Named components, daemons, subsystems |
+
+**stdout is for a command's output, never for logs.** Both emitters write to
+stderr so JSON, reports and other data on stdout stay parseable — by `--json`
+consumers and by parent processes that parse a child's stdout (for example the
+browser actuator run from `browser-conversation-session`). Print results with
+the script harness `print`, not with `logger.info`.
 
 Never add `console.log/error/warn` calls in library code — route through one of
 the two emitters so level filtering, quiet mode and dedup apply.
@@ -66,7 +72,15 @@ JSONL everywhere — machine- and LLM-readable. Policy per stream:
 | `audit/`         | compliance    | Full fidelity; hash chain intact. Only re-derivable arrays may be replaced by `count`+`digest`          |
 | `traces/`        | debugging     | Empty span fields (`events`, `artifacts`, `knowledgeRefs`, `children`, `attributes`) omitted at persist |
 | `worker-events/` | observability | `payload` omitted when empty; payloads are allowlist-redacted                                           |
-| `process/`       | per-process   | Leveled JSONL with size rotation (process-logger.ts)                                                    |
+| `process/`       | per-process   | Every logger line, one file per entry script (`<entry>.log`), JSONL, 10 MB × 5 rotation                 |
+
+`process/` is fed automatically: `core.ts` installs a file sink that tees
+each logger line (both emitters) into `active/shared/logs/process/<entry>.log`
+(`run_doctor.log`, `run_pipeline.log`, …) with `pid`, emitter name and
+`mission` in `meta`. It records even when the console is quiet (`--json`,
+`--quiet`, `LOG_LEVEL=silent` → file keeps `info`+), so silencing the console
+never loses a warning. Disable with `KYBERION_PROCESS_LOG=0`; it is never
+active under Vitest.
 
 Rules:
 
