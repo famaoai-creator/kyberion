@@ -28,7 +28,12 @@ import {
   parseSafeJsonInput,
   readTextFile,
 } from '@agent/core/foundation';
-import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
+import {
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+  stripSharedScriptFlags,
+} from './lib/harness.js';
 import { logger } from '@agent/core/core';
 
 export type BackupScope = 'all' | 'mission' | 'tenant';
@@ -90,7 +95,7 @@ const DEFAULT_PASSPHRASE_ENV = 'KYBERION_BACKUP_PASSPHRASE';
 function usage(): string {
   return [
     'Usage:',
-    '  pnpm backup create [--scope all|mission|tenant] [--mission <id>] [--tenant <slug>] --out <archive.tar.gz.enc> --encrypt',
+    '  pnpm backup create [--scope all|mission|tenant] [--mission <id>] [--tenant <slug>] [--out <archive.tar.gz.enc>] --encrypt',
     '  pnpm backup restore <archive.tar.gz.enc|archive.tar.gz> --target <clean-root> [--scope all|mission|tenant] [--tenant <slug>] [--verify-baseline] [--force]',
     '  pnpm backup list [--dir <backup-dir>]',
     '  pnpm backup prune [--dir <backup-dir>] [--retain-daily 7] [--retain-weekly 4]',
@@ -100,10 +105,15 @@ function usage(): string {
   ].join('\n');
 }
 
+/** Bad invocation: print the message (no stack trace) and exit 2. */
+function usageError(message: string): ScriptExitError {
+  return new ScriptExitError(2, message);
+}
+
 function readArgValue(args: string[], index: number, name: string): string {
   const value = args[index + 1];
   if (!value || value.startsWith('--')) {
-    throw new Error(`Missing value for ${name}`);
+    throw usageError(`Missing value for ${name}`);
   }
   return value;
 }
@@ -111,7 +121,7 @@ function readArgValue(args: string[], index: number, name: string): string {
 export function parseBackupArgs(argv: string[]): BackupCliOptions {
   const [command, ...rest] = argv;
   if (!['create', 'restore', 'list', 'prune', 'drill'].includes(command || '')) {
-    throw new Error(usage());
+    throw usageError(usage());
   }
 
   const options: BackupCliOptions = {
@@ -132,7 +142,7 @@ export function parseBackupArgs(argv: string[]): BackupCliOptions {
       case '--scope': {
         const scope = readArgValue(rest, i, arg) as BackupScope;
         if (!['all', 'mission', 'tenant'].includes(scope)) {
-          throw new Error(`Invalid --scope: ${scope}`);
+          throw usageError(`Invalid --scope: ${scope}`);
         }
         options.scope = scope;
         i += 1;
@@ -191,7 +201,7 @@ export function parseBackupArgs(argv: string[]): BackupCliOptions {
         options.prune = true;
         break;
       default:
-        throw new Error(`Unknown argument: ${arg}\n${usage()}`);
+        throw usageError(`Unknown argument: ${arg}\n${usage()}`);
     }
   }
 

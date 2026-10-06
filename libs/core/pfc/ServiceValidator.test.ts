@@ -116,6 +116,36 @@ describe('ServiceValidator (3-Tier Service Validation)', () => {
     expect(inspection.setupHint).toContain('Run gws auth setup');
   });
 
+  it('bounds a hanging CLI health check instead of stalling the report', () => {
+    safeMkdir(TMP_ROOT, { recursive: true });
+    const presetPath = path.join(TMP_ROOT, 'slow-cli.json');
+    safeWriteFile(
+      presetPath,
+      JSON.stringify(
+        {
+          auth_strategy: 'session',
+          operations: {
+            auth_status: {
+              type: 'cli',
+              command: process.execPath,
+              args: [],
+              // Stands in for a CLI that blocks on the network (e.g. an npx fetch).
+              health_check: `${process.execPath} --eval=setTimeout(()=>{},60000)`,
+            },
+          },
+        },
+        null,
+        2
+      )
+    );
+
+    const startedAt = Date.now();
+    const inspection = inspectServiceAuth('slow-cli', presetPath, { healthCheckTimeoutMs: 500 });
+
+    expect(inspection.valid).toBe(false);
+    expect(Date.now() - startedAt).toBeLessThan(10_000);
+  });
+
   it('rejects an explicit preset bound to another service', () => {
     safeMkdir(TMP_ROOT, { recursive: true });
     const presetPath = path.join(TMP_ROOT, 'wrong-service.json');
