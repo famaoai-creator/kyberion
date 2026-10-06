@@ -145,6 +145,9 @@ const CHILD_PROCESS_ENV_KEYS = [
   'LANG',
   'TERM',
   'NODE_ENV',
+  // Test-run markers (see SAFE_EXEC_ENV_ALLOWLIST): keep children of a test in its sandbox.
+  'VITEST',
+  'VITEST_POOL_ID',
   'NVM_DIR',
   'NVM_BIN',
   'GOOGLE_API_KEY',
