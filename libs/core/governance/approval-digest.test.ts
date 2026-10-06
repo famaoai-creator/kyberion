@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   buildDecisionDigest,
   formatDigestAge,
@@ -149,12 +149,16 @@ describe('buildDecisionDigest', () => {
 });
 
 describe('autonomous action notices', () => {
-  afterEach(() => {
+  // The per-worker approval store is shared by every file that runs in this
+  // worker; clear it before as well as after so earlier files' notices
+  // (e.g. approval-decision-routing) cannot leak into the assertion.
+  const clearNotices = () =>
     withExecutionContext('mission_controller', () => {
       const dir = pathResolver.rootResolve(`${approvalStoreRoots().observability}/autonomy`);
       if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
     });
-  });
+  beforeEach(clearNotices);
+  afterEach(clearNotices);
 
   it('records report-only actions so the digest can show them', () => {
     recordAutonomousActionNotice('mission_controller', {
