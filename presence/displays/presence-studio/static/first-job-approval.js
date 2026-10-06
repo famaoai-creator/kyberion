@@ -19,6 +19,8 @@
     readiness: null,
     items: [],
     held: [],
+    recovery: [],
+    confirmRecovery: null,
     error: null,
     message: null,
     mounted: false,
@@ -35,7 +37,17 @@
         ready: state.eligible && !state.loading && !state.sending,
         busy: state.sending,
       };
+      if (
+        [
+          'authentication_required',
+          'authentication_configuration_required',
+          'access_denied',
+        ].indexOf(state.authStatus) !== -1
+      )
+        update.accessLost = true;
       if (state.held.length) update.heldRequests = state.held;
+      if (state.recovery.length && state.eligible && !state.loading && !state.sending)
+        update.recoveryRequests = state.recovery;
       state.context.onChange(update);
     }
   }
@@ -86,6 +98,27 @@
       item.recovery === 'operator_recovery'
     );
   }
+  function validRecovery(item) {
+    var snapshot = state.context && state.context.snapshot;
+    return (
+      item &&
+      UUID.test(item.request_id) &&
+      UUID.test(item.approval_request_id) &&
+      SESSION.test(item.session_id) &&
+      HASH.test(item.display_digest) &&
+      Number.isSafeInteger(item.revision) &&
+      item.revision > 0 &&
+      item.revision <= 64 &&
+      ['eligible', 'terminated_unstarted'].indexOf(item.status) !== -1 &&
+      typeof item.tenant === 'string' &&
+      /^[a-z0-9][a-z0-9_-]{0,63}$/.test(item.tenant) &&
+      snapshot &&
+      snapshot.scope &&
+      snapshot.scope.tier === 'public' &&
+      item.tenant === snapshot.scope.tenant &&
+      item.session_id === snapshot.sessionId
+    );
+  }
   function authKey() {
     if (state.loading) return 'approval_loading';
     if (state.sending) return 'approval_sending';
@@ -97,7 +130,7 @@
       return 'approval_diagnostic_unavailable';
     return state.eligible ? 'approval_ready' : 'approval_unknown';
   }
-  function render() {
+  function render(focusRecovery) {
     el('readiness').textContent = text(authKey());
     el('signin').hidden =
       ['authentication_required', 'authentication_configuration_required'].indexOf(
@@ -112,9 +145,15 @@
         : state.message ||
             (state.held.length
               ? 'approval_held'
-              : state.eligible && !state.items.length
-                ? 'approval_empty'
-                : authKey())
+              : state.recovery.some(function (item) {
+                    return item.status === 'eligible';
+                  })
+                ? 'recovery_eligible'
+                : state.recovery.length
+                  ? 'recovery_terminated'
+                  : state.eligible && !state.items.length
+                    ? 'approval_empty'
+                    : authKey())
     );
     var container = el('items');
     container.replaceChildren();
@@ -172,14 +211,87 @@
       field(card, 'request', item.request_id);
       append(card, 'p', text('approval_held_detail'));
     });
+    state.recovery.forEach(function (item) {
+      if (!validRecovery(item)) return;
+      var terminal = item.status === 'terminated_unstarted';
+      var card = append(container, 'article', undefined, 'home-work-item');
+      append(
+        card,
+        'h3',
+        text(terminal ? 'recovery_terminated' : 'recovery_eligible'),
+        'kb-section__title'
+      );
+      field(card, 'request', item.request_id);
+      field(card, 'approval_id', item.approval_request_id);
+      field(card, 'revision', item.revision);
+      field(card, 'scope', item.tenant);
+      field(card, 'approval_effect_digest', item.display_digest);
+      append(card, 'p', text(terminal ? 'recovery_terminated_detail' : 'recovery_effect'));
+      if (terminal) return;
+      var confirming = state.confirmRecovery === item.request_id + ':' + item.display_digest;
+      if (confirming) append(card, 'p', text('recovery_confirm_detail'));
+      var buttons = append(card, 'div', undefined, 'home-work-toolbar');
+      var generation = state.generation;
+      var button = append(
+        buttons,
+        'button',
+        text(confirming ? 'recovery_confirm' : 'recovery_review'),
+        'kb-btn kb-btn--secondary'
+      );
+      button.type = 'button';
+      button.disabled = !state.eligible || state.loading || state.sending;
+      button.addEventListener('click', function () {
+        if (
+          generation !== state.generation ||
+          !state.eligible ||
+          state.loading ||
+          state.sending ||
+          !validRecovery(item)
+        )
+          return;
+        if (confirming) {
+          if (state.confirmRecovery === item.request_id + ':' + item.display_digest)
+            terminate(item);
+        } else {
+          state.generation += 1;
+          state.confirmRecovery = item.request_id + ':' + item.display_digest;
+          render(item.request_id + ':' + item.display_digest);
+        }
+      });
+      if (confirming) {
+        var cancel = append(buttons, 'button', text('recovery_cancel'), 'kb-btn kb-btn--secondary');
+        cancel.type = 'button';
+        cancel.disabled = state.sending || state.loading;
+        cancel.addEventListener('click', function () {
+          if (generation !== state.generation || state.sending || state.loading) return;
+          state.generation += 1;
+          state.confirmRecovery = null;
+          render(item.request_id + ':' + item.display_digest);
+        });
+      }
+      if (focusRecovery === item.request_id + ':' + item.display_digest) button.focus();
+    });
     tellParent();
   }
   function fetchJson(url, options) {
     return fetch(url, options).then(function (response) {
-      return response.json().then(function (body) {
-        return { ok: response.ok, body: body };
-      });
+      return response.json().then(
+        function (body) {
+          return { ok: response.ok, status: response.status, body: body };
+        },
+        function () {
+          return { ok: response.ok, status: response.status, body: null };
+        }
+      );
     });
+  }
+  function reflectAccessLoss(result) {
+    if ([401, 403].indexOf(result.status) === -1) return;
+    state.authStatus = result.status === 401 ? 'authentication_required' : 'access_denied';
+    state.items = [];
+    state.held = [];
+    state.recovery = [];
+    state.confirmRecovery = null;
   }
   function readApproval(url, controller, parentSignal) {
     var timer;
@@ -232,6 +344,8 @@
     state.eligible = false;
     state.items = [];
     state.held = [];
+    state.recovery = [];
+    state.confirmRecovery = null;
     state.error = null;
     state.message = null;
     state.authStatus = null;
@@ -252,6 +366,7 @@
     return readApproval('/api/first-job/approvals?' + query.toString(), controller, context.signal)
       .then(function (result) {
         if (generation !== state.generation) return;
+        reflectAccessLoss(result);
         var body = result.body;
         if (
           !result.ok ||
@@ -270,10 +385,19 @@
           body.readiness.status === 'ready';
         if (state.eligible) {
           var held = body.held_requests === undefined ? [] : body.held_requests;
+          var recovery = body.recovery_requests === undefined ? [] : body.recovery_requests;
+          var seen = Object.create(null);
           if (
             !body.approvals.every(validItem) ||
             !Array.isArray(held) ||
             !held.every(validHeld) ||
+            !Array.isArray(recovery) ||
+            !recovery.every(validRecovery) ||
+            body.approvals.concat(held, recovery).some(function (item) {
+              if (seen[item.request_id]) return true;
+              seen[item.request_id] = true;
+              return false;
+            }) ||
             held.some(function (item) {
               return body.approvals.some(function (approval) {
                 return approval.request_id === item.request_id;
@@ -285,6 +409,7 @@
           } else {
             state.items = body.approvals;
             state.held = held;
+            state.recovery = recovery;
           }
         }
       })
@@ -302,7 +427,6 @@
       });
   }
   function invalidate() {
-    if (state.sending) return;
     if (state.readController) state.readController.abort();
     state.readController = null;
     state.generation += 1;
@@ -311,13 +435,19 @@
     state.authStatus = null;
     state.items = [];
     state.held = [];
+    state.recovery = [];
+    state.confirmRecovery = null;
+    state.sending = false;
+    state.message = null;
+    state.error = null;
     state.readiness = 'diagnostic_unavailable';
     if (state.context) render();
   }
   function decide(item, decision) {
     state.sending = true;
     state.eligible = false;
-    state.generation += 1;
+    var generation = ++state.generation;
+    state.confirmRecovery = null;
     state.error = null;
     render();
     var context = state.context;
@@ -336,6 +466,8 @@
       }
     )
       .then(function (result) {
+        if (generation !== state.generation) return;
+        reflectAccessLoss(result);
         if (
           !result.ok ||
           !result.body ||
@@ -353,9 +485,68 @@
         state.message = 'approval_recorded';
       })
       .catch(function () {
+        if (generation !== state.generation) return;
         state.error = 'approval_uncertain';
       })
       .finally(function () {
+        if (generation !== state.generation) return;
+        state.sending = false;
+        render();
+        if (!state.error && context.onDecision) context.onDecision();
+      });
+  }
+  function terminate(item) {
+    var context = state.context;
+    var generation = ++state.generation;
+    state.sending = true;
+    state.eligible = false;
+    state.confirmRecovery = null;
+    state.error = null;
+    render();
+    var timer;
+    // A timeout is unknown outcome, never permission to replay a mutation.
+    var request = fetchJson('/api/first-job/recovery/' + encodeURIComponent(item.request_id), {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: context.snapshot.sessionId,
+        display_digest: item.display_digest,
+        action: 'terminate_unstarted',
+      }),
+    });
+    return new Promise(function (resolve, reject) {
+      timer = window.setTimeout(function () {
+        reject(new Error('recovery_unknown'));
+      }, 15000);
+      request.then(resolve, reject);
+    })
+      .then(function (result) {
+        if (generation !== state.generation) return;
+        reflectAccessLoss(result);
+        if (
+          !result.ok ||
+          !result.body ||
+          result.body.ok !== true ||
+          result.body.request_id !== item.request_id ||
+          result.body.status !== 'terminated_unstarted'
+        ) {
+          state.error =
+            result.body && result.body.retry_safe === true
+              ? 'recovery_changed'
+              : 'recovery_uncertain';
+          return;
+        }
+        // Only the next authoritative GET can grant terminal display/restart eligibility.
+        state.recovery = [];
+        state.message = 'recovery_readback';
+      })
+      .catch(function () {
+        if (generation === state.generation) state.error = 'recovery_uncertain';
+      })
+      .finally(function () {
+        window.clearTimeout(timer);
+        if (generation !== state.generation) return;
         state.sending = false;
         render();
         if (!state.error && context.onDecision) context.onDecision();

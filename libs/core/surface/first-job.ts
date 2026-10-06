@@ -122,6 +122,8 @@ function diagnosticStatus(task: FrontDeskConversationWorkTask, locale?: Supporte
       return t('front_desk:execution_running', undefined, locale);
     case 'blocked':
       return t('front_desk:execution_blocked', { reason: '' }, locale).trim();
+    case 'terminated_unstarted':
+      return t('front_desk:execution_terminated_unstarted', undefined, locale);
     case 'cancel_requested':
       return t('front_desk:execution_cancel_requested', undefined, locale);
     case 'work_completed':
@@ -160,7 +162,7 @@ export function readFirstJobSnapshot(
   // Never echo arbitrary legacy input or raw execution summaries. Typed diagnostic
   // rows are sufficient to reconstruct this fixed protocol's display history.
   const tasks = work.tasks
-    .filter((task) => task.artifact)
+    .filter((task) => task.artifact || task.executionStatus === 'terminated_unstarted')
     .map(({ resultExcerpt: _omit, ...task }) => ({
       ...task,
       title: diagnosticCommand(task),
