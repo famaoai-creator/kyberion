@@ -97,11 +97,21 @@ describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
     ).toBe(false);
   });
 
-  it('records task details into the mission state context', async () => {
+  it('records task details into the mission state context', async (ctx) => {
+    const previousRole = process.env.MISSION_ROLE;
+    const previousPersona = process.env.KYBERION_PERSONA;
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.KYBERION_PERSONA = 'worker';
     const missionId = 'MSN-MAINTENANCE-RECORD-TASK';
     const missionPath = pathResolver.missionDir(missionId, 'public');
+    // The fixture mission lives in the live mission tree; leave nothing behind.
+    ctx.onTestFinished(() => {
+      safeRmSync(missionPath, { recursive: true, force: true });
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = previousPersona;
+    });
     safeMkdir(missionPath, { recursive: true });
     safeWriteFile(
       `${missionPath}/mission-state.json`,
