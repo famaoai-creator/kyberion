@@ -21,8 +21,11 @@ import {
   safeExistsSync,
   safeLstat,
   safeReadFile,
+  safeStat,
 } from '../../../lib/intelligence-primitives';
+import { safeReadFileRange } from '@agent/core/secure-io';
 import { isRecord, readJsonLines } from '@agent/core/foundation';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import * as intelligenceData from './intelligence-observation-data';
 import {
   parseDashboardJsonRecord,
@@ -87,24 +90,177 @@ export function parseControlEventRecord(value: unknown): Record<string, unknown>
   return event;
 }
 
-export type IntelligenceObservationReadCache = Map<string, Record<string, unknown>[]>;
+interface ObservationProjection {
+  dev: number;
+  ino: number;
+  size: number;
+  mtimeMs: number;
+  pending: Buffer;
+  records: Record<string, unknown>[];
+}
+
+interface ObservationSnapshot {
+  stamp: string;
+  records: Record<string, unknown>[];
+}
+
+const OBSERVATION_READ_CHUNK_BYTES = 1024 * 1024;
+const OBSERVATION_PROJECTION_MAX_BYTES = 8 * 1024 * 1024;
+const OBSERVATION_PROJECTION_MAX_FILES = 8;
+
+export class IntelligenceObservationReadCache {
+  private readonly projections = new Map<string, ObservationProjection>();
+  private readonly snapshot = new Map<string, ObservationSnapshot>();
+
+  constructor(private readonly readRange: typeof safeReadFileRange = safeReadFileRange) {}
+
+  beginSnapshot(): void {
+    this.snapshot.clear();
+  }
+
+  clear(): void {
+    this.snapshot.clear();
+    this.projections.clear();
+  }
+
+  private rememberSnapshot(
+    filePath: string,
+    stamp: string,
+    records: Record<string, unknown>[]
+  ): void {
+    this.snapshot.delete(filePath);
+    this.snapshot.set(filePath, { stamp, records });
+    while (this.snapshot.size > OBSERVATION_PROJECTION_MAX_FILES) {
+      const oldest = this.snapshot.keys().next().value;
+      if (!oldest) break;
+      this.snapshot.delete(oldest);
+    }
+  }
+
+  private rememberProjection(filePath: string, projection: ObservationProjection): void {
+    this.projections.delete(filePath);
+    this.projections.set(filePath, projection);
+    while (this.projections.size > OBSERVATION_PROJECTION_MAX_FILES) {
+      const oldest = this.projections.keys().next().value;
+      if (!oldest) break;
+      this.projections.delete(oldest);
+    }
+  }
+
+  read(filePath: string): Record<string, unknown>[] {
+    let safePath = filePath;
+    try {
+      safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+      if (!safeExistsSync(safePath)) {
+        this.projections.delete(safePath);
+        this.rememberSnapshot(safePath, 'missing', []);
+        return [];
+      }
+      const lstat = safeLstat(safePath);
+      if (lstat.isSymbolicLink() || !lstat.isFile()) {
+        this.projections.delete(safePath);
+        this.snapshot.delete(safePath);
+        return [];
+      }
+
+      const stat = safeStat(safePath);
+      const stamp = `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}`;
+      const snapshot = this.snapshot.get(safePath);
+      if (snapshot?.stamp === stamp) return snapshot.records;
+
+      if (stat.size > OBSERVATION_PROJECTION_MAX_BYTES) {
+        this.projections.delete(safePath);
+        const records = readJsonLines<Record<string, unknown>>(safePath, {
+          map: (value) => {
+            if (!isRecord(value)) throw new Error('observation JSONL entry must be an object');
+            return value;
+          },
+          onMalformed: 'skip',
+        });
+        this.rememberSnapshot(safePath, stamp, records);
+        return records;
+      }
+
+      let projection = this.projections.get(safePath);
+      const sameFile = projection?.dev === stat.dev && projection.ino === stat.ino;
+      const isAppend = sameFile && stat.size > projection.size;
+      const unchanged =
+        sameFile && stat.size === projection.size && stat.mtimeMs === projection.mtimeMs;
+      if (unchanged && projection) {
+        this.rememberSnapshot(safePath, stamp, projection.records);
+        return projection.records;
+      }
+      if (!isAppend || !projection || stat.size < projection.size) {
+        projection = {
+          dev: stat.dev,
+          ino: stat.ino,
+          size: 0,
+          mtimeMs: stat.mtimeMs,
+          pending: Buffer.alloc(0),
+          records: [],
+        };
+      }
+
+      let position = projection.size;
+      while (position < stat.size) {
+        const length = Math.min(OBSERVATION_READ_CHUNK_BYTES, stat.size - position);
+        const bytes = this.readRange(safePath, position, length);
+        if (bytes.length === 0) throw new Error('observation file changed during range read');
+        this.consume(projection, bytes);
+        position += bytes.length;
+      }
+      const finalStat = safeStat(safePath);
+      if (
+        finalStat.dev !== stat.dev ||
+        finalStat.ino !== stat.ino ||
+        finalStat.size !== stat.size ||
+        finalStat.mtimeMs !== stat.mtimeMs
+      ) {
+        throw new Error('observation file changed during projection');
+      }
+      projection.size = stat.size;
+      projection.mtimeMs = stat.mtimeMs;
+      this.rememberProjection(safePath, projection);
+      this.rememberSnapshot(safePath, stamp, projection.records);
+      return projection.records;
+    } catch {
+      this.projections.delete(safePath);
+      this.snapshot.delete(safePath);
+      return [];
+    }
+  }
+
+  private consume(projection: ObservationProjection, bytes: Buffer): void {
+    const combined = projection.pending.length ? Buffer.concat([projection.pending, bytes]) : bytes;
+    let start = 0;
+    for (let i = 0; i < combined.length; i += 1) {
+      if (combined[i] !== 0x0a) continue;
+      const line = combined.subarray(start, i).toString('utf8').trim();
+      start = i + 1;
+      if (!line) continue;
+      try {
+        const value: unknown = parseSafeJsonInput(line, 'intelligence observation JSONL entry');
+        if (isRecord(value)) projection.records.push(value);
+      } catch {
+        // Match readJsonLines(onMalformed: 'skip') for complete malformed lines.
+      }
+    }
+    projection.pending = Buffer.from(combined.subarray(start));
+  }
+}
 
 export function createIntelligenceObservationReadCache(): IntelligenceObservationReadCache {
-  return new Map();
+  return new IntelligenceObservationReadCache();
 }
 
 function readSafeObservationRecords(
   filePath: string,
   cache?: IntelligenceObservationReadCache
 ): Record<string, unknown>[] {
-  const cached = cache?.get(filePath);
-  if (cached) return cached;
+  if (cache) return cache.read(filePath);
   try {
     const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
-    if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
-      cache?.set(filePath, []);
-      return [];
-    }
+    if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return [];
     const records = readJsonLines<Record<string, unknown>>(safePath, {
       map: (value) => {
         if (!isRecord(value)) throw new Error('observation JSONL entry must be an object');
@@ -112,10 +268,8 @@ function readSafeObservationRecords(
       },
       onMalformed: 'skip',
     });
-    cache?.set(filePath, records);
     return records;
   } catch {
-    cache?.set(filePath, []);
     return [];
   }
 }

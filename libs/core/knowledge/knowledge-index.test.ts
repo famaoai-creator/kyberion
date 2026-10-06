@@ -443,13 +443,19 @@ describe('knowledge-index', () => {
 
   it('bounds embedding request size while preserving vector order', async () => {
     const batchSizes: number[] = [];
+    let activeBatches = 0;
+    let maxActiveBatches = 0;
     registerEmbeddingBackend({
       name: 'bounded-batch-test',
       async embed() {
         return new Float32Array([1, 0]);
       },
       async embedBatch(texts: string[]) {
+        activeBatches += 1;
+        maxActiveBatches = Math.max(maxActiveBatches, activeBatches);
         batchSizes.push(texts.length);
+        await Promise.resolve();
+        activeBatches -= 1;
         return texts.map((text) => new Float32Array([text.length, 0]));
       },
     });
@@ -463,6 +469,7 @@ describe('knowledge-index', () => {
       const index = new KnowledgeHintIndex(hints);
       await queryKnowledgeHybrid(index, 'batch topic', { maxResults: 40 });
       expect(batchSizes).toEqual([32, 8]);
+      expect(maxActiveBatches).toBe(1);
       expect(index.embedCache.get('public/batch-0.md')?.[0]).toBe(
         new Float32Array([`${hints[0].topic} ${hints[0].hint}`.length, 0])[0]
       );

@@ -14,6 +14,7 @@ import {
 import { readChronosJsonObject, readChronosOptionalStringParam } from '../../../lib/request-input';
 import { memoryCandidateVisibleToViewer } from '../../../lib/knowledge-scope';
 import { collectAgentActivity } from '../../../lib/agent-message-feed';
+import { createIntelligenceObservationReadCache } from './intelligence-control-data';
 import {
   collectBrowserConversationSessions,
   collectBrowserSessions,
@@ -90,14 +91,21 @@ export async function GET(req: NextRequest) {
       )
       .slice(0, 12);
     const rawSurfaces = await intelligenceControlData.collectSurfaceSummaries();
-    const controlActions = intelligenceControlData.collectControlActions(tenantSlugs, tierAccess);
+    const observationReadCache = createIntelligenceObservationReadCache();
+    const controlActions = intelligenceControlData.collectControlActions(
+      tenantSlugs,
+      tierAccess,
+      observationReadCache
+    );
     const { activeMissions, surfaces } = intelligenceControlData.applyPendingActionSummaries(
       rawActiveMissions,
       rawSurfaces,
       controlActions
     );
     const missionProgress = intelligenceData.collectMissionProgress(activeMissions);
-    const agentActivity = collectAgentActivity();
+    const agentActivity = collectAgentActivity({
+      readObservationRecords: (file) => observationReadCache.read(file),
+    });
     const agentMessages = agentActivity.messages.filter((message) =>
       intelligenceData.missionVisibleToScope(message.missionId, tenantSlugs, tierAccess)
     );
@@ -305,7 +313,8 @@ export async function GET(req: NextRequest) {
       recentEvents: intelligenceData.safeCollect(
         'intelligenceControlData.collectRecentEvents',
         [],
-        () => intelligenceControlData.collectRecentEvents(tenantSlugs, tierAccess)
+        () =>
+          intelligenceControlData.collectRecentEvents(tenantSlugs, tierAccess, observationReadCache)
       ),
       agentMessages,
       a2aHandoffs,
