@@ -288,20 +288,35 @@ export async function repairLegacyMissionState(id: string, note?: string): Promi
   logger.success(`✅ Repaired legacy mission state for ${upperId}.`);
 }
 
+/**
+ * Visibility-aware not-found: a mission that exists on disk but fails the
+ * owner-scope locator needs `repair` (or tenant binding), not a "not found"
+ * dead end — the plain error used to strand operators here.
+ */
+function assertMissionReachable(upperId: string): void {
+  if (loadState(upperId)) return;
+  if (findMissionPathForRepair(upperId)) {
+    throw new Error(
+      `Mission ${upperId} exists but is not visible to this tenant scope — run \`pnpm mission repair ${upperId}\` to normalize its state first.`
+    );
+  }
+  throw new Error(`Mission ${upperId} not found.`);
+}
+
 export async function grantMissionAccess(
   missionId: string,
   serviceId: string,
   ttl = 30
 ): Promise<void> {
   const upperId = missionId.toUpperCase();
-  if (!loadState(upperId)) throw new Error(`Mission ${upperId} not found.`);
+  assertMissionReachable(upperId);
   grantAccess(upperId, serviceId, ttl);
   logger.success(`🔑 Access to "${serviceId}" granted to mission ${upperId} for ${ttl} minutes.`);
 }
 
 export async function grantMissionSudo(missionId: string, on = true, ttl = 15): Promise<void> {
   const upperId = missionId.toUpperCase();
-  if (!loadState(upperId)) throw new Error(`Mission ${upperId} not found.`);
+  assertMissionReachable(upperId);
   if (on) {
     await grantAccessGuarded(upperId, 'SUDO', ttl, true, {
       agentId: 'mission_controller',
