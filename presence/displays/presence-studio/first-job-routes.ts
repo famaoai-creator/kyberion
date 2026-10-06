@@ -4,11 +4,13 @@ import type express from 'express';
 import {
   parseFirstJobRequest,
   parseFirstJobReadRequest,
+  parseFirstJobArtifactReadRequest,
   parseFirstJobApprovalDecisionRequest,
 } from '@agent/core/surface/first-job-contract';
 import {
   FIRST_JOB_NEXT_ACTION,
   readFirstJobSnapshot,
+  readFirstJobArtifact,
   resolveFirstJobViewer,
 } from '@agent/core/surface/first-job';
 import {
@@ -138,6 +140,27 @@ export function registerFirstJobRoutes(app: express.Express): void {
       if (error instanceof PresenceStudioViewerError)
         return failure(res, error.status, 'first_job_access_denied', true);
       return failure(res, 503, 'first_job_decision_uncertain', false);
+    }
+  });
+
+  app.get('/api/first-job/artifact', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    try {
+      const viewer = viewerFor(req);
+      const input = parseFirstJobArtifactReadRequest(req.query);
+      if (!input) return failure(res, 400, 'first_job_invalid_request', true);
+      const result = readFirstJobArtifact(viewer, input);
+      return result ? res.json(result) : failure(res, 404, 'first_job_artifact_unavailable', true);
+    } catch (error) {
+      return failure(
+        res,
+        error instanceof PresenceStudioViewerError ? error.status : 503,
+        error instanceof PresenceStudioViewerError
+          ? 'first_job_access_denied'
+          : 'first_job_artifact_unavailable',
+        true
+      );
     }
   });
 

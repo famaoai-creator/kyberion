@@ -12,6 +12,7 @@
     context: null,
     generation: 0,
     loading: false,
+    readController: null,
     sending: false,
     eligible: false,
     authStatus: null,
@@ -180,6 +181,32 @@
       });
     });
   }
+  function readApproval(url, controller, parentSignal) {
+    var timer;
+    var cancel;
+    return new Promise(function (resolve, reject) {
+      cancel = function () {
+        reject(new Error('approval_read_cancelled'));
+        if (controller && !controller.signal.aborted) controller.abort();
+      };
+      if (controller) controller.signal.addEventListener('abort', cancel, { once: true });
+      if (parentSignal) parentSignal.addEventListener('abort', cancel, { once: true });
+      timer = window.setTimeout(cancel, 15000);
+      if (parentSignal && parentSignal.aborted) {
+        cancel();
+        return;
+      }
+      fetchJson(url, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        signal: controller ? controller.signal : undefined,
+      }).then(resolve, reject);
+    }).finally(function () {
+      window.clearTimeout(timer);
+      if (controller) controller.signal.removeEventListener('abort', cancel);
+      if (parentSignal) parentSignal.removeEventListener('abort', cancel);
+    });
+  }
   function contextValid(context) {
     return (
       context &&
@@ -192,6 +219,8 @@
   }
   function check(context) {
     if (state.sending) return Promise.resolve();
+    if (state.readController) state.readController.abort();
+    state.readController = null;
     state.context = context;
     if (!state.mounted) {
       el('refresh').addEventListener('click', function () {
@@ -218,10 +247,9 @@
     var query = new URLSearchParams();
     query.set('session_id', context.snapshot.sessionId);
     if (context.locale) query.set('locale', context.locale);
-    return fetchJson('/api/first-job/approvals?' + query.toString(), {
-      credentials: 'same-origin',
-      cache: 'no-store',
-    })
+    var controller = window.AbortController ? new window.AbortController() : null;
+    state.readController = controller;
+    return readApproval('/api/first-job/approvals?' + query.toString(), controller, context.signal)
       .then(function (result) {
         if (generation !== state.generation) return;
         var body = result.body;
@@ -268,12 +296,15 @@
       })
       .finally(function () {
         if (generation !== state.generation) return;
+        state.readController = null;
         state.loading = false;
         render();
       });
   }
   function invalidate() {
     if (state.sending) return;
+    if (state.readController) state.readController.abort();
+    state.readController = null;
     state.generation += 1;
     state.eligible = false;
     state.loading = false;
