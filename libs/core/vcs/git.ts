@@ -34,19 +34,11 @@ export function gitRun(
   return run('git', args, { cwd });
 }
 
-/** Throw unless the command succeeded; returns stdout on success. */
-export function gitMust(
-  args: string[],
-  cwd: string,
-  run: VcsCommandRunner = safeExecResult
-): string {
-  const result = gitRun(args, cwd, run);
-  if (result.error || result.status !== 0) {
-    throw new Error(
-      `[VCS_GIT_FAILED] git ${args[0] ?? ''}: ${result.stderr || result.error?.message || `exit ${result.status}`}`
-    );
+/** Reject a value that would land in an argv position but parses as a flag. */
+export function assertNotFlagLike(value: string, label: string): void {
+  if (!value.trim() || value.trim().startsWith('-') || /\s/u.test(value.trim())) {
+    throw new Error(`[VCS_GIT_INVALID] ${label} must be a non-empty, non-flag value`);
   }
-  return result.stdout;
 }
 
 export function gitStatus(
@@ -116,6 +108,7 @@ export function gitBranch(
 ): VcsCommandResult {
   if (action === 'list') return gitRun(['branch', '--list'], cwd, run);
   if (!name?.trim()) throw new Error(`[VCS_GIT_INVALID] branch ${action} requires a name`);
+  assertNotFlagLike(name, 'branch name');
   return gitRun(
     action === 'create' ? ['branch', name.trim()] : ['branch', '-d', name.trim()],
     cwd,
@@ -129,9 +122,7 @@ export function gitCheckout(
   options: { createBranch?: boolean } = {},
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
-  if (!ref.trim() || ref.trim().startsWith('-')) {
-    throw new Error('[VCS_GIT_INVALID] checkout ref must be a non-empty non-flag value');
-  }
+  assertNotFlagLike(ref, 'checkout ref');
   const args = ['checkout'];
   if (options.createBranch) args.push('-b');
   args.push(ref.trim());
@@ -167,6 +158,8 @@ export function gitPush(
   options: { remote?: string; ref?: string; setUpstream?: boolean } = {},
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
+  if (options.remote !== undefined) assertNotFlagLike(options.remote, 'remote');
+  if (options.ref !== undefined) assertNotFlagLike(options.ref, 'ref');
   const args = ['push'];
   if (options.setUpstream) args.push('-u');
   args.push(options.remote?.trim() || 'origin');
@@ -179,6 +172,8 @@ export function gitFetch(
   options: { remote?: string; ref?: string } = {},
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
+  if (options.remote !== undefined) assertNotFlagLike(options.remote, 'remote');
+  if (options.ref !== undefined) assertNotFlagLike(options.ref, 'ref');
   const args = ['fetch', options.remote?.trim() || 'origin'];
   if (options.ref?.trim()) args.push(options.ref.trim());
   return gitRun(args, cwd, run);
@@ -189,6 +184,8 @@ export function gitPull(
   options: { remote?: string; ref?: string; ffOnly?: boolean } = {},
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
+  if (options.remote !== undefined) assertNotFlagLike(options.remote, 'remote');
+  if (options.ref !== undefined) assertNotFlagLike(options.ref, 'ref');
   const args = ['pull'];
   if (options.ffOnly !== false) args.push('--ff-only');
   args.push(options.remote?.trim() || 'origin');
@@ -209,8 +206,14 @@ export function gitWorktree(
     if (!options.path?.trim()) {
       throw new Error(`[VCS_GIT_INVALID] worktree ${action} requires params.path`);
     }
+    if (options.path.trim().startsWith('-')) {
+      throw new Error('[VCS_GIT_INVALID] worktree path must not start with -');
+    }
     args.push(options.path.trim());
-    if (action === 'add' && options.ref?.trim()) args.push(options.ref.trim());
+    if (action === 'add' && options.ref?.trim()) {
+      assertNotFlagLike(options.ref, 'ref');
+      args.push(options.ref.trim());
+    }
   }
   return gitRun(args, cwd, run);
 }

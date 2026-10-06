@@ -1,6 +1,5 @@
-import { pathResolver } from '../path-resolver.js';
 import { safeExec, safeExecResult, type SafeExecOptions } from '../secure-io.js';
-import type { VcsCommandResult, VcsCommandRunner } from './git.js';
+import { assertNotFlagLike, type VcsCommandResult, type VcsCommandRunner } from './git.js';
 
 /**
  * Typed GitHub CLI (`gh`) operations over the governed exec boundary — the
@@ -99,10 +98,8 @@ export interface PrViewParams extends GhCallOptions {
   fields: string;
 }
 
-export function ghPrView(
-  params: PrViewParams,
-  run: VcsCommandRunner = safeExecResult
-): Record<string, unknown> {
+export function ghPrView(params: PrViewParams, run?: VcsCommandRunner): Record<string, unknown> {
+  assertNotFlagLike(params.ref, 'pr ref');
   const stdout = ghMust(['pr', 'view', params.ref, '--json', params.fields], params, run);
   return parseJsonStdout<Record<string, unknown>>(stdout, `gh pr view ${params.ref}`);
 }
@@ -163,6 +160,7 @@ export function ghPrChecks(
   params: { ref: string; ignore?: string[] } & GhCallOptions,
   run: VcsCommandRunner = safeExecResult
 ): PrChecksResult {
+  assertNotFlagLike(params.ref, 'pr ref');
   const result = ghRun(
     ['pr', 'checks', params.ref, '--json', 'name,state,bucket,link'],
     params,
@@ -216,16 +214,39 @@ export async function ghPrChecksWait(
   sleep: (ms: number) => Promise<void> = defaultSleep
 ): Promise<PrChecksWaitResult> {
   const intervalMs = Math.max(1000, params.intervalMs ?? 15_000);
-  const timeoutMs = Math.max(intervalMs, params.timeoutMs ?? 20 * 60_000);
+  const timeoutMs = params.timeoutMs ?? 20 * 60_000;
   const started = Date.now();
+  // 'none' (no checks reported yet) is NOT terminal — `gh pr checks` can
+  // return an empty payload for a while right after `pr create`.
+  // Per-call exec timeout stays bounded so a hung gh can't eat the budget;
+  // a few consecutive transient failures are tolerated before aborting.
+  const perCallTimeoutMs = Math.min(60_000, timeoutMs);
+  const maxConsecutiveErrors = 3;
+  let consecutiveErrors = 0;
   let last: PrChecksResult = { state: 'none', checks: [], failing: [], pending: [] };
+  let lastError: string | undefined;
   for (;;) {
-    last = ghPrChecks(params, run);
-    if (last.state !== 'pending') break;
-    if (Date.now() - started >= timeoutMs) break;
-    await sleep(intervalMs);
+    const elapsed = Date.now() - started;
+    if (elapsed >= timeoutMs) break;
+    try {
+      last = ghPrChecks(
+        { ...params, timeoutMs: Math.min(perCallTimeoutMs, Math.max(1000, timeoutMs - elapsed)) },
+        run
+      );
+      consecutiveErrors = 0;
+      lastError = undefined;
+    } catch (error) {
+      consecutiveErrors += 1;
+      lastError = error instanceof Error ? error.message : String(error);
+      if (consecutiveErrors >= maxConsecutiveErrors) {
+        throw new Error(`[VCS_GH_WAIT_FAILED] gh pr checks ${params.ref}: ${lastError}`);
+      }
+    }
+    if (last.state !== 'pending' && last.state !== 'none') break;
+    await sleep(Math.min(intervalMs, Math.max(0, timeoutMs - (Date.now() - started))));
   }
-  const timedOut = last.state === 'pending' && Date.now() - started >= timeoutMs;
+  const timedOut =
+    (last.state === 'pending' || last.state === 'none') && Date.now() - started >= timeoutMs;
   return { ...last, waited_ms: Date.now() - started, timed_out: timedOut };
 }
 
@@ -237,6 +258,7 @@ export function ghPrMerge(
   } & GhCallOptions,
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
+  assertNotFlagLike(params.ref, 'pr ref');
   const args = ['pr', 'merge', params.ref, `--${params.method || 'merge'}`];
   if (params.deleteBranch !== false) args.push('--delete-branch');
   return ghRun(args, params, run);
@@ -254,6 +276,8 @@ export function ghPrCreate(
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
   if (!params.title?.trim()) throw new Error('[VCS_GH_INVALID] pr create requires a title');
+  if (params.head !== undefined) assertNotFlagLike(params.head, 'head');
+  if (params.base !== undefined) assertNotFlagLike(params.base, 'base');
   const args = ['pr', 'create', '--title', params.title.trim()];
   if (params.bodyFile) args.push('--body-file', params.bodyFile);
   else if (params.body?.trim()) args.push('--body', params.body.trim());
@@ -261,9 +285,4 @@ export function ghPrCreate(
   if (params.head?.trim()) args.push('--head', params.head.trim());
   if (params.draft) args.push('--draft');
   return ghRun(args, params, run);
-}
-
-/** Default cwd: the repo root — most gh ops are repo-scoped. */
-export function repoCwd(cwd?: string): string {
-  return cwd || pathResolver.rootDir();
 }
