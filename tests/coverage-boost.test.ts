@@ -38,7 +38,8 @@ describe('Coverage Boost: Core UI & Logic', () => {
   describe('Logger', () => {
     it('should format logs correctly in success mode', () => {
       logger.success('Operation completed');
-      const calls = logSpy.mock.calls.map((c) => stripAnsi(c[0])).join('\n');
+      // Every log level goes to stderr so stdout stays reserved for command output.
+      const calls = errorSpy.mock.calls.map((c) => stripAnsi(c[0])).join('\n');
       expect(calls).toContain('[SUCCESS] Operation completed');
     });
 
