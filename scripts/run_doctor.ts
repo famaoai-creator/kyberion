@@ -197,6 +197,11 @@ export async function collectMeshDeliveryDoctorLines(): Promise<string[]> {
       !getRegisteredEnvText('KYBERION_TENANT') && getRegisteredEnvText('KYBERION_TENANT_ID')
         ? ' (deprecated KYBERION_TENANT_ID alias; prefer KYBERION_TENANT)'
         : '';
+    // Mesh state is tenant-scoped; without a tenant there is nothing to inspect,
+    // which is the normal single-operator state rather than a failure.
+    if (!tenantId) {
+      return ['Mesh delivery: not inspected; no tenant scope (set KYBERION_TENANT to inspect)'];
+    }
     const report = await inspectMeshHub({
       tenantId,
     });
@@ -291,14 +296,28 @@ export function collectMaintenanceDoctorLines(): string[] {
 
   const ageHours =
     lastRunMs !== null ? ((Date.now() - lastRunMs) / (60 * 60 * 1000)).toFixed(1) : 'unknown';
-  const pendingState =
-    submitPending &&
+  const now = Date.now();
+  // The submit marker is never cleared, so a run that completed after the last
+  // submission settles it — otherwise doctor reports `pending` right after a run.
+  const settled = lastRunMs !== null && lastSubmittedAt !== null && lastRunMs >= lastSubmittedAt;
+  let pendingState: 'fresh' | 'pending' | 'submitted' | 'idle';
+  if (
+    lastRunMs !== null &&
+    now - lastRunMs < JANITOR_MAINTENANCE_TTL_MS &&
+    (settled || !submitPending)
+  ) {
+    pendingState = 'fresh';
+  } else if (
     lastSubmittedAt !== null &&
-    Date.now() - lastSubmittedAt < JANITOR_MAINTENANCE_TTL_MS
-      ? 'pending'
-      : submitPending
-        ? 'submitted'
-        : 'idle';
+    !settled &&
+    now - lastSubmittedAt < JANITOR_MAINTENANCE_TTL_MS
+  ) {
+    pendingState = 'pending';
+  } else if (submitPending && !settled) {
+    pendingState = 'submitted';
+  } else {
+    pendingState = 'idle';
+  }
 
   return [
     `Maintenance: janitor ${pendingState}; last_run=${lastRunMs === null ? 'never' : `${ageHours}h ago`}; submit_marker=${submitPending ? 'present' : 'absent'}`,
