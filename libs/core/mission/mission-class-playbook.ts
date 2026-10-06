@@ -53,6 +53,7 @@ export interface MissionClassPlaybookCatalog {
 export interface MissionClassPlaybookSummary {
   class_id: MissionClass;
   title_ja: string;
+  title_en: string;
   posture: string;
   posture_description: string;
   human_decides: string[];
@@ -133,6 +134,7 @@ export function summarizeMissionClassPlaybook(
   return {
     class_id: playbook.class_id,
     title_ja: playbook.title_ja,
+    title_en: playbook.title_en,
     posture: playbook.autonomy.posture,
     posture_description: catalog.postures[playbook.autonomy.posture] ?? '',
     human_decides: playbook.autonomy.human_decides,

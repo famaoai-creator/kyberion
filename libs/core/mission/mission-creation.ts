@@ -325,7 +325,7 @@ export async function createMission(args: {
       const headerLine =
         `> Class: \`${classification.mission_class}\` (risk: ${classification.risk_profile}) · ` +
         `Process: \`${workflowDesign.workflow_id}\` — ${workflowDesign.phases.join(' → ')}\n` +
-        `> Playbook: ${classPlaybook.title_ja} (\`${classPlaybook.posture}\`) — ${classPlaybook.posture_description}`;
+        `> Playbook: ${classPlaybook.title_ja} / ${classPlaybook.title_en} (\`${classPlaybook.posture}\`)`;
       const lines = board.split('\n');
       lines.splice(1, 0, '', headerLine);
       safeWriteFile(safeTaskBoardPath, lines.join('\n'));
