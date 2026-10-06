@@ -28,7 +28,6 @@ import { delegatedTaskTracePath } from '../delegated-task-observability.js';
 import {
   closedToken,
   daysInWindow,
-  errorClass,
   errorCode,
   filesModifiedSince,
   readJsonlFilesMatching,
@@ -184,18 +183,13 @@ export const traceFailureSource: LearningSignalSource = {
       collectErrorSpans(asRecord(row.rootSpan), failures);
       const deepest = failures[failures.length - 1];
       if (!deepest) continue;
-      const scope = closedToken(
-        stringField(metadata, 'pipelineId', 'actuator') ||
-          stringField(asRecord(row.rootSpan), 'name') ||
-          'run',
-        'run'
-      );
+      // Pipeline ids can be user-named, so the cluster keys on the failing op only.
       const step = closedToken(deepest.name, 'step');
       const code = errorCode(deepest.error || 'failed');
       const tenantSlug = stringField(metadata, 'tenantSlug') || undefined;
       observations.push({
-        key: `${scope}:${step}:${code}`,
-        title: `${scope} step ${step} failed (${code})`,
+        key: `${step}:${code}`,
+        title: `step ${step} failed (${code})`,
         ref: `trace:${stringField(row, 'traceId')}`,
         ts,
         ...(tenantSlug ? { tenantSlug } : {}),
@@ -317,7 +311,7 @@ export const delegationFailureSource: LearningSignalSource = {
         if (!outcome?.failed) return [];
         const owner = closedToken(stringField(row, 'owner') || 'unknown');
         const backend = closedToken(stringField(row, 'backend_name') || 'any');
-        const cls = errorClass(outcome.error);
+        const cls = errorCode(outcome.error);
         return [
           {
             key: `${owner}:${backend}:${cls}`,
@@ -404,7 +398,7 @@ export const workerEventSource: LearningSignalSource = {
           const status = stringField(payload, 'status');
           if (status !== 'failed' && status !== 'error') continue;
           const op = closedToken(stringField(payload, 'op', 'step_id'), 'step');
-          const cls = errorClass(stringField(payload, 'error') || status);
+          const cls = errorCode(stringField(payload, 'error') || status);
           observations.push({
             key: `step_failed:${op}:${cls}`,
             title: `step ${op} failed (${cls})`,
@@ -428,7 +422,7 @@ export const reasoningFailoverSource: LearningSignalSource = {
       if (!inWindow(ts, window)) return [];
       const from = closedToken(stringField(row, 'provider_from', 'from_mode'), 'unknown');
       const to = closedToken(stringField(row, 'provider_to', 'to_mode'), 'unknown');
-      const cls = errorClass(stringField(row, 'error_summary') || 'failover');
+      const cls = errorCode(stringField(row, 'error_summary') || 'failover');
       return [
         {
           key: `${from}->${to}:${cls}`,
@@ -516,7 +510,7 @@ export const executionMetricSource: LearningSignalSource = {
       const component = closedToken(stringField(row, 'component'), 'component');
       const ref = `execution-metric:${component}:${ts}`;
       if (row.status === 'error') {
-        const cls = errorClass(stringField(row, 'error', 'message') || 'error');
+        const cls = errorCode(stringField(row, 'error', 'message') || 'error');
         observations.push({
           key: `error:${component}:${cls}`,
           title: `${component} error (${cls})`,
