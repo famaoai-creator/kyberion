@@ -95,6 +95,20 @@ describe('memory-approve --approval-channel (KL-04)', () => {
     ).toThrowError(ScriptExitError);
     expect(updateStatus).not.toHaveBeenCalled();
   });
+
+  it('lists every missing curation property in one error (no error-driven loop)', () => {
+    expect(() =>
+      approveMemoryCandidate(
+        'MEM-KL04-CLI',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        JSON.stringify({ title: 'only title' })
+      )
+    ).toThrowError(/summary.*content.*evidence_refs/s);
+    expect(updateStatus).not.toHaveBeenCalled();
+  });
 });
 
 describe('memory-promote-pending --mission / --target-root (KL-05)', () => {

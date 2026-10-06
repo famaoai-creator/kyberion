@@ -109,6 +109,8 @@ function missingRequiredFields(action: VcsAction): string[] {
       const missing: string[] = [];
       if (!params.action) {
         missing.push('params.action ("list" | "create" | "delete")');
+      } else if (!['list', 'create', 'delete'].includes(params.action)) {
+        missing.push('params.action ("list" | "create" | "delete")');
       } else if (
         (params.action === 'create' || params.action === 'delete') &&
         !params.name?.trim()
@@ -117,6 +119,23 @@ function missingRequiredFields(action: VcsAction): string[] {
       }
       return missing;
     }
+    case 'worktree': {
+      const missing: string[] = [];
+      if (!params.action || !['list', 'add', 'remove', 'prune'].includes(params.action)) {
+        missing.push('params.action ("list" | "add" | "remove" | "prune")');
+      } else if ((params.action === 'add' || params.action === 'remove') && !params.path?.trim()) {
+        missing.push('params.path (required for worktree add/remove)');
+      }
+      return missing;
+    }
+    case 'checkout':
+      return params.ref?.trim() ? [] : ['params.ref (checkout target)'];
+    case 'pr_view':
+      return params.ref?.trim() ? [] : ['params.ref (PR number, URL, or branch)'];
+    case 'pr_checks':
+      return params.ref?.trim() ? [] : ['params.ref (PR number, URL, or branch)'];
+    case 'pr_merge':
+      return params.ref?.trim() ? [] : ['params.ref (PR number, URL, or branch)'];
     default:
       return [];
   }
@@ -188,14 +207,7 @@ export async function handleAction(action: VcsAction): Promise<unknown> {
       return { op: valid.op, cwd, output: result.stdout };
     }
     case 'branch': {
-      // `action` is shared with the worktree op — branch only accepts
-      // list/create/delete; 'add'/'remove'/'prune' must NOT fall through to
-      // `git branch -d` (destructive on an "add" intent).
-      const branchAction = params.action;
-      if (!['list', 'create', 'delete'].includes(branchAction as string)) {
-        throw new Error('vcs-actuator: branch requires params.action (list|create|delete)');
-      }
-      const result = gitBranch(cwd, branchAction as 'list' | 'create' | 'delete', params.name);
+      const result = gitBranch(cwd, params.action as 'list' | 'create' | 'delete', params.name);
       assertOk(result, 'git branch');
       return { op: valid.op, cwd, output: result.stdout };
     }
@@ -248,24 +260,17 @@ export async function handleAction(action: VcsAction): Promise<unknown> {
       return { op: valid.op, cwd, output: result.stdout };
     }
     case 'checkout': {
-      if (!params.ref?.trim()) {
-        throw new Error('vcs-actuator: missing required fields: params.ref (checkout target)');
-      }
       const result = gitCheckout(cwd, params.ref, { createBranch: params.create_branch === true });
       assertOk(result, 'git checkout');
       return { op: valid.op, cwd, output: result.stdout };
     }
     case 'worktree': {
       const action = params.action as 'list' | 'add' | 'remove' | 'prune';
-      if (!['list', 'add', 'remove', 'prune'].includes(action)) {
-        throw new Error('vcs-actuator: worktree requires params.action (list|add|remove|prune)');
-      }
       const result = gitWorktree(cwd, action, { path: params.path, ref: params.ref });
       assertOk(result, 'git worktree');
       return { op: valid.op, cwd, output: result.stdout };
     }
     case 'pr_view': {
-      if (!params.ref?.trim()) throw new Error('vcs-actuator: pr_view requires params.ref');
       return {
         op: valid.op,
         cwd,
@@ -283,7 +288,6 @@ export async function handleAction(action: VcsAction): Promise<unknown> {
       };
     }
     case 'pr_checks': {
-      if (!params.ref?.trim()) throw new Error('vcs-actuator: pr_checks requires params.ref');
       const shared = { ref: params.ref, cwd, ignore: params.ignore_checks };
       const result = params.watch
         ? await ghPrChecksWait(
@@ -294,7 +298,6 @@ export async function handleAction(action: VcsAction): Promise<unknown> {
       return { op: valid.op, cwd, result };
     }
     case 'pr_merge': {
-      if (!params.ref?.trim()) throw new Error('vcs-actuator: pr_merge requires params.ref');
       const result = ghPrMerge(
         { ref: params.ref, method: params.method, deleteBranch: params.delete_branch, cwd },
         runGhResult

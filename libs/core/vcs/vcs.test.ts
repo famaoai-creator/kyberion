@@ -155,6 +155,26 @@ describe('libs/core/vcs', () => {
     expect(result.timed_out).toBe(true);
   });
 
+  it('ghRun forwards registered GH_TOKEN via the explicit env channel (keyring-less auth parity)', () => {
+    const captured: Array<{ opts: any }> = [];
+    const run: VcsCommandRunner = (_cmd, _args, opts) => {
+      captured.push({ opts });
+      return { status: 0, stdout: '[]', stderr: '' };
+    };
+    const prev = process.env.GH_TOKEN;
+    process.env.GH_TOKEN = 'test-token-123';
+    try {
+      ghPrChecks({ ref: '1' }, run);
+      expect(captured[0]?.opts?.env?.GH_TOKEN).toBe('test-token-123');
+      // explicit caller env always wins over registered values
+      ghPrChecks({ ref: '1', env: { GH_TOKEN: 'override' } }, run);
+      expect(captured[1]?.opts?.env?.GH_TOKEN).toBe('override');
+    } finally {
+      if (prev === undefined) delete process.env.GH_TOKEN;
+      else process.env.GH_TOKEN = prev;
+    }
+  });
+
   it('ghRepoDefaultBranch extracts defaultBranchRef.name', () => {
     const { run } = stubRunner([
       {
