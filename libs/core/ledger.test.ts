@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  GLOBAL_LEDGER_PATH,
   loadForScope,
   normalizeLedgerRecord,
   record,
@@ -9,8 +10,9 @@ import {
   verifyLedgerIntegrityDetailed,
 } from './ledger.js';
 
-// We need to handle the hardcoded LEDGER_PATH in ledger.ts
-const LEDGER_FILE = path.join(process.cwd(), 'active/audit/system-ledger.jsonl');
+// Under Vitest the ledger resolves into the vitest-live sandbox (path-resolver),
+// never the operator's real active/audit/system-ledger.jsonl.
+const LEDGER_FILE = GLOBAL_LEDGER_PATH;
 
 describe('ledger core', () => {
   let backupContent: string | null = null;
