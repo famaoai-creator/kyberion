@@ -14,6 +14,9 @@
 !/.claude/agents/
 *.skill
 tmp/
+# Python bytecode written when tests or bridges import voice/media scripts.
+__pycache__/
+*.py[co]
 .DS_Store
 **/node_modules/
 *.traineddata
