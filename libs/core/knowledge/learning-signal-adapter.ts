@@ -543,9 +543,9 @@ const ERROR_CODE_PATTERNS: Array<[RegExp, (match: RegExpMatchArray) => string]> 
   // Kyberion's own `[UPPER_SNAKE]` diagnostic codes always carry an underscore.
   [/\[([A-Z][A-Z0-9]*_[A-Z0-9_]{1,46})\]/, (m) => m[1]],
   [new RegExp(`\\b(${ERRNO_CODES.join('|')})\\b`), (m) => m[1]],
-  [/\b(?:status|HTTP)\s*:?\s*([1-5]\d\d)\b/i, (m) => `http_${m[1]}`],
+  [/\b(?:status|HTTP)[\s:]{0,4}([1-5]\d\d)\b/i, (m) => `http_${m[1]}`],
   [/^([1-5]\d\d)\b/, (m) => `http_${m[1]}`],
-  [/timed?\s*-?out|timeout/i, () => 'timeout'],
+  [/time[d\s-]{0,3}out/i, () => 'timeout'],
   [/rate.?limit|too many requests/i, () => 'rate_limited'],
   [/permission|forbidden|denied|unauthori[sz]ed/i, () => 'denied'],
   [/not found|no such/i, () => 'not_found'],
