@@ -26,6 +26,16 @@ import {
   type LearningSignalSource,
 } from './learning-signal-adapter.js';
 
+interface PersistedState {
+  cursors: Array<[string, string]>;
+  clusters: Array<{ source: string; key: string; total: number }>;
+  seen: Array<[string, Array<[string, string]>]>;
+}
+
+function readState(statePath: string): PersistedState | null {
+  return readJsonIfPresent<PersistedState>(statePath);
+}
+
 const T0 = new Date('2026-10-01T00:00:00.000Z');
 const hours = (n: number) => new Date(T0.getTime() + n * 3_600_000);
 
@@ -139,10 +149,8 @@ describe('learning-signal adapter (LS-01)', () => {
       const run = harvest([src], hours(at));
       expect(run.sources[0].observed).toBe(0);
     }
-    const state = readJsonIfPresent<{ clusters: Record<string, { total: number }> }>(
-      learningHarvestStatePath(stateRoot)
-    );
-    expect(state?.clusters['test-source|trend'].total).toBe(1);
+    const state = readState(learningHarvestStatePath(stateRoot));
+    expect(state?.clusters.find((cluster) => cluster.key === 'trend')?.total).toBe(1);
   });
 
   it('forgets a ref once its source stops reporting it', () => {
@@ -151,17 +159,33 @@ describe('learning-signal adapter (LS-01)', () => {
     harvest([src], hours(1.05));
     rows = [];
     harvest([src], hours(2));
-    const state = readJsonIfPresent<{ seen: Record<string, Record<string, string>> }>(
-      learningHarvestStatePath(stateRoot)
-    );
-    expect(state?.seen['test-source']).toEqual({});
+    const state = readState(learningHarvestStatePath(stateRoot));
+    expect(state?.seen).toEqual([['test-source', []]]);
+  });
+
+  it('keeps record-derived keys as data, never as prototype properties', () => {
+    const rows = [
+      obs('__proto__', hours(1), { ref: '__proto__' }),
+      obs('constructor', hours(1), { ref: 'constructor' }),
+    ];
+    harvest([source(() => rows, { id: '__proto__', minOccurrences: 1 })], hours(2));
+    harvest([source(() => rows, { id: '__proto__', minOccurrences: 1 })], hours(3));
+    expect(Object.getPrototypeOf({})).toBe(Object.prototype);
+    expect(Object.keys(Object.prototype)).toEqual([]);
+    // The state survives a reload: the second harvest saw both refs as already counted.
+    const state = readState(learningHarvestStatePath(stateRoot));
+    expect(state?.clusters.map((cluster) => [cluster.source, cluster.key, cluster.total])).toEqual([
+      ['__proto__', '__proto__', 1],
+      ['__proto__', 'constructor', 1],
+    ]);
+    expect(state?.cursors.map(([id]) => id)).toEqual(['__proto__']);
   });
 
   it('falls back to the lookback when a stored cursor is unreadable', () => {
     harvest([source(() => [])], hours(1));
     const statePath = learningHarvestStatePath(stateRoot);
-    const state = readJsonIfPresent<Record<string, unknown>>(statePath)!;
-    writeJson(statePath, { ...state, cursors: { 'test-source': 'not-a-date' } });
+    const state = readState(statePath)!;
+    writeJson(statePath, { ...state, cursors: [['test-source', 'not-a-date']] });
     const run = harvest([source(() => [obs('a', hours(1.5))], { minOccurrences: 1 })], hours(2));
     expect(run.signals).toBe(1);
   });
@@ -228,11 +252,9 @@ describe('learning-signal adapter (LS-01)', () => {
 
     expect(report.sources[0].error).toBe('log unreadable');
     expect(report.sources[1].signal_ids).toHaveLength(1);
-    const state = readJsonIfPresent<{ cursors: Record<string, string> }>(
-      learningHarvestStatePath(stateRoot)
-    );
-    expect(state?.cursors.broken).toBeUndefined();
-    expect(state?.cursors.healthy).toBe(hours(2).toISOString());
+    const cursors = new Map(readState(learningHarvestStatePath(stateRoot))?.cursors);
+    expect(cursors.has('broken')).toBe(false);
+    expect(cursors.get('healthy')).toBe(hours(2).toISOString());
   });
 
   it('writes nothing on a dry run', () => {
