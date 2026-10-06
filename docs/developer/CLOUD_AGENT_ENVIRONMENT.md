@@ -1,7 +1,7 @@
 ---
 title: Cloud Agent environment notes
 tags: [cloud-agent, node, build, operator, environment]
-last_updated: 2026-09-06
+last_updated: 2026-10-06
 ---
 
 # Cloud Agent / Linux VM environment
@@ -34,6 +34,10 @@ pnpm run doctor          # not bare `pnpm doctor` (that is pnpm's own doctor)
 ```
 
 If `dist/scripts/kyberion.js` is missing, `pnpm kyberion <command>` prints this same sequence instead of a bare `MODULE_NOT_FOUND`.
+
+### Claude Code on the web: automatic
+
+Cloud sessions run `.claude/hooks/session-start.sh` (registered as a `SessionStart` hook in `.claude/settings.json`) before the session starts. It does the sequence above for you: Node 24 via the container's `nvm` (and on `PATH` for the session through `CLAUDE_ENV_FILE`), `pnpm install`, and `pnpm build` only when `dist/` was not built from the current `HEAD` (stamp: `dist/.session-build-head`). A fresh container takes about 6 minutes once; later starts on the same commit take seconds. The hook exits immediately outside cloud sessions (`CLAUDE_CODE_REMOTE` unset).
 
 ## Linux secrets
 
