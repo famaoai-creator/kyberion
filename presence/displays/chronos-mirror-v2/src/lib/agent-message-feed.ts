@@ -81,6 +81,7 @@ function appendRuntimeMessages(
 
 export interface AgentMessageFeedOptions {
   observationPath?: string;
+  readObservationRecords?: (filePath: string) => Record<string, unknown>[];
 }
 
 function readObservedA2AHandoffs(options: AgentMessageFeedOptions = {}): A2AHandoffSummary[] {
@@ -94,13 +95,15 @@ function readObservedA2AHandoffs(options: AgentMessageFeedOptions = {}): A2AHand
     if (!safeExistsSync(safeObservationPath) || !safeLstat(safeObservationPath).isFile()) return [];
 
     const handoffs: A2AHandoffSummary[] = [];
-    const events = readJsonLines<Record<string, unknown>>(safeObservationPath, {
-      map: (value) => {
-        if (!isRecord(value)) throw new Error('A2A observation JSONL entry must be an object');
-        return value;
-      },
-      onMalformed: 'skip',
-    });
+    const events = options.readObservationRecords
+      ? options.readObservationRecords(safeObservationPath)
+      : readJsonLines<Record<string, unknown>>(safeObservationPath, {
+          map: (value) => {
+            if (!isRecord(value)) throw new Error('A2A observation JSONL entry must be an object');
+            return value;
+          },
+          onMalformed: 'skip',
+        });
     for (const event of events) {
       try {
         if (

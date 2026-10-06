@@ -234,6 +234,7 @@ export async function GET(req: NextRequest) {
   const encoder = new TextEncoder();
   let interval: BridgePollLoopHandle | null = null;
   let closed = false;
+  const observationReadCache = createIntelligenceObservationReadCache();
 
   const closeStream = () => {
     if (closed) return;
@@ -242,6 +243,7 @@ export async function GET(req: NextRequest) {
       interval.stop();
       interval = null;
     }
+    observationReadCache.clear();
   };
 
   const changeGate = createIntelligenceSseChangeGate();
@@ -251,12 +253,15 @@ export async function GET(req: NextRequest) {
       const push = async () =>
         withViewerExecutionContextAsync(resolvedViewer.context, async () => {
           if (closed) return;
+          observationReadCache.beginSnapshot();
           const agentActivity = safeCollect(
             'collectAgentActivity',
             { messages: [], handoffs: [] },
-            collectAgentActivity
+            () =>
+              collectAgentActivity({
+                readObservationRecords: (file) => observationReadCache.read(file),
+              })
           );
-          const observationReadCache = createIntelligenceObservationReadCache();
           const agentMessages = agentActivity.messages.filter((message) =>
             intelligenceData.missionVisibleToScope(message.missionId, tenantSlugs, tierAccess)
           );
