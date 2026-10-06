@@ -172,10 +172,20 @@ export function gitFetch(
   options: { remote?: string; ref?: string } = {},
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
-  if (options.remote !== undefined) assertNotFlagLike(options.remote, 'remote');
-  if (options.ref !== undefined) assertNotFlagLike(options.ref, 'ref');
-  const args = ['fetch', options.remote?.trim() || 'origin'];
-  if (options.ref?.trim()) args.push(options.ref.trim());
+  const remote = options.remote?.trim() || 'origin';
+  const ref = options.ref?.trim();
+  if (remote.startsWith('--')) {
+    throw new Error('[VCS_GIT_INVALID] remote must not start with "--"');
+  }
+  assertNotFlagLike(remote, 'remote');
+  const args = ['fetch', remote];
+  if (ref !== undefined) {
+    if (ref.startsWith('--')) {
+      throw new Error('[VCS_GIT_INVALID] ref must not start with "--"');
+    }
+    assertNotFlagLike(ref, 'ref');
+    args.push(ref);
+  }
   return gitRun(args, cwd, run);
 }
 
@@ -184,12 +194,22 @@ export function gitPull(
   options: { remote?: string; ref?: string; ffOnly?: boolean } = {},
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
-  if (options.remote !== undefined) assertNotFlagLike(options.remote, 'remote');
-  if (options.ref !== undefined) assertNotFlagLike(options.ref, 'ref');
+  const remote = options.remote?.trim() || 'origin';
+  const ref = options.ref?.trim();
+  if (remote.startsWith('--')) {
+    throw new Error('[VCS_GIT_INVALID] remote must not start with "--"');
+  }
+  assertNotFlagLike(remote, 'remote');
   const args = ['pull'];
   if (options.ffOnly !== false) args.push('--ff-only');
-  args.push(options.remote?.trim() || 'origin');
-  if (options.ref?.trim()) args.push(options.ref.trim());
+  args.push(remote);
+  if (ref !== undefined) {
+    if (ref.startsWith('--')) {
+      throw new Error('[VCS_GIT_INVALID] ref must not start with "--"');
+    }
+    assertNotFlagLike(ref, 'ref');
+    args.push(ref);
+  }
   return gitRun(args, cwd, run);
 }
 
