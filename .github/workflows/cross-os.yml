@@ -95,18 +95,11 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      # tsc on the full repo sits right at the default ~2 GB old-space limit;
-      # macOS runners OOM where ubuntu/windows squeeze by. Raise the heap for
-      # the compile steps (not the test step — masking leaks there is worse).
       - name: Build
         run: pnpm run build
-        env:
-          NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Type check
         run: pnpm run typecheck
-        env:
-          NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Contract schemas
         run: pnpm run check -- --scope full --only contract-schemas
