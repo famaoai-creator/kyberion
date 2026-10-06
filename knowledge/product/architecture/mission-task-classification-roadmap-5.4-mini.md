@@ -9,6 +9,14 @@ last_updated: 2026-06-22
 
 # Mission and Task Classification Improvement Roadmap for GPT-5.4 mini
 
+> **Update 2026-10-07:** the canonical set is now **fourteen** classes. Five organization-function classes
+> (`finance_and_accounting`, `people_and_talent`, `legal_and_compliance`, `strategy_and_governance`,
+> `procurement_and_supply`) were added because their control regime (money, people, law, direction, supply) needs its
+> own team template, review gates, and AI operating posture, and organization workflows were being classified into the
+> `code_change` default. Per-class ways of working are in
+> [mission-class-operating-guide](../orchestration/mission-class-operating-guide.md). The "nine classes" wording below
+> describes the state when this roadmap was written.
+
 ## 1. Purpose
 
 This document converts the current mission/task classification gaps into bounded implementation tasks suitable for GPT-5.4 mini.

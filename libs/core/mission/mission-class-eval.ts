@@ -1,5 +1,6 @@
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { resolveIntentResolutionPacket } from '../intent/intent-resolution.js';
+import { normalizeExecutionShape } from '../execution-shape.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   mapMissionClassToMissionTypeTemplate,
@@ -79,7 +80,9 @@ export function evaluateMissionClassCase(
   testCase: MissionClassEvalCase
 ): MissionClassEvalCaseResult {
   const packet = resolveIntentResolutionPacket(testCase.utterance);
-  const executionShape = packet.selected_resolution?.shape || 'task_session';
+  const executionShape = normalizeExecutionShape(
+    packet.selected_resolution?.shape || 'task_session'
+  );
   const classification = resolveMissionClassification({
     intentId: packet.selected_intent_id,
     taskType: packet.selected_resolution?.task_kind,
