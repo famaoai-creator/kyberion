@@ -1,7 +1,7 @@
 ---
 title: Organization Lifecycle Verification Playbook
 tags: [organization, project, operation, verification, governance, onboarding]
-last_updated: 2026-09-29
+last_updated: 2026-10-06
 ---
 
 # Organization lifecycle verification playbook
@@ -11,11 +11,22 @@ operations, verifying that Kyberion works as a sustainable operations platform.
 This is the exact procedure used for the `org-verify-20260928` acceptance run
 (tenant `default`, tier `confidential`).
 
+Start here when setting up an organization for the first time. For day-to-day
+operation afterwards (scheduled cadences, deadlines, the daily digest,
+objectives and key results, members, roles, subsidiaries), use the
+[Organization Operations Runbook](./organization-operations-runbook.md).
+
 ## Prerequisites
 
-- Run mutating commands with `KYBERION_PERSONA=sovereign`. Writes under
-  `active/organizations/` are authority-gated; without it you get a
-  `POLICY_VIOLATION`.
+- Writes under `active/organizations/` are authority-gated; without an
+  authorized principal you get a `POLICY_VIOLATION`. For your own tenant's
+  confidential or public organization state, prefer the least-privilege
+  `MISSION_ROLE=organization_operator` with `KYBERION_TENANT=<slug>`. It cannot
+  write another tenant, the personal tier, or `knowledge/`.
+- Reserve `KYBERION_PERSONA=sovereign` for steps that need more: listing
+  tenants, personal-tier organizations, cross-tenant views, and `project create`
+  (step 5). The commands below use `sovereign` because the acceptance run did;
+  for routine single-tenant work, substitute the operator role.
 - Pick a **registered** tenant slug (`KYBERION_PERSONA=sovereign pnpm tenant list`).
   `public`, `confidential`, `personal`, and `shared` are reserved
   tier/partition names and are never valid tenants.
