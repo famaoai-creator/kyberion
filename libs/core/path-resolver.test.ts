@@ -16,6 +16,10 @@ import {
   isSafeMissionManagementPath,
   assertVolatileId,
   volatile,
+  shared,
+  rootResolve,
+  vitestLivePath,
+  VITEST_LIVE_SANDBOX_ROOT,
 } from './path-resolver.js';
 
 describe('path-resolver core', () => {
@@ -173,5 +177,33 @@ describe('assertVolatileId', () => {
   it('validates mission ids with the mission id rule', () => {
     expect(assertVolatileId('mission', 'MSN-A1')).toBe('MSN-A1');
     expect(() => assertVolatileId('mission', '../MSN')).toThrow(/invalid mission id/);
+  });
+});
+
+describe('vitest live-state sandbox', () => {
+  const sandbox = path.join(rootDir(), VITEST_LIVE_SANDBOX_ROOT);
+
+  it('routes live operational stores into the sandbox under Vitest', () => {
+    for (const live of [
+      shared('coordination/channels/telegram/outbox/MSG.json'),
+      shared('logs/audit/audit-2026-10-06.jsonl'),
+      shared('observability/ops-alerts.jsonl'),
+      shared('inbox/entries.jsonl'),
+      resolve('active/audit/system-ledger.jsonl'),
+      rootResolve('active/shared/runtime/peer-messaging/tenants/acme/peers/p/inbox.jsonl'),
+    ]) {
+      expect(live.startsWith(sandbox)).toBe(true);
+    }
+    expect(shared('logs/audit/x.jsonl')).toMatch(
+      /pool-[\w-]+[\\/]shared[\\/]logs[\\/]audit[\\/]x\.jsonl$/
+    );
+  });
+
+  it('leaves other paths alone and never re-maps a sandbox path', () => {
+    const tmp = shared('tmp/scratch.json');
+    expect(tmp).toBe(path.join(rootDir(), 'active/shared/tmp/scratch.json'));
+    expect(shared('observability/ops-alerts.jsonl.bak').startsWith(sandbox)).toBe(false);
+    const mapped = shared('inbox/entries.jsonl');
+    expect(vitestLivePath(mapped)).toBe(mapped);
   });
 });
