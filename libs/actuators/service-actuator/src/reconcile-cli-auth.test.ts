@@ -65,7 +65,9 @@ describe('service-actuator: validateServiceAuth with CLI fallback', () => {
 
     const result = await validateServiceAuth(SERVICE_ID, MOCK_PRESET_PATH);
     expect(result.valid).toBe(true);
-    expect(mocks.safeExec).toHaveBeenCalledWith('gh', ['auth', 'status']);
+    expect(mocks.safeExec).toHaveBeenCalledWith('gh', ['auth', 'status'], {
+      timeoutMs: expect.any(Number),
+    });
   });
 
   it('should return invalid if both API token and CLI auth are missing', async () => {
