@@ -36,7 +36,7 @@
       "pattern": "stage_gated_delivery",
       "description": "Vendor procurement workflow that drafts a comparison memo and prepares contract review and finance_controller decision notes.",
       "match": {
-        "mission_classes": ["operations_and_release"],
+        "mission_classes": ["procurement_and_supply", "operations_and_release"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": ["procurement-vendor", "procurement", "vendor-selection"]
       },
@@ -214,7 +214,7 @@
       "pattern": "stage_gated_delivery",
       "description": "Performance review workflow that drafts a review memo for line_manager and talent_culture review.",
       "match": {
-        "mission_classes": ["decision_support", "operations_and_release"],
+        "mission_classes": ["people_and_talent", "decision_support", "operations_and_release"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": ["performance-review", "performance", "people-review"]
       },
@@ -392,7 +392,7 @@
       "pattern": "coordinated_multi_track_execution",
       "description": "Fundraising preparation workflow that compiles investor brief and dataroom checklist from company and financial context.",
       "match": {
-        "mission_classes": ["decision_support", "operations_and_release"],
+        "mission_classes": ["finance_and_accounting", "decision_support", "operations_and_release"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": ["fundraising-prep", "fundraising", "raise-prep"]
       },
@@ -563,7 +563,7 @@
       "pattern": "stage_gated_delivery",
       "description": "Hiring workflow that drafts a JD, schedules interviews, and produces an evaluation memo for talent_culture and line_manager.",
       "match": {
-        "mission_classes": ["decision_support", "operations_and_release"],
+        "mission_classes": ["people_and_talent", "decision_support", "operations_and_release"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": ["hiring-workflow", "hire", "recruiting", "talent-culture"]
       },
@@ -738,7 +738,7 @@
       "pattern": "stage_gated_delivery",
       "description": "Monthly financial close workflow for finance_controller review, reconciliation, and memo drafting.",
       "match": {
-        "mission_classes": ["operations_and_release"],
+        "mission_classes": ["finance_and_accounting", "operations_and_release"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": ["financial-close-monthly", "monthly-close", "financial-close"]
       },
@@ -910,7 +910,7 @@
       "pattern": "stage_gated_delivery",
       "description": "Budget review workflow that compares budget input against the financial model and drafts approval notes.",
       "match": {
-        "mission_classes": ["operations_and_release"],
+        "mission_classes": ["finance_and_accounting", "operations_and_release"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": ["budget-review", "budget", "budget-review-monthly"]
       },
@@ -1079,7 +1079,11 @@
       "pattern": "coordinated_multi_track_execution",
       "description": "Board meeting preparation workflow that compiles company, decision-rights, financial, and OKR context into a draft pack.",
       "match": {
-        "mission_classes": ["decision_support", "operations_and_release"],
+        "mission_classes": [
+          "strategy_and_governance",
+          "decision_support",
+          "operations_and_release"
+        ],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": ["board-meeting-prep", "board-prep", "board-meeting"]
       },
@@ -3108,7 +3112,7 @@
       "pattern": "stage_gated_delivery",
       "description": "契約内容の把握 → 条項リスクレビュー → 修正案(レッドライン) → 法務レビュー → 承認・締結準備の契約レビュープロセス。",
       "match": {
-        "mission_classes": ["decision_support", "operations_and_release"],
+        "mission_classes": ["legal_and_compliance", "decision_support", "operations_and_release"],
         "delivery_shapes": ["single_artifact", "multi_artifact_pipeline"],
         "intent_ids": [
           "contract-review",
@@ -3878,7 +3882,7 @@
       "pattern": "stage_gated_delivery",
       "description": "Invoice processing workflow that extracts invoice details, performs PO/receipt matching, and prepares payment approval with journal-entry notes.",
       "match": {
-        "mission_classes": ["operations_and_release"],
+        "mission_classes": ["finance_and_accounting", "operations_and_release"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": [
           "invoice-processing",
@@ -4065,7 +4069,7 @@
       "pattern": "stage_gated_delivery",
       "description": "Expense reimbursement workflow that validates claims and receipts against policy and prepares approval and payout records.",
       "match": {
-        "mission_classes": ["operations_and_release"],
+        "mission_classes": ["finance_and_accounting", "operations_and_release"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": [
           "expense-reimbursement",
@@ -4245,7 +4249,7 @@
       "pattern": "stage_gated_delivery",
       "description": "Accounts receivable workflow covering invoicing schedule, cash application, aging review, and collection actions.",
       "match": {
-        "mission_classes": ["operations_and_release"],
+        "mission_classes": ["finance_and_accounting", "operations_and_release"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": [
           "accounts-receivable-collections",
@@ -4429,7 +4433,7 @@
       "pattern": "stage_gated_delivery",
       "description": "Payroll cycle workflow that consolidates attendance and master changes, verifies gross-to-net calculations, and prepares payout approval.",
       "match": {
-        "mission_classes": ["operations_and_release"],
+        "mission_classes": ["finance_and_accounting", "operations_and_release"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": ["payroll-cycle", "payroll-run", "salary-calculation", "payroll-processing"]
       },
@@ -4604,7 +4608,11 @@
       "pattern": "coordinated_multi_track_execution",
       "description": "Business planning workflow that coordinates market analysis, strategy outline, and financial modeling into a reviewed business plan.",
       "match": {
-        "mission_classes": ["decision_support", "operations_and_release"],
+        "mission_classes": [
+          "strategy_and_governance",
+          "decision_support",
+          "operations_and_release"
+        ],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": [
           "business-plan",
@@ -4782,7 +4790,11 @@
       "pattern": "stage_gated_delivery",
       "description": "Quarterly OKR planning workflow that runs a retrospective, drafts objectives, aligns across teams, and finalizes commitments.",
       "match": {
-        "mission_classes": ["decision_support", "operations_and_release"],
+        "mission_classes": [
+          "strategy_and_governance",
+          "decision_support",
+          "operations_and_release"
+        ],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": [
           "quarterly-okr-planning",
@@ -4966,7 +4978,11 @@
       "pattern": "coordinated_multi_track_execution",
       "description": "Due diligence workflow that coordinates finance, legal, and business investigation tracks into a decision-ready DD report.",
       "match": {
-        "mission_classes": ["decision_support", "operations_and_release"],
+        "mission_classes": [
+          "strategy_and_governance",
+          "decision_support",
+          "operations_and_release"
+        ],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": [
           "due-diligence-ma",
@@ -5872,7 +5888,7 @@
       "pattern": "stage_gated_delivery",
       "description": "Order fulfillment workflow that plans order processing, coordinates shipping, reviews exceptions, and reports completion.",
       "match": {
-        "mission_classes": ["operations_and_release"],
+        "mission_classes": ["procurement_and_supply", "operations_and_release"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": [
           "order-fulfillment-tracking",
@@ -6411,7 +6427,7 @@
       "pattern": "stage_gated_delivery",
       "description": "Employee lifecycle workflow covering onboarding, transfer, and offboarding with account, document, and handover checklists.",
       "match": {
-        "mission_classes": ["operations_and_release"],
+        "mission_classes": ["people_and_talent", "operations_and_release"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": [
           "employee-lifecycle-transition",
@@ -6598,7 +6614,7 @@
       "pattern": "stage_gated_delivery",
       "description": "Internal audit workflow that plans the audit, collects evidence, records findings, and produces a remediation-tracked report.",
       "match": {
-        "mission_classes": ["operations_and_release", "decision_support"],
+        "mission_classes": ["legal_and_compliance", "operations_and_release", "decision_support"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": [
           "internal-audit-compliance",
@@ -6773,7 +6789,7 @@
       "pattern": "stage_gated_delivery",
       "description": "Regulatory filing workflow that compiles requirements, drafts submission documents, runs legal review, and prepares submission.",
       "match": {
-        "mission_classes": ["operations_and_release", "decision_support"],
+        "mission_classes": ["legal_and_compliance", "operations_and_release", "decision_support"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": [
           "regulatory-filing-compliance",
@@ -7126,7 +7142,7 @@
       "pattern": "stage_gated_delivery",
       "description": "Fixed asset lifecycle workflow covering acquisition policy, ledger registration, depreciation, physical inventory, and disposal.",
       "match": {
-        "mission_classes": ["operations_and_release"],
+        "mission_classes": ["finance_and_accounting", "operations_and_release"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": [
           "asset-lifecycle-management",
@@ -7300,7 +7316,7 @@
       "pattern": "stage_gated_delivery",
       "description": "Enterprise risk assessment workflow that scopes the assessment, scores risks by impact and likelihood, and produces a risk register with response plans.",
       "match": {
-        "mission_classes": ["decision_support", "operations_and_release"],
+        "mission_classes": ["legal_and_compliance", "decision_support", "operations_and_release"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": ["enterprise-risk-assessment", "risk-assessment", "erm", "risk-register"]
       },
@@ -7469,7 +7485,7 @@
       "pattern": "stage_gated_delivery",
       "description": "Business continuity planning workflow that runs a business impact analysis, designs recovery strategies, and produces a tested BCP/DR plan.",
       "match": {
-        "mission_classes": ["operations_and_release", "decision_support"],
+        "mission_classes": ["legal_and_compliance", "operations_and_release", "decision_support"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": [
           "business-continuity-planning",
@@ -7649,7 +7665,7 @@
       "pattern": "stage_gated_delivery",
       "description": "Supplier onboarding workflow that screens candidates, collects documents, runs credit/compliance checks, and activates the vendor master record.",
       "match": {
-        "mission_classes": ["operations_and_release"],
+        "mission_classes": ["procurement_and_supply", "operations_and_release"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": [
           "supplier-onboarding",
@@ -7826,7 +7842,11 @@
       "pattern": "coordinated_multi_track_execution",
       "description": "Partner alliance workflow that defines objectives, negotiates terms, drafts the agreement, and sets up joint operations and periodic reviews.",
       "match": {
-        "mission_classes": ["decision_support", "operations_and_release"],
+        "mission_classes": [
+          "strategy_and_governance",
+          "decision_support",
+          "operations_and_release"
+        ],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": [
           "partner-alliance-management",
@@ -8901,7 +8921,7 @@
       "pattern": "stage_gated_delivery",
       "description": "Supply chain planning workflow that builds a demand forecast, designs supply and inventory policy, and produces an S&OP-balanced supply plan.",
       "match": {
-        "mission_classes": ["operations_and_release"],
+        "mission_classes": ["procurement_and_supply", "operations_and_release"],
         "delivery_shapes": ["multi_artifact_pipeline"],
         "intent_ids": ["supply-chain-planning", "s-and-op", "demand-planning", "supply-planning"]
       },
@@ -10296,7 +10316,11 @@
       "pattern": "stage_gated_delivery",
       "description": "ゲーティング会議体(会議体)を開催して判定を記録する汎用セレモニー。準備(gate-review-packet 作成) → 判定会(Go/Conditional Go/No-Go) → 議事録記録。どのゲート(gate-profiles)・どの会議体(governance-body-registry)にも適用でき、他のデリバリ/インシデントワークフローのゲートを正式な判断会議として運用するために用いる。",
       "match": {
-        "mission_classes": ["operations_and_release", "decision_support"],
+        "mission_classes": [
+          "strategy_and_governance",
+          "operations_and_release",
+          "decision_support"
+        ],
         "delivery_shapes": ["single_artifact", "multi_artifact_pipeline"],
         "intent_ids": ["gate-review-session", "gate-review", "convene-gate-review", "review-board"]
       },
@@ -11707,6 +11731,766 @@
       ]
     },
     {
+      "id": "finance-controlled-delivery",
+      "pattern": "stage_gated_delivery",
+      "description": "Class-level workflow for money-moving and ledger work: define controls and reconciliation sources first, reconcile before posting, review independently, and leave execution to a human approver.",
+      "match": {
+        "mission_classes": ["finance_and_accounting"]
+      },
+      "phases": [
+        "intake",
+        "classification",
+        {
+          "id": "planning",
+          "title": "統制・照合方針の定義",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "control-plan",
+              "team_role": "planner",
+              "description": "対象期間・取引範囲・照合元資料・承認閾値・職務分掌(作成者と承認者の分離)を evidence/finance-control-plan.json に定義する",
+              "acceptance_criteria": [
+                "照合元となる原資料が列挙されている",
+                "承認閾値と承認者が定義され、作成者と承認者が分離されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable": "evidence/finance-control-plan.json"
+            }
+          ],
+          "exit_gate": {
+            "id": "FINANCE_PLAN_DEFINED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/finance-control-plan.json"
+                }
+              }
+            ]
+          }
+        },
+        "contract_authoring",
+        "preflight",
+        {
+          "id": "execution",
+          "title": "照合・計算・仕訳案作成",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "reconciliation",
+              "team_role": "implementer",
+              "description": "取引と金額を原資料と照合し、差異・例外を理由つきで evidence/finance-work-register.md に記録する",
+              "acceptance_criteria": [
+                "全件に照合結果(一致/例外)がある",
+                "例外に理由と対応方針があり、金額は再計算可能な形で示されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable": "evidence/finance-work-register.md",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "EXECUTION_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/finance-work-register.md"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "verification",
+          "title": "統制レビュー",
+          "kind": "review",
+          "default_tasks": [
+            {
+              "task_id_suffix": "controls-review",
+              "team_role": "reviewer",
+              "description": "金額の再計算・二重計上・承認閾値・職務分掌を作成者とは独立にレビューする(FINANCIAL_CONTROLS)",
+              "acceptance_criteria": [
+                "再計算結果が一致している、または差異に理由がある",
+                "承認閾値超過の項目が承認ルートに載っている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "S",
+              "risk": "medium",
+              "review_target_suffix": "reconciliation"
+            }
+          ],
+          "exit_gate": {
+            "id": "FINANCE_REVIEW_PASSED",
+            "checks": [
+              {
+                "kind": "reviewer_approved",
+                "params": {
+                  "task_id": "verification-controls-review"
+                }
+              },
+              {
+                "kind": "deliverable_quality",
+                "params": {
+                  "path": "evidence/finance-work-register.md",
+                  "kind": "doc",
+                  "min_score": 0.5
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "delivery",
+          "title": "承認・実行指示の引き渡し",
+          "kind": "approval",
+          "default_tasks": [
+            {
+              "task_id_suffix": "approval-package",
+              "team_role": "implementer",
+              "description": "承認者が判断できる根拠付きの承認パッケージを evidence/finance-approval-package.md にまとめる(支払・仕訳確定は人間が実行する)",
+              "acceptance_criteria": [
+                "支払先・金額・期日・根拠が明記されている",
+                "AI が支払・転記を実行していない"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable": "evidence/finance-approval-package.md",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "FINANCE_APPROVER_SIGNOFF",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/finance-approval-package.md"
+                }
+              },
+              {
+                "kind": "human_override"
+              }
+            ]
+          }
+        },
+        "retrospective"
+      ]
+    },
+    {
+      "id": "people-process-stage-gated",
+      "pattern": "stage_gated_delivery",
+      "description": "Class-level workflow for people processes: fix job-related criteria and data handling first, build evidence for human decision-makers, review fairness and privacy, and never decide hiring, rating, or compensation by AI.",
+      "match": {
+        "mission_classes": ["people_and_talent"]
+      },
+      "phases": [
+        "intake",
+        "classification",
+        {
+          "id": "planning",
+          "title": "評価基準・個人情報の取扱定義",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "criteria-and-data",
+              "team_role": "planner",
+              "description": "職務に関連する評価基準・利用するデータ範囲・保管階層(personal/confidential)・最終判断者を evidence/people-process-plan.json に定義する",
+              "acceptance_criteria": [
+                "評価基準が職務関連で文書化されている",
+                "最終判断者が人間として明記されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable": "evidence/people-process-plan.json"
+            }
+          ],
+          "exit_gate": {
+            "id": "PEOPLE_PLAN_DEFINED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/people-process-plan.json"
+                }
+              }
+            ]
+          }
+        },
+        "contract_authoring",
+        "preflight",
+        {
+          "id": "execution",
+          "title": "資料作成・エビデンス整理",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "work-package",
+              "team_role": "implementer",
+              "description": "基準に沿って候補者/従業員ごとのエビデンスと所見を evidence/people-work-package.md に整理する",
+              "acceptance_criteria": [
+                "所見が基準と事実に紐づいている",
+                "必要最小限の個人情報のみを扱っている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable": "evidence/people-work-package.md",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "EXECUTION_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/people-work-package.md"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "verification",
+          "title": "公平性・プライバシーレビュー",
+          "kind": "review",
+          "default_tasks": [
+            {
+              "task_id_suffix": "fairness-privacy-review",
+              "team_role": "reviewer",
+              "description": "属性による差別的基準・根拠の欠落・個人情報の過剰利用がないかを独立にレビューする(PEOPLE_DATA_PROTECTION)",
+              "acceptance_criteria": [
+                "保護属性に基づく判断がない",
+                "個人情報が所定の階層から出ていない"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "S",
+              "risk": "medium",
+              "review_target_suffix": "work-package"
+            }
+          ],
+          "exit_gate": {
+            "id": "PEOPLE_REVIEW_PASSED",
+            "checks": [
+              {
+                "kind": "reviewer_approved",
+                "params": {
+                  "task_id": "verification-fairness-privacy-review"
+                }
+              },
+              {
+                "kind": "deliverable_quality",
+                "params": {
+                  "path": "evidence/people-work-package.md",
+                  "kind": "doc",
+                  "min_score": 0.5
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "delivery",
+          "title": "人間の判断者への引き渡し",
+          "kind": "approval",
+          "default_tasks": [
+            {
+              "task_id_suffix": "decision-handoff",
+              "team_role": "implementer",
+              "description": "判断者が決定できる比較と推奨(あくまで推奨)を evidence/people-decision-handoff.md にまとめる",
+              "acceptance_criteria": [
+                "採否・評価・報酬の最終決定を AI が行っていない",
+                "判断材料と未確認事項が明記されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable": "evidence/people-decision-handoff.md",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "PEOPLE_DECISION_SIGNOFF",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/people-decision-handoff.md"
+                }
+              },
+              {
+                "kind": "human_override"
+              }
+            ]
+          }
+        },
+        "retrospective"
+      ]
+    },
+    {
+      "id": "legal-compliance-stage-gated",
+      "pattern": "stage_gated_delivery",
+      "description": "Class-level workflow for legal and compliance work: fix scope, jurisdiction, and governing text first, analyze with source citations, prepare for qualified human review, and never present AI output as legal advice.",
+      "match": {
+        "mission_classes": ["legal_and_compliance"]
+      },
+      "phases": [
+        "intake",
+        "classification",
+        {
+          "id": "planning",
+          "title": "対象・適用法令・管轄の整理",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "scope-and-authority",
+              "team_role": "planner",
+              "description": "対象文書/業務・適用される法令や規程・管轄・期限を evidence/legal-scope.json に整理する",
+              "acceptance_criteria": [
+                "適用される法令・規程・管轄が特定されている",
+                "判断できない論点が未確認事項として挙げられている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable": "evidence/legal-scope.json"
+            }
+          ],
+          "exit_gate": {
+            "id": "LEGAL_PLAN_DEFINED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/legal-scope.json"
+                }
+              }
+            ]
+          }
+        },
+        "contract_authoring",
+        "preflight",
+        {
+          "id": "execution",
+          "title": "条項・要件の照合分析",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "analysis",
+              "team_role": "implementer",
+              "description": "各所見に原文引用(条項番号)・リスク格付・推奨対応を付けて evidence/legal-analysis.md にまとめる",
+              "acceptance_criteria": [
+                "全所見に原文または条文への参照がある",
+                "リスク格付に根拠がある"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable": "evidence/legal-analysis.md",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "EXECUTION_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/legal-analysis.md"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "verification",
+          "title": "有資格者レビュー準備",
+          "kind": "review",
+          "default_tasks": [
+            {
+              "task_id_suffix": "counsel-review-prep",
+              "team_role": "reviewer",
+              "description": "引用の正確性・見落とし・リスク格付の根拠を独立にレビューし、有資格者が確認すべき論点を抽出する(LEGAL_REVIEW)",
+              "acceptance_criteria": [
+                "引用が原文と一致している",
+                "有資格者の確認が必要な論点が明示されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "S",
+              "risk": "medium",
+              "review_target_suffix": "analysis"
+            }
+          ],
+          "exit_gate": {
+            "id": "LEGAL_REVIEW_PASSED",
+            "checks": [
+              {
+                "kind": "reviewer_approved",
+                "params": {
+                  "task_id": "verification-counsel-review-prep"
+                }
+              },
+              {
+                "kind": "deliverable_quality",
+                "params": {
+                  "path": "evidence/legal-analysis.md",
+                  "kind": "doc",
+                  "min_score": 0.5
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "delivery",
+          "title": "責任者の確認と提出",
+          "kind": "approval",
+          "default_tasks": [
+            {
+              "task_id_suffix": "owner-signoff",
+              "team_role": "implementer",
+              "description": "法務/コンプライアンス責任者が確認できる提出パッケージを evidence/legal-submission-package.md にまとめる",
+              "acceptance_criteria": [
+                "外部への提出・回答は責任者の承認後に限られている",
+                "AI の分析が法的助言ではない旨と前提が明記されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable": "evidence/legal-submission-package.md",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "LEGAL_OWNER_SIGNOFF",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/legal-submission-package.md"
+                }
+              },
+              {
+                "kind": "human_override"
+              }
+            ]
+          }
+        },
+        "retrospective"
+      ]
+    },
+    {
+      "id": "strategy-governance-stage-gated",
+      "pattern": "stage_gated_delivery",
+      "description": "Class-level workflow for direction-setting and governance: frame the decision and assumptions first, analyze options with recorded dissent, review assumptions and alignment, and let the accountable decision-maker decide.",
+      "match": {
+        "mission_classes": ["strategy_and_governance"]
+      },
+      "phases": [
+        "intake",
+        "classification",
+        {
+          "id": "planning",
+          "title": "論点・前提・成功基準の定義",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "framing",
+              "team_role": "planner",
+              "description": "意思決定の対象・代替案・前提・ステークホルダー・成功基準・見直しトリガーを evidence/strategy-framing.json に定義する",
+              "acceptance_criteria": [
+                "前提にデータ根拠または検証方法がある",
+                "意思決定者とステークホルダーが特定されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable": "evidence/strategy-framing.json"
+            }
+          ],
+          "exit_gate": {
+            "id": "STRATEGY_PLAN_DEFINED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/strategy-framing.json"
+                }
+              }
+            ]
+          }
+        },
+        "contract_authoring",
+        "preflight",
+        {
+          "id": "execution",
+          "title": "代替案分析と反対意見の記録",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "options-analysis",
+              "team_role": "implementer",
+              "description": "代替案ごとの根拠・リスク・反対意見を evidence/strategy-options.md に記録する(不採用案と理由を残す)",
+              "acceptance_criteria": [
+                "2案以上が比較されている",
+                "反対意見と不採用理由が記録されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable": "evidence/strategy-options.md",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "EXECUTION_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/strategy-options.md"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "verification",
+          "title": "前提・合意レビュー",
+          "kind": "review",
+          "default_tasks": [
+            {
+              "task_id_suffix": "assumption-review",
+              "team_role": "reviewer",
+              "description": "前提の根拠・反対意見の扱い・ステークホルダー合意度を独立にレビューする(STAKEHOLDER_ALIGNMENT / DISSENT_RESOLUTION)",
+              "acceptance_criteria": [
+                "未解消の反対意見が見直しトリガーに紐づいている",
+                "前提の根拠が確認できる"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "S",
+              "risk": "medium",
+              "review_target_suffix": "options-analysis"
+            }
+          ],
+          "exit_gate": {
+            "id": "STRATEGY_REVIEW_PASSED",
+            "checks": [
+              {
+                "kind": "reviewer_approved",
+                "params": {
+                  "task_id": "verification-assumption-review"
+                }
+              },
+              {
+                "kind": "deliverable_quality",
+                "params": {
+                  "path": "evidence/strategy-options.md",
+                  "kind": "doc",
+                  "min_score": 0.5
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "delivery",
+          "title": "意思決定者への提示と決定記録",
+          "kind": "approval",
+          "default_tasks": [
+            {
+              "task_id_suffix": "decision-record",
+              "team_role": "implementer",
+              "description": "意思決定者に提示する推奨案と、決定内容を記録する枠を evidence/strategy-decision-record.md にまとめる",
+              "acceptance_criteria": [
+                "推奨案と代替案の差が一目で分かる",
+                "決定者・決定日・見直しトリガーを記録できる"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable": "evidence/strategy-decision-record.md",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "STRATEGY_DECISION_SIGNOFF",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/strategy-decision-record.md"
+                }
+              },
+              {
+                "kind": "human_override"
+              }
+            ]
+          }
+        },
+        "retrospective"
+      ]
+    },
+    {
+      "id": "procurement-stage-gated",
+      "pattern": "stage_gated_delivery",
+      "description": "Class-level workflow for sourcing and supply work: define requirements and criteria before contacting vendors, compare on stated criteria, review integrity and conflicts, and leave commitment to the authorized approver.",
+      "match": {
+        "mission_classes": ["procurement_and_supply"]
+      },
+      "phases": [
+        "intake",
+        "classification",
+        {
+          "id": "planning",
+          "title": "要件・評価基準・予算の定義",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "criteria",
+              "team_role": "planner",
+              "description": "要件・評価基準・重み・予算範囲・承認権限を evidence/procurement-criteria.json に定義する",
+              "acceptance_criteria": [
+                "評価基準が候補提示より前に確定している",
+                "承認権限者が明記されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable": "evidence/procurement-criteria.json"
+            }
+          ],
+          "exit_gate": {
+            "id": "PROCUREMENT_PLAN_DEFINED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/procurement-criteria.json"
+                }
+              }
+            ]
+          }
+        },
+        "contract_authoring",
+        "preflight",
+        {
+          "id": "execution",
+          "title": "候補比較・照会",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "comparison",
+              "team_role": "implementer",
+              "description": "候補を評価基準で比較し、価格・条件・リスクを evidence/procurement-comparison.md にまとめる(単独選定の場合は理由を記載)",
+              "acceptance_criteria": [
+                "複数候補の比較、または単独選定の理由がある",
+                "比較が事前定義の基準に沿っている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable": "evidence/procurement-comparison.md",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "EXECUTION_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/procurement-comparison.md"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "verification",
+          "title": "公正性・利益相反レビュー",
+          "kind": "review",
+          "default_tasks": [
+            {
+              "task_id_suffix": "integrity-review",
+              "team_role": "reviewer",
+              "description": "利益相反・取引先の信頼性・契約リスク・比較の公正性を独立にレビューする(VENDOR_INTEGRITY)",
+              "acceptance_criteria": [
+                "利益相反の有無が確認されている",
+                "比較が特定候補に偏っていない"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "S",
+              "risk": "medium",
+              "review_target_suffix": "comparison"
+            }
+          ],
+          "exit_gate": {
+            "id": "PROCUREMENT_REVIEW_PASSED",
+            "checks": [
+              {
+                "kind": "reviewer_approved",
+                "params": {
+                  "task_id": "verification-integrity-review"
+                }
+              },
+              {
+                "kind": "deliverable_quality",
+                "params": {
+                  "path": "evidence/procurement-comparison.md",
+                  "kind": "doc",
+                  "min_score": 0.5
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "delivery",
+          "title": "発注承認・契約手続きへの引き渡し",
+          "kind": "approval",
+          "default_tasks": [
+            {
+              "task_id_suffix": "award-handoff",
+              "team_role": "implementer",
+              "description": "承認者が判断できる推薦案を evidence/procurement-award-recommendation.md にまとめる(発注・契約締結は承認権限者が行う)",
+              "acceptance_criteria": [
+                "推薦理由と代替候補が明記されている",
+                "AI が発注・契約を確定していない"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable": "evidence/procurement-award-recommendation.md",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "PROCUREMENT_APPROVER_SIGNOFF",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/procurement-award-recommendation.md"
+                }
+              },
+              {
+                "kind": "human_override"
+              }
+            ]
+          }
+        },
+        "retrospective"
+      ]
+    },
+    {
       "id": "single-track-default",
       "pattern": "single_track_execution",
       "description": "Default workflow for straightforward bounded work.",
@@ -11720,7 +12504,12 @@
           "environment_and_recovery",
           "decision_support",
           "customer_engagement",
-          "platform_onboarding"
+          "platform_onboarding",
+          "finance_and_accounting",
+          "people_and_talent",
+          "legal_and_compliance",
+          "strategy_and_governance",
+          "procurement_and_supply"
         ],
         "delivery_shapes": ["single_artifact", "long_running_job", "*"],
         "execution_shapes": ["direct_reply", "task_session", "mission", "project_bootstrap"]
