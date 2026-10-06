@@ -1,0 +1,25 @@
+{
+  "record_id": "mem-MSN-ORG-STATE-REPAIR-20261006-2026_10_06",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Shared-scope organizations are not tenant-owned: writes need sovereign or an org-bound execution scope",
+  "summary": "MISSION_ROLE=organization_operator is tenant-bound (${KYBERION_TENANT}); active/organizations/<tier>/shared/ never matches it — interactive writes need KYBERION_PERSONA=sovereign. Delegated scopes can bind the org via shared/${KYBERION_ORGANIZATION_ID}/ grants (security-policy.json + role-write-access.json). Orgs missing organization-state.json flag organization_state:missing forever — repair via pnpm organization state ensure (idempotent).",
+  "candidate_id": "mem-MSN-ORG-STATE-REPAIR-20261006-2026_10_06",
+  "evidence_refs": [
+    "active/missions/public/MSN-ORG-STATE-REPAIR-20261006/evidence/implementation-report.md"
+  ],
+  "created_at": "2026-10-06T14:46:18.340Z",
+  "applicability": ["mission", "mission:MSN-ORG-STATE-REPAIR-20261006"],
+  "reusable_steps": [
+    "MISSION_ROLE=organization_operator is tenant-bound (${KYBERION_TENANT}); active/organizations/<tier>/shared/ never matches it — interactive writes need KYBERION_PERSONA=sovereign",
+    "Delegated scopes can bind the org via shared/${KYBERION_ORGANIZATION_ID}/ grants (security-policy",
+    "json + role-write-access",
+    "json)",
+    "Orgs missing organization-state",
+    "json flag organization_state:missing forever — repair via pnpm organization state ensure (idempotent)"
+  ],
+  "expected_outcome": "expandPolicyPath resolves ${KYBERION_TENANT} only for valid tenant slugs (shared/public rejected → no tenant grant); ${KYBERION_ORGANIZATION_ID} resolves only from currentExecutionScope().organizationId (delegation-bound, not env). Keep security-policy.json and role-write-access.json in sync — hand-maintained parallels.",
+  "source_branch": "main",
+  "source_commit": "17529cb2a131466b81a5293c09d011a52fa490a2"
+}
