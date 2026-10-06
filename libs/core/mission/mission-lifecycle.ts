@@ -1205,6 +1205,41 @@ export async function finishMission(
     traceCtx.endSpan('error', err?.message || String(err));
   }
 
+  // SHIP-01: advisory — finishing while the checkout branch carries commits
+  // that are not on origin/main means declared deliverables are not shipped
+  // yet (observed: MSN-VCS-ACTUATOR-UNIFY-20261006 finished while its diff sat
+  // unpushed/unmerged and had to be re-shipped via a second PR). Advisory only
+  // — ops/documentation missions legitimately ship no code.
+  try {
+    const repoRoot = pathResolver.rootDir();
+    const branchName = safeExec('git', ['branch', '--show-current'], { cwd: repoRoot }).trim();
+    const aheadRaw = safeExec('git', ['rev-list', '--count', 'origin/main..HEAD'], {
+      cwd: repoRoot,
+    }).trim();
+    const aheadCount = Number(aheadRaw);
+    if (
+      Number.isFinite(aheadCount) &&
+      aheadCount > 0 &&
+      branchName &&
+      branchName !== 'main' &&
+      branchName !== 'master'
+    ) {
+      state.context = {
+        ...(state.context || {}),
+        mission_finish_unshipped_commits: {
+          branch: branchName,
+          ahead_of_origin_main: aheadCount,
+          checked_at: nowIso(),
+        },
+      };
+      logger.warn(
+        `⚠️ [UNSHIPPED_COMMITS] ${aheadCount} commit(s) on '${branchName}' are not on origin/main — verify the deliverable PR landed before treating the mission as shipped.`
+      );
+    }
+  } catch {
+    // Advisory only — git inspection must never block finish.
+  }
+
   const missionTmpDir = pathResolver.sharedTmp(path.join('missions', upperId));
   const safeMissionTmpDir = assertSafeRepositoryPath(missionTmpDir, { allowMissingLeaf: true });
   if (safeExistsSync(safeMissionTmpDir)) {

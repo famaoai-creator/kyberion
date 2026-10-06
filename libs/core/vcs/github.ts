@@ -1,4 +1,5 @@
 import { safeExec, safeExecResult, type SafeExecOptions } from '../secure-io.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
 import { assertNotFlagLike, type VcsCommandResult, type VcsCommandRunner } from './git.js';
 
 /**
@@ -22,9 +23,21 @@ export function ghRun(
   options: GhCallOptions = {},
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
+  // GH_TOKEN/GITHUB_TOKEN are excluded from the ambient exec allowlist, so
+  // attach the *registered* values explicitly — the same explicit-override
+  // channel publish_pull_request/pr_shadow use. Without this, the gh ops
+  // only work where keyring auth exists (a GH_TOKEN-only CI env fails).
+  const registeredTokens = {
+    GH_TOKEN: getRegisteredEnvText('GH_TOKEN'),
+    GITHUB_TOKEN: getRegisteredEnvText('GITHUB_TOKEN'),
+  };
+  const env = {
+    ...Object.fromEntries(Object.entries(registeredTokens).filter(([, v]) => v)),
+    ...(options.env || {}),
+  };
   const execOptions: SafeExecOptions = {
     ...(options.cwd ? { cwd: options.cwd } : {}),
-    ...(options.env ? { env: options.env } : {}),
+    ...(Object.keys(env).length > 0 ? { env } : {}),
     ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
   };
   return run('gh', args, execOptions);
