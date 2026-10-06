@@ -178,7 +178,8 @@ export * from './ingress/public-ingress-service.js';
 // Learning-signal adapter: one path from runtime logs into the improvement loop.
 export { builtinLearningSignalSources } from './knowledge/learning-signal-sources.js';
 export {
-  defaultLearningHarvestStatePath,
+  defaultLearningHarvestStateRoot,
+  learningHarvestStatePath,
   harvestLearningSignals,
   shouldProposeCluster,
   type HarvestLearningSignalsOptions,
