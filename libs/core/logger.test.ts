@@ -4,7 +4,10 @@ import {
   emitConsoleLine,
   flushRepeatMarkers,
   formatDiagnostic,
+  recordLogLine,
   resolveLogThreshold,
+  setLogFileSink,
+  type LogRecord,
 } from './logger.js';
 
 describe('logger', () => {
@@ -32,6 +35,7 @@ describe('logger', () => {
   });
 
   afterEach(() => {
+    setLogFileSink(null);
     flushRepeatMarkers();
     stderr = [];
     stdout = [];
@@ -169,5 +173,42 @@ describe('logger', () => {
       reloaded.flushRepeatMarkers();
     }
     expect(process.listenerCount('exit')).toBe(baseline);
+  });
+  describe('file sink', () => {
+    it('records lines even when the console is quiet for --json', () => {
+      const records: LogRecord[] = [];
+      setLogFileSink((record) => records.push(record));
+      process.argv = [...process.argv, '--json'];
+      process.env.LOG_LEVEL = 'silent';
+
+      createLogger('svc').info('kept in the file', { n: 1 });
+
+      expect(stderr.join('')).not.toContain('kept in the file');
+      expect(stdout.join('')).toBe('');
+      expect(records).toEqual([
+        { level: 'info', name: 'svc', msg: 'kept in the file', data: { n: 1 } },
+      ]);
+    });
+
+    it('applies the level threshold to the file', () => {
+      const records: LogRecord[] = [];
+      setLogFileSink((record) => records.push(record));
+
+      createLogger('svc').debug('below threshold');
+
+      expect(records).toEqual([]);
+    });
+
+    it('never throws and never recurses when the sink logs or fails', () => {
+      let calls = 0;
+      setLogFileSink(() => {
+        calls += 1;
+        recordLogLine({ level: 'info', name: 'inner', msg: 'from inside the sink' });
+        throw new Error('disk full');
+      });
+
+      expect(() => createLogger('svc').warn('outer')).not.toThrow();
+      expect(calls).toBe(1);
+    });
   });
 });
