@@ -68,6 +68,15 @@
               <button type="button" id="first-job-start" class="kb-btn kb-btn--primary" disabled>
                 {{t:front_desk:first_job_start}}
               </button>
+              <button
+                type="button"
+                id="first-job-restart"
+                class="kb-btn kb-btn--primary"
+                hidden
+                disabled
+              >
+                {{t:front_desk:first_job_restart}}
+              </button>
               <button type="button" id="first-job-refresh" class="kb-btn kb-btn--secondary">
                 {{t:front_desk:first_job_refresh}}
               </button>
@@ -88,6 +97,7 @@
                 {{t:front_desk:first_job_retry}}
               </button>
             </div>
+            <p id="first-job-restart-note" hidden>{{t:front_desk:first_job_restart_detail}}</p>
             <div id="first-job-advance" hidden>
               <p>{{t:front_desk:first_job_advance}}</p>
               <p>

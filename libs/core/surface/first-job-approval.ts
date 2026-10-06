@@ -380,3 +380,6 @@ export function decideFirstJobApproval(
     })
   );
 }
+
+/** Shared verifier for explicit first-job lifecycle actions; never accepts asserted identity. */
+export { authenticate as authenticateFirstJobBrowser, ownerViewer as resolveFirstJobOwnerViewer };

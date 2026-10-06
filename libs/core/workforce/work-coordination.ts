@@ -20,14 +20,27 @@ import { auditChain } from '../governance/audit-chain.js';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { WorkCoordinationError, assertWorkClaimsAllowed } from './work-coordination-error.js';
+import { applyWorkItemFilters, sortItems } from './work-coordination-query.js';
 import {
   assertOriginalWorkItemIdentity,
+  assertVersion,
   buildWorkItemCreation,
   canReplayWorkItemClaim,
   isTerminalStatus,
   normalizeWorkItemContext,
   validateWorkItem,
 } from './work-coordination-identity.js';
+import {
+  hasUndispatchedWorkItemEvidenceScope,
+  inspectUndispatchedWorkItemHistory,
+  isUndispatchedWorkItemSelector,
+  type UndispatchedWorkItemEvidence,
+  type UndispatchedWorkItemSelector,
+} from './work-coordination-evidence.js';
+export type {
+  UndispatchedWorkItemEvidence,
+  UndispatchedWorkItemSelector,
+} from './work-coordination-evidence.js';
 export { WorkCoordinationError } from './work-coordination-error.js';
 import type {
   AppendCoordinationEventInput,
@@ -89,12 +102,6 @@ const WORK_BOARD_CATALOG_SCHEMA_PATH = pathResolver.knowledge(
 const STORE_ROOT = 'active/shared/runtime/work-coordination';
 const OBS_ROOT = 'active/shared/observability/work-coordination';
 
-const PRIORITY_RANK: Record<WorkItemPriority, number> = {
-  urgent: 0,
-  high: 1,
-  normal: 2,
-  low: 3,
-};
 let coordinationNamespaceOverride: string | null = null;
 let coordinationRootOverride: string | null = null;
 
@@ -152,11 +159,20 @@ function runtimeRoot(): string {
   );
 }
 
-/** All item/lease read-modify-write transitions share one inter-process fence. */
+const heldCoordinationMutations = new Set<string>();
+/** All item/lease/event transitions share one synchronous reentrant inter-process fence. */
 function withCoordinationMutation<T>(fn: () => T): T {
   const key = crypto.createHash('sha256').update(runtimeRoot()).digest('hex');
+  if (heldCoordinationMutations.has(key)) return fn();
   return withExecutionContext('infrastructure_sentinel', () =>
-    withLockSync(`work-coordination:${key}`, fn)
+    withLockSync(`work-coordination:${key}`, () => {
+      heldCoordinationMutations.add(key);
+      try {
+        return fn();
+      } finally {
+        heldCoordinationMutations.delete(key);
+      }
+    })
   );
 }
 
@@ -220,12 +236,6 @@ function latestById<T extends Record<string, any>>(records: T[], key: string): T
     }
   }
   return Array.from(index.values());
-}
-
-function normalizeArray(value?: string | string[]): string[] {
-  if (Array.isArray(value)) return value.filter(Boolean).map((entry) => String(entry));
-  if (typeof value === 'string' && value) return [value];
-  return [];
 }
 
 function currentWorkItems(): WorkItem[] {
@@ -393,9 +403,11 @@ function createEvent(payload: AppendCoordinationEventInput): CoordinationEvent {
 }
 
 function appendEvent(payload: AppendCoordinationEventInput): CoordinationEvent {
-  const event = createEvent(payload);
-  appendJsonl(eventsPath(), event);
-  return event;
+  return withCoordinationMutation(() => {
+    const event = createEvent(payload);
+    appendJsonl(eventsPath(), event);
+    return event;
+  });
 }
 
 /** Record a mission-level handoff on every canonical WorkItem for the mission. */
@@ -431,18 +443,62 @@ export function recordMissionHandoff(input: RecordMissionHandoffInput): WorkItem
   return updated;
 }
 
-function activeLeaseForItem(itemId: string): WorkLease | null {
-  return currentLeaseForItem(itemId);
+function inspectUndispatchedWorkItemEvidence(
+  input: UndispatchedWorkItemSelector
+): UndispatchedWorkItemEvidence {
+  try {
+    if (!isUndispatchedWorkItemSelector(input))
+      return { ok: false, reason: 'invalid_evidence_selector' };
+    return inspectUndispatchedWorkItemHistory(input, {
+      items: itemsPath(),
+      leases: leasesPath(),
+      events: eventsPath(),
+    });
+  } catch {
+    return { ok: false, reason: 'incomplete_coordination_evidence' };
+  }
+}
+/** Advisory read-only snapshot. A POST must revalidate under the mutation fence. */
+export function readUndispatchedWorkItemEvidence(
+  input: UndispatchedWorkItemSelector,
+  options: { rootDir?: string } = {}
+): UndispatchedWorkItemEvidence {
+  return withCoordinationRoot(options.rootDir, () => inspectUndispatchedWorkItemEvidence(input));
+}
+const undispatchedEvidenceScopes: UndispatchedWorkItemSelector[] = [];
+/** A terminal transcript write must be enclosed by the strict coordination proof callback. */
+export function assertUndispatchedWorkItemEvidenceHeld(
+  binding: {
+    request_id: string;
+    work_item_id: string;
+  },
+  links?: { actionRef: string; approvalRequestId: string }
+): void {
+  if (!hasUndispatchedWorkItemEvidenceScope(undispatchedEvidenceScopes, binding, links))
+    throw new Error('strict coordination evidence fence required');
+}
+/** Caller holds the dispatch fence; callback may take the history fence, never vice versa. */
+export function withUndispatchedWorkItemEvidence<T>(
+  input: UndispatchedWorkItemSelector,
+  callback: (evidence: Extract<UndispatchedWorkItemEvidence, { ok: true }>) => T,
+  options: { rootDir?: string } = {}
+): T {
+  return withCoordinationRoot(options.rootDir, () =>
+    withCoordinationMutation(() => {
+      const evidence = inspectUndispatchedWorkItemEvidence(input);
+      if (evidence.ok === false) throw new Error(evidence.reason);
+      undispatchedEvidenceScopes.push(input);
+      try {
+        return callback(evidence);
+      } finally {
+        undispatchedEvidenceScopes.pop();
+      }
+    })
+  );
 }
 
-function assertVersion(item: WorkItem, expectedVersion?: number): void {
-  if (typeof expectedVersion === 'number' && item.version !== expectedVersion) {
-    throw new WorkCoordinationError('version_conflict', `version conflict for ${item.item_id}`, {
-      item_id: item.item_id,
-      expected_version: expectedVersion,
-      current_version: item.version,
-    });
-  }
+function activeLeaseForItem(itemId: string): WorkLease | null {
+  return currentLeaseForItem(itemId);
 }
 
 function workBoardCatalogAtPath(filePath: string) {
@@ -480,81 +536,6 @@ function writeBoardCatalog(catalog: WorkBoardCatalog): void {
   const filePath = assertSafeRepositoryPath(boardsPath(), { allowMissingLeaf: true });
   const validated = workBoardCatalogAtPath(filePath).validate(catalog, filePath);
   writeJson(filePath, validated);
-}
-
-function applyWorkItemFilters(items: WorkItem[], filter: WorkItemFilter): WorkItem[] {
-  const sources = normalizeArray(filter.source);
-  const statuses = normalizeArray(filter.status);
-  const labelSet = new Set(normalizeArray(filter.labels));
-  const query = filter.text ? filter.text.trim().toLowerCase() : '';
-
-  return items.filter((item) => {
-    const metadata = item.metadata || {};
-    const context = item.context || {};
-    const organizationId =
-      context.organization_id ||
-      (typeof metadata.organization_id === 'string' ? metadata.organization_id : undefined);
-    const projectId = context.project_id || item.project_id;
-    const tenantSlugs = filter.tenantSlugs || filter.tenant_slugs;
-    if (tenantSlugs) {
-      const tenantSlug = item.context?.tenant_slug;
-      if (!tenantSlug || !tenantSlugs.includes(tenantSlug)) return false;
-    }
-    const organizationIds = filter.organizationIds || filter.organization_ids;
-    if (organizationIds && (!organizationId || !organizationIds.includes(organizationId)))
-      return false;
-    const projectIds = filter.projectIds || filter.project_ids;
-    if (projectIds && (!projectId || !projectIds.includes(projectId))) return false;
-    if (
-      (filter.projectId || (filter as any).project_id) &&
-      projectId !== (filter.projectId || (filter as any).project_id)
-    )
-      return false;
-    if (sources.length > 0 && !sources.includes(item.source)) return false;
-    if (statuses.length > 0 && !statuses.includes(item.status)) return false;
-    if (
-      (filter.assigneePeerId || (filter as any).assignee_peer_id) &&
-      item.assignee_peer_id !== (filter.assigneePeerId || (filter as any).assignee_peer_id)
-    )
-      return false;
-    if (
-      (filter.assigneeUserId || (filter as any).assignee_user_id) &&
-      item.assignee_user_id !== (filter.assigneeUserId || (filter as any).assignee_user_id)
-    )
-      return false;
-    if (labelSet.size > 0) {
-      const itemLabels = new Set(item.labels || []);
-      for (const label of labelSet) {
-        if (!itemLabels.has(label)) return false;
-      }
-    }
-    if (query) {
-      const haystack = [item.title, item.description, item.source_ref, item.project_id]
-        .join(' ')
-        .toLowerCase();
-      if (!haystack.includes(query)) return false;
-    }
-    return true;
-  });
-}
-
-function sortItems(items: WorkItem[], sortBy: WorkBoard['sort_by'] = 'updated_at'): WorkItem[] {
-  return [...items].sort((a, b) => {
-    switch (sortBy) {
-      case 'priority':
-        return (
-          PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] ||
-          b.updated_at.localeCompare(a.updated_at)
-        );
-      case 'created_at':
-        return b.created_at.localeCompare(a.created_at);
-      case 'status':
-        return a.status.localeCompare(b.status) || b.updated_at.localeCompare(a.updated_at);
-      case 'updated_at':
-      default:
-        return b.updated_at.localeCompare(a.updated_at);
-    }
-  });
 }
 
 export function clearWorkCoordinationStore(): void {

@@ -148,3 +148,13 @@ export function validateWorkItem(value: unknown): void {
 export function isTerminalStatus(status: WorkItemStatus): boolean {
   return status === 'done' || status === 'archived';
 }
+
+export function assertVersion(item: WorkItem, expectedVersion?: number): void {
+  if (typeof expectedVersion === 'number' && item.version !== expectedVersion) {
+    throw new WorkCoordinationError('version_conflict', `version conflict for ${item.item_id}`, {
+      item_id: item.item_id,
+      expected_version: expectedVersion,
+      current_version: item.version,
+    });
+  }
+}

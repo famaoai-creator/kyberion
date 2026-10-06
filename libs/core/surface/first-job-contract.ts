@@ -116,3 +116,28 @@ export function parseFirstJobApprovalDecisionRequest(
     session_id: value.session_id,
   };
 }
+
+/** A separate terminal operation; it never reuses an approval to execute work. */
+export interface FirstJobRecoveryRequest {
+  action: 'terminate_unstarted';
+  display_digest: string;
+  session_id: string;
+}
+export function parseFirstJobRecoveryRequest(value: unknown): FirstJobRecoveryRequest | undefined {
+  if (
+    !object(value) ||
+    Object.keys(value).length !== 3 ||
+    Object.keys(value).some((key) => !['action', 'display_digest', 'session_id'].includes(key)) ||
+    value.action !== 'terminate_unstarted' ||
+    typeof value.display_digest !== 'string' ||
+    !/^[a-f0-9]{64}$/.test(value.display_digest) ||
+    typeof value.session_id !== 'string' ||
+    !FIRST_JOB_SESSION_PATTERN.test(value.session_id)
+  )
+    return undefined;
+  return {
+    action: 'terminate_unstarted',
+    display_digest: value.display_digest,
+    session_id: value.session_id,
+  };
+}

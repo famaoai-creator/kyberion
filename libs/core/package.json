@@ -7299,6 +7299,10 @@
       "types": "./dist/surface/first-job-approval.d.ts",
       "default": "./dist/surface/first-job-approval.js"
     },
+    "./surface/first-job-recovery": {
+      "types": "./dist/surface/first-job-recovery.d.ts",
+      "default": "./dist/surface/first-job-recovery.js"
+    },
     "./surface/first-job-approval-proof": {
       "types": "./dist/surface/first-job-approval-proof.d.ts",
       "default": "./dist/surface/first-job-approval-proof.js"

@@ -24260,14 +24260,14 @@
         "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ƈȧññőŧ őůŧŀȧşŧ ŧħïş ṽėřïƒïėḓ şėşşïőñ őř ŧħė řėɋůėşŧ. Şėşşïőñ-ķėẏ ƈħȧñɠėş, řėṽőķėḓ ɱėɱƀėřşħïṗ, őř ȧ ƈħȧñɠėḓ řėɋůėşŧ ƈȧñ ƀŀőƈķ ėẋėƈůŧïőñ ėȧřŀïėř. Ȧ ƀŀőƈķėḓ ĵőƀ ïş ñėṽėř řėȧṗṗřőṽėḓ ȧůŧőɱȧŧïƈȧŀŀẏ. Şïɠñïñɠ őůŧ ḓőėş ñőŧ ƀẏ ïŧşėŀƒ řėṽőķė ȧ řėƈőřḓėḓ ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
       },
       "first_job_approval_held": {
-        "en": "Approval cannot be verified. Operator recovery is required.",
-        "ja": "承認の検証不可・運用者による回復処理が必要",
-        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ƈȧññőŧ ƀė ṽėřïƒïėḓ. Őṗėřȧŧőř řėƈőṽėřẏ ïş řėɋůïřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+        "en": "Recovery evidence is incomplete. Operator review is required.",
+        "ja": "回復に必要な証拠が不足しています。運用者による確認が必要です。",
+        "qps-ploc": "⟦Řėƈőṽėřẏ ėṽïḓėñƈė ïş ïñƈőɱṗŀėŧė. Őṗėřȧŧőř řėṽïėẇ ïş řėɋůïřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
       },
       "first_job_approval_held_detail": {
-        "en": "This old request cannot execute with its recorded approval. An operator must recover the held workflow before it can continue. Signing in again, refreshing, or submitting another request does not clear this held action. Existing records and receipts remain unchanged.",
-        "ja": "この古い依頼は、記録済みの承認では実行できません。続けるには運用者による回復処理が必要です。再サインイン、画面の更新、新しい依頼の送信では、この保留状態は解消されません。既存の記録と診断記録はそのまま残ります。",
-        "qps-ploc": "⟦Ŧħïş őŀḓ řėɋůėşŧ ƈȧññőŧ ėẋėƈůŧė ẇïŧħ ïŧş řėƈőřḓėḓ ȧṗṗřőṽȧŀ. Ȧñ őṗėřȧŧőř ɱůşŧ řėƈőṽėř ŧħė ħėŀḓ ẇőřķƒŀőẇ ƀėƒőřė ïŧ ƈȧñ ƈőñŧïñůė. Şïɠñïñɠ ïñ ȧɠȧïñ, řėƒřėşħïñɠ, őř şůƀɱïŧŧïñɠ ȧñőŧħėř řėɋůėşŧ ḓőėş ñőŧ ƈŀėȧř ŧħïş ħėŀḓ ȧƈŧïőñ. Ėẋïşŧïñɠ řėƈőřḓş ȧñḓ řėƈėïṗŧş řėɱȧïñ ůñƈħȧñɠėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+        "en": "This request cannot be safely ended from this page because the server cannot prove that execution never started. Signing in again or refreshing does not repair incomplete evidence. An operator must review the held request; no replacement is offered while it remains unresolved.",
+        "ja": "サーバーで未実行を証明できないため、この画面から安全に終了することはできません。再サインインや更新では証拠の不足は解消されません。運用者による保留依頼の確認が必要です。解決するまでは、代わりの新しい依頼を作成できません。",
+        "qps-ploc": "⟦Ŧħïş řėɋůėşŧ ƈȧññőŧ ƀė şȧƒėŀẏ ėñḓėḓ ƒřőɱ ŧħïş ṗȧɠė ƀėƈȧůşė ŧħė şėřṽėř ƈȧññőŧ ṗřőṽė ŧħȧŧ ėẋėƈůŧïőñ ñėṽėř şŧȧřŧėḓ. Şïɠñïñɠ ïñ ȧɠȧïñ őř řėƒřėşħïñɠ ḓőėş ñőŧ řėṗȧïř ïñƈőɱṗŀėŧė ėṽïḓėñƈė. Ȧñ őṗėřȧŧőř ɱůşŧ řėṽïėẇ ŧħė ħėŀḓ řėɋůėşŧ; ñő řėṗŀȧƈėɱėñŧ ïş őƒƒėřėḓ ẇħïŀė ïŧ řėɱȧïñş ůñřėşőŀṽėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈ⟧"
       },
       "first_job_body_title": {
         "en": "Diagnostic JSON body",
@@ -24398,6 +24398,81 @@
         "en": "Progress could not be checked. The last successful check time is shown above; displayed records may be out of date.",
         "ja": "状況を確認できませんでした。最後に確認できた日時を上に表示しています。表示中の記録は古い可能性があります。",
         "qps-ploc": "⟦Ṗřőɠřėşş ƈőůŀḓ ñőŧ ƀė ƈħėƈķėḓ. Ŧħė ŀȧşŧ şůƈƈėşşƒůŀ ƈħėƈķ ŧïɱė ïş şħőẇñ ȧƀőṽė; ḓïşṗŀȧẏėḓ řėƈőřḓş ɱȧẏ ƀė őůŧ őƒ ḓȧŧė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+      },
+      "execution_terminated_unstarted": {
+        "en": "Ended without starting",
+        "ja": "未実行のまま終了",
+        "qps-ploc": "⟦Ėñḓėḓ ẇïŧħőůŧ şŧȧřŧïñɠ ŀőřėɱ ï⟧"
+      },
+      "first_job_status_terminated_unstarted": {
+        "en": "Ended without starting",
+        "ja": "未実行のまま終了",
+        "qps-ploc": "⟦Ėñḓėḓ ẇïŧħőůŧ şŧȧřŧïñɠ ŀőřėɱ ï⟧"
+      },
+      "first_job_recovery_eligible": {
+        "en": "This parked request can be ended safely",
+        "ja": "この保留依頼は安全に終了できます",
+        "qps-ploc": "⟦Ŧħïş ṗȧřķėḓ řėɋůėşŧ ƈȧñ ƀė ėñḓėḓ şȧƒėŀẏ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "first_job_recovery_effect": {
+        "en": "End this old diagnostic request without executing it. Its original approval and audit history will be kept. This does not approve, execute, or create another request.",
+        "ja": "この古い診断依頼を、実行せずに終了します。元の承認と監査履歴は保持されます。別の依頼の承認・実行・作成は行いません。",
+        "qps-ploc": "⟦Ėñḓ ŧħïş őŀḓ ḓïȧɠñőşŧïƈ řėɋůėşŧ ẇïŧħőůŧ ėẋėƈůŧïñɠ ïŧ. Ïŧş őřïɠïñȧŀ ȧṗṗřőṽȧŀ ȧñḓ ȧůḓïŧ ħïşŧőřẏ ẇïŀŀ ƀė ķėṗŧ. Ŧħïş ḓőėş ñőŧ ȧṗṗřőṽė, ėẋėƈůŧė, őř ƈřėȧŧė ȧñőŧħėř řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ï⟧"
+      },
+      "first_job_recovery_review": {
+        "en": "Review ending this request",
+        "ja": "この依頼の終了を確認",
+        "qps-ploc": "⟦Řėṽïėẇ ėñḓïñɠ ŧħïş řėɋůėşŧ ŀőřėɱ ïṗ⟧"
+      },
+      "first_job_recovery_confirm": {
+        "en": "Confirm: end this request",
+        "ja": "この依頼の終了を確定",
+        "qps-ploc": "⟦Ƈőñƒïřɱ: ėñḓ ŧħïş řėɋůėşŧ ŀőřėɱ ïṗ⟧"
+      },
+      "first_job_recovery_cancel": {
+        "en": "Keep this request",
+        "ja": "この依頼をそのままにする",
+        "qps-ploc": "⟦Ķėėṗ ŧħïş řėɋůėşŧ ŀőřėɱ⟧"
+      },
+      "first_job_recovery_confirm_detail": {
+        "en": "End the request identified above? This is a terminal change. The server must verify that execution never started; incomplete evidence keeps the request held. Any new diagnostic requires a separate action and a new approval.",
+        "ja": "上記の依頼を終了しますか？終了後は再開できません。サーバーで未実行を検証できない場合は、依頼は保留のままです。新しい診断には、別の操作と新しい承認が必要です。",
+        "qps-ploc": "⟦Ėñḓ ŧħė řėɋůėşŧ ïḓėñŧïƒïėḓ ȧƀőṽė? Ŧħïş ïş ȧ ŧėřɱïñȧŀ ƈħȧñɠė. Ŧħė şėřṽėř ɱůşŧ ṽėřïƒẏ ŧħȧŧ ėẋėƈůŧïőñ ñėṽėř şŧȧřŧėḓ; ïñƈőɱṗŀėŧė ėṽïḓėñƈė ķėėṗş ŧħė řėɋůėşŧ ħėŀḓ. Ȧñẏ ñėẇ ḓïȧɠñőşŧïƈ řėɋůïřėş ȧ şėṗȧřȧŧė ȧƈŧïőñ ȧñḓ ȧ ñėẇ ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "first_job_recovery_terminated": {
+        "en": "Old request ended without starting",
+        "ja": "古い依頼は未実行のまま終了しました",
+        "qps-ploc": "⟦Őŀḓ řėɋůėşŧ ėñḓėḓ ẇïŧħőůŧ şŧȧřŧïñɠ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "first_job_recovery_terminated_detail": {
+        "en": "The server verified the terminal request record. Its original approval and audit history are retained. A new diagnostic request needs a separate explicit action and a new approval.",
+        "ja": "サーバーで依頼の終了記録を確認しました。元の承認と監査履歴は保持されています。新しい診断依頼には、別の明示的な操作と新しい承認が必要です。",
+        "qps-ploc": "⟦Ŧħė şėřṽėř ṽėřïƒïėḓ ŧħė ŧėřɱïñȧŀ řėɋůėşŧ řėƈőřḓ. Ïŧş őřïɠïñȧŀ ȧṗṗřőṽȧŀ ȧñḓ ȧůḓïŧ ħïşŧőřẏ ȧřė řėŧȧïñėḓ. Ȧ ñėẇ ḓïȧɠñőşŧïƈ řėɋůėşŧ ñėėḓş ȧ şėṗȧřȧŧė ėẋṗŀïƈïŧ ȧƈŧïőñ ȧñḓ ȧ ñėẇ ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "first_job_recovery_readback": {
+        "en": "End recorded. Reading the server state before offering a new request…",
+        "ja": "終了を記録しました。新しい依頼を作成できるか、サーバーの状態を確認中…",
+        "qps-ploc": "⟦Ėñḓ řėƈőřḓėḓ. Řėȧḓïñɠ ŧħė şėřṽėř şŧȧŧė ƀėƒőřė őƒƒėřïñɠ ȧ ñėẇ řėɋůėşŧ… ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "first_job_recovery_uncertain": {
+        "en": "The outcome is unknown. Refresh to read the server state before deciding what to do next. Do not repeat the end action without a fresh review.",
+        "ja": "処理結果を確認できません。更新してサーバーの状態を確認してから、次の操作を判断してください。再確認するまでは終了操作を繰り返さないでください。",
+        "qps-ploc": "⟦Ŧħė őůŧƈőɱė ïş ůñķñőẇñ. Řėƒřėşħ ŧő řėȧḓ ŧħė şėřṽėř şŧȧŧė ƀėƒőřė ḓėƈïḓïñɠ ẇħȧŧ ŧő ḓő ñėẋŧ. Ḓő ñőŧ řėṗėȧŧ ŧħė ėñḓ ȧƈŧïőñ ẇïŧħőůŧ ȧ ƒřėşħ řėṽïėẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
+      },
+      "first_job_recovery_changed": {
+        "en": "The request or its recovery evidence changed. Refresh and review the current server state before deciding again.",
+        "ja": "依頼または回復に必要な証拠が変わりました。更新してサーバーの現在の状態を確認してから、再度判断してください。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ őř ïŧş řėƈőṽėřẏ ėṽïḓėñƈė ƈħȧñɠėḓ. Řėƒřėşħ ȧñḓ řėṽïėẇ ŧħė ƈůřřėñŧ şėřṽėř şŧȧŧė ƀėƒőřė ḓėƈïḓïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "first_job_restart": {
+        "en": "Start a new diagnostic request",
+        "ja": "新しい診断依頼を作成",
+        "qps-ploc": "⟦Şŧȧřŧ ȧ ñėẇ ḓïȧɠñőşŧïƈ řėɋůėşŧ ŀőřėɱ ïṗşů⟧"
+      },
+      "first_job_restart_detail": {
+        "en": "Available only after every old request is confirmed ended without starting. This creates a new request with a new approval; it does not reuse an old approval.",
+        "ja": "古い依頼がすべて未実行のまま終了したと確認できた場合のみ利用できます。新しい依頼と新しい承認依頼を作成し、古い承認は再利用しません。",
+        "qps-ploc": "⟦Ȧṽȧïŀȧƀŀė őñŀẏ ȧƒŧėř ėṽėřẏ őŀḓ řėɋůėşŧ ïş ƈőñƒïřɱėḓ ėñḓėḓ ẇïŧħőůŧ şŧȧřŧïñɠ. Ŧħïş ƈřėȧŧėş ȧ ñėẇ řėɋůėşŧ ẇïŧħ ȧ ñėẇ ȧṗṗřőṽȧŀ; ïŧ ḓőėş ñőŧ řėůşė ȧñ őŀḓ ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřė⟧"
       }
     },
     "operator": {

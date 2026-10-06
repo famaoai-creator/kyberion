@@ -172,7 +172,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/dot/dot-dispatch.ts#dispatchDotProposals (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/dot/dot-dispatch.ts#dispatchDotProposalsUnlocked (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": [
         "chronos_gateway",
         "infrastructure_sentinel",
@@ -831,12 +831,17 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/front-desk-conversation-store.ts#asStore",
+      "site": "libs/core/surface/first-job-recovery.ts#terminateFirstJobRequest",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/front-desk-conversation-persistence.ts#asStore",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/front-desk-conversation-store.ts#publishTranscript (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/surface/front-desk-conversation-persistence.ts#publishTranscript (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },

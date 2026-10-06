@@ -21,6 +21,7 @@
     approvalReady: false,
     approvalBusy: false,
     heldRequests: [],
+    recoveryRequests: [],
     refreshing: false,
     mounted: false,
     errorKey: null,
@@ -170,10 +171,57 @@
       })
     );
   }
+  function recoveryFor(task) {
+    return state.recoveryRequests.find(function (item) {
+      return (
+        item.request_id === task.id &&
+        (!task.artifact ||
+          (item.request_id === task.artifact.requestId && item.revision === task.artifact.revision))
+      );
+    });
+  }
+  function isParked(task) {
+    var recovery = recoveryFor(task);
+    return isHeld(task) || !!(recovery && recovery.status === 'eligible');
+  }
+  function safelyTerminated(task) {
+    var recovery = recoveryFor(task);
+    return !!(
+      recovery &&
+      recovery.status === 'terminated_unstarted' &&
+      task.executionStatus === 'terminated_unstarted' &&
+      task.turnState === 'settled' &&
+      (!task.artifact ||
+        (task.artifact.verification !== 'verified' &&
+          ['requested_pending', 'requested_unknown'].indexOf(task.artifact.currentness) === -1))
+    );
+  }
+  function canRestart() {
+    var ids = tasks().map(function (task) {
+      return task.id;
+    });
+    return (
+      canAct() &&
+      tasks().length > 0 &&
+      tasks().every(safelyTerminated) &&
+      state.recoveryRequests.length === tasks().length &&
+      messages().every(function (message) {
+        return (
+          message &&
+          typeof message.id === 'string' &&
+          ['user', 'secretary'].indexOf(message.role) !== -1 &&
+          ids.indexOf(message.id.replace(/-(user|secretary)$/, '')) !== -1 &&
+          (!message.artifact ||
+            (ids.indexOf(message.artifact.requestId) !== -1 && message.artifact.canRevise !== true))
+        );
+      })
+    );
+  }
   function otherUnfinishedWork() {
     return tasks().some(function (task) {
       return (
-        !isHeld(task) &&
+        !isParked(task) &&
+        !safelyTerminated(task) &&
         (task.turnState === 'pending' ||
           task.turnState === 'uncertain' ||
           ['awaiting_approval', 'queued', 'running', 'uncertain'].indexOf(task.executionStatus) !==
@@ -185,9 +233,13 @@
   }
   function canAct() {
     return (
+      visible() &&
       ready() &&
       state.approvalReady &&
       !state.heldRequests.length &&
+      !state.recoveryRequests.some(function (item) {
+        return item.status === 'eligible';
+      }) &&
       state.storageReady &&
       !!state.sessionId &&
       !busy()
@@ -514,7 +566,7 @@
       !state.pending &&
       !uncertainWork() &&
       tasks().some(function (task) {
-        return !isHeld(task) && ['queued', 'running'].indexOf(task.executionStatus) !== -1;
+        return !isParked(task) && ['queued', 'running'].indexOf(task.executionStatus) !== -1;
       })
     );
   }
@@ -536,42 +588,47 @@
       Math.min(5000 * Math.pow(2, state.pollFailures), 60000)
     );
   }
-  function suspendReads() {
+  function suspendReads(force) {
     stopPolling();
+    var recheck = force || state.refreshing || state.recoveryRequests.length > 0;
+    if (recheck) state.resumeRead = true;
     if (state.refreshing) {
-      state.resumeRead = true;
       state.refreshSequence++;
       if (state.refreshController) state.refreshController.abort();
       state.refreshController = null;
       state.refreshing = false;
-      invalidateApproval();
     }
+    if (recheck) invalidateApproval();
     render();
+  }
+  function historyArtifact(task) {
+    if (task.artifact) return task.artifact;
+    var recovery = recoveryFor(task);
+    return safelyTerminated(task) ? { requestId: task.id, revision: recovery.revision } : null;
   }
   function renderHistory() {
     var history = el('history');
     history.replaceChildren();
     var rows = tasks().filter(function (task) {
-      return (
-        task.artifact &&
-        UUID.test(task.artifact.requestId) &&
-        Number.isSafeInteger(task.artifact.revision)
-      );
+      var artifact = historyArtifact(task);
+      return artifact && UUID.test(artifact.requestId) && Number.isSafeInteger(artifact.revision);
     });
     if (!rows.length) {
       append(history, 'p', text('empty'));
       return;
     }
     rows.forEach(function (task) {
-      var artifact = task.artifact;
+      var artifact = historyArtifact(task);
       var card = append(history, 'article', undefined, 'home-work-item');
       append(card, 'h3', text('revision') + ' ' + artifact.revision, 'kb-section__title');
       var verified = artifact.verification === 'verified' && HASH.test(artifact.sha256);
-      var current = verified
-        ? observedCurrentness(artifact) === 'latest_verified'
-          ? 'latest'
-          : 'older'
-        : 'requested';
+      var current = safelyTerminated(task)
+        ? 'recovery_terminated'
+        : verified
+          ? observedCurrentness(artifact) === 'latest_verified'
+            ? 'latest'
+            : 'older'
+          : 'requested';
       append(card, 'p', text(current), 'kb-badge');
       var status =
         [
@@ -581,11 +638,20 @@
           'blocked',
           'cancel_requested',
           'uncertain',
+          'terminated_unstarted',
         ].indexOf(task.executionStatus) !== -1
           ? task.executionStatus
           : 'unknown';
       if (verified && task.executionStatus === 'work_completed') status = 'work_completed';
-      field(card, 'status', isHeld(task) ? text('approval_held') : text('status_' + status));
+      field(
+        card,
+        'status',
+        isHeld(task)
+          ? text('approval_held')
+          : isParked(task)
+            ? text('recovery_eligible')
+            : text('status_' + status)
+      );
       field(card, 'request', artifact.requestId);
       if (artifact.format === 'compact' || artifact.format === 'readable')
         field(card, 'format', text('format_' + artifact.format));
@@ -639,7 +705,8 @@
     el('scope').hidden = !validTenant;
     el('scope').textContent = validTenant ? text('scope') + ': ' + tenant : '';
     el('advance').hidden =
-      (state.heldRequests.length > 0 && !otherUnfinishedWork()) ||
+      ((state.heldRequests.length > 0 || state.recoveryRequests.length > 0) &&
+        !otherUnfinishedWork()) ||
       !ready() ||
       !validTenant ||
       !tasks().some(function (task) {
@@ -648,6 +715,14 @@
     if (validTenant)
       el('tick').textContent = 'pnpm onboarding first-job --tenant ' + tenant + ' --tick';
     el('start').disabled = !canAct() || tasks().length > 0 || messages().length > 0;
+    var terminalHistory =
+      tasks().length > 0 &&
+      tasks().every(function (task) {
+        return task.executionStatus === 'terminated_unstarted';
+      });
+    el('restart').hidden = !terminalHistory;
+    el('restart').disabled = !canRestart();
+    el('restart-note').hidden = !terminalHistory;
     el('refresh').disabled = state.sending || state.approvalBusy || state.refreshing;
     el('retry').hidden = !state.pending || !state.pending.retrySafe;
     el('retry').disabled =
@@ -686,7 +761,9 @@
                 : verified
                   ? 'verified'
                   : tasks().length
-                    ? 'recorded'
+                    ? canRestart()
+                      ? 'recovery_terminated'
+                      : 'recorded'
                     : 'empty';
     el('status').textContent = text(statusKey);
     el('error').hidden = !state.errorKey;
@@ -782,6 +859,42 @@
         if (sequence !== state.approvalSequence) return;
         state.approvalReady = status.ready === true;
         state.approvalBusy = status.busy === true;
+        if (status.accessLost === true) {
+          state.approvalReady = false;
+          state.snapshot = null;
+          state.loaded = false;
+          state.readBlocked = true;
+          state.heldRequests = [];
+          state.receiptAccessError = 'forbidden';
+          clearReceipts(true);
+          stopPolling();
+        }
+        state.recoveryRequests =
+          status.ready === true && Array.isArray(status.recoveryRequests)
+            ? status.recoveryRequests.filter(function (item) {
+                return (
+                  item &&
+                  UUID.test(item.request_id) &&
+                  UUID.test(item.approval_request_id) &&
+                  HASH.test(item.display_digest) &&
+                  item.session_id === state.sessionId &&
+                  state.snapshot &&
+                  state.snapshot.scope &&
+                  state.snapshot.scope.tier === 'public' &&
+                  item.tenant === state.snapshot.scope.tenant &&
+                  Number.isSafeInteger(item.revision) &&
+                  item.revision > 0 &&
+                  item.revision <= 64 &&
+                  ['eligible', 'terminated_unstarted'].indexOf(item.status) !== -1
+                );
+              })
+            : [];
+        if (
+          status.ready === true &&
+          Array.isArray(status.recoveryRequests) &&
+          state.recoveryRequests.length !== status.recoveryRequests.length
+        )
+          state.approvalReady = false;
         state.heldRequests = Array.isArray(status.heldRequests)
           ? status.heldRequests.filter(function (held) {
               return (
@@ -812,6 +925,8 @@
   function invalidateApproval() {
     state.approvalSequence++;
     state.approvalReady = false;
+    state.approvalBusy = false;
+    state.recoveryRequests = [];
     // A failed read cannot prove that a previously held request has recovered.
     if (window.KyberionFirstJobApproval) window.KyberionFirstJobApproval.invalidate();
   }
@@ -933,6 +1048,7 @@
   }
   function submitNew(action, artifact) {
     if (!canAct()) return;
+    if (action === 'start' && (tasks().length || messages().length) && !canRestart()) return;
     var body = {
       action: action,
       request_id: window.crypto.randomUUID(),
@@ -967,7 +1083,7 @@
     });
     window.addEventListener('pagehide', function () {
       state.pageActive = false;
-      suspendReads();
+      suspendReads(true);
     });
     window.addEventListener('pageshow', function () {
       state.pageActive = true;
@@ -975,6 +1091,9 @@
     });
     el('start').addEventListener('click', function () {
       if (!tasks().length && !messages().length) submitNew('start');
+    });
+    el('restart').addEventListener('click', function () {
+      if (canRestart()) submitNew('start');
     });
     el('refresh').addEventListener('click', load);
     el('retry').addEventListener('click', function () {
