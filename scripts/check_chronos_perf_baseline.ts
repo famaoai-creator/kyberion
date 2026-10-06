@@ -31,10 +31,12 @@ export async function sampleChronosPage(
   durationMs = 1_000
 ): Promise<ChronosPerfSample> {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-  const result = await page.evaluate(async (duration) => {
+  const duration = Math.max(0, Math.trunc(durationMs));
+  const result = (await page.evaluate(`(async () => {
+    const duration = ${duration};
     const start = performance.now();
     let frames = 0;
-    await new Promise<void>((resolve) => {
+    await new Promise((resolve) => {
       const tick = () => {
         frames += 1;
         if (performance.now() - start >= duration) resolve();
@@ -42,13 +44,13 @@ export async function sampleChronosPage(
       };
       requestAnimationFrame(tick);
     });
-    const memory = (performance as Performance & { memory?: { usedJSHeapSize?: number } }).memory;
+    const memory = performance.memory;
     return {
       frames,
       elapsed: Math.max(1, performance.now() - start),
       heap: memory?.usedJSHeapSize || null,
     };
-  }, durationMs);
+  })()`)) as { frames: number; elapsed: number; heap: number | null };
   return {
     url,
     avg_fps: Math.round(((result.frames * 1000) / result.elapsed) * 100) / 100,
