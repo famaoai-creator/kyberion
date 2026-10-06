@@ -108,7 +108,7 @@ describe('mission-classification', () => {
       ['research_report', 'research_and_absorption'],
       ['data_analysis', 'decision_support'],
       ['marketing_campaign', 'content_and_media'],
-      ['contract_review', 'decision_support'],
+      ['contract_review', 'legal_and_compliance'],
       ['customer_onboarding', 'customer_engagement'],
       ['training_material', 'content_and_media'],
       ['event_planning', 'operations_and_release'],
@@ -134,7 +134,7 @@ describe('mission-classification', () => {
     ).toBe('content_and_media');
     expect(
       resolveMissionClassification({ utterance: '委託契約書の確認をお願いしたい' }).mission_class
-    ).toBe('decision_support');
+    ).toBe('legal_and_compliance');
   });
 
   it('maps mission class to existing mission team templates', () => {
