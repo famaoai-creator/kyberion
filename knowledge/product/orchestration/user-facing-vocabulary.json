@@ -24473,6 +24473,231 @@
         "en": "Available only after every old request is confirmed ended without starting. This creates a new request with a new approval; it does not reuse an old approval.",
         "ja": "古い依頼がすべて未実行のまま終了したと確認できた場合のみ利用できます。新しい依頼と新しい承認依頼を作成し、古い承認は再利用しません。",
         "qps-ploc": "⟦Ȧṽȧïŀȧƀŀė őñŀẏ ȧƒŧėř ėṽėřẏ őŀḓ řėɋůėşŧ ïş ƈőñƒïřɱėḓ ėñḓėḓ ẇïŧħőůŧ şŧȧřŧïñɠ. Ŧħïş ƈřėȧŧėş ȧ ñėẇ řėɋůėşŧ ẇïŧħ ȧ ñėẇ ȧṗṗřőṽȧŀ; ïŧ ḓőėş ñőŧ řėůşė ȧñ őŀḓ ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřė⟧"
+      },
+      "first_job_setup_profile_unknown": {
+        "en": "Profile file: not checked.",
+        "ja": "基本設定ファイル：未確認です。",
+        "qps-ploc": "⟦Ṗřőƒïŀė ƒïŀė: ñőŧ ƈħėƈķėḓ. ŀőřėɱ ïṗ⟧"
+      },
+      "first_job_setup_profile_present": {
+        "en": "Profile file: present. Its contents and onboarding completion have not been validated.",
+        "ja": "基本設定ファイル：存在します。内容や初期設定の完了は検証していません。",
+        "qps-ploc": "⟦Ṗřőƒïŀė ƒïŀė: ṗřėşėñŧ. Ïŧş ƈőñŧėñŧş ȧñḓ őñƀőȧřḓïñɠ ƈőɱṗŀėŧïőñ ħȧṽė ñőŧ ƀėėñ ṽȧŀïḓȧŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "first_job_setup_profile_missing": {
+        "en": "Profile file: missing.",
+        "ja": "基本設定ファイル：見つかりません。",
+        "qps-ploc": "⟦Ṗřőƒïŀė ƒïŀė: ɱïşşïñɠ. ŀőřėɱ ï⟧"
+      },
+      "first_job_setup_profile_unavailable": {
+        "en": "Profile file: could not be inspected with this surface's permissions.",
+        "ja": "基本設定ファイル：この画面の権限では確認できませんでした。",
+        "qps-ploc": "⟦Ṗřőƒïŀė ƒïŀė: ƈőůŀḓ ñőŧ ƀė ïñşṗėƈŧėḓ ẇïŧħ ŧħïş şůřƒȧƈė'ş ṗėřɱïşşïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "first_job_setup_oidc_unknown": {
+        "en": "Browser sign-in configuration: not checked.",
+        "ja": "ブラウザーのログイン設定：未確認です。",
+        "qps-ploc": "⟦Ƀřőẇşėř şïɠñ-ïñ ƈőñƒïɠůřȧŧïőñ: ñőŧ ƈħėƈķėḓ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "first_job_setup_oidc_configured": {
+        "en": "Browser sign-in configuration: present. Provider connectivity has not been tested.",
+        "ja": "ブラウザーのログイン設定：設定済みです。認証サービスへの接続は未確認です。",
+        "qps-ploc": "⟦Ƀřőẇşėř şïɠñ-ïñ ƈőñƒïɠůřȧŧïőñ: ṗřėşėñŧ. Ṗřőṽïḓėř ƈőññėƈŧïṽïŧẏ ħȧş ñőŧ ƀėėñ ŧėşŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "first_job_setup_oidc_configuration_required": {
+        "en": "Browser sign-in configuration: incomplete. Signing in is not available yet.",
+        "ja": "ブラウザーのログイン設定：未完了です。まだログインできません。",
+        "qps-ploc": "⟦Ƀřőẇşėř şïɠñ-ïñ ƈőñƒïɠůřȧŧïőñ: ïñƈőɱṗŀėŧė. Şïɠñïñɠ ïñ ïş ñőŧ ȧṽȧïŀȧƀŀė ẏėŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "first_job_setup_oidc_unavailable": {
+        "en": "Browser sign-in configuration: could not be checked.",
+        "ja": "ブラウザーのログイン設定：確認できませんでした。",
+        "qps-ploc": "⟦Ƀřőẇşėř şïɠñ-ïñ ƈőñƒïɠůřȧŧïőñ: ƈőůŀḓ ñőŧ ƀė ƈħėƈķėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "first_job_setup_browser_user_unknown": {
+        "en": "Current browser user: not verified.",
+        "ja": "現在のブラウザー利用者：本人確認できていません。",
+        "qps-ploc": "⟦Ƈůřřėñŧ ƀřőẇşėř ůşėř: ñőŧ ṽėřïƒïėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "first_job_setup_browser_user_verified": {
+        "en": "Current browser user: verified against an active account binding.",
+        "ja": "現在のブラウザー利用者：有効なアカウントとの紐づけを確認しました。",
+        "qps-ploc": "⟦Ƈůřřėñŧ ƀřőẇşėř ůşėř: ṽėřïƒïėḓ ȧɠȧïñşŧ ȧñ ȧƈŧïṽė ȧƈƈőůñŧ ƀïñḓïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "first_job_setup_browser_user_sign_in_required": {
+        "en": "Current browser user: verified sign-in is required.",
+        "ja": "現在のブラウザー利用者：ログインによる本人確認が必要です。",
+        "qps-ploc": "⟦Ƈůřřėñŧ ƀřőẇşėř ůşėř: ṽėřïƒïėḓ şïɠñ-ïñ ïş řėɋůïřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "first_job_setup_browser_user_binding_required": {
+        "en": "Current browser user: an active account binding could not be confirmed.",
+        "ja": "現在のブラウザー利用者：有効なアカウントとの紐づけを確認できませんでした。",
+        "qps-ploc": "⟦Ƈůřřėñŧ ƀřőẇşėř ůşėř: ȧñ ȧƈŧïṽė ȧƈƈőůñŧ ƀïñḓïñɠ ƈőůŀḓ ñőŧ ƀė ƈőñƒïřɱėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "first_job_setup_browser_user_unavailable": {
+        "en": "Current browser user: verification could not be completed.",
+        "ja": "現在のブラウザー利用者：本人確認を完了できませんでした。",
+        "qps-ploc": "⟦Ƈůřřėñŧ ƀřőẇşėř ůşėř: ṽėřïƒïƈȧŧïőñ ƈőůŀḓ ñőŧ ƀė ƈőɱṗŀėŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "first_job_setup_approval_scope_unknown": {
+        "en": "Approval scope: not checked.",
+        "ja": "承認できる範囲：未確認です。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ şƈőṗė: ñőŧ ƈħėƈķėḓ. ŀőřėɱ ïṗş⟧"
+      },
+      "first_job_setup_approval_scope_ready": {
+        "en": "Approval scope: the signed-in account matches this request owner and has the required role in the diagnostic tenant.",
+        "ja": "承認できる範囲：ログイン中のアカウントが依頼の所有者と一致し、診断先テナントで必要な役割を持っています。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ şƈőṗė: ŧħė şïɠñėḓ-ïñ ȧƈƈőůñŧ ɱȧŧƈħėş ŧħïş řėɋůėşŧ őẇñėř ȧñḓ ħȧş ŧħė řėɋůïřėḓ řőŀė ïñ ŧħė ḓïȧɠñőşŧïƈ ŧėñȧñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
+      },
+      "first_job_setup_approval_scope_mapping_required": {
+        "en": "Approval scope: a matching diagnostic setup is needed before it can be checked.",
+        "ja": "承認できる範囲：確認には一致する診断設定が必要です。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ şƈőṗė: ȧ ɱȧŧƈħïñɠ ḓïȧɠñőşŧïƈ şėŧůṗ ïş ñėėḓėḓ ƀėƒőřė ïŧ ƈȧñ ƀė ƈħėƈķėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "first_job_setup_approval_scope_authentication_required": {
+        "en": "Approval scope: verify the browser user first.",
+        "ja": "承認できる範囲：先にブラウザー利用者の本人確認が必要です。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ şƈőṗė: ṽėřïƒẏ ŧħė ƀřőẇşėř ůşėř ƒïřşŧ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "first_job_setup_approval_scope_owner_unavailable": {
+        "en": "Approval scope: an active request owner could not be confirmed.",
+        "ja": "承認できる範囲：有効な依頼の所有者を確認できませんでした。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ şƈőṗė: ȧñ ȧƈŧïṽė řėɋůėşŧ őẇñėř ƈőůŀḓ ñőŧ ƀė ƈőñƒïřɱėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "first_job_setup_approval_scope_owner_mismatch": {
+        "en": "Approval scope: the signed-in account is not the diagnostic request owner.",
+        "ja": "承認できる範囲：ログイン中のアカウントが診断依頼の所有者と一致しません。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ şƈőṗė: ŧħė şïɠñėḓ-ïñ ȧƈƈőůñŧ ïş ñőŧ ŧħė ḓïȧɠñőşŧïƈ řėɋůėşŧ őẇñėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "first_job_setup_approval_scope_tenant_membership_required": {
+        "en": "Approval scope: the request owner lacks an owner or approver role in the diagnostic tenant.",
+        "ja": "承認できる範囲：依頼の所有者が診断先テナントの所有者または承認者ではありません。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ şƈőṗė: ŧħė řėɋůėşŧ őẇñėř ŀȧƈķş ȧñ őẇñėř őř ȧṗṗřőṽėř řőŀė ïñ ŧħė ḓïȧɠñőşŧïƈ ŧėñȧñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "first_job_setup_approval_scope_unavailable": {
+        "en": "Approval scope: could not be checked. No approval authority is assumed.",
+        "ja": "承認できる範囲：確認できませんでした。承認権限があるとは扱いません。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ şƈőṗė: ƈőůŀḓ ñőŧ ƀė ƈħėƈķėḓ. Ñő ȧṗṗřőṽȧŀ ȧůŧħőřïŧẏ ïş ȧşşůɱėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "first_job_setup_baseline_unknown": {
+        "en": "Environment baseline: not checked by this page.",
+        "ja": "環境の基本チェック：この画面では未確認です。",
+        "qps-ploc": "⟦Ėñṽïřőñɱėñŧ ƀȧşėŀïñė: ñőŧ ƈħėƈķėḓ ƀẏ ŧħïş ṗȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "first_job_setup_baseline_unchecked": {
+        "en": "Environment baseline: not run by this page. This guide does not certify overall system health.",
+        "ja": "環境の基本チェック：この画面では実行しません。システム全体の正常性は保証しません。",
+        "qps-ploc": "⟦Ėñṽïřőñɱėñŧ ƀȧşėŀïñė: ñőŧ řůñ ƀẏ ŧħïş ṗȧɠė. Ŧħïş ɠůïḓė ḓőėş ñőŧ ƈėřŧïƒẏ őṽėřȧŀŀ şẏşŧėɱ ħėȧŀŧħ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "first_job_setup_reasoning_unknown": {
+        "en": "AI model: not required for this fixed diagnostic; other AI work is not checked.",
+        "ja": "AIモデル：この定型診断には不要です。ほかのAIの仕事は未確認です。",
+        "qps-ploc": "⟦ȦÏ ɱőḓėŀ: ñőŧ řėɋůïřėḓ ƒőř ŧħïş ƒïẋėḓ ḓïȧɠñőşŧïƈ; őŧħėř ȦÏ ẇőřķ ïş ñőŧ ƈħėƈķėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "first_job_setup_reasoning_not_required": {
+        "en": "AI model: not required for this fixed diagnostic; no AI provider is contacted.",
+        "ja": "AIモデル：この定型診断には不要です。AIサービスには接続しません。",
+        "qps-ploc": "⟦ȦÏ ɱőḓėŀ: ñőŧ řėɋůïřėḓ ƒőř ŧħïş ƒïẋėḓ ḓïȧɠñőşŧïƈ; ñő ȦÏ ṗřőṽïḓėř ïş ƈőñŧȧƈŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "first_job_setup_advancement_unknown": {
+        "en": "Diagnostic progress: not checked.",
+        "ja": "診断の進行状況：未確認です。",
+        "qps-ploc": "⟦Ḓïȧɠñőşŧïƈ ṗřőɠřėşş: ñőŧ ƈħėƈķėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "first_job_setup_advancement_not_started": {
+        "en": "Diagnostic progress: no active diagnostic request.",
+        "ja": "診断の進行状況：進行中の診断依頼はありません。",
+        "qps-ploc": "⟦Ḓïȧɠñőşŧïƈ ṗřőɠřėşş: ñő ȧƈŧïṽė ḓïȧɠñőşŧïƈ řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "first_job_setup_advancement_review_or_tick": {
+        "en": "Diagnostic progress: check the approval section. A bounded operator tick may be needed to offer approval or advance approved work.",
+        "ja": "診断の進行状況：承認欄を確認してください。承認の表示や承認済みの仕事を進めるには、設定担当者による診断専用の実行が必要な場合があります。",
+        "qps-ploc": "⟦Ḓïȧɠñőşŧïƈ ṗřőɠřėşş: ƈħėƈķ ŧħė ȧṗṗřőṽȧŀ şėƈŧïőñ. Ȧ ƀőůñḓėḓ őṗėřȧŧőř ŧïƈķ ɱȧẏ ƀė ñėėḓėḓ ŧő őƒƒėř ȧṗṗřőṽȧŀ őř ȧḓṽȧñƈė ȧṗṗřőṽėḓ ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
+      },
+      "first_job_setup_advancement_running": {
+        "en": "Diagnostic progress: execution is recorded as running; completion is not yet verified.",
+        "ja": "診断の進行状況：実行中として記録されています。完了はまだ検証されていません。",
+        "qps-ploc": "⟦Ḓïȧɠñőşŧïƈ ṗřőɠřėşş: ėẋėƈůŧïőñ ïş řėƈőřḓėḓ ȧş řůññïñɠ; ƈőɱṗŀėŧïőñ ïş ñőŧ ẏėŧ ṽėřïƒïėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "first_job_setup_advancement_receipt_verified": {
+        "en": "Diagnostic progress: the recorded diagnostic receipts are verified.",
+        "ja": "診断の進行状況：記録された診断結果を検証済みです。",
+        "qps-ploc": "⟦Ḓïȧɠñőşŧïƈ ṗřőɠřėşş: ŧħė řėƈőřḓėḓ ḓïȧɠñőşŧïƈ řėƈėïṗŧş ȧřė ṽėřïƒïėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "first_job_setup_advancement_unavailable": {
+        "en": "Diagnostic progress: not enough evidence to recommend advancing work.",
+        "ja": "診断の進行状況：仕事を進めてよいと判断できる証拠がありません。",
+        "qps-ploc": "⟦Ḓïȧɠñőşŧïƈ ṗřőɠřėşş: ñőŧ ėñőůɠħ ėṽïḓėñƈė ŧő řėƈőɱɱėñḓ ȧḓṽȧñƈïñɠ ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "first_job_setup_owner_user": {
+        "en": "You",
+        "ja": "利用者",
+        "qps-ploc": "⟦Ẏőů ŀőř⟧"
+      },
+      "first_job_setup_owner_operator": {
+        "en": "Setup operator",
+        "ja": "設定担当者",
+        "qps-ploc": "⟦Şėŧůṗ őṗėřȧŧőř ŀőřė⟧"
+      },
+      "first_job_setup_action_inspect_profile": {
+        "en": "Inspect the profile through the normal onboarding tools; this page cannot validate it.",
+        "ja": "通常の初期設定ツールで基本設定を確認してください。この画面では検証できません。",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ŧħė ṗřőƒïŀė ŧħřőůɠħ ŧħė ñőřɱȧŀ őñƀőȧřḓïñɠ ŧőőŀş; ŧħïş ṗȧɠė ƈȧññőŧ ṽȧŀïḓȧŧė ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "first_job_setup_action_complete_profile": {
+        "en": "Complete the normal onboarding flow with pnpm onboarding.",
+        "ja": "pnpm onboarding で通常の初期設定を完了してください。",
+        "qps-ploc": "⟦Ƈőɱṗŀėŧė ŧħė ñőřɱȧŀ őñƀőȧřḓïñɠ ƒŀőẇ ẇïŧħ ṗñṗɱ őñƀőȧřḓïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "first_job_setup_action_inspect_mapping": {
+        "en": "Review the diagnostic setup instructions below. Do not create a second setup to bypass a mismatch.",
+        "ja": "下の診断設定手順を確認してください。不一致を回避するための別設定は作成しないでください。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ḓïȧɠñőşŧïƈ şėŧůṗ ïñşŧřůƈŧïőñş ƀėŀőẇ. Ḓő ñőŧ ƈřėȧŧė ȧ şėƈőñḓ şėŧůṗ ŧő ƀẏṗȧşş ȧ ɱïşɱȧŧƈħ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "first_job_setup_action_configure_login": {
+        "en": "Complete the existing browser sign-in setup, then refresh. This page does not create credentials.",
+        "ja": "既存のブラウザーログイン設定を完了してから更新してください。この画面では認証情報を作成しません。",
+        "qps-ploc": "⟦Ƈőɱṗŀėŧė ŧħė ėẋïşŧïñɠ ƀřőẇşėř şïɠñ-ïñ şėŧůṗ, ŧħėñ řėƒřėşħ. Ŧħïş ṗȧɠė ḓőėş ñőŧ ƈřėȧŧė ƈřėḓėñŧïȧŀş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "first_job_setup_action_sign_in": {
+        "en": "When browser sign-in is configured, use the sign-in link, then refresh.",
+        "ja": "ブラウザーのログイン設定が済んでいれば、ログイン用リンクで本人確認してから更新してください。",
+        "qps-ploc": "⟦Ẇħėñ ƀřőẇşėř şïɠñ-ïñ ïş ƈőñƒïɠůřėḓ, ůşė ŧħė şïɠñ-ïñ ŀïñķ, ŧħėñ řėƒřėşħ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "first_job_setup_action_inspect_member_binding": {
+        "en": "Check the existing account binding. Do not infer ownership from a successful login.",
+        "ja": "既存のアカウントとの紐づけを確認してください。ログイン成功だけでは依頼の所有者とは判断できません。",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė ėẋïşŧïñɠ ȧƈƈőůñŧ ƀïñḓïñɠ. Ḓő ñőŧ ïñƒėř őẇñėřşħïṗ ƒřőɱ ȧ şůƈƈėşşƒůŀ ŀőɠïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "first_job_setup_action_inspect_approval_scope": {
+        "en": "Review the existing request owner and target-tenant role; any membership change is a separate authorized action.",
+        "ja": "既存の依頼の所有者と対象テナントの役割を確認してください。所属や権限の変更には別途承認が必要です。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ėẋïşŧïñɠ řėɋůėşŧ őẇñėř ȧñḓ ŧȧřɠėŧ-ŧėñȧñŧ řőŀė; ȧñẏ ɱėɱƀėřşħïṗ ƈħȧñɠė ïş ȧ şėṗȧřȧŧė ȧůŧħőřïẑėḓ ȧƈŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "first_job_setup_action_inspect_baseline": {
+        "en": "Run the normal baseline check separately if overall environment health needs verification.",
+        "ja": "環境全体の状態を検証する場合は、通常の基本チェックを別途実行してください。",
+        "qps-ploc": "⟦Řůñ ŧħė ñőřɱȧŀ ƀȧşėŀïñė ƈħėƈķ şėṗȧřȧŧėŀẏ ïƒ őṽėřȧŀŀ ėñṽïřőñɱėñŧ ħėȧŀŧħ ñėėḓş ṽėřïƒïƈȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "first_job_setup_action_review_or_tick": {
+        "en": "Review any displayed approval first. Inspect the bounded tick instructions below before advancing work.",
+        "ja": "承認が表示されていれば先に確認してください。仕事を進める前に、下の診断専用の実行手順を確認してください。",
+        "qps-ploc": "⟦Řėṽïėẇ ȧñẏ ḓïşṗŀȧẏėḓ ȧṗṗřőṽȧŀ ƒïřşŧ. Ïñşṗėƈŧ ŧħė ƀőůñḓėḓ ŧïƈķ ïñşŧřůƈŧïőñş ƀėŀőẇ ƀėƒőřė ȧḓṽȧñƈïñɠ ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "first_job_setup_action_wait": {
+        "en": "Refresh to check for a verified result.",
+        "ja": "更新して検証済みの結果を確認してください。",
+        "qps-ploc": "⟦Řėƒřėşħ ŧő ƈħėƈķ ƒőř ȧ ṽėřïƒïėḓ řėşůŀŧ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "first_job_setup_action_inspect_execution": {
+        "en": "Inspect the recorded request before retrying or advancing it.",
+        "ja": "再試行や実行の前に、記録済みの依頼を確認してください。",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ŧħė řėƈőřḓėḓ řėɋůėşŧ ƀėƒőřė řėŧřẏïñɠ őř ȧḓṽȧñƈïñɠ ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "first_job_setup_action_refresh": {
+        "en": "Refresh the saved status.",
+        "ja": "保存済みの状態を更新してください。",
+        "qps-ploc": "⟦Řėƒřėşħ ŧħė şȧṽėḓ şŧȧŧůş. ŀőřėɱ ïṗ⟧"
       }
     },
     "operator": {
