@@ -1,3 +1,12 @@
+import { hasFirstJobDiagnosticProvenance } from '../surface/first-job-approval-proof.js';
+import { loadApprovalRequest } from '../governance/approval-store.js';
+import { AUTONOMY_APPROVAL_CHANNEL } from '../governance/approval-decision-card.js';
+import { assertBuiltinOnlyWorkerEventStream } from '../workforce/worker-event-stream.js';
+import {
+  findDotCharter,
+  isFrontDeskDiagnosticDot,
+  requireCurrentFrontDeskDiagnosticDot,
+} from './dot-charter.js';
 /**
  * Dot executor (DL-01) — closes the WorkItems a resident dot delegated.
  *
@@ -285,7 +294,13 @@ async function routeItem(
     let prepared: ReturnType<typeof prepareFrontDeskExecution> | undefined;
     if (item.metadata?.front_desk_execution || ref === FRONT_DESK_RECEIPT_PIPELINE) {
       try {
-        prepared = prepareFrontDeskExecution(c, item, deps);
+        prepared = prepareFrontDeskExecution(
+          c.runtime.execution_mode !== undefined
+            ? requireCurrentFrontDeskDiagnosticDot(c, deps.rootDir)
+            : c,
+          item,
+          deps
+        );
       } catch (error) {
         return {
           mode: 'escalated',
@@ -319,7 +334,13 @@ async function routeItem(
     if (prepared && result.status === 'succeeded') {
       if (signal.aborted)
         throw new Error('diagnostic execution deadline passed before publication');
-      prepared = prepareFrontDeskExecution(c, item, deps);
+      prepared = prepareFrontDeskExecution(
+        c.runtime.execution_mode !== undefined
+          ? requireCurrentFrontDeskDiagnosticDot(c, deps.rootDir)
+          : c,
+        item,
+        deps
+      );
     }
     const verified =
       prepared && result.status === 'succeeded' ? verifyFrontDeskExecution(prepared) : undefined;
@@ -456,6 +477,52 @@ export function resetDotExecutorDenialAuditForTests(): void {
  * Claim, run and close one WorkItem for this dot. Returns a `skipped` row
  * (not persisted) when the item could not be claimed or no backend can run it.
  */
+function hasDiagnosticWorkProvenance(item: WorkItem): boolean {
+  const binding = item.metadata?.front_desk_execution;
+  if (hasFirstJobDiagnosticProvenance(binding)) return true;
+  const approvalId = meta(item, 'approval_request_id');
+  return Boolean(
+    approvalId &&
+    hasFirstJobDiagnosticProvenance(
+      binding,
+      loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, approvalId)
+    )
+  );
+}
+
+/** Diagnostic-only preflight; a mode marker never authorizes queued generic work. */
+function diagnosticWorkRefusal(
+  c: DotCharter,
+  item: WorkItem,
+  deps: DotExecutorDeps
+): string | undefined {
+  if (
+    c.runtime.execution_mode === undefined &&
+    findDotCharter(c.dot_id, deps.rootDir)?.charter.runtime.execution_mode === undefined &&
+    !hasDiagnosticWorkProvenance(item)
+  )
+    return undefined;
+  try {
+    isFrontDeskDiagnosticDot(c);
+    if (
+      meta(item, 'requested_work_shape') !== 'pipeline' ||
+      meta(item, 'pipeline_ref') !== FRONT_DESK_RECEIPT_PIPELINE ||
+      !item.metadata?.front_desk_execution
+    )
+      throw new Error('only a bound front-desk receipt pipeline WorkItem is supported');
+    // Re-read persisted configuration on every attempt, including recovery. A
+    // removed/revised charter cannot lend its stale snapshot to an old item.
+    const current = requireCurrentFrontDeskDiagnosticDot(c, deps.rootDir);
+    prepareFrontDeskExecution(current, item, deps);
+    return undefined;
+  } catch (error) {
+    return (
+      'diagnostic execution refused before effects: ' +
+      (error instanceof Error ? error.message : String(error))
+    );
+  }
+}
+
 export async function executeDotWorkItem(
   c: DotCharter,
   item: WorkItem,
@@ -477,10 +544,12 @@ export async function executeDotWorkItem(
       deps
     );
   }
+  const diagnosticRefusal = diagnosticWorkRefusal(c, item, deps);
   const shape = meta(item, 'requested_work_shape');
   // A task_session the ports cannot run is closed as blocked without probing a backend.
   const conversational =
-    shape === 'direct_reply' || (shape === 'task_session' && !ports.taskSessionUnavailable);
+    !diagnosticRefusal &&
+    (shape === 'direct_reply' || (shape === 'task_session' && !ports.taskSessionUnavailable));
   const goalMode: DotGoalMode = conversational ? (ports.goalMode?.(c) ?? 'tool') : 'tool';
   if (typeof goalMode === 'object') {
     return skippedRow(c, item, startedAt, `no backend: ${goalMode.unavailable}`, deps);
@@ -546,16 +615,21 @@ export async function executeDotWorkItem(
   let outcome: Outcome;
   try {
     outcome = await Promise.race([
-      routeItem(c, claimed.item, ports, goalMode, controller.signal, accountingId, deps).catch(
-        (error): Outcome => ({
-          mode: failedMode,
-          status: 'failed',
-          summary: error instanceof Error ? error.message : String(error),
-          ...(isDotExecutorPreEffectError(error)
-            ? { reason_code: 'pre_effect_failure' as const }
-            : {}),
-        })
-      ),
+      (diagnosticRefusal
+        ? Promise.resolve<Outcome>({
+            mode: 'escalated',
+            status: 'blocked',
+            summary: diagnosticRefusal,
+          })
+        : routeItem(c, claimed.item, ports, goalMode, controller.signal, accountingId, deps)
+      ).catch((error): Outcome => ({
+        mode: failedMode,
+        status: 'failed',
+        summary: error instanceof Error ? error.message : String(error),
+        ...(isDotExecutorPreEffectError(error)
+          ? { reason_code: 'pre_effect_failure' as const }
+          : {}),
+      })),
       deadline,
     ]);
   } finally {
@@ -870,12 +944,43 @@ export async function runDotExecutorSweep(
   // Read each dot's work results once per sweep; this module keeps the cache current.
   const deps = { ...sweepDeps, resultsCache: sweepDeps.resultsCache ?? new Map() };
   const rows: DotWorkResultRow[] = [];
+  const runnable = active.filter(
+    ({ charter }) => !isFrontDeskDiagnosticDot(charter) || deps.assertTenant
+  );
+  const supervised = active;
+  active = runnable;
+  if (active.length === 0 && deps.scopeToActiveCharters) return rows;
+  if (active.some(({ charter }) => isFrontDeskDiagnosticDot(charter)))
+    assertBuiltinOnlyWorkerEventStream();
   const max = Math.max(0, deps.maxPerSweep ?? 1);
   if (max === 0) return rows;
   const clock = deps.clock ?? Date.now;
   const sweepStart = clock();
   const sweepBudget = deps.sweepBudgetMs ?? DOT_EXECUTOR_SWEEP_BUDGET_MS;
-  reapStrandedDotWorkItems(active, deps);
+  // The coordination reaper expires all leases before filtering items.
+  if (!deps.scopeToActiveCharters) reapStrandedDotWorkItems(supervised, deps);
+  else {
+    const pending = deps.listItems ? deps.listItems() : listWorkItems({ status: ['in_progress'] });
+    for (const { charter } of active) {
+      for (const item of pending.filter(
+        (item) =>
+          item.status === 'in_progress' &&
+          addressedTo(charter, item) &&
+          !dotItemTenantMismatch(charter, item)
+      )) {
+        rows.push(
+          skippedRow(
+            charter,
+            item,
+            nowOf(deps).toISOString(),
+            'bounded diagnostic pass does not recover stranded claims; operator review through the normal governed recovery flow is required',
+            deps
+          )
+        );
+      }
+    }
+  }
+  if (active.length === 0) return rows;
   reconcileExecutorReports(active, deps);
   // Human-approved quarantine releases take effect here, before any claim.
   applyApprovedDotReleases(active, deps);
@@ -915,12 +1020,25 @@ export async function runDotExecutorSweep(
         (item) => !denyCrossTenantItem(charter, item, deps)
       );
       if (candidates.length === 0) continue;
-      const charterPorts = typeof ports === 'function' ? ports(charter) : ports;
+      let charterPorts: DotExecutorPorts | undefined;
       for (const item of candidates.slice(0, max)) {
         if (clock() - sweepStart >= sweepBudget) break;
+        if (hasDiagnosticWorkProvenance(item) && !isFrontDeskDiagnosticDot(charter)) {
+          rows.push(
+            skippedRow(
+              charter,
+              item,
+              nowOf(deps).toISOString(),
+              'diagnostic provenance requires the current active diagnostic charter; operator review required',
+              deps
+            )
+          );
+          continue;
+        }
+        charterPorts ??= typeof ports === 'function' ? ports(charter) : ports;
         const row = await withExecutionContextAsync(
           charter.authority.authority_role,
-          () => executeDotWorkItem(charter, item, charterPorts, deps),
+          () => executeDotWorkItem(charter, item, charterPorts!, deps),
           undefined,
           charter.scope.tenant_slug,
           charter.scope.organization_id

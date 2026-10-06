@@ -15,7 +15,11 @@ import {
 import type { AdfStep, AdfSkippedStep } from '@agent/core/pipeline/adf-engine';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { stripGovernanceInputStamps } from '@agent/core/pipeline/op-preflight-stages';
-import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import {
+  assertBuiltinOnlyOpPreflight,
+  ensureDefaultOpPreflight,
+} from '@agent/core/pipeline/op-preflight-defaults';
+import { assertDiagnosticHooksAbsent } from './pipeline-diagnostic-profile.js';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { type PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
@@ -794,6 +798,7 @@ export async function dispatchLeafOp(
   stepPolicy: ReasoningStepPolicy
 ): Promise<Record<string, unknown>> {
   ensureDefaultOpPreflight();
+  if (opts.executionMode) assertBuiltinOnlyOpPreflight();
   const normalizedOp = normalizePipelineOp(step.op);
   const [domain, action] = normalizedOp.split(':');
   const rawParams = (step.params || {}) as Record<string, unknown>;
@@ -837,6 +842,20 @@ export async function dispatchLeafOp(
   // `{{items}}` or `{{dry_run}}`). Resolve them before applying the op
   // contract so the validator sees the value the actuator will receive.
   params = resolveParamsRecursive(params, ctx) as Record<string, unknown>;
+  if (opts.executionMode) {
+    assertBuiltinOnlyOpPreflight();
+    assertDiagnosticHooksAbsent();
+    if (!opts.validateDiagnosticEffect) throw new Error('Diagnostic effect validator required');
+    opts.validateDiagnosticEffect();
+    assertDiagnosticHooksAbsent();
+    if (
+      normalizedOp !== 'system:write_file' ||
+      Object.keys(params).length !== 2 ||
+      params.path !== ctx.front_desk_output_path ||
+      params.content !== ctx.front_desk_artifact_content
+    )
+      throw new Error('Diagnostic bound write inputs changed during preflight');
+  }
 
   // ES-02: a registered scenario runner serves (or fails closed) leaf ops
   // before any inline, composite (ptc / run_pipeline) or real actuator
@@ -844,6 +863,8 @@ export async function dispatchLeafOp(
   // Unregistered -> null.
   const scenarioOperation = resolveScenarioOpOverride(domain, action);
   if (scenarioOperation) {
+    if (opts.executionMode)
+      throw new Error('Diagnostic scenario overrides require normal governed execution');
     validatePipelineOpInput(domain, action, params);
     return dispatchResolvedActuatorOperation(
       step,

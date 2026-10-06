@@ -30,7 +30,10 @@ export function frontDeskArtifactRevisionDigest(input: FrontDeskArtifactRevision
     .update(JSON.stringify({ kind: 'diagnostic-receipt-format-revision', ...parsed }))
     .digest('hex');
 }
+export const FIRST_JOB_DIAGNOSTIC_PROTOCOL = 'first-job-v1' as const;
 export interface FrontDeskExecutionBinding {
+  /** Durable admission provenance; a later charter edit cannot lower this requirement. */
+  diagnostic_protocol?: typeof FIRST_JOB_DIAGNOSTIC_PROTOCOL;
   mapping_id: string;
   config_digest: string;
   conversation_key: string;
@@ -145,7 +148,7 @@ export function loadFrontDeskExecutionPolicy(): FrontDeskExecutionPolicy {
 }
 /** This first slice admits one local write only; a newly approved digest must
  * never turn the diagnostic receipt label into authority for another effect. */
-function assertReceiptPipeline(raw: string): void {
+export function assertFrontDeskReceiptPipeline(raw: string): void {
   const pipeline = parseSafeJsonObjectValue(
     parseSafeJsonInput(raw, 'front desk receipt pipeline'),
     'front desk receipt pipeline'
@@ -179,7 +182,10 @@ function assertReceiptPipeline(raw: string): void {
     throw new Error('front_desk_pipeline_contract_invalid');
 }
 /** The exact installed pipeline bytes are part of authority, re-read on every inspection. */
-export function frontDeskMappingDigest(mapping: FrontDeskExecutionMapping): string {
+export function frontDeskMappingDigest(
+  mapping: FrontDeskExecutionMapping,
+  pipelineSource?: string
+): string {
   if (
     !isFrontDeskExecutionPublicViewer(mapping.viewer) ||
     mapping.pipeline.path !== FRONT_DESK_RECEIPT_PIPELINE ||
@@ -187,10 +193,12 @@ export function frontDeskMappingDigest(mapping: FrontDeskExecutionMapping): stri
     mapping.exactCommand !== FRONT_DESK_RECEIPT_COMMAND
   )
     throw new Error('front_desk_contract_invalid');
-  const pipelineBytes = safeReadFile(pathResolver.rootResolve(FRONT_DESK_RECEIPT_PIPELINE), {
-    encoding: null,
-  });
-  assertReceiptPipeline(
+  const pipelineBytes =
+    pipelineSource ??
+    safeReadFile(pathResolver.rootResolve(FRONT_DESK_RECEIPT_PIPELINE), {
+      encoding: null,
+    });
+  assertFrontDeskReceiptPipeline(
     typeof pipelineBytes === 'string' ? pipelineBytes : pipelineBytes.toString('utf8')
   );
   const pipelineDigest = createHash('sha256').update(pipelineBytes).digest('hex');
@@ -227,6 +235,7 @@ export function parseFrontDeskExecutionBinding(
     'parent_sha256',
     'receipt_format',
   ];
+  const hasDiagnostic = Object.prototype.hasOwnProperty.call(row, 'diagnostic_protocol');
   const hasRevision = revisionFields.some((key) => row[key] !== undefined);
   const revisionInput = hasRevision
     ? parseFrontDeskArtifactRevisionInput({
@@ -237,9 +246,13 @@ export function parseFrontDeskExecutionBinding(
       })
     : undefined;
   if (
-    Object.keys(row).length !== fields.length + (hasRevision ? 4 : 0) ||
+    (hasDiagnostic && row.diagnostic_protocol !== FIRST_JOB_DIAGNOSTIC_PROTOCOL) ||
+    Object.keys(row).length !== fields.length + (hasRevision ? 4 : 0) + (hasDiagnostic ? 1 : 0) ||
     Object.keys(row).some(
-      (key) => !fields.includes(key) && !(hasRevision && revisionFields.includes(key))
+      (key) =>
+        !fields.includes(key) &&
+        !(hasRevision && revisionFields.includes(key)) &&
+        !(hasDiagnostic && key === 'diagnostic_protocol')
     ) ||
     (hasRevision &&
       (!revisionInput ||

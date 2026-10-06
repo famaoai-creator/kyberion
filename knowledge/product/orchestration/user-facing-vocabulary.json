@@ -23813,6 +23813,461 @@
         "en": "Choose a valid receipt format and version.",
         "ja": "有効な受付控えの版と表示形式を選んでください。",
         "qps-ploc": "⟦Ƈħőőşė ȧ ṽȧŀïḓ řėƈėïṗŧ ƒőřɱȧŧ ȧñḓ ṽėřşïőñ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "first_job_title": {
+        "en": "Try your first safe job",
+        "ja": "安全な最初の仕事を試す",
+        "qps-ploc": "⟦Ŧřẏ ẏőůř ƒïřşŧ şȧƒė ĵőƀ ŀőřėɱ ï⟧"
+      },
+      "first_job_summary": {
+        "en": "Create a local diagnostic receipt using synthetic public data. No external AI service is called.",
+        "ja": "公開用の合成データで、ローカルの診断記録を作ります。外部のAIサービスは呼び出しません。",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧ ŀőƈȧŀ ḓïȧɠñőşŧïƈ řėƈėïṗŧ ůşïñɠ şẏñŧħėŧïƈ ṗůƀŀïƈ ḓȧŧȧ. Ñő ėẋŧėřñȧŀ ȦÏ şėřṽïƈė ïş ƈȧŀŀėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "first_job_home_link": {
+        "en": "Open the first-job guide",
+        "ja": "最初の仕事のガイドを開く",
+        "qps-ploc": "⟦Őṗėñ ŧħė ƒïřşŧ-ĵőƀ ɠůïḓė ŀőřėɱ ï⟧"
+      },
+      "first_job_readiness": {
+        "en": "What is ready?",
+        "ja": "準備状況",
+        "qps-ploc": "⟦Ẇħȧŧ ïş řėȧḓẏ? ŀőřė⟧"
+      },
+      "first_job_identity_unknown": {
+        "en": "Identity setup: not checked by this diagnostic.",
+        "ja": "利用者の基本設定：この診断では未確認です。",
+        "qps-ploc": "⟦Ïḓėñŧïŧẏ şėŧůṗ: ñőŧ ƈħėƈķėḓ ƀẏ ŧħïş ḓïȧɠñőşŧïƈ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "first_job_baseline_unknown": {
+        "en": "Environment baseline: not checked by this diagnostic.",
+        "ja": "環境の基本チェック：この診断では未確認です。",
+        "qps-ploc": "⟦Ėñṽïřőñɱėñŧ ƀȧşėŀïñė: ñőŧ ƈħėƈķėḓ ƀẏ ŧħïş ḓïȧɠñőşŧïƈ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "first_job_reasoning_unknown": {
+        "en": "External AI readiness: not checked and not needed for this job.",
+        "ja": "外部AIの準備状況：未確認です。この仕事には不要です。",
+        "qps-ploc": "⟦Ėẋŧėřñȧŀ ȦÏ řėȧḓïñėşş: ñőŧ ƈħėƈķėḓ ȧñḓ ñőŧ ñėėḓėḓ ƒőř ŧħïş ĵőƀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "first_job_loading": {
+        "en": "Checking the saved diagnostic setup…",
+        "ja": "保存済みの診断設定を確認中…",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ŧħė şȧṽėḓ ḓïȧɠñőşŧïƈ şėŧůṗ… ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "first_job_ready": {
+        "en": "The local diagnostic mapping is configured. Verified sign-in for approvals is checked separately below.",
+        "ja": "ローカルの診断設定は紐づいています。承認に必要な本人確認は、下で別に確認します。",
+        "qps-ploc": "⟦Ŧħė ŀőƈȧŀ ḓïȧɠñőşŧïƈ ɱȧṗṗïñɠ ïş ƈőñƒïɠůřėḓ. Ṽėřïƒïėḓ şïɠñ-ïñ ƒőř ȧṗṗřőṽȧŀş ïş ƈħėƈķėḓ şėṗȧřȧŧėŀẏ ƀėŀőẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "first_job_mapping_missing": {
+        "en": "A diagnostic setup has not been linked to this local viewer.",
+        "ja": "このローカルの利用環境に診断用の設定がまだ紐づいていません。",
+        "qps-ploc": "⟦Ȧ ḓïȧɠñőşŧïƈ şėŧůṗ ħȧş ñőŧ ƀėėñ ŀïñķėḓ ŧő ŧħïş ŀőƈȧŀ ṽïėẇėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "first_job_mapping_mismatch": {
+        "en": "The diagnostic setup does not match this local viewer. Ask the setup owner to review it.",
+        "ja": "診断用の設定がこのローカルの利用環境と一致しません。設定担当者に確認を依頼してください。",
+        "qps-ploc": "⟦Ŧħė ḓïȧɠñőşŧïƈ şėŧůṗ ḓőėş ñőŧ ɱȧŧƈħ ŧħïş ŀőƈȧŀ ṽïėẇėř. Ȧşķ ŧħė şėŧůṗ őẇñėř ŧő řėṽïėẇ ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "first_job_mapping_ambiguous": {
+        "en": "More than one diagnostic setup matches. Ask the setup owner to select a single setup.",
+        "ja": "診断用の設定が複数見つかりました。設定担当者に一つに絞ってもらってください。",
+        "qps-ploc": "⟦Ɱőřė ŧħȧñ őñė ḓïȧɠñőşŧïƈ şėŧůṗ ɱȧŧƈħėş. Ȧşķ ŧħė şėŧůṗ őẇñėř ŧő şėŀėƈŧ ȧ şïñɠŀė şėŧůṗ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "first_job_mapping_unavailable": {
+        "en": "The diagnostic setup could not be checked. Refresh before taking any action.",
+        "ja": "診断用の設定を確認できませんでした。操作する前に状況を更新してください。",
+        "qps-ploc": "⟦Ŧħė ḓïȧɠñőşŧïƈ şėŧůṗ ƈőůŀḓ ñőŧ ƀė ƈħėƈķėḓ. Řėƒřėşħ ƀėƒőřė ŧȧķïñɠ ȧñẏ ȧƈŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "first_job_mapping_changed": {
+        "en": "The saved session no longer matches the current setup. Keep any pending request and ask the setup owner to review the change.",
+        "ja": "保存済みの会話と現在の設定が一致しません。保留中の依頼を残し、設定担当者に変更内容の確認を依頼してください。",
+        "qps-ploc": "⟦Ŧħė şȧṽėḓ şėşşïőñ ñő ŀőñɠėř ɱȧŧƈħėş ŧħė ƈůřřėñŧ şėŧůṗ. Ķėėṗ ȧñẏ ṗėñḓïñɠ řėɋůėşŧ ȧñḓ ȧşķ ŧħė şėŧůṗ őẇñėř ŧő řėṽïėẇ ŧħė ƈħȧñɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "first_job_setup_title": {
+        "en": "Review setup first",
+        "ja": "まず設定を確認",
+        "qps-ploc": "⟦Řėṽïėẇ şėŧůṗ ƒïřşŧ ŀőřėɱ⟧"
+      },
+      "first_job_setup_preview": {
+        "en": "In the project terminal, preview a dedicated test tenant setup. This command does not apply changes.",
+        "ja": "プロジェクトのターミナルで、専用のテスト用利用先の設定案を確認します。このコマンドは変更を適用しません。",
+        "qps-ploc": "⟦Ïñ ŧħė ṗřőĵėƈŧ ŧėřɱïñȧŀ, ṗřėṽïėẇ ȧ ḓėḓïƈȧŧėḓ ŧėşŧ ŧėñȧñŧ şėŧůṗ. Ŧħïş ƈőɱɱȧñḓ ḓőėş ñőŧ ȧṗṗŀẏ ƈħȧñɠėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "first_job_setup_apply": {
+        "en": "Review the proposed changes and the actual signed-in user. Only then apply that exact plan using its displayed digest. This page cannot change setup.",
+        "ja": "変更案と実際の利用者を確認してから、表示されたダイジェストを指定して同じ案を適用します。この画面では設定を変更できません。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ṗřőṗőşėḓ ƈħȧñɠėş ȧñḓ ŧħė ȧƈŧůȧŀ şïɠñėḓ-ïñ ůşėř. Őñŀẏ ŧħėñ ȧṗṗŀẏ ŧħȧŧ ėẋȧƈŧ ṗŀȧñ ůşïñɠ ïŧş ḓïşṗŀȧẏėḓ ḓïɠėşŧ. Ŧħïş ṗȧɠė ƈȧññőŧ ƈħȧñɠė şėŧůṗ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀ⟧"
+      },
+      "first_job_steps": {
+        "en": "How this job works",
+        "ja": "この仕事の進め方",
+        "qps-ploc": "⟦Ħőẇ ŧħïş ĵőƀ ẇőřķş ŀőřėɱ⟧"
+      },
+      "first_job_step_start": {
+        "en": "1. Request a synthetic diagnostic receipt.",
+        "ja": "1. 合成データの診断記録を依頼します。",
+        "qps-ploc": "⟦1. Řėɋůėşŧ ȧ şẏñŧħėŧïƈ ḓïȧɠñőşŧïƈ řėƈėïṗŧ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "first_job_step_review": {
+        "en": "2. Advance the diagnostic with the terminal command below, then sign in and review the exact approval in this guide. Nothing is approved automatically.",
+        "ja": "2. 下のターミナルコマンドで診断を進め、サインインして、このガイドで承認内容を確認します。自動で承認されることはありません。",
+        "qps-ploc": "⟦2. Ȧḓṽȧñƈė ŧħė ḓïȧɠñőşŧïƈ ẇïŧħ ŧħė ŧėřɱïñȧŀ ƈőɱɱȧñḓ ƀėŀőẇ, ŧħėñ şïɠñ ïñ ȧñḓ řėṽïėẇ ŧħė ėẋȧƈŧ ȧṗṗřőṽȧŀ ïñ ŧħïş ɠůïḓė. Ñőŧħïñɠ ïş ȧṗṗřőṽėḓ ȧůŧőɱȧŧïƈȧŀŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀő⟧"
+      },
+      "first_job_step_receipt": {
+        "en": "3. Run that command again after approval, then refresh here to check the verified receipt. A reply alone does not prove completion.",
+        "ja": "3. 承認後に同じコマンドをもう一度実行し、この画面を更新して確認済みの記録を見ます。返答があるだけでは完了を意味しません。",
+        "qps-ploc": "⟦3. Řůñ ŧħȧŧ ƈőɱɱȧñḓ ȧɠȧïñ ȧƒŧėř ȧṗṗřőṽȧŀ, ŧħėñ řėƒřėşħ ħėřė ŧő ƈħėƈķ ŧħė ṽėřïƒïėḓ řėƈėïṗŧ. Ȧ řėṗŀẏ ȧŀőñė ḓőėş ñőŧ ṗřőṽė ƈőɱṗŀėŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
+      },
+      "first_job_step_revise": {
+        "en": "4. Change the format of a verified receipt if needed. Each new revision needs a new approval; earlier receipts stay in history.",
+        "ja": "4. 必要なら確認済みの記録の形式を変更します。新しい版には毎回承認が必要で、以前の記録も履歴に残ります。",
+        "qps-ploc": "⟦4. Ƈħȧñɠė ŧħė ƒőřɱȧŧ őƒ ȧ ṽėřïƒïėḓ řėƈėïṗŧ ïƒ ñėėḓėḓ. Ėȧƈħ ñėẇ řėṽïşïőñ ñėėḓş ȧ ñėẇ ȧṗṗřőṽȧŀ; ėȧřŀïėř řėƈėïṗŧş şŧȧẏ ïñ ħïşŧőřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "first_job_start": {
+        "en": "Request the first diagnostic",
+        "ja": "最初の診断を依頼",
+        "qps-ploc": "⟦Řėɋůėşŧ ŧħė ƒïřşŧ ḓïȧɠñőşŧïƈ ŀőřėɱ ïṗş⟧"
+      },
+      "first_job_refresh": {
+        "en": "Refresh status",
+        "ja": "状況を更新",
+        "qps-ploc": "⟦Řėƒřėşħ şŧȧŧůş ŀőřė⟧"
+      },
+      "first_job_approval": {
+        "en": "Review diagnostic approval",
+        "ja": "診断の承認内容を確認",
+        "qps-ploc": "⟦Řėṽïėẇ ḓïȧɠñőşŧïƈ ȧṗṗřőṽȧŀ ŀőřėɱ ïṗ⟧"
+      },
+      "first_job_wait": {
+        "en": "Sending this request…",
+        "ja": "この依頼を送信中…",
+        "qps-ploc": "⟦Şėñḓïñɠ ŧħïş řėɋůėşŧ… ŀőřėɱ ⟧"
+      },
+      "first_job_empty": {
+        "en": "No diagnostic has been requested in this session.",
+        "ja": "この会話ではまだ診断を依頼していません。",
+        "qps-ploc": "⟦Ñő ḓïȧɠñőşŧïƈ ħȧş ƀėėñ řėɋůėşŧėḓ ïñ ŧħïş şėşşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "first_job_pending": {
+        "en": "A diagnostic is still pending. Refresh its status or review its approval before requesting a revision.",
+        "ja": "診断はまだ処理中です。状況の更新または承認内容の確認をしてから、新しい版を依頼してください。",
+        "qps-ploc": "⟦Ȧ ḓïȧɠñőşŧïƈ ïş şŧïŀŀ ṗėñḓïñɠ. Řėƒřėşħ ïŧş şŧȧŧůş őř řėṽïėẇ ïŧş ȧṗṗřőṽȧŀ ƀėƒőřė řėɋůėşŧïñɠ ȧ řėṽïşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "first_job_recorded": {
+        "en": "Your request is recorded. Review any required approval, then refresh the status here.",
+        "ja": "依頼が記録されました。必要な承認内容を確認してから、この画面の状況を更新してください。",
+        "qps-ploc": "⟦Ẏőůř řėɋůėşŧ ïş řėƈőřḓėḓ. Řėṽïėẇ ȧñẏ řėɋůïřėḓ ȧṗṗřőṽȧŀ, ŧħėñ řėƒřėşħ ŧħė şŧȧŧůş ħėřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "first_job_verified": {
+        "en": "A diagnostic receipt has been verified. Earlier versions remain below.",
+        "ja": "診断記録を確認できました。以前の版も下に残っています。",
+        "qps-ploc": "⟦Ȧ ḓïȧɠñőşŧïƈ řėƈėïṗŧ ħȧş ƀėėñ ṽėřïƒïėḓ. Ėȧřŀïėř ṽėřşïőñş řėɱȧïñ ƀėŀőẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "first_job_load_failed": {
+        "en": "The current status could not be loaded. No new request was sent. Refresh to check again.",
+        "ja": "現在の状況を読み込めませんでした。新しい依頼は送信していません。更新して再確認してください。",
+        "qps-ploc": "⟦Ŧħė ƈůřřėñŧ şŧȧŧůş ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. Ñő ñėẇ řėɋůėşŧ ẇȧş şėñŧ. Řėƒřėşħ ŧő ƈħėƈķ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "first_job_uncertain": {
+        "en": "The sending result is uncertain. Refresh to inspect the saved request. This page will not send it again automatically.",
+        "ja": "送信結果を確認できません。更新して保存済みの依頼を確認してください。自動で再送信することはありません。",
+        "qps-ploc": "⟦Ŧħė şėñḓïñɠ řėşůŀŧ ïş ůñƈėřŧȧïñ. Řėƒřėşħ ŧő ïñşṗėƈŧ ŧħė şȧṽėḓ řėɋůėşŧ. Ŧħïş ṗȧɠė ẇïŀŀ ñőŧ şėñḓ ïŧ ȧɠȧïñ ȧůŧőɱȧŧïƈȧŀŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
+      },
+      "first_job_retry_safe": {
+        "en": "This request was not accepted. Refresh the setup, then retry the same request if it is still appropriate.",
+        "ja": "この依頼は受け付けられませんでした。設定を更新して確認し、問題がなければ同じ依頼を再試行してください。",
+        "qps-ploc": "⟦Ŧħïş řėɋůėşŧ ẇȧş ñőŧ ȧƈƈėṗŧėḓ. Řėƒřėşħ ŧħė şėŧůṗ, ŧħėñ řėŧřẏ ŧħė şȧɱė řėɋůėşŧ ïƒ ïŧ ïş şŧïŀŀ ȧṗṗřőṗřïȧŧė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
+      },
+      "first_job_retry": {
+        "en": "Retry the same request",
+        "ja": "同じ依頼を再試行",
+        "qps-ploc": "⟦Řėŧřẏ ŧħė şȧɱė řėɋůėşŧ ŀőřėɱ ï⟧"
+      },
+      "first_job_storage_required": {
+        "en": "Browser session storage and secure request IDs are needed to prevent duplicate submissions. Allow session storage, then reload before starting.",
+        "ja": "重複送信を防ぐため、ブラウザの一時保存と安全な依頼IDが必要です。一時保存を許可してから再読み込みしてください。",
+        "qps-ploc": "⟦Ƀřőẇşėř şėşşïőñ şŧőřȧɠė ȧñḓ şėƈůřė řėɋůėşŧ ÏḒş ȧřė ñėėḓėḓ ŧő ṗřėṽėñŧ ḓůṗŀïƈȧŧė şůƀɱïşşïőñş. Ȧŀŀőẇ şėşşïőñ şŧőřȧɠė, ŧħėñ řėŀőȧḓ ƀėƒőřė şŧȧřŧïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
+      },
+      "first_job_history": {
+        "en": "Diagnostic receipt history",
+        "ja": "診断記録の履歴",
+        "qps-ploc": "⟦Ḓïȧɠñőşŧïƈ řėƈėïṗŧ ħïşŧőřẏ ŀőřėɱ ïṗ⟧"
+      },
+      "first_job_revision": {
+        "en": "Revision",
+        "ja": "版",
+        "qps-ploc": "⟦Řėṽïşïőñ ŀőř⟧"
+      },
+      "first_job_request": {
+        "en": "Request ID",
+        "ja": "依頼ID",
+        "qps-ploc": "⟦Řėɋůėşŧ ÏḒ ŀőř⟧"
+      },
+      "first_job_digest": {
+        "en": "Verified content digest",
+        "ja": "確認済みの内容ダイジェスト",
+        "qps-ploc": "⟦Ṽėřïƒïėḓ ƈőñŧėñŧ ḓïɠėşŧ ŀőřėɱ ï⟧"
+      },
+      "first_job_format": {
+        "en": "Format",
+        "ja": "形式",
+        "qps-ploc": "⟦Ƒőřɱȧŧ ŀőř⟧"
+      },
+      "first_job_format_compact": {
+        "en": "Compact JSON",
+        "ja": "コンパクトなJSON",
+        "qps-ploc": "⟦Ƈőɱṗȧƈŧ ĴŞŐÑ ŀőř⟧"
+      },
+      "first_job_format_readable": {
+        "en": "Readable JSON",
+        "ja": "読みやすいJSON",
+        "qps-ploc": "⟦Řėȧḓȧƀŀė ĴŞŐÑ ŀőřė⟧"
+      },
+      "first_job_revise_compact": {
+        "en": "Request a compact version",
+        "ja": "コンパクトな版を依頼",
+        "qps-ploc": "⟦Řėɋůėşŧ ȧ ƈőɱṗȧƈŧ ṽėřşïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "first_job_revise_readable": {
+        "en": "Request a readable version",
+        "ja": "読みやすい版を依頼",
+        "qps-ploc": "⟦Řėɋůėşŧ ȧ řėȧḓȧƀŀė ṽėřşïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "first_job_revision_notice": {
+        "en": "This requests a new version of the displayed verified receipt. Review and approve that new request separately.",
+        "ja": "表示中の確認済み記録の新しい版を依頼します。新しい依頼は別途、内容の確認と承認が必要です。",
+        "qps-ploc": "⟦Ŧħïş řėɋůėşŧş ȧ ñėẇ ṽėřşïőñ őƒ ŧħė ḓïşṗŀȧẏėḓ ṽėřïƒïėḓ řėƈėïṗŧ. Řėṽïėẇ ȧñḓ ȧṗṗřőṽė ŧħȧŧ ñėẇ řėɋůėşŧ şėṗȧřȧŧėŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "first_job_status": {
+        "en": "Current status",
+        "ja": "現在の状況",
+        "qps-ploc": "⟦Ƈůřřėñŧ şŧȧŧůş ŀőřė⟧"
+      },
+      "first_job_status_unknown": {
+        "en": "Not verified",
+        "ja": "未確認",
+        "qps-ploc": "⟦Ñőŧ ṽėřïƒïėḓ ŀőř⟧"
+      },
+      "first_job_status_awaiting_approval": {
+        "en": "Waiting for your approval",
+        "ja": "あなたの承認待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ẏőůř ȧṗṗřőṽȧŀ ŀőřėɱ ïṗ⟧"
+      },
+      "first_job_status_queued": {
+        "en": "Queued",
+        "ja": "実行待ち",
+        "qps-ploc": "⟦Ɋůėůėḓ ŀőř⟧"
+      },
+      "first_job_status_running": {
+        "en": "Running",
+        "ja": "実行中",
+        "qps-ploc": "⟦Řůññïñɠ ŀőř⟧"
+      },
+      "first_job_status_blocked": {
+        "en": "Blocked; review the request",
+        "ja": "停止中：依頼を確認してください",
+        "qps-ploc": "⟦Ƀŀőƈķėḓ; řėṽïėẇ ŧħė řėɋůėşŧ ŀőřėɱ ïṗ⟧"
+      },
+      "first_job_status_work_completed": {
+        "en": "Verified completion",
+        "ja": "完了確認済み",
+        "qps-ploc": "⟦Ṽėřïƒïėḓ ƈőɱṗŀėŧïőñ ŀőřėɱ ⟧"
+      },
+      "first_job_status_uncertain": {
+        "en": "Execution outcome is not verified",
+        "ja": "実行結果は未確認",
+        "qps-ploc": "⟦Ėẋėƈůŧïőñ őůŧƈőɱė ïş ñőŧ ṽėřïƒïėḓ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "first_job_older": {
+        "en": "Earlier verified version",
+        "ja": "以前の確認済みの版",
+        "qps-ploc": "⟦Ėȧřŀïėř ṽėřïƒïėḓ ṽėřşïőñ ŀőřėɱ ï⟧"
+      },
+      "first_job_latest": {
+        "en": "Latest verified version",
+        "ja": "最新の確認済みの版",
+        "qps-ploc": "⟦Ŀȧŧėşŧ ṽėřïƒïėḓ ṽėřşïőñ ŀőřėɱ ï⟧"
+      },
+      "first_job_requested": {
+        "en": "Requested version; not yet verified",
+        "ja": "依頼済みの版：まだ未確認",
+        "qps-ploc": "⟦Řėɋůėşŧėḓ ṽėřşïőñ; ñőŧ ẏėŧ ṽėřïƒïėḓ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "first_job_checked_at": {
+        "en": "Last verified",
+        "ja": "最後に確認した日時",
+        "qps-ploc": "⟦Ŀȧşŧ ṽėřïƒïėḓ ŀőřė⟧"
+      },
+      "first_job_status_cancel_requested": {
+        "en": "Cancellation requested",
+        "ja": "取り消し依頼済み",
+        "qps-ploc": "⟦Ƈȧñƈėŀŀȧŧïőñ řėɋůėşŧėḓ ŀőřėɱ ï⟧"
+      },
+      "first_job_scope": {
+        "en": "Public diagnostic scope: test tenant only",
+        "ja": "公開データの診断範囲：テスト用の利用先のみ",
+        "qps-ploc": "⟦Ṗůƀŀïƈ ḓïȧɠñőşŧïƈ şƈőṗė: ŧėşŧ ŧėñȧñŧ őñŀẏ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "first_job_advance": {
+        "en": "Advance this diagnostic from the project terminal with one bounded step. If it asks for approval, sign in and review the exact request below, then run the same command again and refresh here.",
+        "ja": "プロジェクトのターミナルで、この診断だけを1段階進めます。承認待ちになったらサインインして下で依頼内容を確認し、同じコマンドをもう一度実行して、この画面を更新してください。",
+        "qps-ploc": "⟦Ȧḓṽȧñƈė ŧħïş ḓïȧɠñőşŧïƈ ƒřőɱ ŧħė ṗřőĵėƈŧ ŧėřɱïñȧŀ ẇïŧħ őñė ƀőůñḓėḓ şŧėṗ. Ïƒ ïŧ ȧşķş ƒőř ȧṗṗřőṽȧŀ, şïɠñ ïñ ȧñḓ řėṽïėẇ ŧħė ėẋȧƈŧ řėɋůėşŧ ƀėŀőẇ, ŧħėñ řůñ ŧħė şȧɱė ƈőɱɱȧñḓ ȧɠȧïñ ȧñḓ řėƒřėşħ ħėřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "first_job_approval_title": {
+        "en": "Review this diagnostic request",
+        "ja": "この診断依頼の承認",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħïş ḓïȧɠñőşŧïƈ řėɋůėşŧ ŀőřėɱ ïṗşů⟧"
+      },
+      "first_job_approval_unknown": {
+        "en": "Approval identity has not been checked. Local browser access alone does not prove who is approving.",
+        "ja": "承認する本人の確認はまだできていません。ローカルのブラウザからのアクセスだけでは、承認者の本人確認にはなりません。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ïḓėñŧïŧẏ ħȧş ñőŧ ƀėėñ ƈħėƈķėḓ. Ŀőƈȧŀ ƀřőẇşėř ȧƈƈėşş ȧŀőñė ḓőėş ñőŧ ṗřőṽė ẇħő ïş ȧṗṗřőṽïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "first_job_approval_auth_needed": {
+        "en": "Sign in with your existing organization account before approving. A verified browser session and permission for this test tenant are required.",
+        "ja": "承認する前に、既存の組織アカウントでサインインしてください。本人確認済みのブラウザセッションと、このテスト用利用先での承認権限が必要です。",
+        "qps-ploc": "⟦Şïɠñ ïñ ẇïŧħ ẏőůř ėẋïşŧïñɠ őřɠȧñïẑȧŧïőñ ȧƈƈőůñŧ ƀėƒőřė ȧṗṗřőṽïñɠ. Ȧ ṽėřïƒïėḓ ƀřőẇşėř şėşşïőñ ȧñḓ ṗėřɱïşşïőñ ƒőř ŧħïş ŧėşŧ ŧėñȧñŧ ȧřė řėɋůïřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
+      },
+      "first_job_approval_signin": {
+        "en": "Open existing sign-in",
+        "ja": "既存のサインイン画面を開く",
+        "qps-ploc": "⟦Őṗėñ ėẋïşŧïñɠ şïɠñ-ïñ ŀőřėɱ ⟧"
+      },
+      "first_job_approval_signin_hint": {
+        "en": "The existing sign-in page will say if authentication is not configured. No provider is set up from this guide.",
+        "ja": "認証が未設定の場合は、既存のサインイン画面に表示されます。このガイドでは認証サービスの設定は行いません。",
+        "qps-ploc": "⟦Ŧħė ėẋïşŧïñɠ şïɠñ-ïñ ṗȧɠė ẇïŀŀ şȧẏ ïƒ ȧůŧħėñŧïƈȧŧïőñ ïş ñőŧ ƈőñƒïɠůřėḓ. Ñő ṗřőṽïḓėř ïş şėŧ ůṗ ƒřőɱ ŧħïş ɠůïḓė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "first_job_approval_forbidden": {
+        "en": "The signed-in account cannot approve this diagnostic. Ask the test tenant administrator to check its existing membership and approval role.",
+        "ja": "サインイン中のアカウントではこの診断を承認できません。テスト用利用先の管理者に、既存の所属と承認権限の確認を依頼してください。",
+        "qps-ploc": "⟦Ŧħė şïɠñėḓ-ïñ ȧƈƈőůñŧ ƈȧññőŧ ȧṗṗřőṽė ŧħïş ḓïȧɠñőşŧïƈ. Ȧşķ ŧħė ŧėşŧ ŧėñȧñŧ ȧḓɱïñïşŧřȧŧőř ŧő ƈħėƈķ ïŧş ėẋïşŧïñɠ ɱėɱƀėřşħïṗ ȧñḓ ȧṗṗřőṽȧŀ řőŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñ⟧"
+      },
+      "first_job_approval_loading": {
+        "en": "Checking verified sign-in and the exact diagnostic request…",
+        "ja": "本人確認と診断依頼の内容を確認中…",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ ṽėřïƒïėḓ şïɠñ-ïñ ȧñḓ ŧħė ėẋȧƈŧ ḓïȧɠñőşŧïƈ řėɋůėşŧ… ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "first_job_approval_empty": {
+        "en": "There is no pending diagnostic approval in this verified view. Refresh after advancing the diagnostic.",
+        "ja": "この確認済みの表示には、承認待ちの診断がありません。診断を進めた後に更新してください。",
+        "qps-ploc": "⟦Ŧħėřė ïş ñő ṗėñḓïñɠ ḓïȧɠñőşŧïƈ ȧṗṗřőṽȧŀ ïñ ŧħïş ṽėřïƒïėḓ ṽïėẇ. Řėƒřėşħ ȧƒŧėř ȧḓṽȧñƈïñɠ ŧħė ḓïȧɠñőşŧïƈ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "first_job_approval_ready": {
+        "en": "Verified sign-in is available for this approval. Review the exact scope, revision, and effect below before choosing.",
+        "ja": "この承認に必要な本人確認ができています。対象範囲、版、実行内容を下で確認してから選んでください。",
+        "qps-ploc": "⟦Ṽėřïƒïėḓ şïɠñ-ïñ ïş ȧṽȧïŀȧƀŀė ƒőř ŧħïş ȧṗṗřőṽȧŀ. Řėṽïėẇ ŧħė ėẋȧƈŧ şƈőṗė, řėṽïşïőñ, ȧñḓ ėƒƒėƈŧ ƀėŀőẇ ƀėƒőřė ƈħőőşïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
+      },
+      "first_job_approval_effect": {
+        "en": "This authorizes one new local public diagnostic file for the displayed request and revision. Existing receipts are preserved. No data is transmitted outside this computer. It does not approve another request or a later revision.",
+        "ja": "表示中の依頼と版について、ローカルの公開用診断ファイルを1つ新規作成することを許可します。既存の記録は残り、このコンピュータの外へデータを送信しません。別の依頼や後の版を承認するものではありません。",
+        "qps-ploc": "⟦Ŧħïş ȧůŧħőřïẑėş őñė ñėẇ ŀőƈȧŀ ṗůƀŀïƈ ḓïȧɠñőşŧïƈ ƒïŀė ƒőř ŧħė ḓïşṗŀȧẏėḓ řėɋůėşŧ ȧñḓ řėṽïşïőñ. Ėẋïşŧïñɠ řėƈėïṗŧş ȧřė ṗřėşėřṽėḓ. Ñő ḓȧŧȧ ïş ŧřȧñşɱïŧŧėḓ őůŧşïḓė ŧħïş ƈőɱṗůŧėř. Ïŧ ḓőėş ñőŧ ȧṗṗřőṽė ȧñőŧħėř řėɋůėşŧ őř ȧ ŀȧŧėř řėṽïşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "first_job_approval_id": {
+        "en": "Approval request",
+        "ja": "承認依頼",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řėɋůėşŧ ŀőřėɱ⟧"
+      },
+      "first_job_approval_effect_digest": {
+        "en": "Displayed request digest",
+        "ja": "表示中の依頼のダイジェスト",
+        "qps-ploc": "⟦Ḓïşṗŀȧẏėḓ řėɋůėşŧ ḓïɠėşŧ ŀőřėɱ ï⟧"
+      },
+      "first_job_approval_binding_digest": {
+        "en": "Scope and identity binding digest",
+        "ja": "範囲と識別情報の結び付けのダイジェスト",
+        "qps-ploc": "⟦Şƈőṗė ȧñḓ ïḓėñŧïŧẏ ƀïñḓïñɠ ḓïɠėşŧ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "first_job_approval_accept": {
+        "en": "Approve this exact diagnostic",
+        "ja": "この診断内容を承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽė ŧħïş ėẋȧƈŧ ḓïȧɠñőşŧïƈ ŀőřėɱ ïṗş⟧"
+      },
+      "first_job_approval_reject": {
+        "en": "Reject this diagnostic",
+        "ja": "この診断を却下",
+        "qps-ploc": "⟦Řėĵėƈŧ ŧħïş ḓïȧɠñőşŧïƈ ŀőřėɱ ï⟧"
+      },
+      "first_job_approval_refresh": {
+        "en": "Check approval status",
+        "ja": "承認状況を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ȧṗṗřőṽȧŀ şŧȧŧůş ŀőřėɱ ⟧"
+      },
+      "first_job_approval_sending": {
+        "en": "Recording your decision…",
+        "ja": "判断を記録中…",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ ẏőůř ḓėƈïşïőñ… ŀőřėɱ ï⟧"
+      },
+      "first_job_approval_recorded": {
+        "en": "Your decision was recorded for this exact request. Refresh the diagnostic status before continuing.",
+        "ja": "この依頼に対する判断を記録しました。続ける前に診断状況を更新してください。",
+        "qps-ploc": "⟦Ẏőůř ḓėƈïşïőñ ẇȧş řėƈőřḓėḓ ƒőř ŧħïş ėẋȧƈŧ řėɋůėşŧ. Řėƒřėşħ ŧħė ḓïȧɠñőşŧïƈ şŧȧŧůş ƀėƒőřė ƈőñŧïñůïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "first_job_approval_failed": {
+        "en": "Approval details could not be verified. Refresh before making a decision.",
+        "ja": "承認内容を確認できませんでした。判断する前に更新してください。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ḓėŧȧïŀş ƈőůŀḓ ñőŧ ƀė ṽėřïƒïėḓ. Řėƒřėşħ ƀėƒőřė ɱȧķïñɠ ȧ ḓėƈïşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "first_job_approval_uncertain": {
+        "en": "The decision result is uncertain. Check the saved approval status before deciding again. Nothing will be sent again automatically.",
+        "ja": "判断の記録結果を確認できません。もう一度判断する前に、保存済みの承認状況を確認してください。自動で再送信することはありません。",
+        "qps-ploc": "⟦Ŧħė ḓėƈïşïőñ řėşůŀŧ ïş ůñƈėřŧȧïñ. Ƈħėƈķ ŧħė şȧṽėḓ ȧṗṗřőṽȧŀ şŧȧŧůş ƀėƒőřė ḓėƈïḓïñɠ ȧɠȧïñ. Ñőŧħïñɠ ẇïŀŀ ƀė şėñŧ ȧɠȧïñ ȧůŧőɱȧŧïƈȧŀŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
+      },
+      "first_job_approval_changed": {
+        "en": "The request or its permissions changed. Refresh and review the current details before deciding.",
+        "ja": "依頼内容または権限が変更されました。更新して現在の内容を確認してから判断してください。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ őř ïŧş ṗėřɱïşşïőñş ƈħȧñɠėḓ. Řėƒřėşħ ȧñḓ řėṽïėẇ ŧħė ƈůřřėñŧ ḓėŧȧïŀş ƀėƒőřė ḓėƈïḓïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "first_job_approval_configuration": {
+        "en": "Verified sign-in is not configured, so this diagnostic cannot yet be approved or executed. Ask the operator to configure the existing organization sign-in, then return here. No credentials are created by this page.",
+        "ja": "本人確認用のサインインが未設定のため、この診断はまだ承認・実行できません。担当者に既存の組織サインインの設定を依頼してから戻ってください。この画面で認証情報を作成することはありません。",
+        "qps-ploc": "⟦Ṽėřïƒïėḓ şïɠñ-ïñ ïş ñőŧ ƈőñƒïɠůřėḓ, şő ŧħïş ḓïȧɠñőşŧïƈ ƈȧññőŧ ẏėŧ ƀė ȧṗṗřőṽėḓ őř ėẋėƈůŧėḓ. Ȧşķ ŧħė őṗėřȧŧőř ŧő ƈőñƒïɠůřė ŧħė ėẋïşŧïñɠ őřɠȧñïẑȧŧïőñ şïɠñ-ïñ, ŧħėñ řėŧůřñ ħėřė. Ñő ƈřėḓėñŧïȧŀş ȧřė ƈřėȧŧėḓ ƀẏ ŧħïş ṗȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "first_job_approval_diagnostic_unavailable": {
+        "en": "The current diagnostic setup could not be matched. Refresh the diagnostic setup before reviewing approvals.",
+        "ja": "現在の診断設定との対応を確認できません。承認内容を確認する前に診断設定を更新してください。",
+        "qps-ploc": "⟦Ŧħė ƈůřřėñŧ ḓïȧɠñőşŧïƈ şėŧůṗ ƈőůŀḓ ñőŧ ƀė ɱȧŧƈħėḓ. Řėƒřėşħ ŧħė ḓïȧɠñőşŧïƈ şėŧůṗ ƀėƒőřė řėṽïėẇïñɠ ȧṗṗřőṽȧŀş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
+      },
+      "first_job_approval_destination": {
+        "en": "Destination",
+        "ja": "保存先",
+        "qps-ploc": "⟦Ḓėşŧïñȧŧïőñ ŀőř⟧"
+      },
+      "first_job_approval_destination_local": {
+        "en": "Local public diagnostic receipt",
+        "ja": "ローカルの公開用診断記録",
+        "qps-ploc": "⟦Ŀőƈȧŀ ṗůƀŀïƈ ḓïȧɠñőşŧïƈ řėƈėïṗŧ ŀőřėɱ ïṗşů⟧"
+      },
+      "first_job_approval_expires": {
+        "en": "Approval expires",
+        "ja": "承認依頼の有効期限",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ėẋṗïřėş ŀőřėɱ⟧"
+      },
+      "first_job_approval_payload_digest": {
+        "en": "Exact diagnostic payload digest",
+        "ja": "診断データのダイジェスト",
+        "qps-ploc": "⟦Ėẋȧƈŧ ḓïȧɠñőşŧïƈ ṗȧẏŀőȧḓ ḓïɠėşŧ ŀőřėɱ ïṗşů⟧"
+      },
+      "first_job_approval_execution_deadline": {
+        "en": "Latest execution time for this verified session",
+        "ja": "この本人確認で実行できる期限",
+        "qps-ploc": "⟦Ŀȧŧėşŧ ėẋėƈůŧïőñ ŧïɱė ƒőř ŧħïş ṽėřïƒïėḓ şėşşïőñ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "first_job_approval_validity": {
+        "en": "Approval cannot outlast this verified session or the request. Session-key changes, revoked membership, or a changed request can block execution earlier. A blocked job is never reapproved automatically. Signing out does not by itself revoke a recorded approval.",
+        "ja": "承認の有効期間は、本人確認セッションや依頼の期限を超えません。セッション鍵の変更、所属の取り消し、依頼内容の変更によって、期限より前に実行が止まる場合があります。停止した仕事が自動で再承認されることはありません。 サインアウトするだけでは、記録済みの承認は取り消されません。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ƈȧññőŧ őůŧŀȧşŧ ŧħïş ṽėřïƒïėḓ şėşşïőñ őř ŧħė řėɋůėşŧ. Şėşşïőñ-ķėẏ ƈħȧñɠėş, řėṽőķėḓ ɱėɱƀėřşħïṗ, őř ȧ ƈħȧñɠėḓ řėɋůėşŧ ƈȧñ ƀŀőƈķ ėẋėƈůŧïőñ ėȧřŀïėř. Ȧ ƀŀőƈķėḓ ĵőƀ ïş ñėṽėř řėȧṗṗřőṽėḓ ȧůŧőɱȧŧïƈȧŀŀẏ. Şïɠñïñɠ őůŧ ḓőėş ñőŧ ƀẏ ïŧşėŀƒ řėṽőķė ȧ řėƈőřḓėḓ ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
+      },
+      "first_job_approval_held": {
+        "en": "Approval cannot be verified. Operator recovery is required.",
+        "ja": "承認の検証不可・運用者による回復処理が必要",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ƈȧññőŧ ƀė ṽėřïƒïėḓ. Őṗėřȧŧőř řėƈőṽėřẏ ïş řėɋůïřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "first_job_approval_held_detail": {
+        "en": "This old request cannot execute with its recorded approval. An operator must recover the held workflow before it can continue. Signing in again, refreshing, or submitting another request does not clear this held action. Existing records and receipts remain unchanged.",
+        "ja": "この古い依頼は、記録済みの承認では実行できません。続けるには運用者による回復処理が必要です。再サインイン、画面の更新、新しい依頼の送信では、この保留状態は解消されません。既存の記録と診断記録はそのまま残ります。",
+        "qps-ploc": "⟦Ŧħïş őŀḓ řėɋůėşŧ ƈȧññőŧ ėẋėƈůŧė ẇïŧħ ïŧş řėƈőřḓėḓ ȧṗṗřőṽȧŀ. Ȧñ őṗėřȧŧőř ɱůşŧ řėƈőṽėř ŧħė ħėŀḓ ẇőřķƒŀőẇ ƀėƒőřė ïŧ ƈȧñ ƈőñŧïñůė. Şïɠñïñɠ ïñ ȧɠȧïñ, řėƒřėşħïñɠ, őř şůƀɱïŧŧïñɠ ȧñőŧħėř řėɋůėşŧ ḓőėş ñőŧ ƈŀėȧř ŧħïş ħėŀḓ ȧƈŧïőñ. Ėẋïşŧïñɠ řėƈőřḓş ȧñḓ řėƈėïṗŧş řėɱȧïñ ůñƈħȧñɠėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
       }
     },
     "operator": {

@@ -345,7 +345,7 @@ function shouldSkipPersistUnderTest(explicitDir: string | undefined): boolean {
  * The day-rotated file makes it cheap for downstream tools (e.g. Chronos viewer)
  * to scan recent activity without parsing the whole history.
  */
-export function persistTrace(trace: Trace, opts?: { dir?: string }): string {
+export function persistTrace(trace: Trace, opts?: { dir?: string; localOnly?: boolean }): string {
   const replayIssues = validateTraceReplay(trace);
   if (replayIssues.length > 0) {
     throw new Error(
@@ -382,7 +382,7 @@ export function persistTrace(trace: Trace, opts?: { dir?: string }): string {
   appendJsonLine(file, record);
   // OTLP is explicitly opt-in. Local JSONL persistence remains synchronous
   // and authoritative; exporter failure must never change pipeline outcome.
-  void exportTraceOtlp(safeTrace).catch(() => undefined);
+  if (!opts?.localOnly) void exportTraceOtlp(safeTrace).catch(() => undefined);
   return file;
 }
 
@@ -498,7 +498,7 @@ export async function exportTraceOtlp(trace: Trace): Promise<boolean> {
  */
 export function finalizeAndPersist(
   ctx: TraceContext,
-  opts?: { dir?: string }
+  opts?: { dir?: string; localOnly?: boolean }
 ): { trace: Trace; path: string } {
   const trace = ctx.finalize();
   const p = persistTrace(trace, opts);

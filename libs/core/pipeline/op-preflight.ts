@@ -150,6 +150,11 @@ export function listOpGuards(): OpPreflightGuard[] {
   return ordered(guards.values());
 }
 
+/** Bounded execution refuses opaque observers rather than bypassing policy. */
+export function opPreflightHasOutcomeObservers(): boolean {
+  return outcomeObservers.size > 0;
+}
+
 /** Clear runtime registrations for isolated tests and worker teardown. */
 export function resetOpPreflight(): void {
   listeners.clear();
