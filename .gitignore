@@ -12,6 +12,7 @@
 .agy/
 /.claude/*
 !/.claude/agents/
+!/.claude/hooks/
 *.skill
 tmp/
 .DS_Store
