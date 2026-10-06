@@ -666,6 +666,8 @@
       "allow_read": [
         "active/organizations/confidential/${KYBERION_TENANT}/",
         "active/organizations/public/${KYBERION_TENANT}/",
+        "active/organizations/personal/shared/${KYBERION_ORGANIZATION_ID}/",
+        "active/organizations/public/shared/${KYBERION_ORGANIZATION_ID}/",
         "knowledge/personal/tenants/${KYBERION_TENANT}.json",
         "knowledge/confidential/${KYBERION_TENANT}/",
         "knowledge/confidential/shared/",
@@ -675,6 +677,8 @@
       "allow_write": [
         "active/organizations/confidential/${KYBERION_TENANT}/",
         "active/organizations/public/${KYBERION_TENANT}/",
+        "active/organizations/personal/shared/${KYBERION_ORGANIZATION_ID}/",
+        "active/organizations/public/shared/${KYBERION_ORGANIZATION_ID}/",
         "active/shared/runtime/",
         "active/shared/observability/"
       ]

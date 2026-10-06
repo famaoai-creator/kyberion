@@ -1224,6 +1224,8 @@ const REASONING_FREE_ACTIONS: ReadonlySet<string> = new Set([
   'list',
   'status',
   'outbox',
+  'suggestions',
+  'hygiene',
   'organization-catalogs',
   'organization-profiles',
   'organization-profile',

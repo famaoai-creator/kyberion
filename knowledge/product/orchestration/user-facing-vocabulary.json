@@ -27819,6 +27819,11 @@
         "en": "{count} deliverable(s) arrived in the inbox.",
         "ja": "成果物 {count} 件が inbox に届きました。",
         "qps-ploc": "⟦{count} ḓėŀïṽėřȧƀŀė(ş) ȧřřïṽėḓ ïñ ŧħė ïñƀőẋ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "retro_evidence_freshness": {
+        "en": "## ⚠️ Evidence freshness\nMost evidence was recorded in one burst and/or deliverables were modified after their record-evidence call (edited-after-record task_ids: {tasks}). Bookkeeping compressed to mission close is weaker than record-as-you-go — treat with care.",
+        "ja": "## ⚠️ 証跡の鮮度\n証跡の大半が一括記録されたか、record-evidence 呼び出し後に成果物が変更されました（後編集 task_ids: {tasks}）。終了時にまとめて記録された証跡は随時記録より弱いため、注意して扱ってください。",
+        "qps-ploc": "⟦## ⚠️ Ėṽïḓėñƈė ƒřėşħñėşş\nⱮőşŧ ėṽïḓėñƈė ẇȧş řėƈőřḓėḓ ïñ őñė ƀůřşŧ ȧñḓ/őř ḓėŀïṽėřȧƀŀėş ẇėřė ɱőḓïƒïėḓ ȧƒŧėř ŧħėïř řėƈőřḓ-ėṽïḓėñƈė ƈȧŀŀ (ėḓïŧėḓ-ȧƒŧėř-řėƈőřḓ ŧȧşķ_ïḓş: {tasks}). Ƀőőķķėėṗïñɠ ƈőɱṗřėşşėḓ ŧő ɱïşşïőñ ƈŀőşė ïş ẇėȧķėř ŧħȧñ řėƈőřḓ-ȧş-ẏőů-ɠő — ŧřėȧŧ ẇïŧħ ƈȧřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
       }
     },
     "project_ops": {

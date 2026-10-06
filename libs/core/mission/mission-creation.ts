@@ -26,6 +26,7 @@ import { resolveMissionReviewDesign } from './mission-review-gates.js';
 import { consumeIntentGoalHandoff } from '../intent/intent-handoff.js';
 import {
   assertSafeRepositoryPath,
+  safeExecResult,
   safeExistsSync,
   safeMkdir,
   safeWriteFile,
@@ -233,6 +234,35 @@ export async function createMission(args: {
   if (safeExistsSync(missionStatePath)) {
     logger.info(`Mission ${upperId} already exists at ${missionDir}.`);
     return;
+  }
+
+  // Advisory surface checks (warn-only, never blocking):
+  //  - no intent baseline → the intent-drift/verify gates compare against
+  //    nothing, so a thin kickoff finishes unexamined (seen in dogfood).
+  //  - dirty working tree → commit-bound evidence checks measure HEAD, not
+  //    the working tree, and uncommitted changes contaminate reviews/diffs.
+  if (!intentHandoff && !isEphemeral) {
+    logger.warn(
+      `⚠️ [Kickoff] No intent baseline: mission ${upperId} has no --goal/--intent-goal handoff. The intent-drift and verify gates will have nothing to compare — pass --goal at kickoff for governed verification.`
+    );
+  }
+  try {
+    // Tracked changes only: untracked artifacts are routine in this repo and
+    // don't contaminate commit-bound diffs — counting them would be noise.
+    const dirty = safeExecResult('git', ['status', '--porcelain', '--untracked-files=no'], {
+      cwd: rootDir,
+    });
+    const dirtyCount =
+      dirty.status === 0
+        ? dirty.stdout.split('\n').filter((line) => line.trim().length > 0).length
+        : 0;
+    if (dirtyCount > 0) {
+      logger.warn(
+        `⚠️ [Kickoff] Working tree has ${dirtyCount} uncommitted change(s); commit-bound evidence and review diffs measure HEAD, not the working tree.`
+      );
+    }
+  } catch {
+    // not a git checkout or git unavailable — the warning is advisory only
   }
 
   const gitBranch = getCurrentBranch(rootDir);

@@ -1075,6 +1075,10 @@
       "types": "./dist/mission/mission-hygiene.d.ts",
       "default": "./dist/mission/mission-hygiene.js"
     },
+    "./mission-review-suggestions": {
+      "types": "./dist/mission/mission-review-suggestions.d.ts",
+      "default": "./dist/mission/mission-review-suggestions.js"
+    },
     "./delegated-task-observability": {
       "types": "./dist/delegated-task-observability.d.ts",
       "default": "./dist/delegated-task-observability.js"
@@ -4650,6 +4654,10 @@
     "./mission/mission-hygiene": {
       "types": "./dist/mission/mission-hygiene.d.ts",
       "default": "./dist/mission/mission-hygiene.js"
+    },
+    "./mission/mission-review-suggestions": {
+      "types": "./dist/mission/mission-review-suggestions.d.ts",
+      "default": "./dist/mission/mission-review-suggestions.js"
     },
     "./mission/mission-intent-delta": {
       "types": "./dist/mission/mission-intent-delta.d.ts",

@@ -8,6 +8,8 @@ last_updated: 2026-10-06
 
 Use `pnpm organization` for organization state changes. Select a tenant and organization scope first, and include `--tier confidential --tenant-slug <slug>` for confidential operations. Writes require an explicit `--apply` and either the sovereign persona or the least-privilege `MISSION_ROLE=organization_operator` with `KYBERION_TENANT=<slug>` (own tenant's confidential/public organization state only); inspect the same command with `--dry-run` first.
 
+Shared-scope organizations (`active/organizations/<tier>/shared/…`) are not tenant-owned, so a tenant-bound `organization_operator` cannot write them from an interactive CLI call — use `KYBERION_PERSONA=sovereign` there. The role does cover shared orgs when a delegated execution scope binds the organization (`scope.organization_id`, e.g. a resident-dot cadence), via the `…/shared/${KYBERION_ORGANIZATION_ID}/` grant. An organization with records but no `organization-state.json` reports `organization_state:missing` in reconcile; repair it with `pnpm organization state ensure --organization-id <id> --tier <tier> --apply` (idempotent).
+
 Setting up an organization for the first time? Follow the [Organization Lifecycle Verification Playbook](./organization-lifecycle-verification-playbook.md) end to end first (formation, domain and service, operation, cadence and decision, project, run, incident and learning, reconcile), then use this runbook for routine operation.
 
 ## Routine operations
