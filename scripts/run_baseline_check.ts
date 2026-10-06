@@ -17,6 +17,7 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
+import { formatDiagnostic } from '@agent/core/logger';
 import { withExecutionContext } from '@agent/core/authority';
 import { loadServiceEndpointsCatalog } from '@agent/core/service/service-endpoint-registry';
 import { killSwitch } from '@agent/core/governance/kill-switch';
@@ -55,8 +56,6 @@ import {
   type FailedScheduleFinding,
 } from '@agent/core/feedback-loop';
 import { enqueueOperationalLearningSignal } from '@agent/core/operational-learning';
-import { harvestLearningSignals } from '@agent/core/knowledge/learning-signal-adapter';
-import { builtinLearningSignalSources } from '@agent/core/knowledge/learning-signal-sources';
 import {
   loadNotificationPreferences,
   resolveOperatorNotificationRoute,
@@ -886,6 +885,11 @@ export async function runBaselineCheck() {
   // blocks the baseline; the cursor makes repeated runs cheap and idempotent.
   if (!isVitestProcess()) {
     try {
+      // Loaded lazily: the sources pull in many stores the rest of baseline never needs.
+      const { harvestLearningSignals } =
+        await import('@agent/core/knowledge/learning-signal-adapter');
+      const { builtinLearningSignalSources } =
+        await import('@agent/core/knowledge/learning-signal-sources');
       const harvest = harvestLearningSignals({ sources: builtinLearningSignalSources() });
       const failed = harvest.sources
         .filter((source) => source.error)
@@ -896,7 +900,12 @@ export async function runBaselineCheck() {
       );
     } catch (err: any) {
       logger.warn(
-        `[BASELINE] learning-signal harvest failed (non-fatal): ${err?.message ?? String(err)}`
+        formatDiagnostic({
+          component: 'baseline',
+          what: 'learning-signal harvest failed (non-fatal)',
+          why: err?.message ?? String(err),
+          next: 'run `pnpm kyberion learning harvest --dry-run` to see which source fails',
+        })
       );
     }
   }

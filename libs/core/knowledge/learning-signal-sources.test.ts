@@ -104,6 +104,24 @@ afterEach(() => {
 });
 
 describe('built-in learning-signal sources (LS-02)', () => {
+  it('keeps free text out of the keys of hint-producing sources', () => {
+    writeJsonl('logs/traces/traces-2026-10-01.jsonl', [
+      {
+        traceId: 'leak',
+        metadata: { startedAt: IN, pipelineId: 'Acme Corp board deck' },
+        rootSpan: {
+          name: 'x',
+          status: 'error',
+          error: "not found in knowledge/confidential/acme/plan.md for customer 'acme'",
+          children: [],
+        },
+      },
+    ]);
+    const [row] = traceFailureSource.read(WINDOW);
+    expect(row.key).toBe('run:x:not_found');
+    expect(JSON.stringify(row)).not.toContain('acme');
+  });
+
   it('registers one source per previously dead-ended log', () => {
     expect(builtinLearningSignalSources().map((source) => source.id)).toEqual([
       'conversation',
@@ -198,7 +216,7 @@ describe('built-in learning-signal sources (LS-02)', () => {
     const rows = traceFailureSource.read(WINDOW);
     expect(rows).toEqual([
       expect.objectContaining({
-        key: 'daily-report:browser:click:Timeout <n>ms exceeded',
+        key: 'daily-report:browser:click:timeout',
         ref: 'trace:t1',
       }),
     ]);
@@ -249,6 +267,14 @@ describe('built-in learning-signal sources (LS-02)', () => {
         error: 'unparseable',
       },
       {
+        trace_id: 'd5',
+        owner: 'adf-repair-agent',
+        status: 'completed',
+        completed_at: IN,
+        context: 'steps/0/op: must be equal to one of the allowed values',
+        result_summary: 'repair completed but validation still failed: steps/0/op',
+      },
+      {
         trace_id: 'd3',
         owner: 'planner',
         status: 'failed',
@@ -259,8 +285,9 @@ describe('built-in learning-signal sources (LS-02)', () => {
       { trace_id: 'd4', owner: 'planner', status: 'completed', completed_at: IN },
     ]);
     expect(adfRepairSource.read(WINDOW).map((row) => row.key)).toEqual([
-      'repaired:steps/<n>/op: must be string',
-      'failed:JSON parse error: Unexpected token',
+      'repaired:type_mismatch',
+      'failed:json_parse',
+      'failed:enum_violation',
     ]);
     expect(delegationFailureSource.read(WINDOW).map((row) => row.key)).toEqual([
       'planner:codex:rate limited',
@@ -288,13 +315,14 @@ describe('built-in learning-signal sources (LS-02)', () => {
       },
     ]);
     expect(auditDenialSource.read(WINDOW)).toEqual([
-      expect.objectContaining({ key: 'policy_evaluation:write <path>:denied:tier-guard' }),
+      expect.objectContaining({ key: 'policy_evaluation:write:denied:tier-guard' }),
       expect.objectContaining({ key: 'tool:run:failed', tenantSlug: 'acme' }),
     ]);
   });
 
   it('reads failed steps and unavailable sub-agents from the worker stream', () => {
-    writeJsonl('logs/worker-events/worker-events-2026-10-01.jsonl', [{}]);
+    // Named after the day the process started, still appended to inside the window.
+    writeJsonl('logs/worker-events/worker-events-2026-09-01.jsonl', [{}]);
     mocks.workerEvents.mockReturnValue([
       {
         type: 'step_end',
@@ -396,10 +424,18 @@ describe('built-in learning-signal sources (LS-02)', () => {
 
   it('turns runtime health trends into observations', () => {
     mocks.healthSamples.mockReturnValue([
+      { timestamp: '2026-10-01T00:30:00Z', process_name: 'chronos', rss_mb: 100, heap_used_mb: 50 },
       { timestamp: '2026-10-01T01:00:00Z', process_name: 'chronos', rss_mb: 100, heap_used_mb: 50 },
       { timestamp: '2026-10-01T20:00:00Z', process_name: 'chronos', rss_mb: 300, heap_used_mb: 50 },
     ]);
-    expect(runtimeHealthSource.read(WINDOW).map((row) => row.key)).toEqual(['rss_growth:chronos']);
+    expect(runtimeHealthSource.read(WINDOW)).toEqual([
+      expect.objectContaining({
+        key: 'rss_growth:chronos',
+        ts: '2026-10-01T20:00:00Z',
+        ref: 'runtime-health:chronos:rss_growth:2026-10-01',
+      }),
+    ]);
+    expect(mocks.healthSamples).toHaveBeenCalledWith(86_400_000, WINDOW.until.getTime());
   });
 
   it('reads peer, discussion and co-session failures', () => {
@@ -441,6 +477,20 @@ describe('built-in learning-signal sources (LS-02)', () => {
     ]);
     const rows = quarantineSource.read(WINDOW);
     expect(rows.map((row) => row.key)).toEqual(['web:exfil+role_override']);
+    mocks.quarantine.mockReturnValue([
+      {
+        id: 'q2',
+        recorded_at: IN,
+        source: 'https://evil.example/x',
+        scope: 'acme',
+        indicators: [],
+        content: '',
+        reason: 'x',
+      },
+    ]);
+    expect(quarantineSource.read(WINDOW)).toEqual([
+      expect.objectContaining({ key: 'external:unspecified', tenantSlug: 'acme' }),
+    ]);
     expect(JSON.stringify(rows)).not.toContain('ignore all previous');
   });
 });

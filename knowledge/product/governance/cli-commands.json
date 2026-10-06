@@ -2664,7 +2664,7 @@
     },
     {
       "id": "script.learning.harvest",
-      "script": "learning:harvest",
+      "module": "scripts/learning_signals.ts",
       "command": "learning harvest",
       "noun": "learning",
       "verb": "harvest",

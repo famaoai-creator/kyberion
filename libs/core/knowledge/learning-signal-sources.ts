@@ -22,10 +22,15 @@ import {
   readDiscussionRoom,
 } from '../discussion/discussion-store.js';
 import { listQuarantineRecords } from '../security-screen.js';
+import { isValidTenantSlug } from '../entity-scope.js';
 import { listTaskSessions } from '../task/task-session.js';
+import { delegatedTaskTracePath } from '../delegated-task-observability.js';
 import {
+  closedToken,
   daysInWindow,
   errorClass,
+  errorCode,
+  filesModifiedSince,
   readJsonlFilesMatching,
   readJsonlRecords,
   stringField,
@@ -88,10 +93,11 @@ export const conversationSignalSource: LearningSignalSource = {
       sinceMs: window.since.getTime(),
       kinds: CONVERSATION_MISS_KINDS,
     }).map((signal) => {
-      const scope = signal.intent_id || signal.surface || 'unknown';
+      const scope = closedToken(signal.intent_id || signal.surface || 'unknown');
+      const locale = closedToken(signal.locale || 'any');
       return {
-        key: `${signal.kind}:${scope}:${signal.locale || 'any'}`,
-        title: `${signal.kind} on ${scope}${signal.locale ? ` (${signal.locale})` : ''}`,
+        key: `${signal.kind}:${scope}:${locale}`,
+        title: `${signal.kind} on ${scope}${locale !== 'any' ? ` (${locale})` : ''}`,
         ref: `conversation-signal:${signal.signal_id}`,
         ts: signal.ts,
       };
@@ -129,8 +135,10 @@ export const approvalRejectionSource: LearningSignalSource = {
         const annotated = record?.workflow?.approvals.find(
           (approval) => approval.status === 'rejected' && approval.reasonCategory
         )?.reasonCategory;
-        const reason = stringField(event, 'reason_category') || annotated || 'uncategorized';
-        const kind = record?.kind || 'unknown';
+        const reason = closedToken(
+          stringField(event, 'reason_category') || annotated || 'uncategorized'
+        );
+        const kind = closedToken(String(record?.kind || 'unknown'));
         const tenantSlug = record?.scope?.tenant_slug?.trim() || undefined;
         observations.push({
           key: `${kind}:${reason}`,
@@ -176,15 +184,18 @@ export const traceFailureSource: LearningSignalSource = {
       collectErrorSpans(asRecord(row.rootSpan), failures);
       const deepest = failures[failures.length - 1];
       if (!deepest) continue;
-      const scope =
+      const scope = closedToken(
         stringField(metadata, 'pipelineId', 'actuator') ||
-        stringField(asRecord(row.rootSpan), 'name') ||
-        'run';
-      const cls = errorClass(deepest.error || 'failed');
+          stringField(asRecord(row.rootSpan), 'name') ||
+          'run',
+        'run'
+      );
+      const step = closedToken(deepest.name, 'step');
+      const code = errorCode(deepest.error || 'failed');
       const tenantSlug = stringField(metadata, 'tenantSlug') || undefined;
       observations.push({
-        key: `${scope}:${deepest.name}:${cls}`,
-        title: `${scope} step ${deepest.name} failed (${cls})`,
+        key: `${scope}:${step}:${code}`,
+        title: `${scope} step ${step} failed (${code})`,
         ref: `trace:${stringField(row, 'traceId')}`,
         ts,
         ...(tenantSlug ? { tenantSlug } : {}),
@@ -203,11 +214,12 @@ export const taskSessionFailureSource: LearningSignalSource = {
     return listTaskSessions()
       .filter((session) => session.status === 'failed' && inWindow(session.updated_at, window))
       .map((session) => {
-        const intentId = String(session.payload?.intent_id || '').trim() || 'no-intent';
+        const intentId = closedToken(String(session.payload?.intent_id || '').trim(), 'no-intent');
+        const taskType = closedToken(String(session.task_type || ''), 'task');
         const tenantSlug = session.project_context?.tenant_slug?.trim() || undefined;
         return {
-          key: `${session.task_type}:${intentId}`,
-          title: `${session.task_type} task session for ${intentId} failed`,
+          key: `${taskType}:${intentId}`,
+          title: `${taskType} task session for ${intentId} failed`,
           ref: `task-session:${session.session_id}`,
           ts: session.updated_at,
           ...(tenantSlug ? { tenantSlug } : {}),
@@ -234,15 +246,32 @@ function delegationOutcome(row: Row): { failed: boolean; error: string } | null 
   }
   const settled = stringField(settlement, 'status');
   if (settled === 'failed' || settled === 'cancelled') return { failed: true, error: settled };
+  // The repair agent completes (not fails) a trace whose output still did not validate.
+  if (
+    status === 'completed' &&
+    /validation still failed/i.test(stringField(row, 'result_summary'))
+  ) {
+    return { failed: true, error: 'validation still failed' };
+  }
   if (status === 'completed') return { failed: false, error: '' };
   return null;
 }
 
+/** Closed classification of the errors an ADF repair was asked to fix. */
+export function adfErrorCategory(context: string): string {
+  if (/JSON parse error|unexpected token|not valid JSON/i.test(context)) return 'json_parse';
+  if (/^Execution failure/i.test(context)) return 'execution_failure';
+  if (/required property|is required|missing/i.test(context)) return 'missing_required';
+  if (/must be equal to one of|allowed values|enum/i.test(context)) return 'enum_violation';
+  if (/additional propert/i.test(context)) return 'additional_property';
+  if (/must be (string|number|integer|boolean|array|object|null)/i.test(context))
+    return 'type_mismatch';
+  if (/guardrail/i.test(context)) return 'guardrail';
+  return 'other';
+}
+
 function readDelegationRows(window: LearningSignalWindow): Row[] {
-  const tracePath =
-    process.env.KYBERION_DELEGATION_TRACE_PATH?.trim() ||
-    pathResolver.shared('observability/delegations.jsonl');
-  return readJsonlRecords(tracePath).filter((row) =>
+  return readJsonlRecords(delegatedTaskTracePath()).filter((row) =>
     inWindow(stringField(row, 'completed_at', 'created_at'), window)
   );
 }
@@ -262,12 +291,12 @@ export const adfRepairSource: LearningSignalSource = {
       .flatMap((row) => {
         const outcome = delegationOutcome(row);
         if (!outcome) return [];
-        const cls = errorClass(stringField(row, 'context') || 'unknown');
+        const category = adfErrorCategory(stringField(row, 'context'));
         const result = outcome.failed ? 'repair failed' : 'repaired';
         return [
           {
-            key: `${outcome.failed ? 'failed' : 'repaired'}:${cls}`,
-            title: `${cls} (${result})`,
+            key: `${outcome.failed ? 'failed' : 'repaired'}:${category}`,
+            title: `ADF ${category.replace(/_/g, ' ')} (${result})`,
             ref: `delegation:${stringField(row, 'trace_id')}`,
             ts: stringField(row, 'completed_at', 'created_at'),
           },
@@ -286,8 +315,8 @@ export const delegationFailureSource: LearningSignalSource = {
       .flatMap((row) => {
         const outcome = delegationOutcome(row);
         if (!outcome?.failed) return [];
-        const owner = stringField(row, 'owner') || 'unknown';
-        const backend = stringField(row, 'backend_name') || 'any';
+        const owner = closedToken(stringField(row, 'owner') || 'unknown');
+        const backend = closedToken(stringField(row, 'backend_name') || 'any');
         const cls = errorClass(outcome.error);
         return [
           {
@@ -321,9 +350,14 @@ export const auditDenialSource: LearningSignalSource = {
       if (result !== 'denied' && result !== 'error' && result !== 'failed') return [];
       const ts = stringField(row, 'timestamp');
       if (!inWindow(ts, window)) return [];
-      const action = stringField(row, 'action') || 'action';
-      const operation = errorClass(stringField(row, 'operation') || 'operation', 50);
-      const policy = stringField(asRecord(row.metadata), 'policy');
+      const action = closedToken(stringField(row, 'action') || 'action');
+      const operation = closedToken(
+        stringField(row, 'operation').split(/\s+/)[0] || '',
+        'operation'
+      );
+      const policy = stringField(asRecord(row.metadata), 'policy')
+        ? closedToken(stringField(asRecord(row.metadata), 'policy'))
+        : '';
       const tenantSlug = stringField(row, 'tenantSlug') || undefined;
       return [
         {
@@ -345,12 +379,10 @@ export const workerEventSource: LearningSignalSource = {
   description: 'Worker event stream steps that failed and sub-agents that were unavailable.',
   minOccurrences: 3,
   read(window) {
+    // The writer names a file after the day its process started and keeps
+    // appending to it, so select by modification time rather than by name.
     const dir = pathResolver.shared('logs/worker-events');
-    if (!safeExistsSync(dir)) return [];
-    const tokens = dayTokens(window);
-    const files = safeReaddir(dir).filter(
-      (name) => name.endsWith('.jsonl') && tokens.some((token) => name.includes(token))
-    );
+    const files = filesModifiedSince(dir, window.since);
     const observations: LearningObservation[] = [];
     for (const file of files) {
       for (const event of readWorkerEventStreamJsonl(path.join(dir, file))) {
@@ -358,7 +390,10 @@ export const workerEventSource: LearningSignalSource = {
         const payload = asRecord(event.payload);
         const ref = `worker-event:${file}#${event.seq}`;
         if (event.type === 'subagent_unavailable') {
-          const who = stringField(payload, 'provider', 'agent_id', 'backend') || 'subagent';
+          const who = closedToken(
+            stringField(payload, 'provider', 'agent_id', 'backend'),
+            'subagent'
+          );
           observations.push({
             key: `subagent_unavailable:${who}`,
             title: `sub-agent ${who} unavailable`,
@@ -368,7 +403,7 @@ export const workerEventSource: LearningSignalSource = {
         } else if (event.type === 'step_end') {
           const status = stringField(payload, 'status');
           if (status !== 'failed' && status !== 'error') continue;
-          const op = stringField(payload, 'op', 'step_id') || 'step';
+          const op = closedToken(stringField(payload, 'op', 'step_id'), 'step');
           const cls = errorClass(stringField(payload, 'error') || status);
           observations.push({
             key: `step_failed:${op}:${cls}`,
@@ -391,8 +426,8 @@ export const reasoningFailoverSource: LearningSignalSource = {
     return readJsonlRecords(reasoningFailoverEventsPath()).flatMap((row) => {
       const ts = stringField(row, 'ts');
       if (!inWindow(ts, window)) return [];
-      const from = stringField(row, 'provider_from', 'from_mode') || 'unknown';
-      const to = stringField(row, 'provider_to', 'to_mode') || 'unknown';
+      const from = closedToken(stringField(row, 'provider_from', 'from_mode'), 'unknown');
+      const to = closedToken(stringField(row, 'provider_to', 'to_mode'), 'unknown');
       const cls = errorClass(stringField(row, 'error_summary') || 'failover');
       return [
         {
@@ -428,9 +463,10 @@ export function detectCostSpikes(
   for (const record of records) {
     const day = String(record.timestamp || '').slice(0, 10);
     if (!day || !Number.isFinite(record.cost_usd)) continue;
-    const bySource = daily.get(record.source) ?? new Map<string, number>();
+    const source = closedToken(String(record.source || ''), 'unknown');
+    const bySource = daily.get(source) ?? new Map<string, number>();
     bySource.set(day, (bySource.get(day) || 0) + record.cost_usd);
-    daily.set(record.source, bySource);
+    daily.set(source, bySource);
   }
   const windowDays = new Set(daysInWindow(window));
   const observations: LearningObservation[] = [];
@@ -477,7 +513,7 @@ export const executionMetricSource: LearningSignalSource = {
       if (stringField(row, 'mission_id')) continue;
       const ts = stringField(row, 'timestamp');
       if (!inWindow(ts, window)) continue;
-      const component = stringField(row, 'component') || 'component';
+      const component = closedToken(stringField(row, 'component'), 'component');
       const ref = `execution-metric:${component}:${ts}`;
       if (row.status === 'error') {
         const cls = errorClass(stringField(row, 'error', 'message') || 'error');
@@ -533,6 +569,8 @@ export const defectSource: LearningSignalSource = {
   },
 };
 
+const RUNTIME_TREND_LOOKBACK_MS = 86_400_000;
+
 const RUNTIME_TREND_THRESHOLDS = {
   rss_growth_warning_ratio: 1.5,
   rss_growth_red_ratio: 2.5,
@@ -545,15 +583,26 @@ export const runtimeHealthSource: LearningSignalSource = {
   description: 'Resident processes whose memory kept growing or whose agents kept restarting.',
   minOccurrences: 2,
   read(window) {
-    const windowMs = window.until.getTime() - window.since.getTime();
-    const samples = loadRuntimeHealthSamples(windowMs, window.until.getTime());
+    // Trends need a full day of samples whatever the harvest cadence; one
+    // observation per process, trend and day keeps an ongoing trend from being
+    // counted again on every harvest (the adapter dedupes by ref).
+    const samples = loadRuntimeHealthSamples(RUNTIME_TREND_LOOKBACK_MS, window.until.getTime());
+    const lastSampleAt = new Map<string, string>();
+    for (const sample of samples) {
+      const current = lastSampleAt.get(sample.process_name);
+      if (!current || sample.timestamp > current) {
+        lastSampleAt.set(sample.process_name, sample.timestamp);
+      }
+    }
     return evaluateRuntimeHealthTrends(samples, RUNTIME_TREND_THRESHOLDS).map((finding) => {
-      const processName = finding.detail.split(':')[0] || 'process';
+      const rawName = finding.detail.split(':')[0] || 'process';
+      const processName = closedToken(rawName, 'process');
+      const ts = lastSampleAt.get(rawName) || window.until.toISOString();
       return {
         key: `${finding.kind}:${processName}`,
         title: `${processName} ${finding.kind.replace('_', ' ')} (${finding.severity})`,
-        ref: `runtime-health:${processName}:${window.until.toISOString().slice(0, 10)}`,
-        ts: window.until.toISOString(),
+        ref: `runtime-health:${processName}:${finding.kind}:${ts.slice(0, 10)}`,
+        ts,
       };
     });
   },
@@ -575,8 +624,8 @@ export const collaborationSource: LearningSignalSource = {
           if (session.status !== 'failed' && session.status !== 'blocked') continue;
           if (!inWindow(session.updated_at, window)) continue;
           observations.push({
-            key: `peer:${session.status}:${session.remote_peer_id}`,
-            title: `peer conversation with ${session.remote_peer_id} ${session.status}`,
+            key: `peer:${session.status}:${closedToken(session.remote_peer_id, 'peer')}`,
+            title: `peer conversation with ${closedToken(session.remote_peer_id, 'peer')} ${session.status}`,
             ref: `peer-conversation:${tenant}/${peer}/${session.session_id}`,
             ts: session.updated_at,
             tenantSlug: tenant,
@@ -601,7 +650,7 @@ export const collaborationSource: LearningSignalSource = {
           key = `discussion:${stringField(event, 'status')}`;
         }
         if (type === 'review_recorded' && stringField(event, 'verdict') !== 'accept') {
-          key = `discussion:review_${stringField(event, 'verdict')}`;
+          key = `discussion:review_${closedToken(stringField(event, 'verdict'))}`;
         }
         if (!key) continue;
         observations.push({
@@ -620,7 +669,7 @@ export const collaborationSource: LearningSignalSource = {
         if (stringField(event, 'type') !== 'lease_expired') continue;
         const ts = stringField(event, 'at');
         if (!inWindow(ts, window)) continue;
-        const provider = stringField(event, 'actor_provider') || 'provider';
+        const provider = closedToken(stringField(event, 'actor_provider'), 'provider');
         observations.push({
           key: `co-session:lease_expired:${provider}`,
           title: `co-session lease held by ${provider} expired`,
@@ -644,12 +693,19 @@ export const quarantineSource: LearningSignalSource = {
     return listQuarantineRecords(500)
       .filter((record) => inWindow(record.recorded_at, window))
       .map((record) => {
-        const indicators = [...record.indicators].sort().join('+') || 'unspecified';
+        const indicators =
+          [...record.indicators]
+            .map((indicator) => closedToken(indicator))
+            .sort()
+            .join('+') || 'unspecified';
+        const origin = closedToken(record.source, 'external');
+        const scope = record.scope?.trim() || '';
         return {
-          key: `${record.source}:${indicators}`,
-          title: `${record.source} content quarantined (${indicators})`,
+          key: `${origin}:${indicators}`,
+          title: `${origin} content quarantined (${indicators})`,
           ref: `quarantine:${record.id}`,
           ts: record.recorded_at,
+          ...(scope && isValidTenantSlug(scope) ? { tenantSlug: scope } : {}),
         };
       });
   },
