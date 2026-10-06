@@ -118,7 +118,7 @@ describe('built-in learning-signal sources (LS-02)', () => {
       },
     ]);
     const [row] = traceFailureSource.read(WINDOW);
-    expect(row.key).toBe('run:x:not_found');
+    expect(row.key).toBe('x:not_found');
     expect(JSON.stringify(row)).not.toContain('acme');
   });
 
@@ -216,7 +216,7 @@ describe('built-in learning-signal sources (LS-02)', () => {
     const rows = traceFailureSource.read(WINDOW);
     expect(rows).toEqual([
       expect.objectContaining({
-        key: 'daily-report:browser:click:timeout',
+        key: 'browser:click:timeout',
         ref: 'trace:t1',
       }),
     ]);
@@ -290,7 +290,7 @@ describe('built-in learning-signal sources (LS-02)', () => {
       'failed:enum_violation',
     ]);
     expect(delegationFailureSource.read(WINDOW).map((row) => row.key)).toEqual([
-      'planner:codex:rate limited',
+      'planner:codex:rate_limited',
     ]);
   });
 
@@ -334,7 +334,7 @@ describe('built-in learning-signal sources (LS-02)', () => {
       { type: 'subagent_unavailable', ts: IN, seq: 3, payload: { provider: 'gemini' } },
     ]);
     expect(workerEventSource.read(WINDOW).map((row) => row.key)).toEqual([
-      'step_failed:system:exec:exit <n>',
+      'step_failed:system:exec:error',
       'subagent_unavailable:gemini',
     ]);
   });
@@ -350,7 +350,7 @@ describe('built-in learning-signal sources (LS-02)', () => {
       },
     ]);
     expect(reasoningFailoverSource.read(WINDOW).map((row) => row.key)).toEqual([
-      'claude-agent->claude-cli:<n> Too Many Requests',
+      'claude-agent->claude-cli:http_429',
     ]);
   });
 
@@ -379,7 +379,7 @@ describe('built-in learning-signal sources (LS-02)', () => {
     ]);
     expect(executionMetricSource.read(WINDOW).map((row) => row.key)).toEqual([
       'slow:render',
-      'error:render:canvas <n> missing',
+      'error:render:error',
       'cost_spike:llm-gateway',
     ]);
   });

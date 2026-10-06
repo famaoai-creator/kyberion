@@ -14,11 +14,10 @@ vi.mock('../authority.js', () => ({ resolveIdentityContext: () => identity }));
 
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeRmSync } from '../secure-io.js';
-import { readJsonIfPresent } from '../foundation/json.js';
+import { readJsonIfPresent, writeJson } from '../foundation/json.js';
 import {
   closedToken,
   daysInWindow,
-  errorClass,
   errorCode,
   harvestLearningSignals,
   learningHarvestStatePath,
@@ -129,6 +128,31 @@ describe('learning-signal adapter (LS-01)', () => {
     expect(late.signals).toBe(1);
   });
 
+  it('counts an ongoing finding once while it keeps being re-reported', () => {
+    // Like runtime health: one ref per day whose timestamp follows the latest sample.
+    let latest = hours(1);
+    const src = source(() => [obs('trend', latest, { ref: 'trend:day-1' })], { minOccurrences: 1 });
+    harvest([src], hours(1.1));
+    for (const at of [2, 3, 4]) {
+      latest = hours(at);
+      const run = harvest([src], hours(at + 0.1));
+      expect(run.sources[0].observed).toBe(0);
+    }
+    const state = readJsonIfPresent<{ clusters: Record<string, { total: number }> }>(
+      learningHarvestStatePath(stateRoot)
+    );
+    expect(state?.clusters['test-source|trend'].total).toBe(1);
+  });
+
+  it('falls back to the lookback when a stored cursor is unreadable', () => {
+    harvest([source(() => [])], hours(1));
+    const statePath = learningHarvestStatePath(stateRoot);
+    const state = readJsonIfPresent<Record<string, unknown>>(statePath)!;
+    writeJson(statePath, { ...state, cursors: { 'test-source': 'not-a-date' } });
+    const run = harvest([source(() => [obs('a', hours(1.5))], { minOccurrences: 1 })], hours(2));
+    expect(run.signals).toBe(1);
+  });
+
   it('re-proposes a cluster only after its total doubles', () => {
     expect(shouldProposeCluster(2, 0, 3)).toBe(false);
     expect(shouldProposeCluster(3, 0, 3)).toBe(true);
@@ -162,7 +186,7 @@ describe('learning-signal adapter (LS-01)', () => {
 
     identity.tenantSlug = 'acme';
     const tenant = harvest([src], hours(3));
-    expect(tenant.scopes).toEqual(['system', 'acme']);
+    expect(tenant.scopes).toEqual(['acme']);
     expect(tenant.signals).toBe(1);
     expect(enqueueSignal).toHaveBeenCalledWith(
       expect.objectContaining({ tier: 'confidential', tenantSlug: 'acme' }),
@@ -208,28 +232,19 @@ describe('learning-signal adapter (LS-01)', () => {
     expect(safeExistsSync(learningHarvestStatePath(stateRoot))).toBe(false);
   });
 
-  it('collapses error messages into structural classes without values or paths', () => {
-    expect(errorClass('ENOENT: no such file /home/u/x.json')).toBe('ENOENT: no such file <path>');
-    expect(errorClass('[POLICY_VIOLATION] request 1234 failed')).toBe(
-      'POLICY_VIOLATION request <n> failed'
-    );
-    expect(errorClass('steps/3/op: must be string; name: required')).toBe(
-      'steps/<n>/op: must be string'
-    );
-    expect(errorClass('not found in knowledge/confidential/acme/x.md')).toBe('not found in <path>');
-    expect(errorClass("Customer 'acme' quota exceeded")).toBe('Customer <value> quota exceeded');
-    expect(errorClass('trace a1b2c3d4e5f6 aborted')).toBe('trace <id> aborted');
-  });
-
   it('maps errors onto closed codes and free text onto a fallback token', () => {
     expect(errorCode('[POLICY_VIOLATION] tenant acme')).toBe('POLICY_VIOLATION');
     expect(errorCode('ENOENT: knowledge/confidential/acme/x.md')).toBe('ENOENT');
     expect(errorCode('Timeout 30000ms exceeded')).toBe('timeout');
+    expect(errorCode('ACME: sync failed')).toBe('error');
+    expect(errorCode('EACMEX quota')).toBe('error');
+    expect(errorCode('[ACME] failed')).toBe('error');
     expect(errorCode('429 Too Many Requests')).toBe('http_429');
     expect(errorCode("Customer 'acme' quota exceeded")).toBe('error');
     expect(closedToken('browser:click')).toBe('browser:click');
     expect(closedToken('write /repo/knowledge/x.md')).toBe('other');
     expect(closedToken('Acme Corp board deck')).toBe('other');
+    expect(closedToken('acme.example.com')).toBe('other');
   });
 
   it('lists every UTC day a window touches', () => {
