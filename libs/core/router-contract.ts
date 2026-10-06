@@ -101,7 +101,7 @@ export function resolveSurfaceIntent(
   const { pipeline_intent_map, mission_intent_action_map } = loadIntentRoutingMap();
 
   if (!selectedIntentId) {
-    recordUnhandledIntent({ missType: 'unrecognized', utterance });
+    recordUnhandledIntent({ missType: 'unrecognized', utterance, tenantId: options.tenantId });
     recordConversationSignal({
       kind: 'route_unrecognized',
       utterance,
@@ -191,7 +191,13 @@ export function resolveSurfaceIntent(
 
   // 'direct_reply'-routed intents are handled by the orchestrator without a pipeline/mission entry — not a gap.
   if (selectedIntentId && routeFamily !== 'direct_reply') {
-    recordUnhandledIntent({ missType: 'unrouted', intentId: selectedIntentId, shape, utterance });
+    recordUnhandledIntent({
+      missType: 'unrouted',
+      intentId: selectedIntentId,
+      shape,
+      utterance,
+      tenantId: options.tenantId,
+    });
     recordConversationSignal({
       kind: 'route_unrouted',
       utterance,
