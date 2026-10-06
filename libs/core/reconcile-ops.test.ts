@@ -272,6 +272,31 @@ describe('reconcile ops (LE-03)', () => {
     });
   });
 
+  it('never records utterance text for tenant-scoped turns', async () => {
+    const { recordUnhandledIntent, listUnhandledIntents } =
+      await import('./unhandled-intent-registry.js');
+    recordUnhandledIntent({
+      missType: 'unrecognized',
+      utterance: 'tenant secret request',
+      tenantId: 'acme',
+    });
+    recordUnhandledIntent({
+      missType: 'unrouted',
+      intentId: 'some-intent',
+      utterance: 'tenant secret follow-up',
+      tenantId: 'acme',
+    });
+    recordUnhandledIntent({ missType: 'unrecognized', utterance: 'shared question' });
+
+    const entries = listUnhandledIntents();
+    expect(entries).toHaveLength(2);
+    expect(JSON.stringify(entries)).not.toContain('tenant secret');
+    expect(entries.find((e) => e.intent_id === 'some-intent')?.utterance_samples).toEqual([]);
+    expect(entries.find((e) => e.miss_type === 'unrecognized')?.utterance_samples).toEqual([
+      'shared question',
+    ]);
+  });
+
   it('persists the catalog-normalized unclassified error registry', async () => {
     const { writeUnclassifiedErrorRegistryAtPath } =
       await import('./unclassified-error-registry.js');

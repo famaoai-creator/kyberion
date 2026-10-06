@@ -58,12 +58,22 @@ function sanitizeErrorMessage(error: string): string {
     .trim();
 }
 
+/** Strip leading/trailing '-' without a regex (an anchored `-+$` backtracks polynomially). */
+function trimDashes(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value[start] === '-') start += 1;
+  while (end > start && value[end - 1] === '-') end -= 1;
+  return value.slice(start, end);
+}
+
 function sanitizeCategory(category: string): string {
-  const normalized = String(category || 'auto-learned')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  const normalized = trimDashes(
+    String(category || 'auto-learned')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, '-')
+  );
   return normalized || 'auto-learned';
 }
 

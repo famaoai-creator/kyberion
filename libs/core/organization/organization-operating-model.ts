@@ -366,8 +366,17 @@ export interface OrganizationDecisionRecord {
   metadata?: Record<string, unknown>;
 }
 
+/**
+ * `runtime_signal` is a recurring failure the learning-signal adapter clustered
+ * from a runtime log (conversation, approvals, audit, traces, ...); the
+ * originating log is named in `metadata.signal_source`.
+ */
 export type OrganizationLearningSourceType =
-  'incident_review' | 'routine_exception' | 'project_closure' | 'governance_decision';
+  | 'incident_review'
+  | 'routine_exception'
+  | 'project_closure'
+  | 'governance_decision'
+  | 'runtime_signal';
 
 export interface OrganizationLearningCandidate {
   version: string;
