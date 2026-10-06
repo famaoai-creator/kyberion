@@ -182,6 +182,7 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/reports/',
   'shared/runtime/service-bindings/',
   'shared/runtime/health/',
+  'shared/runtime/state/',
   'shared/runtime/reasoning-failover-events.jsonl',
 ];
 export const VITEST_LIVE_SANDBOX_ROOT = 'active/shared/runtime/vitest-live';
