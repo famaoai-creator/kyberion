@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { rawExistsSync, rawReadTextFile, rawReaddir } from './fs-primitives.js';
 import { assertSafeRepositoryPath as assertRepositoryPath } from '#repository-path-boundary';
 import { isValidTenantSlug } from './foundation/scope.js';
@@ -16,6 +17,10 @@ function findProjectRoot(startDir: string): string {
   if (envRoot && rawExistsSync(path.join(envRoot, 'package.json'))) {
     return path.resolve(envRoot);
   }
+  return findRepositoryRoot(startDir) ?? process.cwd();
+}
+
+function findRepositoryRoot(startDir: string): string | undefined {
   let current = startDir;
   while (current !== path.parse(current).root) {
     const hasRootMarker =
@@ -31,10 +36,19 @@ function findProjectRoot(startDir: string): string {
     }
     current = path.dirname(current);
   }
-  return process.cwd();
+  return undefined;
 }
 
 const PROJECT_ROOT_DIR = findProjectRoot(process.cwd());
+/** The checkout that contains this module (source or bundled dist), independent of KYBERION_ROOT. */
+const CODE_REPOSITORY_ROOT = (() => {
+  try {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    return findRepositoryRoot(here) ?? '';
+  } catch {
+    return '';
+  }
+})();
 const ACTIVE_ROOT = path.join(PROJECT_ROOT_DIR, 'active');
 const ACTIVE_SHARED_ROOT = path.join(ACTIVE_ROOT, 'shared');
 const KNOWLEDGE_ROOT = path.join(PROJECT_ROOT_DIR, 'knowledge');
@@ -146,9 +160,10 @@ export const VITEST_LIVE_SANDBOX_ROOT = 'active/shared/runtime/vitest-live';
 /** Map an absolute path inside a live subtree to the Vitest sandbox; other paths pass through. */
 export function vitestLivePath(absolutePath: string): string {
   if (!getProcessEnv('VITEST')) return absolutePath;
-  // A test that points KYBERION_ROOT at its own fixture root is already isolated.
-  const envRoot = getProcessEnv('KYBERION_ROOT');
-  if (envRoot && path.resolve(envRoot) !== path.resolve(process.cwd())) return absolutePath;
+  // Only the checkout this code runs from holds live state; a fixture root
+  // (KYBERION_ROOT pointed at a temp tree, in this process or a spawned child)
+  // is already isolated and must resolve identically in parent and child.
+  if (PROJECT_ROOT_DIR !== CODE_REPOSITORY_ROOT) return absolutePath;
   const relative = path.relative(ACTIVE_ROOT, absolutePath).split(path.sep).join('/');
   if (relative.startsWith('..') || path.isAbsolute(relative)) return absolutePath;
   const hit = VITEST_LIVE_SUBTREES.some((prefix) =>
