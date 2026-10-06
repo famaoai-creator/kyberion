@@ -897,6 +897,24 @@ export async function recordEvidence(args: {
 
   logger.info(`🧾 Evidence for ${upperId}: ${args.taskId}...`);
 
+  // Stamp the deliverable's file mtime so the retrospective can tell
+  // record-as-you-go apart from evidence reconstructed at mission close —
+  // deliverables written long after the work look identical without it.
+  const deliverableRelPath = (() => {
+    try {
+      const task = readMissionNextTasks(missionPath).find(
+        (entry) => String(entry.task_id || '') === args.taskId
+      );
+      const rel = String(task?.deliverable || '');
+      if (!rel) return null;
+      const candidate = path.resolve(missionPath, rel);
+      if (!isPathInside(missionPath, candidate) || !safeExistsSync(candidate)) return null;
+      return { rel, mtime: new Date(safeStat(candidate).mtimeMs).toISOString() };
+    } catch {
+      return null;
+    }
+  })();
+
   await withLock(`mission-${upperId}`, async () => {
     appendMissionExecutionLedgerEntry({
       mission_id: upperId,
@@ -910,6 +928,16 @@ export async function recordEvidence(args: {
       evidence: args.evidence || [],
       payload: {
         mission_status: state.status,
+        ...(deliverableRelPath
+          ? {
+              deliverable_path: deliverableRelPath.rel,
+              deliverable_mtime: deliverableRelPath.mtime,
+              deliverable_age_seconds: Math.max(
+                0,
+                Math.round((Date.now() - Date.parse(deliverableRelPath.mtime)) / 1000)
+              ),
+            }
+          : {}),
       },
     });
 

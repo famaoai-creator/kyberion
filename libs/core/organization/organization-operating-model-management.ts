@@ -3,6 +3,7 @@ import { loadOrganizationProfile } from './organization-profile.js';
 import { listProjectRecords, loadProjectRecord } from '../project/project-registry.js';
 import { loadProjectOperationalState } from '../project/project-operational-state-registry.js';
 import { loadState } from '../mission/mission-state.js';
+import { loadMissionManagementConfig } from '../mission/mission-management-config.js';
 import { pathResolver } from '../path-resolver.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
@@ -191,6 +192,19 @@ export function buildOrganizationOperationRecord(
         `Runbook execution ref must exist within the operation scope: ${ref || '(missing)'}`
       );
     }
+  }
+  if (
+    (input.executionKind === 'task_session' || input.executionKind === 'pipeline') &&
+    !input.executionRef
+  ) {
+    // Reconcile flags every non-actuator execution target without a ref, so a
+    // ref-less pipeline/task_session op would register cleanly then degrade
+    // org status to attention (invalid_execution_refs). Fail at add time.
+    // 'mission' stays ref-optional — onboarding provisions mission-kind ops
+    // before the mission exists — and 'actuator' has no ref concept.
+    throw new Error(
+      `--execution-kind ${input.executionKind} requires --execution-ref; reconcile flags ref-less non-actuator targets as invalid_execution_refs.`
+    );
   }
   const deadline = input.deadline
     ? resolveOperationDeadline(input.deadline, input, now)
@@ -619,6 +633,34 @@ export function loadOrganizationCatalog(query: {
   };
 }
 
+/**
+ * Evidence refs recorded against a live mission point under
+ * `active/missions/<tier>/[<tenant>/]<ID>/...`, and `mission finish` moves the
+ * whole directory to the flat archive (`directories.archive`, default
+ * `active/archive/missions/<ID>`). The ref stays valid evidence — resolve it
+ * through the archive before reporting it missing. The mission-id segment is
+ * located by probing which segment names an existing archived mission dir, so
+ * both `<tier>/<ID>` and `<tier>/<tenant>/<ID>` layouts resolve.
+ */
+function organizationEvidenceRefExists(ref: string, rootDir: string, archiveRel: string): boolean {
+  if (safeExistsSync(path.resolve(rootDir, ref))) return true;
+  const segments = ref.split('/');
+  if (
+    segments[0] !== 'active' ||
+    segments[1] !== 'missions' ||
+    segments.length < 4 ||
+    segments.some((segment) => segment === '..' || segment === '.' || segment.includes('\\'))
+  ) {
+    return false;
+  }
+  for (let i = 2; i < segments.length; i++) {
+    const archivedMissionDir = path.resolve(rootDir, archiveRel, segments[i]);
+    if (!safeExistsSync(archivedMissionDir)) continue;
+    if (safeExistsSync(path.join(archivedMissionDir, ...segments.slice(i + 1)))) return true;
+  }
+  return false;
+}
+
 export function reconcileOrganizationCatalog(query: {
   organizationId: string;
   tier?: OrganizationTier;
@@ -735,21 +777,21 @@ export function reconcileOrganizationCatalog(query: {
     }
     return [];
   });
+  const reconcileRootDir = query.rootDir || pathResolver.rootDir();
+  const missionArchiveRel =
+    loadMissionManagementConfig(reconcileRootDir)?.directories?.archive ||
+    'active/archive/missions';
   const invalidEvidenceRefs = [
     ...operationStates.flatMap((entry) =>
       (entry.last_evidence_refs || [])
         .filter((ref) => ref.startsWith('knowledge/') || ref.startsWith('active/'))
-        .filter(
-          (ref) => !safeExistsSync(path.resolve(query.rootDir || pathResolver.rootDir(), ref))
-        )
+        .filter((ref) => !organizationEvidenceRefExists(ref, reconcileRootDir, missionArchiveRel))
         .map((ref) => `${entry.operation_id}:${ref}`)
     ),
     ...operationRuns.flatMap((entry) =>
       (entry.evidence_refs || [])
         .filter((ref) => ref.startsWith('knowledge/') || ref.startsWith('active/'))
-        .filter(
-          (ref) => !safeExistsSync(path.resolve(query.rootDir || pathResolver.rootDir(), ref))
-        )
+        .filter((ref) => !organizationEvidenceRefExists(ref, reconcileRootDir, missionArchiveRel))
         .map((ref) => `${entry.operation_id}:${ref}`)
     ),
   ];

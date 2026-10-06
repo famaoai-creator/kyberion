@@ -229,6 +229,7 @@ export * from './mission-project-ledger.js';
 export * from './mission-read-model.js';
 export * from './mission-retrospective.js';
 export * from './mission-review-gates.js';
+export * from './mission-review-suggestions.js';
 export * from './mission-runtime.js';
 export * from './mission-scope-approval.js';
 // skipped './mission-scope-payload.js' (all exports shadowed)
