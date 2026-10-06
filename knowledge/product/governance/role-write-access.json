@@ -158,6 +158,8 @@
       "allow": [
         "active/organizations/confidential/${KYBERION_TENANT}/",
         "active/organizations/public/${KYBERION_TENANT}/",
+        "active/organizations/personal/shared/${KYBERION_ORGANIZATION_ID}/",
+        "active/organizations/public/shared/${KYBERION_ORGANIZATION_ID}/",
         "active/shared/runtime/",
         "active/shared/observability/"
       ]

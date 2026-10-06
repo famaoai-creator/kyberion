@@ -900,6 +900,32 @@ export async function runMissionControllerAction(
     case 'dispatch-workitems':
       await context.dispatchMissionWorkItems(arg1!);
       break;
+    case 'suggestions': {
+      const { collectMissionReviewSuggestions } =
+        await import('@agent/core/mission/mission-review-suggestions');
+      const suggestions = collectMissionReviewSuggestions({
+        includeBlocking: context.argv.includes('--include-blocking'),
+      });
+      if (context.argv.includes('--json')) {
+        context.print?.(JSON.stringify(suggestions, null, 2));
+        break;
+      }
+      if (suggestions.length === 0) {
+        context.print?.('No non-blocking review findings recorded across missions.');
+        break;
+      }
+      let currentMission = '';
+      for (const finding of suggestions) {
+        if (finding.mission_id !== currentMission) {
+          currentMission = finding.mission_id;
+          context.print?.(`${finding.mission_id}${finding.archived ? ' (archived)' : ''}`);
+        }
+        context.print?.(
+          `  [${finding.severity}] ${finding.review_task_id}: ${finding.description}${finding.location ? ` (${finding.location})` : ''}`
+        );
+      }
+      break;
+    }
     case 'hygiene': {
       const staleDaysRaw = getValue('--stale-days', context.argv);
       const abandonedDaysRaw = getValue('--abandoned-days', context.argv);

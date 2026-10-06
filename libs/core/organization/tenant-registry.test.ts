@@ -6,6 +6,7 @@ import {
   ensureDefaultTenantProfile,
   listTenantProfileSlugs,
   pathResolver,
+  readTenantProfile,
   resolveTenant,
   tenantProfilePath,
   writeTenantGroupProfile,
@@ -348,6 +349,11 @@ describe('resolveTenant (DA-01 spine)', () => {
     try {
       const seen = new Set<string>();
       for (const slug of listTenantProfileSlugs()) {
+        // resolveTenant is operational-gated: archived tenants stay registered
+        // (history, audit) but cannot be resolved for work. This checkout may
+        // hold archived profiles — skip them rather than failing the pin.
+        const profile = readTenantProfile(slug);
+        if (!profile || profile.status !== 'active') continue;
         const resolved = resolveTenant(slug);
         expect(resolved.knowledge_root.length).toBeGreaterThan(0);
         expect(resolved.knowledge_root_path).toBe(

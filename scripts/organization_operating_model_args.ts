@@ -70,6 +70,7 @@ export type ParsedArgs = {
   deadlineTime?: string;
   executionKind?: OrganizationOperationRecord['execution_target']['kind'];
   executionRef?: string;
+  preset?: string;
   allowedActions: string[];
   approvalRequiredActions: string[];
   forbiddenActions: string[];
@@ -208,6 +209,7 @@ export function parseArgs(args: string[]): ParsedArgs {
     '--timezone': { kind: 'value', field: 'triggerTimezone' },
     '--execution-kind': { kind: 'value', field: 'executionKind' },
     '--execution-ref': { kind: 'value', field: 'executionRef' },
+    '--preset': { kind: 'value', field: 'preset' },
     '--allowed-action': { kind: 'push', field: 'allowedActions' },
     '--approval-required-action': { kind: 'push', field: 'approvalRequiredActions' },
     '--forbidden-action': { kind: 'push', field: 'forbiddenActions' },
@@ -271,6 +273,7 @@ export function usage(): string {
     '',
     'Authoring (each requires exactly one of --dry-run | --apply):',
     '  pnpm organization init --organization-id <id> --name <name> --tier <tier> [--tenant-slug <slug>] [--purpose <text>] [--principle <p>]... [--owner-role <role>] [--parent-organization-id <id>]',
+    '  pnpm organization state ensure --organization-id <id> --tier <tier> [--tenant-slug <slug>] [--name <name>] --dry-run|--apply [--json] (repairs organization_state:missing — materializes a minimal operational state; no-op when one exists)',
     '  pnpm organization parent set --organization-id <id> --tier <tier> [--tenant-slug <slug>] --parent-organization-id <id>|--clear (parent must be in the same tier and tenant)',
     '  pnpm organization purpose set --organization-id <id> --name <name> --tier <tier> [--tenant-slug <slug>] --purpose <text> --owner-role <role> [--principle <p>]... [--approval-state <state>]',
     '  pnpm organization objective add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --objective-id <id> --title <title> [--description <text>] [--horizon <h>] [--owner-role <role>]',
@@ -301,7 +304,7 @@ export function usage(): string {
     '  pnpm organization remove --organization-id <id> --tier <tier> --kind <domain|capability|service|operation|cadence> --record-id <id> [--tenant-slug <slug>] [--reason <text>] [--dry-run|--apply]',
     '',
     'Notes:',
-    '  - Writes under active/organizations/ are authority-gated: run with KYBERION_PERSONA=sovereign, or MISSION_ROLE=organization_operator with KYBERION_TENANT=<slug> for that tenant only.',
+    '  - Writes under active/organizations/ are authority-gated: run with KYBERION_PERSONA=sovereign, or MISSION_ROLE=organization_operator with KYBERION_TENANT=<slug> for that tenant only. Tenant-bound roles do not cover shared-scope organizations (active/organizations/<tier>/shared/ is not tenant-owned): shared-scope writes need sovereign, or an execution scope bound to that organization.',
     '  - Reads use the current `pnpm scope` tier and tenant unless explicitly narrowed by flags.',
     '  - Select an organization with --organization-id or `pnpm scope use --organization <id> ...`.',
     '  - confidential reads require --tenant-slug or an active tenant in `pnpm scope`.',
@@ -320,5 +323,10 @@ export function usage(): string {
     '    `--tenant <slug> --organization <id>` selection first, even for --dry-run.',
     '  - operation run record requires --evidence-ref for succeeded runs; evidence/execution refs must be',
     '    existing paths inside the operation scope (the operation definition holds the pipelines/ execution ref).',
+    '  - operation add --preset runbook fills --operation-type/--owner-role/--execution-kind defaults;',
+    '    --execution-ref (a governed runbook doc) is still required.',
+    '  - operation add --execution-kind pipeline|task_session requires --execution-ref; runbook refs must',
+    '    exist inside the operation scope. mission/actuator kinds may omit the ref (mission ops may be',
+    '    provisioned unbound; reconcile still flags ref-less non-actuator targets as invalid_execution_refs).',
   ].join('\n');
 }

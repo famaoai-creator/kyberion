@@ -565,6 +565,60 @@ export function buildOrganizationScaffold(
   return scaffold;
 }
 
+export interface EnsureOrganizationOperationalStateInput {
+  organizationId: string;
+  name?: string;
+  tier: OrganizationTier;
+  tenantSlug?: string;
+  rootDir?: string;
+}
+
+/**
+ * Idempotent repair for `organization_state:missing`: orgs provisioned outside
+ * the `init` scaffold (mission onboarding, direct record writes) own records
+ * but no `organization-state.json`, so reconcile flags them forever and there
+ * was previously no governed verb to materialize one. Returns the existing
+ * state untouched when present; otherwise builds a minimal schema-valid
+ * record (name falls back to the org's purpose title, then the org id).
+ */
+export function ensureOrganizationOperationalState(
+  input: EnsureOrganizationOperationalStateInput,
+  now = nowIso()
+): { state: OrganizationOperationalState; already_present: boolean } {
+  assertOrganizationId(input.organizationId);
+  const existing = loadOrganizationOperationalState(input.organizationId, {
+    tier: input.tier,
+    tenantSlug: input.tenantSlug,
+    rootDir: input.rootDir,
+  });
+  if (existing) return { state: existing, already_present: true };
+
+  const purpose = loadOrganizationPurpose(input.organizationId, {
+    tier: input.tier,
+    tenantSlug: input.tenantSlug,
+    rootDir: input.rootDir,
+  });
+  const state: OrganizationOperationalState = {
+    organization_id: input.organizationId,
+    name: input.name || purpose?.name || input.organizationId,
+    tier: input.tier,
+    ...(input.tenantSlug ? { tenant_slug: input.tenantSlug } : {}),
+    status: 'active',
+    active_project_ids: [],
+    active_operation_ids: [],
+    open_incident_ids: [],
+    pending_decision_ids: [],
+    updated_at: now,
+  };
+  assertRecordIdentity(state, input.rootDir);
+  if (!validateOrganizationOperationalState(state)) {
+    throw new Error(
+      `Invalid organization operational state: ${validationErrors(validatorFor(STATE_SCHEMA_PATH))}`
+    );
+  }
+  return { state, already_present: false };
+}
+
 export interface BuildOrganizationPurposeInput {
   organizationId: string;
   name: string;

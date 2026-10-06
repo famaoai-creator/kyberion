@@ -7,6 +7,7 @@ import {
   buildOrganizationScaffold,
   buildOrganizationServiceAddition,
   buildOrganizationServiceState,
+  ensureOrganizationOperationalState,
   saveOrganizationOperation,
   saveOrganizationOperationRun,
   saveOrganizationOperationState,
@@ -530,6 +531,116 @@ describe('organization operating model', () => {
     expect(reconciliation.invalid_evidence_refs).toContain(
       'invalid-target-operation:active/shared/runtime/missing-operation-evidence.json'
     );
+  });
+
+  it('rejects ref-less pipeline/task_session targets and resolves archived-mission evidence refs', () => {
+    const rootDir = pathResolver.sharedTmp(`organization-evidence-archive-${process.pid}`);
+    const orgId = 'org-evidence-archive-test';
+    try {
+      for (const kind of ['pipeline', 'task_session'] as const) {
+        expect(() =>
+          buildOrganizationOperationRecord({
+            organizationId: orgId,
+            operationId: `op-no-ref-${kind}`,
+            name: `No-ref ${kind}`,
+            operationType: 'event_driven',
+            ownerRole: 'operator',
+            tier: 'public',
+            executionKind: kind,
+            rootDir,
+          })
+        ).toThrow(/requires --execution-ref/);
+      }
+      // mission-kind ops may be provisioned unbound (onboarding), actuator has
+      // no ref concept — both stay addable without --execution-ref.
+      for (const kind of ['mission', 'actuator'] as const) {
+        expect(() =>
+          buildOrganizationOperationRecord({
+            organizationId: orgId,
+            operationId: `op-unbound-${kind}`,
+            name: `Unbound ${kind}`,
+            operationType: 'event_driven',
+            ownerRole: 'operator',
+            tier: 'public',
+            executionKind: kind,
+            rootDir,
+          })
+        ).not.toThrow();
+      }
+
+      // A ref recorded while a mission was live stays valid after `finish`
+      // moves the mission to the flat archive; a genuinely missing mission ref
+      // is still flagged.
+      const archivedRef = 'active/missions/public/MSN-ARCHIVED-EV1/evidence/report.md';
+      const archivedPath = path.join(
+        rootDir,
+        'active/archive/missions/MSN-ARCHIVED-EV1/evidence/report.md'
+      );
+      safeWriteFile(archivedPath, '# report\n');
+      const missingRef = 'active/missions/public/MSN-GONE-EV9/evidence/gone.md';
+      const operation = buildOrganizationOperationRecord(
+        {
+          organizationId: orgId,
+          operationId: 'op-archived-evidence',
+          name: 'Archived evidence op',
+          operationType: 'event_driven',
+          ownerRole: 'operator',
+          tier: 'public',
+          executionKind: 'actuator',
+          rootDir,
+        },
+        '2026-10-06T00:00:00.000Z'
+      );
+      saveOrganizationOperation(operation, { rootDir });
+      saveOrganizationOperationState(
+        {
+          operation_id: operation.operation_id,
+          organization_id: orgId,
+          tier: 'public',
+          status: 'succeeded',
+          due_status: 'not_scheduled',
+          last_evidence_refs: [archivedRef, missingRef],
+          updated_at: '2026-10-06T00:00:00.000Z',
+        },
+        { rootDir }
+      );
+      const reconciliation = reconcileOrganizationCatalog({
+        organizationId: orgId,
+        tier: 'public',
+        tenantSlug: 'shared',
+        rootDir,
+      });
+      expect(reconciliation.invalid_evidence_refs).not.toContain(
+        `op-archived-evidence:${archivedRef}`
+      );
+      expect(reconciliation.invalid_evidence_refs).toContain(`op-archived-evidence:${missingRef}`);
+    } finally {
+      safeRmSync(rootDir);
+    }
+  });
+
+  it('repairs organization_state:missing idempotently via ensureOrganizationOperationalState', () => {
+    const rootDir = pathResolver.sharedTmp(`organization-state-ensure-${process.pid}`);
+    const orgId = 'org-state-ensure-test';
+    try {
+      const created = ensureOrganizationOperationalState(
+        { organizationId: orgId, tier: 'public', name: 'Ensure Test Org', rootDir },
+        '2026-10-06T00:00:00.000Z'
+      );
+      expect(created.already_present).toBe(false);
+      expect(created.state.status).toBe('active');
+      expect(created.state.name).toBe('Ensure Test Org');
+      saveOrganizationOperationalState(created.state, { rootDir });
+
+      const second = ensureOrganizationOperationalState(
+        { organizationId: orgId, tier: 'public', name: 'Ignored', rootDir },
+        '2026-10-06T01:00:00.000Z'
+      );
+      expect(second.already_present).toBe(true);
+      expect(second.state).toEqual(created.state);
+    } finally {
+      safeRmSync(rootDir);
+    }
   });
 
   it('resolves organization work as a dry-run proposal with a human gate', () => {

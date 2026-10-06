@@ -8,6 +8,7 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
+  safeStat,
   safeWriteFile,
 } from '../secure-io.js';
 import { logger } from '../core.js';
@@ -76,6 +77,24 @@ export interface MissionExecutionStats {
   finish_gate_failures: Array<{ gate_id: string; reason: string }>;
   unstaffed_role_fallbacks: string[];
   clarifications: number;
+  evidence_timing: {
+    /** evidence_recorded ledger events seen. */
+    events: number;
+    first_at: string | null;
+    last_at: string | null;
+    /** first→last evidence record span; null when fewer than 2 events. */
+    span_ms: number | null;
+    /** mission history first→last event span; null when unavailable. */
+    mission_active_ms: number | null;
+    /** >=80% of evidence events inside some 10-min window while the mission
+     *  ran >=1h — record-as-you-go degraded into closing-time bookkeeping. */
+    closing_burst: boolean;
+    /** share of evidence events inside the densest 10-min window (0..1). */
+    densest_window_share: number | null;
+    /** task_ids whose deliverable file was modified after its record-evidence
+     *  call — the artifact was touched after the task closed. */
+    edited_after_record: string[];
+  };
   token_usage: {
     prompt_tokens: number;
     completion_tokens: number;
@@ -373,6 +392,16 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
     finish_gate_failures: [],
     unstaffed_role_fallbacks: [],
     clarifications: 0,
+    evidence_timing: {
+      events: 0,
+      first_at: null,
+      last_at: null,
+      span_ms: null,
+      mission_active_ms: null,
+      closing_burst: false,
+      densest_window_share: null,
+      edited_after_record: [],
+    },
     token_usage: {
       prompt_tokens: 0,
       completion_tokens: 0,
@@ -496,6 +525,66 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
     const payload = isRecord(event.payload) ? event.payload : undefined;
     return String(payload?.clarification_packet_path || '');
   }).length;
+
+  // Evidence freshness: ledger entries stamped with deliverable_mtime (added
+  // alongside this stats block) let the retrospective flag bookkeeping that
+  // was compressed into mission close or artifacts edited after the fact.
+  const evidenceEvents = readMissionJsonl(missionPath, 'execution-ledger.jsonl').filter(
+    (entry) => String(entry.event_type || '') === 'evidence_recorded'
+  );
+  const recordTimes = evidenceEvents
+    .map((entry) => Date.parse(String(entry.ts || '')))
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => a - b);
+  stats.evidence_timing.events = evidenceEvents.length;
+  stats.evidence_timing.first_at =
+    recordTimes.length > 0 ? new Date(recordTimes[0]).toISOString() : null;
+  stats.evidence_timing.last_at =
+    recordTimes.length > 0 ? new Date(recordTimes[recordTimes.length - 1]).toISOString() : null;
+  stats.evidence_timing.span_ms =
+    recordTimes.length > 1 ? recordTimes[recordTimes.length - 1] - recordTimes[0] : null;
+  const historyTimes = (Array.isArray(state?.history) ? state.history : [])
+    .map((entry) => Date.parse(String(entry?.ts || '')))
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => a - b);
+  stats.evidence_timing.mission_active_ms =
+    historyTimes.length > 1 ? historyTimes[historyTimes.length - 1] - historyTimes[0] : null;
+  if (recordTimes.length > 0) {
+    let densest = 0;
+    for (let i = 0; i < recordTimes.length; i++) {
+      let count = 0;
+      for (const t0 of recordTimes) {
+        if (t0 >= recordTimes[i] && t0 <= recordTimes[i] + 10 * 60 * 1000) count += 1;
+      }
+      densest = Math.max(densest, count);
+    }
+    stats.evidence_timing.densest_window_share = densest / recordTimes.length;
+    stats.evidence_timing.closing_burst = Boolean(
+      recordTimes.length >= 3 &&
+      stats.evidence_timing.densest_window_share >= 0.8 &&
+      stats.evidence_timing.mission_active_ms !== null &&
+      stats.evidence_timing.mission_active_ms >= 60 * 60 * 1000
+    );
+  }
+  // A deliverable edited after its record bumps the file's real mtime but not
+  // the stamp frozen into the ledger entry — re-stat the recorded path now and
+  // compare against the record ts to catch post-close edits.
+  for (const entry of evidenceEvents) {
+    const payload = isRecord(entry.payload) ? entry.payload : undefined;
+    const deliverablePath = String(payload?.deliverable_path || '');
+    const recordTs = Date.parse(String(entry.ts || ''));
+    if (!deliverablePath || !Number.isFinite(recordTs)) continue;
+    try {
+      const candidate = safeMissionArtifactPath(missionPath, deliverablePath);
+      if (!safeExistsSync(candidate)) continue;
+      const currentMtime = safeStat(candidate).mtimeMs;
+      if (currentMtime > recordTs + 1000) {
+        stats.evidence_timing.edited_after_record.push(String(entry.task_id || 'unknown'));
+      }
+    } catch {
+      // path escapes the mission root or the file vanished — not an edit signal
+    }
+  }
 
   return stats;
 }
@@ -757,6 +846,17 @@ export async function runMissionRetrospective(
     JSON.stringify(stats, null, 2),
     '```',
     '',
+    ...(stats.evidence_timing.closing_burst || stats.evidence_timing.edited_after_record.length > 0
+      ? [
+          t('mission_ops:retro_evidence_freshness', {
+            tasks:
+              stats.evidence_timing.edited_after_record.length > 0
+                ? stats.evidence_timing.edited_after_record.join(', ')
+                : '-',
+          }),
+          '',
+        ]
+      : []),
     t('mission_ops:retro_proposals_heading'),
     ...(proposals.length > 0
       ? proposals.map(
