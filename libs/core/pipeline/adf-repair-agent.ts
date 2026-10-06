@@ -22,6 +22,7 @@ import {
 import { createGapRecorder } from '../gap-phase.js';
 import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-injector.js';
 import { recordKnowledgeDelivery } from '../knowledge/knowledge-feedback-loop.js';
+import { readHintsByCategory } from '../knowledge/feedback-loop.js';
 import { isLocalReasoningBackend } from '../reasoning/reasoning-egress-scope.js';
 import {
   checkProviderEgress,
@@ -370,6 +371,7 @@ async function attemptSubagentRepair(
 
   // Classify errors to generate targeted repair hints
   const hints = buildRepairHints(validationErrors, parseError);
+  const pastLessons = formatPastRepairLessons();
 
   const instruction = `
 The ADF file at '${adfPath}' is invalid and must be repaired.
@@ -381,7 +383,7 @@ ${parseError ? `JSON Parse Error: ${parseError}\n` : ''}${validationErrors.lengt
 
 ## Repair Hints
 ${hints}
-
+${pastLessons ? `\n## Lessons From Earlier Repairs\n${pastLessons}\n` : ''}
 ## Expected Schema (${schemaName}.schema.json)
 \`\`\`json
 ${schemaContent}
@@ -503,6 +505,23 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
       errors: [message],
       report: `Sub-agent repair failed: ${message}`,
     };
+  }
+}
+
+const PAST_REPAIR_LESSON_LIMIT = 5;
+
+/**
+ * LS-03: recurring repair classes harvested by the learning-signal adapter
+ * (`adf-repair` hint category) — the repeat offenders this agent has seen.
+ */
+function formatPastRepairLessons(): string {
+  try {
+    return readHintsByCategory('adf-repair')
+      .slice(-PAST_REPAIR_LESSON_LIMIT)
+      .map((hint) => `- ${hint.hint}`)
+      .join('\n');
+  } catch {
+    return '';
   }
 }
 
