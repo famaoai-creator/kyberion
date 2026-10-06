@@ -94,12 +94,38 @@ interface ClusterState {
   signaled_at?: string;
 }
 
+/**
+ * On-disk shape of one scope's state. Record-derived keys (source ids, refs)
+ * are stored as array entries, never as object keys: the governed JSON reader
+ * rejects a file with a `__proto__` / `constructor` key, which would reset the
+ * whole state on every harvest.
+ */
+interface PersistedScopeState {
+  version: 3;
+  cursors: Array<[string, string]>;
+  clusters: ClusterState[];
+  seen: Array<[string, Array<[string, string]>]>;
+}
+
+/**
+ * In-memory state. Keys come from log records (source ids, cluster keys,
+ * refs), so they live in Maps — never as properties of a plain object, where
+ * a `__proto__` key would reach Object.prototype.
+ */
 interface ScopeState {
-  version: 2;
-  cursors: Record<string, string>;
-  clusters: Record<string, ClusterState>;
+  cursors: Map<string, string>;
+  clusters: Map<string, ClusterState>;
   /** Counted refs a source still reports, per source, with the harvest time they were last reported. */
-  seen: Record<string, Record<string, string>>;
+  seen: Map<string, Map<string, string>>;
+}
+
+function pairsOf(value: unknown): Array<[string, string]> {
+  return Array.isArray(value)
+    ? value.filter(
+        (pair): pair is [string, string] =>
+          Array.isArray(pair) && typeof pair[0] === 'string' && typeof pair[1] === 'string'
+      )
+    : [];
 }
 
 export interface LearningSourceReport {
@@ -159,20 +185,33 @@ export function learningHarvestStatePath(root: string, tenantSlug = ''): string 
 }
 
 function loadScopeState(statePath: string): ScopeState {
-  const raw = readJsonIfPresent<ScopeState>(statePath);
-  if (!raw || raw.version !== 2) return { version: 2, cursors: {}, clusters: {}, seen: {} };
-  return {
-    version: 2,
-    cursors: raw.cursors || {},
-    clusters: raw.clusters || {},
-    seen: raw.seen || {},
-  };
+  const raw = readJsonIfPresent<PersistedScopeState>(statePath);
+  const state: ScopeState = { cursors: new Map(), clusters: new Map(), seen: new Map() };
+  if (!raw || raw.version !== 3) return state;
+  for (const [id, cursor] of pairsOf(raw.cursors)) state.cursors.set(id, cursor);
+  for (const cluster of Array.isArray(raw.clusters) ? raw.clusters : []) {
+    if (cluster && typeof cluster.source === 'string' && typeof cluster.key === 'string') {
+      state.clusters.set(`${cluster.source}|${cluster.key}`, cluster);
+    }
+  }
+  for (const entry of Array.isArray(raw.seen) ? raw.seen : []) {
+    if (Array.isArray(entry) && typeof entry[0] === 'string') {
+      state.seen.set(entry[0], new Map(pairsOf(entry[1])));
+    }
+  }
+  return state;
 }
 
 function saveScopeState(statePath: string, state: ScopeState): void {
   const dir = path.dirname(statePath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  writeJson(statePath, state);
+  const persisted: PersistedScopeState = {
+    version: 3,
+    cursors: [...state.cursors],
+    clusters: [...state.clusters.values()],
+    seen: [...state.seen].map(([id, refs]) => [id, [...refs]]),
+  };
+  writeJson(statePath, persisted);
 }
 
 function shortHash(value: string): string {
@@ -232,7 +271,7 @@ export function harvestLearningSignals(
 
   for (const source of options.sources) {
     const cursorMs = (scope: ScopeRun): number => {
-      const cursor = Date.parse(scope.state.cursors[source.id] || '');
+      const cursor = Date.parse(scope.state.cursors.get(source.id) || '');
       return Number.isFinite(cursor) ? cursor : nowMs - lookbackMs;
     };
     const sinceMs = Math.min(...scopes.map((scope) => cursorMs(scope) - CURSOR_OVERLAP_MS));
@@ -277,17 +316,21 @@ export function harvestLearningSignals(
       // A ref already counted stays remembered for as long as some harvest
       // keeps reporting it (an ongoing finding, or a record re-read inside the
       // overlap); the value is the harvest time it was last reported.
-      const seen = (scope.state.seen[source.id] ||= {});
-      if (seen[obs.ref]) {
-        seen[obs.ref] = now.toISOString();
+      let seen = scope.state.seen.get(source.id);
+      if (!seen) {
+        seen = new Map();
+        scope.state.seen.set(source.id, seen);
+      }
+      if (seen.has(obs.ref)) {
+        seen.set(obs.ref, now.toISOString());
         continue;
       }
       if (ts <= cursorMs(scope) - CURSOR_OVERLAP_MS) continue;
-      seen[obs.ref] = now.toISOString();
+      seen.set(obs.ref, now.toISOString());
       report.observed += 1;
 
       const id = `${source.id}|${obs.key}`;
-      const current = scope.state.clusters[id];
+      const current = scope.state.clusters.get(id);
       const next: ClusterState = current
         ? { ...current }
         : {
@@ -304,7 +347,7 @@ export function harvestLearningSignals(
       if (obs.ts < next.first_seen) next.first_seen = obs.ts;
       if (obs.ts > next.last_seen) next.last_seen = obs.ts;
       next.refs = [...next.refs.filter((ref) => ref !== obs.ref), obs.ref].slice(-MAX_REFS);
-      scope.state.clusters[id] = next;
+      scope.state.clusters.set(id, next);
       const touchKey = `${scope.tenantSlug}|${id}`;
       const entry = touched.get(touchKey) || { scope, id, newCount: 0 };
       entry.newCount += 1;
@@ -314,7 +357,8 @@ export function harvestLearningSignals(
 
     const hints: KnowledgeHint[] = [];
     for (const { scope, id, newCount } of touched.values()) {
-      const entry = scope.state.clusters[id];
+      const entry = scope.state.clusters.get(id);
+      if (!entry) continue;
       if (!shouldProposeCluster(entry.total, entry.signaled_total, source.minOccurrences)) continue;
       const tenantSlug = scope.tenantSlug || undefined;
       const cluster: LearningCluster = {
@@ -386,22 +430,23 @@ export function harvestLearningSignals(
       }
     }
     for (const scope of scopes) {
-      scope.state.cursors[source.id] = now.toISOString();
+      scope.state.cursors.set(source.id, now.toISOString());
       // Drop refs this harvest no longer reported: their records fell behind
       // the overlap, or the ongoing finding ended.
-      const seen = scope.state.seen[source.id] || {};
+      const seen = scope.state.seen.get(source.id);
+      if (!seen) continue;
       const reportedAt = now.toISOString();
-      scope.state.seen[source.id] = Object.fromEntries(
-        Object.entries(seen).filter(([, lastReported]) => lastReported === reportedAt)
-      );
+      for (const [ref, lastReported] of seen) {
+        if (lastReported !== reportedAt) seen.delete(ref);
+      }
     }
   }
 
   if (!options.dryRun) {
     const cutoff = new Date(nowMs - CLUSTER_RETENTION_DAYS * DAY_MS).toISOString();
     for (const scope of scopes) {
-      for (const [id, entry] of Object.entries(scope.state.clusters)) {
-        if (entry.last_seen < cutoff) delete scope.state.clusters[id];
+      for (const [id, entry] of scope.state.clusters) {
+        if (entry.last_seen < cutoff) scope.state.clusters.delete(id);
       }
       saveScopeState(scope.statePath, scope.state);
     }
