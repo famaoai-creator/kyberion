@@ -3,9 +3,10 @@ import * as path from 'node:path';
 import { logger } from '../core.js';
 import { formatDiagnostic } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReaddir } from '../secure-io.js';
+import { safeExistsSync, safeMkdir, safeReaddir, safeStat } from '../secure-io.js';
 import { readJsonIfPresent, readJsonLines, writeJson } from '../foundation/json.js';
 import { resolveIdentityContext } from '../authority.js';
+import { storagePartitionSegments, type StoragePartition } from '../storage-layout.js';
 import { enqueueOperationalLearningSignal } from '../operational-learning.js';
 import { persistHints } from './feedback-loop.js';
 import type { KnowledgeHint } from './knowledge-index.js';
@@ -22,9 +23,16 @@ import type { KnowledgeHint } from './knowledge-index.js';
  * the knowledge index re-injects into later work. Nothing is promoted here: a
  * human or a mission still approves the proposal.
  *
- * Privacy: observations never carry free text from the source record — only
- * kinds, categories, ids and counts. A tenant-scoped observation reaches the
- * learning queue only inside the active tenant scope and never becomes a hint.
+ * Scope: a harvest processes the platform scope (records with no tenant) and,
+ * when one is active, the active tenant. Each scope keeps its own cursor and
+ * cluster state in its own partition (`system/` or `confidential/<tenant>/`),
+ * so records of a tenant that is not active stay unread until a harvest runs
+ * inside that tenant.
+ *
+ * Privacy: a source with a `hintCategory` must build keys and titles from
+ * closed vocabularies only (kinds, categories, op names, error codes — see
+ * `closedToken` / `errorCode`), because hints are read by every later run.
+ * Tenant clusters never become hints.
  */
 
 export interface LearningObservation {
@@ -32,7 +40,7 @@ export interface LearningObservation {
   key: string;
   /** Human-readable cluster title built from the same structural fields. */
   title: string;
-  /** Pointer back to the source record (id, file, correlation id). */
+  /** Unique pointer back to the source record (id, file#seq, correlation id). */
   ref: string;
   /** ISO timestamp of the source record. */
   ts: string;
@@ -52,7 +60,7 @@ export interface LearningSignalSource {
   description: string;
   /** Occurrences of one cluster before it is proposed (then again at 2x, 4x, ...). */
   minOccurrences: number;
-  /** Hint category for tenant-free clusters; omit to propose signals only. */
+  /** Hint category for tenant-free clusters; keys and titles must be closed-vocabulary. */
   hintCategory?: string;
   /** Lesson text for a hint; defaults to a generic recurrence sentence. */
   hintText?: (cluster: LearningCluster) => string;
@@ -73,20 +81,23 @@ export interface LearningCluster {
 }
 
 interface ClusterState {
+  source: string;
+  key: string;
   title: string;
   total: number;
   signaled_total: number;
   first_seen: string;
   last_seen: string;
   refs: string[];
-  tenant_slug?: string;
   signaled_at?: string;
 }
 
-interface HarvestState {
-  version: 1;
+interface ScopeState {
+  version: 2;
   cursors: Record<string, string>;
   clusters: Record<string, ClusterState>;
+  /** Refs seen inside the re-read overlap, per source, so late appends are counted once. */
+  seen: Record<string, Record<string, string>>;
 }
 
 export interface LearningSourceReport {
@@ -104,6 +115,7 @@ export interface LearningSourceReport {
 export interface LearningHarvestReport {
   harvested_at: string;
   dry_run: boolean;
+  scopes: string[];
   sources: LearningSourceReport[];
   signals: number;
   hints: number;
@@ -112,30 +124,50 @@ export interface LearningHarvestReport {
 export interface HarvestLearningSignalsOptions {
   sources: LearningSignalSource[];
   now?: Date;
-  /** Lookback for a source that has no cursor yet. */
+  /** Lookback for a source/scope that has no cursor yet. */
   initialLookbackDays?: number;
   /** Report what would be proposed without writing signals, hints or state. */
   dryRun?: boolean;
-  statePath?: string;
+  /** Root for the per-scope state files (tests). */
+  stateRoot?: string;
 }
 
-const STATE_LOGICAL_PATH = 'runtime/learning-signals/harvest-state.json';
+const STATE_DOMAIN = 'runtime/learning-signals';
+const STATE_FILE = 'harvest-state.json';
 const DEFAULT_LOOKBACK_DAYS = 7;
 const CLUSTER_RETENTION_DAYS = 30;
+/** Records appended shortly after a harvest can carry an earlier timestamp; re-read this much. */
+const CURSOR_OVERLAP_MS = 10 * 60_000;
 const MAX_REFS = 10;
 const DAY_MS = 86_400_000;
 
-export function defaultLearningHarvestStatePath(): string {
-  return pathResolver.shared(STATE_LOGICAL_PATH);
+export function defaultLearningHarvestStateRoot(): string {
+  return pathResolver.shared(STATE_DOMAIN);
 }
 
-function loadState(statePath: string): HarvestState {
-  const raw = readJsonIfPresent<HarvestState>(statePath);
-  if (!raw || raw.version !== 1) return { version: 1, cursors: {}, clusters: {} };
-  return { version: 1, cursors: raw.cursors || {}, clusters: raw.clusters || {} };
+function scopePartition(tenantSlug: string): StoragePartition {
+  return tenantSlug
+    ? { kind: 'tier', tier: 'confidential', tenant: tenantSlug }
+    : { kind: 'system' };
 }
 
-function saveState(statePath: string, state: HarvestState): void {
+/** State file of one scope: `<root>/system/...` or `<root>/confidential/<tenant>/...`. */
+export function learningHarvestStatePath(root: string, tenantSlug = ''): string {
+  return path.join(root, ...storagePartitionSegments(scopePartition(tenantSlug)), STATE_FILE);
+}
+
+function loadScopeState(statePath: string): ScopeState {
+  const raw = readJsonIfPresent<ScopeState>(statePath);
+  if (!raw || raw.version !== 2) return { version: 2, cursors: {}, clusters: {}, seen: {} };
+  return {
+    version: 2,
+    cursors: raw.cursors || {},
+    clusters: raw.clusters || {},
+    seen: raw.seen || {},
+  };
+}
+
+function saveScopeState(statePath: string, state: ScopeState): void {
   const dir = path.dirname(statePath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   writeJson(statePath, state);
@@ -143,10 +175,6 @@ function saveState(statePath: string, state: HarvestState): void {
 
 function shortHash(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex').slice(0, 10);
-}
-
-function clusterId(source: string, key: string, tenantSlug?: string): string {
-  return `${source}|${tenantSlug || ''}|${key}`;
 }
 
 /** First proposal at `min`, then each time the total doubles since the last one. */
@@ -172,28 +200,42 @@ function signalSummary(cluster: LearningCluster, source: LearningSignalSource): 
   );
 }
 
+interface ScopeRun {
+  tenantSlug: string;
+  statePath: string;
+  state: ScopeState;
+}
+
 /**
- * Read every source, update the per-cluster state, and propose the clusters
- * that crossed their recurrence threshold. A failing source is reported and
- * skipped; it never blocks the others.
+ * Read every source, update the per-scope cluster state, and propose the
+ * clusters that crossed their recurrence threshold. A failing source is
+ * reported and skipped; it never blocks the others and keeps its cursors.
  */
 export function harvestLearningSignals(
   options: HarvestLearningSignalsOptions
 ): LearningHarvestReport {
   const now = options.now || new Date();
-  const statePath = options.statePath || defaultLearningHarvestStatePath();
-  const state = loadState(statePath);
+  const nowMs = now.getTime();
+  const stateRoot = options.stateRoot || defaultLearningHarvestStateRoot();
   const lookbackMs = (options.initialLookbackDays ?? DEFAULT_LOOKBACK_DAYS) * DAY_MS;
-  const activeTenant = resolveIdentityContext().tenantSlug?.trim() || undefined;
+  const activeTenant = resolveIdentityContext().tenantSlug?.trim() || '';
+  const scopes: ScopeRun[] = ['', ...(activeTenant ? [activeTenant] : [])].map((tenantSlug) => {
+    const statePath = learningHarvestStatePath(stateRoot, tenantSlug);
+    return { tenantSlug, statePath, state: loadScopeState(statePath) };
+  });
+  const scopeByTenant = new Map(scopes.map((scope) => [scope.tenantSlug, scope]));
   const reports: LearningSourceReport[] = [];
 
   for (const source of options.sources) {
-    const cursor = state.cursors[source.id];
-    const since = cursor ? new Date(cursor) : new Date(now.getTime() - lookbackMs);
-    const window = { since, until: now };
+    const cursorMs = (scope: ScopeRun): number => {
+      const cursor = scope.state.cursors[source.id];
+      return cursor ? Date.parse(cursor) : nowMs - lookbackMs;
+    };
+    const sinceMs = Math.min(...scopes.map((scope) => cursorMs(scope) - CURSOR_OVERLAP_MS));
+    const window = { since: new Date(sinceMs), until: now };
     const report: LearningSourceReport = {
       source: source.id,
-      window: { since: since.toISOString(), until: now.toISOString() },
+      window: { since: window.since.toISOString(), until: now.toISOString() },
       observed: 0,
       clusters: 0,
       proposed: [],
@@ -205,10 +247,7 @@ export function harvestLearningSignals(
 
     let observations: LearningObservation[];
     try {
-      observations = source.read(window).filter((obs) => {
-        const ts = Date.parse(obs.ts);
-        return Number.isFinite(ts) && ts > since.getTime() && ts <= now.getTime();
-      });
+      observations = source.read(window);
     } catch (error) {
       report.error = error instanceof Error ? error.message : String(error);
       logger.warn(
@@ -216,75 +255,87 @@ export function harvestLearningSignals(
           component: 'learning-signal-adapter',
           what: `source ${source.id} could not be read`,
           why: report.error,
-          next: 'the cursor stays put, so the next harvest retries this window',
+          next: 'its cursors stay put, so the next harvest retries this window',
         })
       );
       continue;
     }
 
-    const newCounts = new Map<string, number>();
+    const touched = new Map<string, { scope: ScopeRun; id: string; newCount: number }>();
     for (const obs of observations) {
-      if (obs.tenantSlug && obs.tenantSlug !== activeTenant) {
+      const ts = Date.parse(obs.ts);
+      if (!Number.isFinite(ts) || ts > nowMs) continue;
+      const scope = scopeByTenant.get(obs.tenantSlug?.trim() || '');
+      if (!scope) {
         report.skipped_scope += 1;
         continue;
       }
+      if (ts <= cursorMs(scope) - CURSOR_OVERLAP_MS) continue;
+      const seen = (scope.state.seen[source.id] ||= {});
+      if (seen[obs.ref]) continue;
+      seen[obs.ref] = obs.ts;
       report.observed += 1;
-      const id = clusterId(source.id, obs.key, obs.tenantSlug);
-      const current = state.clusters[id];
+
+      const id = `${source.id}|${obs.key}`;
+      const current = scope.state.clusters[id];
       const next: ClusterState = current
         ? { ...current }
         : {
+            source: source.id,
+            key: obs.key,
             title: obs.title,
             total: 0,
             signaled_total: 0,
             first_seen: obs.ts,
             last_seen: obs.ts,
             refs: [],
-            ...(obs.tenantSlug ? { tenant_slug: obs.tenantSlug } : {}),
           };
       next.total += 1;
       if (obs.ts < next.first_seen) next.first_seen = obs.ts;
       if (obs.ts > next.last_seen) next.last_seen = obs.ts;
       next.refs = [...next.refs.filter((ref) => ref !== obs.ref), obs.ref].slice(-MAX_REFS);
-      state.clusters[id] = next;
-      newCounts.set(id, (newCounts.get(id) || 0) + 1);
+      scope.state.clusters[id] = next;
+      const touchKey = `${scope.tenantSlug}|${id}`;
+      const entry = touched.get(touchKey) || { scope, id, newCount: 0 };
+      entry.newCount += 1;
+      touched.set(touchKey, entry);
     }
-    report.clusters = newCounts.size;
+    report.clusters = touched.size;
 
     const hints: KnowledgeHint[] = [];
-    for (const [id, newCount] of newCounts) {
-      const entry = state.clusters[id];
+    for (const { scope, id, newCount } of touched.values()) {
+      const entry = scope.state.clusters[id];
       if (!shouldProposeCluster(entry.total, entry.signaled_total, source.minOccurrences)) continue;
-      const key = id.slice(id.indexOf('|', id.indexOf('|') + 1) + 1);
+      const tenantSlug = scope.tenantSlug || undefined;
       const cluster: LearningCluster = {
         source: source.id,
-        key,
+        key: entry.key,
         title: entry.title,
         total: entry.total,
         new_count: newCount,
         first_seen: entry.first_seen,
         last_seen: entry.last_seen,
         refs: [...entry.refs],
-        ...(entry.tenant_slug ? { tenant_slug: entry.tenant_slug } : {}),
+        ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
       };
       report.proposed.push(cluster);
       if (options.dryRun) continue;
 
       const signalId = enqueueOperationalLearningSignal(
         {
-          signalId: `${source.id}-${shortHash(key)}`,
+          // The total keeps each re-proposal a separate candidate, so a later
+          // one never overwrites a candidate a human already reviewed.
+          signalId: `${source.id}-${shortHash(entry.key)}-x${entry.total}`,
           sourceType: 'runtime_signal',
-          sourceRef: `learning-signal:${source.id}:${key}`,
+          sourceRef: `learning-signal:${source.id}:${entry.key}`,
           title: `Recurring ${source.id}: ${entry.title}`,
           summary: signalSummary(cluster, source),
           evidenceRefs: cluster.refs,
           targetKind: source.hintCategory ? 'knowledge_hint' : 'sop_candidate',
-          ...(entry.tenant_slug
-            ? { tier: 'confidential' as const, tenantSlug: entry.tenant_slug }
-            : {}),
+          ...(tenantSlug ? { tier: 'confidential' as const, tenantSlug } : {}),
           metadata: {
             signal_source: source.id,
-            cluster_key: key,
+            cluster_key: entry.key,
             total: cluster.total,
             new_count: cluster.new_count,
             first_seen: cluster.first_seen,
@@ -293,13 +344,14 @@ export function harvestLearningSignals(
         },
         { now }
       );
-      if (signalId) report.signal_ids.push(signalId);
+      if (!signalId) continue;
+      report.signal_ids.push(signalId);
       entry.signaled_total = entry.total;
       entry.signaled_at = now.toISOString();
 
-      if (source.hintCategory && !entry.tenant_slug) {
+      if (source.hintCategory && !tenantSlug) {
         hints.push({
-          topic: `${source.id}:${key}`,
+          topic: `${source.id}:${entry.key}`,
           hint: (source.hintText || defaultHintText)(cluster),
           source: `learning-signal:${source.id}`,
           confidence: 0.6,
@@ -308,36 +360,45 @@ export function harvestLearningSignals(
       }
     }
 
-    if (!options.dryRun) {
-      if (hints.length > 0 && source.hintCategory) {
-        try {
-          persistHints(hints, source.hintCategory);
-          report.hints = hints.length;
-        } catch (error) {
-          logger.warn(
-            formatDiagnostic({
-              component: 'learning-signal-adapter',
-              what: `hints for ${source.id} were not persisted`,
-              why: error instanceof Error ? error.message : String(error),
-            })
-          );
-        }
+    if (options.dryRun) continue;
+    if (hints.length > 0 && source.hintCategory) {
+      try {
+        persistHints(hints, source.hintCategory);
+        report.hints = hints.length;
+      } catch (error) {
+        logger.warn(
+          formatDiagnostic({
+            component: 'learning-signal-adapter',
+            what: `hints for ${source.id} were not persisted`,
+            why: error instanceof Error ? error.message : String(error),
+          })
+        );
       }
-      state.cursors[source.id] = now.toISOString();
+    }
+    for (const scope of scopes) {
+      scope.state.cursors[source.id] = now.toISOString();
+      const seen = scope.state.seen[source.id] || {};
+      const keepAfter = nowMs - CURSOR_OVERLAP_MS;
+      scope.state.seen[source.id] = Object.fromEntries(
+        Object.entries(seen).filter(([, ts]) => Date.parse(ts) > keepAfter)
+      );
     }
   }
 
   if (!options.dryRun) {
-    const cutoff = new Date(now.getTime() - CLUSTER_RETENTION_DAYS * DAY_MS).toISOString();
-    for (const [id, entry] of Object.entries(state.clusters)) {
-      if (entry.last_seen < cutoff) delete state.clusters[id];
+    const cutoff = new Date(nowMs - CLUSTER_RETENTION_DAYS * DAY_MS).toISOString();
+    for (const scope of scopes) {
+      for (const [id, entry] of Object.entries(scope.state.clusters)) {
+        if (entry.last_seen < cutoff) delete scope.state.clusters[id];
+      }
+      saveScopeState(scope.statePath, scope.state);
     }
-    saveState(statePath, state);
   }
 
   return {
     harvested_at: now.toISOString(),
     dry_run: Boolean(options.dryRun),
+    scopes: scopes.map((scope) => scope.tenantSlug || 'system'),
     sources: reports,
     signals: reports.reduce((sum, r) => sum + r.signal_ids.length, 0),
     hints: reports.reduce((sum, r) => sum + r.hints, 0),
@@ -395,15 +456,65 @@ export function stringField(record: Record<string, unknown>, ...keys: string[]):
   return '';
 }
 
-/** Collapse a free-form error into a structural class: digits, ids and paths removed. */
+/**
+ * Collapse a free-form error into a structural class for signal-only sources:
+ * quoted values, anything path-like, ids and digits are removed. Not closed
+ * vocabulary — hint sources use `errorCode` instead.
+ */
 export function errorClass(message: string, max = 60): string {
   const normalized = message
     .split(/\n|; /)[0]
     .replace(/\[([A-Z0-9_]+)\]/, '$1 ')
-    .replace(/(^|[\s'"(=])(?:[A-Za-z]:)?[\\/][^\s'"]+/g, '$1<path>')
+    .replace(/(['"`])[^'"`]*\1/g, '<value>')
+    .replace(/\S*[\\/]\S*/g, (token) =>
+      /^[\w-]+(\/\d+)*\/[\w-]+:?$/.test(token) ? token : '<path>'
+    )
     .replace(/\b[0-9a-f]{8,}\b/gi, '<id>')
     .replace(/\d+/g, '<n>')
     .replace(/\s+/g, ' ')
     .trim();
   return (normalized || 'unknown').slice(0, max);
+}
+
+/** A closed-vocabulary token (op name, kind, category) or `fallback` when the value is free text. */
+export function closedToken(value: string, fallback = 'other'): string {
+  const trimmed = value.trim();
+  return /^[A-Za-z][A-Za-z0-9_.:-]{0,47}$/.test(trimmed) ? trimmed : fallback;
+}
+
+const ERROR_CODE_PATTERNS: Array<[RegExp, (match: RegExpMatchArray) => string]> = [
+  [/\[([A-Z][A-Z0-9_]{2,47})\]/, (m) => m[1]],
+  [/^([A-Z][A-Z0-9_]{2,47}):/, (m) => m[1]],
+  [/\b(E[A-Z]{3,15})\b/, (m) => m[1]],
+  [/\b(?:status|HTTP)\s*:?\s*([1-5]\d\d)\b/i, (m) => `http_${m[1]}`],
+  [/^([1-5]\d\d)\b/, (m) => `http_${m[1]}`],
+  [/timed?\s*-?out|timeout/i, () => 'timeout'],
+  [/rate.?limit|too many requests/i, () => 'rate_limited'],
+  [/permission|forbidden|denied|unauthori[sz]ed/i, () => 'denied'],
+  [/not found|no such/i, () => 'not_found'],
+  [/parse|unexpected token|invalid json/i, () => 'parse_error'],
+];
+
+/** Map a free-form error onto a closed code (`ENOENT`, `timeout`, `http_429`, ...) or `error`. */
+export function errorCode(message: string): string {
+  for (const [pattern, pick] of ERROR_CODE_PATTERNS) {
+    const match = message.match(pattern);
+    if (match) return pick(match);
+  }
+  return 'error';
+}
+
+/** Files in `dir` modified at or after `since` (for writers that name files by their start day). */
+export function filesModifiedSince(dir: string, since: Date, suffix = '.jsonl'): string[] {
+  if (!safeExistsSync(dir)) return [];
+  return safeReaddir(dir)
+    .filter((name) => name.endsWith(suffix))
+    .filter((name) => {
+      try {
+        return safeStat(path.join(dir, name)).mtimeMs >= since.getTime();
+      } catch {
+        return false;
+      }
+    })
+    .sort();
 }

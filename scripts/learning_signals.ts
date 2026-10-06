@@ -1,5 +1,5 @@
 /**
- * `pnpm learning:harvest` — read every runtime log registered with the
+ * `pnpm kyberion learning harvest` — read every runtime log registered with the
  * learning-signal adapter, cluster recurring failures, and propose them into
  * the governed organization learning queue (plus runtime knowledge hints for
  * tenant-free clusters). Baseline runs the same harvest; this command is the
@@ -47,7 +47,7 @@ export function parseLookbackDays(argv: string[]): number | undefined {
 }
 
 export const runLearningSignals = defineScript({
-  name: 'learning:harvest',
+  name: 'learning-harvest',
   flags: ['json', 'dry-run', 'quiet'],
   run: ({ argv, print, json, dryRun }) => {
     const lookbackDays = parseLookbackDays(argv);
