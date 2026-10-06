@@ -3,10 +3,18 @@ import {
   ghPrChecks,
   ghPrChecksWait,
   ghPrCreate,
+  ghPrMerge,
   ghRepoDefaultBranch,
   type PrCheckEntry,
 } from './github.js';
-import { gitCheckout, gitDiffChangedPaths, gitWorktree, type VcsCommandRunner } from './git.js';
+import {
+  gitCheckout,
+  gitDiffChangedPaths,
+  gitPull,
+  gitPush,
+  gitWorktree,
+  type VcsCommandRunner,
+} from './git.js';
 
 function stubRunner(
   handlers: Array<{ match: (args: string[]) => boolean; stdout: string; status?: number }>
@@ -87,6 +95,49 @@ describe('libs/core/vcs', () => {
     expect(calls.filter((a) => a[1] === 'checks').length).toBe(2);
   });
 
+  it('ghPrChecksWait keeps polling while no checks are reported yet', async () => {
+    const { run, calls } = stubRunner([
+      { match: (a) => a[1] === 'checks', stdout: '[]', status: 1 },
+    ]);
+    let callCount = 0;
+    const result = await ghPrChecksWait(
+      { ref: '9', intervalMs: 1_000, timeoutMs: 60_000 },
+      ((command, args, options) => {
+        callCount += 1;
+        if (callCount >= 3) {
+          return { stdout: checksJson([{ name: 'build', bucket: 'pass' }]), stderr: '', status: 0 };
+        }
+        return run(command, args, options);
+      }) as VcsCommandRunner,
+      async () => {}
+    );
+    expect(result.state).toBe('success');
+    expect(result.timed_out).toBe(false);
+    expect(callCount).toBe(3);
+  });
+
+  it('ghPrChecksWait tolerates transient gh failures before succeeding', async () => {
+    let callCount = 0;
+    const result = await ghPrChecksWait(
+      { ref: '9', intervalMs: 1_000, timeoutMs: 60_000 },
+      ((command, args) => {
+        callCount += 1;
+        if (callCount < 3) return { stdout: '', stderr: 'network blip', status: 1 };
+        return { stdout: checksJson([{ name: 'build', bucket: 'pass' }]), stderr: '', status: 0 };
+      }) as VcsCommandRunner,
+      async () => {}
+    );
+    expect(result.state).toBe('success');
+    expect(callCount).toBe(3);
+  });
+
+  it('ghPrChecksWait aborts after consecutive gh failures', async () => {
+    const run: VcsCommandRunner = () => ({ stdout: '', stderr: 'boom', status: 1 });
+    await expect(
+      ghPrChecksWait({ ref: '9', intervalMs: 1_000, timeoutMs: 60_000 }, run, async () => {})
+    ).rejects.toThrow(/VCS_GH_WAIT_FAILED/);
+  });
+
   it('ghPrChecksWait reports timed_out when checks never settle', async () => {
     const { run } = stubRunner([
       {
@@ -136,9 +187,18 @@ describe('libs/core/vcs', () => {
     expect(argv).not.toContain('--body ');
   });
 
-  it('gitCheckout rejects flag-like refs', () => {
+  it('rejects flag-like values in every argv position (injection guard)', () => {
     const { run } = stubRunner([]);
     expect(() => gitCheckout('/x', '--force', {}, run)).toThrow(/VCS_GIT_INVALID/);
+    const ghOps = [
+      () => ghPrChecks({ ref: '--repo=evil/x' }, run),
+      () => ghPrMerge({ ref: '--admin' }, run),
+      () => ghPrCreate({ title: 't', head: '--repo=evil/x' }, run),
+    ];
+    for (const call of ghOps) expect(call).toThrow(/VCS_GIT_INVALID/);
+    expect(() => gitPush('/x', { ref: '--force' }, run)).toThrow(/VCS_GIT_INVALID/);
+    expect(() => gitPull('/x', { remote: '--all' }, run)).toThrow(/VCS_GIT_INVALID/);
+    expect(() => gitWorktree('/x', 'add', { path: '-b' }, run)).toThrow(/VCS_GIT_INVALID/);
   });
 
   it('gitDiffChangedPaths parses the NUL-separated list', () => {
