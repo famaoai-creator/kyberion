@@ -68,6 +68,7 @@ export interface FrontDeskExecutionProjection {
     | 'work_completed'
     | 'blocked'
     | 'cancel_requested'
+    | 'terminated_unstarted'
     | 'uncertain';
   text: string;
   reportId?: string;

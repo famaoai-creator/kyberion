@@ -16,6 +16,8 @@ const allowedManagedProcessConsumers = [
   'libs/core/managed-process.watch.test.ts',
   // Real child-process races validate atomic WorkItem persistence and claims.
   'libs/core/workforce/work-coordination.atomic.test.ts',
+  // Real recovery contention and process death test the shared diagnostic fence.
+  'libs/core/surface/front-desk-recovery.engine.integration.test.ts',
   // Fresh executor process verifies durable intake restart and completed-work dedupe.
   'scripts/front_desk_execution_step.test.ts',
   'libs/actuators/service-actuator/src/reconcile-integration.test.ts',

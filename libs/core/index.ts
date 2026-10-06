@@ -69,4 +69,5 @@ export * from './surface/first-job-contract.js';
 export * from './surface/first-job.js';
 
 export * from './surface/first-job-approval.js';
+export * from './surface/first-job-recovery.js';
 export * from './surface/first-job-approval-proof.js';
