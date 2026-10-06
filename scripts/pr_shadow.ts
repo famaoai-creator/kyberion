@@ -90,12 +90,17 @@ export function createGhPrPort(run: GhRunner = runGh): PrReadPort {
     },
     ciState(prNumber: number, ignoredChecks: readonly string[]) {
       // `gh pr checks` exits non-zero while checks fail or are pending; the JSON is still valid.
-      // Shadow mode keeps the original leniency: an unreadable checks payload
-      // is 'none', never a blocker.
+      // Shadow mode keeps the original leniency for command failures (no
+      // checks / unreadable output → 'none', never a blocker) — but a
+      // well-formed gh response whose payload doesn't parse is a different
+      // failure class: fail closed so a gh upgrade can't silently mask CI.
       let result;
       try {
         result = ghPrChecks({ ref: String(prNumber), ignore: [...ignoredChecks] }, exec);
-      } catch {
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('VCS_GH_INVALID_JSON')) {
+          return { state: 'failure' as PrCiState, failing: ['gh-pr-checks-parse'] };
+        }
         return { state: 'none' as PrCiState, failing: [] };
       }
       if (result.state === 'none') return { state: 'none' as PrCiState, failing: [] };

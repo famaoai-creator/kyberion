@@ -1267,7 +1267,11 @@ describe('mission lifecycle finish gate', () => {
 
   it('publishes meeting_facilitation deliverables into the active customer root on finish', async () => {
     const previousCustomer = process.env.KYBERION_CUSTOMER;
+    const previousTenant = process.env.KYBERION_TENANT;
     process.env.KYBERION_CUSTOMER = 'demo';
+    // The fixture declares tenant_slug 'demo'; a tenant-bound mission is only
+    // visible to a process running under that tenant.
+    process.env.KYBERION_TENANT = 'demo';
     try {
       const customerRoot = customerResolver.customerRoot('', process.env);
       if (!customerRoot) throw new Error('Expected demo customer root to resolve.');
@@ -1364,6 +1368,8 @@ describe('mission lifecycle finish gate', () => {
     } finally {
       if (previousCustomer === undefined) delete process.env.KYBERION_CUSTOMER;
       else process.env.KYBERION_CUSTOMER = previousCustomer;
+      if (previousTenant === undefined) delete process.env.KYBERION_TENANT;
+      else process.env.KYBERION_TENANT = previousTenant;
     }
   });
 });
