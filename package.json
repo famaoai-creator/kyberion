@@ -138,6 +138,7 @@
     "scheduler": "node scripts/run_built.mjs dist/scripts/chronos_daemon.js",
     "chronos": "node scripts/deprecated_script_alias.mjs chronos scheduler && node scripts/run_built.mjs dist/scripts/chronos_daemon.js",
     "ops:alerts": "node --import ./scripts/ts-loader.mjs scripts/ops_alerts.ts",
+    "learning:harvest": "node --import ./scripts/ts-loader.mjs scripts/learning_signals.ts",
     "agy:sdk-setup": "node --import ./scripts/ts-loader.mjs scripts/agy_sdk_setup.ts",
     "agy:sdk:setup": "node scripts/deprecated_script_alias.mjs agy:sdk:setup agy:sdk-setup && node --import ./scripts/ts-loader.mjs scripts/agy_sdk_setup.ts",
     "tool:setup": "node --import ./scripts/ts-loader.mjs scripts/tool_runtime_setup.ts",
