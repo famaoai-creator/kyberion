@@ -221,16 +221,6 @@ export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}
         suppressed: false,
       };
     }
-    recordUndeliveredOpsAlert(alertLogPath, input, id, timestamp, 'no_channel_configured');
-    return {
-      id,
-      recorded_path: recordedPath,
-      webhook_attempted: false,
-      webhook_delivered: false,
-      operator_attempted: false,
-      operator_delivered: false,
-      suppressed: false,
-    };
   }
 
   try {
@@ -410,8 +400,18 @@ function classifyUndelivered(records: ParsedOpsAlertRecord[]): UndeliveredClassi
   const outstanding: ParsedOpsAlertRecord[] = [];
   const redelivered: ParsedOpsAlertRecord[] = [];
   const acknowledged: ParsedOpsAlertRecord[] = [];
+  // One alert can leave two envelopes: sendOpsAlert's inbox-fallback writes
+  // `inbox_delivery_failed` while notifyOperatorSync's own catch writes
+  // `delivery_failed` for the same correlation_id — the redeliver path must
+  // not send the alert twice. Collapse by correlation (first wins).
+  const seenCorrelations = new Set<string>();
   for (const record of records) {
     if (record.kind !== 'operator_notification_undelivered') continue;
+    const correlation = record.raw.correlation_id ?? record.raw.alert_id;
+    if (typeof correlation === 'string' && correlation) {
+      if (seenCorrelations.has(correlation)) continue;
+      seenCorrelations.add(correlation);
+    }
     if (redeliveredRefs.has(record.ref)) {
       redelivered.push(record);
     } else if (

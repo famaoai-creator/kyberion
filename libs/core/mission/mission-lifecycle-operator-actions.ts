@@ -15,6 +15,7 @@ import {
 import { readTrustLedger, recordAgentRuntimeEvent } from './mission-governance.js';
 import { deriveMissionBranchName, getCurrentBranch, getGitHash } from './mission-git.js';
 import { isValidTenantSlug } from '../entity-scope.js';
+import { readOrNullOnMissionRefusal } from '../mission-lookup.js';
 import { grantAccess, grantAccessGuarded } from '../secret/secret-guard.js';
 import type { HumanDecidedBy } from './mission-types.js';
 
@@ -290,14 +291,16 @@ export async function repairLegacyMissionState(id: string, note?: string): Promi
 
 /**
  * Visibility-aware not-found: a mission that exists on disk but fails the
- * owner-scope locator needs `repair` (or tenant binding), not a "not found"
- * dead end — the plain error used to strand operators here.
+ * owner-scope locator needs tenant binding or `repair` — the bare "not
+ * found" dead end used to strand operators here. `loadState` *throws*
+ * OWNER_NOT_VISIBLE for that case rather than returning null, so the
+ * refusal has to be caught explicitly.
  */
 function assertMissionReachable(upperId: string): void {
-  if (loadState(upperId)) return;
+  if (readOrNullOnMissionRefusal(() => loadState(upperId))) return;
   if (findMissionPathForRepair(upperId)) {
     throw new Error(
-      `Mission ${upperId} exists but is not visible to this tenant scope — run \`pnpm mission repair ${upperId}\` to normalize its state first.`
+      `Mission ${upperId} exists but is not visible to this tenant scope — if it belongs to another tenant, run under that tenant's binding (KYBERION_TENANT); if its state is legacy or corrupt, run \`pnpm mission repair ${upperId}\` first.`
     );
   }
   throw new Error(`Mission ${upperId} not found.`);
