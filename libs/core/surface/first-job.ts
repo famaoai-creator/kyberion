@@ -15,10 +15,11 @@ import {
   conversationRef,
   readConversationHistory,
   readFrontDeskConversationWork,
+  readFrontDeskConversationArtifact,
   type FrontDeskConversationWorkTask,
 } from './front-desk-conversation-store.js';
 import type { ConversationHistoryMessage } from './front-desk-conversation-history.js';
-import type { FirstJobReadRequest } from './first-job-contract.js';
+import type { FirstJobReadRequest, FirstJobArtifactReadRequest } from './first-job-contract.js';
 
 export type FirstJobReadinessStatus =
   | 'diagnostic_mapping_ready'
@@ -204,4 +205,17 @@ export function readFirstJobSnapshot(
     tasks,
     next_action: FIRST_JOB_NEXT_ACTION,
   };
+}
+
+/** One exact diagnostic version in this authenticated viewer's own conversation. */
+export function readFirstJobArtifact(
+  authenticated: SurfaceViewerScope,
+  input: FirstJobArtifactReadRequest
+) {
+  const resolution = resolveFirstJobViewer(authenticated);
+  if (!resolution.ready) return undefined;
+  const ref = conversationRef(resolution.viewer);
+  if (ref.sessionId !== input.session_id) return undefined;
+  const artifact = readFrontDeskConversationArtifact(resolution.viewer, input);
+  return artifact ? { ok: true as const, sessionId: ref.sessionId, artifact } : undefined;
 }

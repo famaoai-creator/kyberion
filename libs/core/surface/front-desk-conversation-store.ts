@@ -86,6 +86,16 @@ import {
   CONVERSATION_MAX_TURNS,
   type ConversationHistory,
   type ConversationHistoryMessage,
+  type FrontDeskConversationWork,
+  type FrontDeskConversationWorkTask,
+  type FrontDeskConversationWorkArtifact,
+  ConversationStoreError,
+} from './front-desk-conversation-history.js';
+export {
+  ConversationStoreError,
+  type FrontDeskConversationWork,
+  type FrontDeskConversationWorkTask,
+  type FrontDeskConversationWorkArtifact,
 } from './front-desk-conversation-history.js';
 
 type Turn = {
@@ -133,24 +143,6 @@ export interface FrontDeskExecutionReport {
 }
 const MAX_DROPPED_REQUESTS = 1024;
 export const CONVERSATION_RETRY_WINDOW_MS = PENDING_RETENTION_MS;
-
-export class ConversationStoreError extends Error {
-  constructor(
-    public readonly code:
-      | 'identity_required'
-      | 'invalid_history'
-      | 'invalid_text'
-      | 'request_conflict'
-      | 'request_expired'
-      | 'scope_selection_required'
-      | 'invalid_revision'
-      | 'revision_target_unavailable'
-      | 'revision_conflict'
-      | 'diagnostic_admission_required'
-  ) {
-    super(code);
-  }
-}
 
 function canonicalScope(value: string[] | 'all'): string[] | 'all' {
   return value === 'all' ? value : [...new Set(value)].sort();
@@ -464,40 +456,6 @@ function projectConversationHistory(
   };
 }
 
-/** Display-only work state. An answered conversation is never completed execution. */
-export interface FrontDeskConversationWorkTask {
-  id: string;
-  title: string;
-  sourceStatus: 'recorded' | 'answered' | 'awaiting_input' | 'needs_execution';
-  createdAt: number;
-  lastRecordedAt: number;
-  resultExcerpt?: string;
-  turnState: 'settled' | 'pending' | 'uncertain' | 'not_started' | 'unknown';
-  executionStatus?: FrontDeskExecutionProjection['status'] | 'unknown';
-  /** Present only for an existing, scope- and binding-matched governed item. */
-  workItemId?: string;
-  /** Checked now, not an inferred completion time or a persisted report timestamp. */
-  verifiedAt?: number;
-  artifact?: FrontDeskConversationWorkArtifact;
-}
-export interface FrontDeskConversationWorkArtifact {
-  requestId: string;
-  revision: number;
-  format: 'compact' | 'readable';
-  parentRequestId?: string;
-  parentRevision?: number;
-  /** The revision protocol records a format change, never the user's motivation. */
-  changeReason?: 'format_change';
-  verification: 'verified' | 'pending' | 'unknown';
-  currentness: 'latest_verified' | 'older_verified' | 'requested_pending' | 'requested_unknown';
-  sha256?: string;
-  verifiedAt?: number;
-}
-export interface FrontDeskConversationWork {
-  sessionId: string;
-  tasks: FrontDeskConversationWorkTask[];
-}
-
 /** The reserved binding is not proof that an executor created a WorkItem. */
 function existingExecutionWorkItemId(
   viewer: FrontDeskConversationViewer,
@@ -541,12 +499,39 @@ export function readFrontDeskConversationWork(
   viewer: FrontDeskConversationViewer,
   locale?: SupportedLocale
 ): FrontDeskConversationWork {
+  const { artifactBody: _body, ...work } = readConversationWorkProjection(viewer, locale);
+  return work;
+}
+
+export function readFrontDeskConversationArtifact(
+  viewer: FrontDeskConversationViewer,
+  selector: { request_id: string; revision: number; sha256: string }
+): (FrontDeskConversationWorkArtifact & { body: string }) | undefined {
+  const work = readConversationWorkProjection(viewer, undefined, selector);
+  const artifact = work.tasks.find((task) => task.id === selector.request_id)?.artifact;
+  if (
+    !artifact ||
+    artifact.revision !== selector.revision ||
+    artifact.sha256 !== selector.sha256 ||
+    artifact.verification !== 'verified' ||
+    typeof work.artifactBody !== 'string'
+  )
+    return undefined;
+  return { ...artifact, body: work.artifactBody };
+}
+
+function readConversationWorkProjection(
+  viewer: FrontDeskConversationViewer,
+  locale?: SupportedLocale,
+  selector?: { request_id: string; revision: number; sha256: string }
+): FrontDeskConversationWork & { artifactBody?: string } {
   const ref = conversationRef(viewer);
   return asStore(viewer, () => {
     const transcript = load(ref);
     const requests = new Map(
       (transcript.executionRequests ?? []).map((request) => [request.binding.request_id, request])
     );
+    let artifactBody: string | undefined;
     const tasks: FrontDeskConversationWorkTask[] = (transcript.taskState?.tasks ?? []).map(
       (task) => {
         const turns = transcript.turns.filter((turn) => turn.routing?.taskIds.includes(task.id));
@@ -589,7 +574,10 @@ export function readFrontDeskConversationWork(
             : {}),
         };
         if (!request) return row;
-        const projection = executionProjection(viewer, request, locale);
+        const selected =
+          selector?.request_id === request.binding.request_id &&
+          selector.revision === request.binding.revision;
+        const projection = executionProjection(viewer, request, locale, undefined, selected);
         const verified =
           projection?.status === 'work_completed' &&
           typeof projection.artifactSha256 === 'string' &&
@@ -621,6 +609,8 @@ export function readFrontDeskConversationWork(
               ? 'requested_pending'
               : 'requested_unknown',
         };
+        if (verified && selected && projection?.artifactSha256 === selector?.sha256)
+          artifactBody = projection?.artifactBody;
         if (verified) {
           row.verifiedAt = Date.now();
           row.artifact.sha256 = projection!.artifactSha256;
@@ -653,7 +643,11 @@ export function readFrontDeskConversationWork(
         child = parent;
       }
     }
-    return { sessionId: ref.sessionId, tasks };
+    return {
+      sessionId: ref.sessionId,
+      tasks,
+      ...(artifactBody !== undefined ? { artifactBody } : {}),
+    };
   });
 }
 
@@ -1319,7 +1313,8 @@ function executionProjection(
   viewer: FrontDeskConversationViewer,
   request: FrontDeskExecutionRequest,
   locale?: SupportedLocale,
-  rootDir?: string
+  rootDir?: string,
+  includeArtifactBody = false
 ): FrontDeskExecutionProjection | undefined {
   if (request.status === 'cancel_requested')
     return {
@@ -1329,7 +1324,11 @@ function executionProjection(
   if (request.status === 'invalidated')
     return { status: 'blocked', text: t('front_desk:execution_invalidated', undefined, locale) };
   try {
-    return projectFrontDeskExecution(viewer, request.binding, { locale, rootDir });
+    return projectFrontDeskExecution(viewer, request.binding, {
+      locale,
+      rootDir,
+      includeArtifactBody,
+    });
   } catch {
     return undefined;
   } // A report read failure never retries or re-dispatches work.

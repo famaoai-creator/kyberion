@@ -7302,6 +7302,7 @@
     "./surface/first-job-approval-proof": {
       "types": "./dist/surface/first-job-approval-proof.d.ts",
       "default": "./dist/surface/first-job-approval-proof.js"
+    },
     "./knowledge/learning-signal-adapter": {
       "types": "./dist/knowledge/learning-signal-adapter.d.ts",
       "default": "./dist/knowledge/learning-signal-adapter.js"

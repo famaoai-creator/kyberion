@@ -74,3 +74,36 @@
 .home-work-details dt {
   font-weight: 600;
 }
+
+/* Exact diagnostic bodies: preserve whitespace, wrap long tokens, scroll without page overflow. */
+.first-job-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--kb-ui-space-4);
+}
+.first-job-receipt-pane {
+  min-width: 0;
+}
+.first-job-receipt-pane select {
+  width: 100%;
+  max-width: 100%;
+}
+.first-job-receipt-metadata {
+  overflow-wrap: anywhere;
+}
+.first-job-receipt-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: auto;
+  max-height: 32rem;
+  padding: var(--kb-ui-space-3);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  background: var(--kb-ui-surface-sunken);
+  color: var(--kb-ui-text);
+}
+@media (max-width: 48rem) {
+  .first-job-comparison {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
