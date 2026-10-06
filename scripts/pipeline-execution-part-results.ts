@@ -47,6 +47,14 @@ import {
 } from './pipeline-execution-part-bootstrap.js';
 import type { RunStepsOptions } from './pipeline-execution-part-bootstrap.js';
 import { registerPipelineFileRunner } from './lib/pipeline-file-runner.js';
+import {
+  assertDiagnosticPipelineProfile,
+  assertDiagnosticHooksAbsent,
+  firePipelineLifecycleHooks,
+  DIAGNOSTIC_OPERATOR_GUIDANCE,
+  type PipelineExecutionMode,
+} from './pipeline-diagnostic-profile.js';
+import { assertFrontDeskReceiptPipeline } from '@agent/core/surface/front-desk-execution-contract';
 /** Validate Typed Flow channel integrity before allowing any step side effects. */
 export class TypedFlowValidationError extends Error {
   constructor(readonly flowErrors: ReturnType<typeof validateFlow>) {
@@ -60,6 +68,7 @@ export async function runValidatedSteps(
   initialCtx: Record<string, unknown> = {},
   opts: RunStepsOptions = {}
 ) {
+  assertDiagnosticPipelineProfile(opts.executionMode, opts.pipelinePath, steps);
   try {
     return (
       await runAdfLifecycle({
@@ -73,7 +82,7 @@ export async function runValidatedSteps(
         // repair agent as the lifecycle's one auto-repair hook. The one-shot
         // guard prevents an unchanged repair from becoming a retry loop.
         autoRepair:
-          opts.pipelinePath && !opts._adfRepairAttempted
+          opts.executionMode === undefined && opts.pipelinePath && !opts._adfRepairAttempted
             ? async (draft, failure) => {
                 opts._adfRepairAttempted = true;
                 const { attemptAutonomousRepair } = await import('@agent/core/autonomous-repair');
@@ -107,7 +116,7 @@ export async function runValidatedSteps(
   } catch (error) {
     if (!(error instanceof TypedFlowValidationError)) throw error;
 
-    const message = error.message;
+    const message = error.message + (opts.executionMode ? '; ' + DIAGNOSTIC_OPERATOR_GUIDANCE : '');
     for (const flowError of error.flowErrors) {
       logger.warn(`[FLOW_VALIDATION] ${formatFlowValidationErrors([flowError])}.`);
     }
@@ -150,6 +159,9 @@ async function recordPipelineFeedback(
 }
 
 export interface ExecutePipelineFileOptions {
+  executionMode?: PipelineExecutionMode;
+  /** Validate the exact loaded JSON bytes against the approved caller binding. */
+  validateLoadedPipeline?: (pipeline: unknown, sourceText: string) => void;
   context?: Record<string, unknown>;
   trace?: TraceContext;
   quiet?: boolean;
@@ -174,10 +186,32 @@ export async function executePipelineFile(
   inputPath: string,
   options: ExecutePipelineFileOptions = {}
 ) {
+  if (
+    options.executionMode &&
+    (getRegisteredEnvText('MISSION_ID')?.trim() ||
+      Object.prototype.hasOwnProperty.call(options.context ?? {}, 'mission_id'))
+  )
+    throw new Error(
+      'Diagnostic cannot inherit a mission context; run it in a separate unbound diagnostic shell without MISSION_ID.'
+    );
+  let diagnosticSource: string | undefined;
+  if (options.executionMode && !options.validateLoadedPipeline)
+    throw new Error('Diagnostic execution requires an approved pipeline snapshot validator');
   const pipeline = await readValidatedWorkflowAdf(inputPath, {
     trustResolved: options.trustResolved,
     projectTrustApprovalId: options.projectTrustApprovalId,
+    ...(options.executionMode
+      ? {
+          onValidatedInput: (loaded: unknown, source: string) => {
+            assertFrontDeskReceiptPipeline(source);
+            diagnosticSource = source;
+            options.validateLoadedPipeline!(loaded, source);
+          },
+        }
+      : {}),
   });
+  assertDiagnosticPipelineProfile(options.executionMode, inputPath, pipeline.steps);
+  if (options.executionMode) assertDiagnosticHooksAbsent();
   const pipelineId = String(
     pipeline.pipeline_id || pipeline.id || nodePath.basename(inputPath, nodePath.extname(inputPath))
   );
@@ -231,8 +265,8 @@ export async function executePipelineFile(
     });
   trace.addArtifact('file', inputPath, 'Pipeline ADF input');
   const steps = (pipeline.steps || []).map((step) => ({ ...step, params: step.params || {} }));
-  await installReasoningBackendsForSteps(steps);
-  const sessionStart = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'session_start', {
+  if (!options.executionMode) await installReasoningBackendsForSteps(steps);
+  const sessionStart = await firePipelineLifecycleHooks(options.executionMode, 'session_start', {
     matcher_value: pipelineId,
     pipeline_id: pipelineId,
     ...(missionId ? { mission_id: missionId } : {}),
@@ -242,8 +276,8 @@ export async function executePipelineFile(
       `[SAFETY_LIMIT][HOOK_BLOCKED] session_start blocked: ${sessionStart.reasons.join('; ')}`
     );
   }
-  const beforeAgentStart = await fireLifecycleHooks(
-    getDefaultLifecycleHookEngine(),
+  const beforeAgentStart = await firePipelineLifecycleHooks(
+    options.executionMode,
     'before_agent_start',
     {
       matcher_value: pipelineId,
@@ -266,6 +300,13 @@ export async function executePipelineFile(
     runValidatedSteps(steps, mergedContext, {
       trace,
       pipelinePath: inputPath,
+      executionMode: options.executionMode,
+      ...(options.executionMode
+        ? {
+            validateDiagnosticEffect: () =>
+              options.validateLoadedPipeline!(pipeline, diagnosticSource!),
+          }
+        : {}),
       quiet: options.quiet,
       hasHuman: options.hasHuman,
       trustResolved: effectiveTrustResolved,
@@ -300,7 +341,11 @@ export async function executePipelineFile(
           await import('@agent/core/reasoning/reasoning-egress-scope')
         ).withReasoningPayloadScope(effectivePayloadScope, run);
   const failed = result.results.some((entry) => entry.status === 'failed');
-  const settled = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'task_settled', {
+  // Preserve local diagnostic evidence even when a late observer makes final publication unsafe.
+  const diagnosticPersisted = options.executionMode
+    ? finalizePipelineTrace(trace, !failed, { localOnly: true })
+    : undefined;
+  const settled = await firePipelineLifecycleHooks(options.executionMode, 'task_settled', {
     matcher_value: pipelineId,
     pipeline_id: pipelineId,
     status: failed ? 'failed' : 'succeeded',
@@ -311,11 +356,12 @@ export async function executePipelineFile(
       `[PI-08] task_settled observer blocked after library pipeline completion: ${settled.reasons.join('; ')}`
     );
   }
-  const persisted = finalizePipelineTrace(trace, !failed);
+  const persisted = diagnosticPersisted ?? finalizePipelineTrace(trace, !failed);
   result.context.trace_summary = persisted.trace.rootSpan.status;
   result.context.trace_persisted_path =
     nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path;
-  await recordPipelineFeedback(pipelineId, failed ? 'failed' : 'succeeded', persisted.trace);
+  if (!options.executionMode)
+    await recordPipelineFeedback(pipelineId, failed ? 'failed' : 'succeeded', persisted.trace);
   return { ...result, trace, persistedPath: persisted.path };
 }
 

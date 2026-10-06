@@ -1,3 +1,12 @@
+import {
+  findDotCharter,
+  isFrontDeskDiagnosticDot,
+  requireCurrentFrontDeskDiagnosticDot,
+} from '@agent/core/dot/dot-charter';
+import {
+  frontDeskMappingDigest,
+  getFrontDeskExecutionMapping,
+} from '@agent/core/surface/front-desk-execution-contract';
 /**
  * Dot executor supervisor step (DL-01) — wires the real ports into
  * `runDotExecutorSweep` and registers as the `dot-executor` step.
@@ -135,14 +144,41 @@ async function defaultExecutePipeline(
   if (ref === FRONT_DESK_RECEIPT_PIPELINE) {
     const item = typeof ctx.work_item_id === 'string' ? getWorkItem(ctx.work_item_id) : null;
     if (!item) throw new DotExecutorPreEffectError('bound front-desk WorkItem missing');
-    const prepared = prepareFrontDeskExecution(charter, item, deps);
+    const current =
+      charter.runtime.execution_mode !== undefined
+        ? requireCurrentFrontDeskDiagnosticDot(charter, deps.rootDir)
+        : charter;
+    const prepared = prepareFrontDeskExecution(current, item, deps);
     if (
       ctx.front_desk_output_path !== prepared.outputPath ||
       ctx.front_desk_artifact_content !== prepared.expectedContent
     )
       throw new DotExecutorPreEffectError('front-desk pipeline input binding changed');
   }
+  const diagnostic = isFrontDeskDiagnosticDot(charter);
   const result = await executePipelineFile(ref, {
+    ...(diagnostic
+      ? {
+          executionMode: 'front_desk_diagnostic' as const,
+          validateLoadedPipeline: (_pipeline: unknown, source: string) => {
+            const current = requireCurrentFrontDeskDiagnosticDot(charter, deps.rootDir);
+            const item =
+              typeof ctx.work_item_id === 'string' ? getWorkItem(ctx.work_item_id) : null;
+            if (!item) throw new DotExecutorPreEffectError('bound front-desk WorkItem missing');
+            const prepared = prepareFrontDeskExecution(current, item, deps);
+            const mapping = getFrontDeskExecutionMapping(prepared.binding);
+            if (
+              !mapping ||
+              frontDeskMappingDigest(mapping, source) !== prepared.binding.config_digest ||
+              ctx.front_desk_output_path !== prepared.outputPath ||
+              ctx.front_desk_artifact_content !== prepared.expectedContent
+            )
+              throw new DotExecutorPreEffectError(
+                'loaded diagnostic pipeline or bound inputs changed'
+              );
+          },
+        }
+      : {}),
     context: { ...ctx, dot_executor: true },
     quiet: true,
     hasHuman: false,
@@ -218,10 +254,14 @@ export function buildDotExecutorPorts(
   charter: DotCharter,
   deps: DotExecutorStepDeps = {}
 ): DotExecutorPorts {
-  const backend = deps.backend ?? getReasoningBackend();
-  const resolution = resolveDotWakeBackend(charter, backend, {
-    injected: deps.backend !== undefined,
-  });
+  const persisted = findDotCharter(charter.dot_id, deps.rootDir)?.charter;
+  const diagnostic =
+    isFrontDeskDiagnosticDot(charter) || Boolean(persisted && isFrontDeskDiagnosticDot(persisted));
+  const resolution: DotWakeBackendResolution = diagnostic
+    ? { mode: 'unavailable', reason: 'front_desk_diagnostic has no model execution' }
+    : resolveDotWakeBackend(charter, deps.backend ?? getReasoningBackend(), {
+        injected: deps.backend !== undefined,
+      });
   const resolved = resolution.mode === 'unavailable' ? undefined : resolution.backend;
   const drive = deps.goalDriver ?? runGoalDrivenLoop;
   return {
@@ -253,10 +293,15 @@ export function buildDotExecutorPorts(
       }
       return await delegateDotText(resolved, prompt, timeoutMs, signal);
     },
-    runPipeline: (ref, ctx) =>
-      deps.executePipeline
+    runPipeline: async (ref, ctx) => {
+      if (diagnostic && ref !== FRONT_DESK_RECEIPT_PIPELINE)
+        throw new DotExecutorPreEffectError(
+          'diagnostic supports only the front-desk receipt pipeline'
+        );
+      return deps.executePipeline
         ? deps.executePipeline(ref, ctx, charter)
-        : defaultExecutePipeline(ref, ctx, charter, deps),
+        : defaultExecutePipeline(ref, ctx, charter, deps);
+    },
   };
 }
 

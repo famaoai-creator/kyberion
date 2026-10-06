@@ -1,7 +1,9 @@
+import { isFirstJobDiagnosticMapping } from './first-job-admission.js';
 import { frontDeskExecutionArtifactPath } from './front-desk-execution-artifact.js';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   loadFrontDeskExecutionPolicy,
+  FIRST_JOB_DIAGNOSTIC_PROTOCOL,
   frontDeskMappingDigest,
   getFrontDeskExecutionMapping,
   frontDeskExecutionViewerMatches,
@@ -144,6 +146,7 @@ export class ConversationStoreError extends Error {
       | 'invalid_revision'
       | 'revision_target_unavailable'
       | 'revision_conflict'
+      | 'diagnostic_admission_required'
   ) {
     super(code);
   }
@@ -666,7 +669,8 @@ export function reserveConversationTurn(
   requestId: string = randomUUID(),
   requestCreatedAt = Date.now(),
   locale?: SupportedLocale,
-  artifactRevision?: FrontDeskArtifactRevisionInput
+  artifactRevision?: FrontDeskArtifactRevisionInput,
+  options: { requireDiagnosticAdmission?: boolean } = {}
 ): ReservedConversationTurn {
   const revisionInput =
     artifactRevision === undefined
@@ -702,6 +706,23 @@ export function reserveConversationTurn(
         throw new ConversationStoreError('request_conflict');
       const existing = transcript.turns.find((turn) => turn.id === requestId);
       if (existing) {
+        if (options.requireDiagnosticAdmission) {
+          const request = transcript.executionRequests?.find(
+            (entry) => entry.binding.request_id === requestId
+          );
+          const mapping = request && getFrontDeskExecutionMapping(request.binding);
+          if (
+            !request ||
+            !mapping ||
+            !frontDeskExecutionViewerMatches(viewer, mapping) ||
+            !isFirstJobDiagnosticMapping(mapping) ||
+            request.binding.diagnostic_protocol !== FIRST_JOB_DIAGNOSTIC_PROTOCOL ||
+            request.status !== 'pending' ||
+            request.revision !== request.binding.revision ||
+            request.requestDigest !== request.binding.request_digest
+          )
+            throw new ConversationStoreError('diagnostic_admission_required');
+        }
         // Legacy turns have no digest: only their exact stored display text can
         // replay. New turns bind the full input before redaction or truncation.
         const matches = existing.requestDigest
@@ -758,7 +779,15 @@ export function reserveConversationTurn(
       // The request, outbox reference and queued answer share this one atomic write.
       const admission =
         revisionAdmission ?? executionAdmission(viewer, text, id, ref, routed.state, locale);
+      if (
+        options.requireDiagnosticAdmission &&
+        (!admission ||
+          !isFirstJobDiagnosticMapping(getFrontDeskExecutionMapping(admission.request.binding)))
+      )
+        throw new ConversationStoreError('diagnostic_admission_required');
       if (admission) {
+        if (options.requireDiagnosticAdmission)
+          admission.request.binding.diagnostic_protocol = FIRST_JOB_DIAGNOSTIC_PROTOCOL;
         routed = admission.routed;
         transcript.executionRequests = [...(transcript.executionRequests ?? []), admission.request];
       } else {
@@ -1128,6 +1157,9 @@ function executionAdmission(
   }
   const requestDigest = createHash('sha256').update(text).digest('hex');
   const binding: FrontDeskExecutionBinding = {
+    ...(isFirstJobDiagnosticMapping(mapping)
+      ? { diagnostic_protocol: FIRST_JOB_DIAGNOSTIC_PROTOCOL }
+      : {}),
     mapping_id: mapping.id,
     config_digest: digest,
     conversation_key: ref.key,
@@ -1194,7 +1226,11 @@ function admitArtifactRevision(
   )
     throw new ConversationStoreError('revision_conflict');
   const mapping = getFrontDeskExecutionMapping(parent.binding);
-  if (!mapping || !frontDeskExecutionViewerMatches(viewer, mapping))
+  if (
+    !mapping ||
+    !frontDeskExecutionViewerMatches(viewer, mapping) ||
+    (parent.binding.diagnostic_protocol !== undefined && !isFirstJobDiagnosticMapping(mapping))
+  )
     throw new ConversationStoreError('revision_target_unavailable');
   const projection = executionProjection(viewer, parent, locale);
   if (
@@ -1213,6 +1249,9 @@ function admitArtifactRevision(
     throw new ConversationStoreError('revision_conflict');
   const requestDigest = frontDeskArtifactRevisionDigest(input);
   const binding: FrontDeskExecutionBinding = {
+    ...(parent.binding.diagnostic_protocol !== undefined || isFirstJobDiagnosticMapping(mapping)
+      ? { diagnostic_protocol: FIRST_JOB_DIAGNOSTIC_PROTOCOL }
+      : {}),
     mapping_id: mapping.id,
     config_digest: frontDeskMappingDigest(mapping),
     conversation_key: ref.key,
@@ -1351,17 +1390,16 @@ export function readConversationExecutionReports(
   );
 }
 /** Enumerate only explicitly configured partitions. No global transcript scan or bodies. */
-export function listConfiguredFrontDeskExecutions(): Array<{
+export function listConfiguredFrontDeskExecutions(
+  includeMapping?: (mapping: FrontDeskExecutionMapping) => boolean
+): Array<{
   mapping: FrontDeskExecutionMapping;
   binding: FrontDeskExecutionBinding;
   request: Omit<FrontDeskExecutionRequest, 'binding' | 'viewer'>;
 }> {
-  const found: Array<{
-    mapping: FrontDeskExecutionMapping;
-    binding: FrontDeskExecutionBinding;
-    request: Omit<FrontDeskExecutionRequest, 'binding' | 'viewer'>;
-  }> = [];
+  const found: ReturnType<typeof listConfiguredFrontDeskExecutions> = [];
   for (const mapping of loadFrontDeskExecutionPolicy().mappings) {
+    if (includeMapping && !includeMapping(mapping)) continue;
     if (!isFrontDeskExecutionPublicViewer(mapping.viewer)) continue;
     try {
       const ref = conversationRef(mapping.viewer);
@@ -1384,6 +1422,7 @@ export function inspectFrontDeskExecution(
   charter: {
     dot_id: string;
     status: string;
+    runtime?: { execution_mode?: string };
     scope: {
       tier: 'public' | 'confidential' | 'personal';
       tenant_slug?: string;
@@ -1404,6 +1443,12 @@ export function inspectFrontDeskExecution(
   const blocked = (reason: string) => ({ ok: false as const, reason });
   const mapping = getFrontDeskExecutionMapping(binding);
   if (!mapping) return blocked('configuration_changed');
+  if (
+    binding.diagnostic_protocol !== undefined &&
+    (charter.runtime?.execution_mode !== 'front_desk_diagnostic' ||
+      !isFirstJobDiagnosticMapping(mapping))
+  )
+    return blocked('diagnostic_provenance_requires_active_mode');
   if (!isFrontDeskExecutionPublicViewer(mapping.viewer)) return blocked('protected_scope');
   if (charter.dot_id !== mapping.dotId || charter.status !== 'active')
     return blocked('dot_unavailable');
@@ -1425,6 +1470,7 @@ export function inspectFrontDeskExecution(
       );
       if (
         !request ||
+        request.binding.diagnostic_protocol !== binding.diagnostic_protocol ||
         (Object.keys(binding) as Array<keyof FrontDeskExecutionBinding>).some(
           (key) => request.binding[key] !== binding[key]
         )

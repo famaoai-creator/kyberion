@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="{{locale}}" data-density="comfortable">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{{t:front_desk:first_job_title}} — Kyberion</title>
+    <script src="/front-desk-prefs.js"></script>
+    <link rel="stylesheet" href="/design-tokens.css" />
+    <link rel="stylesheet" href="/kyberion-ui.css" />
+    <link rel="stylesheet" href="/design-system.css" />
+    <link rel="stylesheet" href="/home.css" />
+  </head>
+  <body>
+    <div class="kb-app-shell" data-density="comfortable">
+      <div class="kb-app-shell__nav" id="front-desk-rail">{{partial:rail}}</div>
+      <main class="kb-app-shell__main">
+        <header class="kb-page-header">
+          <div class="kb-page-header__titles">
+            <h1 class="kb-page-header__title">
+              {{t:front_desk:first_job_title}}
+              <span class="kb-badge" data-role="presence-studio"
+                >{{t:presence_studio:shell_role_badge}}</span
+              >
+            </h1>
+            <p class="kb-page-header__subtitle">{{t:front_desk:first_job_summary}}</p>
+          </div>
+          {{partial:shell-controls}}
+        </header>
+        <div class="ps-page">
+          <section class="kb-section" aria-labelledby="first-job-readiness-title">
+            <h2 class="kb-section__title" id="first-job-readiness-title">
+              {{t:front_desk:first_job_readiness}}
+            </h2>
+            <ul>
+              <li>{{t:front_desk:first_job_identity_unknown}}</li>
+              <li>{{t:front_desk:first_job_baseline_unknown}}</li>
+              <li>{{t:front_desk:first_job_reasoning_unknown}}</li>
+              <li id="first-job-approval-readiness" role="status" aria-live="polite">
+                {{t:front_desk:first_job_approval_unknown}}
+              </li>
+            </ul>
+            <p id="first-job-readiness" role="status" aria-live="polite">
+              {{t:front_desk:first_job_loading}}
+            </p>
+            <p id="first-job-scope" hidden></p>
+            <div id="first-job-setup" hidden>
+              <h3>{{t:front_desk:first_job_setup_title}}</h3>
+              <p>{{t:front_desk:first_job_setup_preview}}</p>
+              <p><code>pnpm onboarding first-job --tenant &lt;test-tenant&gt;</code></p>
+              <p>{{t:front_desk:first_job_setup_apply}}</p>
+              <p>
+                <code
+                  >pnpm onboarding first-job --tenant &lt;test-tenant&gt; --apply --accept-plan
+                  &lt;digest&gt;</code
+                >
+              </p>
+            </div>
+          </section>
+          <section class="kb-section" aria-labelledby="first-job-steps-title">
+            <h2 class="kb-section__title" id="first-job-steps-title">
+              {{t:front_desk:first_job_steps}}
+            </h2>
+            <p>{{t:front_desk:first_job_step_start}}</p>
+            <p>{{t:front_desk:first_job_step_review}}</p>
+            <p>{{t:front_desk:first_job_step_receipt}}</p>
+            <p>{{t:front_desk:first_job_step_revise}}</p>
+            <div class="home-work-toolbar">
+              <button type="button" id="first-job-start" class="kb-btn kb-btn--primary" disabled>
+                {{t:front_desk:first_job_start}}
+              </button>
+              <button type="button" id="first-job-refresh" class="kb-btn kb-btn--secondary">
+                {{t:front_desk:first_job_refresh}}
+              </button>
+              <a
+                id="first-job-approval"
+                class="kb-btn kb-btn--secondary"
+                href="#first-job-approval-panel"
+                hidden
+                >{{t:front_desk:first_job_approval}}</a
+              >
+              <button
+                type="button"
+                id="first-job-retry"
+                class="kb-btn kb-btn--secondary"
+                hidden
+                disabled
+              >
+                {{t:front_desk:first_job_retry}}
+              </button>
+            </div>
+            <div id="first-job-advance" hidden>
+              <p>{{t:front_desk:first_job_advance}}</p>
+              <p>
+                <code id="first-job-tick"
+                  >pnpm onboarding first-job --tenant &lt;test-tenant&gt; --tick</code
+                >
+              </p>
+            </div>
+            <p id="first-job-status" role="status" aria-live="polite">
+              {{t:front_desk:first_job_loading}}
+            </p>
+            <p id="first-job-error" class="kb-callout" role="alert" hidden>
+              {{t:front_desk:first_job_load_failed}}
+            </p>
+          </section>
+          <section
+            class="kb-section"
+            id="first-job-approval-panel"
+            aria-labelledby="first-job-approval-title"
+          >
+            <h2 class="kb-section__title" id="first-job-approval-title">
+              {{t:front_desk:first_job_approval_title}}
+            </h2>
+            <p id="first-job-approval-status" role="status" aria-live="polite">
+              {{t:front_desk:first_job_approval_unknown}}
+            </p>
+            <p id="first-job-approval-error" class="kb-callout" role="alert" hidden>
+              {{t:front_desk:first_job_approval_failed}}
+            </p>
+            <div id="first-job-approval-signin" hidden>
+              <a class="kb-btn kb-btn--secondary" href="/login?next=%2Ffirst-job"
+                >{{t:front_desk:first_job_approval_signin}}</a
+              >
+              <p>{{t:front_desk:first_job_approval_signin_hint}}</p>
+            </div>
+            <button
+              type="button"
+              id="first-job-approval-refresh"
+              class="kb-btn kb-btn--secondary"
+              disabled
+            >
+              {{t:front_desk:first_job_approval_refresh}}
+            </button>
+            <div id="first-job-approval-items"></div>
+          </section>
+          <section class="kb-section" aria-labelledby="first-job-history-title">
+            <h2 class="kb-section__title" id="first-job-history-title">
+              {{t:front_desk:first_job_history}}
+            </h2>
+            <p>{{t:front_desk:first_job_revision_notice}}</p>
+            <div id="first-job-history"></div>
+          </section>
+        </div>
+      </main>
+    </div>
+    <script src="/first-job-approval.js"></script>
+    <script src="/first-job.js"></script>
+    <script type="module" src="/front-desk-rail.js"></script>
+    <script type="module">
+      if (window.FrontDeskRail)
+        window.FrontDeskRail.mount(document.getElementById('front-desk-rail'), { current: 'home' });
+      if (window.KyberionFirstJob) window.KyberionFirstJob.mount();
+    </script>
+  </body>
+</html>

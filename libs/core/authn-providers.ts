@@ -34,6 +34,8 @@ import {
 } from 'node:crypto';
 
 import { agentActor, humanActor, parseActorRef, serviceActor } from './actor.js';
+import { browserSessionKey } from './authn-browser-session-key.js';
+export { browserSessionKey, BROWSER_SESSION_MIN_KEY_BYTES } from './authn-browser-session-key.js';
 import {
   CHRONOS_TOKEN_REGISTRY_READER_ROLE,
   findChronosTokenRegistration,
@@ -1147,27 +1149,6 @@ export interface BrowserSessionPayload {
   exp: number; // epoch seconds
   iat: number;
   sid: string;
-}
-
-/** Shortest accepted session key: a short key makes the HMAC forgeable offline. */
-export const BROWSER_SESSION_MIN_KEY_BYTES = 32;
-
-/** Sync key lookup shared by the signer (login callback) and the verifier. */
-export function browserSessionKey(deps?: AuthnResolveDeps): Buffer | null {
-  // A weak key is treated as "not configured" rather than silently accepted.
-  const strong = (value: string | undefined): Buffer | null =>
-    value && Buffer.byteLength(value, 'utf8') >= BROWSER_SESSION_MIN_KEY_BYTES
-      ? Buffer.from(value, 'utf8')
-      : null;
-  const envKey = envText(deps, 'KYBERION_SESSION_SECRET')?.trim();
-  if (envKey) return strong(envKey);
-  try {
-    const doc = secretGuard.loadConnectionDocument('kyberion-browser-session') as
-      { hmac_key?: string } | undefined;
-    return strong(doc?.hmac_key?.trim());
-  } catch {
-    return null;
-  }
 }
 
 function signBrowserSessionPayload(payloadB64: string, key: Buffer): string {

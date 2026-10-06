@@ -1,3 +1,4 @@
+import { isFrontDeskDiagnosticDot } from './dot-charter.js';
 /**
  * Dot runtime — evaluates charter attention triggers for due-ness and executes
  * one bounded goal turn per wake.
@@ -232,6 +233,10 @@ export interface DueDotTrigger {
 }
 
 export interface DotRuntimeDeps {
+  /** Resolve provider wiring only after current charter validation. */
+  resolveWakeExecution?: (
+    charter: DotCharter
+  ) => Promise<Pick<DotRuntimeDeps, 'backend' | 'runLoop' | 'backendUnavailable'>>;
   rootDir?: string;
   now?: () => Date;
   /**
@@ -760,6 +765,7 @@ export function applyDotWakeCircuit(
   due: DueDotTrigger[],
   deps: DotRuntimeDeps = {}
 ): DueDotTrigger[] {
+  if (isFrontDeskDiagnosticDot(charter)) return [];
   if (due.length === 0) return due;
   const circuit = evaluateDotWakeCircuit(charter, deps);
   if (!circuit.tripped) return due;
@@ -777,6 +783,7 @@ export function evaluateDotTriggersDue(
   charter: DotCharter,
   deps: DotRuntimeDeps = {}
 ): DueDotTrigger[] {
+  if (isFrontDeskDiagnosticDot(charter)) return [];
   const now = deps.now?.() ?? new Date();
   const isDue = buildDotDueChecker(charter, now, deps);
   const due: DueDotTrigger[] = [];
@@ -891,6 +898,7 @@ export async function evaluateDotProbeTriggers(
   charter: DotCharter,
   deps: DotProbeDeps = {}
 ): Promise<DueDotTrigger[]> {
+  if (isFrontDeskDiagnosticDot(charter)) return [];
   const now = deps.now?.() ?? new Date();
   const probes = charter.attention.triggers.filter(
     (t): t is Extract<DotTrigger, { kind: 'probe' }> => t.kind === 'probe'
@@ -971,12 +979,14 @@ export function listActiveDotHeartbeatSpecs(
   errors?: DotCharterLoadError[]
 ): DotHeartbeatSpec[] {
   try {
-    return listDotCharters(rootDir, { status: 'active', errors }).map((loaded) => ({
-      heartbeat_id: loaded.charter.runtime.heartbeat_id,
-      ...(loaded.charter.runtime.max_idle_wake_ms !== undefined
-        ? { stale_after_ms: loaded.charter.runtime.max_idle_wake_ms }
-        : {}),
-    }));
+    return listDotCharters(rootDir, { status: 'active', errors })
+      .filter((loaded) => !isFrontDeskDiagnosticDot(loaded.charter))
+      .map((loaded) => ({
+        heartbeat_id: loaded.charter.runtime.heartbeat_id,
+        ...(loaded.charter.runtime.max_idle_wake_ms !== undefined
+          ? { stale_after_ms: loaded.charter.runtime.max_idle_wake_ms }
+          : {}),
+      }));
   } catch {
     return [];
   }
@@ -1293,18 +1303,9 @@ function rereadOwnCharter(loaded: LoadedDotCharter): DotCharter {
 }
 
 /**
- * Execute one wake for a charter: per-dot re-entrancy guard → re-read of the
- * charter's OWN file (a sibling's bad JSON never blocks this dot; an
- * unreadable own file is a failed wake carrying the real error) → status
- * re-check (a charter paused between evaluation and delivery must not run) →
- * role re-validation (an already-active charter whose role vanished must not
- * run — the activation gate only fires on transitions) → heartbeat → daily
- * token cap → bounded goal turn (runGoalDrivenLoop under toolRole + KD-02
- * budgets), or one fenced delegateTask turn bounded by wall_clock when the
- * backend cannot drive tools — including a tool loop that finds no live tool
- * candidate, which degrades to the fenced turn inside the same wake. A
- * process holding only the unconfigured stub fails the wake instead of
- * recording `[STUB]` text as a delivery.
+ * Bounded wake: own-file reload and status/mode/role gates precede provider resolution.
+ * Diagnostics durably reject model wakes without consuming executor results.
+ * Generic tool loops retain their wall-clock-bounded fenced fallback.
  */
 export async function runDotWake(
   loaded: LoadedDotCharter,
@@ -1319,6 +1320,7 @@ export async function runDotWake(
     let current: DotCharter;
     try {
       current = rereadOwnCharter(loaded);
+      isFrontDeskDiagnosticDot(charter);
       if (current.dot_id !== charter.dot_id) {
         throw new Error(`file now declares dot_id '${current.dot_id}'`);
       }
@@ -1335,6 +1337,16 @@ export async function runDotWake(
       return { dot_id: charter.dot_id, outcome: 'skipped', reason };
     }
 
+    if (isFrontDeskDiagnosticDot(current) || isFrontDeskDiagnosticDot(charter)) {
+      const reason = 'front_desk_diagnostic charters do not run model-driven wakes';
+      recordDotWakeOutcome(current, deps.trigger, 'rejected', {
+        ...deps,
+        reason,
+        turns_run: 0,
+        tokens_used: 0,
+      });
+      return { dot_id: current.dot_id, outcome: 'rejected', reason };
+    }
     const hasRole =
       deps.hasRole ?? ((role: string) => Boolean(loadAuthorityRoleIndex(deps.rootDir)[role]));
     let roleOk = false;
@@ -1372,8 +1384,9 @@ export async function runDotWake(
 
     const budget = current.goal.budget;
     try {
-      if (deps.backendUnavailable) throw new Error(deps.backendUnavailable);
-      const backend = deps.backend ?? getReasoningBackend();
+      const execution = deps.resolveWakeExecution ? await deps.resolveWakeExecution(current) : deps;
+      if (execution.backendUnavailable) throw new Error(execution.backendUnavailable);
+      const backend = execution.backend ?? getReasoningBackend();
       const accounting_id = randomUUID();
       // Meter from the validated charter, never provider/model-supplied labels.
       const withWakeUsage = <T>(fn: () => T): T =>
@@ -1384,8 +1397,8 @@ export async function runDotWake(
       // Only a caller-injected backend may be the stub (tests, explicit
       // `KYBERION_REASONING_BACKEND=stub`); the process-default stub would
       // record fabricated `[STUB]` text as a delivered wake.
-      const realBackend = deps.backend !== undefined || !dotBackendIsUnconfiguredStub(backend);
-      if (!deps.runLoop) {
+      const realBackend = execution.backend !== undefined || !dotBackendIsUnconfiguredStub(backend);
+      if (!execution.runLoop) {
         if (!realBackend) throw new Error(DOT_WAKE_BACKEND_UNAVAILABLE);
         return await withWakeUsage(() =>
           runFencedWake(current, backend, deps, {
@@ -1394,7 +1407,7 @@ export async function runDotWake(
           })
         );
       }
-      const runLoop = deps.runLoop;
+      const runLoop = execution.runLoop;
       const proposalInputs: unknown[] = [];
       const toolOutputs: DotWakeToolOutputs = {};
       const toolErrors: string[] = [];

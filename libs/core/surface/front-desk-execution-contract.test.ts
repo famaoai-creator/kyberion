@@ -206,6 +206,14 @@ describe('fail-closed bounded diagnostic policy', () => {
     ])
       expect(parseFrontDeskExecutionBinding({ ...valid, ...extra })).toBeUndefined();
   });
+  it('persists only the exact diagnostic protocol marker and preserves unmarked legacy bindings', () => {
+    const legacy = binding();
+    expect(parseFrontDeskExecutionBinding(legacy)).toEqual(legacy);
+    const diagnostic = { ...legacy, diagnostic_protocol: 'first-job-v1' };
+    expect(parseFrontDeskExecutionBinding(diagnostic)).toEqual(diagnostic);
+    for (const diagnostic_protocol of [undefined, null, false, 'other', ''])
+      expect(parseFrontDeskExecutionBinding({ ...legacy, diagnostic_protocol })).toBeUndefined();
+  });
   it('derives the scoped report path and immutable expected receipt without user paths', () => {
     const map = mapping(),
       bound = binding(map);

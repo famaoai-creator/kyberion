@@ -7259,6 +7259,14 @@
       "types": "./dist/ingress/providers/tailscale-funnel.d.ts",
       "default": "./dist/ingress/providers/tailscale-funnel.js"
     },
+    "./surface/first-job-contract": {
+      "types": "./dist/surface/first-job-contract.d.ts",
+      "default": "./dist/surface/first-job-contract.js"
+    },
+    "./surface/first-job": {
+      "types": "./dist/surface/first-job.d.ts",
+      "default": "./dist/surface/first-job.js"
+    },
     "./surface/front-desk-conversation-history": {
       "types": "./dist/surface/front-desk-conversation-history.d.ts",
       "default": "./dist/surface/front-desk-conversation-history.js"
@@ -7282,6 +7290,14 @@
     "./surface/front-desk-execution-status": {
       "types": "./dist/surface/front-desk-execution-status.d.ts",
       "default": "./dist/surface/front-desk-execution-status.js"
+    },
+    "./surface/first-job-approval": {
+      "types": "./dist/surface/first-job-approval.d.ts",
+      "default": "./dist/surface/first-job-approval.js"
+    },
+    "./surface/first-job-approval-proof": {
+      "types": "./dist/surface/first-job-approval-proof.d.ts",
+      "default": "./dist/surface/first-job-approval-proof.js"
     }
   },
   "dependencies": {

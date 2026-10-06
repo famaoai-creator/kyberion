@@ -224,7 +224,6 @@
       "properties": {
         "triggers": {
           "type": "array",
-          "minItems": 1,
           "items": {
             "oneOf": [
               {
@@ -411,11 +410,7 @@
         },
         "goal_ref": {
           "oneOf": [
-            {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 200
-            },
+            { "type": "string", "minLength": 1, "maxLength": 200 },
             {
               "type": "object",
               "additionalProperties": false,
@@ -466,6 +461,10 @@
           "minimum": 1,
           "maximum": 24,
           "description": "How far back missed cron runs are coalesced into one catch-up wake after downtime (default 6)."
+        },
+        "execution_mode": {
+          "const": "front_desk_diagnostic",
+          "description": "Opt-in provider-free receipt diagnostic; removes model wakes and grants no execution."
         }
       }
     },
@@ -481,9 +480,7 @@
     "followups": {
       "type": "object",
       "additionalProperties": false,
-      "properties": {
-        "max_pending": { "type": "integer", "minimum": 0, "maximum": 20 }
-      },
+      "properties": { "max_pending": { "type": "integer", "minimum": 0, "maximum": 20 } },
       "description": "Self-scheduled follow-up wakes."
     },
     "autonomy": {
@@ -521,5 +518,34 @@
         "properties": { "authority_role": { "type": "string", "const": "organization_operator" } }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "runtime": {
+            "type": "object",
+            "required": ["execution_mode"],
+            "properties": { "execution_mode": { "const": "front_desk_diagnostic" } }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "attention": {
+            "type": "object",
+            "properties": { "triggers": { "type": "array", "maxItems": 0 } }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "attention": {
+            "type": "object",
+            "properties": { "triggers": { "type": "array", "minItems": 1 } }
+          }
+        }
+      }
+    }
+  ]
 }
