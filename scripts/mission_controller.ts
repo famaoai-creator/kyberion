@@ -594,10 +594,16 @@ async function archiveMissions(
 /**
  * 6. Visibility Commands
  */
-async function listMissions(filterStatus?: string) {
+async function listMissions(filterStatus?: string, jsonOutput = false) {
   const { renderStatus } = await import('@agent/core/ux-vocabulary');
   const { listMissionSummaries } = await import('./refactor/mission-read-model.js');
   const missions = listMissionSummaries(filterStatus);
+
+  if (jsonOutput) {
+    // Machine-readable: always a JSON array on stdout, `[]` when nothing matches.
+    printOutput(JSON.stringify(missions, null, 2));
+    return;
+  }
 
   if (missions.length === 0) {
     logger.info(filterStatus ? `No missions with status "${filterStatus}".` : 'No missions found.');
