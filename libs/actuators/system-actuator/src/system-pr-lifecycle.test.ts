@@ -14,6 +14,7 @@ function setup(
     fail?: string;
     publishError?: boolean;
     noUrl?: boolean;
+    checks?: string;
   } = {}
 ) {
   const exec = vi.fn((command: string, args: string[]) => {
@@ -26,7 +27,11 @@ function setup(
           ? args.includes('--cached')
             ? (options.cached ?? 'file\0')
             : (options.files ?? 'a file\0line\nbreak\0')
-          : '',
+          : command === 'gh' && args[0] === 'pr' && args[1] === 'checks'
+            ? key === options.fail
+              ? ''
+              : (options.checks ?? '[{"name":"ci","bucket":"pass"}]')
+            : '',
     };
   });
   const write = vi.fn();
@@ -93,6 +98,13 @@ describe('standard PR lifecycle with fully mocked effects', () => {
     const deps = setup({ fail: 'gh pr checks' });
     await expect(runStandardPrLifecycle({ ...params, auto_merge: true }, deps)).rejects.toThrow(
       'COMMAND_FAILED'
+    );
+    expect(deps.exec.mock.calls.some(([, a]) => a[1] === 'merge')).toBe(false);
+  });
+  it('refuses auto-merge when no checks are reported (zero CI evidence)', async () => {
+    const deps = setup({ checks: '[]' });
+    await expect(runStandardPrLifecycle({ ...params, auto_merge: true }, deps)).rejects.toThrow(
+      'CHECKS_FAILED'
     );
     expect(deps.exec.mock.calls.some(([, a]) => a[1] === 'merge')).toBe(false);
   });
