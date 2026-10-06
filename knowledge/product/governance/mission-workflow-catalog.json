@@ -1443,12 +1443,12 @@
             {
               "task_id_suffix": "evaluate-deck",
               "team_role": "reviewer",
-              "phase_kind": "implement",
-              "description": "スクラッチレンダリング済みの draft-deck.pptx をプレビュー(スライド画像化 / artifact-preview 等)で確認し、完成物そのものを評価する。スライド単位で 分かりやすさ・視覚的一貫性・根拠の裏付け・テンポ を採点し、verdict(pass|repair) と per-slide flags を evidence/deck-eval-report.json に記録する",
-              "deliverable": "evidence/deck-eval-report.json",
+              "review_target_suffix": "scratch-render-deck",
+              "description": "スクラッチレンダリング済みの draft-deck.pptx をプレビュー(スライド画像化 / artifact-preview 等)で確認し、完成物そのものを独立評価する。スライド単位で 分かりやすさ・視覚的一貫性・根拠の裏付け・テンポ に加え、読みやすさ(1スライドの文字量・フォントサイズ・コントラスト)を採点し、verdict(pass|repair) と per-slide flags を evidence/deck-eval-report.json に、判定と指摘を REVIEW ファイルに記録する。blocking 指摘は修復必須とする",
               "acceptance_criteria": [
                 "全スライドが評価済み",
-                "verdict と per-slide flags が記録されている"
+                "verdict と per-slide flags が記録されている",
+                "読みやすさの観点が採点に含まれている"
               ],
               "expected_output_format": "structured",
               "estimated_scope": "M",
@@ -1463,6 +1463,12 @@
                 "kind": "evidence_exists",
                 "params": {
                   "path": "evidence/deck-eval-report.json"
+                }
+              },
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/REVIEW-scratch_render-scratch-render-deck.md"
                 }
               }
             ]
@@ -1691,9 +1697,9 @@
             {
               "task_id_suffix": "draft-review",
               "team_role": "reviewer",
-              "description": "本文を読者適合・論理一貫性・根拠の観点でレビューし、指摘と判定を記録する",
+              "description": "本文を読者適合・論理一貫性・根拠に加え、ストーリー(導入→展開→結論の流れが読者の行動を後押しするか)と目的適合性(audience-brief の目的・desired_action に資するか)の観点でレビューし、指摘と判定を記録する",
               "review_target_suffix": "draft",
-              "acceptance_criteria": ["読者と目的に整合", "重大な指摘が解消済み"],
+              "acceptance_criteria": ["読者・目的・ストーリーに整合", "重大な指摘が解消済み"],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium"
@@ -1727,7 +1733,7 @@
             {
               "task_id_suffix": "render-document",
               "team_role": "implementer",
-              "description": "レビュー承認済みの本文を最終形式(PDF/Markdown)に整形して evidence/document-final.md を生成する",
+              "description": "レビュー承認済みの本文を最終形式に整形して evidence/document-final.md を生成する(HTML/PDF は派生形式として同名別拡張子で併置可。HTML の場合は見出し構造・コントラスト・レスポンシブ・noscript フォールバックを確認する)",
               "deliverable": "evidence/document-final.md",
               "acceptance_criteria": ["最終成果物が生成される"],
               "expected_output_format": "files",
@@ -1756,12 +1762,12 @@
             {
               "task_id_suffix": "evaluate-document",
               "team_role": "reviewer",
-              "phase_kind": "implement",
-              "description": "最終形式の document-final.md を通読し、完成物そのものを評価する。セクション単位で 読者適合・論理一貫性・構成・完成度 を採点し、verdict(pass|repair) と per-section flags を evidence/document-eval-report.json に記録する",
-              "deliverable": "evidence/document-eval-report.json",
+              "review_target_suffix": "render-document",
+              "description": "render-document の成果物(document-final.md)を通読し、完成物そのものを独立評価する。セクション単位で 読者適合・論理一貫性・構成・完成度 に加え、文章の読みやすさ(見出し・一文の長さ・用語統一・表と箇条書きの使い分け)と視覚デザイン(配色コントラスト・文字サイズ・レスポンシブ・キーボード操作・noscript・画像alt)に加え、デザインシステム準拠(resolveCreativeDesign＋design-defaults cascade に従いトークン外の都度装飾をしていないか)を採点し、verdict(pass|repair) と per-section flags を evidence/document-eval-report.json に、判定と指摘を REVIEW ファイルに記録する。blocking 指摘は修復必須とする",
               "acceptance_criteria": [
                 "全セクションが評価済み",
-                "verdict と per-section flags が記録されている"
+                "verdict と per-section flags が記録されている",
+                "読みやすさ・視覚デザイン・デザインシステム準拠の観点が採点に含まれている"
               ],
               "expected_output_format": "structured",
               "estimated_scope": "M",
@@ -1776,6 +1782,12 @@
                 "kind": "evidence_exists",
                 "params": {
                   "path": "evidence/document-eval-report.json"
+                }
+              },
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/REVIEW-production_render-render-document.md"
                 }
               }
             ]
@@ -2049,12 +2061,12 @@
             {
               "task_id_suffix": "evaluate-video",
               "team_role": "reviewer",
-              "phase_kind": "implement",
-              "description": "完成動画そのものをAIが視聴して評価する(フレーム抽出 + 音声書き起こし + 台本照合)。シーン単位で 分かりやすさ・退屈箇所・矛盾・テンポ・目的(goal-brief)達成度 を採点し、verdict(pass|repair) と per-scene flags を evidence/video-eval-report.json に記録する",
-              "deliverable": "evidence/video-eval-report.json",
+              "review_target_suffix": "assemble-video",
+              "description": "完成動画そのものをAIが視聴して独立評価する(フレーム抽出 + 音声書き起こし + 台本照合)。シーン単位で 分かりやすさ・退屈箇所・矛盾・テンポ・目的(goal-brief)達成度 に加え、読みやすさ(字幕の有無と文字量・ナレーション速度・用語統一)を採点し、verdict(pass|repair) と per-scene flags を evidence/video-eval-report.json に、判定と指摘を REVIEW ファイルに記録する。blocking 指摘は修復必須とする",
               "acceptance_criteria": [
                 "全シーンが評価済み",
-                "verdict と per-scene flags が記録されている"
+                "verdict と per-scene flags が記録されている",
+                "読みやすさの観点が採点に含まれている"
               ],
               "expected_output_format": "structured",
               "estimated_scope": "M",
@@ -2069,6 +2081,12 @@
                 "kind": "evidence_exists",
                 "params": {
                   "path": "evidence/video-eval-report.json"
+                }
+              },
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/REVIEW-assembly-assemble-video.md"
                 }
               }
             ]
@@ -11569,7 +11587,7 @@
             {
               "task_id_suffix": "code-review",
               "team_role": "reviewer",
-              "description": "実装を正しさ・セキュリティ・回帰の観点でレビューし、指摘と判定を記録する(code-review-cycle 相当)",
+              "description": "実装を正しさ・セキュリティ・回帰・運用性(観測可能性・復旧容易性)・拡張性(将来変更への適合)の観点でレビューし、指摘と判定を記録する(code-review-cycle 相当。運用性・拡張性は Staff Engineer ペルソナが担当)",
               "review_target_suffix": "implement",
               "acceptance_criteria": ["must_fix 指摘が解消済み"],
               "expected_output_format": "structured",

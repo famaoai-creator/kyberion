@@ -1,0 +1,26 @@
+{
+  "record_id": "mem-MSN-CATALOG-FIX-20261007-2026_10_06",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "document系evaluateタスクのデッドロック修正",
+  "summary": "展開時と完了時のreview判定不一致でartifact_evaluationが閉じなくなる不具合を正規review化で解消し、読みやすさ・デザイン等の観点を追加した",
+  "candidate_id": "mem-MSN-CATALOG-FIX-20261007-2026_10_06",
+  "evidence_refs": [
+    "active/missions/public/MSN-CATALOG-FIX-20261007/evidence/implementation-report.md",
+    "active/missions/public/MSN-CATALOG-FIX-20261007/evidence/test-report.md",
+    "active/missions/public/MSN-CATALOG-FIX-20261007/evidence/REVIEW-execution-implement.md"
+  ],
+  "created_at": "2026-10-06T16:49:58.267Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "mission-process-task-expansion.ts のreview判定(phase_kind基準)と mission-lifecycle-completion.js のreview判定(role基準)が不一致だと、role=reviewer かつ phase_kind=implement のタスクは展開できるが完了できない。修正は review_target_suffix 付与＋REVIEW deliverable 化。静的検査(check:workflow-catalog-refs)は展開のみ見るため検出不能で、E2E完走確認が必要。"
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-CATALOG-FIX-20261007/evidence/implementation-report.md",
+    "active/missions/public/MSN-CATALOG-FIX-20261007/evidence/test-report.md",
+    "active/missions/public/MSN-CATALOG-FIX-20261007/evidence/REVIEW-execution-implement.md"
+  ],
+  "source_branch": "fix/document-eval-review-20261007",
+  "source_commit": "17529cb2a131466b81a5293c09d011a52fa490a2"
+}
