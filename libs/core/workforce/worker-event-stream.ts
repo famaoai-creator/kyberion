@@ -149,6 +149,8 @@ function ensureRegularWorkerEventFile(filePath: string): void {
   }
 }
 
+const builtinRecorderListeners = new WeakSet<WorkerEventListener>();
+
 export class WorkerEventStream {
   private readonly listeners = new Set<WorkerEventListener>();
   private seq = 0;
@@ -204,9 +206,22 @@ export class WorkerEventStream {
     return envelope;
   }
 
+  /** Only this module's local recorder is trusted by bounded diagnostics. */
+  get hasExternalListeners(): boolean {
+    return [...this.listeners].some((listener) => !builtinRecorderListeners.has(listener));
+  }
+
   get listenerCount(): number {
     return this.listeners.size;
   }
+}
+
+/** Refuse opaque observers rather than skipping potentially mandatory policy. */
+export function assertBuiltinOnlyWorkerEventStream(stream = getDefaultWorkerEventStream()): void {
+  if (stream.hasExternalListeners)
+    throw new Error(
+      'Diagnostic requires builtin-only worker event listeners; use normal governed execution for custom observers'
+    );
 }
 
 /** Append every envelope to a jsonl file; returns the detach function. */
@@ -265,7 +280,7 @@ function attachDefaultObservabilityRecorder(stream: WorkerEventStream): void {
     if (!dir) return;
     safeMkdir(dir);
     const day = nowIso().slice(0, 10);
-    stream.subscribe((event) => {
+    const recorder: WorkerEventListener = (event) => {
       const redacted = redactCollaborationMetadata(event.payload);
       const sharedEvent: Record<string, unknown> = { ...event };
       if (Object.keys(redacted).length > 0) {
@@ -306,7 +321,9 @@ function attachDefaultObservabilityRecorder(stream: WorkerEventStream): void {
         }),
         sharedEvent
       );
-    });
+    };
+    builtinRecorderListeners.add(recorder);
+    stream.subscribe(recorder);
   } catch {
     // Observability wiring is best-effort; never block stream creation.
   }

@@ -76,6 +76,8 @@ export interface RouteAutonomousDecisionInput {
   blocking?: boolean;
   expiresInMinutes?: number;
   scope?: EventScopeInput;
+  /** Exact payload/effect binding supplied by a governed diagnostic producer. */
+  accountability?: { payloadHash: string; effectBinding: string };
   locale?: SupportedLocale;
   now?: number;
   /**
@@ -226,7 +228,9 @@ export function routeAutonomousDecision(input: RouteAutonomousDecisionInput): Ro
     ...(input.scope ? { scope: input.scope } : {}),
     // Veto requests are settled by the policy when silence elapses; a decide
     // request is a human's call and must stay one.
-    ...(level === 'decide' ? { accountability: { finalDecision: 'human_only' as const } } : {}),
+    ...(level === 'decide'
+      ? { accountability: { ...input.accountability, finalDecision: 'human_only' as const } }
+      : {}),
     decisionCard: buildDecisionCard({
       question: input.question,
       recommendation: input.recommendation,
