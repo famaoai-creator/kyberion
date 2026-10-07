@@ -3734,14 +3734,31 @@
       ],
       "no_match": ["来週の会議を教えて", "show me the meeting agenda"]
     },
+    "schedule.agenda_non_calendar_object": {
+      "old_regex": "/(議事録|録音|文字起こし|文字に起こ|書き起こし|スライド|パワーポイント|パワポ|meeting minutes|recording|transcript|transcribe|slides)/i",
+      "sites": ["libs/core/intent/intent-resolution.ts:476"],
+      "match": [
+        "会議の議事録をまとめて",
+        "会議の録音を文字に起こして",
+        "営業会議用のパワーポイントを作って",
+        "summarize the meeting minutes"
+      ],
+      "no_match": [
+        "来週の会議を教えて",
+        "今日の予定を見せて",
+        "Do I have any meetings in the next 30 minutes?",
+        "来週のミーティング予定を要約して"
+      ]
+    },
     "schedule.agenda_topic": {
-      "old_regex": "/(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|agenda|availability|calendar)/i",
+      "old_regex": "/(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|カレンダー|agenda|availability|calendar)/i",
       "sites": [
         "libs/core/execution-brief.ts:93",
         "libs/core/contextual-intent-frame.ts:103",
         "libs/core/intent/intent-resolution.ts:475"
       ],
       "match": [
+        "カレンダーを見せて",
         "予定",
         "ねえ 予定 して",
         "予定 ok",
@@ -3765,12 +3782,11 @@
         "打ち合わせ ok",
         "アポイント",
         "ねえ アポイント して",
-        "アポイント ok"
+        "アポイント ok",
+        "カレンダーを組み直して"
       ],
       "no_match": [
         "リスケして",
-        "カレンダーを組み直して",
-        "Googleカレンダーで今週の空きを見せて",
         "3Blue1Brownみたいな数学解説動画を作って",
         "confidential dossier をまとめて",
         "hello",

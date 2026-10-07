@@ -148,7 +148,20 @@
       ],
       "outcome_ids": ["artifact:pptx"],
       "specialist_id": "document-specialist",
-      "trigger_keywords": ["pptx", "powerpoint", "slides", "スライド", "パワポ", "パワーポイント"],
+      "trigger_keywords": [
+        "pptx",
+        "powerpoint",
+        "slides",
+        "スライド",
+        "パワポ",
+        "パワーポイント",
+        "提案資料",
+        "資料を作",
+        "プレゼン資料",
+        "スライドを作",
+        "スライド作成",
+        "パワポを作"
+      ],
       "resolution": {
         "shape": "task_session",
         "task_kind": "presentation_deck",
@@ -175,7 +188,15 @@
       ],
       "outcome_ids": ["artifact:docx"],
       "specialist_id": "document-specialist",
-      "trigger_keywords": ["report", "docx", "pdf", "レポート", "報告書"],
+      "trigger_keywords": [
+        "report",
+        "docx",
+        "pdf",
+        "レポート",
+        "報告書",
+        "レポートを書",
+        "レポートを作"
+      ],
       "resolution": {
         "shape": "task_session",
         "task_kind": "report_document",
@@ -202,7 +223,7 @@
       ],
       "outcome_ids": ["artifact:xlsx"],
       "specialist_id": "document-specialist",
-      "trigger_keywords": ["xlsx", "excel", "wbs", "エクセル"],
+      "trigger_keywords": ["xlsx", "excel", "wbs", "エクセル", "ワークブック", "スプレッドシート"],
       "resolution": {
         "shape": "task_session",
         "task_kind": "workbook_wbs",
@@ -242,7 +263,10 @@
         "speak",
         "cloned",
         "私の声",
-        "クローンボイス"
+        "クローンボイス",
+        "読み上げ",
+        "自分の声で",
+        "私の声で"
       ],
       "resolution": {
         "shape": "pipeline",
@@ -364,7 +388,14 @@
       "execution_profile_id": "audio-transcribe-default",
       "outcome_ids": ["artifact:transcript"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["書き起こし", "transcribe", "transcript", "stt"],
+      "trigger_keywords": [
+        "書き起こし",
+        "transcribe",
+        "transcript",
+        "stt",
+        "文字起こし",
+        "音声認識"
+      ],
       "resolution": {
         "shape": "pipeline",
         "result_shape": "summary"
@@ -431,7 +462,7 @@
       ],
       "outcome_ids": ["service_summary", "approval_request"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["status", "logs", "state", "状態", "ログ"],
+      "trigger_keywords": ["status", "logs", "state", "状態", "ログを見", "ログを確認"],
       "resolution": {
         "shape": "task_session",
         "task_kind": "service_operation",
@@ -535,7 +566,7 @@
       "intake_requirements": ["knowledge scope", "question or topic"],
       "outcome_ids": ["knowledge_answer"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": ["knowledge", "ナレッジ", "調べて", "教えて"],
+      "trigger_keywords": ["knowledge", "ナレッジ", "教えて", "社内ナレッジ", "ナレッジベース"],
       "resolution": {
         "shape": "direct_reply",
         "result_shape": "knowledge_answer"
@@ -571,14 +602,14 @@
         "横展開",
         "未展開",
         "過去の要件定義",
-        "不具合",
-        "バグ",
-        "requirements",
         "propagate",
         "propagation",
         "remediation",
         "same bug",
-        "fix across"
+        "fix across",
+        "再発防止",
+        "再発防止策",
+        "恒久対策"
       ],
       "resolution": {
         "shape": "task_session",
@@ -746,7 +777,6 @@
         "文面",
         "レビュー",
         "review",
-        "確認",
         "承認",
         "role",
         "tenant",
@@ -844,7 +874,6 @@
         "歯医者",
         "サブスク",
         "解約",
-        "更新",
         "配送",
         "家事代行",
         "ギフト",
@@ -858,7 +887,8 @@
         "日用品",
         "購入",
         "買って",
-        "探して"
+        "契約更新",
+        "サブスク更新"
       ],
       "resolution": {
         "shape": "task_session",
@@ -1542,7 +1572,22 @@
       ],
       "outcome_ids": ["capability_guide"],
       "specialist_id": "surface-concierge",
-      "trigger_keywords": ["できること", "一覧", "使い方", "capabilities", "guide", "help"],
+      "trigger_keywords": [
+        "できること",
+        "一覧",
+        "使い方",
+        "capabilities",
+        "guide",
+        "help",
+        "利用できる機能",
+        "使える機能",
+        "機能を教えて",
+        "機能一覧",
+        "何ができる",
+        "何が使える",
+        "使えるのか",
+        "何ができ"
+      ],
       "resolution": {
         "shape": "direct_reply",
         "result_shape": "capability_guide"
@@ -1572,7 +1617,7 @@
       ],
       "outcome_ids": ["live_answer"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": ["weather", "location", "web", "search", "天気", "場所", "検索"],
+      "trigger_keywords": ["location", "web", "search", "場所", "検索"],
       "resolution": {
         "shape": "direct_reply",
         "result_shape": "live_answer"
@@ -1694,7 +1739,20 @@
       "intake_requirements": ["conversation_context"],
       "outcome_ids": ["conversation_summary"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": ["summarize", "summary", "要約", "まとめ", "整理", "recap", "thread"],
+      "trigger_keywords": [
+        "summarize",
+        "summary",
+        "要約",
+        "まとめ",
+        "整理",
+        "recap",
+        "thread",
+        "議事録",
+        "決定事項",
+        "要点",
+        "minutes",
+        "action items"
+      ],
       "resolution": {
         "shape": "direct_reply",
         "result_shape": "conversation_summary"
@@ -1734,7 +1792,9 @@
         "仕事にして",
         "実行可能",
         "create a mission",
-        "turn this conversation"
+        "turn this conversation",
+        "ミッションにして",
+        "会話をミッション"
       ],
       "resolution": {
         "shape": "direct_reply",
@@ -1904,7 +1964,18 @@
       "intake_requirements": ["customer context", "deal stage", "constraints"],
       "outcome_ids": ["account_strategy_plan"],
       "specialist_id": "project-lead",
-      "trigger_keywords": ["アップセル", "アカウント", "顧客", "解約", "account", "sales", "提案"],
+      "trigger_keywords": [
+        "アップセル",
+        "アカウント",
+        "顧客",
+        "解約",
+        "account",
+        "sales",
+        "提案",
+        "顧客オンボーディング",
+        "カスタマーオンボーディング",
+        "customer onboarding"
+      ],
       "resolution": {
         "shape": "direct_reply",
         "result_shape": "account_strategy_plan"
@@ -2194,7 +2265,12 @@
         "outage",
         "severity",
         "containment",
-        "remediation"
+        "remediation",
+        "初動",
+        "トリアージ",
+        "triage",
+        "本番障害",
+        "障害発生"
       ],
       "resolution": {
         "shape": "mission",
@@ -2330,7 +2406,6 @@
         "AWS",
         "シミュレーション",
         "ドライラン",
-        "変更",
         "ops automation",
         "operations",
         "runbook",
@@ -3023,7 +3098,16 @@
       ],
       "outcome_ids": ["knowledge_reconciliation_report"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": ["reconcile", "index", "knowledge"],
+      "trigger_keywords": [
+        "reconcile",
+        "index",
+        "knowledge",
+        "インデックス",
+        "索引",
+        "ナレッジインデックス",
+        "インデックスを整合",
+        "不整合"
+      ],
       "resolution": {
         "shape": "task_session",
         "result_shape": "knowledge_reconciliation_report"
@@ -3049,7 +3133,14 @@
       ],
       "outcome_ids": ["kyberion_baseline_status"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["baseline", "health", "status"],
+      "trigger_keywords": [
+        "baseline",
+        "health",
+        "status",
+        "ベースライン",
+        "baseline check",
+        "ベースラインチェック"
+      ],
       "resolution": {
         "shape": "pipeline",
         "result_shape": "kyberion_baseline_status"
@@ -3083,7 +3174,15 @@
       ],
       "outcome_ids": ["kyberion_vital_status"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["vital", "health", "診断"],
+      "trigger_keywords": [
+        "vital",
+        "health",
+        "診断",
+        "健康状態",
+        "ヘルスチェック",
+        "システムの健康",
+        "kyberionの健康"
+      ],
       "resolution": {
         "shape": "pipeline",
         "result_shape": "kyberion_vital_status"
@@ -3109,7 +3208,16 @@
       ],
       "outcome_ids": ["kyberion_diagnostics_report"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["diagnose", "system", "kyberion"],
+      "trigger_keywords": [
+        "diagnose",
+        "system",
+        "kyberion",
+        "診断",
+        "システム診断",
+        "環境を診断",
+        "diagnostics",
+        "診断して"
+      ],
       "resolution": {
         "shape": "pipeline",
         "result_shape": "kyberion_diagnostics_report"
@@ -3143,7 +3251,17 @@
       ],
       "outcome_ids": ["mission_state_summary"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["state", "status", "状態", "進捗", "履歴"],
+      "trigger_keywords": [
+        "state",
+        "status",
+        "状態",
+        "進捗",
+        "履歴",
+        "ミッションの状況",
+        "ブロッカー",
+        "blocker",
+        "ミッション状態"
+      ],
       "resolution": {
         "shape": "task_session",
         "result_shape": "mission_state_summary"
@@ -3874,7 +3992,18 @@
       ],
       "outcome_ids": ["mission_owner_reassigned"],
       "specialist_id": "project-lead",
-      "trigger_keywords": ["reassign", "ミッションオーナーを再割当てして"],
+      "trigger_keywords": [
+        "reassign",
+        "ミッションオーナーを再割当てして",
+        "担当者を変更",
+        "担当を変えて",
+        "オーナー変更",
+        "オーナーを変更",
+        "ミッションの担当",
+        "担当を替",
+        "担当者を替",
+        "ミッションのオーナー"
+      ],
       "resolution": {
         "shape": "mission",
         "result_shape": "summary"
@@ -3900,7 +4029,12 @@
       ],
       "outcome_ids": ["mission_canceled"],
       "specialist_id": "project-lead",
-      "trigger_keywords": ["cancel", "ミッションをキャンセルして"],
+      "trigger_keywords": [
+        "cancel",
+        "ミッションをキャンセルして",
+        "ミッションを中止",
+        "ミッションを取り消"
+      ],
       "resolution": {
         "shape": "mission",
         "result_shape": "summary"
@@ -3952,7 +4086,17 @@
       ],
       "outcome_ids": ["approval_request_created"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["request", "承認を依頼して", "稟議", "承認を申請", "approval request"],
+      "trigger_keywords": [
+        "request",
+        "承認を依頼して",
+        "稟議",
+        "承認を申請",
+        "approval request",
+        "承認を求め",
+        "承認依頼",
+        "承認をリクエスト",
+        "承認リクエスト"
+      ],
       "resolution": {
         "shape": "task_session",
         "result_shape": "summary"
@@ -4035,7 +4179,17 @@
       "intake_requirements": ["service_name", "openapi_url_or_docs"],
       "outcome_ids": ["gateway_adapter_created"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["API", "SaaS", "同化", "取り込んで", "assimilate", "openapi", "gateway"],
+      "trigger_keywords": [
+        "SaaS",
+        "同化",
+        "取り込んで",
+        "assimilate",
+        "openapi",
+        "gateway",
+        "外部API",
+        "新しいAPI",
+        "APIを取り込"
+      ],
       "resolution": {
         "shape": "pipeline",
         "task_kind": "service_onboarding",
@@ -4143,12 +4297,8 @@
       "outcome_ids": ["task_plan"],
       "specialist_id": "project-lead",
       "trigger_keywords": [
-        "要件",
-        "設計",
-        "テスト",
         "タスク分解",
         "段階的",
-        "ステップ",
         "chain of thought",
         "CoT",
         "requirements",
@@ -4218,11 +4368,7 @@
       "outcome_ids": ["execution_result"],
       "specialist_id": "project-lead",
       "trigger_keywords": [
-        "実行",
-        "進めて",
         "タスク実行",
-        "plan",
-        "execute",
         "自動実行",
         "plan and execute",
         "plan-and-execute",
@@ -4288,16 +4434,23 @@
         "過去",
         "先例",
         "以前",
-        "失敗",
-        "経験",
-        "学習",
         "prior knowledge",
         "distilled",
         "recall",
         "past incidents",
         "蓄積",
         "知識注入",
-        "ナレッジ活用"
+        "ナレッジ活用",
+        "思い出して",
+        "過去の事例",
+        "過去の失敗",
+        "以前の失敗",
+        "教訓",
+        "lessons learned",
+        "類似事例",
+        "類似インシデント",
+        "類似の障害",
+        "類似の失敗"
       ],
       "resolution": {
         "shape": "direct_reply",
@@ -4358,12 +4511,9 @@
         "go/no-go",
         "multi-agent",
         "consensus",
-        "全員",
         "賛否",
         "反対意見",
-        "debate",
-        "議論",
-        "判定"
+        "debate"
       ],
       "resolution": {
         "shape": "pipeline",
@@ -4490,11 +4640,8 @@
       "specialist_id": "project-lead",
       "trigger_keywords": [
         "ペルソナ",
-        "視点",
         "専門家",
         "CFO",
-        "法務",
-        "技術",
         "adaptive",
         "prompting",
         "システムプロンプト",
@@ -4557,7 +4704,6 @@
         "MoE",
         "mixture of experts",
         "ツール選択",
-        "実行",
         "tool_use"
       ],
       "resolution": {
@@ -4603,13 +4749,10 @@
       "outcome_ids": ["review_id"],
       "specialist_id": "project-lead",
       "trigger_keywords": [
-        "レビュー",
-        "確認",
         "escalate",
         "escalation",
         "人間",
         "上長",
-        "承認",
         "pending",
         "保留",
         "active learning"
@@ -4648,9 +4791,9 @@
       "legacy_category": "surface",
       "description": "外部サイト・APIからデータを取得してユーザーに要約を返す。初回はURLを尋ねてレジストリに登録し、次回から自動解決する。",
       "surface_examples": [
+        "天気を教えて",
         "今日の秋葉原の天気を教えて",
         "このURLからデータを取ってきて",
-        "天気を教えて",
         "為替レートを調べて",
         "このサイトの最新情報を見て"
       ],
@@ -4664,18 +4807,15 @@
       "outcome_ids": ["data_retrieved"],
       "specialist_id": "service-operator",
       "trigger_keywords": [
-        "天気",
         "weather",
+        "天気",
         "気温",
         "温度",
         "為替",
         "レート",
         "exchange rate",
-        "ニュース",
-        "news",
         "株価",
         "stock",
-        "調べて",
         "取得",
         "fetch",
         "取ってきて",
@@ -4898,7 +5038,12 @@
         "trend",
         "tech",
         "headline",
-        "summary"
+        "summary",
+        "業界動向",
+        "市場動向",
+        "最新動向",
+        "ai動向",
+        "最近の動向"
       ],
       "resolution": {
         "shape": "task_session",
@@ -5049,7 +5194,6 @@
         "照明",
         "ライト",
         "温度",
-        "消して",
         "つけて",
         "オン",
         "オフ",
@@ -5058,7 +5202,10 @@
         "light",
         "aircon",
         "turn on",
-        "turn off"
+        "turn off",
+        "電気を消して",
+        "照明を消して",
+        "電源を消して"
       ],
       "resolution": {
         "shape": "task_session",
@@ -5107,11 +5254,11 @@
         "ToDoリスト",
         "やること",
         "買い物リスト",
-        "追加して",
-        "登録して",
         "remind",
         "todo",
-        "reminder"
+        "reminder",
+        "知らせて",
+        "通知して"
       ],
       "resolution": {
         "shape": "task_session",
@@ -5160,7 +5307,17 @@
         "何て言う",
         "訳して",
         "translate",
-        "translation"
+        "translation",
+        "英訳",
+        "和訳",
+        "語に訳",
+        "に訳して",
+        "に翻訳",
+        "を英語に",
+        "を日本語に",
+        "フランス語に",
+        "中国語に",
+        "韓国語に"
       ],
       "resolution": {
         "shape": "task_session",
@@ -5622,7 +5779,11 @@
         "発売準備",
         "product launch",
         "go to market",
-        "gtm"
+        "gtm",
+        "発売",
+        "発売計画",
+        "上市",
+        "製品発売"
       ],
       "resolution": {
         "shape": "mission",
@@ -5697,7 +5858,9 @@
         "deal review",
         "営業パイプライン",
         "パイプラインレビュー",
-        "sales forecast"
+        "sales forecast",
+        "営業案件",
+        "案件の状況"
       ],
       "resolution": {
         "shape": "mission",
@@ -5777,7 +5940,13 @@
         "ヘルプデスク",
         "support ticket",
         "customer inquiry",
-        "helpdesk"
+        "helpdesk",
+        "お客様対応",
+        "クレーム",
+        "ticket",
+        "チケット対応",
+        "チケットに対応",
+        "チケットを対応"
       ],
       "resolution": {
         "shape": "mission",
@@ -6152,7 +6321,10 @@
         "取引先登録",
         "登録審査",
         "supplier",
-        "vendor onboarding"
+        "vendor onboarding",
+        "サプライヤ",
+        "審査と登録",
+        "サプライヤの審査"
       ],
       "resolution": {
         "shape": "mission",
@@ -6621,7 +6793,12 @@
         "interview kit",
         "名採用",
         "人採用",
-        "採用募集"
+        "採用募集",
+        "中途採用",
+        "新卒採用",
+        "面接を設計",
+        "面接の設計",
+        "面接官"
       ],
       "resolution": {
         "shape": "mission",

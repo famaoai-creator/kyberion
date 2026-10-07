@@ -125,8 +125,10 @@ describe('mission-task-classification scenarios', () => {
       expect(packet.selected_intent_id, `intent mismatch for ${scenario.scenario_id}`).toBe(
         scenario.expected?.intent_id
       );
+      // A scenario that expects no intent must also resolve no shape; its
+      // execution_shape then describes the downstream fallback, not the resolver.
       expect(packet.selected_resolution?.shape, `shape mismatch for ${scenario.scenario_id}`).toBe(
-        scenario.expected?.execution_shape
+        scenario.expected?.intent_id ? scenario.expected?.execution_shape : undefined
       );
 
       const classification = resolveMissionClassification({

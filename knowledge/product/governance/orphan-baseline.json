@@ -62,6 +62,10 @@
     {
       "id": "libs/core/mission/mission-class-eval.ts",
       "reason": "Mission-class evaluation harness (evaluateMissionClassCorpus / formatMissionClassEvalReport): scores the utterance → intent → class → workflow → team → review-gate chain against knowledge/product/governance/mission-class-eval-corpus.json. Its intended consumers are mission-class-eval.test.ts (the CI quality floor) and by-hand improvement runs documented in mission-class-operating-guide.md §4; no production module calls it."
+    },
+    {
+      "id": "libs/core/intent/intent-resolution-eval.ts",
+      "reason": "Intent-resolution evaluation harness (evaluateIntentResolutionCorpus / formatIntentResolutionEvalReport): scores utterance → selected intent against knowledge/product/governance/intent-resolution-eval-corpus.json, including negative cases for ordinary requests. Its consumers are intent-resolution-eval.test.ts (the CI quality floor) and by-hand keyword-review runs documented in mission-class-operating-guide.md §4.3; no production module calls it."
     }
   ],
   "scripts": [
