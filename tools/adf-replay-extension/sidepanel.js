@@ -1014,17 +1014,30 @@ function renderExecutionResults(execution) {
     elements.executionResults.append(seg);
   }
 
-  // #3: golden-scenario verification verdict.
+  // #3: golden-scenario verdict, decided by the host.
   if (execution.golden) {
+    const golden = execution.golden;
     const g = document.createElement('li');
-    g.className = execution.golden.passed ? 'is-done' : 'is-high';
+    g.className =
+      golden.verdict === 'pass' ? 'is-done' : golden.verdict === 'fail' ? 'is-high' : '';
     const t = document.createElement('strong');
-    t.textContent = execution.golden.passed ? '✓ 成功条件を満たしました' : '✗ 成功条件の検証に失敗';
+    t.textContent =
+      golden.verdict === 'pass'
+        ? '✓ 成功条件を満たしました'
+        : golden.verdict === 'fail'
+          ? '✗ 成功条件を満たしていません'
+          : golden.verdict === 'inconclusive'
+            ? '– 成功条件は判定できませんでした'
+            : '! 成功条件の判定に失敗しました';
     const d = document.createElement('small');
-    const failed = (execution.golden.results || []).filter((r) => !r.pass);
-    d.textContent = execution.golden.passed
-      ? `${(execution.golden.results || []).length} 条件 OK`
-      : failed.map((r) => `${r.kind}: ${r.detail || 'NG'}`).join(' / ');
+    const conditions = golden.conditions || [];
+    const unmet = conditions.filter((c) => c.outcome === 'unmet');
+    d.textContent =
+      golden.verdict === 'pass'
+        ? `${conditions.filter((c) => c.outcome === 'met').length} 条件 OK`
+        : golden.verdict === 'fail'
+          ? unmet.map((c) => `${c.kind}: ${c.detail}`).join(' / ')
+          : golden.detail || conditions.map((c) => `${c.kind}: ${c.detail}`).join(' / ');
     g.append(t, d);
     elements.executionResults.append(g);
   }
