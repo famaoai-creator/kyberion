@@ -2,6 +2,7 @@
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { recordDaemonHeartbeat } from '@agent/core/daemon-heartbeat';
+import { recordRuntimeHealthSample } from '@agent/core/tool/runtime-health-history';
 import { sendOpsAlert } from '@agent/core/ops-alert';
 import { spawn } from 'node:child_process';
 import { getRegisteredEnvText } from '@agent/core/foundation';
@@ -37,6 +38,12 @@ async function runTick(): Promise<void> {
 }
 
 async function main(_args: string[] = []) {
+  recordRuntimeHealthSample({ processName: DAEMON_ID });
+  const runtimeHealthSampler = setInterval(
+    () => recordRuntimeHealthSample({ processName: DAEMON_ID }),
+    60 * 60 * 1000
+  );
+  runtimeHealthSampler.unref?.();
   recordDaemonHeartbeat(DAEMON_ID, {
     status: 'starting',
     details: { tick_interval_ms: DEFAULT_INTERVAL_MS },

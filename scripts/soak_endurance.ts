@@ -10,7 +10,7 @@ import {
   safeStat,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { appendJsonLine, nowIso, readTextFile } from '@agent/core/foundation';
+import { appendJsonLine, nowIso, readJsonLines, readTextFile } from '@agent/core/foundation';
 import {
   loadSoakEvidenceManifestAtPath,
   writeSoakEvidenceManifestAtPath,
@@ -114,6 +114,8 @@ const DEFAULT_REPORT_PATH = pathResolver.sharedTmp('soak-endurance/soak-report.j
 const DEFAULT_METRICS_DIR = pathResolver.sharedTmp('soak-endurance');
 const DEFAULT_METRICS_FILE = 'latency-history.jsonl';
 const DEFAULT_LIVE_EVIDENCE_DIR = pathResolver.shared('runtime/health/soak');
+const LIVE_RESOURCE_HISTORY_FILE = 'resource-history.jsonl';
+const LIVE_RESOURCE_HISTORY_RETENTION = 30;
 
 function assertSoakResourcePath(filePath: string, label: string, allowMissingLeaf = true): string {
   try {
@@ -252,7 +254,10 @@ function detectSeriesRegression(
   };
 }
 
-export function detectResourceRegressions(samples: SoakSample[]): SoakRegressionFinding[] {
+export function detectResourceRegressions(
+  samples: SoakSample[],
+  options: { includeProcessMetrics?: boolean } = {}
+): SoakRegressionFinding[] {
   const findings: SoakRegressionFinding[] = [];
   const numericThresholds: Array<{
     resource: keyof Pick<SoakSample, 'rss_mb' | 'heap_used_mb' | 'heap_total_mb' | 'open_handles'>;
@@ -264,14 +269,16 @@ export function detectResourceRegressions(samples: SoakSample[]): SoakRegression
     { resource: 'open_handles', threshold: 0.15 },
   ];
 
-  for (const { resource, threshold } of numericThresholds) {
-    const finding = detectSeriesRegression(
-      resource,
-      samples,
-      (sample) => sample[resource],
-      threshold
-    );
-    if (finding) findings.push(finding);
+  if (options.includeProcessMetrics !== false) {
+    for (const { resource, threshold } of numericThresholds) {
+      const finding = detectSeriesRegression(
+        resource,
+        samples,
+        (sample) => sample[resource],
+        threshold
+      );
+      if (finding) findings.push(finding);
+    }
   }
 
   const trackedPaths = new Set<string>();
@@ -471,6 +478,58 @@ function updateLiveEvidenceManifest(report: SoakReport, evidenceRoot: string): v
   );
 }
 
+function isSoakSample(value: unknown): value is SoakSample {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const sample = value as Partial<SoakSample>;
+  return (
+    Number.isInteger(sample.cycle) &&
+    typeof sample.timestamp === 'string' &&
+    Number.isFinite(sample.duration_ms) &&
+    Number.isFinite(sample.rss_mb) &&
+    Number.isFinite(sample.heap_used_mb) &&
+    Number.isFinite(sample.heap_total_mb) &&
+    Number.isFinite(sample.open_handles) &&
+    Boolean(sample.sampled_files) &&
+    typeof sample.sampled_files === 'object' &&
+    !Array.isArray(sample.sampled_files) &&
+    Object.values(sample.sampled_files).every((size) => Number.isFinite(size))
+  );
+}
+
+/**
+ * Keep a bounded live resource series so daily one-cycle pulses can detect
+ * trends across process restarts. Malformed history fails closed instead of
+ * silently resetting the regression window.
+ */
+function persistLiveResourceHistory(evidenceRoot: string, samples: SoakSample[]): SoakSample[] {
+  const historyPath = assertSoakResourcePath(
+    path.join(evidenceRoot, LIVE_RESOURCE_HISTORY_FILE),
+    'resource history'
+  );
+  const previous = safeExistsSync(historyPath)
+    ? readJsonLines<unknown>(historyPath).map((value, index) => {
+        if (!isSoakSample(value)) {
+          throw new Error(`[soak-endurance] invalid live resource history row ${index + 1}`);
+        }
+        return value;
+      })
+    : [];
+  const root = pathResolver.rootDir();
+  const portableSamples = samples.map((sample) => ({
+    ...sample,
+    sampled_files: Object.fromEntries(
+      Object.entries(sample.sampled_files).map(([samplePath, size]) => [
+        path.relative(root, samplePath) || '.',
+        size,
+      ])
+    ),
+  }));
+  const retained = [...previous, ...portableSamples].slice(-LIVE_RESOURCE_HISTORY_RETENTION);
+  safeMkdir(path.dirname(historyPath), { recursive: true });
+  safeWriteFile(historyPath, `${retained.map((sample) => JSON.stringify(sample)).join('\n')}\n`);
+  return retained;
+}
+
 function applyEvidenceRollover(filePath: string, retentionCount: number): void {
   if (!Number.isFinite(retentionCount) || retentionCount <= 0) return;
   const safeFilePath = assertSoakResourcePath(filePath, 'run log');
@@ -571,7 +630,15 @@ export async function runSoakEnduranceHarness(
     persist: false,
   });
   const latencyRegressions = historyCollector.detectRegressions(1.2);
-  const resourceRegressions = detectResourceRegressions(samples);
+  const resourceSamples = evidenceRoot
+    ? persistLiveResourceHistory(evidenceRoot, samples)
+    : samples;
+  // The live process exits after each pulse, so only durable file sizes are
+  // comparable across runs. Resident daemon RSS/heap is monitored separately
+  // by runtime-health-history and health-degradation-watch.
+  const resourceRegressions = detectResourceRegressions(resourceSamples, {
+    includeProcessMetrics: mode !== 'live',
+  });
   const report: SoakReport = {
     timestamp: nowIso(),
     cycles,
