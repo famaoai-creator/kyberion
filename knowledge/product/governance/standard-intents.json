@@ -695,7 +695,22 @@
       "intake_requirements": ["source document", "review target", "approval or release scope"],
       "outcome_ids": ["review_findings"],
       "specialist_id": "document-specialist",
-      "trigger_keywords": ["契約", "仕様書", "contract", "spec", "レビュー", "法務", "red-team"],
+      "trigger_keywords": [
+        "契約",
+        "仕様書",
+        "contract",
+        "spec",
+        "レビュー",
+        "法務",
+        "red-team",
+        "nda",
+        "秘密保持",
+        "契約書",
+        "条項",
+        "clause",
+        "agreement",
+        "legal risk"
+      ],
       "resolution": {
         "shape": "pipeline",
         "result_shape": "review"
@@ -706,7 +721,7 @@
       "action": "review",
       "object": "contract_or_spec_document",
       "execution_shape": "pipeline",
-      "mission_class": "research_and_absorption",
+      "mission_class": "legal_and_compliance",
       "risk_profile": "review_required"
     },
     {
@@ -2222,7 +2237,10 @@
         "gate review",
         "review board",
         "go/no-go",
-        "CAB"
+        "CAB",
+        "ゲートレビュー",
+        "判定会議",
+        "審査会議"
       ],
       "resolution": {
         "shape": "mission",
@@ -2234,7 +2252,7 @@
       "action": "review",
       "object": "gate_review",
       "execution_shape": "mission",
-      "mission_class": "operations_and_release",
+      "mission_class": "strategy_and_governance",
       "risk_profile": "approval_required"
     },
     {
@@ -3625,7 +3643,7 @@
       "action": "change",
       "object": "mission_handoff",
       "execution_shape": "mission",
-      "mission_class": "operations_and_release",
+      "mission_class": "environment_and_recovery",
       "risk_profile": "approval_required"
     },
     {
@@ -5275,7 +5293,7 @@
       "action": "execute",
       "object": "invoice_processing",
       "execution_shape": "mission",
-      "mission_class": "operations_and_release",
+      "mission_class": "finance_and_accounting",
       "risk_profile": "approval_required"
     },
     {
@@ -5301,7 +5319,12 @@
         "ビジネスプラン",
         "経営計画",
         "新規事業計画",
-        "business plan"
+        "business plan",
+        "事業計画を",
+        "経営計画を",
+        "中期計画",
+        "strategic plan",
+        "annual plan"
       ],
       "resolution": {
         "shape": "mission",
@@ -5313,7 +5336,7 @@
       "action": "create",
       "object": "business_plan",
       "execution_shape": "mission",
-      "mission_class": "decision_support",
+      "mission_class": "strategy_and_governance",
       "risk_profile": "approval_required"
     },
     {
@@ -5424,7 +5447,7 @@
       "action": "execute",
       "object": "expense_claim",
       "execution_shape": "mission",
-      "mission_class": "operations_and_release",
+      "mission_class": "finance_and_accounting",
       "risk_profile": "approval_required"
     },
     {
@@ -5451,7 +5474,11 @@
         "債権回収",
         "未回収",
         "accounts receivable",
-        "collections"
+        "collections",
+        "督促",
+        "overdue",
+        "dunning",
+        "payment reminder"
       ],
       "resolution": {
         "shape": "mission",
@@ -5463,7 +5490,7 @@
       "action": "execute",
       "object": "accounts_receivable",
       "execution_shape": "mission",
-      "mission_class": "operations_and_release",
+      "mission_class": "finance_and_accounting",
       "risk_profile": "approval_required"
     },
     {
@@ -5495,7 +5522,7 @@
       "action": "execute",
       "object": "payroll_run",
       "execution_shape": "mission",
-      "mission_class": "operations_and_release",
+      "mission_class": "finance_and_accounting",
       "risk_profile": "approval_required"
     },
     {
@@ -5527,7 +5554,7 @@
       "action": "create",
       "object": "okr_plan",
       "execution_shape": "mission",
-      "mission_class": "decision_support",
+      "mission_class": "strategy_and_governance",
       "risk_profile": "review_required"
     },
     {
@@ -5554,7 +5581,8 @@
         "買収調査",
         "企業調査",
         "due diligence",
-        "acquisition"
+        "company acquisition",
+        "acquire a company"
       ],
       "resolution": {
         "shape": "mission",
@@ -5566,7 +5594,7 @@
       "action": "review",
       "object": "due_diligence_report",
       "execution_shape": "mission",
-      "mission_class": "decision_support",
+      "mission_class": "strategy_and_governance",
       "risk_profile": "approval_required"
     },
     {
@@ -5666,7 +5694,10 @@
         "商談",
         "sales pipeline",
         "forecast",
-        "deal review"
+        "deal review",
+        "営業パイプライン",
+        "パイプラインレビュー",
+        "sales forecast"
       ],
       "resolution": {
         "shape": "mission",
@@ -5718,7 +5749,7 @@
       "action": "execute",
       "object": "order_fulfillment",
       "execution_shape": "mission",
-      "mission_class": "operations_and_release",
+      "mission_class": "procurement_and_supply",
       "risk_profile": "review_required"
     },
     {
@@ -5826,7 +5857,13 @@
         "オンボーディング",
         "onboarding",
         "offboarding",
-        "employee transfer"
+        "employee transfer",
+        "新入社員",
+        "退職者",
+        "入社",
+        "退職",
+        "new hire",
+        "employee onboarding"
       ],
       "resolution": {
         "shape": "mission",
@@ -5838,7 +5875,7 @@
       "action": "execute",
       "object": "employee_transition",
       "execution_shape": "mission",
-      "mission_class": "operations_and_release",
+      "mission_class": "people_and_talent",
       "risk_profile": "approval_required"
     },
     {
@@ -5878,7 +5915,7 @@
       "action": "review",
       "object": "internal_audit",
       "execution_shape": "mission",
-      "mission_class": "operations_and_release",
+      "mission_class": "legal_and_compliance",
       "risk_profile": "approval_required"
     },
     {
@@ -5918,7 +5955,7 @@
       "action": "prepare",
       "object": "regulatory_filing",
       "execution_shape": "mission",
-      "mission_class": "operations_and_release",
+      "mission_class": "legal_and_compliance",
       "risk_profile": "approval_required"
     },
     {
@@ -5998,7 +6035,7 @@
       "action": "execute",
       "object": "asset_register",
       "execution_shape": "mission",
-      "mission_class": "operations_and_release",
+      "mission_class": "finance_and_accounting",
       "risk_profile": "review_required"
     },
     {
@@ -6026,7 +6063,10 @@
         "リスクマネジメント",
         "risk assessment",
         "erm",
-        "risk register"
+        "risk register",
+        "リスクアセスメント",
+        "リスク分析",
+        "risk analysis"
       ],
       "resolution": {
         "shape": "mission",
@@ -6038,7 +6078,7 @@
       "action": "diagnose",
       "object": "enterprise_risk",
       "execution_shape": "mission",
-      "mission_class": "decision_support",
+      "mission_class": "legal_and_compliance",
       "risk_profile": "review_required"
     },
     {
@@ -6078,7 +6118,7 @@
       "action": "prepare",
       "object": "business_continuity_plan",
       "execution_shape": "mission",
-      "mission_class": "operations_and_release",
+      "mission_class": "legal_and_compliance",
       "risk_profile": "review_required"
     },
     {
@@ -6106,7 +6146,13 @@
         "サプライヤー",
         "supplier onboarding",
         "vendor registration",
-        "new vendor"
+        "new vendor",
+        "仕入先",
+        "新規取引先",
+        "取引先登録",
+        "登録審査",
+        "supplier",
+        "vendor onboarding"
       ],
       "resolution": {
         "shape": "mission",
@@ -6118,7 +6164,7 @@
       "action": "execute",
       "object": "supplier_record",
       "execution_shape": "mission",
-      "mission_class": "operations_and_release",
+      "mission_class": "procurement_and_supply",
       "risk_profile": "review_required"
     },
     {
@@ -6158,7 +6204,7 @@
       "action": "create",
       "object": "partner_alliance",
       "execution_shape": "mission",
-      "mission_class": "decision_support",
+      "mission_class": "strategy_and_governance",
       "risk_profile": "review_required"
     },
     {
@@ -6266,7 +6312,9 @@
         "quality management",
         "qms",
         "quality inspection",
-        "capa"
+        "capa",
+        "品質マネジメント",
+        "マネジメントシステム"
       ],
       "resolution": {
         "shape": "mission",
@@ -6345,7 +6393,11 @@
         "サプライチェーン",
         "在庫計画",
         "supply chain",
-        "demand planning"
+        "demand planning",
+        "需要予測",
+        "demand and supply",
+        "supply planning",
+        "demand forecast"
       ],
       "resolution": {
         "shape": "mission",
@@ -6357,7 +6409,7 @@
       "action": "prepare",
       "object": "supply_plan",
       "execution_shape": "mission",
-      "mission_class": "operations_and_release",
+      "mission_class": "procurement_and_supply",
       "risk_profile": "review_required"
     },
     {
@@ -6385,7 +6437,8 @@
         "変更承認",
         "change management",
         "release management",
-        "cab review"
+        "cab review",
+        "変更"
       ],
       "resolution": {
         "shape": "mission",
@@ -6398,6 +6451,317 @@
       "object": "release_change",
       "execution_shape": "mission",
       "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "financial-close-monthly",
+      "category": "outcome_execution",
+      "description": "Monthly financial close workflow that reconciles accounts, posts adjustments, reviews variances, and produces a signed-off close package.",
+      "surface_examples": [
+        "今月の月次決算を締めて",
+        "月末の締め処理を進めて",
+        "Run the monthly financial close"
+      ],
+      "plan_outline": [
+        "define the close calendar, owners, and cut-off rules",
+        "reconcile sub-ledgers and bank accounts to source documents",
+        "post accruals and adjustments with supporting evidence",
+        "review variances and produce the close package for sign-off"
+      ],
+      "intake_requirements": ["trial_balance", "subledger_reports", "close_calendar"],
+      "outcome_ids": ["execution_result", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "月次決算",
+        "決算処理",
+        "月末締め",
+        "月末の締め",
+        "締め処理",
+        "月次締め",
+        "month-end close",
+        "financial close",
+        "closing the books",
+        "決算",
+        "月次",
+        "month-end",
+        "book close"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "financial_close",
+      "execution_shape": "mission",
+      "mission_class": "finance_and_accounting",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "budget-review",
+      "category": "outcome_execution",
+      "description": "Budget-versus-actual review that analyzes variances, explains drivers, and proposes reforecast or corrective actions.",
+      "surface_examples": [
+        "予算と実績の差異をレビューして",
+        "予実管理の数字を確認して",
+        "Review budget variance for this month"
+      ],
+      "plan_outline": [
+        "collect budget and actuals by cost center",
+        "analyze variances and identify drivers",
+        "assess reforecast needs and corrective actions",
+        "prepare the review memo for the budget owners"
+      ],
+      "intake_requirements": ["budget_plan", "actuals_report", "cost_center_owners"],
+      "outcome_ids": ["execution_result", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "予実",
+        "予算と実績",
+        "予算レビュー",
+        "予算差異",
+        "差異分析",
+        "予算管理",
+        "budget review",
+        "budget variance",
+        "variance analysis",
+        "予算",
+        "budget vs actual",
+        "actuals",
+        "数字の乖離",
+        "乖離",
+        "実績と計画"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "review",
+      "object": "budget_review",
+      "execution_shape": "mission",
+      "mission_class": "finance_and_accounting",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "fundraising-prep",
+      "category": "outcome_execution",
+      "description": "Fundraising preparation workflow that builds the investor narrative, financial model, data room, and outreach plan.",
+      "surface_examples": [
+        "シリーズAの資金調達の準備をして",
+        "投資家向けの資料と財務モデルを整えて",
+        "Prepare for our Series A fundraising"
+      ],
+      "plan_outline": [
+        "frame the raise: amount, use of funds, valuation range, timeline",
+        "build the financial model and investor narrative",
+        "assemble the data room and diligence answers",
+        "plan outreach and rehearse investor Q&A"
+      ],
+      "intake_requirements": ["financial_statements", "growth_metrics", "cap_table"],
+      "outcome_ids": ["execution_result", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "資金調達",
+        "ファンドレイジング",
+        "シリーズa",
+        "投資家向け",
+        "fundraising",
+        "raise capital",
+        "series a",
+        "series b",
+        "investor deck"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "fundraising_package",
+      "execution_shape": "mission",
+      "mission_class": "finance_and_accounting",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "hiring-workflow",
+      "category": "outcome_execution",
+      "description": "Hiring workflow that defines the role, designs structured selection, supports interviews, and produces evaluation memos for human decision.",
+      "surface_examples": [
+        "エンジニアの採用を進めたい",
+        "採用候補者の選考を進めて",
+        "Start hiring for a backend engineer"
+      ],
+      "plan_outline": [
+        "define the role, must-have skills, level, and compensation band",
+        "design the job description and structured selection steps",
+        "prepare interview kits and evaluation sheets",
+        "compile evaluation memos for the hiring decision-makers"
+      ],
+      "intake_requirements": ["role_requirements", "compensation_band", "hiring_manager"],
+      "outcome_ids": ["execution_result", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "採用候補",
+        "採用選考",
+        "採用活動",
+        "求人",
+        "面接官",
+        "募集要項",
+        "hiring",
+        "recruit",
+        "job description",
+        "candidate",
+        "interview kit",
+        "名採用",
+        "人採用",
+        "採用募集"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "hiring_process",
+      "execution_shape": "mission",
+      "mission_class": "people_and_talent",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "performance-review",
+      "category": "outcome_execution",
+      "description": "Performance review cycle that gathers evidence, calibrates ratings, and prepares feedback while leaving rating and compensation decisions to humans.",
+      "surface_examples": [
+        "半期の人事評価を進めたい",
+        "評価面談の準備をして",
+        "Run the annual performance review cycle"
+      ],
+      "plan_outline": [
+        "define the review cycle, criteria, and calibration rules",
+        "collect evidence per employee from goals, feedback, and outcomes",
+        "draft ratings and feedback for manager review",
+        "calibrate across teams and prepare feedback conversations"
+      ],
+      "intake_requirements": ["review_criteria", "employee_goals", "peer_feedback"],
+      "outcome_ids": ["execution_result", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "人事評価",
+        "評価面談",
+        "考課",
+        "評価キャリブレーション",
+        "performance review",
+        "performance appraisal",
+        "calibration",
+        "360 feedback"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "performance_review",
+      "execution_shape": "mission",
+      "mission_class": "people_and_talent",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "board-meeting-prep",
+      "category": "outcome_execution",
+      "description": "Board meeting preparation workflow that curates decisions, metrics, and risks into a board package and rehearses likely questions.",
+      "surface_examples": [
+        "取締役会の資料を準備して",
+        "経営会議の報告パッケージを作って",
+        "Prepare materials for next week's board meeting"
+      ],
+      "plan_outline": [
+        "define the agenda and the decisions the board must make",
+        "assemble metrics, risks, and the strategy narrative",
+        "pre-brief directors and anticipate difficult questions",
+        "finalize the board package and minutes template"
+      ],
+      "intake_requirements": ["board_agenda", "company_metrics", "prior_minutes"],
+      "outcome_ids": ["execution_result", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "取締役会",
+        "経営会議",
+        "役員会",
+        "取締役会資料",
+        "board meeting",
+        "board deck",
+        "board package",
+        "board pack"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "board_package",
+      "execution_shape": "mission",
+      "mission_class": "strategy_and_governance",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "procurement-vendor",
+      "category": "outcome_execution",
+      "description": "Vendor procurement workflow that defines requirements, compares candidates on stated criteria, checks integrity, and prepares the award decision.",
+      "surface_examples": [
+        "新しいCRMのベンダーを選定して",
+        "取引先の比較表を作って",
+        "Select a vendor for our new CRM"
+      ],
+      "plan_outline": [
+        "define requirements, evaluation criteria, and budget range",
+        "solicit and compare candidate vendors on the criteria",
+        "check vendor integrity, conflicts of interest, and contract risk",
+        "prepare the award recommendation for the approver"
+      ],
+      "intake_requirements": ["requirements", "budget_range", "approval_authority"],
+      "outcome_ids": ["execution_result", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "ベンダー選定",
+        "ベンダー比較",
+        "取引先選定",
+        "取引先を選定",
+        "調達",
+        "相見積",
+        "見積比較",
+        "vendor selection",
+        "select a vendor",
+        "vendor comparison",
+        "procurement",
+        "rfq",
+        "request for quotation"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "vendor_selection",
+      "execution_shape": "mission",
+      "mission_class": "procurement_and_supply",
       "risk_profile": "approval_required"
     }
   ]
