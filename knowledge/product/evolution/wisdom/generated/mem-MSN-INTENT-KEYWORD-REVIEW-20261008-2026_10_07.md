@@ -1,0 +1,41 @@
+---
+record_id: mem-MSN-INTENT-KEYWORD-REVIEW-20261008-2026_10_07
+kind: knowledge_hint
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-INTENT-KEYWORD-REVIEW-20261008-2026_10_07
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-10-07T15:43:53.165Z
+source_branch: fix/intent-keyword-review-20261008
+source_commit: 41d1a178ebcc1cbb9f7ed1e66c50ef96f67fa56d
+---
+
+# Fixing intent misresolution: measure on unseen utterances and remove generic keywords
+
+Intent selection errors that class rules cannot repair come from equal-confidence ties broken by catalog order, substring matching of ASCII keywords, and single common words registered as sole triggers. Measured on unseen utterances, accuracy rose 44% to 71%.
+
+## Hint Scope
+
+mission
+
+## Trigger Phrases
+
+- 1. Tuned holdouts stop measuring generalization; add a fresh unseen set before each round and judge improvement on it. 2. Break equal-confidence ties by keyword rarity (document frequency over keywords and examples), not catalog order. 3. Match ASCII keywords on word boundaries (search must not fire inside research). 4. Generic words and short substrings (実行, 追加して, テスト, 中止, チケット, 整合) cause most hijacks; remove them and add compound specific terms; removing generic keywords beats adding examples. 5. Golden fixtures can encode accidental misresolutions; keep the old input as an explicit scenario rather than swapping the utterance. 6. Run an independent reviewer before declaring done: it found eight issues the tests did not.
+
+## Recommended References
+
+- active/missions/public/MSN-INTENT-KEYWORD-REVIEW-20261008/evidence/retrospective.md
+- active/missions/public/MSN-INTENT-KEYWORD-REVIEW-20261008/evidence/test-report.md
+
+## Evidence
+
+- active/missions/public/MSN-INTENT-KEYWORD-REVIEW-20261008/evidence/retrospective.md
+- active/missions/public/MSN-INTENT-KEYWORD-REVIEW-20261008/evidence/test-report.md
+
+## Artifacts

@@ -655,7 +655,7 @@
     },
     {
       "scenario_id": "chain-of-thought-planning-ja",
-      "utterance": "このシェルスクリプトの shebang を直してテストを通して",
+      "utterance": "このシェルスクリプトの shebang を直す手順を段階的に計画して",
       "classification_input": {
         "progress_signals": ["plan_ready"]
       },
@@ -969,6 +969,35 @@
         ],
         "promotion_required": true
       }
+    },
+    {
+      "scenario_id": "shebang-fix-no-intent-ja",
+      "utterance": "このシェルスクリプトの shebang を直してテストを通して",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "task_session"
+      },
+      "expected": {
+        "execution_shape": "task_session",
+        "mission_class": "code_change",
+        "delivery_shape": "single_artifact",
+        "risk_profile": "review_required",
+        "stage": "planning",
+        "workflow_id": "single-track-default",
+        "workflow_pattern": "single_track_execution",
+        "review_mode": "standard",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE",
+          "DELIVERABLE_QUALITY"
+        ],
+        "promotion_required": false
+      },
+      "notes": "Previously resolved to chain-of-thought-planning through the generic keyword テスト. An ordinary fix request must claim no catalog intent and fall to the code_change default."
     }
   ]
 }
