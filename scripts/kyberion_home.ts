@@ -1124,6 +1124,7 @@ async function handleProcedureRun(
             status: actuatorResult.status,
             results: actuatorResult.results,
             errors: actuatorResult.errors,
+            context: actuatorResult.context,
           };
         },
       })
