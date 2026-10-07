@@ -50,6 +50,7 @@ import {
   loadKnowledgeHintsIfPossible,
   organizationIdFromContext,
   resolveScopeBudget,
+  workItemProjectId,
 } from './mission-context-pack-knowledge.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-dispatch-manifest.js';
@@ -791,7 +792,7 @@ function loadProjectStateIfPossible(input: {
   const candidates = [
     input.projectId,
     input.missionState.relationships?.project?.project_id,
-    input.workItem?.project_id,
+    workItemProjectId(input.workItem, input.missionState.mission_id),
   ]
     .map((entry) => String(entry || '').trim())
     .filter(Boolean);
@@ -829,7 +830,7 @@ function loadArtifactHintsIfPossible(input: {
   const projectId = String(
     input.projectState?.project_id ||
       input.missionState.relationships?.project?.project_id ||
-      input.workItem?.project_id ||
+      workItemProjectId(input.workItem, input.missionState.mission_id) ||
       ''
   ).trim();
   if (!projectId) return [];
@@ -947,7 +948,7 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
   const projectId =
     input.projectState?.project_id ||
     input.missionState.relationships?.project?.project_id ||
-    input.workItem?.project_id;
+    workItemProjectId(input.workItem, input.missionState.mission_id);
   const organizationId = organizationIdFromContext({
     missionState: input.missionState,
     projectState: input.projectState,
