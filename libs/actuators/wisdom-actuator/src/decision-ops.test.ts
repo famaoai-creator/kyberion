@@ -1,5 +1,11 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it, beforeEach, vi } from 'vitest';
+
+const procedureCheckMocks = vi.hoisted(() => ({ writeProcedureCheckReport: vi.fn() }));
+vi.mock('@agent/core/knowledge/golden-scenario-maintenance', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/knowledge/golden-scenario-maintenance')>()),
+  writeProcedureCheckReport: procedureCheckMocks.writeProcedureCheckReport,
+}));
 import {
   safeMkdir,
   safeWriteFile,
@@ -1239,5 +1245,30 @@ describe("dispatchDecisionOp 'curation_report' (KP-06)", () => {
     const written = safeReadFile(report.report_path, { encoding: 'utf8' }) as string;
     expect(written).toContain('op-test-low-yield.md');
     expect(written).toContain('stale-governance.md');
+    expect(written).not.toContain('Procedure Check');
+  });
+
+  it('adds the personal-tier procedure check report, and survives its failure', async () => {
+    const checks = {
+      report_path: 'active/shared/artifacts/personal/shared/report/procedure-checks/R.md',
+      summary: { procedure_count: 2, attention_count: 1 },
+    };
+    procedureCheckMocks.writeProcedureCheckReport.mockReturnValueOnce(checks);
+    const ok = await dispatchDecisionOp('curation_report', { export_as: 'curation_report' }, {});
+    expect((ok.ctx.curation_report as { procedure_checks: unknown }).procedure_checks).toEqual(
+      checks
+    );
+
+    procedureCheckMocks.writeProcedureCheckReport.mockImplementationOnce(() => {
+      throw new Error('catalog unreadable');
+    });
+    const failed = await dispatchDecisionOp(
+      'curation_report',
+      { export_as: 'curation_report' },
+      {}
+    );
+    const report = failed.ctx.curation_report as { procedure_checks: unknown; report_path: string };
+    expect(report.procedure_checks).toEqual({ error: 'catalog unreadable' });
+    expect(safeExistsSync(report.report_path)).toBe(true);
   });
 });
