@@ -40,6 +40,7 @@ import {
   rehydrateConversation,
 } from './a2a-conversation-store.js';
 import { Semaphore } from '../semaphore.js';
+import { parseInflightLimit } from '../foundation/inflight-limit.js';
 import {
   appendSupervisorEvent,
   askAgentRuntime,
@@ -180,8 +181,19 @@ export class AgentBusyError extends Error {
 }
 
 // In-process fallback semaphores
-const GLOBAL_LIMIT = Number(getRegisteredEnvText('KYBERION_GLOBAL_INFLIGHT_LIMIT') || 8);
-const AGENT_LIMIT = Number(getRegisteredEnvText('KYBERION_AGENT_INFLIGHT_LIMIT') || 2);
+const GLOBAL_LIMIT = resolveBridgeInflightLimit('KYBERION_GLOBAL_INFLIGHT_LIMIT', 8);
+const AGENT_LIMIT = resolveBridgeInflightLimit('KYBERION_AGENT_INFLIGHT_LIMIT', 2);
+
+function resolveBridgeInflightLimit(name: string, fallback: number): number {
+  const raw = getRegisteredEnvText(name);
+  const result = parseInflightLimit(raw, fallback);
+  if (result.invalid) {
+    logger.warn(
+      `[A2A_CAPACITY_CONFIG_INVALID] ${name}=${JSON.stringify(raw)} is outside 1..256 — using safe default ${fallback} | next: set a positive integer within the supported range | evidence: ${name}`
+    );
+  }
+  return result.value;
+}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

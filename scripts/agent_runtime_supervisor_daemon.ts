@@ -24,19 +24,13 @@ import {
 import { appendSupervisorEvent } from '@agent/core/agent/agent-runtime-events';
 import { recordDaemonHeartbeat } from '@agent/core/daemon-heartbeat';
 import { runtimeSupervisor } from '@agent/core/tool/runtime-supervisor';
-import { recordRuntimeHealthSample } from '@agent/core/tool/runtime-health-history';
 import { sendOpsAlert } from '@agent/core/ops-alert';
 import {
   computeSupervisorCodeStamp,
   normalizeSupervisorResponse,
   normalizeSupervisorResult,
 } from '@agent/core/agent/agent-runtime-supervisor-client';
-import {
-  getRegisteredEnvText,
-  parseSafeJsonInput,
-  readTextFile,
-  setRegisteredEnv,
-} from '@agent/core/foundation';
+import { getRegisteredEnvText, parseSafeJsonInput, setRegisteredEnv } from '@agent/core/foundation';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import { createTriggerRunner, resolveCurrentTriggerAuthority } from '@agent/core/trigger-runner';
 import {
@@ -71,11 +65,18 @@ import { tickVetoWindows } from '@agent/core/governance/approval-veto-window';
 import { getOperationsHaltState } from '@agent/core/governance/operations-halt';
 import { AUTONOMY_APPROVAL_CHANNEL } from '@agent/core/governance/approval-decision-card';
 import { isRecord } from '@agent/core/foundation/text';
+import {
+  alertVetoWindowFailure,
+  readDaemonLockTextFile,
+  resolveInflightLimit,
+  startRuntimeHealthSampler,
+} from './agent_runtime_supervisor_daemon.capacity.js';
+export { resolveInflightLimit } from './agent_runtime_supervisor_daemon.capacity.js';
+export { readDaemonLockTextFile } from './agent_runtime_supervisor_daemon.capacity.js';
 import { logger } from '@agent/core/core';
 import { pathResolver, rootDir } from '@agent/core/path-resolver';
 import {
   safeExistsSync,
-  safeLstat,
   safeMkdir,
   safeUnlinkSync,
   safeCreateExclusiveFileSync,
@@ -91,21 +92,9 @@ function registeredEnv(name: string): string | undefined {
   return getRegisteredEnvText(name);
 }
 
-export function readDaemonLockTextFile(filePath: string): string {
-  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
-    throw new Error(`${filePath} must be a regular file`);
-  }
-  return readTextFile(filePath);
-}
-
 // OP-04: hourly RSS/heap samples feed the degradation watch's trend
 // evaluation (leak / restart-storm detection over a 24h window).
-recordRuntimeHealthSample({ processName: 'agent-runtime-supervisor' });
-const runtimeHealthSampler = setInterval(
-  () => recordRuntimeHealthSample({ processName: 'agent-runtime-supervisor' }),
-  60 * 60 * 1000
-);
-runtimeHealthSampler.unref?.();
+startRuntimeHealthSampler('agent-runtime-supervisor');
 
 // Captured once at startup: the core build this daemon's behavior comes from.
 const DAEMON_CODE_STAMP = computeSupervisorCodeStamp();
@@ -181,8 +170,16 @@ const SOCKET_DIR = pathResolver.shared('runtime/agent-supervisor');
 const SOCKET_PATH = `${SOCKET_DIR}/agent-runtime-supervisor.sock`;
 const DAEMON_LOCK_PATH = `${SOCKET_DIR}/agent-supervisor-daemon.lock`;
 
-const GLOBAL_LIMIT = Number(registeredEnv('KYBERION_GLOBAL_INFLIGHT_LIMIT') || 8);
-const AGENT_LIMIT = Number(registeredEnv('KYBERION_AGENT_INFLIGHT_LIMIT') || 2);
+const GLOBAL_LIMIT = resolveInflightLimit(
+  'KYBERION_GLOBAL_INFLIGHT_LIMIT',
+  registeredEnv('KYBERION_GLOBAL_INFLIGHT_LIMIT'),
+  8
+);
+const AGENT_LIMIT = resolveInflightLimit(
+  'KYBERION_AGENT_INFLIGHT_LIMIT',
+  registeredEnv('KYBERION_AGENT_INFLIGHT_LIMIT'),
+  2
+);
 
 let daemonGlobalInflight = 0;
 const daemonAgentInflightMap = new Map<string, number>();
@@ -376,6 +373,7 @@ export async function runDotSweepOnce(
       logger.warn(
         `[dot-sweep] veto-window tick failed: ${error instanceof Error ? error.message : error}`
       );
+      alertVetoWindowFailure(now, error);
     }
     for (const loaded of active) {
       const housekeeping = await withExecutionContextAsync(
