@@ -245,7 +245,12 @@ function usageAggregatePath(scope?: ScopeContext): string {
     pathResolver.shared('runtime/feedback-loop/knowledge-usage/usage.json')
   );
   if (!scope?.tenant_slug) return base;
-  const directory = scopedRuntimePath(path.dirname(base), scope);
+  // The aggregate is a tenant-level ranking signal (weight proposals, curation
+  // and usage_yield all read it per tenant). Writers sit at mission or task
+  // scope, so partitioning by the full chain left every reader looking at a
+  // file no writer touched. The JSONL delivery log keeps the full chain.
+  const tenantScope: ScopeContext = { tier: scope.tier, tenant_slug: scope.tenant_slug };
+  const directory = scopedRuntimePath(path.dirname(base), tenantScope);
   return assertSafeRepositoryPath(path.join(directory, path.basename(base)), {
     allowMissingLeaf: true,
   });
