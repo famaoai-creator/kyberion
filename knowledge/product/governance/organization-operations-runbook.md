@@ -1,7 +1,7 @@
 ---
 title: Organization Operations Runbook
 tags: [organization, operation, incident, decision, governance]
-last_updated: 2026-10-06
+last_updated: 2026-10-07
 ---
 
 # Organization operations
@@ -43,9 +43,13 @@ An Operation may carry a `deadline` (`--deadline-business-day <n> --deadline-tim
 
 Create an Incident with `incident add`, then advance it with `incident transition`: `detected → triaging → mitigating → resolved → closed` (triaging may resolve directly). Closing requires an existing post-incident review in the same knowledge tier and tenant.
 
-Create a Decision as `proposed`, then advance it with `decision transition`. Approval or rejection requires a `channel:id` approval reference whose record has a strongly authenticated human decision, `human_only` accountability, the same organization and tenant scope, and an effect binding of `organization:decision:<id>:approved` or `organization:decision:<id>:rejected`. An approved Decision needs a chosen option; `implemented` needs a follow-up reference.
+Create a Decision as `proposed`, then advance it with `decision transition`. Move it to `pending_approval` with `--request-approval --chosen-option <option>` to open the human approval request; the command prints the request id and the `--approval-ref` to use. A human decides the request on an authenticated surface (Chronos / concierge approvals; `pnpm kyberion approvals --approve` uses a weaker method and is not accepted here). Then run `decision transition --record-status approved --chosen-option <same option> --rationale <text> --approval-ref <ref>`, or `--record-status rejected` with the same ref when the human denied it. Approval or rejection requires a `channel:id` approval reference whose record has a strongly authenticated human decision, `human_only` accountability, the same organization and tenant scope, and an effect binding of `organization:decision:<id>:approved` or `organization:decision:<id>:rejected`. An approved Decision needs a chosen option; `implemented` needs a follow-up reference.
 
 Chronos shows tenant-scoped CLI commands beside organization intervention points. The HTTP view remains read-only; the commands enter through the governed organization facade.
+
+## Learning candidates
+
+Incidents, routine exceptions, project closures and governance decisions become learning candidates with `learning enqueue`. Triage them with `learning transition`: `proposed → approved → promoted`, or `→ rejected` with `--reason`. Promote only after the learning is written into `knowledge/` in the same tier and tenant, and pass that document as `--promoted-ref`. `status` lists candidates still waiting.
 
 ## Objectives and key results
 
