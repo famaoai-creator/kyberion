@@ -229,6 +229,32 @@ describe('check_dist_workspace_imports', () => {
       expect(violations).toEqual([]);
     });
 
+    it('workspace-only roots flag workspace imports but skip declared third-party ones', () => {
+      write(
+        'packages/broken-actuator/package.json',
+        JSON.stringify({
+          name: '@fixture/broken-actuator',
+          dependencies: { 'totally-unresolvable-fixture-dep': '^1.0.0' },
+        })
+      );
+      write(
+        'dist-libs/entry.js',
+        "import { run } from '@fixture/broken-actuator';\n" +
+          "import unresolvable from 'totally-unresolvable-fixture-dep';\n" +
+          'export default { run, unresolvable };\n'
+      );
+
+      const violations = checkDistWorkspaceImports({
+        packageScanRoots: [`${FIXTURE_ROOT}/packages`],
+        scanRoots: [`${FIXTURE_ROOT}/dist-libs`],
+        workspaceOnlyScanRoots: [`${FIXTURE_ROOT}/dist-libs`],
+      });
+
+      expect(violations).toEqual([
+        `${FIXTURE_ROOT}/dist-libs/entry.js: cannot resolve workspace import '@fixture/broken-actuator' (ERR_MODULE_NOT_FOUND)`,
+      ]);
+    });
+
     it('keeps the real built dist tree free of unresolvable workspace and third-party imports', () => {
       expect(checkDistWorkspaceImports()).toEqual([]);
     }, 60_000);

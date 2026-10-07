@@ -176,7 +176,7 @@
       "expected": {
         "intent_id": "contract-review",
         "execution_shape": "pipeline",
-        "mission_class": "decision_support",
+        "mission_class": "legal_and_compliance",
         "delivery_shape": "multi_artifact_pipeline",
         "risk_profile": "review_required",
         "stage": "planning",
@@ -187,12 +187,10 @@
           "CONTRACT_VALID",
           "QA_READY",
           "ARCHITECTURE_READY",
-          "STAKEHOLDER_ALIGNMENT",
-          "DISSENT_RESOLUTION",
-          "REHEARSAL_READINESS",
           "INTENT_DRIFT",
           "ARTIFACT_BUNDLE",
-          "DELIVERABLE_QUALITY"
+          "DELIVERABLE_QUALITY",
+          "LEGAL_REVIEW"
         ],
         "promotion_required": false
       }
@@ -777,6 +775,198 @@
         "workflow_pattern": "exploratory_to_deterministic_conversion",
         "review_mode": "lean",
         "required_gate_ids": ["CONTRACT_VALID"],
+        "promotion_required": true
+      }
+    },
+    {
+      "scenario_id": "payroll-cycle-ja",
+      "utterance": "給与計算を回したい",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "mission"
+      },
+      "expected": {
+        "intent_id": "payroll-cycle",
+        "execution_shape": "mission",
+        "mission_class": "finance_and_accounting",
+        "delivery_shape": "multi_artifact_pipeline",
+        "risk_profile": "approval_required",
+        "stage": "planning",
+        "workflow_id": "payroll-cycle",
+        "workflow_pattern": "stage_gated_delivery",
+        "review_mode": "strict",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "ARCHITECTURE_READY",
+          "SECURITY_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE",
+          "DELIVERABLE_QUALITY",
+          "FINANCIAL_CONTROLS"
+        ],
+        "promotion_required": true
+      }
+    },
+    {
+      "scenario_id": "invoice-processing-ja",
+      "utterance": "この請求書を処理して支払いまで回して",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "mission"
+      },
+      "expected": {
+        "intent_id": "invoice-processing",
+        "execution_shape": "mission",
+        "mission_class": "finance_and_accounting",
+        "delivery_shape": "multi_artifact_pipeline",
+        "risk_profile": "approval_required",
+        "stage": "planning",
+        "workflow_id": "invoice-processing",
+        "workflow_pattern": "stage_gated_delivery",
+        "review_mode": "strict",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "ARCHITECTURE_READY",
+          "SECURITY_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE",
+          "DELIVERABLE_QUALITY",
+          "FINANCIAL_CONTROLS"
+        ],
+        "promotion_required": true
+      }
+    },
+    {
+      "scenario_id": "financial-close-monthly-en",
+      "utterance": "Run the monthly financial close",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "mission"
+      },
+      "expected": {
+        "intent_id": "financial-close-monthly",
+        "execution_shape": "mission",
+        "mission_class": "finance_and_accounting",
+        "delivery_shape": "multi_artifact_pipeline",
+        "risk_profile": "approval_required",
+        "stage": "planning",
+        "workflow_id": "financial-close-monthly",
+        "workflow_pattern": "stage_gated_delivery",
+        "review_mode": "strict",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "ARCHITECTURE_READY",
+          "SECURITY_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE",
+          "DELIVERABLE_QUALITY",
+          "FINANCIAL_CONTROLS"
+        ],
+        "promotion_required": true
+      }
+    },
+    {
+      "scenario_id": "hiring-workflow-en",
+      "utterance": "Start hiring for a backend engineer",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "mission"
+      },
+      "expected": {
+        "intent_id": "hiring-workflow",
+        "execution_shape": "mission",
+        "mission_class": "people_and_talent",
+        "delivery_shape": "multi_artifact_pipeline",
+        "risk_profile": "review_required",
+        "stage": "planning",
+        "workflow_id": "hiring-workflow",
+        "workflow_pattern": "stage_gated_delivery",
+        "review_mode": "strict",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "ARCHITECTURE_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE",
+          "DELIVERABLE_QUALITY",
+          "PEOPLE_DATA_PROTECTION"
+        ],
+        "promotion_required": true
+      }
+    },
+    {
+      "scenario_id": "quarterly-okr-planning-en",
+      "utterance": "Plan our Q3 OKRs",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "mission"
+      },
+      "expected": {
+        "intent_id": "quarterly-okr-planning",
+        "execution_shape": "mission",
+        "mission_class": "strategy_and_governance",
+        "delivery_shape": "multi_artifact_pipeline",
+        "risk_profile": "review_required",
+        "stage": "planning",
+        "workflow_id": "quarterly-okr-planning",
+        "workflow_pattern": "stage_gated_delivery",
+        "review_mode": "strict",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "ARCHITECTURE_READY",
+          "STAKEHOLDER_ALIGNMENT",
+          "DISSENT_RESOLUTION",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE",
+          "DELIVERABLE_QUALITY",
+          "ASSUMPTIONS_EXPLICIT"
+        ],
+        "promotion_required": true
+      }
+    },
+    {
+      "scenario_id": "procurement-vendor-en",
+      "utterance": "Select a vendor for our new CRM",
+      "classification_input": {
+        "progress_signals": ["plan_ready"]
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "mission"
+      },
+      "expected": {
+        "intent_id": "procurement-vendor",
+        "execution_shape": "mission",
+        "mission_class": "procurement_and_supply",
+        "delivery_shape": "multi_artifact_pipeline",
+        "risk_profile": "approval_required",
+        "stage": "planning",
+        "workflow_id": "procurement-vendor",
+        "workflow_pattern": "stage_gated_delivery",
+        "review_mode": "strict",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "ARCHITECTURE_READY",
+          "SECURITY_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE",
+          "DELIVERABLE_QUALITY",
+          "VENDOR_INTEGRITY"
+        ],
         "promotion_required": true
       }
     }

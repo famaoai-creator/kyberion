@@ -477,11 +477,30 @@ async function opCapture(
           '[KNOWLEDGE_SCOPE_REQUIRED] tenant_id is required for non-public knowledge search'
         );
       }
+      // Knowledge directories are named by slug; tenant_id is only an alias.
+      const tenantKey = String(
+        securityScope?.tenant_slug || securityScope?.tenant_id || ctx.tenant_id || ''
+      ).trim();
+      const optionalId = (key: string) => {
+        const value = String(securityScope?.[key] || '').trim();
+        return value ? { [key]: value } : {};
+      };
+      // Pass the participant's containment chain so the confidential scan
+      // covers its own organization/project/mission path, never siblings.
+      const scopeContext =
+        tenantKey && readTiers.includes('confidential')
+          ? {
+              tier: 'confidential' as const,
+              tenant_slug: tenantKey,
+              ...optionalId('organization_id'),
+              ...optionalId('project_id'),
+              ...optionalId('mission_id'),
+            }
+          : undefined;
       const scope = {
         tiers: readTiers,
-        ...(securityScope?.tenant_id || ctx.tenant_id
-          ? { customerId: String(securityScope?.tenant_id || ctx.tenant_id) }
-          : {}),
+        ...(tenantKey ? { customerId: tenantKey } : {}),
+        ...(scopeContext ? { scopeContext } : {}),
       };
       const scopeKey = JSON.stringify(scope);
       let index = ctx._knowledgeIndex;

@@ -21,6 +21,7 @@ import {
   type DeliveredKnowledgeRef,
 } from '../knowledge/knowledge-feedback-loop.js';
 import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-injector.js';
+import { isKnowledgePathExcluded, resolveKnowledgeSlice } from '../knowledge/knowledge-slices.js';
 import * as nodePath from 'node:path';
 import * as path from 'node:path';
 import { assertSafeRepositoryPath, safeExec, safeExistsSync, safeLstat } from '../secure-io.js';
@@ -927,13 +928,36 @@ export async function buildNeedsKnowledgeReinforcementLines(input: {
   if (input.needs.length === 0) return [];
   try {
     const excludePaths = new Set(input.deliveredKnowledgeRefs.map((ref) => ref.path));
+    // Same lanes and slice excludes as the first-round pack: a confidential
+    // mission also searches its own tenant's distills, and governed excludes
+    // (e.g. unreviewed distill_*.md) stay excluded on the retry.
+    const scope = input.securityScope;
+    const tenantSlug =
+      scope?.write_tier === 'confidential' ? scope.tenant_slug || scope.tenant_id : undefined;
+    const slice = resolveKnowledgeSlice({
+      teamRole: input.teamRole,
+      ...(tenantSlug ? { tenant: tenantSlug } : {}),
+      ...(scope?.project_id ? { project: scope.project_id } : {}),
+    });
     const found = await findRelevantDistilledKnowledge({
       topic: input.needs.join(' '),
       limit: NEEDS_KNOWLEDGE_RETRIEVAL_LIMIT * 2,
       minScore: 0.08,
+      ...(scope && tenantSlug
+        ? {
+            scope: {
+              tier: 'confidential' as const,
+              tenant_slug: tenantSlug,
+              ...(scope.organization_id ? { organization_id: scope.organization_id } : {}),
+              ...(scope.project_id ? { project_id: scope.project_id } : {}),
+              mission_id: scope.mission_id,
+            },
+          }
+        : {}),
     });
     const fresh = found
       .filter((entry) => !excludePaths.has(entry.path))
+      .filter((entry) => !isKnowledgePathExcluded(entry.path, slice.exclude))
       .slice(0, NEEDS_KNOWLEDGE_RETRIEVAL_LIMIT);
     if (fresh.length === 0) return [];
 

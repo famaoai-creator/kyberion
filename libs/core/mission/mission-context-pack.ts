@@ -42,6 +42,7 @@ import {
   type SkillResourceDescriptor,
 } from '../plugin/skill-resource-loader.js';
 import { isSkillAllowed } from '../plugin/skill-plugin-loader.js';
+import { formatKnowledgeVerificationLabel } from '../knowledge/knowledge-verification.js';
 import type { ScopeContext } from '../scope-context.js';
 import {
   commonKnowledgeGrantTenant,
@@ -49,6 +50,7 @@ import {
   loadKnowledgeHintsIfPossible,
   organizationIdFromContext,
   resolveScopeBudget,
+  workItemProjectId,
 } from './mission-context-pack-knowledge.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-dispatch-manifest.js';
@@ -790,7 +792,7 @@ function loadProjectStateIfPossible(input: {
   const candidates = [
     input.projectId,
     input.missionState.relationships?.project?.project_id,
-    input.workItem?.project_id,
+    workItemProjectId(input.workItem, input.missionState.mission_id),
   ]
     .map((entry) => String(entry || '').trim())
     .filter(Boolean);
@@ -828,7 +830,7 @@ function loadArtifactHintsIfPossible(input: {
   const projectId = String(
     input.projectState?.project_id ||
       input.missionState.relationships?.project?.project_id ||
-      input.workItem?.project_id ||
+      workItemProjectId(input.workItem, input.missionState.mission_id) ||
       ''
   ).trim();
   if (!projectId) return [];
@@ -946,7 +948,7 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
   const projectId =
     input.projectState?.project_id ||
     input.missionState.relationships?.project?.project_id ||
-    input.workItem?.project_id;
+    workItemProjectId(input.workItem, input.missionState.mission_id);
   const organizationId = organizationIdFromContext({
     missionState: input.missionState,
     projectState: input.projectState,
@@ -1515,7 +1517,9 @@ export function renderMissionContextPack(pack: MissionContextPack): string {
   if (pack.knowledge_hints && pack.knowledge_hints.length > 0) {
     lines.push('- Knowledge hints:');
     for (const hint of pack.knowledge_hints) {
-      lines.push(`  - ${hint.title} (${hint.path})`);
+      lines.push(
+        `  - ${hint.title} (${hint.path})${formatKnowledgeVerificationLabel(hint.verification)}`
+      );
       lines.push(`    ${summarizeText(hint.excerpt, 220) || hint.excerpt}`);
     }
   }

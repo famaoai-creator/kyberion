@@ -20,6 +20,7 @@ import {
   type MissionStateSummary,
 } from './mission-context-pack.js';
 import { provisionTaskKnowledge } from '../task/task-knowledge-provisioning.js';
+import { recordKnowledgeVerifiedRun } from '../knowledge/knowledge-verification.js';
 import { _resetKnowledgeSlicesCacheForTests } from '../knowledge/knowledge-slices.js';
 import { _resetTenantKnowledgeWarningsForTests } from '../organization/tenant-knowledge-retrieval.js';
 import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-injector.js';
@@ -59,6 +60,7 @@ const kiCacheDir = pathResolver.sharedTmp(`da07-mcp-tenant-ki-cache-${PID}`);
 const slicesDir = pathResolver.sharedTmp(`da07-mcp-tenant-slices-${PID}`);
 const deliveryDirOverride = pathResolver.sharedTmp(`da07-mcp-tenant-delivery-${PID}`);
 const usagePathOverride = pathResolver.sharedTmp(`da07-mcp-tenant-usage-${PID}/usage.json`);
+const feedbackDirOverride = pathResolver.sharedTmp(`da07-mcp-tenant-feedback-${PID}`);
 const egressPolicyDir = pathResolver.sharedTmp(`da07-mcp-tenant-egress-${PID}`);
 const egressPolicyPath = path.join(egressPolicyDir, 'provider-egress-policy.json');
 
@@ -163,6 +165,7 @@ const envKeys = [
   'KYBERION_DISABLE_EMBEDDINGS',
   'KYBERION_KI_CACHE_DIR',
   'KYBERION_KNOWLEDGE_DELIVERY_DIR',
+  'KYBERION_KNOWLEDGE_FEEDBACK_DIR',
   'KYBERION_KNOWLEDGE_USAGE_PATH',
   'KYBERION_PROVIDER_EGRESS_POLICY_PATH',
   'MISSION_ROLE',
@@ -175,6 +178,7 @@ beforeEach(() => {
   process.env.KYBERION_KI_CACHE_DIR = kiCacheDir;
   process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = deliveryDirOverride;
   process.env.KYBERION_KNOWLEDGE_USAGE_PATH = usagePathOverride;
+  process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR = feedbackDirOverride;
   _resetKnowledgeSlicesCacheForTests();
   _resetTenantKnowledgeWarningsForTests();
   vi.mocked(findRelevantDistilledKnowledge).mockReset();
@@ -193,6 +197,7 @@ afterEach(() => {
     slicesDir,
     deliveryDirOverride,
     path.dirname(usagePathOverride),
+    feedbackDirOverride,
     egressPolicyDir,
   ]) {
     if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
@@ -379,6 +384,21 @@ describe('confidential/common grant at the pack scope gate', () => {
     );
   });
 
+  it('labels knowledge/personal/ as personal tier, so no public or tenant scope reads it', () => {
+    const personal = knowledgeHintFragment(
+      { path: 'knowledge/personal/owners/abc/wisdom/x.md', title: 'P', excerpt: 'p', tags: [] },
+      0
+    );
+    expect(personal.source_tier).toBe('personal');
+    expect(evaluateContextFragment(scopeFor('tenant-x'), personal)?.code).toBe('TIER_NOT_READABLE');
+    expect(
+      evaluateContextFragment(
+        { ...scopeFor('tenant-x'), read_tiers: ['public'], write_tier: 'public' },
+        personal
+      )?.code
+    ).toBe('TIER_NOT_READABLE');
+  });
+
   it('a grant never relabels another tenant subtree', () => {
     const otherTenant = knowledgeHintFragment(
       { path: 'knowledge/confidential/tenant-y/x.md', title: 'Y', excerpt: 'y', tags: [] },
@@ -389,6 +409,24 @@ describe('confidential/common grant at the pack scope gate', () => {
     expect(evaluateContextFragment(scopeFor('tenant-x'), otherTenant)?.code).toBe(
       'TENANT_SCOPE_MISMATCH'
     );
+  });
+});
+
+describe('project-less missions keep their own knowledge path', () => {
+  it('ignores the mission-id placeholder that dispatch puts in work item project_id', async () => {
+    const missionId = `MSN-NOPROJ-${PID}`;
+    const missionDoc = `knowledge/confidential/tenant-x/missions/${missionId}/quantum-billing-mission-notes.md`;
+    writeDoc(missionDoc, 'Mission quantum billing notes');
+
+    const hints = await loadKnowledgeHintsIfPossible({
+      missionState: makeMissionState({ mission_id: missionId, tenant_slug: 'tenant-x' }),
+      workItem: { ...makeWorkItem(), project_id: missionId },
+      knowledgeSlicesPath: `${slicesDir}/does-not-exist.json`,
+      tenantKnowledgeRootDir: fixtureRoot,
+      estimatedScope: 'L',
+    });
+
+    expect(hints.map((h) => h.path)).toContain(missionDoc);
   });
 });
 
@@ -599,6 +637,30 @@ describe('DA-07 (1)(5) E2E: provisionTaskKnowledge delivers and records tenant d
     // confidential/common is granted to this non-strict tenant at the gate.
     expect(hintPaths).toContain(COMMON_DOC);
     expect(result.pack!.scope_audit).toBeUndefined();
+  });
+
+  it('labels a delivered doc that changed since it last worked, in the rendered pack', async () => {
+    recordKnowledgeVerifiedRun({
+      documentPaths: [TENANT_DOC],
+      scope: { tier: 'confidential', tenant_slug: 'tenant-x' },
+      projectId: `PRJ-DA07-${PID}`,
+      rootDir: fixtureRoot,
+    });
+    writeDoc(TENANT_DOC, 'Tenant X quantum billing runbook revised');
+
+    const result = await provisionTaskKnowledge({
+      form: 'pack',
+      missionId,
+      tier: 'confidential',
+      missionState: makeMissionState({ mission_id: missionId, tenant_slug: 'tenant-x' }),
+      workItem: makeWorkItem(),
+      provider: 'claude',
+      tenantKnowledgeRootDir: fixtureRoot,
+    });
+
+    const hint = result.pack!.knowledge_hints!.find((h) => h.path === TENANT_DOC);
+    expect(hint?.verification?.state).toBe('changed_since_verified');
+    expect(result.text).toContain('changed since it last worked');
   });
 
   it('delivery log line records the tenant doc path verbatim (repo-relative, not dropped)', async () => {

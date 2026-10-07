@@ -2,10 +2,12 @@ import { nowIso } from '../foundation/time.js';
 import {
   validateOrganizationDecision,
   validateOrganizationIncident,
+  validateOrganizationLearningCandidate,
 } from './organization-operating-model-persistence.js';
 import type {
   OrganizationDecisionRecord,
   OrganizationIncidentRecord,
+  OrganizationLearningCandidate,
   OrganizationTier,
 } from './organization-operating-model.js';
 
@@ -168,4 +170,50 @@ export function transitionOrganizationDecision(
   if (!validateOrganizationDecision(decision))
     throw new Error('Invalid organization decision transition.');
   return decision;
+}
+
+const LEARNING_NEXT: Record<
+  OrganizationLearningCandidate['status'],
+  OrganizationLearningCandidate['status'][]
+> = {
+  proposed: ['approved', 'rejected'],
+  approved: ['promoted', 'rejected'],
+  rejected: [],
+  promoted: [],
+};
+
+/**
+ * Advances a learning candidate: proposed -> approved -> promoted, or -> rejected.
+ * Rejection needs a note; promotion needs the knowledge/ document it landed in,
+ * whose existence and tier the caller verifies.
+ */
+export function transitionOrganizationLearningCandidate(
+  current: OrganizationLearningCandidate,
+  status: OrganizationLearningCandidate['status'],
+  input: { note?: string; promotedRef?: string },
+  now = nowIso()
+): OrganizationLearningCandidate {
+  const allowed = LEARNING_NEXT[current.status];
+  if (!allowed.includes(status))
+    throw new Error(
+      `Invalid learning transition: ${current.status} -> ${status}. ` +
+        `Allowed next states from '${current.status}': ${allowed.length > 0 ? allowed.join(', ') : '(terminal — no further transitions)'}. ` +
+        'Lifecycle: proposed -> approved -> promoted (proposed/approved -> rejected [terminal]).'
+    );
+  if (status === 'rejected' && !input.note)
+    throw new Error('Rejecting a learning candidate requires --reason <why>.');
+  if (status === 'promoted' && !input.promotedRef)
+    throw new Error(
+      'Promoting a learning candidate requires --promoted-ref <knowledge/... document it landed in>.'
+    );
+  const record: OrganizationLearningCandidate = {
+    ...current,
+    status,
+    ...(input.note ? { decision_note: input.note } : {}),
+    ...(input.promotedRef ? { promoted_ref: input.promotedRef } : {}),
+    updated_at: now,
+  };
+  if (!validateOrganizationLearningCandidate(record))
+    throw new Error('Invalid organization learning candidate transition.');
+  return record;
 }
