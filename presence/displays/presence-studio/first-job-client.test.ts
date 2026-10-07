@@ -130,7 +130,6 @@ function harness(
       'readiness',
       'scope',
       'advance',
-      'tick',
       'setup',
       'start',
       'restart',
@@ -290,6 +289,11 @@ function harness(
   );
   window.KyberionFirstJob!.mount();
   const get = (id: string) => elements.get(id)!;
+  const commands = () =>
+    get('history')
+      .descendants()
+      .filter((item) => item.tagName === 'code')
+      .map((item) => item.textContent);
   const posts = () => fetch.mock.calls.filter(([, init]) => init?.method === 'POST');
   const reads = () => fetch.mock.calls.filter(([url]) => url.startsWith('/api/first-job?'));
   const bodies = () =>
@@ -314,7 +318,20 @@ function harness(
     documentListeners.visibilitychange?.();
   };
   const page = (event: string) => windowListeners[event]?.();
-  return { get, window, storage, fetch, posts, reads, bodies, advance, visibility, page, timers };
+  return {
+    get,
+    window,
+    storage,
+    fetch,
+    posts,
+    reads,
+    bodies,
+    commands,
+    advance,
+    visibility,
+    page,
+    timers,
+  };
 }
 
 describe('First-job bounded browser flow (DOM doubles)', () => {
@@ -639,7 +656,7 @@ describe('First-job bounded browser flow (DOM doubles)', () => {
     expect(h.get('history').children).toHaveLength(2);
   });
 
-  it('shows bounded terminal advance guidance using only the server test tenant', async () => {
+  it('shows an exact read-only status command using only the validated server test tenant', async () => {
     const h = harness({
       get: () =>
         reply(
@@ -647,6 +664,7 @@ describe('First-job bounded browser flow (DOM doubles)', () => {
             scope: { tenant: 'onboarding-test', tier: 'public' },
             tasks: [
               {
+                id: first,
                 executionStatus: 'queued',
                 artifact: artifact({ verification: 'pending', currentness: 'requested_pending' }),
               },
@@ -658,9 +676,9 @@ describe('First-job bounded browser flow (DOM doubles)', () => {
     expect(h.get('scope').textContent).toContain('onboarding-test');
     expect(h.get('scope').textContent).not.toMatch(/all|undefined/);
     expect(h.get('advance').hidden).toBe(false);
-    expect(h.get('tick').textContent).toBe(
-      'pnpm onboarding first-job --tenant onboarding-test --tick'
-    );
+    expect(h.commands()).toEqual([
+      'pnpm onboarding first-job --tenant onboarding-test --status --request-id ' + first,
+    ]);
     expect(h.posts()).toHaveLength(0);
   });
 
@@ -2607,11 +2625,11 @@ describe('Truthful first-job setup guidance (DOM doubles)', () => {
         status === 'queued' ? 'review_or_tick' : 'receipt_verified'
       );
       expect(h.get('setup-advancement').textContent).not.toContain('unavailable');
-      expect(h.get('advance').hidden).toBe(status !== 'queued');
+      expect(h.get('advance').hidden).toBe(false);
       expect(h.posts()).toHaveLength(0);
     }
   );
-  it('keeps tick guidance suppressed through a pending and uncertain recovery mutation', async () => {
+  it('clears exact read-only guidance through a pending and uncertain recovery mutation', async () => {
     const pending = deferred<ReturnType<typeof reply>>();
     const h = harness({
       realApproval: true,
@@ -2655,12 +2673,14 @@ describe('Truthful first-job setup guidance (DOM doubles)', () => {
         .get('approval-items')
         .descendants()
         .filter((item) => item.tagName === 'button');
-    expect(h.get('advance').hidden).toBe(true);
+    expect(h.get('advance').hidden).toBe(false);
+    expect(h.commands()).toHaveLength(1);
     buttons()[0].fire();
     await flush();
     buttons()[0].fire();
     await flush();
     expect(h.posts()).toHaveLength(1);
+    expect(h.commands()).toEqual([]);
     expect(h.get('setup-advancement').textContent).toContain('advancement_unknown');
     expect(h.get('advance').hidden).toBe(true);
     pending.resolve(reply({ ok: false, retry_safe: false }, 503));
@@ -2669,5 +2689,370 @@ describe('Truthful first-job setup guidance (DOM doubles)', () => {
     expect(h.get('advance').hidden).toBe(true);
     expect(h.get('refresh').disabled).toBe(false);
     expect(h.posts()).toHaveLength(1);
+  });
+});
+
+describe('Exact read-only operator handoff (DOM doubles)', () => {
+  const task = (id = first, revision = 1, overrides: Record<string, unknown> = {}) => ({
+    id,
+    turnState: 'settled',
+    executionStatus: 'queued',
+    artifact: artifact({
+      requestId: id,
+      revision,
+      verification: 'pending',
+      currentness: 'requested_pending',
+      sha256: undefined,
+    }),
+    ...overrides,
+  });
+  const data = (overrides: Record<string, unknown> = {}) =>
+    snapshot({
+      scope: { tenant: 'onboarding-test', tier: 'public' },
+      tasks: [task()],
+      ...overrides,
+    });
+  const command = (id: string) =>
+    'pnpm onboarding first-job --tenant onboarding-test --status --request-id ' + id;
+
+  it('keeps verified ancestors and pending children bound to their own cards without choosing a latest request', async () => {
+    const parent = artifact();
+    const child = artifact({
+      requestId: second,
+      revision: 2,
+      parentRequestId: first,
+      parentRevision: 1,
+      verification: 'pending',
+      currentness: 'requested_pending',
+      sha256: undefined,
+    });
+    const unrelated = '33333333-3333-4333-8333-333333333333';
+    const h = harness({
+      get: () =>
+        reply(
+          data({
+            tasks: [
+              task(first, 1, { executionStatus: 'work_completed', artifact: parent }),
+              task(second, 2, { artifact: child }),
+              task(unrelated, 64),
+            ],
+          })
+        ),
+    });
+    await flush();
+    expect(h.commands()).toEqual([command(first), command(second), command(unrelated)]);
+    const cards = h.get('history').children;
+    expect(cards[0].textContent).toContain('first_job_revision 1');
+    expect(cards[1].textContent).toContain('first_job_revision 2');
+    expect(cards[1].textContent).toContain(command(second));
+    expect(cards[1].textContent).not.toContain(command(first));
+    h.get('body-select').value = first + ':1:' + sha256;
+    h.get('body-select').fire('change');
+    await flush();
+    expect(h.commands()).toEqual([command(first), command(second), command(unrelated)]);
+    expect(h.posts()).toHaveLength(0);
+  });
+
+  it.each([
+    { id: undefined },
+    { id: second },
+    { id: first + '\n' },
+    { id: 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA' },
+    { id: first + '; echo injected' },
+    { artifact: artifact({ requestId: [first] }) },
+    { artifact: artifact({ requestId: first + '\n' }) },
+    { artifact: artifact({ revision: 0 }) },
+    { artifact: artifact({ revision: 65 }) },
+    { artifact: artifact({ revision: 1.5 }) },
+    { artifact: artifact({ revision: '1' }) },
+  ])(
+    'does not construct a command from malformed or mismatched identity: %j',
+    async (malformed) => {
+      const h = harness({ get: () => reply(data({ tasks: [task(first, 1, malformed)] })) });
+      await flush();
+      expect(h.commands()).toEqual([]);
+      expect(h.get('advance').hidden).toBe(true);
+      expect(h.posts()).toHaveLength(0);
+    }
+  );
+
+  it('rejects duplicate and conflicting request identities instead of picking one row', async () => {
+    const h = harness({
+      get: () =>
+        reply(
+          data({
+            tasks: [
+              task(),
+              task(first, 2),
+              task(second, 3, { artifact: artifact({ requestId: first, revision: 3 }) }),
+            ],
+          })
+        ),
+    });
+    await flush();
+    expect(h.commands()).toEqual([]);
+    expect(h.posts()).toHaveLength(0);
+  });
+
+  it.each([
+    'public',
+    'confidential',
+    'personal',
+    'shared',
+    'a',
+    '1tenant',
+    'test_tenant',
+    'A-test',
+    'a'.repeat(32),
+    'test\n',
+    'test;echo injected',
+    '$(echo injected)',
+    '<img src=x>',
+  ])('rejects noncanonical or reserved tenant %j', async (tenant) => {
+    const h = harness({ get: () => reply(data({ scope: { tenant, tier: 'public' } })) });
+    await flush();
+    expect(h.commands()).toEqual([]);
+    expect(h.get('scope').hidden).toBe(true);
+    expect(h.posts()).toHaveLength(0);
+  });
+
+  it.each([
+    { tenant: 'onboarding-test', tier: 'confidential' },
+    { tenant: 'onboarding-test' },
+    { tenant: ['onboarding-test'], tier: 'public' },
+  ])('requires a public server scope: %j', async (scope) => {
+    const h = harness({ get: () => reply(data({ scope })) });
+    await flush();
+    expect(h.commands()).toEqual([]);
+    expect(h.posts()).toHaveLength(0);
+  });
+
+  it('removes a vanished request command without relabeling another card as its replacement', async () => {
+    let disappeared = false;
+    const h = harness({
+      get: () =>
+        reply(data({ tasks: disappeared ? [task(second, 2)] : [task(), task(second, 2)] })),
+    });
+    await flush();
+    expect(h.commands()).toEqual([command(first), command(second)]);
+    disappeared = true;
+    h.get('refresh').fire();
+    expect(h.commands()).toEqual([]);
+    await flush();
+    expect(h.commands()).toEqual([command(second)]);
+    expect(h.get('history').textContent).not.toContain(first);
+    expect(h.posts()).toHaveLength(0);
+  });
+
+  it.each([401, 403, 409, 500])(
+    'clears every command after a failed %s status refresh, including a retained held ancestor',
+    async (status) => {
+      let failed = false;
+      const h = harness({
+        heldRequests: [
+          {
+            request_id: first,
+            status: 'approval_verification_failed',
+            recovery: 'operator_recovery',
+          },
+        ],
+        get: () => (failed ? reply(null, status) : reply(data())),
+      });
+      await flush();
+      expect(h.commands()).toEqual([command(first)]);
+      failed = true;
+      h.get('refresh').fire();
+      expect(h.commands()).toEqual([]);
+      await flush();
+      expect(h.commands()).toEqual([]);
+      expect(h.get('advance').hidden).toBe(true);
+      expect(h.posts()).toHaveLength(0);
+    }
+  );
+
+  it('clears commands during a timed-out automatic status poll and restores only fresh evidence', async () => {
+    const pending = deferred<ReturnType<typeof reply>>();
+    let reads = 0;
+    const h = harness({ get: () => (++reads === 1 ? reply(data()) : pending.promise) });
+    await flush();
+    expect(h.commands()).toEqual([command(first)]);
+    await h.advance(5000);
+    expect(h.commands()).toEqual([]);
+    await h.advance(15000);
+    expect(h.commands()).toEqual([]);
+    pending.resolve(reply(data()));
+    await flush();
+    expect(h.commands()).toEqual([]);
+    expect(h.posts()).toHaveLength(0);
+  });
+
+  it('rechecks an idle verified-only handoff after hiding without a prior refresh or setup state', async () => {
+    const fresh = deferred<ReturnType<typeof reply>>();
+    const verified = data({
+      tasks: [task(first, 1, { executionStatus: 'work_completed', artifact: artifact() })],
+    });
+    let reads = 0;
+    const h = harness({ get: () => (++reads === 1 ? reply(verified) : fresh.promise) });
+    await flush();
+    expect(h.commands()).toEqual([command(first)]);
+    expect(h.reads()).toHaveLength(1);
+    expect(h.timers.size).toBe(0);
+    expect(h.get('refresh').disabled).toBe(false);
+
+    h.visibility(true);
+    expect(h.commands()).toEqual([]);
+    expect(h.get('history').textContent).toContain(first);
+    expect(h.reads()).toHaveLength(1);
+    h.visibility(false);
+    await flush();
+    expect(h.reads()).toHaveLength(2);
+    expect(h.get('refresh').disabled).toBe(true);
+    expect(h.commands()).toEqual([]);
+
+    fresh.resolve(reply(verified));
+    await flush();
+    expect(h.commands()).toEqual([command(first)]);
+    expect(h.get('refresh').disabled).toBe(false);
+    expect(h.posts()).toHaveLength(0);
+  });
+
+  it.each(['page', 'visibility'])(
+    'requires a fresh read on %s resume and ignores an older cancelled response',
+    async (navigation) => {
+      const old = deferred<ReturnType<typeof reply>>();
+      const fresh = deferred<ReturnType<typeof reply>>();
+      let reads = 0;
+      const verified = data({
+        tasks: [task(first, 1, { executionStatus: 'work_completed', artifact: artifact() })],
+      });
+      const h = harness({
+        get: () => (++reads === 1 ? reply(verified) : reads === 2 ? old.promise : fresh.promise),
+      });
+      await flush();
+      expect(h.commands()).toEqual([command(first)]);
+      h.get('refresh').fire();
+      await flush();
+      if (navigation === 'page') h.page('pagehide');
+      else h.visibility(true);
+      expect(h.commands()).toEqual([]);
+      if (navigation === 'page') h.page('pageshow');
+      else h.visibility(false);
+      await flush();
+      expect(h.commands()).toEqual([]);
+      fresh.resolve(reply(data({ tasks: [task(second, 2)] })));
+      await flush();
+      expect(h.commands()).toEqual([command(second)]);
+      old.resolve(reply(verified));
+      await flush();
+      expect(h.commands()).toEqual([command(second)]);
+      expect(h.posts()).toHaveLength(0);
+    }
+  );
+
+  it('clears commands when an independent approval refresh discovers sign-out', async () => {
+    let signedOut = false;
+    const h = harness({
+      get: () => reply(data()),
+      approvals: () =>
+        signedOut
+          ? reply({ ok: false }, 401)
+          : reply({
+              ok: true,
+              auth: { status: 'ready' },
+              readiness: { ready: true, status: 'ready' },
+              approvals: [],
+              held_requests: [],
+              recovery_requests: [],
+            }),
+    });
+    await flush();
+    expect(h.commands()).toEqual([command(first)]);
+    signedOut = true;
+    h.get('approval-refresh').fire();
+    expect(h.commands()).toEqual([]);
+    await flush();
+    expect(h.commands()).toEqual([]);
+    expect(h.posts()).toHaveLength(0);
+  });
+
+  it('clears an ancestor command during a revision POST and keeps it cleared for an uncertain result', async () => {
+    const pending = deferred<ReturnType<typeof reply>>();
+    const receipt = artifact();
+    const h = harness({
+      get: () =>
+        reply(
+          data({
+            tasks: [task(first, 1, { executionStatus: 'work_completed', artifact: receipt })],
+            messages: [
+              {
+                id: first + '-secretary',
+                role: 'secretary',
+                artifact: { ...receipt, canRevise: true },
+              },
+            ],
+          })
+        ),
+      post: () => pending.promise,
+    });
+    await flush();
+    expect(h.commands()).toEqual([command(first)]);
+    h.get('history')
+      .descendants()
+      .find((item) => item.tagName === 'button')!
+      .fire();
+    await flush();
+    expect(h.commands()).toEqual([]);
+    pending.resolve(reply({ ok: false }, 503));
+    await flush();
+    expect(h.commands()).toEqual([]);
+    expect(h.posts()).toHaveLength(1);
+  });
+
+  it.each([undefined, 'other-session', session + '\n', [session]])(
+    'requires the exact canonical snapshot session: %j',
+    async (sessionId) => {
+      const h = harness({ get: () => reply(data({ sessionId })) });
+      await flush();
+      expect(h.commands()).toEqual([]);
+      expect(h.posts()).toHaveLength(0);
+    }
+  );
+
+  it('clears commands when the next status read changes the bound session', async () => {
+    let changed = false;
+    const h = harness({
+      get: () => reply(data({ sessionId: changed ? 'concierge-' + 'b'.repeat(64) : session })),
+    });
+    await flush();
+    expect(h.commands()).toEqual([command(first)]);
+    changed = true;
+    h.get('refresh').fire();
+    await flush();
+    expect(h.commands()).toEqual([]);
+    expect(h.get('history').textContent).not.toContain(first);
+    expect(h.posts()).toHaveLength(0);
+  });
+
+  it.each([null, { status: 'mapping_changed' }, { status: 'mapping_missing' }])(
+    'withholds commands when current setup mapping is unavailable: %j',
+    async (mapping) => {
+      const h = harness({
+        get: () => reply(data({ setup: { mapping, advancement: { status: 'review_or_tick' } } })),
+      });
+      await flush();
+      expect(h.commands()).toEqual([]);
+      expect(h.posts()).toHaveLength(0);
+    }
+  );
+
+  it('has no tenant-wide tick or placeholder request command in initial HTML or client source', () => {
+    for (const path of [
+      'presence/displays/presence-studio/static/first-job.html',
+      'presence/displays/presence-studio/static/first-job.js',
+    ]) {
+      const source = String(safeReadFile(path, { encoding: 'utf8' }));
+      expect(source).not.toContain('--tick');
+      expect(source).not.toContain('id="first-job-tick"');
+    }
   });
 });
