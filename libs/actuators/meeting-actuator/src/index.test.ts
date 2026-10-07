@@ -54,9 +54,16 @@ describe('meeting-actuator', () => {
       ),
       { encoding: 'utf8' }
     ) as string;
-    expect(source).toContain("parseSafeJsonInput(normalized, 'meeting bridge result')");
+    const sessionSource = safeReadFile(
+      path.join(pathResolver.rootDir(), 'libs/actuators/meeting-actuator/src/meeting-session.ts'),
+      { encoding: 'utf8' }
+    ) as string;
+    // Bridge envelope parsing lives in the session transport module;
+    // CLI input parsing stays in the orchestration layer.
+    expect(sessionSource).toContain("parseSafeJsonInput(normalized, 'meeting bridge result')");
     expect(source).toContain("readJson<unknown>(inputPath, { label: 'meeting action input' })");
     expect(source).not.toContain('handleAction(JSON.parse(inputContent))');
+    expect(sessionSource).not.toContain('handleAction(JSON.parse(inputContent))');
   });
 
   it('rejects malformed typed action input after safe JSON parsing', () => {
