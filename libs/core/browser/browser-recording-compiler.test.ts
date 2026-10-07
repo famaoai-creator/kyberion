@@ -295,6 +295,42 @@ describe('compileBrowserRecording', () => {
     expect(textCond?.name_contains).toBe('承認完了');
   });
 
+  it('does not use an extraction region named only by its role as a text needle', () => {
+    const rec = {
+      ...BASE_RECORDING,
+      actions: [
+        makeAction('extract_text_ref', {
+          target: { ref: 'r1', role: 'table', name: 'table', snapshot_hash: 'h1' },
+        }),
+      ],
+    };
+    const { goldenScenario } = compileBrowserRecording(rec, OPTS);
+    expect(goldenScenario.success_conditions).toEqual([
+      { kind: 'text_present', role: 'table', name_contains: undefined },
+    ]);
+  });
+
+  it('turns a captured success message into a strong condition', () => {
+    const rec = {
+      ...BASE_RECORDING,
+      actions: [
+        makeAction('click_ref', { risk: 'low' }),
+        makeAction('wait_for_ref', {
+          target: {
+            ref: '@status_abc_1',
+            role: 'status',
+            name: '保存しました',
+            snapshot_hash: 'h2',
+          },
+        }),
+      ],
+    };
+    const { goldenScenario } = compileBrowserRecording(rec, OPTS);
+    expect(goldenScenario.success_conditions).toEqual([
+      { kind: 'ref_visible', role: 'status', name_contains: '保存しました' },
+    ]);
+  });
+
   it('extracts ref_visible condition from wait_for_ref', () => {
     const rec = {
       ...BASE_RECORDING,
