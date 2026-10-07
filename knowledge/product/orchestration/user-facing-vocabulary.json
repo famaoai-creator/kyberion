@@ -9877,6 +9877,11 @@
         "ja": "一時停止",
         "qps-ploc": "⟦ṗȧůşėḓ ŀőř⟧"
       },
+      "mission_validating": {
+        "en": "validating",
+        "ja": "検証中",
+        "qps-ploc": "⟦ṽȧŀïḓȧŧïñɠ ŀőř⟧"
+      },
       "mission_distilling": {
         "en": "distilling",
         "ja": "学習整理中",

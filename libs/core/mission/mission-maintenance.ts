@@ -951,6 +951,9 @@ export async function recordEvidence(args: {
     const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.taskId);
     if (autoComplete.completed) {
       logger.info(`✅ Task "${args.taskId}" auto-completed (${autoComplete.reason}).`);
+      for (const cascadedId of autoComplete.cascaded) {
+        logger.info(`✅ Task "${cascadedId}" auto-completed (dependencies satisfied via cascade).`);
+      }
     }
 
     safeExec('git', ['add', '.'], { cwd: missionPath });
@@ -1176,6 +1179,9 @@ export async function recordArtifactReview(args: {
   if (evaluation.ready) {
     const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.reviewTaskId);
     taskCompleted = autoComplete.completed;
+    for (const cascadedId of autoComplete.cascaded) {
+      logger.info(`✅ Task "${cascadedId}" auto-completed (dependencies satisfied via cascade).`);
+    }
   }
 
   if (evaluation.ready) {
