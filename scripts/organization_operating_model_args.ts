@@ -91,6 +91,9 @@ export type ParsedArgs = {
   dueAt?: string;
   options: string[];
   chosenOption?: string;
+  /** Flags the parser does not know, kept so the CLI can name them instead of guessing a command. */
+  unknownFlags: string[];
+  everySeconds?: number;
   requestApproval?: boolean;
   promotedRef?: string;
   rationale?: string;
@@ -126,6 +129,7 @@ export function parseArgs(args: string[]): ParsedArgs {
     exceptionRefs: [],
     options: [],
     followUpRefs: [],
+    unknownFlags: [],
   };
   type FlagSpec =
     | { kind: 'flag'; field: keyof ParsedArgs }
@@ -165,6 +169,7 @@ export function parseArgs(args: string[]): ParsedArgs {
     '--baseline': { kind: 'value', field: 'baseline', asNumber: true },
     '--unit': { kind: 'value', field: 'unit' },
     '--weight': { kind: 'value', field: 'weight', asNumber: true },
+    '--every': { kind: 'value', field: 'everySeconds', asNumber: true },
     '--description': { kind: 'value', field: 'description' },
     '--horizon': { kind: 'value', field: 'horizon' },
     '--domain-id': { kind: 'value', field: 'domainId' },
@@ -248,6 +253,13 @@ export function parseArgs(args: string[]): ParsedArgs {
       }
       continue;
     }
+    if (arg.startsWith('--')) {
+      // An unknown option: record it (and the value that follows it) rather than
+      // folding both into the command name.
+      parsed.unknownFlags.push(arg);
+      if (index + 1 < args.length && !args[index + 1]!.startsWith('--')) index += 1;
+      continue;
+    }
     positional.push(arg);
   }
   if (positional.length > 0) parsed.command = positional.join(' ');
@@ -282,7 +294,7 @@ export function usage(): string {
     '  pnpm organization parent set --organization-id <id> --tier <tier> [--tenant-slug <slug>] --parent-organization-id <id>|--clear (parent must be in the same tier and tenant)',
     '  pnpm organization purpose set --organization-id <id> --name <name> --tier <tier> [--tenant-slug <slug>] --purpose <text> --owner-role <role> [--principle <p>]... [--approval-state <state>]',
     '  pnpm organization objective add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --objective-id <id> --title <title> [--description <text>] [--horizon <h>] [--owner-role <role>]',
-    '  pnpm organization objective kr add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --objective-id <id> --kr-id <id> --title <title> --metric-json <json> --target <n> --direction <increase|decrease|maintain> [--baseline <n>] [--unit <u>] [--weight <n>]',
+    '  pnpm organization objective kr add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --objective-id <id> --kr-id <id> --title <title> --metric-json <json> --target <n> --direction <increase|decrease|maintain> [--baseline <n>] [--unit <u>] [--weight <n>] [--every <seconds, default 900>]',
     '      --metric-json shapes: {"source":"org_metric","metric":"open_incidents|overdue_operations|pending_decisions|unhealthy_services"} | {"source":"file","path":"<repo-relative json>","json_path":"<key>"} | {"source":"probe","probe":{...}} | {"source":"signal_ratio","signal":"<name>"} | {"source":"manual"}',
     '  pnpm organization objective kr measure --organization-id <id> --tier <tier> [--tenant-slug <slug>] --dry-run|--apply [--json] (measures due KRs without a dot; status then shows progress)',
     '  pnpm organization objective kr record --organization-id <id> --tier <tier> [--tenant-slug <slug>] --objective-id <id> --kr-id <id> --value <n> [--measured-at <iso>] --dry-run|--apply [--json] (records a value measured outside Kyberion; required for manual KRs)',
