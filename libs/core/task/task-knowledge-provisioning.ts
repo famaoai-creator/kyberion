@@ -53,6 +53,7 @@ import {
 } from '../provider/provider-egress-gate.js';
 import { getInstalledReasoningMode } from '../reasoning/reasoning-bootstrap.js';
 import { logger } from '../core.js';
+import { formatKnowledgeVerificationLabel } from '../knowledge/knowledge-verification.js';
 import {
   appendPromptVisibilityRecord,
   type PromptVisibilityRecord,
@@ -133,7 +134,9 @@ function renderKnowledgeHintLines(
   if (!hints || hints.length === 0) return [];
   const lines: string[] = ['- Knowledge hints:'];
   for (const hint of hints) {
-    lines.push(`  - ${hint.title} (${hint.path})`);
+    lines.push(
+      `  - ${hint.title} (${hint.path})${formatKnowledgeVerificationLabel(hint.verification)}`
+    );
     lines.push(`    ${truncate(hint.excerpt, excerptMax)}`);
   }
   return lines;

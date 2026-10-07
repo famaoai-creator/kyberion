@@ -3,7 +3,7 @@ title: 'Role Procedure: Infinite Librarian'
 tags: [role, knowledge-steward, governance, distillation, taxonomy]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-09-27
+last_updated: 2026-10-07
 kind: role
 scope: global
 authority: advisory
@@ -48,9 +48,18 @@ You are the keeper of wisdom, ensuring that information is categorized, discover
 - **Output**: `knowledge/product/governance/CURATION_REPORT.md`, regenerated (overwritten) on every run — do not edit it manually, same convention as `HINTS.md`.
 - **What to review**:
   - **Low-yield hints**: documents delivered `low_yield_delivery_threshold` times or more (KP-05 usage aggregate) with zero recorded uses. Candidates for retirement or rewrite — check whether the content is actually irrelevant or whether workers simply aren't reporting `knowledge_feedback` yet.
-  - **Freshness SLO breaches**: documents whose frontmatter `last_updated` is older than the re-verify deadline for their `kind`, per `knowledge/product/governance/knowledge-curation-slo.json` (defaults: governance 90d / playbook 60d / knowledge_hint 30d; other kinds fall back to `default_freshness_days`). Re-verify the content and bump `last_updated`, or flag for supersession.
+  - **Freshness SLO breaches**: documents whose frontmatter `last_updated` is older than the re-verify deadline for their `kind`, per `knowledge/product/governance/knowledge-curation-slo.json` (defaults: governance 90d / playbook 60d / knowledge_hint 30d; other kinds fall back to `default_freshness_days`). Re-verify the content and bump `last_updated`, or flag for supersession. An age-based `stale` breach is skipped when the document's current text worked in a run inside the same window (see E); the report counts these as `stale_suppressed_by_verified_runs`. `review_by` deadlines and missing `last_updated` are never skipped.
 - **Approval boundary (KM-03 guardrail)**: `curation_report` only proposes candidates — it never deletes, archives, or demotes anything. If you agree a document should be retired, process it by hand through the existing supersede/archive machinery (`promoted-memory.ts`'s `supersedes`/`superseded_by` backlink, or archive it under `knowledge/product/hints/archive/` for promoted hints). Promotion and demotion both require steward approval; neither happens automatically.
 - **Tuning the thresholds**: edit `knowledge/product/governance/knowledge-curation-slo.json` (validated against `knowledge/product/schemas/knowledge-curation-slo.schema.json`) — never hardcode a new deadline in code.
+
+### E. Verified Runs (knowledge-verification ledger)
+
+A procedure that keeps working does not need rewriting; what matters is whether its **current text** has worked. `libs/core/knowledge/knowledge-verification.ts` keeps a per-tenant ledger (shared ledger for public work) of the last successful run per document, with a fingerprint of the text at that time.
+
+- **Evidence**: a success is recorded only when a mission task finishes with no `gaps` / `needs` / parse errors and its `knowledge_feedback.used` names documents that were delivered to it. A failed task is not blamed on what it read. A problem is recorded only from explicit human `wrong` / `stale` feedback (`pnpm knowledge feedback`, Chronos, MCP, Slack).
+- **States shown to workers** (label next to each knowledge hint): `verified` (worked in a run on <date>), `changed_since_verified` (text changed since it last worked — re-check), `reported_problem` (reported wrong/stale after its last success).
+- **Mechanical delivery**: when a document a project relied on in a successful run has changed since, one such document is delivered to that project's next missions regardless of topic match, until a run confirms the new text. Other projects and tenants never receive it.
+- **Steward action**: a `changed_since_verified` document that stays unconfirmed for long is a sign the change was never exercised — ask the owning project to run it, or revert. A `reported_problem` document needs a fix or a supersession.
 
 ### D. Tenant Scope Reconciliation (KO-19)
 

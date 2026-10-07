@@ -12,6 +12,10 @@ import {
   buildTenantKnowledgeScopeSet,
   queryTenantKnowledge,
 } from '../organization/tenant-knowledge-retrieval.js';
+import {
+  findChangedSinceVerified,
+  resolveKnowledgeVerification,
+} from '../knowledge/knowledge-verification.js';
 import { selectRelevantKnowledge } from '../knowledge/knowledge-relevance-judgment.js';
 import { judgmentAssistReady } from '../reasoning/judgment-provider-bootstrap.js';
 import { loadProjectRecord } from '../project/project-registry.js';
@@ -75,11 +79,13 @@ function truncatePinnedExcerpt(body: string, max = PINNED_EXCERPT_MAX_CHARS): st
   return para.replace(/\s+/g, ' ').slice(0, max);
 }
 
-function resolveSafePinnedKnowledgePath(repoRelativePath: string): string | null {
+function resolveSafePinnedKnowledgePath(repoRelativePath: string, rootDir?: string): string | null {
   const normalized = repoRelativePath.replaceAll('\\', '/');
   if (!normalized.startsWith('knowledge/')) return null;
-  const root = path.resolve(pathResolver.knowledge());
-  const absolute = path.resolve(pathResolver.rootResolve(normalized));
+  const root = path.resolve(rootDir ? path.join(rootDir, 'knowledge') : pathResolver.knowledge());
+  const absolute = path.resolve(
+    rootDir ? path.join(rootDir, normalized) : pathResolver.rootResolve(normalized)
+  );
   const relative = path.relative(root, absolute).replaceAll('\\', '/');
   if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
     return null;
@@ -93,9 +99,12 @@ function resolveSafePinnedKnowledgePath(repoRelativePath: string): string | null
   return absolute;
 }
 
-function loadPinnedKnowledgeHint(repoRelativePath: string): MissionContextPackKnowledgeHint | null {
+function loadPinnedKnowledgeHint(
+  repoRelativePath: string,
+  rootDir?: string
+): MissionContextPackKnowledgeHint | null {
   try {
-    const abs = resolveSafePinnedKnowledgePath(repoRelativePath);
+    const abs = resolveSafePinnedKnowledgePath(repoRelativePath, rootDir);
     if (!abs) return null;
     if (!safeExistsSync(abs)) return null;
     if (!safeLstat(abs).isFile()) return null;
@@ -367,8 +376,41 @@ export async function loadKnowledgeHintsIfPossible(
     if (hint) pinnedHints.push(hint);
   }
 
+  // Verification is tenant-level for confidential work, shared for public.
+  const verificationTenant = tenantSlugForKnowledgeRetrieval(input);
+  const verificationScope: ScopeContext | undefined = verificationTenant
+    ? { tier: 'confidential', tenant_slug: verificationTenant }
+    : undefined;
+  // Mechanical delivery: a document this project relied on in a successful
+  // run has changed since, and the new text has not worked yet. Deliver it
+  // regardless of topic match (one at most), so the worker re-checks it.
+  if (pinnedHints.length < hintLimit) {
+    const pinnedPaths = new Set(pinnedHints.map((hint) => hint.path));
+    for (const changed of findChangedSinceVerified({
+      scope: verificationScope,
+      ...(sliceProject ? { projectId: sliceProject } : {}),
+      limit: 1,
+      ...(input.tenantKnowledgeRootDir ? { rootDir: input.tenantKnowledgeRootDir } : {}),
+    })) {
+      if (pinnedPaths.has(changed.document_path)) continue;
+      const hint = loadPinnedKnowledgeHint(changed.document_path, input.tenantKnowledgeRootDir);
+      if (hint) pinnedHints.push({ ...hint, delivered_because: 'changed_since_verified' });
+    }
+  }
+  const annotate = (hints: MissionContextPackKnowledgeHint[]) => {
+    const verification = resolveKnowledgeVerification(
+      hints.map((hint) => hint.path),
+      verificationScope,
+      input.tenantKnowledgeRootDir
+    );
+    return hints.map((hint) => {
+      const resolved = verification.get(hint.path);
+      return resolved ? { ...hint, verification: resolved } : hint;
+    });
+  };
+
   const remaining = hintLimit - pinnedHints.length;
-  if (remaining <= 0) return pinnedHints;
+  if (remaining <= 0) return annotate(pinnedHints);
   const narrow = (hints: MissionContextPackKnowledgeHint[]) =>
     narrowKnowledgeHintsWithJudgment(hints, {
       task: topic,
@@ -450,7 +492,7 @@ export async function loadKnowledgeHintsIfPossible(
   }
 
   if (tenantHints.length === 0) {
-    return narrow([...pinnedHints, ...distillHints.slice(0, remaining)]);
+    return annotate(await narrow([...pinnedHints, ...distillHints.slice(0, remaining)]));
   }
 
   const merged = mergeTenantKnowledgeHints({
@@ -459,5 +501,5 @@ export async function loadKnowledgeHintsIfPossible(
     cap: remaining,
     deliveredPaths: new Set(pinnedHints.map((hint) => hint.path)),
   });
-  return narrow([...pinnedHints, ...merged]);
+  return annotate(await narrow([...pinnedHints, ...merged]));
 }

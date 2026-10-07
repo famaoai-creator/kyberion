@@ -22,6 +22,7 @@ import {
   listMemoryPromotionCandidates,
   memoryPromotionQueuePath,
 } from './memory-promotion-queue.js';
+import { resolveKnowledgeVerification } from './knowledge-verification.js';
 
 // Hermetic isolation: point the delivery log dir, the usage aggregate file,
 // and the memory promotion queue at unique per-process tmp paths so this
@@ -262,6 +263,25 @@ describe('recordKnowledgeDelivery', () => {
     expect(listMemoryPromotionCandidates()[0]).toMatchObject({
       proposed_memory_kind: 'clarification_prompt',
       sensitivity_tier: 'confidential',
+    });
+  });
+});
+
+describe('human feedback reaches the verification ledger', () => {
+  it('records stale/wrong reports as a problem, not useful ones', () => {
+    const scope = { tier: 'confidential' as const, tenant_slug: 'tenant-a' };
+    const doc = 'knowledge/confidential/tenant-a/runbook.md';
+    recordHumanKnowledgeFeedback({ document_path: doc, verdict: 'useful', scope });
+    expect(resolveKnowledgeVerification([doc], scope).get(doc)).toBeUndefined();
+    recordHumanKnowledgeFeedback({
+      document_path: doc,
+      verdict: 'stale',
+      reason: 'old CLI',
+      scope,
+    });
+    expect(resolveKnowledgeVerification([doc], scope).get(doc)).toMatchObject({
+      state: 'reported_problem',
+      last_problem_kind: 'stale',
     });
   });
 });
