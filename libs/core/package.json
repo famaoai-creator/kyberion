@@ -3899,6 +3899,10 @@
       "types": "./dist/browser/browser-extension-bridge.d.ts",
       "default": "./dist/browser/browser-extension-bridge.js"
     },
+    "./browser/browser-golden-evidence": {
+      "types": "./dist/browser/browser-golden-evidence.d.ts",
+      "default": "./dist/browser/browser-golden-evidence.js"
+    },
     "./browser/browser-judgment": {
       "types": "./dist/browser/browser-judgment.d.ts",
       "default": "./dist/browser/browser-judgment.js"
@@ -5302,6 +5306,10 @@
     "./knowledge/procedure-registry": {
       "types": "./dist/knowledge/procedure-registry.d.ts",
       "default": "./dist/knowledge/procedure-registry.js"
+    },
+    "./knowledge/golden-scenario-maintenance": {
+      "types": "./dist/knowledge/golden-scenario-maintenance.d.ts",
+      "default": "./dist/knowledge/golden-scenario-maintenance.js"
     },
     "./knowledge/procedure-self-repair": {
       "types": "./dist/knowledge/procedure-self-repair.d.ts",

@@ -310,6 +310,26 @@ describe('compileBrowserRecording', () => {
     expect(refCond?.name_contains).toBe('確認ダイアログ');
   });
 
+  it('marks the last-action fallback so it can never pass a run on its own', () => {
+    const rec = {
+      ...BASE_RECORDING,
+      actions: [
+        makeAction('click_ref', {
+          target: { ref: 'r3', role: 'button', name: 'Approve', snapshot_hash: 'h3' },
+        }),
+      ],
+    };
+    const { goldenScenario } = compileBrowserRecording(rec, OPTS);
+    expect(goldenScenario.success_conditions).toEqual([
+      {
+        kind: 'ref_visible',
+        role: 'button',
+        name_contains: 'Approve',
+        params: { anchor: 'last_action_target' },
+      },
+    ]);
+  });
+
   // -------------------------------------------------------------------------
   // isDryRunSafe + warnings
   // -------------------------------------------------------------------------
