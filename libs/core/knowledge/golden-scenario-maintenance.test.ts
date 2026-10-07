@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
 import { pathResolver } from '../path-resolver.js';
 import {
   safeExistsSync,
@@ -12,7 +13,10 @@ import {
 import {
   backfillGoldenScenarios,
   goldenScenarioIsWeakOnly,
+  procedureCheckReportPath,
   procedureCheckStatus,
+  renderProcedureCheckReportMarkdown,
+  writeProcedureCheckReport,
 } from './golden-scenario-maintenance.js';
 import { loadGoldenScenario, saveGoldenScenario } from './golden-scenario-verdict.js';
 import { recordKnowledgeProblem, recordKnowledgeVerifiedRun } from './knowledge-verification.js';
@@ -261,5 +265,44 @@ describe('procedureCheckStatus', () => {
       )
     ).toBe(true);
     expect(goldenScenarioIsWeakOnly(scenario([{ kind: 'screenshot_state' }]))).toBe(true);
+  });
+});
+
+describe('weekly procedure check report', () => {
+  it('writes the status rows and a summary to the report path', () => {
+    const reportPath = path.join(root, 'PROCEDURE_CHECK_REPORT.md');
+    const result = writeProcedureCheckReport({
+      now: new Date('2026-10-07T00:00:00.000Z'),
+      reportPath,
+      procedures: [
+        entry('maint.nogolden', { adapter: { recorder: 'x', executor: 'extension_session' } }),
+      ],
+    });
+
+    const written = safeReadFile(reportPath, { encoding: 'utf8' }) as string;
+    expect(written).toContain('| maint.nogolden | browser | missing | none |');
+    expect(written).toContain('pnpm kyberion procedure golden backfill');
+    expect(result).toEqual({
+      report_path: pathResolver.toRepoRelative(reportPath),
+      summary: {
+        procedure_count: 1,
+        attention_count: 1,
+        failed_check_count: 0,
+        no_golden_scenario_count: 1,
+        weak_only_count: 0,
+      },
+    });
+  });
+
+  it('defaults to the personal tier, never the public curation report', () => {
+    expect(pathResolver.toRepoRelative(procedureCheckReportPath())).toBe(
+      'knowledge/personal/governance/PROCEDURE_CHECK_REPORT.md'
+    );
+  });
+
+  it('renders an empty catalog without tables', () => {
+    const markdown = renderProcedureCheckReportMarkdown([], '2026-10-07T00:00:00.000Z');
+    expect(markdown).toContain('0 of 0 procedure(s) need attention');
+    expect(markdown.match(/_\(none\)_/g)).toHaveLength(2);
   });
 });
