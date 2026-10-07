@@ -9,6 +9,7 @@ import {
 } from './tier-guard.js';
 import * as pathResolver from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
+import { setLogFileSink } from './logger.js';
 
 vi.mock('./secure-io.js', async () => {
   const fsModule = await import('node:fs');
@@ -523,6 +524,249 @@ describe('tier-guard tenant scope (IP-1)', () => {
     expect(validateWritePermission(otherProject).allowed).toBe(false);
   });
 
+  describe('bounded tenant audit sink failures', () => {
+    const target = path.join(ROOT, 'knowledge/confidential/other-tenant/private-audit-probe.md');
+    const nestedTarget = path.join(ROOT, 'knowledge/confidential/another-tenant/private-sink.md');
+    const groupTarget = path.join(ROOT, 'knowledge/confidential/shared/unit-shared/brief.md');
+    const settleAudits = () => vi.dynamicImportSettled();
+    let stderr: ReturnType<typeof vi.spyOn>;
+    let savedArgv: string[];
+
+    beforeEach(async () => {
+      // Earlier permission tests intentionally leave best-effort audits queued.
+      // Drain those before installing this test's failure/reentrancy behavior.
+      await settleAudits();
+      const { auditChain } = await import('./governance/audit-chain.js');
+      vi.mocked(auditChain.record).mockReset();
+      process.env.KYBERION_TENANT = 'acme-corp';
+      process.env.KYBERION_TENANT_SCOPE_REQUIRED = '0';
+      process.env.KYBERION_PERSONA = 'ecosystem_architect';
+      delete process.env.KYBERION_SUDO;
+      savedArgv = process.argv;
+      process.argv = [...process.argv, '--json'];
+      vi.stubEnv('LOG_LEVEL', 'silent');
+      stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    });
+
+    afterEach(async () => {
+      await settleAudits();
+      const { auditChain } = await import('./governance/audit-chain.js');
+      vi.mocked(auditChain.record).mockReset();
+      setLogFileSink(null);
+      stderr.mockRestore();
+      process.argv = savedArgv;
+      vi.unstubAllEnvs();
+    });
+
+    function seedSharedGroup(): void {
+      const dir = path.join(ROOT, 'knowledge/confidential/tenant-groups');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, 'unit-shared.json'),
+        JSON.stringify({
+          tenant_group_id: 'unit-shared',
+          status: 'active',
+          member_tenants: ['acme-corp'],
+          shared_prefixes: ['knowledge/confidential/shared/unit-shared/'],
+        })
+      );
+    }
+
+    it('bounds nested denied writes even when record returns, preserving the first event', async () => {
+      const { auditChain } = await import('./governance/audit-chain.js');
+      const record = vi.mocked(auditChain.record);
+      const nestedDecisions: ReturnType<typeof validateWritePermission>[] = [];
+      record.mockImplementation((entry) => {
+        // The cap lets a regressed implementation fail rather than spin forever.
+        if (record.mock.calls.length < 8) {
+          for (let index = 0; index < 3; index += 1) {
+            nestedDecisions.push(validateWritePermission(nestedTarget));
+          }
+        }
+        return entry as ReturnType<typeof auditChain.record>;
+      });
+
+      const decision = validateWritePermission(target);
+      await settleAudits();
+
+      expect(decision.allowed).toBe(false);
+      expect(record).toHaveBeenCalledTimes(1);
+      expect(record).toHaveBeenCalledWith({
+        agentId: 'tier-guard',
+        action: 'tenant.scope_violation',
+        operation: 'knowledge/confidential/other-tenant/private-audit-probe.md',
+        result: 'denied',
+        reason: decision.reason,
+        tenantSlug: 'acme-corp',
+        metadata: { target_tenant: 'other-tenant' },
+      });
+      expect(nestedDecisions).toHaveLength(3);
+      expect(nestedDecisions.every((result) => !result.allowed)).toBe(true);
+      expect(stderr).toHaveBeenCalledTimes(1);
+      const diagnostic = String(stderr.mock.calls[0][0]);
+      expect(diagnostic).toContain('Tenant access audit persistence unverified');
+      expect(diagnostic).not.toMatch(/acme-corp|other-tenant|another-tenant|private-/);
+    });
+
+    it('emits only one failure when a nested denial is followed by a thrown sink error', async () => {
+      const { auditChain } = await import('./governance/audit-chain.js');
+      const record = vi.mocked(auditChain.record);
+      record.mockImplementation(() => {
+        if (record.mock.calls.length < 8) validateWritePermission(nestedTarget);
+        throw new Error('private sink failure details');
+      });
+
+      expect(validateWritePermission(target).allowed).toBe(false);
+      await settleAudits();
+
+      expect(record).toHaveBeenCalledTimes(1);
+      expect(stderr).toHaveBeenCalledTimes(1);
+      expect(String(stderr.mock.calls[0][0])).not.toContain('private sink failure details');
+    });
+
+    it('attempts every independent denial queued before import resolves and resets after errors', async () => {
+      const { auditChain } = await import('./governance/audit-chain.js');
+      const record = vi.mocked(auditChain.record);
+      let firstAttempt = true;
+      record.mockImplementation((entry) => {
+        if (firstAttempt) {
+          firstAttempt = false;
+          throw new Error('unavailable');
+        }
+        return entry as ReturnType<typeof auditChain.record>;
+      });
+
+      const first = validateWritePermission(target);
+      const second = validateWritePermission(nestedTarget);
+      expect(first.reason).toContain('tenant.scope_violation');
+      expect(second.reason).toContain('tenant.scope_violation');
+      await settleAudits();
+      expect(record).toHaveBeenCalledTimes(2);
+      expect(stderr).toHaveBeenCalledTimes(1);
+      expect(record.mock.calls.map(([entry]) => entry.operation)).toEqual([
+        'knowledge/confidential/other-tenant/private-audit-probe.md',
+        'knowledge/confidential/another-tenant/private-sink.md',
+      ]);
+      expect(stderr).toHaveBeenCalledTimes(1);
+
+      expect(validateWritePermission(target).allowed).toBe(false);
+      await settleAudits();
+      expect(record).toHaveBeenCalledTimes(3);
+      expect(stderr).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not retry a broken diagnostic stream or leave the audit guard set', async () => {
+      const { auditChain } = await import('./governance/audit-chain.js');
+      const record = vi.mocked(auditChain.record);
+      record.mockImplementationOnce(() => {
+        throw new Error('sink unavailable');
+      });
+      stderr.mockImplementationOnce(() => {
+        throw new Error('stderr unavailable');
+      });
+
+      expect(validateWritePermission(target).allowed).toBe(false);
+      await settleAudits();
+      expect(record).toHaveBeenCalledTimes(1);
+      expect(stderr).toHaveBeenCalledTimes(1);
+
+      expect(validateWritePermission(nestedTarget).allowed).toBe(false);
+      await settleAudits();
+      expect(record).toHaveBeenCalledTimes(2);
+      expect(stderr).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports through the shared console without invoking a failing process-file sink', async () => {
+      const { auditChain } = await import('./governance/audit-chain.js');
+      const fileSink = vi.fn(() => {
+        validateWritePermission(nestedTarget);
+        throw new Error('process log denied');
+      });
+      setLogFileSink(fileSink);
+      vi.mocked(auditChain.record).mockImplementationOnce(() => {
+        throw new Error('audit denied');
+      });
+
+      expect(validateWritePermission(target).allowed).toBe(false);
+      await settleAudits();
+
+      expect(auditChain.record).toHaveBeenCalledTimes(1);
+      expect(fileSink).not.toHaveBeenCalled();
+      expect(stderr).toHaveBeenCalledTimes(1);
+    });
+
+    it('suppresses nested allowed group auditing without claiming persistence failed', async () => {
+      seedSharedGroup();
+      const { auditChain } = await import('./governance/audit-chain.js');
+      const record = vi.mocked(auditChain.record);
+      record.mockImplementation((entry) => {
+        if (record.mock.calls.length < 8) validateWritePermission(groupTarget);
+        return entry as ReturnType<typeof auditChain.record>;
+      });
+
+      expect(validateWritePermission(target).allowed).toBe(false);
+      await settleAudits();
+      expect(record).toHaveBeenCalledTimes(1);
+      expect(stderr).not.toHaveBeenCalled();
+
+      validateWritePermission(groupTarget);
+      await settleAudits();
+      expect(record).toHaveBeenCalledTimes(2);
+      expect(record.mock.calls[1][0].action).toBe('tenant.group_access');
+      expect(stderr).not.toHaveBeenCalled();
+    });
+
+    it('persists the initial denied event through a healthy real audit chain', async () => {
+      const { auditChain } = await import('./governance/audit-chain.js');
+      const actual = await vi.importActual<typeof import('./governance/audit-chain.js')>(
+        './governance/audit-chain.js'
+      );
+      let recorded: ReturnType<typeof actual.auditChain.record> | undefined;
+      vi.mocked(auditChain.record).mockImplementation((entry) => {
+        // The shared test bootstrap supplies a sandboxed durable audit/lock IO.
+        recorded = actual.auditChain.record(entry);
+        return recorded;
+      });
+
+      const decision = validateWritePermission(target);
+      await settleAudits();
+
+      expect(decision.allowed).toBe(false);
+      expect(auditChain.record).toHaveBeenCalledTimes(1);
+      expect(recorded).toBeDefined();
+      expect(actual.auditChain.loadAll().find((entry) => entry.id === recorded?.id)).toMatchObject({
+        action: 'tenant.scope_violation',
+        operation: 'knowledge/confidential/other-tenant/private-audit-probe.md',
+        result: 'denied',
+        reason: decision.reason,
+        tenantSlug: 'acme-corp',
+        metadata: { target_tenant: 'other-tenant' },
+      });
+      expect(stderr).not.toHaveBeenCalled();
+    });
+
+    it('also bounds a denial inside the group-access audit sink', async () => {
+      seedSharedGroup();
+      const { auditChain } = await import('./governance/audit-chain.js');
+      const record = vi.mocked(auditChain.record);
+      record.mockImplementation((entry) => {
+        if (record.mock.calls.length < 8) validateWritePermission(nestedTarget);
+        return entry as ReturnType<typeof auditChain.record>;
+      });
+
+      validateWritePermission(groupTarget);
+      await settleAudits();
+
+      expect(record).toHaveBeenCalledTimes(1);
+      expect(record.mock.calls[0][0]).toMatchObject({
+        action: 'tenant.group_access',
+        result: 'allowed',
+        metadata: { tenant_slug: 'acme-corp', tenant_group_id: 'unit-shared' },
+      });
+      expect(stderr).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('denies worker access to confidential projects when project scope is missing or invalid', () => {
     process.env.KYBERION_PERSONA = 'worker';
     process.env.MISSION_ROLE = 'worker';
@@ -636,6 +880,51 @@ describe('tier-guard brokered missions (C8)', () => {
     );
   });
 
+  it('bounds denied and allowed reentrancy from a broker audit without dropping independent events', async () => {
+    await vi.dynamicImportSettled();
+    delete process.env.KYBERION_TENANT;
+    process.env.MISSION_ID = FIX_MISSION;
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    const { auditChain } = await import('./governance/audit-chain.js');
+    const record = vi.mocked(auditChain.record);
+    record.mockReset();
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const allowedTarget = path.join(ROOT, 'knowledge/confidential/acme-corp/broker-audit.md');
+    const deniedTarget = path.join(ROOT, 'knowledge/confidential/gamma-org/broker-denied.md');
+    let nestedDenied: ReturnType<typeof validateWritePermission> | undefined;
+    try {
+      record.mockImplementation((entry) => {
+        if (record.mock.calls.length < 8) validateWritePermission(allowedTarget);
+        return entry as ReturnType<typeof auditChain.record>;
+      });
+      validateWritePermission(allowedTarget);
+      await vi.dynamicImportSettled();
+      expect(record).toHaveBeenCalledTimes(1);
+      expect(record.mock.calls[0][0].action).toBe('tenant.broker_access');
+      expect(stderr).not.toHaveBeenCalled();
+
+      record.mockImplementation((entry) => {
+        if (record.mock.calls.length < 8) {
+          nestedDenied = validateWritePermission(deniedTarget);
+        }
+        return entry as ReturnType<typeof auditChain.record>;
+      });
+      validateWritePermission(allowedTarget);
+      await vi.dynamicImportSettled();
+      expect(record).toHaveBeenCalledTimes(2);
+      expect(nestedDenied?.allowed).toBe(false);
+      expect(stderr).toHaveBeenCalledTimes(1);
+      expect(record.mock.calls[1][0]).toMatchObject({
+        action: 'tenant.broker_access',
+        result: 'allowed',
+        metadata: { target_tenant: 'acme-corp', broker_tenants: ['acme-corp', 'beta-co'] },
+      });
+    } finally {
+      record.mockReset();
+      stderr.mockRestore();
+    }
+  });
+
   it('broker mission: still denies tenants outside source_tenants list', () => {
     delete process.env.KYBERION_TENANT;
     process.env.MISSION_ID = FIX_MISSION;
@@ -688,5 +977,51 @@ describe('tier-guard brokered missions (C8)', () => {
     const result = validateWritePermission(target);
     expect(result.allowed).toBe(false);
     expect(result.reason).toMatch(/tenant\.broker_expired/);
+  });
+});
+
+describe('tier-guard audit module load failure', () => {
+  it('reports each independent failed import attempt and keeps subsequent denials denied', async () => {
+    await vi.dynamicImportSettled();
+    vi.resetModules();
+    vi.doMock('./governance/audit-chain.js', () => {
+      throw new Error('private module load detail');
+    });
+    vi.stubEnv('KYBERION_TENANT', 'acme-corp');
+    vi.stubEnv('KYBERION_TENANT_SCOPE_REQUIRED', '0');
+    vi.stubEnv('KYBERION_PERSONA', 'ecosystem_architect');
+    vi.stubEnv('KYBERION_SUDO', '0');
+    vi.stubEnv('MISSION_ID', '');
+    vi.stubEnv('LOG_LEVEL', 'silent');
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      const isolated = await import('./tier-guard.js');
+      for (const tenant of ['other-tenant', 'another-tenant']) {
+        const decision = isolated.validateWritePermission(
+          path.join(ROOT, 'knowledge/confidential', tenant, 'secret.md')
+        );
+        expect(decision.allowed).toBe(false);
+        expect(decision.reason).toContain('tenant.scope_violation');
+      }
+      await vi.dynamicImportSettled();
+      expect(stderr).toHaveBeenCalledTimes(2);
+
+      expect(
+        isolated.validateWritePermission(
+          path.join(ROOT, 'knowledge/confidential/other-tenant/later.md')
+        ).allowed
+      ).toBe(false);
+      await vi.dynamicImportSettled();
+      expect(stderr).toHaveBeenCalledTimes(3);
+      for (const [line] of stderr.mock.calls) {
+        expect(String(line)).toContain('Tenant access audit persistence unverified');
+        expect(String(line)).not.toMatch(/private module|acme-corp|other-tenant|secret.md/);
+      }
+    } finally {
+      stderr.mockRestore();
+      vi.unstubAllEnvs();
+      vi.doMock('./governance/audit-chain.js', () => ({ auditChain: { record: vi.fn() } }));
+      vi.resetModules();
+    }
   });
 });

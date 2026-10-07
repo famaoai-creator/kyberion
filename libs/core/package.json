@@ -7350,6 +7350,26 @@
     "./knowledge/learning-signal-sources": {
       "types": "./dist/knowledge/learning-signal-sources.d.ts",
       "default": "./dist/knowledge/learning-signal-sources.js"
+    },
+    "./surface/first-job-approval-binding": {
+      "types": "./dist/surface/first-job-approval-binding.d.ts",
+      "default": "./dist/surface/first-job-approval-binding.js"
+    },
+    "./surface/first-job-admission": {
+      "types": "./dist/surface/first-job-admission.d.ts",
+      "default": "./dist/surface/first-job-admission.js"
+    },
+    "./surface/front-desk-execution-proposal": {
+      "types": "./dist/surface/front-desk-execution-proposal.d.ts",
+      "default": "./dist/surface/front-desk-execution-proposal.js"
+    },
+    "./dot/dot-action-ledger": {
+      "types": "./dist/dot/dot-action-ledger.d.ts",
+      "default": "./dist/dot/dot-action-ledger.js"
+    },
+    "./dot/dot-executor-reports": {
+      "types": "./dist/dot/dot-executor-reports.d.ts",
+      "default": "./dist/dot/dot-executor-reports.js"
     }
   },
   "dependencies": {
