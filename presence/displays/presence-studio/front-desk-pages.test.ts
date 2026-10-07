@@ -6,6 +6,7 @@ import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
+import { loadVocabularyCatalog } from '@agent/core/knowledge/vocabulary-catalog';
 import {
   FRONT_DESK_PAGE_PARTIALS,
   FRONT_DESK_TEMPLATE_FILE_REDIRECTS,
@@ -237,6 +238,26 @@ describe('raw template files are never served unrendered', () => {
     routes.get('/')!({ headers: { 'accept-language': 'ja' } }, home);
     expect(String(home.sent)).toContain('<html lang="ja"');
     expect(String(home.sent)).not.toMatch(/\{\{(t|partial|locale)[:}]/);
+  });
+});
+
+describe('First-job setup vocabulary delivery', () => {
+  it('delivers every dynamically selected setup message through the browser vocabulary endpoint', () => {
+    const catalog = loadVocabularyCatalog();
+    expect(catalog).not.toBeNull();
+    const keys = Object.keys(catalog!.domains.front_desk).filter((key) =>
+      key.startsWith('first_job_setup_')
+    );
+    expect(keys.length).toBeGreaterThan(0);
+    for (const key of keys) {
+      const qualified = ('front_desk:' + key) as VocabularyKey;
+      expect(FIRST_JOB_VOCABULARY_KEYS).toContain(qualified);
+      expect(PRESENCE_STUDIO_VOCABULARY_KEYS).toContain(qualified);
+      for (const locale of ['en', 'ja', 'qps-ploc'] as const) {
+        expect(catalogT(qualified, undefined, locale)).not.toBe(qualified);
+        expect(catalogT(qualified, undefined, locale)).not.toBe('');
+      }
+    }
   });
 });
 

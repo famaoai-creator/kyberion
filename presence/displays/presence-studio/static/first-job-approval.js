@@ -45,6 +45,19 @@
         ].indexOf(state.authStatus) !== -1
       )
         update.accessLost = true;
+      if (
+        state.error ||
+        ['authentication_required', 'authentication_configuration_required'].indexOf(
+          state.authStatus
+        ) !== -1
+      )
+        update.setupInvalidated = true;
+      if (
+        state.authStatus === 'access_denied' ||
+        (state.authStatus === 'ready' &&
+          ['scope_changed', 'diagnostic_unavailable'].indexOf(state.readiness) !== -1)
+      )
+        update.setupScopeInvalidated = true;
       if (state.held.length) update.heldRequests = state.held;
       if (state.recovery.length && state.eligible && !state.loading && !state.sending)
         update.recoveryRequests = state.recovery;
@@ -132,10 +145,7 @@
   }
   function render(focusRecovery) {
     el('readiness').textContent = text(authKey());
-    el('signin').hidden =
-      ['authentication_required', 'authentication_configuration_required'].indexOf(
-        state.authStatus
-      ) === -1;
+    el('signin').hidden = state.authStatus !== 'authentication_required';
     el('refresh').disabled = state.sending || state.loading || !state.context;
     el('error').hidden = !state.error;
     el('error').textContent = state.error ? text(state.error) : '';

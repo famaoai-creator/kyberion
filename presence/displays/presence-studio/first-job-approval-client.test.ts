@@ -194,7 +194,7 @@ describe('Dedicated diagnostic approval UI with inert fixtures', () => {
 
   it.each([
     ['authentication_required', 'approval_auth_needed', false],
-    ['authentication_configuration_required', 'approval_configuration', false],
+    ['authentication_configuration_required', 'approval_configuration', true],
     ['access_denied', 'approval_forbidden', true],
     ['loopback', 'approval_unknown', true],
   ])(
@@ -214,6 +214,11 @@ describe('Dedicated diagnostic approval UI with inert fixtures', () => {
         ready: false,
         busy: false,
         ...(status === 'loopback' ? {} : { accessLost: true }),
+        ...(status === 'loopback'
+          ? {}
+          : status === 'access_denied'
+            ? { setupScopeInvalidated: true }
+            : { setupInvalidated: true }),
       });
       expect(h.get('readiness').textContent).toContain(key);
       expect(h.get('signin').hidden).toBe(hideLogin);
@@ -347,7 +352,9 @@ describe('Dedicated diagnostic approval UI with inert fixtures', () => {
   ])('fails closed on malformed, out-of-scope, or expired approval data: %j', async (override) => {
     const h = harness({ get: () => response(view({ approvals: [item(override)] })) });
     await flush();
-    expect(h.context.onChange).toHaveBeenLastCalledWith({ ready: false, busy: false });
+    expect(h.context.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ready: false, busy: false })
+    );
     expect(h.buttons()).toHaveLength(0);
     expect(h.posts()).toHaveLength(0);
   });
@@ -361,7 +368,9 @@ describe('Dedicated diagnostic approval UI with inert fixtures', () => {
     await flush();
     expect(h.posts()).toHaveLength(0);
     expect(h.get('error').textContent).toContain('approval_changed');
-    expect(h.context.onChange).toHaveBeenLastCalledWith({ ready: false, busy: false });
+    expect(h.context.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ready: false, busy: false })
+    );
   });
 
   it('invalidates approval actions when the main diagnostic scope becomes unavailable', async () => {
@@ -373,7 +382,9 @@ describe('Dedicated diagnostic approval UI with inert fixtures', () => {
     await flush();
     expect(h.posts()).toHaveLength(0);
     expect(h.buttons()).toHaveLength(0);
-    expect(h.context.onChange).toHaveBeenLastCalledWith({ ready: false, busy: false });
+    expect(h.context.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ready: false, busy: false })
+    );
   });
 
   it('discards late reads from an older scope view', async () => {
@@ -451,7 +462,9 @@ describe('Dedicated diagnostic approval UI with inert fixtures', () => {
     });
     h.window.KyberionFirstJobApproval!.invalidate();
     expect(h.get('items').textContent).not.toContain(requestId);
-    expect(h.context.onChange).toHaveBeenLastCalledWith({ ready: false, busy: false });
+    expect(h.context.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ready: false, busy: false })
+    );
   });
 
   it('fails closed on conflicting actionable and held entries', async () => {
@@ -471,7 +484,9 @@ describe('Dedicated diagnostic approval UI with inert fixtures', () => {
     });
     await flush();
     expect(h.buttons()).toHaveLength(0);
-    expect(h.context.onChange).toHaveBeenLastCalledWith({ ready: false, busy: false });
+    expect(h.context.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ready: false, busy: false })
+    );
     expect(h.posts()).toHaveLength(0);
   });
 });
@@ -571,7 +586,9 @@ describe('Explicit parked-request recovery with inert fixtures', () => {
       action: 'terminate_unstarted',
     });
     expect(h.context.onDecision).toHaveBeenCalledOnce();
-    expect(h.context.onChange).toHaveBeenLastCalledWith({ ready: false, busy: false });
+    expect(h.context.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ready: false, busy: false })
+    );
     expect(h.get('status').textContent).toContain('recovery_readback');
     expect(h.get('items').textContent).not.toContain('recovery_terminated');
   });
@@ -694,11 +711,13 @@ describe('Explicit parked-request recovery with inert fixtures', () => {
     pending.resolve(terminalResponse());
     await flush();
     expect(h.context.onDecision).not.toHaveBeenCalled();
-    expect(h.context.onChange).toHaveBeenLastCalledWith({
-      ready: false,
-      busy: false,
-      accessLost: true,
-    });
+    expect(h.context.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        ready: false,
+        busy: false,
+        accessLost: true,
+      })
+    );
     expect(h.get('items').textContent).not.toContain(requestId);
   });
   it.each([
@@ -715,7 +734,9 @@ describe('Explicit parked-request recovery with inert fixtures', () => {
     await flush();
     expect(h.buttons()).toHaveLength(0);
     expect(h.posts()).toHaveLength(0);
-    expect(h.context.onChange).toHaveBeenLastCalledWith({ ready: false, busy: false });
+    expect(h.context.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ready: false, busy: false })
+    );
   });
   it('clears recovery identities and reports authentication loss if the terminal POST is rejected', async () => {
     const h = harness({
@@ -727,11 +748,13 @@ describe('Explicit parked-request recovery with inert fixtures', () => {
     h.buttons()[0].fire();
     await flush();
     expect(h.get('items').textContent).not.toContain(requestId);
-    expect(h.context.onChange).toHaveBeenLastCalledWith({
-      ready: false,
-      busy: false,
-      accessLost: true,
-    });
+    expect(h.context.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        ready: false,
+        busy: false,
+        accessLost: true,
+      })
+    );
     expect(h.get('signin').hidden).toBe(false);
     expect(h.context.onDecision).not.toHaveBeenCalled();
     expect(h.posts()).toHaveLength(1);
@@ -759,11 +782,13 @@ describe('Explicit parked-request recovery with inert fixtures', () => {
       await h.refresh();
       expect(h.get('items').textContent).not.toContain(requestId);
       expect(h.buttons()).toHaveLength(0);
-      expect(h.context.onChange).toHaveBeenLastCalledWith({
-        ready: false,
-        busy: false,
-        accessLost: true,
-      });
+      expect(h.context.onChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          ready: false,
+          busy: false,
+          accessLost: true,
+        })
+      );
       expect(h.get('readiness').textContent).toContain(
         status === 401 ? 'approval_auth_needed' : 'approval_forbidden'
       );
@@ -787,11 +812,13 @@ describe('Explicit parked-request recovery with inert fixtures', () => {
       await flush();
       expect(h.get('items').textContent).not.toContain(requestId);
       expect(h.buttons()).toHaveLength(0);
-      expect(h.context.onChange).toHaveBeenLastCalledWith({
-        ready: false,
-        busy: false,
-        accessLost: true,
-      });
+      expect(h.context.onChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          ready: false,
+          busy: false,
+          accessLost: true,
+        })
+      );
       expect(h.get('readiness').textContent).toContain(
         status === 401 ? 'approval_auth_needed' : 'approval_forbidden'
       );
