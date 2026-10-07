@@ -120,6 +120,10 @@ describe('judgeExtensionRun', () => {
   it('refuses evidence that is not tied to a completed run of this procedure', () => {
     const elements = [{ role: 'status', text: 'Request approved' }];
     expect(judge('RCP-unknown', elements)).toMatchObject({ ok: false });
+    expect(judge('../RCP-x', elements)).toEqual({
+      ok: false,
+      error: 'golden evidence requires receipt_id',
+    });
     expect(judge(receipt('failed'), elements)).toMatchObject({ ok: false });
     expect(judge(receipt('completed', 'rec-other'), elements)).toMatchObject({ ok: false });
     expect(judge(receipt(), 'not-a-list')).toMatchObject({ ok: false });
