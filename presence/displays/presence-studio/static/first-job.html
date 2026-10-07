@@ -31,14 +31,29 @@
             <h2 class="kb-section__title" id="first-job-readiness-title">
               {{t:front_desk:first_job_readiness}}
             </h2>
-            <ul>
-              <li>{{t:front_desk:first_job_identity_unknown}}</li>
-              <li>{{t:front_desk:first_job_baseline_unknown}}</li>
-              <li>{{t:front_desk:first_job_reasoning_unknown}}</li>
+            <ul aria-live="polite" aria-atomic="false">
+              <li id="first-job-setup-profile">{{t:front_desk:first_job_identity_unknown}}</li>
+              <li id="first-job-setup-oidc">{{t:front_desk:first_job_setup_oidc_unknown}}</li>
+              <li id="first-job-setup-browser_user">
+                {{t:front_desk:first_job_setup_browser_user_unknown}}
+              </li>
+              <li id="first-job-setup-approval_scope">
+                {{t:front_desk:first_job_setup_approval_scope_unknown}}
+              </li>
+              <li id="first-job-setup-baseline">{{t:front_desk:first_job_baseline_unknown}}</li>
+              <li id="first-job-setup-reasoning">{{t:front_desk:first_job_reasoning_unknown}}</li>
+              <li id="first-job-setup-advancement">
+                {{t:front_desk:first_job_setup_advancement_unknown}}
+              </li>
               <li id="first-job-approval-readiness" role="status" aria-live="polite">
                 {{t:front_desk:first_job_approval_unknown}}
               </li>
             </ul>
+            <p>
+              <a id="first-job-setup-signin" href="/login?next=%2Ffirst-job" hidden
+                >{{t:front_desk:first_job_approval_signin}}</a
+              >
+            </p>
             <p id="first-job-readiness" role="status" aria-live="polite">
               {{t:front_desk:first_job_loading}}
             </p>

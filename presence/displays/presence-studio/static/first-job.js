@@ -13,6 +13,7 @@
     vocab: {},
     vocabReady: false,
     snapshot: null,
+    setup: null,
     sessionId: null,
     pending: null,
     storageReady: false,
@@ -328,6 +329,7 @@
     state.readBlocked = true;
     state.loaded = false;
     state.snapshot = null;
+    state.setup = null;
     state.receiptAccessError = reason;
     clearReceipts(false);
     state.refreshSequence++;
@@ -590,15 +592,17 @@
   }
   function suspendReads(force) {
     stopPolling();
-    var recheck = force || state.refreshing || state.recoveryRequests.length > 0;
+    var recheck = force || state.refreshing || state.recoveryRequests.length > 0 || state.setup;
     if (recheck) state.resumeRead = true;
+    state.setup = null;
     if (state.refreshing) {
       state.refreshSequence++;
       if (state.refreshController) state.refreshController.abort();
       state.refreshController = null;
       state.refreshing = false;
     }
-    if (recheck) invalidateApproval();
+    // Preserve an in-flight decision callback; clearing guidance does not cancel a mutation.
+    if (recheck && !state.approvalBusy) invalidateApproval();
     render();
   }
   function historyArtifact(task) {
@@ -682,22 +686,103 @@
       }
     });
   }
+  function setupRecoveryBlocked() {
+    return (
+      state.heldRequests.length > 0 ||
+      state.recoveryRequests.some(function (item) {
+        return item.status === 'eligible';
+      })
+    );
+  }
+  function renderSetup() {
+    var setup = visible() && !state.refreshing && !state.networkError && state.setup;
+    var fields = {
+      profile: ['present', 'missing', 'unavailable'],
+      oidc: ['configured', 'configuration_required', 'unavailable'],
+      browser_user: ['verified', 'sign_in_required', 'binding_required', 'unavailable'],
+      approval_scope: [
+        'ready',
+        'mapping_required',
+        'authentication_required',
+        'owner_unavailable',
+        'owner_mismatch',
+        'tenant_membership_required',
+        'unavailable',
+      ],
+      baseline: ['unchecked'],
+      reasoning: ['not_required'],
+      advancement: ['not_started', 'review_or_tick', 'running', 'receipt_verified', 'unavailable'],
+    };
+    var actions = [
+      'inspect_profile',
+      'complete_profile',
+      'inspect_mapping',
+      'configure_login',
+      'sign_in',
+      'inspect_member_binding',
+      'inspect_approval_scope',
+      'inspect_baseline',
+      'review_or_tick',
+      'wait',
+      'inspect_execution',
+      'refresh',
+    ];
+    Object.keys(fields).forEach(function (field) {
+      var row = el('setup-' + field);
+      if (!row) return;
+      var value = setup && setup[field];
+      if (value && field === 'advancement' && setupRecoveryBlocked())
+        value = { status: 'unavailable', owner: 'operator', next_action: 'inspect_execution' };
+      if (field === 'advancement' && (state.sending || state.approvalBusy)) value = null;
+      var known = value && fields[field].indexOf(value.status) !== -1;
+      var content = text('setup_' + field + '_' + (known ? value.status : 'unknown'));
+      if (
+        known &&
+        ['user', 'operator'].indexOf(value.owner) !== -1 &&
+        actions.indexOf(value.next_action) !== -1
+      ) {
+        content +=
+          ' ' +
+          text('setup_owner_' + value.owner) +
+          ': ' +
+          text('setup_action_' + value.next_action);
+      }
+      if (row.textContent !== content) row.textContent = content;
+    });
+    var signin = el('setup-signin');
+    if (signin)
+      signin.hidden = !(
+        setup &&
+        setup.oidc &&
+        setup.oidc.status === 'configured' &&
+        setup.browser_user &&
+        setup.browser_user.status === 'sign_in_required'
+      );
+  }
   function render() {
+    renderSetup();
     var readiness = state.snapshot && state.snapshot.readiness;
-    var readinessKey = !state.loaded
-      ? 'loading'
-      : readiness && readiness.status === 'diagnostic_mapping_ready' && readiness.ready === true
-        ? 'ready'
-        : [
-              'mapping_missing',
-              'mapping_mismatch',
-              'mapping_ambiguous',
-              'mapping_unavailable',
-              'mapping_changed',
-            ].indexOf(readiness && readiness.status) !== -1
-          ? readiness.status
-          : 'mapping_unavailable';
-    if (!state.loaded && !state.refreshing) readinessKey = 'mapping_unavailable';
+    var mapping = state.setup && state.setup.mapping;
+    if (state.setup)
+      readiness = mapping
+        ? { status: mapping.status, ready: mapping.status === 'diagnostic_mapping_ready' }
+        : { status: 'mapping_unavailable', ready: false };
+    var readinessKey =
+      !state.loaded && !mapping
+        ? 'loading'
+        : readiness && readiness.status === 'diagnostic_mapping_ready' && readiness.ready === true
+          ? 'ready'
+          : [
+                'mapping_missing',
+                'mapping_mismatch',
+                'mapping_ambiguous',
+                'mapping_unavailable',
+                'mapping_changed',
+              ].indexOf(readiness && readiness.status) !== -1
+            ? readiness.status
+            : 'mapping_unavailable';
+    if (state.refreshing || state.resumeRead || !visible()) readinessKey = 'loading';
+    else if (!state.loaded && !mapping) readinessKey = 'mapping_unavailable';
     el('readiness').textContent = text(readinessKey);
     el('setup').hidden = !state.loaded || ready();
     var tenant = state.snapshot && state.snapshot.scope && state.snapshot.scope.tenant;
@@ -705,6 +790,15 @@
     el('scope').hidden = !validTenant;
     el('scope').textContent = validTenant ? text('scope') + ': ' + tenant : '';
     el('advance').hidden =
+      state.sending ||
+      state.approvalBusy ||
+      !visible() ||
+      state.refreshing ||
+      state.resumeRead ||
+      (state.setup &&
+        (setupRecoveryBlocked() ||
+          !state.setup.advancement ||
+          state.setup.advancement.status !== 'review_or_tick')) ||
       ((state.heldRequests.length > 0 || state.recoveryRequests.length > 0) &&
         !otherUnfinishedWork()) ||
       !ready() ||
@@ -830,6 +924,8 @@
     if (!body || !body.readiness || !Array.isArray(body.tasks) || !Array.isArray(body.messages))
       throw new Error('invalid_snapshot');
     state.snapshot = body;
+    // Keep only the status-only setup projection apart from protected request history.
+    state.setup = body.setup || null;
     state.loaded = true;
     state.receiptAccessError = null;
     if (SESSION.test(body.sessionId)) state.sessionId = body.sessionId;
@@ -858,8 +954,30 @@
       onChange: function (status) {
         if (sequence !== state.approvalSequence) return;
         state.approvalReady = status.ready === true;
+        if (status.setupInvalidated && state.setup) {
+          var setup = state.setup;
+          setup.advancement = null;
+          if (setup.browser_user && setup.browser_user.status === 'verified')
+            setup.browser_user = null;
+          if (setup.approval_scope && setup.approval_scope.status === 'ready')
+            setup.approval_scope = null;
+        }
+        if (status.setupScopeInvalidated && state.setup) {
+          state.setup.approval_scope = null;
+          state.setup.mapping = null;
+          state.setup.advancement = null;
+        }
         state.approvalBusy = status.busy === true;
         if (status.accessLost === true) {
+          // Recovery identities/history still clear completely. The local GET
+          // separately established these redacted configuration blockers.
+          if (state.setup) {
+            if (state.setup.browser_user && state.setup.browser_user.status === 'verified')
+              state.setup.browser_user = null;
+            if (state.setup.approval_scope && state.setup.approval_scope.status === 'ready')
+              state.setup.approval_scope = null;
+            state.setup.advancement = null;
+          }
           state.approvalReady = false;
           state.snapshot = null;
           state.loaded = false;
@@ -908,8 +1026,22 @@
             ? []
             : state.heldRequests;
         render();
+        if (
+          state.resumeRead &&
+          visible() &&
+          !state.approvalBusy &&
+          !state.sending &&
+          !state.refreshing
+        )
+          refresh();
       },
-      onDecision: refresh,
+      onDecision: function () {
+        if (!visible()) {
+          state.resumeRead = true;
+          return;
+        }
+        refresh();
+      },
     });
     var timer;
     return new Promise(function (resolve, reject) {
@@ -986,6 +1118,7 @@
       .catch(function () {
         if (sequence !== state.refreshSequence) return;
         state.loaded = false;
+        state.setup = null;
         state.networkError = true;
         state.pollFailures = Math.min(state.pollFailures + 1, 4);
         invalidateApproval();
@@ -1001,6 +1134,8 @@
   function sendPending() {
     if (state.sending || !state.pending || !state.storageReady) return;
     state.sending = true;
+    // An intake outcome is unknown until fresh server readback arrives.
+    state.setup = null;
     state.pending.retrySafe = false;
     state.pending.checked = false;
     state.errorKey = null;

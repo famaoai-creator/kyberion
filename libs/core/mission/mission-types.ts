@@ -217,6 +217,11 @@ export interface MissionState {
       errors: number;
     };
     mission_finish_trace_persisted_path?: string;
+    mission_finish_unshipped_commits?: {
+      branch: string;
+      ahead_of_origin_main: number;
+      checked_at: string;
+    };
     mission_completion_next_action?: {
       title: string;
       request: string;

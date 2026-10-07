@@ -123,6 +123,22 @@
       "types": "./dist/pptx-utils.d.ts",
       "default": "./dist/pptx-utils.js"
     },
+    "./vcs": {
+      "types": "./dist/vcs/index.d.ts",
+      "default": "./dist/vcs/index.js"
+    },
+    "./vcs/git": {
+      "types": "./dist/vcs/git.d.ts",
+      "default": "./dist/vcs/git.js"
+    },
+    "./vcs/github": {
+      "types": "./dist/vcs/github.d.ts",
+      "default": "./dist/vcs/github.js"
+    },
+    "./vcs/index": {
+      "types": "./dist/vcs/index.d.ts",
+      "default": "./dist/vcs/index.js"
+    },
     "./xlsx-utils": {
       "types": "./dist/xlsx-utils.d.ts",
       "default": "./dist/xlsx-utils.js"
@@ -7274,6 +7290,10 @@
     "./surface/first-job-contract": {
       "types": "./dist/surface/first-job-contract.d.ts",
       "default": "./dist/surface/first-job-contract.js"
+    },
+    "./surface/first-job-setup": {
+      "types": "./dist/surface/first-job-setup.d.ts",
+      "default": "./dist/surface/first-job-setup.js"
     },
     "./surface/first-job": {
       "types": "./dist/surface/first-job.d.ts",

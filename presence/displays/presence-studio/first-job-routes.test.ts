@@ -1,5 +1,6 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import type express from 'express';
+import type { FirstJobSetup } from '@agent/core/surface/first-job-setup';
 import type { DotCharter } from '@agent/core/dot/dot-charter';
 import type {
   FrontDeskExecutionMapping,
@@ -84,6 +85,7 @@ import {
 } from '@agent/core/surface/first-job';
 type TestBody = Omit<Partial<FirstJobSnapshot>, 'ok'> & {
   ok?: boolean;
+  setup?: FirstJobSetup;
   error?: string;
   replayed?: boolean;
   artifact?: {
@@ -209,6 +211,38 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('first-job local diagnostic boundary', () => {
+  it('returns independent redacted setup checks before mapping, without running setup or a provider', async () => {
+    state.mappings = [];
+    vi.stubEnv('KYBERION_OIDC_ISSUER', 'https://private-issuer.invalid');
+    vi.stubEnv('KYBERION_OIDC_CLIENT_ID', 'private-client-id');
+    vi.stubEnv('KYBERION_SESSION_SECRET', 'private-session-key-longer-than-32-bytes');
+    const result = await request();
+    expect(result.statusCode).toBe(200);
+    expect(result.body.setup).toMatchObject({
+      mapping: { status: 'mapping_missing', owner: 'operator' },
+      oidc: { status: 'configured' },
+      browser_user: { status: 'sign_in_required', owner: 'user' },
+      approval_scope: { status: 'mapping_required' },
+      baseline: { status: 'unchecked' },
+      reasoning: { status: 'not_required' },
+    });
+    expect(JSON.stringify(result.body.setup)).not.toMatch(
+      /private-|issuer|clientSecret|member_id|knowledge\//
+    );
+    expect(result.headers['Cache-Control']).toBe('no-store');
+    expect(state.writes).toBe(0);
+    expect(state.locks).toBe(0);
+    expect(state.run).not.toHaveBeenCalled();
+  });
+  it.each([
+    { address: '192.0.2.1', headers: { 'x-forwarded-for': '127.0.0.1' } },
+    { headers: { host: 'attacker.invalid:3031' } },
+  ])('never reveals setup state outside the existing local read boundary %#', async (options) => {
+    const result = await request('GET', {}, options);
+    expect(result.statusCode).toBe(403);
+    expect(result.body.setup).toBeUndefined();
+    expect(state.writes).toBe(0);
+  });
   it('keeps supported aliases working and rejects unsupported locales in GET/POST/domain reads', async () => {
     for (const locale of ['en-US', 'EN_us', 'jaJP'])
       expect((await request('GET', {}, { query: { locale } })).statusCode).toBe(200);

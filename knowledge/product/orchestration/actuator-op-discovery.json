@@ -31742,7 +31742,7 @@
               },
               "action": {
                 "type": "string",
-                "enum": ["list", "create", "delete"]
+                "enum": ["list", "create", "delete", "add", "remove", "prune"]
               },
               "name": {
                 "type": "string"
@@ -31760,6 +31760,55 @@
                 "type": "string"
               },
               "base": {
+                "type": "string"
+              },
+              "remote": {
+                "type": "string"
+              },
+              "set_upstream": {
+                "type": "boolean"
+              },
+              "create_branch": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["open", "closed", "merged", "all"]
+              },
+              "fields": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["merge", "squash", "rebase"]
+              },
+              "delete_branch": {
+                "type": "boolean"
+              },
+              "watch": {
+                "type": "boolean"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "ignore_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "head": {
                 "type": "string"
               }
             },
@@ -31798,7 +31847,7 @@
               },
               "action": {
                 "type": "string",
-                "enum": ["list", "create", "delete"]
+                "enum": ["list", "create", "delete", "add", "remove", "prune"]
               },
               "name": {
                 "type": "string"
@@ -31816,6 +31865,55 @@
                 "type": "string"
               },
               "base": {
+                "type": "string"
+              },
+              "remote": {
+                "type": "string"
+              },
+              "set_upstream": {
+                "type": "boolean"
+              },
+              "create_branch": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["open", "closed", "merged", "all"]
+              },
+              "fields": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["merge", "squash", "rebase"]
+              },
+              "delete_branch": {
+                "type": "boolean"
+              },
+              "watch": {
+                "type": "boolean"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "ignore_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "head": {
                 "type": "string"
               }
             },
@@ -31854,7 +31952,7 @@
               },
               "action": {
                 "type": "string",
-                "enum": ["list", "create", "delete"]
+                "enum": ["list", "create", "delete", "add", "remove", "prune"]
               },
               "name": {
                 "type": "string"
@@ -31873,6 +31971,55 @@
               },
               "base": {
                 "type": "string"
+              },
+              "remote": {
+                "type": "string"
+              },
+              "set_upstream": {
+                "type": "boolean"
+              },
+              "create_branch": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["open", "closed", "merged", "all"]
+              },
+              "fields": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["merge", "squash", "rebase"]
+              },
+              "delete_branch": {
+                "type": "boolean"
+              },
+              "watch": {
+                "type": "boolean"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "ignore_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "head": {
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -31883,6 +32030,530 @@
               "oneline": true
             }
           ]
+        },
+        {
+          "op": "pr_view",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string"
+              },
+              "short": {
+                "type": "boolean"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "stat": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "oneline": {
+                "type": "boolean"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["list", "create", "delete", "add", "remove", "prune"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "add": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              },
+              "remote": {
+                "type": "string"
+              },
+              "set_upstream": {
+                "type": "boolean"
+              },
+              "create_branch": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["open", "closed", "merged", "all"]
+              },
+              "fields": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["merge", "squash", "rebase"]
+              },
+              "delete_branch": {
+                "type": "boolean"
+              },
+              "watch": {
+                "type": "boolean"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "ignore_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "head": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": ["ref"]
+          },
+          "examples": [
+            {
+              "ref": "123",
+              "fields": "number,title,state,url"
+            }
+          ]
+        },
+        {
+          "op": "pr_list",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string"
+              },
+              "short": {
+                "type": "boolean"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "stat": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "oneline": {
+                "type": "boolean"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["list", "create", "delete", "add", "remove", "prune"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "add": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              },
+              "remote": {
+                "type": "string"
+              },
+              "set_upstream": {
+                "type": "boolean"
+              },
+              "create_branch": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["open", "closed", "merged", "all"]
+              },
+              "fields": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["merge", "squash", "rebase"]
+              },
+              "delete_branch": {
+                "type": "boolean"
+              },
+              "watch": {
+                "type": "boolean"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "ignore_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "head": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "state": "open",
+              "limit": 50
+            }
+          ]
+        },
+        {
+          "op": "pr_checks",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string"
+              },
+              "short": {
+                "type": "boolean"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "stat": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "oneline": {
+                "type": "boolean"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["list", "create", "delete", "add", "remove", "prune"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "add": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              },
+              "remote": {
+                "type": "string"
+              },
+              "set_upstream": {
+                "type": "boolean"
+              },
+              "create_branch": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["open", "closed", "merged", "all"]
+              },
+              "fields": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["merge", "squash", "rebase"]
+              },
+              "delete_branch": {
+                "type": "boolean"
+              },
+              "watch": {
+                "type": "boolean"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "ignore_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "head": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": ["ref"]
+          },
+          "examples": [
+            {
+              "ref": "123",
+              "watch": true,
+              "timeout_ms": 1200000,
+              "interval_ms": 15000
+            }
+          ]
+        },
+        {
+          "op": "repo_view",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string"
+              },
+              "short": {
+                "type": "boolean"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "stat": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "oneline": {
+                "type": "boolean"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["list", "create", "delete", "add", "remove", "prune"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "add": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              },
+              "remote": {
+                "type": "string"
+              },
+              "set_upstream": {
+                "type": "boolean"
+              },
+              "create_branch": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["open", "closed", "merged", "all"]
+              },
+              "fields": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["merge", "squash", "rebase"]
+              },
+              "delete_branch": {
+                "type": "boolean"
+              },
+              "watch": {
+                "type": "boolean"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "ignore_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "head": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "gh_status",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string"
+              },
+              "short": {
+                "type": "boolean"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "stat": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "oneline": {
+                "type": "boolean"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["list", "create", "delete", "add", "remove", "prune"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "add": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              },
+              "remote": {
+                "type": "string"
+              },
+              "set_upstream": {
+                "type": "boolean"
+              },
+              "create_branch": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["open", "closed", "merged", "all"]
+              },
+              "fields": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["merge", "squash", "rebase"]
+              },
+              "delete_branch": {
+                "type": "boolean"
+              },
+              "watch": {
+                "type": "boolean"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "ignore_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "head": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
         },
         {
           "op": "branch",
@@ -31911,7 +32582,7 @@
               },
               "action": {
                 "type": "string",
-                "enum": ["list", "create", "delete"]
+                "enum": ["list", "create", "delete", "add", "remove", "prune"]
               },
               "name": {
                 "type": "string"
@@ -31929,6 +32600,55 @@
                 "type": "string"
               },
               "base": {
+                "type": "string"
+              },
+              "remote": {
+                "type": "string"
+              },
+              "set_upstream": {
+                "type": "boolean"
+              },
+              "create_branch": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["open", "closed", "merged", "all"]
+              },
+              "fields": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["merge", "squash", "rebase"]
+              },
+              "delete_branch": {
+                "type": "boolean"
+              },
+              "watch": {
+                "type": "boolean"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "ignore_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "head": {
                 "type": "string"
               }
             },
@@ -31968,7 +32688,7 @@
               },
               "action": {
                 "type": "string",
-                "enum": ["list", "create", "delete"]
+                "enum": ["list", "create", "delete", "add", "remove", "prune"]
               },
               "name": {
                 "type": "string"
@@ -31986,6 +32706,55 @@
                 "type": "string"
               },
               "base": {
+                "type": "string"
+              },
+              "remote": {
+                "type": "string"
+              },
+              "set_upstream": {
+                "type": "boolean"
+              },
+              "create_branch": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["open", "closed", "merged", "all"]
+              },
+              "fields": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["merge", "squash", "rebase"]
+              },
+              "delete_branch": {
+                "type": "boolean"
+              },
+              "watch": {
+                "type": "boolean"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "ignore_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "head": {
                 "type": "string"
               }
             },
@@ -32026,7 +32795,7 @@
               },
               "action": {
                 "type": "string",
-                "enum": ["list", "create", "delete"]
+                "enum": ["list", "create", "delete", "add", "remove", "prune"]
               },
               "name": {
                 "type": "string"
@@ -32045,6 +32814,55 @@
               },
               "base": {
                 "type": "string"
+              },
+              "remote": {
+                "type": "string"
+              },
+              "set_upstream": {
+                "type": "boolean"
+              },
+              "create_branch": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["open", "closed", "merged", "all"]
+              },
+              "fields": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["merge", "squash", "rebase"]
+              },
+              "delete_branch": {
+                "type": "boolean"
+              },
+              "watch": {
+                "type": "boolean"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "ignore_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "head": {
+                "type": "string"
               }
             },
             "additionalProperties": false,
@@ -32054,6 +32872,647 @@
             {
               "title": "Add vcs-actuator",
               "base": "main"
+            }
+          ]
+        },
+        {
+          "op": "push",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string"
+              },
+              "short": {
+                "type": "boolean"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "stat": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "oneline": {
+                "type": "boolean"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["list", "create", "delete", "add", "remove", "prune"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "add": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              },
+              "remote": {
+                "type": "string"
+              },
+              "set_upstream": {
+                "type": "boolean"
+              },
+              "create_branch": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["open", "closed", "merged", "all"]
+              },
+              "fields": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["merge", "squash", "rebase"]
+              },
+              "delete_branch": {
+                "type": "boolean"
+              },
+              "watch": {
+                "type": "boolean"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "ignore_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "head": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "remote": "origin",
+              "ref": "feat/x",
+              "set_upstream": true
+            }
+          ]
+        },
+        {
+          "op": "fetch",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string"
+              },
+              "short": {
+                "type": "boolean"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "stat": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "oneline": {
+                "type": "boolean"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["list", "create", "delete", "add", "remove", "prune"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "add": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              },
+              "remote": {
+                "type": "string"
+              },
+              "set_upstream": {
+                "type": "boolean"
+              },
+              "create_branch": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["open", "closed", "merged", "all"]
+              },
+              "fields": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["merge", "squash", "rebase"]
+              },
+              "delete_branch": {
+                "type": "boolean"
+              },
+              "watch": {
+                "type": "boolean"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "ignore_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "head": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "remote": "origin"
+            }
+          ]
+        },
+        {
+          "op": "pull",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string"
+              },
+              "short": {
+                "type": "boolean"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "stat": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "oneline": {
+                "type": "boolean"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["list", "create", "delete", "add", "remove", "prune"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "add": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              },
+              "remote": {
+                "type": "string"
+              },
+              "set_upstream": {
+                "type": "boolean"
+              },
+              "create_branch": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["open", "closed", "merged", "all"]
+              },
+              "fields": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["merge", "squash", "rebase"]
+              },
+              "delete_branch": {
+                "type": "boolean"
+              },
+              "watch": {
+                "type": "boolean"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "ignore_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "head": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "remote": "origin",
+              "ref": "main"
+            }
+          ]
+        },
+        {
+          "op": "checkout",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string"
+              },
+              "short": {
+                "type": "boolean"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "stat": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "oneline": {
+                "type": "boolean"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["list", "create", "delete", "add", "remove", "prune"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "add": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              },
+              "remote": {
+                "type": "string"
+              },
+              "set_upstream": {
+                "type": "boolean"
+              },
+              "create_branch": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["open", "closed", "merged", "all"]
+              },
+              "fields": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["merge", "squash", "rebase"]
+              },
+              "delete_branch": {
+                "type": "boolean"
+              },
+              "watch": {
+                "type": "boolean"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "ignore_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "head": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": ["ref"]
+          },
+          "examples": [
+            {
+              "ref": "main",
+              "create_branch": false
+            }
+          ]
+        },
+        {
+          "op": "worktree",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string"
+              },
+              "short": {
+                "type": "boolean"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "stat": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "oneline": {
+                "type": "boolean"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["list", "create", "delete", "add", "remove", "prune"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "add": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              },
+              "remote": {
+                "type": "string"
+              },
+              "set_upstream": {
+                "type": "boolean"
+              },
+              "create_branch": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["open", "closed", "merged", "all"]
+              },
+              "fields": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["merge", "squash", "rebase"]
+              },
+              "delete_branch": {
+                "type": "boolean"
+              },
+              "watch": {
+                "type": "boolean"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "ignore_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "head": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": ["action"]
+          },
+          "examples": [
+            {
+              "action": "add",
+              "path": "../wt",
+              "ref": "feat/x"
+            }
+          ]
+        },
+        {
+          "op": "pr_merge",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "cwd": {
+                "type": "string"
+              },
+              "short": {
+                "type": "boolean"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "stat": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "oneline": {
+                "type": "boolean"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["list", "create", "delete", "add", "remove", "prune"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "add": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              },
+              "remote": {
+                "type": "string"
+              },
+              "set_upstream": {
+                "type": "boolean"
+              },
+              "create_branch": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["open", "closed", "merged", "all"]
+              },
+              "fields": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["merge", "squash", "rebase"]
+              },
+              "delete_branch": {
+                "type": "boolean"
+              },
+              "watch": {
+                "type": "boolean"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "ignore_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "head": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": ["ref"]
+          },
+          "examples": [
+            {
+              "ref": "123",
+              "method": "merge",
+              "delete_branch": true
             }
           ]
         }

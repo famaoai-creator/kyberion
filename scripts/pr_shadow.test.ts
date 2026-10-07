@@ -87,6 +87,13 @@ describe('createGhPrPort', () => {
     expect(
       createGhPrPort(runnerFor({ 'pr checks 7': { status: 1, stdout: '' } }).run).ciState(7, [])
     ).toEqual({ state: 'none', failing: [] });
+    // malformed-but-successful gh output fails closed instead of reading as 'none'
+    expect(
+      createGhPrPort(runnerFor({ 'pr checks 7': { status: 0, stdout: 'not-json{' } }).run).ciState(
+        7,
+        []
+      )
+    ).toEqual({ state: 'failure', failing: ['gh-pr-checks-parse'] });
   });
 
   it('maps merged and closed PRs to their final state', () => {

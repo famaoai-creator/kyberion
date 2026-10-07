@@ -315,6 +315,40 @@ export class KnowledgeHintIndex {
 // ─── Module-level cache (legacy — kept for clearKnowledgeEmbedCache compat) ──
 const _embedCache = new Map<string, Float32Array>();
 
+// Bound each provider payload by both item count and UTF-8 text size. This is
+// a local resource budget, not a claim about any provider's published limit.
+const EMBEDDING_BATCH_MAX_ITEMS = 32;
+const EMBEDDING_BATCH_MAX_BYTES = 512 * 1024;
+
+async function embedBounded(
+  backend: ReturnType<typeof getEmbeddingBackend> & {},
+  texts: string[]
+): Promise<Float32Array[]> {
+  const vectors: Float32Array[] = [];
+  let batch: string[] = [];
+  let bytes = 0;
+  for (const text of texts) {
+    const size = Buffer.byteLength(text, 'utf8');
+    if (size > EMBEDDING_BATCH_MAX_BYTES) {
+      throw new Error('Embedding input exceeds the local per-request byte budget');
+    }
+    if (
+      batch.length > 0 &&
+      (batch.length >= EMBEDDING_BATCH_MAX_ITEMS || bytes + size > EMBEDDING_BATCH_MAX_BYTES)
+    ) {
+      vectors.push(...(await backend.embedBatch(batch)));
+      batch = [];
+      bytes = 0;
+    }
+    batch.push(text);
+    bytes += size;
+  }
+  if (batch.length > 0) vectors.push(...(await backend.embedBatch(batch)));
+  if (vectors.length !== texts.length)
+    throw new Error('Embedding backend returned an invalid vector count');
+  return vectors;
+}
+
 export function clearKnowledgeEmbedCache(): void {
   _embedCache.clear();
 }
@@ -610,7 +644,7 @@ async function _hydrateEmbedCache(index: KnowledgeHintIndex, scope: KnowledgeSco
   if (toEmbed.length === 0 || !backend) return;
 
   try {
-    const vectors = await backend.embedBatch(toEmbed.map(_corpusText));
+    const vectors = await embedBounded(backend, toEmbed.map(_corpusText));
     const newEntries: DiskCacheEntry[] = [];
     toEmbed.forEach((hint, i) => {
       index.embedCache.set(hint.source, vectors[i]);
@@ -1387,7 +1421,7 @@ export async function queryKnowledgeHybrid(
   const unembed = pool.filter((h) => !cache.has(h.source));
   if (unembed.length > 0) {
     try {
-      const vectors = await backend.embedBatch(unembed.map(_corpusText));
+      const vectors = await embedBounded(backend, unembed.map(_corpusText));
       unembed.forEach((h, i) => cache.set(h.source, vectors[i]));
     } catch {
       // Remaining hints will score 0 in semantic ranking

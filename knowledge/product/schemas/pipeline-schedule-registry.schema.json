@@ -43,6 +43,7 @@
             ]
           },
           "enabled": { "type": "boolean" },
+          "managedBy": { "type": "string", "minLength": 1 },
           "optIn": { "type": "boolean" },
           "lastRun": { "type": "string", "format": "date-time" },
           "lastStatus": { "enum": ["succeeded", "failed"] },
