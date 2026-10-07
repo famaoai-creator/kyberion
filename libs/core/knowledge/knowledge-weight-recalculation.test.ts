@@ -69,9 +69,7 @@ describe('proposeKnowledgeRankingWeightRecalculation', () => {
     expect(proposal.approval_required).toBe(true);
     expect(proposal.sample.feedback_events).toBe(30);
     expect(proposal.proposed_weights.usage_yield).toBe(6.8);
-    expect(proposal.output_path).toContain(
-      '/active/shared/runtime/feedback-loop/tenants/tenant-a/'
-    );
+    expect(proposal.output_path).toContain('/runtime/feedback-loop/tenants/tenant-a/');
     expect(loadKnowledgeRankingWeightProposal(proposal.output_path!)).toMatchObject({
       scope: { tier: 'confidential', tenant_slug: 'tenant-a' },
       approval_required: true,

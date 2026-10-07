@@ -181,6 +181,6 @@ describe('service harness contract', () => {
     const plan = planServiceOperation('github', 'list_repos');
     const receipt = createServiceExecutionReceipt(plan, { ok: true });
     const persisted = persistServiceExecutionReceipt(receipt);
-    expect(persisted.receipt_path).toContain('active/shared/runtime/service-receipts');
+    expect(persisted.receipt_path).toContain('/runtime/service-receipts');
   });
 });

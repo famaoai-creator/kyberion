@@ -154,11 +154,15 @@ const VITEST_LIVE_SUBTREES = [
   'shared/inbox/',
   'shared/runtime/dot-inbox.jsonl',
   'shared/runtime/peer-messaging/',
-  // Internal runtime state a full test run otherwise leaves in the operator's
-  // tree (orchestration, run graphs, pipeline runs, …). Not yet listed, because
-  // their tests seed or assert the live paths directly: task-sessions,
-  // work-coordination, feedback-loop, tenants, service-receipts, logs/traces —
-  // the leak guard still reports them.
+  // Internal runtime state a full test run would otherwise leave in the
+  // operator's tree.
+  'shared/runtime/task-sessions/',
+  'shared/runtime/work-coordination/',
+  'shared/observability/work-coordination/',
+  'shared/runtime/feedback-loop/',
+  'shared/runtime/tenants/',
+  'shared/runtime/service-receipts/',
+  'shared/logs/traces/',
   'shared/coordination/orchestration/',
   'shared/coordination/agent-runtime/',
   'shared/coordination/connection-reviews/',
@@ -178,6 +182,7 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/reports/',
   'shared/runtime/service-bindings/',
   'shared/runtime/health/',
+  'shared/runtime/state/',
   'shared/runtime/reasoning-failover-events.jsonl',
 ];
 export const VITEST_LIVE_SANDBOX_ROOT = 'active/shared/runtime/vitest-live';
@@ -777,6 +782,7 @@ export const pathResolver = {
   volatile,
   resolve,
   rootResolve,
+  vitestLivePath,
   toRepoRelative,
   normalizeStoredPath,
 };
