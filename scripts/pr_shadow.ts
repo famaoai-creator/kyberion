@@ -15,6 +15,7 @@ import {
 } from '@agent/core/governance/pr-shadow';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult } from '@agent/core/secure-io';
+import { ghPrChecks, ghPrList, type VcsCommandRunner } from '@agent/core/vcs';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 /**
@@ -55,6 +56,12 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 export function createGhPrPort(run: GhRunner = runGh): PrReadPort {
+  // Adapts the argv-level seam (kept for tests) to the typed helpers in
+  // libs/core/vcs — the single implementation of gh verbs.
+  const exec: VcsCommandRunner = (_command, args) => {
+    const out = run(args);
+    return { stdout: out.stdout, stderr: '', status: out.status };
+  };
   const view = (prNumber: number, fields: string): Record<string, unknown> => {
     const out = run(['pr', 'view', String(prNumber), '--json', fields]);
     if (out.status !== 0) throw new Error(`gh pr view #${prNumber} exited ${out.status}`);
@@ -62,27 +69,13 @@ export function createGhPrPort(run: GhRunner = runGh): PrReadPort {
   };
   return {
     listOpen(): PrSummary[] {
-      const out = run([
-        'pr',
-        'list',
-        '--state',
-        'open',
-        '--limit',
-        '100',
-        '--json',
-        'number,title,headRefOid,isDraft,author',
-      ]);
-      if (out.status !== 0) throw new Error(`gh pr list exited ${out.status}`);
-      return parseJson<unknown[]>(out.stdout, 'gh pr list').map((entry) => {
-        const record = asRecord(entry);
-        return {
-          number: Number(record.number),
-          title: String(record.title ?? ''),
-          headSha: String(record.headRefOid ?? ''),
-          isDraft: record.isDraft === true,
-          author: String(asRecord(record.author).login ?? '') || undefined,
-        };
-      });
+      return ghPrList({ state: 'open', limit: 100 }, exec).map((entry) => ({
+        number: Number(entry.number),
+        title: String(entry.title ?? ''),
+        headSha: String(entry.headRefOid ?? ''),
+        isDraft: entry.isDraft === true,
+        author: String(entry.author?.login ?? '') || undefined,
+      }));
     },
     files(prNumber: number): PrFile[] {
       const files = view(prNumber, 'files').files;
@@ -97,18 +90,21 @@ export function createGhPrPort(run: GhRunner = runGh): PrReadPort {
     },
     ciState(prNumber: number, ignoredChecks: readonly string[]) {
       // `gh pr checks` exits non-zero while checks fail or are pending; the JSON is still valid.
-      const out = run(['pr', 'checks', String(prNumber), '--json', 'name,bucket']);
-      if (!out.stdout.trim()) return { state: 'none' as PrCiState, failing: [] };
-      const checks = parseJson<unknown[]>(out.stdout, `gh pr checks #${prNumber}`)
-        .map(asRecord)
-        .filter((check) => !ignoredChecks.includes(String(check.name)));
-      if (checks.length === 0) return { state: 'none' as PrCiState, failing: [] };
-      const failing = checks
-        .filter((check) => check.bucket === 'fail' || check.bucket === 'cancel')
-        .map((check) => String(check.name));
-      if (failing.length > 0) return { state: 'failure' as PrCiState, failing };
-      const pending = checks.some((check) => check.bucket === 'pending');
-      return { state: (pending ? 'pending' : 'success') as PrCiState, failing: [] };
+      // Shadow mode keeps the original leniency for command failures (no
+      // checks / unreadable output → 'none', never a blocker) — but a
+      // well-formed gh response whose payload doesn't parse is a different
+      // failure class: fail closed so a gh upgrade can't silently mask CI.
+      let result;
+      try {
+        result = ghPrChecks({ ref: String(prNumber), ignore: [...ignoredChecks] }, exec);
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('VCS_GH_INVALID_JSON')) {
+          return { state: 'failure' as PrCiState, failing: ['gh-pr-checks-parse'] };
+        }
+        return { state: 'none' as PrCiState, failing: [] };
+      }
+      if (result.state === 'none') return { state: 'none' as PrCiState, failing: [] };
+      return { state: result.state as PrCiState, failing: result.failing };
     },
     finalState(prNumber: number): PrFinalState {
       const record = view(prNumber, 'state,mergedAt,closedAt');

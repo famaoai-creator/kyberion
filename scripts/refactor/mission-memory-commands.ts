@@ -162,6 +162,24 @@ export function approveMemoryCandidate(
         ? (parsedCuration as NonNullable<MemoryCandidate['curation']>)
         : undefined;
     if (curationJson && !curation) throw new Error('Curation must be a JSON object.');
+    // Fail fast with the FULL required-field list — the downstream queue
+    // validator (ajv, allErrors off) reports only one missing property per
+    // invocation, which turned approval into an error-driven loop.
+    if (curation) {
+      const missing: string[] = [];
+      for (const key of ['title', 'summary', 'content'] as const) {
+        if (typeof curation[key] !== 'string' || !curation[key].trim()) missing.push(key);
+      }
+      if (!Array.isArray(curation.evidence_refs) || curation.evidence_refs.length === 0) {
+        missing.push('evidence_refs (non-empty array)');
+      }
+      if (missing.length > 0) {
+        throw new Error(
+          `--curation-json is missing required properties: ${missing.join(', ')}. ` +
+            `Expected shape: {"title": "...", "summary": "...", "content": "...", "evidence_refs": ["<evidence path>", ...]}.`
+        );
+      }
+    }
     const currentDomain = review.candidate.knowledge_domain;
     const selectedDomain = knowledgeDomain || currentDomain;
     if (

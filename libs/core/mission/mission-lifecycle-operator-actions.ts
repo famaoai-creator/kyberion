@@ -6,7 +6,12 @@ import { findMissionPath } from '../path-resolver.js';
 import { logger } from '../core.js';
 import { nowIso } from '../foundation/time.js';
 import { safeExec } from '../secure-io.js';
-import { loadState, loadStateForRepair, saveState } from './mission-state.js';
+import {
+  findMissionPathForRepair,
+  loadState,
+  loadStateForRepair,
+  saveState,
+} from './mission-state.js';
 import { readTrustLedger, recordAgentRuntimeEvent } from './mission-governance.js';
 import { deriveMissionBranchName, getCurrentBranch, getGitHash } from './mission-git.js';
 import { isValidTenantSlug } from '../entity-scope.js';
@@ -227,7 +232,9 @@ export async function repairLegacyMissionState(id: string, note?: string): Promi
     logger.error(`Mission ${upperId} not found.`);
     return;
   }
-  const missionPath = findMissionPath(upperId);
+  // Plain scan, like loadStateForRepair — the locator's visibility check
+  // would report the repair target itself as OWNER_NOT_VISIBLE.
+  const missionPath = findMissionPathForRepair(upperId);
   if (!missionPath) {
     logger.error(`Mission ${upperId} directory not found.`);
     return;
@@ -275,7 +282,9 @@ export async function repairLegacyMissionState(id: string, note?: string): Promi
         note || 'Repaired legacy mission state to the current schema before lifecycle transition.',
     },
   ];
-  await saveState(upperId, state);
+  // Pass the already-resolved path: saveState's own findMissionPath lookup
+  // goes through the visibility locator and would reject the repair target.
+  await saveState(upperId, state, { missionDir: missionPath });
   logger.success(`✅ Repaired legacy mission state for ${upperId}.`);
 }
 
