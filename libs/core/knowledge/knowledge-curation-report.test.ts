@@ -128,7 +128,7 @@ describe('computeCurationReport — low-yield hints', () => {
   it('keeps tenant archive history outside the global archive override', () => {
     const tenantPath = knowledgeCurationArchiveHistoryPath('tenant-a');
     expect(tenantPath).toContain(
-      '/active/shared/runtime/feedback-loop/tenants/tenant-a/curation-archive-history.json'
+      '/runtime/feedback-loop/tenants/tenant-a/curation-archive-history.json'
     );
     expect(tenantPath).not.toBe(pathResolver.rootResolve(archiveHistoryPathOverride));
   });

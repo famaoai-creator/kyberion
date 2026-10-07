@@ -327,7 +327,7 @@ describe('memory-promotion-queue', () => {
     try {
       expect(
         memoryPromotionQueuePath({ tier: 'confidential', tenant_slug: 'acme-corp' })
-      ).toContain('active/shared/runtime/tenants/acme-corp/memory/promotion-queue.jsonl');
+      ).toContain('/runtime/tenants/acme-corp/memory/promotion-queue.jsonl');
       expect(memoryPromotionQueuePath()).toContain(
         'active/shared/runtime/memory/promotion-queue.jsonl'
       );

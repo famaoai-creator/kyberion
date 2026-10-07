@@ -23,7 +23,9 @@ const PUBLIC_HINTS = path.resolve(
   process.cwd(),
   'knowledge/public/procedures/hints/auto-learned.json'
 );
-const RUNTIME_HINTS_DIR = path.resolve(process.cwd(), 'active/shared/runtime/feedback-loop/hints');
+// Resolved through pathResolver: under Vitest this is the vitest-live sandbox,
+// so the rmSync cleanup below can never touch the operator's real hints.
+const RUNTIME_HINTS_DIR = pathResolver.shared('runtime/feedback-loop/hints');
 const RUNTIME_HINTS = path.join(RUNTIME_HINTS_DIR, 'auto-learned.json');
 
 function makeTrace(): Trace {

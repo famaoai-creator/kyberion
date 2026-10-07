@@ -1,7 +1,7 @@
 {
   "actuator_id": "vcs-actuator",
-  "version": "1.0.0",
-  "description": "Git version-control operations (status, diff, log, branch, commit) plus GitHub PR creation via the gh CLI",
+  "version": "1.1.0",
+  "description": "Governed VCS surface: git (status/diff/log/branch/commit/push/fetch/pull/checkout/worktree) plus GitHub PR ops via gh (pr_create/pr_view/pr_list/pr_checks watch/pr_merge/repo_view/gh_status)",
   "contract_schema": "knowledge/product/schemas/vcs-action.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
@@ -60,6 +60,105 @@
       "platforms": ["darwin", "linux", "win32"],
       "requirements": {
         "bin": ["git", "gh"]
+      },
+      "effect": "egress"
+    },
+    {
+      "op": "pr_view",
+      "description": "Reads a pull request via gh pr view --json",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {
+        "bin": ["gh"]
+      },
+      "effect": "read"
+    },
+    {
+      "op": "pr_list",
+      "description": "Lists pull requests via gh pr list",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {
+        "bin": ["gh"]
+      },
+      "effect": "read"
+    },
+    {
+      "op": "pr_checks",
+      "description": "Reads CI check status via gh pr checks --json; watch=true polls until terminal with interval_ms/timeout_ms",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {
+        "bin": ["gh"]
+      },
+      "effect": "read"
+    },
+    {
+      "op": "repo_view",
+      "description": "Reads the repository default branch via gh repo view --json",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {
+        "bin": ["gh"]
+      },
+      "effect": "read"
+    },
+    {
+      "op": "gh_status",
+      "description": "Reports gh CLI version and auth status",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {
+        "bin": ["gh"]
+      },
+      "effect": "read"
+    },
+    {
+      "op": "push",
+      "description": "Pushes a branch via git push",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {
+        "bin": ["git"]
+      },
+      "effect": "egress"
+    },
+    {
+      "op": "fetch",
+      "description": "Fetches from a remote via git fetch (writes .git refs)",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {
+        "bin": ["git"]
+      },
+      "effect": "write"
+    },
+    {
+      "op": "pull",
+      "description": "Pulls via git pull --ff-only",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {
+        "bin": ["git"]
+      },
+      "effect": "write"
+    },
+    {
+      "op": "checkout",
+      "description": "Checks out a ref or creates a branch via git checkout",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {
+        "bin": ["git"]
+      },
+      "effect": "write"
+    },
+    {
+      "op": "worktree",
+      "description": "Manages worktrees via git worktree list/add/remove/prune",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {
+        "bin": ["git"]
+      },
+      "effect": "write"
+    },
+    {
+      "op": "pr_merge",
+      "description": "Merges a pull request via gh pr merge",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": {
+        "bin": ["gh"]
       },
       "effect": "egress"
     }
