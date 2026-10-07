@@ -54,14 +54,21 @@ function makeCommandRunner() {
 
 describe('createVirtualMediaDeviceControlBridge', () => {
   const originalPlatform = process.platform;
+  const originalPath = process.env.PATH;
 
   beforeEach(() => {
     // The fixtures below model system_profiler and AVFoundation devices.
     Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' });
+    // Darwin probes (CoreAudio/AVFoundation via `swift`, imagesnap, ...) would
+    // otherwise run whatever the host has on PATH — a Linux CI runner with
+    // Swift installed compiles those scripts and blows the test timeout.
+    process.env.PATH = '/nonexistent-kyberion-test-path';
   });
 
   afterEach(() => {
     Object.defineProperty(process, 'platform', { configurable: true, value: originalPlatform });
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
   });
 
   it('selects existing audio and camera devices at runtime', async () => {
