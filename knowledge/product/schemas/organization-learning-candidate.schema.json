@@ -56,6 +56,8 @@
       "pattern": "^[a-z][a-z0-9-]{1,30}$",
       "not": { "enum": ["public", "confidential", "personal", "shared"] }
     },
+    "decision_note": { "type": "string", "minLength": 1 },
+    "promoted_ref": { "type": "string", "minLength": 1 },
     "created_at": { "type": "string", "format": "date-time" },
     "updated_at": { "type": "string", "format": "date-time" },
     "metadata": { "type": "object", "additionalProperties": true }
@@ -65,6 +67,10 @@
     {
       "if": { "required": ["tier"], "properties": { "tier": { "const": "confidential" } } },
       "then": { "required": ["tenant_slug"] }
+    },
+    {
+      "if": { "required": ["status"], "properties": { "status": { "const": "promoted" } } },
+      "then": { "required": ["promoted_ref"] }
     }
   ]
 }
