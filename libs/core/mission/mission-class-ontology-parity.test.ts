@@ -79,3 +79,24 @@ describe('mission class ↔ intent ontology parity', () => {
     }
   });
 });
+
+describe('reasoning-pattern intents classify only on their distinctive phrasing', () => {
+  const classify = (intentId: string, utterance: string) =>
+    resolveMissionClassification({ intentId, utterance }).mission_class;
+
+  it('rescues the declared class when the phrasing is distinctive', () => {
+    expect(classify('multi-agent-consensus', '関係者の賛否を整理して')).toBe('decision_support');
+    expect(classify('counterfactual-simulation', '反事実シミュレーションして')).toBe(
+      'decision_support'
+    );
+    expect(classify('recall-prior-knowledge', '過去の類似失敗を思い出して')).toBe(
+      'research_and_absorption'
+    );
+  });
+
+  it('keeps ordinary code requests on the default even when the intent mis-resolves', () => {
+    for (const utterance of ['shebang を追加して設計をテストして', 'この関数のテストを実行して']) {
+      expect(classify('chain-of-thought-planning', utterance)).toBe('code_change');
+    }
+  });
+});
