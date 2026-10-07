@@ -71,6 +71,15 @@ jobs:
           for source in /etc/apt/sources.list.d/*azure* /etc/apt/sources.list.d/*microsoft*; do
             if [ -f "$source" ]; then sudo mv "$source" "$source.disabled"; fi
           done
+          # GitHub hosted images may leave Ubuntu sources pointed at the Azure
+          # mirror inside ubuntu.sources; that mirror can stall package downloads.
+          for source in /etc/apt/sources.list /etc/apt/sources.list.d/*.sources; do
+            if [ -f "$source" ]; then sudo sed -i 's|azure.archive.ubuntu.com|archive.ubuntu.com|g' "$source"; fi
+          done
+          if [ -r /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc ]; then
+            echo "CJK font already available; skipping package installation."
+            exit 0
+          fi
           for attempt in 1 2 3; do
             if sudo timeout --signal=TERM 300s apt-get \
               -o Acquire::ForceIPv4=true \
@@ -78,7 +87,7 @@ jobs:
               -o Acquire::http::Timeout=30 \
               -o Acquire::https::Timeout=30 \
               -o Acquire::http::Pipeline-Depth=0 \
-              -o DPkg::Lock::Timeout=60 update -qq; then
+              -o DPkg::Lock::Timeout=60 update; then
               break
             fi
             if [ "$attempt" = "3" ]; then exit 1; fi
@@ -92,7 +101,7 @@ jobs:
               -o Acquire::http::Timeout=30 \
               -o Acquire::https::Timeout=30 \
               -o Acquire::http::Pipeline-Depth=0 \
-              -o DPkg::Lock::Timeout=60 install -y -qq fonts-noto-cjk; then
+              -o DPkg::Lock::Timeout=60 install -y --no-install-recommends fonts-noto-cjk; then
               break
             fi
             if [ "$attempt" = "3" ]; then exit 1; fi
