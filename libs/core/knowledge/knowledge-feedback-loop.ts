@@ -37,6 +37,7 @@ import {
 import type { TaskResultKnowledgeFeedback } from '../surface/channel-surface-types.js';
 import { scopeContextKey, type ScopeContext } from '../scope-context.js';
 import { physicalScopedPath } from '../physical-namespace.js';
+import { recordKnowledgeProblem } from './knowledge-verification.js';
 import {
   loadKnowledgeUsageAggregateAtPath,
   writeKnowledgeUsageAggregateAtPath,
@@ -245,7 +246,12 @@ function usageAggregatePath(scope?: ScopeContext): string {
     pathResolver.shared('runtime/feedback-loop/knowledge-usage/usage.json')
   );
   if (!scope?.tenant_slug) return base;
-  const directory = scopedRuntimePath(path.dirname(base), scope);
+  // The aggregate is a tenant-level ranking signal (weight proposals, curation
+  // and usage_yield all read it per tenant). Writers sit at mission or task
+  // scope, so partitioning by the full chain left every reader looking at a
+  // file no writer touched. The JSONL delivery log keeps the full chain.
+  const tenantScope: ScopeContext = { tier: scope.tier, tenant_slug: scope.tenant_slug };
+  const directory = scopedRuntimePath(path.dirname(base), tenantScope);
   return assertSafeRepositoryPath(path.join(directory, path.basename(base)), {
     allowMissingLeaf: true,
   });
@@ -312,6 +318,17 @@ export function recordHumanKnowledgeFeedback(input: HumanKnowledgeFeedback): str
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   ensureRegularFeedbackFile(target);
   appendJsonLine(target, record);
+  if (input.verdict === 'wrong' || input.verdict === 'stale') {
+    recordKnowledgeProblem({
+      documentPath,
+      kind: input.verdict,
+      ...(input.reason ? { reason: input.reason } : {}),
+      ...(input.scope?.tenant_slug
+        ? { scope: { tier: input.scope.tier, tenant_slug: input.scope.tenant_slug } }
+        : {}),
+      at: record.recorded_at,
+    });
+  }
   bumpUsageAggregate(
     documentPath,
     input.verdict === 'useful' ? { used_count: 1 } : { not_used_count: 1 },

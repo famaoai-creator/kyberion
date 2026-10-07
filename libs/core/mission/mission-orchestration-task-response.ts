@@ -1,3 +1,4 @@
+import { recordKnowledgeVerifiedRun } from '../knowledge/knowledge-verification.js';
 import { a2aBridge } from '../mesh/a2a-bridge.js';
 import { nowIso } from '../foundation/time.js';
 import { serializeDelegationChain, type DelegationChain } from './delegation-chain.js';
@@ -256,6 +257,29 @@ export async function obtainTaskResultResponse(
             },
           }
         : {}),
+    });
+  }
+
+  // A finished task (no gaps, no open needs, parseable result) that reports
+  // using delivered documents is evidence those documents' current text
+  // works. Only delivered paths count; a failed task is not blamed on them.
+  const usedDelivered = (taskResult?.knowledge_feedback?.used || []).filter((usedPath) =>
+    (input.deliveredKnowledgeRefs || []).some((ref) => ref.path === usedPath)
+  );
+  if (
+    taskResult &&
+    usedDelivered.length > 0 &&
+    parseErrors.length === 0 &&
+    (taskResult.gaps || []).length === 0 &&
+    (taskResult.needs || []).length === 0
+  ) {
+    const scope = input.securityScope;
+    const tenant =
+      scope?.write_tier === 'confidential' ? scope.tenant_slug || scope.tenant_id : undefined;
+    recordKnowledgeVerifiedRun({
+      documentPaths: usedDelivered,
+      ...(tenant ? { scope: { tier: 'confidential' as const, tenant_slug: tenant } } : {}),
+      ...(scope?.project_id ? { projectId: scope.project_id } : {}),
     });
   }
 

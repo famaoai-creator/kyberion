@@ -5,6 +5,7 @@ import {
   buildOrganizationCadence,
   buildOrganizationDecision,
   listOrganizationDecisions,
+  listOrganizationLearningCandidates,
   listOrganizationIncidents,
   listOrganizationOperationalStates,
   reconcileOrganizationState,
@@ -21,6 +22,7 @@ import {
   buildOrganizationServiceState,
   ensureOrganizationOperationalState,
   enqueueOrganizationLearningCandidate,
+  saveOrganizationLearningCandidate,
   loadOrganizationOperation,
   listOrganizationOperationRuns,
   saveOrganizationOperation,
@@ -58,8 +60,12 @@ import {
   createOrganizationIncident,
   transitionOrganizationIncident,
   transitionOrganizationDecision,
+  transitionOrganizationLearningCandidate,
 } from '@agent/core/organization/organization-interventions';
-import { verifyDecisionApprovalRef } from './organization_decision_approval.js';
+import {
+  requestDecisionApproval,
+  verifyDecisionApprovalRef,
+} from './organization_decision_approval.js';
 import {
   defaultOperationRunId,
   recordOrganizationOperationRun,
@@ -71,6 +77,7 @@ import type {
   OrganizationCadenceRecord,
   OrganizationDecisionRecord,
   OrganizationIncidentRecord,
+  OrganizationLearningCandidate,
   OrganizationManagementView,
   OrganizationOperationalState,
   OrganizationOperationRecord,
@@ -102,6 +109,33 @@ function resolveWriteMode(parsed: ParsedArgs, command: string): 'dry_run' | 'app
   }
   return parsed.apply ? 'apply' : 'dry_run';
 }
+/**
+ * A knowledge/ document in the record's own tier and tenant (post-incident reviews,
+ * promoted learnings). Returns an error message, or undefined when the ref is valid.
+ */
+function tierKnowledgeRefError(
+  ref: string,
+  record: { tier: OrganizationTier; tenant_slug?: string }
+): string | undefined {
+  const prefix =
+    record.tier === 'confidential'
+      ? `knowledge/confidential/${record.tenant_slug}/`
+      : record.tier === 'personal'
+        ? record.tenant_slug
+          ? `knowledge/personal/${record.tenant_slug}/`
+          : ''
+        : 'knowledge/public/';
+  if (!prefix) return 'a personal-tier record needs a tenant to place knowledge.';
+  if (
+    !ref.startsWith(prefix) ||
+    ref.includes('\\') ||
+    ref.split('/').includes('..') ||
+    !safeExistsSync(pathResolver.rootResolve(ref))
+  )
+    return `expected an existing document under ${prefix}, got '${ref || '(none)'}'.`;
+  return undefined;
+}
+
 function requireFlags(command: string, flags: Record<string, string | undefined>): void {
   const missing = Object.entries(flags)
     .filter(([, value]) => !value)
@@ -242,7 +276,7 @@ function printStatus(
   const awaitingApproval = view.decisions.filter((entry) => entry.status === 'pending_approval');
   if (proposedDecisions.length) {
     activePrint(
-      'Next: review proposed decisions in the organization cadence before external action, then move them to pending_approval with decision transition'
+      'Next: review proposed decisions in the organization cadence before external action, then request approval with decision transition --record-status pending_approval --request-approval --chosen-option <option>'
     );
   }
   if (awaitingApproval.length) {
@@ -274,6 +308,18 @@ function printStatus(
   if (view.reconciliation.operations_without_state.length) {
     activePrint(
       `Operations awaiting first evidence: ${view.reconciliation.operations_without_state.join(', ')}`
+    );
+  }
+  const proposedLearnings = view.learning_candidates.filter((entry) => entry.status === 'proposed');
+  const approvedLearnings = view.learning_candidates.filter((entry) => entry.status === 'approved');
+  if (proposedLearnings.length || approvedLearnings.length) {
+    activePrint(
+      `Learning: ${proposedLearnings.length} proposed, ${approvedLearnings.length} approved awaiting promotion`
+    );
+    activePrint(
+      proposedLearnings.length
+        ? 'Next: triage learning candidates with pnpm organization learning transition --learning-id <id> --record-status approved|rejected'
+        : 'Next: land approved learnings in knowledge/, then pnpm organization learning transition --record-status promoted --promoted-ref <doc>'
     );
   }
   if (
@@ -545,6 +591,44 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
         tenantSlug: readScope.tenantSlug,
         apply: mode === 'apply',
       }),
+      parsed.json
+    );
+    return;
+  },
+  'learning transition': (ctx) => {
+    const { parsed, organizationId } = ctx;
+
+    requireFlags('learning transition', {
+      '--organization-id': organizationId,
+      '--tier': parsed.tier,
+      '--learning-id': parsed.learningId,
+      '--record-status': parsed.recordStatus,
+    });
+    const mode = resolveWriteMode(parsed, 'learning transition');
+    const current = listOrganizationLearningCandidates({
+      organizationId: organizationId!,
+      tier: parsed.tier,
+      tenantSlug: parsed.tenantSlug,
+    }).find((candidate) => candidate.learning_id === parsed.learningId);
+    if (!current) throw new Error(`Learning candidate not found: ${parsed.learningId}`);
+    const target = parsed.recordStatus as OrganizationLearningCandidate['status'];
+    if (target === 'promoted') {
+      const refError = tierKnowledgeRefError(parsed.promotedRef || '', current);
+      if (refError)
+        throw new Error(
+          `Promoting a learning needs the knowledge document it landed in, in the same tier and tenant: ${refError}`
+        );
+    }
+    const learning = transitionOrganizationLearningCandidate(current, target, {
+      note: parsed.reason,
+      promotedRef: parsed.promotedRef,
+    });
+    emit(
+      {
+        mode,
+        learning,
+        saved_path: mode === 'apply' ? saveOrganizationLearningCandidate(learning) : null,
+      },
       parsed.json
     );
     return;
@@ -882,7 +966,7 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
         "New decisions must start as proposed (omit --record-status or pass 'proposed'); then advance with " +
           "'decision transition': proposed -> pending_approval -> approved (-> implemented), " +
           "with 'deferred' as a side branch and 'rejected' as terminal. " +
-          'Approving also requires --rationale and --approval-ref <channel:id>.'
+          'Approving also requires --rationale and --approval-ref <channel:id>; open that approval request with --request-approval --chosen-option <option> when moving to pending_approval.'
       );
     if (
       listOrganizationDecisions({
@@ -977,23 +1061,10 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
     if (!current) throw new Error(`Incident not found: ${parsed.incidentId}`);
     if (parsed.recordStatus === 'closed') {
       const reviewRef = parsed.postIncidentReviewRef || current.post_incident_review_ref || '';
-      const prefix =
-        current.tier === 'confidential'
-          ? `knowledge/confidential/${current.tenant_slug}/`
-          : current.tier === 'personal'
-            ? current.tenant_slug
-              ? `knowledge/personal/${current.tenant_slug}/`
-              : ''
-            : 'knowledge/public/';
-      if (
-        !prefix ||
-        !reviewRef.startsWith(prefix) ||
-        reviewRef.includes('\\') ||
-        reviewRef.split('/').includes('..') ||
-        !safeExistsSync(pathResolver.rootResolve(reviewRef))
-      )
+      const refError = tierKnowledgeRefError(reviewRef, current);
+      if (refError)
         throw new Error(
-          'Closing an incident requires an existing review in the same knowledge tier and tenant.'
+          `Closing an incident requires an existing review in the same knowledge tier and tenant: ${refError}`
         );
     }
     const incident = transitionOrganizationIncident(
@@ -1032,21 +1103,50 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
     }).find((decision) => decision.decision_id === parsed.decisionId);
     if (!current) throw new Error(`Decision not found: ${parsed.decisionId}`);
     const target = parsed.recordStatus as OrganizationDecisionRecord['status'];
+    if (parsed.requestApproval && target !== 'pending_approval')
+      throw new Error('--request-approval applies only with --record-status pending_approval.');
+    if (parsed.requestApproval && !parsed.chosenOption)
+      throw new Error(
+        '--request-approval needs --chosen-option <option>: the human approves one named option.'
+      );
     const approvalRef =
       target === 'approved' || target === 'rejected'
-        ? verifyDecisionApprovalRef(parsed.approvalRef, current, target)
+        ? verifyDecisionApprovalRef(
+            parsed.approvalRef,
+            current,
+            target,
+            parsed.chosenOption || current.chosen_option
+          )
         : undefined;
     const decision = transitionOrganizationDecision(current, target, {
-      chosenOption: parsed.chosenOption,
+      chosenOption: target === 'pending_approval' ? undefined : parsed.chosenOption,
       rationale: parsed.rationale,
       approvalRef,
       followUpRefs: parsed.followUpRefs,
     });
+    const savedPath = mode === 'apply' ? saveOrganizationDecision(decision) : null;
+    const approvalRequest =
+      parsed.requestApproval && mode === 'apply'
+        ? requestDecisionApproval({
+            decision,
+            chosenOption: parsed.chosenOption!,
+            requestedBy: parsed.requestedBy || process.env.MISSION_ROLE || 'organization-cli',
+            rationale: parsed.rationale,
+          })
+        : undefined;
     emit(
       {
         mode,
         decision,
-        saved_path: mode === 'apply' ? saveOrganizationDecision(decision) : null,
+        saved_path: savedPath,
+        ...(approvalRequest
+          ? {
+              approval_request: {
+                ...approvalRequest,
+                next: `A human approves or denies request ${approvalRequest.request_id} on an authenticated surface (Chronos / concierge approvals), then run: pnpm organization decision transition --organization-id ${decision.organization_id} --tier ${decision.tier}${decision.tenant_slug ? ` --tenant-slug ${decision.tenant_slug}` : ''} --decision-id ${decision.decision_id} --record-status approved --chosen-option ${parsed.chosenOption} --rationale <text> --approval-ref ${approvalRequest.ref} --apply (or --record-status rejected with the same --approval-ref).`,
+              },
+            }
+          : {}),
       },
       parsed.json
     );

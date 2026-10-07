@@ -13,7 +13,7 @@ tags:
     observability,
     governance,
   ]
-last_updated: 2026-10-06
+last_updated: 2026-10-07
 status: active
 ---
 
@@ -186,6 +186,8 @@ KS-16 checker を PR CI に入れ意味論検査へ拡張し、新区画を rete
 - `scripts/watch_tenant_drift.ts` / `pipelines/tenant-drift-watch.json`(KO-18 の雛形)、`pipelines/knowledge-curation-weekly.json`(KO-03/14/16/17 の実行基盤)
 
 ## 実装状況
+
+- 2026-10-07: 注入・学習ループの追加監査で 6 件を修正。(1) KO-16/KO-03 の usage aggregate は書き手(delivery=mission scope、worker feedback=task scope)と読み手(weights/curation=tenant、retrieval=mission+org/project)で物理パスが全て異なり、tenant ミッションの usage が誰にも読まれていなかった。aggregate を tenant 単位の 1 ファイルに集約(delivery JSONL は full chain のまま)。既存の mission/task 配下 aggregate は統合しない。(2) needs 再取得(KP-04)が tenant distill lane と slice exclude を無視していた。(3) project 無しミッションで dispatch が `project_id=mission_id` を入れるため、pack が `projects/<MID>/missions/<MID>` を探索し `missions/<MID>/` の文書が届かなかった。(4) `wisdom:knowledge_search` が containment scope を渡さず tenant 全体(兄弟 project/mission)を走査していた。(5) pack gate が `knowledge/personal/` を public 扱いしていた。(6) 校正済み relevance judgment 時に cap 後に絞り込んでいたため budget 未満になっていた。未対応: embedding backend 有効時に distill の `minScore` が意味検索側に効かず、RRF スコア(≈0.03)が tenant lexical スコアと同列比較される点は閾値の設計判断が必要なため保留。
 
 - 2026-10-06: 注入経路の再監査で KO-01 の取りこぼしを 2 件修正。(1) pack の tenant retrieval が `organization_id`/`project_id` を渡しておらず、index は tenant root と `missions/{id}` しか走査しないため、`knowledge place --project` で正準配置した project 配下の文書が mission に届かなかった。distill と tenant の両経路で同じ containment scope を使うようにした(gap 記録にも org/project が載る)。(2) `confidential/common/` の文書は retrieval で取得されても、tenant を持たないため pack の scope gate で `TENANT_SCOPE_MISMATCH` として全件落ちていた。登録済みかつ `strict_isolation` でない tenant にだけ gate 上で common を許可する(retrieval と同じ `buildTenantKnowledgeScopeSet` 判定、解決不能は fail-closed)。検証: `mission-context-pack.tenant.test.ts` に project 配下・兄弟 project 除外・common の E2E・strict/未登録/他 tenant の拒否を追加。
 

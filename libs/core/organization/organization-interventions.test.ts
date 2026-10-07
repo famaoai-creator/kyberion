@@ -3,8 +3,12 @@ import {
   createOrganizationIncident,
   transitionOrganizationIncident,
   transitionOrganizationDecision,
+  transitionOrganizationLearningCandidate,
 } from './organization-interventions.js';
-import type { OrganizationDecisionRecord } from './organization-operating-model.js';
+import type {
+  OrganizationDecisionRecord,
+  OrganizationLearningCandidate,
+} from './organization-operating-model.js';
 
 describe('organization interventions', () => {
   it('requires a review before closing an incident', () => {
@@ -89,5 +93,54 @@ describe('organization interventions', () => {
     expect(() => transitionOrganizationIncident(incident, 'resolved', {})).toThrow(
       /detected -> resolved.*Allowed next states.*triaging.*Lifecycle: detected -> triaging -> mitigating -> resolved -> closed/s
     );
+  });
+
+  describe('learning candidate transitions', () => {
+    const candidate: OrganizationLearningCandidate = {
+      version: '1.0.0',
+      learning_id: 'LRN-1',
+      organization_id: 'ORG-1',
+      source_type: 'incident_review',
+      source_ref: 'INC-1',
+      title: 'Invoice lag',
+      summary: 'Batch ran late',
+      evidence_refs: [],
+      target_kind: 'pattern',
+      status: 'proposed',
+      tier: 'public',
+      created_at: '2026-10-01T00:00:00.000Z',
+      updated_at: '2026-10-01T00:00:00.000Z',
+    };
+
+    it('approves, then promotes with the knowledge document it landed in', () => {
+      const approved = transitionOrganizationLearningCandidate(candidate, 'approved', {
+        note: 'recurring',
+      });
+      expect(approved.decision_note).toBe('recurring');
+      expect(() => transitionOrganizationLearningCandidate(approved, 'promoted', {})).toThrow(
+        /--promoted-ref/
+      );
+      const promoted = transitionOrganizationLearningCandidate(approved, 'promoted', {
+        promotedRef: 'knowledge/public/invoice-lag.md',
+      });
+      expect(promoted).toMatchObject({
+        status: 'promoted',
+        promoted_ref: 'knowledge/public/invoice-lag.md',
+      });
+    });
+
+    it('requires a reason to reject and refuses to skip approval', () => {
+      expect(() => transitionOrganizationLearningCandidate(candidate, 'rejected', {})).toThrow(
+        /--reason/
+      );
+      expect(
+        transitionOrganizationLearningCandidate(candidate, 'rejected', { note: 'one-off' }).status
+      ).toBe('rejected');
+      expect(() =>
+        transitionOrganizationLearningCandidate(candidate, 'promoted', {
+          promotedRef: 'knowledge/public/x.md',
+        })
+      ).toThrow(/proposed -> promoted/);
+    });
   });
 });

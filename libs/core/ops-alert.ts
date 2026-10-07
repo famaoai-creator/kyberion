@@ -167,16 +167,39 @@ export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}
 
   const webhookUrl = options.webhookUrl ?? getRegisteredEnvText(OPS_ALERT_WEBHOOK_ENV);
   if (!webhookUrl) {
-    const operatorRoute = resolveOperatorNotificationRoute(
+    let operatorRoute = resolveOperatorNotificationRoute(
       'ops_alert',
       loadNotificationPreferences()
     );
+    // No channel configured at all → land the alert in the local deliverable
+    // inbox (the surface `pnpm kyberion` shows on the home screen) instead of
+    // only recording an undelivered envelope nobody reads. An ops alert that
+    // never reaches an operator is how a stale daemon heartbeat went unnoticed
+    // for ~6h; the inbox needs no bridge, webhook, or preferences file.
+    // An explicit `mute` preference below still wins — only *absent* routing
+    // falls back.
+    const inboxFallback = !operatorRoute;
+    if (inboxFallback) operatorRoute = { surface: 'inbox', target: 'ops-alert' };
     if (operatorRoute && operatorRoute !== 'mute') {
-      const operatorDelivered = notifyOperatorSync('ops_alert', {
-        title: input.title,
-        body: `${input.recommendation}\n${JSON.stringify(input.context)}`,
-        correlation_id: id,
-      });
+      const operatorDelivered = notifyOperatorSync(
+        'ops_alert',
+        {
+          title: input.title,
+          body: `${input.recommendation}\n${JSON.stringify(input.context)}`,
+          correlation_id: id,
+        },
+        // Caller-owned route: when prefs resolve nothing we already substituted
+        // the inbox fallback above; resolveOperatorNotificationRoute inside
+        // notifyOperatorSync would otherwise return null again and the alert
+        // would only record an undelivered envelope.
+        { route: operatorRoute }
+      );
+      // A failed inbox fallback still gets the retryable undelivered envelope
+      // so `ops:alerts --redeliver` can pick it up once a real channel exists —
+      // the same contract the pre-fallback null-route path honored.
+      if (inboxFallback && !operatorDelivered) {
+        recordUndeliveredOpsAlert(alertLogPath, input, id, timestamp, 'inbox_delivery_failed');
+      }
       return {
         id,
         recorded_path: recordedPath,
@@ -198,16 +221,6 @@ export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}
         suppressed: false,
       };
     }
-    recordUndeliveredOpsAlert(alertLogPath, input, id, timestamp, 'no_channel_configured');
-    return {
-      id,
-      recorded_path: recordedPath,
-      webhook_attempted: false,
-      webhook_delivered: false,
-      operator_attempted: false,
-      operator_delivered: false,
-      suppressed: false,
-    };
   }
 
   try {
@@ -387,8 +400,18 @@ function classifyUndelivered(records: ParsedOpsAlertRecord[]): UndeliveredClassi
   const outstanding: ParsedOpsAlertRecord[] = [];
   const redelivered: ParsedOpsAlertRecord[] = [];
   const acknowledged: ParsedOpsAlertRecord[] = [];
+  // One alert can leave two envelopes: sendOpsAlert's inbox-fallback writes
+  // `inbox_delivery_failed` while notifyOperatorSync's own catch writes
+  // `delivery_failed` for the same correlation_id — the redeliver path must
+  // not send the alert twice. Collapse by correlation (first wins).
+  const seenCorrelations = new Set<string>();
   for (const record of records) {
     if (record.kind !== 'operator_notification_undelivered') continue;
+    const correlation = record.raw.correlation_id ?? record.raw.alert_id;
+    if (typeof correlation === 'string' && correlation) {
+      if (seenCorrelations.has(correlation)) continue;
+      seenCorrelations.add(correlation);
+    }
     if (redeliveredRefs.has(record.ref)) {
       redelivered.push(record);
     } else if (

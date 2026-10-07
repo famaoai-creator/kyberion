@@ -49,7 +49,7 @@
       "description": "Verify readiness_matrix reaches the required consensus score before proceeding to formal proposal.",
       "required_in_modes": ["standard", "strict"],
       "applies_to": {
-        "mission_classes": ["decision_support"]
+        "mission_classes": ["decision_support", "strategy_and_governance"]
       }
     },
     {
@@ -57,7 +57,7 @@
       "description": "Verify unresolved items in dissent-log do not match active revisit_triggers before mission completion.",
       "required_in_modes": ["standard", "strict"],
       "applies_to": {
-        "mission_classes": ["decision_support"]
+        "mission_classes": ["decision_support", "strategy_and_governance"]
       }
     },
     {
@@ -98,6 +98,46 @@
       "gate_id": "DELIVERABLE_QUALITY",
       "description": "Evaluate the produced deliverable against kind-specific quality checks and block low-quality artifacts before delivery.",
       "required_in_modes": ["standard", "strict"]
+    },
+    {
+      "gate_id": "FINANCIAL_CONTROLS",
+      "description": "Verify segregation of duties (preparer is not approver), tie-out of every figure to a source document, approval-threshold compliance, and an audit trail before any payment, posting, or filing is handed to a human approver.",
+      "required_in_modes": ["standard", "strict"],
+      "applies_to": {
+        "mission_classes": ["finance_and_accounting"]
+      }
+    },
+    {
+      "gate_id": "PEOPLE_DATA_PROTECTION",
+      "description": "Verify that evaluation criteria are job-related and documented, personal data stays within its tier and minimum necessary scope, and the hiring, rating, or compensation decision is recorded as made by a named human.",
+      "required_in_modes": ["standard", "strict"],
+      "applies_to": {
+        "mission_classes": ["people_and_talent"]
+      }
+    },
+    {
+      "gate_id": "LEGAL_REVIEW",
+      "description": "Verify that every finding cites its source text or provision and governing jurisdiction, risk ratings are justified, and a qualified human has reviewed before external reliance or submission; AI output is never presented as legal advice.",
+      "required_in_modes": ["standard", "strict"],
+      "applies_to": {
+        "mission_classes": ["legal_and_compliance"]
+      }
+    },
+    {
+      "gate_id": "VENDOR_INTEGRITY",
+      "description": "Verify that evaluation criteria were fixed before candidates were compared, more than one option was compared or a sole-source reason is recorded, conflicts of interest are declared, and commitment authority is respected.",
+      "required_in_modes": ["standard", "strict"],
+      "applies_to": {
+        "mission_classes": ["procurement_and_supply"]
+      }
+    },
+    {
+      "gate_id": "ASSUMPTIONS_EXPLICIT",
+      "description": "Verify that key assumptions, their evidence, owners, and revisit triggers are stated so the decision can be audited and revisited.",
+      "required_in_modes": ["standard", "strict"],
+      "applies_to": {
+        "mission_classes": ["strategy_and_governance"]
+      }
     }
   ],
   "mode_rules": [
@@ -113,6 +153,13 @@
       "review_mode": "strict",
       "match": {
         "workflow_patterns": ["stage_gated_delivery", "creative_assembly_loop"]
+      }
+    },
+    {
+      "id": "mode-strict-money-people-law",
+      "review_mode": "strict",
+      "match": {
+        "mission_classes": ["finance_and_accounting", "people_and_talent", "legal_and_compliance"]
       }
     },
     {
@@ -133,7 +180,7 @@
       "id": "mode-standard-decision-support",
       "review_mode": "standard",
       "match": {
-        "mission_classes": ["decision_support"]
+        "mission_classes": ["decision_support", "strategy_and_governance"]
       }
     },
     {
@@ -159,7 +206,8 @@
           "code_change",
           "research_and_absorption",
           "content_and_media",
-          "environment_and_recovery"
+          "environment_and_recovery",
+          "procurement_and_supply"
         ]
       }
     }
@@ -220,6 +268,41 @@
         "required_reviewer_roles": ["release-reviewer"],
         "required_capabilities": ["review", "testing", "operations"],
         "mission_classes": ["operations_and_release"]
+      },
+      {
+        "id": "finance-controls-review",
+        "artifact_kinds": ["doc", "deck", "media"],
+        "required_reviewer_roles": ["finance-reviewer"],
+        "required_capabilities": ["review", "analysis"],
+        "mission_classes": ["finance_and_accounting"]
+      },
+      {
+        "id": "people-fairness-privacy-review",
+        "artifact_kinds": ["doc", "deck", "media"],
+        "required_reviewer_roles": ["hr-reviewer", "privacy-reviewer"],
+        "required_capabilities": ["review", "analysis", "security"],
+        "mission_classes": ["people_and_talent"]
+      },
+      {
+        "id": "legal-counsel-review",
+        "artifact_kinds": ["doc", "deck", "media"],
+        "required_reviewer_roles": ["legal-reviewer"],
+        "required_capabilities": ["review", "analysis", "documentation"],
+        "mission_classes": ["legal_and_compliance"]
+      },
+      {
+        "id": "strategy-assumption-review",
+        "artifact_kinds": ["doc", "deck", "media"],
+        "required_reviewer_roles": ["fact-reviewer"],
+        "required_capabilities": ["review", "analysis"],
+        "mission_classes": ["strategy_and_governance"]
+      },
+      {
+        "id": "procurement-integrity-review",
+        "artifact_kinds": ["doc", "deck", "media"],
+        "required_reviewer_roles": ["procurement-reviewer", "fact-reviewer"],
+        "required_capabilities": ["review", "analysis"],
+        "mission_classes": ["procurement_and_supply"]
       }
     ]
   }

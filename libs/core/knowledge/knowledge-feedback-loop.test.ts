@@ -22,6 +22,7 @@ import {
   listMemoryPromotionCandidates,
   memoryPromotionQueuePath,
 } from './memory-promotion-queue.js';
+import { resolveKnowledgeVerification } from './knowledge-verification.js';
 
 // Hermetic isolation: point the delivery log dir, the usage aggregate file,
 // and the memory promotion queue at unique per-process tmp paths so this
@@ -205,6 +206,44 @@ describe('recordKnowledgeDelivery', () => {
     expect(result!.refs[0]?.score).toBe(0.1);
   });
 
+  it('folds mission deliveries and task feedback into one tenant-level usage aggregate', () => {
+    const doc = 'knowledge/confidential/tenant-a/runbook.md';
+    const missionScope = {
+      tier: 'confidential' as const,
+      tenant_slug: 'tenant-a',
+      organization_id: 'org-a',
+      project_id: 'PRJ-A',
+      mission_id: 'MSN-USAGE',
+    };
+    recordKnowledgeDelivery({ missionId: 'MSN-USAGE', refs: [{ path: doc }], scope: missionScope });
+    recordKnowledgeUsageFeedback({
+      missionId: 'MSN-USAGE',
+      taskId: 'T1',
+      scope: {
+        tier: 'confidential',
+        tenant_slug: 'tenant-a',
+        mission_id: 'MSN-USAGE',
+        task_id: 'T1',
+      },
+      feedback: { used: [doc] },
+    });
+
+    // The tenant-level readers (weight proposals, curation report) and any
+    // child scope read the same aggregate.
+    const tenantScope = { tier: 'confidential' as const, tenant_slug: 'tenant-a' };
+    expect(loadKnowledgeUsageAggregate(tenantScope)).toMatchObject([
+      { document_path: doc, delivered_count: 1, used_count: 1 },
+    ]);
+    expect(knowledgeUsageAggregatePath(missionScope)).toBe(
+      knowledgeUsageAggregatePath(tenantScope)
+    );
+    expect(loadKnowledgeUsageAggregate({ tier: 'confidential', tenant_slug: 'tenant-b' })).toEqual(
+      []
+    );
+    // Delivery audit logs stay partitioned by the full chain.
+    expect(knowledgeDeliveryLogDir(missionScope)).toContain('/missions/MSN-USAGE');
+  });
+
   it('partitions delivery and usage telemetry by the canonical tenant namespace', () => {
     const scope = {
       tier: 'confidential' as const,
@@ -262,6 +301,25 @@ describe('recordKnowledgeDelivery', () => {
     expect(listMemoryPromotionCandidates()[0]).toMatchObject({
       proposed_memory_kind: 'clarification_prompt',
       sensitivity_tier: 'confidential',
+    });
+  });
+});
+
+describe('human feedback reaches the verification ledger', () => {
+  it('records stale/wrong reports as a problem, not useful ones', () => {
+    const scope = { tier: 'confidential' as const, tenant_slug: 'tenant-a' };
+    const doc = 'knowledge/confidential/tenant-a/runbook.md';
+    recordHumanKnowledgeFeedback({ document_path: doc, verdict: 'useful', scope });
+    expect(resolveKnowledgeVerification([doc], scope).get(doc)).toBeUndefined();
+    recordHumanKnowledgeFeedback({
+      document_path: doc,
+      verdict: 'stale',
+      reason: 'old CLI',
+      scope,
+    });
+    expect(resolveKnowledgeVerification([doc], scope).get(doc)).toMatchObject({
+      state: 'reported_problem',
+      last_problem_kind: 'stale',
     });
   });
 });

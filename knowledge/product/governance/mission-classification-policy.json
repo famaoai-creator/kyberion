@@ -184,14 +184,14 @@
       "mission_class": "content_and_media"
     },
     {
-      "id": "class-contract-review-hint",
+      "id": "class-legal-contract-review-hint",
       "match": {
         "mission_type_hints": ["contract_review"]
       },
-      "mission_class": "decision_support"
+      "mission_class": "legal_and_compliance"
     },
     {
-      "id": "class-contract-review-intent",
+      "id": "class-legal-contract-review-intent",
       "match": {
         "intent_ids": [
           "contract-review",
@@ -200,14 +200,409 @@
           "review-agreement"
         ]
       },
-      "mission_class": "decision_support"
+      "mission_class": "legal_and_compliance"
     },
     {
-      "id": "class-contract-review-utterance",
+      "id": "class-legal-contract-review-utterance",
       "match": {
         "utterance_patterns": ["契約レビュー", "契約書の確認", "契約書をレビュー"]
       },
-      "mission_class": "decision_support"
+      "mission_class": "legal_and_compliance"
+    },
+    {
+      "id": "class-finance-hint",
+      "match": {
+        "mission_type_hints": ["finance_operations"]
+      },
+      "mission_class": "finance_and_accounting"
+    },
+    {
+      "id": "class-finance-intent",
+      "match": {
+        "intent_ids": [
+          "financial-close-monthly",
+          "monthly-close",
+          "financial-close",
+          "budget-review",
+          "budget",
+          "budget-review-monthly",
+          "fundraising-prep",
+          "fundraising",
+          "raise-prep",
+          "invoice-processing",
+          "invoice-handling",
+          "accounts-payable",
+          "expense-reimbursement",
+          "expense-claim",
+          "expense-report-processing",
+          "accounts-receivable-collections",
+          "accounts-receivable",
+          "ar-collections",
+          "payroll-cycle",
+          "payroll-run",
+          "salary-calculation",
+          "asset-lifecycle-management",
+          "fixed-asset-management",
+          "asset-register"
+        ]
+      },
+      "mission_class": "finance_and_accounting"
+    },
+    {
+      "id": "class-finance-utterance",
+      "match": {
+        "utterance_patterns": [
+          "決算",
+          "月次締め",
+          "月末の締め",
+          "締め処理",
+          "請求書",
+          "経費精算",
+          "売掛",
+          "買掛",
+          "未回収",
+          "督促",
+          "給与計算",
+          "給与明細",
+          "予算と実績",
+          "予実",
+          "予算レビュー",
+          "予算管理",
+          "資金調達",
+          "仕訳",
+          "経理",
+          "financial close",
+          "month-end close",
+          "invoice",
+          "expense report",
+          "expense claim",
+          "accounts receivable",
+          "accounts payable",
+          "payroll",
+          "budget variance",
+          "budget review",
+          "fundraising",
+          "bookkeeping",
+          "overdue customer payment",
+          "overdue payment",
+          "財務モデル",
+          "資金繰り",
+          "キャッシュフロー",
+          "売上計上",
+          "入金確認",
+          "財務諸表",
+          "投資家",
+          "financial model",
+          "seed round",
+          "investor",
+          "cash flow",
+          "cashflow",
+          "general ledger",
+          "journal entr",
+          "突合",
+          "bank reconciliation",
+          "account reconciliation"
+        ]
+      },
+      "mission_class": "finance_and_accounting"
+    },
+    {
+      "id": "class-people-hint",
+      "match": {
+        "mission_type_hints": ["people_operations"]
+      },
+      "mission_class": "people_and_talent"
+    },
+    {
+      "id": "class-people-intent",
+      "match": {
+        "intent_ids": [
+          "hiring-workflow",
+          "hire",
+          "recruiting",
+          "performance-review",
+          "performance",
+          "people-review",
+          "employee-lifecycle-transition",
+          "employee-onboarding",
+          "employee-offboarding"
+        ]
+      },
+      "mission_class": "people_and_talent"
+    },
+    {
+      "id": "class-people-utterance",
+      "match": {
+        "utterance_patterns": [
+          "採用候補",
+          "採用選考",
+          "採用活動",
+          "採用面接",
+          "採用計画",
+          "名採用",
+          "人採用",
+          "求人",
+          "人事評価",
+          "評価面談",
+          "考課",
+          "入社手続",
+          "新入社員",
+          "退職者",
+          "退職手続",
+          "人事異動",
+          "勤怠",
+          "hiring",
+          "performance review",
+          "offboarding",
+          "employee onboarding",
+          "new hire",
+          "中途採用",
+          "新卒採用",
+          "従業員",
+          "評価シート",
+          "interview question",
+          "job opening",
+          "job posting",
+          "job post",
+          "headcount",
+          "talent acquisition",
+          "面接官",
+          "面接設計",
+          "面接質問",
+          "面接日程",
+          "入社予定",
+          "入社する",
+          "employee review"
+        ]
+      },
+      "mission_class": "people_and_talent"
+    },
+    {
+      "id": "class-legal-hint",
+      "match": {
+        "mission_type_hints": ["legal_compliance"]
+      },
+      "mission_class": "legal_and_compliance"
+    },
+    {
+      "id": "class-legal-intent",
+      "match": {
+        "intent_ids": [
+          "internal-audit-compliance",
+          "internal-audit",
+          "compliance-audit",
+          "regulatory-filing-compliance",
+          "regulatory-filing",
+          "regulatory-submission",
+          "enterprise-risk-assessment",
+          "risk-assessment",
+          "erm",
+          "business-continuity-planning",
+          "bcp",
+          "dr-planning"
+        ]
+      },
+      "mission_class": "legal_and_compliance"
+    },
+    {
+      "id": "class-legal-utterance",
+      "match": {
+        "utterance_patterns": [
+          "契約書",
+          "契約条項",
+          "秘密保持",
+          "法務",
+          "コンプライアンス",
+          "規制対応",
+          "当局",
+          "届出",
+          "内部監査",
+          "監査対応",
+          "個人情報保護",
+          "リスクアセスメント",
+          "事業継続",
+          "contract review",
+          "legal review",
+          "internal audit",
+          "risk assessment",
+          "business continuity",
+          "bcp",
+          "non-disclosure",
+          "nondisclosure",
+          "損害賠償",
+          "法令",
+          "法改正",
+          "社内規程",
+          "利用規約",
+          "知的財産",
+          "訴訟",
+          "soc 2",
+          "soc2",
+          "iso 27001",
+          "iso27001",
+          "gdpr",
+          "compliance audit",
+          "terms of service",
+          "license agreement",
+          "regulatory filing",
+          "regulatory submission",
+          "regulatory requirement",
+          "規制要件"
+        ]
+      },
+      "mission_class": "legal_and_compliance"
+    },
+    {
+      "id": "class-strategy-hint",
+      "match": {
+        "mission_type_hints": ["strategy_governance"]
+      },
+      "mission_class": "strategy_and_governance"
+    },
+    {
+      "id": "class-strategy-intent",
+      "match": {
+        "intent_ids": [
+          "business-plan-development",
+          "business-plan",
+          "business-planning",
+          "quarterly-okr-planning",
+          "okr-planning",
+          "quarterly-okr",
+          "board-meeting-prep",
+          "board-prep",
+          "board-meeting",
+          "due-diligence-ma",
+          "due-diligence",
+          "ma-due-diligence",
+          "partner-alliance-management",
+          "partner-alliance",
+          "alliance-management",
+          "gate-review-session",
+          "gate-review",
+          "convene-gate-review"
+        ]
+      },
+      "mission_class": "strategy_and_governance"
+    },
+    {
+      "id": "class-strategy-utterance",
+      "match": {
+        "utterance_patterns": [
+          "事業計画",
+          "経営計画",
+          "中期計画",
+          "中長期計画",
+          "okr",
+          "取締役会",
+          "経営会議",
+          "経営陣への報告",
+          "デューデリジェンス",
+          "m&a",
+          "アライアンス",
+          "提携戦略",
+          "戦略立案",
+          "business plan",
+          "strategic plan",
+          "board meeting",
+          "due diligence",
+          "alliance strategy",
+          "quarterly goals",
+          "全社目標",
+          "成果指標",
+          "年度目標",
+          "経営目標",
+          "経営状況",
+          "経営戦略",
+          "事業戦略",
+          "役員向け",
+          "役員会",
+          "買収",
+          "合併",
+          "出資",
+          "中期経営",
+          "joint venture",
+          "company acquisition",
+          "acquire a company",
+          "acquire the startup",
+          "acquiring a company",
+          "merger and acquisition",
+          "company merger"
+        ]
+      },
+      "mission_class": "strategy_and_governance"
+    },
+    {
+      "id": "class-procurement-hint",
+      "match": {
+        "mission_type_hints": ["procurement_supply"]
+      },
+      "mission_class": "procurement_and_supply"
+    },
+    {
+      "id": "class-procurement-intent",
+      "match": {
+        "intent_ids": [
+          "procurement-vendor",
+          "procurement",
+          "vendor-selection",
+          "supplier-onboarding",
+          "vendor-onboarding",
+          "supplier-registration",
+          "supply-chain-planning",
+          "s-and-op",
+          "demand-planning",
+          "order-fulfillment-tracking",
+          "order-fulfillment",
+          "order-tracking"
+        ]
+      },
+      "mission_class": "procurement_and_supply"
+    },
+    {
+      "id": "class-procurement-utterance",
+      "match": {
+        "utterance_patterns": [
+          "調達",
+          "ベンダー選定",
+          "ベンダー比較",
+          "取引先選定",
+          "取引先を選定",
+          "仕入先",
+          "サプライヤー",
+          "発注",
+          "需給",
+          "需要予測",
+          "在庫計画",
+          "出荷状況",
+          "受注",
+          "procurement",
+          "vendor selection",
+          "select a vendor",
+          "vendor comparison",
+          "supplier",
+          "purchase order",
+          "supply chain",
+          "demand and supply",
+          "demand planning",
+          "order fulfillment",
+          "仕入",
+          "注文の状況",
+          "注文状況",
+          "物流",
+          "相見積",
+          "見積比較",
+          "見積依頼",
+          "在庫管理",
+          "vendor onboarding",
+          "業者を比較",
+          "業者選定",
+          "納期遅延",
+          "warehouse management",
+          "shipment status"
+        ]
+      },
+      "mission_class": "procurement_and_supply"
     },
     {
       "id": "class-customer-onboarding-hint",
@@ -383,6 +778,13 @@
       "mission_class": "content_and_media"
     },
     {
+      "id": "class-operations-release-intent-process-definition",
+      "match": {
+        "intent_ids": ["define-engineering-governance", "define-operational-process"]
+      },
+      "mission_class": "operations_and_release"
+    },
+    {
       "id": "class-product-delivery",
       "match": {
         "shapes": ["project_bootstrap"]
@@ -442,7 +844,9 @@
           "prepare-negotiation",
           "rehearse-session",
           "capture-intuition",
-          "analyze-counterfactual"
+          "analyze-counterfactual",
+          "executive-strategy-brief",
+          "executive-prioritization"
         ]
       },
       "mission_class": "decision_support"
@@ -556,6 +960,21 @@
       "mission_class": "research_and_absorption"
     },
     {
+      "id": "class-research-absorption-intent-knowledge-lifecycle",
+      "match": {
+        "intent_ids": [
+          "inventory-work",
+          "query-knowledge",
+          "organize-knowledge-assets",
+          "promote-memory-candidate",
+          "reconcile-knowledge-index",
+          "trace-memory-promotion-decision",
+          "recall-prior-knowledge"
+        ]
+      },
+      "mission_class": "research_and_absorption"
+    },
+    {
       "id": "class-decision-support-intent-extended",
       "match": {
         "intent_ids": ["review-text", "technical-decision-memo"]
@@ -600,9 +1019,197 @@
         ]
       },
       "mission_class": "platform_onboarding"
+    },
+    {
+      "id": "class-operations-and-release-intent-ontology-parity",
+      "match": {
+        "intent_ids": [
+          "enable-voice-input",
+          "open-site",
+          "browser-step",
+          "restart-service",
+          "inspect-service",
+          "start-service",
+          "stop-service",
+          "inspect-network-environment",
+          "inspect-workspace-surfaces",
+          "monitor-service-health",
+          "automate-browser-workflow",
+          "automate-os-macro",
+          "live-query",
+          "agent-runtime-tuning",
+          "release-readiness-review",
+          "verify-actuator-capability",
+          "rotate-integration-secret",
+          "run-system-upgrade-check",
+          "sanitize-knowledge-for-public-tier",
+          "retire-stale-knowledge",
+          "check-kyberion-vital",
+          "inspect-mission-state",
+          "inspect-mission-inventory",
+          "inspect-generation-schedules",
+          "inspect-runtime-supervisor",
+          "verify-audit-chain",
+          "prewarm-mission-team",
+          "deprecate-actuator-adapter",
+          "rollback-actuator-adapter",
+          "audit-knowledge-tier-boundary",
+          "request-approval",
+          "resolve-approval",
+          "escalate-governance-issue",
+          "fetch-external-data",
+          "weather-lookup",
+          "transit-lookup",
+          "restaurant-search",
+          "news-summary",
+          "email-draft",
+          "calendar-schedule",
+          "device-control",
+          "reminder-task",
+          "translation-service"
+        ]
+      },
+      "mission_class": "operations_and_release"
+    },
+    {
+      "id": "class-content-and-media-intent-ontology-parity",
+      "match": {
+        "intent_ids": [
+          "capture-photo",
+          "generate-workbook",
+          "speak-with-my-voice",
+          "generate-narrated-video",
+          "generate-video",
+          "transcribe-audio",
+          "live-voice"
+        ]
+      },
+      "mission_class": "content_and_media"
+    },
+    {
+      "id": "class-platform-onboarding-intent-ontology-parity",
+      "match": {
+        "intent_ids": [
+          "clone-my-voice",
+          "setup-messaging-bridge",
+          "rebuild-env",
+          "validate-all",
+          "bootstrap-kyberion-runtime",
+          "verify-environment-readiness",
+          "configure-reasoning-backend",
+          "register-actuator-adapter",
+          "check-kyberion-baseline",
+          "inspect-environment-readiness",
+          "reconcile-capability-lifecycle",
+          "assimilate-gateway-capability"
+        ]
+      },
+      "mission_class": "platform_onboarding"
+    },
+    {
+      "id": "class-customer-engagement-intent-ontology-parity",
+      "match": {
+        "intent_ids": [
+          "lifestyle-booking",
+          "continue-conversation",
+          "stakeholder-communication",
+          "sales-account-strategy"
+        ]
+      },
+      "mission_class": "customer_engagement"
+    },
+    {
+      "id": "class-research-and-absorption-intent-ontology-parity",
+      "match": {
+        "intent_ids": [
+          "automate-code-transformation",
+          "list-capabilities",
+          "summarize-conversation"
+        ]
+      },
+      "mission_class": "research_and_absorption"
+    },
+    {
+      "id": "class-decision-support-intent-ontology-parity",
+      "match": {
+        "intent_ids": [
+          "conversation-to-mission",
+          "executive-reporting",
+          "classify-mission",
+          "select-mission-workflow",
+          "review-worker-output"
+        ]
+      },
+      "mission_class": "decision_support"
+    },
+    {
+      "id": "class-environment-and-recovery-intent-ontology-parity",
+      "match": {
+        "intent_ids": [
+          "llm-provider-selection",
+          "reconcile-ecosystem",
+          "audit-security",
+          "reset-environment-state"
+        ]
+      },
+      "mission_class": "environment_and_recovery"
+    },
+    {
+      "id": "class-product-delivery-intent-ontology-parity",
+      "match": {
+        "intent_ids": ["compose-mission-team"]
+      },
+      "mission_class": "product_delivery"
     }
   ],
   "delivery_shape_rules": [
+    {
+      "id": "delivery-org-function-pipeline",
+      "match": {
+        "intent_ids": [
+          "invoice-processing",
+          "expense-reimbursement",
+          "accounts-receivable-collections",
+          "payroll-cycle",
+          "asset-lifecycle-management",
+          "financial-close-monthly",
+          "budget-review",
+          "fundraising-prep",
+          "employee-lifecycle-transition",
+          "hiring-workflow",
+          "performance-review",
+          "contract-review",
+          "internal-audit-compliance",
+          "regulatory-filing-compliance",
+          "enterprise-risk-assessment",
+          "business-continuity-planning",
+          "business-plan-development",
+          "quarterly-okr-planning",
+          "due-diligence-ma",
+          "partner-alliance-management",
+          "gate-review-session",
+          "board-meeting-prep",
+          "supplier-onboarding",
+          "supply-chain-planning",
+          "order-fulfillment-tracking",
+          "procurement-vendor"
+        ]
+      },
+      "delivery_shape": "multi_artifact_pipeline"
+    },
+    {
+      "id": "delivery-org-function-hint",
+      "match": {
+        "mission_type_hints": [
+          "finance_operations",
+          "people_operations",
+          "legal_compliance",
+          "strategy_governance",
+          "procurement_supply"
+        ]
+      },
+      "delivery_shape": "multi_artifact_pipeline"
+    },
     {
       "id": "delivery-ops-report-single",
       "match": {
@@ -799,6 +1406,61 @@
         "utterance_patterns": ["outage", "security", "breach", "緊急", "障害"]
       },
       "risk_profile": "high_stakes"
+    },
+    {
+      "id": "risk-org-function-approval-required",
+      "match": {
+        "intent_ids": [
+          "invoice-processing",
+          "expense-reimbursement",
+          "accounts-receivable-collections",
+          "payroll-cycle",
+          "financial-close-monthly",
+          "fundraising-prep",
+          "employee-lifecycle-transition",
+          "performance-review",
+          "internal-audit-compliance",
+          "regulatory-filing-compliance",
+          "business-plan-development",
+          "due-diligence-ma",
+          "gate-review-session",
+          "procurement-vendor"
+        ]
+      },
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "risk-org-function-review-required",
+      "match": {
+        "intent_ids": [
+          "asset-lifecycle-management",
+          "budget-review",
+          "hiring-workflow",
+          "contract-review",
+          "enterprise-risk-assessment",
+          "business-continuity-planning",
+          "quarterly-okr-planning",
+          "partner-alliance-management",
+          "board-meeting-prep",
+          "supplier-onboarding",
+          "supply-chain-planning",
+          "order-fulfillment-tracking"
+        ]
+      },
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "risk-org-function-hint",
+      "match": {
+        "mission_type_hints": [
+          "finance_operations",
+          "people_operations",
+          "legal_compliance",
+          "strategy_governance",
+          "procurement_supply"
+        ]
+      },
+      "risk_profile": "approval_required"
     },
     {
       "id": "risk-approval-required",
