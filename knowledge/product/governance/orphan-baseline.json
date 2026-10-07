@@ -58,6 +58,10 @@
     {
       "id": "libs/core/ingress/providers/tailscale-funnel.ts",
       "reason": "Data-driven extension module: public-ingress-provider-registry resolves it dynamically via the public-ingress-providers.json catalog (provider_id 'tailscale-funnel') and the @agent/core/ingress/providers/tailscale-funnel package export, so no static in-repo caller exists."
+    },
+    {
+      "id": "libs/core/mission/mission-class-eval.ts",
+      "reason": "Mission-class evaluation harness (evaluateMissionClassCorpus / formatMissionClassEvalReport): scores the utterance → intent → class → workflow → team → review-gate chain against knowledge/product/governance/mission-class-eval-corpus.json. Its intended consumers are mission-class-eval.test.ts (the CI quality floor) and by-hand improvement runs documented in mission-class-operating-guide.md §4; no production module calls it."
     }
   ],
   "scripts": [

@@ -282,7 +282,7 @@ export function resolveMissionWorkflowDesign(
       taskType: 'marketing_campaign',
     },
     contract_review: {
-      missionClass: 'decision_support',
+      missionClass: 'legal_and_compliance',
       intentId: 'contract-review',
       taskType: 'contract_review',
     },

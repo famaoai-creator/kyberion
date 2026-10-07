@@ -393,6 +393,7 @@
 - [Memory Promotion Queue Recovery Playbook — draining a stuck candidate backlog](./product/orchestration/memory-promotion-queue-recovery-playbook.md) (public | Unknown)
 - [Memory Snapshot Protocol](./product/orchestration/memory-snapshot-protocol.md) (public | Ecosystem Architect)
 - [Mesh Hub Inspection](./product/orchestration/mesh-hub-inspection.md) (public | Unknown)
+- [Mission Class Operating Guide — クラス別の AI の進め方](./product/orchestration/mission-class-operating-guide.md) (public | Ecosystem Architect)
 - [Mission Kickoff Playbook — friction-free mission start for repo-internal work](./product/orchestration/mission-kickoff-playbook.md) (public | Unknown)
 - [Mission Portability Standard (MEP v0.1)](./product/orchestration/mission-portability-standard.md) (public | Ecosystem Architect)
 - [Mission Triage Playbook — closing missions that cannot finish](./product/orchestration/mission-triage-playbook.md) (public | Unknown)

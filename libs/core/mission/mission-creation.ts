@@ -23,6 +23,7 @@ import { ensureDefaultTenantProfile, resolveTenant } from '../organization/tenan
 import { loadOrganizationProfile } from '../organization/organization-profile.js';
 import { resolveMissionWorkflowDesign } from './mission-workflow-catalog.js';
 import { resolveMissionReviewDesign } from './mission-review-gates.js';
+import { summarizeMissionClassPlaybook } from './mission-class-playbook.js';
 import { consumeIntentGoalHandoff } from '../intent/intent-handoff.js';
 import {
   assertSafeRepositoryPath,
@@ -311,13 +312,20 @@ export async function createMission(args: {
       })
     : undefined;
   if (classification && workflowDesign) {
+    // How the class should be worked (autonomy posture, stage practice, traps,
+    // escalation) travels with the mission so any worker can read it.
+    const classPlaybook = summarizeMissionClassPlaybook(
+      classification.mission_class,
+      classification.stage
+    );
     const taskBoardPath = path.join(missionDir, 'TASK_BOARD.md');
     const safeTaskBoardPath = assertSafeRepositoryPath(taskBoardPath, { allowMissingLeaf: true });
     if (safeExistsSync(safeTaskBoardPath)) {
       const board = readTextFile(safeTaskBoardPath);
       const headerLine =
         `> Class: \`${classification.mission_class}\` (risk: ${classification.risk_profile}) · ` +
-        `Process: \`${workflowDesign.workflow_id}\` — ${workflowDesign.phases.join(' → ')}`;
+        `Process: \`${workflowDesign.workflow_id}\` — ${workflowDesign.phases.join(' → ')}\n` +
+        `> Playbook: ${classPlaybook.title_ja} / ${classPlaybook.title_en} (\`${classPlaybook.posture}\`)`;
       const lines = board.split('\n');
       lines.splice(1, 0, '', headerLine);
       safeWriteFile(safeTaskBoardPath, lines.join('\n'));
@@ -339,7 +347,12 @@ export async function createMission(args: {
         allowMissingLeaf: true,
       }),
       JSON.stringify(
-        { classification, workflow_design: workflowDesign, review_design: reviewDesign },
+        {
+          classification,
+          workflow_design: workflowDesign,
+          review_design: reviewDesign,
+          class_playbook: classPlaybook,
+        },
         null,
         2
       )
