@@ -56,6 +56,10 @@ describe('createVirtualMediaDeviceControlBridge', () => {
   const originalPlatform = process.platform;
   const originalPath = process.env.PATH;
 
+  // Every bridge below pins the stub audio bus and camera backend: with the
+  // platform faked to darwin, auto-selection would otherwise spawn the host's
+  // real swift / ffmpeg / imagesnap (compiling the CoreAudio inventory script
+  // alone can exceed the test timeout on CI runners).
   beforeEach(() => {
     // The fixtures below model system_profiler and AVFoundation devices.
     Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' });
@@ -78,16 +82,19 @@ describe('createVirtualMediaDeviceControlBridge', () => {
     const bridge = createVirtualMediaDeviceControlBridge({
       inventory_bridge: inventory,
       audio_bridge: {
+        preferred_bus: 'stub',
         input_device_preference: 'Built-in Microphone',
         output_device_preference: 'Built-in Output',
       },
       camera_bridge: {
         device_preference: 'FaceTime',
+        preferred_backend: 'stub',
       } as any,
     });
 
     const probe = await bridge.probe();
     expect(probe.bridge_id).toBe(VIRTUAL_MEDIA_DEVICE_CONTROL_BRIDGE_ID);
+    expect(probe.selection.camera?.backend).toBe('stub');
     expect(
       probe.supported_actions.find(
         (action) => action.action === 'select' && action.scope === 'audio'
@@ -100,7 +107,11 @@ describe('createVirtualMediaDeviceControlBridge', () => {
   });
 
   it('returns a host provisioning plan for add/remove requests', async () => {
-    const bridge = createVirtualMediaDeviceControlBridge();
+    const bridge = createVirtualMediaDeviceControlBridge({
+      inventory_bridge: createVirtualDeviceInventoryBridge({ command_runner: makeCommandRunner() }),
+      audio_bridge: { preferred_bus: 'stub' },
+      camera_bridge: { preferred_backend: 'stub' } as any,
+    });
     const result = await bridge.control({ action: 'add', scope: 'all' });
 
     expect(result.bridge_id).toBe(VIRTUAL_MEDIA_DEVICE_CONTROL_BRIDGE_ID);
@@ -111,7 +122,10 @@ describe('createVirtualMediaDeviceControlBridge', () => {
 
   it('routes request camera preferences and rejects unavailable registered backends', async () => {
     const inventory = createVirtualDeviceInventoryBridge({ command_runner: makeCommandRunner() });
-    const bridge = createVirtualMediaDeviceControlBridge({ inventory_bridge: inventory });
+    const bridge = createVirtualMediaDeviceControlBridge({
+      inventory_bridge: inventory,
+      audio_bridge: { preferred_bus: 'stub' },
+    });
     const result = await bridge.control({
       action: 'select',
       scope: 'camera',
