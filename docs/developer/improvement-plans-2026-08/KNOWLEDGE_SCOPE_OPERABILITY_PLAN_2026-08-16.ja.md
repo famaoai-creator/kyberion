@@ -13,7 +13,7 @@ tags:
     observability,
     governance,
   ]
-last_updated: 2026-08-29
+last_updated: 2026-10-06
 status: active
 ---
 
@@ -186,6 +186,8 @@ KS-16 checker を PR CI に入れ意味論検査へ拡張し、新区画を rete
 - `scripts/watch_tenant_drift.ts` / `pipelines/tenant-drift-watch.json`(KO-18 の雛形)、`pipelines/knowledge-curation-weekly.json`(KO-03/14/16/17 の実行基盤)
 
 ## 実装状況
+
+- 2026-10-06: 注入経路の再監査で KO-01 の取りこぼしを 2 件修正。(1) pack の tenant retrieval が `organization_id`/`project_id` を渡しておらず、index は tenant root と `missions/{id}` しか走査しないため、`knowledge place --project` で正準配置した project 配下の文書が mission に届かなかった。distill と tenant の両経路で同じ containment scope を使うようにした(gap 記録にも org/project が載る)。(2) `confidential/common/` の文書は retrieval で取得されても、tenant を持たないため pack の scope gate で `TENANT_SCOPE_MISMATCH` として全件落ちていた。登録済みかつ `strict_isolation` でない tenant にだけ gate 上で common を許可する(retrieval と同じ `buildTenantKnowledgeScopeSet` 判定、解決不能は fail-closed)。検証: `mission-context-pack.tenant.test.ts` に project 配下・兄弟 project 除外・common の E2E・strict/未登録/他 tenant の拒否を追加。
 
 - 2026-09-11: [テナントナレッジと actuator 活用の再評価](../improvement-plans-2026-09/TENANT_KNOWLEDGE_ACTUATOR_REVIEW_2026-09-11.ja.md)で、`knowledge place` の tenant 指定が子階層へ入る問題と、同一 ID の階層取り違えを修正。制作テーマの解決にも canonical execution scope と tier 制約を適用した。KA-01〜04 の検証記録と残課題は同計画に記載。
 
