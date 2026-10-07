@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
+import { DiagnosticError } from '@agent/core/logger';
 import {
   defineGenerator,
   defineScript,
@@ -203,6 +204,125 @@ describe('script harness', () => {
     await main([]);
 
     expect(process.exitCode).toBe(2);
+    process.exitCode = undefined;
+  });
+
+  it('prints the message — not the stack — when a script fails', async () => {
+    delete process.env.DEBUG;
+    process.exitCode = undefined;
+    const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const main = defineScript({
+      name: 'harness-stack-test',
+      run: () => {
+        throw new Error('boom failure');
+      },
+    });
+
+    await main([]);
+
+    const lines = err.mock.calls.map((call) => String(call[0]));
+    expect(lines[0]).toBe('[harness-stack-test] boom failure');
+    expect(lines.join('\n')).not.toContain('\n    at ');
+    expect(process.exitCode).toBe(1);
+    err.mockRestore();
+    process.exitCode = undefined;
+  });
+
+  it('appends a `next:` hint for classified system errors', async () => {
+    delete process.env.DEBUG;
+    process.exitCode = undefined;
+    const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const main = defineScript({
+      name: 'harness-hint-test',
+      run: () => {
+        const error = new Error('ENOENT: no such file or directory');
+        (error as NodeJS.ErrnoException).code = 'ENOENT';
+        throw error;
+      },
+    });
+
+    await main([]);
+
+    const lines = err.mock.calls.map((call) => String(call[0]));
+    expect(lines).toEqual([
+      '[harness-hint-test] ENOENT: no such file or directory',
+      '  next: verify the path exists, then retry',
+    ]);
+    err.mockRestore();
+    process.exitCode = undefined;
+  });
+
+  it('keeps the DiagnosticError `next:` inline without a generic hint', async () => {
+    delete process.env.DEBUG;
+    process.exitCode = undefined;
+    const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const main = defineScript({
+      name: 'harness-diagnostic-test',
+      run: () => {
+        throw new DiagnosticError({
+          code: 'THING_MISSING',
+          what: 'the thing is missing',
+          next: 'create the thing first',
+        });
+      },
+    });
+
+    await main([]);
+
+    const lines = err.mock.calls.map((call) => String(call[0]));
+    expect(lines).toEqual([
+      '[harness-diagnostic-test] [THING_MISSING] the thing is missing | next: create the thing first',
+    ]);
+    err.mockRestore();
+    process.exitCode = undefined;
+  });
+
+  it('prints the stack only when DEBUG is enabled', async () => {
+    process.env.DEBUG = '1';
+    process.exitCode = undefined;
+    const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const main = defineScript({
+      name: 'harness-debug-test',
+      run: () => {
+        throw new Error('debug boom');
+      },
+    });
+
+    try {
+      await main([]);
+      const output = err.mock.calls.map((call) => String(call[0])).join('\n');
+      expect(output).toContain('[harness-debug-test] debug boom');
+      expect(output).toContain('\n    at ');
+    } finally {
+      delete process.env.DEBUG;
+      err.mockRestore();
+      process.exitCode = undefined;
+    }
+  });
+
+  it('keeps stacks out of the JSON error report', async () => {
+    delete process.env.DEBUG;
+    process.exitCode = undefined;
+    const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const main = defineScript({
+      name: 'harness-json-error-test',
+      run: () => {
+        const error = new Error('gone');
+        (error as NodeJS.ErrnoException).code = 'ECONNREFUSED';
+        throw error;
+      },
+    });
+
+    await main(['--json']);
+
+    const parsed = JSON.parse(String(err.mock.calls[0]?.[0])) as Record<string, unknown>;
+    expect(parsed).toEqual({
+      ok: false,
+      error: 'gone',
+      next: 'confirm the target service is running and reachable',
+    });
+    expect(parsed.stack).toBeUndefined();
+    err.mockRestore();
     process.exitCode = undefined;
   });
 });
