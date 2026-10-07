@@ -132,10 +132,16 @@ function extractSuccessConditions(actions: BrowserExtensionAction[]): GoldenSucc
   for (const action of reversed) {
     if (conditions.length >= 3) break;
     if (action.op === 'extract_text_ref' && action.target) {
+      // An extraction region without an accessible name is recorded with its
+      // role as the name; that is not text the page shows, so it is no needle.
+      const name =
+        action.target.name && action.target.name !== action.target.role
+          ? action.target.name
+          : undefined;
       conditions.push({
         kind: 'text_present',
         role: action.target.role || undefined,
-        name_contains: action.target.name || undefined,
+        name_contains: name,
       });
     } else if (action.op === 'wait_for_ref' && action.target) {
       conditions.push({
