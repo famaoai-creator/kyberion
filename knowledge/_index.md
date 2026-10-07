@@ -446,6 +446,7 @@
 - [ドキュメントファイル読み取りプレイブック（PDF / PPTX / XLSX / DOCX → テキスト・表・OCR）](./product/orchestration/document-file-reading-playbook.ja.md) (public | Ecosystem Architect)
 - [ハイブリッド型AIネイティブ開発フロー (Hybrid AI-Native Flow)](./product/orchestration/hybrid-development-flow.md) (public | Ecosystem Architect)
 - [パイプライン結晶化ループ設計メモ](./product/orchestration/pipeline-crystallization-memo.md) (public | Kyberion)
+- [プロジェクト依存ミッション連鎖の実走メモ (PRJ-KYBERION-PRODUCTION-READINESS, 2026-10-07)](./product/orchestration/mission-dependency-chain-demo-20261007.md) (public | Unknown)
 - [ミッション実行規程 (Mission Execution Protocol v2.0)](./product/orchestration/mission-execution-protocol.md) (public | Kyberion Sovereign Entity)
 - [企業内ネットワーク環境セットアップガイド](./product/orchestration/corporate-env-guide.md) (public | Ecosystem Architect)
 - [残留データ（残骸）運用プレイブック — 実測スナップショットと掃除・運用の虎の巻](./product/orchestration/storage-residue-operations-playbook.ja.md) (public | Unknown)
