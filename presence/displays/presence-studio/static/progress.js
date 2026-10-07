@@ -59,9 +59,15 @@
 
   function fetchJson(url, options) {
     return fetch(scopedUrl(url), options).then(function (response) {
-      return response.json().then(function (body) {
-        return { ok: response.ok, status: response.status, body: body };
-      });
+      return response.json().then(
+        function (body) {
+          return { ok: response.ok, status: response.status, body: body };
+        },
+        function () {
+          // Gateways can deny with HTML or no body. Keep status authoritative.
+          return { ok: response.ok, status: response.status, body: null };
+        }
+      );
     });
   }
 
@@ -123,6 +129,7 @@
     vocab: {},
     vocabularyReady: false,
     loaded: false,
+    navigationPending: false,
     noticeKey: null,
     payload: { counts: {}, active: [], delivered: [], done: [], mirror_href: '' },
     filter: 'active',
@@ -207,9 +214,10 @@
   }
 
   function selectItem(id, title) {
+    if (!state.loaded || !findSection(id)) return;
     state.selectedId = id;
     state.selectedTitle = title || '';
-    if (state.noticeKey === 'progress_request_pending') showNotice(null);
+    if (isSelectionNotice()) showNotice(null);
     writeHashId(id);
     renderList();
     loadDetail();
@@ -640,6 +648,7 @@
   }
 
   function submitVerdict(item, status, note, row) {
+    if (!state.loaded) return;
     if (!state.verdictStorageKey) {
       showNotice('progress_scope_required');
       return;
@@ -687,16 +696,37 @@
       });
   }
 
+  function isSelectionNotice() {
+    return ['progress_request_pending', 'progress_item_unavailable'].indexOf(state.noticeKey) >= 0;
+  }
+
+  // A failed/currently refreshing read cannot leave old scope data or actions
+  // available to hash/filter handlers. Keep uncertain verdict storage intact.
+  function clearPresentation() {
+    state.loaded = false;
+    state.payload = { counts: {}, active: [], delivered: [], done: [], mirror_href: '' };
+    state.selectedId = null;
+    state.selectedTitle = '';
+    state.detailSequence += 1;
+    renderFilters();
+    renderList();
+    renderDetailHint();
+  }
+
   function loadDetail() {
     var sequence = ++state.detailSequence;
     var selectedId = state.selectedId;
     renderDetailHint();
-    if (!selectedId) return Promise.resolve();
+    if (!state.loaded || !selectedId) return Promise.resolve();
     return fetchJson('/api/progress/' + encodeURIComponent(selectedId))
       .then(function (result) {
         if (sequence !== state.detailSequence || selectedId !== state.selectedId) return;
         if (!result.ok || !result.body || !result.body.ok) {
-          showNotice('progress_load_failed');
+          if (result.status === 401 || result.status === 403 || result.status === 404) {
+            state.loadSequence += 1;
+            clearPresentation();
+            showNotice('progress_item_unavailable');
+          } else showNotice('progress_load_failed');
           return;
         }
         if (state.noticeKey === 'progress_load_failed') showNotice(null);
@@ -709,9 +739,14 @@
   }
 
   function applyHashOrDefault() {
-    var found = findSection(readHashId());
+    if (!state.loaded) return;
+    var hashId = readHashId();
+    var hasHash = Boolean(String(window.location.hash || '').replace(/^#/, ''));
+    var found = findSection(hashId);
     var request = new URLSearchParams(window.location.search).get('request');
-    if (!found && request) {
+    // A decodable explicit item is the target even when unavailable. A malformed
+    // fragment may still use the established request-correlation handoff.
+    if (!found && !hashId && request) {
       FILTERS.some(function (filter) {
         var match = itemsForFilter(filter).find(function (item) {
           return item.correlation_id === request;
@@ -719,25 +754,22 @@
         if (match) found = { filter: filter, item: match };
         return Boolean(match);
       });
-      if (!found) {
-        state.selectedId = null;
-        state.selectedTitle = '';
-        showNotice('progress_request_pending');
-        return;
-      }
     }
-    if (!found && !request) {
+    if (!found && !hasHash && !request) {
       var defaultActive = (state.payload.active || []).find(function (item) {
         return item.selected_default;
       });
       if (defaultActive) found = { filter: 'active', item: defaultActive };
     }
+    state.selectedId = found ? found.item.id : null;
+    state.selectedTitle = found ? found.item.title : '';
     if (found) {
       state.filter = found.filter;
-      state.selectedId = found.item.id;
-      state.selectedTitle = found.item.title;
+      if (isSelectionNotice()) showNotice(null);
       writeHashId(found.item.id);
-    }
+    } else if (hasHash || request) {
+      showNotice(hashId || !request ? 'progress_item_unavailable' : 'progress_request_pending');
+    } else if (isSelectionNotice()) showNotice(null);
   }
 
   function wireFilters() {
@@ -753,7 +785,9 @@
   }
 
   function reload() {
+    if (state.navigationPending) return Promise.resolve();
     var sequence = ++state.loadSequence;
+    clearPresentation();
     // A read can reconcile only decisions already uncertain when that read began.
     // An in-flight older snapshot must never unlock a later uncertain write.
     var reconciliationGeneration = state.verdictGeneration;
@@ -790,17 +824,16 @@
                 ? 'progress_action_failed'
                 : null
         );
-        if (state.selectedId && !findSection(state.selectedId)) {
-          state.selectedId = null;
-          writeHashId(null);
-        }
         applyHashOrDefault();
         renderFilters();
         renderList();
         return loadDetail();
       })
       .catch(function () {
-        if (sequence === state.loadSequence) showNotice('progress_load_failed');
+        if (sequence === state.loadSequence) {
+          clearPresentation();
+          showNotice('progress_load_failed');
+        }
       });
   }
 
@@ -935,6 +968,7 @@
       fetchJson('/api/front-desk/work-inventory'),
     ])
       .then(function (pair) {
+        if (state.navigationPending) return;
         var vocabResult = pair[0];
         var dataResult = pair[1];
         if (!vocabResult.ok || !vocabResult.body || !vocabResult.body.ok) return;
@@ -950,8 +984,10 @@
   }
 
   function refreshProgress() {
+    if (state.navigationPending) return Promise.resolve();
     return Promise.resolve(window.FrontDeskRail && window.FrontDeskRail.ready)
       .then(function () {
+        if (state.navigationPending) return;
         if (state.vocabularyReady) return reload();
         return fetchJson(
           '/api/progress-vocabulary?locale=' + encodeURIComponent(normalizeLocale())
@@ -968,6 +1004,15 @@
       });
   }
 
+  function navigationScope() {
+    var query = new URLSearchParams(window.location.search);
+    return JSON.stringify(
+      ['tenant', 'organizationId', 'projectId'].map(function (key) {
+        return query.getAll(key);
+      })
+    );
+  }
+
   function mount() {
     var locale = normalizeLocale();
     wireFilters();
@@ -977,15 +1022,31 @@
       refresh.addEventListener('click', function () {
         refreshProgress();
       });
-    window.addEventListener('hashchange', function () {
+    var initialScope = null;
+    function navigateSelection() {
+      if (initialScope === null || state.navigationPending) return;
+      if (navigationScope() !== initialScope) {
+        // Tenant preferences are initialized once by the shared rail. A scope
+        // traversal needs a fresh page rather than using its old cached scope.
+        state.navigationPending = true;
+        state.loadSequence += 1;
+        clearPresentation();
+        wi.payload = { scope: null, candidates: [], counts: {} };
+        renderWorkInventoryPanel();
+        window.location.reload();
+        return;
+      }
       applyHashOrDefault();
       renderFilters();
       renderList();
       loadDetail();
-    });
+    }
+    window.addEventListener('hashchange', navigateSelection);
+    window.addEventListener('popstate', navigateSelection);
     // The shared rail validates the selected scope before any tenant read.
     return Promise.resolve(window.FrontDeskRail && window.FrontDeskRail.ready)
       .then(function () {
+        initialScope = navigationScope();
         loadWorkInventoryPanel(locale);
         return refreshProgress();
       })

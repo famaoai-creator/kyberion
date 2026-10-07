@@ -71,12 +71,13 @@ function call(
   body: unknown = {},
   tenant = 'alpha-team',
   selection: Record<string, string> = {},
-  detail = false
+  detail = false,
+  detailId = 'artifact-1'
 ) {
   const req = {
     body,
     query: { tenant, ...selection },
-    params: { id: detail ? 'artifact-1' : 'entry-1' },
+    params: { id: detail ? detailId : 'entry-1' },
     headers: { host: '127.0.0.1:3031' },
     socket: { remoteAddress: '127.0.0.1' },
     path: method === 'GET' ? '/api/progress' : '/api/outcomes/entry-1/verdict',
@@ -210,4 +211,56 @@ it('checks artifact scope before following its in-scope task association', () =>
   const result = call('GET', {}, 'alpha-team', {}, true);
   expect(result.statusCode).toBe(404);
   expect(f.findTask).not.toHaveBeenCalledWith('task-1');
+});
+
+describe('explicit progress target HTTP boundaries', () => {
+  const selected = { organizationId: 'org-a', projectId: 'project-a' };
+  const exact = 'task/日本語 %2F';
+  const session = (tenant = 'alpha-team', project = 'project-a') => ({
+    session_id: exact,
+    goal: { summary: 'Scoped task detail' },
+    status: 'running',
+    scope: {
+      scope_kind: 'project',
+      tier: 'confidential',
+      tenant_slug: tenant,
+      organization_id: 'org-a',
+      project_id: project,
+    },
+  });
+  it('resolves only the exact decoded route identifier within the matching project', () => {
+    f.findTask.mockImplementation((id: string) => (id === exact ? session() : null));
+    const allowed = call('GET', {}, 'alpha-team', selected, true, exact);
+    expect(allowed.statusCode).toBe(200);
+    expect(allowed.body.item).toMatchObject({ requested: 'Scoped task detail' });
+    expect(f.findTask).toHaveBeenCalledWith(exact);
+    expect(
+      call('GET', {}, 'alpha-team', selected, true, encodeURIComponent(exact)).statusCode
+    ).toBe(404);
+    expect(f.accept).not.toHaveBeenCalled();
+    expect(f.mark).not.toHaveBeenCalled();
+  });
+  it.each(['unknown', 'tenant', 'project', 'organization'])(
+    'keeps %s targets unavailable without unrelated fallback',
+    (reason) => {
+      f.findTask.mockImplementation((id: string) => {
+        if (id !== exact || reason === 'unknown') return null;
+        const value = session(
+          reason === 'tenant' ? 'beta-team' : 'alpha-team',
+          reason === 'project' ? 'project-b' : 'project-a'
+        );
+        if (reason === 'organization') value.scope.organization_id = 'org-b';
+        return value;
+      });
+      const denied = call('GET', {}, 'alpha-team', selected, true, exact);
+      expect(denied.statusCode).toBe(404);
+      expect(denied.body.item).toBeUndefined();
+      expect(JSON.stringify(denied.body)).not.toContain('Scoped task detail');
+      expect(call().body.active).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: 'task-1' })])
+      );
+      expect(f.accept).not.toHaveBeenCalled();
+      expect(f.mark).not.toHaveBeenCalled();
+    }
+  );
 });
