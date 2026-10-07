@@ -67,7 +67,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
     if (recordingEnabled) {
       recordedFieldStates.clear();
+      lastRecordedActionAt = 0;
       observePage();
+      startOutcomeObserver();
+    } else {
+      stopOutcomeObserver();
     }
     sendResponse({ ok: true });
     return;
@@ -261,6 +265,100 @@ function goldenEvidence(conditions) {
   return { ok: true, elements };
 }
 
+// Success-message capture (golden-scenario anchor). While recording, a status
+// message that appears after the user's last action and then stays put is
+// recorded as a `wait_for_ref` step, so the procedure's golden scenario can
+// check the result instead of "the button I clicked is still visible". The
+// user still approves or rejects the step in review. Only [role="status"]
+// (role="alert" is usually an error), only text the PII scrubber left intact,
+// and only the settled text (a "Saving…" that turns into "Saved" records once).
+const OUTCOME_SELECTOR = '[role="status"]';
+const OUTCOME_WINDOW_MS = 10000;
+const OUTCOME_SETTLE_MS = 1200;
+const OUTCOME_MAX_WAIT_MS = 4000;
+let lastRecordedActionAt = 0;
+// Status texts as they were at the last action: only a message that changed
+// after it is an outcome (a cart counter that is always there is not).
+let outcomeBaseline = new Map();
+let outcomeObserver = null;
+let outcomeSettleTimer = null;
+let outcomeScanDeadline = 0;
+
+function startOutcomeObserver() {
+  if (outcomeObserver || !document.body) return;
+  outcomeObserver = new MutationObserver(() => {
+    // Settle, but never wait longer than OUTCOME_MAX_WAIT_MS on a page that
+    // keeps changing (clocks, spinners).
+    if (!outcomeSettleTimer) outcomeScanDeadline = Date.now() + OUTCOME_MAX_WAIT_MS;
+    clearTimeout(outcomeSettleTimer);
+    const delay = Math.max(0, Math.min(OUTCOME_SETTLE_MS, outcomeScanDeadline - Date.now()));
+    outcomeSettleTimer = setTimeout(() => {
+      outcomeSettleTimer = null;
+      scanOutcomeMessages();
+    }, delay);
+  });
+  outcomeObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+}
+
+function snapshotOutcomeBaseline() {
+  outcomeBaseline = new Map();
+  for (const element of document.querySelectorAll(OUTCOME_SELECTOR)) {
+    if (element instanceof HTMLElement)
+      outcomeBaseline.set(structuralPath(element), outcomeText(element));
+  }
+}
+
+function stopOutcomeObserver() {
+  clearTimeout(outcomeSettleTimer);
+  outcomeSettleTimer = null;
+  outcomeObserver?.disconnect();
+  outcomeObserver = null;
+}
+
+function outcomeText(element) {
+  const text = safeText(element.innerText || '').slice(0, 80);
+  return text && !text.includes('[REDACTED') ? text : '';
+}
+
+function scanOutcomeMessages() {
+  if (!recordingEnabled || !lastRecordedActionAt || !snapshotHash) return;
+  if (Date.now() - lastRecordedActionAt > OUTCOME_WINDOW_MS + OUTCOME_SETTLE_MS) return;
+  for (const element of document.querySelectorAll(OUTCOME_SELECTOR)) {
+    if (!(element instanceof HTMLElement) || !isVisible(element)) continue;
+    const text = outcomeText(element);
+    const domPath = structuralPath(element);
+    if (!text || !domPath || domPath.length > 600) continue;
+    if (outcomeBaseline.get(domPath) === text) continue;
+    record(
+      {
+        op: 'wait_for_ref',
+        summary: `完了表示「${text}」を待つ`,
+        target: {
+          ref: `@status_${shortHash(text)}_1`,
+          role: 'status',
+          name: text,
+          snapshot_hash: snapshotHash,
+          dom_path: domPath,
+        },
+      },
+      `outcome:${domPath}:${text}`
+    );
+  }
+}
+
+// A recorded success message is found by its text (status regions have no
+// accessible name of their own); anything else uses the normal resolution.
+function resolveOutcomeMessage(step) {
+  if (step.op !== 'wait_for_ref' || step.target?.role !== 'status') return null;
+  const matches = [...document.querySelectorAll(OUTCOME_SELECTOR)].filter(
+    (element) =>
+      element instanceof HTMLElement &&
+      isVisible(element) &&
+      outcomeText(element) === step.target.name
+  );
+  return matches.length > 0 ? { element: matches[0] } : null;
+}
+
 // --- Approved-step executor (lease-bound replay) -------------------------------
 // Re-snapshots before every step, resolves the reviewed ref against the live
 // DOM, and refuses to act when the target is missing or ambiguous.
@@ -324,6 +422,8 @@ function candidatesFor(step) {
 }
 
 function resolveTarget(step) {
+  const outcome = resolveOutcomeMessage(step);
+  if (outcome) return outcome;
   const candidates = candidatesFor(step);
   const exact = candidates.filter(
     (element) => semanticRef(element, roleOf(element), accessibleName(element)) === step.target.ref
@@ -1117,6 +1217,10 @@ function record(event, dedupeKey) {
   if (dedupeKey) {
     if (recordedFieldStates.has(dedupeKey)) return;
     recordedFieldStates.add(dedupeKey);
+  }
+  if (event.op !== 'wait_for_ref') {
+    lastRecordedActionAt = Date.now();
+    snapshotOutcomeBaseline();
   }
   chrome.runtime.sendMessage({ type: 'bridge:record-event', event }).catch(() => undefined);
 }
