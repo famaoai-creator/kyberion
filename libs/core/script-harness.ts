@@ -3,6 +3,7 @@ import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { readTextFile } from './foundation/text.js';
 import { withExecutionContext } from './authority.js';
 import { isDirectEntry } from './direct-entry.js';
+import { DiagnosticError } from './logger.js';
 
 export interface ScriptFlags {
   json: boolean;
@@ -98,6 +99,65 @@ export function stripSharedScriptFlags(args: readonly string[]): string[] {
   return args.filter((arg) => !SHARED_SCRIPT_FLAG_VALUES.has(arg));
 }
 
+// --- failure rendering -----------------------------------------------------
+// The harness is the single failure boundary for every `defineScript` CLI.
+// It prints `error.message` plus a `next:` remediation hint — never a raw
+// stack — unless DEBUG is set, matching the `core.ts` convention.
+
+export interface ScriptErrorReport {
+  /** Operator-facing message — never contains a stack trace. */
+  message: string;
+  /** Remediation hint when the error did not already carry `| next:` text. */
+  next?: string;
+  /** Stack text, present only when DEBUG is enabled. */
+  stack?: string;
+}
+
+const ERRNO_NEXT_HINTS: Readonly<Record<string, string>> = Object.freeze({
+  ENOENT: 'verify the path exists, then retry',
+  EACCES: 'check file permissions or run with sufficient privileges',
+  EPERM: 'check file permissions or run with sufficient privileges',
+  ENOSPC: 'free disk space, then retry',
+  ECONNREFUSED: 'confirm the target service is running and reachable',
+  ETIMEDOUT: 'check network connectivity, then retry',
+  ESOCKETTIMEDOUT: 'check network connectivity, then retry',
+  ENOTFOUND: 'check the hostname or DNS resolution',
+  EADDRINUSE: 'another process holds the port — stop it or choose a different port',
+  ERR_MODULE_NOT_FOUND: 'run `pnpm build` to regenerate dist/',
+});
+
+function errorNextHint(error: Error): string | undefined {
+  const code = (error as NodeJS.ErrnoException).code;
+  if (code && ERRNO_NEXT_HINTS[code]) return ERRNO_NEXT_HINTS[code];
+  if (error instanceof SyntaxError && /json/i.test(error.message)) {
+    return 'the input is not valid JSON — fix or regenerate the file';
+  }
+  if (/Cannot find module/.test(error.message)) {
+    return ERRNO_NEXT_HINTS.ERR_MODULE_NOT_FOUND;
+  }
+  return undefined;
+}
+
+/**
+ * Render an unknown thrown value into an operator-facing report. Plain
+ * `Error`s get a remediation hint when their class or message maps to a known
+ * failure; `DiagnosticError`s already carry `next`, so nothing is appended.
+ * Stacks are attached only when DEBUG (or `options.debug`) is set.
+ */
+export function renderScriptError(
+  error: unknown,
+  options: { debug?: boolean } = {}
+): ScriptErrorReport {
+  if (!(error instanceof Error)) return { message: String(error) };
+  const report: ScriptErrorReport = { message: error.message || String(error) };
+  if (!(error instanceof DiagnosticError) && !/\| next:/u.test(report.message)) {
+    report.next = errorNextHint(error);
+  }
+  const debug = options.debug ?? Boolean(getRegisteredEnvText('DEBUG'));
+  if (debug && error.stack) report.stack = error.stack;
+  return report;
+}
+
 export function defineScript<T>(options: {
   name: string;
   flags?: readonly ScriptFlag[];
@@ -126,14 +186,24 @@ export function defineScript<T>(options: {
         const exitCode = error instanceof ScriptExitError ? error.code : 1;
         const silent = error instanceof ScriptExitError && error.silent;
         if (!silent) {
-          const message =
+          const report =
             error instanceof ScriptExitError
-              ? error.message
-              : error instanceof Error
-                ? error.stack || error.message
-                : String(error);
-          if (!flags.json) console.error(`[${options.name}] ${message}`);
-          else console.error(JSON.stringify({ ok: false, error: message }));
+              ? { message: error.message }
+              : renderScriptError(error);
+          if (!flags.json) {
+            console.error(`[${options.name}] ${report.message}`);
+            if (report.next) console.error(`  next: ${report.next}`);
+            if (report.stack) console.error(report.stack);
+          } else {
+            console.error(
+              JSON.stringify({
+                ok: false,
+                error: report.message,
+                ...(report.next ? { next: report.next } : {}),
+                ...(report.stack ? { stack: report.stack } : {}),
+              })
+            );
+          }
         }
         process.exitCode = exitCode;
         if (error instanceof ScriptExitError && error.returnValue !== undefined) {
