@@ -344,13 +344,19 @@ async function verifyMission(id: string, result: 'verified' | 'rejected', note: 
 
 async function finishMission(id: string, seal: boolean = false) {
   const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
+  // A stale `mission_finish_gate_last_reason` from an earlier attempt must not
+  // be reported as THIS attempt's blocker (observed: a later run blocked on
+  // `status: active` but printed the previous run's pending-tasks reason).
+  const attemptStartedAt = nowIso();
   const result = await missionLifecycleService.finish(id, seal);
   const finalState = loadState(id.toUpperCase());
   const archivedPath = pathResolver.archivedMissionDir(id.toUpperCase());
-  const finishReason = String(
-    (finalState?.context as Record<string, unknown> | undefined)?.mission_finish_gate_last_reason ||
-      ''
-  );
+  const finishCtx = finalState?.context as Record<string, unknown> | undefined;
+  const lastCheckedAt = String(finishCtx?.mission_finish_gate_last_checked_at || '');
+  const finishReason =
+    lastCheckedAt >= attemptStartedAt
+      ? String(finishCtx?.mission_finish_gate_last_reason || '')
+      : '';
   if (
     (finalState && finalState.status !== 'archived') ||
     (!finalState && !safeExistsSync(archivedPath))

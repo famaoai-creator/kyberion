@@ -309,12 +309,38 @@ export function loadStateAtPath(statePath: string): MissionState | null {
  * callers must use `loadState`, which rejects schema-invalid state before it
  * reaches lifecycle logic.
  */
+/**
+ * Locate a mission directory for the explicit repair command — the plain
+ * directory scan, without the visibility locator. See loadStateForRepair.
+ */
+export function findMissionPathForRepair(
+  id: string,
+  options: { rootDir?: string; directories?: string[] } = {}
+): string | null {
+  const rootDir = options.rootDir || pathResolver.rootDir();
+  return findMissionPathAtRoot(id, rootDir, options.directories);
+}
+
 export function loadStateForRepair(
   id: string,
   options: { rootDir?: string; directories?: string[] } = {}
 ): MissionState | null {
-  const statePath = resolveMissionStatePath(id, options);
-  if (!statePath) return null;
+  // Repair exists precisely to fix states the visibility boundary can't
+  // resolve (legacy ownerless/inconsistent state). Resolve the path with the
+  // plain directory scan — going through findMissionPath's locator check
+  // would report the repair target itself as OWNER_NOT_VISIBLE. The operator
+  // invoked this command explicitly, so the scan is intentional; normal
+  // callers keep using the visibility-checked loadState path.
+  const rootDir = options.rootDir || pathResolver.rootDir();
+  const missionPath = findMissionPathAtRoot(id, rootDir, options.directories);
+  if (!missionPath) return null;
+  let statePath: string;
+  try {
+    statePath = assertSafeRepositoryPath(path.join(missionPath, 'mission-state.json'));
+  } catch {
+    return null;
+  }
+  if (!safeExistsSync(statePath)) return null;
   try {
     if (!safeLstat(statePath).isFile()) return null;
     return readJson<MissionState>(statePath);
