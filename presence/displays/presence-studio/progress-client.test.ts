@@ -99,6 +99,8 @@ const texts: Record<string, string> = {
   'front_desk:progress_action_failed': 'Decision outcome uncertain. Refresh before retry.',
   'front_desk:progress_storage_required': 'Allow session storage before recording a decision.',
   'front_desk:progress_scope_required': 'Decision scope could not be verified. Refresh.',
+  'front_desk:progress_item_unavailable':
+    'This work item is unavailable. Refresh or choose another item.',
   'front_desk:progress_request_pending': 'No tracked work is linked yet.',
   'front_desk:progress_refresh': 'Refresh',
   'front_desk:progress_phase_estimate': 'Phase estimate',
@@ -200,6 +202,7 @@ function harness(
       },
     },
     location: {
+      reload: vi.fn(),
       get href() {
         return location.href;
       },
@@ -427,6 +430,259 @@ describe('progress browser-script contracts', () => {
     expect(h.window.location.hash).toBe('#failed-work');
     expect(h.elements['progress-detail'].innerHTML).toContain('Failed');
   });
+  it.each(['#missing', '#%E0%A4%A'])(
+    'never substitutes a default for unresolved explicit target %s',
+    async (hash) => {
+      const payload = emptyPayload();
+      payload.active = [{ id: 'unrelated', title: 'Other', selected_default: true }];
+      const h = harness({ hash, fetcher: dataFetcher(payload) });
+      await h.window.KyberionProgress.mount();
+      expect(h.window.location.hash).toBe(hash);
+      expect(h.noticeText.textContent).toContain('work item is unavailable');
+      expect(h.fetch.mock.calls.some(([url]) => url.startsWith('/api/progress/'))).toBe(false);
+      h.elements['progress-list'].children[0].children[0].fire();
+      await flush();
+      expect(h.window.location.hash).toBe('#unrelated');
+      expect(h.elements['progress-notice'].hidden).toBe(true);
+    }
+  );
+  it('does not replace a valid missing hash with a matching request correlation', async () => {
+    const payload = emptyPayload();
+    payload.active = [
+      { id: 'other', title: 'Other', correlation_id: 'request-1', selected_default: true },
+    ];
+    const h = harness({
+      hash: '#missing',
+      search: '?request=request-1',
+      fetcher: dataFetcher(payload),
+    });
+    await h.window.KyberionProgress.mount();
+    expect(h.window.location.hash).toBe('#missing');
+    expect(h.fetch.mock.calls.some(([url]) => url.startsWith('/api/progress/'))).toBe(false);
+  });
+  it('preserves a disappeared target across refresh and resolves its later delivery', async () => {
+    const payload = emptyPayload();
+    payload.active = [
+      { id: 'target', title: 'Target' },
+      { id: 'other', title: 'Other', selected_default: true },
+    ];
+    const h = harness({ hash: '#target', fetcher: dataFetcher(payload) });
+    await h.window.KyberionProgress.mount();
+    payload.active.shift();
+    h.fetch.mockClear();
+    h.refresh.fire();
+    await flush();
+    expect(h.window.location.hash).toBe('#target');
+    expect(h.elements['progress-detail'].innerHTML).not.toContain('/api/progress/target');
+    expect(h.noticeText.textContent).toContain('work item is unavailable');
+    expect(h.fetch.mock.calls.some(([url]) => url.startsWith('/api/progress/'))).toBe(false);
+    payload.delivered = [{ id: 'target', title: 'Delivered target' }];
+    h.refresh.fire();
+    await flush();
+    expect(h.window.location.hash).toBe('#target');
+    expect(h.elements['filter-delivered'].attributes['aria-selected']).toBe('true');
+    expect(h.elements['progress-detail'].innerHTML).toContain('/api/progress/target');
+    expect(h.elements['progress-notice'].hidden).toBe(true);
+  });
+  it('clears selection and fences an old detail after an unknown hash navigation', async () => {
+    const payload = emptyPayload();
+    payload.active = [{ id: 'old', title: 'Old' }];
+    const pending = deferred<MockResponse>();
+    const h = harness({
+      fetcher: dataFetcher(payload, (path) =>
+        path === '/api/progress/old' ? pending.promise : undefined
+      ),
+    });
+    await h.window.KyberionProgress.mount();
+    h.elements['progress-list'].children[0].children[0].fire();
+    h.window.location.href = '/progress#missing';
+    h.listeners.hashchange();
+    pending.resolve(response(detail('private stale content')));
+    await flush();
+    expect(h.window.location.hash).toBe('#missing');
+    expect(h.elements['progress-detail'].innerHTML).not.toContain('private stale content');
+    expect(h.noticeText.textContent).toContain('work item is unavailable');
+  });
+  it('resolves an encoded exact ID once and keeps implicit default selection', async () => {
+    const payload = emptyPayload();
+    const id = 'task/日本語 %2F';
+    payload.done = [{ id, title: 'Exact' }];
+    payload.active = [{ id: 'default', title: 'Default', selected_default: true }];
+    const h = harness({ hash: '#' + encodeURIComponent(id), fetcher: dataFetcher(payload) });
+    await h.window.KyberionProgress.mount();
+    expect(
+      h.fetch.mock.calls.some(
+        ([url]) => url === '/api/progress/' + encodeURIComponent(id) + '?tenant=alpha'
+      )
+    ).toBe(true);
+    expect(h.elements['filter-done'].attributes['aria-selected']).toBe('true');
+    const implicit = harness({ fetcher: dataFetcher(payload) });
+    await implicit.window.KyberionProgress.mount();
+    expect(implicit.window.location.hash).toBe('#default');
+  });
+  it('clears old detail immediately when refresh begins and ignores its late response', async () => {
+    const payload = emptyPayload();
+    payload.active = [{ id: 'old', title: 'Old' }];
+    const staleDetail = deferred<MockResponse>();
+    const pendingList = deferred<MockResponse>();
+    let reads = 0;
+    const h = harness({
+      fetcher: dataFetcher(payload, (path) => {
+        if (path === '/api/progress' && ++reads === 2) return pendingList.promise;
+        if (path === '/api/progress/old') return staleDetail.promise;
+        return undefined;
+      }),
+    });
+    await h.window.KyberionProgress.mount();
+    h.elements['progress-list'].children[0].children[0].fire();
+    h.refresh.fire();
+    await flush();
+    staleDetail.resolve(response(detail('old private bytes')));
+    await flush();
+    expect(h.elements['progress-detail'].innerHTML).not.toContain('old private bytes');
+    expect(h.elements['progress-list'].children).toHaveLength(0);
+    pendingList.resolve(response({ ok: false, error: 'private denial detail' }, false));
+    await flush();
+    h.elements['filter-active'].fire();
+    h.listeners.hashchange();
+    await flush();
+    expect(h.elements['progress-list'].children).toHaveLength(0);
+    expect(h.elements['progress-detail'].innerHTML).not.toContain('old private bytes');
+    expect(h.noticeText.textContent).not.toContain('private denial detail');
+    expect(h.window.location.hash).toBe('#old');
+  });
+  it.each([401, 403, 404])(
+    'clears cached actions on detail denial %s without forgetting uncertain decisions',
+    async (status) => {
+      const payload = emptyPayload();
+      payload.delivered = [
+        { id: 'target', title: 'Private result', can_verdict: true, entry_id: 'inbox-1' },
+      ];
+      const key = 'front-desk.progress.uncertain.principal-alpha';
+      const storage = new Map([[key, JSON.stringify(['inbox-1'])]]);
+      const h = harness({
+        hash: '#target',
+        storage,
+        fetcher: dataFetcher(payload, (path) =>
+          path === '/api/progress/target'
+            ? Promise.resolve({
+                ...response({ ok: false, error: 'private context' }, false),
+                status,
+              })
+            : undefined
+        ),
+      });
+      await h.window.KyberionProgress.mount();
+      h.elements['filter-delivered'].fire();
+      h.listeners.hashchange();
+      await flush();
+      expect(h.elements['progress-list'].children).toHaveLength(0);
+      expect(h.elements['progress-detail'].innerHTML).not.toContain('Private result');
+      expect(h.noticeText.textContent).toContain('work item is unavailable');
+      expect(storage.get(key)).toBe(JSON.stringify(['inbox-1']));
+      expect(h.fetch.mock.calls.every(([, options]) => options?.method !== 'POST')).toBe(true);
+    }
+  );
+  it('handles query-only history traversal and reloads before changed-scope navigation', async () => {
+    const payload = emptyPayload();
+    payload.active = [
+      { id: 'one', title: 'One', correlation_id: 'r1' },
+      { id: 'two', title: 'Two', correlation_id: 'r2' },
+    ];
+    const h = harness({ search: '?request=r1', fetcher: dataFetcher(payload) });
+    await h.window.KyberionProgress.mount();
+    h.window.location.href = '/progress?request=r2';
+    h.listeners.popstate();
+    await flush();
+    expect(h.window.location.hash).toBe('#two');
+    h.window.location.href = '/progress?request=r1';
+    h.listeners.popstate();
+    await flush();
+    expect(h.window.location.hash).toBe('#one');
+    h.fetch.mockClear();
+    h.window.location.href = '/progress?tenant=beta#two';
+    h.listeners.popstate();
+    await flush();
+    expect(h.window.location.reload).toHaveBeenCalledOnce();
+    expect(h.elements['progress-list'].children).toHaveLength(0);
+    expect(h.elements['progress-detail'].innerHTML).not.toContain('/api/progress/one');
+    expect(h.fetch).not.toHaveBeenCalled();
+  });
+  it('captures scope after the shared rail normalizes the URL', async () => {
+    const ready = deferred<void>();
+    const payload = emptyPayload();
+    payload.active = [
+      { id: 'one', title: 'One' },
+      { id: 'two', title: 'Two' },
+    ];
+    const h = harness({ ready: ready.promise, hash: '#one', fetcher: dataFetcher(payload) });
+    const mounted = h.window.KyberionProgress.mount();
+    await flush();
+    h.window.location.href = '/progress?tenant=alpha#one';
+    ready.resolve();
+    await mounted;
+    h.window.location.href = '/progress?tenant=alpha#two';
+    h.listeners.hashchange();
+    await flush();
+    expect(h.window.location.reload).not.toHaveBeenCalled();
+    expect(h.elements['progress-detail'].innerHTML).toContain('/api/progress/two');
+  });
+  it('never restarts old-scope reads after a late verdict settles during navigation', async () => {
+    const payload = emptyPayload();
+    payload.delivered = [
+      { id: 'target', title: 'Old tenant', can_verdict: true, entry_id: 'inbox-1' },
+    ];
+    const pending = deferred<MockResponse>();
+    const storage = new Map<string, string>();
+    const h = harness({
+      hash: '#target',
+      storage,
+      fetcher: dataFetcher(payload, (_path, input) =>
+        input?.method === 'POST' ? pending.promise : undefined
+      ),
+    });
+    await h.window.KyberionProgress.mount();
+    h.elements['progress-list'].children[0].children[0]
+      .querySelector('[data-action="receive"]')!
+      .fire();
+    h.window.location.href = '/progress?tenant=beta#target';
+    h.listeners.popstate();
+    h.fetch.mockClear();
+    pending.resolve(response({ ok: true }));
+    h.refresh.fire();
+    await flush();
+    expect(h.fetch).not.toHaveBeenCalled();
+    expect(h.elements['progress-list'].children).toHaveLength(0);
+    expect(h.elements['progress-detail'].innerHTML).not.toContain('Old tenant');
+    expect(storage.get('front-desk.progress.uncertain.principal-alpha')).toBe(
+      JSON.stringify(['inbox-1'])
+    );
+  });
+  it('clears cached actions on non-JSON detail denial', async () => {
+    const payload = emptyPayload();
+    payload.delivered = [
+      { id: 'target', title: 'Old result', can_verdict: true, entry_id: 'inbox-1' },
+    ];
+    const h = harness({
+      hash: '#target',
+      fetcher: dataFetcher(payload, (path) =>
+        path === '/api/progress/target'
+          ? Promise.resolve({
+              ok: false,
+              status: 403,
+              json: async () => {
+                throw new Error('gateway private error');
+              },
+            })
+          : undefined
+      ),
+    });
+    await h.window.KyberionProgress.mount();
+    h.elements['filter-delivered'].fire();
+    expect(h.elements['progress-list'].children).toHaveLength(0);
+    expect(h.noticeText.textContent).toContain('work item is unavailable');
+    expect(h.noticeText.textContent).not.toContain('gateway');
+  });
   it('labels status-derived progress as a phase estimate and omits unqualified numeric bars', async () => {
     const payload = emptyPayload();
     payload.active = [
@@ -464,7 +720,7 @@ describe('progress browser-script contracts', () => {
     expect(h.elements['progress-detail'].innerHTML).toContain('newer selection');
     expect(h.elements['progress-detail'].innerHTML).not.toContain('stale selection');
   });
-  it('shows recoverable load errors and does not clear an explicit selected item', async () => {
+  it('shows generic detail unavailability and preserves the explicit URL target', async () => {
     const payload = emptyPayload();
     payload.active = [{ id: 'kept', title: 'Kept' }];
     const h = harness({
@@ -474,7 +730,8 @@ describe('progress browser-script contracts', () => {
       ),
     });
     await h.window.KyberionProgress.mount();
-    expect(h.noticeText.textContent).toContain('Could not load');
+    expect(h.noticeText.textContent).toContain('work item is unavailable');
+    expect(h.elements['progress-list'].children).toHaveLength(0);
     expect(h.window.location.hash).toBe('#kept');
     expect(h.elements['progress-notice'].hidden).toBe(false);
   });
