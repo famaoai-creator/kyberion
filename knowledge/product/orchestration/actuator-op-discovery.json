@@ -22394,11 +22394,159 @@
           "examples": [{}]
         },
         {
+          "op": "resolve_next_target",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
+                "type": "string"
+              },
+              "now": {},
+              "started_ago_min": {
+                "type": "number"
+              },
+              "starts_within_min": {
+                "type": "number"
+              },
+              "max_duration_sec": {
+                "type": "number"
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "events": []
+            }
+          ]
+        },
+        {
+          "op": "normalize_transcript",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "transcript": {
+                "type": "string"
+              },
+              "transcript_path": {
+                "type": "string"
+              },
+              "attendees": {
+                "type": "array"
+              },
+              "attendees_from": {
+                "type": "string"
+              },
+              "speaker_aliases": {
+                "type": "object"
+              },
+              "language": {
+                "type": "string"
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "transcript_path": "active/shared/tmp/meeting.vtt"
+            }
+          ]
+        },
+        {
           "op": "audit_speaker_fairness",
           "kind": "apply",
           "input_schema": {
             "type": "object",
             "properties": {
+              "export_as": {
+                "type": "string"
+              },
+              "mission_id": {
+                "type": "string"
+              },
+              "work_item_id": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "provider_profile_id": {
+                "type": "string"
+              },
+              "execution_profile_id": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": ["transcribe", "realtime"]
+              },
+              "node": {
+                "type": "string",
+                "enum": ["local", "named-node"]
+              },
+              "audio_bridge": {
+                "type": "string"
+              },
+              "url_policy": {
+                "type": "string",
+                "enum": ["explicit_only", "explicit_or_detected"]
+              },
+              "url": {
+                "type": "string"
+              },
+              "meeting_id": {
+                "type": "string"
+              },
+              "passcode": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "duration_sec": {
+                "type": "number"
+              },
+              "transcript_path": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "join_backend": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
               "agenda": {
                 "type": "array"
               },
@@ -22406,6 +22554,12 @@
                 "type": "array"
               },
               "attendees_from": {
+                "type": "string"
+              },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
                 "type": "string"
               },
               "counterparty_ref": {
@@ -22423,175 +22577,22 @@
               "enforce_restricted_actions": {
                 "type": "boolean"
               },
-              "export_as": {
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
                 "type": "string"
               },
               "facilitator_persona_label": {
                 "type": "string"
               },
+              "goal": {
+                "type": "string"
+              },
               "item": {
-                "type": "object",
-                "properties": {
-                  "item_id": {
-                    "type": "string"
-                  },
-                  "mission_id": {
-                    "type": "string"
-                  },
-                  "meeting_ref": {},
-                  "title": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  },
-                  "assignee": {},
-                  "due_at": {
-                    "type": "string"
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "modality": {
-                    "type": "string"
-                  },
-                  "review_state": {
-                    "type": "string"
-                  },
-                  "provenance": {},
-                  "max_reminders": {
-                    "type": "number"
-                  },
-                  "policy": {},
-                  "priority": {
-                    "type": "string"
-                  },
-                  "created_at": {
-                    "type": "string"
-                  },
-                  "updated_at": {
-                    "type": "string"
-                  },
-                  "completed_at": {
-                    "type": "string"
-                  },
-                  "blocked_reason": {
-                    "type": "string"
-                  },
-                  "tenant_slug": {
-                    "type": "string"
-                  },
-                  "reminders": {
-                    "type": "array"
-                  },
-                  "execution": {}
-                },
-                "additionalProperties": false
-              },
-              "item_from": {
-                "type": "string"
-              },
-              "language": {
-                "type": "string"
-              },
-              "max_items": {
-                "type": "number"
-              },
-              "meeting_id": {
-                "type": "string"
-              },
-              "mode": {
-                "type": "string",
-                "enum": ["transcribe", "realtime"]
-              },
-              "mission_id": {
-                "type": "string"
-              },
-              "mission_ids": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "node": {
-                "type": "string",
-                "enum": ["local", "named-node"]
-              },
-              "operator_label": {
-                "type": "string"
-              },
-              "output_path": {
-                "type": "string"
-              },
-              "passcode": {
-                "type": "string"
-              },
-              "partial_reason": {
-                "type": "string"
-              },
-              "partial_state": {
-                "type": "boolean"
-              },
-              "platform": {
-                "type": "string"
-              },
-              "proposal_draft_ref": {
-                "type": "string"
-              },
-              "provider": {
-                "type": "string"
-              },
-              "provider_profile_id": {
-                "type": "string"
-              },
-              "recent_transcript_chunk": {
-                "type": "string"
-              },
-              "remaining_minutes": {
-                "type": "number"
-              },
-              "structure": {
-                "type": "array"
-              },
-              "speaker_aliases": {
                 "type": "object"
               },
-              "tenant_slug": {
-                "type": "string"
-              },
-              "text": {
-                "type": "string"
-              },
-              "tone": {
-                "type": "string",
-                "enum": ["friendly", "formal", "urgent"]
-              },
-              "transcript": {
-                "type": "string"
-              },
-              "transcript_path": {
-                "type": "string"
-              },
-              "url": {
-                "type": "string"
-              },
-              "url_policy": {
-                "type": "string",
-                "enum": ["explicit_only", "explicit_or_detected"]
-              },
-              "work_item_id": {
-                "type": "string"
-              },
-              "audio_bridge": {
-                "type": "string"
-              },
-              "answers": {
-                "type": "array"
-              },
-              "counterparty_label": {
-                "type": "string"
-              },
-              "goal": {
+              "item_from": {
                 "type": "string"
               },
               "learner_label": {
@@ -22603,62 +22604,45 @@
               "material_path": {
                 "type": "string"
               },
-              "topic": {
-                "type": "string"
-              },
-              "duration_sec": {
-                "type": "number"
-              },
-              "execution_profile_id": {
-                "type": "string"
-              },
-              "display_name": {
-                "type": "string"
-              },
-              "enable_captions": {
-                "type": "boolean"
-              },
-              "end": {
-                "type": "string"
-              },
-              "events": {
-                "type": "array"
-              },
-              "events_from": {
-                "type": "string"
-              },
-              "headed": {
-                "type": "boolean"
-              },
-              "join_backend": {
-                "type": "string"
-              },
-              "join_timeout_sec": {
-                "type": "number"
-              },
               "max_duration_sec": {
                 "type": "number"
               },
-              "name": {
+              "max_items": {
+                "type": "number"
+              },
+              "mission_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "now": {},
+              "operator_label": {
                 "type": "string"
               },
-              "now": {
+              "output_path": {
                 "type": "string"
               },
-              "profile_id": {
+              "partial_reason": {
                 "type": "string"
               },
-              "python_bin": {
-                "type": "string"
-              },
-              "raise_hand": {
+              "partial_state": {
                 "type": "boolean"
               },
-              "screenshot_path": {
+              "proposal_draft_ref": {
                 "type": "string"
               },
-              "start": {
+              "recent_transcript_chunk": {
                 "type": "string"
+              },
+              "remaining_minutes": {
+                "type": "number"
+              },
+              "report_path": {
+                "type": "string"
+              },
+              "speaker_aliases": {
+                "type": "object"
               },
               "started_ago_min": {
                 "type": "number"
@@ -22666,11 +22650,18 @@
               "starts_within_min": {
                 "type": "number"
               },
-              "user_data_dir": {
+              "structure": {
+                "type": "array"
+              },
+              "tone": {
+                "type": "string",
+                "enum": ["friendly", "formal", "urgent"]
+              },
+              "topic": {
                 "type": "string"
               },
-              "ws_port": {
-                "type": "number"
+              "transcript": {
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -22687,280 +22678,20 @@
           "input_schema": {
             "type": "object",
             "properties": {
-              "agenda": {
-                "type": "array"
-              },
-              "attendees": {
-                "type": "array"
-              },
-              "attendees_from": {
-                "type": "string"
-              },
-              "counterparty_ref": {
-                "type": "string"
-              },
-              "current_topic": {
-                "type": "string"
-              },
-              "days_overdue": {
-                "type": "number"
-              },
-              "default_assignee_label": {
-                "type": "string"
-              },
-              "enforce_restricted_actions": {
-                "type": "boolean"
-              },
-              "export_as": {
-                "type": "string"
-              },
-              "facilitator_persona_label": {
-                "type": "string"
-              },
-              "item": {
-                "type": "object",
-                "properties": {
-                  "item_id": {
-                    "type": "string"
-                  },
-                  "mission_id": {
-                    "type": "string"
-                  },
-                  "meeting_ref": {},
-                  "title": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  },
-                  "assignee": {},
-                  "due_at": {
-                    "type": "string"
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "modality": {
-                    "type": "string"
-                  },
-                  "review_state": {
-                    "type": "string"
-                  },
-                  "provenance": {},
-                  "max_reminders": {
-                    "type": "number"
-                  },
-                  "policy": {},
-                  "priority": {
-                    "type": "string"
-                  },
-                  "created_at": {
-                    "type": "string"
-                  },
-                  "updated_at": {
-                    "type": "string"
-                  },
-                  "completed_at": {
-                    "type": "string"
-                  },
-                  "blocked_reason": {
-                    "type": "string"
-                  },
-                  "tenant_slug": {
-                    "type": "string"
-                  },
-                  "reminders": {
-                    "type": "array"
-                  },
-                  "execution": {}
-                },
-                "additionalProperties": false
-              },
-              "item_from": {
-                "type": "string"
-              },
-              "language": {
-                "type": "string"
-              },
-              "max_items": {
-                "type": "number"
-              },
-              "meeting_id": {
-                "type": "string"
-              },
-              "mode": {
-                "type": "string",
-                "enum": ["transcribe", "realtime"]
-              },
-              "mission_id": {
-                "type": "string"
-              },
-              "mission_ids": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "node": {
-                "type": "string",
-                "enum": ["local", "named-node"]
-              },
-              "operator_label": {
-                "type": "string"
-              },
-              "output_path": {
-                "type": "string"
-              },
-              "passcode": {
-                "type": "string"
-              },
-              "partial_reason": {
-                "type": "string"
-              },
-              "partial_state": {
-                "type": "boolean"
-              },
               "platform": {
-                "type": "string"
-              },
-              "proposal_draft_ref": {
-                "type": "string"
-              },
-              "provider": {
-                "type": "string"
-              },
-              "provider_profile_id": {
-                "type": "string"
-              },
-              "recent_transcript_chunk": {
-                "type": "string"
-              },
-              "remaining_minutes": {
-                "type": "number"
-              },
-              "structure": {
-                "type": "array"
-              },
-              "speaker_aliases": {
-                "type": "object"
-              },
-              "tenant_slug": {
                 "type": "string"
               },
               "text": {
                 "type": "string"
               },
-              "tone": {
-                "type": "string",
-                "enum": ["friendly", "formal", "urgent"]
-              },
-              "transcript": {
+              "mission_id": {
                 "type": "string"
               },
-              "transcript_path": {
+              "export_as": {
                 "type": "string"
-              },
-              "url": {
-                "type": "string"
-              },
-              "url_policy": {
-                "type": "string",
-                "enum": ["explicit_only", "explicit_or_detected"]
-              },
-              "work_item_id": {
-                "type": "string"
-              },
-              "audio_bridge": {
-                "type": "string"
-              },
-              "answers": {
-                "type": "array"
-              },
-              "counterparty_label": {
-                "type": "string"
-              },
-              "goal": {
-                "type": "string"
-              },
-              "learner_label": {
-                "type": "string"
-              },
-              "material": {
-                "type": "string"
-              },
-              "material_path": {
-                "type": "string"
-              },
-              "topic": {
-                "type": "string"
-              },
-              "duration_sec": {
-                "type": "number"
-              },
-              "execution_profile_id": {
-                "type": "string"
-              },
-              "display_name": {
-                "type": "string"
-              },
-              "enable_captions": {
-                "type": "boolean"
-              },
-              "end": {
-                "type": "string"
-              },
-              "events": {
-                "type": "array"
-              },
-              "events_from": {
-                "type": "string"
-              },
-              "headed": {
-                "type": "boolean"
-              },
-              "join_backend": {
-                "type": "string"
-              },
-              "join_timeout_sec": {
-                "type": "number"
-              },
-              "max_duration_sec": {
-                "type": "number"
-              },
-              "name": {
-                "type": "string"
-              },
-              "now": {
-                "type": "string"
-              },
-              "profile_id": {
-                "type": "string"
-              },
-              "python_bin": {
-                "type": "string"
-              },
-              "raise_hand": {
-                "type": "boolean"
-              },
-              "screenshot_path": {
-                "type": "string"
-              },
-              "start": {
-                "type": "string"
-              },
-              "started_ago_min": {
-                "type": "number"
-              },
-              "starts_within_min": {
-                "type": "number"
-              },
-              "user_data_dir": {
-                "type": "string"
-              },
-              "ws_port": {
-                "type": "number"
               }
             },
+            "required": ["text"],
             "additionalProperties": false
           },
           "examples": [
@@ -22975,6 +22706,84 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "export_as": {
+                "type": "string"
+              },
+              "mission_id": {
+                "type": "string"
+              },
+              "work_item_id": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "provider_profile_id": {
+                "type": "string"
+              },
+              "execution_profile_id": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": ["transcribe", "realtime"]
+              },
+              "node": {
+                "type": "string",
+                "enum": ["local", "named-node"]
+              },
+              "audio_bridge": {
+                "type": "string"
+              },
+              "url_policy": {
+                "type": "string",
+                "enum": ["explicit_only", "explicit_or_detected"]
+              },
+              "url": {
+                "type": "string"
+              },
+              "meeting_id": {
+                "type": "string"
+              },
+              "passcode": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "duration_sec": {
+                "type": "number"
+              },
+              "transcript_path": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "join_backend": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
               "agenda": {
                 "type": "array"
               },
@@ -22982,6 +22791,12 @@
                 "type": "array"
               },
               "attendees_from": {
+                "type": "string"
+              },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
                 "type": "string"
               },
               "counterparty_ref": {
@@ -22999,175 +22814,22 @@
               "enforce_restricted_actions": {
                 "type": "boolean"
               },
-              "export_as": {
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
                 "type": "string"
               },
               "facilitator_persona_label": {
                 "type": "string"
               },
+              "goal": {
+                "type": "string"
+              },
               "item": {
-                "type": "object",
-                "properties": {
-                  "item_id": {
-                    "type": "string"
-                  },
-                  "mission_id": {
-                    "type": "string"
-                  },
-                  "meeting_ref": {},
-                  "title": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  },
-                  "assignee": {},
-                  "due_at": {
-                    "type": "string"
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "modality": {
-                    "type": "string"
-                  },
-                  "review_state": {
-                    "type": "string"
-                  },
-                  "provenance": {},
-                  "max_reminders": {
-                    "type": "number"
-                  },
-                  "policy": {},
-                  "priority": {
-                    "type": "string"
-                  },
-                  "created_at": {
-                    "type": "string"
-                  },
-                  "updated_at": {
-                    "type": "string"
-                  },
-                  "completed_at": {
-                    "type": "string"
-                  },
-                  "blocked_reason": {
-                    "type": "string"
-                  },
-                  "tenant_slug": {
-                    "type": "string"
-                  },
-                  "reminders": {
-                    "type": "array"
-                  },
-                  "execution": {}
-                },
-                "additionalProperties": false
-              },
-              "item_from": {
-                "type": "string"
-              },
-              "language": {
-                "type": "string"
-              },
-              "max_items": {
-                "type": "number"
-              },
-              "meeting_id": {
-                "type": "string"
-              },
-              "mode": {
-                "type": "string",
-                "enum": ["transcribe", "realtime"]
-              },
-              "mission_id": {
-                "type": "string"
-              },
-              "mission_ids": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "node": {
-                "type": "string",
-                "enum": ["local", "named-node"]
-              },
-              "operator_label": {
-                "type": "string"
-              },
-              "output_path": {
-                "type": "string"
-              },
-              "passcode": {
-                "type": "string"
-              },
-              "partial_reason": {
-                "type": "string"
-              },
-              "partial_state": {
-                "type": "boolean"
-              },
-              "platform": {
-                "type": "string"
-              },
-              "proposal_draft_ref": {
-                "type": "string"
-              },
-              "provider": {
-                "type": "string"
-              },
-              "provider_profile_id": {
-                "type": "string"
-              },
-              "recent_transcript_chunk": {
-                "type": "string"
-              },
-              "remaining_minutes": {
-                "type": "number"
-              },
-              "structure": {
-                "type": "array"
-              },
-              "speaker_aliases": {
                 "type": "object"
               },
-              "tenant_slug": {
-                "type": "string"
-              },
-              "text": {
-                "type": "string"
-              },
-              "tone": {
-                "type": "string",
-                "enum": ["friendly", "formal", "urgent"]
-              },
-              "transcript": {
-                "type": "string"
-              },
-              "transcript_path": {
-                "type": "string"
-              },
-              "url": {
-                "type": "string"
-              },
-              "url_policy": {
-                "type": "string",
-                "enum": ["explicit_only", "explicit_or_detected"]
-              },
-              "work_item_id": {
-                "type": "string"
-              },
-              "audio_bridge": {
-                "type": "string"
-              },
-              "answers": {
-                "type": "array"
-              },
-              "counterparty_label": {
-                "type": "string"
-              },
-              "goal": {
+              "item_from": {
                 "type": "string"
               },
               "learner_label": {
@@ -23179,62 +22841,45 @@
               "material_path": {
                 "type": "string"
               },
-              "topic": {
-                "type": "string"
-              },
-              "duration_sec": {
-                "type": "number"
-              },
-              "execution_profile_id": {
-                "type": "string"
-              },
-              "display_name": {
-                "type": "string"
-              },
-              "enable_captions": {
-                "type": "boolean"
-              },
-              "end": {
-                "type": "string"
-              },
-              "events": {
-                "type": "array"
-              },
-              "events_from": {
-                "type": "string"
-              },
-              "headed": {
-                "type": "boolean"
-              },
-              "join_backend": {
-                "type": "string"
-              },
-              "join_timeout_sec": {
-                "type": "number"
-              },
               "max_duration_sec": {
                 "type": "number"
               },
-              "name": {
+              "max_items": {
+                "type": "number"
+              },
+              "mission_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "now": {},
+              "operator_label": {
                 "type": "string"
               },
-              "now": {
+              "output_path": {
                 "type": "string"
               },
-              "profile_id": {
+              "partial_reason": {
                 "type": "string"
               },
-              "python_bin": {
-                "type": "string"
-              },
-              "raise_hand": {
+              "partial_state": {
                 "type": "boolean"
               },
-              "screenshot_path": {
+              "proposal_draft_ref": {
                 "type": "string"
               },
-              "start": {
+              "recent_transcript_chunk": {
                 "type": "string"
+              },
+              "remaining_minutes": {
+                "type": "number"
+              },
+              "report_path": {
+                "type": "string"
+              },
+              "speaker_aliases": {
+                "type": "object"
               },
               "started_ago_min": {
                 "type": "number"
@@ -23242,11 +22887,18 @@
               "starts_within_min": {
                 "type": "number"
               },
-              "user_data_dir": {
+              "structure": {
+                "type": "array"
+              },
+              "tone": {
+                "type": "string",
+                "enum": ["friendly", "formal", "urgent"]
+              },
+              "topic": {
                 "type": "string"
               },
-              "ws_port": {
-                "type": "number"
+              "transcript": {
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -23263,6 +22915,84 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "export_as": {
+                "type": "string"
+              },
+              "mission_id": {
+                "type": "string"
+              },
+              "work_item_id": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "provider_profile_id": {
+                "type": "string"
+              },
+              "execution_profile_id": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": ["transcribe", "realtime"]
+              },
+              "node": {
+                "type": "string",
+                "enum": ["local", "named-node"]
+              },
+              "audio_bridge": {
+                "type": "string"
+              },
+              "url_policy": {
+                "type": "string",
+                "enum": ["explicit_only", "explicit_or_detected"]
+              },
+              "url": {
+                "type": "string"
+              },
+              "meeting_id": {
+                "type": "string"
+              },
+              "passcode": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "duration_sec": {
+                "type": "number"
+              },
+              "transcript_path": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "join_backend": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
               "agenda": {
                 "type": "array"
               },
@@ -23270,6 +23000,12 @@
                 "type": "array"
               },
               "attendees_from": {
+                "type": "string"
+              },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
                 "type": "string"
               },
               "counterparty_ref": {
@@ -23287,175 +23023,22 @@
               "enforce_restricted_actions": {
                 "type": "boolean"
               },
-              "export_as": {
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
                 "type": "string"
               },
               "facilitator_persona_label": {
                 "type": "string"
               },
+              "goal": {
+                "type": "string"
+              },
               "item": {
-                "type": "object",
-                "properties": {
-                  "item_id": {
-                    "type": "string"
-                  },
-                  "mission_id": {
-                    "type": "string"
-                  },
-                  "meeting_ref": {},
-                  "title": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  },
-                  "assignee": {},
-                  "due_at": {
-                    "type": "string"
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "modality": {
-                    "type": "string"
-                  },
-                  "review_state": {
-                    "type": "string"
-                  },
-                  "provenance": {},
-                  "max_reminders": {
-                    "type": "number"
-                  },
-                  "policy": {},
-                  "priority": {
-                    "type": "string"
-                  },
-                  "created_at": {
-                    "type": "string"
-                  },
-                  "updated_at": {
-                    "type": "string"
-                  },
-                  "completed_at": {
-                    "type": "string"
-                  },
-                  "blocked_reason": {
-                    "type": "string"
-                  },
-                  "tenant_slug": {
-                    "type": "string"
-                  },
-                  "reminders": {
-                    "type": "array"
-                  },
-                  "execution": {}
-                },
-                "additionalProperties": false
-              },
-              "item_from": {
-                "type": "string"
-              },
-              "language": {
-                "type": "string"
-              },
-              "max_items": {
-                "type": "number"
-              },
-              "meeting_id": {
-                "type": "string"
-              },
-              "mode": {
-                "type": "string",
-                "enum": ["transcribe", "realtime"]
-              },
-              "mission_id": {
-                "type": "string"
-              },
-              "mission_ids": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "node": {
-                "type": "string",
-                "enum": ["local", "named-node"]
-              },
-              "operator_label": {
-                "type": "string"
-              },
-              "output_path": {
-                "type": "string"
-              },
-              "passcode": {
-                "type": "string"
-              },
-              "partial_reason": {
-                "type": "string"
-              },
-              "partial_state": {
-                "type": "boolean"
-              },
-              "platform": {
-                "type": "string"
-              },
-              "proposal_draft_ref": {
-                "type": "string"
-              },
-              "provider": {
-                "type": "string"
-              },
-              "provider_profile_id": {
-                "type": "string"
-              },
-              "recent_transcript_chunk": {
-                "type": "string"
-              },
-              "remaining_minutes": {
-                "type": "number"
-              },
-              "structure": {
-                "type": "array"
-              },
-              "speaker_aliases": {
                 "type": "object"
               },
-              "tenant_slug": {
-                "type": "string"
-              },
-              "text": {
-                "type": "string"
-              },
-              "tone": {
-                "type": "string",
-                "enum": ["friendly", "formal", "urgent"]
-              },
-              "transcript": {
-                "type": "string"
-              },
-              "transcript_path": {
-                "type": "string"
-              },
-              "url": {
-                "type": "string"
-              },
-              "url_policy": {
-                "type": "string",
-                "enum": ["explicit_only", "explicit_or_detected"]
-              },
-              "work_item_id": {
-                "type": "string"
-              },
-              "audio_bridge": {
-                "type": "string"
-              },
-              "answers": {
-                "type": "array"
-              },
-              "counterparty_label": {
-                "type": "string"
-              },
-              "goal": {
+              "item_from": {
                 "type": "string"
               },
               "learner_label": {
@@ -23467,62 +23050,45 @@
               "material_path": {
                 "type": "string"
               },
-              "topic": {
-                "type": "string"
-              },
-              "duration_sec": {
-                "type": "number"
-              },
-              "execution_profile_id": {
-                "type": "string"
-              },
-              "display_name": {
-                "type": "string"
-              },
-              "enable_captions": {
-                "type": "boolean"
-              },
-              "end": {
-                "type": "string"
-              },
-              "events": {
-                "type": "array"
-              },
-              "events_from": {
-                "type": "string"
-              },
-              "headed": {
-                "type": "boolean"
-              },
-              "join_backend": {
-                "type": "string"
-              },
-              "join_timeout_sec": {
-                "type": "number"
-              },
               "max_duration_sec": {
                 "type": "number"
               },
-              "name": {
+              "max_items": {
+                "type": "number"
+              },
+              "mission_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "now": {},
+              "operator_label": {
                 "type": "string"
               },
-              "now": {
+              "output_path": {
                 "type": "string"
               },
-              "profile_id": {
+              "partial_reason": {
                 "type": "string"
               },
-              "python_bin": {
-                "type": "string"
-              },
-              "raise_hand": {
+              "partial_state": {
                 "type": "boolean"
               },
-              "screenshot_path": {
+              "proposal_draft_ref": {
                 "type": "string"
               },
-              "start": {
+              "recent_transcript_chunk": {
                 "type": "string"
+              },
+              "remaining_minutes": {
+                "type": "number"
+              },
+              "report_path": {
+                "type": "string"
+              },
+              "speaker_aliases": {
+                "type": "object"
               },
               "started_ago_min": {
                 "type": "number"
@@ -23530,11 +23096,18 @@
               "starts_within_min": {
                 "type": "number"
               },
-              "user_data_dir": {
+              "structure": {
+                "type": "array"
+              },
+              "tone": {
+                "type": "string",
+                "enum": ["friendly", "formal", "urgent"]
+              },
+              "topic": {
                 "type": "string"
               },
-              "ws_port": {
-                "type": "number"
+              "transcript": {
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -23551,172 +23124,11 @@
           "input_schema": {
             "type": "object",
             "properties": {
-              "agenda": {
-                "type": "array"
-              },
-              "attendees": {
-                "type": "array"
-              },
-              "attendees_from": {
-                "type": "string"
-              },
-              "counterparty_ref": {
-                "type": "string"
-              },
-              "current_topic": {
-                "type": "string"
-              },
-              "days_overdue": {
-                "type": "number"
-              },
-              "default_assignee_label": {
-                "type": "string"
-              },
-              "enforce_restricted_actions": {
-                "type": "boolean"
-              },
-              "export_as": {
-                "type": "string"
-              },
-              "facilitator_persona_label": {
-                "type": "string"
-              },
-              "item": {
-                "type": "object",
-                "properties": {
-                  "item_id": {
-                    "type": "string"
-                  },
-                  "mission_id": {
-                    "type": "string"
-                  },
-                  "meeting_ref": {},
-                  "title": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  },
-                  "assignee": {},
-                  "due_at": {
-                    "type": "string"
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "modality": {
-                    "type": "string"
-                  },
-                  "review_state": {
-                    "type": "string"
-                  },
-                  "provenance": {},
-                  "max_reminders": {
-                    "type": "number"
-                  },
-                  "policy": {},
-                  "priority": {
-                    "type": "string"
-                  },
-                  "created_at": {
-                    "type": "string"
-                  },
-                  "updated_at": {
-                    "type": "string"
-                  },
-                  "completed_at": {
-                    "type": "string"
-                  },
-                  "blocked_reason": {
-                    "type": "string"
-                  },
-                  "tenant_slug": {
-                    "type": "string"
-                  },
-                  "reminders": {
-                    "type": "array"
-                  },
-                  "execution": {}
-                },
-                "additionalProperties": false
-              },
-              "item_from": {
-                "type": "string"
-              },
-              "language": {
-                "type": "string"
-              },
-              "max_items": {
-                "type": "number"
-              },
-              "meeting_id": {
-                "type": "string"
-              },
-              "mode": {
-                "type": "string",
-                "enum": ["transcribe", "realtime"]
-              },
               "mission_id": {
                 "type": "string"
               },
-              "mission_ids": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "node": {
-                "type": "string",
-                "enum": ["local", "named-node"]
-              },
-              "operator_label": {
+              "work_item_id": {
                 "type": "string"
-              },
-              "output_path": {
-                "type": "string"
-              },
-              "passcode": {
-                "type": "string"
-              },
-              "partial_reason": {
-                "type": "string"
-              },
-              "partial_state": {
-                "type": "boolean"
-              },
-              "platform": {
-                "type": "string"
-              },
-              "proposal_draft_ref": {
-                "type": "string"
-              },
-              "provider": {
-                "type": "string"
-              },
-              "provider_profile_id": {
-                "type": "string"
-              },
-              "recent_transcript_chunk": {
-                "type": "string"
-              },
-              "remaining_minutes": {
-                "type": "number"
-              },
-              "structure": {
-                "type": "array"
-              },
-              "speaker_aliases": {
-                "type": "object"
-              },
-              "tenant_slug": {
-                "type": "string"
-              },
-              "text": {
-                "type": "string"
-              },
-              "tone": {
-                "type": "string",
-                "enum": ["friendly", "formal", "urgent"]
               },
               "transcript": {
                 "type": "string"
@@ -23724,105 +23136,35 @@
               "transcript_path": {
                 "type": "string"
               },
-              "url": {
-                "type": "string"
-              },
-              "url_policy": {
-                "type": "string",
-                "enum": ["explicit_only", "explicit_or_detected"]
-              },
-              "work_item_id": {
-                "type": "string"
-              },
-              "audio_bridge": {
-                "type": "string"
-              },
-              "answers": {
+              "attendees": {
                 "type": "array"
               },
-              "counterparty_label": {
+              "attendees_from": {
                 "type": "string"
               },
-              "goal": {
+              "operator_label": {
                 "type": "string"
               },
-              "learner_label": {
+              "default_assignee_label": {
                 "type": "string"
               },
-              "material": {
+              "language": {
                 "type": "string"
               },
-              "material_path": {
-                "type": "string"
-              },
-              "topic": {
-                "type": "string"
-              },
-              "duration_sec": {
-                "type": "number"
-              },
-              "execution_profile_id": {
-                "type": "string"
-              },
-              "display_name": {
-                "type": "string"
-              },
-              "enable_captions": {
+              "partial_state": {
                 "type": "boolean"
               },
-              "end": {
+              "partial_reason": {
                 "type": "string"
               },
-              "events": {
-                "type": "array"
-              },
-              "events_from": {
-                "type": "string"
-              },
-              "headed": {
+              "enforce_restricted_actions": {
                 "type": "boolean"
               },
-              "join_backend": {
+              "output_path": {
                 "type": "string"
               },
-              "join_timeout_sec": {
-                "type": "number"
-              },
-              "max_duration_sec": {
-                "type": "number"
-              },
-              "name": {
+              "export_as": {
                 "type": "string"
-              },
-              "now": {
-                "type": "string"
-              },
-              "profile_id": {
-                "type": "string"
-              },
-              "python_bin": {
-                "type": "string"
-              },
-              "raise_hand": {
-                "type": "boolean"
-              },
-              "screenshot_path": {
-                "type": "string"
-              },
-              "start": {
-                "type": "string"
-              },
-              "started_ago_min": {
-                "type": "number"
-              },
-              "starts_within_min": {
-                "type": "number"
-              },
-              "user_data_dir": {
-                "type": "string"
-              },
-              "ws_port": {
-                "type": "number"
               }
             },
             "additionalProperties": false
@@ -23839,6 +23181,84 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "export_as": {
+                "type": "string"
+              },
+              "mission_id": {
+                "type": "string"
+              },
+              "work_item_id": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "provider_profile_id": {
+                "type": "string"
+              },
+              "execution_profile_id": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": ["transcribe", "realtime"]
+              },
+              "node": {
+                "type": "string",
+                "enum": ["local", "named-node"]
+              },
+              "audio_bridge": {
+                "type": "string"
+              },
+              "url_policy": {
+                "type": "string",
+                "enum": ["explicit_only", "explicit_or_detected"]
+              },
+              "url": {
+                "type": "string"
+              },
+              "meeting_id": {
+                "type": "string"
+              },
+              "passcode": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "duration_sec": {
+                "type": "number"
+              },
+              "transcript_path": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "join_backend": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
               "agenda": {
                 "type": "array"
               },
@@ -23846,6 +23266,12 @@
                 "type": "array"
               },
               "attendees_from": {
+                "type": "string"
+              },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
                 "type": "string"
               },
               "counterparty_ref": {
@@ -23863,175 +23289,22 @@
               "enforce_restricted_actions": {
                 "type": "boolean"
               },
-              "export_as": {
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
                 "type": "string"
               },
               "facilitator_persona_label": {
                 "type": "string"
               },
+              "goal": {
+                "type": "string"
+              },
               "item": {
-                "type": "object",
-                "properties": {
-                  "item_id": {
-                    "type": "string"
-                  },
-                  "mission_id": {
-                    "type": "string"
-                  },
-                  "meeting_ref": {},
-                  "title": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  },
-                  "assignee": {},
-                  "due_at": {
-                    "type": "string"
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "modality": {
-                    "type": "string"
-                  },
-                  "review_state": {
-                    "type": "string"
-                  },
-                  "provenance": {},
-                  "max_reminders": {
-                    "type": "number"
-                  },
-                  "policy": {},
-                  "priority": {
-                    "type": "string"
-                  },
-                  "created_at": {
-                    "type": "string"
-                  },
-                  "updated_at": {
-                    "type": "string"
-                  },
-                  "completed_at": {
-                    "type": "string"
-                  },
-                  "blocked_reason": {
-                    "type": "string"
-                  },
-                  "tenant_slug": {
-                    "type": "string"
-                  },
-                  "reminders": {
-                    "type": "array"
-                  },
-                  "execution": {}
-                },
-                "additionalProperties": false
-              },
-              "item_from": {
-                "type": "string"
-              },
-              "language": {
-                "type": "string"
-              },
-              "max_items": {
-                "type": "number"
-              },
-              "meeting_id": {
-                "type": "string"
-              },
-              "mode": {
-                "type": "string",
-                "enum": ["transcribe", "realtime"]
-              },
-              "mission_id": {
-                "type": "string"
-              },
-              "mission_ids": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "node": {
-                "type": "string",
-                "enum": ["local", "named-node"]
-              },
-              "operator_label": {
-                "type": "string"
-              },
-              "output_path": {
-                "type": "string"
-              },
-              "passcode": {
-                "type": "string"
-              },
-              "partial_reason": {
-                "type": "string"
-              },
-              "partial_state": {
-                "type": "boolean"
-              },
-              "platform": {
-                "type": "string"
-              },
-              "proposal_draft_ref": {
-                "type": "string"
-              },
-              "provider": {
-                "type": "string"
-              },
-              "provider_profile_id": {
-                "type": "string"
-              },
-              "recent_transcript_chunk": {
-                "type": "string"
-              },
-              "remaining_minutes": {
-                "type": "number"
-              },
-              "structure": {
-                "type": "array"
-              },
-              "speaker_aliases": {
                 "type": "object"
               },
-              "tenant_slug": {
-                "type": "string"
-              },
-              "text": {
-                "type": "string"
-              },
-              "tone": {
-                "type": "string",
-                "enum": ["friendly", "formal", "urgent"]
-              },
-              "transcript": {
-                "type": "string"
-              },
-              "transcript_path": {
-                "type": "string"
-              },
-              "url": {
-                "type": "string"
-              },
-              "url_policy": {
-                "type": "string",
-                "enum": ["explicit_only", "explicit_or_detected"]
-              },
-              "work_item_id": {
-                "type": "string"
-              },
-              "audio_bridge": {
-                "type": "string"
-              },
-              "answers": {
-                "type": "array"
-              },
-              "counterparty_label": {
-                "type": "string"
-              },
-              "goal": {
+              "item_from": {
                 "type": "string"
               },
               "learner_label": {
@@ -24043,62 +23316,45 @@
               "material_path": {
                 "type": "string"
               },
-              "topic": {
-                "type": "string"
-              },
-              "duration_sec": {
-                "type": "number"
-              },
-              "execution_profile_id": {
-                "type": "string"
-              },
-              "display_name": {
-                "type": "string"
-              },
-              "enable_captions": {
-                "type": "boolean"
-              },
-              "end": {
-                "type": "string"
-              },
-              "events": {
-                "type": "array"
-              },
-              "events_from": {
-                "type": "string"
-              },
-              "headed": {
-                "type": "boolean"
-              },
-              "join_backend": {
-                "type": "string"
-              },
-              "join_timeout_sec": {
-                "type": "number"
-              },
               "max_duration_sec": {
                 "type": "number"
               },
-              "name": {
+              "max_items": {
+                "type": "number"
+              },
+              "mission_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "now": {},
+              "operator_label": {
                 "type": "string"
               },
-              "now": {
+              "output_path": {
                 "type": "string"
               },
-              "profile_id": {
+              "partial_reason": {
                 "type": "string"
               },
-              "python_bin": {
-                "type": "string"
-              },
-              "raise_hand": {
+              "partial_state": {
                 "type": "boolean"
               },
-              "screenshot_path": {
+              "proposal_draft_ref": {
                 "type": "string"
               },
-              "start": {
+              "recent_transcript_chunk": {
                 "type": "string"
+              },
+              "remaining_minutes": {
+                "type": "number"
+              },
+              "report_path": {
+                "type": "string"
+              },
+              "speaker_aliases": {
+                "type": "object"
               },
               "started_ago_min": {
                 "type": "number"
@@ -24106,11 +23362,18 @@
               "starts_within_min": {
                 "type": "number"
               },
-              "user_data_dir": {
+              "structure": {
+                "type": "array"
+              },
+              "tone": {
+                "type": "string",
+                "enum": ["friendly", "formal", "urgent"]
+              },
+              "topic": {
                 "type": "string"
               },
-              "ws_port": {
-                "type": "number"
+              "transcript": {
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -24127,6 +23390,84 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "export_as": {
+                "type": "string"
+              },
+              "mission_id": {
+                "type": "string"
+              },
+              "work_item_id": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "provider_profile_id": {
+                "type": "string"
+              },
+              "execution_profile_id": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": ["transcribe", "realtime"]
+              },
+              "node": {
+                "type": "string",
+                "enum": ["local", "named-node"]
+              },
+              "audio_bridge": {
+                "type": "string"
+              },
+              "url_policy": {
+                "type": "string",
+                "enum": ["explicit_only", "explicit_or_detected"]
+              },
+              "url": {
+                "type": "string"
+              },
+              "meeting_id": {
+                "type": "string"
+              },
+              "passcode": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "duration_sec": {
+                "type": "number"
+              },
+              "transcript_path": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "join_backend": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
               "agenda": {
                 "type": "array"
               },
@@ -24134,6 +23475,12 @@
                 "type": "array"
               },
               "attendees_from": {
+                "type": "string"
+              },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
                 "type": "string"
               },
               "counterparty_ref": {
@@ -24151,175 +23498,22 @@
               "enforce_restricted_actions": {
                 "type": "boolean"
               },
-              "export_as": {
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
                 "type": "string"
               },
               "facilitator_persona_label": {
                 "type": "string"
               },
+              "goal": {
+                "type": "string"
+              },
               "item": {
-                "type": "object",
-                "properties": {
-                  "item_id": {
-                    "type": "string"
-                  },
-                  "mission_id": {
-                    "type": "string"
-                  },
-                  "meeting_ref": {},
-                  "title": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  },
-                  "assignee": {},
-                  "due_at": {
-                    "type": "string"
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "modality": {
-                    "type": "string"
-                  },
-                  "review_state": {
-                    "type": "string"
-                  },
-                  "provenance": {},
-                  "max_reminders": {
-                    "type": "number"
-                  },
-                  "policy": {},
-                  "priority": {
-                    "type": "string"
-                  },
-                  "created_at": {
-                    "type": "string"
-                  },
-                  "updated_at": {
-                    "type": "string"
-                  },
-                  "completed_at": {
-                    "type": "string"
-                  },
-                  "blocked_reason": {
-                    "type": "string"
-                  },
-                  "tenant_slug": {
-                    "type": "string"
-                  },
-                  "reminders": {
-                    "type": "array"
-                  },
-                  "execution": {}
-                },
-                "additionalProperties": false
-              },
-              "item_from": {
-                "type": "string"
-              },
-              "language": {
-                "type": "string"
-              },
-              "max_items": {
-                "type": "number"
-              },
-              "meeting_id": {
-                "type": "string"
-              },
-              "mode": {
-                "type": "string",
-                "enum": ["transcribe", "realtime"]
-              },
-              "mission_id": {
-                "type": "string"
-              },
-              "mission_ids": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "node": {
-                "type": "string",
-                "enum": ["local", "named-node"]
-              },
-              "operator_label": {
-                "type": "string"
-              },
-              "output_path": {
-                "type": "string"
-              },
-              "passcode": {
-                "type": "string"
-              },
-              "partial_reason": {
-                "type": "string"
-              },
-              "partial_state": {
-                "type": "boolean"
-              },
-              "platform": {
-                "type": "string"
-              },
-              "proposal_draft_ref": {
-                "type": "string"
-              },
-              "provider": {
-                "type": "string"
-              },
-              "provider_profile_id": {
-                "type": "string"
-              },
-              "recent_transcript_chunk": {
-                "type": "string"
-              },
-              "remaining_minutes": {
-                "type": "number"
-              },
-              "structure": {
-                "type": "array"
-              },
-              "speaker_aliases": {
                 "type": "object"
               },
-              "tenant_slug": {
-                "type": "string"
-              },
-              "text": {
-                "type": "string"
-              },
-              "tone": {
-                "type": "string",
-                "enum": ["friendly", "formal", "urgent"]
-              },
-              "transcript": {
-                "type": "string"
-              },
-              "transcript_path": {
-                "type": "string"
-              },
-              "url": {
-                "type": "string"
-              },
-              "url_policy": {
-                "type": "string",
-                "enum": ["explicit_only", "explicit_or_detected"]
-              },
-              "work_item_id": {
-                "type": "string"
-              },
-              "audio_bridge": {
-                "type": "string"
-              },
-              "answers": {
-                "type": "array"
-              },
-              "counterparty_label": {
-                "type": "string"
-              },
-              "goal": {
+              "item_from": {
                 "type": "string"
               },
               "learner_label": {
@@ -24331,62 +23525,45 @@
               "material_path": {
                 "type": "string"
               },
-              "topic": {
-                "type": "string"
-              },
-              "duration_sec": {
-                "type": "number"
-              },
-              "execution_profile_id": {
-                "type": "string"
-              },
-              "display_name": {
-                "type": "string"
-              },
-              "enable_captions": {
-                "type": "boolean"
-              },
-              "end": {
-                "type": "string"
-              },
-              "events": {
-                "type": "array"
-              },
-              "events_from": {
-                "type": "string"
-              },
-              "headed": {
-                "type": "boolean"
-              },
-              "join_backend": {
-                "type": "string"
-              },
-              "join_timeout_sec": {
-                "type": "number"
-              },
               "max_duration_sec": {
                 "type": "number"
               },
-              "name": {
+              "max_items": {
+                "type": "number"
+              },
+              "mission_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "now": {},
+              "operator_label": {
                 "type": "string"
               },
-              "now": {
+              "output_path": {
                 "type": "string"
               },
-              "profile_id": {
+              "partial_reason": {
                 "type": "string"
               },
-              "python_bin": {
-                "type": "string"
-              },
-              "raise_hand": {
+              "partial_state": {
                 "type": "boolean"
               },
-              "screenshot_path": {
+              "proposal_draft_ref": {
                 "type": "string"
               },
-              "start": {
+              "recent_transcript_chunk": {
                 "type": "string"
+              },
+              "remaining_minutes": {
+                "type": "number"
+              },
+              "report_path": {
+                "type": "string"
+              },
+              "speaker_aliases": {
+                "type": "object"
               },
               "started_ago_min": {
                 "type": "number"
@@ -24394,11 +23571,18 @@
               "starts_within_min": {
                 "type": "number"
               },
-              "user_data_dir": {
+              "structure": {
+                "type": "array"
+              },
+              "tone": {
+                "type": "string",
+                "enum": ["friendly", "formal", "urgent"]
+              },
+              "topic": {
                 "type": "string"
               },
-              "ws_port": {
-                "type": "number"
+              "transcript": {
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -24410,587 +23594,89 @@
           ]
         },
         {
-          "op": "normalize_transcript",
-          "kind": "apply",
-          "input_schema": {
-            "type": "object",
-            "properties": {
-              "agenda": {
-                "type": "array"
-              },
-              "attendees": {
-                "type": "array"
-              },
-              "attendees_from": {
-                "type": "string"
-              },
-              "counterparty_ref": {
-                "type": "string"
-              },
-              "current_topic": {
-                "type": "string"
-              },
-              "days_overdue": {
-                "type": "number"
-              },
-              "default_assignee_label": {
-                "type": "string"
-              },
-              "enforce_restricted_actions": {
-                "type": "boolean"
-              },
-              "export_as": {
-                "type": "string"
-              },
-              "facilitator_persona_label": {
-                "type": "string"
-              },
-              "item": {
-                "type": "object",
-                "properties": {
-                  "item_id": {
-                    "type": "string"
-                  },
-                  "mission_id": {
-                    "type": "string"
-                  },
-                  "meeting_ref": {},
-                  "title": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  },
-                  "assignee": {},
-                  "due_at": {
-                    "type": "string"
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "modality": {
-                    "type": "string"
-                  },
-                  "review_state": {
-                    "type": "string"
-                  },
-                  "provenance": {},
-                  "max_reminders": {
-                    "type": "number"
-                  },
-                  "policy": {},
-                  "priority": {
-                    "type": "string"
-                  },
-                  "created_at": {
-                    "type": "string"
-                  },
-                  "updated_at": {
-                    "type": "string"
-                  },
-                  "completed_at": {
-                    "type": "string"
-                  },
-                  "blocked_reason": {
-                    "type": "string"
-                  },
-                  "tenant_slug": {
-                    "type": "string"
-                  },
-                  "reminders": {
-                    "type": "array"
-                  },
-                  "execution": {}
-                },
-                "additionalProperties": false
-              },
-              "item_from": {
-                "type": "string"
-              },
-              "language": {
-                "type": "string"
-              },
-              "max_items": {
-                "type": "number"
-              },
-              "meeting_id": {
-                "type": "string"
-              },
-              "mode": {
-                "type": "string",
-                "enum": ["transcribe", "realtime"]
-              },
-              "mission_id": {
-                "type": "string"
-              },
-              "mission_ids": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "node": {
-                "type": "string",
-                "enum": ["local", "named-node"]
-              },
-              "operator_label": {
-                "type": "string"
-              },
-              "output_path": {
-                "type": "string"
-              },
-              "passcode": {
-                "type": "string"
-              },
-              "partial_reason": {
-                "type": "string"
-              },
-              "partial_state": {
-                "type": "boolean"
-              },
-              "platform": {
-                "type": "string"
-              },
-              "proposal_draft_ref": {
-                "type": "string"
-              },
-              "provider": {
-                "type": "string"
-              },
-              "provider_profile_id": {
-                "type": "string"
-              },
-              "recent_transcript_chunk": {
-                "type": "string"
-              },
-              "remaining_minutes": {
-                "type": "number"
-              },
-              "structure": {
-                "type": "array"
-              },
-              "speaker_aliases": {
-                "type": "object"
-              },
-              "tenant_slug": {
-                "type": "string"
-              },
-              "text": {
-                "type": "string"
-              },
-              "tone": {
-                "type": "string",
-                "enum": ["friendly", "formal", "urgent"]
-              },
-              "transcript": {
-                "type": "string"
-              },
-              "transcript_path": {
-                "type": "string"
-              },
-              "url": {
-                "type": "string"
-              },
-              "url_policy": {
-                "type": "string",
-                "enum": ["explicit_only", "explicit_or_detected"]
-              },
-              "work_item_id": {
-                "type": "string"
-              },
-              "audio_bridge": {
-                "type": "string"
-              },
-              "answers": {
-                "type": "array"
-              },
-              "counterparty_label": {
-                "type": "string"
-              },
-              "goal": {
-                "type": "string"
-              },
-              "learner_label": {
-                "type": "string"
-              },
-              "material": {
-                "type": "string"
-              },
-              "material_path": {
-                "type": "string"
-              },
-              "topic": {
-                "type": "string"
-              },
-              "duration_sec": {
-                "type": "number"
-              },
-              "execution_profile_id": {
-                "type": "string"
-              },
-              "display_name": {
-                "type": "string"
-              },
-              "enable_captions": {
-                "type": "boolean"
-              },
-              "end": {
-                "type": "string"
-              },
-              "events": {
-                "type": "array"
-              },
-              "events_from": {
-                "type": "string"
-              },
-              "headed": {
-                "type": "boolean"
-              },
-              "join_backend": {
-                "type": "string"
-              },
-              "join_timeout_sec": {
-                "type": "number"
-              },
-              "max_duration_sec": {
-                "type": "number"
-              },
-              "name": {
-                "type": "string"
-              },
-              "now": {
-                "type": "string"
-              },
-              "profile_id": {
-                "type": "string"
-              },
-              "python_bin": {
-                "type": "string"
-              },
-              "raise_hand": {
-                "type": "boolean"
-              },
-              "screenshot_path": {
-                "type": "string"
-              },
-              "start": {
-                "type": "string"
-              },
-              "started_ago_min": {
-                "type": "number"
-              },
-              "starts_within_min": {
-                "type": "number"
-              },
-              "user_data_dir": {
-                "type": "string"
-              },
-              "ws_port": {
-                "type": "number"
-              }
-            },
-            "additionalProperties": false
-          },
-          "examples": [
-            {
-              "transcript_path": "active/shared/tmp/meeting.vtt"
-            }
-          ]
-        },
-        {
-          "op": "resolve_next_target",
-          "kind": "apply",
-          "input_schema": {
-            "type": "object",
-            "properties": {
-              "agenda": {
-                "type": "array"
-              },
-              "attendees": {
-                "type": "array"
-              },
-              "attendees_from": {
-                "type": "string"
-              },
-              "counterparty_ref": {
-                "type": "string"
-              },
-              "current_topic": {
-                "type": "string"
-              },
-              "days_overdue": {
-                "type": "number"
-              },
-              "default_assignee_label": {
-                "type": "string"
-              },
-              "enforce_restricted_actions": {
-                "type": "boolean"
-              },
-              "export_as": {
-                "type": "string"
-              },
-              "facilitator_persona_label": {
-                "type": "string"
-              },
-              "item": {
-                "type": "object",
-                "properties": {
-                  "item_id": {
-                    "type": "string"
-                  },
-                  "mission_id": {
-                    "type": "string"
-                  },
-                  "meeting_ref": {},
-                  "title": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  },
-                  "assignee": {},
-                  "due_at": {
-                    "type": "string"
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "modality": {
-                    "type": "string"
-                  },
-                  "review_state": {
-                    "type": "string"
-                  },
-                  "provenance": {},
-                  "max_reminders": {
-                    "type": "number"
-                  },
-                  "policy": {},
-                  "priority": {
-                    "type": "string"
-                  },
-                  "created_at": {
-                    "type": "string"
-                  },
-                  "updated_at": {
-                    "type": "string"
-                  },
-                  "completed_at": {
-                    "type": "string"
-                  },
-                  "blocked_reason": {
-                    "type": "string"
-                  },
-                  "tenant_slug": {
-                    "type": "string"
-                  },
-                  "reminders": {
-                    "type": "array"
-                  },
-                  "execution": {}
-                },
-                "additionalProperties": false
-              },
-              "item_from": {
-                "type": "string"
-              },
-              "language": {
-                "type": "string"
-              },
-              "max_items": {
-                "type": "number"
-              },
-              "meeting_id": {
-                "type": "string"
-              },
-              "mode": {
-                "type": "string",
-                "enum": ["transcribe", "realtime"]
-              },
-              "mission_id": {
-                "type": "string"
-              },
-              "mission_ids": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "node": {
-                "type": "string",
-                "enum": ["local", "named-node"]
-              },
-              "operator_label": {
-                "type": "string"
-              },
-              "output_path": {
-                "type": "string"
-              },
-              "passcode": {
-                "type": "string"
-              },
-              "partial_reason": {
-                "type": "string"
-              },
-              "partial_state": {
-                "type": "boolean"
-              },
-              "platform": {
-                "type": "string"
-              },
-              "proposal_draft_ref": {
-                "type": "string"
-              },
-              "provider": {
-                "type": "string"
-              },
-              "provider_profile_id": {
-                "type": "string"
-              },
-              "recent_transcript_chunk": {
-                "type": "string"
-              },
-              "remaining_minutes": {
-                "type": "number"
-              },
-              "structure": {
-                "type": "array"
-              },
-              "speaker_aliases": {
-                "type": "object"
-              },
-              "tenant_slug": {
-                "type": "string"
-              },
-              "text": {
-                "type": "string"
-              },
-              "tone": {
-                "type": "string",
-                "enum": ["friendly", "formal", "urgent"]
-              },
-              "transcript": {
-                "type": "string"
-              },
-              "transcript_path": {
-                "type": "string"
-              },
-              "url": {
-                "type": "string"
-              },
-              "url_policy": {
-                "type": "string",
-                "enum": ["explicit_only", "explicit_or_detected"]
-              },
-              "work_item_id": {
-                "type": "string"
-              },
-              "audio_bridge": {
-                "type": "string"
-              },
-              "answers": {
-                "type": "array"
-              },
-              "counterparty_label": {
-                "type": "string"
-              },
-              "goal": {
-                "type": "string"
-              },
-              "learner_label": {
-                "type": "string"
-              },
-              "material": {
-                "type": "string"
-              },
-              "material_path": {
-                "type": "string"
-              },
-              "topic": {
-                "type": "string"
-              },
-              "duration_sec": {
-                "type": "number"
-              },
-              "execution_profile_id": {
-                "type": "string"
-              },
-              "display_name": {
-                "type": "string"
-              },
-              "enable_captions": {
-                "type": "boolean"
-              },
-              "end": {
-                "type": "string"
-              },
-              "events": {
-                "type": "array"
-              },
-              "events_from": {
-                "type": "string"
-              },
-              "headed": {
-                "type": "boolean"
-              },
-              "join_backend": {
-                "type": "string"
-              },
-              "join_timeout_sec": {
-                "type": "number"
-              },
-              "max_duration_sec": {
-                "type": "number"
-              },
-              "name": {
-                "type": "string"
-              },
-              "now": {
-                "type": "string"
-              },
-              "profile_id": {
-                "type": "string"
-              },
-              "python_bin": {
-                "type": "string"
-              },
-              "raise_hand": {
-                "type": "boolean"
-              },
-              "screenshot_path": {
-                "type": "string"
-              },
-              "start": {
-                "type": "string"
-              },
-              "started_ago_min": {
-                "type": "number"
-              },
-              "starts_within_min": {
-                "type": "number"
-              },
-              "user_data_dir": {
-                "type": "string"
-              },
-              "ws_port": {
-                "type": "number"
-              }
-            },
-            "additionalProperties": false
-          },
-          "examples": [
-            {
-              "events": []
-            }
-          ]
-        },
-        {
           "op": "generate_facilitation_script",
           "kind": "apply",
           "input_schema": {
             "type": "object",
             "properties": {
+              "export_as": {
+                "type": "string"
+              },
+              "mission_id": {
+                "type": "string"
+              },
+              "work_item_id": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "provider_profile_id": {
+                "type": "string"
+              },
+              "execution_profile_id": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": ["transcribe", "realtime"]
+              },
+              "node": {
+                "type": "string",
+                "enum": ["local", "named-node"]
+              },
+              "audio_bridge": {
+                "type": "string"
+              },
+              "url_policy": {
+                "type": "string",
+                "enum": ["explicit_only", "explicit_or_detected"]
+              },
+              "url": {
+                "type": "string"
+              },
+              "meeting_id": {
+                "type": "string"
+              },
+              "passcode": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "duration_sec": {
+                "type": "number"
+              },
+              "transcript_path": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "join_backend": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
               "agenda": {
                 "type": "array"
               },
@@ -24998,6 +23684,12 @@
                 "type": "array"
               },
               "attendees_from": {
+                "type": "string"
+              },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
                 "type": "string"
               },
               "counterparty_ref": {
@@ -25015,175 +23707,22 @@
               "enforce_restricted_actions": {
                 "type": "boolean"
               },
-              "export_as": {
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
                 "type": "string"
               },
               "facilitator_persona_label": {
                 "type": "string"
               },
+              "goal": {
+                "type": "string"
+              },
               "item": {
-                "type": "object",
-                "properties": {
-                  "item_id": {
-                    "type": "string"
-                  },
-                  "mission_id": {
-                    "type": "string"
-                  },
-                  "meeting_ref": {},
-                  "title": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  },
-                  "assignee": {},
-                  "due_at": {
-                    "type": "string"
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "modality": {
-                    "type": "string"
-                  },
-                  "review_state": {
-                    "type": "string"
-                  },
-                  "provenance": {},
-                  "max_reminders": {
-                    "type": "number"
-                  },
-                  "policy": {},
-                  "priority": {
-                    "type": "string"
-                  },
-                  "created_at": {
-                    "type": "string"
-                  },
-                  "updated_at": {
-                    "type": "string"
-                  },
-                  "completed_at": {
-                    "type": "string"
-                  },
-                  "blocked_reason": {
-                    "type": "string"
-                  },
-                  "tenant_slug": {
-                    "type": "string"
-                  },
-                  "reminders": {
-                    "type": "array"
-                  },
-                  "execution": {}
-                },
-                "additionalProperties": false
-              },
-              "item_from": {
-                "type": "string"
-              },
-              "language": {
-                "type": "string"
-              },
-              "max_items": {
-                "type": "number"
-              },
-              "meeting_id": {
-                "type": "string"
-              },
-              "mode": {
-                "type": "string",
-                "enum": ["transcribe", "realtime"]
-              },
-              "mission_id": {
-                "type": "string"
-              },
-              "mission_ids": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "node": {
-                "type": "string",
-                "enum": ["local", "named-node"]
-              },
-              "operator_label": {
-                "type": "string"
-              },
-              "output_path": {
-                "type": "string"
-              },
-              "passcode": {
-                "type": "string"
-              },
-              "partial_reason": {
-                "type": "string"
-              },
-              "partial_state": {
-                "type": "boolean"
-              },
-              "platform": {
-                "type": "string"
-              },
-              "proposal_draft_ref": {
-                "type": "string"
-              },
-              "provider": {
-                "type": "string"
-              },
-              "provider_profile_id": {
-                "type": "string"
-              },
-              "recent_transcript_chunk": {
-                "type": "string"
-              },
-              "remaining_minutes": {
-                "type": "number"
-              },
-              "structure": {
-                "type": "array"
-              },
-              "speaker_aliases": {
                 "type": "object"
               },
-              "tenant_slug": {
-                "type": "string"
-              },
-              "text": {
-                "type": "string"
-              },
-              "tone": {
-                "type": "string",
-                "enum": ["friendly", "formal", "urgent"]
-              },
-              "transcript": {
-                "type": "string"
-              },
-              "transcript_path": {
-                "type": "string"
-              },
-              "url": {
-                "type": "string"
-              },
-              "url_policy": {
-                "type": "string",
-                "enum": ["explicit_only", "explicit_or_detected"]
-              },
-              "work_item_id": {
-                "type": "string"
-              },
-              "audio_bridge": {
-                "type": "string"
-              },
-              "answers": {
-                "type": "array"
-              },
-              "counterparty_label": {
-                "type": "string"
-              },
-              "goal": {
+              "item_from": {
                 "type": "string"
               },
               "learner_label": {
@@ -25195,62 +23734,45 @@
               "material_path": {
                 "type": "string"
               },
-              "topic": {
-                "type": "string"
-              },
-              "duration_sec": {
-                "type": "number"
-              },
-              "execution_profile_id": {
-                "type": "string"
-              },
-              "display_name": {
-                "type": "string"
-              },
-              "enable_captions": {
-                "type": "boolean"
-              },
-              "end": {
-                "type": "string"
-              },
-              "events": {
-                "type": "array"
-              },
-              "events_from": {
-                "type": "string"
-              },
-              "headed": {
-                "type": "boolean"
-              },
-              "join_backend": {
-                "type": "string"
-              },
-              "join_timeout_sec": {
-                "type": "number"
-              },
               "max_duration_sec": {
                 "type": "number"
               },
-              "name": {
+              "max_items": {
+                "type": "number"
+              },
+              "mission_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "now": {},
+              "operator_label": {
                 "type": "string"
               },
-              "now": {
+              "output_path": {
                 "type": "string"
               },
-              "profile_id": {
+              "partial_reason": {
                 "type": "string"
               },
-              "python_bin": {
-                "type": "string"
-              },
-              "raise_hand": {
+              "partial_state": {
                 "type": "boolean"
               },
-              "screenshot_path": {
+              "proposal_draft_ref": {
                 "type": "string"
               },
-              "start": {
+              "recent_transcript_chunk": {
                 "type": "string"
+              },
+              "remaining_minutes": {
+                "type": "number"
+              },
+              "report_path": {
+                "type": "string"
+              },
+              "speaker_aliases": {
+                "type": "object"
               },
               "started_ago_min": {
                 "type": "number"
@@ -25258,11 +23780,18 @@
               "starts_within_min": {
                 "type": "number"
               },
-              "user_data_dir": {
+              "structure": {
+                "type": "array"
+              },
+              "tone": {
+                "type": "string",
+                "enum": ["friendly", "formal", "urgent"]
+              },
+              "topic": {
                 "type": "string"
               },
-              "ws_port": {
-                "type": "number"
+              "transcript": {
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -25279,6 +23808,84 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "export_as": {
+                "type": "string"
+              },
+              "mission_id": {
+                "type": "string"
+              },
+              "work_item_id": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "provider_profile_id": {
+                "type": "string"
+              },
+              "execution_profile_id": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": ["transcribe", "realtime"]
+              },
+              "node": {
+                "type": "string",
+                "enum": ["local", "named-node"]
+              },
+              "audio_bridge": {
+                "type": "string"
+              },
+              "url_policy": {
+                "type": "string",
+                "enum": ["explicit_only", "explicit_or_detected"]
+              },
+              "url": {
+                "type": "string"
+              },
+              "meeting_id": {
+                "type": "string"
+              },
+              "passcode": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "duration_sec": {
+                "type": "number"
+              },
+              "transcript_path": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "join_backend": {
+                "type": "string"
+              },
+              "ws_port": {
+                "type": "number"
+              },
+              "join_timeout_sec": {
+                "type": "number"
+              },
+              "raise_hand": {
+                "type": "boolean"
+              },
+              "headed": {
+                "type": "boolean"
+              },
+              "user_data_dir": {
+                "type": "string"
+              },
               "agenda": {
                 "type": "array"
               },
@@ -25286,6 +23893,12 @@
                 "type": "array"
               },
               "attendees_from": {
+                "type": "string"
+              },
+              "answers": {
+                "type": "array"
+              },
+              "counterparty_label": {
                 "type": "string"
               },
               "counterparty_ref": {
@@ -25303,175 +23916,22 @@
               "enforce_restricted_actions": {
                 "type": "boolean"
               },
-              "export_as": {
+              "events": {
+                "type": "array"
+              },
+              "events_from": {
                 "type": "string"
               },
               "facilitator_persona_label": {
                 "type": "string"
               },
+              "goal": {
+                "type": "string"
+              },
               "item": {
-                "type": "object",
-                "properties": {
-                  "item_id": {
-                    "type": "string"
-                  },
-                  "mission_id": {
-                    "type": "string"
-                  },
-                  "meeting_ref": {},
-                  "title": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  },
-                  "assignee": {},
-                  "due_at": {
-                    "type": "string"
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "modality": {
-                    "type": "string"
-                  },
-                  "review_state": {
-                    "type": "string"
-                  },
-                  "provenance": {},
-                  "max_reminders": {
-                    "type": "number"
-                  },
-                  "policy": {},
-                  "priority": {
-                    "type": "string"
-                  },
-                  "created_at": {
-                    "type": "string"
-                  },
-                  "updated_at": {
-                    "type": "string"
-                  },
-                  "completed_at": {
-                    "type": "string"
-                  },
-                  "blocked_reason": {
-                    "type": "string"
-                  },
-                  "tenant_slug": {
-                    "type": "string"
-                  },
-                  "reminders": {
-                    "type": "array"
-                  },
-                  "execution": {}
-                },
-                "additionalProperties": false
-              },
-              "item_from": {
-                "type": "string"
-              },
-              "language": {
-                "type": "string"
-              },
-              "max_items": {
-                "type": "number"
-              },
-              "meeting_id": {
-                "type": "string"
-              },
-              "mode": {
-                "type": "string",
-                "enum": ["transcribe", "realtime"]
-              },
-              "mission_id": {
-                "type": "string"
-              },
-              "mission_ids": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "node": {
-                "type": "string",
-                "enum": ["local", "named-node"]
-              },
-              "operator_label": {
-                "type": "string"
-              },
-              "output_path": {
-                "type": "string"
-              },
-              "passcode": {
-                "type": "string"
-              },
-              "partial_reason": {
-                "type": "string"
-              },
-              "partial_state": {
-                "type": "boolean"
-              },
-              "platform": {
-                "type": "string"
-              },
-              "proposal_draft_ref": {
-                "type": "string"
-              },
-              "provider": {
-                "type": "string"
-              },
-              "provider_profile_id": {
-                "type": "string"
-              },
-              "recent_transcript_chunk": {
-                "type": "string"
-              },
-              "remaining_minutes": {
-                "type": "number"
-              },
-              "structure": {
-                "type": "array"
-              },
-              "speaker_aliases": {
                 "type": "object"
               },
-              "tenant_slug": {
-                "type": "string"
-              },
-              "text": {
-                "type": "string"
-              },
-              "tone": {
-                "type": "string",
-                "enum": ["friendly", "formal", "urgent"]
-              },
-              "transcript": {
-                "type": "string"
-              },
-              "transcript_path": {
-                "type": "string"
-              },
-              "url": {
-                "type": "string"
-              },
-              "url_policy": {
-                "type": "string",
-                "enum": ["explicit_only", "explicit_or_detected"]
-              },
-              "work_item_id": {
-                "type": "string"
-              },
-              "audio_bridge": {
-                "type": "string"
-              },
-              "answers": {
-                "type": "array"
-              },
-              "counterparty_label": {
-                "type": "string"
-              },
-              "goal": {
+              "item_from": {
                 "type": "string"
               },
               "learner_label": {
@@ -25483,62 +23943,45 @@
               "material_path": {
                 "type": "string"
               },
-              "topic": {
-                "type": "string"
-              },
-              "duration_sec": {
-                "type": "number"
-              },
-              "execution_profile_id": {
-                "type": "string"
-              },
-              "display_name": {
-                "type": "string"
-              },
-              "enable_captions": {
-                "type": "boolean"
-              },
-              "end": {
-                "type": "string"
-              },
-              "events": {
-                "type": "array"
-              },
-              "events_from": {
-                "type": "string"
-              },
-              "headed": {
-                "type": "boolean"
-              },
-              "join_backend": {
-                "type": "string"
-              },
-              "join_timeout_sec": {
-                "type": "number"
-              },
               "max_duration_sec": {
                 "type": "number"
               },
-              "name": {
+              "max_items": {
+                "type": "number"
+              },
+              "mission_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "now": {},
+              "operator_label": {
                 "type": "string"
               },
-              "now": {
+              "output_path": {
                 "type": "string"
               },
-              "profile_id": {
+              "partial_reason": {
                 "type": "string"
               },
-              "python_bin": {
-                "type": "string"
-              },
-              "raise_hand": {
+              "partial_state": {
                 "type": "boolean"
               },
-              "screenshot_path": {
+              "proposal_draft_ref": {
                 "type": "string"
               },
-              "start": {
+              "recent_transcript_chunk": {
                 "type": "string"
+              },
+              "remaining_minutes": {
+                "type": "number"
+              },
+              "report_path": {
+                "type": "string"
+              },
+              "speaker_aliases": {
+                "type": "object"
               },
               "started_ago_min": {
                 "type": "number"
@@ -25546,11 +23989,18 @@
               "starts_within_min": {
                 "type": "number"
               },
-              "user_data_dir": {
+              "structure": {
+                "type": "array"
+              },
+              "tone": {
+                "type": "string",
+                "enum": ["friendly", "formal", "urgent"]
+              },
+              "topic": {
                 "type": "string"
               },
-              "ws_port": {
-                "type": "number"
+              "transcript": {
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -25605,280 +24055,23 @@
           "input_schema": {
             "type": "object",
             "properties": {
-              "agenda": {
-                "type": "array"
-              },
-              "attendees": {
-                "type": "array"
-              },
-              "attendees_from": {
-                "type": "string"
-              },
-              "counterparty_ref": {
-                "type": "string"
-              },
-              "current_topic": {
-                "type": "string"
-              },
-              "days_overdue": {
-                "type": "number"
-              },
-              "default_assignee_label": {
-                "type": "string"
-              },
-              "enforce_restricted_actions": {
-                "type": "boolean"
-              },
-              "export_as": {
-                "type": "string"
-              },
-              "facilitator_persona_label": {
-                "type": "string"
-              },
-              "item": {
-                "type": "object",
-                "properties": {
-                  "item_id": {
-                    "type": "string"
-                  },
-                  "mission_id": {
-                    "type": "string"
-                  },
-                  "meeting_ref": {},
-                  "title": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  },
-                  "assignee": {},
-                  "due_at": {
-                    "type": "string"
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "modality": {
-                    "type": "string"
-                  },
-                  "review_state": {
-                    "type": "string"
-                  },
-                  "provenance": {},
-                  "max_reminders": {
-                    "type": "number"
-                  },
-                  "policy": {},
-                  "priority": {
-                    "type": "string"
-                  },
-                  "created_at": {
-                    "type": "string"
-                  },
-                  "updated_at": {
-                    "type": "string"
-                  },
-                  "completed_at": {
-                    "type": "string"
-                  },
-                  "blocked_reason": {
-                    "type": "string"
-                  },
-                  "tenant_slug": {
-                    "type": "string"
-                  },
-                  "reminders": {
-                    "type": "array"
-                  },
-                  "execution": {}
-                },
-                "additionalProperties": false
-              },
-              "item_from": {
-                "type": "string"
-              },
-              "language": {
-                "type": "string"
-              },
-              "max_items": {
-                "type": "number"
-              },
-              "meeting_id": {
-                "type": "string"
-              },
-              "mode": {
-                "type": "string",
-                "enum": ["transcribe", "realtime"]
-              },
-              "mission_id": {
-                "type": "string"
-              },
-              "mission_ids": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "node": {
-                "type": "string",
-                "enum": ["local", "named-node"]
-              },
-              "operator_label": {
-                "type": "string"
-              },
-              "output_path": {
-                "type": "string"
-              },
-              "passcode": {
-                "type": "string"
-              },
-              "partial_reason": {
-                "type": "string"
-              },
-              "partial_state": {
-                "type": "boolean"
-              },
               "platform": {
-                "type": "string"
-              },
-              "proposal_draft_ref": {
                 "type": "string"
               },
               "provider": {
                 "type": "string"
               },
-              "provider_profile_id": {
-                "type": "string"
-              },
-              "recent_transcript_chunk": {
-                "type": "string"
-              },
-              "remaining_minutes": {
-                "type": "number"
-              },
-              "structure": {
-                "type": "array"
-              },
-              "speaker_aliases": {
-                "type": "object"
-              },
-              "tenant_slug": {
-                "type": "string"
-              },
               "text": {
                 "type": "string"
               },
-              "tone": {
-                "type": "string",
-                "enum": ["friendly", "formal", "urgent"]
-              },
-              "transcript": {
+              "mission_id": {
                 "type": "string"
               },
-              "transcript_path": {
+              "export_as": {
                 "type": "string"
-              },
-              "url": {
-                "type": "string"
-              },
-              "url_policy": {
-                "type": "string",
-                "enum": ["explicit_only", "explicit_or_detected"]
-              },
-              "work_item_id": {
-                "type": "string"
-              },
-              "audio_bridge": {
-                "type": "string"
-              },
-              "answers": {
-                "type": "array"
-              },
-              "counterparty_label": {
-                "type": "string"
-              },
-              "goal": {
-                "type": "string"
-              },
-              "learner_label": {
-                "type": "string"
-              },
-              "material": {
-                "type": "string"
-              },
-              "material_path": {
-                "type": "string"
-              },
-              "topic": {
-                "type": "string"
-              },
-              "duration_sec": {
-                "type": "number"
-              },
-              "execution_profile_id": {
-                "type": "string"
-              },
-              "display_name": {
-                "type": "string"
-              },
-              "enable_captions": {
-                "type": "boolean"
-              },
-              "end": {
-                "type": "string"
-              },
-              "events": {
-                "type": "array"
-              },
-              "events_from": {
-                "type": "string"
-              },
-              "headed": {
-                "type": "boolean"
-              },
-              "join_backend": {
-                "type": "string"
-              },
-              "join_timeout_sec": {
-                "type": "number"
-              },
-              "max_duration_sec": {
-                "type": "number"
-              },
-              "name": {
-                "type": "string"
-              },
-              "now": {
-                "type": "string"
-              },
-              "profile_id": {
-                "type": "string"
-              },
-              "python_bin": {
-                "type": "string"
-              },
-              "raise_hand": {
-                "type": "boolean"
-              },
-              "screenshot_path": {
-                "type": "string"
-              },
-              "start": {
-                "type": "string"
-              },
-              "started_ago_min": {
-                "type": "number"
-              },
-              "starts_within_min": {
-                "type": "number"
-              },
-              "user_data_dir": {
-                "type": "string"
-              },
-              "ws_port": {
-                "type": "number"
               }
             },
+            "required": ["text"],
             "additionalProperties": false
           },
           "examples": [

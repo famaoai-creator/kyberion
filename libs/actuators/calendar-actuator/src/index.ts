@@ -33,6 +33,14 @@ export {
   listEvents,
   queryFreeBusy,
   createEvent,
+  updateEvent,
+  deleteEvent,
+  findSlots,
+  listBackends,
+  describeBackendCapabilities,
+  scheduleInFirstSlot,
+  listCalendarsOnJxa,
+  listEventsOnJxa,
 } from './calendar-actuator-helpers.js';
 
 export {
