@@ -23,6 +23,7 @@
  * See docs/developer/improvement-plans-2026-07/
  * TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md §KP-06.
  */
+import { resolveKnowledgeVerification } from './knowledge-verification.js';
 import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
@@ -102,6 +103,27 @@ export interface CurationLowYieldHint {
   last_seen: string;
 }
 
+/**
+ * Whether the document's current text worked in a run within `windowDays`
+ * (knowledge-verification ledger: the tenant's own for its confidential
+ * subtree, the shared ledger otherwise). Fails closed to "no".
+ */
+function workedRecently(documentPath: string, windowDays: number, now: Date): boolean {
+  try {
+    const tenant = documentPath.match(/^knowledge\/confidential\/([^/]+)\//)?.[1];
+    const scope =
+      tenant && tenant !== 'common' && tenant !== 'tenant-groups'
+        ? { tier: 'confidential' as const, tenant_slug: tenant }
+        : undefined;
+    const verification = resolveKnowledgeVerification([documentPath], scope).get(documentPath);
+    if (verification?.state !== 'verified' || !verification.last_success_at) return false;
+    const ageMs = now.getTime() - Date.parse(verification.last_success_at);
+    return Number.isFinite(ageMs) && ageMs <= windowDays * MS_PER_DAY;
+  } catch {
+    return false;
+  }
+}
+
 export interface CurationFreshnessBreach {
   document_path: string;
   kind: string;
@@ -139,6 +161,8 @@ export interface KnowledgeCurationReport {
     archive_advisory_count?: number;
     /** DA-08: total flagged ingested assets across tenants. */
     tenant_ingest_flagged_count: number;
+    /** Age-based `stale` breaches skipped because the text worked in a recent run. */
+    stale_suppressed_by_verified_runs?: number;
   };
 }
 
@@ -561,6 +585,7 @@ export function computeCurationReport(options: { now?: Date } = {}): KnowledgeCu
   }
 
   const freshnessBreaches: CurationFreshnessBreach[] = [];
+  let staleSuppressedByVerifiedRuns = 0;
   for (const doc of docs) {
     const thresholdDays = config.freshness_days_by_kind[doc.kind] ?? config.default_freshness_days;
     const reviewByMs = doc.review_by ? Date.parse(doc.review_by) : NaN;
@@ -589,6 +614,12 @@ export function computeCurationReport(options: { now?: Date } = {}): KnowledgeCu
       continue;
     }
     const ageDays = Math.floor((now.getTime() - parsed) / MS_PER_DAY);
+    if (ageDays > thresholdDays && workedRecently(doc.document_path, thresholdDays, now)) {
+      // Old text that keeps working is not stale: a successful run within
+      // the freshness window re-confirms it.
+      staleSuppressedByVerifiedRuns += 1;
+      continue;
+    }
     if (ageDays > thresholdDays) {
       freshnessBreaches.push({
         document_path: doc.document_path,
@@ -635,6 +666,7 @@ export function computeCurationReport(options: { now?: Date } = {}): KnowledgeCu
       freshness_breach_count: freshnessBreaches.length,
       archive_advisory_count: archiveAdvisories.length,
       tenant_ingest_flagged_count: tenantIngestFlaggedCount,
+      stale_suppressed_by_verified_runs: staleSuppressedByVerifiedRuns,
     },
   };
 }

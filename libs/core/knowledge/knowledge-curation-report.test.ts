@@ -21,6 +21,7 @@ import {
   writeCurationReport,
 } from './knowledge-curation-report.js';
 import type { KnowledgeUsageAggregateEntry } from './knowledge-feedback-loop.js';
+import { recordKnowledgeVerifiedRun } from './knowledge-verification.js';
 import { validatePipelineAdf } from '../pipeline/pipeline-contract.js';
 import AjvModule from 'ajv';
 import { compileSchemaFromPath } from '../schema-loader.js';
@@ -43,6 +44,7 @@ const envKeys = [
   'KYBERION_CURATION_REPORT_PATH',
   'KYBERION_CURATION_ARCHIVE_HISTORY_PATH',
   'KYBERION_MEMORY_QUEUE_PATH',
+  'KYBERION_KNOWLEDGE_FEEDBACK_DIR',
 ] as const;
 const originalEnv: Record<string, string | undefined> = {};
 
@@ -224,6 +226,24 @@ describe('computeCurationReport — freshness SLO breaches', () => {
       },
     ]);
     expect(report.freshness_breaches[0]?.age_days).toBeGreaterThan(90);
+  });
+
+  it('does not flag an old doc as stale when its text worked in a recent run', () => {
+    process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR = `${suiteRoot}/feedback`;
+    writeCorpusDoc(
+      'old-but-working.md',
+      ['---', 'kind: governance', 'last_updated: 2026-01-01', '---', '', '# Works'].join('\n')
+    );
+    const docPath = computeCurationReport({ now: NOW }).freshness_breaches[0]!.document_path;
+    recordKnowledgeVerifiedRun({ documentPaths: [docPath], at: '2026-07-20T00:00:00.000Z' });
+
+    const report = computeCurationReport({ now: NOW });
+    expect(report.freshness_breaches).toEqual([]);
+    expect(report.summary.stale_suppressed_by_verified_runs).toBe(1);
+
+    // A success older than the window does not re-confirm it.
+    recordKnowledgeVerifiedRun({ documentPaths: [docPath], at: '2026-01-02T00:00:00.000Z' });
+    expect(computeCurationReport({ now: NOW }).freshness_breaches).toHaveLength(1);
   });
 
   it('does not flag a playbook doc within its 60-day threshold', () => {
