@@ -1,7 +1,7 @@
 ---
 title: 'Logging Policy: console and file logs humans and LLMs can act on'
 tags: [governance, logging, observability, console-output, jsonl]
-last_updated: 2026-10-06
+last_updated: 2026-10-07
 ---
 
 # Logging Policy
@@ -62,6 +62,25 @@ Rules:
 Use it (or the same field order inline) for warnings and errors so an LLM or
 operator can act without re-reading a stack. `next` and `evidence` are optional
 but strongly preferred when a follow-up exists.
+
+### CLI failure boundary
+
+The `defineScript` harness (`libs/core/script-harness.ts`) is the single
+failure boundary for every CLI entrypoint, and `scripts/run_built.mjs` covers
+import-time failures before it. Both render `error.message` plus a `next:`
+remediation hint — **never a raw stack trace** — unless `DEBUG` is set
+(`core.ts` convention). Rules for thrown failures:
+
+- Operator-facing failures should throw `DiagnosticError`
+  (`libs/core/logger.ts`) — `[CODE] what — why | next: remedy`, the same shape
+  as `OwnerScopeError`. The boundary never appends a generic hint on top of it.
+- Plain `Error`s get a `next:` hint auto-derived from `error.code` (ENOENT,
+  EACCES, ECONNREFUSED, ERR_MODULE_NOT_FOUND, …) when the message lacks
+  `| next:` already.
+- In `--json` mode the report is `{ ok:false, error, next?, stack? }`; `stack`
+  appears only under `DEBUG`.
+- Long-lived daemon guards (`process-guards.ts`) still record full stacks at
+  error level — they are postmortem evidence, not operator output.
 
 ## 2. File logs (`active/shared/logs/`)
 

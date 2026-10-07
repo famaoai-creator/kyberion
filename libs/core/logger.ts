@@ -209,6 +209,45 @@ export function formatDiagnostic(diag: DiagnosticInput): string {
   return line;
 }
 
+export interface DiagnosticErrorInput {
+  /** SCREAMING_SNAKE failure identifier, greppable in code and support tooling. */
+  code: string;
+  what: string;
+  why?: string;
+  next?: string;
+  evidence?: string;
+}
+
+/**
+ * An operator-facing failure that says what happened and how to fix it, so a
+ * person or an agent can act without reading a stack trace. Message shape:
+ * `[CODE] what — why | next: remedy | evidence: path` (same convention as
+ * OwnerScopeError). The script-harness failure boundary recognizes this type
+ * and never appends a generic hint on top of its `next`.
+ */
+export class DiagnosticError extends Error {
+  readonly code: string;
+  readonly next?: string;
+  readonly evidence?: string;
+
+  constructor(input: DiagnosticErrorInput, options?: { cause?: unknown }) {
+    super(
+      formatDiagnostic({
+        component: input.code,
+        what: input.what,
+        why: input.why,
+        next: input.next,
+        evidence: input.evidence,
+      }),
+      options
+    );
+    this.name = 'DiagnosticError';
+    this.code = input.code;
+    this.next = input.next;
+    this.evidence = input.evidence;
+  }
+}
+
 // --- named structured logger ----------------------------------------------
 
 export function createLogger(name: string, options: LoggerOptions = {}) {
