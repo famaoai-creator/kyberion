@@ -546,7 +546,7 @@ export function isTaskDeliverableSatisfied(
 export function tryAutoCompleteTaskFromEvidence(
   missionDir: string,
   taskId: string
-): { completed: boolean; reason: string } {
+): { completed: boolean; reason: string; cascaded: string[] } {
   const nextTasks = readMissionNextTasks(missionDir);
   const statusByTaskId = new Map(
     nextTasks.map((task) => [
@@ -555,22 +555,60 @@ export function tryAutoCompleteTaskFromEvidence(
     ])
   );
   const task = nextTasks.find((entry) => String(entry.task_id || '') === taskId);
-  if (!task) return { completed: false, reason: 'task not found in NEXT_TASKS.json' };
+  if (!task) return { completed: false, reason: 'task not found in NEXT_TASKS.json', cascaded: [] };
 
   const currentStatus = String(task.status || 'planned').toLowerCase();
   if (MISSION_TASK_COMPLETED_STATUSES.has(currentStatus)) {
-    return { completed: false, reason: 'already completed' };
+    return { completed: false, reason: 'already completed', cascaded: [] };
   }
   if (!isTaskDeliverableSatisfied(missionDir, task, statusByTaskId)) {
     return {
       completed: false,
       reason: 'deliverable file missing or a dependency is not yet completed',
+      cascaded: [],
     };
   }
 
   task.status = 'completed';
+  // Cascade: completing one task may satisfy dependents whose deliverables
+  // already exist (e.g. a review-task closing late after record-evidence ran
+  // for downstream tasks). Re-evaluate until no task flips so a single
+  // record-evidence / review-task call drains the satisfied suffix instead of
+  // requiring a manual re-record per dependent. Review-kind tasks still pass
+  // through isReviewTaskSatisfied inside isTaskDeliverableSatisfied — the
+  // cascade cannot rubber-stamp a missing review receipt.
+  const cascaded: string[] = [];
+  let progressed = true;
+  while (progressed) {
+    progressed = false;
+    for (const candidate of nextTasks) {
+      const candidateId = String(candidate.task_id || '');
+      const candidateStatus = String(candidate.status || 'planned').toLowerCase();
+      if (
+        !candidateId ||
+        candidateId === taskId ||
+        MISSION_TASK_COMPLETED_STATUSES.has(candidateStatus)
+      )
+        continue;
+      const refreshedStatuses = new Map(
+        nextTasks.map((entry) => [
+          String(entry.task_id || ''),
+          String(entry.status || 'planned').toLowerCase(),
+        ])
+      );
+      if (isTaskDeliverableSatisfied(missionDir, candidate, refreshedStatuses)) {
+        candidate.status = 'completed';
+        cascaded.push(candidateId);
+        progressed = true;
+      }
+    }
+  }
   writeMissionNextTasks(missionDir, nextTasks);
-  return { completed: true, reason: 'deliverable present and dependencies satisfied' };
+  return {
+    completed: true,
+    reason: 'deliverable present and dependencies satisfied',
+    cascaded,
+  };
 }
 
 /**

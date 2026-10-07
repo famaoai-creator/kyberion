@@ -943,6 +943,7 @@ export async function runBaselineCheck() {
   // pipeline step, far from the actual cause; here it lands in needs_recovery
   // with `pnpm run build` as the fix.
   let distImportViolations: string[] = [];
+  let staleDistTargets: string[] = [];
   sentinel.registerLayer('L2', async () => {
     const distPath = pathResolver.rootResolve('dist/scripts');
     if (!safeExistsSync(distPath)) return false;
@@ -957,7 +958,17 @@ export async function runBaselineCheck() {
         `scan failed: ${error instanceof Error ? error.message : String(error)}`,
       ];
     }
-    return distImportViolations.length === 0;
+    // Staleness is the sibling failure mode: a dist tree older than its
+    // sources serves old exports — e.g. `pnpm organization` dying on a
+    // missing export while baseline reported all_clear.
+    const { findStaleDistTargets } = await import('./check_stale_dist.js');
+    try {
+      const staleScan = findStaleDistTargets();
+      staleDistTargets = staleScan.stale.map((entry) => `${entry.target}: ${entry.reason}`);
+    } catch (error) {
+      staleDistTargets = [`scan failed: ${error instanceof Error ? error.message : String(error)}`];
+    }
+    return distImportViolations.length === 0 && staleDistTargets.length === 0;
   });
 
   // L3: Identity Layer (Soul)
@@ -1048,6 +1059,9 @@ export async function runBaselineCheck() {
       dist_import_violations: distImportViolations.length
         ? `${distImportViolations.length} dist file(s) import workspace subpaths that don't resolve — run \`pnpm run build\` to rebuild; first: ${distImportViolations[0]}`
         : null,
+      stale_dist_targets: staleDistTargets.length
+        ? `${staleDistTargets.length} dist target(s) are stale vs their TypeScript sources — run \`pnpm run build\` to rebuild; first: ${staleDistTargets[0]}`
+        : null,
     },
     // LC-01: scheduler liveness observation surface (L10).
     scheduler: {
@@ -1132,6 +1146,9 @@ export const runBaselineCheckCli = defineScript({
       }
       return report;
     } catch (error) {
+      // The needs_recovery ScriptExitError above is an intentional exit, not
+      // a failure — rethrow it instead of swallowing it into fatal_error.
+      if (error instanceof ScriptExitError) throw error;
       const fatalReport = {
         status: 'fatal_error' as const,
         circuit_broken: true,

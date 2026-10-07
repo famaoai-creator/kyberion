@@ -1485,7 +1485,7 @@ describe('tryAutoCompleteTaskFromEvidence', () => {
 
     const result = tryAutoCompleteTaskFromEvidence(missionPath, 'retrospective-retrospective');
 
-    expect(result).toEqual({ completed: false, reason: 'already completed' });
+    expect(result).toEqual({ completed: false, reason: 'already completed', cascaded: [] });
   });
 
   it('returns completed:false for an unknown task_id', () => {
@@ -1493,7 +1493,90 @@ describe('tryAutoCompleteTaskFromEvidence', () => {
 
     const result = tryAutoCompleteTaskFromEvidence(missionPath, 'does-not-exist');
 
-    expect(result).toEqual({ completed: false, reason: 'task not found in NEXT_TASKS.json' });
+    expect(result).toEqual({
+      completed: false,
+      reason: 'task not found in NEXT_TASKS.json',
+      cascaded: [],
+    });
+  });
+
+  it('cascades: completing one task drains dependents whose deliverables already exist', () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'gate-task',
+            status: 'planned',
+            dependencies: [],
+            deliverable: 'evidence/gate.md',
+          },
+          {
+            task_id: 'delivery-deliver',
+            status: 'planned',
+            dependencies: ['gate-task'],
+            deliverable: 'evidence/delivery.md',
+          },
+          {
+            task_id: 'retrospective-retrospective',
+            status: 'planned',
+            dependencies: ['delivery-deliver'],
+            deliverable: 'evidence/retrospective.md',
+          },
+        ],
+        null,
+        2
+      )
+    );
+    // All three deliverables exist, but only the first task was evidence'd —
+    // the shape that used to leave delivery/retrospective stuck on 'planned'
+    // until each was manually re-recorded.
+    seedMissionEvidence('gate.md', '# done');
+    seedMissionEvidence('delivery.md', '# done');
+    seedMissionEvidence('retrospective.md', '# done');
+
+    const result = tryAutoCompleteTaskFromEvidence(missionPath, 'gate-task');
+    const tasks = JSON.parse(
+      String(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }))
+    ) as Array<{ task_id?: string; status?: string }>;
+
+    expect(result.completed).toBe(true);
+    expect(result.cascaded).toEqual(['delivery-deliver', 'retrospective-retrospective']);
+    expect(tasks.every((task) => task.status === 'completed')).toBe(true);
+  });
+
+  it('cascade does NOT complete a dependent whose own deliverable is missing', () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'gate-task',
+            status: 'planned',
+            dependencies: [],
+            deliverable: 'evidence/gate.md',
+          },
+          {
+            task_id: 'delivery-deliver',
+            status: 'planned',
+            dependencies: ['gate-task'],
+            deliverable: 'evidence/delivery.md',
+          },
+        ],
+        null,
+        2
+      )
+    );
+    seedMissionEvidence('gate.md', '# done');
+
+    const result = tryAutoCompleteTaskFromEvidence(missionPath, 'gate-task');
+    const tasks = JSON.parse(
+      String(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }))
+    ) as Array<{ task_id?: string; status?: string }>;
+
+    expect(result.completed).toBe(true);
+    expect(result.cascaded).toEqual([]);
+    expect(tasks.find((task) => task.task_id === 'delivery-deliver')?.status).toBe('planned');
   });
 
   it('does NOT complete a review-kind task just because its deliverable file exists — no receipt means no completion', () => {

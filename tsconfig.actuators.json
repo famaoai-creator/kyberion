@@ -1,5 +1,12 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Dedicated buildinfo so the actuator program's recorded inputs are not
+    // clobbered by (or confused with) build:repo's — both otherwise share
+    // ./dist/.tsbuildinfo and the stale-dist checker cannot tell which build
+    // actually saw a file.
+    "tsBuildInfoFile": "./dist/.tsbuildinfo.actuators"
+  },
   "include": ["libs/actuators/**/*.ts"],
   "exclude": [
     "node_modules",
