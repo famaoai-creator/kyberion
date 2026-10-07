@@ -23674,6 +23674,11 @@
         "ja": "判断の保存結果を確認できませんでした。再試行する前に状態を更新してください。",
         "qps-ploc": "⟦Ŧħė ḓėƈïşïőñ őůŧƈőɱė ƈőůŀḓ ñőŧ ƀė ƈőñƒïřɱėḓ. Řėƒřėşħ ïŧş şŧȧŧůş ƀėƒőřė ŧřẏïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
       },
+      "progress_item_unavailable": {
+        "en": "This work item is unavailable. Refresh or choose another item.",
+        "ja": "この作業は表示できません。更新するか、別の作業を選んでください。",
+        "qps-ploc": "⟦Ŧħïş ẇőřķ ïŧėɱ ïş ůñȧṽȧïŀȧƀŀė. Řėƒřėşħ őř ƈħőőşė ȧñőŧħėř ïŧėɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
       "progress_request_pending": {
         "en": "No tracked work is linked to this request yet.",
         "ja": "この依頼に紐づく作業はまだありません。",
