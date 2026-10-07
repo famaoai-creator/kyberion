@@ -3,6 +3,7 @@ import {
   terminateFirstJobRequest,
 } from '@agent/core/surface/first-job-recovery';
 import { normalizeLocale } from '@agent/core/locale-normalize';
+import { readFirstJobSetup } from '@agent/core/surface/first-job-setup';
 /** Local-only typed diagnostic intake; outer authentication and rate limits remain installed. */
 import type express from 'express';
 import {
@@ -207,7 +208,11 @@ export function registerFirstJobRoutes(app: express.Express): void {
       const input = parseFirstJobReadRequest(req.query);
       if (!input || (input.locale !== undefined && !normalizeLocale(input.locale)))
         return failure(res, 400, 'first_job_invalid_request', true);
-      return res.json(readFirstJobSnapshot(viewer, input));
+      const snapshot = readFirstJobSnapshot(viewer, input);
+      return res.json({
+        ...snapshot,
+        setup: readFirstJobSetup(viewer, credentialFor(req), snapshot),
+      });
     } catch (error) {
       return failure(
         res,
@@ -260,8 +265,13 @@ export function registerFirstJobRoutes(app: express.Express): void {
       const reply = turn.routing?.reply;
       if (!reply) return failure(res, 503, 'first_job_admission_uncertain', false);
       if (turn.created) completeConversationTurn(viewer, turn.id, reply);
+      const snapshot = readFirstJobSnapshot(authenticated, {
+        session_id: ref.sessionId,
+        locale: input.locale,
+      });
       return res.json({
-        ...readFirstJobSnapshot(authenticated, { session_id: ref.sessionId, locale: input.locale }),
+        ...snapshot,
+        setup: readFirstJobSetup(authenticated, credentialFor(req), snapshot),
         request_id: input.request_id,
         replayed: !turn.created,
         mode: turn.created ? 'intake' : 'history',
