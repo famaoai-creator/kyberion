@@ -384,6 +384,21 @@ describe('confidential/common grant at the pack scope gate', () => {
     );
   });
 
+  it('labels knowledge/personal/ as personal tier, so no public or tenant scope reads it', () => {
+    const personal = knowledgeHintFragment(
+      { path: 'knowledge/personal/owners/abc/wisdom/x.md', title: 'P', excerpt: 'p', tags: [] },
+      0
+    );
+    expect(personal.source_tier).toBe('personal');
+    expect(evaluateContextFragment(scopeFor('tenant-x'), personal)?.code).toBe('TIER_NOT_READABLE');
+    expect(
+      evaluateContextFragment(
+        { ...scopeFor('tenant-x'), read_tiers: ['public'], write_tier: 'public' },
+        personal
+      )?.code
+    ).toBe('TIER_NOT_READABLE');
+  });
+
   it('a grant never relabels another tenant subtree', () => {
     const otherTenant = knowledgeHintFragment(
       { path: 'knowledge/confidential/tenant-y/x.md', title: 'Y', excerpt: 'y', tags: [] },
@@ -394,6 +409,24 @@ describe('confidential/common grant at the pack scope gate', () => {
     expect(evaluateContextFragment(scopeFor('tenant-x'), otherTenant)?.code).toBe(
       'TENANT_SCOPE_MISMATCH'
     );
+  });
+});
+
+describe('project-less missions keep their own knowledge path', () => {
+  it('ignores the mission-id placeholder that dispatch puts in work item project_id', async () => {
+    const missionId = `MSN-NOPROJ-${PID}`;
+    const missionDoc = `knowledge/confidential/tenant-x/missions/${missionId}/quantum-billing-mission-notes.md`;
+    writeDoc(missionDoc, 'Mission quantum billing notes');
+
+    const hints = await loadKnowledgeHintsIfPossible({
+      missionState: makeMissionState({ mission_id: missionId, tenant_slug: 'tenant-x' }),
+      workItem: { ...makeWorkItem(), project_id: missionId },
+      knowledgeSlicesPath: `${slicesDir}/does-not-exist.json`,
+      tenantKnowledgeRootDir: fixtureRoot,
+      estimatedScope: 'L',
+    });
+
+    expect(hints.map((h) => h.path)).toContain(missionDoc);
   });
 });
 
