@@ -4791,6 +4791,8 @@
       "legacy_category": "surface",
       "description": "外部サイト・APIからデータを取得してユーザーに要約を返す。初回はURLを尋ねてレジストリに登録し、次回から自動解決する。",
       "surface_examples": [
+        "天気を教えて",
+        "今日の秋葉原の天気を教えて",
         "このURLからデータを取ってきて",
         "為替レートを調べて",
         "このサイトの最新情報を見て"
@@ -4805,6 +4807,8 @@
       "outcome_ids": ["data_retrieved"],
       "specialist_id": "service-operator",
       "trigger_keywords": [
+        "weather",
+        "天気",
         "気温",
         "温度",
         "為替",
