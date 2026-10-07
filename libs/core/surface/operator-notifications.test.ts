@@ -224,16 +224,16 @@ describe('operator notifications (E2E-04 Task 2)', () => {
     expect(enqueue).not.toHaveBeenCalled();
     expect(inbox.addInboxEntry).toHaveBeenCalledTimes(1);
     expect(inbox.addInboxEntry.mock.calls[0][0]).toMatchObject({
-      entryId: 'INBOX-N-OPS123',
+      entryId: 'INBOX-N-589C74A517D435E3AB6E',
       title: 'scheduler down',
       kind: 'operator_notification',
       status: 'unread',
     });
   });
 
-  it('inbox route dedupes an already-queued notification entry', async () => {
+  it('inbox route dedupes an already-queued notification entry (same correlation → same hashed entry)', async () => {
     writePrefs({ default_channel: { surface: 'inbox', target: 'operator' } });
-    inbox.listInboxEntries.mockReturnValue([{ entry_id: 'INBOX-N-OPS123' }]);
+    inbox.listInboxEntries.mockReturnValue([{ entry_id: 'INBOX-N-589C74A517D435E3AB6E' }]);
     const sent = await mod.notifyOperator('ops_alert', {
       title: 'scheduler down',
       body: 'chronos heartbeat missing',

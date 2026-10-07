@@ -33,6 +33,20 @@ instruction-file discovery chain (`AGENTS.md` and its symlinks) and makes the
 read/write matrix below unenforceable, since claim and ownership checks are
 scoped to that root.
 
+## Shared-checkout build freshness
+
+`dist/` is a per-checkout artifact shared by every provider working in the
+same worktree. When a session switches the checkout's branch, dist may hold
+artifacts compiled from the old branch — including imports of workspace
+subpaths that no longer exist (e.g. a removed `@agent/core/*` export). Those
+surface far from the cause, as `ERR_PACKAGE_PATH_NOT_EXPORTED` inside an
+otherwise unrelated pipeline step. A session that switches branches in a
+shared checkout must rebuild (`pnpm run build`) before running pipelines,
+gates, or baseline checks; a baseline-check L2 failure with
+`dist_import_violations` in the report means exactly this. Rebuilding after a
+branch switch is cheap insurance and never harms an in-flight claim holder —
+dist contents are derived state, not authored state.
+
 ## The read/write matrix
 
 | Surface                                                                       | Who may act                                                                                                                                                                                                                           | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
