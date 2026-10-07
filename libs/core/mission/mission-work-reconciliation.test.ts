@@ -247,6 +247,7 @@ function prepareReviewReconciliationFixture(input?: {
   receiptHash?: string;
   reviewerAgentId?: string;
   artifactKind?: 'doc' | 'code';
+  receiptArtifactPath?: 'source-relative' | 'repo-relative';
 }): MissionWorkReconciliationManifest {
   const sourceRepository = nodePath.join(fixtureRoot, 'review-source');
   safeMkdir(sourceRepository, { recursive: true });
@@ -270,7 +271,10 @@ function prepareReviewReconciliationFixture(input?: {
         review_task_id: 'review-content',
         review_target_task_id: 'implementation',
         artifact: {
-          path: 'artifact.md',
+          path:
+            input?.receiptArtifactPath === 'repo-relative'
+              ? pathResolver.toRepoRelative(reviewedArtifactPath)
+              : 'artifact.md',
           sha256: input?.receiptHash || reviewedArtifactHash,
           kind: input?.artifactKind || 'doc',
         },
@@ -824,6 +828,18 @@ describe('mission existing work reconciliation', () => {
       implementer_agent_ids: ['implementation-agent'],
     };
     safeWriteFile(nodePath.join(missionPath, 'NEXT_TASKS.json'), JSON.stringify(tasks, null, 2));
+    writeManifest(manifest);
+
+    const result = await reconcileMissionExistingWork({ missionId, manifestPath, dryRun: true });
+
+    expect(result.reconciled_task_ids).toEqual(['review-content']);
+  });
+
+  it('accepts a repo-root-relative receipt artifact path inside the source repository', async () => {
+    // Governed review-task receipts always store repo-root-relative paths, while
+    // independent mission repositories reconcile with source.repository set to the
+    // mission directory. The validator must bridge both conventions.
+    const manifest = prepareReviewReconciliationFixture({ receiptArtifactPath: 'repo-relative' });
     writeManifest(manifest);
 
     const result = await reconcileMissionExistingWork({ missionId, manifestPath, dryRun: true });

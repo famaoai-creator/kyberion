@@ -545,6 +545,32 @@ function isCommitBoundSourceFile(input: {
   }
 }
 
+/**
+ * Resolve a review receipt's artifact path against the manifest source.
+ * Receipts always store repo-root-relative paths (see recordArtifactReview in
+ * mission-maintenance.ts and mission-lifecycle-completion.ts), so when the
+ * manifest source is an independent mission repository the receipt path only
+ * resolves through the repo root — while still landing inside the source
+ * repository. Worktree checkouts keep working untouched: the direct
+ * resolution hits first and the fallback never fires. The fallback never
+ * escapes the source repository, and commit-bound / hash checks below still
+ * apply to whichever path wins.
+ */
+function resolveReceiptArtifactPath(sourceRepository: string, receiptArtifactPath: string): string {
+  const direct = nodePath.resolve(sourceRepository, receiptArtifactPath);
+  if (safeExistsSync(direct) && safeStat(direct).isFile()) return direct;
+  const fromRepoRoot = nodePath.resolve(pathResolver.rootDir(), receiptArtifactPath);
+  if (
+    fromRepoRoot !== direct &&
+    isInside(sourceRepository, fromRepoRoot) &&
+    safeExistsSync(fromRepoRoot) &&
+    safeStat(fromRepoRoot).isFile()
+  ) {
+    return fromRepoRoot;
+  }
+  return direct;
+}
+
 function validateReconciledArtifactReview(input: {
   missionId: string;
   missionType?: string;
@@ -597,7 +623,7 @@ function validateReconciledArtifactReview(input: {
     );
   }
 
-  const artifactPath = nodePath.resolve(input.sourceRepository, receipt.artifact.path);
+  const artifactPath = resolveReceiptArtifactPath(input.sourceRepository, receipt.artifact.path);
   assertCommitBoundSourceFile({
     taskId: input.manifestTask.task_id,
     label: 'reviewed artifact',
