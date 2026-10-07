@@ -25,7 +25,7 @@ import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { sendOpsAlert } from '@agent/core/ops-alert';
 import {
-  registerScheduledPipeline,
+  reconcileScheduledPipelines,
   resolveScheduledPipelinePath,
   getSchedulesDueNow,
   claimScheduledPipelineRun,
@@ -466,7 +466,7 @@ function syncSchedulesFromAdf(): void {
   const files = collectPipelineFiles(pipelinesDir);
   const tenantFiles = collectTenantPipelineFiles(root);
 
-  let registered = 0;
+  const desired: Array<Parameters<typeof reconcileScheduledPipelines>[1][number]> = [];
   for (const fullPath of [...files, ...tenantFiles.map((entry) => entry.file)]) {
     try {
       const { scope, adf } = readScheduledPipelineAdf(fullPath);
@@ -481,7 +481,7 @@ function syncSchedulesFromAdf(): void {
       // repository schedule id (or another tenant's).
       const id = scope.kind === 'tenant' ? `tenant-${scope.tenant_slug}-${baseId}` : baseId;
 
-      registerScheduledPipeline({
+      desired.push({
         id,
         name: adf.name ?? id,
         pipelinePath: fullPath,
@@ -492,6 +492,7 @@ function syncSchedulesFromAdf(): void {
           timezone: sched.timezone,
         },
         enabled: sched.enabled !== false,
+        managedBy: 'chronos_adf',
         // Shipped-disabled schedules run only when the host lists their id in
         // KYBERION_CHRONOS_SCHEDULES (see scheduleExplicitlyOptedIn).
         optIn: sched.enabled === false,
@@ -499,7 +500,6 @@ function syncSchedulesFromAdf(): void {
         context: scope.kind === 'tenant' ? {} : (adf.context ?? {}),
         deliver_to: sched.deliver_to,
       });
-      registered++;
     } catch (err: any) {
       logger.warn(
         `[CHRONOS] Skipped ${path.relative(pathResolver.rootDir(), fullPath)}: ${err.message}`
@@ -507,8 +507,12 @@ function syncSchedulesFromAdf(): void {
     }
   }
 
-  if (registered > 0) {
-    logger.info(`[CHRONOS] Synced ${registered} scheduled pipeline(s) from pipelines/`);
+  const result = reconcileScheduledPipelines('chronos_adf', desired);
+  const changed = result.added + result.updated + result.removed;
+  if (changed > 0) {
+    logger.info(
+      `[CHRONOS] Reconciled schedules: ${result.added} added, ${result.updated} updated, ${result.removed} removed`
+    );
   }
 }
 
