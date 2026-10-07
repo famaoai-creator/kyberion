@@ -352,6 +352,14 @@ export async function findRelevantDistilledKnowledge(
   }
 
   // ── Semantic ranking (hybrid path) ──────────────────────────────────────
+  // An approximate backend (the default hash embedding) gives nearly every
+  // pair a similarity above 0, so it may only re-order entries that already
+  // cleared the lexical `minScore`; letting it admit entries returned
+  // unrelated distills for any query. A semantic backend may still admit
+  // entries without lexical overlap (e.g. a cross-lingual query).
+  const approximate = backend.quality === 'approximate';
+  const pool = approximate ? lexicalScored : all;
+  if (pool.length === 0) return [];
   const queryText = [input.topic, ...(input.tags ?? [])].filter(Boolean).join(' ');
   const cache = cacheForBackend(backend);
   const queryVec = await _embedWithCache(backend, `__q__${queryText}`, queryText);
@@ -361,8 +369,8 @@ export async function findRelevantDistilledKnowledge(
     return lexicalScored.slice(0, limit);
   }
 
-  // Embed corpus entries in batch for efficiency
-  const unembed = all.filter((e) => !cache.has(e.path));
+  // Embed candidate entries in batch for efficiency
+  const unembed = pool.filter((e) => !cache.has(e.path));
   if (unembed.length > 0) {
     try {
       const vectors = await backend.embedBatch(unembed.map(_corpusText));
@@ -372,7 +380,7 @@ export async function findRelevantDistilledKnowledge(
     }
   }
 
-  const semanticScored = all
+  const semanticScored = pool
     .map((e) => {
       const vec = cache.get(e.path);
       return { entry: e, sim: vec ? cosineSimilarity(queryVec, vec) : 0 };
@@ -382,10 +390,16 @@ export async function findRelevantDistilledKnowledge(
     .map((x) => x.entry);
 
   // ── RRF fusion ──────────────────────────────────────────────────────────
+  // RRF values (~1/(60+rank)) only rank. Rescale them onto the lexical 0..1
+  // range (the top fused entry gets the best lexical score) so the returned
+  // scores stay descending and comparable with other lexical lanes, e.g.
+  // tenant retrieval in the context pack merge.
   const rrfScores = reciprocalRankFusion([lexicalScored, semanticScored]);
+  const maxRrf = Math.max(0, ...rrfScores.values());
+  const scale = lexicalScored[0]?.score ?? minScore;
 
-  return all
-    .map((e) => ({ ...e, score: rrfScores.get(e.path) ?? 0 }))
+  return pool
+    .map((e) => ({ ...e, score: maxRrf > 0 ? ((rrfScores.get(e.path) ?? 0) / maxRrf) * scale : 0 }))
     .filter((e) => (e.score ?? 0) > 0)
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;

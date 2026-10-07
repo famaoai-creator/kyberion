@@ -278,3 +278,58 @@ describe('findRelevantDistilledKnowledge — hybrid (with embedding backend)', (
     expect(r.length).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe('findRelevantDistilledKnowledge — approximate embedding backend', () => {
+  // Every text maps to the same vector: similarity is positive for every
+  // pair, the way the default hash embedding behaves for unrelated text.
+  const flat = new Float32Array([0.5, 0.5, 0.5, 0.5]);
+  const registerApproximate = () =>
+    registerEmbeddingBackend({
+      name: 'test-approximate',
+      dimensions: 4,
+      quality: 'approximate',
+      embed: async () => flat,
+      embedBatch: async (texts) => texts.map(() => flat),
+    });
+  const lexicalOnly = async (topic: string, limit: number) => {
+    resetEmbeddingBackend();
+    process.env.KYBERION_DISABLE_EMBEDDINGS = '1';
+    try {
+      return await findRelevantDistilledKnowledge({ topic, limit });
+    } finally {
+      delete process.env.KYBERION_DISABLE_EMBEDDINGS;
+      registerApproximate();
+    }
+  };
+
+  beforeEach(() => {
+    resetEmbeddingBackend();
+    registerApproximate();
+  });
+
+  afterEach(() => {
+    resetEmbeddingBackend();
+  });
+
+  it('returns nothing for an off-topic query instead of filling the budget', async () => {
+    const r = await findRelevantDistilledKnowledge({
+      topic: 'bake sourdough bread with rye starter',
+      limit: 3,
+      minScore: 0.08,
+    });
+    expect(r).toEqual([]);
+  });
+
+  it('keeps scores on the lexical 0..1 scale and only returns lexical matches', async () => {
+    const lexicalTop = await lexicalOnly('meeting facilitator', 3);
+    const lexicalAll = new Set((await lexicalOnly('meeting facilitator', 50)).map((e) => e.path));
+
+    const r = await findRelevantDistilledKnowledge({ topic: 'meeting facilitator', limit: 3 });
+    expect(r.length).toBeGreaterThan(0);
+    expect(r[0].score).toBeCloseTo(lexicalTop[0].score ?? 0, 5);
+    for (let i = 1; i < r.length; i++) {
+      expect(r[i - 1].score!).toBeGreaterThanOrEqual(r[i].score!);
+    }
+    for (const e of r) expect(lexicalAll.has(e.path)).toBe(true);
+  });
+});
