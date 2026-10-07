@@ -8,6 +8,7 @@ Chrome の現在タブで操作意図を記録し、Kyberion が review でき�
 - 接続解除と、同一 origin のページ遷移後の再接続・記録続行
 - 入力値、password、OTP、token、Cookie、WebAuthn credential、raw CSS selector、contenteditable の本文を保存しない
 - 記録した各操作を承認または除外し、承認済み操作だけを review 用の JSON 下書きに残す
+- 操作の直後に `role="status"` の完了表示（例：「保存しました」）が出て落ち着くと、それを待つ `wait_for_ref` ステップとして自動で記録（Review で承認/除外できます）。手順の golden シナリオはこの表示を成功条件に使うため、実行後に本当に成功したかを判定できます。記録の対象外：`role="alert"`、操作前から出ていた表示、PII 除去で伏せ字になった文言
 - Native Messaging host 経由で Kyberion の preflight / 承認 / lease 発行 / Chrome 実行 / receipt 生成に接続
 - preflight は browser-actuator の `browser` パイプライン step `op: extension_session`（`actuator-op-registry.json`）で検証
 - Chrome 138 以降で利用可能な Built-in AI（`Summarizer` / `LanguageModel`）による、redaction 済みページ本文・抽出観測のローカル要約とシナリオ候補抽出（候補は実行不可）
