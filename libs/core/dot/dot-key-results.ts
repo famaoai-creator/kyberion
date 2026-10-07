@@ -73,6 +73,8 @@ export interface DotKeyResultDeps {
   serviceCall?: StateProbeDeps['serviceCall'];
   /** Reads a repo-relative file as text; defaults to a repo-confined secure-io read. */
   readFile?: (relPath: string) => string;
+  /** Measure every key result now, ignoring its `every_s` throttle (on-demand sweeps). */
+  force?: boolean;
   /** Organization metric port; defaults to the persisted organization records. */
   orgMetric?: (metric: KeyResultOrgMetric, scope: OrgMetricScope) => number | undefined;
   readSignals?: (dotId: string) => DotSignalEntry[];
@@ -503,7 +505,11 @@ export async function measureOrganizationKeyResults(
   const rows: KrMeasurementRow[] = [];
   for (const objective of purpose?.objectives ?? []) {
     for (const spec of objective.key_results ?? []) {
-      if (!isDue(spec, latest.get(`${objective.objective_id}\u0000${spec.kr_id}`), now)) continue;
+      if (
+        !deps.force &&
+        !isDue(spec, latest.get(`${objective.objective_id}\u0000${spec.kr_id}`), now)
+      )
+        continue;
       try {
         const value = await measureSpec(spec, target, deps, now);
         if (value === undefined) continue;

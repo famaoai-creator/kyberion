@@ -177,6 +177,37 @@ describe('dot key results', () => {
     safeRmSync('active/shared/runtime/dot/tenants/acme', { recursive: true, force: true });
   });
 
+  it('re-measures an org KR inside its interval only when forced', async () => {
+    const scope = { organizationId: 'org-f', tenantSlug: 'acme', tier: 'confidential' as const };
+    const purpose = {
+      objectives: [
+        {
+          objective_id: 'o1',
+          title: 'O1',
+          key_results: [
+            {
+              kr_id: 'inc',
+              title: 'Incidents',
+              metric: { source: 'org_metric', metric: 'open_incidents' },
+              target: 0,
+              direction: 'decrease',
+              baseline: 4,
+            },
+          ],
+        },
+      ],
+    } as never;
+    const deps = { loadPurpose: () => purpose, orgMetric: () => 0 };
+    expect(await measureOrganizationKeyResults(scope, { ...deps, now: at(0) })).toHaveLength(1);
+    // An incident opens five minutes later: the default 15-minute throttle skips it…
+    const later = { ...deps, orgMetric: () => 1, now: at(5) };
+    expect(await measureOrganizationKeyResults(scope, later)).toEqual([]);
+    // …and an on-demand sweep with force picks it up.
+    const forced = await measureOrganizationKeyResults(scope, { ...later, force: true });
+    expect(forced[0]).toMatchObject({ kr_id: 'inc', value: 1 });
+    safeRmSync('active/shared/runtime/dot/tenants/acme', { recursive: true, force: true });
+  });
+
   it('records a manual KR value that sweeps leave alone', async () => {
     const scope = { organizationId: 'org-m', tenantSlug: 'acme', tier: 'confidential' as const };
     const purpose = {

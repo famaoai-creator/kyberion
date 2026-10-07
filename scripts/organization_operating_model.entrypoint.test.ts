@@ -22,4 +22,13 @@ describe('organization operating model output boundary', () => {
     expect(output).toHaveLength(1);
     expect(String(output[0])).toContain('pnpm organization model');
   });
+
+  it('names an unknown option instead of treating it as part of the command', () => {
+    expect(() =>
+      runOrganizationOperatingModelCli(
+        ['decision', 'transition', '--decision-id', 'd1', '--to', 'pending_approval'],
+        () => undefined
+      )
+    ).toThrow(/Unknown option --to for 'pnpm organization decision transition'/);
+  });
 });

@@ -23,7 +23,7 @@ import {
 type Print = (value: unknown) => void;
 
 const USAGE =
-  'Usage: pnpm organization objective kr measure --organization-id <id> --tier <tier> [--tenant-slug <slug>] --dry-run|--apply [--json]';
+  'Usage: pnpm organization objective kr measure --organization-id <id> --tier <tier> [--tenant-slug <slug>] --dry-run|--apply [--force] [--json]';
 
 const RECORD_USAGE =
   'Usage: pnpm organization objective kr record --organization-id <id> --tier <tier> [--tenant-slug <slug>] --objective-id <id> --kr-id <id> --value <n> [--measured-at <iso>] --dry-run|--apply [--json]';
@@ -34,15 +34,36 @@ function flag(args: string[], name: string): string | undefined {
   return value && !value.startsWith('--') ? value : undefined;
 }
 
-/** One line per objective: progress, then each KR's progress or "unmeasured". */
-export function formatObjectiveProgress(progress: OrganizationObjectiveProgress): string[] {
+/** "just now", "12m ago", "3h ago", "2d ago". */
+function formatAge(ms: number): string {
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return hours < 48 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`;
+}
+
+/**
+ * One line per objective: progress, then each KR's progress or "unmeasured",
+ * and how old its oldest measurement is so a stale roll-up is visible.
+ */
+export function formatObjectiveProgress(
+  progress: OrganizationObjectiveProgress,
+  now: Date = new Date()
+): string[] {
   return progress.objectives.map((objective) => {
     const pct = (value: number | undefined) =>
       value === undefined ? 'unmeasured' : `${Math.round(value * 100)}%`;
     const krs = objective.key_results.length
       ? objective.key_results.map((kr) => `${kr.kr_id} ${pct(kr.progress)}`).join(', ')
       : 'no key results';
-    return `Objective: ${objective.title} — ${pct(objective.progress)} (${krs})`;
+    const measuredAt = objective.key_results
+      .map((kr) => (kr.measured_at ? Date.parse(kr.measured_at) : Number.NaN))
+      .filter((ms) => Number.isFinite(ms));
+    const age = measuredAt.length
+      ? ` · measured ${formatAge(Math.max(0, now.getTime() - Math.min(...measuredAt)))}`
+      : '';
+    return `Objective: ${objective.title} — ${pct(objective.progress)} (${krs})${age}`;
   });
 }
 
@@ -70,7 +91,9 @@ export async function measureOrganizationObjectives(
     );
     return;
   }
-  const rows = await (deps.measure ?? measureOrganizationKeyResults)(scope);
+  const rows = await (deps.measure ?? measureOrganizationKeyResults)(scope, {
+    force: args.includes('--force'),
+  });
   const measured = new Set(rows.map((row) => `${row.objective_id}/${row.kr_id}`));
   const manual = new Set(
     (purpose?.objectives || []).flatMap((objective) =>
@@ -95,7 +118,7 @@ export async function measureOrganizationObjectives(
         .map((ref) =>
           manual.has(ref)
             ? `  not measured: ${ref} (manual — record it with pnpm organization objective kr record)`
-            : `  not measured: ${ref} (not due yet, or its metric could not be read)`
+            : `  not measured: ${ref} (measured less than its interval ago — rerun with --force — or its metric could not be read)`
         ),
       ...formatObjectiveProgress(progress),
     ].join('\n')
