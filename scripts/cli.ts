@@ -29,6 +29,7 @@ import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { nowIso } from '@agent/core/foundation/time';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { readTextFile } from '@agent/core/foundation/text';
+import { DiagnosticError } from '@agent/core/logger';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { createCliCommandHandlers, type CliCommandHandler } from './cli-command-handlers.js';
 export { parseOffboardArgs } from './cli-offboard-args.js';
@@ -147,7 +148,12 @@ const rootDir = pathResolver.rootDir();
 
 export function readCliTextFile(filePath: string, label: string): string {
   if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
-    throw new Error(`${label} must be a regular file`);
+    throw new DiagnosticError({
+      code: 'CLI_INPUT_INVALID',
+      what: `${label} must be a regular file`,
+      evidence: filePath,
+      next: 'pass a readable file path inside the repository',
+    });
   }
   return readTextFile(filePath);
 }
@@ -381,9 +387,12 @@ export function resolveAppProfileResourcePath(relativePath: string): string {
     }
   );
   if (!safeLstat(resolved).isFile()) {
-    throw new Error(
-      `[APP_PROFILE_RESOURCE_INVALID] resource must be a regular file: ${relativePath}`
-    );
+    throw new DiagnosticError({
+      code: 'APP_PROFILE_RESOURCE_INVALID',
+      what: 'resource must be a regular file',
+      evidence: relativePath,
+      next: 'point the profile entry at an existing file in the repository',
+    });
   }
   return resolved;
 }
@@ -476,7 +485,13 @@ function printAppProfilesSummary(profiles: AppProfileRecord[], kind: string): vo
 
 function printAppProfile(profiles: AppProfileRecord[], profileId: string, kind: string): void {
   const profile = profiles.find((entry) => entry.id === profileId);
-  if (!profile) throw new Error(`${kind} profile "${profileId}" not found.`);
+  if (!profile) {
+    throw new DiagnosticError({
+      code: 'APP_PROFILE_NOT_FOUND',
+      what: `${kind} profile "${profileId}" not found`,
+      next: 'run the same command without an id to list available profiles',
+    });
+  }
   printHeader();
   printText(`${chalk.bold(profile.id)} (${profile.platform})`);
   printText(profile.title);
@@ -501,7 +516,12 @@ function printWebAppProfile(profileId: string) {
 function printArtifactInfo(targetPath: string) {
   const resolvedPath = path.resolve(rootDir, targetPath);
   if (!safeExistsSync(resolvedPath)) {
-    throw new Error(`Artifact not found: ${targetPath}`);
+    throw new DiagnosticError({
+      code: 'ARTIFACT_NOT_FOUND',
+      what: 'artifact not found',
+      evidence: targetPath,
+      next: 'check the path relative to the repository root',
+    });
   }
   const stat = safeStat(resolvedPath);
   const ext = path.extname(resolvedPath).toLowerCase();
@@ -541,7 +561,12 @@ function resolveOpenArtifactCommand(targetPath: string): OpenArtifactCommand {
 function openArtifact(targetPath: string) {
   const resolvedPath = path.resolve(rootDir, targetPath);
   if (!safeExistsSync(resolvedPath)) {
-    throw new Error(`Artifact not found: ${targetPath}`);
+    throw new DiagnosticError({
+      code: 'ARTIFACT_NOT_FOUND',
+      what: 'artifact not found',
+      evidence: targetPath,
+      next: 'check the path relative to the repository root',
+    });
   }
   const opener = resolveOpenArtifactCommand(resolvedPath);
   printHeader();
@@ -653,19 +678,35 @@ function loadPacketFile(targetPath: string): PacketFile {
   const resolvedPath = path.resolve(rootDir, targetPath);
   assertPacketPathAllowed(resolvedPath);
   if (!safeExistsSync(resolvedPath)) {
-    throw new Error(`Packet file not found: ${targetPath}`);
+    throw new DiagnosticError({
+      code: 'PACKET_NOT_FOUND',
+      what: 'packet file not found',
+      evidence: targetPath,
+      next: 'check the path relative to the repository root',
+    });
   }
   const content = readCliTextFile(resolvedPath, 'packet file');
   let parsed: unknown;
   try {
     parsed = parseSafeJsonInput(content, 'Packet file');
   } catch (error) {
-    throw new Error(
-      `Packet file contains invalid JSON: ${error instanceof Error ? error.message : String(error)}`
-    );
+    throw new DiagnosticError({
+      code: 'PACKET_INVALID',
+      what: 'packet file contains invalid JSON',
+      why: error instanceof Error ? error.message : String(error),
+      evidence: targetPath,
+      next: 'fix the JSON or regenerate the packet',
+    });
   }
   const packet = parseInteractionPacket(parsed);
-  if (!packet) throw new Error(`Packet file contains an invalid packet shape: ${targetPath}`);
+  if (!packet) {
+    throw new DiagnosticError({
+      code: 'PACKET_INVALID',
+      what: 'packet file contains an invalid packet shape',
+      evidence: targetPath,
+      next: 'regenerate the packet with the originating pipeline',
+    });
+  }
   return packet;
 }
 
@@ -681,22 +722,39 @@ export function assertPacketPathAllowed(resolvedPath: string): void {
   ) {
     return;
   }
-  throw new Error(
-    `Packet path must stay within ${path.relative(rootDir, ORCHESTRATOR_PACKET_DIR)}.`
-  );
+  throw new DiagnosticError({
+    code: 'PACKET_PATH_DENIED',
+    what: 'packet path is outside the allowed directory',
+    evidence: resolvedPath,
+    next: `keep packet files under ${path.relative(rootDir, ORCHESTRATOR_PACKET_DIR)}`,
+  });
 }
 
 export function assertApprovedNextActionCommand(command: string): void {
   const [bin, ...args] = tokenizeSuggestedCommand(command);
   if (bin !== 'node') {
-    throw new Error(`Only node-based packet commands are allowed. Received: ${bin || 'empty'}`);
+    throw new DiagnosticError({
+      code: 'PACKET_COMMAND_DENIED',
+      what: 'only node-based packet commands are allowed',
+      why: `received: ${bin || 'empty'}`,
+      next: 'suggest a `node dist/scripts/...` command in the packet',
+    });
   }
   const script = args[0];
   if (!script || script.startsWith('-')) {
-    throw new Error('Packet commands must target an approved dist/scripts entrypoint.');
+    throw new DiagnosticError({
+      code: 'PACKET_COMMAND_DENIED',
+      what: 'packet commands must target an approved dist/scripts entrypoint',
+      next: 'suggest a `node dist/scripts/...` command in the packet',
+    });
   }
   if (!APPROVED_PACKET_COMMAND_SCRIPTS.has(script)) {
-    throw new Error(`Packet command script is not approved: ${script}`);
+    throw new DiagnosticError({
+      code: 'PACKET_COMMAND_DENIED',
+      what: 'packet command script is not approved',
+      evidence: script,
+      next: 'choose one of the approved dist/scripts entrypoints',
+    });
   }
 }
 
@@ -706,7 +764,12 @@ export function assertApprovedPipelinePath(pipelinePath: string): void {
     isPathWithin(path.join(rootDir, 'pipelines'), resolvedPath) ||
     isPathWithin(ORCHESTRATOR_PACKET_DIR, resolvedPath);
   if (!allowed || path.extname(resolvedPath) !== '.json') {
-    throw new Error(`Pipeline path is not approved: ${pipelinePath}`);
+    throw new DiagnosticError({
+      code: 'PIPELINE_PATH_DENIED',
+      what: 'pipeline path is not approved',
+      evidence: pipelinePath,
+      next: 'use a .json pipeline under pipelines/ or the orchestrator packet dir',
+    });
   }
 }
 
@@ -731,7 +794,11 @@ function loadPacketLike(targetPath: string): OperatorInteractionPacket | SystemS
   if (parsed.kind === 'operator-interaction-packet' || parsed.kind === 'system-status-report') {
     return parsed;
   }
-  throw new Error(`Unsupported packet kind: ${parsed.kind || 'unknown'}`);
+  throw new DiagnosticError({
+    code: 'PACKET_KIND_UNSUPPORTED',
+    what: `unsupported packet kind: ${parsed.kind || 'unknown'}`,
+    next: 'expected operator-interaction-packet or system-status-report — regenerate the packet',
+  });
 }
 
 function tokenizeSuggestedCommand(command: string): string[] {
@@ -818,7 +885,14 @@ function acceptNextAction(packetPath: string, actionId: string) {
   const nextActions = Array.isArray(packet.next_actions) ? packet.next_actions : [];
   const action = nextActions.find((item) => item.id === actionId);
   if (!action) {
-    throw new Error(`Next action "${actionId}" not found in packet.`);
+    throw new DiagnosticError({
+      code: 'PACKET_ACTION_NOT_FOUND',
+      what: `next action "${actionId}" not found in packet`,
+      why: nextActions.length
+        ? `available: ${nextActions.map((item) => item.id).join(', ')}`
+        : 'the packet declares no next_actions',
+      next: 'pass one of the action ids listed in the packet',
+    });
   }
   printHeader();
   printText(chalk.bold(`Executing next action: ${action.id}`));
@@ -833,7 +907,11 @@ function acceptNextAction(packetPath: string, actionId: string) {
       assertApprovedNextActionCommand(action.suggested_command);
       const [command, ...args] = tokenizeSuggestedCommand(action.suggested_command);
       if (!command) {
-        throw new Error(`Next action "${actionId}" has an empty suggested_command.`);
+        throw new DiagnosticError({
+          code: 'PACKET_ACTION_INVALID',
+          what: `next action "${actionId}" has an empty suggested_command`,
+          next: 'regenerate the packet with the originating pipeline',
+        });
       }
       printText(`Command: ${action.suggested_command}\n`);
       output = safeExec(command, args, { cwd: rootDir, timeoutMs: 120000 });
@@ -853,9 +931,12 @@ function acceptNextAction(packetPath: string, actionId: string) {
       executedVia = 'pipeline';
       executedTarget = action.suggested_pipeline_path;
     } else {
-      throw new Error(
-        `Next action "${actionId}" has neither suggested_command nor suggested_pipeline_path. The packet may be malformed or was generated by an outdated pipeline. Re-run the originating pipeline or ask the orchestrator to regenerate the packet.`
-      );
+      throw new DiagnosticError({
+        code: 'PACKET_ACTION_INVALID',
+        what: `next action "${actionId}" has neither suggested_command nor suggested_pipeline_path`,
+        why: 'the packet may be malformed or was generated by an outdated pipeline',
+        next: 're-run the originating pipeline or ask the orchestrator to regenerate the packet',
+      });
     }
   } catch (error: unknown) {
     executionFailed = true;
@@ -907,7 +988,11 @@ function acceptNextAction(packetPath: string, actionId: string) {
     assertApprovedNextActionCommand(packet.refresh_command);
     const [refreshCommand, ...refreshArgs] = tokenizeSuggestedCommand(packet.refresh_command);
     if (!refreshCommand) {
-      throw new Error('refresh_command is empty.');
+      throw new DiagnosticError({
+        code: 'PACKET_REFRESH_INVALID',
+        what: 'refresh_command is empty',
+        next: 'regenerate the packet with a valid refresh command',
+      });
     }
     const refreshOutput = safeExec(refreshCommand, refreshArgs, {
       cwd: rootDir,
@@ -971,9 +1056,11 @@ async function applyApprovalDecision(
   channelArg?: string
 ): Promise<void> {
   if (!requestId) {
-    throw new Error(
-      `Usage: pnpm kyberion ${command} <request-id> [storage-channel]\nRun \`pnpm kyberion approvals\` first to list pending request IDs.`
-    );
+    throw new DiagnosticError({
+      code: 'CLI_USAGE',
+      what: `Usage: pnpm kyberion ${command} <request-id> [storage-channel]`,
+      next: 'run `pnpm kyberion approvals` first to list pending request IDs',
+    });
   }
 
   const { decideApprovalRequest, listApprovalRequests } =
@@ -984,7 +1071,11 @@ async function applyApprovalDecision(
   });
   const request = requests.find((entry) => entry.id === requestId);
   if (!request) {
-    throw new Error(`Pending approval request "${requestId}" not found.`);
+    throw new DiagnosticError({
+      code: 'APPROVAL_NOT_FOUND',
+      what: `pending approval request "${requestId}" not found`,
+      next: 'run `pnpm kyberion approvals` to list pending request IDs',
+    });
   }
 
   const decision = command === 'approve' ? 'approved' : 'rejected';
@@ -1072,7 +1163,11 @@ function runActuator(
   missionId?: string
 ) {
   if (!actuatorName) {
-    throw new Error('Missing actuator name. Try `pnpm kyberion list`.');
+    throw new DiagnosticError({
+      code: 'CLI_USAGE',
+      what: 'missing actuator name',
+      next: 'run `pnpm kyberion list` to see available actuators',
+    });
   }
 
   const actuator = findActuator(actuators, actuatorName);
@@ -1080,8 +1175,12 @@ function runActuator(
     const suggestions = searchActuators(actuators, actuatorName)
       .slice(0, 5)
       .map((match) => match.name);
-    const suffix = suggestions.length > 0 ? ` Did you mean: ${suggestions.join(', ')}?` : '';
-    throw new Error(`Actuator "${actuatorName}" not found.${suffix}`);
+    throw new DiagnosticError({
+      code: 'ACTUATOR_NOT_FOUND',
+      what: `actuator "${actuatorName}" not found`,
+      ...(suggestions.length > 0 ? { why: `did you mean: ${suggestions.join(', ')}?` } : {}),
+      next: 'run `pnpm kyberion list` to see available actuators',
+    });
   }
 
   const { branchId } = extractBranchArg(rawArgs);
@@ -1089,9 +1188,11 @@ function runActuator(
 
   const script = resolveActuatorPath(actuator.path);
   if (!script) {
-    throw new Error(
-      `Actuator "${actuator.name}" is indexed but has no runnable build output. Run \`pnpm build\` first.`
-    );
+    throw new DiagnosticError({
+      code: 'ACTUATOR_BUILD_MISSING',
+      what: `actuator "${actuator.name}" is indexed but has no runnable build output`,
+      next: 'run `pnpm build` first',
+    });
   }
 
   printText(chalk.blue(`🚀 ACTUATING: ${actuator.name}...\n`));
@@ -1227,7 +1328,10 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
     return;
   }
 
-  throw new Error(t('cli_error_unknown_command', locale).replace('{command}', command));
+  throw new DiagnosticError({
+    code: 'CLI_UNKNOWN_COMMAND',
+    what: t('cli_error_unknown_command', locale).replace('{command}', command),
+  });
 }
 
 export async function main(args: string[] = [], print: Print = () => undefined) {

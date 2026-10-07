@@ -432,7 +432,7 @@ describe('Kyberion CLI helpers', () => {
       assertApprovedNextActionCommand('node dist/scripts/mission_controller.js status MSN-1')
     ).not.toThrow();
     expect(() => assertApprovedNextActionCommand('bash -lc "echo hacked"')).toThrow(
-      'Only node-based packet commands are allowed'
+      'PACKET_COMMAND_DENIED'
     );
     expect(() => assertApprovedNextActionCommand('node -e "console.log(1)"')).toThrow(
       'approved dist/scripts entrypoint'
@@ -447,7 +447,7 @@ describe('Kyberion CLI helpers', () => {
       assertPacketPathAllowed(`${process.cwd()}/active/shared/tmp/orchestrator/test-packet.json`)
     ).not.toThrow();
     expect(() => assertPacketPathAllowed(`${process.cwd()}/tmp/evil.json`)).toThrow(
-      'Packet path must stay within'
+      'PACKET_PATH_DENIED'
     );
     expect(() =>
       assertApprovedPipelinePath('pipelines/web-session-handoff-runner.json')
@@ -455,9 +455,7 @@ describe('Kyberion CLI helpers', () => {
     expect(() =>
       assertApprovedPipelinePath('active/shared/tmp/orchestrator/status-packet.json')
     ).not.toThrow();
-    expect(() => assertApprovedPipelinePath('../secrets.json')).toThrow(
-      'Pipeline path is not approved'
-    );
+    expect(() => assertApprovedPipelinePath('../secrets.json')).toThrow('PIPELINE_PATH_DENIED');
   });
 });
 
