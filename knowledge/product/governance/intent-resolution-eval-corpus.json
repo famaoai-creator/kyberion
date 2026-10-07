@@ -1,5 +1,7 @@
 {
+  "$schema": "../schemas/intent-resolution-eval-corpus.schema.json",
   "version": "1.0.0",
+  "purpose": "Labelled utterances for evaluating which standard intent the resolver selects, including negatives that no catalog intent may claim; the measuring stick for intent keyword review.",
   "cases": [
     {
       "case_id": "ir-dev-001",
