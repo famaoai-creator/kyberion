@@ -52,6 +52,7 @@ import {
   validateMissionStartCreateInput,
 } from './refactor/mission-controller-args.js';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
+import { DiagnosticError } from '@agent/core/logger';
 import { buildHelpText } from './refactor/mission-controller-help.js';
 export { buildHelpText } from './refactor/mission-controller-help.js';
 import {
@@ -122,7 +123,13 @@ async function reassignMissionProject(
   }
 ): Promise<unknown> {
   const { reassignMissionToProject } = await import('@agent/core/project/project-management');
-  if (!options.projectId) throw new Error('reassign-project requires --project-id');
+  if (!options.projectId) {
+    throw new DiagnosticError({
+      code: 'CLI_USAGE',
+      what: 'reassign-project requires --project-id',
+      next: 'pass --project-id <id> naming the target project',
+    });
+  }
   const result = await reassignMissionToProject({
     mission_id: missionId,
     project_id: options.projectId,
@@ -369,9 +376,12 @@ async function finishMission(id: string, seal: boolean = false) {
         reason: finishReason || `Mission archive was not confirmed at ${archivedPath}`,
       })
     );
-    throw new Error(
-      `Mission ${id.toUpperCase()} finish gate did not pass (status: ${finalState?.status || 'unknown'}).`
-    );
+    throw new DiagnosticError({
+      code: 'MISSION_FINISH_GATE',
+      what: `mission ${id.toUpperCase()} finish gate did not pass`,
+      why: `status: ${finalState?.status || 'unknown'}`,
+      next: `run \`pnpm mission triage ${id.toUpperCase()}\` to inspect and resolve the blocker`,
+    });
   }
   syncIntentContractMemorySnapshot(id, 'finish');
   return result;
@@ -1017,17 +1027,43 @@ async function grantMissionAccess(missionId: string, serviceId: string, ttl: num
 
 async function resolveGate(missionId: string, gateFile?: string): Promise<string> {
   const evidDir = missionEvidenceDir(missionId.toUpperCase());
-  if (!evidDir) throw new Error(`Mission ${missionId} evidence directory not found.`);
+  if (!evidDir) {
+    throw new DiagnosticError({
+      code: 'MISSION_NOT_FOUND',
+      what: `mission ${missionId} evidence directory not found`,
+      next: 'check the mission id — run `pnpm mission list` to see known missions',
+    });
+  }
   if (gateFile) {
     const abs = path.isAbsolute(gateFile) ? gateFile : path.resolve(evidDir, gateFile);
-    if (!safeExistsSync(abs)) throw new Error(`Gate file not found: ${abs}`);
+    if (!safeExistsSync(abs)) {
+      throw new DiagnosticError({
+        code: 'GATE_NOT_FOUND',
+        what: 'gate file not found',
+        evidence: abs,
+        next: 'omit the gate file to auto-pick, or pass one under the mission evidence dir',
+      });
+    }
     return abs;
   }
   const files = safeReaddir(evidDir) as string[];
   const gates = files.filter((f) => f.endsWith('-gate.json'));
-  if (gates.length === 0) throw new Error(`No gate files found in ${evidDir}`);
-  if (gates.length > 1)
-    throw new Error(`Multiple gates found — specify gate file: ${gates.join(', ')}`);
+  if (gates.length === 0) {
+    throw new DiagnosticError({
+      code: 'GATE_NOT_FOUND',
+      what: 'no gate files found in the mission evidence directory',
+      evidence: evidDir,
+      next: 'run the phase that emits the gate, then retry',
+    });
+  }
+  if (gates.length > 1) {
+    throw new DiagnosticError({
+      code: 'GATE_AMBIGUOUS',
+      what: 'multiple gates found — specify which one',
+      why: `candidates: ${gates.join(', ')}`,
+      next: 'pass the gate file name as an argument',
+    });
+  }
   return path.join(evidDir, gates[0]);
 }
 

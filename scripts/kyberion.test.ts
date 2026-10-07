@@ -108,7 +108,7 @@ describe('kyberion command router', () => {
   });
 
   it('rejects unknown commands instead of falling back to an executable surface', () => {
-    expect(() => selectEntrypoint('unknown-command')).toThrow('Unknown kyberion command');
+    expect(() => selectEntrypoint('unknown-command')).toThrow('CLI_UNKNOWN_COMMAND');
   });
 
   it('fails closed when the command registry and entrypoint map disagree', () => {
@@ -134,9 +134,7 @@ describe('kyberion command router', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/kyberion.ts'), { encoding: 'utf8' })
     );
-    expect(source).toContain(
-      'throw new Error(`Unsupported kyberion entrypoint: ${entrypoint.id}`)'
-    );
+    expect(source).toContain('CLI_ENTRYPOINT_UNSUPPORTED');
   });
 
   it('fails closed when a dispatch key is defined more than once', () => {

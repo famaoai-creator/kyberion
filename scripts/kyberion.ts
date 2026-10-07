@@ -16,6 +16,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { resolveLocale, type SupportedLocale } from '@agent/core/locale';
 import { t } from '@agent/core/t';
+import { DiagnosticError } from '@agent/core/logger';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { hasHelpFlag } from './lib/cli-guard.js';
 import {
@@ -46,7 +47,11 @@ function findUniqueCommand(
 ): CliCommand | undefined {
   const matches = manifest.commands.filter((candidate) => candidate.command === command);
   if (matches.length > 1) {
-    throw new Error(`CLI command registry has duplicate command: ${command || '<default>'}`);
+    throw new DiagnosticError({
+      code: 'CLI_REGISTRY_DUPLICATE',
+      what: `CLI command registry has duplicate command: ${command || '<default>'}`,
+      next: 'fix the duplicated entry in cli-commands.json and regenerate the manifest',
+    });
   }
   return matches[0];
 }
@@ -62,24 +67,38 @@ function findUniqueScriptCommand(
       ? exactMatches
       : scriptCommands.filter((candidate) => candidate.command === `${command} default`);
   if (matches.length > 1) {
-    throw new Error(`CLI script command registry has duplicate command: ${command}`);
+    throw new DiagnosticError({
+      code: 'CLI_REGISTRY_DUPLICATE',
+      what: `CLI script command registry has duplicate command: ${command}`,
+      next: 'fix the duplicated entry in cli-commands.json and regenerate the manifest',
+    });
   }
   return matches[0];
 }
 
 export function selectEntrypoint(command: string, manifest = loadCliManifest()): CliEntrypoint {
   const registered = findUniqueCommand(command, manifest);
-  if (!registered) throw new Error(`Unknown kyberion command: ${command}`);
+  if (!registered) {
+    throw new DiagnosticError({
+      code: 'CLI_UNKNOWN_COMMAND',
+      what: `unknown kyberion command: ${command}`,
+      next: 'run `pnpm kyberion help` to list commands',
+    });
+  }
   const entrypoint = manifest.entrypoints.find((candidate) => candidate.id === registered.entry);
   if (!entrypoint) {
-    throw new Error(
-      `CLI command ${command || '<default>'} references missing entrypoint: ${registered.entry}`
-    );
+    throw new DiagnosticError({
+      code: 'CLI_REGISTRY_INVALID',
+      what: `CLI command ${command || '<default>'} references missing entrypoint: ${registered.entry}`,
+      next: 'regenerate the CLI manifest (`pnpm generate:cli-reference`)',
+    });
   }
   if (!entrypoint.commands.includes(command)) {
-    throw new Error(
-      `CLI command registry mismatch: ${command || '<default>'} -> ${registered.entry}`
-    );
+    throw new DiagnosticError({
+      code: 'CLI_REGISTRY_INVALID',
+      what: `CLI command registry mismatch: ${command || '<default>'} -> ${registered.entry}`,
+      next: 'regenerate the CLI manifest (`pnpm generate:cli-reference`)',
+    });
   }
   return entrypoint;
 }
@@ -129,7 +148,11 @@ async function runScriptCommand(
     throw new ScriptExitError(1, formatUnknownCommand(typed || command, manifest));
   }
   if (scriptCommand.script === 'kyberion') {
-    throw new Error('The kyberion package script cannot dispatch itself');
+    throw new DiagnosticError({
+      code: 'CLI_DISPATCH_RECURSION',
+      what: 'the kyberion package script cannot dispatch itself',
+      next: 'fix the script_commands entry in cli-commands.json',
+    });
   }
   const commandArgs = args.slice(command.split(' ').length);
   // CU-01: a target without its own guarded --help never runs for --help.
@@ -296,13 +319,11 @@ export function assertRequiredEnvironment(report: {
 }): void {
   if (report.errors.length === 0) return;
   const details = report.errors.map((issue) => `${issue.name} (${issue.issue})`).join(', ');
-  throw new Error(
-    [
-      `Required environment is not configured: ${details}`,
-      `Register or correct each variable in ${ENV_REGISTRY_PATH} (regenerate with \`pnpm generate:env-registry\`).`,
-      `To downgrade unregistered/mistyped KYBERION_* variables to warnings, set ${ENV_STRICT_FLAG}=0 (strict applies by default only when CI is set).`,
-    ].join('\n')
-  );
+  throw new DiagnosticError({
+    code: 'ENV_REQUIRED_MISSING',
+    what: `required environment is not configured: ${details}`,
+    next: `register or correct each variable in ${ENV_REGISTRY_PATH} (regenerate with \`pnpm generate:env-registry\`); to downgrade unregistered/mistyped KYBERION_* variables to warnings, set ${ENV_STRICT_FLAG}=0 (strict applies by default only when CI is set)`,
+  });
 }
 
 export function validateKyberionStartupEnvironment(
@@ -439,7 +460,11 @@ export async function main(
       return;
     }
     default:
-      throw new Error(`Unsupported kyberion entrypoint: ${entrypoint.id}`);
+      throw new DiagnosticError({
+        code: 'CLI_ENTRYPOINT_UNSUPPORTED',
+        what: `unsupported kyberion entrypoint: ${entrypoint.id}`,
+        next: 'register a dispatch case for the entrypoint or fix cli-commands.json',
+      });
   }
 }
 
