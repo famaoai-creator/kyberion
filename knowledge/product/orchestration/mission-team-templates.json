@@ -184,6 +184,83 @@
         "resume_policy": "checkpoint_resume",
         "cooldown_minutes": 8
       }
+    },
+    "finance_operations": {
+      "required_roles": ["owner", "orchestrator", "planner", "operator", "tracker", "reviewer"],
+      "optional_roles": ["researcher", "scribe", "surface_liaison"],
+      "lifecycle": {
+        "max_parallel_members": 5,
+        "max_members": 8,
+        "max_messages_per_run": 60,
+        "max_wall_clock_minutes": 180,
+        "max_member_turns": 8,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 15
+      }
+    },
+    "people_operations": {
+      "required_roles": ["owner", "orchestrator", "planner", "operator", "reviewer"],
+      "optional_roles": ["facilitator", "scribe", "surface_liaison"],
+      "lifecycle": {
+        "max_parallel_members": 4,
+        "max_members": 6,
+        "max_messages_per_run": 50,
+        "max_wall_clock_minutes": 150,
+        "max_member_turns": 8,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 15
+      }
+    },
+    "legal_compliance": {
+      "required_roles": ["owner", "orchestrator", "researcher", "planner", "reviewer"],
+      "optional_roles": ["devils_advocate", "scribe", "tracker"],
+      "lifecycle": {
+        "max_parallel_members": 5,
+        "max_members": 7,
+        "max_messages_per_run": 60,
+        "max_wall_clock_minutes": 240,
+        "max_member_turns": 10,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 10
+      }
+    },
+    "strategy_governance": {
+      "required_roles": [
+        "owner",
+        "orchestrator",
+        "researcher",
+        "planner",
+        "devils_advocate",
+        "reviewer"
+      ],
+      "optional_roles": ["facilitator", "scribe", "product_strategist"],
+      "lifecycle": {
+        "max_parallel_members": 6,
+        "max_members": 8,
+        "max_messages_per_run": 80,
+        "max_wall_clock_minutes": 240,
+        "max_member_turns": 12,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 10
+      }
+    },
+    "procurement_supply": {
+      "required_roles": ["owner", "orchestrator", "researcher", "planner", "operator", "reviewer"],
+      "optional_roles": ["tracker", "counterparty_persona", "scribe"],
+      "lifecycle": {
+        "max_parallel_members": 5,
+        "max_members": 8,
+        "max_messages_per_run": 60,
+        "max_wall_clock_minutes": 180,
+        "max_member_turns": 8,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 15
+      }
     }
   }
 }
