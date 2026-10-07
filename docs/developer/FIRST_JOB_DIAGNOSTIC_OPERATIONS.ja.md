@@ -60,6 +60,20 @@ loopback の localadmin 接続だけでは人間の承認を証明できませ�
 
 形式変更の依頼は親成果に結び付き、改めて個別承認を必要とします。再読み込みしても承認を再利用したり、新しい依頼を自動作成したりしません。
 
+## tick の結果と次の担当
+
+`--tick --json` は、従来の `dot_id`、`first_job_url`、`recovery`、`next_step` に加えて次を返します。事前条件を満たさない場合の拒否は従来どおりで、実行や自動修復を始めません。
+
+- `status: supervisor_pass_completed` と `pass_completed: true` は、1回の housekeeping / intake / executor 処理が終わったことを示します。成果完成の判定ではありません。途中の例外や housekeeping エラーでは `supervisor_pass_failed` / `false` になります。
+- CLI の終了コードは、処理中の例外や housekeeping エラーによる未完了・失敗時は 1、1回の処理が完了した場合は 0 です。承認待ち・保留は処理失敗ではないため、終了コードだけでなく `outcome` と `next_actor` / `next_action` を確認してください。
+- `outcome` は現在の対応を優先した分類です。`artifact_verified` は既存の読み戻しで実際の成果バイト列とハッシュを確認できた状態だけです。executor の done 行だけでは完成にしません。
+- `awaiting_approval` は対象の現在有効な承認カードが pending の状態です。カード未生成や承認済みだが止まっている状態は、本人の承認待ちと混同しません。
+- `held`、`uncertain`、`failed`、`configuration_changed` はオペレーターによる確認が必要です。期限切れ `expired`、却下等の `refused`、対象処理のない `noop` も分けます。
+- `next_actor` は `user` / `operator` / `none`、`next_action` は `review_approval` / `review_request` / `view_artifact` / `inspect_execution` / `inspect_configuration` / `none` です。これは案内であり、実行や承認の許可ではありません。
+- `stages` は各段階の completed / failed / not_run、`counts` は処理件数、`outcomes` は分類別件数です。過去の終了済み依頼も件数に含みますが、未解決の問題や今回の実行失敗を優先し、それがなければ新しい終了結果を案内します。
+
+過去の検証済み成果があっても、新しい保留依頼や今回の実行失敗を成功表示で隠しません。実行後に対応付けや設定が変わった場合も再確認します。応答には成果本文、物理パス、生の例外や失敗理由を含めません。読み戻しは読み取り専用で、tick の回数、実行範囲、承認手順を増やしません。
+
 ## 停止・期限切れ・復旧
 
 期限切れ、署名失効、設定変更、不確かな実行状態では処理を保持します。保存済みの履歴から未実行と証明できる保留依頼だけは、本人が画面で内容を確認し、未実行のまま終了できます。元の承認と終了記録を保持し、終了をサーバーで確認できた後に、別の依頼と別の承認で再開します。実行済みの可能性や証拠不足がある場合は回復を提供せず、オペレーター確認が必要です。既存の監査や依頼を消す、承認を書き換える、一般処理へ切り替える操作で回避しないでください。
