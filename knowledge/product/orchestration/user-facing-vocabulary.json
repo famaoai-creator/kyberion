@@ -13920,6 +13920,61 @@
         "en": "Go to it",
         "ja": "進める",
         "qps-ploc": "⟦Ɠő ŧő ïŧ ŀőř⟧"
+      },
+      "home.files_show": {
+        "en": "Download files",
+        "ja": "ファイルをダウンロード",
+        "qps-ploc": "⟦Ḓőẇñŀőȧḓ ƒïŀėş ŀőřė⟧"
+      },
+      "home.files_hide": {
+        "en": "Close file list",
+        "ja": "ファイル一覧を閉じる",
+        "qps-ploc": "⟦Ƈŀőşė ƒïŀė ŀïşŧ ŀőřė⟧"
+      },
+      "home.files_scope": {
+        "en": "Mission-owned files, up to 16 MiB each. Some older or unbound files may be unavailable.",
+        "ja": "ミッション所有のファイルを表示します（各16 MiBまで）。古いファイルや所有範囲を確認できないファイルは利用できない場合があります。",
+        "qps-ploc": "⟦Ɱïşşïőñ-őẇñėḓ ƒïŀėş, ůṗ ŧő 16 ⱮïɃ ėȧƈħ. Şőɱė őŀḓėř őř ůñƀőůñḓ ƒïŀėş ɱȧẏ ƀė ůñȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "home.files_error": {
+        "en": "Files could not be loaded. Access may have changed. Refresh the list to try again.",
+        "ja": "ファイルを読み込めませんでした。アクセス権が変更された可能性があります。一覧を再読み込みしてください。",
+        "qps-ploc": "⟦Ƒïŀėş ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. Ȧƈƈėşş ɱȧẏ ħȧṽė ƈħȧñɠėḓ. Řėƒřėşħ ŧħė ŀïşŧ ŧő ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "home.files_retry": {
+        "en": "Refresh file list",
+        "ja": "ファイル一覧を再読み込み",
+        "qps-ploc": "⟦Řėƒřėşħ ƒïŀė ŀïşŧ ŀőřėɱ⟧"
+      },
+      "home.files_empty": {
+        "en": "There are no files in this outcome.",
+        "ja": "この成果物にはファイルがありません。",
+        "qps-ploc": "⟦Ŧħėřė ȧřė ñő ƒïŀėş ïñ ŧħïş őůŧƈőɱė. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "home.files_download": {
+        "en": "Download {name}",
+        "ja": "{name} をダウンロード",
+        "qps-ploc": "⟦Ḓőẇñŀőȧḓ {name} ŀőřė⟧"
+      },
+      "home.files_too_large": {
+        "en": "Exceeds the 16 MiB download limit.",
+        "ja": "16 MiBのダウンロード上限を超えています。",
+        "qps-ploc": "⟦Ėẋƈėėḓş ŧħė 16 ⱮïɃ ḓőẇñŀőȧḓ ŀïɱïŧ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "home.files_unavailable": {
+        "en": "File unavailable",
+        "ja": "ファイルを利用できません",
+        "qps-ploc": "⟦Ƒïŀė ůñȧṽȧïŀȧƀŀė ŀőřėɱ⟧"
+      },
+      "home.files_loading": {
+        "en": "Loading files…",
+        "ja": "ファイルを読み込み中…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ƒïŀėş… ŀőřė⟧"
+      },
+      "home.files_more": {
+        "en": "Show more files",
+        "ja": "次のファイルを表示",
+        "qps-ploc": "⟦Şħőẇ ɱőřė ƒïŀėş ŀőřė⟧"
       }
     },
     "onboarding": {
