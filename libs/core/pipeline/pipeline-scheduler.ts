@@ -23,6 +23,8 @@ export interface ScheduledPipeline {
     timezone?: string;
   };
   enabled: boolean;
+  /** Owning synchronizer for declarative registry reconciliation. */
+  managedBy?: string;
   /**
    * The schedule ships disabled (`schedule.enabled: false` in its pipeline)
    * and runs only on hosts whose KYBERION_CHRONOS_SCHEDULES names its id.
@@ -242,6 +244,81 @@ export function registerScheduledPipeline(
     logger.info(`[PIPELINE-SCHEDULER] Registered new schedule: ${pipeline.id}`);
   }
   saveScheduleRegistry(registry, options);
+}
+
+/**
+ * Reconcile one declarative schedule source with a single registry read/write.
+ * Runtime execution state is retained for matching ids; unrelated schedules
+ * registered by other surfaces are left untouched.
+ */
+export function reconcileScheduledPipelines(
+  source: string,
+  pipelines: ScheduledPipeline[],
+  options: PipelineSchedulerOptions = {}
+): { added: number; updated: number; removed: number; unchanged: number } {
+  if (!source.trim()) throw new Error('schedule reconciliation source is required');
+
+  const desired = new Map<string, ScheduledPipeline>();
+  for (const pipeline of pipelines) {
+    const normalized = {
+      ...pipeline,
+      pipelinePath: normalizeScheduledPipelinePath(pipeline.pipelinePath, options.rootDir),
+      managedBy: source,
+    };
+    if (desired.has(normalized.id)) {
+      throw new Error(
+        `duplicate schedule id in reconciliation source '${source}': ${normalized.id}`
+      );
+    }
+    desired.set(normalized.id, normalized);
+  }
+
+  const registry = loadScheduleRegistry(options);
+  const currentIds = new Set<string>();
+  let added = 0;
+  let updated = 0;
+  let unchanged = 0;
+  const schedules: ScheduledPipeline[] = [];
+
+  for (const existing of registry.schedules) {
+    const wanted = desired.get(existing.id);
+    if (!wanted) {
+      if (existing.managedBy === source) {
+        continue;
+      }
+      schedules.push(existing);
+      continue;
+    }
+
+    currentIds.add(existing.id);
+    const reconciled = {
+      ...existing,
+      ...wanted,
+      lastRun: wanted.lastRun ?? existing.lastRun,
+      lastStatus: wanted.lastStatus ?? existing.lastStatus,
+      runLock: wanted.runLock ?? existing.runLock,
+    };
+    schedules.push(reconciled);
+    if (JSON.stringify(existing) === JSON.stringify(reconciled)) unchanged += 1;
+    else updated += 1;
+  }
+
+  for (const [id, pipeline] of desired) {
+    if (currentIds.has(id)) continue;
+    schedules.push(pipeline);
+    added += 1;
+  }
+
+  const retainedManagedCount = registry.schedules.filter(
+    (schedule) => schedule.managedBy === source && desired.has(schedule.id)
+  ).length;
+  const removed =
+    registry.schedules.filter((schedule) => schedule.managedBy === source).length -
+    retainedManagedCount;
+  const changed = added > 0 || updated > 0 || removed > 0;
+  if (changed) saveScheduleRegistry({ ...registry, schedules }, options);
+
+  return { added, updated, removed, unchanged };
 }
 
 export function unregisterScheduledPipeline(

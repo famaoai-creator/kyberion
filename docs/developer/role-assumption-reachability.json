@@ -2664,6 +2664,7 @@
         "presence/displays/chronos-mirror-v2/src/lib/intelligence-diagnostics-response.ts",
         "presence/displays/chronos-mirror-v2/src/lib/intelligence-observations.ts",
         "presence/displays/chronos-mirror-v2/src/lib/intelligence-primitives.ts",
+        "presence/displays/chronos-mirror-v2/src/lib/intelligence-sse-change-gate.ts",
         "presence/displays/chronos-mirror-v2/src/lib/intelligence-work-coordination-response.ts",
         "presence/displays/chronos-mirror-v2/src/lib/json-record.ts",
         "presence/displays/chronos-mirror-v2/src/lib/knowledge-mutation-response.ts",

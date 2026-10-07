@@ -90,7 +90,7 @@ export function resolveMissionAssetTier(input: {
   const pathTier = tierFromPath(input.assetPath);
   if (resolvedMissionTier || pathTier) return resolvedMissionTier || pathTier;
   return inferDeliverableTier(
-    input.artifact || { kind: '', storage_class: 'external_ref', artifact_id: '' },
+    input.artifact || { kind: 'artifact', storage_class: 'external_ref', artifact_id: '' },
     normalizeAssetPath(input.artifact?.path),
     undefined
   );

@@ -13,7 +13,8 @@ import {
 } from '../../../lib/viewer-context';
 import { readChronosJsonObject, readChronosOptionalStringParam } from '../../../lib/request-input';
 import { memoryCandidateVisibleToViewer } from '../../../lib/knowledge-scope';
-import { collectA2AHandoffs, collectAgentMessages } from '../../../lib/agent-message-feed';
+import { collectAgentActivity } from '../../../lib/agent-message-feed';
+import { createIntelligenceObservationReadCache } from './intelligence-control-data';
 import {
   collectBrowserConversationSessions,
   collectBrowserSessions,
@@ -90,17 +91,25 @@ export async function GET(req: NextRequest) {
       )
       .slice(0, 12);
     const rawSurfaces = await intelligenceControlData.collectSurfaceSummaries();
-    const controlActions = intelligenceControlData.collectControlActions(tenantSlugs, tierAccess);
+    const observationReadCache = createIntelligenceObservationReadCache();
+    const controlActions = intelligenceControlData.collectControlActions(
+      tenantSlugs,
+      tierAccess,
+      observationReadCache
+    );
     const { activeMissions, surfaces } = intelligenceControlData.applyPendingActionSummaries(
       rawActiveMissions,
       rawSurfaces,
       controlActions
     );
     const missionProgress = intelligenceData.collectMissionProgress(activeMissions);
-    const agentMessages = collectAgentMessages().filter((message) =>
+    const agentActivity = collectAgentActivity({
+      readObservationRecords: (file) => observationReadCache.read(file),
+    });
+    const agentMessages = agentActivity.messages.filter((message) =>
       intelligenceData.missionVisibleToScope(message.missionId, tenantSlugs, tierAccess)
     );
-    const a2aHandoffs = collectA2AHandoffs().filter((handoff) =>
+    const a2aHandoffs = agentActivity.handoffs.filter((handoff) =>
       intelligenceData.missionVisibleToScope(handoff.missionId, tenantSlugs, tierAccess)
     );
     let managedRuntimes: Array<{
@@ -304,7 +313,8 @@ export async function GET(req: NextRequest) {
       recentEvents: intelligenceData.safeCollect(
         'intelligenceControlData.collectRecentEvents',
         [],
-        () => intelligenceControlData.collectRecentEvents(tenantSlugs, tierAccess)
+        () =>
+          intelligenceControlData.collectRecentEvents(tenantSlugs, tierAccess, observationReadCache)
       ),
       agentMessages,
       a2aHandoffs,
