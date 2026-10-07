@@ -340,6 +340,41 @@ describe('Browser Bridge extension state transitions', () => {
     expect(harness.store.browserBridgeState.recording.actions).toHaveLength(6);
   });
 
+  it('keeps a captured success message as a reviewable low-risk wait step', async () => {
+    const harness = await createHarness();
+    await harness.send({ type: 'bridge:start-recording' });
+    await harness.send(
+      { type: 'bridge:record-event', event: recordedEvent('保存 を選択') },
+      { tab: harness.tab }
+    );
+    await harness.send(
+      {
+        type: 'bridge:record-event',
+        event: {
+          op: 'wait_for_ref',
+          summary: '完了表示「保存しました」を待つ',
+          target: {
+            ref: '@status_1x2y3z_1',
+            role: 'status',
+            name: '保存しました',
+            snapshot_hash: HASH,
+            dom_path: 'body > div > p',
+          },
+        },
+      },
+      { tab: harness.tab }
+    );
+    const actions = harness.store.browserBridgeState.recording.actions;
+    expect(actions.map((action: { op: string }) => action.op)).toEqual([
+      'click_ref',
+      'wait_for_ref',
+    ]);
+    expect(actions[1]).toMatchObject({
+      risk: 'low',
+      target: { role: 'status', name: '保存しました', dom_path: 'body > div > p' },
+    });
+  });
+
   it('requires action decisions before finalizing review', async () => {
     const harness = await createHarness();
     await harness.send({ type: 'bridge:start-recording' });
