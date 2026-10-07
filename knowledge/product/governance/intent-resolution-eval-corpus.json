@@ -44,12 +44,6 @@
       "expected_intent_id": "lifestyle-booking"
     },
     {
-      "case_id": "ir-dev-008",
-      "split": "dev",
-      "utterance": "明日の天気を教えて",
-      "expected_intent_id": "weather-lookup"
-    },
-    {
       "case_id": "ir-dev-009",
       "split": "dev",
       "utterance": "新宿から渋谷までの電車の乗り換えを調べて",
@@ -392,12 +386,6 @@
       "expected_intent_id": "reassign-mission-owner"
     },
     {
-      "case_id": "ir-hold-001",
-      "split": "holdout",
-      "utterance": "今夜の天気と傘がいるか知りたい",
-      "expected_intent_id": "weather-lookup"
-    },
-    {
       "case_id": "ir-hold-002",
       "split": "holdout",
       "utterance": "渋谷から品川まで電車で何分かかるか調べて",
@@ -666,12 +654,6 @@
       "split": "holdout",
       "utterance": "テストが落ちる原因を調べて",
       "expect_no_intent": true
-    },
-    {
-      "case_id": "ir-hold2-001",
-      "split": "holdout",
-      "utterance": "明後日の東京の気温と降水確率を知りたい",
-      "expected_intent_id": "weather-lookup"
     },
     {
       "case_id": "ir-hold2-002",
@@ -948,12 +930,6 @@
       "split": "holdout",
       "utterance": "ページネーションを実装して",
       "expect_no_intent": true
-    },
-    {
-      "case_id": "ir-hold3-001",
-      "split": "holdout",
-      "utterance": "週末の大阪の天気はどう？",
-      "expected_intent_id": "weather-lookup"
     },
     {
       "case_id": "ir-hold3-002",

@@ -142,6 +142,8 @@ export function findMissionProcessBindingViolations(): string[] {
       ['risk_profile', expected.risk_profile, riskProfiles],
       ['stage', expected.stage, stages],
     ] as Array<[string, string, Set<string>]>) {
+      // A scenario may omit intent_id to assert the utterance claims no catalog intent.
+      if (name === 'intent_id' && value === undefined) continue;
       if (!allowed.has(String(value)))
         violations.push(`${prefix}: unknown ${name} ${String(value)}`);
     }
