@@ -238,9 +238,37 @@ function printStatus(
       'Next: collect a timestamped service observation, then record it with pnpm organization service state set'
     );
   }
-  if (accounting.pending_decisions > 0) {
+  const proposedDecisions = view.decisions.filter((entry) => entry.status === 'proposed');
+  const awaitingApproval = view.decisions.filter((entry) => entry.status === 'pending_approval');
+  if (proposedDecisions.length) {
     activePrint(
-      'Next: review proposed decisions in the organization cadence before external action'
+      'Next: review proposed decisions in the organization cadence before external action, then move them to pending_approval with decision transition'
+    );
+  }
+  if (awaitingApproval.length) {
+    activePrint(
+      `Next: ${awaitingApproval.map((entry) => entry.decision_id).join(', ')} await${awaitingApproval.length === 1 ? 's' : ''} a human approval; once decided, record it with decision transition --record-status approved|rejected --approval-ref <channel:id>`
+    );
+  }
+  const openIncidents = view.incidents.filter(
+    (entry) => entry.status !== 'resolved' && entry.status !== 'closed'
+  );
+  const resolvedIncidents = view.incidents.filter((entry) => entry.status === 'resolved');
+  if (openIncidents.length) {
+    activePrint(
+      `Open incidents: ${openIncidents.map((entry) => `${entry.incident_id} (${entry.severity}, ${entry.status})`).join(', ')}`
+    );
+    activePrint(
+      'Next: advance open incidents with pnpm organization incident transition --incident-id <id> --record-status <next>'
+    );
+  }
+  const reviewDir =
+    scope.tier === 'public'
+      ? 'knowledge/public/incidents/'
+      : `knowledge/${scope.tier}/${scope.tenantSlug || '<tenant>'}/incidents/`;
+  if (resolvedIncidents.length) {
+    activePrint(
+      `Next: write a post-incident review (what happened, impact, cause, follow-ups) at ${reviewDir}<incident-id>-review.md for ${resolvedIncidents.map((entry) => entry.incident_id).join(', ')}, then close with incident transition --record-status closed --post-incident-review-ref <that path>`
     );
   }
   if (view.reconciliation.operations_without_state.length) {
@@ -694,6 +722,12 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
     if (parsed.target === undefined || !Number.isFinite(parsed.target)) {
       throw new Error('--target <number> is required for objective kr add.');
     }
+    if (
+      parsed.everySeconds !== undefined &&
+      !(Number.isInteger(parsed.everySeconds) && parsed.everySeconds >= 60)
+    ) {
+      throw new Error('--every <seconds> must be an integer of at least 60.');
+    }
     let metric: KeyResultMetric;
     try {
       metric = JSON.parse(parsed.metricJson!) as KeyResultMetric;
@@ -715,6 +749,7 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
         ...(parsed.baseline !== undefined ? { baseline: parsed.baseline } : {}),
         ...(parsed.unit ? { unit: parsed.unit } : {}),
         ...(parsed.weight !== undefined ? { weight: parsed.weight } : {}),
+        ...(parsed.everySeconds !== undefined ? { every_s: parsed.everySeconds } : {}),
       },
     });
     const savedPaths = mode === 'apply' ? [saveOrganizationPurpose(record)] : [];
@@ -1258,6 +1293,12 @@ export function runOrganizationOperatingModelCli(
   activePrint = print;
   try {
     const parsed = parseArgs(args);
+    if (parsed.unknownFlags.length) {
+      throw new Error(
+        `Unknown option${parsed.unknownFlags.length > 1 ? 's' : ''} ${parsed.unknownFlags.join(', ')} for 'pnpm organization ${parsed.command || '(no command)'}'. ` +
+          'Run pnpm organization help for the options each command takes.'
+      );
+    }
     const earlyHandler = EARLY_ORGANIZATION_COMMAND_HANDLERS[parsed.command];
     if (earlyHandler) {
       earlyHandler({ parsed, activePrint });
