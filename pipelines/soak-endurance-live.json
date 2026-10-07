@@ -2,7 +2,7 @@
   "action": "pipeline",
   "name": "soak-endurance-live",
   "version": "1.0.0",
-  "description": "Daily live soak evidence pulse for OP-04. Persists cumulative runtime-health evidence under active/shared/runtime/health/soak and fails closed on regressions.",
+  "description": "Opt-in daily live soak evidence pulse for file-growth trends under active/shared/runtime/health/soak. Agent runtime supervisor, Chronos, and generation schedule daemon RSS and heap trends are sampled hourly by runtime-health-history and alerted by health-degradation-watch.",
   "_refs": {
     "plan": "docs/developer/improvement-plans-2026-07/OP-04_HEALTH_DEGRADATION_MONITORING.ja.md",
     "implementation": "scripts/soak_endurance.ts"

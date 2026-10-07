@@ -21,6 +21,7 @@ import * as path from 'node:path';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { recordDaemonHeartbeat } from '@agent/core/daemon-heartbeat';
+import { recordRuntimeHealthSample } from '@agent/core/tool/runtime-health-history';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { sendOpsAlert } from '@agent/core/ops-alert';
@@ -713,6 +714,12 @@ async function tick(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function main(_args: string[] = []): Promise<void> {
+  recordRuntimeHealthSample({ processName: 'chronos-daemon' });
+  const runtimeHealthSampler = setInterval(
+    () => recordRuntimeHealthSample({ processName: 'chronos-daemon' }),
+    60 * 60 * 1000
+  );
+  runtimeHealthSampler.unref?.();
   logger.info('[CHRONOS] Kyberion Pipeline Scheduler starting...');
   recordDaemonHeartbeat('chronos-daemon', {
     status: 'starting',

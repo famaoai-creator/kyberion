@@ -3,6 +3,7 @@ import { type DelegationChain } from './delegation-chain.js';
 import { type PlanningPacket } from '../surface/channel-surface.js';
 import { draftRefine } from '../draft-refine.js';
 import { logger } from '../core.js';
+import { sendOpsAlert } from '../ops-alert.js';
 import { missionEvidenceDir } from '../path-resolver.js';
 import { type DeliveredKnowledgeRef } from '../knowledge/knowledge-feedback-loop.js';
 import { TraceContext, persistTrace } from '../analysis/trace.js';
@@ -890,6 +891,25 @@ export async function processMissionOrchestrationEventPath(eventPath: string): P
       scope: event.scope,
       error: error instanceof Error ? error.message : String(error),
     });
+    try {
+      sendOpsAlert({
+        severity: 'warning',
+        category: 'mission_orchestration',
+        title: `Mission orchestration event failed: ${event.event_type}`,
+        context: {
+          mission_id: event.mission_id,
+          event_id: event.event_id,
+          event_type: event.event_type,
+          requested_by: event.requested_by,
+        },
+        recommendation: `Inspect the failure with pnpm mission triage ${event.mission_id}; reconcile any partially applied work before replaying the event.`,
+        dedupe_key: `mission-orchestration:event-failed:${event.event_id}`,
+      });
+    } catch (alertError) {
+      logger.warn(
+        `[MISSION_ORCHESTRATION_ALERT_FAILED] event=${event.event_id} — ${alertError instanceof Error ? alertError.message : String(alertError)} | next: inspect the orchestration journal and ops-alert log | evidence: ${event.mission_id}/${event.event_id}`
+      );
+    }
     throw error;
   }
 }
