@@ -26,7 +26,7 @@ describe('soak_endurance', () => {
     expect(source).not.toContain('JSON.stringify(manifest, null, 2)');
     expect(source).not.toContain('console.log');
     expect(source).toContain('const code = await main(argv, print)');
-    expect(source).toContain('appendJsonLine, nowIso, readTextFile');
+    expect(source).toContain('appendJsonLine, nowIso, readJsonLines, readTextFile');
   });
   it('captures a time series with sampled file sizes', async () => {
     const sampleRoot = pathResolver.sharedTmp('soak-endurance-tests/series');
@@ -207,6 +207,42 @@ describe('soak_endurance', () => {
     expect(safeReadFile(report.evidence.manifest_path, { encoding: 'utf8' })).toContain(
       '"run_count": 1'
     );
+  });
+
+  it('detects resource growth across daily live pulses and process restarts', async () => {
+    const root = pathResolver.sharedTmp('soak-endurance-tests/live-series');
+    safeRmSync(root, { recursive: true, force: true });
+    const evidenceDir = path.join(root, 'evidence');
+    const samplePath = path.join(root, 'growing-history.jsonl');
+
+    let latestReport: Awaited<ReturnType<typeof runSoakEnduranceHarness>> | undefined;
+    for (let run = 1; run <= 4; run += 1) {
+      latestReport = await runSoakEnduranceHarness({
+        mode: 'live',
+        cycles: 1,
+        evidenceDir,
+        reportPath: path.join(root, 'latest-report.json'),
+        metricsDir: path.join(root, 'metrics'),
+        samplePaths: [samplePath],
+        exercise: async () => {
+          safeMkdir(root, { recursive: true });
+          if (run === 1) safeWriteFile(samplePath, `${'x'.repeat(4096)}\n`);
+          else safeAppendFileSync(samplePath, `${'x'.repeat(4096)}\n`);
+        },
+      });
+    }
+
+    expect(
+      latestReport?.resource_regressions.some((finding) =>
+        finding.resource.includes('growing-history')
+      )
+    ).toBe(true);
+    expect(
+      safeReadFile(path.join(evidenceDir, 'resource-history.jsonl'), { encoding: 'utf8' })
+    ).toContain('growing-history.jsonl');
+    expect(
+      latestReport?.resource_regressions.some((finding) => finding.resource === 'rss_mb')
+    ).toBe(false);
   });
 
   it('rejects repository-external soak resources before executing a cycle', async () => {

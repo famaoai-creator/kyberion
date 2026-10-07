@@ -7,9 +7,9 @@
  * governed thresholds in knowledge/product/governance/health-thresholds.json,
  * and escalates warning/critical findings through the AO-03 ops-alert sink.
  *
- * v1 covers latency regressions + provider demotions; RSS/heap trends and
- * agent restart frequency plug in here once their history surfaces exist
- * (documented extension points, see the plan).
+ * Gathers latency regressions, provider demotions, and resident-process
+ * RSS/heap trends from durable histories. Restart trends are evaluated when
+ * callers provide cumulative restart counters.
  */
 
 import { logger } from './core.js';
