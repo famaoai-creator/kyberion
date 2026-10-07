@@ -391,6 +391,10 @@ export interface OrganizationLearningCandidate {
   status: 'proposed' | 'approved' | 'rejected' | 'promoted';
   tier: OrganizationTier;
   tenant_slug?: string;
+  /** Why it was approved or rejected. */
+  decision_note?: string;
+  /** The knowledge/ document the learning landed in (set when promoted). */
+  promoted_ref?: string;
   created_at: string;
   updated_at: string;
   metadata?: Record<string, unknown>;

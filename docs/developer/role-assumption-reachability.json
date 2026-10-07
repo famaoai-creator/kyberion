@@ -2176,6 +2176,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/organization_decision_approval.ts#requestDecisionApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/organization_member.ts#runOrganizationMember",
       "roles": ["sovereign_concierge"],
       "unresolved": []
