@@ -2,7 +2,14 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "additionalProperties": false,
-  "required": ["mission_class", "delivery_shape", "risk_profile", "stage", "matched_rules", "evidence"],
+  "required": [
+    "mission_class",
+    "delivery_shape",
+    "risk_profile",
+    "stage",
+    "matched_rules",
+    "evidence"
+  ],
   "properties": {
     "mission_class": {
       "type": "string",
@@ -15,7 +22,12 @@
         "environment_and_recovery",
         "decision_support",
         "customer_engagement",
-        "platform_onboarding"
+        "platform_onboarding",
+        "finance_and_accounting",
+        "people_and_talent",
+        "legal_and_compliance",
+        "strategy_and_governance",
+        "procurement_and_supply"
       ]
     },
     "delivery_shape": {
