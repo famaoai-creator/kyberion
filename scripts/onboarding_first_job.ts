@@ -26,6 +26,12 @@ import {
 } from '@agent/core/surface/front-desk-execution-contract';
 import { assertBuiltinOnlyWorkerEventStream } from '@agent/core/workforce/worker-event-stream';
 import { resolveSurfaceBrowserUrl } from '@agent/core/surface/surface-url';
+import type { DotWorkResultRow } from '@agent/core/dot/dot-state-paths';
+import { ScriptExitError } from './lib/harness.js';
+import type {
+  FirstJobTickOutcome,
+  FirstJobTickReadback,
+} from './onboarding_first_job_tick_status.js';
 
 const OWNER = 'onboarding-first-job';
 const PRINCIPAL = 'human:presence-studio-localadmin';
@@ -224,21 +230,89 @@ export async function tickFirstJob(tenant: string) {
   const { createFirstJobTenantStatusAssertion } =
     await import('./onboarding_first_job_tenant_status.js');
   const { runDotExecutorStep } = await import('./dot_executor_step.js');
+  const { readFirstJobTickStatus, summarizeFirstJobTick } =
+    await import('./onboarding_first_job_tick_status.js');
   const assertTenant = createFirstJobTenantStatusAssertion(loaded.charter, plan.mapping);
   const now = new Date();
-  await runAsDotCharter(loaded.charter, () =>
-    runDotHousekeeping(loaded.charter, { now: () => new Date(), assertTenant })
+  type StageStatus = 'not_run' | 'completed' | 'failed';
+  const stages: Record<'housekeeping' | 'intake' | 'executor', StageStatus> = {
+    housekeeping: 'not_run',
+    intake: 'not_run',
+    executor: 'not_run',
+  };
+  const counts = {
+    settled_actions: 0,
+    housekeeping_errors: 0,
+    executor_done: 0,
+    executor_blocked: 0,
+    executor_failed: 0,
+    executor_skipped: 0,
+  };
+  let stage: keyof typeof stages = 'housekeeping';
+  let rows: DotWorkResultRow[] = [];
+  const issues: FirstJobTickOutcome[] = [];
+  try {
+    const housekeeping = await runAsDotCharter(loaded.charter, () =>
+      runDotHousekeeping(loaded.charter, { now: () => new Date(), assertTenant })
+    );
+    counts.settled_actions = housekeeping.settled.length;
+    counts.housekeeping_errors = housekeeping.errors.length;
+    stages.housekeeping = housekeeping.errors.length ? 'failed' : 'completed';
+    if (housekeeping.errors.length) issues.push('failed');
+    stage = 'intake';
+    await runFrontDeskExecutionIntake([loaded], { now: () => new Date(), assertTenant });
+    stages.intake = 'completed';
+    stage = 'executor';
+    rows = await runDotExecutorStep(now, [loaded], { scopeToActiveCharters: true, assertTenant });
+    stages.executor = 'completed';
+    for (const row of rows) {
+      if (['done', 'blocked', 'failed', 'skipped'].includes(row.status))
+        counts[('executor_' + row.status) as keyof typeof counts]++;
+      else issues.push('uncertain');
+    }
+  } catch {
+    // A throwing stage may have committed an effect. Stop this pass and report
+    // uncertainty; never run a second pass or infer that retrying is safe.
+    stages[stage] = 'failed';
+    issues.push('uncertain');
+  }
+  let readback: FirstJobTickReadback;
+  try {
+    if (planFirstJob(tenant).plan_digest !== plan.plan_digest)
+      throw new Error('first_job_configuration_changed');
+    readback = await runAsDotCharter(loaded.charter, async () =>
+      readFirstJobTickStatus(loaded.charter, plan.mapping, plan.pipeline_digest, rows)
+    );
+  } catch {
+    readback = summarizeFirstJobTick(['configuration_changed']);
+  }
+  const outcomes = Object.entries(readback.outcomes).flatMap(([outcome, count]) =>
+    Array.from({ length: count }, () => outcome as FirstJobTickOutcome)
   );
-  await runFrontDeskExecutionIntake([loaded], { now: () => new Date(), assertTenant });
-  await runDotExecutorStep(now, [loaded], { scopeToActiveCharters: true, assertTenant });
+  const summary = summarizeFirstJobTick([...outcomes, ...issues], [readback.outcome, ...issues]);
+  const passCompleted = Object.values(stages).every((status) => status === 'completed');
   return {
-    status: 'supervisor_pass_completed',
+    // Existing successful-pass consumers retain their machine status. Failures
+    // that previously escaped as raw exceptions now have a separate envelope.
+    status: passCompleted ? 'supervisor_pass_completed' : 'supervisor_pass_failed',
+    pass_completed: passCompleted,
+    ...summary,
+    stages,
+    counts,
     dot_id: plan.dot_id,
     first_job_url: plan.first_job_url,
     recovery:
       'No global lease recovery was run. Uncertain work remains held for operator inspection.',
     next_step:
-      'Refresh the page. A pass is not proof of work completion and does not approve anything.',
+      summary.next_actor === 'operator'
+        ? 'Inspect the reported state before another tick. This pass does not prove that retrying is safe.'
+        : summary.outcome === 'awaiting_approval'
+          ? 'Review the pending approval in the first-job page. This tick does not approve anything.'
+          : summary.outcome === 'artifact_verified'
+            ? 'The receipt was verified by reading its current bytes. Open it in the first-job page.'
+            : summary.outcome === 'noop'
+              ? 'No diagnostic work needs advancement in this conversation.'
+              : 'Review the request in the first-job page before choosing any further action.',
   };
 }
 
@@ -267,15 +341,14 @@ export async function main(args: string[] = [], print: (value: unknown) => void 
     (tick && (apply || accepted || args.includes('--dry-run')))
   )
     throw new Error('first_job_conflicting_mode');
-  print(
-    JSON.stringify(
-      tick
-        ? await tickFirstJob(tenant)
-        : apply
-          ? applyFirstJob(tenant, accepted ?? '')
-          : planFirstJob(tenant),
-      null,
-      2
-    )
-  );
+  const result = tick
+    ? await tickFirstJob(tenant)
+    : apply
+      ? applyFirstJob(tenant, accepted ?? '')
+      : planFirstJob(tenant);
+  print(JSON.stringify(result, null, 2));
+  // The CLI retains its nonzero process-failure contract without printing a
+  // second payload or exposing a raw stack. Direct tick callers keep the envelope.
+  if (tick && 'pass_completed' in result && !result.pass_completed)
+    throw new ScriptExitError(1, '', true);
 }
