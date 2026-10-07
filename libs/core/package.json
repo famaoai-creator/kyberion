@@ -7291,6 +7291,10 @@
       "types": "./dist/surface/first-job-contract.d.ts",
       "default": "./dist/surface/first-job-contract.js"
     },
+    "./surface/first-job-setup": {
+      "types": "./dist/surface/first-job-setup.d.ts",
+      "default": "./dist/surface/first-job-setup.js"
+    },
     "./surface/first-job": {
       "types": "./dist/surface/first-job.d.ts",
       "default": "./dist/surface/first-job.js"

@@ -836,6 +836,16 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/first-job-setup.ts#approvalScope",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/first-job-setup.ts#browserUser",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/front-desk-conversation-persistence.ts#asStore",
       "roles": ["sovereign_concierge"],
       "unresolved": []
