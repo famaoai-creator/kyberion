@@ -212,6 +212,25 @@ export interface GoldenVerdict {
 
 const lower = (value: unknown) => (typeof value === 'string' ? value.toLowerCase() : '');
 
+/** Anchors the compilers set on fallback conditions when they found no real one. */
+const FALLBACK_ANCHORS = new Set(['last_action_target', 'last_service_result']);
+
+/**
+ * Whether a condition names what must be produced or shown. Only a met strong
+ * condition can pass a run; the compilers' fallbacks ("the control just used
+ * is still visible", "the last service step finished") are weak.
+ */
+export function goldenConditionStrength(condition: GoldenSuccessCondition): 'strong' | 'weak' {
+  if (FALLBACK_ANCHORS.has(String(condition.params?.anchor ?? ''))) return 'weak';
+  if (condition.kind === 'ref_visible' || condition.kind === 'text_present') {
+    return condition.name_contains ? 'strong' : 'weak';
+  }
+  if (condition.kind === 'response_field') {
+    return typeof condition.params?.channel === 'string' ? 'strong' : 'weak';
+  }
+  return 'weak';
+}
+
 function matchesElement(
   element: RunEvidenceElement,
   condition: GoldenSuccessCondition,
@@ -282,7 +301,7 @@ function evaluateCondition(
       if (!elements) {
         return { ...base, outcome: 'unsupported', strength: 'strong', detail: 'no page snapshot' };
       }
-      const strength = condition.name_contains ? 'strong' : 'weak';
+      const strength = goldenConditionStrength(condition);
       const found = elements.some(
         (element) =>
           (condition.kind === 'text_present' || element.visible !== false) &&

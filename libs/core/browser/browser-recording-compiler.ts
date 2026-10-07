@@ -151,13 +151,16 @@ function extractSuccessConditions(actions: BrowserExtensionAction[]): GoldenSucc
     }
   }
   if (conditions.length === 0 && actions.length > 0) {
-    // Fallback: treat the last action's target as the success anchor
+    // Fallback: treat the last action's target as the success anchor. It is
+    // marked as a fallback: the control just clicked staying visible says
+    // nothing about success, so the verdict never passes a run on it alone.
     const last = actions[actions.length - 1];
     if (last.target) {
       conditions.push({
         kind: 'ref_visible',
         role: last.target.role || undefined,
         name_contains: last.target.name || undefined,
+        params: { anchor: 'last_action_target' },
       });
     }
   }

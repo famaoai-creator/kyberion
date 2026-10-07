@@ -1353,6 +1353,16 @@
       "group": "operate"
     },
     {
+      "id": "script.procedure.golden",
+      "module": "scripts/procedure_golden.ts",
+      "command": "procedure golden",
+      "noun": "procedure",
+      "verb": "golden",
+      "audience": "operator",
+      "description": "cli_cmd_script_procedure_golden",
+      "group": "inspect"
+    },
+    {
       "id": "script.knowledge.scope-health",
       "module": "scripts/watch_knowledge_scope_health.ts",
       "command": "knowledge scope-health",

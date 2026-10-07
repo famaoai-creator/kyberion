@@ -1148,7 +1148,7 @@ async function executeProcedure(procedureId, origin, values = {}) {
       response.session,
       values
     );
-    await verifyGoldenScenario(procedureId, response.golden_scenario, out.status);
+    await verifyGoldenScenario(procedureId, response.golden_scenario, out);
     return out;
   }
 
@@ -1163,7 +1163,7 @@ async function executeProcedure(procedureId, origin, values = {}) {
     response.lease,
     values
   );
-  await verifyGoldenScenario(procedureId, response.golden_scenario, out.status);
+  await verifyGoldenScenario(procedureId, response.golden_scenario, out);
   return out;
 }
 
@@ -1191,40 +1191,65 @@ async function promoteProcedure(procedureId, intentPhrases) {
   return { state, registration: response };
 }
 
-// #3: after execution, verify the golden scenario's success conditions against
-// the live page (content script). Records the verdict on the execution state.
-async function verifyGoldenScenario(procedureId, golden, runStatus) {
+// #3: after a completed run, collect the page evidence the golden scenario's
+// success conditions need and let the host judge it (the extension never
+// decides pass/fail). The host records the verdict on the procedure's
+// knowledge-verification ledger.
+async function verifyGoldenScenario(procedureId, golden, run) {
   if (
     !golden ||
     !Array.isArray(golden.success_conditions) ||
     golden.success_conditions.length === 0
   )
     return;
-  if (runStatus !== 'completed') return; // only verify a run that actually finished
+  if (run?.status !== 'completed' || !run.receipt?.receipt_id) return;
   const connectedTabId = (await loadState()).connected?.tabId;
   if (!connectedTabId) return;
   let verdict;
   try {
-    verdict = await chrome.tabs.sendMessage(connectedTabId, {
-      type: 'bridge:verify-golden',
+    const evidence = await chrome.tabs.sendMessage(connectedTabId, {
+      type: 'bridge:golden-evidence',
       conditions: golden.success_conditions,
     });
+    // No evidence is not "nothing matched": never send an empty list that the
+    // host would read as a failed check.
+    if (!evidence?.ok || !Array.isArray(evidence.elements)) {
+      throw new Error('ページから成功条件の情報を取得できませんでした');
+    }
+    const response = await callNativeHost({
+      type: 'submit_golden_evidence',
+      procedure_id: procedureId,
+      receipt_id: run.receipt.receipt_id,
+      elements: evidence.elements,
+    });
+    verdict = response?.ok
+      ? response.golden || null
+      : { verdict: 'error', detail: response?.error || '判定できませんでした' };
   } catch (error) {
-    verdict = { ok: false, error: error instanceof Error ? error.message : String(error) };
+    verdict = {
+      verdict: 'error',
+      detail: error instanceof Error ? error.message : String(error),
+    };
   }
-  const passed = Boolean(verdict?.ok) && (verdict.results || []).every((r) => r.pass);
+  if (!verdict) return; // the procedure has no golden scenario on the host
   const state = await loadState();
   if (state.execution) {
     state.execution.golden = {
       scenario_id: golden.scenario_id,
-      passed,
-      results: verdict?.results || [],
+      verdict: verdict.verdict,
+      conditions: verdict.conditions || [],
+      ...(verdict.detail ? { detail: verdict.detail } : {}),
     };
-    if (!passed) state.execution.status = 'verification_failed';
+    if (verdict.verdict === 'fail') state.execution.status = 'verification_failed';
   }
-  state.notice = passed
-    ? `手順「${procedureId}」を実行し、成功条件 ${golden.success_conditions.length} 件を満たしました。`
-    : `手順「${procedureId}」は実行しましたが、成功条件の検証に失敗しました。結果を確認してください。`;
+  state.notice =
+    verdict.verdict === 'pass'
+      ? `手順「${procedureId}」を実行し、成功条件を満たしました。`
+      : verdict.verdict === 'fail'
+        ? `手順「${procedureId}」は実行しましたが、成功条件を満たしていません。結果を確認してください。`
+        : verdict.verdict === 'inconclusive'
+          ? `手順「${procedureId}」を実行しました。成功条件はこの実行の情報では判定できませんでした。`
+          : `手順「${procedureId}」を実行しましたが、成功条件の判定に失敗しました: ${verdict.detail}`;
   await saveState(state);
   await broadcastState();
 }
@@ -1539,7 +1564,7 @@ async function runCompiledSteps(procedureId, steps, session, lease, values, segm
   }
   await saveState(done);
   await broadcastState();
-  return { state: done, status: finalStatus };
+  return { state: done, status: finalStatus, receipt };
 }
 
 // Surface passkey (WebAuthn) progress while a run is active: the step executor
