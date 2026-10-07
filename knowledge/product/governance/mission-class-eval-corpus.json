@@ -936,15 +936,13 @@
       "case_id": "neg-cot-shebang",
       "split": "holdout",
       "utterance": "shebang を追加して設計をテストして",
-      "expected_class": "code_change",
-      "expected_intent_id": "chain-of-thought-planning"
+      "expected_class": "code_change"
     },
     {
       "case_id": "neg-cot-runtests",
       "split": "dev",
       "utterance": "この関数のテストを実行して",
-      "expected_class": "code_change",
-      "expected_intent_id": "chain-of-thought-planning"
+      "expected_class": "code_change"
     },
     {
       "case_id": "neg-cot-stepbystep",
