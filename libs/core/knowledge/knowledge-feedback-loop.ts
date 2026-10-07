@@ -37,6 +37,7 @@ import {
 import type { TaskResultKnowledgeFeedback } from '../surface/channel-surface-types.js';
 import { scopeContextKey, type ScopeContext } from '../scope-context.js';
 import { physicalScopedPath } from '../physical-namespace.js';
+import { recordKnowledgeProblem } from './knowledge-verification.js';
 import {
   loadKnowledgeUsageAggregateAtPath,
   writeKnowledgeUsageAggregateAtPath,
@@ -317,6 +318,17 @@ export function recordHumanKnowledgeFeedback(input: HumanKnowledgeFeedback): str
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   ensureRegularFeedbackFile(target);
   appendJsonLine(target, record);
+  if (input.verdict === 'wrong' || input.verdict === 'stale') {
+    recordKnowledgeProblem({
+      documentPath,
+      kind: input.verdict,
+      ...(input.reason ? { reason: input.reason } : {}),
+      ...(input.scope?.tenant_slug
+        ? { scope: { tier: input.scope.tier, tenant_slug: input.scope.tenant_slug } }
+        : {}),
+      at: record.recorded_at,
+    });
+  }
   bumpUsageAggregate(
     documentPath,
     input.verdict === 'useful' ? { used_count: 1 } : { not_used_count: 1 },
