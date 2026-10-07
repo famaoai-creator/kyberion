@@ -13,7 +13,11 @@ import {
   type ContextualIntentFrame,
 } from '../contextual-intent-frame.js';
 import { sanitizeIntentPathSegment } from './intent-path-utils.js';
-import { matchesIntentPhrase } from './intent-phrase-lexicon.js';
+import {
+  intentPhraseFlags,
+  intentPhraseSource,
+  matchesIntentPhrase,
+} from './intent-phrase-lexicon.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 const STANDARD_INTENTS_SCHEMA_PATH = pathResolver.knowledge(
@@ -459,7 +463,15 @@ function scoreScheduleReadAgendaIntent(
   frame: ContextualIntentFrame = buildContextualIntentFrame(utterance)
 ): IntentResolutionCandidate | null {
   const normalized = normalizeFreeText(utterance);
-  const calendarHint = matchesIntentPhrase(normalized, 'schedule.agenda_topic');
+  // A meeting named only as a time anchor ("before the meeting") is not a calendar request.
+  const anchorPattern = new RegExp(
+    intentPhraseSource('schedule.agenda_temporal_anchor'),
+    `${intentPhraseFlags('schedule.agenda_temporal_anchor').replace('g', '')}g`
+  );
+  const calendarHint = matchesIntentPhrase(
+    normalized.replace(anchorPattern, ' '),
+    'schedule.agenda_topic'
+  );
   const readHint = frame.action === 'read';
   if (!calendarHint || !readHint) return null;
 

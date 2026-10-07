@@ -3724,6 +3724,16 @@
         "明日の会議予定を見て"
       ]
     },
+    "schedule.agenda_temporal_anchor": {
+      "old_regex": "/(会議の前|会議の後|会議までに|会議に向けて|ミーティングの前|ミーティングの後|打ち合わせの前|打ち合わせの後|打ち合わせまでに|before the meeting|after the meeting|ahead of the meeting|before our meeting)/i",
+      "sites": ["libs/core/intent/intent-resolution.ts:475"],
+      "match": [
+        "予実管理の会議の前に数字を確認して",
+        "会議までに資料を直して",
+        "check the numbers before the meeting"
+      ],
+      "no_match": ["来週の会議を教えて", "show me the meeting agenda"]
+    },
     "schedule.agenda_topic": {
       "old_regex": "/(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|agenda|availability|calendar)/i",
       "sites": [

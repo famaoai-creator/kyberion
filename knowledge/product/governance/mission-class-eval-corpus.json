@@ -882,6 +882,76 @@
       "expected_intent_id": "supplier-onboarding",
       "expected_team_template": "procurement_supply",
       "required_gates": ["VENDOR_INTEGRITY"]
+    },
+    {
+      "case_id": "rsn-hypo-ja",
+      "split": "dev",
+      "utterance": "仮説を複数出して批判し合って",
+      "expected_class": "decision_support",
+      "expected_intent_id": "diverge-hypotheses"
+    },
+    {
+      "case_id": "rsn-brain-holdout",
+      "split": "holdout",
+      "utterance": "この案をブレストして多角的に見たい",
+      "expected_class": "decision_support",
+      "expected_intent_id": "diverge-hypotheses"
+    },
+    {
+      "case_id": "rsn-consensus-ja",
+      "split": "dev",
+      "utterance": "関係者の合意を取りたい。賛否を整理して",
+      "expected_class": "decision_support",
+      "expected_intent_id": "multi-agent-consensus"
+    },
+    {
+      "case_id": "rsn-counterfactual-holdout",
+      "split": "holdout",
+      "utterance": "もしAを選ばなかったらどうなるか反事実シミュレーションして",
+      "expected_class": "decision_support",
+      "expected_intent_id": "counterfactual-simulation"
+    },
+    {
+      "case_id": "rsn-persona-ja",
+      "split": "dev",
+      "utterance": "CFOの立場から分析して",
+      "expected_class": "decision_support",
+      "expected_intent_id": "adaptive-reasoning"
+    },
+    {
+      "case_id": "rsn-recall-holdout",
+      "split": "holdout",
+      "utterance": "過去の類似失敗を思い出して",
+      "expected_class": "research_and_absorption",
+      "expected_intent_id": "recall-prior-knowledge"
+    },
+    {
+      "case_id": "rsn-decompose-ja",
+      "split": "dev",
+      "utterance": "要件を段階的にタスク分解して",
+      "expected_class": "decision_support",
+      "expected_intent_id": "chain-of-thought-planning"
+    },
+    {
+      "case_id": "neg-cot-shebang",
+      "split": "holdout",
+      "utterance": "shebang を追加して設計をテストして",
+      "expected_class": "code_change",
+      "expected_intent_id": "chain-of-thought-planning"
+    },
+    {
+      "case_id": "neg-cot-runtests",
+      "split": "dev",
+      "utterance": "この関数のテストを実行して",
+      "expected_class": "code_change",
+      "expected_intent_id": "chain-of-thought-planning"
+    },
+    {
+      "case_id": "neg-cot-stepbystep",
+      "split": "holdout",
+      "utterance": "要件をステップバイステップで実装して",
+      "expected_class": "code_change",
+      "expected_intent_id": "chain-of-thought-planning"
     }
   ]
 }

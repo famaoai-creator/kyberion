@@ -1155,6 +1155,68 @@
       "mission_class": "environment_and_recovery"
     },
     {
+      "id": "class-decision-support-reasoning-diverge",
+      "match": {
+        "intent_ids": ["diverge-hypotheses"],
+        "utterance_patterns": ["仮説", "ブレスト", "多角的", "複数視点", "hypothes", "brainstorm"]
+      },
+      "mission_class": "decision_support"
+    },
+    {
+      "id": "class-decision-support-reasoning-consensus",
+      "match": {
+        "intent_ids": ["multi-agent-consensus"],
+        "utterance_patterns": ["合意", "賛否", "コンセンサス", "反対意見", "consensus", "go/no-go"]
+      },
+      "mission_class": "decision_support"
+    },
+    {
+      "id": "class-decision-support-reasoning-counterfactual",
+      "match": {
+        "intent_ids": ["counterfactual-simulation"],
+        "utterance_patterns": ["反事実", "シナリオ分析", "counterfactual", "もし.*なかったら"]
+      },
+      "mission_class": "decision_support"
+    },
+    {
+      "id": "class-decision-support-reasoning-adaptive",
+      "match": {
+        "intent_ids": ["adaptive-reasoning"],
+        "utterance_patterns": [
+          "立場から",
+          "専門家として",
+          "ペルソナ",
+          "役割を変えて",
+          "from the perspective"
+        ]
+      },
+      "mission_class": "decision_support"
+    },
+    {
+      "id": "class-decision-support-reasoning-planning",
+      "match": {
+        "intent_ids": ["chain-of-thought-planning"],
+        "utterance_patterns": ["タスク分解", "計画を立て", "decompose", "break down"]
+      },
+      "mission_class": "decision_support"
+    },
+    {
+      "id": "class-research-reasoning-recall",
+      "match": {
+        "intent_ids": ["recall-prior-knowledge"],
+        "utterance_patterns": ["過去の", "先例", "類似", "prior knowledge", "past incident"]
+      },
+      "mission_class": "research_and_absorption"
+    },
+    {
+      "id": "class-operations-reasoning-escalate",
+      "match": {
+        "intent_ids": ["active-learning-escalate"],
+        "utterance_patterns": ["エスカレ", "人間の承認", "上長", "escalat"]
+      },
+      "mission_class": "operations_and_release"
+    },
+    {
       "id": "class-product-delivery-intent-ontology-parity",
       "match": {
         "intent_ids": ["compose-mission-team"]
