@@ -86,7 +86,7 @@
       "delivery_shape": "multi_artifact_pipeline",
       "workflow_pattern": "stage_gated_delivery",
       "expected_workflow_id": "stage-gated-high-stakes",
-      "prompt": "research reportを作って",
+      "prompt": "新規事業の管理基盤を作って",
       "expected_signals": [
         "classification",
         "alignment_brief_created",
@@ -327,6 +327,17 @@
         "delivery_ready"
       ],
       "notes": "Recurring follow-up path using pipelines/action-item-tracking.json and the append-only action-item-store."
+    },
+    {
+      "scenario_id": "golden-report-request-single-track",
+      "scenario_class": "golden",
+      "mission_class": "content_and_media",
+      "delivery_shape": "multi_artifact_pipeline",
+      "workflow_pattern": "single_track_execution",
+      "expected_workflow_id": "single-track-default",
+      "prompt": "research reportを作って",
+      "expected_signals": ["classification", "execution_started", "delivery_ready"],
+      "notes": "A report request resolves to generate-report. It used to reach the high-stakes workflow only because `search` matched inside `research` and bootstrap-project won the tie."
     }
   ]
 }
