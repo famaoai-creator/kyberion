@@ -44,6 +44,7 @@ import {
 import { isSkillAllowed } from '../plugin/skill-plugin-loader.js';
 import type { ScopeContext } from '../scope-context.js';
 import {
+  commonKnowledgeGrantTenant,
   knowledgeHintFragment,
   loadKnowledgeHintsIfPossible,
   organizationIdFromContext,
@@ -1211,9 +1212,20 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
   // pack boundary. Public/product hints remain compatible; tenant and
   // overlay hints must prove the same security scope.
   const candidateHints = input.knowledgeHints || [];
+  const commonGrantTenant = candidateHints.some((hint) =>
+    hint.path.replace(/\\/g, '/').startsWith('knowledge/confidential/common/')
+  )
+    ? commonKnowledgeGrantTenant({
+        tier: missionTier,
+        tenantSlug: input.missionState.tenant_slug,
+        ...(input.tenantKnowledgeRootDir
+          ? { tenantKnowledgeRootDir: input.tenantKnowledgeRootDir }
+          : {}),
+      })
+    : undefined;
   const compiledKnowledge = compileScopedContextPack(
     securityScope,
-    candidateHints.map(knowledgeHintFragment)
+    candidateHints.map((hint, index) => knowledgeHintFragment(hint, index, { commonGrantTenant }))
   );
   const acceptedHintRefs = new Set(
     compiledKnowledge.fragments.map((fragment) => fragment.source_ref)
@@ -1361,6 +1373,9 @@ export async function resolveMissionContextPack(
     ...(input.contextBudgetChars ? { contextBudgetChars: input.contextBudgetChars } : {}),
     ...(input.contextPackId ? { contextPackId: input.contextPackId } : {}),
     ...(input.estimatedScope ? { estimatedScope: input.estimatedScope } : {}),
+    ...(input.tenantKnowledgeRootDir
+      ? { tenantKnowledgeRootDir: input.tenantKnowledgeRootDir }
+      : {}),
   });
 }
 

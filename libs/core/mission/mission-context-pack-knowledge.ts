@@ -8,13 +8,17 @@ import {
   isKnowledgePathExcluded,
   isKnowledgePathInSearchRoots,
 } from '../knowledge/knowledge-slices.js';
-import { queryTenantKnowledge } from '../organization/tenant-knowledge-retrieval.js';
+import {
+  buildTenantKnowledgeScopeSet,
+  queryTenantKnowledge,
+} from '../organization/tenant-knowledge-retrieval.js';
 import { selectRelevantKnowledge } from '../knowledge/knowledge-relevance-judgment.js';
 import { judgmentAssistReady } from '../reasoning/judgment-provider-bootstrap.js';
 import { loadProjectRecord } from '../project/project-registry.js';
 import { pathResolver } from '../path-resolver.js';
 import { readTextFile } from '../foundation/text.js';
 import { safeExistsSync, safeLstat } from '../secure-io.js';
+import type { ScopeContext } from '../scope-context.js';
 import type { ProjectOperationalState } from '../project/project-operational-state-registry.js';
 import type { WorkItem } from '../workforce/work-coordination.js';
 import type {
@@ -186,11 +190,39 @@ function tenantSlugForKnowledgeRetrieval(input: {
   return tenantSlugFromContext(input);
 }
 
-export function knowledgeHintFragment(hint: MissionContextPackKnowledgeHint, index: number) {
+/**
+ * The tenant that may read `knowledge/confidential/common/` in this pack, or
+ * undefined. `common/` is the one shared confidential prefix: a registered,
+ * non-strict tenant reads it (the same decision tenant retrieval makes), a
+ * strict-isolation or unresolvable tenant does not.
+ */
+export function commonKnowledgeGrantTenant(input: {
+  tier: MissionTier;
+  tenantSlug?: string;
+  tenantKnowledgeRootDir?: string;
+}): string | undefined {
+  const slug = String(input.tenantSlug || '').trim();
+  if (input.tier !== 'confidential' || !slug || slug === 'shared') return undefined;
+  const scopeSet = buildTenantKnowledgeScopeSet(
+    slug,
+    input.tenantKnowledgeRootDir ? { rootDir: input.tenantKnowledgeRootDir } : {}
+  );
+  return scopeSet && !scopeSet.strictIsolation ? slug : undefined;
+}
+
+export function knowledgeHintFragment(
+  hint: MissionContextPackKnowledgeHint,
+  index: number,
+  options: { commonGrantTenant?: string } = {}
+) {
   const normalized = hint.path.replace(/\\/g, '/');
   const confidential = normalized.match(/(?:^|\/)confidential\/([^/]+)/);
   const customer = normalized.match(/(?:^|\/)customer\/([^/]+)/);
-  const tenant = confidential?.[1] || customer?.[1];
+  const pathTenant = confidential?.[1] || customer?.[1];
+  // A common doc carries no tenant of its own; stamping the granted reader's
+  // tenant lets the scope gate admit it for exactly that reader.
+  const tenant =
+    confidential?.[1] === 'common' && !customer ? options.commonGrantTenant : pathTenant;
   const sourceTier: MissionTier = confidential || customer ? 'confidential' : 'public';
   const organization = normalized.match(/\/organizations\/([^/]+)/)?.[1];
   const project = normalized.match(/\/projects\/([^/]+)/)?.[1];
@@ -345,23 +377,27 @@ export async function loadKnowledgeHintsIfPossible(
       pinnedPaths: new Set(pinnedHints.map((hint) => hint.path)),
     });
 
+  // One containment scope for both lanes: the tenant index only scans the
+  // organization/project subtrees named here, so dropping them would hide
+  // knowledge placed at its canonical project path from the mission.
+  const tenantSlug = tenantSlugForKnowledgeRetrieval(input);
+  const retrievalScope: ScopeContext | undefined = tenantSlug
+    ? {
+        tier: 'confidential',
+        tenant_slug: tenantSlug,
+        ...(sliceOrganization ? { organization_id: sliceOrganization } : {}),
+        ...(sliceProject ? { project_id: sliceProject } : {}),
+        mission_id: input.missionState.mission_id,
+      }
+    : undefined;
+
   const searchLimit = slice.exclude.length > 0 ? remaining * 2 : remaining;
   const relevant = await findRelevantDistilledKnowledge({
     topic,
     tags: Array.from(tags),
     limit: searchLimit,
     minScore: 0.08,
-    ...(sliceTenant && normalizeTier(input.missionState.tier) === 'confidential'
-      ? {
-          scope: {
-            tier: 'confidential' as const,
-            tenant_slug: sliceTenant,
-            ...(sliceOrganization ? { organization_id: sliceOrganization } : {}),
-            ...(sliceProject ? { project_id: sliceProject } : {}),
-            mission_id: input.missionState.mission_id,
-          },
-        }
-      : {}),
+    ...(retrievalScope ? { scope: retrievalScope } : {}),
   });
 
   const filtered =
@@ -392,19 +428,14 @@ export async function loadKnowledgeHintsIfPossible(
     ...(entry.last_updated ? { last_updated: entry.last_updated } : {}),
   }));
 
-  const tenantSlug = tenantSlugForKnowledgeRetrieval(input);
   let tenantHints: MissionContextPackKnowledgeHint[] = [];
-  if (tenantSlug) {
+  if (tenantSlug && retrievalScope) {
     const tenantFetchLimit = slice.exclude.length > 0 ? remaining * 2 : remaining;
     const tenantHits = await queryTenantKnowledge({
       tenantSlug,
       topic,
       limit: tenantFetchLimit,
-      scope: {
-        tier: 'confidential',
-        tenant_slug: tenantSlug,
-        mission_id: input.missionState.mission_id,
-      },
+      scope: retrievalScope,
       ...(input.tenantKnowledgeRootDir ? { rootDir: input.tenantKnowledgeRootDir } : {}),
     });
     tenantHints = tenantHits
