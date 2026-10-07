@@ -8,6 +8,10 @@ import {
 } from '../knowledge/procedure-registry.js';
 import { pathResolver } from '../path-resolver.js';
 import {
+  goldenScenarioPathForCatalog,
+  saveGoldenScenario,
+} from '../knowledge/golden-scenario-verdict.js';
+import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
@@ -88,8 +92,17 @@ export function promoteBrowserProcedure(
     throw new Error(`procedure_id "${procedureId}" already exists in the selected catalog`);
   }
 
+  // The golden scenario travels with the procedure, in the catalog's tier,
+  // so each run can be checked against it (golden-scenario-verdict.ts).
+  const goldenPath = goldenScenarioPathForCatalog(
+    catalogPath,
+    procedureId,
+    compiled.procedureEntry.version
+  );
+  compiled.procedureEntry.golden_scenario_ref = pathResolver.toRepoRelative(goldenPath);
   catalog.procedures.push(compiled.procedureEntry);
   validateProcedureCatalog(catalog, catalogPath);
+  saveGoldenScenario(compiled.goldenScenario, goldenPath);
   safeMkdir(path.dirname(catalogPath), { recursive: true });
   safeWriteFile(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`);
   invalidateProcedureCache();

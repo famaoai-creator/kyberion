@@ -44,6 +44,16 @@ import type { ScopeContext } from '../scope-context.js';
 
 export type KnowledgeVerificationState = 'verified' | 'changed_since_verified' | 'reported_problem';
 
+/**
+ * What a success rests on: a golden-scenario check of the run's own evidence
+ * (`golden`), or a worker reporting it used the document in a finished task
+ * (`worker_report`). A golden check is the stronger of the two.
+ */
+export type KnowledgeVerificationEvidence = 'golden' | 'worker_report';
+
+/** `failed_check`: a golden-scenario check of a run failed. */
+export type KnowledgeProblemKind = 'wrong' | 'stale' | 'failed_check';
+
 export interface KnowledgeVerificationEntry {
   document_path: string;
   last_success_at?: string;
@@ -51,17 +61,20 @@ export interface KnowledgeVerificationEntry {
   last_success_fingerprint?: string;
   /** Project of the last successful run, when it had one. */
   last_success_project_id?: string;
+  /** Absent on entries written before evidence was recorded: a worker report. */
+  last_success_evidence?: KnowledgeVerificationEvidence;
   success_count: number;
   last_problem_at?: string;
-  last_problem_kind?: 'wrong' | 'stale';
+  last_problem_kind?: KnowledgeProblemKind;
   last_problem_reason?: string;
 }
 
 export interface KnowledgeVerification {
   state: KnowledgeVerificationState;
   last_success_at?: string;
+  evidence?: KnowledgeVerificationEvidence;
   last_problem_at?: string;
-  last_problem_kind?: 'wrong' | 'stale';
+  last_problem_kind?: KnowledgeProblemKind;
 }
 
 const LEDGER_FILE = 'knowledge-verification.json';
@@ -152,6 +165,8 @@ export function recordKnowledgeVerifiedRun(input: {
   documentPaths: string[];
   scope?: ScopeContext;
   projectId?: string;
+  /** Defaults to `worker_report`. */
+  evidence?: KnowledgeVerificationEvidence;
   at?: string;
   rootDir?: string;
 }): void {
@@ -168,6 +183,7 @@ export function recordKnowledgeVerifiedRun(input: {
       entry.last_success_fingerprint = fingerprint;
       if (input.projectId) entry.last_success_project_id = input.projectId;
       else delete entry.last_success_project_id;
+      entry.last_success_evidence = input.evidence ?? 'worker_report';
       entry.success_count += 1;
     }
     saveLedger(entries, input.scope);
@@ -180,10 +196,10 @@ export function recordKnowledgeVerifiedRun(input: {
   }
 }
 
-/** Record an explicit `wrong` / `stale` report against a document. */
+/** Record an explicit `wrong` / `stale` report, or a failed golden check, against a document. */
 export function recordKnowledgeProblem(input: {
   documentPath: string;
-  kind: 'wrong' | 'stale';
+  kind: KnowledgeProblemKind;
   reason?: string;
   scope?: ScopeContext;
   at?: string;
@@ -229,6 +245,7 @@ function stateOf(
     state:
       entry.last_success_fingerprint === currentFingerprint ? 'verified' : 'changed_since_verified',
     last_success_at: entry.last_success_at,
+    evidence: entry.last_success_evidence ?? 'worker_report',
   };
 }
 
@@ -288,10 +305,14 @@ export function formatKnowledgeVerificationLabel(verification?: KnowledgeVerific
   const day = (iso?: string) => (iso ? iso.slice(0, 10) : 'unknown');
   switch (verification.state) {
     case 'verified':
-      return ` [worked in a run on ${day(verification.last_success_at)}]`;
+      return verification.evidence === 'golden'
+        ? ` [passed its success check in a run on ${day(verification.last_success_at)}]`
+        : ` [worked in a run on ${day(verification.last_success_at)}]`;
     case 'changed_since_verified':
       return ` [changed since it last worked (${day(verification.last_success_at)}) — not yet confirmed; check the steps you rely on]`;
     case 'reported_problem':
-      return ` [reported ${verification.last_problem_kind ?? 'wrong'} on ${day(verification.last_problem_at)} — verify before relying on it]`;
+      return verification.last_problem_kind === 'failed_check'
+        ? ` [failed its success check in a run on ${day(verification.last_problem_at)} — verify before relying on it]`
+        : ` [reported ${verification.last_problem_kind ?? 'wrong'} on ${day(verification.last_problem_at)} — verify before relying on it]`;
   }
 }
