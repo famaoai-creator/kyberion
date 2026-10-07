@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { rawReadFileSnapshot } from './fs-primitives.js';
 import {
   execFileSync,
   spawn,
@@ -347,6 +348,12 @@ export function safeReadFileRange(filePath: string, position: number, length: nu
   } finally {
     fs.closeSync(fd);
   }
+}
+
+export { MAX_SNAPSHOT_READ_BYTES } from './fs-primitives.js';
+export function safeReadFileSnapshot(filePath: string, maxBytes: number): Buffer {
+  const resolved = assertReadableRepositoryFile(filePath, 'snapshot');
+  return rawReadFileSnapshot(resolved, pathResolver.rootDir(), maxBytes);
 }
 
 export function safeReadFileTail(filePath: string, maxBytes: number): SafeReadTailResult {

@@ -6,13 +6,18 @@ import * as path from 'node:path';
 // `node:fs` is a native ESM namespace whose exports are non-configurable, so
 // `vi.spyOn(fs, 'readSync')` cannot redefine the property directly. Mocking
 // the module with a `vi.fn` wrapper around the real implementation gives the
-// `safeReadFileTail` byte-bound-read test below a spyable reference while
+// byte-bound and snapshot-race tests below spyable references while
 // every other export (used throughout this file's fixtures) stays real.
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return {
     ...actual,
+    constants: { ...actual.constants },
     readSync: vi.fn(actual.readSync),
+    openSync: vi.fn(actual.openSync),
+    fstatSync: vi.fn(actual.fstatSync),
+    lstatSync: vi.fn(actual.lstatSync),
+    closeSync: vi.fn(actual.closeSync),
   };
 });
 import {
@@ -27,6 +32,8 @@ import {
   safeReadFile,
   MAX_RANGE_READ_BYTES,
   safeReadFileRange,
+  MAX_SNAPSHOT_READ_BYTES,
+  safeReadFileSnapshot,
   safeReadFileTail,
   safeRealpath,
   safeStatfs,
@@ -117,6 +124,339 @@ describe('secure-io core', () => {
       expect(safeReadFileRange(testFile, 0, MAX_RANGE_READ_BYTES).toString('utf8')).toBe('abc');
       expect(() => safeReadFileRange(testFile, 0, MAX_RANGE_READ_BYTES + 1)).toThrow('exceeds the');
     });
+  });
+
+  describe('safeReadFileSnapshot', () => {
+    let actualFs: typeof fs;
+    const supported = fs.constants.O_NOFOLLOW > 0 && fs.constants.O_NONBLOCK > 0;
+    const snapshotIt = it.skipIf(!supported);
+
+    beforeEach(async () => {
+      actualFs = await vi.importActual<typeof fs>('node:fs');
+      vi.mocked(fs.readSync).mockReset().mockImplementation(actualFs.readSync);
+      vi.mocked(fs.openSync).mockReset().mockImplementation(actualFs.openSync);
+      vi.mocked(fs.fstatSync).mockReset().mockImplementation(actualFs.fstatSync);
+      vi.mocked(fs.lstatSync).mockReset().mockImplementation(actualFs.lstatSync);
+      vi.mocked(fs.closeSync).mockReset().mockImplementation(actualFs.closeSync);
+    });
+
+    afterEach(() => {
+      vi.mocked(fs.readSync).mockReset().mockImplementation(actualFs.readSync);
+      vi.mocked(fs.openSync).mockReset().mockImplementation(actualFs.openSync);
+      vi.mocked(fs.fstatSync).mockReset().mockImplementation(actualFs.fstatSync);
+      vi.mocked(fs.lstatSync).mockReset().mockImplementation(actualFs.lstatSync);
+      vi.mocked(fs.closeSync).mockReset().mockImplementation(actualFs.closeSync);
+    });
+
+    snapshotIt('returns exact binary bytes at the limit and supports empty files', () => {
+      const file = path.join(tmpDir, 'snapshot.bin');
+      const bytes = Buffer.from([0, 255, 12, 128, 0]);
+      fs.writeFileSync(file, bytes);
+      expect(safeReadFileSnapshot(file, bytes.length)).toEqual(bytes);
+      expect(fs.openSync).toHaveBeenCalledWith(
+        file,
+        fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK
+      );
+      fs.writeFileSync(file, '');
+      expect(safeReadFileSnapshot(file, 1)).toEqual(Buffer.alloc(0));
+    });
+
+    snapshotIt('continues partial reads without exceeding the byte limit plus one', () => {
+      const file = path.join(tmpDir, 'snapshot-partial.txt');
+      fs.writeFileSync(file, 'abcdef');
+      vi.mocked(fs.readSync).mockImplementation((fd, buffer, offset, length, position) =>
+        actualFs.readSync(fd, buffer, offset, Math.min(length, 2), position)
+      );
+      expect(safeReadFileSnapshot(file, 6).toString()).toBe('abcdef');
+      expect(fs.readSync).toHaveBeenCalledTimes(4);
+      for (const call of vi.mocked(fs.readSync).mock.calls) {
+        expect(call[1].byteLength).toBeLessThanOrEqual(7);
+        expect(call[2] + call[3]).toBeLessThanOrEqual(7);
+      }
+    });
+
+    it.each([0, -1, 1.5, NaN, Infinity, -Infinity, MAX_SNAPSHOT_READ_BYTES + 1])(
+      'rejects invalid cap %p before opening a file',
+      (cap) => {
+        expect(() => safeReadFileSnapshot(path.join(tmpDir, 'missing'), cap)).toThrow(
+          'Invalid maxBytes'
+        );
+        expect(fs.openSync).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each(['O_NOFOLLOW', 'O_NONBLOCK'] as const)(
+      'fails closed when %s is unsupported',
+      (flag) => {
+        const original = fs.constants[flag];
+        Object.defineProperty(fs.constants, flag, { value: 0, configurable: true });
+        try {
+          expect(() => safeReadFileSnapshot(path.join(tmpDir, 'missing'), 1)).toThrow(
+            'unsupported on this platform'
+          );
+          expect(fs.openSync).not.toHaveBeenCalled();
+        } finally {
+          Object.defineProperty(fs.constants, flag, { value: original, configurable: true });
+        }
+      }
+    );
+
+    snapshotIt('rejects oversized files and directories before opening or reading', () => {
+      const file = path.join(tmpDir, 'snapshot-oversize.txt');
+      fs.writeFileSync(file, 'abcdef');
+      expect(() => safeReadFileSnapshot(file, 5)).toThrow('snapshot byte limit');
+      expect(() => safeReadFileSnapshot(tmpDir, 5)).toThrow('Not a regular file');
+      expect(fs.openSync).not.toHaveBeenCalled();
+      expect(fs.readSync).not.toHaveBeenCalled();
+    });
+
+    snapshotIt('rejects leaf and ancestor symlinks without reading', () => {
+      const dir = path.join(tmpDir, 'snapshot-real');
+      const link = path.join(tmpDir, 'snapshot-linked');
+      fs.mkdirSync(dir);
+      fs.writeFileSync(path.join(dir, 'file'), 'abc');
+      fs.symlinkSync(dir, link, 'dir');
+      const leaf = path.join(tmpDir, 'snapshot-leaf');
+      fs.symlinkSync(path.join(dir, 'file'), leaf);
+      expect(() => safeReadFileSnapshot(leaf, 3)).toThrow('RESOURCE_PATH_SYMLINK');
+      expect(() => safeReadFileSnapshot(path.join(link, 'file'), 3)).toThrow(
+        'RESOURCE_PATH_SYMLINK'
+      );
+      expect(fs.readSync).not.toHaveBeenCalled();
+    });
+
+    snapshotIt('rejects a same-sized different inode returned by open before any read', () => {
+      const file = path.join(tmpDir, 'snapshot-authorized');
+      const other = path.join(tmpDir, 'snapshot-unauthorized');
+      fs.writeFileSync(file, 'aaa');
+      fs.writeFileSync(other, 'bbb');
+      let opened = -1;
+      // Models swap/open/restore: the path still names A when open returns B's fd.
+      vi.mocked(fs.openSync).mockImplementationOnce((_file, flags) => {
+        opened = actualFs.openSync(other, flags);
+        return opened;
+      });
+      expect(() => safeReadFileSnapshot(file, 3)).toThrow('changed before snapshot read');
+      expect(fs.readSync).not.toHaveBeenCalled();
+      expect(fs.closeSync).toHaveBeenCalledWith(opened);
+      expect(() => actualFs.fstatSync(opened)).toThrow();
+    });
+
+    snapshotIt('refuses a leaf swapped to a symlink immediately before open', () => {
+      const file = path.join(tmpDir, 'snapshot-open-leaf');
+      const other = path.join(tmpDir, 'snapshot-other');
+      fs.writeFileSync(file, 'aaa');
+      fs.writeFileSync(other, 'bbb');
+      vi.mocked(fs.openSync).mockImplementationOnce((target, flags) => {
+        fs.unlinkSync(file);
+        fs.symlinkSync(other, file);
+        return actualFs.openSync(target, flags);
+      });
+      expect(() => safeReadFileSnapshot(file, 3)).toThrow();
+      expect(fs.readSync).not.toHaveBeenCalled();
+      expect(fs.closeSync).not.toHaveBeenCalled();
+    });
+
+    snapshotIt('rejects ancestor swap/open/restore before reading the different inode', () => {
+      const dir = path.join(tmpDir, 'snapshot-parent');
+      const other = path.join(tmpDir, 'snapshot-other-parent');
+      const saved = path.join(tmpDir, 'snapshot-parent-saved');
+      fs.mkdirSync(dir);
+      fs.mkdirSync(other);
+      const file = path.join(dir, 'file');
+      fs.writeFileSync(file, 'aaa');
+      fs.writeFileSync(path.join(other, 'file'), 'bbb');
+      vi.mocked(fs.openSync).mockImplementationOnce((target, flags) => {
+        fs.renameSync(dir, saved);
+        fs.symlinkSync(other, dir, 'dir');
+        try {
+          return actualFs.openSync(target, flags);
+        } finally {
+          fs.unlinkSync(dir);
+          fs.renameSync(saved, dir);
+        }
+      });
+      expect(() => safeReadFileSnapshot(file, 3)).toThrow('changed before snapshot read');
+      expect(fs.readSync).not.toHaveBeenCalled();
+      expect(fs.closeSync).toHaveBeenCalledOnce();
+    });
+
+    snapshotIt(
+      'rejects repeated ancestor substitutions restored around each strict path check',
+      () => {
+        const dir = path.join(tmpDir, 'snapshot-repeated-parent');
+        const saved = path.join(tmpDir, 'snapshot-repeated-saved');
+        const other = path.join(tmpDir, 'snapshot-repeated-other');
+        fs.mkdirSync(dir);
+        fs.mkdirSync(other);
+        const file = path.join(dir, 'file');
+        fs.writeFileSync(file, 'aaa');
+        fs.writeFileSync(path.join(other, 'file'), 'bbb');
+        const originalDirectory = actualFs.lstatSync(dir, { bigint: true });
+        let swapped = false;
+        const swap = () => {
+          fs.renameSync(dir, saved);
+          fs.symlinkSync(other, dir, 'dir');
+          swapped = true;
+        };
+        const restore = () => {
+          if (!swapped) return;
+          fs.unlinkSync(dir);
+          fs.renameSync(saved, dir);
+          swapped = false;
+        };
+        let leafStats = 0;
+        vi.mocked(fs.lstatSync).mockImplementation((target, options) => {
+          if (target !== file || !options?.bigint) return actualFs.lstatSync(target, options);
+          leafStats += 1;
+          // Both leaf samples deliberately see B, while all strict path walks
+          // see A. The first substitution stays in place through open/read.
+          swap();
+          const stat = actualFs.lstatSync(target, options);
+          if (leafStats > 1) restore();
+          return stat;
+        });
+        let descriptorStats = 0;
+        vi.mocked(fs.fstatSync).mockImplementation((fd, options) => {
+          const stat = actualFs.fstatSync(fd, options);
+          descriptorStats += 1;
+          if (descriptorStats === 2) restore();
+          return stat;
+        });
+        try {
+          expect(() => safeReadFileSnapshot(file, 3)).toThrow('Snapshot ancestor changed');
+          expect(leafStats).toBe(2);
+          expect(descriptorStats).toBe(2);
+          expect(fs.readSync).toHaveBeenCalled();
+          expect(fs.closeSync).toHaveBeenCalledOnce();
+          const restoredDirectory = actualFs.lstatSync(dir, { bigint: true });
+          expect(restoredDirectory.ino).toBe(originalDirectory.ino);
+          expect(actualFs.readFileSync(file, 'utf8')).toBe('aaa');
+        } finally {
+          restore();
+        }
+      }
+    );
+
+    snapshotIt.each(['dev', 'ino', 'mtimeNs', 'ctimeNs'] as const)(
+      'rejects a changed ancestor %s even when every other sampled field is stable',
+      (field) => {
+        const file = path.join(tmpDir, 'snapshot-ancestor-metadata');
+        fs.writeFileSync(file, 'abc');
+        let samples = 0;
+        vi.mocked(fs.lstatSync).mockImplementation((target, options) => {
+          const stat = actualFs.lstatSync(target, options);
+          if (target === tmpDir && options?.bigint) {
+            samples += 1;
+            if (samples === 2) {
+              return Object.assign(Object.create(Object.getPrototypeOf(stat)), stat, {
+                [field]: (stat as fs.BigIntStats)[field] + 1n,
+              });
+            }
+          }
+          return stat;
+        });
+        expect(() => safeReadFileSnapshot(file, 3)).toThrow('Snapshot ancestor changed');
+        expect(samples).toBe(2);
+        expect(fs.closeSync).toHaveBeenCalledOnce();
+      }
+    );
+
+    snapshotIt('opens a raced FIFO nonblocking and rejects it before reading', () => {
+      const file = path.join(tmpDir, 'snapshot-fifo-source');
+      const fifo = path.join(tmpDir, 'snapshot-fifo');
+      fs.writeFileSync(file, 'aaa');
+      safeExec('mkfifo', [fifo]);
+      vi.mocked(fs.openSync).mockImplementationOnce((_target, flags) => {
+        // Assert before the real open, so a regression cannot hang this test.
+        expect(Number(flags) & fs.constants.O_NONBLOCK).not.toBe(0);
+        return actualFs.openSync(fifo, flags);
+      });
+      expect(() => safeReadFileSnapshot(file, 3)).toThrow('changed before snapshot read');
+      expect(fs.readSync).not.toHaveBeenCalled();
+      expect(fs.closeSync).toHaveBeenCalledOnce();
+    });
+
+    snapshotIt.each(['rewrite', 'grow', 'truncate'] as const)(
+      'rejects an in-place %s during a partial read',
+      (mutation) => {
+        const file = path.join(tmpDir, 'snapshot-mutation');
+        fs.writeFileSync(file, 'abcdef');
+        vi.mocked(fs.readSync).mockImplementationOnce((fd, buffer, offset, length, position) => {
+          const read = actualFs.readSync(fd, buffer, offset, Math.min(length, 2), position);
+          if (mutation === 'grow') fs.appendFileSync(file, 'extra bytes');
+          else if (mutation === 'truncate') fs.truncateSync(file, 1);
+          else {
+            fs.writeFileSync(file, 'uvwxyz');
+            fs.utimesSync(file, new Date(0), new Date(0));
+          }
+          return read;
+        });
+        expect(() => safeReadFileSnapshot(file, 6)).toThrow('changed during snapshot read');
+        expect(fs.closeSync).toHaveBeenCalledOnce();
+        for (const call of vi.mocked(fs.readSync).mock.calls) {
+          expect(call[1].byteLength).toBeLessThanOrEqual(7);
+          expect(call[2] + call[3]).toBeLessThanOrEqual(7);
+        }
+      }
+    );
+
+    snapshotIt('rejects early EOF instead of returning a truncated snapshot', () => {
+      const file = path.join(tmpDir, 'snapshot-early-eof');
+      fs.writeFileSync(file, 'abc');
+      vi.mocked(fs.readSync).mockReturnValueOnce(0);
+      expect(() => safeReadFileSnapshot(file, 3)).toThrow('changed during snapshot read');
+      expect(fs.closeSync).toHaveBeenCalledOnce();
+    });
+
+    snapshotIt('rechecks ancestors after reading even when the leaf inode is unchanged', () => {
+      const dir = path.join(tmpDir, 'snapshot-post-parent');
+      const saved = path.join(tmpDir, 'snapshot-post-parent-saved');
+      fs.mkdirSync(dir);
+      const file = path.join(dir, 'file');
+      fs.writeFileSync(file, 'abc');
+      vi.mocked(fs.readSync).mockImplementationOnce((fd, buffer, offset, length, position) => {
+        const read = actualFs.readSync(fd, buffer, offset, length, position);
+        fs.renameSync(dir, saved);
+        fs.symlinkSync(saved, dir, 'dir');
+        return read;
+      });
+      expect(() => safeReadFileSnapshot(file, 3)).toThrow('RESOURCE_PATH_SYMLINK');
+      expect(fs.closeSync).toHaveBeenCalledOnce();
+    });
+
+    snapshotIt('rechecks the final pathname against the descriptor', () => {
+      const file = path.join(tmpDir, 'snapshot-post-leaf');
+      const other = path.join(tmpDir, 'snapshot-replacement');
+      const saved = path.join(tmpDir, 'snapshot-original');
+      fs.writeFileSync(file, 'aaa');
+      fs.writeFileSync(other, 'bbb');
+      vi.mocked(fs.readSync).mockImplementationOnce((fd, buffer, offset, length, position) => {
+        const read = actualFs.readSync(fd, buffer, offset, length, position);
+        fs.renameSync(file, saved);
+        fs.renameSync(other, file);
+        return read;
+      });
+      expect(() => safeReadFileSnapshot(file, 3)).toThrow('changed during snapshot read');
+      expect(fs.closeSync).toHaveBeenCalledOnce();
+    });
+
+    snapshotIt.each(['fstat', 'read'] as const)(
+      'closes the descriptor after a %s error',
+      (step) => {
+        const file = path.join(tmpDir, 'snapshot-error');
+        fs.writeFileSync(file, 'abc');
+        const fail = () => {
+          throw new Error('injected failure');
+        };
+        if (step === 'fstat') vi.mocked(fs.fstatSync).mockImplementationOnce(fail);
+        else vi.mocked(fs.readSync).mockImplementationOnce(fail);
+        expect(() => safeReadFileSnapshot(file, 3)).toThrow('injected failure');
+        expect(fs.closeSync).toHaveBeenCalledOnce();
+        const fd = vi.mocked(fs.closeSync).mock.calls[0][0];
+        expect(() => actualFs.fstatSync(fd)).toThrow();
+      }
+    );
   });
 
   describe('safeRealpath', () => {

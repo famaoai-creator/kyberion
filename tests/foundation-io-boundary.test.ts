@@ -11,6 +11,8 @@ const allowedImporters = new Set([
   'libs/core/foundation/project-scope-env.ts',
   'libs/core/path-resolver.ts',
   'libs/core/tier-guard.ts',
+  // Policy-enforced snapshot wrapper delegates only its low-level file mechanics.
+  'libs/core/secure-io.ts',
   'libs/core/secret/vault-mount.ts',
 ]);
 

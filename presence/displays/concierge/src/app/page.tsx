@@ -18,6 +18,7 @@ import { TENANT_CHANGED_EVENT, tenantFromChangeEvent } from '../lib/tenant-conte
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { frontDeskText } from '../lib/i18n';
 import { ReviewCheckin } from './review-checkin';
+import { OutcomeFiles } from './outcome-files';
 import {
   parseConciergeSummaryEvent,
   parseConciergeSummaryResponse,
@@ -915,6 +916,9 @@ export default function ConciergePage() {
           ) : null}
           {later(entry.id, busyId === item.entry_id)}
         </div>
+        {item.artifact_paths.length > 0 ? (
+          <OutcomeFiles entryId={item.entry_id} revision={item.updated_at} />
+        ) : null}
         {previewId === item.entry_id ? (
           <div className="outcome-preview">
             {previewError ? (
