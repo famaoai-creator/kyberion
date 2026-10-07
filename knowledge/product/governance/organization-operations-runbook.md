@@ -1,7 +1,7 @@
 ---
 title: Organization Operations Runbook
 tags: [organization, operation, incident, decision, governance]
-last_updated: 2026-10-06
+last_updated: 2026-10-07
 ---
 
 # Organization operations
@@ -41,7 +41,7 @@ An Operation may carry a `deadline` (`--deadline-business-day <n> --deadline-tim
 
 ## Incidents and decisions
 
-Create an Incident with `incident add`, then advance it with `incident transition`: `detected → triaging → mitigating → resolved → closed` (triaging may resolve directly). Closing requires an existing post-incident review in the same knowledge tier and tenant.
+Create an Incident with `incident add`, then advance it with `incident transition`: `detected → triaging → mitigating → resolved → closed` (triaging may resolve directly). Closing requires an existing post-incident review in the same knowledge tier and tenant. Write it at `knowledge/<tier>/<tenant>/incidents/<incident-id>-review.md` (what happened, impact, cause, follow-ups) and pass it as `--post-incident-review-ref`; `status` names the path once an incident is resolved.
 
 Create a Decision as `proposed`, then advance it with `decision transition`. Approval or rejection requires a `channel:id` approval reference whose record has a strongly authenticated human decision, `human_only` accountability, the same organization and tenant scope, and an effect binding of `organization:decision:<id>:approved` or `organization:decision:<id>:rejected`. An approved Decision needs a chosen option; `implemented` needs a follow-up reference.
 
@@ -49,7 +49,7 @@ Chronos shows tenant-scoped CLI commands beside organization intervention points
 
 ## Objectives and key results
 
-Attach key results to an objective with `objective add` and `objective kr add`. A KR measures itself (`--metric-json` source `org_metric`, `file`, `probe` or `signal_ratio`) or takes values recorded by people (`manual`); `pnpm organization help` lists the shapes. KRs are measured automatically only while an active dot charter references the objective, so an organization run by hand measures on demand:
+Attach key results to an objective with `objective add` and `objective kr add`. A KR measures itself (`--metric-json` source `org_metric`, `file`, `probe` or `signal_ratio`) or takes values recorded by people (`manual`); `pnpm organization help` lists the shapes. KRs are measured automatically only while an active dot charter references the objective, so an organization run by hand measures on demand. Each KR is measured at most once per interval (`kr add --every <seconds>`, default 900); add `--force` to re-measure now, for example right after opening an incident. Objective lines show how old the oldest measurement is:
 
 ```bash
 pnpm organization objective kr measure --organization-id ORG --tier confidential --tenant-slug TENANT --apply

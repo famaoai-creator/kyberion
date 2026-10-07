@@ -42,6 +42,45 @@ describe('organization objective kr measure', () => {
     ]);
   });
 
+  it('shows how old the oldest key-result measurement is', () => {
+    expect(
+      formatObjectiveProgress(
+        {
+          organization_id: 'acme',
+          objectives: [
+            {
+              objective_id: 'obj-a',
+              title: 'Stable billing',
+              progress: 1,
+              key_results: [
+                { kr_id: 'kr-1', weight: 1, progress: 1, measured_at: '2026-10-07T00:48:00.000Z' },
+                { kr_id: 'kr-2', weight: 1, progress: 1, measured_at: '2026-10-06T22:00:00.000Z' },
+              ],
+              unmeasured_krs: [],
+            },
+          ],
+        },
+        new Date('2026-10-07T01:00:00.000Z')
+      )
+    ).toEqual(['Objective: Stable billing — 100% (kr-1 100%, kr-2 100%) · measured 3h ago']);
+  });
+
+  it('passes --force through to the sweep', async () => {
+    const seen: unknown[] = [];
+    await measureOrganizationObjectives(
+      ['--organization-id', 'acme', '--tier', 'public', '--apply', '--force'],
+      () => undefined,
+      {
+        measure: async (_scope, deps) => {
+          seen.push(deps);
+          return [];
+        },
+        readMeasurements: () => [],
+      }
+    );
+    expect(seen).toEqual([{ force: true }]);
+  });
+
   it('requires exactly one of --dry-run and --apply and a tenant for confidential scope', async () => {
     const print = () => undefined;
     await expect(
