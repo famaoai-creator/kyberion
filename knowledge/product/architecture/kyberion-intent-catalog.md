@@ -356,7 +356,19 @@ per the source's tier.
 7. platform_onboarding     - environment integration
 8. environment_and_recovery - incident recovery / session resume
 9. research_and_absorption - cross-codebase research / external absorption
+10. finance_and_accounting  - closes, invoices/expenses/AR/payroll, budget, fundraising
+11. people_and_talent       - hiring, performance review, employee lifecycle
+12. legal_and_compliance    - contract review, audits, regulatory filing, risk, BCP
+13. strategy_and_governance - business plan, OKR, board prep, M&A diligence, alliances
+14. procurement_and_supply  - vendor selection, supplier onboarding, supply planning, fulfillment
 ```
+
+Classes 10–14 are the organization-function classes: work whose control
+regime (money, people, law, direction, supply) differs enough that it needs its
+own team, review gates, and way of working. How an AI agent should proceed in
+each class is defined in
+`knowledge/product/governance/mission-class-playbooks.json` and explained in
+[mission-class-operating-guide](../orchestration/mission-class-operating-guide.md).
 
 Classification rules live in
 `knowledge/product/governance/mission-classification-policy.json`.
@@ -364,6 +376,8 @@ Per-class workflows are defined in
 `knowledge/product/governance/mission-workflow-catalog.json`.
 Review gates per class are in
 `knowledge/product/governance/mission-review-gate-registry.json`.
+Per-class ways of working (autonomy posture, stage practice, pitfalls,
+escalation) are in `knowledge/product/governance/mission-class-playbooks.json`.
 
 ## 7. Cross-Device / Handoff Intents
 

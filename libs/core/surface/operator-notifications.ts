@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { parseSafeJsonObjectValue } from '../foundation/json.js';
@@ -425,9 +426,16 @@ function deliver(
       // Local fallback surface: no bridge/daemon required. The notification
       // lands in the deliverable inbox that `pnpm kyberion` surfaces on the
       // home screen and `pnpm kyberion inbox` lists/acknowledges.
-      const entryId = `INBOX-N-${correlationId
-        .replace(/[^A-Za-z0-9]/g, '')
-        .slice(-24)
+      // Derive from a hash of the full correlation id, not its tail: callers
+      // like sendOpsAlert build correlation_id as "<isoTs>-<dedupeKey>", and a
+      // tail-only slice collapsed every recurring alert of one dedupe class
+      // onto a single inbox entry — the next stale-daemon alert would
+      // silently no-op behind the first. Hashing keeps one entry per alert
+      // instance while staying deterministic for retries of the same alert.
+      const entryId = `INBOX-N-${createHash('sha256')
+        .update(correlationId)
+        .digest('hex')
+        .slice(-20)
         .toUpperCase()}`;
       withExecutionContext('surface_runtime', () => {
         const alreadyQueued = listInboxEntries({ limit: 500 }).some(
