@@ -487,7 +487,7 @@
       "op": "curation_report",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "KP-06: deterministic weekly report of low-yield knowledge hints (KP-05 usage aggregate) and freshness SLO breaches (knowledge-curation-slo.json); writes CURATION_REPORT.md. Candidates only — no automatic demotion, steward approval required.",
+      "note": "KP-06: deterministic weekly report of low-yield knowledge hints (KP-05 usage aggregate) and freshness SLO breaches (knowledge-curation-slo.json); writes CURATION_REPORT.md, plus a personal-tier procedure check report (golden-scenario status). Candidates only — no automatic demotion, steward approval required.",
       "effect": "read"
     },
     {

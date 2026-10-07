@@ -12,8 +12,8 @@
  */
 import {
   backfillGoldenScenarios,
+  PROCEDURE_ATTENTION_ACTIONS,
   procedureCheckStatus,
-  type ProcedureCheckAttention,
 } from '@agent/core/knowledge/golden-scenario-maintenance';
 import { procedureCatalogPaths } from '@agent/core/knowledge/procedure-registry';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -22,15 +22,6 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 
 const USAGE =
   'Usage: pnpm kyberion procedure golden <status|backfill> [--json] [--dry-run] [--catalog <path>]';
-
-const ATTENTION_TEXT: Record<ProcedureCheckAttention, string> = {
-  no_golden_scenario: 'no golden scenario — run `pnpm kyberion procedure golden backfill`',
-  weak_only: 'golden scenario has no condition that can pass — re-record with a visible result',
-  failed_check: 'failed its success check — fix or re-record',
-  reported_problem: 'reported wrong/stale — fix or supersede',
-  changed_since_verified: 'changed since it last worked — run it to confirm',
-  never_passed: 'has not passed its check yet — run it once',
-};
 
 function flagValue(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -47,7 +38,9 @@ export const runProcedureGolden = defineScript({
       if (rows.length === 0) return context.print('No procedures in the catalogs.');
       const lines = rows.map((row) => {
         const state = `${row.verification}${row.last_success_at ? ` (last success ${row.last_success_at.slice(0, 10)})` : ''}`;
-        const todo = row.attention.map((item) => `\n    - ${ATTENTION_TEXT[item]}`).join('');
+        const todo = row.attention
+          .map((item) => `\n    - ${PROCEDURE_ATTENTION_ACTIONS[item]}`)
+          .join('');
         return `${row.procedure_id} [${row.substrate}, ${row.status}] golden=${row.golden} check=${state}${todo}`;
       });
       const needing = rows.filter((row) => row.attention.length > 0).length;
