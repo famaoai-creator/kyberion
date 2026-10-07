@@ -279,7 +279,18 @@ async function detectLive(target: LiveTarget): Promise<LiveResult> {
       continue;
     }
     const started = Date.now();
-    const snapshot = await detector.readSnapshot(request);
+    let snapshot: Awaited<ReturnType<typeof detector.readSnapshot>>;
+    try {
+      snapshot = await detector.readSnapshot(request);
+    } catch (error) {
+      // Windows UIA can exceed the detector's production timeout while the
+      // hosted runner is starting Notepad or compiling the PowerShell walker.
+      // This is a live smoke test, so retry the whole focus/capture/read cycle
+      // before treating a transient runner stall as a regression.
+      outcome = `snapshot read failed: ${String(error)}`;
+      console.log(`[uia-smoke:${target.label}] snapshot attempt ${attempt} failed`, outcome);
+      continue;
+    }
     const roles = new Map<string, number>();
     for (const element of snapshot.elements) {
       roles.set(element.role, (roles.get(element.role) ?? 0) + 1);
