@@ -429,6 +429,7 @@ export const PROGRESS_VOCABULARY_KEYS = [
   'front_desk:progress_load_failed',
   'front_desk:progress_action_failed',
   'front_desk:progress_request_pending',
+  'front_desk:progress_item_unavailable',
   'front_desk:progress_refresh',
   'ui:status_completed',
   'ui:status_failed',
