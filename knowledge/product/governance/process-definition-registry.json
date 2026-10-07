@@ -29,7 +29,7 @@
         "tests/scenario-coverage-contract.test.ts"
       ],
       "expected_counts": {
-        "scenarios": 24
+        "scenarios": 25
       }
     },
     {
@@ -43,7 +43,7 @@
         "libs/core/mission/mission-task-classification-scenarios.test.ts"
       ],
       "expected_counts": {
-        "scenarios": 32
+        "scenarios": 33
       }
     },
     {

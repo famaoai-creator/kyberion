@@ -1,0 +1,1177 @@
+{
+  "$schema": "../schemas/intent-resolution-eval-corpus.schema.json",
+  "version": "1.0.0",
+  "purpose": "Labelled utterances for evaluating which standard intent the resolver selects, including negatives that no catalog intent may claim; the measuring stick for intent keyword review.",
+  "cases": [
+    {
+      "case_id": "ir-dev-001",
+      "split": "dev",
+      "utterance": "テスト失敗を分解して原因を探して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-dev-002",
+      "split": "dev",
+      "utterance": "この関数のテストを実行して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-dev-003",
+      "split": "dev",
+      "utterance": "バグを直して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-dev-004",
+      "split": "dev",
+      "utterance": "READMEの誤字を直して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-dev-005",
+      "split": "dev",
+      "utterance": "APIのエンドポイントを追加して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-dev-006",
+      "split": "dev",
+      "utterance": "今夜のレストランを2名で予約したい",
+      "expected_intent_id": "lifestyle-booking"
+    },
+    {
+      "case_id": "ir-dev-007",
+      "split": "dev",
+      "utterance": "来週の出張のホテルを手配して",
+      "expected_intent_id": "lifestyle-booking"
+    },
+    {
+      "case_id": "ir-dev-009",
+      "split": "dev",
+      "utterance": "新宿から渋谷までの電車の乗り換えを調べて",
+      "expected_intent_id": "transit-lookup"
+    },
+    {
+      "case_id": "ir-dev-010",
+      "split": "dev",
+      "utterance": "取引先への返信メールの下書きを作って",
+      "expected_intent_id": "email-draft"
+    },
+    {
+      "case_id": "ir-dev-011",
+      "split": "dev",
+      "utterance": "この文章を英語に訳して",
+      "expected_intent_id": "translation-service"
+    },
+    {
+      "case_id": "ir-dev-012",
+      "split": "dev",
+      "utterance": "明日の朝9時にリマインドして",
+      "expected_intent_id": "reminder-task"
+    },
+    {
+      "case_id": "ir-dev-013",
+      "split": "dev",
+      "utterance": "リビングのエアコンをつけて",
+      "expected_intent_id": "device-control"
+    },
+    {
+      "case_id": "ir-dev-014",
+      "split": "dev",
+      "utterance": "最新のAI動向をまとめて",
+      "expected_intent_id": "news-summary"
+    },
+    {
+      "case_id": "ir-dev-015",
+      "split": "dev",
+      "utterance": "会議の議事録から決定事項をまとめて",
+      "expected_intent_id": "summarize-conversation"
+    },
+    {
+      "case_id": "ir-dev-016",
+      "split": "dev",
+      "utterance": "今週の予定を教えて",
+      "expected_intent_id": "schedule-read-agenda"
+    },
+    {
+      "case_id": "ir-dev-017",
+      "split": "dev",
+      "utterance": "木曜の打ち合わせを金曜に動かして",
+      "expected_intent_id": "schedule-coordination"
+    },
+    {
+      "case_id": "ir-dev-018",
+      "split": "dev",
+      "utterance": "請求書を処理して支払いまで進めたい",
+      "expected_intent_id": "invoice-processing"
+    },
+    {
+      "case_id": "ir-dev-019",
+      "split": "dev",
+      "utterance": "月次決算を締めたい",
+      "expected_intent_id": "financial-close-monthly"
+    },
+    {
+      "case_id": "ir-dev-020",
+      "split": "dev",
+      "utterance": "新卒の採用活動を始めたい",
+      "expected_intent_id": "hiring-workflow"
+    },
+    {
+      "case_id": "ir-dev-021",
+      "split": "dev",
+      "utterance": "半期の人事評価を進めたい",
+      "expected_intent_id": "performance-review"
+    },
+    {
+      "case_id": "ir-dev-022",
+      "split": "dev",
+      "utterance": "取締役会の資料を準備して",
+      "expected_intent_id": "board-meeting-prep"
+    },
+    {
+      "case_id": "ir-dev-023",
+      "split": "dev",
+      "utterance": "調達先の見積比較をしたい",
+      "expected_intent_id": "procurement-vendor"
+    },
+    {
+      "case_id": "ir-dev-024",
+      "split": "dev",
+      "utterance": "障害が出ているので初動対応して",
+      "expected_intent_id": "incident-response"
+    },
+    {
+      "case_id": "ir-dev-025",
+      "split": "dev",
+      "utterance": "リリースしてよいか判断して",
+      "expected_intent_id": "release-readiness-review"
+    },
+    {
+      "case_id": "ir-dev-026",
+      "split": "dev",
+      "utterance": "ソースコードのセキュリティ監査をして",
+      "expected_intent_id": "security-audit-service"
+    },
+    {
+      "case_id": "ir-dev-027",
+      "split": "dev",
+      "utterance": "サービスのログを見て状態を教えて",
+      "expected_intent_id": "inspect-service"
+    },
+    {
+      "case_id": "ir-dev-028",
+      "split": "dev",
+      "utterance": "サービスを再起動して",
+      "expected_intent_id": "restart-service"
+    },
+    {
+      "case_id": "ir-dev-029",
+      "split": "dev",
+      "utterance": "過去の障害の再発防止策を探して",
+      "expected_intent_id": "cross-project-remediation"
+    },
+    {
+      "case_id": "ir-dev-030",
+      "split": "dev",
+      "utterance": "社内ナレッジから手順を検索して",
+      "expected_intent_id": "knowledge-query"
+    },
+    {
+      "case_id": "ir-dev-031",
+      "split": "dev",
+      "utterance": "パワポで提案資料を作って",
+      "expected_intent_id": "generate-presentation"
+    },
+    {
+      "case_id": "ir-dev-032",
+      "split": "dev",
+      "utterance": "Excelで工程表を作って",
+      "expected_intent_id": "generate-workbook"
+    },
+    {
+      "case_id": "ir-dev-033",
+      "split": "dev",
+      "utterance": "報告書をdocxで作って",
+      "expected_intent_id": "generate-report"
+    },
+    {
+      "case_id": "ir-dev-034",
+      "split": "dev",
+      "utterance": "音声を文字起こしして",
+      "expected_intent_id": "transcribe-audio"
+    },
+    {
+      "case_id": "ir-dev-035",
+      "split": "dev",
+      "utterance": "このサイトを開いて",
+      "expected_intent_id": "open-site"
+    },
+    {
+      "case_id": "ir-dev-036",
+      "split": "dev",
+      "utterance": "ミッションの状況を教えて",
+      "expected_intent_id": "inspect-mission-state"
+    },
+    {
+      "case_id": "ir-dev-037",
+      "split": "dev",
+      "utterance": "ミッションを一時停止して",
+      "expected_intent_id": "pause-mission"
+    },
+    {
+      "case_id": "ir-dev-038",
+      "split": "dev",
+      "utterance": "承認依頼を出して",
+      "expected_intent_id": "request-approval"
+    },
+    {
+      "case_id": "ir-dev-039",
+      "split": "dev",
+      "utterance": "仮説を複数出して批判し合って",
+      "expected_intent_id": "diverge-hypotheses"
+    },
+    {
+      "case_id": "ir-dev-040",
+      "split": "dev",
+      "utterance": "関係者の合意を取りたい。賛否を整理して",
+      "expected_intent_id": "multi-agent-consensus"
+    },
+    {
+      "case_id": "ir-dev-041",
+      "split": "dev",
+      "utterance": "要件を段階的にタスク分解して",
+      "expected_intent_id": "chain-of-thought-planning"
+    },
+    {
+      "case_id": "ir-dev-042",
+      "split": "dev",
+      "utterance": "タスクを依存関係順に実行して進捗も追って",
+      "expected_intent_id": "plan-and-execute"
+    },
+    {
+      "case_id": "ir-dev-043",
+      "split": "dev",
+      "utterance": "過去の類似インシデントを思い出して",
+      "expected_intent_id": "recall-prior-knowledge"
+    },
+    {
+      "case_id": "ir-dev-044",
+      "split": "dev",
+      "utterance": "CFOの立場から分析して",
+      "expected_intent_id": "adaptive-reasoning"
+    },
+    {
+      "case_id": "ir-dev-045",
+      "split": "dev",
+      "utterance": "判断が難しいので人間のレビューに回して",
+      "expected_intent_id": "active-learning-escalate"
+    },
+    {
+      "case_id": "ir-dev-046",
+      "split": "dev",
+      "utterance": "契約書の条項をレビューして",
+      "expected_intent_id": "contract-review"
+    },
+    {
+      "case_id": "ir-dev-047",
+      "split": "dev",
+      "utterance": "ベンダーのオンボーディングを進めて",
+      "expected_intent_id": "supplier-onboarding"
+    },
+    {
+      "case_id": "ir-dev-048",
+      "split": "dev",
+      "utterance": "予算と実績の差異を確認して",
+      "expected_intent_id": "budget-review"
+    },
+    {
+      "case_id": "ir-dev-049",
+      "split": "dev",
+      "utterance": "四半期のOKRを立てたい",
+      "expected_intent_id": "quarterly-okr-planning"
+    },
+    {
+      "case_id": "ir-dev-050",
+      "split": "dev",
+      "utterance": "顧客サポートのチケットを対応して",
+      "expected_intent_id": "support-ticket-resolution"
+    },
+    {
+      "case_id": "ir-dev-051",
+      "split": "dev",
+      "utterance": "経費精算を処理して",
+      "expected_intent_id": "expense-reimbursement"
+    },
+    {
+      "case_id": "ir-dev-052",
+      "split": "dev",
+      "utterance": "給与計算を進めて",
+      "expected_intent_id": "payroll-cycle"
+    },
+    {
+      "case_id": "ir-dev-053",
+      "split": "dev",
+      "utterance": "資金調達の準備をしたい",
+      "expected_intent_id": "fundraising-prep"
+    },
+    {
+      "case_id": "ir-dev-054",
+      "split": "dev",
+      "utterance": "プレスリリースを書きたい",
+      "expected_intent_id": "public-relations-release"
+    },
+    {
+      "case_id": "ir-dev-055",
+      "split": "dev",
+      "utterance": "事業継続計画を作りたい",
+      "expected_intent_id": "business-continuity-planning"
+    },
+    {
+      "case_id": "ir-dev-056",
+      "split": "dev",
+      "utterance": "環境を診断して状態を教えて",
+      "expected_intent_id": "diagnose-kyberion-system"
+    },
+    {
+      "case_id": "ir-dev-057",
+      "split": "dev",
+      "utterance": "ベースラインチェックを実行して",
+      "expected_intent_id": "check-kyberion-baseline"
+    },
+    {
+      "case_id": "ir-dev-058",
+      "split": "dev",
+      "utterance": "知識を整理してインデックスを整合させて",
+      "expected_intent_id": "reconcile-knowledge-index"
+    },
+    {
+      "case_id": "ir-dev-059",
+      "split": "dev",
+      "utterance": "自分の声でこの原稿を読み上げて",
+      "expected_intent_id": "speak-with-my-voice"
+    },
+    {
+      "case_id": "ir-dev-060",
+      "split": "dev",
+      "utterance": "今の会話をまとめて",
+      "expected_intent_id": "summarize-conversation"
+    },
+    {
+      "case_id": "ir-dev-061",
+      "split": "dev",
+      "utterance": "利用できる機能を教えて",
+      "expected_intent_id": "list-capabilities"
+    },
+    {
+      "case_id": "ir-dev-062",
+      "split": "dev",
+      "utterance": "ここまでの会話をミッションにして",
+      "expected_intent_id": "conversation-to-mission"
+    },
+    {
+      "case_id": "ir-dev-063",
+      "split": "dev",
+      "utterance": "プロジェクトを新しく立ち上げて",
+      "expected_intent_id": "bootstrap-project"
+    },
+    {
+      "case_id": "ir-dev-064",
+      "split": "dev",
+      "utterance": "ミッションをクローズして",
+      "expected_intent_id": "close-mission"
+    },
+    {
+      "case_id": "ir-dev-065",
+      "split": "dev",
+      "utterance": "担当者を変更して",
+      "expected_intent_id": "reassign-mission-owner"
+    },
+    {
+      "case_id": "ir-hold-002",
+      "split": "holdout",
+      "utterance": "渋谷から品川まで電車で何分かかるか調べて",
+      "expected_intent_id": "transit-lookup"
+    },
+    {
+      "case_id": "ir-hold-003",
+      "split": "holdout",
+      "utterance": "取引先に送るお礼メールの文面を考えて",
+      "expected_intent_id": "email-draft"
+    },
+    {
+      "case_id": "ir-hold-004",
+      "split": "holdout",
+      "utterance": "英語の文書を日本語にしてほしい",
+      "expected_intent_id": "translation-service"
+    },
+    {
+      "case_id": "ir-hold-005",
+      "split": "holdout",
+      "utterance": "来週月曜の朝にミーティングがあると通知して",
+      "expected_intent_id": "reminder-task"
+    },
+    {
+      "case_id": "ir-hold-006",
+      "split": "holdout",
+      "utterance": "エアコンの温度を下げて",
+      "expected_intent_id": "device-control"
+    },
+    {
+      "case_id": "ir-hold-007",
+      "split": "holdout",
+      "utterance": "競合の最近の動きをニュースで追いたい",
+      "expected_intent_id": "news-summary"
+    },
+    {
+      "case_id": "ir-hold-008",
+      "split": "holdout",
+      "utterance": "今月の予定を一覧で見せて",
+      "expected_intent_id": "schedule-read-agenda"
+    },
+    {
+      "case_id": "ir-hold-009",
+      "split": "holdout",
+      "utterance": "水曜の会議を来週に延期したい",
+      "expected_intent_id": "schedule-coordination"
+    },
+    {
+      "case_id": "ir-hold-010",
+      "split": "holdout",
+      "utterance": "取引先の請求書の支払処理を進めたい",
+      "expected_intent_id": "invoice-processing"
+    },
+    {
+      "case_id": "ir-hold-011",
+      "split": "holdout",
+      "utterance": "決算の締め作業を始めて",
+      "expected_intent_id": "financial-close-monthly"
+    },
+    {
+      "case_id": "ir-hold-012",
+      "split": "holdout",
+      "utterance": "エンジニアを採用するための募集要項を作りたい",
+      "expected_intent_id": "hiring-workflow"
+    },
+    {
+      "case_id": "ir-hold-013",
+      "split": "holdout",
+      "utterance": "本番環境で障害が発生したので復旧して",
+      "expected_intent_id": "incident-response"
+    },
+    {
+      "case_id": "ir-hold-014",
+      "split": "holdout",
+      "utterance": "リリース前の最終チェックをして判定して",
+      "expected_intent_id": "release-readiness-review"
+    },
+    {
+      "case_id": "ir-hold-015",
+      "split": "holdout",
+      "utterance": "このリポジトリの脆弱性を静的解析で調べて",
+      "expected_intent_id": "security-audit-service"
+    },
+    {
+      "case_id": "ir-hold-016",
+      "split": "holdout",
+      "utterance": "サーバーのログを確認して",
+      "expected_intent_id": "inspect-service"
+    },
+    {
+      "case_id": "ir-hold-017",
+      "split": "holdout",
+      "utterance": "バックグラウンドサービスを再起動して",
+      "expected_intent_id": "restart-service"
+    },
+    {
+      "case_id": "ir-hold-018",
+      "split": "holdout",
+      "utterance": "過去の失敗事例から学べることを思い出して",
+      "expected_intent_id": "recall-prior-knowledge"
+    },
+    {
+      "case_id": "ir-hold-019",
+      "split": "holdout",
+      "utterance": "ナレッジベースで認証方式を検索して",
+      "expected_intent_id": "knowledge-query"
+    },
+    {
+      "case_id": "ir-hold-020",
+      "split": "holdout",
+      "utterance": "営業向けのスライドを作って",
+      "expected_intent_id": "generate-presentation"
+    },
+    {
+      "case_id": "ir-hold-021",
+      "split": "holdout",
+      "utterance": "売上推移のExcelを作って",
+      "expected_intent_id": "generate-workbook"
+    },
+    {
+      "case_id": "ir-hold-022",
+      "split": "holdout",
+      "utterance": "月次報告書をPDFで作って",
+      "expected_intent_id": "generate-report"
+    },
+    {
+      "case_id": "ir-hold-023",
+      "split": "holdout",
+      "utterance": "録音データの文字起こしをして",
+      "expected_intent_id": "transcribe-audio"
+    },
+    {
+      "case_id": "ir-hold-024",
+      "split": "holdout",
+      "utterance": "今の会話の要点を整理して",
+      "expected_intent_id": "summarize-conversation"
+    },
+    {
+      "case_id": "ir-hold-025",
+      "split": "holdout",
+      "utterance": "Kyberionで何が使えるのか知りたい",
+      "expected_intent_id": "list-capabilities"
+    },
+    {
+      "case_id": "ir-hold-026",
+      "split": "holdout",
+      "utterance": "この話をミッション化して",
+      "expected_intent_id": "conversation-to-mission"
+    },
+    {
+      "case_id": "ir-hold-027",
+      "split": "holdout",
+      "utterance": "ミッションを中止して",
+      "expected_intent_id": "cancel-mission"
+    },
+    {
+      "case_id": "ir-hold-028",
+      "split": "holdout",
+      "utterance": "ミッションの担当をAさんに替えて",
+      "expected_intent_id": "reassign-mission-owner"
+    },
+    {
+      "case_id": "ir-hold-029",
+      "split": "holdout",
+      "utterance": "承認を求めるリクエストを作って",
+      "expected_intent_id": "request-approval"
+    },
+    {
+      "case_id": "ir-hold-030",
+      "split": "holdout",
+      "utterance": "サプライヤの審査と登録を進めて",
+      "expected_intent_id": "supplier-onboarding"
+    },
+    {
+      "case_id": "ir-hold-031",
+      "split": "holdout",
+      "utterance": "予算に対する実績の差を調べて",
+      "expected_intent_id": "budget-review"
+    },
+    {
+      "case_id": "ir-hold-032",
+      "split": "holdout",
+      "utterance": "社員の入社手続きを進めて",
+      "expected_intent_id": "employee-lifecycle-transition"
+    },
+    {
+      "case_id": "ir-hold-033",
+      "split": "holdout",
+      "utterance": "取締役会に出す議題を整理して",
+      "expected_intent_id": "board-meeting-prep"
+    },
+    {
+      "case_id": "ir-hold-034",
+      "split": "holdout",
+      "utterance": "事業計画を作りたい",
+      "expected_intent_id": "business-plan-development"
+    },
+    {
+      "case_id": "ir-hold-035",
+      "split": "holdout",
+      "utterance": "製品の発売計画を立てて",
+      "expected_intent_id": "product-launch-gtm"
+    },
+    {
+      "case_id": "ir-hold-036",
+      "split": "holdout",
+      "utterance": "営業案件の状況を見直したい",
+      "expected_intent_id": "sales-pipeline-review"
+    },
+    {
+      "case_id": "ir-hold-037",
+      "split": "holdout",
+      "utterance": "知識インデックスの不整合を直して",
+      "expected_intent_id": "reconcile-knowledge-index"
+    },
+    {
+      "case_id": "ir-hold-038",
+      "split": "holdout",
+      "utterance": "システムの健康状態を確認して",
+      "expected_intent_id": "check-kyberion-vital"
+    },
+    {
+      "case_id": "ir-hold-039",
+      "split": "holdout",
+      "utterance": "ホテルを予約したい",
+      "expected_intent_id": "lifestyle-booking"
+    },
+    {
+      "case_id": "ir-hold-040",
+      "split": "holdout",
+      "utterance": "声を録音して自分のボイスモデルを作って",
+      "expected_intent_id": "clone-my-voice"
+    },
+    {
+      "case_id": "ir-hold-041",
+      "split": "holdout",
+      "utterance": "この関数のユニットテストを書いて",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-hold-042",
+      "split": "holdout",
+      "utterance": "変数名をわかりやすく直して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-hold-043",
+      "split": "holdout",
+      "utterance": "型エラーを修正して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-hold-044",
+      "split": "holdout",
+      "utterance": "ログ出力を追加して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-hold-045",
+      "split": "holdout",
+      "utterance": "依存パッケージを更新して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-hold-046",
+      "split": "holdout",
+      "utterance": "テストが落ちる原因を調べて",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-hold2-002",
+      "split": "holdout",
+      "utterance": "新大阪から京都までの最終電車は何時",
+      "expected_intent_id": "transit-lookup"
+    },
+    {
+      "case_id": "ir-hold2-003",
+      "split": "holdout",
+      "utterance": "お客様への謝罪メールを下書きして",
+      "expected_intent_id": "email-draft"
+    },
+    {
+      "case_id": "ir-hold2-004",
+      "split": "holdout",
+      "utterance": "この説明文をフランス語に訳して",
+      "expected_intent_id": "translation-service"
+    },
+    {
+      "case_id": "ir-hold2-005",
+      "split": "holdout",
+      "utterance": "毎朝8時に薬を飲むよう知らせて",
+      "expected_intent_id": "reminder-task"
+    },
+    {
+      "case_id": "ir-hold2-006",
+      "split": "holdout",
+      "utterance": "リビングの照明を消して",
+      "expected_intent_id": "device-control"
+    },
+    {
+      "case_id": "ir-hold2-007",
+      "split": "holdout",
+      "utterance": "生成AI業界の最近のトレンドを要約して",
+      "expected_intent_id": "news-summary"
+    },
+    {
+      "case_id": "ir-hold2-008",
+      "split": "holdout",
+      "utterance": "来週の私のカレンダーを見せて",
+      "expected_intent_id": "schedule-read-agenda"
+    },
+    {
+      "case_id": "ir-hold2-009",
+      "split": "holdout",
+      "utterance": "金曜の打ち合わせを月曜にずらして",
+      "expected_intent_id": "schedule-coordination"
+    },
+    {
+      "case_id": "ir-hold2-010",
+      "split": "holdout",
+      "utterance": "未払いの請求書の支払い手続きをしたい",
+      "expected_intent_id": "invoice-processing"
+    },
+    {
+      "case_id": "ir-hold2-011",
+      "split": "holdout",
+      "utterance": "月末の締め処理と仕訳の確認をして",
+      "expected_intent_id": "financial-close-monthly"
+    },
+    {
+      "case_id": "ir-hold2-012",
+      "split": "holdout",
+      "utterance": "中途採用の面接を設計して",
+      "expected_intent_id": "hiring-workflow"
+    },
+    {
+      "case_id": "ir-hold2-013",
+      "split": "holdout",
+      "utterance": "本番のAPIが落ちているので原因切り分けと復旧をして",
+      "expected_intent_id": "incident-response"
+    },
+    {
+      "case_id": "ir-hold2-014",
+      "split": "holdout",
+      "utterance": "デプロイしても大丈夫か判断して",
+      "expected_intent_id": "release-readiness-review"
+    },
+    {
+      "case_id": "ir-hold2-015",
+      "split": "holdout",
+      "utterance": "ソースコードの脆弱性診断をお願い",
+      "expected_intent_id": "security-audit-service"
+    },
+    {
+      "case_id": "ir-hold2-016",
+      "split": "holdout",
+      "utterance": "presence-studio の状態を見せて",
+      "expected_intent_id": "inspect-service"
+    },
+    {
+      "case_id": "ir-hold2-017",
+      "split": "holdout",
+      "utterance": "voice-hub を止めて",
+      "expected_intent_id": "stop-service"
+    },
+    {
+      "case_id": "ir-hold2-018",
+      "split": "holdout",
+      "utterance": "voice-hub を起動して",
+      "expected_intent_id": "start-service"
+    },
+    {
+      "case_id": "ir-hold2-019",
+      "split": "holdout",
+      "utterance": "以前の障害対応で得た教訓を参照して",
+      "expected_intent_id": "recall-prior-knowledge"
+    },
+    {
+      "case_id": "ir-hold2-020",
+      "split": "holdout",
+      "utterance": "ナレッジから認可の設計方針を調べて",
+      "expected_intent_id": "knowledge-query"
+    },
+    {
+      "case_id": "ir-hold2-021",
+      "split": "holdout",
+      "utterance": "投資家向けのスライドを作成して",
+      "expected_intent_id": "generate-presentation"
+    },
+    {
+      "case_id": "ir-hold2-022",
+      "split": "holdout",
+      "utterance": "月次の売上をまとめたワークブックを作って",
+      "expected_intent_id": "generate-workbook"
+    },
+    {
+      "case_id": "ir-hold2-023",
+      "split": "holdout",
+      "utterance": "四半期の調査レポートを書いて",
+      "expected_intent_id": "generate-report"
+    },
+    {
+      "case_id": "ir-hold2-024",
+      "split": "holdout",
+      "utterance": "会議の録音を文字に起こして",
+      "expected_intent_id": "transcribe-audio"
+    },
+    {
+      "case_id": "ir-hold2-025",
+      "split": "holdout",
+      "utterance": "ここまでの議論の結論を要約して",
+      "expected_intent_id": "summarize-conversation"
+    },
+    {
+      "case_id": "ir-hold2-026",
+      "split": "holdout",
+      "utterance": "このシステムで何ができるか教えて",
+      "expected_intent_id": "list-capabilities"
+    },
+    {
+      "case_id": "ir-hold2-027",
+      "split": "holdout",
+      "utterance": "この相談を実行可能なミッションにして",
+      "expected_intent_id": "conversation-to-mission"
+    },
+    {
+      "case_id": "ir-hold2-028",
+      "split": "holdout",
+      "utterance": "このミッションをキャンセルして",
+      "expected_intent_id": "cancel-mission"
+    },
+    {
+      "case_id": "ir-hold2-029",
+      "split": "holdout",
+      "utterance": "ミッションのオーナーを別の人に変更して",
+      "expected_intent_id": "reassign-mission-owner"
+    },
+    {
+      "case_id": "ir-hold2-030",
+      "split": "holdout",
+      "utterance": "承認依頼を作成して",
+      "expected_intent_id": "request-approval"
+    },
+    {
+      "case_id": "ir-hold2-031",
+      "split": "holdout",
+      "utterance": "新しい取引先の登録審査をして",
+      "expected_intent_id": "supplier-onboarding"
+    },
+    {
+      "case_id": "ir-hold2-032",
+      "split": "holdout",
+      "utterance": "予実の差異を分析して",
+      "expected_intent_id": "budget-review"
+    },
+    {
+      "case_id": "ir-hold2-033",
+      "split": "holdout",
+      "utterance": "新入社員のオンボーディングを進めて",
+      "expected_intent_id": "employee-lifecycle-transition"
+    },
+    {
+      "case_id": "ir-hold2-034",
+      "split": "holdout",
+      "utterance": "取締役会の資料を準備して",
+      "expected_intent_id": "board-meeting-prep"
+    },
+    {
+      "case_id": "ir-hold2-035",
+      "split": "holdout",
+      "utterance": "新規事業の事業計画を作って",
+      "expected_intent_id": "business-plan-development"
+    },
+    {
+      "case_id": "ir-hold2-036",
+      "split": "holdout",
+      "utterance": "新商品のローンチ計画を立てて",
+      "expected_intent_id": "product-launch-gtm"
+    },
+    {
+      "case_id": "ir-hold2-037",
+      "split": "holdout",
+      "utterance": "商談パイプラインの健全性をレビューして",
+      "expected_intent_id": "sales-pipeline-review"
+    },
+    {
+      "case_id": "ir-hold2-038",
+      "split": "holdout",
+      "utterance": "ナレッジのインデックスを再整合して",
+      "expected_intent_id": "reconcile-knowledge-index"
+    },
+    {
+      "case_id": "ir-hold2-039",
+      "split": "holdout",
+      "utterance": "Kyberionの健康状態をチェックして",
+      "expected_intent_id": "check-kyberion-vital"
+    },
+    {
+      "case_id": "ir-hold2-040",
+      "split": "holdout",
+      "utterance": "子どもの習い事を探して手配して",
+      "expected_intent_id": "lifestyle-booking"
+    },
+    {
+      "case_id": "ir-hold2-041",
+      "split": "holdout",
+      "utterance": "自分の声のボイスクローンを登録して",
+      "expected_intent_id": "clone-my-voice"
+    },
+    {
+      "case_id": "ir-hold2-042",
+      "split": "holdout",
+      "utterance": "関数の戻り値の型を修正して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-hold2-043",
+      "split": "holdout",
+      "utterance": "READMEにインストール手順を追記して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-hold2-044",
+      "split": "holdout",
+      "utterance": "CIが失敗する原因を調査して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-hold2-045",
+      "split": "holdout",
+      "utterance": "不要なimportを削除して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-hold2-046",
+      "split": "holdout",
+      "utterance": "この関数の処理を高速化して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-hold2-047",
+      "split": "holdout",
+      "utterance": "ページネーションを実装して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-hold3-002",
+      "split": "holdout",
+      "utterance": "梅田から難波への行き方を教えて",
+      "expected_intent_id": "transit-lookup"
+    },
+    {
+      "case_id": "ir-hold3-003",
+      "split": "holdout",
+      "utterance": "上司に送る進捗報告のメール文を作って",
+      "expected_intent_id": "email-draft"
+    },
+    {
+      "case_id": "ir-hold3-004",
+      "split": "holdout",
+      "utterance": "この契約文面をスペイン語に翻訳して",
+      "expected_intent_id": "translation-service"
+    },
+    {
+      "case_id": "ir-hold3-005",
+      "split": "holdout",
+      "utterance": "明日の午後3時に歯医者へ行くことを忘れないようにして",
+      "expected_intent_id": "reminder-task"
+    },
+    {
+      "case_id": "ir-hold3-006",
+      "split": "holdout",
+      "utterance": "玄関のスマートロックを施錠して",
+      "expected_intent_id": "device-control"
+    },
+    {
+      "case_id": "ir-hold3-007",
+      "split": "holdout",
+      "utterance": "半導体業界の最新ニュースを教えて",
+      "expected_intent_id": "news-summary"
+    },
+    {
+      "case_id": "ir-hold3-008",
+      "split": "holdout",
+      "utterance": "今日の空き時間を教えて",
+      "expected_intent_id": "schedule-read-agenda"
+    },
+    {
+      "case_id": "ir-hold3-009",
+      "split": "holdout",
+      "utterance": "来週の面談の日程を調整し直して",
+      "expected_intent_id": "schedule-coordination"
+    },
+    {
+      "case_id": "ir-hold3-010",
+      "split": "holdout",
+      "utterance": "仕入先からの請求書を登録して支払いまで進めて",
+      "expected_intent_id": "invoice-processing"
+    },
+    {
+      "case_id": "ir-hold3-011",
+      "split": "holdout",
+      "utterance": "今月の経費の精算を処理して",
+      "expected_intent_id": "expense-reimbursement"
+    },
+    {
+      "case_id": "ir-hold3-012",
+      "split": "holdout",
+      "utterance": "社員の評価面談の準備を進めて",
+      "expected_intent_id": "performance-review"
+    },
+    {
+      "case_id": "ir-hold3-013",
+      "split": "holdout",
+      "utterance": "サービスのレスポンスが急に遅くなったので緊急対応して",
+      "expected_intent_id": "incident-response"
+    },
+    {
+      "case_id": "ir-hold3-014",
+      "split": "holdout",
+      "utterance": "このバージョンを出荷してよいか判断して",
+      "expected_intent_id": "release-readiness-review"
+    },
+    {
+      "case_id": "ir-hold3-015",
+      "split": "holdout",
+      "utterance": "サービスを一時的に停止して",
+      "expected_intent_id": "stop-service"
+    },
+    {
+      "case_id": "ir-hold3-016",
+      "split": "holdout",
+      "utterance": "ナレッジベースから過去の設計判断を検索して",
+      "expected_intent_id": "knowledge-query"
+    },
+    {
+      "case_id": "ir-hold3-017",
+      "split": "holdout",
+      "utterance": "営業会議用のパワーポイントを作って",
+      "expected_intent_id": "generate-presentation"
+    },
+    {
+      "case_id": "ir-hold3-018",
+      "split": "holdout",
+      "utterance": "商談の進捗をまとめた表をExcelで作って",
+      "expected_intent_id": "generate-workbook"
+    },
+    {
+      "case_id": "ir-hold3-019",
+      "split": "holdout",
+      "utterance": "今期の業績をまとめた報告書を作成して",
+      "expected_intent_id": "generate-report"
+    },
+    {
+      "case_id": "ir-hold3-020",
+      "split": "holdout",
+      "utterance": "会議の音声を書き起こして",
+      "expected_intent_id": "transcribe-audio"
+    },
+    {
+      "case_id": "ir-hold3-021",
+      "split": "holdout",
+      "utterance": "ここまでの内容を短くまとめて",
+      "expected_intent_id": "summarize-conversation"
+    },
+    {
+      "case_id": "ir-hold3-022",
+      "split": "holdout",
+      "utterance": "今できる操作の一覧を見たい",
+      "expected_intent_id": "list-capabilities"
+    },
+    {
+      "case_id": "ir-hold3-023",
+      "split": "holdout",
+      "utterance": "このやりとりを正式なミッションに切り出して",
+      "expected_intent_id": "conversation-to-mission"
+    },
+    {
+      "case_id": "ir-hold3-024",
+      "split": "holdout",
+      "utterance": "進行中のミッションを一旦止めて",
+      "expected_intent_id": "pause-mission"
+    },
+    {
+      "case_id": "ir-hold3-025",
+      "split": "holdout",
+      "utterance": "ミッションを終了して締めて",
+      "expected_intent_id": "close-mission"
+    },
+    {
+      "case_id": "ir-hold3-026",
+      "split": "holdout",
+      "utterance": "サプライヤーの新規登録を進めて",
+      "expected_intent_id": "supplier-onboarding"
+    },
+    {
+      "case_id": "ir-hold3-027",
+      "split": "holdout",
+      "utterance": "今期の予算と実績を突き合わせて",
+      "expected_intent_id": "budget-review"
+    },
+    {
+      "case_id": "ir-hold3-028",
+      "split": "holdout",
+      "utterance": "新しい製品を市場に出すための計画を作って",
+      "expected_intent_id": "product-launch-gtm"
+    },
+    {
+      "case_id": "ir-hold3-029",
+      "split": "holdout",
+      "utterance": "株価を取得して",
+      "expected_intent_id": "fetch-external-data"
+    },
+    {
+      "case_id": "ir-hold3-030",
+      "split": "holdout",
+      "utterance": "この変数名を英語にして",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-hold3-031",
+      "split": "holdout",
+      "utterance": "ビルドが通らないので直して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-hold3-032",
+      "split": "holdout",
+      "utterance": "ユニットテストのカバレッジを上げて",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-hold3-033",
+      "split": "holdout",
+      "utterance": "関数を分割して読みやすくして",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-hold3-034",
+      "split": "holdout",
+      "utterance": "バグの再現手順を整理して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-review-001",
+      "split": "dev",
+      "utterance": "git commit を取り消して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-review-002",
+      "split": "dev",
+      "utterance": "ビルドを中止して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-review-003",
+      "split": "dev",
+      "utterance": "この型定義の整合性を確認して",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-review-005",
+      "split": "dev",
+      "utterance": "毎日の売上レポートを作って",
+      "expected_intent_id": "generate-report"
+    },
+    {
+      "case_id": "ir-review-006",
+      "split": "dev",
+      "utterance": "お知らせメールの文面を書いて",
+      "expected_intent_id": "email-draft"
+    },
+    {
+      "case_id": "ir-review-007",
+      "split": "dev",
+      "utterance": "中国語市場の調査をして",
+      "expect_no_intent": true
+    },
+    {
+      "case_id": "ir-review-009",
+      "split": "dev",
+      "utterance": "ヘルスケア事業の事業計画を作って",
+      "expected_intent_id": "business-plan-development"
+    }
+  ]
+}

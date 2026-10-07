@@ -542,6 +542,9 @@
             "再調整",
             "詰め直し",
             "組み直",
+            "動かし",
+            "延期",
+            "後ろ倒し",
             "並べ替え",
             "再編成",
             "再配置",
@@ -1272,6 +1275,26 @@
         }
       }
     },
+    "schedule.agenda_non_calendar_object": {
+      "description": "The meeting is only the source or occasion of the thing asked for (minutes, recording, slides, a creation request); it is not a calendar read.",
+      "locales": {
+        "ja": {
+          "phrases": [
+            "議事録",
+            "録音",
+            "文字起こし",
+            "文字に起こ",
+            "書き起こし",
+            "スライド",
+            "パワーポイント",
+            "パワポ"
+          ]
+        },
+        "en": {
+          "phrases": ["meeting minutes", "recording", "transcript", "transcribe", "slides"]
+        }
+      }
+    },
     "schedule.agenda_topic": {
       "description": "Text refers to an agenda, calendar events, meetings or availability.",
       "locales": {
@@ -1284,7 +1307,8 @@
             "会議",
             "ミーティング",
             "打ち合わせ",
-            "アポイント"
+            "アポイント",
+            "カレンダー"
           ]
         },
         "en": {
