@@ -37,6 +37,15 @@ const procedureCatalog = defineCatalog<ProcedureCatalog>({
   schema: PROCEDURE_SCHEMA_PATH,
 });
 
+/** Every catalog `loadProcedures` reads, personal overlays first (absolute paths). */
+export function procedureCatalogPaths(): string[] {
+  return [
+    PERSONAL_PROCEDURES_PATH,
+    PERSONAL_BROWSER_PROCEDURES_PATH,
+    pathResolver.rootResolve(PROCEDURES_PATH),
+  ];
+}
+
 /** Validate a procedure catalog before it is persisted by a promotion flow. */
 export function validateProcedureCatalog(
   value: unknown,
