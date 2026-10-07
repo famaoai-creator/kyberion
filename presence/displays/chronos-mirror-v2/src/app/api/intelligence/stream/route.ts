@@ -5,10 +5,11 @@ import {
 } from '../../../../../../../../satellites/shared/bridge-poll-loop';
 import { NextRequest } from 'next/server';
 import { nowIso } from '@agent/core/foundation';
-import { collectA2AHandoffs, collectAgentMessages } from '../../../../lib/agent-message-feed';
+import { collectAgentActivity } from '../../../../lib/agent-message-feed';
 import { buildRuntimeTopology } from '../../../../lib/runtime-topology';
 import { collectBrowserSessions } from '../../../../lib/intelligence-observations';
 import {
+  createIntelligenceObservationReadCache,
   collectControlActionDetails,
   collectControlActions,
   collectOwnerSummaries,
@@ -34,6 +35,7 @@ import {
 } from '@agent/core/surface/surface-runtime';
 import { deriveProviderPressure } from '@agent/core/ce-adoption';
 import * as intelligenceData from '../intelligence-observation-data';
+import { createIntelligenceSseChangeGate } from '../../../../lib/intelligence-sse-change-gate';
 
 export const runtime = 'nodejs';
 
@@ -230,9 +232,9 @@ export async function GET(req: NextRequest) {
   const broadOperationalAccess = tenantSlugs === 'all' && tierAccess.includes('confidential');
 
   const encoder = new TextEncoder();
-  let previousPayload = '';
   let interval: BridgePollLoopHandle | null = null;
   let closed = false;
+  const observationReadCache = createIntelligenceObservationReadCache();
 
   const closeStream = () => {
     if (closed) return;
@@ -241,23 +243,30 @@ export async function GET(req: NextRequest) {
       interval.stop();
       interval = null;
     }
+    observationReadCache.clear();
   };
+
+  const changeGate = createIntelligenceSseChangeGate();
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       const push = async () =>
         withViewerExecutionContextAsync(resolvedViewer.context, async () => {
           if (closed) return;
-          const agentMessages = safeCollect(
-            'collectAgentMessages',
-            [],
-            collectAgentMessages
-          ).filter((message) =>
+          observationReadCache.beginSnapshot();
+          const agentActivity = safeCollect(
+            'collectAgentActivity',
+            { messages: [], handoffs: [] },
+            () =>
+              collectAgentActivity({
+                readObservationRecords: (file) => observationReadCache.read(file),
+              })
+          );
+          const agentMessages = agentActivity.messages.filter((message) =>
             intelligenceData.missionVisibleToScope(message.missionId, tenantSlugs, tierAccess)
           );
-          const a2aHandoffs = safeCollect('collectA2AHandoffs', [], collectA2AHandoffs).filter(
-            (handoff) =>
-              intelligenceData.missionVisibleToScope(handoff.missionId, tenantSlugs, tierAccess)
+          const a2aHandoffs = agentActivity.handoffs.filter((handoff) =>
+            intelligenceData.missionVisibleToScope(handoff.missionId, tenantSlugs, tierAccess)
           );
           const runtimeTopology = await (async () => {
             try {
@@ -274,15 +283,13 @@ export async function GET(req: NextRequest) {
           const { managedRuntimes, surfaces, runtimeSummary } = runtimeTopology;
           if (closed) return;
           const scopedView = tenantSlugs !== 'all';
-          const payload = {
-            revision: nextIntelligenceStreamRevision(),
-            ts: nowIso(),
+          const domainPayload = {
             accessRole,
             ...(scopedView
               ? {}
               : {
                   recentEvents: safeCollect('collectRecentEvents', [], () =>
-                    collectRecentEvents(tenantSlugs, tierAccess)
+                    collectRecentEvents(tenantSlugs, tierAccess, observationReadCache)
                   ),
                   agentMessages,
                   a2aHandoffs,
@@ -306,7 +313,7 @@ export async function GET(req: NextRequest) {
                 }
               : {
                   controlActions: safeCollect('collectControlActions', [], () =>
-                    collectControlActions(tenantSlugs, tierAccess)
+                    collectControlActions(tenantSlugs, tierAccess, observationReadCache)
                   ),
                   controlActionDetails: safeCollect('collectControlActionDetails', {}, () =>
                     collectControlActionDetails(tenantSlugs, tierAccess)
@@ -326,9 +333,12 @@ export async function GET(req: NextRequest) {
                   }),
                 }),
           };
-          const serialized = JSON.stringify(payload);
-          if (serialized === previousPayload) return;
-          previousPayload = serialized;
+          if (!changeGate.hasChanged(domainPayload)) return;
+          const payload = {
+            ...domainPayload,
+            revision: nextIntelligenceStreamRevision(),
+            ts: nowIso(),
+          };
           try {
             controller.enqueue(encoder.encode(sseChunk(payload)));
           } catch {

@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReaddir } from '../secure-io.js';
+import { safeExistsSync, safeLstat, safeMkdir, safeReaddir, safeStat } from '../secure-io.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
 import type {
@@ -30,6 +30,8 @@ export class DiscussionUserError extends Error {
 
 const ROOM_ID_PATTERN = /^[A-Za-z0-9._-]{1,96}$/;
 const MAX_EVENTS_PER_ROOM = 5000;
+const ROOM_SNAPSHOT_CACHE_LIMIT = 64;
+const roomSnapshotCache = new Map<string, { stamp: string; room: DiscussionRoomState | null }>();
 
 export function sanitizeDiscussionId(id: string): string {
   const value = id.trim();
@@ -81,9 +83,36 @@ export function appendDiscussionEvent(roomId: string, body: DiscussionEventBody)
 }
 
 export function readDiscussionRoom(roomId: string): DiscussionRoomState | null {
-  const events = readDiscussionEvents(roomId);
+  const id = sanitizeDiscussionId(roomId);
+  const filePath = eventsPath(id);
+  if (safeExistsSync(filePath)) {
+    const lstat = safeLstat(filePath);
+    if (lstat.isSymbolicLink() || !lstat.isFile()) {
+      roomSnapshotCache.delete(filePath);
+      throw new Error('Discussion event log must be a regular, non-symlink file');
+    }
+    const stat = safeStat(filePath);
+    const stamp = `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}`;
+    const cached = roomSnapshotCache.get(filePath);
+    if (cached?.stamp === stamp) {
+      roomSnapshotCache.delete(filePath);
+      roomSnapshotCache.set(filePath, cached);
+      return cached.room;
+    }
+    const events = readDiscussionEvents(id);
+    const room = events.length === 0 ? null : reduceDiscussionRoom(id, events);
+    roomSnapshotCache.set(filePath, { stamp, room });
+    while (roomSnapshotCache.size > ROOM_SNAPSHOT_CACHE_LIMIT) {
+      const oldest = roomSnapshotCache.keys().next().value;
+      if (!oldest) break;
+      roomSnapshotCache.delete(oldest);
+    }
+    return room;
+  }
+  roomSnapshotCache.delete(filePath);
+  const events = readDiscussionEvents(id);
   if (events.length === 0) return null;
-  return reduceDiscussionRoom(sanitizeDiscussionId(roomId), events);
+  return reduceDiscussionRoom(id, events);
 }
 
 export interface ListDiscussionRoomsOptions {

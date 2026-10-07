@@ -836,6 +836,16 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/first-job-setup.ts#approvalScope",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/first-job-setup.ts#browserUser",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/front-desk-conversation-persistence.ts#asStore",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -2664,6 +2674,7 @@
         "presence/displays/chronos-mirror-v2/src/lib/intelligence-diagnostics-response.ts",
         "presence/displays/chronos-mirror-v2/src/lib/intelligence-observations.ts",
         "presence/displays/chronos-mirror-v2/src/lib/intelligence-primitives.ts",
+        "presence/displays/chronos-mirror-v2/src/lib/intelligence-sse-change-gate.ts",
         "presence/displays/chronos-mirror-v2/src/lib/intelligence-work-coordination-response.ts",
         "presence/displays/chronos-mirror-v2/src/lib/json-record.ts",
         "presence/displays/chronos-mirror-v2/src/lib/knowledge-mutation-response.ts",

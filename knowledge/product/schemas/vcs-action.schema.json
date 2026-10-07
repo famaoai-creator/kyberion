@@ -6,7 +6,25 @@
   "additionalProperties": false,
   "properties": {
     "op": {
-      "enum": ["status", "diff", "log", "branch", "commit", "pr_create"]
+      "enum": [
+        "status",
+        "diff",
+        "log",
+        "branch",
+        "commit",
+        "pr_create",
+        "push",
+        "fetch",
+        "pull",
+        "checkout",
+        "worktree",
+        "pr_view",
+        "pr_list",
+        "pr_checks",
+        "pr_merge",
+        "repo_view",
+        "gh_status"
+      ]
     },
     "params": {
       "type": "object",
@@ -18,13 +36,27 @@
         "stat": { "type": "boolean" },
         "limit": { "type": "integer", "minimum": 1 },
         "oneline": { "type": "boolean" },
-        "action": { "enum": ["list", "create", "delete"] },
+        "action": { "enum": ["list", "create", "delete", "add", "remove", "prune"] },
         "name": { "type": "string" },
         "message": { "type": "string" },
         "add": { "type": "boolean" },
         "title": { "type": "string" },
         "body": { "type": "string" },
-        "base": { "type": "string" }
+        "base": { "type": "string" },
+        "remote": { "type": "string" },
+        "set_upstream": { "type": "boolean" },
+        "create_branch": { "type": "boolean" },
+        "path": { "type": "string" },
+        "state": { "enum": ["open", "closed", "merged", "all"] },
+        "fields": { "type": "string" },
+        "method": { "enum": ["merge", "squash", "rebase"] },
+        "delete_branch": { "type": "boolean" },
+        "watch": { "type": "boolean" },
+        "interval_ms": { "type": "integer", "minimum": 1000 },
+        "timeout_ms": { "type": "integer", "minimum": 1000 },
+        "ignore_checks": { "type": "array", "items": { "type": "string" } },
+        "draft": { "type": "boolean" },
+        "head": { "type": "string" }
       }
     }
   }

@@ -261,7 +261,15 @@ class AuditChainImpl {
 
   constructor() {
     auditIo ||= testAuditChainIo();
-    this.auditDir = path.join(pathResolver.rootDir(), 'active', 'shared', 'logs', 'audit');
+    // Under Vitest this resolves into the vitest-live sandbox (path-resolver),
+    // so test events never land in the operator's real audit evidence.
+    // (Suites that partially mock path-resolver lack vitestLivePath; they
+    // already point rootDir at a fixture tree, so the plain path is correct.)
+    const auditDir = path.join(pathResolver.rootDir(), 'active', 'shared', 'logs', 'audit');
+    this.auditDir =
+      typeof pathResolver.vitestLivePath === 'function'
+        ? pathResolver.vitestLivePath(auditDir)
+        : auditDir;
   }
 
   initializeFromDisk(): void {

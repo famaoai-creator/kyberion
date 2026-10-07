@@ -253,10 +253,10 @@
     {
       "n": "vcs-actuator",
       "path": "libs/actuators/vcs-actuator",
-      "d": "Git version-control operations (status, diff, log, branch, commit) plus GitHub PR creation via the gh CLI",
+      "d": "Governed VCS surface: git (status/diff/log/branch/commit/push/fetch/pull/checkout/worktree) plus GitHub PR ops via gh (pr_create/pr_view/pr_list/pr_checks watch/pr_merge/repo_view/gh_status)",
       "s": "implemented",
-      "version": "1.0.0",
-      "capability_count": 6
+      "version": "1.1.0",
+      "capability_count": 17
     },
     {
       "n": "video-composition-actuator",

@@ -99,6 +99,9 @@ function harness(
     cryptoMissing?: boolean;
     approvalReady?: boolean;
     recoveryRequests?: Array<Record<string, unknown>>;
+    realApproval?: boolean;
+    approvalGet?: () => ReturnType<typeof reply> | Promise<ReturnType<typeof reply>>;
+    approvalPost?: (body: Record<string, unknown>) => Promise<ReturnType<typeof reply>>;
     heldRequests?: Array<{ request_id: string; status: string; recovery: string }>;
     ready?: Promise<void>;
     hidden?: boolean;
@@ -111,6 +114,19 @@ function harness(
 ) {
   const elements = new Map(
     [
+      ...['readiness', 'signin', 'refresh', 'error', 'status', 'items'].map(
+        (name) => 'approval-' + name
+      ),
+      'setup-signin',
+      ...[
+        'profile',
+        'oidc',
+        'browser_user',
+        'approval_scope',
+        'baseline',
+        'reasoning',
+        'advancement',
+      ].map((name) => 'setup-' + name),
       'readiness',
       'scope',
       'advance',
@@ -179,6 +195,8 @@ function harness(
           ready: boolean;
           busy: boolean;
           recoveryRequests?: Array<Record<string, unknown>>;
+          setupInvalidated?: boolean;
+          setupScopeInvalidated?: boolean;
           heldRequests?: Array<{ request_id: string; status: string; recovery: string }>;
         }) => void;
       }) =>
@@ -195,6 +213,25 @@ function harness(
     KyberionFirstJob: undefined as undefined | { mount: () => void },
   };
   const fetch = vi.fn(async (url: string, init?: { method?: string; body?: string }) => {
+    if (url.startsWith('/api/first-job/approvals')) {
+      if (init?.method === 'POST')
+        return options.approvalPost
+          ? options.approvalPost(JSON.parse(init.body!))
+          : options.post
+            ? options.post(JSON.parse(init.body!), url)
+            : reply({ ok: false }, 403);
+      return options.approvalGet
+        ? options.approvalGet()
+        : options.approvals
+          ? options.approvals()
+          : reply({
+              ok: true,
+              auth: { status: 'ready' },
+              readiness: { ready: true, status: 'ready' },
+              approvals: [],
+              held_requests: [],
+            });
+    }
     if (init?.method === 'POST')
       return options.post
         ? options.post(JSON.parse(init.body!), url)
@@ -204,8 +241,6 @@ function harness(
       const texts = new Proxy({}, { get: (_target, key) => String(key) });
       return reply({ ok: true, texts });
     }
-    if (url.startsWith('/api/first-job/approvals?'))
-      return options.approvals ? options.approvals() : reply({ ok: false });
     if (url.startsWith('/api/first-job/artifact?')) {
       const query = new URLSearchParams(url.split('?')[1]);
       return options.body
@@ -238,7 +273,7 @@ function harness(
         document.activeElement = element;
       }),
   };
-  if (options.approvals)
+  if (options.approvals || options.realApproval)
     runInNewContext(
       String(
         safeReadFile('presence/displays/presence-studio/static/first-job-approval.js', {
@@ -1948,5 +1983,691 @@ describe('Fresh revision after all prior sibling requests are safely terminated'
     expect(revisionButtons(h)).toHaveLength(1);
     expect(revisionButtons(h)[0].disabled).toBe(false);
     expect(h.get('restart').hidden).toBe(true);
+  });
+});
+
+describe('Truthful first-job setup guidance (DOM doubles)', () => {
+  const row = (status: string, owner = 'none', next_action = 'none') => ({
+    status,
+    owner,
+    next_action,
+  });
+  const setup = (overrides: Record<string, unknown> = {}) => ({
+    mapping: row('diagnostic_mapping_ready'),
+    profile: row('present'),
+    oidc: row('configured'),
+    browser_user: row('verified'),
+    approval_scope: row('ready'),
+    baseline: row('unchecked', 'operator', 'inspect_baseline'),
+    reasoning: row('not_required'),
+    advancement: row('not_started'),
+    ...overrides,
+  });
+  it('shows simultaneous missing profile, mapping and login configuration without posting', async () => {
+    const h = harness({
+      approvalReady: false,
+      get: () =>
+        reply(
+          snapshot({
+            readiness: { ready: false, status: 'mapping_missing' },
+            sessionId: undefined,
+            setup: setup({
+              mapping: row('mapping_missing', 'operator', 'inspect_mapping'),
+              profile: row('missing', 'operator', 'complete_profile'),
+              oidc: row('configuration_required', 'operator', 'configure_login'),
+              browser_user: row('sign_in_required', 'user', 'sign_in'),
+              approval_scope: row('mapping_required', 'operator', 'inspect_mapping'),
+            }),
+          })
+        ),
+    });
+    await flush();
+    expect(h.get('readiness').textContent).toContain('mapping_missing');
+    expect(h.get('setup-profile').textContent).toContain('setup_profile_missing');
+    expect(h.get('setup-profile').textContent).toContain('setup_owner_operator');
+    expect(h.get('setup-oidc').textContent).toContain('configuration_required');
+    expect(h.get('setup-browser_user').textContent).toContain('setup_owner_user');
+    expect(h.get('setup-baseline').textContent).toContain('unchecked');
+    expect(h.get('setup-reasoning').textContent).toContain('not_required');
+    expect(h.get('setup-signin').hidden).toBe(true);
+    expect(h.get('start').disabled).toBe(true);
+    expect(h.posts()).toHaveLength(0);
+  });
+  it('offers only the fixed login link when configured, even before mapping', async () => {
+    const h = harness({
+      approvalReady: false,
+      get: () =>
+        reply(
+          snapshot({
+            readiness: { ready: false, status: 'mapping_missing' },
+            sessionId: undefined,
+            setup: setup({
+              mapping: row('mapping_missing', 'operator', 'inspect_mapping'),
+              browser_user: row('sign_in_required', 'user', 'sign_in'),
+            }),
+          })
+        ),
+    });
+    await flush();
+    expect(h.get('setup-signin').hidden).toBe(false);
+    expect(h.get('start').disabled).toBe(true);
+    expect(h.posts()).toHaveLength(0);
+  });
+  it('renders unknown on an absent or malformed setup field and never interpolates server text', async () => {
+    const h = harness({
+      get: () =>
+        reply(
+          snapshot({
+            setup: setup({
+              profile: row('<img onerror=attack>', '<script>', 'https://evil.invalid'),
+            }),
+          })
+        ),
+    });
+    await flush();
+    expect(h.get('setup-profile').textContent).toContain('setup_profile_unknown');
+    expect(h.get('setup-profile').textContent).not.toMatch(/attack|script|evil/);
+  });
+  it.each([401, 403, 503])('removes verified guidance after a %s read failure', async (status) => {
+    let failed = false;
+    const h = harness({
+      get: () => (failed ? reply(null, status) : reply(snapshot({ setup: setup() }))),
+    });
+    await flush();
+    expect(h.get('setup-browser_user').textContent).toContain('browser_user_verified');
+    failed = true;
+    h.get('refresh').fire();
+    await flush();
+    expect(h.get('setup-browser_user').textContent).toContain('browser_user_unknown');
+    expect(h.get('setup-approval_scope').textContent).toContain('approval_scope_unknown');
+    expect(h.get('setup-signin').hidden).toBe(true);
+    expect(h.get('start').disabled).toBe(true);
+  });
+  it('clears a previously verified user when the independent approval read loses access', async () => {
+    const h = harness({ get: () => reply(snapshot({ setup: setup() })) });
+    await flush();
+    h.window.KyberionFirstJobApproval.check = async (context) => {
+      context.onChange({ ready: false, busy: false, setupInvalidated: true });
+    };
+    h.get('refresh').fire();
+    await flush();
+    expect(h.get('setup-profile').textContent).toContain('profile_present');
+    expect(h.get('setup-browser_user').textContent).toContain('browser_user_unknown');
+    expect(h.get('setup-approval_scope').textContent).toContain('approval_scope_unknown');
+    expect(h.get('start').disabled).toBe(true);
+  });
+  it('discards a late verified response after page cancellation and a newer blocked result', async () => {
+    const old = deferred<ReturnType<typeof reply>>();
+    let calls = 0;
+    const h = harness({
+      approvalReady: false,
+      get: () =>
+        ++calls === 1
+          ? old.promise
+          : reply(
+              snapshot({
+                setup: setup({ browser_user: row('sign_in_required', 'user', 'sign_in') }),
+              })
+            ),
+    });
+    await flush();
+    h.page('pagehide');
+    h.page('pageshow');
+    await flush();
+    old.resolve(reply(snapshot({ setup: setup() })));
+    await flush();
+    expect(h.get('setup-browser_user').textContent).toContain('sign_in_required');
+    expect(h.get('setup-browser_user').textContent).not.toContain('browser_user_verified');
+    expect(h.get('start').disabled).toBe(true);
+    expect(h.posts()).toHaveLength(0);
+  });
+
+  it.each(['scope_changed', 'diagnostic_unavailable'])(
+    'invalidates ready scope after the real approval reader reports %s',
+    async (status) => {
+      const h = harness({
+        realApproval: true,
+        get: () => reply(snapshot({ setup: setup() })),
+        approvalGet: () =>
+          reply({
+            ok: true,
+            auth: { status: 'ready' },
+            readiness: { ready: false, status },
+            approvals: [],
+          }),
+      });
+      await flush();
+      expect(h.get('setup-browser_user').textContent).toContain('browser_user_verified');
+      expect(h.get('setup-approval_scope').textContent).toContain('approval_scope_unknown');
+      expect(h.get('readiness').textContent).toContain('mapping_unavailable');
+      expect(h.get('setup-advancement').textContent).toContain('advancement_unknown');
+      expect(h.get('advance').hidden).toBe(true);
+      expect(h.get('start').disabled).toBe(true);
+    }
+  );
+  it.each([401, 403])(
+    'invalidates ready identity and scope on a real approval decision %s',
+    async (status) => {
+      const approvalId = '33333333-3333-4333-8333-333333333333';
+      const expires = new Date(Date.now() + 60_000).toISOString();
+      const h = harness({
+        realApproval: true,
+        get: () =>
+          reply(snapshot({ setup: setup(), scope: { tenant: 'test-tenant', tier: 'public' } })),
+        approvalGet: () =>
+          reply({
+            ok: true,
+            auth: { status: 'ready' },
+            readiness: { ready: true, status: 'ready' },
+            approvals: [
+              {
+                approval_request_id: approvalId,
+                request_id: first,
+                revision: 1,
+                display_digest: sha256,
+                payload_hash: sha256,
+                effect_binding: 'first-job:' + sha256,
+                tenant: 'test-tenant',
+                receipt_format: 'pretty',
+                expires_at: expires,
+                execution_deadline_at: expires,
+              },
+            ],
+          }),
+        approvalPost: async () => reply({ ok: false, retry_safe: true }, status),
+      });
+      await flush();
+      expect(h.get('setup-browser_user').textContent).toContain('browser_user_verified');
+      const button = h
+        .get('approval-items')
+        .descendants()
+        .find((item) => item.tagName === 'button');
+      expect(button).toBeDefined();
+      button!.fire();
+      await flush();
+      expect(h.posts()).toHaveLength(1);
+      expect(h.get('setup-browser_user').textContent).toContain('browser_user_unknown');
+      expect(h.get('setup-approval_scope').textContent).toContain('approval_scope_unknown');
+      expect(h.get('start').disabled).toBe(true);
+    }
+  );
+  it('suppresses the new tick guidance when the actual approval reader reports a held request', async () => {
+    const h = harness({
+      realApproval: true,
+      get: () =>
+        reply(
+          snapshot({
+            setup: setup({ advancement: row('review_or_tick', 'operator', 'review_or_tick') }),
+            scope: { tenant: 'test-tenant', tier: 'public' },
+            tasks: [
+              {
+                executionStatus: 'awaiting_approval',
+                artifact: artifact({ verification: 'pending', currentness: 'requested_pending' }),
+              },
+            ],
+          })
+        ),
+      approvalGet: () =>
+        reply({
+          ok: true,
+          auth: { status: 'ready' },
+          readiness: { ready: true, status: 'ready' },
+          approvals: [],
+          held_requests: [
+            {
+              request_id: first,
+              status: 'approval_verification_failed',
+              recovery: 'operator_recovery',
+            },
+          ],
+        }),
+    });
+    await flush();
+    expect(h.get('setup-advancement').textContent).toContain('advancement_unavailable');
+    expect(h.get('setup-advancement').textContent).toContain('inspect_execution');
+    expect(h.get('setup-advancement').textContent).not.toContain('review_or_tick');
+    expect(h.get('advance').hidden).toBe(true);
+    expect(h.posts()).toHaveLength(0);
+  });
+  it.each(['visibility', 'page'])(
+    'rechecks an idle verified snapshot after %s suspension',
+    async (kind) => {
+      let signedOut = false;
+      const h = harness({
+        realApproval: true,
+        get: () =>
+          reply(
+            snapshot({
+              setup: setup({
+                browser_user: row(signedOut ? 'sign_in_required' : 'verified'),
+                approval_scope: row(signedOut ? 'authentication_required' : 'ready'),
+              }),
+            })
+          ),
+      });
+      await flush();
+      expect(h.get('setup-browser_user').textContent).toContain('browser_user_verified');
+      if (kind === 'page') h.page('pagehide');
+      else h.visibility(true);
+      expect(h.get('setup-browser_user').textContent).toContain('browser_user_unknown');
+      signedOut = true;
+      if (kind === 'page') h.page('pageshow');
+      else h.visibility(false);
+      await flush();
+      expect(h.reads()).toHaveLength(2);
+      expect(h.get('setup-browser_user').textContent).toContain('sign_in_required');
+      expect(h.posts()).toHaveLength(0);
+    }
+  );
+  it('never restores old verified guidance when a later refresh is cancelled', async () => {
+    const stale = deferred<ReturnType<typeof reply>>();
+    let calls = 0;
+    const h = harness({
+      get: () =>
+        ++calls === 2
+          ? stale.promise
+          : reply(
+              snapshot({
+                setup: setup({ browser_user: row(calls > 2 ? 'sign_in_required' : 'verified') }),
+              })
+            ),
+    });
+    await flush();
+    h.get('refresh').fire();
+    await flush();
+    h.page('pagehide');
+    expect(h.get('setup-browser_user').textContent).toContain('browser_user_unknown');
+    h.page('pageshow');
+    await flush();
+    stale.resolve(reply(snapshot({ setup: setup() })));
+    await flush();
+    expect(h.get('setup-browser_user').textContent).toContain('sign_in_required');
+    expect(h.get('setup-browser_user').textContent).not.toContain('browser_user_verified');
+  });
+
+  it.each([200, 403])(
+    'preserves an in-flight approval callback through suspension and settles %s',
+    async (status) => {
+      const pending = deferred<ReturnType<typeof reply>>();
+      const approvalId = '33333333-3333-4333-8333-333333333333';
+      const expires = new Date(Date.now() + 60_000).toISOString();
+      let settled = false;
+      const h = harness({
+        realApproval: true,
+        get: () =>
+          reply(snapshot({ setup: setup(), scope: { tenant: 'test-tenant', tier: 'public' } })),
+        approvalGet: () =>
+          reply({
+            ok: true,
+            auth: { status: settled && status === 403 ? 'authentication_required' : 'ready' },
+            readiness: {
+              ready: !(settled && status === 403),
+              status: settled && status === 403 ? 'authentication_required' : 'ready',
+            },
+            approvals: settled
+              ? []
+              : [
+                  {
+                    approval_request_id: approvalId,
+                    request_id: first,
+                    revision: 1,
+                    display_digest: sha256,
+                    payload_hash: sha256,
+                    effect_binding: 'first-job:' + sha256,
+                    tenant: 'test-tenant',
+                    receipt_format: 'pretty',
+                    expires_at: expires,
+                    execution_deadline_at: expires,
+                  },
+                ],
+          }),
+        approvalPost: () => pending.promise,
+      });
+      await flush();
+      h.get('approval-items')
+        .descendants()
+        .find((item) => item.tagName === 'button')!
+        .fire();
+      await flush();
+      h.page('pagehide');
+      h.page('pageshow');
+      await flush();
+      expect(h.get('refresh').disabled).toBe(true);
+      expect(h.get('setup-browser_user').textContent).toContain('browser_user_unknown');
+      settled = true;
+      pending.resolve(
+        status === 200
+          ? reply({ ok: true, approval_request_id: approvalId, status: 'approved' })
+          : reply({ ok: false, retry_safe: true }, status)
+      );
+      await flush();
+      expect(h.get('refresh').disabled).toBe(false);
+      expect(h.reads()).toHaveLength(2);
+      expect(h.posts()).toHaveLength(1);
+      if (status === 403) {
+        expect(h.get('setup-browser_user').textContent).toContain('browser_user_unknown');
+        expect(h.get('start').disabled).toBe(true);
+      }
+    }
+  );
+  it.each(['blocked', 'running'])(
+    'never restores tick instructions while resuming %s work',
+    async (status) => {
+      const pending = deferred<ReturnType<typeof reply>>();
+      const data = snapshot({
+        setup: setup({
+          advancement: row(
+            status === 'running' ? 'running' : 'unavailable',
+            'operator',
+            'inspect_execution'
+          ),
+        }),
+        scope: { tenant: 'test-tenant', tier: 'public' },
+        tasks: [
+          {
+            executionStatus: status,
+            artifact: artifact({ verification: 'pending', currentness: 'requested_pending' }),
+          },
+        ],
+      });
+      let calls = 0;
+      const h = harness({
+        get: () => (++calls === 1 ? reply(structuredClone(data)) : pending.promise),
+      });
+      await flush();
+      expect(h.get('advance').hidden).toBe(true);
+      h.page('pagehide');
+      expect(h.get('advance').hidden).toBe(true);
+      h.page('pageshow');
+      await flush();
+      expect(h.get('advance').hidden).toBe(true);
+      pending.resolve(reply(structuredClone(data)));
+      await flush();
+      expect(h.get('advance').hidden).toBe(true);
+      expect(h.posts()).toHaveLength(0);
+    }
+  );
+
+  it.each([200, 403])(
+    'waits for visible resume when an approval %s settles while hidden',
+    async (status) => {
+      const pending = deferred<ReturnType<typeof reply>>();
+      const approvalId = '33333333-3333-4333-8333-333333333333';
+      const expires = new Date(Date.now() + 60_000).toISOString();
+      let signedOut = false;
+      const h = harness({
+        realApproval: true,
+        get: () =>
+          reply(
+            snapshot({
+              setup: setup({
+                browser_user: row(signedOut ? 'sign_in_required' : 'verified'),
+                approval_scope: row(signedOut ? 'authentication_required' : 'ready'),
+              }),
+              scope: { tenant: 'test-tenant', tier: 'public' },
+            })
+          ),
+        approvalGet: () =>
+          reply({
+            ok: true,
+            auth: { status: signedOut ? 'authentication_required' : 'ready' },
+            readiness: {
+              ready: !signedOut,
+              status: signedOut ? 'authentication_required' : 'ready',
+            },
+            approvals: signedOut
+              ? []
+              : [
+                  {
+                    approval_request_id: approvalId,
+                    request_id: first,
+                    revision: 1,
+                    display_digest: sha256,
+                    payload_hash: sha256,
+                    effect_binding: 'first-job:' + sha256,
+                    tenant: 'test-tenant',
+                    receipt_format: 'pretty',
+                    expires_at: expires,
+                    execution_deadline_at: expires,
+                  },
+                ],
+          }),
+        approvalPost: () => pending.promise,
+      });
+      await flush();
+      h.get('approval-items')
+        .descendants()
+        .find((item) => item.tagName === 'button')!
+        .fire();
+      await flush();
+      h.page('pagehide');
+      pending.resolve(
+        status === 200
+          ? reply({ ok: true, approval_request_id: approvalId, status: 'approved' })
+          : reply({ ok: false, retry_safe: true }, status)
+      );
+      await flush();
+      expect(h.reads()).toHaveLength(1);
+      expect(h.get('setup-browser_user').textContent).toContain('browser_user_unknown');
+      signedOut = true;
+      h.page('pageshow');
+      await flush();
+      expect(h.reads()).toHaveLength(2);
+      expect(h.get('setup-browser_user').textContent).toContain('sign_in_required');
+      expect(h.get('start').disabled).toBe(true);
+      expect(h.get('refresh').disabled).toBe(false);
+      expect(h.posts()).toHaveLength(1);
+    }
+  );
+
+  it('keeps redacted configuration blockers visible when approval auth loss clears request history', async () => {
+    const h = harness({
+      realApproval: true,
+      get: () =>
+        reply(
+          snapshot({
+            setup: setup({
+              profile: row('missing', 'operator', 'complete_profile'),
+              oidc: row('configuration_required', 'operator', 'configure_login'),
+              browser_user: row('sign_in_required', 'user', 'sign_in'),
+              approval_scope: row('authentication_required', 'user', 'sign_in'),
+              advancement: row('review_or_tick', 'operator', 'review_or_tick'),
+            }),
+            scope: { tenant: 'test-tenant', tier: 'public' },
+            tasks: [
+              {
+                id: first,
+                executionStatus: 'awaiting_approval',
+                artifact: artifact({ verification: 'pending' }),
+              },
+            ],
+          })
+        ),
+      approvalGet: () =>
+        reply({
+          ok: true,
+          auth: { status: 'authentication_configuration_required' },
+          readiness: { ready: false, status: 'authentication_required' },
+          approvals: [],
+        }),
+    });
+    await flush();
+    expect(h.get('setup-profile').textContent).toContain('profile_missing');
+    expect(h.get('setup-oidc').textContent).toContain('configuration_required');
+    expect(h.get('setup-browser_user').textContent).toContain('sign_in_required');
+    expect(h.get('setup-advancement').textContent).toContain('advancement_unknown');
+    expect(h.get('readiness').textContent).toContain('first_job_ready');
+    expect(h.get('history').textContent).not.toContain(first);
+    expect(h.get('scope').hidden).toBe(true);
+    expect(h.get('advance').hidden).toBe(true);
+    expect(h.get('start').disabled).toBe(true);
+    expect(h.posts()).toHaveLength(0);
+  });
+
+  it.each([
+    ['start', '503'],
+    ['start', 'network'],
+    ['revise', '503'],
+    ['revise', 'network'],
+  ])('clears prior setup when %s intake has uncertain %s outcome', async (action, failure) => {
+    const h = harness({
+      realApproval: true,
+      get: () =>
+        reply(
+          snapshot({
+            setup: setup({
+              advancement: row(action === 'revise' ? 'receipt_verified' : 'not_started'),
+            }),
+            scope: { tenant: 'test-tenant', tier: 'public' },
+            ...(action === 'revise'
+              ? {
+                  tasks: [{ id: first, executionStatus: 'work_completed', artifact: artifact() }],
+                  messages: [
+                    {
+                      id: first + '-secretary',
+                      role: 'secretary',
+                      artifact: artifact({ canRevise: true }),
+                    },
+                  ],
+                }
+              : {}),
+          })
+        ),
+      post: async () => {
+        if (failure === 'network') throw new Error('response lost after possible admission');
+        return reply({ ok: false, retry_safe: false }, 503);
+      },
+    });
+    await flush();
+    expect(h.get('setup-browser_user').textContent).toContain('browser_user_verified');
+    if (action === 'start') h.get('start').fire();
+    else
+      h.get('history')
+        .descendants()
+        .find((item) => item.tagName === 'button')!
+        .fire();
+    await flush();
+    expect(h.posts()).toHaveLength(1);
+    expect(h.get('setup-browser_user').textContent).toContain('browser_user_unknown');
+    expect(h.get('setup-approval_scope').textContent).toContain('approval_scope_unknown');
+    expect(h.get('setup-advancement').textContent).toContain('advancement_unknown');
+    expect(h.get('advance').hidden).toBe(true);
+    expect(h.get('start').disabled).toBe(true);
+    expect(JSON.parse(h.storage.get(storageKey)!).pending).not.toBeNull();
+  });
+  it.each(['queued', 'work_completed'])(
+    'does not let terminal recovery history mask a new %s diagnostic',
+    async (status) => {
+      const h = harness({
+        recoveryRequests: [
+          {
+            request_id: first,
+            approval_request_id: second,
+            session_id: session,
+            status: 'terminated_unstarted',
+            display_digest: sha256,
+            revision: 1,
+            tenant: 'test-tenant',
+          },
+        ],
+        get: () =>
+          reply(
+            snapshot({
+              setup: setup({
+                advancement: row(status === 'queued' ? 'review_or_tick' : 'receipt_verified'),
+              }),
+              scope: { tenant: 'test-tenant', tier: 'public' },
+              tasks: [
+                {
+                  id: first,
+                  turnState: 'settled',
+                  executionStatus: 'terminated_unstarted',
+                  artifact: artifact({
+                    verification: 'terminated_unstarted',
+                    currentness: 'older_requested',
+                  }),
+                },
+                {
+                  id: second,
+                  turnState: 'settled',
+                  executionStatus: status,
+                  artifact: artifact({
+                    requestId: second,
+                    revision: 2,
+                    verification: status === 'queued' ? 'pending' : 'verified',
+                    currentness: status === 'queued' ? 'requested_pending' : 'latest_verified',
+                  }),
+                },
+              ],
+            })
+          ),
+      });
+      await flush();
+      expect(h.get('setup-advancement').textContent).toContain(
+        status === 'queued' ? 'review_or_tick' : 'receipt_verified'
+      );
+      expect(h.get('setup-advancement').textContent).not.toContain('unavailable');
+      expect(h.get('advance').hidden).toBe(status !== 'queued');
+      expect(h.posts()).toHaveLength(0);
+    }
+  );
+  it('keeps tick guidance suppressed through a pending and uncertain recovery mutation', async () => {
+    const pending = deferred<ReturnType<typeof reply>>();
+    const h = harness({
+      realApproval: true,
+      get: () =>
+        reply(
+          snapshot({
+            setup: setup({ advancement: row('review_or_tick', 'operator', 'review_or_tick') }),
+            scope: { tenant: 'test-tenant', tier: 'public' },
+            tasks: [
+              {
+                id: first,
+                executionStatus: 'awaiting_approval',
+                artifact: artifact({ verification: 'pending' }),
+              },
+            ],
+          })
+        ),
+      approvalGet: () =>
+        reply({
+          ok: true,
+          auth: { status: 'ready' },
+          readiness: { ready: true, status: 'ready' },
+          approvals: [],
+          recovery_requests: [
+            {
+              request_id: first,
+              approval_request_id: second,
+              session_id: session,
+              status: 'eligible',
+              display_digest: sha256,
+              revision: 1,
+              tenant: 'test-tenant',
+            },
+          ],
+        }),
+      post: () => pending.promise,
+    });
+    await flush();
+    const buttons = () =>
+      h
+        .get('approval-items')
+        .descendants()
+        .filter((item) => item.tagName === 'button');
+    expect(h.get('advance').hidden).toBe(true);
+    buttons()[0].fire();
+    await flush();
+    buttons()[0].fire();
+    await flush();
+    expect(h.posts()).toHaveLength(1);
+    expect(h.get('setup-advancement').textContent).toContain('advancement_unknown');
+    expect(h.get('advance').hidden).toBe(true);
+    pending.resolve(reply({ ok: false, retry_safe: false }, 503));
+    await flush();
+    expect(h.get('setup-advancement').textContent).toContain('advancement_unknown');
+    expect(h.get('advance').hidden).toBe(true);
+    expect(h.get('refresh').disabled).toBe(false);
+    expect(h.posts()).toHaveLength(1);
   });
 });

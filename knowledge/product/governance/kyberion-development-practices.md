@@ -100,6 +100,8 @@ dist/scripts/check_golden_output.js --rebaseline`); `vital-check` is
 
 ## 3. Hermetic tests — the machine is not a fixture
 
+How-to with examples: [docs/developer/WRITING_TESTS.md](../../../docs/developer/WRITING_TESTS.md).
+
 13 tests were green for weeks only because this dev box had the right
 leftovers. A test may not depend on:
 
@@ -128,8 +130,10 @@ leftovers. A test may not depend on:
 - **live operational subtrees, whoever the writer is** — under Vitest,
   `path-resolver` maps delivery outboxes and channel logs
   (`coordination/channels`, `observability/channels`), audit evidence
-  (`logs/audit`, `active/audit`), ops alerts, the inbox, the dot inbox and peer
-  mailboxes into `active/shared/runtime/vitest-live/pool-<n>/` (reads and
+  (`logs/audit`, `active/audit`), ops alerts, the inbox, peer mailboxes, task
+  sessions, work coordination, the feedback loop, tenants, traces and the other
+  internal runtime stores listed in `VITEST_LIVE_SUBTREES` into
+  `active/shared/runtime/vitest-live/pool-<n>/` (reads and
   writes alike; skipped when a test sets its own `KYBERION_ROOT`). The
   per-writer gates above leaked again as new writers appeared — a full run
   still grew the live inbox, audit log and Telegram/Discord outboxes — so

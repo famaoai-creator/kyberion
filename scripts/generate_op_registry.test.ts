@@ -108,7 +108,7 @@ describe('generate_op_registry discovery output', () => {
     // Ratchet count regenerated via `pnpm generate:op-registry` against the
     // ops actually registered on disk; update this when an actuator contract
     // intentionally adds or removes operations.
-    expect(operations).toHaveLength(609);
+    expect(operations).toHaveLength(620);
     expect(operations.every((item) => item.input_schema)).toBe(true);
     expect(operations.every((item) => Array.isArray(item.examples))).toBe(true);
     expect(
