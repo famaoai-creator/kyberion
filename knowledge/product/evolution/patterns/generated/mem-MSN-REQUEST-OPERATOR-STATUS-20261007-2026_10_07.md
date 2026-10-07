@@ -1,0 +1,42 @@
+---
+record_id: mem-MSN-REQUEST-OPERATOR-STATUS-20261007-2026_10_07
+kind: pattern
+tier: public
+knowledge_domain: product
+owner_nhi: ""
+candidate_id: mem-MSN-REQUEST-OPERATOR-STATUS-20261007-2026_10_07
+supersedes: ""
+superseded_by: ""
+project_id: ""
+task_session_id: ""
+specialist_id: ""
+locale: ""
+created_at: 2026-10-07T23:15:03.851Z
+source_branch: feat/request-operator-status-20261007
+source_commit: 17d11f6c8b867ec7dc3931e20ee0339a4f571f77
+---
+
+# Read-only request status must bind current evidence without expanding authority
+
+Operator handoff uses an exact tenant and request identity, current approval and execution evidence, and bounded denial-audit failure handling.
+
+## Applicability
+
+- mission
+- mission:MSN-REQUEST-OPERATOR-STATUS-20261007
+
+## Reusable Steps
+
+1. Operator handoff uses an exact tenant and request identity, current approval and execution evidence, and bounded denial-audit failure handling
+
+## Expected Outcome
+
+A request-status view is an observation, not an execution capability. Bind the canonical tenant and request UUID to the selected request or revision, verify current configuration and approval bindings, and require consistent work-item, attempt and lease evidence before displaying running or completed. Missing or conflicting evidence must remain unavailable or uncertain. Clear stale browser state after navigation, dismissal and newer requests; copying an operator command must never execute it. Read public repository charters through a repository-only reader rather than scanning tenant runtime state. A denied audit persistence operation must terminate with a fixed redacted failure diagnostic instead of recursively invoking the same policy-controlled logger. Verify read purity and termination using real persisted synthetic fixtures and production guards, including hardened-policy suspended tenants; DOM doubles do not establish authenticated browser usability.
+
+## Evidence
+
+- active/missions/public/MSN-REQUEST-OPERATOR-STATUS-20261007/evidence/implementation-report.md
+- active/missions/public/MSN-REQUEST-OPERATOR-STATUS-20261007/evidence/test-report.md
+- active/missions/public/MSN-REQUEST-OPERATOR-STATUS-20261007/evidence/REVIEW-execution-implement.md
+
+## Artifacts
