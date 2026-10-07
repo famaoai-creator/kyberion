@@ -42,6 +42,7 @@ import {
   saveProcedureDelta,
 } from '@agent/core/knowledge/procedure-self-repair';
 import { compileBrowserRecording } from '@agent/core/browser/browser-recording-compiler';
+import { judgeExtensionRun } from '@agent/core/browser/browser-golden-evidence';
 import { promoteBrowserProcedure } from '@agent/core/browser/browser-procedure-promotion';
 import { dispatchProcedure } from '@agent/core/knowledge/procedure-dispatcher';
 import { collectProcedureUserInputs } from '@agent/core/knowledge/procedure-inputs';
@@ -741,6 +742,39 @@ function verifyObservationExecutionProof(
     : { ok: true };
 }
 
+/**
+ * Judge a completed extension run against the procedure's golden scenario.
+ * The extension sends the matching page elements; the verdict is decided and
+ * recorded here, never in the extension.
+ */
+function handleSubmitGoldenEvidence(message: any): HostResponse {
+  const procedureId = typeof message.procedure_id === 'string' ? message.procedure_id.trim() : '';
+  if (!procedureId) return { ok: false, error: 'submit_golden_evidence requires procedure_id' };
+  const loaded = loadBrowserProcedure(procedureId);
+  if (loaded.error || !loaded.entry || !loaded.recording) {
+    return { ok: false, error: loaded.error ?? 'failed to load procedure' };
+  }
+  const { entry, recording } = loaded;
+  const judged = withExecutionContext(
+    'sovereign_concierge',
+    () =>
+      judgeExtensionRun({
+        procedure: entry,
+        recordingId: recording.recording_id,
+        receiptId: message.receipt_id,
+        elements: message.elements,
+      }),
+    'sovereign'
+  );
+  if (!judged.ok) return judged;
+  return {
+    ok: true,
+    status: judged.verdict ? 'judged' : 'no_golden_scenario',
+    procedure_id: procedureId,
+    ...(judged.verdict ? { golden: judged.verdict } : {}),
+  };
+}
+
 function handleSubmitObservation(message: any): HostResponse {
   const proof = withExecutionContext(
     'sovereign_concierge',
@@ -948,6 +982,8 @@ function handle(message: any): HostResponse | Promise<HostResponse> {
       return handleSubmitObservation(message);
     case 'analyze_observation':
       return handleAnalyzeObservation(message);
+    case 'submit_golden_evidence':
+      return handleSubmitGoldenEvidence(message);
     default:
       return { ok: false, error: `Unsupported message type: ${String(message?.type)}` };
   }

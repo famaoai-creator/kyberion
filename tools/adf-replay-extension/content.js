@@ -100,8 +100,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ ok: true });
     return;
   }
-  if (message?.type === 'bridge:verify-golden') {
-    sendResponse(verifyGolden(message.conditions || []));
+  if (message?.type === 'bridge:golden-evidence') {
+    sendResponse(goldenEvidence(message.conditions || []));
     return;
   }
   if (message?.type === 'bridge:inspect-page') {
@@ -216,49 +216,49 @@ function inspectPageDOM() {
   }
 }
 
-// Post-execution golden-scenario verification (#3): check each success condition
-// against the live DOM. Kinds we cannot check in-page do not claim success but
-// also do not block (verified:false).
-function verifyGolden(conditions) {
-  const results = conditions.map((condition) => {
-    try {
-      if (condition.kind === 'text_present') {
-        const needle = condition.name_contains || '';
-        const pass = !needle || (document.body?.innerText || '').includes(needle);
-        return {
-          kind: condition.kind,
-          pass,
-          detail: pass ? 'テキスト一致' : `"${needle}" が見つかりません`,
-        };
-      }
-      if (condition.kind === 'ref_visible') {
-        const matches = interactiveElements().filter(
-          (el) =>
-            (!condition.role || roleOf(el) === condition.role) &&
-            (!condition.name_contains || accessibleName(el).includes(condition.name_contains)) &&
-            isVisible(el)
-        );
-        return {
-          kind: condition.kind,
-          pass: matches.length > 0,
-          detail: matches.length > 0 ? '要素あり' : '対象要素が見つかりません',
-        };
-      }
-      return {
-        kind: condition.kind,
-        pass: true,
-        verified: false,
-        detail: 'このブラウザでは検証対象外',
-      };
-    } catch (error) {
-      return {
-        kind: condition.kind,
-        pass: false,
-        detail: error instanceof Error ? error.message : String(error),
-      };
+// Post-execution golden-scenario evidence (#3): collect, for each success
+// condition, the elements of the live page that could satisfy it. The host
+// decides pass/fail (golden-scenario-verdict.ts), so this never judges. Only
+// matching elements leave the page, and text only as a short window around the
+// condition's needle — never the page body.
+const GOLDEN_ELEMENT_SELECTOR =
+  'a, button, input, textarea, select, h1, h2, h3, h4, h5, h6, [role], [aria-live]';
+const GOLDEN_MAX_ELEMENTS = 50;
+
+function textWindow(text, needle) {
+  const flat = String(text || '').replace(/\s+/g, ' ');
+  if (!needle) return null;
+  const at = flat.toLowerCase().indexOf(needle.toLowerCase());
+  if (at < 0) return null;
+  return flat.slice(Math.max(0, at - 40), at + needle.length + 40);
+}
+
+function goldenEvidence(conditions) {
+  const elements = [];
+  const push = (entry) => {
+    if (elements.length < GOLDEN_MAX_ELEMENTS) elements.push(entry);
+  };
+  for (const condition of conditions) {
+    if (condition?.kind !== 'ref_visible' && condition?.kind !== 'text_present') continue;
+    const needle = typeof condition.name_contains === 'string' ? condition.name_contains : '';
+    const role = typeof condition.role === 'string' ? condition.role : '';
+    if (condition.kind === 'text_present' && !role) {
+      const snippet = textWindow(document.body?.innerText || '', needle);
+      if (snippet) push({ role: 'document', name: null, text: snippet, visible: true });
+      continue;
     }
-  });
-  return { ok: true, results };
+    for (const element of document.querySelectorAll(GOLDEN_ELEMENT_SELECTOR)) {
+      if (!(element instanceof HTMLElement)) continue;
+      const elementRole = roleOf(element);
+      if (role && elementRole.toLowerCase() !== role.toLowerCase()) continue;
+      const name = accessibleName(element);
+      const nameHit = needle && name.toLowerCase().includes(needle.toLowerCase());
+      const text = needle && !nameHit ? textWindow(element.innerText || '', needle) : null;
+      if (needle && !nameHit && !text) continue;
+      push({ role: elementRole, name: nameHit ? name : null, text, visible: isVisible(element) });
+    }
+  }
+  return { ok: true, elements };
 }
 
 // --- Approved-step executor (lease-bound replay) -------------------------------

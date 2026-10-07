@@ -43,6 +43,7 @@ async function createHarness() {
     hostAccess: true,
     piiScrubberReady: true,
     injectedFiles: [] as string[][],
+    tabMessage: undefined as undefined | ((message: { type: string }) => unknown),
   };
 
   const chrome: any = {
@@ -94,6 +95,10 @@ async function createHarness() {
         tabId === tab.id ? { ...tab, status: 'complete' } : null
       ),
       sendMessage: vi.fn(async (_tabId: number, message: any) => {
+        if (hooks.tabMessage) {
+          const handled = hooks.tabMessage(message);
+          if (handled !== undefined) return handled;
+        }
         if (message.type === 'bridge:ping')
           return { ok: true, piiScrubberReady: hooks.piiScrubberReady };
         if (message.type === 'bridge:observe')
@@ -469,6 +474,163 @@ describe('Browser Bridge extension state transitions', () => {
       requestId: 'REQ-PROC-1',
       procedureId: 'example.proc',
     });
+  });
+
+  it('sends golden evidence for a completed procedure run and shows the host verdict', async () => {
+    const harness = await createHarness();
+    const nativeCalls: Array<Record<string, unknown>> = [];
+    harness.hooks.native = (payload) => {
+      nativeCalls.push(payload);
+      if (payload.type === 'prepare_procedure') {
+        return {
+          ok: true,
+          origin: 'https://example.com',
+          origins: ['https://example.com'],
+          inputs: [],
+          has_inputs: false,
+        };
+      }
+      if (payload.type === 'dispatch_procedure') {
+        return {
+          ok: true,
+          status: 'dispatched',
+          lease: {
+            lease_id: 'L-PROC',
+            issued_at: '2026-06-23T00:00:00.000Z',
+            expires_at: '2999-01-01T00:00:00.000Z',
+            approved_step_hashes: [],
+          },
+          session: {
+            mission_id: 'MSN-PROC-example.proc',
+            pipeline_id: 'pipelines/browser/example.proc.json',
+            recording_id: 'rec-1',
+            tab_id: '42',
+            origin: 'https://example.com',
+          },
+          compiled_steps: [
+            { step_index: 0, op: 'click_ref', ref: '@button_1_1', role: 'button', name: 'Approve' },
+          ],
+          golden_scenario: {
+            scenario_id: 'gs-1',
+            success_conditions: [
+              { kind: 'ref_visible', role: 'status', name_contains: 'approved' },
+            ],
+          },
+        };
+      }
+      if (payload.type === 'submit_golden_evidence') {
+        return {
+          ok: true,
+          status: 'judged',
+          golden: {
+            verdict: 'fail',
+            conditions: [
+              {
+                kind: 'ref_visible',
+                outcome: 'unmet',
+                detail: 'visible "status approved" not found',
+              },
+            ],
+          },
+        };
+      }
+      return defaultNative(payload);
+    };
+    harness.hooks.tabMessage = (message) =>
+      message.type === 'bridge:golden-evidence'
+        ? {
+            ok: true,
+            elements: [{ role: 'alert', name: null, text: 'Session expired', visible: true }],
+          }
+        : undefined;
+    await harness.send({ type: 'bridge:connect-active-tab' });
+
+    await harness.send({ type: 'bridge:execute-procedure', procedureId: 'example.proc' });
+
+    const receipt = nativeCalls.find((call) => call.type === 'submit_receipt')?.receipt as {
+      receipt_id: string;
+    };
+    const evidence = nativeCalls.find((call) => call.type === 'submit_golden_evidence');
+    expect(evidence).toMatchObject({
+      procedure_id: 'example.proc',
+      receipt_id: receipt.receipt_id,
+      elements: [{ role: 'alert', text: 'Session expired' }],
+    });
+    const execution = harness.store.browserBridgeState.execution;
+    expect(execution.status).toBe('verification_failed');
+    expect(execution.golden).toMatchObject({ scenario_id: 'gs-1', verdict: 'fail' });
+  });
+
+  it('does not send golden evidence when the page returned none', async () => {
+    const harness = await createHarness();
+    const nativeCalls: Array<Record<string, unknown>> = [];
+    harness.hooks.native = (payload) => {
+      nativeCalls.push(payload);
+      if (payload.type === 'prepare_procedure') {
+        return {
+          ok: true,
+          origin: 'https://example.com',
+          origins: ['https://example.com'],
+          inputs: [],
+          has_inputs: false,
+        };
+      }
+      if (payload.type === 'dispatch_procedure') {
+        return {
+          ok: true,
+          status: 'dispatched',
+          lease: {
+            lease_id: 'L-PROC',
+            issued_at: '2026-06-23T00:00:00.000Z',
+            expires_at: '2999-01-01T00:00:00.000Z',
+            approved_step_hashes: [],
+          },
+          session: {
+            mission_id: 'MSN-PROC-example.proc',
+            pipeline_id: 'pipelines/browser/example.proc.json',
+            recording_id: 'rec-1',
+            tab_id: '42',
+            origin: 'https://example.com',
+          },
+          compiled_steps: [
+            { step_index: 0, op: 'click_ref', ref: '@button_1_1', role: 'button', name: 'Approve' },
+          ],
+          golden_scenario: {
+            scenario_id: 'gs-1',
+            success_conditions: [
+              { kind: 'ref_visible', role: 'status', name_contains: 'approved' },
+            ],
+          },
+        };
+      }
+      if (payload.type === 'submit_golden_evidence') {
+        return {
+          ok: true,
+          status: 'judged',
+          golden: {
+            verdict: 'fail',
+            conditions: [
+              {
+                kind: 'ref_visible',
+                outcome: 'unmet',
+                detail: 'visible "status approved" not found',
+              },
+            ],
+          },
+        };
+      }
+      return defaultNative(payload);
+    };
+    harness.hooks.tabMessage = (message) =>
+      message.type === 'bridge:golden-evidence' ? { ok: false } : undefined;
+    await harness.send({ type: 'bridge:connect-active-tab' });
+
+    await harness.send({ type: 'bridge:execute-procedure', procedureId: 'example.proc' });
+
+    expect(nativeCalls.some((call) => call.type === 'submit_golden_evidence')).toBe(false);
+    const execution = harness.store.browserBridgeState.execution;
+    expect(execution.status).toBe('completed');
+    expect(execution.golden).toMatchObject({ scenario_id: 'gs-1', verdict: 'error' });
   });
 
   it('reports a friendly error when the native host is not installed', async () => {

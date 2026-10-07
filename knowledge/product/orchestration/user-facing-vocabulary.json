@@ -7543,6 +7543,11 @@
         "ja": "knowledge へのフィードバックを記録",
         "qps-ploc": "⟦Řėƈőřḓ ķñőẇŀėḓɠė ƒėėḓƀȧƈķ ŀőřėɱ ïṗ⟧"
       },
+      "cli_cmd_script_procedure_golden": {
+        "en": "Show procedure success-check status or backfill golden scenarios",
+        "ja": "手順の成功チェック状態を表示、または golden シナリオを補完",
+        "qps-ploc": "⟦Şħőẇ ṗřőƈėḓůřė şůƈƈėşş-ƈħėƈķ şŧȧŧůş őř ƀȧƈķƒïŀŀ ɠőŀḓėñ şƈėñȧřïőş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
       "cli_cmd_script_knowledge_scope_health": {
         "en": "Report tenant knowledge scope health",
         "ja": "テナント knowledge スコープの健全性を報告",
