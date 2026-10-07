@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createHash } from 'node:crypto';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import {
   safeExistsSync,
@@ -10,10 +10,16 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { seedFirstJobTestRoot } from './fixtures/first-job-approval-fixture.js';
+import {
+  seedFirstJobTestRoot,
+  syntheticFirstJobOwner,
+  FIRST_JOB_TEST_SESSION_KEY,
+  FIRST_JOB_TEST_ISSUER,
+  FIRST_JOB_TEST_SUBJECT,
+} from './fixtures/first-job-approval-fixture.js';
 
 // No facade, authority, lock, registry, or IO mocks. Only the root and standalone
-// operator environment are isolated; no browser identity or credentials are seeded.
+// operator environment are isolated. Tick tests seed only synthetic browser identity.
 const sourceRoot = process.cwd();
 const root = path.join(sourceRoot, 'active/shared/tmp', 'first-job-operator-setup-' + process.pid);
 const tenant = 'setup-fixture';
@@ -44,6 +50,13 @@ function treeSnapshot(directory = root): Array<[string, string]> {
   visit(directory);
   return found;
 }
+let store: typeof import('@agent/core/surface/front-desk-conversation-store');
+let work: typeof import('@agent/core/workforce/work-coordination');
+let dispatch: typeof import('@agent/core/dot/dot-dispatch');
+let executor: typeof import('./dot_executor_step.js');
+let execution: typeof import('@agent/core/surface/front-desk-execution');
+let browser: typeof import('@agent/core/authn-providers');
+let approvals: typeof import('@agent/core/surface/first-job-approval');
 let api: typeof import('./onboarding_first_job.js');
 let authority: typeof import('@agent/core/authority');
 let foundation: typeof import('@agent/core/foundation');
@@ -127,11 +140,27 @@ beforeAll(async () => {
   lifecycle = await import('@agent/core/dot/dot-lifecycle');
   io = await import('@agent/core/secure-io');
   api = await import('./onboarding_first_job.js');
+  store = await import('@agent/core/surface/front-desk-conversation-store');
+  work = await import('@agent/core/workforce/work-coordination');
+  dispatch = await import('@agent/core/dot/dot-dispatch');
+  executor = await import('./dot_executor_step.js');
+  execution = await import('@agent/core/surface/front-desk-execution');
+  browser = await import('@agent/core/authn-providers');
+  approvals = await import('@agent/core/surface/first-job-approval');
 }, 60_000);
 beforeEach(() => {
   for (const relative of ['knowledge/personal', 'knowledge/confidential', 'dots', 'active'])
     safeRmSync(path.join(root, relative), { recursive: true, force: true });
   put(policyPath, { version: 1, mappings: [] });
+  work.setWorkCoordinationNamespace('first-job-tick-' + randomUUID());
+  vi.setSystemTime(new Date('2026-10-06T00:00:00Z'));
+  for (const key of ['KYBERION_SESSION_SECRET', 'KYBERION_OIDC_ISSUER', 'KYBERION_OIDC_CLIENT_ID'])
+    vi.stubEnv(key, '');
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+  work.clearWorkCoordinationStore();
+  work.clearWorkCoordinationNamespace();
 });
 afterAll(() => {
   process.chdir(sourceRoot);
@@ -287,3 +316,232 @@ describe('standalone first-job setup with real governed facades', { timeout: 60_
     expect(safeExistsSync(path.join(root, charterPath))).toBe(true);
   });
 });
+
+function configureTick() {
+  const plan = api.planFirstJob(tenant);
+  const configured = api.applyFirstJob(tenant, plan.plan_digest);
+  put('knowledge/personal/members/owner.json', syntheticFirstJobOwner(tenant));
+  vi.stubEnv('KYBERION_SESSION_SECRET', FIRST_JOB_TEST_SESSION_KEY);
+  vi.stubEnv('KYBERION_OIDC_ISSUER', FIRST_JOB_TEST_ISSUER);
+  vi.stubEnv('KYBERION_OIDC_CLIENT_ID', 'fixture');
+  const token = browser.mintBrowserSessionToken({
+    idpIssuer: FIRST_JOB_TEST_ISSUER,
+    subject: FIRST_JOB_TEST_SUBJECT,
+    ttlSeconds: 1800,
+  }).token;
+  return { configured, viewer: configured.mapping.viewer, token };
+}
+async function requestTick() {
+  const fixture = configureTick();
+  store.reserveConversationTurn(
+    fixture.viewer,
+    fixture.configured.mapping.exactCommand,
+    randomUUID()
+  );
+  const first = await api.tickFirstJob(tenant);
+  expect(first).toMatchObject({
+    status: 'supervisor_pass_completed',
+    pass_completed: true,
+    outcome: 'awaiting_approval',
+    next_actor: 'user',
+  });
+  expect(work.listWorkItems()).toHaveLength(0);
+  return fixture;
+}
+function decideTick(
+  fixture: ReturnType<typeof configureTick>,
+  decision: 'approved' | 'rejected' = 'approved'
+) {
+  const session_id = store.conversationRef(fixture.viewer).sessionId;
+  const card = approvals.readFirstJobApprovals(fixture.viewer, fixture.token, { session_id })
+    .approvals[0];
+  expect(card).toBeTruthy();
+  approvals.decideFirstJobApproval(fixture.viewer, fixture.token, card.approval_request_id, {
+    decision,
+    display_digest: card.display_digest,
+    session_id,
+  });
+}
+
+describe(
+  'truthful bounded first-job tick with real stores and receipt readback',
+  { timeout: 60_000 },
+  () => {
+    it('runs one pass without a request and reports noop without provisioning work', async () => {
+      configureTick();
+      const result = await api.tickFirstJob(tenant);
+      expect(result).toMatchObject({
+        outcome: 'noop',
+        pass_completed: true,
+        stages: { housekeeping: 'completed', intake: 'completed', executor: 'completed' },
+      });
+      expect(work.listWorkItems()).toHaveLength(0);
+    });
+    it('reports a real signed approval, verified bytes, repeat safety, then a pending revision', async () => {
+      const fixture = await requestTick();
+      decideTick(fixture);
+      const result = await api.tickFirstJob(tenant);
+      expect(result).toMatchObject({
+        outcome: 'artifact_verified',
+        pass_completed: true,
+        counts: { settled_actions: 1, executor_done: 1 },
+      });
+      const item = work.listWorkItems()[0];
+      expect(item.status).toBe('done');
+      expect(item.attempts).toHaveLength(1);
+      const repeat = await api.tickFirstJob(tenant);
+      expect(repeat).toMatchObject({
+        outcome: 'artifact_verified',
+        counts: { settled_actions: 0, executor_done: 0 },
+      });
+      expect(work.getWorkItem(item.item_id)?.attempts).toHaveLength(1);
+      const helper = await import('./onboarding_first_job_tick_status.js');
+      const beforeReadback = treeSnapshot();
+      expect(
+        authority.withExecutionContext(
+          'infrastructure_sentinel',
+          () =>
+            helper.readFirstJobTickStatus(
+              charterFacade.findDotCharter(dotId)!.charter,
+              fixture.configured.mapping,
+              fixture.configured.pipeline_digest
+            ),
+          'worker',
+          tenant
+        ).outcome
+      ).toBe('artifact_verified');
+      expect(treeSnapshot()).toEqual(beforeReadback);
+      const artifact = store.readFrontDeskConversationWork(fixture.viewer).tasks[0].artifact!;
+      expect(artifact.verification).toBe('verified');
+      store.reserveConversationTurn(
+        fixture.viewer,
+        (
+          await import('@agent/core/surface/front-desk-execution-contract')
+        ).frontDeskArtifactRevisionCommand('compact'),
+        randomUUID(),
+        Date.now(),
+        undefined,
+        {
+          requestId: artifact.requestId,
+          revision: artifact.revision,
+          sha256: artifact.sha256!,
+          format: 'compact',
+        }
+      );
+      const revised = await api.tickFirstJob(tenant);
+      expect(revised).toMatchObject({
+        outcome: 'awaiting_approval',
+        outcomes: { artifact_verified: 1, awaiting_approval: 1 },
+      });
+      expect(work.getWorkItem(item.item_id)?.attempts).toHaveLength(1);
+      expect(JSON.stringify(revised)).not.toMatch(
+        /artifact_path|PRIVATE_|knowledge\/|active\/|"body"|"summary"/
+      );
+    });
+    it('cannot reuse a success report after actual artifact bytes are altered', async () => {
+      const fixture = await requestTick();
+      decideTick(fixture);
+      expect((await api.tickFirstJob(tenant)).outcome).toBe('artifact_verified');
+      const loaded = charterFacade.findDotCharter(dotId)!.charter;
+      const results = (await import('@agent/core/dot/dot-executor')).readDotWorkResults(loaded);
+      const target = results.at(-1)!.front_desk_verification!.artifact_path;
+      operator(() => io.safeWriteFile(target, 'PRIVATE_TAMPERED_BYTES'));
+      const result = await api.tickFirstJob(tenant);
+      expect(result).toMatchObject({
+        outcome: 'uncertain',
+        next_actor: 'operator',
+        counts: { executor_done: 0 },
+      });
+      expect(work.listWorkItems()[0].attempts).toHaveLength(1);
+      expect(JSON.stringify(result)).not.toContain('PRIVATE_TAMPERED_BYTES');
+    });
+    it('reports an explicit refusal without creating work', async () => {
+      const fixture = await requestTick();
+      decideTick(fixture, 'rejected');
+      // Rejection distillation is an unrelated asynchronous edge; keep the real
+      // settlement/store path while preventing background work after fixture cleanup.
+      const housekeeping = dispatch.runDotHousekeeping;
+      vi.spyOn(dispatch, 'runDotHousekeeping').mockImplementation((charter, deps) =>
+        housekeeping(charter, { ...deps, feedback: { onRejection: () => undefined } })
+      );
+      expect((await api.tickFirstJob(tenant)).outcome).toBe('refused');
+      expect(work.listWorkItems()).toHaveLength(0);
+    });
+    it('reports an expired pending approval without creating work', async () => {
+      await requestTick();
+      vi.setSystemTime(new Date('2026-10-08T00:00:00Z'));
+      expect((await api.tickFirstJob(tenant)).outcome).toBe('expired');
+      expect(work.listWorkItems()).toHaveLength(0);
+    });
+    it('preserves housekeeping errors instead of claiming a healthy pass', async () => {
+      configureTick();
+      vi.spyOn(dispatch, 'runDotHousekeeping').mockResolvedValueOnce({
+        settled: [],
+        signals: 0,
+        digest: false,
+        errors: ['PRIVATE_HOUSEKEEPING /private/path'],
+      });
+      const result = await api.tickFirstJob(tenant);
+      expect(result).toMatchObject({
+        status: 'supervisor_pass_failed',
+        pass_completed: false,
+        outcome: 'failed',
+        counts: { housekeeping_errors: 1 },
+        stages: { housekeeping: 'failed', executor: 'completed' },
+      });
+      expect(JSON.stringify(result)).not.toMatch(/PRIVATE_|private\/path/);
+    });
+    it('stops after a throwing stage and never retries or exposes its raw error', async () => {
+      configureTick();
+      const intake = vi
+        .spyOn(execution, 'runFrontDeskExecutionIntake')
+        .mockRejectedValueOnce(Error('PRIVATE_INTAKE /private/path'));
+      const execute = vi.spyOn(executor, 'runDotExecutorStep');
+      const result = await api.tickFirstJob(tenant);
+      expect(result).toMatchObject({
+        status: 'supervisor_pass_failed',
+        pass_completed: false,
+        outcome: 'uncertain',
+        stages: { intake: 'failed', executor: 'not_run' },
+      });
+      expect(intake).toHaveBeenCalledTimes(1);
+      expect(execute).not.toHaveBeenCalled();
+      expect(JSON.stringify(result)).not.toMatch(/PRIVATE_|private\/path/);
+    });
+    it('never treats a mocked executor success as artifact evidence', async () => {
+      const fixture = await requestTick();
+      decideTick(fixture);
+      const execute = vi.spyOn(executor, 'runDotExecutorStep').mockResolvedValueOnce([
+        {
+          dot_id: dotId,
+          work_item_id: 'fabricated',
+          action_ref: 'fabricated',
+          status: 'done',
+          mode: 'pipeline',
+          summary: 'PRIVATE_SUCCESS',
+          started_at: '',
+          completed_at: '',
+        },
+      ]);
+      const result = await api.tickFirstJob(tenant);
+      expect(result.outcome).not.toBe('artifact_verified');
+      expect(execute).toHaveBeenCalledTimes(1);
+      expect(execute.mock.calls[0][2]).toMatchObject({
+        scopeToActiveCharters: true,
+        assertTenant: expect.any(Function),
+      });
+      expect(JSON.stringify(result)).not.toContain('PRIVATE_SUCCESS');
+    });
+    it('observes post-pass configuration revocation instead of a stale success', async () => {
+      configureTick();
+      vi.spyOn(executor, 'runDotExecutorStep').mockImplementationOnce(async () => {
+        put(policyPath, { version: 1, mappings: [] });
+        return [];
+      });
+      expect(await api.tickFirstJob(tenant)).toMatchObject({
+        outcome: 'configuration_changed',
+        next_action: 'inspect_configuration',
+      });
+    });
+  }
+);

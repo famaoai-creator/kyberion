@@ -1600,6 +1600,16 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/lib/outcome-files.ts#metadata",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/outcome-files.ts#readAsViewer",
+      "roles": ["concierge_localadmin", "concierge_operator"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/lib/personal-avatar-access.ts#readConciergePersonal",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -3327,6 +3337,8 @@
         "presence/displays/concierge/src/app/api/notification-preferences/route.ts",
         "presence/displays/concierge/src/app/api/oauth/begin/route.ts",
         "presence/displays/concierge/src/app/api/org-readiness/route.ts",
+        "presence/displays/concierge/src/app/api/outcomes/[id]/files/[fileId]/route.ts",
+        "presence/displays/concierge/src/app/api/outcomes/[id]/files/route.ts",
         "presence/displays/concierge/src/app/api/outcomes/[id]/preview/route.ts",
         "presence/displays/concierge/src/app/api/outcomes/[id]/route.ts",
         "presence/displays/concierge/src/app/api/plugins/[id]/route.ts",
@@ -3366,6 +3378,7 @@
         "presence/displays/concierge/src/app/login/route.ts",
         "presence/displays/concierge/src/app/logout/route.ts",
         "presence/displays/concierge/src/app/manifest.ts",
+        "presence/displays/concierge/src/app/outcome-files.tsx",
         "presence/displays/concierge/src/app/page.tsx",
         "presence/displays/concierge/src/app/review-checkin.tsx",
         "presence/displays/concierge/src/app/settings/page.tsx",
@@ -3420,6 +3433,10 @@
         "presence/displays/concierge/src/lib/observation-review.ts",
         "presence/displays/concierge/src/lib/org-readiness-server.ts",
         "presence/displays/concierge/src/lib/org-readiness-view.ts",
+        "presence/displays/concierge/src/lib/outcome-files-client.ts",
+        "presence/displays/concierge/src/lib/outcome-files-focus.ts",
+        "presence/displays/concierge/src/lib/outcome-files-response.ts",
+        "presence/displays/concierge/src/lib/outcome-files.ts",
         "presence/displays/concierge/src/lib/outcome-preview-response.ts",
         "presence/displays/concierge/src/lib/personal-avatar-access.ts",
         "presence/displays/concierge/src/lib/presence-studio-url.ts",
@@ -3542,12 +3559,14 @@
         },
         "concierge_localadmin": {
           "example_path": [
-            "presence/displays/concierge/src/lib/viewer-context.ts#withConciergeViewerContext"
+            "presence/displays/concierge/src/lib/outcome-files.ts#listOutcomeFiles",
+            "presence/displays/concierge/src/lib/outcome-files.ts#readAsViewer"
           ]
         },
         "concierge_operator": {
           "example_path": [
-            "presence/displays/concierge/src/lib/viewer-context.ts#withConciergeViewerContext"
+            "presence/displays/concierge/src/lib/outcome-files.ts#listOutcomeFiles",
+            "presence/displays/concierge/src/lib/outcome-files.ts#readAsViewer"
           ]
         },
         "ecosystem_architect": {
