@@ -1,8 +1,13 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as path from 'node:path';
+import { pathResolver } from '../path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { saveGoldenScenario } from './golden-scenario-verdict.js';
+import { resolveKnowledgeVerification } from './knowledge-verification.js';
 import * as bridge from '../browser/browser-extension-bridge.js';
 import * as approvalGate from '../governance/approval-gate.js';
 import * as killSwitch from '../governance/kill-switch.js';
-import { type ProcedureEntry } from './procedure-types.js';
+import { type GoldenScenario, type ProcedureEntry } from './procedure-types.js';
 import {
   dispatchProcedure,
   extendLeaseForMfa,
@@ -997,5 +1002,194 @@ describe('procedure executor registry (RS-07)', () => {
       expect(result.status).toBe('blocked');
       expect(result.errors[0]).toContain(`Unknown executor: "${executor}"`);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dispatchProcedure — golden-scenario verdicts on executed runs
+// ---------------------------------------------------------------------------
+
+describe('dispatchProcedure — golden-scenario verdicts', () => {
+  const root = pathResolver.sharedTmp(`dispatcher-golden-${process.pid}`);
+  const feedbackDir = pathResolver.sharedTmp(`dispatcher-golden-feedback-${process.pid}`);
+  const recordingRef = pathResolver.toRepoRelative(path.join(root, 'recording.json'));
+  let savedFeedbackDir: string | undefined;
+
+  beforeEach(() => {
+    savedFeedbackDir = process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR;
+    process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR = feedbackDir;
+    safeMkdir(root, { recursive: true });
+    safeWriteFile(path.join(root, 'recording.json'), '{"recording":"v1"}\n');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    if (savedFeedbackDir === undefined) delete process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR;
+    else process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR = savedFeedbackDir;
+    safeRmSync(root, { recursive: true, force: true });
+    safeRmSync(feedbackDir, { recursive: true, force: true });
+  });
+
+  function withGolden(
+    procedure: ProcedureEntry,
+    conditions: GoldenScenario['success_conditions']
+  ): ProcedureEntry {
+    const goldenRef = saveGoldenScenario(
+      {
+        schema_version: 'golden-scenario.v1',
+        scenario_id: `gs-${procedure.procedure_id}`,
+        procedure_id: procedure.procedure_id,
+        success_conditions: conditions,
+        captured_from: 'rec-1',
+        version: '1.0.0',
+      },
+      path.join(root, 'golden', `${procedure.procedure_id}.json`)
+    );
+    return {
+      ...procedure,
+      adapter: { ...procedure.adapter, recording_ref: recordingRef },
+      golden_scenario_ref: goldenRef,
+    };
+  }
+
+  const ledgerState = () => resolveKnowledgeVerification([recordingRef]).get(recordingRef);
+
+  it('passes a service run that produced what the golden scenario names, and records it', async () => {
+    vi.spyOn(approvalGate, 'enforceApprovalGate').mockReturnValue({
+      allowed: true,
+      status: 'approved',
+    });
+    const result = await dispatchProcedure({
+      procedure: withGolden(SERVICE_PROCEDURE, [
+        {
+          kind: 'response_field',
+          params: { channel: 'issue_key', service_id: 'jira', action: 'create_issue' },
+        },
+      ]),
+      agentId: 'test-agent',
+      missionId: 'msn-1',
+      serviceRecording: serviceRecording(),
+      executePreset: async () => ({ issue_key: 'JIRA-1' }),
+    });
+    expect(result.status).toBe('executed');
+    expect(result.golden?.verdict).toBe('pass');
+    expect(ledgerState()).toMatchObject({ state: 'verified', evidence: 'golden' });
+  });
+
+  it('fails a service run whose producing step errored, and records a failed check', async () => {
+    vi.spyOn(approvalGate, 'enforceApprovalGate').mockReturnValue({
+      allowed: true,
+      status: 'approved',
+    });
+    const result = await dispatchProcedure({
+      procedure: withGolden(SERVICE_PROCEDURE, [
+        { kind: 'response_field', params: { channel: 'issue_key' } },
+      ]),
+      agentId: 'test-agent',
+      missionId: 'msn-1',
+      serviceRecording: serviceRecording(),
+      executePreset: async () => {
+        throw new Error('jira 503');
+      },
+    });
+    expect(result.golden?.verdict).toBe('fail');
+    expect(ledgerState()).toMatchObject({
+      state: 'reported_problem',
+      last_problem_kind: 'failed_check',
+    });
+  });
+
+  const PLAYWRIGHT: ProcedureEntry = { ...PROCEDURE, execution_substrate: 'playwright' };
+  const CLICK: BrowserExtensionRecording = {
+    ...RECORDING,
+    tab: { ...RECORDING.tab, origin_hash: 'a'.repeat(64) },
+    actions: [
+      {
+        action_id: 'act-1',
+        op: 'click_ref',
+        summary: 'Approve',
+        risk: 'low',
+        captured_at: '2026-06-24T00:00:00Z',
+        target: { ref: '@e1', role: 'button', name: 'Approve', snapshot_hash: 'a'.repeat(64) },
+      },
+    ],
+    review: {
+      status: 'approved',
+      reviewed_at: '2026-06-24T00:00:01Z',
+      decisions: [{ action_id: 'act-1', status: 'approved' }],
+    },
+  };
+  const approvedBanner = [
+    { kind: 'ref_visible' as const, role: 'status', name_contains: 'Approved' },
+  ];
+  const runPlaywright = (context: unknown) =>
+    dispatchProcedure({
+      ...BASE_INPUT,
+      procedure: withGolden(PLAYWRIGHT, approvedBanner),
+      recording: CLICK,
+      executeBrowserPipeline: vi
+        .fn()
+        .mockResolvedValue({ status: 'succeeded', results: [], context }),
+    });
+
+  it('checks a playwright run against the page it ended on', async () => {
+    const pass = await runPlaywright({
+      golden_final_snapshot: {
+        elements: [{ role: 'status', name: 'Request Approved', text: '', visible: true }],
+      },
+    });
+    expect(pass.golden?.verdict).toBe('pass');
+
+    const fail = await runPlaywright({
+      golden_final_snapshot: {
+        elements: [{ role: 'alert', name: 'Session expired', text: '', visible: true }],
+      },
+    });
+    expect(fail.status).toBe('executed');
+    expect(fail.golden?.verdict).toBe('fail');
+  });
+
+  it('appends one read-only final snapshot and ignores any earlier last_snapshot', async () => {
+    const executeBrowserPipeline = vi.fn().mockResolvedValue({
+      status: 'succeeded',
+      results: [],
+      // A snapshot an earlier step took before the final click: not evidence.
+      context: {
+        last_snapshot: { elements: [{ role: 'status', name: 'Request Approved', visible: true }] },
+      },
+    });
+    const result = await dispatchProcedure({
+      ...BASE_INPUT,
+      procedure: withGolden(PLAYWRIGHT, approvedBanner),
+      recording: CLICK,
+      executeBrowserPipeline,
+    });
+    const steps = executeBrowserPipeline.mock.calls[0][0].steps;
+    expect(steps.at(-1)).toMatchObject({
+      type: 'capture',
+      op: 'snapshot',
+      params: { export_as: 'golden_final_snapshot' },
+    });
+    expect(steps).toHaveLength(2);
+    expect(result.golden?.verdict).toBe('inconclusive');
+  });
+
+  it('is inconclusive, and records nothing, when the run returned no page snapshot', async () => {
+    const result = await runPlaywright(undefined);
+    expect(result.golden?.verdict).toBe('inconclusive');
+    expect(ledgerState()).toBeUndefined();
+  });
+
+  it('runs exactly as before for a procedure without a golden scenario', async () => {
+    const executeBrowserPipeline = vi.fn().mockResolvedValue({ status: 'succeeded', results: [] });
+    const result = await dispatchProcedure({
+      ...BASE_INPUT,
+      procedure: PLAYWRIGHT,
+      recording: CLICK,
+      executeBrowserPipeline,
+    });
+    expect(result.status).toBe('executed');
+    expect(result.golden).toBeUndefined();
+    expect(executeBrowserPipeline.mock.calls[0][0].steps).toHaveLength(1);
   });
 });
