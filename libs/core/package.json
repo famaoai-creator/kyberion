@@ -31,6 +31,10 @@
       "types": "./dist/foundation/env.d.ts",
       "default": "./dist/foundation/env.js"
     },
+    "./foundation/inflight-limit": {
+      "types": "./dist/foundation/inflight-limit.d.ts",
+      "default": "./dist/foundation/inflight-limit.js"
+    },
     "./foundation/scope": {
       "types": "./dist/foundation/scope.d.ts",
       "default": "./dist/foundation/scope.js"

@@ -5,6 +5,8 @@ import type { DueDotTrigger } from '@agent/core/dot/dot-runtime';
 const mocks = vi.hoisted(() => ({
   housekeeping: vi.fn(async () => ({ settled: [], signals: 0, digest: false, errors: [] })),
   recordDaemonHeartbeat: vi.fn(),
+  sendOpsAlert: vi.fn(),
+  tickVetoWindows: vi.fn(),
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
@@ -16,7 +18,7 @@ vi.mock('@agent/core/daemon-heartbeat', async () => ({
 }));
 vi.mock('@agent/core/ops-alert', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/ops-alert')),
-  sendOpsAlert: vi.fn(),
+  sendOpsAlert: mocks.sendOpsAlert,
 }));
 vi.mock('@agent/core/core', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/core')),
@@ -26,7 +28,9 @@ vi.mock('@agent/core/reasoning/reasoning-bootstrap', () => ({
   installReasoningBackends: vi.fn(() => true),
   reselectReasoningBackends: vi.fn(),
 }));
-vi.mock('@agent/core/governance/approval-veto-window', () => ({ tickVetoWindows: vi.fn() }));
+vi.mock('@agent/core/governance/approval-veto-window', () => ({
+  tickVetoWindows: mocks.tickVetoWindows,
+}));
 vi.mock('@agent/core/dot/dot-dispatch', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/dot/dot-dispatch')),
   runDotHousekeeping: mocks.housekeeping,
@@ -51,7 +55,11 @@ vi.mock('@agent/core/trigger-runner', () => ({
   }),
 }));
 
-import { resetDotSweepStateForTests, runDotSweepOnce } from './agent_runtime_supervisor_daemon.js';
+import {
+  resetDotSweepStateForTests,
+  resolveInflightLimit,
+  runDotSweepOnce,
+} from './agent_runtime_supervisor_daemon.js';
 import { DOT_SUPERVISOR_STEPS } from './dot_supervisor_extensions.js';
 
 function charter(dotId: string): DotCharter {
@@ -75,6 +83,21 @@ const A: LoadedDotCharter = { path: 'dots/a.json', charter: charter('a') };
 const B: LoadedDotCharter = { path: 'dots/b.json', charter: charter('b') };
 const NOW = new Date('2026-10-04T10:00:00Z');
 
+describe('resolveInflightLimit', () => {
+  it('uses the default for absent values and accepts supported positive integers', () => {
+    expect(resolveInflightLimit('LIMIT', undefined, 8)).toBe(8);
+    expect(resolveInflightLimit('LIMIT', '  ', 8)).toBe(8);
+    expect(resolveInflightLimit('LIMIT', '12', 8)).toBe(12);
+  });
+
+  it.each(['0', '-1', '1.5', 'NaN', 'Infinity', '257', 'not-a-number'])(
+    'falls back safely for invalid limit %s',
+    (raw) => {
+      expect(resolveInflightLimit('LIMIT', raw, 8)).toBe(8);
+    }
+  );
+});
+
 beforeEach(() => {
   resetDotSweepStateForTests();
   DOT_SUPERVISOR_STEPS.length = 0;
@@ -82,6 +105,23 @@ beforeEach(() => {
 });
 
 describe('runDotSweepOnce org budget hard throttle', () => {
+  it('alerts when veto-window processing fails so silent-consent decisions do not stall unnoticed', async () => {
+    mocks.tickVetoWindows.mockImplementationOnce(() => {
+      throw new Error('internal failure');
+    });
+
+    await runDotSweepOnce(NOW, { listCharters: () => [], wake: vi.fn() });
+
+    expect(mocks.sendOpsAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'approval',
+        context: expect.objectContaining({ operation: 'veto_window_tick' }),
+        dedupe_key: 'dot-supervisor:veto-window-tick-failed',
+      })
+    );
+    expect(JSON.stringify(mocks.sendOpsAlert.mock.calls)).not.toContain('internal failure');
+  });
+
   it('skips wakes for a hard-throttled dot but keeps housekeeping and heartbeat', async () => {
     const woken: string[] = [];
     const wake = async (loaded: LoadedDotCharter) => {
