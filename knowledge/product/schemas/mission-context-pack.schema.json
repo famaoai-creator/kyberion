@@ -393,8 +393,9 @@
                 "enum": ["verified", "changed_since_verified", "reported_problem"]
               },
               "last_success_at": { "type": "string" },
+              "evidence": { "type": "string", "enum": ["golden", "worker_report"] },
               "last_problem_at": { "type": "string" },
-              "last_problem_kind": { "type": "string", "enum": ["wrong", "stale"] }
+              "last_problem_kind": { "type": "string", "enum": ["wrong", "stale", "failed_check"] }
             },
             "additionalProperties": false
           },

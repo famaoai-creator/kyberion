@@ -116,6 +116,14 @@ describe('promoteBrowserProcedure', () => {
       expect.stringContaining('knowledge/product/orchestration/procedures.json'),
       expect.anything()
     );
+    // The golden scenario is stored in the same (personal) tier as the catalog.
+    expect(result.procedureEntry.golden_scenario_ref).toBe(
+      'knowledge/personal/golden/personal.example.continue.v1.0.0.json'
+    );
+    expect(write).toHaveBeenCalledWith(
+      expect.stringContaining('knowledge/personal/golden/personal.example.continue.v1.0.0.json'),
+      expect.stringContaining('"schema_version": "golden-scenario.v1"')
+    );
   });
 
   it('refuses an unapproved recording', () => {

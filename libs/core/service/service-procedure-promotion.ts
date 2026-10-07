@@ -8,6 +8,10 @@ import {
 } from '../knowledge/procedure-registry.js';
 import { pathResolver } from '../path-resolver.js';
 import {
+  goldenScenarioPathForCatalog,
+  saveGoldenScenario,
+} from '../knowledge/golden-scenario-verdict.js';
+import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
@@ -99,8 +103,17 @@ export function promoteServiceProcedure(
     pathResolver.rootResolve(compiled.procedureEntry.pipeline_ref),
     { allowMissingLeaf: true }
   );
+  // The golden scenario travels with the procedure, in the catalog's tier,
+  // so each run can be checked against it (golden-scenario-verdict.ts).
+  const goldenPath = goldenScenarioPathForCatalog(
+    catalogPath,
+    procedureId,
+    compiled.procedureEntry.version
+  );
+  compiled.procedureEntry.golden_scenario_ref = pathResolver.toRepoRelative(goldenPath);
   catalog.procedures.push(compiled.procedureEntry);
   validateProcedureCatalog(catalog, catalogPath);
+  saveGoldenScenario(compiled.goldenScenario, goldenPath);
   safeMkdir(path.dirname(pipelinePath), { recursive: true });
   safeWriteFile(pipelinePath, `${JSON.stringify(pipeline, null, 2)}\n`);
   safeMkdir(path.dirname(catalogPath), { recursive: true });

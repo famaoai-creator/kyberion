@@ -97,6 +97,15 @@ describe('promoteServiceProcedure', () => {
       expect.stringContaining('service-promotion-test/procedures.json'),
       expect.stringContaining('service.issue-intake.test')
     );
+    expect(result.procedureEntry.golden_scenario_ref).toBe(
+      'active/shared/tmp/service-promotion-test/golden/service.issue-intake.test.v1.0.0.json'
+    );
+    expect(write).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'service-promotion-test/golden/service.issue-intake.test.v1.0.0.json'
+      ),
+      expect.stringContaining('"procedure_id": "service.issue-intake.test"')
+    );
   });
 
   it('refuses a recording that has not passed review', () => {
