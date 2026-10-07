@@ -32,6 +32,7 @@ import type {
 } from '@agent/core/reasoning/reasoning-backend-contracts';
 import { curateBackgroundReviewProposals } from '@agent/core/workforce/background-review-curator';
 import { generateKnowledgeCurationReport } from '@agent/core/knowledge-curation-report';
+import { writeProcedureCheckReport } from '@agent/core/knowledge/golden-scenario-maintenance';
 import { runKnowledgeValidationSweep } from '@agent/core/report-ops';
 import { deriveExecutionGraph, executeGraph } from '@agent/core/graph-scheduler';
 import * as path from 'node:path';
@@ -1056,7 +1057,23 @@ export async function dispatchWisdomOperation(
       // CURATION_REPORT.md. Candidates only (KM-03 guardrail): no file is
       // deleted, archived, or demoted here.
       const { report, reportPath } = generateKnowledgeCurationReport();
-      return { handled: true, ctx: assign({ ...report, report_path: reportPath }) };
+      // Procedure success checks ride the same weekly run but land in a
+      // personal-tier report, never in the public CURATION_REPORT.md. Fail
+      // open: a broken procedure catalog must not cost the curation report.
+      let procedureChecks: ReturnType<typeof writeProcedureCheckReport> | { error: string };
+      try {
+        procedureChecks = writeProcedureCheckReport();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.warn(
+          `[wisdom:curation_report] procedure check report skipped — ${message} | next: the personal tier is written only by the operator's persona (personal/sovereign); run the weekly pipeline as the operator, or use \`pnpm kyberion procedure golden status\``
+        );
+        procedureChecks = { error: message };
+      }
+      return {
+        handled: true,
+        ctx: assign({ ...report, report_path: reportPath, procedure_checks: procedureChecks }),
+      };
     }
 
     case 'knowledge_validation_sweep': {
