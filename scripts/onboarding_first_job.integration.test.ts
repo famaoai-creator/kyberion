@@ -545,3 +545,82 @@ describe(
     });
   }
 );
+
+describe('first-job CLI tick exit status', { timeout: 60_000 }, () => {
+  it.each(['housekeeping', 'intake'] as const)(
+    'prints one sanitized JSON payload and exits nonzero for a failed %s pass',
+    async (stage) => {
+      configureTick();
+      if (stage === 'housekeeping') {
+        vi.spyOn(dispatch, 'runDotHousekeeping').mockResolvedValueOnce({
+          settled: [],
+          signals: 0,
+          digest: false,
+          errors: ['PRIVATE_FAILURE /private/path'],
+        });
+      } else {
+        vi.spyOn(execution, 'runFrontDeskExecutionIntake').mockRejectedValueOnce(
+          new Error('PRIVATE_FAILURE /private/path')
+        );
+      }
+      const { runOnboarding } = await import('./onboarding.js');
+      const { getProcessExitCode, setProcessExitCode, clearProcessExitCode } =
+        await import('./lib/harness.js');
+      const previousExitCode = getProcessExitCode();
+      const output = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      try {
+        setProcessExitCode(0);
+        await runOnboarding(['first-job', '--tenant', tenant, '--tick', '--json']);
+        expect(getProcessExitCode()).toBe(1);
+        expect(output).toHaveBeenCalledTimes(1);
+        const printed = String(output.mock.calls[0][0]);
+        expect(JSON.parse(printed)).toMatchObject({
+          status: 'supervisor_pass_failed',
+          pass_completed: false,
+          outcome: stage === 'housekeeping' ? 'failed' : 'uncertain',
+        });
+        expect(printed).not.toMatch(/PRIVATE_|private\/path|"stack"/);
+        expect(errors).not.toHaveBeenCalled();
+      } finally {
+        clearProcessExitCode();
+        if (previousExitCode !== undefined) setProcessExitCode(previousExitCode);
+      }
+    }
+  );
+  it.each(['noop', 'awaiting_approval'] as const)(
+    'keeps a completed %s pass at exit zero with one JSON payload',
+    async (outcome) => {
+      const fixture = configureTick();
+      if (outcome === 'awaiting_approval') {
+        store.reserveConversationTurn(
+          fixture.viewer,
+          fixture.configured.mapping.exactCommand,
+          randomUUID()
+        );
+      }
+      const { runOnboarding } = await import('./onboarding.js');
+      const { getProcessExitCode, setProcessExitCode, clearProcessExitCode } =
+        await import('./lib/harness.js');
+      const previousExitCode = getProcessExitCode();
+      const output = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      try {
+        setProcessExitCode(0);
+        await runOnboarding(['first-job', '--tenant', tenant, '--tick', '--json']);
+        expect(getProcessExitCode()).toBe(0);
+        expect(output).toHaveBeenCalledTimes(1);
+        expect(JSON.parse(String(output.mock.calls[0][0]))).toMatchObject({
+          status: 'supervisor_pass_completed',
+          pass_completed: true,
+          outcome,
+        });
+        expect(errors).not.toHaveBeenCalled();
+        expect(work.listWorkItems()).toHaveLength(0);
+      } finally {
+        clearProcessExitCode();
+        if (previousExitCode !== undefined) setProcessExitCode(previousExitCode);
+      }
+    }
+  );
+});

@@ -65,6 +65,7 @@ loopback の localadmin 接続だけでは人間の承認を証明できませ�
 `--tick --json` は、従来の `dot_id`、`first_job_url`、`recovery`、`next_step` に加えて次を返します。事前条件を満たさない場合の拒否は従来どおりで、実行や自動修復を始めません。
 
 - `status: supervisor_pass_completed` と `pass_completed: true` は、1回の housekeeping / intake / executor 処理が終わったことを示します。成果完成の判定ではありません。途中の例外や housekeeping エラーでは `supervisor_pass_failed` / `false` になります。
+- CLI の終了コードは、処理中の例外や housekeeping エラーによる未完了・失敗時は 1、1回の処理が完了した場合は 0 です。承認待ち・保留は処理失敗ではないため、終了コードだけでなく `outcome` と `next_actor` / `next_action` を確認してください。
 - `outcome` は現在の対応を優先した分類です。`artifact_verified` は既存の読み戻しで実際の成果バイト列とハッシュを確認できた状態だけです。executor の done 行だけでは完成にしません。
 - `awaiting_approval` は対象の現在有効な承認カードが pending の状態です。カード未生成や承認済みだが止まっている状態は、本人の承認待ちと混同しません。
 - `held`、`uncertain`、`failed`、`configuration_changed` はオペレーターによる確認が必要です。期限切れ `expired`、却下等の `refused`、対象処理のない `noop` も分けます。

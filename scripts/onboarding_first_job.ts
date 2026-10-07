@@ -27,6 +27,7 @@ import {
 import { assertBuiltinOnlyWorkerEventStream } from '@agent/core/workforce/worker-event-stream';
 import { resolveSurfaceBrowserUrl } from '@agent/core/surface/surface-url';
 import type { DotWorkResultRow } from '@agent/core/dot/dot-state-paths';
+import { ScriptExitError } from './lib/harness.js';
 import type {
   FirstJobTickOutcome,
   FirstJobTickReadback,
@@ -340,15 +341,14 @@ export async function main(args: string[] = [], print: (value: unknown) => void 
     (tick && (apply || accepted || args.includes('--dry-run')))
   )
     throw new Error('first_job_conflicting_mode');
-  print(
-    JSON.stringify(
-      tick
-        ? await tickFirstJob(tenant)
-        : apply
-          ? applyFirstJob(tenant, accepted ?? '')
-          : planFirstJob(tenant),
-      null,
-      2
-    )
-  );
+  const result = tick
+    ? await tickFirstJob(tenant)
+    : apply
+      ? applyFirstJob(tenant, accepted ?? '')
+      : planFirstJob(tenant);
+  print(JSON.stringify(result, null, 2));
+  // The CLI retains its nonzero process-failure contract without printing a
+  // second payload or exposing a raw stack. Direct tick callers keep the envelope.
+  if (tick && 'pass_completed' in result && !result.pass_completed)
+    throw new ScriptExitError(1, '', true);
 }
