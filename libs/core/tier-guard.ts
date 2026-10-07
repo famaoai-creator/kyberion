@@ -11,7 +11,8 @@ import { pathResolver } from './path-resolver.js';
 import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
 import { resolveProjectScope, resolveProjectScopeId } from './foundation/project-scope-env.js';
 import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
-import { createLogger } from './logger.js';
+import { createLogger, emitConsoleLine } from './logger.js';
+import type { AuditEntry } from './governance/audit-chain.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
   STORAGE_FLOOR_ROOTS,
@@ -608,58 +609,109 @@ function checkTenantScope(
   return { allowed: false, reason };
 }
 
+type TenantAuditEntry = Omit<AuditEntry, 'id' | 'timestamp' | 'previousHash' | 'currentHash'>;
+
+interface TenantAuditAttempt {
+  nestedDenied: boolean;
+  diagnosticEmitted: boolean;
+}
+
+let activeTenantAuditAttempt: TenantAuditAttempt | undefined;
+let tenantAuditModule: Promise<typeof import('./governance/audit-chain.js')> | undefined;
+
+function reportTenantAuditFailure(attempt: TenantAuditAttempt): void {
+  if (attempt.diagnosticEmitted) return;
+  attempt.diagnosticEmitted = true;
+  try {
+    // The shared console emitter avoids the file sink (which may itself be
+    // denied), and keeps this fixed, redacted failure visible in quiet/JSON mode.
+    emitConsoleLine(
+      'stderr',
+      '[tier-guard] Tenant access audit persistence unverified — audit recording failed or encountered a nested policy denial | next: inspect tenant activation and audit persistence policy',
+      { dedup: false }
+    );
+  } catch {
+    // A broken stderr must not change the policy decision or start a retry loop.
+  }
+}
+
+function recordTenantAudit(entry: TenantAuditEntry): void {
+  if (activeTenantAuditAttempt) {
+    if (entry.result === 'denied') activeTenantAuditAttempt.nestedDenied = true;
+    return;
+  }
+
+  const attempt: TenantAuditAttempt = { nestedDenied: false, diagnosticEmitted: false };
+  // Never hold the guard while the import is pending: unrelated denials queued
+  // in the same turn each need their own attempt. record() and its secure I/O
+  // are synchronous; only calls made inside that sink are audit-of-audit work.
+  // Share native module resolution, but keep one callback/attempt per event.
+  if (!tenantAuditModule) {
+    const pendingModule = import('./governance/audit-chain.js');
+    tenantAuditModule = pendingModule;
+    void pendingModule.catch(() => {
+      if (tenantAuditModule === pendingModule) tenantAuditModule = undefined;
+    });
+  }
+  void tenantAuditModule.then(
+    ({ auditChain }) => {
+      activeTenantAuditAttempt = attempt;
+      try {
+        auditChain.record(entry);
+      } catch {
+        reportTenantAuditFailure(attempt);
+      } finally {
+        // appendToFile can catch a denied write and still return an entry, so
+        // a returned record alone cannot prove persistence in this case.
+        if (attempt.nestedDenied) reportTenantAuditFailure(attempt);
+        activeTenantAuditAttempt = undefined;
+      }
+    },
+    () => {
+      activeTenantAuditAttempt = attempt;
+      try {
+        reportTenantAuditFailure(attempt);
+      } finally {
+        activeTenantAuditAttempt = undefined;
+      }
+    }
+  );
+}
+
 function recordTenantScopeViolation(input: {
   relativePath: string;
   tenantSlug?: string;
   targetTenant: string;
   reason: string;
 }): void {
-  import('./governance/audit-chain.js')
-    .then(({ auditChain }) => {
-      auditChain.record({
-        agentId: 'tier-guard',
-        action: 'tenant.scope_violation',
-        operation: input.relativePath,
-        result: 'denied',
-        reason: input.reason,
-        ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
-        metadata: { target_tenant: input.targetTenant },
-      });
-    })
-    .catch(() => {
-      /* best-effort audit sink; the policy decision remains denied */
-    });
+  recordTenantAudit({
+    agentId: 'tier-guard',
+    action: 'tenant.scope_violation',
+    operation: input.relativePath,
+    result: 'denied',
+    reason: input.reason,
+    ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
+    metadata: { target_tenant: input.targetTenant },
+  });
 }
 
-/**
- * Append a `tenant.broker_access` event to the audit chain. Uses ESM
- * dynamic import to avoid a circular dependency at module load
- * (audit-chain lives in @agent/core too). Failures are swallowed because
- * tier-guard should never block a permitted operation just because the
- * audit sink hiccupped.
- */
+/** Best-effort auditing leaves the original brokered access decision unchanged. */
 function recordBrokerAccess(input: {
   relativePath: string;
   brokerTenants: string[];
   targetTenant: string;
 }): void {
-  import('./governance/audit-chain.js')
-    .then(({ auditChain }) => {
-      auditChain.record({
-        agentId: 'tier-guard',
-        action: 'tenant.broker_access',
-        operation: input.relativePath,
-        result: 'allowed',
-        reason: `Brokered cross-tenant access to '${input.targetTenant}' via mission allowed across {${input.brokerTenants.join(', ')}}.`,
-        metadata: {
-          target_tenant: input.targetTenant,
-          broker_tenants: input.brokerTenants,
-        },
-      });
-    })
-    .catch(() => {
-      /* best-effort */
-    });
+  recordTenantAudit({
+    agentId: 'tier-guard',
+    action: 'tenant.broker_access',
+    operation: input.relativePath,
+    result: 'allowed',
+    reason: `Brokered cross-tenant access to '${input.targetTenant}' via mission allowed across {${input.brokerTenants.join(', ')}}.`,
+    metadata: {
+      target_tenant: input.targetTenant,
+      broker_tenants: input.brokerTenants,
+    },
+  });
 }
 
 function recordGroupAccess(input: {
@@ -667,23 +719,17 @@ function recordGroupAccess(input: {
   groupId: string;
   tenantSlug: string;
 }): void {
-  import('./governance/audit-chain.js')
-    .then(({ auditChain }) => {
-      auditChain.record({
-        agentId: 'tier-guard',
-        action: 'tenant.group_access',
-        operation: input.relativePath,
-        result: 'allowed',
-        reason: `Tenant '${input.tenantSlug}' accessed shared tenant group '${input.groupId}'.`,
-        metadata: {
-          tenant_slug: input.tenantSlug,
-          tenant_group_id: input.groupId,
-        },
-      });
-    })
-    .catch(() => {
-      /* best-effort */
-    });
+  recordTenantAudit({
+    agentId: 'tier-guard',
+    action: 'tenant.group_access',
+    operation: input.relativePath,
+    result: 'allowed',
+    reason: `Tenant '${input.tenantSlug}' accessed shared tenant group '${input.groupId}'.`,
+    metadata: {
+      tenant_slug: input.tenantSlug,
+      tenant_group_id: input.groupId,
+    },
+  });
 }
 
 export function validateWritePermission(filePath: string): { allowed: boolean; reason?: string } {

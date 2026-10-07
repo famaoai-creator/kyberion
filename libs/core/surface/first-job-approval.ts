@@ -9,7 +9,7 @@ import { resolveAuthnSurfaceViewerScope } from './surface-authn.js';
 import { resolveOidcLoginConfig } from './oidc-browser-login.js';
 import { resolveMemberByPrincipal } from '../organization/member-registry.js';
 import { findDotCharter } from '../dot/dot-charter.js';
-import { currentDotActions, dotProposalHash } from '../dot/dot-dispatch.js';
+import { currentDotActions } from '../dot/dot-dispatch.js';
 import {
   computeApprovalPayloadHash,
   decideApprovalRequest,
@@ -26,7 +26,8 @@ import {
   frontDeskExecutionViewerMatches,
   type FrontDeskExecutionBinding,
 } from './front-desk-execution-contract.js';
-import { frontDeskBindingsEqual, frontDeskExecutionProposal } from './front-desk-execution.js';
+import { frontDeskBindingsEqual } from './front-desk-execution.js';
+import { firstJobActionMatches, firstJobApprovalMatches } from './first-job-approval-binding.js';
 import { resolveFirstJobViewer } from './first-job.js';
 import type { SurfaceViewerScope } from './surface-mutation-guard.js';
 import {
@@ -138,7 +139,6 @@ function inspect(
   const admission = inspectFrontDeskExecution(binding, charter);
   if (!admission.ok) reject(409, 'request_changed');
   const effect = firstJobApprovalEffect(charter, binding);
-  const expected = frontDeskExecutionProposal(binding);
   const actions = currentDotActions(charter.dot_id).filter(
     (action) => action.request_id === approvalId
   );
@@ -148,38 +148,17 @@ function inspect(
     !action ||
     action.status !== 'parked' ||
     action.decision !== 'approve' ||
-    action.dot_id !== charter.dot_id ||
-    action.actor_id !== 'dot:' + charter.dot_id ||
-    action.action_id !== expected.action_id ||
-    action.work_shape !== expected.work_shape ||
-    action.pipeline_ref !== expected.pipeline_ref ||
-    action.target !== expected.target ||
-    action.intent !== expected.intent ||
-    action.handoff_to ||
-    action.proposal_hash !== dotProposalHash(charter.dot_id, expected) ||
-    !frontDeskBindingsEqual(binding, action.front_desk_execution)
+    !firstJobActionMatches(charter, binding, action)
   )
     reject(409, 'request_changed');
   const record = loadApprovalRequest('autonomy', approvalId);
   if (
     !record ||
-    record.id !== approvalId ||
-    record.storageChannel !== 'autonomy' ||
-    record.kind !== 'channel-approval' ||
+    !firstJobApprovalMatches(charter, approvalId, effect, record) ||
     record.status !== 'pending' ||
     !record.expiresAt ||
     !Number.isFinite(Date.parse(record.expiresAt)) ||
     isApprovalRequestExpired(record) ||
-    record.requestedBy !== 'dot:' + charter.dot_id ||
-    record.accountability?.finalDecision !== 'human_only' ||
-    record.accountability.payloadHash !== effect.payloadHash ||
-    record.accountability.effectBinding !== effect.effectBinding ||
-    computeApprovalPayloadHash({ scope: record.scope }) !==
-      computeApprovalPayloadHash({ scope: effect.effect.scope }) ||
-    record.target ||
-    record.steering ||
-    record.workflow ||
-    record.veto ||
     record.diagnosticDecision
   )
     reject(409, 'approval_unavailable');

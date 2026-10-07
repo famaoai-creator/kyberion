@@ -54,7 +54,10 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('../workforce/work-coordination.js', () => ({ getWorkItem: state.getWorkItem }));
-vi.mock('../dot/dot-charter.js', () => ({ listDotCharters: state.listDotCharters }));
+vi.mock('../dot/dot-charter.js', () => ({
+  findRepoDotCharter: (id: string) =>
+    state.listDotCharters().find((entry: CharterFixture) => entry.charter.dot_id === id),
+}));
 vi.mock('../dot/dot-executor-reports.js', () => ({
   readDotWorkResults: state.readDotWorkResults,
 }));

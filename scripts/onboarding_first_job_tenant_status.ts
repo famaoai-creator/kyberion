@@ -1,4 +1,4 @@
-/** CLI-only, status-only tenant boundary for the explicit first-job tick. */
+/** CLI-only, status-only tenant boundary for explicit first-job status/tick. */
 import { isDeepStrictEqual } from 'node:util';
 import {
   resolveRole,
@@ -25,7 +25,7 @@ import { inspectFrontDeskExecution } from '@agent/core/surface/front-desk-conver
 
 /**
  * No generic tenant reader is exported. The closure is installed only by the
- * operator's bounded CLI tick, never by a surface or the general supervisor.
+ * operator's bounded CLI status/tick, never by a surface or the general supervisor.
  * It derives the one registry target from a current server mapping after
  * validating this exact durable request, then returns only void or a fixed error.
  * The existing transcript admission reader does not confer tenant-read authority.

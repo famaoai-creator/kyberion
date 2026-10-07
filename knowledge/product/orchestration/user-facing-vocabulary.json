@@ -23975,14 +23975,14 @@
         "qps-ploc": "⟦1. Řėɋůėşŧ ȧ şẏñŧħėŧïƈ ḓïȧɠñőşŧïƈ řėƈėïṗŧ. ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "first_job_step_review": {
-        "en": "2. Advance the diagnostic with the terminal command below, then sign in and review the exact approval in this guide. Nothing is approved automatically.",
-        "ja": "2. 下のターミナルコマンドで診断を進め、サインインして、このガイドで承認内容を確認します。自動で承認されることはありません。",
-        "qps-ploc": "⟦2. Ȧḓṽȧñƈė ŧħė ḓïȧɠñőşŧïƈ ẇïŧħ ŧħė ŧėřɱïñȧŀ ƈőɱɱȧñḓ ƀėŀőẇ, ŧħėñ şïɠñ ïñ ȧñḓ řėṽïėẇ ŧħė ėẋȧƈŧ ȧṗṗřőṽȧŀ ïñ ŧħïş ɠůïḓė. Ñőŧħïñɠ ïş ȧṗṗřőṽėḓ ȧůŧőɱȧŧïƈȧŀŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀő⟧"
+        "en": "2. Ask the setup operator to inspect the exact request with its read-only status command. If approval is pending, sign in and review that request here.",
+        "ja": "2. 設定担当者に、読み取り専用の状況確認コマンドで対象の依頼を確認してもらいます。承認待ちの場合は、サインインしてこの画面でその依頼を確認します。",
+        "qps-ploc": "⟦2. Ȧşķ ŧħė şėŧůṗ őṗėřȧŧőř ŧő ïñşṗėƈŧ ŧħė ėẋȧƈŧ řėɋůėşŧ ẇïŧħ ïŧş řėȧḓ-őñŀẏ şŧȧŧůş ƈőɱɱȧñḓ. Ïƒ ȧṗṗřőṽȧŀ ïş ṗėñḓïñɠ, şïɠñ ïñ ȧñḓ řėṽïėẇ ŧħȧŧ řėɋůėşŧ ħėřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀő⟧"
       },
       "first_job_step_receipt": {
-        "en": "3. Run that command again after approval, then refresh here to check the verified receipt. A reply alone does not prove completion.",
-        "ja": "3. 承認後に同じコマンドをもう一度実行し、この画面を更新して確認済みの記録を見ます。返答があるだけでは完了を意味しません。",
-        "qps-ploc": "⟦3. Řůñ ŧħȧŧ ƈőɱɱȧñḓ ȧɠȧïñ ȧƒŧėř ȧṗṗřőṽȧŀ, ŧħėñ řėƒřėşħ ħėřė ŧő ƈħėƈķ ŧħė ṽėřïƒïėḓ řėƈėïṗŧ. Ȧ řėṗŀẏ ȧŀőñė ḓőėş ñőŧ ṗřőṽė ƈőɱṗŀėŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
+        "en": "3. After an approval decision, the setup operator checks that same request’s status and follows its reported next action. Refresh here to check the verified receipt; approval alone does not prove execution.",
+        "ja": "3. 承認の判断後、設定担当者が同じ依頼の状況と次の操作を確認します。この画面を更新して検証済みの記録を確認してください。承認だけでは実行済みとは判断できません。",
+        "qps-ploc": "⟦3. Ȧƒŧėř ȧñ ȧṗṗřőṽȧŀ ḓėƈïşïőñ, ŧħė şėŧůṗ őṗėřȧŧőř ƈħėƈķş ŧħȧŧ şȧɱė řėɋůėşŧ’ş şŧȧŧůş ȧñḓ ƒőŀŀőẇş ïŧş řėṗőřŧėḓ ñėẋŧ ȧƈŧïőñ. Řėƒřėşħ ħėřė ŧő ƈħėƈķ ŧħė ṽėřïƒïėḓ řėƈėïṗŧ; ȧṗṗřőṽȧŀ ȧŀőñė ḓőėş ñőŧ ṗřőṽė ėẋėƈůŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
       },
       "first_job_step_revise": {
         "en": "4. Change the format of a verified receipt if needed. Each new revision needs a new approval; earlier receipts stay in history.",
@@ -24175,9 +24175,9 @@
         "qps-ploc": "⟦Ṗůƀŀïƈ ḓïȧɠñőşŧïƈ şƈőṗė: ŧėşŧ ŧėñȧñŧ őñŀẏ ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
       "first_job_advance": {
-        "en": "Advance this diagnostic from the project terminal with one bounded step. If it asks for approval, sign in and review the exact request below, then run the same command again and refresh here.",
-        "ja": "プロジェクトのターミナルで、この診断だけを1段階進めます。承認待ちになったらサインインして下で依頼内容を確認し、同じコマンドをもう一度実行して、この画面を更新してください。",
-        "qps-ploc": "⟦Ȧḓṽȧñƈė ŧħïş ḓïȧɠñőşŧïƈ ƒřőɱ ŧħė ṗřőĵėƈŧ ŧėřɱïñȧŀ ẇïŧħ őñė ƀőůñḓėḓ şŧėṗ. Ïƒ ïŧ ȧşķş ƒőř ȧṗṗřőṽȧŀ, şïɠñ ïñ ȧñḓ řėṽïėẇ ŧħė ėẋȧƈŧ řėɋůėşŧ ƀėŀőẇ, ŧħėñ řůñ ŧħė şȧɱė ƈőɱɱȧñḓ ȧɠȧïñ ȧñḓ řėƒřėşħ ħėřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+        "en": "Setup operator: use the status command beside the exact request and revision in the history below. It only reads existing evidence; it does not approve or execute work. Follow the reported next actor and action, then refresh here.",
+        "ja": "設定担当者：下の履歴で、対象の依頼と版に表示された状況確認コマンドを使ってください。既存の証拠を読み取るだけで、承認や実行はしません。表示された次の担当者と操作を確認してから、この画面を更新してください。",
+        "qps-ploc": "⟦Şėŧůṗ őṗėřȧŧőř: ůşė ŧħė şŧȧŧůş ƈőɱɱȧñḓ ƀėşïḓė ŧħė ėẋȧƈŧ řėɋůėşŧ ȧñḓ řėṽïşïőñ ïñ ŧħė ħïşŧőřẏ ƀėŀőẇ. Ïŧ őñŀẏ řėȧḓş ėẋïşŧïñɠ ėṽïḓėñƈė; ïŧ ḓőėş ñőŧ ȧṗṗřőṽė őř ėẋėƈůŧė ẇőřķ. Ƒőŀŀőẇ ŧħė řėṗőřŧėḓ ñėẋŧ ȧƈŧőř ȧñḓ ȧƈŧïőñ, ŧħėñ řėƒřėşħ ħėřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
       },
       "first_job_approval_title": {
         "en": "Review this diagnostic request",
@@ -24675,9 +24675,9 @@
         "qps-ploc": "⟦Ḓïȧɠñőşŧïƈ ṗřőɠřėşş: ñő ȧƈŧïṽė ḓïȧɠñőşŧïƈ řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       },
       "first_job_setup_advancement_review_or_tick": {
-        "en": "Diagnostic progress: check the approval section. A bounded operator tick may be needed to offer approval or advance approved work.",
-        "ja": "診断の進行状況：承認欄を確認してください。承認の表示や承認済みの仕事を進めるには、設定担当者による診断専用の実行が必要な場合があります。",
-        "qps-ploc": "⟦Ḓïȧɠñőşŧïƈ ṗřőɠřėşş: ƈħėƈķ ŧħė ȧṗṗřőṽȧŀ şėƈŧïőñ. Ȧ ƀőůñḓėḓ őṗėřȧŧőř ŧïƈķ ɱȧẏ ƀė ñėėḓėḓ ŧő őƒƒėř ȧṗṗřőṽȧŀ őř ȧḓṽȧñƈė ȧṗṗřőṽėḓ ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
+        "en": "Diagnostic progress: inspect the exact request status to distinguish intake, approval, and execution.",
+        "ja": "診断の進行状況：対象の依頼の状況を確認し、受付・承認・実行のどの段階かを確かめてください。",
+        "qps-ploc": "⟦Ḓïȧɠñőşŧïƈ ṗřőɠřėşş: ïñşṗėƈŧ ŧħė ėẋȧƈŧ řėɋůėşŧ şŧȧŧůş ŧő ḓïşŧïñɠůïşħ ïñŧȧķė, ȧṗṗřőṽȧŀ, ȧñḓ ėẋėƈůŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
       },
       "first_job_setup_advancement_running": {
         "en": "Diagnostic progress: execution is recorded as running; completion is not yet verified.",
@@ -24745,9 +24745,9 @@
         "qps-ploc": "⟦Řůñ ŧħė ñőřɱȧŀ ƀȧşėŀïñė ƈħėƈķ şėṗȧřȧŧėŀẏ ïƒ őṽėřȧŀŀ ėñṽïřőñɱėñŧ ħėȧŀŧħ ñėėḓş ṽėřïƒïƈȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
       },
       "first_job_setup_action_review_or_tick": {
-        "en": "Review any displayed approval first. Inspect the bounded tick instructions below before advancing work.",
-        "ja": "承認が表示されていれば先に確認してください。仕事を進める前に、下の診断専用の実行手順を確認してください。",
-        "qps-ploc": "⟦Řėṽïėẇ ȧñẏ ḓïşṗŀȧẏėḓ ȧṗṗřőṽȧŀ ƒïřşŧ. Ïñşṗėƈŧ ŧħė ƀőůñḓėḓ ŧïƈķ ïñşŧřůƈŧïőñş ƀėŀőẇ ƀėƒőřė ȧḓṽȧñƈïñɠ ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+        "en": "Use the read-only status command for the exact request and revision below. Follow the reported next actor and action.",
+        "ja": "下に表示された対象の依頼と版の読み取り専用コマンドで状況を確認し、次の担当者と操作を確認してください。",
+        "qps-ploc": "⟦Ůşė ŧħė řėȧḓ-őñŀẏ şŧȧŧůş ƈőɱɱȧñḓ ƒőř ŧħė ėẋȧƈŧ řėɋůėşŧ ȧñḓ řėṽïşïőñ ƀėŀőẇ. Ƒőŀŀőẇ ŧħė řėṗőřŧėḓ ñėẋŧ ȧƈŧőř ȧñḓ ȧƈŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
       },
       "first_job_setup_action_wait": {
         "en": "Refresh to check for a verified result.",
