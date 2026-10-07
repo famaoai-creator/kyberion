@@ -54,6 +54,11 @@ describe('mission-classification contract', () => {
       'decision_support',
       'customer_engagement',
       'platform_onboarding',
+      'finance_and_accounting',
+      'people_and_talent',
+      'legal_and_compliance',
+      'strategy_and_governance',
+      'procurement_and_supply',
     ]);
 
     const workflowCatalog = readJson<WorkflowCatalogFile>(

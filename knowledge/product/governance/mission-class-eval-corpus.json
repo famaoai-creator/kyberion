@@ -1,0 +1,887 @@
+{
+  "$schema": "../schemas/mission-class-eval-corpus.schema.json",
+  "version": "1.0.0",
+  "purpose": "Labelled utterances for the classify → workflow → team → review chain; the measuring stick for the evaluate-and-improve cycle on organization mission classes.",
+  "cases": [
+    {
+      "case_id": "fin-close-ja",
+      "split": "dev",
+      "utterance": "今月の月次決算を締めたい",
+      "expected_class": "finance_and_accounting",
+      "expected_intent_id": "financial-close-monthly",
+      "expected_workflow_id": "financial-close-monthly",
+      "expected_team_template": "finance_operations",
+      "required_gates": ["FINANCIAL_CONTROLS"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "fin-invoice-ja",
+      "split": "dev",
+      "utterance": "請求書を処理して支払いまで回して",
+      "expected_class": "finance_and_accounting",
+      "expected_intent_id": "invoice-processing",
+      "expected_workflow_id": "invoice-processing",
+      "expected_team_template": "finance_operations",
+      "required_gates": ["FINANCIAL_CONTROLS"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "fin-expense-ja",
+      "split": "dev",
+      "utterance": "経費精算の申請を確認して",
+      "expected_class": "finance_and_accounting",
+      "expected_intent_id": "expense-reimbursement",
+      "expected_workflow_id": "expense-reimbursement",
+      "expected_team_template": "finance_operations",
+      "required_gates": ["FINANCIAL_CONTROLS"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "fin-ar-ja",
+      "split": "dev",
+      "utterance": "未回収の売掛金の督促を進めたい",
+      "expected_class": "finance_and_accounting",
+      "expected_intent_id": "accounts-receivable-collections",
+      "expected_workflow_id": "accounts-receivable-collections",
+      "expected_team_template": "finance_operations",
+      "required_gates": ["FINANCIAL_CONTROLS"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "fin-payroll-ja",
+      "split": "dev",
+      "utterance": "給与計算を回したい",
+      "expected_class": "finance_and_accounting",
+      "expected_intent_id": "payroll-cycle",
+      "expected_workflow_id": "payroll-cycle",
+      "expected_team_template": "finance_operations",
+      "required_gates": ["FINANCIAL_CONTROLS"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "fin-budget-ja",
+      "split": "dev",
+      "utterance": "来月の予算と実績の差異をレビューして",
+      "expected_class": "finance_and_accounting",
+      "expected_intent_id": "budget-review",
+      "expected_workflow_id": "budget-review",
+      "expected_team_template": "finance_operations",
+      "required_gates": ["FINANCIAL_CONTROLS"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "fin-close-en",
+      "split": "dev",
+      "utterance": "Run the monthly financial close",
+      "expected_class": "finance_and_accounting",
+      "expected_intent_id": "financial-close-monthly",
+      "expected_workflow_id": "financial-close-monthly",
+      "expected_team_template": "finance_operations",
+      "required_gates": ["FINANCIAL_CONTROLS"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "fin-fundraising-en",
+      "split": "dev",
+      "utterance": "Prepare for our Series A fundraising",
+      "expected_class": "finance_and_accounting",
+      "expected_intent_id": "fundraising-prep",
+      "expected_workflow_id": "fundraising-prep",
+      "expected_team_template": "finance_operations",
+      "required_gates": ["FINANCIAL_CONTROLS"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "fin-close-holdout",
+      "split": "holdout",
+      "utterance": "月末の締め処理を始めよう",
+      "expected_class": "finance_and_accounting",
+      "expected_intent_id": "financial-close-monthly",
+      "expected_workflow_id": "financial-close-monthly",
+      "expected_team_template": "finance_operations",
+      "required_gates": ["FINANCIAL_CONTROLS"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "fin-ar-holdout",
+      "split": "holdout",
+      "utterance": "Chase overdue customer payments",
+      "expected_class": "finance_and_accounting",
+      "expected_intent_id": "accounts-receivable-collections",
+      "expected_workflow_id": "accounts-receivable-collections",
+      "expected_team_template": "finance_operations",
+      "required_gates": ["FINANCIAL_CONTROLS"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "fin-budget-holdout",
+      "split": "holdout",
+      "utterance": "予実管理の会議の前に数字の乖離を確認しておいて",
+      "expected_class": "finance_and_accounting",
+      "expected_intent_id": "budget-review",
+      "expected_workflow_id": "budget-review",
+      "expected_team_template": "finance_operations",
+      "required_gates": ["FINANCIAL_CONTROLS"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "ppl-hire-ja",
+      "split": "dev",
+      "utterance": "採用候補者の選考を進めたい",
+      "expected_class": "people_and_talent",
+      "expected_intent_id": "hiring-workflow",
+      "expected_workflow_id": "hiring-workflow",
+      "expected_team_template": "people_operations",
+      "required_gates": ["PEOPLE_DATA_PROTECTION"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "ppl-hire-en",
+      "split": "dev",
+      "utterance": "Start hiring for a backend engineer",
+      "expected_class": "people_and_talent",
+      "expected_intent_id": "hiring-workflow",
+      "expected_workflow_id": "hiring-workflow",
+      "expected_team_template": "people_operations",
+      "required_gates": ["PEOPLE_DATA_PROTECTION"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "ppl-perf-ja",
+      "split": "dev",
+      "utterance": "半期の人事評価を進めたい",
+      "expected_class": "people_and_talent",
+      "expected_intent_id": "performance-review",
+      "expected_workflow_id": "performance-review",
+      "expected_team_template": "people_operations",
+      "required_gates": ["PEOPLE_DATA_PROTECTION"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "ppl-perf-en",
+      "split": "dev",
+      "utterance": "Run the annual performance review cycle",
+      "expected_class": "people_and_talent",
+      "expected_intent_id": "performance-review",
+      "expected_workflow_id": "performance-review",
+      "expected_team_template": "people_operations",
+      "required_gates": ["PEOPLE_DATA_PROTECTION"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "ppl-onboard-ja",
+      "split": "dev",
+      "utterance": "新入社員のオンボーディングを進めたい",
+      "expected_class": "people_and_talent",
+      "expected_intent_id": "employee-lifecycle-transition",
+      "expected_workflow_id": "employee-lifecycle-transition",
+      "expected_team_template": "people_operations",
+      "required_gates": ["PEOPLE_DATA_PROTECTION"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "ppl-offboard-ja",
+      "split": "dev",
+      "utterance": "退職者の手続きを整理して",
+      "expected_class": "people_and_talent",
+      "expected_intent_id": "employee-lifecycle-transition",
+      "expected_workflow_id": "employee-lifecycle-transition",
+      "expected_team_template": "people_operations",
+      "required_gates": ["PEOPLE_DATA_PROTECTION"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "ppl-hire-holdout",
+      "split": "holdout",
+      "utterance": "エンジニアを2名採用したい",
+      "expected_class": "people_and_talent",
+      "expected_intent_id": "hiring-workflow",
+      "expected_workflow_id": "hiring-workflow",
+      "expected_team_template": "people_operations",
+      "required_gates": ["PEOPLE_DATA_PROTECTION"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "ppl-offboard-holdout",
+      "split": "holdout",
+      "utterance": "Process an employee offboarding",
+      "expected_class": "people_and_talent",
+      "expected_intent_id": "employee-lifecycle-transition",
+      "expected_workflow_id": "employee-lifecycle-transition",
+      "expected_team_template": "people_operations",
+      "required_gates": ["PEOPLE_DATA_PROTECTION"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "leg-contract-ja",
+      "split": "dev",
+      "utterance": "契約書をレビューして",
+      "expected_class": "legal_and_compliance",
+      "expected_intent_id": "contract-review",
+      "expected_workflow_id": "contract-review-approval",
+      "expected_team_template": "legal_compliance",
+      "required_gates": ["LEGAL_REVIEW"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "leg-nda-en",
+      "split": "dev",
+      "utterance": "Review this NDA for legal risk",
+      "expected_class": "legal_and_compliance",
+      "expected_intent_id": "contract-review",
+      "expected_workflow_id": "contract-review-approval",
+      "expected_team_template": "legal_compliance",
+      "required_gates": ["LEGAL_REVIEW"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "leg-audit-ja",
+      "split": "dev",
+      "utterance": "内部監査の準備をしたい",
+      "expected_class": "legal_and_compliance",
+      "expected_intent_id": "internal-audit-compliance",
+      "expected_workflow_id": "internal-audit-compliance",
+      "expected_team_template": "legal_compliance",
+      "required_gates": ["LEGAL_REVIEW"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "leg-reg-ja",
+      "split": "dev",
+      "utterance": "規制当局への届出を準備して",
+      "expected_class": "legal_and_compliance",
+      "expected_intent_id": "regulatory-filing-compliance",
+      "expected_workflow_id": "regulatory-filing-compliance",
+      "expected_team_template": "legal_compliance",
+      "required_gates": ["LEGAL_REVIEW"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "leg-risk-ja",
+      "split": "dev",
+      "utterance": "全社のリスクアセスメントをやりたい",
+      "expected_class": "legal_and_compliance",
+      "expected_intent_id": "enterprise-risk-assessment",
+      "expected_workflow_id": "enterprise-risk-assessment",
+      "expected_team_template": "legal_compliance",
+      "required_gates": ["LEGAL_REVIEW"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "leg-bcp-ja",
+      "split": "dev",
+      "utterance": "事業継続計画を見直したい",
+      "expected_class": "legal_and_compliance",
+      "expected_intent_id": "business-continuity-planning",
+      "expected_workflow_id": "business-continuity-planning",
+      "expected_team_template": "legal_compliance",
+      "required_gates": ["LEGAL_REVIEW"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "leg-audit-en",
+      "split": "dev",
+      "utterance": "Prepare for the ISO 27001 internal audit",
+      "expected_class": "legal_and_compliance",
+      "expected_intent_id": "internal-audit-compliance",
+      "expected_workflow_id": "internal-audit-compliance",
+      "expected_team_template": "legal_compliance",
+      "required_gates": ["LEGAL_REVIEW"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "leg-contract-holdout",
+      "split": "holdout",
+      "utterance": "取引先との基本契約書の条項をチェックして",
+      "expected_class": "legal_and_compliance",
+      "expected_intent_id": "contract-review",
+      "expected_workflow_id": "contract-review-approval",
+      "expected_team_template": "legal_compliance",
+      "required_gates": ["LEGAL_REVIEW"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "leg-bcp-holdout",
+      "split": "holdout",
+      "utterance": "Update our BCP for the new data center",
+      "expected_class": "legal_and_compliance",
+      "expected_intent_id": "business-continuity-planning",
+      "expected_workflow_id": "business-continuity-planning",
+      "expected_team_template": "legal_compliance",
+      "required_gates": ["LEGAL_REVIEW"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "str-plan-ja",
+      "split": "dev",
+      "utterance": "来期の事業計画を作って",
+      "expected_class": "strategy_and_governance",
+      "expected_intent_id": "business-plan-development",
+      "expected_workflow_id": "business-plan-development",
+      "expected_team_template": "strategy_governance",
+      "required_gates": ["STAKEHOLDER_ALIGNMENT"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "str-okr-ja",
+      "split": "dev",
+      "utterance": "四半期OKRを策定したい",
+      "expected_class": "strategy_and_governance",
+      "expected_intent_id": "quarterly-okr-planning",
+      "expected_workflow_id": "quarterly-okr-planning",
+      "expected_team_template": "strategy_governance",
+      "required_gates": ["STAKEHOLDER_ALIGNMENT"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "str-board-ja",
+      "split": "dev",
+      "utterance": "取締役会の資料を準備して",
+      "expected_class": "strategy_and_governance",
+      "expected_intent_id": "board-meeting-prep",
+      "expected_workflow_id": "board-meeting-prep",
+      "expected_team_template": "strategy_governance",
+      "required_gates": ["STAKEHOLDER_ALIGNMENT"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "str-ma-ja",
+      "split": "dev",
+      "utterance": "M&Aのデューデリジェンスをしたい",
+      "expected_class": "strategy_and_governance",
+      "expected_intent_id": "due-diligence-ma",
+      "expected_workflow_id": "due-diligence-ma",
+      "expected_team_template": "strategy_governance",
+      "required_gates": ["STAKEHOLDER_ALIGNMENT"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "str-alliance-ja",
+      "split": "dev",
+      "utterance": "提携先とのアライアンス戦略を整理して",
+      "expected_class": "strategy_and_governance",
+      "expected_intent_id": "partner-alliance-management",
+      "expected_workflow_id": "partner-alliance-management",
+      "expected_team_template": "strategy_governance",
+      "required_gates": ["STAKEHOLDER_ALIGNMENT"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "str-okr-en",
+      "split": "dev",
+      "utterance": "Plan our Q3 OKRs",
+      "expected_class": "strategy_and_governance",
+      "expected_intent_id": "quarterly-okr-planning",
+      "expected_workflow_id": "quarterly-okr-planning",
+      "expected_team_template": "strategy_governance",
+      "required_gates": ["STAKEHOLDER_ALIGNMENT"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "str-gate-ja",
+      "split": "dev",
+      "utterance": "ゲートレビューを開催して",
+      "expected_class": "strategy_and_governance",
+      "expected_intent_id": "gate-review-session",
+      "expected_workflow_id": "gate-review-session",
+      "expected_team_template": "strategy_governance",
+      "required_gates": ["STAKEHOLDER_ALIGNMENT"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "str-board-holdout",
+      "split": "holdout",
+      "utterance": "Prepare materials for next week's board meeting",
+      "expected_class": "strategy_and_governance",
+      "expected_intent_id": "board-meeting-prep",
+      "expected_workflow_id": "board-meeting-prep",
+      "expected_team_template": "strategy_governance",
+      "required_gates": ["STAKEHOLDER_ALIGNMENT"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "str-plan-holdout",
+      "split": "holdout",
+      "utterance": "今期の経営計画を練りたい",
+      "expected_class": "strategy_and_governance",
+      "expected_intent_id": "business-plan-development",
+      "expected_workflow_id": "business-plan-development",
+      "expected_team_template": "strategy_governance",
+      "required_gates": ["STAKEHOLDER_ALIGNMENT"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "prc-vendor-ja",
+      "split": "dev",
+      "utterance": "取引先を選定してベンダー比較したい",
+      "expected_class": "procurement_and_supply",
+      "expected_intent_id": "procurement-vendor",
+      "expected_workflow_id": "procurement-vendor",
+      "expected_team_template": "procurement_supply",
+      "required_gates": ["VENDOR_INTEGRITY"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "prc-supplier-ja",
+      "split": "dev",
+      "utterance": "サプライヤー登録をしたい",
+      "expected_class": "procurement_and_supply",
+      "expected_intent_id": "supplier-onboarding",
+      "expected_workflow_id": "supplier-onboarding",
+      "expected_team_template": "procurement_supply",
+      "required_gates": ["VENDOR_INTEGRITY"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "prc-supply-ja",
+      "split": "dev",
+      "utterance": "需給計画を立てて",
+      "expected_class": "procurement_and_supply",
+      "expected_intent_id": "supply-chain-planning",
+      "expected_workflow_id": "supply-chain-planning",
+      "expected_team_template": "procurement_supply",
+      "required_gates": ["VENDOR_INTEGRITY"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "prc-order-ja",
+      "split": "dev",
+      "utterance": "受注した注文の出荷状況を追いたい",
+      "expected_class": "procurement_and_supply",
+      "expected_intent_id": "order-fulfillment-tracking",
+      "expected_workflow_id": "order-fulfillment-tracking",
+      "expected_team_template": "procurement_supply",
+      "required_gates": ["VENDOR_INTEGRITY"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "prc-vendor-en",
+      "split": "dev",
+      "utterance": "Select a vendor for our new CRM",
+      "expected_class": "procurement_and_supply",
+      "expected_intent_id": "procurement-vendor",
+      "expected_workflow_id": "procurement-vendor",
+      "expected_team_template": "procurement_supply",
+      "required_gates": ["VENDOR_INTEGRITY"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "prc-supplier-holdout",
+      "split": "holdout",
+      "utterance": "新規仕入先の登録審査を進めて",
+      "expected_class": "procurement_and_supply",
+      "expected_intent_id": "supplier-onboarding",
+      "expected_workflow_id": "supplier-onboarding",
+      "expected_team_template": "procurement_supply",
+      "required_gates": ["VENDOR_INTEGRITY"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "prc-supply-holdout",
+      "split": "holdout",
+      "utterance": "Plan next quarter's demand and supply",
+      "expected_class": "procurement_and_supply",
+      "expected_intent_id": "supply-chain-planning",
+      "expected_workflow_id": "supply-chain-planning",
+      "expected_team_template": "procurement_supply",
+      "required_gates": ["VENDOR_INTEGRITY"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "reg-agenda-ja",
+      "split": "dev",
+      "utterance": "来週の予定教えて",
+      "expected_class": "customer_engagement",
+      "expected_intent_id": "schedule-read-agenda"
+    },
+    {
+      "case_id": "reg-qbr-ja",
+      "split": "dev",
+      "utterance": "顧客のQBRを準備して",
+      "expected_class": "customer_engagement",
+      "expected_intent_id": "customer-health-qbr"
+    },
+    {
+      "case_id": "reg-support-ja",
+      "split": "dev",
+      "utterance": "サポートチケットを解決して",
+      "expected_class": "customer_engagement",
+      "expected_intent_id": "support-ticket-resolution"
+    },
+    {
+      "case_id": "reg-rfp-ja",
+      "split": "dev",
+      "utterance": "RFPへの回答を作って",
+      "expected_class": "customer_engagement",
+      "expected_intent_id": "rfp-response-proposal"
+    },
+    {
+      "case_id": "reg-sales-ja",
+      "split": "dev",
+      "utterance": "営業パイプラインをレビューして",
+      "expected_class": "customer_engagement",
+      "expected_intent_id": "sales-pipeline-review",
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "reg-incident-en",
+      "split": "dev",
+      "utterance": "Respond to the production incident",
+      "expected_class": "operations_and_release",
+      "expected_intent_id": "incident-response"
+    },
+    {
+      "case_id": "reg-change-ja",
+      "split": "dev",
+      "utterance": "リリースの変更管理を進めて",
+      "expected_class": "operations_and_release",
+      "expected_intent_id": "release-change-management"
+    },
+    {
+      "case_id": "reg-qms-ja",
+      "split": "dev",
+      "utterance": "品質マネジメントシステムの運用を回して",
+      "expected_class": "operations_and_release",
+      "expected_intent_id": "quality-management-system"
+    },
+    {
+      "case_id": "reg-reviewtext-ja",
+      "split": "dev",
+      "utterance": "この承認文面をレビューして",
+      "expected_class": "decision_support",
+      "expected_intent_id": "review-text"
+    },
+    {
+      "case_id": "reg-techmemo-ja",
+      "split": "dev",
+      "utterance": "技術判断メモを書いて",
+      "expected_class": "decision_support",
+      "expected_intent_id": "technical-decision-memo"
+    },
+    {
+      "case_id": "reg-knowledge-ja",
+      "split": "dev",
+      "utterance": "ナレッジを検索して",
+      "expected_class": "research_and_absorption"
+    },
+    {
+      "case_id": "reg-slides-ja",
+      "split": "dev",
+      "utterance": "提案資料をスライドにして",
+      "expected_class": "content_and_media"
+    },
+    {
+      "case_id": "reg-video-ja",
+      "split": "dev",
+      "utterance": "ナレーション付きの動画を作って",
+      "expected_class": "content_and_media"
+    },
+    {
+      "case_id": "reg-research-ja",
+      "split": "dev",
+      "utterance": "競合調査のレポートを作って",
+      "expected_class": "research_and_absorption"
+    },
+    {
+      "case_id": "h2-fin-1",
+      "split": "holdout",
+      "utterance": "今月分の仕訳と残高の突合をお願い",
+      "expected_class": "finance_and_accounting",
+      "expected_team_template": "finance_operations",
+      "required_gates": ["FINANCIAL_CONTROLS"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "h2-fin-2",
+      "split": "holdout",
+      "utterance": "Our contractors are waiting on payment, can you get the invoices approved and paid?",
+      "expected_class": "finance_and_accounting",
+      "expected_team_template": "finance_operations",
+      "required_gates": ["FINANCIAL_CONTROLS"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "h2-fin-3",
+      "split": "holdout",
+      "utterance": "社員の立替経費をまとめてチェックして",
+      "expected_class": "finance_and_accounting",
+      "expected_team_template": "finance_operations",
+      "required_gates": ["FINANCIAL_CONTROLS"],
+      "forbidden_gates": ["RELEASE_READY"],
+      "expected_intent_id": "expense-reimbursement",
+      "expected_workflow_id": "expense-reimbursement"
+    },
+    {
+      "case_id": "h2-fin-4",
+      "split": "holdout",
+      "utterance": "Prepare an investor update and financial model for our seed round",
+      "expected_class": "finance_and_accounting",
+      "expected_team_template": "finance_operations",
+      "required_gates": ["FINANCIAL_CONTROLS"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "h2-ppl-1",
+      "split": "holdout",
+      "utterance": "来月入社するメンバーの受け入れ準備を整えたい",
+      "expected_class": "people_and_talent",
+      "expected_team_template": "people_operations",
+      "required_gates": ["PEOPLE_DATA_PROTECTION"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "h2-ppl-2",
+      "split": "holdout",
+      "utterance": "Draft the interview questions for our product designer opening",
+      "expected_class": "people_and_talent",
+      "expected_team_template": "people_operations",
+      "required_gates": ["PEOPLE_DATA_PROTECTION"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "h2-ppl-3",
+      "split": "holdout",
+      "utterance": "上期の評価面談に向けて各メンバーの成果をまとめて",
+      "expected_class": "people_and_talent",
+      "expected_team_template": "people_operations",
+      "required_gates": ["PEOPLE_DATA_PROTECTION"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "h2-leg-1",
+      "split": "holdout",
+      "utterance": "この業務委託契約の損害賠償条項に問題がないか見てほしい",
+      "expected_class": "legal_and_compliance",
+      "expected_team_template": "legal_compliance",
+      "required_gates": ["LEGAL_REVIEW"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "h2-leg-2",
+      "split": "holdout",
+      "utterance": "Get us ready for next month's SOC 2 compliance audit",
+      "expected_class": "legal_and_compliance",
+      "expected_team_template": "legal_compliance",
+      "required_gates": ["LEGAL_REVIEW"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "h2-leg-3",
+      "split": "holdout",
+      "utterance": "個人情報保護法の改正に合わせて社内規程の対応状況を確認したい",
+      "expected_class": "legal_and_compliance",
+      "expected_team_template": "legal_compliance",
+      "required_gates": ["LEGAL_REVIEW"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "h2-str-1",
+      "split": "holdout",
+      "utterance": "来年度の全社目標と主要な成果指標を決めたい",
+      "expected_class": "strategy_and_governance",
+      "expected_team_template": "strategy_governance",
+      "required_gates": ["STAKEHOLDER_ALIGNMENT"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "h2-str-2",
+      "split": "holdout",
+      "utterance": "Evaluate whether we should acquire the startup we have been talking to",
+      "expected_class": "strategy_and_governance",
+      "expected_team_template": "strategy_governance",
+      "required_gates": ["STAKEHOLDER_ALIGNMENT"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "h2-str-3",
+      "split": "holdout",
+      "utterance": "役員向けに今期の経営状況を報告するパッケージを作りたい",
+      "expected_class": "strategy_and_governance",
+      "expected_team_template": "strategy_governance",
+      "required_gates": ["STAKEHOLDER_ALIGNMENT"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "h2-prc-1",
+      "split": "holdout",
+      "utterance": "新しい倉庫管理システムの業者を比較して決めたい",
+      "expected_class": "procurement_and_supply",
+      "expected_team_template": "procurement_supply",
+      "required_gates": ["VENDOR_INTEGRITY"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "h2-prc-2",
+      "split": "holdout",
+      "utterance": "Check whether our key suppliers can meet demand for the holiday season",
+      "expected_class": "procurement_and_supply",
+      "expected_team_template": "procurement_supply",
+      "required_gates": ["VENDOR_INTEGRITY"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "h2-prc-3",
+      "split": "holdout",
+      "utterance": "出荷が遅れている注文の状況を整理して",
+      "expected_class": "procurement_and_supply",
+      "expected_team_template": "procurement_supply",
+      "required_gates": ["VENDOR_INTEGRITY"],
+      "forbidden_gates": ["RELEASE_READY"]
+    },
+    {
+      "case_id": "neg-agenda-en",
+      "split": "dev",
+      "utterance": "What's on my agenda next week?",
+      "expected_class": "customer_engagement",
+      "forbidden_gates": [
+        "FINANCIAL_CONTROLS",
+        "PEOPLE_DATA_PROTECTION",
+        "LEGAL_REVIEW",
+        "VENDOR_INTEGRITY",
+        "ASSUMPTIONS_EXPLICIT"
+      ],
+      "expected_intent_id": "schedule-read-agenda"
+    },
+    {
+      "case_id": "neg-secaudit-ja",
+      "split": "dev",
+      "utterance": "ソースコードのセキュリティ監査をお願いします",
+      "expected_class": "customer_engagement",
+      "forbidden_gates": [
+        "FINANCIAL_CONTROLS",
+        "PEOPLE_DATA_PROTECTION",
+        "LEGAL_REVIEW",
+        "VENDOR_INTEGRITY",
+        "ASSUMPTIONS_EXPLICIT"
+      ]
+    },
+    {
+      "case_id": "neg-reconcile-en",
+      "split": "dev",
+      "utterance": "Reconcile the knowledge index",
+      "expected_class": "research_and_absorption",
+      "forbidden_gates": [
+        "FINANCIAL_CONTROLS",
+        "PEOPLE_DATA_PROTECTION",
+        "LEGAL_REVIEW",
+        "VENDOR_INTEGRITY",
+        "ASSUMPTIONS_EXPLICIT"
+      ],
+      "expected_intent_id": "reconcile-knowledge-index"
+    },
+    {
+      "case_id": "neg-inventory-ja",
+      "split": "dev",
+      "utterance": "ミッションの棚卸し状況を確認して",
+      "expected_class": "research_and_absorption",
+      "forbidden_gates": [
+        "FINANCIAL_CONTROLS",
+        "PEOPLE_DATA_PROTECTION",
+        "LEGAL_REVIEW",
+        "VENDOR_INTEGRITY",
+        "ASSUMPTIONS_EXPLICIT"
+      ],
+      "expected_intent_id": "inventory-work"
+    },
+    {
+      "case_id": "neg-estimate-ja",
+      "split": "dev",
+      "utterance": "この機能の工数見積もりを出して",
+      "expected_class": "code_change",
+      "forbidden_gates": [
+        "FINANCIAL_CONTROLS",
+        "PEOPLE_DATA_PROTECTION",
+        "LEGAL_REVIEW",
+        "VENDOR_INTEGRITY",
+        "ASSUMPTIONS_EXPLICIT"
+      ]
+    },
+    {
+      "case_id": "neg-rehearse-ja",
+      "split": "dev",
+      "utterance": "面接のリハーサルをしたい",
+      "expected_class": "decision_support",
+      "forbidden_gates": [
+        "FINANCIAL_CONTROLS",
+        "PEOPLE_DATA_PROTECTION",
+        "LEGAL_REVIEW",
+        "VENDOR_INTEGRITY",
+        "ASSUMPTIONS_EXPLICIT"
+      ]
+    },
+    {
+      "case_id": "neg-adopt-ja",
+      "split": "dev",
+      "utterance": "この方式を採用したい",
+      "expected_class": "code_change",
+      "forbidden_gates": [
+        "FINANCIAL_CONTROLS",
+        "PEOPLE_DATA_PROTECTION",
+        "LEGAL_REVIEW",
+        "VENDOR_INTEGRITY",
+        "ASSUMPTIONS_EXPLICIT"
+      ]
+    },
+    {
+      "case_id": "neg-dataacq-en",
+      "split": "dev",
+      "utterance": "Improve the data acquisition pipeline",
+      "expected_class": "code_change",
+      "forbidden_gates": [
+        "FINANCIAL_CONTROLS",
+        "PEOPLE_DATA_PROTECTION",
+        "LEGAL_REVIEW",
+        "VENDOR_INTEGRITY",
+        "ASSUMPTIONS_EXPLICIT"
+      ]
+    },
+    {
+      "case_id": "neg-leadtime-en",
+      "split": "dev",
+      "utterance": "Reduce lead time for changes",
+      "expected_class": "code_change",
+      "forbidden_gates": [
+        "FINANCIAL_CONTROLS",
+        "PEOPLE_DATA_PROTECTION",
+        "LEGAL_REVIEW",
+        "VENDOR_INTEGRITY",
+        "ASSUMPTIONS_EXPLICIT"
+      ]
+    },
+    {
+      "case_id": "neg-datawh-ja",
+      "split": "dev",
+      "utterance": "データ倉庫のクエリを高速化して",
+      "expected_class": "code_change",
+      "forbidden_gates": [
+        "FINANCIAL_CONTROLS",
+        "PEOPLE_DATA_PROTECTION",
+        "LEGAL_REVIEW",
+        "VENDOR_INTEGRITY",
+        "ASSUMPTIONS_EXPLICIT"
+      ]
+    },
+    {
+      "case_id": "neg-custonboard-ja",
+      "split": "dev",
+      "utterance": "顧客オンボーディングを進めて",
+      "expected_class": "customer_engagement",
+      "forbidden_gates": [
+        "FINANCIAL_CONTROLS",
+        "PEOPLE_DATA_PROTECTION",
+        "LEGAL_REVIEW",
+        "VENDOR_INTEGRITY",
+        "ASSUMPTIONS_EXPLICIT"
+      ]
+    },
+    {
+      "case_id": "ppl-vendoronboard-ja",
+      "split": "dev",
+      "utterance": "ベンダーのオンボーディングを進めて",
+      "expected_class": "procurement_and_supply",
+      "expected_intent_id": "supplier-onboarding",
+      "expected_team_template": "procurement_supply",
+      "required_gates": ["VENDOR_INTEGRITY"]
+    }
+  ]
+}
