@@ -181,15 +181,13 @@ describe('mission orchestration dashboard contract', () => {
     expect(route).toContain('recentEvents');
     expect(route).toContain('agentMessages');
     expect(route).toContain('a2aHandoffs');
-    expect(route).toContain('collectAgentMessages');
-    expect(route).toContain('collectA2AHandoffs');
+    expect(route).toContain('collectAgentActivity');
     expect(messageFeed).toContain('a2a_message_routed');
     expect(messageFeed).toContain('handoff from');
     expect(messageFeed).toContain('prompt');
     expect(messageFeed).toContain('response');
     expect(streamRoute).toContain('text/event-stream');
-    expect(streamRoute).toContain('collectAgentMessages');
-    expect(streamRoute).toContain('collectA2AHandoffs');
+    expect(streamRoute).toContain('collectAgentActivity');
     expect(streamRoute).toContain('collectRecentEvents');
     expect(streamRoute).toContain('collectControlActions');
     expect(streamRoute).toContain('collectControlActionDetails');
