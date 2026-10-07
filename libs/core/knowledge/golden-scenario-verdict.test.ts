@@ -83,6 +83,20 @@ describe('evaluateGoldenScenario', () => {
     expect(verdictOf([{ kind: 'ref_visible', role: 'button' }], page([{ role: 'button' }]))).toBe(
       'inconclusive'
     );
+    // The control the run just clicked still being visible says nothing about success.
+    expect(
+      verdictOf(
+        [
+          {
+            kind: 'ref_visible',
+            role: 'button',
+            name_contains: 'Approve',
+            params: { anchor: 'last_action_target' },
+          },
+        ],
+        page([{ role: 'button', name: 'Approve' }])
+      )
+    ).toBe('inconclusive');
   });
 
   it('is inconclusive when the evidence does not cover the conditions', () => {

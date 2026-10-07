@@ -1832,6 +1832,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/browser_bridge_host.ts#handleSubmitGoldenEvidence",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/browser_bridge_host.ts#handleSubmitObservation",
       "roles": ["sovereign_concierge"],
       "unresolved": []
