@@ -1,12 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { withExecutionContext } from '../authority.js';
 
 const mocks = vi.hoisted(() => {
   const safeExec = vi.fn();
   const spawnManagedProcess = vi.fn();
-  return { safeExec, spawnManagedProcess };
+  const sendOpsAlert = vi.fn();
+  return { safeExec, spawnManagedProcess, sendOpsAlert };
 });
+const temporaryMissionPaths: string[] = [];
+const temporaryEventPaths: string[] = [];
 
 vi.mock('../secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('../secure-io.js')>('../secure-io.js');
@@ -19,6 +22,11 @@ vi.mock('../secure-io.js', async () => {
 vi.mock('../managed-process.js', () => ({
   spawnManagedProcess: mocks.spawnManagedProcess,
 }));
+
+vi.mock('../ops-alert.js', async () => {
+  const actual = await vi.importActual<typeof import('../ops-alert.js')>('../ops-alert.js');
+  return { ...actual, sendOpsAlert: mocks.sendOpsAlert };
+});
 
 /** Mission paths are owner-derived: a mission exists only once its state is recorded. */
 async function seedMissionState(
@@ -47,11 +55,22 @@ describe('mission-orchestration-worker resume replay', () => {
     process.env.MISSION_ROLE = 'mission_controller';
   });
 
+  afterEach(async () => {
+    const { safeRmSync } = await import('../secure-io.js');
+    for (const eventPath of temporaryEventPaths.splice(0)) {
+      safeRmSync(eventPath, { force: true });
+    }
+    for (const missionPath of temporaryMissionPaths.splice(0)) {
+      safeRmSync(missionPath, { recursive: true, force: true });
+    }
+  });
+
   it('replays the next event and resumes the mission controller command', async () => {
     const missionId = 'MSN-RESUME-REPLAY';
     const missionPath = withExecutionContext('mission_controller', () =>
       pathResolver.missionDir(missionId, 'public')
     );
+    temporaryMissionPaths.push(missionPath);
     const coordinationPath = `${missionPath}/coordination`;
 
     const { safeRmSync, safeReadFile } = await import('../secure-io.js');
@@ -70,12 +89,18 @@ describe('mission-orchestration-worker resume replay', () => {
       requestedBy: 'tester',
       payload: { channel: 'slack', threadTs: '123' },
     });
+    temporaryEventPaths.push(
+      `${pathResolver.shared('coordination/orchestration/events')}/${issue.event_id}.json`
+    );
     const followup = enqueueMissionOrchestrationEvent({
       eventType: 'mission_team_prewarm_requested',
       missionId,
       requestedBy: 'tester',
       payload: { channel: 'slack', threadTs: '123' },
     });
+    temporaryEventPaths.push(
+      `${pathResolver.shared('coordination/orchestration/events')}/${followup.event_id}.json`
+    );
 
     appendMissionOrchestrationJournalEntry({
       missionId,
@@ -94,6 +119,9 @@ describe('mission-orchestration-worker resume replay', () => {
       requestedBy: 'tester',
       payload: { operation: 'resume' },
     });
+    temporaryEventPaths.push(
+      `${pathResolver.shared('coordination/orchestration/events')}/${controlEvent.event_id}.json`
+    );
 
     mocks.safeExec.mockReturnValue({ stdout: '', stderr: '', status: 0 });
     mocks.spawnManagedProcess.mockReturnValue(undefined);
@@ -224,5 +252,45 @@ describe('mission-orchestration-worker resume replay', () => {
     } finally {
       safeRmSync(missionPath, { recursive: true, force: true });
     }
+  });
+
+  it('sends a deduplicated operator alert when an orchestration event fails', async () => {
+    const missionId = 'MSN-RESUME-FAILED';
+    const missionPath = withExecutionContext('mission_controller', () =>
+      pathResolver.missionDir(missionId, 'public')
+    );
+    temporaryMissionPaths.push(missionPath);
+    const { safeRmSync } = await import('../secure-io.js');
+    safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+    await seedMissionState(missionPath, missionId, 'public');
+
+    const { enqueueMissionOrchestrationEvent } = await import('./mission-orchestration-events.js');
+    const { loadMissionOrchestrationJournal } = await import('./mission-orchestration-journal.js');
+    const { processMissionOrchestrationEventPath } =
+      await import('./mission-orchestration-worker.js');
+    const event = enqueueMissionOrchestrationEvent({
+      eventType: 'mission_control_requested',
+      missionId,
+      requestedBy: 'tester',
+      payload: { operation: 'unsupported' },
+    });
+    const eventPath = `${pathResolver.shared('coordination/orchestration/events')}/${event.event_id}.json`;
+    temporaryEventPaths.push(eventPath);
+
+    await expect(processMissionOrchestrationEventPath(eventPath)).rejects.toThrow(
+      'Unsupported mission control operation'
+    );
+
+    expect(loadMissionOrchestrationJournal(missionId).at(-1)?.status).toBe('failed');
+    expect(mocks.sendOpsAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'mission_orchestration',
+        context: expect.objectContaining({ mission_id: missionId, event_id: event.event_id }),
+        dedupe_key: `mission-orchestration:event-failed:${event.event_id}`,
+      })
+    );
+    expect(JSON.stringify(mocks.sendOpsAlert.mock.calls)).not.toContain(
+      'Unsupported mission control operation'
+    );
   });
 });
