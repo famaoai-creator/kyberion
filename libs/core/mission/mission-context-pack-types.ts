@@ -1,3 +1,4 @@
+import type { KnowledgeVerification } from '../knowledge/knowledge-verification.js';
 import type { ArtifactKind, ArtifactOwnershipRecord } from '../workforce/artifact-registry.js';
 import type { ContextFragmentRejection, ContextSecurityScope } from '../context-security-scope.js';
 import type { FacetRequest } from '../facet-registry.js';
@@ -136,6 +137,10 @@ export interface MissionContextPackKnowledgeHint {
   category?: string;
   source_mission?: string;
   last_updated?: string;
+  /** Whether the current text has led to a successful run (knowledge-verification ledger). */
+  verification?: KnowledgeVerification;
+  /** Set when the hint was delivered because it changed since it last worked. */
+  delivered_because?: 'changed_since_verified';
 }
 
 export interface MissionContextPackArtifactHint {

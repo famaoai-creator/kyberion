@@ -383,7 +383,22 @@
           "score": { "type": "number" },
           "category": { "type": "string" },
           "source_mission": { "type": "string" },
-          "last_updated": { "type": "string" }
+          "last_updated": { "type": "string" },
+          "verification": {
+            "type": "object",
+            "required": ["state"],
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": ["verified", "changed_since_verified", "reported_problem"]
+              },
+              "last_success_at": { "type": "string" },
+              "last_problem_at": { "type": "string" },
+              "last_problem_kind": { "type": "string", "enum": ["wrong", "stale"] }
+            },
+            "additionalProperties": false
+          },
+          "delivered_because": { "type": "string", "enum": ["changed_since_verified"] }
         },
         "additionalProperties": true
       }
