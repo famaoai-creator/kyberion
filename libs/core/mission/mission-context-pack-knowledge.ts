@@ -150,6 +150,20 @@ export function deriveGovernancePhaseFromMissionState(
   }
 }
 
+/**
+ * The work item's project, or undefined when it only carries the mission id:
+ * dispatch fills `project_id` with the mission id for project-less missions,
+ * and treating that as a project scopes retrieval and the security gate to
+ * `projects/<mission>/missions/<mission>` instead of the mission's own path.
+ */
+export function workItemProjectId(
+  workItem: WorkItem | null | undefined,
+  missionId: string
+): string | undefined {
+  const value = String(workItem?.project_id || '').trim();
+  return value && value !== missionId ? value : undefined;
+}
+
 function tenantSlugFromContext(input: {
   missionState: MissionStateSummary;
   projectState?: ProjectOperationalState | null;
@@ -223,7 +237,14 @@ export function knowledgeHintFragment(
   // tenant lets the scope gate admit it for exactly that reader.
   const tenant =
     confidential?.[1] === 'common' && !customer ? options.commonGrantTenant : pathTenant;
-  const sourceTier: MissionTier = confidential || customer ? 'confidential' : 'public';
+  // Anything under knowledge/personal/ is personal-tier; labelling it public
+  // would let a pinned personal doc through the gate for any mission.
+  const personal = /(?:^|\/)knowledge\/personal\//.test(normalized);
+  const sourceTier: MissionTier = personal
+    ? 'personal'
+    : confidential || customer
+      ? 'confidential'
+      : 'public';
   const organization = normalized.match(/\/organizations\/([^/]+)/)?.[1];
   const project = normalized.match(/\/projects\/([^/]+)/)?.[1];
   const mission = normalized.match(/\/missions\/([^/]+)/)?.[1];
@@ -345,7 +366,7 @@ export async function loadKnowledgeHintsIfPossible(
   const sliceProject = String(
     input.projectState?.project_id ||
       input.missionState.relationships?.project?.project_id ||
-      input.workItem?.project_id ||
+      workItemProjectId(input.workItem, input.missionState.mission_id) ||
       ''
   ).trim();
   const sliceOrganization = organizationIdFromContext(input);
@@ -369,13 +390,23 @@ export async function loadKnowledgeHintsIfPossible(
 
   const remaining = hintLimit - pinnedHints.length;
   if (remaining <= 0) return pinnedHints;
-  const narrow = (hints: MissionContextPackKnowledgeHint[]) =>
-    narrowKnowledgeHintsWithJudgment(hints, {
+  // A calibrated judgment can only drop hints, so give it a wider candidate
+  // pool and cap afterwards; otherwise narrowing would leave the pack under
+  // its budget. Without a judgment the pool is exactly the budget, as before.
+  const judging = judgmentAssistReady(KNOWLEDGE_RELEVANCE_QUESTION);
+  const candidateCap = judging ? remaining * 2 : remaining;
+  const pinnedPaths = new Set(pinnedHints.map((hint) => hint.path));
+  const narrow = async (hints: MissionContextPackKnowledgeHint[]) => {
+    const kept = await narrowKnowledgeHintsWithJudgment(hints, {
       task: topic,
       tier: normalizeTier(input.missionState.tier),
       ...(sliceTenant ? { tenantSlug: sliceTenant } : {}),
-      pinnedPaths: new Set(pinnedHints.map((hint) => hint.path)),
+      pinnedPaths,
     });
+    if (!judging) return kept;
+    let unpinned = 0;
+    return kept.filter((hint) => pinnedPaths.has(hint.path) || unpinned++ < remaining);
+  };
 
   // One containment scope for both lanes: the tenant index only scans the
   // organization/project subtrees named here, so dropping them would hide
@@ -391,7 +422,7 @@ export async function loadKnowledgeHintsIfPossible(
       }
     : undefined;
 
-  const searchLimit = slice.exclude.length > 0 ? remaining * 2 : remaining;
+  const searchLimit = slice.exclude.length > 0 ? candidateCap * 2 : candidateCap;
   const relevant = await findRelevantDistilledKnowledge({
     topic,
     tags: Array.from(tags),
@@ -430,7 +461,7 @@ export async function loadKnowledgeHintsIfPossible(
 
   let tenantHints: MissionContextPackKnowledgeHint[] = [];
   if (tenantSlug && retrievalScope) {
-    const tenantFetchLimit = slice.exclude.length > 0 ? remaining * 2 : remaining;
+    const tenantFetchLimit = slice.exclude.length > 0 ? candidateCap * 2 : candidateCap;
     const tenantHits = await queryTenantKnowledge({
       tenantSlug,
       topic,
@@ -450,13 +481,13 @@ export async function loadKnowledgeHintsIfPossible(
   }
 
   if (tenantHints.length === 0) {
-    return narrow([...pinnedHints, ...distillHints.slice(0, remaining)]);
+    return narrow([...pinnedHints, ...distillHints.slice(0, candidateCap)]);
   }
 
   const merged = mergeTenantKnowledgeHints({
     distill: distillHints,
     tenant: tenantHints,
-    cap: remaining,
+    cap: candidateCap,
     deliveredPaths: new Set(pinnedHints.map((hint) => hint.path)),
   });
   return narrow([...pinnedHints, ...merged]);
