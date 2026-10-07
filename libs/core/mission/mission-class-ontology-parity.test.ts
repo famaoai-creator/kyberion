@@ -15,9 +15,25 @@ const ORGANIZATION_CLASSES = [
 describe('mission class ↔ intent ontology parity', () => {
   const intents = loadIntentDomainOntologyCatalog().intents || [];
 
-  it('classifies every mission-shaped ontology intent into the class the ontology declares', () => {
+  // Generic reasoning-pattern intents are matched on broad keywords and can be
+  // mis-resolved for ordinary code requests (e.g. `chain-of-thought-planning`
+  // for a shebang fix). Their declared class is deliberately not enforced, so
+  // such requests keep falling back to the code_change default.
+  const REASONING_PATTERN_INTENTS = new Set([
+    'diverge-hypotheses',
+    'chain-of-thought-planning',
+    'plan-and-execute',
+    'multi-agent-consensus',
+    'counterfactual-simulation',
+    'adaptive-reasoning',
+    'tool-use-expert',
+    'active-learning-escalate',
+    'recall-prior-knowledge',
+  ]);
+
+  it('classifies every ontology intent into the class the ontology declares', () => {
     const drift = intents
-      .filter((intent) => intent.execution_shape === 'mission')
+      .filter((intent) => !REASONING_PATTERN_INTENTS.has(intent.intent_id))
       .map((intent) => ({
         intent: intent.intent_id,
         declared: intent.mission_class,

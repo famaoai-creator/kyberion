@@ -153,10 +153,30 @@ function matchesValue(actual: string | undefined, expected: string[] | undefined
   return expected.includes(actual);
 }
 
+// Patterns are literal substrings unless they carry regex syntax (`.*`, groups,
+// alternation); those were authored as regexes and silently never matched as
+// substrings. Compiled patterns are cached; an invalid one falls back to literal.
+const REGEX_SYNTAX = /\.\*|\.\+|\(.*\|.*\)/;
+const compiledPatterns = new Map<string, RegExp | null>();
+
+function patternMatches(utterance: string, pattern: string): boolean {
+  if (!REGEX_SYNTAX.test(pattern)) return utterance.includes(pattern);
+  let compiled = compiledPatterns.get(pattern);
+  if (compiled === undefined) {
+    try {
+      compiled = new RegExp(pattern, 'i');
+    } catch {
+      compiled = null;
+    }
+    compiledPatterns.set(pattern, compiled);
+  }
+  return compiled ? compiled.test(utterance) : utterance.includes(pattern);
+}
+
 function matchesPattern(utterance: string | undefined, patterns: string[] | undefined): boolean {
   if (!patterns?.length) return true;
   if (!utterance) return false;
-  return patterns.some((pattern) => utterance.includes(pattern));
+  return patterns.some((pattern) => patternMatches(utterance, pattern));
 }
 
 function ruleMatches(

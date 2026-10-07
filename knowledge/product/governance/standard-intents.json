@@ -6529,7 +6529,10 @@
         "variance analysis",
         "予算",
         "budget vs actual",
-        "actuals"
+        "actuals",
+        "数字の乖離",
+        "乖離",
+        "実績と計画"
       ],
       "resolution": {
         "shape": "mission",

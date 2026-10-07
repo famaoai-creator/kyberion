@@ -1019,6 +1019,147 @@
         ]
       },
       "mission_class": "platform_onboarding"
+    },
+    {
+      "id": "class-operations-and-release-intent-ontology-parity",
+      "match": {
+        "intent_ids": [
+          "enable-voice-input",
+          "open-site",
+          "browser-step",
+          "restart-service",
+          "inspect-service",
+          "start-service",
+          "stop-service",
+          "inspect-network-environment",
+          "inspect-workspace-surfaces",
+          "monitor-service-health",
+          "automate-browser-workflow",
+          "automate-os-macro",
+          "live-query",
+          "agent-runtime-tuning",
+          "release-readiness-review",
+          "verify-actuator-capability",
+          "rotate-integration-secret",
+          "run-system-upgrade-check",
+          "sanitize-knowledge-for-public-tier",
+          "retire-stale-knowledge",
+          "check-kyberion-vital",
+          "inspect-mission-state",
+          "inspect-mission-inventory",
+          "inspect-generation-schedules",
+          "inspect-runtime-supervisor",
+          "verify-audit-chain",
+          "prewarm-mission-team",
+          "deprecate-actuator-adapter",
+          "rollback-actuator-adapter",
+          "audit-knowledge-tier-boundary",
+          "request-approval",
+          "resolve-approval",
+          "escalate-governance-issue",
+          "fetch-external-data",
+          "weather-lookup",
+          "transit-lookup",
+          "restaurant-search",
+          "news-summary",
+          "email-draft",
+          "calendar-schedule",
+          "device-control",
+          "reminder-task",
+          "translation-service"
+        ]
+      },
+      "mission_class": "operations_and_release"
+    },
+    {
+      "id": "class-content-and-media-intent-ontology-parity",
+      "match": {
+        "intent_ids": [
+          "capture-photo",
+          "generate-workbook",
+          "speak-with-my-voice",
+          "generate-narrated-video",
+          "generate-video",
+          "transcribe-audio",
+          "live-voice"
+        ]
+      },
+      "mission_class": "content_and_media"
+    },
+    {
+      "id": "class-platform-onboarding-intent-ontology-parity",
+      "match": {
+        "intent_ids": [
+          "clone-my-voice",
+          "setup-messaging-bridge",
+          "rebuild-env",
+          "validate-all",
+          "bootstrap-kyberion-runtime",
+          "verify-environment-readiness",
+          "configure-reasoning-backend",
+          "register-actuator-adapter",
+          "check-kyberion-baseline",
+          "inspect-environment-readiness",
+          "reconcile-capability-lifecycle",
+          "assimilate-gateway-capability"
+        ]
+      },
+      "mission_class": "platform_onboarding"
+    },
+    {
+      "id": "class-customer-engagement-intent-ontology-parity",
+      "match": {
+        "intent_ids": [
+          "lifestyle-booking",
+          "continue-conversation",
+          "stakeholder-communication",
+          "sales-account-strategy"
+        ]
+      },
+      "mission_class": "customer_engagement"
+    },
+    {
+      "id": "class-research-and-absorption-intent-ontology-parity",
+      "match": {
+        "intent_ids": [
+          "automate-code-transformation",
+          "list-capabilities",
+          "summarize-conversation"
+        ]
+      },
+      "mission_class": "research_and_absorption"
+    },
+    {
+      "id": "class-decision-support-intent-ontology-parity",
+      "match": {
+        "intent_ids": [
+          "conversation-to-mission",
+          "executive-reporting",
+          "classify-mission",
+          "select-mission-workflow",
+          "review-worker-output"
+        ]
+      },
+      "mission_class": "decision_support"
+    },
+    {
+      "id": "class-environment-and-recovery-intent-ontology-parity",
+      "match": {
+        "intent_ids": [
+          "llm-provider-selection",
+          "reconcile-ecosystem",
+          "audit-security",
+          "reset-environment-state"
+        ]
+      },
+      "mission_class": "environment_and_recovery"
+    },
+    {
+      "id": "class-product-delivery-intent-ontology-parity",
+      "match": {
+        "intent_ids": ["compose-mission-team"]
+      },
+      "mission_class": "product_delivery"
     }
   ],
   "delivery_shape_rules": [
