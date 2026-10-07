@@ -91,6 +91,8 @@ export type ParsedArgs = {
   dueAt?: string;
   options: string[];
   chosenOption?: string;
+  requestApproval?: boolean;
+  promotedRef?: string;
   rationale?: string;
   requestedBy?: string;
   followUpRefs: string[];
@@ -183,6 +185,8 @@ export function parseArgs(args: string[]): ParsedArgs {
     '--due-at': { kind: 'value', field: 'dueAt' },
     '--option': { kind: 'push', field: 'options' },
     '--chosen-option': { kind: 'value', field: 'chosenOption' },
+    '--request-approval': { kind: 'flag', field: 'requestApproval' },
+    '--promoted-ref': { kind: 'value', field: 'promotedRef' },
     '--rationale': { kind: 'value', field: 'rationale' },
     '--requested-by': { kind: 'value', field: 'requestedBy' },
     '--follow-up-ref': { kind: 'push', field: 'followUpRefs' },
@@ -268,6 +272,7 @@ export function usage(): string {
     '  pnpm organization lineage --organization-id <id> [--json]',
     '  pnpm organization learning list --organization-id <id> [--status <status>] [--json]',
     '  pnpm organization learning enqueue --organization-id <id> --tier <tier> --learning-id <id> --source-type <incident_review|routine_exception|project_closure|governance_decision> --source-ref <ref> --title <title> --summary <summary> --target-kind <pattern|sop_candidate|knowledge_hint|report_template> [--evidence-ref <ref>] [--dry-run|--apply] [--json]',
+    '  pnpm organization learning transition --organization-id <id> --tier <tier> [--tenant-slug <slug>] --learning-id <id> --record-status <approved|rejected|promoted> [--reason <text>] [--promoted-ref <knowledge/...>] --dry-run|--apply [--json]',
     '  pnpm organization reconcile --organization-id <id> [--dry-run|--apply] [--json]',
     '  pnpm organization work resolve --organization-id <id> --intent "<request>" --dry-run [--json]',
     '',
@@ -294,7 +299,7 @@ export function usage(): string {
     '  pnpm organization service state set --organization-id <id> --tier <tier> [--tenant-slug <slug>] --service-id <id> --health-status <healthy|degraded|critical|unknown> [--reconcile-status <current|stale|missing_source|conflict|unknown>] [--freshness-seconds <n>] [--confidence <0..1>] [--source-timestamp <iso>]',
     '  pnpm organization cadence add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --cadence-id <id> --name <name> --cadence-type <daily|weekly|biweekly|monthly|quarterly|annual|ad_hoc> --schedule <text> --owner-role <role> [--record-status <s>]',
     '  pnpm organization decision add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --decision-id <id> --cadence-id <id> --title <title> --decision-owner <role> --due-at <iso> --option <o>... [--decision-type <t>] [--requested-by <role>] [--chosen-option <o>] [--rationale <text>] [--follow-up-ref <ref>]... [--record-status <s>]',
-    '  pnpm organization decision transition --organization-id <id> --tier <tier> [--tenant-slug <slug>] --decision-id <id> --record-status <status> [--chosen-option <o>] [--rationale <text>] [--approval-ref <channel:id>] [--follow-up-ref <ref>]... --dry-run|--apply',
+    '  pnpm organization decision transition --organization-id <id> --tier <tier> [--tenant-slug <slug>] --decision-id <id> --record-status <status> [--chosen-option <o>] [--rationale <text>] [--approval-ref <channel:id>] [--request-approval] [--follow-up-ref <ref>]... --dry-run|--apply',
     '  pnpm organization incident add --organization-id <id> --tier <tier> [--tenant-slug <slug>] --incident-id <id> --title <title> --severity <level> --owner-role <role> --impact-summary <text> [--service-id <id>] [--operation-id <id>] --dry-run|--apply',
     '  pnpm organization incident transition --organization-id <id> --tier <tier> [--tenant-slug <slug>] --incident-id <id> --record-status <status> [--impact-summary <text>] [--mitigation-mission-id <id>] [--post-incident-review-ref <ref>] --dry-run|--apply',
     '  pnpm organization project attach --organization-id <id> --project-id <id> [--tier <tier>] [--tenant-slug <slug>]',
