@@ -1,3 +1,13 @@
+import {
+  finalPageSnapshotStep,
+  loadGoldenScenario,
+  needsFinalPageSnapshot,
+  presentServiceChannels,
+  snapshotElementsFromBrowserContext,
+  verifyProcedureRun,
+  type GoldenVerdict,
+} from './golden-scenario-verdict.js';
+import type { ScopeContext } from '../scope-context.js';
 import { logger } from '../core.js';
 import { t } from '../t.js';
 import { randomUUID } from 'node:crypto';
@@ -73,6 +83,11 @@ export type DispatchStatus =
 export interface DispatchInput {
   /** The procedure to execute (from the catalog). */
   procedure: ProcedureEntry;
+  /**
+   * Tenant scope for the golden-check verdict ledger. Omitted for personal and
+   * public procedures, which use the shared ledger.
+   */
+  verificationScope?: ScopeContext;
   /** Agent identity for the approval gate audit trail. */
   agentId: string;
   /** Owning mission. */
@@ -119,7 +134,13 @@ export interface DispatchInput {
     steps: Array<{ id: string; type: string; op: string; params: Record<string, unknown> }>;
     sessionId?: string;
     options?: Record<string, unknown>;
-  }) => Promise<{ status: 'succeeded' | 'failed'; results?: unknown[]; errors?: string[] }>;
+  }) => Promise<{
+    status: 'succeeded' | 'failed';
+    results?: unknown[];
+    errors?: string[];
+    /** browser-actuator run context; its `last_snapshot` is golden-check evidence. */
+    context?: unknown;
+  }>;
   /** Surface channel forwarded to the approval gate (e.g. "browser-extension"). */
   channel?: string;
   correlationId?: string;
@@ -144,6 +165,8 @@ export interface DispatchResult {
   browserResults?: unknown[];
   /** Set when `status === 'approval_required'`. */
   approvalRequestId?: string;
+  /** Golden-scenario check of a run that executed (service / playwright), when the procedure has one. */
+  golden?: GoldenVerdict;
   errors: string[];
 }
 
@@ -729,6 +752,15 @@ function dispatchExtensionSession(input: DispatchInput): DispatchResult {
 // Design: docs/INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN.ja.md §4/§7 Layer③
 // ---------------------------------------------------------------------------
 
+function verifyPlaywrightRun(input: DispatchInput, context: unknown): GoldenVerdict | undefined {
+  const snapshotElements = snapshotElementsFromBrowserContext(context);
+  return verifyProcedureRun({
+    procedure: input.procedure,
+    evidence: { substrate: 'browser', ...(snapshotElements ? { snapshotElements } : {}) },
+    ...(input.verificationScope ? { scope: input.verificationScope } : {}),
+  });
+}
+
 async function dispatchPlaywrightPipeline(input: DispatchInput): Promise<DispatchResult> {
   const { procedure, recording, session, agentId, channel, correlationId } = input;
 
@@ -837,9 +869,12 @@ async function dispatchPlaywrightPipeline(input: DispatchInput): Promise<Dispatc
     executionSubstrate: 'playwright',
   });
 
+  // A golden scenario that checks the page needs the page as the run left
+  // it: append one read-only snapshot after the recorded steps.
+  const finalSnapshot = needsFinalPageSnapshot(loadGoldenScenario(procedure));
   try {
     const exec = await input.executeBrowserPipeline({
-      steps: draft.steps,
+      steps: finalSnapshot ? [...draft.steps, finalPageSnapshotStep()] : draft.steps,
       sessionId: session?.tab_id,
       options: draft.options,
     });
@@ -855,12 +890,24 @@ async function dispatchPlaywrightPipeline(input: DispatchInput): Promise<Dispatc
         `playwright_execution_failed:${procedure.procedure_id}`,
         true
       );
-      return { status: 'blocked', browserResults: exec.results, errors };
+      const golden = verifyPlaywrightRun(input, exec.context);
+      return {
+        status: 'blocked',
+        browserResults: exec.results,
+        ...(golden ? { golden } : {}),
+        errors,
+      };
     }
     logger.info(
       `[procedure-dispatcher] playwright procedure "${procedure.procedure_id}" executed (${draft.steps.length} steps)`
     );
-    return { status: 'executed', browserResults: exec.results, errors: [] };
+    const golden = verifyPlaywrightRun(input, exec.context);
+    return {
+      status: 'executed',
+      browserResults: exec.results,
+      ...(golden ? { golden } : {}),
+      errors: [],
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.warn(
@@ -985,16 +1032,31 @@ async function dispatchServiceSession(input: DispatchInput): Promise<DispatchRes
     executePreset: input.executePreset,
   });
 
+  const golden = verifyProcedureRun({
+    procedure,
+    evidence: {
+      substrate: 'service',
+      serviceResults: exec.results,
+      serviceChannelsPresent: presentServiceChannels(exec.channels),
+    },
+    ...(input.verificationScope ? { scope: input.verificationScope } : {}),
+  });
   if (exec.status === 'completed') {
     logger.info(
       `[procedure-dispatcher] service procedure "${procedure.procedure_id}" executed (${exec.results.length} steps)`
     );
-    return { status: 'executed', serviceResults: exec.results, errors: [] };
+    return {
+      status: 'executed',
+      serviceResults: exec.results,
+      ...(golden ? { golden } : {}),
+      errors: [],
+    };
   }
   const failed = exec.results.find((r) => r.status === 'error' || r.status === 'blocked');
   return {
     status: 'blocked',
     serviceResults: exec.results,
+    ...(golden ? { golden } : {}),
     errors: [
       failed
         ? `step ${failed.step_id} ${failed.status}: ${failed.detail ?? ''}`

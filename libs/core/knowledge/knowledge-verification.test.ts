@@ -52,7 +52,11 @@ describe('knowledge verification ledger', () => {
       at: '2026-10-01T00:00:00Z',
       rootDir: root,
     });
-    expect(stateOf()).toEqual({ state: 'verified', last_success_at: '2026-10-01T00:00:00Z' });
+    expect(stateOf()).toEqual({
+      state: 'verified',
+      last_success_at: '2026-10-01T00:00:00Z',
+      evidence: 'worker_report',
+    });
   });
 
   it('flags a document whose text changed since it last worked, until it works again', () => {
@@ -71,7 +75,11 @@ describe('knowledge verification ledger', () => {
       at: '2026-10-02T00:00:00Z',
       rootDir: root,
     });
-    expect(stateOf()).toEqual({ state: 'verified', last_success_at: '2026-10-02T00:00:00Z' });
+    expect(stateOf()).toEqual({
+      state: 'verified',
+      last_success_at: '2026-10-02T00:00:00Z',
+      evidence: 'worker_report',
+    });
   });
 
   it('a wrong/stale report after the last success outranks it; a later success clears it', () => {
