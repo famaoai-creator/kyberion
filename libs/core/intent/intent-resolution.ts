@@ -348,6 +348,21 @@ function loadIntentDomainOntology(): Map<string, IntentDomainOntologyEntry> {
   return intentDomainOntologyCache;
 }
 
+const wholeWordPatterns = new Map<string, RegExp>();
+
+function wholeWordPattern(keyword: string): RegExp {
+  let pattern = wholeWordPatterns.get(keyword);
+  if (!pattern) {
+    pattern = new RegExp(`(^|[^a-z0-9])${escapeRegExp(keyword)}(?:e?s)?($|[^a-z0-9])`);
+    wholeWordPatterns.set(keyword, pattern);
+  }
+  return pattern;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function normalizeFreeText(value: string): string {
   return value
     .toLowerCase()
@@ -383,15 +398,66 @@ function tokenize(value: string): string[] {
     .filter((token) => token.length >= 2);
 }
 
+/**
+ * Tie-break weight for candidates with equal confidence: matched keywords that
+ * few intents declare ("天気") outweigh ones many intents share ("教えて").
+ * Kept off the packet so the resolution contract does not change.
+ */
+const candidateSpecificity = new WeakMap<IntentResolutionCandidate, number>();
+
+/** Number of intents whose keywords or examples mention `keyword` — memoised per catalog. */
+function keywordDocumentFrequency(
+  intents: StandardIntentDefinition[]
+): (keyword: string) => number {
+  const texts = intents.map((intent) =>
+    [...(intent.trigger_keywords || []), ...(intent.surface_examples || [])]
+      .map((value) => String(value).toLowerCase())
+      .join('\n')
+  );
+  const memo = new Map<string, number>();
+  return (keyword) => {
+    const key = keyword.toLowerCase();
+    let count = memo.get(key);
+    if (count === undefined) {
+      count = texts.filter((text) => text.includes(key)).length;
+      memo.set(key, count);
+    }
+    return count;
+  };
+}
+
+const keywordFrequencyByCatalog = new WeakMap<
+  StandardIntentDefinition[],
+  (keyword: string) => number
+>();
+
+function cachedKeywordDocumentFrequency(
+  catalog: StandardIntentDefinition[],
+  surfaceIntents: StandardIntentDefinition[]
+): (keyword: string) => number {
+  let frequency = keywordFrequencyByCatalog.get(catalog);
+  if (!frequency) {
+    frequency = keywordDocumentFrequency(surfaceIntents);
+    keywordFrequencyByCatalog.set(catalog, frequency);
+  }
+  return frequency;
+}
+
 function scoreCatalogIntent(
   utterance: string,
-  intent: StandardIntentDefinition
+  intent: StandardIntentDefinition,
+  keywordFrequency?: (keyword: string) => number
 ): IntentResolutionCandidate | null {
   const policy = loadIntentResolutionPolicy().catalog_scoring;
   const normalized = normalizeFreeText(utterance);
   const localizedNormalized = normalizeForTriggerMatch(utterance);
   const matchedKeywords = (intent.trigger_keywords || []).filter((keyword) => {
     const kw = String(keyword).toLowerCase();
+    // ASCII keywords match whole words only ("search" must not fire inside "research").
+    if (/^[a-z0-9][a-z0-9 ._/-]*$/.test(kw)) {
+      const pattern = wholeWordPattern(kw);
+      return pattern.test(normalized) || pattern.test(localizedNormalized);
+    }
     return normalized.includes(kw) || localizedNormalized.includes(kw);
   });
   const reasons: string[] = [];
@@ -448,7 +514,7 @@ function scoreCatalogIntent(
   }
 
   if (score <= 0 || !intent.id) return null;
-  return {
+  const candidate: IntentResolutionCandidate = {
     intent_id: intent.id,
     confidence: Number(score.toFixed(2)),
     source: matchedKeywords.length > 0 ? 'heuristic' : 'catalog',
@@ -456,6 +522,17 @@ function scoreCatalogIntent(
     reasons,
     resolution: intent.resolution,
   };
+  if (keywordFrequency) {
+    candidateSpecificity.set(
+      candidate,
+      matchedKeywords.reduce(
+        (sum, keyword) =>
+          sum + 1 / Math.max(keywordFrequency(String(keyword)), 1) + keyword.length * 0.001,
+        0
+      )
+    );
+  }
+  return candidate;
 }
 
 function scoreScheduleReadAgendaIntent(
@@ -474,6 +551,7 @@ function scoreScheduleReadAgendaIntent(
   );
   const readHint = frame.action === 'read';
   if (!calendarHint || !readHint) return null;
+  if (matchesIntentPhrase(normalized, 'schedule.agenda_non_calendar_object')) return null;
 
   let confidence = 0.78;
   const reasons: string[] = ['read-only calendar agenda request'];
@@ -756,16 +834,18 @@ export function resolveIntentResolutionPacket(
   const contextualFrame = buildContextualIntentFrame(trimmed);
   const scoringPolicy = loadIntentResolutionPolicy().catalog_scoring;
   const ontology = loadIntentDomainOntology();
-  const surfaceIntents = loadResolvedStandardIntentCatalog(options).filter((intent) => {
+  const catalog = loadResolvedStandardIntentCatalog(options);
+  const surfaceIntents = catalog.filter((intent) => {
     if (!intent.id) return false;
     const ontologyEntry = ontology.get(intent.id);
     if (ontologyEntry) return ontologyEntry.exposed_to_surface !== false;
     if (typeof intent.exposed_to_surface === 'boolean') return intent.exposed_to_surface;
     return intent.category === scoringPolicy.catalog_intent_category;
   });
+  const keywordFrequency = cachedKeywordDocumentFrequency(catalog, surfaceIntents);
   const candidates = [
     ...surfaceIntents
-      .map((intent) => scoreCatalogIntent(trimmed, intent))
+      .map((intent) => scoreCatalogIntent(trimmed, intent, keywordFrequency))
       .filter((candidate): candidate is IntentResolutionCandidate => Boolean(candidate)),
     ...[scoreScheduleCoordinationIntent(trimmed, contextualFrame)].filter(
       (candidate): candidate is IntentResolutionCandidate => Boolean(candidate)
@@ -793,7 +873,11 @@ export function resolveIntentResolutionPacket(
     }
   }
 
-  const sorted = [...deduped.values()].sort((left, right) => right.confidence - left.confidence);
+  const sorted = [...deduped.values()].sort(
+    (left, right) =>
+      right.confidence - left.confidence ||
+      (candidateSpecificity.get(right) || 0) - (candidateSpecificity.get(left) || 0)
+  );
   // A greeting can occur inside a substantive request (for example,
   // `「こんにちは」を英語に翻訳して`).  The generic conversation intent
   // intentionally has a strong greeting score, so prefer a near-tied,

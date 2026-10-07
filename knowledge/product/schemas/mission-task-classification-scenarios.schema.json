@@ -77,7 +77,6 @@
             "type": "object",
             "additionalProperties": false,
             "required": [
-              "intent_id",
               "execution_shape",
               "mission_class",
               "delivery_shape",
@@ -90,7 +89,11 @@
               "promotion_required"
             ],
             "properties": {
-              "intent_id": { "type": "string", "minLength": 1 },
+              "intent_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Omit when the utterance must claim no catalog intent."
+              },
               "execution_shape": {
                 "type": "string",
                 "enum": [
