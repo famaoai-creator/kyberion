@@ -154,7 +154,9 @@ function runtimeRoot(): string {
   const namespace = coordinationNamespace();
   const base = coordinationBase();
   return assertSafeRepositoryPath(
-    path.resolve(base, namespace ? `${STORE_ROOT}/${namespace}` : STORE_ROOT),
+    pathResolver.vitestLivePath(
+      path.resolve(base, namespace ? `${STORE_ROOT}/${namespace}` : STORE_ROOT)
+    ),
     { allowMissingLeaf: true }
   );
 }
@@ -180,7 +182,9 @@ function observabilityRoot(): string {
   const namespace = coordinationNamespace();
   const base = coordinationBase();
   return assertSafeRepositoryPath(
-    path.resolve(base, namespace ? `${OBS_ROOT}/${namespace}` : OBS_ROOT),
+    pathResolver.vitestLivePath(
+      path.resolve(base, namespace ? `${OBS_ROOT}/${namespace}` : OBS_ROOT)
+    ),
     { allowMissingLeaf: true }
   );
 }
