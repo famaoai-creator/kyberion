@@ -1246,6 +1246,32 @@
         }
       }
     },
+    "schedule.agenda_temporal_anchor": {
+      "description": "A meeting named only as a time anchor (before/after/by the meeting); it is not a calendar request.",
+      "locales": {
+        "ja": {
+          "phrases": [
+            "会議の前",
+            "会議の後",
+            "会議までに",
+            "会議に向けて",
+            "ミーティングの前",
+            "ミーティングの後",
+            "打ち合わせの前",
+            "打ち合わせの後",
+            "打ち合わせまでに"
+          ]
+        },
+        "en": {
+          "phrases": [
+            "before the meeting",
+            "after the meeting",
+            "ahead of the meeting",
+            "before our meeting"
+          ]
+        }
+      }
+    },
     "schedule.agenda_topic": {
       "description": "Text refers to an agenda, calendar events, meetings or availability.",
       "locales": {

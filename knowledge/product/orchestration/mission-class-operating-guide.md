@@ -72,7 +72,9 @@ pnpm exec vitest run libs/core/mission/mission-class-eval.test.ts   # 床値(flo
 - 反復 4 では偽陽性を生みやすい語(`nda`、`reconcil`、`inventory`、`見積`、`acquire`、`strategic`、`採用` 単独)を入れかけて、`agenda`・`reconcile-knowledge-index`・業務棚卸し・工数見積り・「方式を採用」を組織クラスに吸ってしまう実害を偽陽性ガードで検出し、語を限定した(反復 5)。発話パターンは**部分一致**なので、短い英単語や一般語は入れない。
 - 独立レビュー(別エージェント)が、実測に現れなかった吸い込み(`データ倉庫`→調達、`data acquisition`→経営企画、`顧客オンボーディング`→人事)を静的読解で指摘した。コーパスの偽陽性ガードは**実害を見つけた後に足す**のではなく、レビューで出た入力を負例として先に固定すること。
 - 試して撤回した変更: 意図解決の同点を「一致キーワードの長さ」で破る案は意図の選択精度を上げた(overall 96.6%)が、`research reportを作って` が `bootstrap-project` から `generate-report` に変わり golden シナリオ(`golden-alignment-gated-high-stakes`)を壊したため撤回し、キーワード補強で対処した。グローバルな解決ロジックの変更は golden を壊しうるので、データ(キーワード・ルール)側で直せるならデータで直す。
-- 残る既知の取りこぼし: 「予実管理の会議の前に数字の乖離を確認しておいて」は、専用のカレンダー意図スコアラー(`schedule-read-agenda`、0.94)が budget-review(0.91)を上回って流れる(クラスは正しく経理に分類される=専用ワークフローではなく経理クラスの汎用ワークフローに到達)。
+- 解消した取りこぼし(反復 6): 「予実管理の会議の前に数字の乖離を確認しておいて」は、カレンダー意図スコアラーが「会議」を時間の目印として使われただけでも拾っていたため `schedule-read-agenda` に流れていた。語彙 `schedule.agenda_temporal_anchor`(「会議の前」「before the meeting」等)を判定前に取り除くようにし、budget-review に到達する。スコアラー全体は変えず、語彙データ+1語彙の除去だけで直した。
+- 汎用推論意図の救済(反復 6): 9 意図のうち 7 つ(`diverge-hypotheses`・`multi-agent-consensus`・`counterfactual-simulation`・`adaptive-reasoning`・`chain-of-thought-planning`・`recall-prior-knowledge`・`active-learning-escalate`)は、**意図 かつ 特徴語句**の両方に当たるときだけ ontology 宣言のクラスにする(「反事実」「賛否」「立場から」「タスク分解」等)。意図の信頼度は本物の推論依頼と通常のコード依頼を区別できない(`shebang を追加して設計をテストして` も 0.79)ため、信頼度ではなく語句で絞った。`plan-and-execute` と `tool-use-expert` は任意のタスクの実行を指すので対象外のまま `code_change` に残る。コーパスに該当 7 件と、コード依頼が引きずられない負例 3 件を追加した。
+- 未解決(意図解決そのものの精度): 「テスト失敗を分解して原因を探して」が `lifestyle-booking` に解決される。クラス規則では救えないため、意図キーワードの見直しが別途必要。
 
 ### 4.2 構造的な発見(分類そのものの欠陥)
 
