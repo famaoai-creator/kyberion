@@ -72,13 +72,14 @@ pnpm exec vitest run libs/core/mission/mission-class-eval.test.ts   # 床値(flo
 - 反復 4 では偽陽性を生みやすい語(`nda`、`reconcil`、`inventory`、`見積`、`acquire`、`strategic`、`採用` 単独)を入れかけて、`agenda`・`reconcile-knowledge-index`・業務棚卸し・工数見積り・「方式を採用」を組織クラスに吸ってしまう実害を偽陽性ガードで検出し、語を限定した(反復 5)。発話パターンは**部分一致**なので、短い英単語や一般語は入れない。
 - 独立レビュー(別エージェント)が、実測に現れなかった吸い込み(`データ倉庫`→調達、`data acquisition`→経営企画、`顧客オンボーディング`→人事)を静的読解で指摘した。コーパスの偽陽性ガードは**実害を見つけた後に足す**のではなく、レビューで出た入力を負例として先に固定すること。
 - 試して撤回した変更: 意図解決の同点を「一致キーワードの長さ」で破る案は意図の選択精度を上げた(overall 96.6%)が、`research reportを作って` が `bootstrap-project` から `generate-report` に変わり golden シナリオ(`golden-alignment-gated-high-stakes`)を壊したため撤回し、キーワード補強で対処した。グローバルな解決ロジックの変更は golden を壊しうるので、データ(キーワード・ルール)側で直せるならデータで直す。
-- 残る既知の取りこぼし: 「予実管理の会議の前に数字の乖離を確認しておいて」は意図解決が `schedule-read-agenda` に流れる(クラスは正しく経理に分類される=専用ワークフローではなく経理クラスの汎用ワークフローに到達)。
+- 残る既知の取りこぼし: 「予実管理の会議の前に数字の乖離を確認しておいて」は、専用のカレンダー意図スコアラー(`schedule-read-agenda`、0.94)が budget-review(0.91)を上回って流れる(クラスは正しく経理に分類される=専用ワークフローではなく経理クラスの汎用ワークフローに到達)。
 
 ### 4.2 構造的な発見(分類そのものの欠陥)
 
 - 改善前は ontology 上 `operations_and_release` 等の 143/168 件の意図が分類ポリシーのルールに当たらず既定値 `code_change` に落ちていた。mission 形の意図については **ontology の宣言クラスを参照**するようにした(`matched_rules.mission_class_rule_id = ontology-intent:<id>`)。task 形の汎用推論意図(`chain-of-thought-planning` 等)は誤解決されうるため対象外にし、通常のコード依頼が意思決定クラスへ引きずられる回帰を避けた。
 - 組織系ワークフローは `delivery_shapes: [multi_artifact_pipeline]` を要求するが、配送形ルールが無く専用テンプレートに到達していなかった。組織意図の配送形・リスクを明示ルール化し、`mission-class-ontology-parity.test.ts` で「mission 形の全意図が ontology 宣言どおりのクラス・専用ワークフロー・リスクに到達する」ことを保証する。
-- 未解決(今回の範囲外): task 形・direct_reply 形の約 94 意図は依然としてポリシールールが無く既定値に落ちる(`mission-class-ontology-parity` は mission 形のみ保証)。
+- task 形・direct_reply 形の意図も、汎用推論パターン9件(`chain-of-thought-planning` 等、広いキーワードで誤解決されうる)を除き、ontology と同じクラスに分類される(ポリシーに `*-intent-ontology-parity` ルール追加、`mission-class-ontology-parity.test.ts` が全意図で保証)。除外した9件は既定値 `code_change` のまま。
+- 発話パターンのうち `.*` や `(a|b)` を含むものは正規表現として評価する(従来は部分一致のため一度も一致しなかった)。
 
 ## 5. 新しいクラスを足すとき(チェックリスト)
 
