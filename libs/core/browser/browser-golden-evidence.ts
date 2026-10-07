@@ -38,12 +38,12 @@ const RECEIPT_STORE = pathResolver.shared('runtime/browser-receipts');
 const MAX_ELEMENTS = 200;
 const MAX_TEXT = 300;
 
+// Receipt ids the extension mints (`RCP-<uuid>`) are already file-safe, so the
+// id is its own file stem; anything else is refused rather than rewritten.
+const RECEIPT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+
 function receiptFileStem(receiptId: string): string | undefined {
-  const stem = String(receiptId || '')
-    .trim()
-    .replace(/[^A-Za-z0-9_-]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-  return stem || undefined;
+  return RECEIPT_ID.test(receiptId) ? receiptId : undefined;
 }
 
 function clip(value: unknown): string | null {
