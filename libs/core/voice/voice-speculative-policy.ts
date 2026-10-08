@@ -9,6 +9,9 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { safeExecResult } from '../secure-io.js';
 import type { ReasoningBackendMode } from '../reasoning/reasoning-backend-policy.js';
 import { getReasoningProviderDescriptor } from '../reasoning/reasoning-provider-registry.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('voice-speculative-policy');
 
 export const SPECULATIVE_REPLY_ENV = 'KYBERION_VOICE_SPECULATIVE_REPLY';
 
@@ -16,8 +19,7 @@ let warnedRegistryLoadFailure = false;
 function warnRegistryLoadFailureOnce(error: unknown): void {
   if (warnedRegistryLoadFailure) return;
   warnedRegistryLoadFailure = true;
-  // eslint-disable-next-line no-console
-  console.warn(
+  logger.warn(
     `[voice-speculative-policy] reasoning provider registry failed to load; treating cost tier as 'metered' (fail closed). ${
       (error as Error)?.message || String(error)
     }`
