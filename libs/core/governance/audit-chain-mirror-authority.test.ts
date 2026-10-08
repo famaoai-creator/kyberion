@@ -10,7 +10,10 @@ import { auditChain, registerAuditChainIo, type AuditChainIo } from './audit-cha
 // entry inside work coordination's infrastructure_sentinel store fence, so the
 // tenant mirror (customer/{slug}/logs/audit/) was written as an unbound
 // sentinel and denied. The mirror is the chain's own store: it is written as
-// infrastructure_sentinel bound to the entry's tenant, whatever the caller is.
+// the dedicated audit_mirror_writer role bound to the entry's tenant, whatever
+// the caller is. infrastructure_sentinel (also bound by resident dots) holds no
+// customer/ grant at all.
+const MIRROR_WRITER = 'audit_mirror_writer';
 const TENANT = 'mirror-authority-co';
 const OTHER_TENANT = 'mirror-other-co';
 const ENV_KEYS = ['KYBERION_PERSONA', 'MISSION_ROLE', 'KYBERION_SUDO', 'KYBERION_TENANT'] as const;
@@ -21,6 +24,7 @@ function mirrorPath(slug: string): string {
 
 describe('audit chain tenant mirror authority', () => {
   const saved: Partial<Record<(typeof ENV_KEYS)[number], string>> = {};
+  let restoreAuditIo: (() => void) | undefined;
 
   beforeEach(() => {
     for (const key of ENV_KEYS) saved[key] = process.env[key];
@@ -31,27 +35,71 @@ describe('audit chain tenant mirror authority', () => {
   });
 
   afterEach(() => {
+    restoreAuditIo?.();
+    restoreAuditIo = undefined;
     for (const key of ENV_KEYS) {
       if (saved[key] === undefined) delete process.env[key];
       else process.env[key] = saved[key];
     }
   });
 
-  it('grants the tenant-bound store-writer only its own tenant mirror', () => {
+  const allowedAs = (role: string, slug: string | undefined, file: string): boolean =>
+    withExecutionContext(role, () => validateWritePermission(file).allowed, undefined, slug);
+
+  it('grants the tenant-bound mirror writer only its own tenant mirror', () => {
     const allowed = (slug: string | undefined, file: string): boolean =>
-      withExecutionContext(
-        'infrastructure_sentinel',
-        () => validateWritePermission(file).allowed,
-        undefined,
-        slug
-      );
+      allowedAs(MIRROR_WRITER, slug, file);
 
     expect(allowed(TENANT, mirrorPath(TENANT))).toBe(true);
     expect(allowed(TENANT, mirrorPath(OTHER_TENANT))).toBe(false);
+    expect(allowed(OTHER_TENANT, mirrorPath(TENANT))).toBe(false);
     expect(allowed(undefined, mirrorPath(TENANT))).toBe(false);
     expect(
       allowed(TENANT, path.join(pathResolver.rootDir(), 'customer', TENANT, 'customer.json'))
     ).toBe(false);
+    // No infrastructure_sentinel scope rides along with the mirror grant.
+    expect(
+      allowed(
+        TENANT,
+        path.join(pathResolver.rootDir(), 'active', 'shared', 'coordination', 'channels', 'x.json')
+      )
+    ).toBe(false);
+  });
+
+  it('adds nothing beyond the worker persona baseline except the mirror', () => {
+    // audit_mirror_writer runs with persona worker (like every narrow
+    // store-writer role); no persona carries fewer grants. It therefore keeps
+    // the policy default_allow and worker persona write paths, and must add
+    // exactly the tenant mirror on top. chronos_token_registry_reader is the
+    // baseline: persona worker with an empty role write grant.
+    const root = pathResolver.rootDir();
+    const samples = [
+      path.join(root, 'active', 'shared', 'tmp', 'x.txt'),
+      path.join(root, 'active', 'shared', 'logs', 'x.jsonl'),
+      path.join(root, 'customer', TENANT, 'logs', 'traces', 'x.jsonl'),
+      path.join(root, 'customer', TENANT, 'customer.json'),
+      path.join(root, 'knowledge', 'product', 'x.md'),
+      path.join(root, 'knowledge', 'confidential', TENANT, 'x.md'),
+      path.join(root, 'active', 'shared', 'coordination', 'channels', 'x.json'),
+    ];
+    for (const file of samples) {
+      expect({ file, allowed: allowedAs(MIRROR_WRITER, TENANT, file) }).toEqual({
+        file,
+        allowed: allowedAs('chronos_token_registry_reader', TENANT, file),
+      });
+    }
+    // What the inherited baseline allows (documented, not granted by the role).
+    expect(allowedAs(MIRROR_WRITER, TENANT, samples[0])).toBe(true);
+    expect(allowedAs('chronos_token_registry_reader', TENANT, mirrorPath(TENANT))).toBe(false);
+    expect(allowedAs(MIRROR_WRITER, TENANT, mirrorPath(TENANT))).toBe(true);
+  });
+
+  it('no longer grants infrastructure_sentinel any tenant mirror', () => {
+    expect(allowedAs('infrastructure_sentinel', TENANT, mirrorPath(TENANT))).toBe(false);
+    expect(allowedAs('infrastructure_sentinel', OTHER_TENANT, mirrorPath(OTHER_TENANT))).toBe(
+      false
+    );
+    expect(allowedAs('infrastructure_sentinel', undefined, mirrorPath(TENANT))).toBe(false);
   });
 
   it('writes the mirror as the tenant-bound writer even inside an unbound sentinel fence', () => {
@@ -77,7 +125,7 @@ describe('audit chain tenant mirror authority', () => {
       },
       assertSafePath: (file) => file,
     };
-    registerAuditChainIo(io);
+    restoreAuditIo = registerAuditChainIo(io);
 
     // Same shape as work coordination's store fence (G17 reproduction).
     withExecutionContext('infrastructure_sentinel', () =>
@@ -93,7 +141,7 @@ describe('audit chain tenant mirror authority', () => {
     const mirror = appends.find((entry) => entry.file.includes(`customer${path.sep}${TENANT}`));
     expect(mirror).toEqual({
       file: expect.stringContaining(path.join('customer', TENANT, 'logs', 'audit')),
-      role: 'infrastructure_sentinel',
+      role: MIRROR_WRITER,
       tenant: TENANT,
       allowed: true,
     });
