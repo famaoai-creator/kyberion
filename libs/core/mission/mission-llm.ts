@@ -123,13 +123,18 @@ function inferAdapter(profile: LlmProfile): string {
 }
 
 function registerDefaultStructuredRunners(): void {
+  // Runbook §7: the dedicated provider runners answer one-shot structured
+  // queries, so they run without write access (read-only / no-write
+  // permission projection, never workspace-write or yolo), from an empty
+  // scratch cwd instead of the repository root, with the prompt on stdin.
   ensureStructuredRunner('codex-cli', async ({ profile, prompt, schema, systemPrompt }) => {
     return runCodexCliQuery({
       systemPrompt: systemPrompt || 'Return exactly one JSON object that matches the schema.',
       userPrompt: prompt,
       schema,
-      mode: 'workspace-write',
-      options: profile as any,
+      mode: 'read-only',
+      profile: 'explorer',
+      options: { ...(profile as any), cwd: llmShellScratchCwd() },
     });
   });
 
@@ -138,6 +143,9 @@ function registerDefaultStructuredRunners(): void {
       systemPrompt: systemPrompt || 'Return exactly one JSON object that matches the schema.',
       userPrompt: prompt,
       schema,
+      profile: 'explorer',
+      promptVia: 'stdin',
+      cwd: llmShellScratchCwd(),
       options: profile as any,
     });
   });
