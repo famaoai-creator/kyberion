@@ -273,6 +273,50 @@ pnpm onboarding apply --identity <reviewed-identity-json>
 `customer/<company-slug>/onboarding/ai-company-readiness.json` と `first-work-plan.md` を
 確認する。consistency check と Step 7 の activation は省略しない。
 
+### Step 5.1: 使うモデルと provider への送信許可を決める（C）
+
+Kyberion が使う推論バックエンドとモデル、そして tenant の機密情報をどの provider に送ってよいかを
+ここで決める。どちらも dry-run が既定で、`--apply` を付けたときだけ書き込む。
+
+```bash
+# 現在の選択と、データ tier ごとに LLM 作業で使える provider を見る
+pnpm onboarding llm show --tenant <tenant-slug>
+
+# バックエンド（reasoning-backend-policy.json の allowed_modes）とモデル（model registry）を選ぶ
+pnpm onboarding llm select --backend claude-cli --model claude-opus-5-5
+pnpm onboarding llm select --backend claude-cli --model claude-opus-5-5 --apply
+```
+
+- 選択は operator の LLM selection（`<profile-root>/onboarding/llm-selection.json`。customer stance が
+  無ければ `knowledge/personal/onboarding/`）に保存され、route resolver と推論ブートストラップが使う。
+  モデルは `claude-opus-5-5` のように省略形でも、`anthropic:claude-opus-5-5` のように registry の id でもよい。
+- 実行できないバックエンド（CLI 未導入、API キー未設定）や registry に無いモデルは拒否される。
+- 環境変数 `KYBERION_REASONING_BACKEND` は選択より優先される。`.env.local` に別の値が保存されていると、
+  それを読み込んだシェルでは選択が効かないため、`--apply` でその行も更新する。シェルで export している
+  値は上書きできないので、警告に従って unset する。
+- 選択は監査台帳に `onboarding.llm_select` として記録される。
+
+provider への送信は既定で拒否される。shipped policy では claude / codex / gemini などの
+`training_use` が `unknown` のため、confidential・personal の material（mission distill など）は
+local-only provider 以外に送られない。契約しているプランが学習に使わないことを確認できたら、
+tenant ごとに明示的に attest する。
+
+```bash
+pnpm onboarding llm attest --tenant <tenant-slug> --provider claude --training-use none \
+  --plan "<契約プラン名>" --basis <規約の URL または契約の参照> --attested-by human:<owner>
+# 表示内容を確認してから、人間の受け入れとして --apply --accept を付けて記録する
+pnpm onboarding llm attest ... --valid-for-days 180 --apply --accept
+```
+
+- `--provider` は `provider-egress-policy.json` に宣言された id だけを受け付ける。`--training-use none`
+  には `--plan`・`--basis`・`--attested-by` が必須。`--apply` だけでは書き込まず、`--accept` が要る。
+- attestation は tenant profile（`knowledge/personal/tenants/<tenant-slug>.json` の
+  `provider_attestations`）に保存され、監査台帳に `tenant.attest_provider` として記録される。
+  `pnpm tenant attest-provider` と同じ経路で、有効期限（既定 180 日）が切れると再び拒否になる。
+- 許可されるのはその tenant だけ。他の tenant の confidential は引き続き拒否される。
+- 結果は出力の「LLM availability by data tier」と、Step 7 の `tenant:activation plan` の
+  `llm_availability` で確認できる。
+
 ### Step 6: customer stance と organization を結合する（C）
 
 tenant と organization の結合を dry-run で確認してから適用する。
@@ -363,6 +407,11 @@ pnpm tenant:activation probe --customer-slug <customer-slug> --tenant-slug <tena
 証跡（`--probe-ref nhi_provisioned=audit://...`）を人間が確認して受け入れる。
 
 `plan` の `blockers` が空になるまで `activate` しない。
+
+`plan` の出力には `llm_availability` も含まれる。データ tier（public / confidential / personal）ごとに、
+LLM 作業で使える provider と根拠（`tenant-attestation`、`local-only` など）が表示される。
+confidential に外部 provider が無い場合は、mission distill などの LLM 作業が拒否されることを示し、
+Step 5.1 の `pnpm onboarding llm attest` を案内する。
 
 ### Step 7.1: 設定変更と外部入口の追加
 

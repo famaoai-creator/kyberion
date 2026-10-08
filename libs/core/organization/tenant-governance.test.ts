@@ -1,7 +1,12 @@
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
+
 import { withExecutionContext } from '../authority.js';
-import { mutateTenant } from './tenant-governance.js';
+import { auditChain } from '../governance/audit-chain.js';
+import { checkProviderEgress } from '../provider/provider-egress-gate.js';
+import { attestTenantProvider, mutateTenant } from './tenant-governance.js';
 import { readTenantProfile, recordTenantProviderAttestation } from './tenant-registry.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
@@ -89,5 +94,73 @@ describe('tenant lifecycle preserves provider policy state', () => {
         })
       )
     ).toThrow('requires plan, basis, attested_by');
+  });
+
+  it('records an audited attestation that opens confidential egress for that tenant only', () => {
+    const record = vi.spyOn(auditChain, 'record').mockImplementation(() => ({}) as never);
+    try {
+      withExecutionContext('sovereign_concierge', () =>
+        mutateTenant({ verb: 'create', slug: 'beta', rootDir, apply: true })
+      );
+      const egress = (slug: string) =>
+        checkProviderEgress({
+          provider: 'codex',
+          dataTier: 'confidential',
+          tenant_slug: slug,
+          tenant_registry_root_dir: rootDir,
+        }).allowed;
+      // Default stays deny: no attestation, no confidential egress.
+      expect(egress('beta')).toBe(false);
+
+      const result = withExecutionContext('sovereign_concierge', () =>
+        attestTenantProvider({
+          slug: 'beta',
+          provider: 'codex',
+          training_use: 'none',
+          plan: 'ChatGPT Enterprise',
+          basis: 'https://openai.com/enterprise-privacy',
+          attested_by: 'human:owner',
+          rootDir,
+        })
+      );
+      expect(result.attestation).toMatchObject({
+        training_use: 'none',
+        plan: 'ChatGPT Enterprise',
+        attested_by: 'human:owner',
+      });
+      expect(result.profile_path).toContain(path.join('knowledge', 'personal', 'tenants'));
+      expect(record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'tenant.attest_provider',
+          tenantSlug: 'beta',
+          metadata: expect.objectContaining({ provider: 'codex', training_use: 'none' }),
+        })
+      );
+      expect(egress('beta')).toBe(true);
+      // The attestation belongs to beta: acme still cannot send to codex.
+      expect(egress('acme')).toBe(false);
+    } finally {
+      record.mockRestore();
+    }
+  });
+
+  it('rejects an attestation for a provider the egress policy does not declare', () => {
+    expect(() =>
+      withExecutionContext('sovereign_concierge', () =>
+        attestTenantProvider({
+          slug: 'acme',
+          provider: 'not-a-provider',
+          training_use: 'none',
+          plan: 'x',
+          basis: 'y',
+          attested_by: 'z',
+          rootDir,
+        })
+      )
+    ).toThrow(/unknown provider 'not-a-provider'/);
+    expect(
+      withExecutionContext('sovereign_concierge', () => readTenantProfile('acme', { rootDir }))
+        ?.provider_attestations?.['not-a-provider']
+    ).toBeUndefined();
   });
 });
