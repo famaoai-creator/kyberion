@@ -161,3 +161,67 @@ export function installGracefulShutdown(
   proc.once('SIGINT', () => void trigger('SIGINT'));
   return trigger;
 }
+
+/** The subset of ChildProcess the deadline supervisor needs (injectable for tests). */
+export interface SupervisableChild {
+  kill(signal?: NodeJS.Signals): boolean;
+  once(
+    event: 'exit',
+    listener: (code: number | null, signal: NodeJS.Signals | null) => void
+  ): unknown;
+  once(event: 'error', listener: (error: Error) => void): unknown;
+}
+
+export class ChildDeadlineError extends Error {
+  constructor(
+    readonly label: string,
+    readonly deadlineMs: number
+  ) {
+    super(`${label} exceeded its ${deadlineMs}ms deadline and was killed`);
+    this.name = 'ChildDeadlineError';
+  }
+}
+
+/**
+ * Await a child process with a hard deadline: resolve on exit 0, reject on a
+ * non-zero exit or spawn 'error', and on deadline send SIGTERM, escalate to
+ * SIGKILL after `killGraceMs`, and reject with `ChildDeadlineError`.
+ */
+export function awaitChildWithDeadline(
+  child: SupervisableChild,
+  options: { label: string; deadlineMs: number; killGraceMs?: number }
+): Promise<void> {
+  const killGraceMs = options.killGraceMs ?? 5000;
+  return new Promise<void>((resolve, reject) => {
+    let settled = false;
+    let timedOut = false;
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
+    const settle = (error?: Error): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      if (killTimer) clearTimeout(killTimer);
+      if (error) reject(error);
+      else resolve();
+    };
+    const deadline = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGTERM');
+      killTimer = setTimeout(() => {
+        child.kill('SIGKILL');
+        settle(new ChildDeadlineError(options.label, options.deadlineMs));
+      }, killGraceMs);
+    }, options.deadlineMs);
+    child.once('exit', (code, signal) => {
+      if (timedOut) settle(new ChildDeadlineError(options.label, options.deadlineMs));
+      else if (code === 0) settle();
+      else
+        settle(
+          new Error(
+            `${options.label} failed with exit code ${code}${signal ? ` (signal ${signal})` : ''}`
+          )
+        );
+    });
+    child.once('error', (error) => settle(error));
+  });
+}
