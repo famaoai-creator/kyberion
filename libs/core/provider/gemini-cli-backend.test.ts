@@ -184,4 +184,44 @@ describe('gemini-cli-backend sandbox projection', () => {
     expect(spawnMock.mock.calls[0]?.[2]?.cwd).toBe('/tmp/llm-cwd');
     expect(stdin).toBe('SYS\n\nuser 91be');
   });
+
+  it('runGeminiCliQuery strips widening extras when a profile is requested', async () => {
+    spawnMock.mockReturnValue(createChild('{"response":"{\\"ok\\":true}"}'));
+
+    await runGeminiCliQuery({
+      systemPrompt: 'SYS',
+      userPrompt: 'user',
+      schema: z.object({ ok: z.boolean() }),
+      options: {
+        model: 'gemini-test-model',
+        extraArgs: ['-y', '--approval-mode', 'yolo', '--sandbox=false', '--debug'],
+      },
+      profile: 'explorer',
+    });
+
+    const args = spawnMock.mock.calls[0]?.[1] as string[];
+    expect(args.slice(4)).toEqual([
+      '--sandbox',
+      '--approval-mode',
+      'plan',
+      '--model',
+      'gemini-test-model',
+      '--debug',
+    ]);
+  });
+
+  it('runGeminiCliQuery truncates unparseable stdout in its error', async () => {
+    spawnMock.mockReturnValue(createChild(`no json here ${'x'.repeat(2000)} TAIL-MARKER`));
+
+    const error = await runGeminiCliQuery({
+      systemPrompt: 'SYS',
+      userPrompt: 'user',
+      schema: z.object({ ok: z.boolean() }),
+      options: { model: 'gemini-test-model' },
+    }).catch((err: Error) => err);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('could not find JSON');
+    expect((error as Error).message).not.toContain('TAIL-MARKER');
+  });
 });
