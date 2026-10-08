@@ -279,6 +279,64 @@ describe('codex-cli-query', () => {
       expect(argv).toEqual(expect.arrayContaining(['--model', 'gpt-5.6-luna']));
       expect(argv).toEqual(expect.arrayContaining(['-c', 'model_reasoning_effort=low']));
     });
+
+    const wideningExtras = [
+      '--sandbox',
+      'workspace-write',
+      '-s',
+      'danger-full-access',
+      '--dangerously-bypass-approvals-and-sandbox',
+      '--full-auto',
+      '--add-dir',
+      '/elsewhere',
+      '-c',
+      'sandbox_mode=danger-full-access',
+      '--config=approval_policy=never',
+      '-c',
+      'model_verbosity=low',
+    ];
+
+    it('strips widening extras when a permission profile is requested', async () => {
+      mocks.spawnMock.mockReturnValueOnce(createChild());
+
+      await runCodexCliQuery({
+        systemPrompt: 'sys',
+        userPrompt: 'usr',
+        schema: z.object({ ok: z.boolean() }),
+        profile: 'explorer',
+        options: { bin: 'codex', extraArgs: wideningExtras },
+      });
+
+      const [, argv] = mocks.spawnMock.mock.calls[0] as [string, string[]];
+      expect(argv.slice(1, 3)).toEqual(['--sandbox', 'read-only']);
+      expect(argv.filter((arg) => arg === '--sandbox')).toHaveLength(1);
+      for (const widened of [
+        'workspace-write',
+        'danger-full-access',
+        '--dangerously-bypass-approvals-and-sandbox',
+        '--full-auto',
+        '--add-dir',
+        'sandbox_mode=danger-full-access',
+        '--config=approval_policy=never',
+      ]) {
+        expect(argv).not.toContain(widened);
+      }
+      expect(argv).toEqual(expect.arrayContaining(['-c', 'model_verbosity=low']));
+    });
+
+    it('keeps caller extras unchanged without a permission profile', async () => {
+      mocks.spawnMock.mockReturnValueOnce(createChild());
+
+      await runCodexCliQuery({
+        systemPrompt: 'sys',
+        userPrompt: 'usr',
+        schema: z.object({ ok: z.boolean() }),
+        options: { bin: 'codex', extraArgs: ['--full-auto'] },
+      });
+
+      const [, argv] = mocks.spawnMock.mock.calls[0] as [string, string[]];
+      expect(argv).toContain('--full-auto');
+    });
   });
 
   describe('private session git index (WS-02)', () => {
