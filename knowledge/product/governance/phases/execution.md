@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Mission Execution'
 tags: [governance, lifecycle, execution]
-last_updated: 2026-09-30
+last_updated: 2026-10-08
 runtime_stages: [contract_authoring, preflight, execution]
 ---
 
@@ -90,7 +90,11 @@ template task is recorded while the work happens**. Verified end to end on 2026-
 
    `--actor-id` is not optional in practice: `review-task` computes reviewer independence
    from the actor ids recorded for the review target, and without them review is rejected
-   ("implementer identity is missing").
+   ("implementer identity is missing"). When `record-evidence` (or `review-task`) completes a
+   task it also appends an estimated `source: direct_cli` usage entry (tokens/cost not
+   observed, recorded as null/0) to the resource-usage ledger; pass `--provider <id>` when the
+   provider is not the `--actor-id` prefix, so the retrospective can tell unrecorded usage
+   (`usage_unrecorded`) from free work.
 
 4. **Review with a different agent.** After an independent reviewer (a distinct subagent,
    or the agent reviewing the PR) has reviewed, record its verdict, then close the review

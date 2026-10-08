@@ -487,7 +487,8 @@ async function recordEvidence(
   evidence?: string[],
   teamRole?: string,
   actorId?: string,
-  actorType?: 'agent' | 'human' | 'service'
+  actorType?: 'agent' | 'human' | 'service',
+  provider?: string
 ) {
   const { missionSystem } = await import('./refactor/mission-system.js');
   const { TraceContext, persistTrace } = await import('@agent/core/trace');
@@ -498,7 +499,8 @@ async function recordEvidence(
     evidence,
     teamRole,
     actorId,
-    actorType
+    actorType,
+    provider
   );
   try {
     const tc = new TraceContext('mission:evidence', { missionId: missionId.toUpperCase() });
@@ -525,7 +527,8 @@ async function recordArtifactReview(
   reviewerAgentId: string,
   findings?: unknown[],
   reviewerTeamRole?: 'reviewer' | 'qa',
-  specialistRoles?: string[]
+  specialistRoles?: string[],
+  provider?: string
 ) {
   const { missionSystem } = await import('./refactor/mission-system.js');
   const result = await missionSystem.recordArtifactReview(
@@ -534,7 +537,8 @@ async function recordArtifactReview(
     reviewerAgentId,
     (findings || []) as ArtifactReviewFinding[],
     reviewerTeamRole,
-    specialistRoles
+    specialistRoles,
+    provider
   );
   logger.info(
     `[review-task] ${reviewTaskId}: status=${result.status}${result.taskCompleted ? ' (task completed)' : ''}${
