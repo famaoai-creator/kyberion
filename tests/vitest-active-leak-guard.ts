@@ -3,10 +3,14 @@
  *
  * `active/` is the operator's real runtime tree (missions, audit, ops alerts,
  * inbox, …). Tests must write to `active/shared/tmp/` or a `vitest-*`
- * redirect root (see `approvalStoreRoots`). This guard snapshots `active/`
- * before the run and, after it, lists every file the run created or grew
- * outside those sandboxes, so a new leak is visible instead of silently
- * mixing fixture data into an operator's mission list or audit trail.
+ * redirect root (see `approvalStoreRoots`). The gitignored roots outside
+ * `active/` hold live state too — the tenant registry and personal tier
+ * (`knowledge/personal/`), tenant knowledge (`knowledge/confidential/`) and
+ * customer stance overlays (`customer/`) — and git status cannot see writes
+ * there. This guard snapshots every root in `LIVE_STATE_ROOTS` before the run
+ * and, after it, lists every file the run created or grew outside the
+ * sandboxes, so a new leak is visible instead of silently mixing fixture data
+ * into an operator's mission list, audit trail or tenant registry.
  *
  * Report: active/shared/tmp/vitest-active-leaks.json.
  * KYBERION_TEST_LEAK_STRICT=1 fails the run when anything leaked.
@@ -15,8 +19,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
-const ACTIVE = path.join(ROOT, 'active');
-const REPORT = path.join(ACTIVE, 'shared', 'tmp', 'vitest-active-leaks.json');
+const REPORT = path.join(ROOT, 'active', 'shared', 'tmp', 'vitest-active-leaks.json');
+
+/** Repo-relative roots holding live (gitignored) operator state a test run must not change. */
+export const LIVE_STATE_ROOTS = [
+  'active',
+  'knowledge/personal',
+  'knowledge/confidential',
+  'customer',
+];
 
 /** Repo-relative prefixes tests may write freely. */
 export const TEST_SANDBOX_PREFIXES = [
@@ -31,7 +42,7 @@ export function isSandboxed(relativePath: string): boolean {
   return TEST_SANDBOX_PREFIXES.some((prefix) => relativePath.startsWith(prefix));
 }
 
-function snapshot(): Snapshot {
+export function snapshot(rootDir = ROOT, roots: readonly string[] = LIVE_STATE_ROOTS): Snapshot {
   const files: Snapshot = new Map();
   const walk = (dir: string): void => {
     let entries: fs.Dirent[];
@@ -42,7 +53,7 @@ function snapshot(): Snapshot {
     }
     for (const entry of entries) {
       const full = path.join(dir, entry.name);
-      const relative = path.relative(ROOT, full).split(path.sep).join('/');
+      const relative = path.relative(rootDir, full).split(path.sep).join('/');
       if (entry.isDirectory()) {
         if (!isSandboxed(`${relative}/`)) walk(full);
       } else if (entry.isFile() && !isSandboxed(relative)) {
@@ -54,7 +65,7 @@ function snapshot(): Snapshot {
       }
     }
   };
-  walk(ACTIVE);
+  for (const root of roots) walk(path.join(rootDir, root));
   return files;
 }
 
@@ -92,12 +103,12 @@ export default function setup(): () => void {
       .map(([area, count]) => `  ${count}\t${area}`)
       .join('\n');
     process.stderr.write(
-      `\n[vitest-active-leak-guard] tests wrote ${total} file(s) into live active/ state ` +
+      `\n[vitest-active-leak-guard] tests wrote ${total} file(s) into live state (${LIVE_STATE_ROOTS.join('/, ')}/) ` +
         `(created ${leaks.created.length}, grown ${leaks.grown.length}) — ` +
-        `redirect them to active/shared/tmp/ or a vitest-* root | evidence: ${path.relative(ROOT, REPORT)}\n${areas}\n`
+        `redirect them to active/shared/tmp/, a vitest-* root or a fixture root | evidence: ${path.relative(ROOT, REPORT)}\n${areas}\n`
     );
     if (process.env.KYBERION_TEST_LEAK_STRICT === '1') {
-      throw new Error(`[vitest-active-leak-guard] ${total} live active/ write(s) from tests`);
+      throw new Error(`[vitest-active-leak-guard] ${total} live-state write(s) from tests`);
     }
   };
 }
