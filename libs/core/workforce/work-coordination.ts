@@ -24,6 +24,7 @@ import { applyWorkItemFilters, sortItems } from './work-coordination-query.js';
 import {
   assertOriginalWorkItemIdentity,
   assertVersion,
+  assertWorkItemTenantRegistered,
   buildWorkItemCreation,
   canReplayWorkItemClaim,
   isTerminalStatus,
@@ -627,9 +628,10 @@ export function listWorkItemAttempts(itemId: string): WorkItemAttempt[] {
 }
 
 export function createWorkItem(input: CreateWorkItemInput): WorkItem {
-  return withCoordinationRoot(input.rootDir, () =>
-    withCoordinationMutation(() => createWorkItemInternal(input))
-  );
+  return withCoordinationRoot(input.rootDir, () => {
+    assertWorkItemTenantRegistered(input, coordinationRootOverride || undefined);
+    return withCoordinationMutation(() => createWorkItemInternal(input));
+  });
 }
 
 /**
@@ -637,24 +639,25 @@ export function createWorkItem(input: CreateWorkItemInput): WorkItem {
  * A committed snapshot survives event/audit interruption without duplicate creation.
  */
 export function createWorkItemIfAbsent(input: CreateWorkItemInput & { itemId: string }): WorkItem {
-  return withCoordinationRoot(input.rootDir, () =>
-    withCoordinationMutation(() => {
+  return withCoordinationRoot(input.rootDir, () => {
+    assertWorkItemTenantRegistered(input, coordinationRootOverride || undefined);
+    return withCoordinationMutation(() => {
       if (!input.itemId?.trim()) {
         throw new WorkCoordinationError('validation_error', 'itemId is required');
       }
-      const candidate = buildWorkItemCreation(input, coordinationRootOverride || undefined);
+      const candidate = buildWorkItemCreation(input);
       const records = readJsonl<WorkItem>(itemsPath()).filter(
         (item) => item.item_id === input.itemId
       );
       if (records.length === 0) return createWorkItemInternal(input);
       assertOriginalWorkItemIdentity(records, candidate);
       return records[records.length - 1];
-    })
-  );
+    });
+  });
 }
 
 function createWorkItemInternal(input: CreateWorkItemInput): WorkItem {
-  const item = buildWorkItemCreation(input, coordinationRootOverride || undefined);
+  const item = buildWorkItemCreation(input);
   if (currentWorkItem(item.item_id)) {
     throw new WorkCoordinationError(
       'idempotency_conflict',
@@ -1469,6 +1472,7 @@ export function importExternalWorkItem(input: {
   context?: WorkItemContext;
   metadata?: Record<string, unknown>;
 }): WorkItem {
+  assertWorkItemTenantRegistered(input, coordinationRootOverride || undefined);
   return withCoordinationMutation(() => {
     const existing = listWorkItems({ source: input.source }).find(
       (item) => item.source_ref === input.sourceRef
