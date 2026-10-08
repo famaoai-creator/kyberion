@@ -276,3 +276,19 @@ When a defect class not listed here recurs:
 3. Record the incident in the mission's retrospective.
 
 A rule without an enforcing check is a candidate for the next gate.
+
+## §7 Project lifecycle facade parity
+
+**Rule.** Dedicated lifecycle commands and generic status updates must execute the
+same guarded facade. Archive checks live missions, task sessions and unfinished
+tracks before changing ownership projections. Leaving archived state requires an
+explicit restore operation.
+
+**Procedure.** When changing project or track statuses, update the CLI and typed
+facade together, reconcile operational state and default track membership, and
+preserve rollback and audit behavior. Verify descriptive edits do not implicitly
+restore archived records.
+
+**Gate.** Run the focused lifecycle regressions in
+`libs/core/project/project-management.test.ts` and build core plus the repo CLI.
+These cover archive entry-point parity, restore, and track state/projection changes.

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it } from 'vitest';
 import { middleware, config } from './middleware';
+import { withLocalPeerRequest } from '../test/local-peer-fixture';
 
 const NAV = { 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document' };
 
@@ -11,10 +12,9 @@ function session(expSeconds: number): string {
 
 function run(path: string, headers: Record<string, string> = {}, loopback = false) {
   const req = new NextRequest(`https://app.example${path}`, {
-    headers: loopback ? { ...headers, 'x-real-ip': '127.0.0.1' } : headers,
+    headers,
   });
-  if (loopback) process.env.KYBERION_TRUST_PROXY = '1';
-  return middleware(req);
+  return loopback ? withLocalPeerRequest(req, middleware) : middleware(req);
 }
 
 describe('concierge middleware', () => {
@@ -46,6 +46,12 @@ describe('concierge middleware', () => {
 
   it('never redirects loopback', () => {
     expect(run('/', NAV, true).headers.get('location')).toBeNull();
+  });
+
+  it('does not grant a loopback navigation hint from forwarded headers', () => {
+    process.env.KYBERION_TRUST_PROXY = '1';
+    expect(run('/', { ...NAV, 'x-real-ip': '127.0.0.1' }).status).toBe(302);
+    expect(config.runtime).toBe('nodejs');
   });
 
   it('leaves API calls untouched', () => {
