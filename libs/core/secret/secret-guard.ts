@@ -1,4 +1,5 @@
 import * as secureIo from '../secure-io.js';
+import { operatorProbeSecretAccess } from '../service/operator-service-connection-admission.js';
 import { logger } from '../core.js';
 import { ledger } from '../ledger.js';
 import * as pathResolver from '../path-resolver.js';
@@ -305,6 +306,8 @@ export const checkAuthority = (missionId: string, authority: string): boolean =>
  */
 export const getSecret = (key: string, scope?: string, operation?: string): string | null => {
   assertPluginGrantAllows('secrets', key);
+  const probeAccess = operatorProbeSecretAccess(key, scope, operation);
+  if (probeAccess === false) throw new Error('[OPERATOR_SERVICE_PROBE_DENIED]');
   const currentMission = getRegisteredEnvText('MISSION_ID');
   const authorizedScope = getRegisteredEnvText('AUTHORIZED_SCOPE');
 
@@ -321,7 +324,7 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
         g.expiresAt > Date.now()
     );
 
-    if (!activeGrant && !hasScopeIdentity) {
+    if (!activeGrant && !hasScopeIdentity && probeAccess !== true) {
       throw new Error(
         `TIBA_VIOLATION: No active temporal grant or authorized scope for service "${scope}". Access Denied.`
       );
@@ -431,7 +434,9 @@ export const storeConnectionDocument = (
     // Back up the raw previous bytes: an encrypted document must never gain
     // a plaintext .bak sibling.
     const backupPath = safeSecretPath(`${fullPath}.bak`);
-    safeWriteFile(backupPath, safeReadFile(fullPath, { encoding: 'utf8' }) as string);
+    safeWriteFile(backupPath, safeReadFile(fullPath, { encoding: 'utf8' }) as string, {
+      mode: 0o600,
+    });
     try {
       safeFsyncFile(backupPath);
     } catch (_) {
@@ -443,7 +448,7 @@ export const storeConnectionDocument = (
     resolveSecretEncryptionMode() === 'none'
       ? JSON.stringify(next, null, 2)
       : JSON.stringify(encryptConnectionDocument(next), null, 2);
-  safeWriteFile(fullPath, serialized + '\n');
+  safeWriteFile(fullPath, serialized + '\n', { mode: 0o600 });
   try {
     safeFsyncFile(fullPath);
   } catch (_) {

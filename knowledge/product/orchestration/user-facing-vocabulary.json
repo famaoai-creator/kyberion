@@ -14105,6 +14105,226 @@
         "en": "Your account and settings scope could not be verified. No save was sent. Your edits are still here; check your connection before trying again.",
         "ja": "アカウントと設定の対象を確認できなかったため、保存を送信していません。編集中の内容は残っています。接続状況を確認してから再度お試しください。",
         "qps-ploc": "⟦Ẏőůř ȧƈƈőůñŧ ȧñḓ şėŧŧïñɠş şƈőṗė ƈőůŀḓ ñőŧ ƀė ṽėřïƒïėḓ. Ñő şȧṽė ẇȧş şėñŧ. Ẏőůř ėḓïŧş ȧřė şŧïŀŀ ħėřė; ƈħėƈķ ẏőůř ƈőññėƈŧïőñ ƀėƒőřė ŧřẏïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
+      },
+      "settings.operator_title": {
+        "en": "Register service tokens on this PC",
+        "ja": "この PC にサービスのトークンを登録",
+        "qps-ploc": "⟦Řėɠïşŧėř şėřṽïƈė ŧőķėñş őñ ŧħïş ṖƇ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "settings.operator_description": {
+        "en": "Review each service’s access, register a token you issued, then check runtime authentication.",
+        "ja": "各サービスのアクセス権を確認し、自分で発行したトークンを登録して、実行環境の認証を確認します。",
+        "qps-ploc": "⟦Řėṽïėẇ ėȧƈħ şėřṽïƈė’ş ȧƈƈėşş, řėɠïşŧėř ȧ ŧőķėñ ẏőů ïşşůėḓ, ŧħėñ ƈħėƈķ řůñŧïɱė ȧůŧħėñŧïƈȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "settings.operator_independent": {
+        "en": "Token registration is saved separately from the service selections above. Switching a service off does not disconnect it or revoke its token.",
+        "ja": "トークン登録は上のサービス選択とは別に保存されます。選択をオフにしても、接続の解除やトークンの失効は行いません。",
+        "qps-ploc": "⟦Ŧőķėñ řėɠïşŧřȧŧïőñ ïş şȧṽėḓ şėṗȧřȧŧėŀẏ ƒřőɱ ŧħė şėřṽïƈė şėŀėƈŧïőñş ȧƀőṽė. Şẇïŧƈħïñɠ ȧ şėřṽïƈė őƒƒ ḓőėş ñőŧ ḓïşƈőññėƈŧ ïŧ őř řėṽőķė ïŧş ŧőķėñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñ⟧"
+      },
+      "settings.operator_unsupported_providers": {
+        "en": "Google Workspace, Microsoft 365, and Notion do not yet support registration from this Web screen.",
+        "ja": "Google Workspace、Microsoft 365、Notion は、この Web 画面からの登録にまだ対応していません。",
+        "qps-ploc": "⟦Ɠőőɠŀė Ẇőřķşṗȧƈė, Ɱïƈřőşőƒŧ 365, ȧñḓ Ñőŧïőñ ḓő ñőŧ ẏėŧ şůṗṗőřŧ řėɠïşŧřȧŧïőñ ƒřőɱ ŧħïş Ẇėƀ şƈřėėñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "settings.operator_local_required": {
+        "en": "Open the local operator Web screen on your own PC: from the repository root, run pnpm --dir presence/displays/concierge local:start. This screen does not allow remote registration.",
+        "ja": "自分の PC でリポジトリのルートから pnpm --dir presence/displays/concierge local:start を実行し、ローカル操作用 Web 画面を開いてください。この画面からのリモート登録はできません。",
+        "qps-ploc": "⟦Őṗėñ ŧħė ŀőƈȧŀ őṗėřȧŧőř Ẇėƀ şƈřėėñ őñ ẏőůř őẇñ ṖƇ: ƒřőɱ ŧħė řėṗőşïŧőřẏ řőőŧ, řůñ ṗñṗɱ --ḓïř ṗřėşėñƈė/ḓïşṗŀȧẏş/ƈőñƈïėřɠė ŀőƈȧŀ:şŧȧřŧ. Ŧħïş şƈřėėñ ḓőėş ñőŧ ȧŀŀőẇ řėɱőŧė řėɠïşŧřȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "settings.operator_invalid_request": {
+        "en": "The registration request was not accepted. Prepare a new request and try again.",
+        "ja": "登録リクエストを受け付けられませんでした。新しいリクエストを準備してやり直してください。",
+        "qps-ploc": "⟦Ŧħė řėɠïşŧřȧŧïőñ řėɋůėşŧ ẇȧş ñőŧ ȧƈƈėṗŧėḓ. Ṗřėṗȧřė ȧ ñėẇ řėɋůėşŧ ȧñḓ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "settings.operator_approval_required": {
+        "en": "Approval is required or has expired. Prepare and review a new registration request.",
+        "ja": "承認が必要、または有効期限が切れています。新しい登録リクエストを準備して確認してください。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ïş řėɋůïřėḓ őř ħȧş ėẋṗïřėḓ. Ṗřėṗȧřė ȧñḓ řėṽïėẇ ȧ ñėẇ řėɠïşŧřȧŧïőñ řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "settings.operator_recovery_required": {
+        "en": "Registration needs local recovery before another attempt. No successful registration has been confirmed.",
+        "ja": "再試行する前にローカル環境の復旧が必要です。登録の成功は確認できていません。",
+        "qps-ploc": "⟦Řėɠïşŧřȧŧïőñ ñėėḓş ŀőƈȧŀ řėƈőṽėřẏ ƀėƒőřė ȧñőŧħėř ȧŧŧėɱṗŧ. Ñő şůƈƈėşşƒůŀ řėɠïşŧřȧŧïőñ ħȧş ƀėėñ ƈőñƒïřɱėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "settings.operator_unavailable": {
+        "en": "The result could not be confirmed. Reload this page before retrying; a submitted registration may already have completed.",
+        "ja": "結果を確認できませんでした。送信済みの登録が完了している可能性があるため、再試行前にこのページを再読み込みしてください。",
+        "qps-ploc": "⟦Ŧħė řėşůŀŧ ƈőůŀḓ ñőŧ ƀė ƈőñƒïřɱėḓ. Řėŀőȧḓ ŧħïş ṗȧɠė ƀėƒőřė řėŧřẏïñɠ; ȧ şůƀɱïŧŧėḓ řėɠïşŧřȧŧïőñ ɱȧẏ ȧŀřėȧḓẏ ħȧṽė ƈőɱṗŀėŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "settings.operator_reload": {
+        "en": "Reload service status",
+        "ja": "サービスの状態を再読み込み",
+        "qps-ploc": "⟦Řėŀőȧḓ şėřṽïƈė şŧȧŧůş ŀőřėɱ ⟧"
+      },
+      "settings.operator_loading": {
+        "en": "Loading registration status…",
+        "ja": "登録状態を読み込み中…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ řėɠïşŧřȧŧïőñ şŧȧŧůş… ŀőřėɱ ïṗş⟧"
+      },
+      "settings.operator_empty": {
+        "en": "No Web token-registration adapters are available.",
+        "ja": "Web トークン登録に対応したアダプターがありません。",
+        "qps-ploc": "⟦Ñő Ẇėƀ ŧőķėñ-řėɠïşŧřȧŧïőñ ȧḓȧṗŧėřş ȧřė ȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "settings.operator_authenticated": {
+        "en": "Authenticated",
+        "ja": "認証を確認済み",
+        "qps-ploc": "⟦Ȧůŧħėñŧïƈȧŧėḓ ŀőřė⟧"
+      },
+      "settings.operator_registered_unverified": {
+        "en": "Registered · authentication unverified",
+        "ja": "登録済み・認証未確認",
+        "qps-ploc": "⟦Řėɠïşŧėřėḓ · ȧůŧħėñŧïƈȧŧïőñ ůñṽėřïƒïėḓ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "settings.operator_not_registered": {
+        "en": "No registered token",
+        "ja": "トークン未登録",
+        "qps-ploc": "⟦Ñő řėɠïşŧėřėḓ ŧőķėñ ŀőřėɱ ⟧"
+      },
+      "settings.operator_credential_missing": {
+        "en": "No runtime credential was found. Register a token before verifying again.",
+        "ja": "実行環境の認証情報が見つかりません。トークンを登録してから再確認してください。",
+        "qps-ploc": "⟦Ñő řůñŧïɱė ƈřėḓėñŧïȧŀ ẇȧş ƒőůñḓ. Řėɠïşŧėř ȧ ŧőķėñ ƀėƒőřė ṽėřïƒẏïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "settings.operator_credential_shadowed": {
+        "en": "The registered token is shadowed by another runtime credential. Authentication for this registered token could not be verified.",
+        "ja": "別の実行環境の認証情報が登録済みトークンより優先されているため、このトークンの認証を確認できませんでした。",
+        "qps-ploc": "⟦Ŧħė řėɠïşŧėřėḓ ŧőķėñ ïş şħȧḓőẇėḓ ƀẏ ȧñőŧħėř řůñŧïɱė ƈřėḓėñŧïȧŀ. Ȧůŧħėñŧïƈȧŧïőñ ƒőř ŧħïş řėɠïşŧėřėḓ ŧőķėñ ƈőůŀḓ ñőŧ ƀė ṽėřïƒïėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
+      "settings.operator_authentication_failed": {
+        "en": "The service did not accept the runtime credential. Check the token’s validity and replace it if needed.",
+        "ja": "サービスが実行環境の認証情報を受け付けませんでした。トークンの有効性を確認し、必要に応じて更新してください。",
+        "qps-ploc": "⟦Ŧħė şėřṽïƈė ḓïḓ ñőŧ ȧƈƈėṗŧ ŧħė řůñŧïɱė ƈřėḓėñŧïȧŀ. Ƈħėƈķ ŧħė ŧőķėñ’ş ṽȧŀïḓïŧẏ ȧñḓ řėṗŀȧƈė ïŧ ïƒ ñėėḓėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "settings.operator_probe_unavailable": {
+        "en": "Authentication could not be checked. The token’s registered status is unchanged; try Verify again.",
+        "ja": "認証を確認できませんでした。トークンの登録状態は変わりません。「認証を確認」で再試行してください。",
+        "qps-ploc": "⟦Ȧůŧħėñŧïƈȧŧïőñ ƈőůŀḓ ñőŧ ƀė ƈħėƈķėḓ. Ŧħė ŧőķėñ’ş řėɠïşŧėřėḓ şŧȧŧůş ïş ůñƈħȧñɠėḓ; ŧřẏ Ṽėřïƒẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "settings.operator_probe_unsupported": {
+        "en": "This adapter does not support an authentication check.",
+        "ja": "このアダプターは認証の確認に対応していません。",
+        "qps-ploc": "⟦Ŧħïş ȧḓȧṗŧėř ḓőėş ñőŧ şůṗṗőřŧ ȧñ ȧůŧħėñŧïƈȧŧïőñ ƈħėƈķ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "settings.operator_scope_limit": {
+        "en": "Authentication only confirms identity. Repository access, channel access, and write permissions must be checked separately.",
+        "ja": "認証の確認は本人確認のみです。リポジトリ、チャンネルへのアクセスや書き込み権限は別途確認が必要です。",
+        "qps-ploc": "⟦Ȧůŧħėñŧïƈȧŧïőñ őñŀẏ ƈőñƒïřɱş ïḓėñŧïŧẏ. Řėṗőşïŧőřẏ ȧƈƈėşş, ƈħȧññėŀ ȧƈƈėşş, ȧñḓ ẇřïŧė ṗėřɱïşşïőñş ɱůşŧ ƀė ƈħėƈķėḓ şėṗȧřȧŧėŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+      },
+      "settings.operator_auth_operation": {
+        "en": "Read-only authentication check: {operation}",
+        "ja": "読み取り専用の認証確認: {operation}",
+        "qps-ploc": "⟦Řėȧḓ-őñŀẏ ȧůŧħėñŧïƈȧŧïőñ ƈħėƈķ: {operation} ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "settings.operator_issue_token": {
+        "en": "Open {service} to issue your own token",
+        "ja": "{service} を開いて自分でトークンを発行",
+        "qps-ploc": "⟦Őṗėñ {service} ŧő ïşşůė ẏőůř őẇñ ŧőķėñ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "settings.operator_prepare": {
+        "en": "Prepare registration",
+        "ja": "登録を準備",
+        "qps-ploc": "⟦Ṗřėṗȧřė řėɠïşŧřȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "settings.operator_prepare_replace": {
+        "en": "Prepare token replacement",
+        "ja": "トークンの更新を準備",
+        "qps-ploc": "⟦Ṗřėṗȧřė ŧőķėñ řėṗŀȧƈėɱėñŧ ŀőřėɱ ïṗ⟧"
+      },
+      "settings.operator_verify": {
+        "en": "Verify authentication",
+        "ja": "認証を確認",
+        "qps-ploc": "⟦Ṽėřïƒẏ ȧůŧħėñŧïƈȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "settings.operator_cancel": {
+        "en": "Cancel registration review",
+        "ja": "登録の確認をキャンセル",
+        "qps-ploc": "⟦Ƈȧñƈėŀ řėɠïşŧřȧŧïőñ řėṽïėẇ ŀőřėɱ ïṗ⟧"
+      },
+      "settings.operator_pending": {
+        "en": "This registration is awaiting approval. No token has been submitted. After approval, choose Check approval.",
+        "ja": "この登録は承認待ちです。トークンはまだ送信されていません。承認後に「承認状態を確認」を選んでください。",
+        "qps-ploc": "⟦Ŧħïş řėɠïşŧřȧŧïőñ ïş ȧẇȧïŧïñɠ ȧṗṗřőṽȧŀ. Ñő ŧőķėñ ħȧş ƀėėñ şůƀɱïŧŧėḓ. Ȧƒŧėř ȧṗṗřőṽȧŀ, ƈħőőşė Ƈħėƈķ ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
+      },
+      "settings.operator_review": {
+        "en": "Review the access notice above, then enter the token you issued for {service} and choose Save. It is stored on this PC using the existing OS keychain or local connection-file policy. Encryption depends on your local configuration.",
+        "ja": "上のアクセス権に関する注意を確認し、{service} 用に自分で発行したトークンを入力して保存してください。この PC の既存の OS キーチェーンまたはローカル接続ファイルの方針に従って保存されます。暗号化の有無はローカル設定によって異なります。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ȧƈƈėşş ñőŧïƈė ȧƀőṽė, ŧħėñ ėñŧėř ŧħė ŧőķėñ ẏőů ïşşůėḓ ƒőř {service} ȧñḓ ƈħőőşė Şȧṽė. Ïŧ ïş şŧőřėḓ őñ ŧħïş ṖƇ ůşïñɠ ŧħė ėẋïşŧïñɠ ŐŞ ķėẏƈħȧïñ őř ŀőƈȧŀ ƈőññėƈŧïőñ-ƒïŀė ṗőŀïƈẏ. Ėñƈřẏṗŧïőñ ḓėṗėñḓş őñ ẏőůř ŀőƈȧŀ ƈőñƒïɠůřȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "settings.operator_token_label": {
+        "en": "{service} access token",
+        "ja": "{service} アクセストークン",
+        "qps-ploc": "⟦{service} ȧƈƈėşş ŧőķėñ ŀőřėɱ ï⟧"
+      },
+      "settings.operator_token_help": {
+        "en": "The token is sent only when you choose Save. The input is cleared immediately after submission. This app never issues a token for you.",
+        "ja": "保存を選ぶとトークンが送信され、入力欄はすぐに消去されます。このアプリが代わりにトークンを発行することはありません。",
+        "qps-ploc": "⟦Ŧħė ŧőķėñ ïş şėñŧ őñŀẏ ẇħėñ ẏőů ƈħőőşė Şȧṽė. Ŧħė ïñṗůŧ ïş ƈŀėȧřėḓ ïɱɱėḓïȧŧėŀẏ ȧƒŧėř şůƀɱïşşïőñ. Ŧħïş ȧṗṗ ñėṽėř ïşşůėş ȧ ŧőķėñ ƒőř ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈ⟧"
+      },
+      "settings.operator_preparing": {
+        "en": "Preparing registration…",
+        "ja": "登録を準備中…",
+        "qps-ploc": "⟦Ṗřėṗȧřïñɠ řėɠïşŧřȧŧïőñ… ŀőřėɱ ï⟧"
+      },
+      "settings.operator_applying": {
+        "en": "Saving token… A submitted save cannot be cancelled.",
+        "ja": "トークンを保存中… 送信済みの保存はキャンセルできません。",
+        "qps-ploc": "⟦Şȧṽïñɠ ŧőķėñ… Ȧ şůƀɱïŧŧėḓ şȧṽė ƈȧññőŧ ƀė ƈȧñƈėŀŀėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "settings.operator_probing": {
+        "en": "Checking runtime authentication…",
+        "ja": "実行環境の認証を確認中…",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ řůñŧïɱė ȧůŧħėñŧïƈȧŧïőñ… ŀőřėɱ ïṗşů⟧"
+      },
+      "settings.operator_saved": {
+        "en": "Token registered on this PC.",
+        "ja": "この PC にトークンを登録しました。",
+        "qps-ploc": "⟦Ŧőķėñ řėɠïşŧėřėḓ őñ ŧħïş ṖƇ. ŀőřėɱ ïṗş⟧"
+      },
+      "settings.operator_checked_at": {
+        "en": "Checked at {time}",
+        "ja": "確認時刻: {time}",
+        "qps-ploc": "⟦Ƈħėƈķėḓ ȧŧ {time} ŀőřėɱ⟧"
+      },
+      "settings.operator_selections_title": {
+        "en": "Service selections",
+        "ja": "サービスの選択",
+        "qps-ploc": "⟦Şėřṽïƈė şėŀėƈŧïőñş ŀőřėɱ⟧"
+      },
+      "settings.operator_selections_description": {
+        "en": "Record which services you plan to use. These selections do not register, verify, disconnect, or revoke credentials.",
+        "ja": "利用予定のサービスを記録します。この選択では認証情報の登録、確認、接続解除、失効は行いません。",
+        "qps-ploc": "⟦Řėƈőřḓ ẇħïƈħ şėřṽïƈėş ẏőů ṗŀȧñ ŧő ůşė. Ŧħėşė şėŀėƈŧïőñş ḓő ñőŧ řėɠïşŧėř, ṽėřïƒẏ, ḓïşƈőññėƈŧ, őř řėṽőķė ƈřėḓėñŧïȧŀş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+      },
+      "settings.operator_metadata_configured": {
+        "en": "Configuration recorded · authentication unverified",
+        "ja": "設定を記録済み・認証未確認",
+        "qps-ploc": "⟦Ƈőñƒïɠůřȧŧïőñ řėƈőřḓėḓ · ȧůŧħėñŧïƈȧŧïőñ ůñṽėřïƒïėḓ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "settings.operator_metadata_unconfigured": {
+        "en": "Configuration not recorded",
+        "ja": "設定の記録なし",
+        "qps-ploc": "⟦Ƈőñƒïɠůřȧŧïőñ ñőŧ řėƈőřḓėḓ ŀőřėɱ ïṗ⟧"
+      },
+      "settings.operator_save_selections": {
+        "en": "Save service selections",
+        "ja": "サービスの選択を保存",
+        "qps-ploc": "⟦Şȧṽė şėřṽïƈė şėŀėƈŧïőñş ŀőřėɱ ï⟧"
+      },
+      "settings.operator_check_approval": {
+        "en": "Check approval",
+        "ja": "承認状態を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ȧṗṗřőṽȧŀ ŀőřė⟧"
+      },
+      "settings.operator_next_step": {
+        "en": "Use this credential in supported {service} preset service tasks. Open Requests and ask for the task you need; normal task authorization and provider permissions still apply. Other CLI or bridge integrations may use separate credentials.",
+        "ja": "この認証情報は、対応する {service} のプリセットサービスタスクで利用できます。「依頼を開く」から必要なタスクを依頼してください。通常のタスク承認とサービス側の権限は引き続き必要です。他の CLI やブリッジ連携では別の認証情報を使う場合があります。",
+        "qps-ploc": "⟦Ůşė ŧħïş ƈřėḓėñŧïȧŀ ïñ şůṗṗőřŧėḓ {service} ṗřėşėŧ şėřṽïƈė ŧȧşķş. Őṗėñ Řėɋůėşŧş ȧñḓ ȧşķ ƒőř ŧħė ŧȧşķ ẏőů ñėėḓ; ñőřɱȧŀ ŧȧşķ ȧůŧħőřïẑȧŧïőñ ȧñḓ ṗřőṽïḓėř ṗėřɱïşşïőñş şŧïŀŀ ȧṗṗŀẏ. Őŧħėř ƇĿÏ őř ƀřïḓɠė ïñŧėɠřȧŧïőñş ɱȧẏ ůşė şėṗȧřȧŧė ƈřėḓėñŧïȧŀş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "settings.operator_open_requests": {
+        "en": "Open Requests",
+        "ja": "依頼を開く",
+        "qps-ploc": "⟦Őṗėñ Řėɋůėşŧş ŀőřė⟧"
       }
     },
     "onboarding": {
