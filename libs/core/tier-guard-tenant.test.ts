@@ -129,6 +129,22 @@ describe('tier-guard tenant scope (IP-1)', () => {
     }
   });
 
+  it('scopes the partitioned resource-usage ledger to the bound tenant', () => {
+    process.env.KYBERION_TENANT = 'acme-corp';
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    const ledger = (tenant: string) =>
+      path.join(
+        ROOT,
+        `active/shared/runtime/usage-ledger/confidential/${tenant}/resource-usage.jsonl`
+      );
+    const own = validateReadPermission(ledger('acme-corp'));
+    if (!own.allowed) expect(own.reason).not.toMatch(/tenant\.scope_violation/);
+    const other = validateReadPermission(ledger('other-tenant'));
+    expect(other.allowed).toBe(false);
+    expect(other.reason).toMatch(/tenant\.scope_violation/);
+    expect(validateWritePermission(ledger('other-tenant')).allowed).toBe(false);
+  });
+
   it('denies read from a different tenant prefix', () => {
     process.env.KYBERION_TENANT = 'acme-corp';
     process.env.KYBERION_PERSONA = 'ecosystem_architect';

@@ -453,6 +453,48 @@ describe('mission retrospective loop', () => {
       expect(stats.resource_usage).toEqual({ entries: 1, cost_usd: 0 });
       expect(stats.usage_unrecorded).toBe(false);
     });
+
+    it("counts a tenant mission's partitioned entries, never another tenant's", async () => {
+      removeUsageFixtures();
+      completeTasks();
+      const statePath = path.join(missionDir, 'mission-state.json');
+      const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+      fs.writeFileSync(
+        statePath,
+        JSON.stringify({ ...state, tier: 'confidential', tenant_slug: 'tenant-a' })
+      );
+      const { MetricsCollector } = await import('../metrics.js');
+      const { recordDirectCliTaskUsage } = await import('./mission-direct-cli-usage.js');
+      for (const [taskId, tenant] of [
+        ['T-1', 'tenant-a'],
+        ['T-2', 'tenant-a'],
+        ['T-1', 'tenant-b'],
+      ] as const) {
+        recordDirectCliTaskUsage({
+          missionId: MISSION,
+          taskId,
+          event: 'record_evidence',
+          actorId: 'codex-implementer',
+          state: { tier: 'confidential', tenant_slug: tenant },
+          collector: new MetricsCollector(),
+        });
+      }
+      const ledger = (tenant: string) =>
+        path.join(
+          tmpRoot,
+          'active/shared/runtime/usage-ledger/confidential',
+          tenant,
+          'resource-usage.jsonl'
+        );
+      expect(fs.readFileSync(ledger('tenant-a'), 'utf8').trim().split('\n')).toHaveLength(2);
+      expect(fs.existsSync(path.join(tmpRoot, 'work', 'metrics', 'resource-usage.jsonl'))).toBe(
+        false
+      );
+
+      const stats = mod.collectMissionExecutionStats(MISSION);
+      expect(stats.resource_usage).toEqual({ entries: 2, cost_usd: 0 });
+      expect(stats.usage_unrecorded).toBe(false);
+    });
   });
 
   it('does not flag a closing burst for a short mission', () => {

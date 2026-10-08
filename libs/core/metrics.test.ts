@@ -1,10 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
+import type { EventScopeInput } from './event-scope.js';
 import {
   MetricsCollector,
+  RESOURCE_USAGE_LEDGER_ROOT,
+  resourceUsageProtectedPrefixes,
   resolveCostRatesFromRegistry,
   type ModelCostRegistry,
 } from './metrics.js';
@@ -294,9 +297,10 @@ describe('metrics core', () => {
     });
 
     expect(record.cost_usd).toBe(150);
-    expect(mc.loadResourceUsageHistory()).toHaveLength(1);
-    expect(mc.loadResourceUsageHistory()[0]?.status).toBe('committed');
-    expect(mc.loadResourceUsageHistory()[0]?.scope).toMatchObject({
+    const tenantRead = { scope: { tier: 'confidential', tenant_slug: 'client-a' } } as const;
+    expect(mc.loadResourceUsageHistory(tenantRead)).toHaveLength(1);
+    expect(mc.loadResourceUsageHistory(tenantRead)[0]?.status).toBe('committed');
+    expect(mc.loadResourceUsageHistory(tenantRead)[0]?.scope).toMatchObject({
       scope_kind: 'tenant',
       tenant_slug: 'client-a',
     });
@@ -446,5 +450,137 @@ describe('metrics core', () => {
     });
     const persisted = fs.readFileSync(usageFile, 'utf8');
     expect(persisted).toContain(usageId);
+  });
+});
+
+describe('resource-usage ledger partitioning', () => {
+  const base = path.join(process.cwd(), 'active/shared/tmp/resource-usage-partition-test');
+  const metricsDir = path.join(base, 'metrics');
+  const usageRoot = path.join(base, 'usage-ledger');
+  const systemFile = path.join(metricsDir, 'resource-usage.jsonl');
+  const partitionFile = (...segments: string[]) =>
+    path.join(usageRoot, ...segments, 'resource-usage.jsonl');
+  const collector = () => new MetricsCollector({ metricsDir, resourceUsageRoot: usageRoot });
+  const usage = (usageId: string, scope?: EventScopeInput) => ({
+    usage_id: usageId,
+    resource_kind: 'llm' as const,
+    mission_id: 'MSN-PARTITION-1',
+    quantity: 10,
+    unit: 'input_token',
+    unit_cost_usd: 0.001,
+    status: 'actual' as const,
+    source: 'partition-test',
+    ...(scope ? { scope } : {}),
+  });
+  const ids = (records: Array<{ usage_id: string }>) => records.map((r) => r.usage_id).sort();
+  const read = (file: string) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '');
+
+  beforeEach(() => fs.rmSync(base, { recursive: true, force: true }));
+  afterEach(() => fs.rmSync(base, { recursive: true, force: true }));
+
+  it('lands a confidential tenant entry in its tenant partition, never in the shared file', () => {
+    collector().recordResourceUsage(
+      usage('tenant-a-1', {
+        tier: 'confidential',
+        tenant_slug: 'tenant-a',
+        mission_id: 'MSN-PARTITION-1',
+      })
+    );
+    expect(read(systemFile)).not.toContain('tenant-a-1');
+    expect(read(partitionFile('confidential', 'tenant-a'))).toContain('tenant-a-1');
+  });
+
+  it('lands an untenanted personal entry in the <tier>/shared partition', () => {
+    collector().recordResourceUsage(usage('personal-shared-1', { tier: 'personal' }));
+    expect(read(systemFile)).toBe('');
+    expect(read(partitionFile('personal', 'shared'))).toContain('personal-shared-1');
+  });
+
+  it('keeps a public untenanted entry in the system file and the default reader', () => {
+    const mc = collector();
+    mc.recordResourceUsage(usage('public-1', { tier: 'public' }));
+    mc.recordResourceUsage(usage('unscoped-1'));
+    expect(read(systemFile)).toContain('public-1');
+    expect(read(systemFile)).toContain('unscoped-1');
+    expect(fs.existsSync(usageRoot)).toBe(false);
+    expect(ids(mc.loadResourceUsageHistory())).toEqual(['public-1', 'unscoped-1']);
+  });
+
+  it("never shows tenant A's reader tenant B's entries (partitioned or legacy)", () => {
+    const mc = collector();
+    mc.recordResourceUsage(usage('a-1', { tier: 'confidential', tenant_slug: 'tenant-a' }));
+    mc.recordResourceUsage(usage('b-1', { tier: 'confidential', tenant_slug: 'tenant-b' }));
+    mc.recordResourceUsage(usage('sys-1', { tier: 'public' }));
+    // Pre-partition mixed rows stay readable as legacy, filtered by their own scope.
+    const legacyRow = (usageId: string, tenant: string) =>
+      JSON.stringify({
+        type: 'resource_usage',
+        usage_id: usageId,
+        cost_usd: 0,
+        scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenant },
+      });
+    fs.appendFileSync(
+      systemFile,
+      `${legacyRow('legacy-a', 'tenant-a')}\n${legacyRow('legacy-b', 'tenant-b')}\n`
+    );
+
+    const tenantA = { scope: { tier: 'confidential', tenant_slug: 'tenant-a' } };
+    expect(ids(mc.loadResourceUsageHistory(tenantA))).toEqual(['a-1', 'legacy-a']);
+    expect(ids(mc.loadResourceUsageHistory({ tenants: ['tenant-b'] }))).toEqual([
+      'b-1',
+      'legacy-b',
+    ]);
+    // The system reader sees neither tenant, even the legacy rows in its own file.
+    expect(ids(mc.loadResourceUsageHistory())).toEqual(['sys-1']);
+    expect(ids(mc.loadResourceUsageHistory({ ...tenantA, includeSystem: true }))).toEqual([
+      'a-1',
+      'legacy-a',
+      'sys-1',
+    ]);
+    // The operator aggregate sees every partition.
+    expect(ids(mc.loadResourceUsageHistory({ all: true }))).toEqual([
+      'a-1',
+      'b-1',
+      'legacy-a',
+      'legacy-b',
+      'sys-1',
+    ]);
+  });
+
+  it('writes records that validate against resource-usage.schema.json (incl. cause)', async () => {
+    const { compileSchema } = await import('./foundation/ajv.js');
+    const validate = compileSchema(
+      path.join(process.cwd(), 'knowledge/product/schemas/resource-usage.schema.json')
+    );
+    const record = collector().recordResourceUsage({
+      ...usage('schema-1', { tier: 'confidential', tenant_slug: 'tenant-a' }),
+      cause: 'tool',
+    });
+    expect(record.cause).toBe('tool');
+    const persisted = JSON.parse(JSON.stringify(record));
+    expect(validate(persisted), JSON.stringify(validate.errors)).toBe(true);
+  });
+
+  it('keeps the protected partition prefixes in security-policy tenant_scope', () => {
+    const policy = JSON.parse(
+      fs.readFileSync(
+        path.join(process.cwd(), 'knowledge/product/governance/security-policy.json'),
+        'utf8'
+      )
+    ) as { tenant_scope: { protected_prefixes: string[] } };
+    expect(resourceUsageProtectedPrefixes()).toEqual([
+      `${RESOURCE_USAGE_LEDGER_ROOT}/personal/`,
+      `${RESOURCE_USAGE_LEDGER_ROOT}/confidential/`,
+    ]);
+    for (const prefix of resourceUsageProtectedPrefixes()) {
+      expect(policy.tenant_scope.protected_prefixes).toContain(prefix);
+    }
+  });
+
+  it('defaults the partition root into the Vitest live sandbox', () => {
+    const root = pathResolver.shared('runtime/usage-ledger');
+    expect(
+      root.startsWith(path.join(pathResolver.rootDir(), pathResolver.VITEST_LIVE_SANDBOX_ROOT))
+    ).toBe(true);
   });
 });
