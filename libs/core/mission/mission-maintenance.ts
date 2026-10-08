@@ -1309,7 +1309,42 @@ function appendMissionPurgeAudit(record: Record<string, unknown>): void {
   }
 }
 
-export async function purgeMissions(rootDir: string, dryRun = false): Promise<PurgeMissionsResult> {
+/**
+ * Human-readable candidate table for `purgeMissions` (one string per line).
+ * The library never writes it to stdout itself: stdout belongs to the caller
+ * (e.g. the weekly-audit pipeline op emits structured JSON there). The CLI
+ * renders it via `PurgeMissionsOptions.onCandidates`.
+ */
+export function formatPurgeCandidateTable(
+  rootDir: string,
+  candidates: PurgeMissionCandidate[]
+): string[] {
+  return [
+    '',
+    `  Missions matching purge policies: ${candidates.length}`,
+    '',
+    ...candidates.map(
+      (candidate) =>
+        `    ${candidate.mission.padEnd(30)} → ${path.relative(rootDir, candidate.targetPath)}  (${candidate.policyName})`
+    ),
+    '',
+  ];
+}
+
+export interface PurgeMissionsOptions {
+  /**
+   * Called once with the matched candidates before any mission is moved, so
+   * an interactive caller can render the preview table (see
+   * `formatPurgeCandidateTable`) ahead of the archive log lines.
+   */
+  onCandidates?: (candidates: PurgeMissionCandidate[]) => void;
+}
+
+export async function purgeMissions(
+  rootDir: string,
+  dryRun = false,
+  options: PurgeMissionsOptions = {}
+): Promise<PurgeMissionsResult> {
   const { adfPath, policies } = loadMissionLifecyclePolicies();
   if (!policies) {
     return { status: 'adf_missing', adfPath, dryRun, candidates: [], archived: [] };
@@ -1371,15 +1406,11 @@ export async function purgeMissions(rootDir: string, dryRun = false): Promise<Pu
     return { status: 'ok', adfPath, dryRun, candidates: [], archived: [] };
   }
 
-  console.log('');
-  console.log(`  Missions matching purge policies: ${candidates.length}`);
-  console.log('');
-  for (const candidate of candidates) {
-    console.log(
-      `    ${candidate.mission.padEnd(30)} → ${path.relative(rootDir, candidate.targetPath)}  (${candidate.policyName})`
-    );
+  if (options.onCandidates) {
+    options.onCandidates(candidates);
+  } else {
+    logger.info(`Missions matching purge policies: ${candidates.length}`);
   }
-  console.log('');
 
   if (dryRun) {
     logger.info('Dry run complete. No missions were moved. Run "purge --execute" to apply.');

@@ -151,8 +151,25 @@ describe('purgeMissions (AL-01)', () => {
     const oldActiveDir = seedMission('MSN-OLD-ACTIVE', 'active', 40); // old but active — must survive
     const completedDir = seedMission('MSN-DONE', 'completed', 1); // archive-completed: status only
 
-    // Dry run first: candidates reported, nothing moved.
-    const dry = await mod.purgeMissions(tmpRoot, true);
+    // Dry run first: candidates reported, nothing moved. The library must not
+    // write the table to stdout (G08) — the caller renders it via onCandidates.
+    const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const seen: string[] = [];
+    let dry: Awaited<ReturnType<typeof mod.purgeMissions>>;
+    try {
+      dry = await mod.purgeMissions(tmpRoot, true, {
+        onCandidates: (candidates) => seen.push(...candidates.map((c) => c.mission)),
+      });
+      expect(consoleLog).not.toHaveBeenCalled();
+    } finally {
+      consoleLog.mockRestore();
+    }
+    expect(seen.sort()).toEqual(['MSN-DONE', 'MSN-OLD-FAILED']);
+    const table = mod.formatPurgeCandidateTable(tmpRoot, dry.candidates);
+    expect(table[1]).toBe('  Missions matching purge policies: 2');
+    expect(table.join('\n')).toMatch(
+      /MSN-OLD-FAILED\s+→ active\/archive\/failed_missions\/MSN-OLD-FAILED {2}\(purge-orphaned\)/
+    );
     expect(dry.status).toBe('ok');
     expect(dry.dryRun).toBe(true);
     expect(dry.candidates.map((c) => c.mission).sort()).toEqual(['MSN-DONE', 'MSN-OLD-FAILED']);
