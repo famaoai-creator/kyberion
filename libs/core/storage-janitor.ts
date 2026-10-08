@@ -17,6 +17,12 @@ import {
   safeRmSync,
 } from './secure-io.js';
 import { collectDirsPostOrder, collectFiles } from './storage-walk.js';
+import { listUncoveredRuntimeDirs, listUncoveredRuntimeFiles } from './storage-runtime-coverage.js';
+export {
+  listUncoveredRuntimeDirs,
+  listUncoveredRuntimeEntries,
+  listUncoveredRuntimeFiles,
+} from './storage-runtime-coverage.js';
 import { logger } from './core.js';
 import { withExecutionContext } from './authority.js';
 import { loadVaultEntryAtPath } from './data-vault.js';
@@ -37,7 +43,6 @@ import {
   eventStoreRetentionRules,
   storageFloorRetentionRules,
   coveredEventStoreDirs,
-  coveredRuntimeSubdirs,
   catalogStatusRules,
   statusRulePatternToRegex,
   EVENT_STORE_PREFIXES,
@@ -226,6 +231,8 @@ export interface JanitorReport {
    * them (reported, never deleted).
    */
   uncoveredRuntimeDirs: string[];
+  /** G01: top-level runtime files (ledgers, state) with no entry — reported, never deleted. */
+  uncoveredRuntimeFiles: string[];
   /**
    * EV-06: event-store directories on disk with no catalog entry. Same
    * contract as `uncoveredRuntimeDirs` — reported, never deleted.
@@ -984,35 +991,6 @@ export function listReviewRequiredDirs(catalog?: LoadedRetentionCatalog): string
   return present;
 }
 
-/**
- * AL-01: `active/shared/runtime/` subdirectories that exist on disk but have
- * no retention-catalog entry. The janitor never deletes these — it reports
- * them so undeclared (silently-forever) retention is visible instead of
- * invisible. Returned repo-relative, sorted, directories only.
- */
-export function listUncoveredRuntimeDirs(catalog?: LoadedRetentionCatalog): string[] {
-  const covered = coveredRuntimeSubdirs(catalog ?? loadRetentionCatalog());
-  const runtimeRoot = shared('runtime');
-  if (!safeExistsSync(runtimeRoot)) return [];
-  let entries: string[];
-  try {
-    entries = safeReaddir(runtimeRoot);
-  } catch {
-    return [];
-  }
-  const uncovered: string[] = [];
-  for (const name of [...entries].sort()) {
-    try {
-      const stat = safeLstat(nodePath.join(runtimeRoot, name));
-      if (!stat.isDirectory() || stat.isSymbolicLink()) continue;
-    } catch {
-      continue;
-    }
-    if (!covered.has(name)) uncovered.push(`active/shared/runtime/${name}`);
-  }
-  return uncovered;
-}
-
 function readDelegationChildrenRegistry(): DelegationChildRecord[] {
   const filePath = shared(DELEGATION_CHILDREN_REGISTRY_SUBPATH);
   return loadDelegationChildrenRegistryAtPath(filePath);
@@ -1302,8 +1280,10 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
   }
 
   let uncoveredRuntimeDirs: string[] = [];
+  let uncoveredRuntimeFiles: string[] = [];
   try {
     uncoveredRuntimeDirs = listUncoveredRuntimeDirs(catalog);
+    uncoveredRuntimeFiles = listUncoveredRuntimeFiles(catalog);
   } catch (err: any) {
     errors.push(`uncovered-runtime: ${err?.message ?? String(err)}`);
   }
@@ -1411,6 +1391,7 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
       removed: emptyMissionDirsResult.removed,
     },
     uncoveredRuntimeDirs,
+    uncoveredRuntimeFiles,
     uncoveredEventStoreDirs,
     reviewRequiredDirs,
     softDeleted:

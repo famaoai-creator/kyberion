@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/storage-retention-catalog.schema.json",
-  "version": "1.8.0",
-  "description": "Single source of truth for storage retention (AL-01/AL-04). Declares, per repo-relative directory, the artifact class, TTL, and expiry action enforced by libs/core/storage-janitor.ts. AL-04 extends the AL-01 seed to full coverage of active/shared/runtime/, active/shared/exports/ and active/archive/: every directory is either TTL-governed or declared action=review_required (no automatic deletion; surfaced in the janitor report for a human decision — never a silent forever-retention). Entries with audit=true leave a deletion audit record in active/shared/logs/audit/storage-retention.jsonl; entries with soft_delete_days move expired files to active/archive/.trash/<original-path> for that many further days before the trash sweep purges them. Directories not declared here are never deleted by the janitor; runtime/ subdirectories without an entry are surfaced in the janitor report as uncovered. EV-06 extends coverage beyond active/shared/runtime/ to the append-only event stores (active/shared/observability/, active/shared/coordination/orchestration/events/, presence/bridge/runtime/): these sat outside every janitor scan root, so they were neither TTL-governed nor surfaced as uncovered. scanEventStores enforces their TTLs and listUncoveredEventStoreDirs reports undeclared event streams. WI-10 declares the work-inventory personal/member knowledge subtrees (knowledge/personal/work-inventory, knowledge/personal/members) as never-auto-delete evidence. WI-16 adds an entry-level status_rules vocabulary — a generic, declarative per-file status+age expiry rule nested under a directory entry — and uses it on knowledge/personal/members to expire stale pending_review and discarded work-inventory observation summaries by their own JSON status/date fields (see storage-janitor.ts's sweepStatusRules) without touching confirmed summaries, consents, or unrelated member records.",
+  "version": "1.9.0",
+  "description": "Single source of truth for storage retention (AL-01/AL-04). Declares, per repo-relative directory, the artifact class, TTL, and expiry action enforced by libs/core/storage-janitor.ts. AL-04 extends the AL-01 seed to full coverage of active/shared/runtime/, active/shared/exports/ and active/archive/: every directory is either TTL-governed or declared action=review_required (no automatic deletion; surfaced in the janitor report for a human decision — never a silent forever-retention). Entries with audit=true leave a deletion audit record in active/shared/logs/audit/storage-retention.jsonl; entries with soft_delete_days move expired files to active/archive/.trash/<original-path> for that many further days before the trash sweep purges them. Directories not declared here are never deleted by the janitor; runtime/ subdirectories without an entry are surfaced in the janitor report as uncovered. EV-06 extends coverage beyond active/shared/runtime/ to the append-only event stores (active/shared/observability/, active/shared/coordination/orchestration/events/, presence/bridge/runtime/): these sat outside every janitor scan root, so they were neither TTL-governed nor surfaced as uncovered. scanEventStores enforces their TTLs and listUncoveredEventStoreDirs reports undeclared event streams. WI-10 declares the work-inventory personal/member knowledge subtrees (knowledge/personal/work-inventory, knowledge/personal/members) as never-auto-delete evidence. WI-16 adds an entry-level status_rules vocabulary — a generic, declarative per-file status+age expiry rule nested under a directory entry — and uses it on knowledge/personal/members to expire stale pending_review and discarded work-inventory observation summaries by their own JSON status/date fields (see storage-janitor.ts's sweepStatusRules) without touching confirmed summaries, consents, or unrelated member records. G01/G02/G14 (ops-runtime-retention) declare the top-level ledgers and state files that sit directly in active/shared/runtime/ (dot-*.jsonl, mission_queue.jsonl, reasoning-failover-events.jsonl, …) and the remaining runtime subdirectories; listUncoveredRuntimeEntries now reports undeclared top-level files too (janitor report field uncoveredRuntimeFiles), and the runtime-store-retention check gate (scripts/check_runtime_store_retention.ts) fails when source references an active/shared/runtime/<name> store with no entry here. Top-level file entries carry no ttl_days: the janitor's mtime TTL walks directories and an append-only ledger's mtime never ages, so such files are either self-bounded (the note says how) or review_required.",
   "entries": [
     {
       "path": "active/shared/tmp",
@@ -460,6 +460,397 @@
       "artifact_class": "state",
       "action": "review_required",
       "note": "Execution graph records are load-bearing lineage and require scope-linked cleanup."
+    },
+    {
+      "path": "active/shared/runtime/dot-wake-ledger.jsonl",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "G01: append-only resident-dot wake ledger (libs/core/dot/dot-runtime.ts). Load-bearing history: a delivered/rejected trigger key stays consumed forever, so truncating it would re-fire old inbox/watch/event wakes — never TTL-deleted. Hot-path reads (due-ness, wake circuit, per-skip dedupe) replay it incrementally via readJsonLinesCached (libs/core/jsonl-tail.ts), parsing only rows appended since the previous call."
+    },
+    {
+      "path": "active/shared/runtime/dot-token-usage.jsonl",
+      "artifact_class": "log",
+      "action": "review_required",
+      "audit": true,
+      "note": "G01: append-only per-wake dot token usage (dot-runtime.ts recordDotTokenUsage), read by dotTokensUsedToday and org-budget-governor for the current UTC day only. Usage-accounting history, so no automatic deletion; dotTokensUsedToday replays it incrementally (readJsonLinesCached) instead of parsing the whole history per call. Archive old days by operator decision."
+    },
+    {
+      "path": "active/shared/runtime/dot-inbox.jsonl",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "G01: dot wake inbox (libs/core/dot/dot-inbox.ts). Wake trigger keys hash the row's line index, so truncating or rewriting the file would re-key and re-fire every row — never TTL-deleted or compacted in place."
+    },
+    {
+      "path": "active/shared/runtime/dot-lifecycle-audit.jsonl",
+      "artifact_class": "evidence",
+      "action": "review_required",
+      "audit": true,
+      "note": "G01: dot charter lifecycle audit trail (dot-charter.ts / dot-lifecycle.ts). Audit evidence — human retention decision only."
+    },
+    {
+      "path": "active/shared/runtime/dot-action-ledger.jsonl",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "G01: append-only dot action snapshots (dot-action-ledger.ts / dot-dispatch.ts); dispatch and recovery replay it, so it is load-bearing state."
+    },
+    {
+      "path": "active/shared/runtime/dot-digest-ledger.jsonl",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Dot digest delivery ledger (dot-dispatch.ts DOT_DIGEST_LEDGER_PATH); dedupes digests, so load-bearing."
+    },
+    {
+      "path": "active/shared/runtime/dot-feedback.jsonl",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Operator feedback on dot actions (dot-feedback.ts DOT_FEEDBACK_PATH); feeds later wakes' prompts."
+    },
+    {
+      "path": "active/shared/runtime/dot-signal-ledger.jsonl",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Dot signal ledger (dot-feedback.ts DOT_SIGNAL_LEDGER_PATH); load-bearing signal history for the feedback loop."
+    },
+    {
+      "path": "active/shared/runtime/dot-watch-state.json",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Single-file watch-trigger snapshot (dot-runtime.ts DOT_WATCH_STATE_PATH), rewritten in place; bounded by the number of watched paths."
+    },
+    {
+      "path": "active/shared/runtime/dot-probe-state.json",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Single-file probe-trigger baseline/fingerprint state (dot-runtime.ts DOT_PROBE_STATE_PATH), rewritten in place."
+    },
+    {
+      "path": "active/shared/runtime/reasoning-failover-events.jsonl",
+      "artifact_class": "log",
+      "action": "review_required",
+      "note": "G01: append-only reasoning backend switch log (libs/core/reasoning/reasoning-failover.ts appendReasoningFailoverEvent). Diagnostic only — no hot-path reader; the latest switch lives in runtime/state/reasoning-failover.json. Grows with failovers only; operator trims or archives."
+    },
+    {
+      "path": "active/shared/runtime/mission_queue.jsonl",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "G01: mission dispatch queue (scripts/mission_controller.ts QUEUE_PATH); pending queue state, never TTL-deleted."
+    },
+    {
+      "path": "active/shared/runtime/trigger-deliveries.jsonl",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Trigger-runner idempotency/claim store (libs/core/trigger-runner.ts). Self-bounding: appendRecord compacts it to the latest record per idempotency key once it would exceed maxStoreBytes (default 4 MiB), so no TTL is needed."
+    },
+    {
+      "path": "active/shared/runtime/vuln-ledger.jsonl",
+      "artifact_class": "evidence",
+      "action": "review_required",
+      "audit": true,
+      "note": "Dependency vulnerability ledger (libs/core/dependency-vulnerability-ledger.ts); security evidence trail."
+    },
+    {
+      "path": "active/shared/runtime/current_mission_focus.json",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Single-file pointer to the operator's current mission focus (mission-system.ts / agent-dispatch.ts), rewritten in place."
+    },
+    {
+      "path": "active/shared/runtime/customer.env",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Active customer overlay selector written by scripts/customer_switch.ts / company_onboarding.ts; rewritten in place."
+    },
+    {
+      "path": "active/shared/runtime/scope.env",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Active project scope selector (foundation/project-scope-env.ts, scope-context.ts); rewritten in place."
+    },
+    {
+      "path": "active/shared/runtime/delegation-children.json",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Delegation child-process registry (mission/delegation-concurrency.ts); the janitor's sweepDelegationChildren prunes stale rows itself."
+    },
+    {
+      "path": "active/shared/runtime/execution-feedback.json",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Execution feedback store (libs/core/execution-feedback.ts); self-bounded to the newest MAX_FEEDBACK_ENTRIES (500) entries on every write."
+    },
+    {
+      "path": "active/shared/runtime/external-service-registry.json",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Mutable runtime external-service registry (libs/core/external-service-registry.ts)."
+    },
+    {
+      "path": "active/shared/runtime/intent-flow-cache.json",
+      "artifact_class": "cache",
+      "action": "delete",
+      "note": "Intent flow cache (libs/core/intent/intent-flow-cache.ts), one file rewritten in place; entries self-expire by the policy's cache_ttl_hours, so the file carries no TTL of its own."
+    },
+    {
+      "path": "active/shared/runtime/migrations.applied.json",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Applied-migration ledger (scripts/run_migrations.ts); deleting it would re-run migrations."
+    },
+    {
+      "path": "active/shared/runtime/pipeline-schedules.json",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Pipeline scheduler registry (libs/core/pipeline/pipeline-scheduler.ts); operator-declared schedules."
+    },
+    {
+      "path": "active/shared/runtime/provider-cache.json",
+      "artifact_class": "cache",
+      "action": "delete",
+      "note": "Provider discovery disk cache (libs/core/provider/provider-discovery.ts), one file rewritten on every refresh — bounded by construction, regenerable."
+    },
+    {
+      "path": "active/shared/runtime/provider-capability-registry.json",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Runtime provider capability registry (libs/core/provider/provider-capability-registry.ts)."
+    },
+    {
+      "path": "active/shared/runtime/provider-capabilities.json",
+      "artifact_class": "report",
+      "action": "delete",
+      "note": "Provider CLI capability scan report (scripts/scan_provider_cli_capabilities.ts), overwritten in place each scan — bounded by construction, regenerable."
+    },
+    {
+      "path": "active/shared/runtime/backend-conformance.json",
+      "artifact_class": "report",
+      "action": "delete",
+      "note": "Backend conformance report (scripts/check_backend_conformance.ts), overwritten in place each run — bounded by construction, regenerable."
+    },
+    {
+      "path": "active/shared/runtime/tenant-rate-limit-state.json",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Tenant rate-limiter window state (libs/core/organization/tenant-rate-limiter.ts), rewritten in place."
+    },
+    {
+      "path": "active/shared/runtime/share-grant-live-sessions.json",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Live share-grant session registry (libs/core/share-grant-live-sessions.ts)."
+    },
+    {
+      "path": "active/shared/runtime/service-receipts",
+      "artifact_class": "evidence",
+      "ttl_days": 90,
+      "action": "delete",
+      "audit": true,
+      "note": "G02: one receipt per service-harness call (libs/core/service/service-harness.ts RECEIPT_DIR). Write-only execution evidence — kept ~90d like browser-receipts / voice-loopback-receipts."
+    },
+    {
+      "path": "active/shared/runtime/recordings",
+      "artifact_class": "evidence",
+      "action": "review_required",
+      "audit": true,
+      "note": "G02: browser/desktop/service recordings (service-recording-session.ts, desktop-recording-compiler.ts). NOT TTL'd: procedure-catalog recording_ref entries dispatch from this store (knowledge/procedure-registry.ts resolveAllowlistedRecordingRef), so expiring a recording would break a promoted procedure."
+    },
+    {
+      "path": "active/shared/runtime/learning-signals",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "G02: learning-signal harvest cursor/cluster state (libs/core/knowledge/learning-signal-adapter.ts STATE_DOMAIN); the adapter prunes clusters itself (CLUSTER_RETENTION_DAYS)."
+    },
+    {
+      "path": "active/shared/runtime/discussions",
+      "artifact_class": "log",
+      "action": "review_required",
+      "note": "G02: discussion rooms — events, minutes.md, brief.html (libs/core/discussion/discussion-store.ts, discussion-outcomes.ts). Outcomes are referenced after the room closes; human retention decision."
+    },
+    {
+      "path": "active/shared/runtime/peer-recovery-quarantine",
+      "artifact_class": "evidence",
+      "action": "review_required",
+      "audit": true,
+      "note": "G02: tenant-partitioned quarantine of rejected peer-recovery payloads (libs/core/mesh/peer-runtime-recovery.ts, scripts/backup.ts). Security evidence — never auto-deleted."
+    },
+    {
+      "path": "active/shared/runtime/telegram-bridge",
+      "artifact_class": "log",
+      "action": "review_required",
+      "note": "G02: Telegram bridge thread history (satellites/telegram-bridge THREAD_HISTORY_ROOT), indexed by history-search-index.ts. User conversation records — human retention decision."
+    },
+    {
+      "path": "active/shared/runtime/discord-bridge",
+      "artifact_class": "log",
+      "action": "review_required",
+      "note": "G02: Discord bridge thread history (satellites/discord-bridge THREAD_HISTORY_ROOT), indexed by history-search-index.ts. User conversation records — human retention decision."
+    },
+    {
+      "path": "active/shared/runtime/imessage-bridge",
+      "artifact_class": "log",
+      "action": "review_required",
+      "note": "iMessage bridge event log (libs/core/imessage-bridge.ts IMESSAGE_LOG_PATH). User conversation records — human retention decision."
+    },
+    {
+      "path": "active/shared/runtime/video-leases",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "G02: video device lease files (libs/core/video/video-device-lease.ts); the lease manager reclaims expired/dead-pid leases itself."
+    },
+    {
+      "path": "active/shared/runtime/audio-leases",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Audio device lease files (libs/core/voice/audio-device-lease.ts); the lease manager reclaims expired/dead-pid leases itself."
+    },
+    {
+      "path": "active/shared/runtime/service-bindings-backup",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "G02: pre-migration snapshots of service bindings (service-binding-registry.ts BINDING_BACKUP_ROOT) — the rollback source for an owner migration; human decision before removal."
+    },
+    {
+      "path": "active/shared/runtime/cloudflare-os",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "G02: Cloudflare OS control-plane state (libs/core/cloudflare-os-control-plane.ts control-plane.json)."
+    },
+    {
+      "path": "active/shared/runtime/generated-pipelines",
+      "artifact_class": "cache",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "G02: pipeline ADF rendered from execution plan-set bundles (orchestrator-actuator orchestrator-helpers.ts / orchestrator-execution-brief-helpers.ts). Regenerable from the bundle; consumed in the same run."
+    },
+    {
+      "path": "active/shared/runtime/delivery-packs",
+      "artifact_class": "export",
+      "action": "review_required",
+      "note": "G02: delivery packs written by the artifact-actuator delivery-pack template (orchestrator-execution-brief-helpers.ts). Deliverables are never silently expired."
+    },
+    {
+      "path": "active/shared/runtime/role-assumption-trace",
+      "artifact_class": "log",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "G02: opt-in role-assumption trace JSONL (KYBERION_ROLE_ASSUMPTION_TRACE, libs/core/organization/role-assumption-trace.ts), analyzed by scripts/analyze_role_assumptions.ts. Diagnostic — short TTL."
+    },
+    {
+      "path": "active/shared/runtime/front-desk-execution",
+      "artifact_class": "evidence",
+      "action": "review_required",
+      "audit": true,
+      "note": "G02: tier/tenant-partitioned front-desk execution receipts (libs/core/surface/front-desk-execution.ts, front-desk-recovery-evidence.ts); recovery reads them back."
+    },
+    {
+      "path": "active/shared/runtime/tool-runtimes",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "G02: managed provider-CLI installs (libs/core/provider/provider-managed-env.ts). Installed files keep old mtimes, so an mtime TTL would delete live tools; reinstall is the operator's call."
+    },
+    {
+      "path": "active/shared/runtime/youtube",
+      "artifact_class": "export",
+      "action": "review_required",
+      "note": "G02: staged YouTube upload packages (scripts/stage_youtube_upload_package.ts). Outbound deliverables — human decision."
+    },
+    {
+      "path": "active/shared/runtime/scheduler",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "G02: durable schedule declarations (scheduler-actuator scheduler-helpers.ts SCHEDULER_STORE_RELATIVE)."
+    },
+    {
+      "path": "active/shared/runtime/seam-selection",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "G02: operator seam selection rules (libs/core/seam-selection-rules.ts rules.json) — operator judgment, never auto-deleted."
+    },
+    {
+      "path": "active/shared/runtime/delegations",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Delegation notification queue (libs/core/mission/delegation-notifications.ts notifications.jsonl)."
+    },
+    {
+      "path": "active/shared/runtime/design-patterns",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Operator-authored runtime overlay for media design themes (media-actuator media-design-protocol.ts)."
+    },
+    {
+      "path": "active/shared/runtime/ingress",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Public ingress exposure state (libs/core/ingress/public-ingress-service.ts state.json)."
+    },
+    {
+      "path": "active/shared/runtime/mandate-shadow",
+      "artifact_class": "log",
+      "action": "review_required",
+      "note": "Mandate shadow-mode decision ledger (libs/core/governance/mandate-shadow.ts); evidence for promoting shadow mandates."
+    },
+    {
+      "path": "active/shared/runtime/pr-shadow",
+      "artifact_class": "log",
+      "action": "review_required",
+      "note": "PR shadow-mode decision ledger (libs/core/governance/pr-shadow.ts); evidence for promoting shadow PR policy."
+    },
+    {
+      "path": "active/shared/runtime/meeting",
+      "artifact_class": "report",
+      "action": "review_required",
+      "note": "Per-mission meeting briefs (scripts/meeting_orchestrator.ts)."
+    },
+    {
+      "path": "active/shared/runtime/mission-seeds",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Mission seed registry (libs/core/mission/mission-seed-registry.ts)."
+    },
+    {
+      "path": "active/shared/runtime/provider-pins",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Per-mission provider pins (libs/core/provider/provider-pins-store.ts)."
+    },
+    {
+      "path": "active/shared/runtime/qa",
+      "artifact_class": "evidence",
+      "action": "review_required",
+      "audit": true,
+      "note": "Software-quality defect event log (libs/core/software-quality-operations.ts qa/defect-events.jsonl)."
+    },
+    {
+      "path": "active/shared/runtime/realtime-voice-conversations",
+      "artifact_class": "log",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "Realtime voice conversation sessions (libs/core/voice/realtime-voice-conversation.ts) — conversation log, same 30d as peer-conversations / a2a-conversations."
+    },
+    {
+      "path": "active/shared/runtime/security",
+      "artifact_class": "evidence",
+      "action": "review_required",
+      "audit": true,
+      "note": "Security-screen quarantine records (libs/core/security-screen.ts quarantineDir)."
+    },
+    {
+      "path": "active/shared/runtime/share-grants",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Share-grant graph state incl. its HMAC key (libs/core/share-grant-graph.ts) — deleting the key invalidates every grant."
+    },
+    {
+      "path": "active/shared/runtime/voice-first-phrase-cache",
+      "artifact_class": "cache",
+      "action": "delete",
+      "note": "Synthesized first-phrase audio cache (libs/core/voice/voice-first-phrase-cache.ts); self-evicting LRU (maxEntries, default 64), regenerable."
+    },
+    {
+      "path": "active/shared/runtime/web-push",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Web-push subscriptions (libs/core/surface/web-push.ts)."
     },
     {
       "path": "active/shared/exports",

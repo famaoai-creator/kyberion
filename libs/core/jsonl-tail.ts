@@ -16,11 +16,21 @@
  * A trailing line without its newline is never consumed. The offset advances
  * only past the last complete record, so a partially-flushed append is read
  * whole on the next pass rather than parsed as a torn fragment and discarded.
+ *
+ * Reads are range-based: one pass touches the fingerprint prefix and the bytes
+ * appended since the cursor, never the whole file, so following a long-lived
+ * ledger costs O(appended) per pass instead of O(history) (G01).
  */
 
 import { createHash } from 'node:crypto';
 import { parseSafeJsonInput } from './foundation/json.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReadFile, safeStat } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  MAX_RANGE_READ_BYTES,
+  safeExistsSync,
+  safeReadFileRange,
+  safeStat,
+} from './secure-io.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('jsonl-tail');
@@ -76,6 +86,25 @@ function fingerprintOf(content: Buffer, basis: number): string {
     .update(content.subarray(0, Math.min(basis, content.length)))
     .digest('hex')
     .slice(0, 32);
+}
+
+/** Read `[start, end)` through governed range reads, chunked at the window cap. */
+function readRange(filePath: string, start: number, end: number): Buffer {
+  if (end <= start) return Buffer.alloc(0);
+  const chunks: Buffer[] = [];
+  let position = start;
+  while (position < end) {
+    const length = Math.min(MAX_RANGE_READ_BYTES, end - position);
+    const chunk = safeReadFileRange(filePath, position, length);
+    if (chunk.length === 0) break;
+    chunks.push(chunk);
+    position += chunk.length;
+  }
+  return chunks.length === 1 ? chunks[0] : Buffer.concat(chunks);
+}
+
+function fileSizeOf(filePath: string): number {
+  return safeStat(filePath).size;
 }
 
 function inodeOf(filePath: string): number {
@@ -156,13 +185,11 @@ export class JsonlTail<T = unknown> {
       this.position = { ...EMPTY_JSONL_CURSOR };
       return;
     }
-    const content = safeReadFile(this.filePath, {
-      encoding: null,
-      maxSizeMB: this.maxSizeMB,
-    }) as Buffer;
+    const size = fileSizeOf(this.filePath);
+    const basis = this.basisFor(size);
     this.position = {
-      offset: content.length,
-      fingerprint: fingerprintOf(content, this.basisFor(content.length)),
+      offset: size,
+      fingerprint: fingerprintOf(readRange(this.filePath, 0, basis), basis),
       inode: inodeOf(this.filePath),
     };
   }
@@ -176,28 +203,33 @@ export class JsonlTail<T = unknown> {
       return { records: [], cursor: this.cursor(), rotated, malformed: 0 };
     }
 
-    const content = safeReadFile(this.filePath, {
-      encoding: null,
-      maxSizeMB: this.maxSizeMB,
-    }) as Buffer;
+    const size = fileSizeOf(this.filePath);
     const inode = inodeOf(this.filePath);
     // Compare over the prefix the cursor already accounted for, so an ordinary
     // append never looks like a replacement.
-    const fingerprint = fingerprintOf(content, this.basisFor(this.position.offset));
+    const priorBasis = this.basisFor(this.position.offset);
+    const prefix = readRange(this.filePath, 0, Math.min(priorBasis, size));
+    const fingerprint = fingerprintOf(prefix, priorBasis);
 
     const rotated = detectRotation(this.position, {
-      size: content.length,
+      size,
       fingerprint,
       inode,
     });
     if (rotated) {
       logger.warn(
-        `[jsonl-tail] ${this.filePath} was rotated or truncated (offset=${this.position.offset} size=${content.length}); restarting from the beginning`
+        `[jsonl-tail] ${this.filePath} was rotated or truncated (offset=${this.position.offset} size=${size}); restarting from the beginning`
       );
       this.position = { offset: 0, fingerprint: '', inode };
     }
 
-    const slice = content.subarray(this.position.offset).toString('utf8');
+    const pending = size - this.position.offset;
+    if (pending > this.maxSizeMB * 1024 * 1024) {
+      throw new Error(
+        `File too large: ${this.filePath} has ${(pending / (1024 * 1024)).toFixed(1)}MB unread (limit: ${this.maxSizeMB}MB)`
+      );
+    }
+    const slice = readRange(this.filePath, this.position.offset, size).toString('utf8');
     const { lines, consumedChars } = splitCompleteLines(slice);
 
     const records: T[] = [];
@@ -215,9 +247,10 @@ export class JsonlTail<T = unknown> {
 
     const nextOffset =
       this.position.offset + Buffer.byteLength(slice.slice(0, consumedChars), 'utf8');
+    const nextBasis = this.basisFor(nextOffset);
     this.position = {
       offset: nextOffset,
-      fingerprint: fingerprintOf(content, this.basisFor(nextOffset)),
+      fingerprint: fingerprintOf(readRange(this.filePath, 0, nextBasis), nextBasis),
       inode,
     };
 
@@ -286,4 +319,134 @@ export function subscribeJsonl<T = unknown>(
 
   signal?.addEventListener('abort', stop, { once: true });
   return stop;
+}
+
+/**
+ * G01: replay-everything reader for append-only ledgers on hot paths.
+ *
+ * Returns the same rows as `readJsonLines(filePath, { onMalformed: 'skip' })`
+ * — every parseable line in file order, including a final line that lacks its
+ * newline — but keeps a per-process {@link JsonlTail} per file, so repeated
+ * calls parse only the bytes appended since the previous call. A rotation,
+ * truncation or in-place rewrite (size regression, inode change, head or
+ * consumed-tail fingerprint change) drops the cache and replays from byte 0,
+ * so the result never diverges from a full read.
+ *
+ * Returned rows are frozen and shared across calls: callers must not mutate
+ * them. The cache keeps each ledger's parsed history resident for the life of
+ * the process (bounded by `maxSizeMB` per call), which is the trade for
+ * O(appended) reads; use it only for ledgers whose history must stay whole.
+ */
+const LEDGER_TAIL_CHECK_BYTES = 64;
+const DEFAULT_LEDGER_MAX_SIZE_MB = 100;
+
+interface CachedLedger {
+  tail: JsonlTail<unknown>;
+  rows: unknown[];
+  /** Hash of the consumed bytes just before the cursor; '' when nothing consumed. */
+  tailCheck: string;
+  /** File identity at the previous call: unchanged file → one stat, no read. */
+  size: number;
+  mtimeMs: number;
+  ino: number;
+}
+
+const ledgerCache = new Map<string, CachedLedger>();
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+  }
+  return value;
+}
+
+function consumedTailHash(filePath: string, offset: number): string {
+  if (offset <= 0) return '';
+  const start = Math.max(0, offset - LEDGER_TAIL_CHECK_BYTES);
+  return createHash('sha256')
+    .update(readRange(filePath, start, offset))
+    .digest('hex')
+    .slice(0, 32);
+}
+
+export interface ReadJsonLinesCachedOptions {
+  /** Ceiling on the bytes one call may have to parse (the first call parses the whole file). */
+  maxSizeMB?: number;
+}
+
+export function readJsonLinesCached<T>(
+  filePath: string,
+  options: ReadJsonLinesCachedOptions = {}
+): T[] {
+  const resolved = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(resolved)) {
+    ledgerCache.delete(resolved);
+    return [];
+  }
+  const stat = safeStat(resolved);
+  const ino = Number.isFinite(stat.ino) ? Number(stat.ino) : 0;
+  let cached = ledgerCache.get(resolved);
+  if (
+    cached &&
+    cached.size === stat.size &&
+    cached.mtimeMs === stat.mtimeMs &&
+    cached.ino === ino &&
+    cached.tail.cursor().offset === stat.size
+  ) {
+    return cached.rows.slice() as T[];
+  }
+  if (cached) {
+    const offset = cached.tail.cursor().offset;
+    // JsonlTail's head fingerprint cannot see a rewrite that kept the first
+    // bytes; the consumed bytes right before the cursor must also be unchanged.
+    if (stat.size < offset || consumedTailHash(resolved, offset) !== cached.tailCheck) {
+      cached = undefined;
+    }
+  }
+  if (!cached) {
+    cached = {
+      tail: new JsonlTail<unknown>(resolved, {
+        maxSizeMB: options.maxSizeMB ?? DEFAULT_LEDGER_MAX_SIZE_MB,
+      }),
+      rows: [],
+      tailCheck: '',
+      size: 0,
+      mtimeMs: 0,
+      ino: 0,
+    };
+    ledgerCache.set(resolved, cached);
+  }
+  const batch = cached.tail.read();
+  if (batch.rotated) cached.rows = [];
+  // Rows are shared by every later call in this process; freeze them so a
+  // caller that mutates a row cannot corrupt the cache for everyone else.
+  for (const record of batch.records) cached.rows.push(deepFreeze(record));
+  cached.tailCheck = consumedTailHash(resolved, batch.cursor.offset);
+  cached.size = stat.size;
+  cached.mtimeMs = stat.mtimeMs;
+  cached.ino = ino;
+
+  const rows = cached.rows.slice() as T[];
+  // readJsonLines also returns records past the last newline (a final line
+  // with no terminator, or lines appended after the read above). They are
+  // parsed for this call only and never cached — the next pass consumes them.
+  const size = fileSizeOf(resolved);
+  if (size > batch.cursor.offset) {
+    const unconsumed = readRange(resolved, batch.cursor.offset, size).toString('utf8');
+    for (const line of unconsumed.split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      try {
+        rows.push(parseSafeJsonInput(line, 'jsonl ledger record') as T);
+      } catch {
+        // torn trailing write — skipped exactly like readJsonLines' 'skip'
+      }
+    }
+  }
+  return rows;
+}
+
+/** Drop every cached ledger replay (tests, or after an out-of-band rewrite). */
+export function resetJsonLinesCache(): void {
+  ledgerCache.clear();
 }
