@@ -1,6 +1,6 @@
 {
   "role": "audit_mirror_writer",
-  "description": "G17 follow-up: dedicated store-writer of the audit chain's per-tenant mirror (customer/<tenant>/logs/audit/). libs/core/authority.ts registers it as the audit chain's tenant mirror writer context, always bound to the entry's tenant, so the grant resolves through ${KYBERION_TENANT} to that one tenant's mirror directory. It grants no read and no other write; nothing else assumes it (resident dots and coordination store writers run as infrastructure_sentinel, which has no customer/ grant).",
+  "description": "G17 follow-up: dedicated store-writer of the audit chain's per-tenant mirror (customer/<tenant>/logs/audit/). libs/core/authority.ts registers it as the audit chain's tenant mirror writer context, always bound to the entry's tenant, so the grant resolves through ${KYBERION_TENANT} to that one tenant's mirror directory. Its only role grant is that write (no role read grant). Like every narrow store-writer role it runs with persona worker, so it also keeps the paths every worker identity has (security-policy default_allow and worker persona grants, e.g. active/shared/tmp/ and the current mission's evidence); it adds nothing else. Nothing else assumes it (resident dots and coordination store writers run as infrastructure_sentinel, which has no customer/ grant).",
   "default_persona": "worker",
   "write_scopes": ["customer/${KYBERION_TENANT}/logs/audit/"],
   "scope_classes": ["audit"],
