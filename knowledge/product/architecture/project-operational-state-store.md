@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, project, operational-state, tenant, distillation, active-projects]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-10-02
+last_updated: 2026-10-08
 ---
 
 # Project Operational State Store
@@ -157,3 +157,35 @@ What it was missing was a clean place for:
 - tenant-aware project working state that is not yet knowledge
 
 This store fills that gap.
+
+## 7. Governed project and track lifecycle
+
+Use `pnpm project archive <PROJECT_ID>` or
+`pnpm project update <PROJECT_ID> --status archived` to archive a project.
+Both paths use the same lifecycle checks. Active missions, live task sessions,
+and unfinished tracks must be closed first; archiving never silently drops their
+ownership links.
+
+An archived project returns to active state only through
+`pnpm project restore <PROJECT_ID>`. Restore validates the linked organization
+and reconciles the operational snapshot. Name, summary, and other descriptive
+fields can be edited while the project remains archived.
+
+Track creation and mutation belong to the same project facade:
+
+- `pnpm project track update --track-id <TRACK_ID> --name <NAME> --summary <TEXT>`
+  edits descriptive fields. Release id, required artifacts, lifecycle model,
+  locale and metadata can also be updated.
+- `pnpm project track pause|resume|complete|archive --track-id <TRACK_ID>`
+  changes lifecycle state; `track update --status <STATUS>` uses the same checks.
+- A planned track may become active, completed or archived. An active track may
+  become paused, completed or archived. A paused track may become active,
+  completed or archived. A completed track may be archived. Archived tracks are
+  terminal.
+- Moving a track out of active state requires closing its live missions first.
+  Mutation reconciles active track membership and selects an active replacement
+  for the default track, or clears the default when none remains.
+
+Project and track mutations require the mission owner: a worker view cannot
+prove that sibling missions have finished. Lifecycle writes use scoped records,
+audit events and rollback on reconciliation failure. IDs and ownership are immutable.

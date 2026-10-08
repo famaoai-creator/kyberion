@@ -3,6 +3,21 @@ import { pathResolver, safeReadFile } from '@agent/core';
 import { main, parseProjectMetadata } from './project_controller.js';
 
 describe('project controller resource boundaries', () => {
+  it('rejects unsupported lifecycle flags and missing values before changing state', async () => {
+    for (const args of [
+      ['track', 'archive', 'TRK-NONEXISTENT', '--dry-run'],
+      ['archive', 'PRJ-NONEXISTENT', '--dry-run'],
+      ['restore', 'PRJ-NONEXISTENT', '--dry-run'],
+      ['track', 'pause', 'TRK-NONEXISTENT', '--statuz', 'active'],
+      ['track', 'update', 'TRK-NONEXISTENT', '--name'],
+      ['restore', 'PRJ-NONEXISTENT', '--reason'],
+      ['track', 'update', 'TRK-NONEXISTENT', '--name', 'New', '--reason', 'Reason'],
+    ]) {
+      await expect(main(args, () => undefined)).rejects.toThrow(
+        /Unknown option|requires a value|requires a track lifecycle command/
+      );
+    }
+  });
   it('accepts metadata objects and rejects unsafe or non-object JSON', () => {
     expect(parseProjectMetadata('{"owner":"ops"}')).toEqual({ owner: 'ops' });
     expect(() => parseProjectMetadata('[]')).toThrow('--metadata must be a JSON object');
