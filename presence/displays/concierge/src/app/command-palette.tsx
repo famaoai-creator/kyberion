@@ -2,154 +2,196 @@
 
 import * as React from 'react';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
-import { frontDeskText, type ConciergeMessageKey, type FrontDeskMessageKey } from '../lib/i18n';
-// Type-only: erased at compile time (`isolatedModules`), so it never pulls
-// `@agent/core/front-desk-nav`'s Node-only runtime (`surface-runtime` /
-// `secure-io`) into this client bundle. See the `frontDeskPorts` prop below.
-import { withSelectedTenant } from '../lib/tenant-context';
-import type { FrontDeskSurfacePorts } from '@agent/core/front-desk-nav';
+import { frontDeskText, type FrontDeskMessageKey } from '../lib/i18n';
+import { attachFrontDeskAuthHeaders } from '../lib/front-desk-auth-token';
+import {
+  TENANT_CHANGED_EVENT,
+  readSelectedTenant,
+  withSelectedTenant,
+} from '../lib/tenant-context';
 
-/**
- * CS-04 command palette — ⌘K / Ctrl+K opens a small, keyboard-first overlay
- * for reaching every concierge destination without hunting through the
- * navigation. Pure navigation + opening the conversation dock; it never
- * performs a decision itself (those stay behind their guarded, confirmed
- * flows) and never fetches — every entry resolves synchronously so the
- * palette opens instantly.
- *
- * FD-00c: also exposes the 5 shared front-desk rail items (home / ask /
- * decide / progress / settings). The concierge-hosted two (decide /
- * settings) use relative hrefs; the other three's cross-surface hrefs are
- * built from `frontDeskPorts` — the manifest-resolved ports, read once by
- * `layout.tsx` (a Server Component) via `readFrontDeskSurfacePorts()` and
- * passed down as a plain prop, since `@agent/core/front-desk-nav`'s runtime
- * exports cannot be imported into this client component (that module pulls
- * in `surface-runtime`/`secure-io`, which reference Node-only `node:fs`,
- * `node:child_process`, … and cannot be bundled for the browser). No port
- * is ever hardcoded here. Role gating is left to the destination route
- * (same defense-in-depth already used by the unconditional `setup`/`ingest`
- * entries below); the palette is a navigation aid, not an authorization
- * surface.
- */
-
+/** The rail and palette share the server's role-gated, manifest-resolved catalog. */
 type PaletteEntry = {
   id: string;
-  labelKey?: ConciergeMessageKey;
-  /** Pre-resolved label (used for the front-desk rail entries below). */
-  label?: string;
-  /** Either a navigation target… */
+  label: string;
+  sublabel?: string;
+  group_label?: string;
+  icon?: string;
+  scope_query_style?: 'snake' | 'camel';
   href?: string;
-  /** …or a same-page action (open the conversation dock). */
   event?: string;
 };
+type NavItem = PaletteEntry & { allowed: boolean; href: string };
 
-const PALETTE_ENTRIES: PaletteEntry[] = [
-  { id: 'home', labelKey: 'palette.home', href: '/' },
-  { id: 'dock', labelKey: 'palette.dock', event: 'concierge:open-dock' },
-  { id: 'ingest', labelKey: 'palette.ingest', href: '/ingest' },
-  { id: 'setup', labelKey: 'palette.setup', href: '/settings' },
-  { id: 'setup-profile', labelKey: 'palette.setup_profile', href: '/settings#setup-profile' },
-  { id: 'setup-services', labelKey: 'palette.setup_services', href: '/settings#setup-services' },
-  {
-    id: 'setup-notifications',
-    labelKey: 'palette.setup_notifications',
-    href: '/settings#setup-notifications',
-  },
-  { id: 'setup-plugins', labelKey: 'palette.setup_plugins', href: '/settings#setup-plugins' },
-  {
-    id: 'setup-governance',
-    labelKey: 'palette.setup_governance',
-    href: '/settings#setup-governance',
-  },
+const SETTINGS_SHORTCUTS: Array<{ anchor: string; labelKey: FrontDeskMessageKey }> = [
+  { anchor: 'setup-profile', labelKey: 'settings_nav_profile' },
+  { anchor: 'settings-display', labelKey: 'settings_nav_display' },
+  { anchor: 'settings-members', labelKey: 'settings_nav_members' },
+  { anchor: 'setup-services', labelKey: 'settings_nav_services' },
+  { anchor: 'setup-media', labelKey: 'settings_nav_voice' },
+  { anchor: 'setup-notifications', labelKey: 'settings_nav_notifications' },
+  { anchor: 'settings-recording', labelKey: 'settings_nav_recording' },
+  { anchor: 'setup-plugins', labelKey: 'settings_nav_plugins' },
+  { anchor: 'settings-advanced', labelKey: 'settings_nav_advanced' },
 ];
 
-export interface CommandPaletteProps {
-  /** Manifest-resolved surface ports, read server-side by `layout.tsx`. */
-  frontDeskPorts: FrontDeskSurfacePorts;
-  frontDeskUrls?: Record<keyof FrontDeskSurfacePorts, string>;
+function allowedItems(payload: unknown): NavItem[] {
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    !('items' in payload) ||
+    !Array.isArray(payload.items)
+  )
+    return [];
+  return payload.items.filter(
+    (item): item is NavItem =>
+      !!item &&
+      item.allowed === true &&
+      typeof item.id === 'string' &&
+      typeof item.label === 'string' &&
+      typeof item.href === 'string'
+  );
 }
 
-export function CommandPalette({ frontDeskPorts, frontDeskUrls }: CommandPaletteProps) {
+export function CommandPalette() {
   const { locale, t } = useConciergeI18n();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [activeIndex, setActiveIndex] = React.useState(0);
+  const [tenant, setTenant] = React.useState<string | null>(null);
+  const [catalog, setCatalog] = React.useState<{
+    locale: string;
+    tenant: string | null;
+    items: NavItem[];
+  } | null>(null);
+  const generation = React.useRef(0);
+  const openRef = React.useRef(false);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const listRef = React.useRef<HTMLUListElement | null>(null);
-
-  const frontDeskEntries = React.useMemo<PaletteEntry[]>(() => {
-    const presenceStudioBase =
-      frontDeskUrls?.['presence-studio'] ?? `http://127.0.0.1:${frontDeskPorts['presence-studio']}`;
-    const items: Array<{ id: string; labelKey: FrontDeskMessageKey; href: string }> = [
-      { id: 'home', labelKey: 'nav_home', href: `${presenceStudioBase}/` },
-      { id: 'ask', labelKey: 'nav_ask', href: `${presenceStudioBase}/ask` },
-      { id: 'decide', labelKey: 'nav_decide', href: '/' },
-      {
-        id: 'progress',
-        labelKey: 'nav_progress',
-        href: `${presenceStudioBase}/progress`,
-      },
-      { id: 'settings', labelKey: 'nav_settings', href: '/settings' },
-    ];
-    return items.map((item) => ({
-      id: `front-desk-${item.id}`,
-      label: frontDeskText(item.labelKey, locale),
-      href: item.href,
-    }));
-  }, [frontDeskPorts, frontDeskUrls, locale]);
-
-  const entries = React.useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    const labeled = [...PALETTE_ENTRIES, ...frontDeskEntries].map((entry) => ({
-      entry,
-      label: entry.label ?? t(entry.labelKey as ConciergeMessageKey),
-    }));
-    if (!needle) return labeled;
-    return labeled.filter(({ label }) => label.toLowerCase().includes(needle));
-  }, [query, t, frontDeskEntries]);
+  const previousFocus = React.useRef<HTMLElement | null>(null);
 
   const close = React.useCallback(() => {
+    openRef.current = false;
+    generation.current += 1;
+    setCatalog(null);
     setOpen(false);
     setQuery('');
     setActiveIndex(0);
+    previousFocus.current?.focus();
   }, []);
 
-  const run = React.useCallback(
-    (entry: PaletteEntry) => {
-      close();
-      if (entry.event) {
-        window.dispatchEvent(new CustomEvent(entry.event));
-        return;
-      }
-      if (entry.href) {
-        // Same-page hash targets scroll smoothly unless reduced motion is on.
-        const [path, hash] = entry.href.split('#');
-        if (hash && window.location.pathname === path) {
-          const target = document.getElementById(hash);
-          if (target) {
-            const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
-            return;
-          }
-        }
-        window.location.href = withSelectedTenant(entry.href);
-      }
-    },
-    [close]
-  );
-
   React.useEffect(() => {
+    const refreshTenant = () => {
+      if (readSelectedTenant() === tenant) return;
+      generation.current += 1;
+      setCatalog(null);
+      setTenant(readSelectedTenant());
+    };
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
-        setOpen((prev) => !prev);
+        if (openRef.current) {
+          close();
+          return;
+        }
+        previousFocus.current = document.activeElement as HTMLElement | null;
+        refreshTenant();
+        openRef.current = true;
+        setOpen(true);
         setQuery('');
         setActiveIndex(0);
       }
     };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === 'front-desk.tenant' || event.key === null) refreshTenant();
+    };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+    window.addEventListener(TENANT_CHANGED_EVENT, refreshTenant);
+    window.addEventListener('popstate', refreshTenant);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener(TENANT_CHANGED_EVENT, refreshTenant);
+      window.removeEventListener('popstate', refreshTenant);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [close, tenant]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const request = ++generation.current;
+    const controller = new AbortController();
+    setCatalog(null);
+    fetch(withSelectedTenant('/api/front-desk/nav?locale=' + locale, tenant), {
+      headers: attachFrontDeskAuthHeaders(),
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: unknown) => {
+        if (
+          controller.signal.aborted ||
+          request !== generation.current ||
+          !openRef.current ||
+          tenant !== readSelectedTenant()
+        )
+          return;
+        setCatalog({ locale, tenant, items: allowedItems(payload) });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted && request === generation.current) setCatalog(null);
+      });
+    return () => controller.abort();
+  }, [open, locale, tenant]);
+
+  const entries = React.useMemo(() => {
+    const nav = catalog?.locale === locale && catalog.tenant === tenant ? catalog.items : [];
+    const settings = nav.find((item) => item.id === 'settings');
+    const shortcuts: PaletteEntry[] = settings
+      ? SETTINGS_SHORTCUTS.map(({ anchor, labelKey }) => ({
+          id: anchor,
+          label: frontDeskText(labelKey, locale),
+          href: settings.href.split('#')[0] + '#' + anchor,
+        }))
+      : [];
+    const all: PaletteEntry[] = [
+      { id: 'dock', label: t('palette.dock'), event: 'concierge:open-dock' },
+      ...nav.map((item) => ({ ...item, id: 'front-desk-' + item.id })),
+      ...shortcuts,
+    ];
+    const needle = query.trim().toLowerCase();
+    return all
+      .filter((entry) =>
+        [entry.label, entry.sublabel, entry.group_label].some(
+          (text) => typeof text === 'string' && text.toLowerCase().includes(needle)
+        )
+      )
+      .map((entry) => ({ entry, label: entry.label }));
+  }, [catalog, locale, tenant, query, t]);
+
+  const run = React.useCallback(
+    (entry: PaletteEntry) => {
+      // A selection made before React processes a tenant event must not use old grants.
+      if (entry.href && tenant !== readSelectedTenant()) {
+        close();
+        return;
+      }
+      close();
+      if (entry.event) window.dispatchEvent(new CustomEvent(entry.event));
+      else if (entry.href) {
+        // Native navigation updates history and emits hashchange, allowing Settings
+        // to reveal collapsed sections and supporting browser Back/Forward.
+        const target = withSelectedTenant(entry.href, tenant, entry.scope_query_style);
+        if (
+          new URL(target, window.location.href).href === window.location.href &&
+          window.location.hash
+        ) {
+          window.dispatchEvent(new Event('hashchange'));
+        } else window.location.href = target;
+      }
+    },
+    [close, tenant]
+  );
 
   React.useEffect(() => {
     if (open) inputRef.current?.focus();

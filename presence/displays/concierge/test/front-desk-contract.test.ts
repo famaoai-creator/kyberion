@@ -19,16 +19,16 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     expect(layout).toContain('CommandPalette');
   });
 
-  it('reads front-desk ports server-side in layout.tsx and passes them to CommandPalette, never hardcoded', () => {
+  it('uses the server-resolved role-gated navigation payload in the command palette, never hardcoded', () => {
     const layout = read('src/app/layout.tsx');
     const palette = read('src/app/command-palette.tsx');
-    expect(layout).toContain('readFrontDeskSurfacePorts');
-    expect(layout).toContain('frontDeskPorts={frontDeskPorts}');
+    expect(layout).toContain('<CommandPalette');
     // The palette builds its 3 cross-surface hrefs from the prop, not a
     // hardcoded port literal (plan §2.6: "ポート番号をハードコードしない").
     expect(palette).not.toContain('3031');
     expect(palette).not.toContain('3050');
-    expect(palette).toContain('frontDeskPorts');
+    expect(palette).toContain('/api/front-desk/nav');
+    expect(palette).toContain('attachFrontDeskAuthHeaders');
   });
 
   it('drops the header nav links now that the rail carries them', () => {
@@ -53,7 +53,8 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     expect(rail).toContain('aria-current');
     // 資料の取込 (ingest) stays reachable from the rail, labelled with the
     // existing header.ingest key, now that the header dropped its own link.
-    expect(rail).toContain("t('header.ingest')");
+    expect(rail).toContain("pathname === '/ingest'");
+    expect(rail).toContain('group_label: item.group_label');
   });
 
   it('guards /api/me and /api/front-desk/nav with the shared viewer resolver and no-store', () => {
@@ -214,7 +215,7 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     // The palette's onboarding entries now point at /settings, not /setup.
     expect(palette).not.toContain("href: '/setup'");
     expect(palette).not.toContain("'/setup#");
-    expect(palette).toContain("href: '/settings'");
+    expect(palette).toContain("href: settings.href.split('#')[0] + '#' + anchor");
   });
 
   it('FD-10: re-ports 声と話し方 voice selection, the accountable-agents list, and training assignment into their split section files', () => {
@@ -357,7 +358,7 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
 });
 
 describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
-  it('returns 5 rail items with ja labels, relative concierge hrefs, and absolute presence-studio hrefs', async () => {
+  it('returns grouped existing rail items with ja labels, relative concierge hrefs, and absolute presence-studio hrefs', async () => {
     vi.resetModules();
     vi.doMock('@agent/core/front-desk-nav', async () => {
       const actual = await vi.importActual<typeof import('@agent/core/front-desk-nav')>(
@@ -378,12 +379,16 @@ describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
 
     expect(payload.ok).toBe(true);
     expect(payload.current_surface).toBe('concierge');
-    expect(payload.items).toHaveLength(5);
+    expect(payload.items).toHaveLength(9);
     expect(payload.items.map((item) => item.id)).toEqual([
       'home',
       'ask',
       'decide',
       'progress',
+      'workspace',
+      'ingest',
+      'first-job',
+      'help',
       'settings',
     ]);
 

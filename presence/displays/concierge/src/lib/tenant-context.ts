@@ -13,6 +13,8 @@ export function announceTenantChange(tenantSlug: string): void {
   if (url.searchParams.get('tenant') !== tenantSlug) {
     url.searchParams.delete('organizationId');
     url.searchParams.delete('projectId');
+    url.searchParams.delete('organization_id');
+    url.searchParams.delete('project_id');
   }
   url.searchParams.set('tenant', tenantSlug);
   window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
@@ -36,13 +38,22 @@ export function readSelectedTenant(): string | null {
   }
 }
 
-export function withSelectedTenant(path: string, tenant = readSelectedTenant()): string {
+export function withSelectedTenant(
+  path: string,
+  tenant = readSelectedTenant(),
+  scopeQueryStyle: 'snake' | 'camel' = 'camel'
+): string {
   if (typeof window === 'undefined') return path;
   const url = new URL(path, window.location.href);
   if (tenant) url.searchParams.set('tenant', tenant);
   const current = new URL(window.location.href);
-  for (const key of ['organizationId', 'projectId']) {
-    const selected = current.searchParams.get(key);
+  for (const [camel, snake] of [
+    ['organizationId', 'organization_id'],
+    ['projectId', 'project_id'],
+  ]) {
+    const selected = current.searchParams.get(camel) ?? current.searchParams.get(snake);
+    const key = scopeQueryStyle === 'snake' ? snake : camel;
+    url.searchParams.delete(scopeQueryStyle === 'snake' ? camel : snake);
     if (selected) url.searchParams.set(key, selected);
   }
   return url.origin === window.location.origin ? url.pathname + url.search + url.hash : url.href;

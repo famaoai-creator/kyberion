@@ -179,6 +179,25 @@
   list-style: none;
 }
 
+/* Keep long rails scrollable without flex-compressing their contents. */
+.kb-nav-rail > * {
+  flex-shrink: 0;
+}
+
+.kb-nav-rail__group + .kb-nav-rail__group {
+  margin-top: var(--kb-ui-space-3);
+  padding-top: var(--kb-ui-space-3);
+  border-top: 1px solid var(--kb-ui-border);
+}
+
+.kb-nav-rail__group-label {
+  display: block;
+  padding: var(--kb-ui-space-2) var(--kb-ui-space-3);
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-xs);
+  font-weight: 600;
+}
+
 .kb-nav-rail__footer {
   margin-top: auto;
   padding-top: var(--kb-ui-space-3);
@@ -1703,6 +1722,29 @@ a.kb-list__title:hover {
 
   .kb-nav-rail__list {
     flex-direction: row;
+    align-items: center;
+  }
+
+  .kb-nav-rail__list > li {
+    flex-shrink: 0;
+  }
+
+  .kb-nav-rail__group {
+    display: flex;
+    align-items: center;
+  }
+
+  .kb-nav-rail__group + .kb-nav-rail__group {
+    margin-top: 0;
+    margin-left: var(--kb-ui-space-2);
+    padding-top: 0;
+    padding-left: var(--kb-ui-space-2);
+    border-top: 0;
+    border-left: 1px solid var(--kb-ui-border);
+  }
+
+  .kb-nav-rail__group-label {
+    white-space: nowrap;
   }
 
   .kb-nav-rail__item {
