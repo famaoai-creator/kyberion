@@ -2,6 +2,8 @@ name: PR Validation
 
 env:
   PUPPETEER_SKIP_DOWNLOAD: 'true'
+  # Fail Vitest runs that write into live active/ state (tests/vitest-active-leak-guard.ts).
+  KYBERION_TEST_LEAK_STRICT: '1'
 
 on:
   pull_request:

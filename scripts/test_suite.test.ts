@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildVitestArgs, parseTestSuiteArgs, TEST_SUITES, runTestSuite } from './test_suite.js';
+import {
+  buildVitestArgs,
+  buildVitestEnv,
+  parseTestSuiteArgs,
+  TEST_SUITES,
+  runTestSuite,
+} from './test_suite.js';
 
 describe('test suite dispatcher', () => {
   it('keeps every named suite explicit and deterministic', () => {
@@ -39,6 +45,13 @@ describe('test suite dispatcher', () => {
   it('rejects missing and unknown suite names', () => {
     expect(() => parseTestSuiteArgs(['--suite'])).toThrow('--suite requires a suite name');
     expect(() => parseTestSuiteArgs(['--suite', 'unknown'])).toThrow('unknown test suite');
+  });
+
+  it('forwards the leak-guard strict switch past the safeExec env allowlist', () => {
+    expect(buildVitestEnv({ KYBERION_TEST_LEAK_STRICT: '1' })).toEqual({
+      KYBERION_TEST_LEAK_STRICT: '1',
+    });
+    expect(buildVitestEnv({})).toEqual({ KYBERION_TEST_LEAK_STRICT: undefined });
   });
 
   it('requires an explicit argv array at the dispatcher boundary', () => {
