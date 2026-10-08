@@ -10,6 +10,7 @@
  */
 
 import { randomBytes } from 'node:crypto';
+import { withExecutionContext } from '../authority.js';
 import { browserSessionKey } from '../authn-browser-session-key.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
@@ -143,7 +144,12 @@ function stringField(doc: Record<string, unknown>, key: string): string | undefi
 export function loadStoredOidcLoginSettings(): StoredOidcLoginSettings | null {
   let doc: Record<string, unknown>;
   try {
-    doc = secretGuard.loadConnectionDocument(OIDC_SETTINGS_DOCUMENT) as Record<string, unknown>;
+    // Every surface's login routes read this unauthenticated, outside any
+    // execution context; the document lives under the personal tier.
+    doc = withExecutionContext(
+      'sovereign_concierge',
+      () => secretGuard.loadConnectionDocument(OIDC_SETTINGS_DOCUMENT) as Record<string, unknown>
+    );
   } catch {
     return null;
   }
