@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { withExecutionContext } from '../authority.js';
 import { tenantProfilePath, writeTenantProfile } from '../organization/tenant-registry.js';
-import { safeUnlinkSync } from '../secure-io.js';
+import { pathResolver } from '../path-resolver.js';
+import { safeRmSync, safeUnlinkSync } from '../secure-io.js';
 import { createWorkItem, createWorkItemIfAbsent } from './work-coordination.js';
 
 // The store fence assumes infrastructure_sentinel, which may not read the
@@ -40,7 +41,18 @@ describe('work item tenant validation authority', () => {
   });
 
   afterEach(() => {
-    withExecutionContext('sovereign', () => safeUnlinkSync(tenantProfilePath(TENANT)), 'sovereign');
+    withExecutionContext(
+      'sovereign',
+      () => {
+        safeUnlinkSync(tenantProfilePath(TENANT));
+        // writeTenantProfile also creates the tenant's confidential knowledge root.
+        safeRmSync(pathResolver.knowledge(`confidential/${TENANT}`), {
+          recursive: true,
+          force: true,
+        });
+      },
+      'sovereign'
+    );
     for (const key of ENV_KEYS) {
       if (saved[key] === undefined) delete process.env[key];
       else process.env[key] = saved[key];
