@@ -4,7 +4,7 @@ category: Roles
 tags: [roles, performance_engineer, knowledge, base]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-10-05
+last_updated: 2026-10-08
 ---
 
 # Performance Evaluation Knowledge Base
@@ -22,7 +22,7 @@ last_updated: 2026-10-05
 
 ## 2. 性能監視・計測ツール
 
-- **Capability Metrics**: `libs/core/metrics.ts` により自動収集。`work/metrics/execution-metrics.jsonl` に記録。
+- **Capability Metrics**: `libs/core/metrics.ts` により自動収集。システム行は `work/metrics/execution-metrics.jsonl`、テナント／personal・confidential 行は `active/shared/runtime/execution-metrics/<tier>/<tenant|shared>/` に記録（全体集計は `metrics.loadHistory({ read: { all: true } })`）。
 - **System Benchmark**: `pnpm exec tsx scripts/benchmark_memory.ts` / `scripts/benchmark_learning_efficiency.ts` でベンチマークを実行。
 - **Resource Profiler**: `libs/core/metrics.ts` と `pnpm dashboard` を使用して、詳細なボトルネック分析を実施。
 

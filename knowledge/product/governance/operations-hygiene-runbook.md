@@ -209,6 +209,17 @@ the test passes against the sandbox while the writer leaks into live state.
   fence, they fail with `ROLE_VIOLATION` on `knowledge/personal/tenants/`. Validate on creation and
   whenever an update changes the tenant; a plain re-sync of an existing item does not re-validate,
   so suspending a tenant does not strand its imported items.
+- **Tier data outside `knowledge/` keeps the knowledge tier's read rules.** A runtime ledger that
+  holds tenant or personal/confidential rows is partitioned
+  `active/shared/runtime/<ledger>/<tier>/<tenant|shared>/`, never appended to a repo-wide file.
+  Register its root in `PARTITIONED_RUNTIME_LEDGER_ROOTS` (`libs/core/storage-layout.ts`) and its
+  `<root>/{personal,confidential}/` prefixes in `tenant_scope.protected_prefixes`. Tier-guard then
+  applies the tenant check **and** the persona decision of `knowledge/<tier>/` to every read
+  (`personaTierReadDecision`) — never a second persona table. Aggregate readers skip a denied
+  partition with a diagnostic `debug` line instead of failing. Reuse the metrics ledgers'
+  `PartitionedMetricsLedger` and the offboarding `METRICS_LEDGERS` table
+  (`libs/core/scope-offboarding.ts`: export, approval-gated legacy-row prune, audit) instead of a
+  new mechanism.
 - **Evidence stays in the tenant's scope.** A per-tenant command (activation probe, readiness
   report) that runs a repository-wide check keeps only the lines about its own tenant in the
   evidence it writes, and points at the repository-wide command for the rest.
@@ -219,7 +230,13 @@ the test passes against the sandbox while the writer leaks into live state.
    the read through a governed system-scope reader instead of widening the policy. Add a
    `tier-guard-tenant.test.ts` case proving a tenant-bound context still cannot write (or, unless
    brokered, read) the file.
-2. Verify onboarding-flow commands with the real CLI in a throwaway worktree.
+2. When a store moves tenant rows out of a shared file, find every reader first
+   (`grep` the loader, e.g. `loadHistory(` / `loadResourceUsageHistory(`) and give each an explicit
+   read scope; a reader left on the default silently loses the tenant rows it used to see. Prove the
+   gate with the real tier-guard (pattern: `libs/core/metrics-ledger-persona-gate.test.ts` — one
+   persona allowed, one denied, aggregate read skips instead of throwing) and add a
+   `scope-offboarding.test.ts` case for the purge.
+3. Verify onboarding-flow commands with the real CLI in a throwaway worktree.
    - Create the throwaway company with `pnpm onboarding company … --slug probe-co --tenant-slug probe-co`.
    - Then run `tenant:activation plan|probe` and `work create-item` with `KYBERION_CUSTOMER`,
      `KYBERION_TENANT_SCOPE_REQUIRED=true` and `KYBERION_PERSONA=sovereign`.
