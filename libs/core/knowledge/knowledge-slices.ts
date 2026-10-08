@@ -37,6 +37,9 @@
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('knowledge-slices');
 
 const SCHEMA_PATH = 'knowledge/product/schemas/knowledge-slices.schema.json';
 const DEFAULT_DATA_PATH = 'knowledge/product/governance/knowledge-slices.json';
@@ -119,8 +122,7 @@ const warnedKeys = new Set<string>();
 function warnOnce(key: string, message: string): void {
   if (warnedKeys.has(key)) return;
   warnedKeys.add(key);
-  // eslint-disable-next-line no-console
-  console.warn(message);
+  logger.warn(message);
 }
 
 function knowledgeSlicesCatalog(filePath: string) {

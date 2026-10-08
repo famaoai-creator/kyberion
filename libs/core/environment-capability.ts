@@ -250,6 +250,64 @@ function parseIsoDate(value: unknown): { ok: true; ms: number } | { ok: false } 
   return Number.isFinite(ms) ? { ok: true, ms } : { ok: false };
 }
 
+/** Bound for a capability command probe (matches provider-discovery's CLI probe). */
+export const COMMAND_PROBE_TIMEOUT_MS = 10_000;
+/** Generous but finite bound for a capability install command (package managers, downloads). */
+export const INSTALL_COMMAND_TIMEOUT_MS = 10 * 60_000;
+
+function isSpawnTimeout(error: Error | undefined): boolean {
+  return (error as NodeJS.ErrnoException | undefined)?.code === 'ETIMEDOUT';
+}
+
+/**
+ * Run one command probe with a hard timeout so a hung binary (e.g. a CLI
+ * waiting on a login prompt) cannot block doctor / preflight / bootstrap.
+ */
+export function runCommandProbe(
+  command: string,
+  args: string[]
+): { available: boolean; reason?: string } {
+  const result = spawnSync(command, args, { stdio: 'ignore', timeout: COMMAND_PROBE_TIMEOUT_MS });
+  if (isSpawnTimeout(result.error)) {
+    return {
+      available: false,
+      reason: `${command}: timed out after ${COMMAND_PROBE_TIMEOUT_MS / 1000}s`,
+    };
+  }
+  if (result.error) {
+    return { available: false, reason: `${command}: ${result.error.message}` };
+  }
+  return result.status === 0
+    ? { available: true }
+    : { available: false, reason: `${command} exited with code ${result.status}` };
+}
+
+/** Run one install command with inherited stdio under a finite timeout. */
+export function runInstallCommand(
+  command: string,
+  args: string[]
+): { status: number | null; failure?: string } {
+  const result = spawnSync(command, args, {
+    stdio: 'inherit',
+    timeout: INSTALL_COMMAND_TIMEOUT_MS,
+  });
+  if (isSpawnTimeout(result.error)) {
+    return {
+      status: result.status,
+      failure: `install command timed out after ${INSTALL_COMMAND_TIMEOUT_MS / 60_000} min and was killed (${command})`,
+    };
+  }
+  if (result.error) {
+    return {
+      status: result.status,
+      failure: `install command failed to run: ${result.error.message}`,
+    };
+  }
+  return result.status === 0
+    ? { status: 0 }
+    : { status: result.status, failure: `install command failed with exit code ${result.status}` };
+}
+
 async function runProbe(
   probe: CapabilityProbe,
   missionId?: string,
@@ -264,13 +322,7 @@ async function runProbe(
             'command probe denied: manifest was not loaded from the governed manifest directory',
         };
       }
-      const result = spawnSync(probe.command, [...(probe.args ?? [])], { stdio: 'ignore' });
-      if (result.error) {
-        return { available: false, reason: `${probe.command}: ${result.error.message}` };
-      }
-      return result.status === 0
-        ? { available: true }
-        : { available: false, reason: `${probe.command} exited with code ${result.status}` };
+      return runCommandProbe(probe.command, [...(probe.args ?? [])]);
     }
     case 'module': {
       if (!allowExecutableProbe) {
@@ -459,9 +511,7 @@ export async function bootstrapManifest(
       });
       continue;
     }
-    const installResult = spawnSync(install.command, [...(install.args ?? [])], {
-      stdio: 'inherit',
-    });
+    const installResult = runInstallCommand(install.command, [...(install.args ?? [])]);
     const auditId = safeEmitAudit('env_bootstrap.install', cap.capability_id, {
       command: install.command,
       args: install.args,
@@ -473,11 +523,8 @@ export async function bootstrapManifest(
       command: install.command,
       ...(auditId ? { audit_event_id: auditId } : {}),
     });
-    if (installResult.status !== 0) {
-      unsatisfied.push({
-        ...status,
-        reason: `install command failed with exit code ${installResult.status}`,
-      });
+    if (installResult.failure) {
+      unsatisfied.push({ ...status, reason: installResult.failure });
       continue;
     }
     if (install.retry_after_install !== false) {

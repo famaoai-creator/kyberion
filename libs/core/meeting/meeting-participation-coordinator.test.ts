@@ -63,6 +63,8 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
   });
 
   it('joins, hears 3 stub utterances, replies once each, leaves cleanly', async () => {
+    // Do not rely on an earlier suite having created the scratch root.
+    fs.mkdirSync(path.join(ROOT, 'active/shared/tmp'), { recursive: true });
     const traceDir = fs.mkdtempSync(path.join(ROOT, 'active/shared/tmp/kyberion-meeting-trace-'));
     const bus = new StubAudioBus();
     const driver = new StubMeetingJoinDriver();

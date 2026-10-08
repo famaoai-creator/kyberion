@@ -1,5 +1,5 @@
 /* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
@@ -96,6 +96,37 @@ export function registryRemove(service: string, account: string): void {
   saveRegistry(registry);
 }
 
+/** Bound for keychain reads/deletes (`security`). */
+export const KEYCHAIN_COMMAND_TIMEOUT_MS = 10_000;
+/** Bound for keychain writes: `swift -e` compiles the helper before running it. */
+export const KEYCHAIN_WRITE_TIMEOUT_MS = 60_000;
+
+/**
+ * Settle a keychain child exactly once: on 'close', on spawn 'error' (e.g.
+ * the binary is missing — without a listener that crashes the process), or
+ * when the kill timer fires (a locked keychain can prompt and hang forever).
+ */
+function superviseKeychainChild(
+  child: ChildProcess,
+  timeoutMs: number,
+  onSettled: (outcome: { code: number | null; error?: Error }) => void
+): void {
+  let settled = false;
+  const settle = (outcome: { code: number | null; error?: Error }): void => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    onSettled(outcome);
+  };
+  const timer = setTimeout(() => {
+    child.kill('SIGKILL');
+    settle({ code: null, error: new Error(`timed out after ${timeoutMs}ms`) });
+  }, timeoutMs);
+  timer.unref?.();
+  child.on('error', (error) => settle({ code: null, error }));
+  child.on('close', (code) => settle({ code }));
+}
+
 // 1. macOS Keychain native provider
 export class MacKeychainSecretProvider implements SecretProvider {
   readonly id = 'mac_keychain';
@@ -117,12 +148,8 @@ export class MacKeychainSecretProvider implements SecretProvider {
       child.stdout.on('data', (chunk) => {
         stdout += String(chunk);
       });
-      child.on('close', (code) => {
-        if (code === 0 && stdout.trim()) {
-          resolve(stdout.trim());
-        } else {
-          resolve(null);
-        }
+      superviseKeychainChild(child, KEYCHAIN_COMMAND_TIMEOUT_MS, ({ code }) => {
+        resolve(code === 0 && stdout.trim() ? stdout.trim() : null);
       });
     });
   }
@@ -158,15 +185,18 @@ export class MacKeychainSecretProvider implements SecretProvider {
       child.stderr.on('data', (chunk) => {
         stderr += String(chunk);
       });
-      child.on('error', (err) => reject(err));
-      child.on('close', (code) => {
-        if (code === 0) {
+      superviseKeychainChild(child, KEYCHAIN_WRITE_TIMEOUT_MS, ({ code, error }) => {
+        if (error) {
+          reject(new Error(`macOS Keychain write failed: ${error.message}`));
+        } else if (code === 0) {
           registryAdd(service, account);
           resolve();
         } else {
           reject(new Error(`macOS Keychain write failed with code ${code}: ${stderr}`));
         }
       });
+      // A child that dies before reading stdin must not crash the caller (EPIPE).
+      child.stdin?.on('error', () => undefined);
       child.stdin?.write(`${service}\n${account}\n${value}`);
       child.stdin?.end();
     });
@@ -177,7 +207,7 @@ export class MacKeychainSecretProvider implements SecretProvider {
       const child = spawn('security', ['delete-generic-password', '-a', account, '-s', service], {
         stdio: ['ignore', 'ignore', 'ignore'],
       });
-      child.on('close', () => {
+      superviseKeychainChild(child, KEYCHAIN_COMMAND_TIMEOUT_MS, () => {
         registryRemove(service, account);
         resolve();
       });

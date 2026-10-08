@@ -331,6 +331,26 @@ export default [
     },
   },
   {
+    // G13 (MSN-OPS-GAPS-20261008): library code logs through the shared
+    // logger (`core.ts` logger / `createLogger`) so lines honour level/quiet
+    // gating, stay off stdout and reach the log file sink. Raw console.* only
+    // belongs to CLI surfaces (excluded below) or carries an explicit
+    // `eslint-disable-next-line no-console -- <reason>`.
+    files: ['libs/**/*.ts', 'libs/**/*.tsx'],
+    ignores: [
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/*.test-support.ts',
+      'libs/**/examples/**',
+      'libs/core/script-harness.ts',
+      'libs/core/cli-utils.ts',
+      'libs/core/plugin/skill-wrapper.ts',
+    ],
+    rules: {
+      'no-console': 'error',
+    },
+  },
+  {
     files: [
       'libs/actuators/**/*.ts',
       'satellites/**/*.ts',

@@ -27,6 +27,14 @@
       "rationale": "Requires explicit review evidence before a lockfile change is accepted."
     },
     {
+      "id": "ci-workflow-contract",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_ci_workflow_contract.ts"],
+      "owner": "release",
+      "rationale": "Keeps every workflow job time-boxed, pull_request workflows cancel superseded runs, actions on Node24 majors, and no redundant core build (operations-hygiene runbook §CI)."
+    },
+    {
       "id": "golden",
       "scope": "pr",
       "executable": "node",
@@ -176,6 +184,14 @@
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_channel_adapter_adoption.ts"],
       "owner": "experience",
       "rationale": "Keeps all text bridges on the shared turn/thread/typing lifecycle."
+    },
+    {
+      "id": "runtime-store-retention",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_runtime_store_retention.ts"],
+      "owner": "operations",
+      "rationale": "Fails when source references an active/shared/runtime/<name> store with no storage-retention-catalog entry, so new ledgers and runtime dirs cannot grow unbounded and invisible to the janitor."
     },
     {
       "id": "ci-gate-parity",
