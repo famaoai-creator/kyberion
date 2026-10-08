@@ -3,7 +3,7 @@ title: サーフェスの初回セットアップ — OIDC 設定前でも owner
 category: Improvement Plan
 tags: [surfaces, authentication, oidc, onboarding, first-run, concierge, multi-tenant]
 last_updated: 2026-10-09
-status: partial
+status: completed
 mission: MSN-SURFACE-FIRSTRUN-20261009
 ---
 
@@ -47,14 +47,14 @@ OIDC を設定するまで、サーフェスにはほぼログインできない
 
 ## 実装
 
-| 段階 | 内容                                                                                                                                                                                                          | 状態                                                                                          |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| P1   | `libs/core/surface/oidc-login-settings.ts`: secret-guard の OIDC 設定の読み書き・検証・要約。`resolveOidcLoginConfig` のフォールバック                                                                        | 実装                                                                                          |
-| P2   | `libs/core/surface/first-run-setup.ts`: 開放判定、コード発行・検証、claim                                                                                                                                     | 実装                                                                                          |
-| P3   | `pnpm organization first-run <code\|status>`                                                                                                                                                                  | 実装                                                                                          |
-| P4   | concierge: `/api/setup/first-run`(GET 状態 / POST claim)、`/api/setup/oidc`(GET 要約 / PUT 保存)、画面 `/setup/first-run`(claim → トークン表示 → OIDC 設定)、middleware の通過、`/login` 未設定画面からの導線 | 実装                                                                                          |
-| P5   | 運用手順(`SURFACE_OIDC_LOGIN_OPERATIONS.ja.md`)と changelog                                                                                                                                                   | 実装                                                                                          |
-| P6   | IdP アカウントの自己紐付け: owner がトークンでサインイン中に IdP ログインし、callback の `unbound` 結果を署名付きの意図 cookie で自分に紐付ける                                                               | 次段(未着手)。現状は未登録画面の `issuer`/`subject` を設定画面の SSO 欄に貼る既存手順で足りる |
+| 段階 | 内容                                                                                                                                                                                                                                                                                                     | 状態                                    |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| P1   | `libs/core/surface/oidc-login-settings.ts`: secret-guard の OIDC 設定の読み書き・検証・要約。`resolveOidcLoginConfig` のフォールバック                                                                                                                                                                   | 実装                                    |
+| P2   | `libs/core/surface/first-run-setup.ts`: 開放判定、コード発行・検証、claim                                                                                                                                                                                                                                | 実装                                    |
+| P3   | `pnpm organization first-run <code\|status>`                                                                                                                                                                                                                                                             | 実装                                    |
+| P4   | concierge: `/api/setup/first-run`(GET 状態 / POST claim)、`/api/setup/oidc`(GET 要約 / PUT 保存)、画面 `/setup/first-run`(claim → トークン表示 → OIDC 設定)、middleware の通過、`/login` 未設定画面からの導線                                                                                            | 実装                                    |
+| P5   | 運用手順(`SURFACE_OIDC_LOGIN_OPERATIONS.ja.md`)と changelog                                                                                                                                                                                                                                              | 実装                                    |
+| P6   | IdP アカウントの自己紐付け: サインイン中の member が `/api/setup/link-identity` から IdP ログインを始める。紐付け先の member id は HMAC 署名付きのログイン transaction(`tx.link`)にだけ入れ、callback で未紐付けのアカウントだけを紐付ける(別 member のアカウントは拒否、停止中の member には紐付けない) | 実装(MSN-SURFACE-IDP-SELFLINK-20261009) |
 
 ## 手順(利用者から見た流れ)
 
@@ -66,7 +66,7 @@ pnpm organization first-run code            # → http://localhost:3050/setup/fi
 1. 表示された URL を開き、tenant と自分の表示名を入れて「セットアップする」。
 2. 発行されたアクセストークンが 1 回だけ表示される。このブラウザはそのままサインイン済みになる(他のサーフェスでは `/signin` や Bearer ヘッダーで使う)。
 3. 続けて IdP の issuer / client id / client secret を入れて保存する。表示されるリダイレクト URI を IdP に登録する。
-4. 他のサーフェスの `/login` にサインインボタンが出る。IdP でサインインし、未登録画面に出た `issuer`/`subject` を concierge の「設定 › 組織とメンバー」の SSO 欄で自分に紐付ける。
+4. 「自分のアカウントを紐付ける」から IdP で一度サインインすると、その IdP アカウントが自分に紐付く。以後は全サーフェスの `/login` から IdP でサインインできる。
 
 ## 検証
 

@@ -4,10 +4,15 @@ const mocks = vi.hoisted(() => ({
   claim: vi.fn(),
   isInstanceOwner: vi.fn(),
   resolveMember: vi.fn(),
+  startLink: vi.fn(),
 }));
 
 vi.mock('@agent/core/authority', () => ({
   withExecutionContext: (_role: string, fn: () => unknown) => fn(),
+  withExecutionContextAsync: async (_role: string, fn: () => unknown) => fn(),
+}));
+vi.mock('@agent/core/surface/surface-auth-routes', () => ({
+  startSurfaceIdentityLink: mocks.startLink,
 }));
 vi.mock('@agent/core/surface/first-run-setup', async () => {
   class FirstRunError extends Error {
@@ -40,7 +45,11 @@ vi.mock('@agent/core/organization/member-registry', () => ({
 vi.mock('@agent/core/governance/audit-chain', () => ({ auditChain: { record: vi.fn() } }));
 
 import { FirstRunError } from '@agent/core/surface/first-run-setup';
-import { claimFirstRunForRequest, viewerIsInstanceOwner } from './first-run-server';
+import {
+  claimFirstRunForRequest,
+  startIdentityLinkForViewer,
+  viewerIsInstanceOwner,
+} from './first-run-server';
 
 const viewer = {
   principalId: 'token:owner-first-run',
@@ -95,6 +104,45 @@ describe('first-run-server', () => {
       ok: false,
       status: 500,
       error: 'first_run_failed',
+    });
+  });
+
+  describe('startIdentityLinkForViewer', () => {
+    const request = { requestOrigin: 'http://localhost:3050', loopback: false, next: '/x' };
+
+    it('seals the member resolved from the viewer, never anything else', async () => {
+      mocks.resolveMember.mockReturnValue({ member_id: 'owner', status: 'active' });
+      mocks.startLink.mockResolvedValue({ ok: true, location: 'https://idp/a', setCookies: ['c'] });
+      const result = await startIdentityLinkForViewer(viewer, request);
+      expect(result).toEqual({ ok: true, location: 'https://idp/a', setCookies: ['c'] });
+      expect(mocks.startLink).toHaveBeenCalledWith({
+        surfaceId: 'concierge',
+        requestOrigin: request.requestOrigin,
+        loopback: false,
+        linkMemberId: 'owner',
+        next: '/x',
+      });
+    });
+
+    it('refuses a viewer without an active member', async () => {
+      mocks.resolveMember.mockReturnValue({ member_id: 'owner', status: 'suspended' });
+      expect(await startIdentityLinkForViewer(viewer, request)).toMatchObject({
+        ok: false,
+        status: 403,
+        error: 'member_required',
+      });
+      mocks.resolveMember.mockReturnValue(null);
+      expect(await startIdentityLinkForViewer(viewer, request)).toMatchObject({ status: 403 });
+      expect(mocks.startLink).not.toHaveBeenCalled();
+    });
+
+    it('reports missing SSO settings distinctly', async () => {
+      mocks.resolveMember.mockReturnValue({ member_id: 'owner', status: 'active' });
+      mocks.startLink.mockResolvedValue({ ok: false, view: { kind: 'unconfigured', missing: [] } });
+      expect(await startIdentityLinkForViewer(viewer, request)).toMatchObject({
+        status: 409,
+        error: 'sso_not_configured',
+      });
     });
   });
 
