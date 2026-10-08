@@ -1,7 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
-import { resolveTickDeadlineMs } from './run_generation_schedule_daemon.js';
+import {
+  resolveTickDeadlineMs,
+  runTickAndReport,
+  type TickReportDeps,
+} from './run_generation_schedule_daemon.js';
 
 describe('run_generation_schedule_daemon', () => {
   it('delegates fatal exit handling to the shared script harness', () => {
@@ -39,5 +43,37 @@ describe('resolveTickDeadlineMs (G10)', () => {
     expect(source).toContain('awaitChildWithDeadline(child');
     expect(source).toContain('currentChild?.kill(signal)');
     expect(source).toContain('`${DAEMON_ID}:tick-timeout`');
+  });
+});
+
+describe('runTickAndReport (G10 review)', () => {
+  function deps(shuttingDown: boolean) {
+    return {
+      runTick: vi.fn(async () => {
+        throw new Error(
+          'generation schedule daemon tick failed with exit code null (signal SIGTERM)'
+        );
+      }),
+      isShuttingDown: () => shuttingDown,
+      recordHeartbeat: vi.fn<TickReportDeps['recordHeartbeat']>(),
+      sendAlert: vi.fn<TickReportDeps['sendAlert']>(),
+    };
+  }
+
+  it('treats a child killed by the shutdown signal as a cancellation: no error heartbeat, no alert', async () => {
+    const d = deps(true);
+    await runTickAndReport(d);
+    expect(d.sendAlert).not.toHaveBeenCalled();
+    expect(d.recordHeartbeat).toHaveBeenCalledTimes(1);
+    expect(d.recordHeartbeat.mock.calls[0][1]).toMatchObject({ status: 'running' });
+  });
+
+  it('still records an error heartbeat and alerts for a failure outside shutdown', async () => {
+    const d = deps(false);
+    await runTickAndReport(d);
+    expect(d.recordHeartbeat.mock.calls.map((c) => c[1]?.status)).toEqual(['running', 'error']);
+    expect(d.sendAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ dedupe_key: 'generation-schedule-daemon:tick-failed' })
+    );
   });
 });

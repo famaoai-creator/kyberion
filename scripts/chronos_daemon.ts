@@ -54,7 +54,13 @@ import type { ChronosDeliveryTarget } from '@agent/core/chronos-delivery';
 import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 import { runSteps } from './run_pipeline.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { installGracefulShutdown, startSerialTickLoop } from './lib/daemon-loop.js';
+import {
+  installGracefulShutdown,
+  startSerialTickLoop,
+  type ImmediateExitRequest,
+  type SerialTickStopOutcome,
+  type ShutdownSignal,
+} from './lib/daemon-loop.js';
 
 const TICK_INTERVAL_MS = 60_000;
 /** Bound on waiting for an in-flight tick during SIGTERM/SIGINT shutdown. */
@@ -716,6 +722,39 @@ async function tick(): Promise<void> {
   }
 }
 
+export interface ChronosShutdownDeps {
+  stopLoop: (graceMs: number) => Promise<SerialTickStopOutcome>;
+  stopSampler: () => void;
+  releaseLease: () => void;
+  recordHeartbeat: (details: Record<string, unknown>) => void;
+  graceMs?: number;
+}
+
+/**
+ * SIGTERM/SIGINT routine. When the in-flight tick drained (or none ran) the
+ * lease is already free and the process exits normally. When the tick timed
+ * out it is abandoned but still running: the lease is released only as the
+ * very last step before a synchronous exit, so no second chronos can take the
+ * lease while this process may still execute scheduled work.
+ */
+export function createChronosShutdown(deps: ChronosShutdownDeps) {
+  const graceMs = deps.graceMs ?? SHUTDOWN_GRACE_MS;
+  return async (signal: ShutdownSignal): Promise<void | ImmediateExitRequest> => {
+    deps.stopSampler();
+    const inFlightTick = await deps.stopLoop(graceMs);
+    deps.recordHeartbeat({ state: 'stopped', signal, in_flight_tick: inFlightTick });
+    if (inFlightTick === 'timed_out') {
+      logger.warn(
+        `[CHRONOS] in-flight tick did not settle within ${graceMs}ms — abandoning it and exiting now | next: check the scheduled run state and rerun it if needed | evidence: ${signal}`
+      );
+      return { exitImmediately: true, beforeExit: deps.releaseLease };
+    }
+    // Defensive: withLock already released the lease when the tick settled.
+    deps.releaseLease();
+    logger.info(`[CHRONOS] Stopped (${signal}, in-flight tick: ${inFlightTick}).`);
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
@@ -752,23 +791,13 @@ async function main(_args: string[] = []): Promise<void> {
   });
   installGracefulShutdown({
     name: 'chronos-daemon',
-    shutdown: async (signal) => {
-      clearInterval(runtimeHealthSampler);
-      const inFlightTick = await loop.stop(SHUTDOWN_GRACE_MS);
-      if (inFlightTick === 'timed_out') {
-        logger.warn(
-          `[CHRONOS] in-flight tick did not settle within ${SHUTDOWN_GRACE_MS}ms — abandoning it | next: check the scheduled run state and rerun it if needed | evidence: ${signal}`
-        );
-      }
-      // withLock releases the lease when a tick settles; an abandoned tick
-      // would otherwise leave it held until stale-lock reclaim.
-      releaseTriggerLeaderLease('chronos-daemon');
-      recordDaemonHeartbeat('chronos-daemon', {
-        status: 'stopping',
-        details: { state: 'stopped', signal, in_flight_tick: inFlightTick },
-      });
-      logger.info(`[CHRONOS] Stopped (${signal}, in-flight tick: ${inFlightTick}).`);
-    },
+    shutdown: createChronosShutdown({
+      stopLoop: (graceMs) => loop.stop(graceMs),
+      stopSampler: () => clearInterval(runtimeHealthSampler),
+      releaseLease: () => releaseTriggerLeaderLease('chronos-daemon'),
+      recordHeartbeat: (details) =>
+        void recordDaemonHeartbeat('chronos-daemon', { status: 'stopping', details }),
+    }),
   });
 
   await loop.firstTick;
