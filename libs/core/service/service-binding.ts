@@ -28,7 +28,8 @@ export interface ServiceBinding {
 
 export function resolveServiceBinding(
   serviceId: string,
-  authMode: 'none' | 'secret-guard' | 'session' = 'none'
+  authMode: 'none' | 'secret-guard' | 'session' = 'none',
+  credentialKeys?: readonly CredentialSuffixKey[]
 ): ServiceBinding {
   if (authMode === 'none') {
     return { serviceId, authMode };
@@ -47,25 +48,27 @@ export function resolveServiceBinding(
   // Suffixes are catalog-governed (service-endpoints.schema.json defaults applied
   // on load); no hardcoded fallback literals live here.
   const suffixes = getServiceCredentialSuffixes(serviceId);
+  const selected = (key: CredentialSuffixKey): string[] =>
+    !credentialKeys || credentialKeys.includes(key) ? suffixes[key] || [] : [];
   const referenceOperation = 'service.binding';
   const referenceEntry = (key: string, candidates: string[]) => {
     const references = resolveServiceSecretReferences(serviceId, candidates, referenceOperation);
     return references.length > 0 ? { [key]: references } : {};
   };
   const secretReferences = {
-    ...referenceEntry('accessToken', suffixes.accessToken || []),
-    ...referenceEntry('appToken', suffixes.appToken || []),
-    ...referenceEntry('refreshToken', suffixes.refreshToken || []),
-    ...referenceEntry('clientId', suffixes.clientId || []),
-    ...referenceEntry('clientSecret', suffixes.clientSecret || []),
-    ...referenceEntry('redirectUri', suffixes.redirectUri || []),
+    ...referenceEntry('accessToken', selected('accessToken')),
+    ...referenceEntry('appToken', selected('appToken')),
+    ...referenceEntry('refreshToken', selected('refreshToken')),
+    ...referenceEntry('clientId', selected('clientId')),
+    ...referenceEntry('clientSecret', selected('clientSecret')),
+    ...referenceEntry('redirectUri', selected('redirectUri')),
   };
-  const accessToken = resolveServiceSecret(serviceId, suffixes.accessToken || []);
-  const appToken = resolveServiceSecret(serviceId, suffixes.appToken || []);
-  const refreshToken = resolveServiceSecret(serviceId, suffixes.refreshToken || []);
-  const clientId = resolveServiceSecret(serviceId, suffixes.clientId || []);
-  const clientSecret = resolveServiceSecret(serviceId, suffixes.clientSecret || []);
-  const redirectUri = resolveServiceSecret(serviceId, suffixes.redirectUri || []);
+  const accessToken = resolveServiceSecret(serviceId, selected('accessToken'));
+  const appToken = resolveServiceSecret(serviceId, selected('appToken'));
+  const refreshToken = resolveServiceSecret(serviceId, selected('refreshToken'));
+  const clientId = resolveServiceSecret(serviceId, selected('clientId'));
+  const clientSecret = resolveServiceSecret(serviceId, selected('clientSecret'));
+  const redirectUri = resolveServiceSecret(serviceId, selected('redirectUri'));
 
   if (!accessToken && !appToken && !refreshToken && !clientId && !clientSecret && !redirectUri) {
     throw new Error(`Access denied: no service binding secret found for "${serviceId}"`);
