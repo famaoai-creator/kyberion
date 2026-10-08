@@ -23,8 +23,16 @@ const mocks = vi.hoisted(() => ({
   safeWriteFile: vi.fn(),
   assertSafeRepositoryPath: vi.fn((candidate: string) => {
     const normalized = path.resolve(String(candidate));
+    // The shared metrics collector resolves its default dir through
+    // path-resolver, which maps `work/metrics` into the Vitest live sandbox
+    // (VITEST_LIVE_REPO_SUBTREES); allow that location, nothing else in-repo.
     const metricsPath = path.resolve('work/metrics');
-    if (normalized !== '/tmp' && !normalized.startsWith('/tmp/') && normalized !== metricsPath) {
+    const vitestLiveRoot = path.resolve('active/shared/runtime/vitest-live');
+    const isMetricsDir =
+      normalized === metricsPath ||
+      (normalized.startsWith(`${vitestLiveRoot}${path.sep}`) &&
+        normalized.endsWith(`${path.sep}repo${path.sep}work${path.sep}metrics`));
+    if (normalized !== '/tmp' && !normalized.startsWith('/tmp/') && !isMetricsDir) {
       throw new Error(
         `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${candidate}`
       );
