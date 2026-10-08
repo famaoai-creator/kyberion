@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
+import type { EventScopeInput } from './event-scope.js';
 import {
   MetricsCollector,
   RESOURCE_USAGE_LEDGER_ROOT,
@@ -460,7 +461,7 @@ describe('resource-usage ledger partitioning', () => {
   const partitionFile = (...segments: string[]) =>
     path.join(usageRoot, ...segments, 'resource-usage.jsonl');
   const collector = () => new MetricsCollector({ metricsDir, resourceUsageRoot: usageRoot });
-  const usage = (usageId: string, scope?: Record<string, string>) => ({
+  const usage = (usageId: string, scope?: EventScopeInput) => ({
     usage_id: usageId,
     resource_kind: 'llm' as const,
     mission_id: 'MSN-PARTITION-1',
@@ -469,7 +470,7 @@ describe('resource-usage ledger partitioning', () => {
     unit_cost_usd: 0.001,
     status: 'actual' as const,
     source: 'partition-test',
-    ...(scope ? { scope: scope as any } : {}),
+    ...(scope ? { scope } : {}),
   });
   const ids = (records: Array<{ usage_id: string }>) => records.map((r) => r.usage_id).sort();
   const read = (file: string) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '');
