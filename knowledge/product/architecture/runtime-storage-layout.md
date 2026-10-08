@@ -150,42 +150,65 @@ category-only text for tenant dots. One `storage-retention-catalog.json` entry
 covers `active/shared/runtime/dot`. See
 [resident-dot-model](./resident-dot-model.md).
 
-### Resource-usage ledger
+### Metrics ledgers (resource usage, execution metrics)
 
-Usage accounting (`MetricsCollector.recordResourceUsage`, `libs/core/metrics.ts`)
-is placed by the record's own `scope`; callers do not choose the file:
+Both ledgers of the shared `MetricsCollector` (`libs/core/metrics.ts`) place
+each row by the row's own `scope`; callers do not choose the file. Usage
+accounting (`recordResourceUsage`) and execution metrics (`record`: latency,
+tokens, cost per component call) share one mechanism:
 
-| Record scope                                      | Place                                                                             |
-| ------------------------------------------------- | --------------------------------------------------------------------------------- |
-| none, or `public` without a tenant (system)       | `work/metrics/resource-usage.jsonl` (legacy repo-wide file)                       |
-| carries a `tenant_slug`, or personal/confidential | `active/shared/runtime/usage-ledger/<tier>/<tenant\|shared>/resource-usage.jsonl` |
+| Record scope                                      | Resource usage                                                                    | Execution metrics                                                                         |
+| ------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| none, or `public` without a tenant (system)       | `work/metrics/resource-usage.jsonl` (legacy repo-wide file)                       | `work/metrics/execution-metrics.jsonl` (legacy repo-wide file; interventions too)         |
+| carries a `tenant_slug`, or personal/confidential | `active/shared/runtime/usage-ledger/<tier>/<tenant\|shared>/resource-usage.jsonl` | `active/shared/runtime/execution-metrics/<tier>/<tenant\|shared>/execution-metrics.jsonl` |
 
-- `loadResourceUsageHistory()` reads the system partition only;
+- Readers choose partitions with the same read scope
+  (`MetricsLedgerReadScope`): `loadResourceUsageHistory(read)` and
+  `loadHistory({ read })`. Omitted reads the system partition only;
   `{ scope }` reads one owner's partition (`includeSystem` adds the system
   one — the mission retrospective uses its mission's tier/tenant),
-  `{ tenants }` reads every tier partition of those tenants (tenant cost
-  report) and `{ all: true }` is the operator aggregate (cost report, HUD).
-- `usage-ledger/{personal,confidential}/` are `tenant_scope.protected_prefixes`:
+  `{ tenants }` reads every tier partition of those tenants (`includeSystem`
+  as above; tenant cost reports and tenant budgets add it for execution
+  metrics, whose unscoped rows are attributed by mission id) and
+  `{ all: true }` is the operator aggregate (cost report without a tenant
+  filter, terminal HUD, spend guard, health regressions, operator home).
+  `reportFromHistory(read)` / `detectRegressions(multiplier, read)` order the
+  merged rows by timestamp. Learning signals read the system partition only
+  (their clusters are tenant-free).
+- `<ledger>/{personal,confidential}/` are `tenant_scope.protected_prefixes`:
   tier-guard denies a tenant-bound process another tenant's partition on read
-  and write, so the operator aggregate skips what the caller may not see.
-- Rows written to the system file before partitioning stay there as
+  and write.
+- **Persona read gate.** A personal/confidential partition is readable only
+  by a persona/role/authority that may read `knowledge/personal/`
+  (resp. `knowledge/confidential/`): tier-guard reuses the knowledge tier's
+  decision (`personaTierReadDecision` — SUDO scope, authority, role and
+  persona grants, tier restriction) for the partition path, after the tenant
+  check. There is no separate persona table. Aggregate readers skip a denied
+  partition instead of failing and log a `debug` line in the diagnostic
+  format (`<ledger> partition skipped — … | next: … | evidence: <path>`).
+  Consequence: a process whose persona may not read a tier (e.g. a plain
+  `worker` without the `mission_controller` role) sees only the system
+  partition and the tiers it may read — including in the spend guard and
+  the budget governor.
+- Rows written to a system file before partitioning stay there as
   **legacy**: each reader filters them by the row's own scope, so a tenant
   reader still sees its own old rows and the system reader never sees tenant
   rows; in every read mode a legacy tier row also inherits tier-guard's read
-  decision for its partition, so a tenant-bound process never sees another
-  tenant's old rows. There is no split command — the file is not rewritten,
-  so nothing can be lost or duplicated by a half-run migration. The one
-  exception is tenant offboarding (`scope-offboarding.ts`): it exports the
-  tenant's legacy rows, then removes them with one atomic, audited,
-  approval-gated rewrite, and soft-deletes the tenant's partitions.
+  decision (tenant and persona) for its partition, so it is visible only
+  where its partition would be. There is no split command — the file is not
+  rewritten, so nothing can be lost or duplicated by a half-run migration.
+  The one exception is tenant offboarding (`scope-offboarding.ts`): for each
+  ledger it exports the tenant's legacy rows, then removes them with one
+  atomic, audited, approval-gated rewrite
+  (`SCOPE_OFFBOARD_USAGE_LEDGER_PRUNE` / `SCOPE_OFFBOARD_EXECUTION_METRICS_PRUNE`),
+  and exports + soft-deletes the tenant's partitions.
 - A tenant-bound process that records a personal/confidential row without a
   tenant gets its bound tenant stamped on (a bound process may not write
   `<tier>/shared/`). A row that still cannot be written is logged at warn,
   never dropped silently.
-- Persona tier gating is unchanged: like the old shared file, the partitions
-  carry no persona read gate of their own, so an unbound process of any
-  persona can read confidential usage rows. Only the tenant binding narrows
-  access.
+- An execution-metrics row without a `scope` stays in the system file even
+  when it carries a tenant mission's `mission_id`: placement follows the
+  row's scope only, as for usage rows.
 
 ## 3. Surface visibility
 
