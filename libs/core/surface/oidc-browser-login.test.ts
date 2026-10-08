@@ -15,9 +15,11 @@ import {
 import {
   handleSurfaceAuthRoute,
   resetSurfaceAuthRateLimitForTests,
+  startSurfaceIdentityLink,
 } from './surface-auth-routes.js';
 import { mintBrowserSessionToken, verifyBrowserSessionToken } from '../authn-providers.js';
 import { resolveAuthnPrincipal } from '../authn-principal-resolver.js';
+import { readMemberProfile } from '../organization/member-registry.js';
 import {
   SURFACE_SESSION_COOKIE,
   extractSurfaceSessionToken,
@@ -132,7 +134,7 @@ function baseEnv(extra: Record<string, string> = {}): Record<string, string> {
 async function runLogin(
   deps: OidcLoginDeps,
   idp: ReturnType<typeof makeIdp>,
-  options: { next?: string; tamperState?: boolean } = {}
+  options: { next?: string; tamperState?: boolean; linkMemberId?: string } = {}
 ) {
   const started = await startOidcLogin(
     {
@@ -140,6 +142,7 @@ async function runLogin(
       requestOrigin: 'https://desk.example.com',
       loopback: false,
       next: options.next,
+      linkMemberId: options.linkMemberId,
     },
     deps
   );
@@ -340,6 +343,104 @@ describe('OIDC browser login (mock IdP)', () => {
       ok: false,
       status: 403,
       view: { kind: 'unbound', issuer: ISSUER, subject: 'idp-subject-1' },
+    });
+  });
+
+  describe('self-link (linkMemberId sealed into the transaction)', () => {
+    const linkDeps = (audit = vi.fn()): OidcLoginDeps => ({
+      env: baseEnv(),
+      memberRegistry: { rootDir: memberRoot },
+      audit,
+    });
+    const seedOther = (identity: { issuer: string; subject: string }) =>
+      safeWriteFile(
+        `${memberRoot}/knowledge/personal/members/dave.json`,
+        JSON.stringify({
+          member_id: 'dave',
+          display_name: 'Dave',
+          status: 'active',
+          memberships: [],
+          access_registrations: [],
+          external_identities: [identity],
+          created_at: '2026-09-30T00:00:00.000Z',
+          updated_at: '2026-09-30T00:00:00.000Z',
+        })
+      );
+
+    it('binds an unbound identity to the sealed member and signs it in', async () => {
+      seedMember(null);
+      const idp = makeIdp();
+      const audit = vi.fn();
+      const { result } = await runLogin({ ...linkDeps(audit), fetchJson: idp.fetchJson }, idp, {
+        linkMemberId: 'carol',
+      });
+      expect(result).toMatchObject({ ok: true, memberId: 'carol', linked: true });
+      expect(readMemberProfile('carol', { rootDir: memberRoot })?.external_identities).toEqual([
+        { issuer: ISSUER, subject: 'idp-subject-1' },
+      ]);
+      const events = audit.mock.calls.map(([event]) => event);
+      expect(events).toContainEqual(
+        expect.objectContaining({ metadata: { link_member_id: 'carol' } })
+      );
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          result: 'completed',
+          metadata: expect.objectContaining({ member_id: 'carol', linked: true }),
+        })
+      );
+      expect(JSON.stringify(events)).not.toContain('idp-subject-1');
+    });
+
+    it('signs in normally when the identity is already bound to the same member', async () => {
+      seedMember({ issuer: ISSUER, subject: 'idp-subject-1' });
+      const idp = makeIdp();
+      const { result } = await runLogin({ ...linkDeps(), fetchJson: idp.fetchJson }, idp, {
+        linkMemberId: 'carol',
+      });
+      expect(result).toMatchObject({ ok: true, memberId: 'carol' });
+      expect(result).not.toHaveProperty('linked');
+    });
+
+    it('refuses (no session) when the identity belongs to another member', async () => {
+      seedMember(null);
+      seedOther({ issuer: ISSUER, subject: 'idp-subject-1' });
+      const idp = makeIdp();
+      const { result } = await runLogin({ ...linkDeps(), fetchJson: idp.fetchJson }, idp, {
+        linkMemberId: 'carol',
+      });
+      expect(result).toMatchObject({ ok: false, view: { kind: 'failed', code: 'link_failed' } });
+      expect(readMemberProfile('carol', { rootDir: memberRoot })?.external_identities).toEqual([]);
+    });
+
+    it('refuses to link to a suspended or missing member', async () => {
+      seedMember(null, 'suspended');
+      const idp = makeIdp();
+      const suspended = await runLogin({ ...linkDeps(), fetchJson: idp.fetchJson }, idp, {
+        linkMemberId: 'carol',
+      });
+      expect(suspended.result).toMatchObject({
+        ok: false,
+        view: { kind: 'failed', code: 'link_failed' },
+      });
+      expect(readMemberProfile('carol', { rootDir: memberRoot })?.external_identities).toEqual([]);
+      const other = makeIdp();
+      const missing = await runLogin({ ...linkDeps(), fetchJson: other.fetchJson }, other, {
+        linkMemberId: 'nobody',
+      });
+      expect(missing.result).toMatchObject({ ok: false, view: { code: 'link_failed' } });
+    });
+
+    it('rejects an invalid link member id at start', async () => {
+      const started = await startOidcLogin(
+        {
+          surfaceId: 'concierge',
+          requestOrigin: 'https://desk.example.com',
+          loopback: false,
+          linkMemberId: 'ext-abc',
+        },
+        { env: baseEnv(), fetchJson: makeIdp().fetchJson }
+      );
+      expect(started).toMatchObject({ ok: false, view: { kind: 'failed', code: 'link_failed' } });
     });
   });
 
@@ -557,6 +658,61 @@ describe('handleSurfaceAuthRoute', () => {
     expect(
       callback!.setCookies.some((c) => c.includes('Max-Age=0') && c.startsWith('kyberion_oidc_tx_'))
     ).toBe(true);
+  });
+
+  it('self-link: startSurfaceIdentityLink → callback binds through the injected writer', async () => {
+    seedMember(null);
+    const idp = makeIdp();
+    const linkIdentity = vi.fn(
+      (memberId: string, identity: { issuer: string; subject: string }) => {
+        const member = readMemberProfile(memberId, { rootDir: memberRoot })!;
+        safeWriteFile(
+          `${memberRoot}/knowledge/personal/members/${memberId}.json`,
+          JSON.stringify({ ...member, external_identities: [identity] })
+        );
+      }
+    );
+    const deps: OidcLoginDeps = {
+      env: baseEnv(),
+      fetchJson: idp.fetchJson,
+      memberRegistry: { rootDir: memberRoot },
+      linkIdentity,
+    };
+    const start = await startSurfaceIdentityLink(
+      {
+        surfaceId: 'concierge',
+        requestOrigin: 'https://desk.example.com',
+        loopback: false,
+        linkMemberId: 'carol',
+        next: '/setup/sso?linked=1',
+      },
+      deps
+    );
+    if (start.ok === false) throw new Error('link start failed');
+    const txCookie = start.setCookies[0]!;
+    expect(txCookie).toContain('HttpOnly');
+    expect(txCookie).toContain('Secure');
+    expect(txCookie).toContain('SameSite=Lax');
+    const authorize = new URL(start.location);
+    idp.state.nonceFor.set('code-l', authorize.searchParams.get('nonce') ?? '');
+    const callback = await handleSurfaceAuthRoute(
+      req({
+        pathname: '/auth/callback',
+        searchParams: new URLSearchParams({
+          code: 'code-l',
+          state: authorize.searchParams.get('state') ?? '',
+        }),
+        cookieHeader: txCookie.split(';')[0]!,
+      }),
+      deps
+    );
+    expect(callback?.status).toBe(302);
+    expect(callback?.headers.Location).toBe('/setup/sso?linked=1');
+    expect(linkIdentity).toHaveBeenCalledWith('carol', {
+      issuer: ISSUER,
+      subject: 'idp-subject-1',
+    });
+    expect(callback!.setCookies.some((c) => c.startsWith(`${SURFACE_SESSION_COOKIE}=`))).toBe(true);
   });
 
   it('unbound and suspended screens offer a way out and tell the admin where to bind', async () => {

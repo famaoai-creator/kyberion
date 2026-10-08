@@ -37,7 +37,8 @@ export type SurfaceLoginFailureCode =
   | 'session_unavailable'
   | 'method_not_allowed'
   | 'rate_limited'
-  | 'logout_blocked';
+  | 'logout_blocked'
+  | 'link_failed';
 
 export function resolveLoginLocale(
   query: string | null | undefined,
@@ -87,6 +88,7 @@ const FAILURE_KEYS: Record<SurfaceLoginFailureCode, VocabularyKey> = {
   method_not_allowed: 'surface_login:failed_method_not_allowed',
   rate_limited: 'surface_login:failed_rate_limited',
   logout_blocked: 'surface_login:failed_logout_blocked',
+  link_failed: 'surface_login:failed_link_failed',
 };
 
 function tokenLink(href: string | undefined, label: string): string {
