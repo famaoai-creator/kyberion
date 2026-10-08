@@ -38,6 +38,7 @@ import {
   safeReadFile,
 } from '../secure-io.js';
 import { appendJsonLine, readJsonIfPresent, readJsonLines, writeJson } from '../foundation/json.js';
+import { readJsonLinesCached } from '../jsonl-tail.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { getZonedDateParts, matchesCron } from '../pipeline/cron-utils.js';
 import { recordDaemonHeartbeat } from '../daemon-heartbeat.js';
@@ -270,10 +271,17 @@ function runtimePath(rootDir: string | undefined, rel: string): string {
   return path.join(rootDir ?? pathResolver.rootDir(), rel);
 }
 
+/**
+ * The wake ledger is load-bearing history (a delivered/rejected key stays
+ * consumed forever), so it is never truncated; instead every hot-path read —
+ * due-ness, the circuit, and the per-skip dedupe in
+ * {@link recordDotWakeOutcome} — goes through a per-process incremental
+ * replay that parses only the rows appended since the previous call (G01).
+ */
 export function readDotWakeLedger(deps: DotRuntimeDeps = {}): DotWakeLedgerEntry[] {
-  return readJsonLines<DotWakeLedgerEntry>(runtimePath(deps.rootDir, DOT_WAKE_LEDGER_PATH), {
-    onMalformed: 'skip',
-  }).filter((row) => typeof row?.dot_id === 'string' && typeof row?.trigger_key === 'string');
+  return readJsonLinesCached<DotWakeLedgerEntry>(
+    runtimePath(deps.rootDir, DOT_WAKE_LEDGER_PATH)
+  ).filter((row) => typeof row?.dot_id === 'string' && typeof row?.trigger_key === 'string');
 }
 
 function appendJsonlEnsured(rel: string, value: unknown, deps: DotRuntimeDeps): void {
@@ -348,12 +356,14 @@ export function recordDotTokenUsage(
   );
 }
 
-/** Tokens accrued by this dot today (UTC day bucket), across all processes. */
+/**
+ * Tokens accrued by this dot today (UTC day bucket), across all processes.
+ * Incremental replay (G01): a call parses only usage rows appended since the
+ * previous call in this process, not the whole history.
+ */
 export function dotTokensUsedToday(dotId: string, deps: DotRuntimeDeps = {}): number {
   const day = (deps.now?.() ?? new Date()).toISOString().slice(0, 10);
-  return readJsonLines<DotTokenUsageEntry>(runtimePath(deps.rootDir, DOT_TOKEN_USAGE_PATH), {
-    onMalformed: 'skip',
-  })
+  return readJsonLinesCached<DotTokenUsageEntry>(runtimePath(deps.rootDir, DOT_TOKEN_USAGE_PATH))
     .filter((row) => row?.dot_id === dotId && row?.day === day)
     .reduce((sum, row) => sum + (Number(row.tokens) || 0), 0);
 }
