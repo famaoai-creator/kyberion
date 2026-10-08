@@ -114,7 +114,7 @@ describe('RN-01 role assumption trace', () => {
     process.env[DELEGATED_ROLE_ENV] = 'sovereign_concierge@concierge';
     expect(resolveRole()).toBe('sovereign_concierge');
     expect(resolveRole()).toBe('sovereign_concierge');
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
       // The delegation is snapshotted: a later env write changes nothing...
       process.env[DELEGATED_ROLE_ENV] = 'chronos_localadmin@concierge';
@@ -146,7 +146,7 @@ describe('RN-01 role assumption trace', () => {
   });
 
   it('only accepts a .jsonl file in a dedicated trace directory (S5)', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
       expect(resolveRoleAssumptionTracePath('knowledge/public/trace.jsonl')).toBeNull();
       expect(resolveRoleAssumptionTracePath('../outside/trace.jsonl')).toBeNull();
@@ -168,7 +168,7 @@ describe('RN-01 role assumption trace', () => {
   });
 
   it('refuses a trace path that goes through a symbolic link (S5)', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     const dir = path.dirname(traceFile);
     try {
       safeMkdir(path.join(dir, 'real'), { recursive: true });
@@ -186,7 +186,7 @@ describe('RN-01 role assumption trace', () => {
   it('never changes a decision when the trace write fails (S6)', () => {
     process.env[ROLE_ASSUMPTION_TRACE_ENV] = relativeTrace;
     process.env.SYSTEM_ROLE = 'computer_surface';
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     const original = getFoundationIo();
     registerFoundationIo({
       ...original,
@@ -214,8 +214,8 @@ describe('RN-01 role assumption trace', () => {
     // Rejecting the path warns; a warn that throws must not escape either.
     process.env[ROLE_ASSUMPTION_TRACE_ENV] = 'knowledge/public/trace.jsonl';
     process.env.SYSTEM_ROLE = 'computer_surface';
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {
-      throw new Error('console exploded');
+    const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => {
+      throw new Error('stderr exploded');
     });
     try {
       expect(withExecutionContext('infrastructure_sentinel', () => 'ran')).toBe('ran');
