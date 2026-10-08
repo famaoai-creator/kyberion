@@ -377,13 +377,13 @@ export class MetricsCollector {
     this._persist = options.persist !== false;
     this._memoryBudgetMB = options.memoryBudgetMB || DEFAULT_MEMORY_BUDGET_MB;
     this._resourceUsageFile = options.resourceUsageFile || DEFAULT_RESOURCE_USAGE_FILE;
-    this._resourceUsageRoot = assertSafeRepositoryPath(
+    // Not asserted here: the shared collector is built at import time, and
+    // every partition path is asserted when it is read or written.
+    this._resourceUsageRoot =
       options.resourceUsageRoot ||
-        (options.metricsDir
-          ? path.join(this._metricsDir, 'usage-partitions')
-          : pathResolver.shared('runtime/usage-ledger')),
-      { allowMissingLeaf: true }
-    );
+      (options.metricsDir
+        ? path.join(this._metricsDir, 'usage-partitions')
+        : pathResolver.shared('runtime/usage-ledger'));
     this._costRegistry = options.costRegistry;
     this._aggregates = new Map();
   }
