@@ -10,6 +10,8 @@ describe('ux-vocabulary', () => {
   it('renders mission statuses through the shared vocabulary catalog', () => {
     expect(renderStatus('mission', 'blocked', 'ja')).toBe('停止中');
     expect(renderStatus('mission', 'planned', 'en')).toBe('planned');
+    expect(renderStatus('mission', 'validating', 'ja')).toBe('検証中');
+    expect(renderStatus('mission', 'validating', 'en')).toBe('validating');
   });
 
   it('renders progress statuses through the shared vocabulary catalog', () => {
