@@ -12,8 +12,8 @@ area, and the automated check that enforces the rule. A defect class that recurs
 was missing or unenforced. Fix the defect, then extend this runbook or its gate in the same PR.
 
 **Audience.** Anyone (human or agent) who changes CI workflows, runtime stores, daemons, child
-processes, library logging, tests, tenant-scoped facades, LLM/provider calls, or generators that
-write mission evidence.
+processes, library logging, tests, tenant-scoped facades, LLM/provider calls, generators that
+write mission evidence, or project lifecycle commands.
 
 **Origin.** MSN-OPS-GAPS-20261008 (organization `kyberion-ops`, project `PRJ-OPS-IMPROVEMENT`).
 That mission closed 16 gaps from the 2026-10-08 operations survey. Several had been fixed before and
@@ -29,6 +29,7 @@ had regressed.
 | Tenant scope and facade env   | `tier-guard-tenant` tests, facade binding tests                    | §6      |
 | LLM / provider calls          | per-call-site egress tests (e.g. `mission-distill-egress.test.ts`) | §7      |
 | Mission evidence overwrites   | generator path tests (e.g. `mission-retrospective.test.ts`)        | §8      |
+| Project lifecycle facades     | lifecycle regressions in `project-management.test.ts`              | §9      |
 
 ---
 
@@ -310,18 +311,7 @@ step) get their own file names.
 
 ---
 
-## Maintenance
-
-When a defect class not listed here recurs:
-
-1. Add a section with the rule, the procedure, and the gate or test that enforces it.
-2. Link the section from [kyberion-development-practices](./kyberion-development-practices.md) and
-   the pre-PR checklist.
-3. Record the incident in the mission's retrospective.
-
-A rule without an enforcing check is a candidate for the next gate.
-
-## §7 Project lifecycle facade parity
+## §9 Project lifecycle facade parity
 
 **Rule.** Dedicated lifecycle commands and generic status updates must execute the
 same guarded facade. Archive checks live missions, task sessions and unfinished
@@ -336,3 +326,16 @@ restore archived records.
 **Gate.** Run the focused lifecycle regressions in
 `libs/core/project/project-management.test.ts` and build core plus the repo CLI.
 These cover archive entry-point parity, restore, and track state/projection changes.
+
+---
+
+## Maintenance
+
+When a defect class not listed here recurs:
+
+1. Add a section with the rule, the procedure, and the gate or test that enforces it.
+2. Link the section from [kyberion-development-practices](./kyberion-development-practices.md) and
+   the pre-PR checklist.
+3. Record the incident in the mission's retrospective.
+
+A rule without an enforcing check is a candidate for the next gate.
