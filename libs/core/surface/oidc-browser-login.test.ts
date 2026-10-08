@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile, safeExistsSync } from '../secure-io.js';
@@ -23,6 +23,11 @@ import {
   extractSurfaceSessionToken,
   parseCookieHeader,
 } from './surface-session-cookie.js';
+
+// Hermetic: never read the checkout's real connection documents (session key, SSO settings).
+vi.mock('../secret/secret-guard.js', () => ({
+  secretGuard: { loadConnectionDocument: () => ({}) },
+}));
 
 const ISSUER = 'https://idp.example.com';
 const CLIENT_ID = 'kyberion-client';
@@ -171,6 +176,35 @@ describe('resolveOidcLoginConfig', () => {
       'KYBERION_OIDC_CLIENT_ID',
       'KYBERION_SESSION_SECRET (>= 32 bytes)',
     ]);
+  });
+
+  it('falls back to stored settings only when the environment sets neither issuer nor client id', () => {
+    const stored = {
+      issuer: 'https://idp.stored.example',
+      client_id: 'stored-client',
+      client_secret: 'stored-secret',
+      provider_label: 'Stored IdP',
+      public_base_url: 'https://desk.stored.example',
+    };
+    const sessionOnly = { KYBERION_SESSION_SECRET: baseEnv().KYBERION_SESSION_SECRET };
+    const fromStore = resolveOidcLoginConfig({ env: sessionOnly, storedSettings: () => stored });
+    expect(fromStore.config).toMatchObject({
+      issuer: 'https://idp.stored.example',
+      clientId: 'stored-client',
+      clientSecret: 'stored-secret',
+      providerLabel: 'Stored IdP',
+      scopes: 'openid',
+      publicBaseUrl: 'https://desk.stored.example',
+    });
+    // Environment wins as a whole set: a stored secret never mixes in.
+    const fromEnv = resolveOidcLoginConfig({
+      env: { ...sessionOnly, KYBERION_OIDC_ISSUER: ISSUER },
+      storedSettings: () => stored,
+    });
+    expect(fromEnv.config).toBeNull();
+    expect(fromEnv.missing).toEqual(['KYBERION_OIDC_CLIENT_ID']);
+    // An injected env without a stored lookup stays hermetic.
+    expect(resolveOidcLoginConfig({ env: sessionOnly }).config).toBeNull();
   });
 
   it('requires a declared public origin off loopback and never trusts Host there', () => {
@@ -453,6 +487,19 @@ describe('handleSurfaceAuthRoute', () => {
     expect(res?.headers['Content-Type']).toContain('text/html');
     expect(res?.body).toContain('KYBERION_OIDC_ISSUER');
     expect(res?.headers['Content-Security-Policy']).toContain("default-src 'none'");
+    expect(res?.body).not.toContain('/setup/first-run');
+  });
+
+  it('offers first-run setup only when the adapter says it is open', async () => {
+    const unconfigured = await handleSurfaceAuthRoute(
+      req({ firstRunSetupHref: '/setup/first-run' }),
+      { env: {} }
+    );
+    expect(unconfigured?.body).toContain('href="/setup/first-run"');
+    const ready = await handleSurfaceAuthRoute(req({ firstRunSetupHref: '/setup/first-run' }), {
+      env: baseEnv(),
+    });
+    expect(ready?.body).toContain('href="/setup/first-run"');
   });
 
   it('renders the sign-in button with a safe next and localizes to Japanese', async () => {

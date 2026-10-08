@@ -1,0 +1,6 @@
+---
+category: Added
+---
+
+- **First-run setup from Concierge** — before any owner can sign in from a browser, `pnpm organization first-run code` issues a one-time setup code (hashed at rest, 30-minute default, five failed attempts, single use) and prints `http://localhost:3050/setup/first-run#code=…`. The page creates the tenant and the owner member, issues an owner-bound access token shown exactly once (the tab is signed in with it), and then closes for good. It stays closed wherever an owner already holds a token or a bound IdP identity. The `/login` screen links to it while it is open. See [SURFACE_FIRST_RUN_SETUP_PLAN](docs/developer/improvement-plans-2026-10/SURFACE_FIRST_RUN_SETUP_PLAN_2026-10-09.ja.md).
+- **SSO settings without environment variables** — an owner of every tenant can save the OIDC issuer, client id, client secret, button label and public URL from Concierge (`/setup/sso`, `PUT /api/setup/oidc`). They are stored in secret-guard (`kyberion-oidc`), the browser-session signing key is generated when missing, and every surface picks them up without a restart. `KYBERION_OIDC_ISSUER` / `KYBERION_OIDC_CLIENT_ID` in the environment still take precedence as a whole set. The client secret is never returned.
