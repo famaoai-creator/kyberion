@@ -2206,6 +2206,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/organization_identity.ts#runOrganizationIdentity",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/organization_member.ts#runOrganizationMember",
       "roles": ["sovereign_concierge"],
       "unresolved": []
