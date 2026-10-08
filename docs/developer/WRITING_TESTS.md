@@ -20,12 +20,12 @@ pnpm vitest run                                    # everything (slow; see "Afte
 
 Pick the first option that fits:
 
-| You need…                                        | Use                                                                                        |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| A scratch file or directory                      | `pathResolver.sharedTmp('<suite>-<pid>/…')`, removed in `afterEach`/`afterAll`             |
-| To exercise a store (outbox, audit, sessions, …) | The store's own API, or `pathResolver.shared('…')` for the path — the sandbox handles it   |
-| A whole isolated repository root                 | A fixture root: temp dir + `KYBERION_ROOT`, then `vi.resetModules()` and import the module |
-| A fixture mission                                | A fixture root, or clean up the mission directory in `afterAll` (see below)                |
+| You need…                                        | Use                                                                                      |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| A scratch file or directory                      | `pathResolver.sharedTmp('<suite>-<pid>/…')`, removed in `afterEach`/`afterAll`           |
+| To exercise a store (outbox, audit, sessions, …) | The store's own API, or `pathResolver.shared('…')` for the path — the sandbox handles it |
+| A whole isolated repository root                 | A fixture root: temp dir + `KYBERION_ROOT`, then import the module once in `beforeAll`   |
+| A fixture mission                                | A fixture root, or clean up the mission directory in `afterAll` (see below)              |
 
 ### The Vitest sandbox (`vitest-live`)
 
@@ -58,22 +58,31 @@ The sandbox is skipped when the project root is not the checkout that contains t
 
 Use a fixture root when the code under test reads repository data you want to control: schemas, governance JSON, a tenant registry.
 
+Set the environment first, then import the module once per file in `beforeAll`. `path-resolver` reads `KYBERION_ROOT` at import time, and each test file already starts with a fresh module registry. Reset per-test state through the module's own reset hooks in `beforeEach`, not by re-importing:
+
 ```ts
-beforeEach(() => {
-  tmpRoot = path.join(os.tmpdir(), `kyberion-thing-${randomUUID()}`);
-  fs.mkdirSync(tmpRoot, { recursive: true });
+let thing: typeof import('./thing.js');
+
+beforeAll(async () => {
+  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-thing-'));
   fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}'); // marks it as a project root
   // copy only the knowledge/ files the module needs
   process.env.KYBERION_ROOT = tmpRoot;
-  vi.resetModules(); // path-resolver reads KYBERION_ROOT at import time
+  thing = await import('./thing.js'); // after KYBERION_ROOT is set
 });
-afterEach(() => {
+beforeEach(() => {
+  thing.resetThingCacheForTests(); // the module's own reset hook
+  // rewrite the fixture files the test reads
+});
+afterAll(() => {
   delete process.env.KYBERION_ROOT;
   fs.rmSync(tmpRoot, { recursive: true, force: true });
 });
 ```
 
-`libs/core/deliverable-inbox.test.ts` and `scripts/virtual_office.test.ts` are working examples.
+Do not call `vi.resetModules()` and re-import the secure-io / tier-guard / authority stack in every test. Each re-import repeats that stack's module initialisation, and the pattern has crashed macOS Vitest workers ([operations-hygiene-runbook §5](../../knowledge/product/governance/operations-hygiene-runbook.md#5-tests-pollution-and-host-dependencies)). Use `vi.resetModules()` only when a test needs a fresh instance, for example after `vi.doMock`.
+
+`libs/core/stimuli-journal-rotation-role.test.ts` and `scripts/virtual_office.test.ts` are working examples.
 
 ### Fixture missions in the live tree
 

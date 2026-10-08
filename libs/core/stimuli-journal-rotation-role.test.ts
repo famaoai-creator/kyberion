@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 /**
  * SB-01: under SYSTEM_ROLE=slack_bridge an in-process assumption of another
@@ -32,16 +32,24 @@ function journalPath(): string {
   return path.join(root, JOURNAL_RELATIVE);
 }
 
-async function loadModules() {
-  vi.resetModules();
-  const authority = await import('./authority.js');
-  const journal = await import('./stimuli-journal.js');
-  authority.resetRoleAssumptionPolicyCache();
-  return { authority, journal };
-}
+type AuthorityModule = typeof import('./authority.js');
+type JournalModule = typeof import('./stimuli-journal.js');
+type JsonModule = typeof import('./foundation/json.js');
+type SensorModule = typeof import('./sensor-engine.js');
+
+// Imported ONCE per file, after KYBERION_ROOT / SYSTEM_ROLE are set:
+// path-resolver caches the project root and stimuli-journal its path at import
+// time. Re-importing the secure-io / tier-guard / authority stack per test with
+// vi.resetModules() re-ran all of its module-level initialisation every test and
+// coincided with intermittent macOS Vitest worker SIGSEGVs (#989, #990). Per-test
+// state is reset through the modules' own seams instead (see beforeEach).
+let authority: AuthorityModule;
+let journal: JournalModule;
+let json: JsonModule;
+let sensorEngine: SensorModule;
 
 describe('SB-01 stimuli-journal rotation under SYSTEM_ROLE=slack_bridge', () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-stimuli-rotation-'));
     fs.writeFileSync(path.join(root, 'package.json'), '{"name":"hermetic"}\n');
     fs.writeFileSync(path.join(root, 'AGENTS.md'), '# hermetic\n');
@@ -54,39 +62,44 @@ describe('SB-01 stimuli-journal rotation under SYSTEM_ROLE=slack_bridge', () => 
         { recursive: true }
       );
     }
-  });
-
-  afterAll(() => {
-    if (root) fs.rmSync(root, { recursive: true, force: true });
-  });
-
-  beforeEach(() => {
     for (const key of ENV_KEYS) {
       original[key] = process.env[key];
       delete process.env[key];
     }
     process.env.KYBERION_ROOT = root;
     process.env.SYSTEM_ROLE = 'slack_bridge';
-    fs.writeFileSync(journalPath(), journalLines(20));
+    // Each test file gets a fresh module registry (isolate: true) and the
+    // setup file imports no core module, so this first import binds the root.
+    authority = await import('./authority.js');
+    journal = await import('./stimuli-journal.js');
+    json = await import('./foundation/json.js');
+    sensorEngine = await import('./sensor-engine.js');
   });
 
-  afterEach(() => {
+  afterAll(() => {
     for (const key of ENV_KEYS) {
       if (original[key] === undefined) delete process.env[key];
       else process.env[key] = original[key];
     }
-    vi.resetModules();
+    if (root) fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  beforeEach(() => {
+    // Per-test isolation: no test may inherit a role/persona left by another;
+    // afterAll restores the values saved in beforeAll.
+    delete process.env.MISSION_ROLE;
+    delete process.env.KYBERION_PERSONA;
+    authority.resetRoleAssumptionPolicyCache();
+    fs.writeFileSync(journalPath(), journalLines(20));
   });
 
   it('rotates under the ambient slack_bridge role', async () => {
-    const { journal } = await loadModules();
     const before = fs.statSync(journalPath()).size;
     expect(journal.rotateStimuliJournalIfNeeded(MAX_BYTES)).toBe(true);
     expect(fs.statSync(journalPath()).size).toBeLessThan(before);
   });
 
   it('rotates from inside a mission_controller assumption', async () => {
-    const { authority, journal } = await loadModules();
     const before = fs.statSync(journalPath()).size;
     const rotated = authority.withExecutionContext('mission_controller', () => {
       expect(authority.resolveRole()).toBe('mission_controller');
@@ -98,7 +111,6 @@ describe('SB-01 stimuli-journal rotation under SYSTEM_ROLE=slack_bridge', () => 
   });
 
   it('rotates from an async continuation (await + timer) of that assumption', async () => {
-    const { authority, journal } = await loadModules();
     const before = fs.statSync(journalPath()).size;
     const rotated = await authority.withExecutionContextAsync('mission_controller', async () => {
       await Promise.resolve();
@@ -119,7 +131,6 @@ describe('SB-01 stimuli-journal rotation under SYSTEM_ROLE=slack_bridge', () => 
   });
 
   it('appends and rotates through appendStimulus inside the assumption', async () => {
-    const { authority, journal } = await loadModules();
     // Just over the real ceiling, so appendStimulus's own rotation fires.
     const line = `${JSON.stringify({ id: 'msg-old', intent: 'probe', pad: 'x'.repeat(1000) })}\n`;
     fs.writeFileSync(
@@ -147,8 +158,7 @@ describe('SB-01 stimuli-journal rotation under SYSTEM_ROLE=slack_bridge', () => 
   });
 
   it('appends a Slack surface stimulus unchanged from inside another assumption (SB-02)', async () => {
-    const { authority, journal } = await loadModules();
-    const { appendJsonLine } = await import('./foundation/json.js');
+    const { appendJsonLine } = json;
     fs.writeFileSync(journalPath(), '');
     const stimulus = {
       id: 'slack-stimulus-1',
@@ -178,8 +188,7 @@ describe('SB-01 stimuli-journal rotation under SYSTEM_ROLE=slack_bridge', () => 
     expect(fs.readFileSync(journalPath(), 'utf8')).toBe(`${JSON.stringify(stimulus)}\n`);
   });
   it('emits sensor stimuli through the journal store writer inside another assumption', async () => {
-    const { authority } = await loadModules();
-    const { KyberionSensor } = await import('./sensor-engine.js');
+    const { KyberionSensor } = sensorEngine;
     class ProbeSensor extends KyberionSensor {
       async start(): Promise<void> {}
       async stop(): Promise<void> {}
