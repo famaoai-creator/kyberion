@@ -592,7 +592,12 @@
   }
   function suspendReads(force) {
     stopPolling();
-    var recheck = force || state.refreshing || state.recoveryRequests.length > 0 || state.setup;
+    var recheck =
+      force ||
+      state.refreshing ||
+      state.recoveryRequests.length > 0 ||
+      state.setup ||
+      (state.approvalReady && diagnosticTenant() && tasks().some(statusHandoffTarget));
     if (recheck) state.resumeRead = true;
     state.setup = null;
     if (state.refreshing) {
@@ -610,7 +615,65 @@
     var recovery = recoveryFor(task);
     return safelyTerminated(task) ? { requestId: task.id, revision: recovery.revision } : null;
   }
-  function renderHistory() {
+  function diagnosticTenant() {
+    var scope = state.snapshot && state.snapshot.scope;
+    var tenant = scope && scope.tenant;
+    // Mirror the canonical tenant primitive; display data is never authority.
+    return scope &&
+      scope.tier === 'public' &&
+      typeof tenant === 'string' &&
+      tenant.trim() === tenant &&
+      /^[a-z][a-z0-9-]{1,30}$/.test(tenant) &&
+      ['public', 'confidential', 'personal', 'shared'].indexOf(tenant) === -1
+      ? tenant
+      : null;
+  }
+  function statusHandoffTenant() {
+    return visible() &&
+      ready() &&
+      state.approvalReady &&
+      (!state.setup ||
+        (state.setup.mapping &&
+          state.setup.mapping.status === 'diagnostic_mapping_ready' &&
+          state.setup.advancement)) &&
+      !state.sending &&
+      !state.approvalBusy &&
+      !state.refreshing &&
+      !state.resumeRead &&
+      !state.networkError &&
+      !state.readBlocked &&
+      !state.pending &&
+      typeof state.sessionId === 'string' &&
+      state.sessionId.length === 74 &&
+      SESSION.test(state.sessionId) &&
+      state.snapshot.sessionId === state.sessionId
+      ? diagnosticTenant()
+      : null;
+  }
+  function statusHandoffTarget(task) {
+    var artifact = historyArtifact(task);
+    if (
+      !task ||
+      typeof task.id !== 'string' ||
+      task.id.length !== 36 ||
+      !UUID.test(task.id) ||
+      !artifact ||
+      typeof artifact.requestId !== 'string' ||
+      artifact.requestId !== task.id ||
+      !UUID.test(artifact.requestId) ||
+      !Number.isSafeInteger(artifact.revision) ||
+      artifact.revision < 1 ||
+      artifact.revision > 64 ||
+      tasks().filter(function (item) {
+        return (
+          item && (item.id === task.id || (item.artifact && item.artifact.requestId === task.id))
+        );
+      }).length !== 1
+    )
+      return null;
+    return { requestId: task.id, revision: artifact.revision };
+  }
+  function renderHistory(statusTenant) {
     var history = el('history');
     history.replaceChildren();
     var rows = tasks().filter(function (task) {
@@ -657,6 +720,19 @@
             : text('status_' + status)
       );
       field(card, 'request', artifact.requestId);
+      var statusTarget = statusTenant && statusHandoffTarget(task);
+      if (statusTarget) {
+        // This card owns its exact identity. Never infer a latest/default request.
+        var command = append(card, 'p');
+        append(
+          command,
+          'code',
+          'pnpm onboarding first-job --tenant ' +
+            statusTenant +
+            ' --status --request-id ' +
+            statusTarget.requestId
+        );
+      }
       if (artifact.format === 'compact' || artifact.format === 'readable')
         field(card, 'format', text('format_' + artifact.format));
       if (verified) field(card, 'digest', artifact.sha256);
@@ -785,29 +861,11 @@
     else if (!state.loaded && !mapping) readinessKey = 'mapping_unavailable';
     el('readiness').textContent = text(readinessKey);
     el('setup').hidden = !state.loaded || ready();
-    var tenant = state.snapshot && state.snapshot.scope && state.snapshot.scope.tenant;
-    var validTenant = typeof tenant === 'string' && /^[a-z0-9][a-z0-9_-]{0,63}$/.test(tenant);
-    el('scope').hidden = !validTenant;
-    el('scope').textContent = validTenant ? text('scope') + ': ' + tenant : '';
-    el('advance').hidden =
-      state.sending ||
-      state.approvalBusy ||
-      !visible() ||
-      state.refreshing ||
-      state.resumeRead ||
-      (state.setup &&
-        (setupRecoveryBlocked() ||
-          !state.setup.advancement ||
-          state.setup.advancement.status !== 'review_or_tick')) ||
-      ((state.heldRequests.length > 0 || state.recoveryRequests.length > 0) &&
-        !otherUnfinishedWork()) ||
-      !ready() ||
-      !validTenant ||
-      !tasks().some(function (task) {
-        return !task.artifact || task.artifact.verification !== 'verified';
-      });
-    if (validTenant)
-      el('tick').textContent = 'pnpm onboarding first-job --tenant ' + tenant + ' --tick';
+    var tenant = diagnosticTenant();
+    el('scope').hidden = !tenant;
+    el('scope').textContent = tenant ? text('scope') + ': ' + tenant : '';
+    var statusTenant = statusHandoffTenant();
+    el('advance').hidden = !statusTenant || !tasks().some(statusHandoffTarget);
     el('start').disabled = !canAct() || tasks().length > 0 || messages().length > 0;
     var terminalHistory =
       tasks().length > 0 &&
@@ -863,7 +921,7 @@
     el('error').hidden = !state.errorKey;
     el('error').textContent = state.errorKey ? text(state.errorKey) : '';
     el('history').setAttribute('aria-busy', String(state.refreshing));
-    renderHistory();
+    renderHistory(statusTenant);
     renderReceipts();
     el('last-checked').textContent =
       text('last_checked') +
