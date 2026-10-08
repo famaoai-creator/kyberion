@@ -10,6 +10,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
+import { withExecutionContext } from '@agent/core/authority';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   EXCEPTIONS_RELATIVE_PATH,
@@ -272,5 +273,44 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
       if (savedRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = savedRole;
     }
+  });
+});
+
+// G16a: `pnpm tenant:activation probe` runs this check while bound to the
+// tenant it activates. The index lists every tenant, so it is read through the
+// governed system registry reader role instead of the tenant's own authority.
+describe('confidential index read from a tenant-bound caller', () => {
+  const indexPath = path.join(pathResolver.rootDir(), 'knowledge/confidential/tenants/index.json');
+  let created = false;
+  let createdDir = false;
+  const savedRequired = process.env.KYBERION_TENANT_SCOPE_REQUIRED;
+
+  beforeEach(() => {
+    process.env.KYBERION_TENANT_SCOPE_REQUIRED = '0';
+    if (!fs.existsSync(indexPath)) {
+      createdDir = !fs.existsSync(path.dirname(indexPath));
+      fs.mkdirSync(path.dirname(indexPath), { recursive: true });
+      fs.writeFileSync(indexPath, '{"tenants": []}\n');
+      created = true;
+    }
+  });
+
+  afterEach(() => {
+    if (created) fs.rmSync(indexPath, { force: true });
+    if (createdDir) fs.rmSync(path.dirname(indexPath), { recursive: true, force: true });
+    created = false;
+    createdDir = false;
+    if (savedRequired === undefined) delete process.env.KYBERION_TENANT_SCOPE_REQUIRED;
+    else process.env.KYBERION_TENANT_SCOPE_REQUIRED = savedRequired;
+  });
+
+  it('reads the index without granting the tenant itself access to it', () => {
+    const systems = withExecutionContext(
+      'sovereign_concierge',
+      () => collectTenantSystems({ env: EMPTY_ENV }),
+      undefined,
+      'acme-corp'
+    );
+    expect(Array.isArray(systems.confidentialIndex)).toBe(true);
   });
 });
