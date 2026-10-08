@@ -224,6 +224,16 @@ describe('jsonl-tail', () => {
       expect(readJsonLinesCached(file)).toEqual(readJsonLines(file, { onMalformed: 'skip' }));
     });
 
+    it('returns frozen rows so a mutating caller cannot corrupt later reads', () => {
+      append({ n: 1, nested: { v: 1 } });
+      const first = readJsonLinesCached<{ n: number; nested: { v: number } }>(file);
+      expect(Object.isFrozen(first[0])).toBe(true);
+      expect(() => {
+        (first[0] as { n: number }).n = 99;
+      }).toThrow(TypeError);
+      expect(readJsonLinesCached<{ n: number }>(file)[0].n).toBe(1);
+    });
+
     it('parses only the appended bytes on later calls, and nothing when the file is unchanged', () => {
       const big = 'x'.repeat(200);
       append(...Array.from({ length: 500 }, (_, n) => ({ n, big })));
