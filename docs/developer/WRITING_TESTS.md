@@ -102,7 +102,7 @@ Leftover fixture missions show up in `pnpm mission list` and in mission hygiene 
 - **Traces** are not persisted under Vitest unless the caller passes a `dir` or sets `KYBERION_TRACE_TEST_PERSIST=1`.
 - **Child processes** inherit `VITEST` / `VITEST_POOL_ID` (`SAFE_EXEC_ENV_ALLOWLIST`, `CHILD_PROCESS_ENV_KEYS`), so a script spawned by a test uses the same sandbox.
 - **Network egress** to anything but localhost is rejected by `tests/vitest-network-guard.ts` (explicit `host:port` exceptions go in `KYBERION_VITEST_NETWORK_ALLOWLIST`); mock remote clients instead.
-- **Locks** (`active/shared/runtime/locks`) are not sandboxed: many suites partially mock `path-resolver`, and lock files are short-lived.
+- **Locks** (`active/shared/runtime/locks`) are not sandboxed: many suites partially mock `path-resolver`, and lock files are short-lived. A test that holds a lock on purpose (a timeout scenario) must `releaseLock` it in `afterAll`.
 
 ## Things a test may not depend on
 
@@ -112,7 +112,7 @@ These are covered in detail in development practices §3:
 - **Installed provider CLIs:** seed `active/shared/runtime/provider-cache.json`, and don't call `refreshProviderDiscoveryCache()` afterwards.
 - **Leftovers from earlier runs or `/tmp`:** create what the flow validates.
 - **The calendar:** use `vi.useFakeTimers({ now, toFake: ['Date'] })` for the whole flow.
-- **Host binaries** (`sqlite3`, LibreOffice, CJK fonts): a test that needs one must skip or mock when it is absent. Otherwise it fails on minimal machines and CI images.
+- **Host binaries** (`sqlite3`, LibreOffice, CJK fonts): a test that needs one must skip or mock when it is absent. Otherwise it fails on minimal machines and CI images. Gate on the probe of the module that owns the dependency, so the test skips exactly when the code would fail: `it.skipIf(!probeHistorySearchBackend().available)` (sqlite3 with FTS5 trigram), `it.skipIf(!pickCjkFontSource())` (CJK font), `describe.skipIf(!detectRasterCapabilities().hasPdfRaster)` (poppler). CI installs these, so the tests still run there.
 
 Smell test: _would this pass in a fresh clone, on a different OS, on the first run?_
 
@@ -137,4 +137,4 @@ Open `active/shared/tmp/vitest-active-leaks.json` to see the files. Fix a leak i
 - add the store's subtree to `VITEST_LIVE_SUBTREES`;
 - move the test to a fixture root.
 
-Set `KYBERION_TEST_LEAK_STRICT=1` to make the run fail on any leak. Also check `git status`: tracked files must never change during a test run.
+Set `KYBERION_TEST_LEAK_STRICT=1` to make the run fail on any leak. CI sets it for every workflow that runs Vitest, and `pnpm test -- --suite …` forwards it to the Vitest child. Also check `git status`: tracked files must never change during a test run.
