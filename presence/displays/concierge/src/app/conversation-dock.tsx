@@ -40,6 +40,8 @@ import {
   type IntentResolutionContract,
 } from '@agent/core/intent/intent-resolution-contract-parser';
 
+type HistoryFailure = 'unavailable' | 'signin' | 'forbidden' | 'scope' | 'revision';
+
 type DockMessage = {
   id: string;
   role: 'user' | 'secretary';
@@ -134,22 +136,25 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
   const inFlight = React.useRef(false);
   const [busy, setBusy] = React.useState(false);
   const [historyState, setHistoryState] = React.useState<'loading' | 'ready' | 'failed'>('loading');
+  const [historyFailure, setHistoryFailure] = React.useState<HistoryFailure>('unavailable');
   const [historyWarning, setHistoryWarning] = React.useState(false);
   const [storageVerified, setStorageVerified] = React.useState(false);
   const [pendingTurns, setPendingTurns] = React.useState(0);
   const [historyAttempt, setHistoryAttempt] = React.useState(0);
   const voice = useVoice(locale);
   const [voiceSettingsOpen, setVoiceSettingsOpen] = React.useState(false);
-  const { speakText, notifyServerSpeech, unlockSpeechAudio } = voice;
+  const { speakText, notifyServerSpeech, unlockSpeechAudio, stopListening, resetPlayback } = voice;
   const sessionIdRef = React.useRef<string | null>(null);
   const restoredScope = React.useRef<ConversationRequestScope | null>(null);
-  const preserveDraftOnRestore = React.useRef(false);
   const logRef = React.useRef<HTMLDivElement | null>(null);
 
-  React.useEffect(() => {
-    if (previousNavigation.current === navigationKey) return;
-    previousNavigation.current = navigationKey;
+  // A fresh history read owns all visible state. Retained storage is inert until
+  // the server verifies the same session and scope; recovery never replays a POST.
+  const clearVerifiedConversation = React.useCallback(() => {
     scopeEpoch.current += 1;
+    sendEpoch.current += 1;
+    stopListening?.();
+    resetPlayback?.();
     sessionIdRef.current = null;
     restoredScope.current = null;
     pendingRequest.current = null;
@@ -159,27 +164,50 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
     setMessages([]);
     setBusy(false);
     setPendingTurns(0);
+    setHistoryWarning(false);
     setStorageVerified(false);
+  }, [stopListening, resetPlayback]);
+
+  const invalidateHistory = React.useCallback(
+    (reason: HistoryFailure) => {
+      clearVerifiedConversation();
+      setHistoryFailure(reason);
+      setHistoryState('failed');
+    },
+    [clearVerifiedConversation]
+  );
+
+  React.useEffect(() => {
+    if (previousNavigation.current === navigationKey) return;
+    previousNavigation.current = navigationKey;
+    clearVerifiedConversation();
+    setHistoryFailure('unavailable');
     setHistoryState('loading');
     setTenant(readSelectedTenant());
-  }, [navigationKey]);
+  }, [navigationKey, clearVerifiedConversation]);
 
   const closeDock = () => {
-    scopeEpoch.current += 1;
-    inFlight.current = false;
-    setBusy(false);
-    setRevisionSelection(null);
+    clearVerifiedConversation();
+    setHistoryState('loading');
     setOpen(false);
   };
 
   React.useEffect(() => {
     if (!open) return;
+    clearVerifiedConversation();
     const epoch = scopeEpoch.current;
+    const navigation = window.location.pathname + window.location.search;
     const controller = new AbortController();
+    const current = () =>
+      !controller.signal.aborted &&
+      epoch === scopeEpoch.current &&
+      navigation === window.location.pathname + window.location.search;
     const timeout = setTimeout(() => {
-      setHistoryState('failed');
+      if (!current()) return;
+      invalidateHistory('unavailable');
       controller.abort();
     }, 15000);
+    setHistoryFailure('unavailable');
     setHistoryState('loading');
     void (async () => {
       try {
@@ -187,10 +215,15 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
           cache: 'no-store',
           signal: controller.signal,
         });
+        if (!current()) return;
+        if (response.status === 401 || response.status === 403) {
+          invalidateHistory(response.status === 401 ? 'signin' : 'forbidden');
+          return;
+        }
         if (!response.ok) throw new Error('history_unavailable');
         const history = parseConversationHistory(await response.json());
         if (!history) throw new Error('invalid_history');
-        if (controller.signal.aborted || epoch !== scopeEpoch.current) return;
+        if (!current()) return;
         sessionIdRef.current = history.sessionId;
         restoredScope.current = currentRequestScope(history.sessionId, tenant);
         try {
@@ -207,12 +240,19 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
           const completed =
             saved && history.messages.some((message) => message.id === saved.id + '-secretary');
           pendingRequest.current = completed ? null : saved || null;
-          if (completed)
-            window.sessionStorage.removeItem('front-desk.request.' + history.sessionId);
           const savedDraft =
             window.sessionStorage.getItem('front-desk.draft.' + history.sessionId) || '';
-          if (!preserveDraftOnRestore.current) setDraft(savedDraft);
-          preserveDraftOnRestore.current = false;
+          // A recovered completed turn must not leave its submitted draft
+          // looking unsent. Preserve a newer edit, but never invite a new-ID
+          // repeat merely because the original reply was interrupted.
+          if (completed && savedDraft.trim() === saved.text) {
+            window.sessionStorage.removeItem('front-desk.draft.' + history.sessionId);
+          } else {
+            setDraft(savedDraft);
+          }
+          // Keep the completion correlation until draft cleanup succeeds.
+          if (completed)
+            window.sessionStorage.removeItem('front-desk.request.' + history.sessionId);
           setStorageVerified(true);
         } catch {
           setStorageVerified(false);
@@ -222,7 +262,7 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
         setPendingTurns(history.pending);
         setHistoryState('ready');
       } catch {
-        if (!controller.signal.aborted) setHistoryState('failed');
+        if (current()) invalidateHistory('unavailable');
       } finally {
         clearTimeout(timeout);
       }
@@ -230,31 +270,22 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
     return () => {
       clearTimeout(timeout);
       controller.abort();
+      if (epoch === scopeEpoch.current) scopeEpoch.current += 1;
     };
-  }, [open, historyAttempt, tenant, navigationKey]);
+  }, [open, historyAttempt, tenant, navigationKey, clearVerifiedConversation, invalidateHistory]);
 
   React.useEffect(() => {
     const change = (event: Event) => {
       const next = tenantFromChangeEvent(event);
       if (!next || next === tenant) return;
-      preserveDraftOnRestore.current = false;
-      scopeEpoch.current += 1;
-      sessionIdRef.current = null;
-      restoredScope.current = null;
-      pendingRequest.current = null;
-      inFlight.current = false;
-      setDraft('');
-      setRevisionSelection(null);
-      setMessages([]);
-      setBusy(false);
-      setPendingTurns(0);
+      clearVerifiedConversation();
+      setHistoryFailure('unavailable');
       setHistoryState('loading');
-      setStorageVerified(false);
       setTenant(next);
     };
     window.addEventListener(TENANT_CHANGED_EVENT, change);
     return () => window.removeEventListener(TENANT_CHANGED_EVENT, change);
-  }, [tenant]);
+  }, [tenant, clearVerifiedConversation]);
 
   function storeDraft(value: string) {
     setDraft(value);
@@ -345,7 +376,7 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
         artifactRevision
       );
       try {
-        const key = 'front-desk.request.' + sessionIdRef.current;
+        const key = 'front-desk.request.' + request.payload.sessionId;
         const serialized = JSON.stringify(request);
         window.sessionStorage.setItem(key, serialized);
         if (window.sessionStorage.getItem(key) !== serialized)
@@ -388,6 +419,17 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(request.payload),
         });
+        if (
+          epoch !== scopeEpoch.current ||
+          navigation !== window.location.pathname + window.location.search
+        )
+          return;
+        // Authentication failures may be HTML/empty bodies from a proxy. The
+        // status alone withdraws old content before any JSON parsing.
+        if (response.status === 401 || response.status === 403) {
+          invalidateHistory(response.status === 401 ? 'signin' : 'forbidden');
+          return;
+        }
         const rawPayload: unknown = await response.json();
         if (
           epoch !== scopeEpoch.current ||
@@ -416,17 +458,12 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
             } catch {
               /* Optional. */
             }
-            setHistoryState('failed');
+            invalidateHistory('revision');
+            return;
           }
           if (failure.invalidateHistory) {
-            preserveDraftOnRestore.current = true;
-            sessionIdRef.current = null;
-            restoredScope.current = null;
-            pendingRequest.current = null;
-            setRevisionSelection(null);
-            setMessages([]);
-            setHistoryState('failed');
-            throw new Error(t('dock.history.failed'));
+            invalidateHistory('scope');
+            return;
           }
           const typedError = failure.messageKey;
           throw new Error(
@@ -462,16 +499,22 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
             const response = await fetch(withSelectedTenant('/api/message', tenant), {
               cache: 'no-store',
             });
+            const current = () =>
+              sequence === sendEpoch.current &&
+              epoch === scopeEpoch.current &&
+              navigation === window.location.pathname + window.location.search;
+            if (!current()) return;
+            if (response.status === 401 || response.status === 403) {
+              invalidateHistory(response.status === 401 ? 'signin' : 'forbidden');
+              return;
+            }
             if (!response.ok) return;
             const history = parseConversationHistory(await response.json());
-            if (
-              !history ||
-              history.sessionId !== request.payload.sessionId ||
-              sequence !== sendEpoch.current ||
-              epoch !== scopeEpoch.current ||
-              navigation !== window.location.pathname + window.location.search
-            )
+            if (!history || !current()) return;
+            if (history.sessionId !== request.payload.sessionId) {
+              invalidateHistory('scope');
               return;
+            }
             setMessages((current) =>
               current.map((message) => ({
                 ...message,
@@ -484,17 +527,18 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
           }
         })();
         try {
-          window.sessionStorage.removeItem('front-desk.request.' + sessionIdRef.current);
+          window.sessionStorage.removeItem('front-desk.request.' + request.payload.sessionId);
         } catch {
           /* Optional. */
         }
         setDraft((value) => (value.trim() === trimmed ? '' : value));
         try {
           if (
-            window.sessionStorage.getItem('front-desk.draft.' + sessionIdRef.current)?.trim() ===
-            trimmed
+            window.sessionStorage
+              .getItem('front-desk.draft.' + request.payload.sessionId)
+              ?.trim() === trimmed
           )
-            window.sessionStorage.removeItem('front-desk.draft.' + sessionIdRef.current);
+            window.sessionStorage.removeItem('front-desk.draft.' + request.payload.sessionId);
         } catch {
           /* Optional. */
         }
@@ -543,6 +587,7 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
       notifyServerSpeech,
       speakText,
       unlockSpeechAudio,
+      invalidateHistory,
     ]
   );
 
@@ -550,10 +595,21 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
   // always shown as the user bubble (captions requirement) and the reply as
   // the secretary bubble; the reply audio already played server-side.
   const runVoiceHubTurn = React.useCallback(async () => {
-    if (busy) return;
+    if (busy || inFlight.current || historyState !== 'ready' || !storageVerified) return;
+    const epoch = scopeEpoch.current;
+    const navigation = window.location.pathname + window.location.search;
+    const current = () =>
+      epoch === scopeEpoch.current &&
+      navigation === window.location.pathname + window.location.search;
+    inFlight.current = true;
     setBusy(true);
     try {
-      const result = await voice.listenOnce();
+      const result = await voice.listenOnce(current);
+      if (!current()) return;
+      if (result.error === 'listen_failed_401' || result.error === 'listen_failed_403') {
+        invalidateHistory(result.error === 'listen_failed_401' ? 'signin' : 'forbidden');
+        return;
+      }
       const transcript = result.stt?.text?.trim() || '';
       const reply = typeof result.replyText === 'string' ? result.replyText.trim() : '';
       if (!result.ok || !transcript) {
@@ -590,11 +646,20 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
       // The separate voice-hub listen-once protocol is not yet a durable thread.
       setHistoryWarning(true);
     } finally {
-      setBusy(false);
+      if (current()) {
+        inFlight.current = false;
+        setBusy(false);
+      }
     }
-  }, [busy, t, voice]);
+  }, [busy, historyState, storageVerified, t, voice, invalidateHistory]);
 
   const handleMicClick = React.useCallback(() => {
+    if (busy || historyState !== 'ready' || !storageVerified) return;
+    const epoch = scopeEpoch.current;
+    const navigation = window.location.pathname + window.location.search;
+    const current = () =>
+      epoch === scopeEpoch.current &&
+      navigation === window.location.pathname + window.location.search;
     void voice.unlockSpeechAudio();
     if (voice.listening) {
       voice.stopListening();
@@ -609,12 +674,15 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
     // path so it appears as a user bubble like any typed message.
     voice.startListening(
       (text) => {
+        if (!current()) return;
         storeDraft(text);
         void send(text);
       },
-      (interim) => setDraft(interim)
+      (interim) => {
+        if (current()) setDraft(interim);
+      }
     );
-  }, [voice, runVoiceHubTurn, send]);
+  }, [voice, runVoiceHubTurn, send, busy, historyState, storageVerified]);
 
   const submitDraft = React.useCallback(
     (event: React.FormEvent) => {
@@ -656,40 +724,54 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
         {historyState === 'loading' ? t('dock.history.loading') : null}
         {historyState === 'failed' ? (
           <>
-            {t('dock.history.failed')}{' '}
-            <button type="button" onClick={() => setHistoryAttempt((attempt) => attempt + 1)}>
-              {t('dock.history.retry')}
-            </button>
+            {t(
+              historyFailure === 'signin'
+                ? 'dock.history.signin'
+                : historyFailure === 'forbidden'
+                  ? 'dock.history.forbidden'
+                  : historyFailure === 'scope'
+                    ? 'dock.history.scope_changed'
+                    : historyFailure === 'revision'
+                      ? 'dock.history.revision_changed'
+                      : 'dock.history.failed'
+            )}{' '}
+            {historyFailure === 'signin' ? (
+              <a
+                href={
+                  '/login?next=' +
+                  encodeURIComponent(window.location.pathname + window.location.search)
+                }
+              >
+                {t('dock.history.signin_action')}
+              </a>
+            ) : null}
           </>
         ) : null}
         {historyState === 'ready' && pendingTurns > 0 ? t('dock.history.pending') : null}
-        {historyWarning ? t('dock.history.unsaved') : null}
-        {historyState === 'ready' && !storageVerified ? (
-          <>
-            {frontDeskText('conversation_storage_required', locale)}{' '}
-            <button type="button" onClick={() => setHistoryAttempt((attempt) => attempt + 1)}>
-              {t('dock.history.retry')}
-            </button>
-          </>
-        ) : null}
-        {pendingTurns > 0 || historyState === 'failed' ? (
+        {historyState === 'ready' && historyWarning ? t('dock.history.unsaved') : null}
+        {historyState === 'ready' && !storageVerified
+          ? frontDeskText('conversation_storage_required', locale)
+          : null}
+        {historyState === 'failed' ||
+        (historyState === 'ready' && (pendingTurns > 0 || !storageVerified)) ? (
           <>
             {' '}
-            <a href={withSelectedTenant(progressHref, tenant)}>
-              {frontDeskText('nav_progress', locale)}
-            </a>{' '}
-            <a href={withSelectedTenant('/settings', tenant)}>
-              {frontDeskText('nav_settings', locale)}
-            </a>{' '}
             <button type="button" onClick={() => setHistoryAttempt((attempt) => attempt + 1)}>
               {t('dock.history.retry')}
-            </button>
+            </button>{' '}
+            {historyState === 'ready' && pendingTurns > 0 ? (
+              <a href={withSelectedTenant(progressHref, tenant)}>
+                {frontDeskText('nav_progress', locale)}
+              </a>
+            ) : null}
           </>
         ) : null}
       </div>
       <div className="dock-log" ref={logRef} aria-live="polite">
-        {messages.length === 0 ? <p className="dock-empty">{t('dock.empty')}</p> : null}
-        {messages.map((message) => {
+        {historyState === 'ready' && messages.length === 0 ? (
+          <p className="dock-empty">{t('dock.empty')}</p>
+        ) : null}
+        {(historyState === 'ready' ? messages : []).map((message) => {
           const shapeKey =
             message.shape && message.shape !== 'reply' ? SHAPE_LABEL_KEYS[message.shape] : null;
           const actionable = message.role === 'secretary' && message.id === lastMessageId;
@@ -852,7 +934,7 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
                       key={action.id}
                       type="button"
                       className={`action-button${action.id === 'confirm' ? '' : ' secondary'}`}
-                      disabled={busy || historyState !== 'ready'}
+                      disabled={busy || historyState !== 'ready' || !storageVerified}
                       onClick={() => void send(action.label)}
                     >
                       {action.label}
@@ -947,14 +1029,14 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
           ) : null}
         </div>
       ) : null}
-      {messages.length === 0 ? (
+      {historyState === 'ready' && messages.length === 0 ? (
         <div className="dock-quick-row" role="group" aria-label={t('dock.quick.label')}>
           {QUICK_REQUEST_KEYS.map((key) => (
             <button
               key={key}
               type="button"
               className="dock-quick-chip"
-              disabled={busy || historyState !== 'ready'}
+              disabled={busy || historyState !== 'ready' || !storageVerified}
               onClick={() => void send(t(key))}
             >
               {t(key)}
@@ -986,7 +1068,7 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
             aria-pressed={voice.listening}
             aria-label={t(voice.listening ? 'dock.voice.mic_stop' : 'dock.voice.mic_start')}
             title={t(voice.listening ? 'dock.voice.mic_stop' : 'dock.voice.mic_start')}
-            disabled={busy || historyState !== 'ready'}
+            disabled={busy || historyState !== 'ready' || !storageVerified}
             onClick={handleMicClick}
           >
             <svg
@@ -1007,7 +1089,7 @@ function ConversationDockContent({ progressHref = '/progress' }: { progressHref?
         ) : null}
         <input
           type="text"
-          value={draft}
+          value={historyState === 'ready' ? draft : ''}
           placeholder={t('dock.placeholder')}
           aria-label={t('dock.placeholder')}
           onChange={(event) => storeDraft(event.target.value)}
@@ -1134,7 +1216,10 @@ export function conversationFailurePolicy(
       : undefined;
   return {
     uncertain: raw.retry_safe !== true,
-    invalidateHistory: status === 409 && raw.error === 'conversation_scope_changed',
+    invalidateHistory:
+      status === 401 ||
+      status === 403 ||
+      (status === 409 && raw.error === 'conversation_scope_changed'),
     messageKey,
   };
 }
