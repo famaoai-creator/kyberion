@@ -44,7 +44,6 @@ import {
 import { withLock } from '../foundation/lock-utils.js';
 import { getToolRuntimePolicy, writeToolRuntimePolicyAtPath } from '../tool/tool-runtime-policy.js';
 import { isValidTenantSlug } from '../entity-scope.js';
-import { writeServiceConnectionAtPath } from '../service/service-engine-helpers.js';
 import {
   getVoiceProfileRegistry,
   loadVoiceProfileRegistryAtPath,
@@ -75,6 +74,7 @@ const allowedServices = [
   'github',
   'google-workspace',
   'microsoft-365',
+  'notion',
   'slack',
   'comfyui',
   'voice-hub',
@@ -265,8 +265,8 @@ export function previewBrowserOnboarding(input: unknown): BrowserOnboardingPrevi
     ['state', onboardingPath('browser-onboarding-state.json'), 'Record onboarding receipt'],
     ...draft.services.map((service) => [
       'service',
-      path.join(profileRoot(), 'connections', `${service.service_id}.json`),
-      `Create ${service.service_id} connection proposal`,
+      onboardingPath('browser-onboarding-state.json'),
+      `Record ${service.service_id} selection (credentials are unchanged)`,
     ]),
     ...(draft.voice.enabled
       ? [
@@ -378,20 +378,9 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
         });
         artifacts.push(toolPath);
 
-        for (const service of draft.services) {
-          const servicePath = path.join(profileRoot(), 'connections', `${service.service_id}.json`);
-          writeServiceConnectionAtPath(servicePath, {
-            version: '1.0.0',
-            service_id: service.service_id,
-            status: 'proposed',
-            auth_mode: service.auth_mode,
-            required: service.required,
-            credential_ref: null,
-            created_at: now,
-            source: 'browser-onboarding',
-          });
-          artifacts.push(servicePath);
-        }
+        // Service selection is onboarding metadata, not authentication state.
+        // Connection documents may contain encrypted or plaintext credentials;
+        // only governed authentication flows may create or update them.
 
         if (draft.voice.enabled) {
           const voicePath = path.join(profileRoot(), 'voice', 'profile-registry.json');

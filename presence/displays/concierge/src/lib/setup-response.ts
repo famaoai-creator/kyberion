@@ -48,6 +48,8 @@ export type Setup = {
     }>;
   };
   service_catalog: SetupService[];
+  /** Persisted selection, distinct from credentials. Undefined is a legacy receipt. */
+  selected_services?: string[];
   /** The connections the viewer may see, by owner. Older payloads omit it. */
   connections?: SetupConnection[];
   diagnostics: SetupDiagnostic[];
@@ -197,6 +199,9 @@ function parseSetup(value: unknown): Setup | undefined {
   }
 
   if (
+    (value.selected_services !== undefined &&
+      (!Array.isArray(value.selected_services) ||
+        value.selected_services.some((id) => typeof id !== 'string'))) ||
     !Array.isArray(value.service_catalog) ||
     value.service_catalog.some(
       (entry) =>
