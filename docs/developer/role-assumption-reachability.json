@@ -75,6 +75,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/authn-browser-session-key.ts#browserSessionKey",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/authn-providers.ts#<module>",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -882,6 +887,11 @@
     },
     {
       "site": "libs/core/surface/front-desk-conversation-persistence.ts#publishTranscript (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/oidc-login-settings.ts#loadStoredOidcLoginSettings",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -3385,7 +3395,8 @@
           "example_path": [
             "presence/displays/computer-surface/server.ts#<module>",
             "libs/core/surface/surface-authn.ts#<module>",
-            "libs/core/authn-providers.ts#<module>"
+            "libs/core/authn-providers.ts#<module>",
+            "libs/core/authn-browser-session-key.ts#browserSessionKey"
           ]
         },
         "surface_runtime": {
@@ -3827,9 +3838,9 @@
         },
         "sovereign_concierge": {
           "example_path": [
-            "presence/displays/concierge/src/lib/first-run-server.ts#<module>",
-            "libs/core/surface/oidc-browser-login.ts#<module>",
-            "libs/core/authn-providers.ts#<module>"
+            "presence/displays/concierge/src/lib/first-run-server.ts#oidcRedirectUris",
+            "libs/core/surface/oidc-browser-login.ts#resolveOidcLoginConfig",
+            "libs/core/authn-browser-session-key.ts#browserSessionKey"
           ]
         },
         "surface_runtime": {
@@ -4094,9 +4105,11 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-dispatch.ts#runDotHousekeeping",
+            "libs/core/dot/dot-dispatch.ts#settleDotParkedActions",
+            "libs/core/surface/first-job-approval-proof.ts#hasVerifiedFirstJobDecision",
+            "libs/core/authn-browser-session-key.ts#browserSessionKey"
           ]
         },
         "surface_runtime": {
@@ -4410,9 +4423,11 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-dispatch.ts#runDotHousekeeping",
+            "libs/core/dot/dot-dispatch.ts#settleDotParkedActions",
+            "libs/core/surface/first-job-approval-proof.ts#hasVerifiedFirstJobDecision",
+            "libs/core/authn-browser-session-key.ts#browserSessionKey"
           ]
         },
         "surface_runtime": {
@@ -4686,9 +4701,11 @@
             "scripts/pipeline-execution-part-results.ts#main",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-dispatch.ts#runDotHousekeeping",
+            "libs/core/dot/dot-dispatch.ts#settleDotParkedActions",
+            "libs/core/surface/first-job-approval-proof.ts#hasVerifiedFirstJobDecision",
+            "libs/core/authn-browser-session-key.ts#browserSessionKey"
           ]
         },
         "surface_runtime": {
@@ -5465,9 +5482,10 @@
         },
         "sovereign_concierge": {
           "example_path": [
-            "presence/displays/operator-surface/src/lib/viewer-context.ts#<module>",
-            "libs/core/surface/surface-authn.ts#<module>",
-            "libs/core/authn-providers.ts#<module>"
+            "presence/displays/operator-surface/src/lib/surface-auth-route.ts#handleOperatorAuthRoute",
+            "libs/core/surface/surface-auth-routes.ts#handleSurfaceAuthRoute",
+            "libs/core/surface/oidc-browser-login.ts#resolveOidcLoginConfig",
+            "libs/core/authn-browser-session-key.ts#browserSessionKey"
           ]
         },
         "surface_runtime": {
@@ -5778,7 +5796,8 @@
           "example_path": [
             "scripts/personal-pads/server.ts#<module>",
             "libs/core/surface/surface-authn.ts#<module>",
-            "libs/core/authn-providers.ts#<module>"
+            "libs/core/authn-providers.ts#<module>",
+            "libs/core/authn-browser-session-key.ts#browserSessionKey"
           ]
         },
         "surface_runtime": {
@@ -6023,7 +6042,8 @@
             "presence/displays/presence-studio/server.ts#<module>",
             "presence/displays/presence-studio/security.ts#<module>",
             "libs/core/surface/surface-authn.ts#<module>",
-            "libs/core/authn-providers.ts#<module>"
+            "libs/core/authn-providers.ts#<module>",
+            "libs/core/authn-browser-session-key.ts#browserSessionKey"
           ]
         },
         "surface_runtime": {
@@ -6304,9 +6324,11 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-dispatch.ts#runDotHousekeeping",
+            "libs/core/dot/dot-dispatch.ts#settleDotParkedActions",
+            "libs/core/surface/first-job-approval-proof.ts#hasVerifiedFirstJobDecision",
+            "libs/core/authn-browser-session-key.ts#browserSessionKey"
           ]
         },
         "surface_runtime": {
@@ -6599,9 +6621,11 @@
             "scripts/pipeline-execution-part-results.ts#main",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-dispatch.ts#runDotHousekeeping",
+            "libs/core/dot/dot-dispatch.ts#settleDotParkedActions",
+            "libs/core/surface/first-job-approval-proof.ts#hasVerifiedFirstJobDecision",
+            "libs/core/authn-browser-session-key.ts#browserSessionKey"
           ]
         },
         "surface_runtime": {
@@ -6864,9 +6888,11 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-dispatch.ts#runDotHousekeeping",
+            "libs/core/dot/dot-dispatch.ts#settleDotParkedActions",
+            "libs/core/surface/first-job-approval-proof.ts#hasVerifiedFirstJobDecision",
+            "libs/core/authn-browser-session-key.ts#browserSessionKey"
           ]
         },
         "surface_runtime": {
@@ -7140,9 +7166,11 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-dispatch.ts#runDotHousekeeping",
+            "libs/core/dot/dot-dispatch.ts#settleDotParkedActions",
+            "libs/core/surface/first-job-approval-proof.ts#hasVerifiedFirstJobDecision",
+            "libs/core/authn-browser-session-key.ts#browserSessionKey"
           ]
         },
         "surface_runtime": {
@@ -7385,9 +7413,11 @@
             "libs/core/governance/kill-switch.ts#<module>",
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/dot/dot-dispatch.ts#runDotHousekeeping",
+            "libs/core/dot/dot-dispatch.ts#settleDotParkedActions",
+            "libs/core/surface/first-job-approval-proof.ts#hasVerifiedFirstJobDecision",
+            "libs/core/authn-browser-session-key.ts#browserSessionKey"
           ]
         },
         "surface_runtime": {
