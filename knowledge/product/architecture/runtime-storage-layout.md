@@ -171,7 +171,9 @@ is placed by the record's own `scope`; callers do not choose the file:
 - Rows written to the system file before partitioning stay there as
   **legacy**: each reader filters them by the row's own scope, so a tenant
   reader still sees its own old rows and the system reader never sees tenant
-  rows. There is no split migration; the rows age out with the file.
+  rows; in the operator aggregate a legacy tier row inherits tier-guard's read
+  decision for its partition. There is no split command — the file is not
+  rewritten, so nothing can be lost or duplicated by a half-run migration.
 
 ## 3. Surface visibility
 

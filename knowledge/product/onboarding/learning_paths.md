@@ -4,7 +4,7 @@ category: Onboarding
 tags: [onboarding, learning, paths, security]
 importance: 5
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-10-08
 ---
 
 # ロール別教育ロードマップ (Learning Paths by Role)
@@ -30,7 +30,7 @@ Kyberion エコシステムへ参加するメンバーが、それぞれの役�
 **目標**: capability execution の実行性能を監視し、SLO 違反の検知と自動復旧（Self-healing）の仕組みを運用できる。
 
 - **Step 1: 観測**
-  - `work/metrics/`（`execution-metrics.jsonl` / `resource-usage.jsonl`）のデータ構造理解
+  - `work/metrics/`（`execution-metrics.jsonl` / `resource-usage.jsonl`）のデータ構造理解。テナント／confidential の使用量は `active/shared/runtime/usage-ledger/<tier>/<tenant|shared>/` に分割保存される（[runtime-storage-layout](../architecture/runtime-storage-layout.md)）
   - `pnpm dashboard`（`scripts/sovereign_dashboard.ts`）の実行と分析
 - **Step 2: 改善**
   - `pnpm check` の静的ゲートと TODO/FIXME スキャンによる技術負債の定量的評価
