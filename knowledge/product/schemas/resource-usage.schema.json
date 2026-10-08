@@ -33,6 +33,21 @@
     "cost_usd": { "type": "number", "minimum": 0 },
     "status": { "type": "string", "enum": ["actual", "estimated", "committed"] },
     "source": { "type": "string", "minLength": 1 },
+    "cause": {
+      "type": "string",
+      "enum": [
+        "assistant",
+        "tool",
+        "hook",
+        "compaction",
+        "branch_summary",
+        "deferred_fetch",
+        "judge",
+        "subagent",
+        "repair",
+        "adjustment"
+      ]
+    },
     "scope": {
       "type": "object",
       "required": ["scope_kind", "tier"],

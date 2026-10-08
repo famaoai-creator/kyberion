@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { isRecord } from '@agent/core/foundation';
-import { metrics } from '@agent/core/metrics';
+import { metrics, RESOURCE_USAGE_LEDGER_ROOT } from '@agent/core/metrics';
 import { pathResolver } from '@agent/core/path-resolver';
 import { traceLogDir } from '@agent/core/trace';
 import { validateTraceReplay } from '@agent/core/analysis/trace-schema';
@@ -68,7 +68,8 @@ export function loadStats(): StatsData {
   }
   const usageCounts = new Map<string, number>();
   try {
-    for (const record of metrics.loadResourceUsageHistory()) {
+    // Operator HUD: the governed aggregate over every partition this process may read.
+    for (const record of metrics.loadResourceUsageHistory({ all: true })) {
       const kind = String((record as any).kind ?? 'other');
       usageCounts.set(kind, (usageCounts.get(kind) ?? 0) + 1);
     }
@@ -96,7 +97,11 @@ export function loadStats(): StatsData {
 }
 
 export function statsWatchPaths(): string[] {
-  return [traceLogDir(), pathResolver.resolve('work/metrics')];
+  return [
+    traceLogDir(),
+    pathResolver.resolve('work/metrics'),
+    pathResolver.rootResolve(RESOURCE_USAGE_LEDGER_ROOT),
+  ];
 }
 
 export function statsViewModel(data: StatsData, i18n: I18n): PanelViewModel {

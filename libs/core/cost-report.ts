@@ -1,4 +1,4 @@
-import { metrics, type ResourceUsageStatus } from './metrics.js';
+import { metrics, type ResourceUsageReadScope, type ResourceUsageStatus } from './metrics.js';
 import { eventScopeMatches, type EventScope, type EventScopeFilter } from './event-scope.js';
 import { resolveScopeForRecord } from './scope-migration.js';
 import { normalizeUsageCause, type UsageCause } from './usage-accounting.js';
@@ -199,13 +199,32 @@ export function buildCostReport(
   };
 }
 
+/**
+ * Resource-usage partitions a cost report reads. A tenant filter reads only
+ * those tenants' partitions (plus their legacy rows); without one the report
+ * is the operator aggregate over every partition this process may read —
+ * tier-guard still withholds other tenants' partitions from a tenant-bound
+ * process.
+ */
+export function resourceUsageReadFor(filter?: EventScopeFilter): ResourceUsageReadScope {
+  const tenants =
+    filter?.tenant_slugs && filter.tenant_slugs !== 'all'
+      ? filter.tenant_slugs
+      : filter?.tenant_slug
+        ? [filter.tenant_slug]
+        : undefined;
+  return tenants ? { tenants } : { all: true };
+}
+
 export function buildCostReportFromHistory(
   options: { since?: string; until?: string; scopeFilter?: EventScopeFilter } = {}
 ): CostReport {
   return buildCostReport(
     [
       ...(metrics.loadHistory() as CostLedgerEntry[]),
-      ...(metrics.loadResourceUsageHistory() as CostLedgerEntry[]),
+      ...(metrics.loadResourceUsageHistory(
+        resourceUsageReadFor(options.scopeFilter)
+      ) as CostLedgerEntry[]),
     ],
     options
   );

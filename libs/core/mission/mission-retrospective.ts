@@ -130,8 +130,22 @@ export interface MissionExecutionStats {
  *  kept local so the retrospective does not pull in the lifecycle module graph. */
 const COMPLETED_TASK_STATUSES = new Set(['done', 'completed', 'accepted', 'reviewed']);
 
+/**
+ * The mission's own tier/tenant, from its state record: the resource-usage
+ * ledger is partitioned by it. Unknown (no state) reads the system partition only.
+ */
+function missionUsageScope(
+  missionPath: string | null
+): { tier: MissionState['tier']; tenant_slug?: string } | undefined {
+  if (!missionPath) return undefined;
+  const state = loadMissionStateAtPath(safeMissionArtifactPath(missionPath, 'mission-state.json'));
+  if (!state?.tier) return undefined;
+  return { tier: state.tier, ...(state.tenant_slug ? { tenant_slug: state.tenant_slug } : {}) };
+}
+
 function collectMissionUsageStats(
-  missionId: string
+  missionId: string,
+  missionScope?: { tier: MissionState['tier']; tenant_slug?: string }
 ): Pick<MissionExecutionStats, 'token_usage' | 'resource_usage'> {
   const tokenUsage: MissionExecutionStats['token_usage'] = {
     prompt_tokens: 0,
@@ -209,7 +223,11 @@ function collectMissionUsageStats(
     tokenUsage.entries += 1;
   }
 
-  for (const entry of metricsCollector.loadResourceUsageHistory()) {
+  // The mission's own partition plus the system one (a runtime scope that
+  // resolved to public still carries this mission's id); never another tenant's.
+  for (const entry of metricsCollector.loadResourceUsageHistory(
+    missionScope ? { scope: missionScope, includeSystem: true } : undefined
+  )) {
     if (String(entry.mission_id || '').toUpperCase() !== missionId.toUpperCase()) continue;
     resourceUsage.entries += 1;
     resourceUsage.cost_usd += Number(entry.cost_usd) || 0;
@@ -425,7 +443,7 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
     usage_unrecorded: false,
     item_outcomes: [],
   };
-  Object.assign(stats, collectMissionUsageStats(missionId));
+  Object.assign(stats, collectMissionUsageStats(missionId, missionUsageScope(missionPath)));
   if (!missionPath) return stats;
 
   const nextTasks = (() => {
