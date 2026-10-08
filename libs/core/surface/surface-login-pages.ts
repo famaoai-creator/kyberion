@@ -15,8 +15,14 @@ import type { VocabularyKey } from '../knowledge/vocabulary-keys.generated.js';
 export type SurfaceLoginLocale = 'en' | 'ja';
 
 export type SurfaceLoginView =
-  | { kind: 'ready'; providerLabel: string; startHref: string; tokenHref?: string }
-  | { kind: 'unconfigured'; missing: string[]; tokenHref?: string }
+  | {
+      kind: 'ready';
+      providerLabel: string;
+      startHref: string;
+      tokenHref?: string;
+      setupHref?: string;
+    }
+  | { kind: 'unconfigured'; missing: string[]; tokenHref?: string; setupHref?: string }
   | { kind: 'unbound'; issuer: string; subject: string }
   | { kind: 'suspended' }
   | { kind: 'failed'; code: SurfaceLoginFailureCode }
@@ -87,6 +93,11 @@ function tokenLink(href: string | undefined, label: string): string {
   return href ? `<p class="muted"><a href="${escapeHtml(href)}">${escapeHtml(label)}</a></p>` : '';
 }
 
+/** First-run setup entry; offered only while no owner can sign in from a browser. */
+function setupLink(href: string | undefined, label: string): string {
+  return href ? `<a class="btn" href="${escapeHtml(href)}">${escapeHtml(label)}</a>` : '';
+}
+
 export function renderSurfaceLoginPage(input: {
   surfaceLabel: string;
   /** Where "try again" / "different account" go; keeps `next` and `lang`. */
@@ -103,7 +114,7 @@ export function renderSurfaceLoginPage(input: {
   switch (view.kind) {
     case 'ready':
       title = t('surface_login:title', undefined, locale);
-      body = `<h1>${text('surface_login:title')}</h1><p>${text('surface_login:lead')}</p><a class="btn" href="${escapeHtml(view.startHref)}">${text('surface_login:button', { label: view.providerLabel })}</a>${tokenLink(view.tokenHref, t('surface_login:token_link', undefined, locale))}`;
+      body = `<h1>${text('surface_login:title')}</h1><p>${text('surface_login:lead')}</p><a class="btn" href="${escapeHtml(view.startHref)}">${text('surface_login:button', { label: view.providerLabel })}</a>${tokenLink(view.setupHref, t('surface_login:setup_link', undefined, locale))}${tokenLink(view.tokenHref, t('surface_login:token_link', undefined, locale))}`;
       break;
     case 'unconfigured':
       title = t('surface_login:unconfigured_title', undefined, locale);
@@ -111,7 +122,7 @@ export function renderSurfaceLoginPage(input: {
         .map((name) => `<li><code>${escapeHtml(name)}</code></li>`)
         .join(
           ''
-        )}</ul><p class="muted">${text('surface_login:unconfigured_hint')}</p>${tokenLink(view.tokenHref, t('surface_login:token_link', undefined, locale))}`;
+        )}</ul>${setupLink(view.setupHref, t('surface_login:setup_link', undefined, locale))}<p class="muted">${text('surface_login:unconfigured_hint')}</p>${tokenLink(view.tokenHref, t('surface_login:token_link', undefined, locale))}`;
       break;
     case 'unbound':
       title = t('surface_login:unbound_title', undefined, locale);

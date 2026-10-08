@@ -1625,6 +1625,36 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/lib/first-run-server.ts#claimFirstRunForRequest",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/first-run-server.ts#firstRunOpen",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/first-run-server.ts#oidcRedirectUris",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/first-run-server.ts#readSsoSettings",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/first-run-server.ts#saveSsoSettings",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/lib/first-run-server.ts#viewerIsInstanceOwner",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/lib/front-desk-member.ts#resolveConciergeMembership",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -2278,6 +2308,11 @@
     {
       "site": "scripts/organization_decision_approval.ts#requestDecisionApproval (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/organization_first_run.ts#runOrganizationFirstRun",
+      "roles": ["sovereign_concierge"],
       "unresolved": []
     },
     {
@@ -3468,6 +3503,8 @@
         "presence/displays/concierge/src/app/api/services/operator/route.ts",
         "presence/displays/concierge/src/app/api/setup/avatar-actions.ts",
         "presence/displays/concierge/src/app/api/setup/avatar-generation/route.ts",
+        "presence/displays/concierge/src/app/api/setup/first-run/route.ts",
+        "presence/displays/concierge/src/app/api/setup/oidc/route.ts",
         "presence/displays/concierge/src/app/api/setup/route.ts",
         "presence/displays/concierge/src/app/api/setup/setup-input.ts",
         "presence/displays/concierge/src/app/api/summary/route.ts",
@@ -3521,7 +3558,10 @@
         "presence/displays/concierge/src/app/settings/sections/VoiceSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/form-scope.tsx",
         "presence/displays/concierge/src/app/settings/settings-api.ts",
+        "presence/displays/concierge/src/app/setup/first-run/page.tsx",
         "presence/displays/concierge/src/app/setup/page.tsx",
+        "presence/displays/concierge/src/app/setup/sso-settings-form.tsx",
+        "presence/displays/concierge/src/app/setup/sso/page.tsx",
         "presence/displays/concierge/src/app/signin/page.tsx",
         "presence/displays/concierge/src/app/sw-register.tsx",
         "presence/displays/concierge/src/lib/agent-avatar-sources.ts",
@@ -3537,6 +3577,7 @@
         "presence/displays/concierge/src/lib/conversation-store.ts",
         "presence/displays/concierge/src/lib/conversation-types.ts",
         "presence/displays/concierge/src/lib/decide-view.ts",
+        "presence/displays/concierge/src/lib/first-run-server.ts",
         "presence/displays/concierge/src/lib/front-desk-auth-token.ts",
         "presence/displays/concierge/src/lib/front-desk-member.ts",
         "presence/displays/concierge/src/lib/front-desk-nav.ts",
@@ -3681,8 +3722,8 @@
         },
         "chronos_token_registry_reader": {
           "example_path": [
-            "presence/displays/concierge/src/lib/headless-projections.ts#<module>",
-            "libs/core/surface/surface-authn.ts#<module>",
+            "presence/displays/concierge/src/lib/first-run-server.ts#<module>",
+            "libs/core/surface/oidc-browser-login.ts#<module>",
             "libs/core/authn-providers.ts#<module>",
             "libs/core/authn-providers.ts#loadRegistrations"
           ]
@@ -3786,8 +3827,8 @@
         },
         "sovereign_concierge": {
           "example_path": [
-            "presence/displays/concierge/src/lib/headless-projections.ts#<module>",
-            "libs/core/surface/surface-authn.ts#<module>",
+            "presence/displays/concierge/src/lib/first-run-server.ts#<module>",
+            "libs/core/surface/oidc-browser-login.ts#<module>",
             "libs/core/authn-providers.ts#<module>"
           ]
         },

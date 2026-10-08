@@ -3,6 +3,7 @@ import { handleSurfaceAuthRoute } from '@agent/core/surface/surface-auth-routes'
 import { isLoopbackPeer } from './loopback-peer';
 import { getRegisteredEnvBool } from '@agent/core/foundation/env';
 import { resolveAuthClientKey } from '@agent/core/surface/surface-session-cookie';
+import { FIRST_RUN_SETUP_HREF, firstRunOpen } from './first-run-server';
 
 export const CONCIERGE_SURFACE_ID = 'concierge';
 export const CONCIERGE_SURFACE_LABEL = 'Concierge';
@@ -30,6 +31,9 @@ export async function handleConciergeAuthRoute(req: NextRequest): Promise<Respon
     secFetchSite: req.headers.get('sec-fetch-site'),
     referrerOrigin: req.headers.get('origin') ?? req.headers.get('referer'),
     tokenSignInHref: CONCIERGE_TOKEN_SIGNIN_HREF,
+    ...(url.pathname === '/login' && firstRunOpen()
+      ? { firstRunSetupHref: FIRST_RUN_SETUP_HREF }
+      : {}),
   });
   if (!result) return new Response('Not found', { status: 404 });
   const headers = new Headers(result.headers);

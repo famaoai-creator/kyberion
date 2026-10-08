@@ -278,6 +278,9 @@ export function MembersSection({
           title={frontDeskText('settings_member_sso_title', locale)}
           description={frontDeskText('settings_member_sso_help', locale)}
         >
+          <p className="kb-text kb-text--muted">
+            <a href="/setup/sso">{frontDeskText('sso_title', locale)}</a>
+          </p>
           {members.map((member) => {
             const form = ssoForm(member.member_id);
             return (

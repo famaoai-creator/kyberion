@@ -125,7 +125,8 @@ export function FrontDeskRail() {
           typeof window !== 'undefined' &&
           !isLoopbackHostname(window.location.hostname) &&
           window.location.pathname !== '/signin' &&
-          window.location.pathname !== '/login'
+          window.location.pathname !== '/login' &&
+          window.location.pathname !== '/setup/first-run'
         ) {
           const next = `${window.location.pathname}${window.location.search}`;
           window.location.assign(
