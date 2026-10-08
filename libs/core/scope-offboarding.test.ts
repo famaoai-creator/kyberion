@@ -841,6 +841,16 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     writeJsonl(`${ledger('confidential', 'tenant-beta')}/resource-usage.jsonl`, [
       { usage_id: 'b-1' },
     ]);
+    // Pre-partition rows in the shared ledger: two of this tenant (one via the
+    // legacy tenant_id alias), one of tenant-beta, one system row, one corrupt.
+    const legacyLedger = 'work/metrics/resource-usage.jsonl';
+    writeJsonl(legacyLedger, [
+      { usage_id: 'legacy-a', scope: { tier: 'confidential', tenant_slug: TENANT } },
+      { usage_id: 'legacy-a2', scope: { tier: 'confidential', tenant_id: TENANT } },
+      { usage_id: 'legacy-b', scope: { tier: 'confidential', tenant_slug: 'tenant-beta' } },
+      { usage_id: 'legacy-sys', scope: { tier: 'public' } },
+      '{corrupt line',
+    ]);
 
     const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
     expect(dryRun.targets).toEqual(
@@ -850,6 +860,13 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
       ])
     );
     expect(dryRun.targets.map((t) => t.path)).not.toContain(ledger('confidential', 'tenant-beta'));
+    expect(dryRun.usage_ledger_legacy).toEqual({ matched: 2, removed: 0 });
+    expect(fs.readFileSync(abs(legacyLedger), 'utf8')).toContain('legacy-a');
+
+    // Removal is approval-gated: nothing is pruned without one.
+    const denied = offboardScope({ scopeType: 'tenant', scopeId: TENANT, mode: 'execute' });
+    expect(denied.status).toBe('approval_required');
+    expect(fs.readFileSync(abs(legacyLedger), 'utf8')).toContain('legacy-a2');
 
     const result = offboardScope({
       scopeType: 'tenant',
@@ -873,6 +890,29 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     expect(softDeletes.map((e) => e.path)).toEqual(
       expect.arrayContaining([ledger('confidential', TENANT), ledger('public', TENANT)])
     );
+    // Legacy rows: exported verbatim, pruned from the shared ledger, audited.
+    const kept = fs.readFileSync(abs(legacyLedger), 'utf8');
+    expect(kept).not.toContain('"legacy-a"');
+    expect(kept).not.toContain('legacy-a2');
+    expect(kept).toContain('legacy-b');
+    expect(kept).toContain('legacy-sys');
+    expect(kept).toContain('{corrupt line');
+    expect(result.usage_ledger_legacy).toMatchObject({ matched: 2, removed: 2 });
+    const removedCopy = fs.readFileSync(
+      abs(`${result.export_path}/usage-ledger-legacy-removed.jsonl`),
+      'utf8'
+    );
+    expect(removedCopy).toContain('legacy-a');
+    expect(removedCopy).toContain('legacy-a2');
+    expect(removedCopy).not.toContain('legacy-b');
+    expect(
+      auditEvents().find((e) => e.event === 'SCOPE_OFFBOARD_USAGE_LEDGER_PRUNE')
+    ).toMatchObject({
+      scope_id: TENANT,
+      removed_lines: 2,
+      kept_lines: 3,
+      approved_by: 'operator@example',
+    });
   });
 
   it('keeps a dedup line with a dangerous JSON key as an unreadable record', () => {

@@ -24,6 +24,7 @@ import {
   type StoragePartition,
 } from './storage-layout.js';
 import { validateReadPermission } from './tier-guard.js';
+import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 const logger = createLogger('metrics');
 
 interface SloTarget {
@@ -98,6 +99,18 @@ export function resourceUsagePartition(scope?: UsageScopeRef): StoragePartition 
   if (tenant) return { kind: 'tier', tier: tier as StorageDataTier, tenant };
   if (tier === 'public') return SYSTEM_PARTITION;
   return { kind: 'tier', tier: tier as StorageDataTier };
+}
+
+/**
+ * A personal/confidential scope without a tenant, recorded by a tenant-bound
+ * process, belongs to that tenant: its `<tier>/shared/` partition is denied to
+ * a bound process (tier-guard scope_invalid_prefix), so the row would be lost.
+ */
+function withBoundTenant(scope: EventScopeInput): EventScopeInput {
+  if (scope.tenant_slug || scope.tenant_id) return scope;
+  if (scope.tier !== 'personal' && scope.tier !== 'confidential') return scope;
+  const bound = resolvePolicyIdentityContext().tenantSlug;
+  return bound ? { ...scope, tenant_slug: bound } : scope;
 }
 
 function partitionKey(partition: StoragePartition): string {
@@ -423,7 +436,7 @@ export class MetricsCollector {
       throw new Error('resource usage cost_usd must be a finite non-negative number');
     }
     const missionId = input.mission_id || getRegisteredEnvText('MISSION_ID') || undefined;
-    const scope = input.scope ? normalizeEventScope(input.scope) : undefined;
+    const scope = input.scope ? normalizeEventScope(withBoundTenant(input.scope)) : undefined;
     const record: ResourceUsageRecord = {
       type: 'resource_usage',
       usage_id:
@@ -674,21 +687,14 @@ export class MetricsCollector {
    * ResourceUsageReadScope). Legacy records in the system file that predate
    * partitioning are filtered by their own scope, so a scoped reader still
    * sees its legacy entries and a system reader never sees tenant entries.
+   * In every mode a legacy tier row is visible only where its partition would
+   * be: it inherits tier-guard's read decision for that partition's path.
    */
   loadResourceUsageHistory(read?: ResourceUsageReadScope): ResourceUsageRecord[] {
     const legacy = this._readUsageFile(this._metricsPath(this._resourceUsageFile));
     if (read && 'all' in read && read.all) {
-      // A legacy tier row is visible only where its partition would be: it
-      // inherits tier-guard's read decision for that partition's ledger path.
-      const readable = new Map<string, boolean>();
-      const legacyVisible = legacy.filter((record) => {
-        const key = recordPartitionKey(record);
-        if (key === partitionKey(SYSTEM_PARTITION)) return true;
-        if (!readable.has(key)) readable.set(key, this._partitionReadable(record));
-        return readable.get(key) === true;
-      });
       return [
-        ...legacyVisible,
+        ...this._visibleLegacyRows(legacy),
         ...this._partitionUsageFiles().flatMap((filePath) => this._readUsageFile(filePath)),
       ];
     }
@@ -710,7 +716,9 @@ export class MetricsCollector {
       );
       return [];
     }
-    const records = legacy.filter((record) => wanted.has(recordPartitionKey(record)));
+    const records = this._visibleLegacyRows(
+      legacy.filter((record) => wanted.has(recordPartitionKey(record)))
+    );
     for (const partition of wanted.values()) {
       if (partition.kind === 'system') continue;
       records.push(...this._readUsageFile(this._partitionUsagePath(partition)));
@@ -727,6 +735,17 @@ export class MetricsCollector {
       ),
       { allowMissingLeaf: true }
     );
+  }
+
+  /** Legacy rows this process may see: system rows, plus tier rows whose partition it may read. */
+  private _visibleLegacyRows(rows: ResourceUsageRecord[]): ResourceUsageRecord[] {
+    const readable = new Map<string, boolean>();
+    return rows.filter((record) => {
+      const key = recordPartitionKey(record);
+      if (key === partitionKey(SYSTEM_PARTITION)) return true;
+      if (!readable.has(key)) readable.set(key, this._partitionReadable(record));
+      return readable.get(key) === true;
+    });
   }
 
   private _partitionReadable(record: ResourceUsageRecord): boolean {
@@ -944,8 +963,11 @@ export class MetricsCollector {
       }
       this._ensureRegularMetricsFile(filePath);
       appendJsonLine(filePath, entry);
-    } catch (_) {
-      /* metrics are best-effort and must not block the operation */
+    } catch (err) {
+      // Best-effort: never block the operation, but never drop a row silently.
+      logger.warn(
+        `resource usage entry not recorded — ${err instanceof Error ? err.message : String(err)} | next: record with a scope this process may write (a tenant-bound process writes only its own tenant partition) | evidence: usage_id=${entry.usage_id}`
+      );
     }
   }
 }
