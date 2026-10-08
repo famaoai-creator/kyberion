@@ -1136,8 +1136,25 @@ function listProgress(ctx, value) {
 function navList(ctx, items, source) {
   if (!Array.isArray(items) || items.length === 0) return null;
   const list = el(ctx, 'ul', 'kb-nav-rail__list');
+  let previousLabel = '';
+  let target = list;
   for (const item of items) {
     if (!isRecord(item)) continue;
+    const label = typeof item.group_label === 'string' ? item.group_label.trim() : '';
+    if (label !== previousLabel) {
+      target = list;
+      if (label) {
+        const group = el(ctx, 'li', 'kb-nav-rail__group');
+        const heading = el(ctx, 'span', 'kb-nav-rail__group-label', label);
+        heading.setAttribute('aria-hidden', 'true');
+        group.appendChild(heading);
+        target = el(ctx, 'ul', 'kb-nav-rail__list');
+        target.setAttribute('aria-label', label);
+        group.appendChild(target);
+        list.appendChild(group);
+      }
+      previousLabel = label;
+    }
     const li = el(ctx, 'li');
     const href = safeHref(item.href);
     const action = normalizeAction(item.action);
@@ -1164,7 +1181,7 @@ function navList(ctx, items, source) {
     if (item.hint) text.appendChild(el(ctx, 'span', 'kb-nav-rail__hint', item.hint));
     link.appendChild(text);
     li.appendChild(link);
-    list.appendChild(li);
+    target.appendChild(li);
   }
   return list;
 }

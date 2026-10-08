@@ -31,7 +31,10 @@ const TENANT_STORAGE_KEY = 'front-desk.tenant';
 const TENANT_SWITCH_ACTION = 'tenant.switch';
 
 interface FrontDeskNavItemPayload {
-  id: 'home' | 'ask' | 'decide' | 'progress' | 'settings';
+  id: string;
+  group_label: string;
+  icon: string;
+  scope_query_style: 'snake' | 'camel';
   label: string;
   sublabel: string;
   href: string;
@@ -89,23 +92,17 @@ function storeTenant(slug: string): void {
  * presence-studio rail (vanilla renderer) uses the same mapping, so both
  * front-desk surfaces render the same `.kb-nav-rail` markup.
  */
-const RAIL_ICONS: Record<FrontDeskNavItemPayload['id'], string> = {
-  home: 'home',
-  ask: 'chat',
-  decide: 'approval',
-  progress: 'chart',
-  settings: 'settings',
-};
 
 /** `/` -> decide, `/setup` or `/settings` -> settings; every other path has no current rail item. */
 function currentItemId(pathname: string | null): FrontDeskNavItemPayload['id'] | null {
   if (pathname === '/') return 'decide';
+  if (pathname === '/ingest') return 'ingest';
   if (pathname === '/setup' || pathname === '/settings') return 'settings';
   return null;
 }
 
 export function FrontDeskRail() {
-  const { locale, t } = useConciergeI18n();
+  const { locale } = useConciergeI18n();
   const pathname = usePathname();
   const [nav, setNav] = React.useState<FrontDeskNavResponse | null>(null);
   const [me, setMe] = React.useState<FrontDeskMeResponse | null>(null);
@@ -113,6 +110,8 @@ export function FrontDeskRail() {
 
   const fetchMe = React.useCallback((tenant?: string | null) => {
     const generation = ++selectionGeneration.current;
+    setNav(null);
+    setMe(null);
     const query = tenant ? `?tenant=${encodeURIComponent(tenant)}` : '';
     return fetch(`/api/me${query}`, { headers: attachFrontDeskAuthHeaders() })
       .then((res) => {
@@ -147,7 +146,7 @@ export function FrontDeskRail() {
       })
       .catch(() => {
         // The rail degrades to "no tenant block" — it must never block the
-        // 5-item menu from rendering.
+        // navigation from rendering.
       });
   }, []);
 
@@ -155,6 +154,7 @@ export function FrontDeskRail() {
     // A slower response for the previous locale must not overwrite the
     // current one after a language switch.
     let current = true;
+    const generation = selectionGeneration.current;
     setNav(null);
     if (!me) return;
     fetch(withSelectedTenant(`/api/front-desk/nav?locale=${locale}`, me.viewing?.tenant_slug), {
@@ -162,7 +162,7 @@ export function FrontDeskRail() {
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: FrontDeskNavResponse | null) => {
-        if (current && data?.ok) setNav(data);
+        if (current && generation === selectionGeneration.current && data?.ok) setNav(data);
       })
       .catch(() => {});
     return () => {
@@ -201,25 +201,20 @@ export function FrontDeskRail() {
   const ariaLabel = nav?.aria_label || frontDeskText('nav_aria_label', locale);
   const brandTagline = nav?.brand_tagline || frontDeskText('brand_tagline', locale);
 
-  // UI-05: `ui:nav-rail` — the 5 human-verb items (role-gated by
+  // UI-05: `ui:nav-rail` — the grouped existing destinations (role-gated by
   // `allowed`, unchanged) with the current one marked `aria-current="page"`
-  // by NavRail, 資料の取込 + help in the footer.
+  // by NavRail.
   const items = (nav?.items || [])
     .filter((item) => item.allowed)
     .map((item) => ({
       id: item.id,
       label: item.label,
       hint: item.sublabel,
-      href: withSelectedTenant(item.href, me?.viewing?.tenant_slug),
-      icon: RAIL_ICONS[item.id],
+      href: withSelectedTenant(item.href, me?.viewing?.tenant_slug, item.scope_query_style),
+      icon: item.icon,
+      group_label: item.group_label,
       active: item.id === current,
     }));
-  const footerItems = [
-    // FD-03 will fold this into the 頼む (ask) request templates; until
-    // then, ingest keeps its own reachable entry point here.
-    { id: 'ingest', label: t('header.ingest'), href: '/ingest', icon: 'folder' },
-    ...(nav ? [{ id: 'help', label: nav.help.label, href: nav.help.href, icon: 'help' }] : []),
-  ];
 
   // UI-05: the brand and tenant blocks are the shared `ui:nav-rail`
   // `brand` / `context` slots (same markup and CSS as the presence-studio
@@ -261,7 +256,6 @@ export function FrontDeskRail() {
         brand={{ name: 'Kyberion', subtitle: brandTagline }}
         context={context}
         items={items}
-        footer_items={footerItems}
       />
     </A2UIActionProvider>
   );

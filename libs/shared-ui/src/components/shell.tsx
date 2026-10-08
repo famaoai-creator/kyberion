@@ -181,6 +181,38 @@ function NavRailItem({ item }: { item: KbNavItem }) {
   );
 }
 
+/** Preserve flat markup; labelled runs become named nested lists. */
+function NavRailList({ items }: { items: KbNavItem[] }) {
+  if (!items.length) return null;
+  const runs: Array<{ label: string; items: KbNavItem[] }> = [];
+  for (const item of items) {
+    const label = typeof item.group_label === 'string' ? item.group_label.trim() : '';
+    const previous = runs[runs.length - 1];
+    if (previous && previous.label === label) previous.items.push(item);
+    else runs.push({ label, items: [item] });
+  }
+  return (
+    <ul className="kb-nav-rail__list">
+      {runs.flatMap((run, index) =>
+        run.label
+          ? [
+              <li className="kb-nav-rail__group" key={`group:${index}`}>
+                <span className="kb-nav-rail__group-label" aria-hidden="true">
+                  {run.label}
+                </span>
+                <ul className="kb-nav-rail__list" aria-label={run.label}>
+                  {run.items.map((item) => (
+                    <NavRailItem key={item.id} item={item} />
+                  ))}
+                </ul>
+              </li>,
+            ]
+          : run.items.map((item) => <NavRailItem key={`item:${item.id}`} item={item} />)
+      )}
+    </ul>
+  );
+}
+
 /** `ui:nav-rail` brand slot → `.kb-nav-rail__brand` (logo or mark + name / subtitle). */
 function NavBrand({ brand }: { brand: KbNavBrand }) {
   const logo = navBrandLogo(brand.logo_url);
@@ -338,20 +370,10 @@ export function NavRail({
         <NavContext context={context} />
       ) : null}
       {children}
-      {asArray(items).length ? (
-        <ul className="kb-nav-rail__list">
-          {asArray(items).map((item) => (
-            <NavRailItem key={item.id} item={item} />
-          ))}
-        </ul>
-      ) : null}
+      <NavRailList items={asArray(items)} />
       {footer.length ? (
         <div className="kb-nav-rail__footer">
-          <ul className="kb-nav-rail__list">
-            {footer.map((item) => (
-              <NavRailItem key={item.id} item={item} />
-            ))}
-          </ul>
+          <NavRailList items={footer} />
         </div>
       ) : null}
     </nav>

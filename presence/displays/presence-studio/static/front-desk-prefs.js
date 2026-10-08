@@ -111,14 +111,19 @@
     tenant: function () {
       return selectedTenant;
     },
-    scopedUrl: function (path) {
+    scopedUrl: function (path, scopeQueryStyle) {
       var url = new URL(path, window.location.href);
       var current = new URL(window.location.href);
-      ['organizationId', 'projectId'].forEach(function (key) {
-        var selected = current.searchParams.get(key);
+      if (selectedTenant) url.searchParams.set('tenant', selectedTenant);
+      [
+        ['organizationId', 'organization_id'],
+        ['projectId', 'project_id'],
+      ].forEach(function (keys) {
+        var selected = current.searchParams.get(keys[0]) || current.searchParams.get(keys[1]);
+        var key = scopeQueryStyle === 'snake' ? keys[1] : keys[0];
+        url.searchParams.delete(scopeQueryStyle === 'snake' ? keys[0] : keys[1]);
         if (selected) url.searchParams.set(key, selected);
       });
-      if (selectedTenant) url.searchParams.set('tenant', selectedTenant);
       return url.origin === window.location.origin
         ? url.pathname + url.search + url.hash
         : url.href;
@@ -131,6 +136,8 @@
       if (changed) {
         url.searchParams.delete('organizationId');
         url.searchParams.delete('projectId');
+        url.searchParams.delete('organization_id');
+        url.searchParams.delete('project_id');
       }
       if (selectedTenant) url.searchParams.set('tenant', selectedTenant);
       else url.searchParams.delete('tenant');
