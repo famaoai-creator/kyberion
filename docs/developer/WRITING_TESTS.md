@@ -137,6 +137,6 @@ Open `active/shared/tmp/vitest-active-leaks.json` to see the files. Fix a leak i
 - add the store's subtree to `VITEST_LIVE_SUBTREES`;
 - move the test to a fixture root.
 
-`vitestLivePath` maps only `active/` subtrees. A write to `knowledge/personal/` (for example the tenant registry) or to `customer/` needs a fixture root, a mock, or a skip of that code path under Vitest. Do not sandbox those trees: tier-guard authority depends on the real path.
+`vitestLivePath` maps `active/` subtrees plus the repo-root stores in `VITEST_LIVE_REPO_SUBTREES` (the `work/metrics/` ledgers). A write to `knowledge/personal/` (for example the tenant registry) or to `customer/` needs a fixture root, a mock, or a skip of that code path under Vitest. Do not sandbox those trees: tier-guard authority depends on the real path.
 
 Set `KYBERION_TEST_LEAK_STRICT=1` to make the run fail on any leak. CI sets it for every workflow that runs Vitest, and `pnpm test -- --suite …` forwards it to the Vitest child. Also check `git status`: tracked files must never change during a test run.

@@ -149,7 +149,9 @@ gets clean JSON.
 
 1. **Written through `pathResolver.shared()` / `rootResolve()`:** add the sub-path to
    `VITEST_LIVE_SUBTREES` (`libs/core/path-resolver.ts`) and assert the mapping in
-   `path-resolver.test.ts`.
+   `path-resolver.test.ts`. A live store outside `active/` (e.g. the `work/metrics/`
+   execution-metrics / resource-usage ledgers) goes in `VITEST_LIVE_REPO_SUBTREES` instead, and
+   its root in the leak guard's `LIVE_STATE_ROOTS`.
 2. **Hand-built path:** route it through `pathResolver` or `vitestLivePath`.
 3. **Lock or one-off file:** fix it at the test. Release the lock, or use `sharedTmp`.
 4. **"Created" on CI but not locally:** a fresh checkout shows files a dev tree hides, because a
