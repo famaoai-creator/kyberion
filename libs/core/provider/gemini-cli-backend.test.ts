@@ -3,7 +3,13 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
-import { buildGeminiCliBackendFromEnv, GeminiCliBackend } from './gemini-cli-backend.js';
+import { z } from 'zod';
+import {
+  buildGeminiCliBackendFromEnv,
+  GeminiCliBackend,
+  GEMINI_STDIN_PROMPT_INSTRUCTION,
+  runGeminiCliQuery,
+} from './gemini-cli-backend.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
 
 const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }));
@@ -122,5 +128,60 @@ describe('gemini-cli-backend sandbox projection', () => {
     expect(childEnv.GEMINI_API_KEY).toBe('gemini-secret');
     expect(childEnv.ANTHROPIC_API_KEY).toBeUndefined();
     expect(childEnv.OPENAI_API_KEY).toBeUndefined();
+  });
+
+  it('keeps the historical runGeminiCliQuery argv when no profile is requested', async () => {
+    spawnMock.mockReturnValue(createChild('{"response":"{\\"ok\\":true}"}'));
+
+    await runGeminiCliQuery({
+      systemPrompt: 'SYS',
+      userPrompt: 'user 91be',
+      schema: z.object({ ok: z.boolean() }),
+      options: { model: 'gemini-test-model' },
+    });
+
+    const args = spawnMock.mock.calls[0]?.[1] as string[];
+    expect(args).toEqual([
+      '-p',
+      'SYS\n\nuser 91be',
+      '-o',
+      'json',
+      '-y',
+      '--model',
+      'gemini-test-model',
+    ]);
+    expect(spawnMock.mock.calls[0]?.[2]?.cwd).toBeUndefined();
+  });
+
+  it('runGeminiCliQuery projects a requested profile and keeps a stdin prompt off argv', async () => {
+    const child = createChild('{"response":"{\\"ok\\":true}"}');
+    let stdin = '';
+    child.stdin.on('data', (chunk) => (stdin += chunk.toString()));
+    spawnMock.mockReturnValue(child);
+
+    await runGeminiCliQuery({
+      systemPrompt: 'SYS',
+      userPrompt: 'user 91be',
+      schema: z.object({ ok: z.boolean() }),
+      options: { model: 'gemini-test-model' },
+      profile: 'explorer',
+      promptVia: 'stdin',
+      cwd: '/tmp/llm-cwd',
+    });
+
+    const args = spawnMock.mock.calls[0]?.[1] as string[];
+    expect(args).toEqual([
+      '-p',
+      GEMINI_STDIN_PROMPT_INSTRUCTION,
+      '-o',
+      'json',
+      '--sandbox',
+      '--approval-mode',
+      'plan',
+      '--model',
+      'gemini-test-model',
+    ]);
+    expect(spawnMock.mock.calls[0]?.[2]?.cwd).toBe('/tmp/llm-cwd');
+    expect(stdin).toBe('SYS\n\nuser 91be');
   });
 });
