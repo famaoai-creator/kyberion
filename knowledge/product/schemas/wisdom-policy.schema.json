@@ -57,6 +57,11 @@
               "adapter": {
                 "type": "string",
                 "minLength": 1
+              },
+              "prompt_via": {
+                "type": "string",
+                "enum": ["argv", "stdin"],
+                "description": "How the shell-json runner passes the prompt: stdin keeps it out of argv (default argv substitutes {prompt})."
               }
             }
           }
