@@ -217,7 +217,7 @@ describe('FD-01 GET /api/me composition', () => {
 });
 
 describe('FD-00 GET /api/front-desk/nav composition (mirrors the route in server.ts)', () => {
-  it('resolves 5 items in home/ask/decide/progress/settings order with ja labels and the manifest-driven concierge port', () => {
+  it('resolves grouped existing routes with ja labels and the manifest-driven concierge port', () => {
     const viewer = resolvePresenceStudioViewerContext(fakeRequest({ remoteAddress: '127.0.0.1' }));
     const role = frontDeskRoleFromViewer({ role: toFrontDeskViewerScope(viewer).role });
     const ports = readFrontDeskSurfacePorts();
@@ -230,12 +230,26 @@ describe('FD-00 GET /api/front-desk/nav composition (mirrors the route in server
       })
     );
 
-    expect(items.map((item) => item.id)).toEqual(['home', 'ask', 'decide', 'progress', 'settings']);
+    expect(items.map((item) => item.id)).toEqual([
+      'home',
+      'ask',
+      'decide',
+      'progress',
+      'workspace',
+      'ingest',
+      'first-job',
+      'help',
+      'settings',
+    ]);
     expect(items.map((item) => item.label)).toEqual([
       'ホーム',
       '頼む',
       '決める',
       '進み具合',
+      '作業スペース',
+      '資料の取込',
+      'はじめての仕事',
+      '使い方を見る',
       '設定',
     ]);
     // decide/settings live on concierge — the port must come from the
