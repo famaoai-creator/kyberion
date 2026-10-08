@@ -171,9 +171,21 @@ is placed by the record's own `scope`; callers do not choose the file:
 - Rows written to the system file before partitioning stay there as
   **legacy**: each reader filters them by the row's own scope, so a tenant
   reader still sees its own old rows and the system reader never sees tenant
-  rows; in the operator aggregate a legacy tier row inherits tier-guard's read
-  decision for its partition. There is no split command — the file is not
-  rewritten, so nothing can be lost or duplicated by a half-run migration.
+  rows; in every read mode a legacy tier row also inherits tier-guard's read
+  decision for its partition, so a tenant-bound process never sees another
+  tenant's old rows. There is no split command — the file is not rewritten,
+  so nothing can be lost or duplicated by a half-run migration. The one
+  exception is tenant offboarding (`scope-offboarding.ts`): it exports the
+  tenant's legacy rows, then removes them with one atomic, audited,
+  approval-gated rewrite, and soft-deletes the tenant's partitions.
+- A tenant-bound process that records a personal/confidential row without a
+  tenant gets its bound tenant stamped on (a bound process may not write
+  `<tier>/shared/`). A row that still cannot be written is logged at warn,
+  never dropped silently.
+- Persona tier gating is unchanged: like the old shared file, the partitions
+  carry no persona read gate of their own, so an unbound process of any
+  persona can read confidential usage rows. Only the tenant binding narrows
+  access.
 
 ## 3. Surface visibility
 
