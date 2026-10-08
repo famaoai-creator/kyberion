@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { withLocalPeerRequest } from '../../test/local-peer-fixture';
+
 const REGISTERED_TOKEN = 'registered-concierge-token';
 
 function tokenHash(token: string): string {
@@ -29,16 +31,26 @@ describe('concierge viewer-context tier masking', () => {
   });
 
   it('never grants the personal tier to a loopback localadmin viewer', async () => {
-    vi.stubEnv('KYBERION_TRUST_PROXY', 'true');
     const { resolveConciergeViewerContext } = await import('./viewer-context.js');
-    const context = resolveConciergeViewerContext(
-      new NextRequest('http://localhost/api/concierge/inbox', {
-        headers: { 'x-forwarded-for': '127.0.0.1' },
-      })
+    const context = withLocalPeerRequest(
+      new NextRequest('http://localhost/api/concierge/inbox'),
+      resolveConciergeViewerContext
     );
     expect(context).toMatchObject({ role: 'localadmin', source: 'loopback' });
     expect(context.tierAccess).not.toContain('personal');
     expect(context.tierAccess).toEqual(['confidential', 'public']);
+  });
+
+  it('rejects forwarded loopback authority even when trust-proxy is enabled', async () => {
+    vi.stubEnv('KYBERION_TRUST_PROXY', 'true');
+    const { resolveConciergeViewerContext } = await import('./viewer-context.js');
+    expect(() =>
+      resolveConciergeViewerContext(
+        new NextRequest('http://localhost:3050/api/me', {
+          headers: { 'x-real-ip': '127.0.0.1', 'x-forwarded-for': '::1' },
+        })
+      )
+    ).toThrow(/viewer principal/);
   });
 
   it('never grants the personal tier to an unregistered localadmin token', async () => {

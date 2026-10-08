@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 import { previewPipeline } from './pipeline/pipeline-preview.js';
 import {
   buildProductivityTaskPlan,
@@ -52,6 +53,43 @@ describe('productivity-task-plan', () => {
 
     expect(plan.steps.find((step) => step.domain === 'calendar')?.effect).toBe('read');
     expect(plan.approval.required).toBe(false);
+  });
+
+  it('routes a plain GitHub read request to the existing service preset capability', () => {
+    const plan = buildProductivityTaskPlan('List my GitHub repositories');
+    expect(plan.steps).toEqual([
+      expect.objectContaining({
+        domain: 'connected_systems',
+        capability: 'service:preset',
+        effect: 'read',
+        execution_mode: 'preview_only',
+      }),
+    ]);
+    expect(plan.execution.external_effects_executed).toBe(false);
+    // Planning a read is not a mission credential grant or an execution receipt.
+    expect(plan.approval.required).toBe(false);
+  });
+
+  it('uses guarded credentials for all reads in the existing GitHub inbox template', () => {
+    const template = readJson<{
+      schedule: { enabled: boolean };
+      steps: Array<{
+        op: string;
+        params?: { service_id?: string; auth?: string; action?: string };
+      }>;
+    }>(pathResolver.knowledge('product/pipeline-templates/daily-github-inbox.json'));
+    const reads = template.steps.filter((step) => step.op === 'service:preset');
+    expect(reads.map((step) => step.params?.action)).toEqual([
+      'list_issues',
+      'list_pulls',
+      'actions_list_runs',
+    ]);
+    expect(
+      reads.every(
+        (step) => step.params?.service_id === 'github' && step.params.auth === 'secret-guard'
+      )
+    ).toBe(true);
+    expect(template.schedule.enabled).toBe(false);
   });
 
   it('conforms to the productivity task plan schema', () => {

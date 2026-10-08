@@ -110,7 +110,7 @@ const DOMAIN_DEFINITIONS: DomainDefinition[] = [
     title: 'Collect information from connected systems',
     capability: () => 'service:preset',
     matches:
-      /(?:連携|システム|サービス|情報収集|データ取得|Notion|Slack|Salesforce|Google Drive|Microsoft 365|API|connector|connected system)/i,
+      /(?:連携|システム|サービス|情報収集|データ取得|Notion|Slack|GitHub|Salesforce|Google Drive|Microsoft 365|API|connector|connected system)/i,
   },
 ];
 

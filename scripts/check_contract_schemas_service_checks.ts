@@ -66,6 +66,16 @@ export function createServiceChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'operator-service-connections',
+      schemaPath: 'knowledge/product/schemas/operator-service-connections.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/product/governance/operator-service-connections.json'),
+      ],
+      invalidPayloads: [
+        { version: '1.0.0', services: [{ serviceId: 'github', secretKey: 'CLIENT_SECRET' }] },
+      ],
+    },
+    {
       id: 'service-runtime-policy',
       schemaPath: 'knowledge/product/schemas/service-runtime-policy.schema.json',
       validPayloads: [

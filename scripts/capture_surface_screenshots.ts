@@ -21,9 +21,11 @@
  * Assumes the 5 surfaces are already running locally (the caller is
  * responsible for starting/stopping them — see docs/SURFACES.md and
  * knowledge/product/governance/active-surfaces.json for how each one is
- * normally launched). Surfaces that gate on loopback-only access require:
+ * normally launched). Concierge must use its local:start/local:dev adapter;
+ * its real loopback peer is proven server-side, without supplied IP headers.
+ * Other legacy surfaces that gate on loopback-only access currently require:
  *   - env KYBERION_TRUST_PROXY=1 on the surface process
- *   - the `x-real-ip: 127.0.0.1` request header (set automatically below)
+ *   - the `x-real-ip: 127.0.0.1` header (set below only for those surfaces)
  *   - operator-surface additionally needs KYBERION_MOS_PRINCIPAL=human:operator
  *
  * `--set pads` captures the local pads instead (MSN-PADS-A2UI-20260923),
@@ -184,6 +186,14 @@ async function scrubDomText(context: BrowserContext, needles: string[]): Promise
   }, needles);
 }
 
+/** Concierge's local adapter rejects supplied proxy provenance rather than trusting it. */
+export function surfaceCaptureHeaders(surface: string, locale: Locale): Record<string, string> {
+  return {
+    ...(surface === 'concierge' ? {} : { 'x-real-ip': '127.0.0.1' }),
+    'accept-language': localeToBcp47(locale) + ',' + locale + ';q=0.9',
+  };
+}
+
 async function captureOne(
   browser: Browser,
   spec: PageSpec,
@@ -200,10 +210,7 @@ async function captureOne(
     viewport: { width, height },
     colorScheme: theme,
     locale: localeToBcp47(locale),
-    extraHTTPHeaders: {
-      'x-real-ip': '127.0.0.1',
-      'accept-language': `${localeToBcp47(locale)},${locale};q=0.9`,
-    },
+    extraHTTPHeaders: surfaceCaptureHeaders(spec.surface, locale),
   });
   const origin = new URL(baseUrl);
   await context.addCookies([
