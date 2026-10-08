@@ -21,9 +21,38 @@ if (isDirectEntry(import.meta.url, 'libs/actuators/meeting-actuator/src/index.ts
 }
 
 export { handleAction };
+export {
+  checkSpeakConsent,
+  parseMeetingActionInput,
+  parseMeetingActionResult,
+} from './meeting-actuator-helpers.js';
+export {
+  dispatchMeetingIntelligenceOp,
+  isMeetingIntelligenceOp,
+  isMeetingSessionOp,
+  MEETING_ALL_SINGLE_OPS,
+  MEETING_INTELLIGENCE_OPS,
+  MEETING_SESSION_OPS,
+} from './meeting-op-dispatch.js';
+export {
+  listMeetingProviderAdapters,
+  resolveMeetingProvider,
+} from './meeting-provider-adapters.js';
+export { extractMeetingUrl, resolveNextMeetingTarget } from './meeting-target-resolve.js';
+export { normalizeTranscriptText } from './transcript-normalize.js';
+export type {
+  MeetingAction,
+  MeetingActionResult,
+  MeetingInput,
+  MeetingOpAction,
+  MeetingPipelineAction,
+} from './meeting-types.js';
 
 export const actuator = defineCatalogBackedActuator({
   id: 'meeting-actuator',
   describeOps,
+  // SDK dispatch is catalog-style `{ op, params }`; the helper accepts
+  // it directly alongside legacy `{ action, params }` and pipelines.
+  actionInput: (op, params) => ({ op, params }),
   handleAction: (input) => handleAction(input as Parameters<typeof handleAction>[0]),
 });

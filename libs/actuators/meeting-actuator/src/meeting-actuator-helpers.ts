@@ -1,289 +1,70 @@
 /**
- * Meeting Actuator — abstracts Zoom / Teams / Google Meet behind a
- * single ADF surface (join / leave / speak / listen / chat / status).
+ * Meeting Actuator — orchestration layer.
+ *
+ * Transport (join / leave / speak / listen / chat / status + consent +
+ * audit) lives in `meeting-session.ts`; intelligence / target / dialogue
+ * ops live behind `meeting-op-dispatch.ts`. This module only owns:
+ * input normalization (`{ action }` legacy, `{ op }` catalog, pipeline),
+ * preflight + trace, and the ADF pipeline wiring.
  *
  * Guardrails (audit-load-bearing):
- *
- *   1. **Voice consent gate** — `speak` is refused unless the active
- *      mission's evidence/voice-consent.json declares
- *      `consent: granted` from the operator (or sudo override).
- *   2. **Audit emission** — every action emits a `meeting.<verb>`
- *      audit-chain entry with `tenant_slug` (when set), platform, and
- *      a redacted reference to the meeting URL. Failures emit a
- *      `meeting.<verb>_failed` event with the error reason.
- *   3. **Persona binding** — when a tenant slug is set on the active
- *      identity, the audit entry inherits it so per-tenant SIEMs see
- *      only their own meeting activity.
- *
- * The Python `meeting-bridge.py` is a thin platform driver. Real
- * Zoom / Teams / Meet integration is a deployment-time concern (drop
- * in a vendor SDK behind the same JSON contract).
+ *   1. Voice consent gate — `speak` refused without granted consent.
+ *   2. Audit emission — every session action emits `meeting.<verb>`.
+ *   3. Persona binding via the active identity context.
  */
-
-import { auditChain } from '@agent/core/governance/audit-chain';
 import { logger } from '@agent/core/core';
 import { isDirectEntry } from '@agent/core/direct-entry';
-import {
-  assertSafeRepositoryPath,
-  safeExec,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-  safeExistsSync,
-  safeLstat,
-} from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeLstat, safeExistsSync } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
 } from '@agent/core/execution-bounds';
-
-import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator/actuator-trace';
-import { resolveIdentityContext } from '@agent/core/authority';
-import {
-  loadVoiceConsentAtPath,
-  validateVoiceConsentRecord,
-} from '@agent/core/voice/voice-consent';
-import {
-  runAdfActuatorPipeline,
-  defineActuatorPipelineBase,
-} from '@agent/core/actuator/actuator-sdk';
+import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
 import { resolveVars } from '@agent/core/logic-utils';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
-import { getRegisteredEnvText, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import {
   createStandardYargs,
   currentProcessArgv,
   runActuatorCliEntryPoint,
 } from '@agent/core/cli-utils';
-import * as path from 'node:path';
-import {
-  auditSpeakerFairnessOp,
-  conduct1on1,
-  executeSelfActionItemsOp,
-  extractActionItemsOp,
-  generateFacilitationScriptOp,
-  generateReminderMessageOp,
-  runActionItemReminderSweepOp,
-  trackPendingActionItemsOp,
-} from './meeting-intelligence-ops.js';
-import { hearingSessionOp, tutorSessionOp } from './meeting-guided-dialogue.js';
-import { normalizeTranscriptText } from './transcript-normalize.js';
-import { resolveNextMeetingTarget, type CalendarLikeEvent } from './meeting-target-resolve.js';
-import { extensionCaptionsToTranscript } from './extension-transcript.js';
-import { StubAudioBus } from '@agent/core/voice/audio-bus';
-import { resolveAudioBus, type AudioBusId } from '@agent/core/voice/audio-bus-resolver';
-import { installMeetingParticipationDriver } from '@agent/core/meeting/meeting-driver-module-loader';
-import { getMeetingJoinDriver } from '@agent/core/meeting/meeting-join-driver';
-import type { MeetingPlatform, TranscriptChunk } from '@agent/core/meeting/meeting-session-types';
-
-function resolveMeetingPath(ref: string, allowMissingLeaf = true): string {
-  return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf });
-}
-
-/**
- * Run a registered MeetingJoinDriver, collect its optional transcript stream,
- * render the shared `[mm:ss] Speaker: text` transcript file, and leave.
- */
-async function runRegisteredJoinDriver(params: {
-  driver_id?: string;
-  url: string;
-  platform?: string;
-  display_name?: string;
-  duration_sec?: number;
-  transcript_path?: string;
-  ws_port?: number;
-  join_timeout_sec?: number;
-  raise_hand?: boolean;
-  audio_bridge?: string;
-}): Promise<Record<string, unknown>> {
-  const url = String(params.url || '').trim();
-  if (!url) throw new Error('[meeting] extension join requires params.url');
-  const platform = String(params.platform || 'auto').trim() || 'auto';
-  const driverId = String(params.driver_id || 'chrome-extension').trim();
-  if (!driverId) throw new Error('[meeting] join driver id must not be empty');
-  const durationSec = Math.max(0, Number(params.duration_sec || 0));
-  let driver = getMeetingJoinDriver(driverId);
-  if (!driver) {
-    await installMeetingParticipationDriver(driverId, {
-      ...(params.ws_port !== undefined ? { extensionWsPort: Number(params.ws_port) } : {}),
-      ...(params.join_timeout_sec !== undefined
-        ? { extensionJoinTimeoutSec: Number(params.join_timeout_sec) }
-        : {}),
-    });
-    driver = getMeetingJoinDriver(driverId);
-  }
-  if (!driver) throw new Error(`[meeting] '${driverId}' driver is not registered`);
-  const probe = await driver.probe();
-  if (!probe.available) {
-    throw new Error(`[meeting] '${driverId}' driver unavailable: ${probe.reason || 'unknown'}`);
-  }
-  const audioBus =
-    params.audio_bridge && params.audio_bridge !== 'none'
-      ? resolveAudioBus(params.audio_bridge as AudioBusId)
-      : new StubAudioBus();
-  const session = await driver.join(
-    {
-      url,
-      platform: platform as MeetingPlatform,
-      display_name: String(params.display_name || 'Kyberion'),
-    },
-    audioBus
-  );
-  // Declared gesture: announce presence right after joining so a
-  // listen-only bot is visible in the participant list.
-  if (params.raise_hand && typeof session.raiseHand === 'function') {
-    try {
-      await session.raiseHand();
-    } catch (err) {
-      logger.warn(
-        `[meeting] raise_hand after join failed: ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
-  }
-  const chunks: TranscriptChunk[] = [];
-  const endAt = Date.now() + durationSec * 1000;
-  const consumer = (async () => {
-    if (typeof session.transcriptInput !== 'function') return;
-    for await (const chunk of session.transcriptInput()) {
-      if (typeof chunk.text === 'string' && chunk.text.trim()) chunks.push(chunk);
-      if (Date.now() >= endAt) break;
-    }
-  })();
-  try {
-    while (Date.now() < endAt) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
-  } finally {
-    await session.leave().catch(() => undefined);
-  }
-  await Promise.race([
-    consumer.catch(() => undefined),
-    new Promise((resolve) => setTimeout(resolve, 3000)),
-  ]);
-
-  const jsonl = chunks
-    .map((chunk) =>
-      JSON.stringify({
-        text: chunk.text,
-        ...(chunk.speaker_label ? { speaker: chunk.speaker_label } : {}),
-        ts: chunk.emitted_at,
-      })
-    )
-    .join('\n');
-  const rendered = extensionCaptionsToTranscript(jsonl);
-  const transcriptPath = String(params.transcript_path || '').trim();
-  if (transcriptPath && rendered.cueCount > 0) {
-    const resolved = resolveMeetingPath(transcriptPath);
-    safeMkdir(path.dirname(resolved), { recursive: true });
-    safeWriteFile(resolved, `${rendered.transcript}\n`);
-  }
-  return {
-    status: 'success',
-    platform,
-    join_backend: driverId,
-    ...(transcriptPath ? { transcript_path: transcriptPath } : {}),
-    caption_cues: rendered.cueCount,
-    partial_state: rendered.cueCount === 0,
-    ...(rendered.cueCount === 0
-      ? { partial_reason: 'no live captions arrived from the extension' }
-      : {}),
-  };
-}
-
-function resolveExistingMeetingFile(ref: string, label: string): string {
-  const resolved = resolveMeetingPath(ref, false);
-  if (!safeExistsSync(resolved) || !safeLstat(resolved).isFile()) {
-    throw new Error(`[MEETING_RESOURCE_FILE] ${label} must be a regular file: ${ref}`);
-  }
-  return resolved;
-}
 import { resolveMeetingProvider } from './meeting-provider-adapters.js';
+import {
+  checkSpeakConsent,
+  parseMeetingActionResult,
+  recordMeetingEvent,
+  runPythonBridge,
+  runRegisteredJoinDriver,
+} from './meeting-session.js';
+import {
+  MEETING_ALL_SINGLE_OPS,
+  dispatchMeetingIntelligenceOp,
+  isMeetingIntelligenceOp,
+  isMeetingSessionOp,
+} from './meeting-op-dispatch.js';
+import type {
+  MeetingAction,
+  MeetingActionResult,
+  MeetingInput,
+  MeetingOpAction,
+  MeetingPipelineAction,
+} from './meeting-types.js';
 
-type MeetingActuatorPlatform = MeetingAction['params']['platform'];
+export type { MeetingAction, MeetingActionResult, MeetingPipelineAction } from './meeting-types.js';
+export { checkSpeakConsent, parseMeetingActionResult };
+export { MEETING_ALL_SINGLE_OPS };
+
 type MeetingActuatorProvider = NonNullable<MeetingAction['params']['provider']>;
+type MeetingActuatorPlatform = MeetingAction['params']['platform'];
 
-export interface MeetingAction {
-  action: 'check_consent' | 'join' | 'leave' | 'speak' | 'listen' | 'chat' | 'status';
-  params: {
-    platform: string;
-    provider?: string;
-    provider_profile_id?: string;
-    execution_profile_id?: string;
-    mode?: 'transcribe' | 'realtime';
-    node?: 'local' | 'named-node';
-    audio_bridge?: string;
-    url_policy?: 'explicit_only' | 'explicit_or_detected';
-    url?: string;
-    meeting_id?: string;
-    passcode?: string;
-    text?: string;
-    duration_sec?: number;
-    transcript_path?: string;
-    display_name?: string;
-    join_backend?: string;
-    ws_port?: number;
-    join_timeout_sec?: number;
-    raise_hand?: boolean;
-    headed?: boolean;
-    user_data_dir?: string;
-  };
-}
-
-export interface MeetingPipelineAction {
-  action: 'pipeline';
-  steps: Array<{
-    type: 'capture' | 'transform' | 'apply' | 'control';
-    op: string;
-    params: Record<string, unknown>;
-  }>;
-  context?: Record<string, unknown>;
-  options?: { max_steps?: number; timeout_ms?: number };
-}
-
-export interface MeetingActionResult {
-  status: 'success' | 'error' | 'denied';
-  action?: string;
-  platform?: string;
-  method?: string;
-  join_backend?: string;
-  provider?: string;
-  provider_profile_id?: string;
-  execution_profile_id?: string;
-  mode?: string;
-  node?: string;
-  audio_bridge?: string;
-  url_policy?: string;
-  chars?: number;
-  duration?: number;
-  elapsed?: number;
-  playwright_driver?: string;
-  voice_bridge?: string;
-  blackhole_router?: string;
-  message?: string;
-  audit_event_id?: string;
-  trace?: unknown;
-  trace_summary?: unknown;
-  trace_persisted_path?: string;
-  partial_state?: boolean;
-  partial_reason?: string;
-  transcript_path?: string;
-  caption_cues?: number;
-  captions_available?: boolean;
-}
-
-const MEETING_MANIFEST_PATH = pathResolver.rootResolve(
-  'libs/actuators/meeting-actuator/manifest.json'
-);
-const DEFAULT_MEETING_RETRY = getRetryDefaults('meeting');
-
-function isPlainObject(value: unknown): value is Record<string, any> {
+function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-const MEETING_ACTIONS = new Set<MeetingAction['action']>([
+const MEETING_ACTIONS = new Set<string>([
   'check_consent',
   'join',
   'leave',
@@ -293,182 +74,61 @@ const MEETING_ACTIONS = new Set<MeetingAction['action']>([
   'status',
 ]);
 
-/** Validate the structural CLI boundary before the typed action handler runs. */
-export function parseMeetingActionInput(value: unknown): MeetingAction | MeetingPipelineAction {
-  if (!isPlainObject(value) || typeof value.action !== 'string') {
+const MEETING_OPS = new Set<string>(MEETING_ALL_SINGLE_OPS);
+
+/** Validate the structural CLI boundary before the typed handler runs. */
+export function parseMeetingActionInput(value: unknown): MeetingInput {
+  if (!isPlainObject(value)) {
+    throw new Error('meeting action input must be an object with an action');
+  }
+  // Catalog-style single-op envelope: { op, params }.
+  if (typeof value.op === 'string') {
+    if (!MEETING_OPS.has(value.op)) {
+      throw new Error(`meeting action input has unknown op: ${value.op}`);
+    }
+    const params = value.params ?? {};
+    if (!isPlainObject(params)) {
+      throw new Error('meeting action input params must be an object');
+    }
+    return { op: value.op, params } as MeetingOpAction;
+  }
+  if (typeof value.action !== 'string') {
     throw new Error('meeting action input must be an object with an action');
   }
   if (value.action === 'pipeline') {
-    if (!Array.isArray(value.steps)) {
+    if (!Array.isArray((value as { steps?: unknown }).steps)) {
       throw new Error('meeting action input pipeline steps must be an array');
     }
     return value as unknown as MeetingPipelineAction;
   }
-  if (!MEETING_ACTIONS.has(value.action as MeetingAction['action'])) {
+  if (isMeetingIntelligenceOp(value.action)) {
+    if (value.params !== undefined && !isPlainObject(value.params)) {
+      throw new Error('meeting action input params must be an object');
+    }
+    // Intelligence ops are also accepted as direct actions (not only
+    // via pipeline steps) so SDK dispatch and CLI stay uniform.
+    return {
+      op: value.action,
+      params: (value.params ?? {}) as Record<string, unknown>,
+    } as MeetingOpAction;
+  }
+  if (!MEETING_ACTIONS.has(value.action)) {
     throw new Error(`meeting action input has unknown action: ${value.action}`);
   }
-  if (!isPlainObject(value.params)) {
+  if (!isPlainObject((value as { params?: unknown }).params)) {
     throw new Error('meeting action input params must be an object');
   }
   return value as unknown as MeetingAction;
 }
 
-const MEETING_RESULT_STRING_FIELDS = [
-  'action',
-  'platform',
-  'method',
-  'join_backend',
-  'provider',
-  'provider_profile_id',
-  'execution_profile_id',
-  'mode',
-  'node',
-  'audio_bridge',
-  'url_policy',
-  'message',
-  'partial_reason',
-  'transcript_path',
-  'playwright_driver',
-  'voice_bridge',
-  'blackhole_router',
-] as const;
-
-const MEETING_RESULT_NUMBER_FIELDS = ['chars', 'duration', 'elapsed'] as const;
-
-/** Validate the JSON envelope emitted by the Python meeting bridge. */
-export function parseMeetingActionResult(value: unknown): MeetingActionResult | undefined {
-  if (!isPlainObject(value)) return undefined;
-  if (value.status !== 'success' && value.status !== 'error' && value.status !== 'denied') {
-    return undefined;
-  }
-
-  const result: MeetingActionResult = { status: value.status };
-  for (const field of MEETING_RESULT_STRING_FIELDS) {
-    const candidate = value[field];
-    if (candidate !== undefined && typeof candidate !== 'string') return undefined;
-    if (typeof candidate === 'string') result[field] = candidate;
-  }
-  for (const field of MEETING_RESULT_NUMBER_FIELDS) {
-    const candidate = value[field];
-    if (candidate !== undefined && (typeof candidate !== 'number' || !Number.isFinite(candidate))) {
-      return undefined;
-    }
-    if (typeof candidate === 'number') result[field] = candidate;
-  }
-  if (value.partial_state !== undefined && typeof value.partial_state !== 'boolean') {
-    return undefined;
-  }
-  if (typeof value.partial_state === 'boolean') result.partial_state = value.partial_state;
-  if (value.audit_event_id !== undefined && typeof value.audit_event_id !== 'string') {
-    return undefined;
-  }
-  if (typeof value.audit_event_id === 'string') result.audit_event_id = value.audit_event_id;
-  return result;
-}
-
-export function checkSpeakConsent(): { allowed: boolean; reason?: string } {
-  if (getRegisteredEnvText('KYBERION_SUDO') === 'true') return { allowed: true };
-  const missionId = getRegisteredEnvText('MISSION_ID');
-  if (!missionId) {
-    return {
-      allowed: false,
-      reason: 'speak requires MISSION_ID + voice-consent.json in the mission evidence dir',
-    };
-  }
-  const evidenceDir = pathResolver.missionEvidenceDir(missionId);
-  if (!evidenceDir) {
-    return { allowed: false, reason: `mission '${missionId}' not found` };
-  }
-  const consentPath = assertSafeRepositoryPath(path.join(evidenceDir, 'voice-consent.json'), {
-    allowMissingLeaf: true,
+function resolveExistingMeetingFile(ref: string, label: string): string {
+  const resolved = assertSafeRepositoryPath(pathResolver.rootResolve(ref), {
+    allowMissingLeaf: false,
   });
-  if (!safeExistsSync(consentPath)) {
-    return {
-      allowed: false,
-      reason: `voice-consent.json missing at ${path.relative(pathResolver.rootDir(), consentPath)}`,
-    };
+  if (!safeExistsSync(resolved) || !safeLstat(resolved).isFile()) {
+    throw new Error(`[MEETING_RESOURCE_FILE] ${label} must be a regular file: ${ref}`);
   }
-  try {
-    const consent = loadVoiceConsentAtPath(consentPath);
-    return validateVoiceConsentRecord(consent, {
-      missionId,
-      tenantSlug: resolveIdentityContext().tenantSlug,
-    });
-  } catch (err: any) {
-    return { allowed: false, reason: `failed to parse voice-consent.json: ${err?.message ?? err}` };
-  }
-}
-
-function redactedTarget(input: MeetingAction): string {
-  const url = input.params.url;
-  if (!url) return `${input.params.platform}:no-url`;
-  try {
-    const u = new URL(url);
-    return `${input.params.platform}:${u.host}${u.pathname.split('/').slice(0, 3).join('/')}`;
-  } catch {
-    return `${input.params.platform}:invalid-url`;
-  }
-}
-
-const { buildRetryOptions: buildRetryOptions } = defineActuatorPipelineBase({
-  manifestPath: MEETING_MANIFEST_PATH,
-  retryDefaults: DEFAULT_MEETING_RETRY,
-  retryFallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-});
-
-function recordMeetingEvent(input: MeetingAction, result: MeetingActionResult): string {
-  const isDenied = result.status === 'denied';
-  const isError = result.status === 'error';
-  const isPartial = result.partial_state === true;
-  const action = isError
-    ? `meeting.${input.action}_failed`
-    : isDenied
-      ? `meeting.${input.action}_denied`
-      : isPartial
-        ? `meeting.${input.action}_partial`
-        : `meeting.${input.action}`;
-  try {
-    const entry = auditChain.record({
-      agentId: 'meeting-actuator',
-      action,
-      operation: redactedTarget(input),
-      result: isDenied ? 'denied' : isError ? 'error' : 'allowed',
-      ...(result.message
-        ? { reason: result.message }
-        : isPartial && result.partial_reason
-          ? { reason: result.partial_reason }
-          : {}),
-      metadata: {
-        platform: input.params.platform,
-        ...(input.params.provider ? { provider: input.params.provider } : {}),
-        ...(input.params.provider_profile_id
-          ? { provider_profile_id: input.params.provider_profile_id }
-          : {}),
-        ...(input.params.execution_profile_id
-          ? { execution_profile_id: input.params.execution_profile_id }
-          : {}),
-        ...(input.params.mode ? { mode: input.params.mode } : {}),
-        ...(input.params.node ? { node: input.params.node } : {}),
-        ...(input.params.audio_bridge ? { audio_bridge: input.params.audio_bridge } : {}),
-        ...(input.params.url_policy ? { url_policy: input.params.url_policy } : {}),
-        ...(input.params.meeting_id ? { meeting_id: input.params.meeting_id } : {}),
-        ...(input.params.duration_sec !== undefined
-          ? { duration_sec: input.params.duration_sec }
-          : {}),
-        ...(typeof input.params.text === 'string'
-          ? { speech_chars: input.params.text.length }
-          : {}),
-        ...(isPartial ? { partial_state: true } : {}),
-        ...(result.partial_reason ? { partial_reason: result.partial_reason } : {}),
-        ...(result.transcript_path ? { transcript_path: result.transcript_path } : {}),
-        ...(result.join_backend ? { join_backend: result.join_backend } : {}),
-      },
-    });
-    return entry.id;
-  } catch (err: any) {
-    logger.warn(`[meeting] audit emission failed: ${err?.message ?? err}`);
-    return '';
-  }
+  return resolved;
 }
 
 function resolveMeetingParams(value: unknown, context: Record<string, unknown>): unknown {
@@ -505,6 +165,29 @@ async function executeMeetingPipeline(
     },
     handlers: {
       capture: async (op, rawParams, context) => {
+        if (op === 'check_consent') {
+          const consent = checkSpeakConsent();
+          return meetingExport(
+            context,
+            rawParams as Record<string, unknown>,
+            {
+              status: consent.allowed ? 'success' : 'denied',
+              allowed: consent.allowed,
+              ...(consent.reason ? { message: consent.reason } : {}),
+            },
+            'consent_result'
+          );
+        }
+        // Pure ops are callable as capture (dry-run safe) or apply.
+        if (op === 'resolve_next_target' || op === 'normalize_transcript') {
+          const params = resolveMeetingParams(rawParams, context) as Record<string, unknown>;
+          return meetingExport(
+            context,
+            params,
+            await dispatchMeetingIntelligenceOp(op, params, context),
+            op === 'resolve_next_target' ? 'meeting_target' : `${op}_result`
+          );
+        }
         if (op !== 'listen' && op !== 'status') {
           throw new Error(`[UNKNOWN_OP] Unknown meeting capture op: ${op}`);
         }
@@ -512,7 +195,7 @@ async function executeMeetingPipeline(
         return meetingExport(
           context,
           params as Record<string, unknown>,
-          await handleAction({ action: op, params }),
+          await handleSessionAction({ action: op as 'listen' | 'status', params }),
           `${op}_result`
         );
       },
@@ -523,298 +206,43 @@ async function executeMeetingPipeline(
         throw new Error('[UNKNOWN_OP] Meeting intelligence does not own control operations');
       },
       apply: async (op, rawParams, context) => {
-        const params = resolveMeetingParams(rawParams, context) as Record<string, any>;
-        const missionId = String(params.mission_id || getRegisteredEnvText('MISSION_ID') || '');
-        const workItemId =
-          String(params.work_item_id || context.work_item_id || '').trim() || undefined;
-        switch (op) {
-          case 'join':
-          case 'leave':
-          case 'speak':
-          case 'chat':
-            return meetingExport(
-              context,
-              params,
-              await handleAction({ action: op, params: params as MeetingAction['params'] }),
-              `meeting_${op}_result`
-            );
-          case 'conduct_1on_1':
-            return meetingExport(
-              context,
-              params,
-              await conduct1on1({
-                counterparty_ref: String(params.counterparty_ref || ''),
-                proposal_draft_ref: String(params.proposal_draft_ref || ''),
-                structure: Array.isArray(params.structure) ? params.structure.map(String) : [],
-                output_path: String(params.output_path || ''),
-              }),
-              'one_on_one_result'
-            );
-          case 'hearing_session': {
-            const result = await hearingSessionOp({
-              topic: String(params.topic || ''),
-              ...(params.counterparty_label
-                ? { counterparty_label: String(params.counterparty_label) }
-                : {}),
-              ...(params.context ? { context: String(params.context) } : {}),
-              ...(Array.isArray(params.answers) ? { answers: params.answers } : {}),
-              ...(missionId ? { mission_id: missionId } : {}),
-              ...(workItemId ? { work_item_id: workItemId } : {}),
-              ...(params.output_path ? { output_path: String(params.output_path) } : {}),
-              ...(params.language ? { language: String(params.language) } : {}),
-            });
-            return meetingExport(context, params, result, 'hearing_result');
-          }
-          case 'tutor_session': {
-            const materialPath = params.material_path ? String(params.material_path) : '';
-            const material = materialPath
-              ? String(
-                  safeReadFile(resolveExistingMeetingFile(materialPath, 'material_path'), {
-                    encoding: 'utf8',
-                  })
-                )
-              : String(params.material || '');
-            const result = await tutorSessionOp({
-              material,
-              ...(params.learner_label ? { learner_label: String(params.learner_label) } : {}),
-              ...(params.goal ? { goal: String(params.goal) } : {}),
-              ...(Array.isArray(params.answers) ? { answers: params.answers } : {}),
-              ...(missionId ? { mission_id: missionId } : {}),
-              ...(workItemId ? { work_item_id: workItemId } : {}),
-              ...(params.output_path ? { output_path: String(params.output_path) } : {}),
-              ...(params.language ? { language: String(params.language) } : {}),
-            });
-            return meetingExport(context, params, result, 'tutor_result');
-          }
-          case 'extract_action_items': {
-            const transcriptPath = params.transcript_path ? String(params.transcript_path) : '';
-            const transcript = transcriptPath
-              ? String(
-                  safeReadFile(resolveExistingMeetingFile(transcriptPath, 'transcript_path'), {
-                    encoding: 'utf8',
-                  })
-                )
-              : String(params.transcript || '');
-            const attendees = (
-              Array.isArray(params.attendees)
-                ? params.attendees
-                : Array.isArray(context[String(params.attendees_from || 'attendees')])
-                  ? context[String(params.attendees_from || 'attendees')]
-                  : []
-            ) as Array<{
-              name: string;
-              person_slug?: string;
-              channel_handle?: string;
-              manager_handle?: string;
-            }>;
-            const listenResult = context.listen_result || context.meeting_listen_result;
-            const partialState =
-              params.partial_state !== undefined
-                ? Boolean(params.partial_state)
-                : Boolean(
-                    listenResult &&
-                    typeof listenResult === 'object' &&
-                    (listenResult as any).partial_state
-                  );
-            const partialReason =
-              params.partial_reason !== undefined
-                ? String(params.partial_reason || '')
-                : listenResult && typeof listenResult === 'object'
-                  ? String((listenResult as any).partial_reason || '')
-                  : undefined;
-            const result = await extractActionItemsOp({
-              mission_id: missionId,
-              ...(workItemId ? { work_item_id: workItemId } : {}),
-              transcript,
-              attendees,
-              ...(params.operator_label ? { operator_label: String(params.operator_label) } : {}),
-              ...(params.default_assignee_label
-                ? { default_assignee_label: String(params.default_assignee_label) }
-                : {}),
-              ...(params.language ? { language: String(params.language) } : {}),
-              ...(partialState ? { partial_state: true } : {}),
-              ...(partialReason ? { partial_reason: partialReason } : {}),
-              ...(params.enforce_restricted_actions !== undefined
-                ? { enforce_restricted_actions: Boolean(params.enforce_restricted_actions) }
-                : {}),
-            });
-            return meetingExport(context, params, result, 'extracted_action_items');
-          }
-          case 'normalize_transcript': {
-            const transcriptPath = params.transcript_path ? String(params.transcript_path) : '';
-            const raw = transcriptPath
-              ? String(
-                  safeReadFile(resolveExistingMeetingFile(transcriptPath, 'transcript_path'), {
-                    encoding: 'utf8',
-                  })
-                )
-              : String(params.transcript || '');
-            const attendees = (
-              Array.isArray(params.attendees)
-                ? params.attendees
-                : Array.isArray(context[String(params.attendees_from || 'attendees')])
-                  ? context[String(params.attendees_from || 'attendees')]
-                  : []
-            ) as Array<string | { name?: string }>;
-            const speakerAliases =
-              params.speaker_aliases && typeof params.speaker_aliases === 'object'
-                ? (params.speaker_aliases as Record<string, string>)
-                : {};
-            const normalized = normalizeTranscriptText(
-              raw,
-              { attendees, speakerAliases },
-              transcriptPath
-            );
-            return meetingExport(context, params, normalized, 'normalized_transcript');
-          }
-          case 'resolve_next_target': {
-            const events = (
-              Array.isArray(params.events)
-                ? params.events
-                : Array.isArray(context[String(params.events_from || 'events')])
-                  ? context[String(params.events_from || 'events')]
-                  : []
-            ) as CalendarLikeEvent[];
-            const target = resolveNextMeetingTarget(events, {
-              ...(params.now !== undefined ? { now: params.now as string | number } : {}),
-              ...(params.started_ago_min !== undefined
-                ? { started_ago_min: Number(params.started_ago_min) }
-                : {}),
-              ...(params.starts_within_min !== undefined
-                ? { starts_within_min: Number(params.starts_within_min) }
-                : {}),
-              ...(params.max_duration_sec !== undefined
-                ? { max_duration_sec: Number(params.max_duration_sec) }
-                : {}),
-            });
-            return meetingExport(context, params, target, 'meeting_target');
-          }
-          case 'generate_facilitation_script':
-            return meetingExport(
-              context,
-              params,
-              await generateFacilitationScriptOp({
-                ...(missionId ? { mission_id: missionId } : {}),
-                ...(workItemId ? { work_item_id: workItemId } : {}),
-                agenda: Array.isArray(params.agenda) ? params.agenda.map(String) : undefined,
-                ...(params.current_topic ? { current_topic: String(params.current_topic) } : {}),
-                ...(params.recent_transcript_chunk
-                  ? { recent_transcript_chunk: String(params.recent_transcript_chunk) }
-                  : {}),
-                ...(params.remaining_minutes !== undefined
-                  ? { remaining_minutes: Number(params.remaining_minutes) }
-                  : {}),
-                ...(params.facilitator_persona_label
-                  ? { facilitator_persona_label: String(params.facilitator_persona_label) }
-                  : {}),
-                ...(params.language ? { language: String(params.language) } : {}),
-              }),
-              'facilitation_script'
-            );
-          case 'generate_reminder_message': {
-            const item = params.item || context[String(params.item_from || 'item')];
-            if (!item || typeof item !== 'object') {
-              throw new Error('generate_reminder_message: missing params.item (ActionItem)');
-            }
-            return meetingExport(
-              context,
-              params,
-              await generateReminderMessageOp({
-                item: item as any,
-                ...(missionId ? { mission_id: missionId } : {}),
-                ...(workItemId ? { work_item_id: workItemId } : {}),
-                ...(params.days_overdue !== undefined
-                  ? { days_overdue: Number(params.days_overdue) }
-                  : {}),
-                ...(params.tone ? { tone: params.tone } : {}),
-                ...(params.language ? { language: String(params.language) } : {}),
-              }),
-              'reminder_message'
-            );
-          }
-          case 'run_action_item_reminder_sweep':
-            return meetingExport(
-              context,
-              params,
-              await runActionItemReminderSweepOp({
-                ...(Array.isArray(params.mission_ids)
-                  ? { mission_ids: params.mission_ids.map(String) }
-                  : {}),
-                tone: params.tone as 'friendly' | 'formal' | 'urgent' | undefined,
-                language: String(params.language || 'ja'),
-                max_items_per_mission: Number(params.max_items || 20),
-                ...(params.report_path ? { report_path: String(params.report_path) } : {}),
-              }),
-              'reminder_sweep_report'
-            );
-          case 'execute_self_action_items': {
-            if (!missionId) throw new Error('execute_self_action_items: mission_id is required');
-            const result = await executeSelfActionItemsOp({
-              mission_id: missionId,
-              ...(workItemId ? { work_item_id: workItemId } : {}),
-              language: String(params.language || 'ja'),
-            });
-            if (params.output_path) {
-              safeWriteFile(
-                resolveMeetingPath(String(params.output_path)),
-                JSON.stringify(result, null, 2)
-              );
-            }
-            return meetingExport(context, params, result, 'self_action_items_report');
-          }
-          case 'track_pending_action_items': {
-            if (!missionId) throw new Error('track_pending_action_items: mission_id is required');
-            const result = await trackPendingActionItemsOp({
-              mission_id: missionId,
-              ...(workItemId ? { work_item_id: workItemId } : {}),
-              tone: params.tone as 'friendly' | 'formal' | 'urgent' | undefined,
-              language: String(params.language || 'ja'),
-              max_items: Number(params.max_items || 20),
-            });
-            return meetingExport(context, params, result, 'pending_action_items_report');
-          }
-          case 'audit_speaker_fairness': {
-            if (!missionId) throw new Error('audit_speaker_fairness: mission_id is required');
-            const report = auditSpeakerFairnessOp({ mission_id: missionId });
-            if (params.output_path) {
-              safeWriteFile(
-                resolveMeetingPath(String(params.output_path)),
-                JSON.stringify(report, null, 2)
-              );
-            }
-            return meetingExport(context, params, report, 'speaker_fairness_report');
-          }
-          default:
-            throw new Error(`[UNKNOWN_OP] Unknown meeting op: ${op}`);
+        const params = resolveMeetingParams(rawParams, context) as Record<string, unknown>;
+        // Session verbs run through the audited transport; everything
+        // else shares the intelligence dispatch table.
+        if (isMeetingSessionOp(op) && op !== 'check_consent') {
+          return meetingExport(
+            context,
+            params,
+            await handleSessionAction({
+              action: op as MeetingAction['action'],
+              params: params as unknown as MeetingAction['params'],
+            }),
+            `meeting_${op}_result`
+          );
         }
+        if (isMeetingIntelligenceOp(op)) {
+          return meetingExport(
+            context,
+            params,
+            await dispatchMeetingIntelligenceOp(op, params, context),
+            op === 'resolve_next_target' ? 'meeting_target' : `${op}_result`
+          );
+        }
+        throw new Error(`[UNKNOWN_OP] Unknown meeting op: ${op}`);
       },
     },
   });
   return result as unknown as Record<string, unknown>;
 }
 
-export async function handleAction(
-  input: MeetingAction | MeetingPipelineAction
-): Promise<MeetingActionResult | Record<string, unknown>> {
-  if (input.action === 'pipeline') {
-    return await executeMeetingPipeline(input.steps || [], input.context || {}, input.options);
-  }
-  if (input.action === 'check_consent') {
-    const consent = checkSpeakConsent();
-    return {
-      status: consent.allowed ? 'success' : 'denied',
-      kind: 'voice_consent_check',
-      allowed: consent.allowed,
-      ...(consent.reason ? { message: consent.reason } : {}),
-    };
-  }
+/** Session transport with provider resolution, consent gate, and audit. */
+async function handleSessionAction(input: MeetingAction): Promise<MeetingActionResult> {
   const providerAdapter = resolveMeetingProvider(input.params.provider, input.params.url);
   if (providerAdapter && input.params.provider === 'auto') {
     input = {
       ...input,
       params: {
         ...input.params,
-        // Execution provider and platform id are meeting-platform registry data.
         provider: providerAdapter.executionProvider as MeetingActuatorProvider,
         platform: providerAdapter.platform as MeetingActuatorPlatform,
       },
@@ -839,9 +267,9 @@ export async function handleAction(
     platform: input.params.platform,
   });
 
-  // Explicit driver ids resolve through MeetingJoinDriver. `playwright` keeps
-  // the established subprocess path; `auto` tries the operator's Chrome and
-  // falls back to Playwright for unattended runs.
+  // Explicit driver ids resolve through MeetingJoinDriver. `playwright`
+  // keeps the established subprocess path; `auto` tries the operator's
+  // Chrome and falls back to Playwright for unattended runs.
   if (input.action === 'join' || input.action === 'listen') {
     const requested = String(input.params.join_backend || 'playwright')
       .trim()
@@ -905,42 +333,75 @@ export async function handleAction(
     }
   }
 
-  const bridgePath = path.resolve(
-    pathResolver.rootResolve('libs/actuators/meeting-actuator/meeting-bridge.py')
-  );
-  logger.info(`[MEETING] Executing action: ${input.action} on ${input.params.platform}`);
-
-  let parsed: MeetingActionResult;
-  try {
-    const raw = await retry(
-      async () =>
-        safeExec('python3', [bridgePath], {
-          input: JSON.stringify(input),
-        }),
-      buildRetryOptions()
-    );
-    const normalized = String(raw).trim();
-    if (!normalized) {
-      parsed = { status: 'error', message: 'meeting-bridge produced no output' };
-    } else {
-      parsed = parseMeetingActionResult(
-        parseSafeJsonInput(normalized, 'meeting bridge result')
-      ) || {
-        status: 'error',
-        message: 'meeting-bridge produced an invalid result envelope',
-      };
-    }
-  } catch (err: any) {
-    parsed = {
-      status: 'error',
-      platform: input.params.platform,
-      message: err?.message ?? String(err),
-    };
-  }
-
+  const parsed = await runPythonBridge(input);
   traceCtx.endSpan(parsed.status === 'error' ? 'error' : 'ok', parsed.message);
   parsed.audit_event_id = recordMeetingEvent(input, parsed);
   return { ...parsed, ...finalizeActuatorTrace(traceCtx) };
+}
+
+/** Direct single intelligence op with preflight (mirrors pipeline apply). */
+async function handleIntelligenceOp(op: string, params: Record<string, unknown>): Promise<unknown> {
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: `meeting:${op}`,
+    params,
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation meeting:${op} was not admitted.`}`
+    );
+  }
+  return dispatchMeetingIntelligenceOp(op, preflight.input as Record<string, unknown>, {});
+}
+
+export async function handleAction(
+  input: MeetingInput
+): Promise<MeetingActionResult | Record<string, unknown>> {
+  const normalized = parseMeetingActionInput(input) as MeetingInput;
+  if ((normalized as MeetingPipelineAction).action === 'pipeline') {
+    const pipeline = normalized as MeetingPipelineAction;
+    return executeMeetingPipeline(pipeline.steps || [], pipeline.context || {}, pipeline.options);
+  }
+  if ((normalized as MeetingOpAction).op) {
+    const single = normalized as MeetingOpAction;
+    if (single.op === 'check_consent') {
+      const consent = checkSpeakConsent();
+      return {
+        status: consent.allowed ? 'success' : 'denied',
+        kind: 'voice_consent_check',
+        allowed: consent.allowed,
+        ...(consent.reason ? { message: consent.reason } : {}),
+      };
+    }
+    if (isMeetingSessionOp(single.op)) {
+      return handleSessionAction({
+        action: single.op as MeetingAction['action'],
+        params: (single.params ?? {}) as MeetingAction['params'],
+      });
+    }
+    return (await handleIntelligenceOp(
+      single.op,
+      (single.params ?? {}) as Record<string, unknown>
+    )) as Record<string, unknown>;
+  }
+  const action = normalized as MeetingAction;
+  if (action.action === 'check_consent') {
+    const consent = checkSpeakConsent();
+    return {
+      status: consent.allowed ? 'success' : 'denied',
+      kind: 'voice_consent_check',
+      allowed: consent.allowed,
+      ...(consent.reason ? { message: consent.reason } : {}),
+    };
+  }
+  if (isMeetingIntelligenceOp(action.action)) {
+    return (await handleIntelligenceOp(
+      action.action,
+      (action.params ?? {}) as unknown as Record<string, unknown>
+    )) as Record<string, unknown>;
+  }
+  return handleSessionAction(action);
 }
 
 const main = async () => {

@@ -484,7 +484,13 @@
       "control": ["pipeline"]
     },
     "meeting": {
-      "capture": ["check_consent", "listen", "status"],
+      "capture": [
+        "check_consent",
+        "listen",
+        "normalize_transcript",
+        "resolve_next_target",
+        "status"
+      ],
       "transform": [],
       "apply": [
         "audit_speaker_fairness",
@@ -497,8 +503,6 @@
         "hearing_session",
         "join",
         "leave",
-        "normalize_transcript",
-        "resolve_next_target",
         "run_action_item_reminder_sweep",
         "speak",
         "track_pending_action_items",
