@@ -17,6 +17,7 @@ import {
   assertProviderEgress,
   resolveTenantProviderAttestation,
   checkProviderEgress,
+  describeProviderTierAvailability,
   highestTierForPaths,
   loadProviderEgressPolicy,
   providerIdForReasoningIdentifier,
@@ -538,5 +539,31 @@ describe('the gate reads the tenant profile as its own policy input', () => {
     );
     expect(denied.allowed).toBe(false);
     expect(denied.reason).toContain('conflicts with the active tenant scope');
+  });
+  it("reports per-tier LLM availability from that tenant's attestations only, without alerts", () => {
+    const acme = describeProviderTierAvailability({
+      tenant_slug: 'acme',
+      tenant_registry_root_dir: fixtureRoot,
+    });
+    const byTier = Object.fromEntries(acme.tiers.map((entry) => [entry.tier, entry]));
+    expect(byTier.public.usable.map((entry) => entry.provider)).toEqual(['clean', 'dirty']);
+    expect(byTier.confidential.usable).toEqual([
+      { provider: 'clean', basis: 'tenant-attestation' },
+    ]);
+    expect(byTier.personal.usable).toEqual([{ provider: 'clean', basis: 'tenant-attestation' }]);
+    expect(byTier.confidential.note).toBe('confidential: clean');
+
+    // Another tenant without an attestation gets nothing for confidential —
+    // and is told how to enable it.
+    const other = describeProviderTierAvailability({
+      tenant_slug: 'other',
+      tenant_registry_root_dir: fixtureRoot,
+    });
+    const otherConfidential = other.tiers.find((entry) => entry.tier === 'confidential')!;
+    expect(otherConfidential.usable).toEqual([]);
+    expect(otherConfidential.note).toContain('confidential: none');
+    expect(otherConfidential.note).toContain('pnpm onboarding llm attest --tenant other');
+    // A planning view must not raise an ops-alert per hypothetical denial.
+    expect(mocks.sendOpsAlert).not.toHaveBeenCalled();
   });
 });

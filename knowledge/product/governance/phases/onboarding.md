@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Onboarding'
 tags: [governance, lifecycle, onboarding]
-last_updated: 2026-10-04
+last_updated: 2026-10-08
 runtime_stages: [intake, classification]
 ---
 
@@ -87,6 +87,19 @@ pnpm tenant:activation activate ... --owner-id human:<owner> --apply --accept
 pnpm onboarding:context first-work --customer-slug <customer-slug> \
   --intent "<最初の依頼>" --dry-run --json
 ```
+
+tenant を登録したら、使うモデルと provider への送信許可を決める（標準フロー Step 5.1）。
+どちらも dry-run が既定で、attestation は `--apply --accept` で人間が明示したときだけ記録される。
+
+```bash
+pnpm onboarding llm show --tenant <tenant-slug>   # tier ごとに使える provider を表示する
+pnpm onboarding llm select --backend <mode> [--model <model-id>] --apply
+pnpm onboarding llm attest --tenant <tenant-slug> --provider <id> --training-use none \
+  --plan "<plan>" --basis <url|ref> --attested-by human:<owner> --apply --accept
+```
+
+attest しない限り、confidential・personal の material は local-only 以外の provider に送られない。
+`tenant:activation plan` の `llm_availability` で結果を確認する。
 
 未登録、`suspended`、`archived`、または reserved scope 名の tenant は先へ進めない。
 activation receipt が `active` になるまで、first-work の apply と tenant に紐づく mission は
