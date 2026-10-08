@@ -97,7 +97,7 @@ export default defineConfig({
     pool: 'forks',
     maxWorkers: 4,
     setupFiles: ['./tests/vitest-network-guard.ts'],
-    // Reports test writes that land in live active/ state (missions, audit, …).
+    // Reports test writes that land in live state (active/, knowledge/personal/, customer/, …).
     globalSetup: ['./tests/vitest-active-leak-guard.ts'],
     coverage: {
       provider: 'v8',

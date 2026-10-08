@@ -120,11 +120,13 @@ export interface UseVoiceResult {
   startListening: (onFinal: (text: string) => void, onInterim?: (text: string) => void) => boolean;
   stopListening: () => void;
   /** Tier 1: one server-side capture → STT → reply (already spoken server-side). */
-  listenOnce: () => Promise<VoiceListenOnceResponse>;
+  listenOnce: (isCurrent?: () => boolean) => Promise<VoiceListenOnceResponse>;
   /** Tier 0 output: read a reply aloud (cancels any previous utterance). */
   speakText: (text: string) => void;
   /** Stops browser TTS and (Tier 1) server TTS. */
   stopSpeaking: () => Promise<void>;
+  /** Withdraw local playback/mirroring without contacting or stopping the server. */
+  resetPlayback: () => void;
   /** Call after a voice-hub turn to mirror the server speaking state. */
   notifyServerSpeech: () => void;
   refreshStatus: () => Promise<void>;
@@ -163,6 +165,7 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
   const speechListenersRef = React.useRef(new Set<(event: VoiceSpeechEvent) => void>());
   const listenOnceInFlightRef = React.useRef(false);
   const speechPollRef = React.useRef<number | null>(null);
+  const playbackEpoch = React.useRef(0);
   const localeRef = React.useRef(locale);
   localeRef.current = locale;
 
@@ -227,6 +230,22 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
     }
   }, []);
 
+  const resetPlayback = React.useCallback(() => {
+    playbackEpoch.current += 1;
+    clearSpeechPoll();
+    playerRef.current?.stop();
+    try {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window)
+        window.speechSynthesis.cancel();
+    } catch {
+      // Browser playback cancellation is best-effort; never add a remote action.
+    }
+    setBrowserSpeaking(false);
+    setServerSpeaking(false);
+    setPlayerMode(null);
+    emitSpeechEvent({ type: 'end', mode: null });
+  }, [clearSpeechPoll, emitSpeechEvent]);
+
   const refreshStatus = React.useCallback(async () => {
     try {
       const response = await fetch('/api/voice/status');
@@ -258,6 +277,7 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
     const recognitionAtMount = recognitionRef;
     const playerAtMount = playerRef;
     return () => {
+      playbackEpoch.current += 1;
       clearSpeechPoll();
       playerAtMount.current?.dispose();
       playerAtMount.current = null;
@@ -296,12 +316,14 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
    * soon as the state reports idle or the max window elapses.
    */
   const notifyServerSpeech = React.useCallback(() => {
+    const epoch = playbackEpoch.current;
     setServerSpeaking(true);
     clearSpeechPoll();
     // PA-09: with an avatar attached, mirror host playback as synthetic motion.
     if (lipsyncRef.current) ensurePlayer()?.followHostSpeech({ speaking: true });
     const startedAt = Date.now();
     speechPollRef.current = window.setInterval(() => {
+      if (epoch !== playbackEpoch.current) return;
       if (Date.now() - startedAt > SPEECH_POLL_MAX_MS) {
         clearSpeechPoll();
         setServerSpeaking(false);
@@ -312,7 +334,7 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
         try {
           const response = await fetch('/api/voice/status');
           const payload = parseVoiceStatusResponse(await response.json());
-          if (!payload) return;
+          if (!payload || epoch !== playbackEpoch.current) return;
           if (payload.speech?.status !== 'speaking') {
             clearSpeechPoll();
             setServerSpeaking(false);
@@ -380,39 +402,45 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
     }
   }, []);
 
-  const listenOnce = React.useCallback(async (): Promise<VoiceListenOnceResponse> => {
-    if (listenOnceInFlightRef.current) return { ok: false, error: 'listen_in_flight' };
-    listenOnceInFlightRef.current = true;
-    setListening(true);
-    try {
-      const response = await fetch('/api/voice/listen-once', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          // Empty selection is an explicit Auto override; omitting backend
-          // is reserved for callers that want the persisted profile choice.
-          backend: sttBackend || 'auto',
-          device: inputDevice || undefined,
-          locale: speechLocale(localeRef.current),
-        }),
-      });
-      const payload = parseVoiceListenOnceResponse(await response.json().catch(() => null));
-      if (!payload) return { ok: false, error: `listen_failed_${response.status}` };
-      // spoken=true means the server-side TTS is reading the reply right now;
-      // mirror it in the speaking indicator (with the stop button).
-      if (payload.ok && payload.spoken) notifyServerSpeech();
-      return payload;
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    } finally {
-      listenOnceInFlightRef.current = false;
-      setListening(false);
-    }
-  }, [sttBackend, inputDevice, notifyServerSpeech]);
+  const listenOnce = React.useCallback(
+    async (isCurrent: () => boolean = () => true): Promise<VoiceListenOnceResponse> => {
+      if (listenOnceInFlightRef.current) return { ok: false, error: 'listen_in_flight' };
+      listenOnceInFlightRef.current = true;
+      setListening(true);
+      try {
+        const response = await fetch('/api/voice/listen-once', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            // Empty selection is an explicit Auto override; omitting backend
+            // is reserved for callers that want the persisted profile choice.
+            backend: sttBackend || 'auto',
+            device: inputDevice || undefined,
+            locale: speechLocale(localeRef.current),
+          }),
+        });
+        if (response.status === 401 || response.status === 403)
+          return { ok: false, error: `listen_failed_${response.status}` };
+        const payload = parseVoiceListenOnceResponse(await response.json().catch(() => null));
+        if (!payload) return { ok: false, error: `listen_failed_${response.status}` };
+        // spoken=true means the server-side TTS is reading the reply right now;
+        // mirror it in the speaking indicator (with the stop button).
+        if (payload.ok && payload.spoken && isCurrent()) notifyServerSpeech();
+        return payload;
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      } finally {
+        listenOnceInFlightRef.current = false;
+        setListening(false);
+      }
+    },
+    [sttBackend, inputDevice, notifyServerSpeech]
+  );
 
   const speakText = React.useCallback(
     (text: string) => {
       if (!voiceOutputEnabled || !text) return;
+      const epoch = playbackEpoch.current;
       if (lipsyncRef.current) {
         // PA-09: voice-hub audio in the browser (analyser mouth), falling back
         // to speechSynthesis (synthetic mouth) inside the player.
@@ -429,14 +457,17 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
         utterance.lang = speechLocale(localeRef.current);
         utterance.rate = 1.02;
         utterance.onstart = () => {
+          if (epoch !== playbackEpoch.current) return;
           setBrowserSpeaking(true);
           emitSpeechEvent({ type: 'start', mode: 'speech-synthesis' });
         };
         utterance.onend = () => {
+          if (epoch !== playbackEpoch.current) return;
           setBrowserSpeaking(false);
           emitSpeechEvent({ type: 'end', mode: 'speech-synthesis' });
         };
         utterance.onerror = () => {
+          if (epoch !== playbackEpoch.current) return;
           setBrowserSpeaking(false);
           emitSpeechEvent({ type: 'end', mode: 'speech-synthesis' });
         };
@@ -451,11 +482,7 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
   );
 
   const stopSpeaking = React.useCallback(async () => {
-    playerRef.current?.stop();
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-    setBrowserSpeaking(false);
+    resetPlayback();
     if (tier === 1 || serverSpeaking) {
       clearSpeechPoll();
       setServerSpeaking(false);
@@ -465,7 +492,7 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
         // Daemon unreachable — nothing is speaking server-side then.
       }
     }
-  }, [tier, serverSpeaking, clearSpeechPoll]);
+  }, [tier, serverSpeaking, clearSpeechPoll, resetPlayback]);
 
   return {
     supported: tier === 1 || recognitionSupported,
@@ -486,6 +513,7 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
     listenOnce,
     speakText,
     stopSpeaking,
+    resetPlayback,
     notifyServerSpeech,
     refreshStatus,
     speechMode:
