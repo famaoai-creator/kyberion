@@ -190,6 +190,12 @@ const VITEST_LIVE_SUBTREES = [
   // Audit hash-chain key (chain-integrity.ts); pairs with the sandboxed
   // shared/logs/audit/ so a test chain is keyed and verified inside the sandbox.
   'shared/runtime/audit/',
+  // Provider discovery disk cache: suites that probe or seed it must not
+  // rewrite the operator's cache (and a fresh CI checkout must stay clean).
+  'shared/runtime/provider-cache.json',
+  // Tenant token-bucket state and its lock (tenant-rate-limiter.ts).
+  'shared/runtime/tenant-rate-limit-state.json',
+  'shared/runtime/tenant-rate-limit-state.json.lock',
 ];
 export const VITEST_LIVE_SANDBOX_ROOT = 'active/shared/runtime/vitest-live';
 
