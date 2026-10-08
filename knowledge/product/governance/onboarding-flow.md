@@ -1,7 +1,7 @@
 ---
 title: オンボーディング標準フロー — 環境 / Identity / Tenant / Activation / First Work
 tags: [governance, onboarding, identity, tenant, organization, activation, first-work]
-last_updated: 2026-10-04
+last_updated: 2026-10-08
 kind: governance
 scope: repository
 authority: standard
@@ -56,6 +56,9 @@ Step 1〜2 → Step 3（個人 identity） → Step 4 → Step 5（onboard compa
 オンボーディングの governed facade（`stance:create`、`onboarding company`、`onboarding:context`、
 `tenant:activation`）は、それぞれ必要な権限（tenant registry を扱う onboarding 権限など）を
 自分で持つので、操作者 persona を設定しなくても動く。mission の作成も同様である。
+`tenant:activation` は `--tenant-slug` / `--organization-id` の tenant と組織に自分で束縛するので、
+`KYBERION_TENANT_SCOPE_REQUIRED=true` のシェルでも `KYBERION_TENANT` を設定せずに `plan` と `probe` が
+同じ環境で動く。
 
 persona が要るのは Step 10 の `pnpm organization` の書き込み系だけである。これは組織の運営状態を
 変える操作なので、操作者を明示する。`pnpm onboarding apply` は `KYBERION_PERSONA` を `.env.local` に
