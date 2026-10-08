@@ -139,6 +139,8 @@ import {
   readSchedulerOpsAlertDays,
   writeSchedulerOpsAlertDay,
   listUncoveredRuntimeDirs,
+  listUncoveredRuntimeEntries,
+  listUncoveredRuntimeFiles,
   DEFAULT_TMP_TTL_MS,
   DEFAULT_TRASH_GRACE_DAYS,
   DEFAULT_SUPERVISOR_EVENTS_RETENTION_DAYS,
@@ -1215,6 +1217,50 @@ describe('storage-janitor', () => {
       expect(uncovered).toContain('active/shared/runtime/undeclared');
       expect(uncovered).not.toContain('active/shared/runtime/declared-no-ttl');
     });
+
+    it('G01: top-level runtime files (ledgers/state) without an entry are reported, never deleted', () => {
+      writeCatalogFile({
+        version: '1.0.0',
+        entries: [
+          {
+            path: 'active/shared/runtime/declared-ledger.jsonl',
+            artifact_class: 'log',
+            action: 'review_required',
+            note: 'declared top-level ledger',
+          },
+        ],
+      });
+      const runtimeRoot = path.join(path.dirname(tmpDir), 'runtime');
+      const undeclared = path.join(runtimeRoot, 'undeclared-ledger.jsonl');
+      writeFile(undeclared);
+      setMtime(undeclared, 365 * RETENTION_DAY_MS);
+      writeFile(path.join(runtimeRoot, 'declared-ledger.jsonl'));
+      writeFile(path.join(runtimeRoot, 'undeclared-dir', 'x.json'));
+
+      expect(listUncoveredRuntimeFiles()).toContain(
+        'active/shared/runtime/undeclared-ledger.jsonl'
+      );
+      expect(listUncoveredRuntimeFiles()).not.toContain(
+        'active/shared/runtime/declared-ledger.jsonl'
+      );
+      // the dir-only list keeps its original shape
+      expect(listUncoveredRuntimeDirs()).not.toContain(
+        'active/shared/runtime/undeclared-ledger.jsonl'
+      );
+      expect(listUncoveredRuntimeEntries()).toEqual(
+        expect.arrayContaining([
+          'active/shared/runtime/undeclared-dir',
+          'active/shared/runtime/undeclared-ledger.jsonl',
+        ])
+      );
+
+      const report = runJanitor({ dryRun: false });
+      expect(report.uncoveredRuntimeFiles).toContain(
+        'active/shared/runtime/undeclared-ledger.jsonl'
+      );
+      expect(report.uncoveredRuntimeDirs).toContain('active/shared/runtime/undeclared-dir');
+      expect(fs.existsSync(undeclared)).toBe(true);
+    });
   });
 
   /** AL-04: deletion audit, soft-delete grace + restore, review_required. */
@@ -1425,6 +1471,7 @@ describe('storage-janitor', () => {
       const report = runJanitor({ dryRun: true });
       expect(report).toMatchObject({
         uncoveredRuntimeDirs: expect.any(Array),
+        uncoveredRuntimeFiles: expect.any(Array),
         reviewRequiredDirs: expect.any(Array),
         softDeleted: expect.any(Number),
         expiredTrash: expect.any(Number),
