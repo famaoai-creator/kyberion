@@ -27,6 +27,14 @@
       "rationale": "Requires explicit review evidence before a lockfile change is accepted."
     },
     {
+      "id": "ci-workflow-contract",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_ci_workflow_contract.ts"],
+      "owner": "release",
+      "rationale": "Keeps every workflow job time-boxed, pull_request workflows cancel superseded runs, actions on Node24 majors, and no redundant core build (operations-hygiene runbook §CI)."
+    },
+    {
       "id": "golden",
       "scope": "pr",
       "executable": "node",
