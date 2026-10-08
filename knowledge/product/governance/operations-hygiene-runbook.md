@@ -19,17 +19,17 @@ write mission evidence, or project lifecycle commands.
 That mission closed 16 gaps from the 2026-10-08 operations survey. Several had been fixed before and
 had regressed.
 
-| Class                         | Gate / check                                                       | Section |
-| ----------------------------- | ------------------------------------------------------------------ | ------- |
-| CI workflow drift             | `ci-workflow-contract` (scope `pr`)                                | §1      |
-| Undeclared runtime stores     | `runtime-store-retention` (scope `pr`), janitor `uncovered*` lists | §2      |
-| Daemons and child processes   | unit tests per daemon; this checklist in review                    | §3      |
-| stdout / logging in libraries | eslint `no-console` on `libs/`                                     | §4      |
-| Test pollution and host deps  | Vitest leak guard, strict in CI (`KYBERION_TEST_LEAK_STRICT=1`)    | §5      |
-| Tenant scope and facade env   | `tier-guard-tenant` tests, facade binding tests                    | §6      |
-| LLM / provider calls          | per-call-site egress tests (e.g. `mission-distill-egress.test.ts`) | §7      |
-| Mission evidence overwrites   | generator path tests (e.g. `mission-retrospective.test.ts`)        | §8      |
-| Project lifecycle facades     | lifecycle regressions in `project-management.test.ts`              | §9      |
+| Class                         | Gate / check                                                          | Section |
+| ----------------------------- | --------------------------------------------------------------------- | ------- |
+| CI workflow drift             | `ci-workflow-contract` (scope `pr`)                                   | §1      |
+| Undeclared runtime stores     | `runtime-store-retention` (scope `pr`), janitor `uncovered*` lists    | §2      |
+| Daemons and child processes   | unit tests per daemon; this checklist in review                       | §3      |
+| stdout / logging in libraries | eslint `no-console` on `libs/`                                        | §4      |
+| Test pollution and host deps  | Vitest leak guard, strict in CI (`KYBERION_TEST_LEAK_STRICT=1`)       | §5      |
+| Tenant scope and facade env   | `tier-guard-tenant` tests, facade binding tests                       | §6      |
+| LLM / provider calls          | per-call-site egress tests (e.g. `mission-distill-egress.test.ts`)    | §7      |
+| Mission evidence overwrites   | generator and phase-pipeline tests in `mission-retrospective.test.ts` | §8      |
+| Project lifecycle facades     | lifecycle regressions in `project-management.test.ts`                 | §9      |
 
 ---
 
@@ -296,6 +296,12 @@ step) get their own file names.
   `evidence/retrospective-stats.md` and `evidence/retrospective.json`. It never writes
   `evidence/retrospective.md`, which is the hand-written deliverable of the retrospective task
   (MSN-OPS-ROUND3-20261008).
+- Pipeline templates count as generators. The `pipeline_ref` template of a `judgment`, `review` or
+  `approval` phase may read evidence, but must not target that phase's deliverable. Only a
+  `deterministic` phase's deliverable is the pipeline's own output. Resolve mission paths through
+  the engine-derived `{{mission_evidence_dir}}`, never a hand-built `active/missions/{{mission_id}}`
+  (which skips the tier directory). Example: `post-release-retrospective` writes
+  `evidence/retrospective-packet.md`, not `evidence/retrospective.md`.
 
 **Procedure:**
 
@@ -305,7 +311,9 @@ step) get their own file names.
 2. Add a test that fails if the generator overwrites the path: seed a hand-written file at the
    deliverable path, run the generator, and assert the file is byte-identical and that the
    generated output is in its own file. Also assert that the generated path is not a declared
-   deliverable (pattern: `mission-retrospective.test.ts`).
+   deliverable (pattern: `mission-retrospective.test.ts`). The same file checks every
+   non-deterministic phase's `pipeline_ref` template against the phase's deliverables; keep it
+   green when you add or edit a phase pipeline.
 3. Update every reader and link of a renamed generated file in the same PR: `report_path`
    consumers, `notifyOperator` `link_hint`, phase docs and playbooks.
 

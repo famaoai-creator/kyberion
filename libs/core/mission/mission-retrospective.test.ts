@@ -792,6 +792,56 @@ describe('mission retrospective loop', () => {
     }
   });
 
+  it('keeps phase pipelines from writing the deliverable a non-deterministic phase records', () => {
+    // A judgment / review / approval phase's deliverable is authored by the
+    // team and recorded via record-evidence. The phase's pipeline_ref template
+    // may read evidence, but must not target that deliverable path (in its
+    // context or steps) — a pipeline write would truncate the recorded file or
+    // satisfy the task with boilerplate. Deterministic phases are the
+    // pipeline's own output and are exempt.
+    const repoRoot = process.cwd();
+    const catalog: unknown = JSON.parse(
+      fs.readFileSync(
+        path.join(repoRoot, 'knowledge/product/governance/mission-workflow-catalog.json'),
+        'utf8'
+      )
+    );
+    type Phase = { id?: string; kind?: string; pipeline_ref?: string; default_tasks?: unknown };
+    const phases: Phase[] = [];
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) return node.forEach(walk);
+      if (!node || typeof node !== 'object') return;
+      const record = node as Record<string, unknown>;
+      if (typeof record.pipeline_ref === 'string') phases.push(record as Phase);
+      Object.values(record).forEach(walk);
+    };
+    walk(catalog);
+
+    const violations: string[] = [];
+    let checked = 0;
+    for (const phase of phases) {
+      if (phase.kind === 'deterministic' || !phase.pipeline_ref) continue;
+      const templatePath = path.join(repoRoot, phase.pipeline_ref);
+      if (!fs.existsSync(templatePath)) continue;
+      const template = JSON.parse(fs.readFileSync(templatePath, 'utf8')) as Record<string, unknown>;
+      const writable = JSON.stringify({ context: template.context, steps: template.steps });
+      const tasks = Array.isArray(phase.default_tasks) ? phase.default_tasks : [];
+      for (const task of tasks as Array<{ deliverable?: unknown }>) {
+        if (typeof task.deliverable !== 'string') continue;
+        checked += 1;
+        const fileName = task.deliverable.replace(/^evidence\//u, '');
+        const escaped = fileName.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+        if (new RegExp(`(?:evidence|\\}\\})/${escaped}(?![\\w.-])`, 'u').test(writable)) {
+          violations.push(
+            `${phase.id} (${phase.kind}) → ${phase.pipeline_ref}: ${task.deliverable}`
+          );
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+    expect(violations).toEqual([]);
+  });
+
   it('does not create evidence/retrospective.md when no deliverable was recorded', async () => {
     backendName.value = 'stub';
     const result = await mod.runMissionRetrospective(MISSION);
