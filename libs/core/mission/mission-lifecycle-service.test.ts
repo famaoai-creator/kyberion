@@ -5,6 +5,7 @@ import { withExecutionContext } from '../authority.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { resetAgentIdentityServiceForTests } from '../agent/agent-identity.js';
 import * as pathResolver from '../path-resolver.js';
+import { tenantProfilePath } from '../organization/tenant-registry.js';
 import {
   buildMissionLifecycleService,
   MissionLifecycleGovernedError,
@@ -414,6 +415,10 @@ describe('mission-lifecycle-service — argv independence (SO-01 landmine regres
     // set MISSION_ROLE directly for the duration (the outer beforeEach/
     // afterEach in this file save and restore it).
     process.env.MISSION_ROLE = 'mission_controller';
+    // G18: the real start() bootstraps the default tenant outside Vitest
+    // only; a test run must not create it in the operator's personal tier.
+    const defaultTenantFile = tenantProfilePath('default');
+    const defaultTenantExisted = fs.existsSync(defaultTenantFile);
     await realFacade.start(
       missionIdArgvPolluted,
       'public',
@@ -452,6 +457,7 @@ describe('mission-lifecycle-service — argv independence (SO-01 landmine regres
     expect((cleanState as any).is_ephemeral).toBeFalsy();
     expect(pollutedState!.status).toBe(cleanState!.status);
     expect(pollutedState!.status).toBe('active');
+    expect(fs.existsSync(defaultTenantFile)).toBe(defaultTenantExisted);
   });
 });
 
