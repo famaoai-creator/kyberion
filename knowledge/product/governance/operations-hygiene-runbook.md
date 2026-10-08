@@ -12,7 +12,8 @@ area, and the automated check that enforces the rule. A defect class that recurs
 was missing or unenforced. Fix the defect, then extend this runbook or its gate in the same PR.
 
 **Audience.** Anyone (human or agent) who changes CI workflows, runtime stores, daemons, child
-processes, library logging, tests, tenant-scoped facades, or LLM/provider calls.
+processes, library logging, tests, tenant-scoped facades, LLM/provider calls, or generators that
+write mission evidence.
 
 **Origin.** MSN-OPS-GAPS-20261008 (organization `kyberion-ops`, project `PRJ-OPS-IMPROVEMENT`).
 That mission closed 16 gaps from the 2026-10-08 operations survey. Several had been fixed before and
@@ -27,6 +28,7 @@ had regressed.
 | Test pollution and host deps  | Vitest leak guard, strict in CI (`KYBERION_TEST_LEAK_STRICT=1`)    | §5      |
 | Tenant scope and facade env   | `tier-guard-tenant` tests, facade binding tests                    | §6      |
 | LLM / provider calls          | per-call-site egress tests (e.g. `mission-distill-egress.test.ts`) | §7      |
+| Mission evidence overwrites   | generator path tests (e.g. `mission-retrospective.test.ts`)        | §8      |
 
 ---
 
@@ -274,6 +276,37 @@ the test passes against the sandbox while the writer leaks into live state.
    write to the shared ops-alert sink.
 3. For a new provider CLI invocation, assert in a test that argv carries the tool-disabling flags
    and no prompt text, and that the child's cwd is not the repository root.
+
+---
+
+## §8 Mission evidence: generated files and recorded deliverables
+
+**Rule:** a generator never writes to a path that a task records as its deliverable. Generated
+artifacts (stats, reports, manifests written by `finish`, `verify`, dispatch or any other automatic
+step) get their own file names.
+
+- A task's `deliverable` path (from `mission-workflow-catalog.json` and the other workflow
+  templates) belongs to whoever records it with `record-evidence`. Writing it from a generator
+  silently replaces recorded evidence.
+- A generator also does not create a deliverable path when the file is absent. Task
+  auto-completion trusts the existence of the deliverable (`tryAutoCompleteTaskFromEvidence`), so a
+  generated placeholder would close a task that nobody did.
+- Example: `mission finish` runs the retrospective generator. It writes
+  `evidence/retrospective-stats.md` and `evidence/retrospective.json`. It never writes
+  `evidence/retrospective.md`, which is the hand-written deliverable of the retrospective task
+  (MSN-OPS-ROUND3-20261008).
+
+**Procedure:**
+
+1. When you add or change a write under a mission's `evidence/`, grep the workflow templates for
+   the path (`grep -rn '"deliverable": "evidence/<name>"' knowledge/product/`). If a template
+   declares it, pick a different name.
+2. Add a test that fails if the generator overwrites the path: seed a hand-written file at the
+   deliverable path, run the generator, and assert the file is byte-identical and that the
+   generated output is in its own file. Also assert that the generated path is not a declared
+   deliverable (pattern: `mission-retrospective.test.ts`).
+3. Update every reader and link of a renamed generated file in the same PR: `report_path`
+   consumers, `notifyOperator` `link_hint`, phase docs and playbooks.
 
 ---
 
