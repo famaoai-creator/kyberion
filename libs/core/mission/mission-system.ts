@@ -22,6 +22,7 @@ import {
   approveScopeChange as _approveScopeChange,
   createCheckpoint as _createCheckpoint,
   purgeMissions as _purgeMissions,
+  type PurgeMissionsOptions,
   recordArtifactReview as _recordArtifactReview,
   recordEvidence as _recordEvidence,
   recordTask as _recordTask,
@@ -303,8 +304,8 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         return syncProjectOperationalStateIfLinked(missionId).then(() => result);
       });
     },
-    purgeMissions(dryRun = false) {
-      return _purgeMissions(rootDir, dryRun);
+    purgeMissions(dryRun = false, options?: PurgeMissionsOptions) {
+      return _purgeMissions(rootDir, dryRun, options);
     },
     showMissionTeam(id: string, refresh = false, providerPreference?: TeamProviderPreference) {
       return _showMissionTeam(id, refresh, rootDir, providerPreference);

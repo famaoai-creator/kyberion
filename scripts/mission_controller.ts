@@ -589,7 +589,16 @@ async function purgeMissions(dryRun: boolean = false): Promise<void> {
   // AL-01: purgeMissions now returns a structured PurgeMissionsResult; the
   // CLI router's context type is (dryRun?) => Awaitable<void> and never
   // consumed a return value, so drop it here to keep the thin-router contract.
-  await missionSystem.purgeMissions(dryRun);
+  // The library returns rows and never writes to stdout (G08); the human
+  // table is rendered here, before any archive log lines.
+  const { formatPurgeCandidateTable } = await import('@agent/core/mission/mission-maintenance');
+  await missionSystem.purgeMissions(dryRun, {
+    onCandidates: (candidates) => {
+      for (const line of formatPurgeCandidateTable(ROOT_DIR, candidates)) {
+        printOutput(line);
+      }
+    },
+  });
 }
 
 async function archiveMissions(
