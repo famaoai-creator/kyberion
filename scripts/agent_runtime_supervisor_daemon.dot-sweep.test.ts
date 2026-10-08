@@ -104,6 +104,9 @@ const B: LoadedDotCharter = { path: 'dots/b.json', charter: charter('b') };
 const NOW = new Date('2026-10-04T10:00:00Z');
 
 beforeEach(() => {
+  // The module registers the real supervisor steps (outcomes, autonomy, …) at
+  // import; they would write dot state into the live active/ tree.
+  DOT_SUPERVISOR_STEPS.length = 0;
   resetDotSweepStateForTests();
   mocks.due.clear();
   mocks.runnerSources.length = 0;
