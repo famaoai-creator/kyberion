@@ -214,6 +214,15 @@ describe('vitest live-state sandbox', () => {
     );
   });
 
+  it('routes repo-root live stores outside active/ (work/metrics) into the sandbox', () => {
+    const metricsDir = resolve('work/metrics');
+    expect(metricsDir.startsWith(sandbox)).toBe(true);
+    expect(metricsDir).toMatch(/pool-[\w-]+[\\/]repo[\\/]work[\\/]metrics$/);
+    expect(rootResolve('work/metrics/resource-usage.jsonl').startsWith(sandbox)).toBe(true);
+    expect(vitestLivePath(metricsDir)).toBe(metricsDir);
+    expect(resolve('work/other/file.json')).toBe(path.join(rootDir(), 'work/other/file.json'));
+  });
+
   it('leaves other paths alone and never re-maps a sandbox path', () => {
     const tmp = shared('tmp/scratch.json');
     expect(tmp).toBe(path.join(rootDir(), 'active/shared/tmp/scratch.json'));
