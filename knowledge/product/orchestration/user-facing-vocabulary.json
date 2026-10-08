@@ -24024,6 +24024,26 @@
         "ja": "Google と Microsoft 以外の IdP は、knowledge/product/governance/egress-policy.json で通信先を許可する必要があります。",
         "qps-ploc": "⟦Ïḓėñŧïŧẏ ṗřőṽïḓėřş őŧħėř ŧħȧñ Ɠőőɠŀė ȧñḓ Ɱïƈřőşőƒŧ ɱůşŧ ƀė ȧŀŀőẇėḓ ïñ ķñőẇŀėḓɠė/ṗřőḓůƈŧ/ɠőṽėřñȧñƈė/ėɠřėşş-ṗőŀïƈẏ.ĵşőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
       },
+      "sso_link_title": {
+        "en": "Link your identity provider account",
+        "ja": "IdP アカウントを紐付ける"
+      },
+      "sso_link_lead": {
+        "en": "Sign in with your identity provider once to link that account to you. From then on you can sign in to every surface with it.",
+        "ja": "IdP で一度サインインすると、そのアカウントがあなたに紐付きます。以後はそのアカウントで全サーフェスにサインインできます。"
+      },
+      "sso_link_button": {
+        "en": "Link my account",
+        "ja": "自分のアカウントを紐付ける"
+      },
+      "sso_linked": {
+        "en": "Your identity provider account is linked.",
+        "ja": "IdP アカウントを紐付けました。"
+      },
+      "sso_link_unavailable": {
+        "en": "Linking is not available yet. Save the SSO settings first.",
+        "ja": "まだ紐付けできません。先に SSO 設定を保存してください。"
+      },
       "sso_link_hint": {
         "en": "After signing in with your identity provider, bind the issuer and subject shown on screen to your member under Settings › Organization and members.",
         "ja": "IdP でサインインしたら、画面に表示される issuer と subject を「設定 › 組織とメンバー」で自分に紐付けてください。",
@@ -28340,6 +28360,10 @@
         "en": "That request is not supported here. Start again from the sign-in page.",
         "ja": "この操作はここではできません。サインイン画面からやり直してください。",
         "qps-ploc": "⟦Ŧħȧŧ řėɋůėşŧ ïş ñőŧ şůṗṗőřŧėḓ ħėřė. Şŧȧřŧ ȧɠȧïñ ƒřőɱ ŧħė şïɠñ-ïñ ṗȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "failed_link_failed": {
+        "en": "This identity provider account could not be linked. It may already belong to another member, or your member is not active. Ask an owner to check Settings › Organization and members.",
+        "ja": "この IdP アカウントは紐付けできませんでした。すでに別のメンバーに紐付いているか、あなたのメンバーが有効ではない可能性があります。owner に「設定 › 組織とメンバー」を確認してもらってください。"
       },
       "failed_logout_blocked": {
         "en": "A sign-out request from another site was ignored, so you are still signed in. Use the sign-out control in this app to sign out.",

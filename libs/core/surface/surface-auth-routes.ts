@@ -203,6 +203,70 @@ function isSecureOrigin(origin: string): boolean {
   return origin.startsWith('https://');
 }
 
+/**
+ * `Secure` follows the origin the browser actually uses: the DECLARED public
+ * origin when there is one (a TLS-terminating proxy hands the app an http
+ * request origin even though the user is on https), else the request origin.
+ */
+function cookieSecure(req: OriginRequest, deps: OidcLoginDeps): boolean {
+  return isSecureOrigin(publicOriginFor(req, deps) ?? req.requestOrigin);
+}
+
+type OriginRequest = { surfaceId: string; requestOrigin: string; loopback: boolean };
+
+function publicOriginFor(req: OriginRequest, deps: OidcLoginDeps): string | null {
+  const loginConfig = resolveOidcLoginConfig(deps).config;
+  return loginConfig
+    ? resolveOidcRedirectOrigin(loginConfig, {
+        surfaceId: req.surfaceId,
+        requestOrigin: req.requestOrigin,
+        loopback: req.loopback,
+      })
+    : null;
+}
+
+export type SurfaceIdentityLinkStart =
+  { ok: true; location: string; setCookies: string[] } | { ok: false; view: SurfaceLoginView };
+
+/**
+ * Start an OIDC login that binds the IdP account to `linkMemberId` on
+ * callback. The caller must have authenticated that member already; the
+ * returned transaction cookie is the only carrier of the link intent.
+ */
+export async function startSurfaceIdentityLink(
+  req: {
+    surfaceId: string;
+    requestOrigin: string;
+    loopback: boolean;
+    linkMemberId: string;
+    next?: string | null;
+  },
+  deps: OidcLoginDeps = {}
+): Promise<SurfaceIdentityLinkStart> {
+  const started = await startOidcLogin(
+    {
+      surfaceId: req.surfaceId,
+      requestOrigin: req.requestOrigin,
+      loopback: req.loopback,
+      next: sanitizeNextPath(req.next),
+      linkMemberId: req.linkMemberId,
+    },
+    deps
+  );
+  if (started.ok === false) return started;
+  return {
+    ok: true,
+    location: started.location,
+    setCookies: [
+      serializeCookie(started.transactionCookie.name, started.transactionCookie.value, {
+        maxAgeSeconds: started.transactionCookie.maxAgeSeconds,
+        secure: cookieSecure(req, deps),
+        sameSite: 'Lax',
+      }),
+    ],
+  };
+}
+
 function startHref(next: string): string {
   return next === '/'
     ? SURFACE_AUTH_START_PATH
@@ -230,17 +294,7 @@ export async function handleSurfaceAuthRoute(
     return html(req, 429, { kind: 'failed', code: 'rate_limited' }, [], { 'Retry-After': '60' });
   }
   const next = sanitizeNextPath(req.searchParams.get('next'));
-  // `Secure` follows the origin the browser actually uses: the DECLARED public
-  // origin when there is one (a TLS-terminating proxy hands the app an http
-  // request origin even though the user is on https), else the request origin.
-  const loginConfig = resolveOidcLoginConfig(deps).config;
-  const publicOrigin = loginConfig
-    ? resolveOidcRedirectOrigin(loginConfig, {
-        surfaceId: req.surfaceId,
-        requestOrigin: req.requestOrigin,
-        loopback: req.loopback,
-      })
-    : null;
+  const publicOrigin = publicOriginFor(req, deps);
   const secure = isSecureOrigin(publicOrigin ?? req.requestOrigin);
 
   switch (req.pathname) {

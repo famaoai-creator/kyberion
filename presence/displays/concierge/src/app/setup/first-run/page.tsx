@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useConciergeI18n } from '../../../lib/use-concierge-i18n';
 import { frontDeskText } from '../../../lib/i18n';
 import { storeFrontDeskToken } from '../../../lib/front-desk-auth-token';
+import { IdentityLinkSection } from '../identity-link-section';
 import { SsoSettingsForm } from '../sso-settings-form';
 
 /**
@@ -96,6 +97,7 @@ export default function FirstRunSetupPage() {
           <code style={{ userSelect: 'all', wordBreak: 'break-all' }}>{claimed.token}</code>
         </p>
         <SsoSettingsForm />
+        <IdentityLinkSection />
         <div className="button-row">
           <a className="action-button" href="/">
             {frontDeskText('first_run_finish', locale)}

@@ -1,4 +1,6 @@
 import type { NextRequest } from 'next/server';
+import { withExecutionContext } from '@agent/core/authority';
+import { linkMemberExternalIdentity } from '@agent/core/organization/member-identity-link';
 import { handleSurfaceAuthRoute } from '@agent/core/surface/surface-auth-routes';
 import { isLoopbackPeer } from './loopback-peer';
 import { getRegisteredEnvBool } from '@agent/core/foundation/env';
@@ -9,32 +11,43 @@ export const CONCIERGE_SURFACE_ID = 'concierge';
 export const CONCIERGE_SURFACE_LABEL = 'Concierge';
 export const CONCIERGE_TOKEN_SIGNIN_HREF = '/signin';
 
+/** Self-link writes a member profile, which needs the concierge's personal-tier authority. */
+function linkIdentity(memberId: string, identity: { issuer: string; subject: string }): void {
+  withExecutionContext('sovereign_concierge', () => {
+    const result = linkMemberExternalIdentity(memberId, identity);
+    if (result.status === 'member_not_found') throw new Error('member not found');
+  });
+}
+
 /** Adapt a NextRequest to the shared browser-OIDC route handler. */
 export async function handleConciergeAuthRoute(req: NextRequest): Promise<Response> {
   const url = new URL(req.url);
-  const result = await handleSurfaceAuthRoute({
-    surfaceId: CONCIERGE_SURFACE_ID,
-    surfaceLabel: CONCIERGE_SURFACE_LABEL,
-    method: req.method,
-    pathname: url.pathname,
-    searchParams: url.searchParams,
-    cookieHeader: req.headers.get('cookie'),
-    acceptLanguage: req.headers.get('accept-language'),
-    requestOrigin: url.origin,
-    loopback: isLoopbackPeer(req),
-    clientKey: resolveAuthClientKey({
-      ip: (req as { ip?: string }).ip,
-      forwardedFor: req.headers.get('x-forwarded-for'),
-      realIp: req.headers.get('x-real-ip'),
-      trustProxy: getRegisteredEnvBool('KYBERION_TRUST_PROXY') === true,
-    }),
-    secFetchSite: req.headers.get('sec-fetch-site'),
-    referrerOrigin: req.headers.get('origin') ?? req.headers.get('referer'),
-    tokenSignInHref: CONCIERGE_TOKEN_SIGNIN_HREF,
-    ...(url.pathname === '/login' && firstRunOpen()
-      ? { firstRunSetupHref: FIRST_RUN_SETUP_HREF }
-      : {}),
-  });
+  const result = await handleSurfaceAuthRoute(
+    {
+      surfaceId: CONCIERGE_SURFACE_ID,
+      surfaceLabel: CONCIERGE_SURFACE_LABEL,
+      method: req.method,
+      pathname: url.pathname,
+      searchParams: url.searchParams,
+      cookieHeader: req.headers.get('cookie'),
+      acceptLanguage: req.headers.get('accept-language'),
+      requestOrigin: url.origin,
+      loopback: isLoopbackPeer(req),
+      clientKey: resolveAuthClientKey({
+        ip: (req as { ip?: string }).ip,
+        forwardedFor: req.headers.get('x-forwarded-for'),
+        realIp: req.headers.get('x-real-ip'),
+        trustProxy: getRegisteredEnvBool('KYBERION_TRUST_PROXY') === true,
+      }),
+      secFetchSite: req.headers.get('sec-fetch-site'),
+      referrerOrigin: req.headers.get('origin') ?? req.headers.get('referer'),
+      tokenSignInHref: CONCIERGE_TOKEN_SIGNIN_HREF,
+      ...(url.pathname === '/login' && firstRunOpen()
+        ? { firstRunSetupHref: FIRST_RUN_SETUP_HREF }
+        : {}),
+    },
+    { linkIdentity }
+  );
   if (!result) return new Response('Not found', { status: 404 });
   const headers = new Headers(result.headers);
   for (const cookie of result.setCookies) headers.append('Set-Cookie', cookie);

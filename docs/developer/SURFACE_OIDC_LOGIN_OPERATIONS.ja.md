@@ -68,7 +68,7 @@ pnpm organization first-run status          # まだ開いているか
 1. 表示された `http://localhost:3050/setup/first-run#code=…` を開き、組織 ID・組織名・自分の表示名を入れて「セットアップする」。
 2. owner に紐付くアクセストークンが**一度だけ**表示されます。このタブはそのトークンでサインイン済みになります。他のサーフェスでは `/signin` や Bearer ヘッダーで使います。
 3. 続けて SSO の issuer / client id / client secret を保存します。画面に出るリダイレクト URI を IdP に登録します。
-4. IdP でサインインし、未登録画面に出た `issuer` / `subject` を「設定 › 組織とメンバー」の SSO 欄で自分に紐付けます。
+4. 「自分のアカウントを紐付ける」を押して IdP でサインインすると、その IdP アカウントが自分(owner)に紐付きます。以後は全サーフェスの `/login` から IdP でサインインできます。トークンは画面を離れる前に控えてください。
 
 - コードは SHA-256 ハッシュだけを secret-guard(`kyberion-first-run`)に保存します。既定 30 分、失敗 5 回で失効、使用で失効します。再発行すると前のコードは無効になります。
 - URL のコードは fragment(`#code=`)に置くので、サーバーやプロキシのログには残りません。
@@ -169,7 +169,8 @@ export KYBERION_OIDC_PROVIDER_LABEL=Microsoft
 
 1. owner が concierge の「設定 › 組織とメンバー」で、対象 member の「SSO」欄に `issuer`(`KYBERION_OIDC_ISSUER` と同じ値)と `subject`(`sub`)を入力して紐付けます。API は `PATCH /api/members/<member_id>` の `external_identity`(紐付け)/ `external_identity_remove`(解除)です。紐付けはその member の**全 tenant の権限**をそのアカウントに与える操作なので、member が所属するすべての tenant で owner であることが必要です。1 組の `issuer`+`subject` は 1 人の member にしか紐付けられません(重複は 409)。
 2. 利用者が先にサインインを試すと、未登録画面に `issuer` / `subject` が表示されます。これを管理者に伝えれば、そのまま貼り付けて紐付けられます。
-3. 紐付けた member の `memberships`(tenant ごとの役割)が、そのまま閲覧・操作の範囲になります。詳細は [external-identity-member-mapping](../../knowledge/product/architecture/external-identity-member-mapping.md)。
+3. **自分で紐付ける**: トークン(`/signin`)などで concierge にサインイン済みの member は、`/setup/sso` の「自分のアカウントを紐付ける」から IdP でサインインすると、そのアカウントを自分に紐付けられます(`POST /api/setup/link-identity`)。紐付け先の member はサインイン中の viewer からサーバー側で決まり、HMAC 署名付きのログイン transaction cookie(10 分)にだけ入ります。callback では、未紐付けのアカウントだけを紐付けます。別の member に紐付いたアカウントは拒否し(「紐付けできませんでした」)、その member としてサインインさせることもしません。停止中の member にも紐付けません。監査には member id と subject のダイジェストだけを残します。
+4. 紐付けた member の `memberships`(tenant ごとの役割)が、そのまま閲覧・操作の範囲になります。詳細は [external-identity-member-mapping](../../knowledge/product/architecture/external-identity-member-mapping.md)。
 
 ## 確認手順
 
