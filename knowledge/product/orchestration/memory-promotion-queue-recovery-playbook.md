@@ -1,7 +1,7 @@
 ---
 title: 'Memory Promotion Queue Recovery Playbook — draining a stuck candidate backlog'
 tags: [governance, knowledge, memory-promotion, curation, maintenance]
-last_updated: 2026-10-05
+last_updated: 2026-10-08
 runtime_stages: [review]
 ---
 
@@ -62,7 +62,8 @@ pnpm pipeline --input pipelines/knowledge-curation-weekly.json   # weekly report
 ## Recovery recipe (per stale candidate)
 
 1. `memory-review <id>` — collect blockers.
-2. Curate: read `distillation.md` / `retrospective.md` (active mission dir, else
+2. Curate: read `distillation.md` / `retrospective.md` (the hand-written retrospective;
+   generated stats are in `retrospective-stats.md`) (active mission dir, else
    `active/archive/missions/<MSN>/evidence/`). Extract the durable lesson — a
    "mission delivered X, PR merged" status report is NOT knowledge. Reject thin,
    test, probe, or already-shipped duplicates instead.
