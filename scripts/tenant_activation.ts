@@ -14,6 +14,7 @@ import {
 } from '@agent/core/organization/tenant-activation';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
+import { describeProviderTierAvailability } from '@agent/core/provider/provider-egress-gate';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
@@ -91,6 +92,8 @@ function usage(): string {
     '  Probe refs: --probe-ref viewer_scope=<audit-ref> --probe-ref nhi_provisioned=<audit-ref> ...',
     '  `probe` runs all four checks, writes evidence beside the receipt, and prints the activate command.',
     '  A ref is either <scheme>://... (external attestation) or an existing repository path.',
+    '  `plan` also prints llm_availability: per data tier, the providers usable for LLM work',
+    '  (attest one with `pnpm onboarding llm attest` to enable confidential/personal tiers).',
   ].join('\n');
 }
 
@@ -165,6 +168,26 @@ function dispatch(command: string, argv: string[], print: Print): void {
                   accept: argv.includes('--accept'),
                 })
               : resolveTenantActivation(activationInput);
+  if (command === 'plan') {
+    // Show the consequence of the tenant's provider attestations before work
+    // starts: which providers each data tier can use for LLM work.
+    print(
+      JSON.stringify(
+        {
+          ...result,
+          llm_availability: describeProviderTierAvailability({
+            tenant_slug: activationInput.tenantSlug,
+            ...(activationInput.rootDir
+              ? { tenant_registry_root_dir: activationInput.rootDir }
+              : {}),
+          }),
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
   print(JSON.stringify(result, null, 2));
 }
 

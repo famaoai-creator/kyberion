@@ -236,6 +236,13 @@ the test passes against the sandbox while the writer leaks into live state.
     say so explicitly.
   - Skip a denied provider and degrade (next provider, or a no-LLM path). Do not add
     `approved_providers` exceptions to make a call site work.
+  - To enable LLM work on confidential/personal material for a tenant, the operator attests the
+    provider's plan explicitly with `pnpm onboarding llm attest` (`--training-use none` plus
+    `--plan`, `--basis`, `--attested-by`, then `--apply --accept`). It uses the same store and
+    audit action `tenant.attest_provider` as `pnpm tenant attest-provider`. Never attest on the
+    operator's behalf. `pnpm onboarding llm show --tenant <slug>` and `tenant:activation plan`
+    (`llm_availability`) show which providers each tier can use. See
+    [onboarding-flow Step 5.1](./onboarding-flow.md).
   - In `libs/core/mission/mission-llm.ts`, `runAdaptiveStructuredLlmProfile`,
     `runStructuredLlmProfile` and `invokeLlm` all take an `egress` option and apply this gate;
     `mission distill` passes the mission tier and tenant.

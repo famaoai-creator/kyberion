@@ -1,12 +1,10 @@
 import {
+  attestTenantProvider,
   mutateTenant,
   type TenantLifecycleVerb,
   listTenants,
 } from '@agent/core/organization/tenant-governance';
-import {
-  readTenantProfile,
-  recordTenantProviderAttestation,
-} from '@agent/core/organization/tenant-registry';
+import { readTenantProfile } from '@agent/core/organization/tenant-registry';
 import { withExecutionContext } from '@agent/core/authority';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -82,6 +80,9 @@ function usage(): string {
     '    [--attested-by <who>] [--valid-for-days <n>]   (none requires all three evidence fields; --apply)',
     '  Attestations are written to the tenant profile under knowledge/personal/, which is',
     '  outside git: a contract is a fact about your account, not about the project.',
+    '  The provider must be declared in provider-egress-policy.json; every attestation is',
+    '  written to the audit chain (tenant.attest_provider). Onboarding equivalent:',
+    '  pnpm onboarding llm attest.',
     '  create/update require --apply to write; without it they are dry-run only.',
     '  --display-name <text> --assigned-role <role> --knowledge-root <repo-relative-path>',
     '  --json',
@@ -141,8 +142,8 @@ export function main(argv: string[] = [], print: Print = () => undefined): void 
       );
       return;
     }
-    const profile = withExecutionContext('sovereign_concierge', () =>
-      recordTenantProviderAttestation({
+    const result = withExecutionContext('sovereign_concierge', () =>
+      attestTenantProvider({
         slug: args.slug!,
         provider: args.provider!,
         training_use: trainingUse,
@@ -152,7 +153,7 @@ export function main(argv: string[] = [], print: Print = () => undefined): void 
         ...(typeof args.validForDays === 'number' ? { valid_for_days: args.validForDays } : {}),
       })
     );
-    print(JSON.stringify(profile.provider_attestations?.[args.provider], null, 2));
+    print(JSON.stringify(result.attestation, null, 2));
     return;
   }
   const result = withExecutionContext('sovereign_concierge', () =>

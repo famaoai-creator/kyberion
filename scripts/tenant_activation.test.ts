@@ -79,3 +79,33 @@ describe('tenant activation facade tenant binding', () => {
     );
   });
 });
+
+describe('tenant activation plan shows LLM availability per data tier', () => {
+  it('prints which providers each tier can use, and how to enable confidential', () => {
+    const output: unknown[] = [];
+    main(
+      [
+        'plan',
+        '--customer-slug',
+        'acme',
+        '--tenant-slug',
+        'acme-prod',
+        '--organization-id',
+        'acme',
+      ],
+      (value) => output.push(value)
+    );
+    const plan = JSON.parse(String(output[0]));
+    expect(plan.mode).toBe('dry_run');
+    const tiers = plan.llm_availability.tiers as Array<{
+      tier: string;
+      usable: Array<{ provider: string }>;
+      note: string;
+    }>;
+    expect(tiers.map((entry) => entry.tier)).toEqual(['public', 'confidential', 'personal']);
+    expect(tiers[0]!.usable.map((entry) => entry.provider)).toContain('claude');
+    // Nothing attested for this tenant: confidential has no external provider.
+    expect(tiers[1]!.usable.map((entry) => entry.provider)).not.toContain('claude');
+    expect(tiers[1]!.note).toContain('pnpm onboarding llm attest --tenant acme-prod');
+  });
+});
