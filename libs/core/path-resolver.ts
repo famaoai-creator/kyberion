@@ -196,6 +196,15 @@ const VITEST_LIVE_SUBTREES = [
   // Tenant token-bucket state and its lock (tenant-rate-limiter.ts).
   'shared/runtime/tenant-rate-limit-state.json',
   'shared/runtime/tenant-rate-limit-state.json.lock',
+  // Found by a strict full run on a fresh tree (files the run created).
+  'shared/runtime/agent-supervisor/a2a-secret',
+  'shared/runtime/current_mission_focus.json',
+  'shared/runtime/external-service-registry.json',
+  'shared/runtime/oauth/',
+  'shared/runtime/voice-loopback-receipts/',
+  'shared/runtime/background-review/nudge/',
+  'shared/runtime/mesh-hub/',
+  'shared/observability/mesh-hub/',
 ];
 export const VITEST_LIVE_SANDBOX_ROOT = 'active/shared/runtime/vitest-live';
 
