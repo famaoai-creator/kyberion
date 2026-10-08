@@ -228,6 +228,7 @@ export const KB_UI_DEFAULT_MESSAGES = Object.freeze({
   'ui:status_stale': 'Slow to respond',
   'ui:status_stopped': 'Stopped',
   'ui:status_unavailable': 'Unavailable',
+  'ui:status_validating': 'Validating',
   'ui:status_working': 'Working',
   'ui:table_empty': 'No data',
   'ui:tabs_label': 'Views',
@@ -302,6 +303,7 @@ export const KB_STATUS_MESSAGE_KEYS = Object.freeze({
   stale: 'ui:status_stale',
   stopped: 'ui:status_stopped',
   unavailable: 'ui:status_unavailable',
+  validating: 'ui:status_validating',
   working: 'ui:status_working',
 });
 

@@ -1173,6 +1173,7 @@ a.kb-list__title:hover {
 .kb-status-pill[data-status="connecting"],
 .kb-status-pill[data-status="distilling"],
 .kb-status-pill[data-status="review"],
+.kb-status-pill[data-status="validating"],
 .kb-status-pill[data-status="working"] {
   --kb-ui-pill-fg: var(--kb-ui-info-fg);
   --kb-ui-pill-bg: var(--kb-ui-info-bg);
@@ -1240,6 +1241,7 @@ a.kb-list__title:hover {
 .kb-status-pill[data-status="connecting"],
 .kb-status-pill[data-status="distilling"],
 .kb-status-pill[data-status="running"],
+.kb-status-pill[data-status="validating"],
 .kb-status-pill[data-status="working"] {
   --kb-ui-pill-icon: "\25D0";
 }

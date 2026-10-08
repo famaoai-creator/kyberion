@@ -151,6 +151,7 @@ export const KB_STATUS_VALUES = [
   'stale',
   'stopped',
   'unavailable',
+  'validating',
   'working',
 ] as const;
 
@@ -173,6 +174,7 @@ export const KB_STATUS_TONES: Readonly<Record<KbStatus, KbStatusTone>> = Object.
   busy: 'info',
   review: 'info',
   distilling: 'info',
+  validating: 'info',
   needs_clarification: 'warning',
   needs_external_assets: 'warning',
   needs_assets: 'warning',
@@ -232,6 +234,7 @@ export const KB_STATUS_FAMILIES: Readonly<Record<KbStatus, KbStatusFamily>> = Ob
   working: 'running',
   busy: 'running',
   distilling: 'running',
+  validating: 'running',
   review: 'waiting',
   needs_clarification: 'waiting',
   needs_external_assets: 'waiting',
