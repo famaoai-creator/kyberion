@@ -36,7 +36,7 @@ import {
   readFirstRunStatus,
 } from './first-run-setup.js';
 import { readMemberProfile, writeMemberProfile } from '../organization/member-registry.js';
-import { readTenantProfile } from '../organization/tenant-registry.js';
+import { readTenantProfile, writeTenantProfile } from '../organization/tenant-registry.js';
 
 const NOW = Date.parse('2026-10-09T00:00:00.000Z');
 
@@ -229,6 +229,31 @@ describe('first-run setup', () => {
     );
     expect(store.get(FIRST_RUN_DOCUMENT)?.failed_attempts).toBe(0);
     expectCode(() => issueFirstRunSetupCode({ ttlMinutes: 0 }, opts()), 'invalid_input');
+  });
+
+  it('discloses tenant state only to a valid code holder and keeps the code usable', () => {
+    freshRoot();
+    writeTenantProfile(
+      {
+        tenant_slug: 'acme',
+        tenant_id: 'acme',
+        display_name: 'Acme',
+        status: 'suspended',
+        assigned_role: 'owner',
+      },
+      { rootDir: root }
+    );
+    const { code } = issueFirstRunSetupCode({}, opts());
+    expectCode(
+      () => claimFirstRun({ code: 'WRONG', tenant_slug: 'acme', display_name: 'H' }, opts()),
+      'code_invalid'
+    );
+    expectCode(
+      () => claimFirstRun({ code, tenant_slug: 'acme', display_name: 'H' }, opts()),
+      'tenant_unavailable'
+    );
+    const result = claimFirstRun({ code, tenant_slug: 'beta', display_name: 'H' }, opts());
+    expect(result.tenant_slug).toBe('beta');
   });
 
   it('isInstanceOwner requires owner on every registered tenant', () => {
