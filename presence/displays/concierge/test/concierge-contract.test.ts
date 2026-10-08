@@ -579,7 +579,9 @@ describe('concierge surface contract', () => {
     // preview-first default (dry-run ON) with an explicit second commit step.
     expect(page).toContain('onDrop');
     expect(page).toContain("t('ingest.drop_hint')");
-    expect(page).toContain('setDryRun] = React.useState(true)');
+    expect(page).toContain('useIngestFlow()');
+    const flow = safeReadFile(path.join(appDir, 'src/lib/use-ingest-flow.ts'));
+    expect(flow).toContain('setDryRun] = React.useState(true)');
     expect(page).toContain("t('ingest.commit_after_preview')");
     expect(rail).toContain("t('header.ingest')");
     expect(messages).toContain('資料の取込');
