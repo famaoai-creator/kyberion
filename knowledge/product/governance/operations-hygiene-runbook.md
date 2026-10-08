@@ -154,7 +154,10 @@ gets clean JSON.
   (`resetRoleAssumptionPolicyCache()`, rewriting the fixture file). Each re-import repeats all
   module-level initialisation of that stack, and the pattern has crashed macOS Vitest workers
   with SIGSEGV (`stimuli-journal-rotation-role.test.ts`, 2026-10). Keep `vi.resetModules()` for
-  the tests that need a fresh instance, for example after `vi.doMock`.
+  the tests that need a fresh instance, for example after `vi.doMock`. Import a heavy stack in
+  `beforeAll` with an explicit hook timeout (e.g. `60_000`) so its one-time load is not charged
+  to the first test's 10s budget ([WRITING_TESTS](../../../docs/developer/WRITING_TESTS.md#fixture-roots)
+  lists the accepted exceptions).
 
 **Procedure when the leak guard reports a file** (`active/shared/tmp/vitest-active-leaks.json`):
 
