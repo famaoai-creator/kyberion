@@ -144,6 +144,13 @@ gets clean JSON.
   absent. Gate them with the owning module's probe (`probeHistorySearchBackend()`,
   `pickCjkFontSource()`, `detectRasterCapabilities()`), and make sure the CI workflows install the
   binary so coverage is kept.
+- Do not re-import the secure-io / tier-guard / authority stack in every test with
+  `vi.resetModules()`. Set `KYBERION_ROOT` and the role env first, import once per file in
+  `beforeAll`, and reset per-test state through the module's own hooks
+  (`resetRoleAssumptionPolicyCache()`, rewriting the fixture file). Each re-import repeats all
+  module-level initialisation of that stack, and the pattern has crashed macOS Vitest workers
+  with SIGSEGV (`stimuli-journal-rotation-role.test.ts`, 2026-10). Keep `vi.resetModules()` for
+  the tests that need a fresh instance, for example after `vi.doMock`.
 
 **Procedure when the leak guard reports a file** (`active/shared/tmp/vitest-active-leaks.json`):
 
