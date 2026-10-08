@@ -14011,6 +14011,76 @@
         "ja": "サインイン",
         "qps-ploc": "⟦Şïɠñ ïñ ŀőř⟧"
       },
+      "ingest.loading": {
+        "en": "Preparing document intake…",
+        "ja": "取込画面を準備しています…",
+        "qps-ploc": "⟦Ṗřėṗȧřïñɠ ḓőƈůɱėñŧ ïñŧȧķė… ŀőřėɱ ïṗ⟧"
+      },
+      "ingest.prepare_failed": {
+        "en": "Could not load the destinations. Reload the form to try again.",
+        "ja": "登録先を読み込めませんでした。画面を再読込してお試しください。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ŀőȧḓ ŧħė ḓėşŧïñȧŧïőñş. Řėŀőȧḓ ŧħė ƒőřɱ ŧő ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ingest.reload": {
+        "en": "Reload the form",
+        "ja": "画面を再読込",
+        "qps-ploc": "⟦Řėŀőȧḓ ŧħė ƒőřɱ ŀőřė⟧"
+      },
+      "ingest.signin_required": {
+        "en": "Your session could not be verified. Sign in, then reload this form before uploading.",
+        "ja": "セッションを確認できませんでした。サインイン後、この画面を再読込してください。",
+        "qps-ploc": "⟦Ẏőůř şėşşïőñ ƈőůŀḓ ñőŧ ƀė ṽėřïƒïėḓ. Şïɠñ ïñ, ŧħėñ řėŀőȧḓ ŧħïş ƒőřɱ ƀėƒőřė ůṗŀőȧḓïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "ingest.signin": {
+        "en": "Sign in",
+        "ja": "サインイン",
+        "qps-ploc": "⟦Şïɠñ ïñ ŀőř⟧"
+      },
+      "ingest.access_denied": {
+        "en": "You no longer have access to this upload. Check your account and destination with an administrator, then reload the form.",
+        "ja": "この取込へのアクセス権を確認できません。アカウントと登録先を管理者に確認し、画面を再読込してください。",
+        "qps-ploc": "⟦Ẏőů ñő ŀőñɠėř ħȧṽė ȧƈƈėşş ŧő ŧħïş ůṗŀőȧḓ. Ƈħėƈķ ẏőůř ȧƈƈőůñŧ ȧñḓ ḓėşŧïñȧŧïőñ ẇïŧħ ȧñ ȧḓɱïñïşŧřȧŧőř, ŧħėñ řėŀőȧḓ ŧħė ƒőřɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "ingest.no_destination": {
+        "en": "No available destination was found. Ask an administrator to check your access, then reload the form.",
+        "ja": "利用できる登録先がありません。管理者にアクセス権を確認し、画面を再読込してください。",
+        "qps-ploc": "⟦Ñő ȧṽȧïŀȧƀŀė ḓėşŧïñȧŧïőñ ẇȧş ƒőůñḓ. Ȧşķ ȧñ ȧḓɱïñïşŧřȧŧőř ŧő ƈħėƈķ ẏőůř ȧƈƈėşş, ŧħėñ řėŀőȧḓ ŧħė ƒőřɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "ingest.preview_failed": {
+        "en": "Review the file and destination, then check the document again before filing.",
+        "ja": "資料と登録先を確認し、登録前にもう一度内容を確認してください。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ƒïŀė ȧñḓ ḓėşŧïñȧŧïőñ, ŧħėñ ƈħėƈķ ŧħė ḓőƈůɱėñŧ ȧɠȧïñ ƀėƒőřė ƒïŀïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "ingest.commit_uncertain": {
+        "en": "We could not confirm whether {file} was filed under {tenant}.",
+        "ja": "{file} が {tenant} に登録されたか確認できませんでした。",
+        "qps-ploc": "⟦Ẇė ƈőůŀḓ ñőŧ ƈőñƒïřɱ ẇħėŧħėř {file} ẇȧş ƒïŀėḓ ůñḓėř {tenant}. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "ingest.uncertain_guidance": {
+        "en": "Check the existing records before reloading this page to file again. You can preview without filing, but a preview does not confirm what happened to the earlier request.",
+        "ja": "再登録する前に既存の記録を確認し、このページを再読込してください。確認モードでは登録しませんが、その結果から前回の登録が完了したかは判断できません。",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė ėẋïşŧïñɠ řėƈőřḓş ƀėƒőřė řėŀőȧḓïñɠ ŧħïş ṗȧɠė ŧő ƒïŀė ȧɠȧïñ. Ẏőů ƈȧñ ṗřėṽïėẇ ẇïŧħőůŧ ƒïŀïñɠ, ƀůŧ ȧ ṗřėṽïėẇ ḓőėş ñőŧ ƈőñƒïřɱ ẇħȧŧ ħȧṗṗėñėḓ ŧő ŧħė ėȧřŀïėř řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗ⟧"
+      },
+      "ingest.filing": {
+        "en": "Filing the document…",
+        "ja": "資料を登録しています…",
+        "qps-ploc": "⟦Ƒïŀïñɠ ŧħė ḓőƈůɱėñŧ… ŀőřėɱ ⟧"
+      },
+      "ingest.duplicate_label": {
+        "en": "Matching content detected",
+        "ja": "同じ内容を検出",
+        "qps-ploc": "⟦Ɱȧŧƈħïñɠ ƈőñŧėñŧ ḓėŧėƈŧėḓ ŀőřėɱ ïṗ⟧"
+      },
+      "ingest.duplicate_note": {
+        "en": "No new document was filed by this check. Matching content does not confirm it is registered at the selected destination.",
+        "ja": "今回の確認では新たに登録していません。同じ内容が見つかっても、選択した登録先への登録を確認できたとは限りません。",
+        "qps-ploc": "⟦Ñő ñėẇ ḓőƈůɱėñŧ ẇȧş ƒïŀėḓ ƀẏ ŧħïş ƈħėƈķ. Ɱȧŧƈħïñɠ ƈőñŧėñŧ ḓőėş ñőŧ ƈőñƒïřɱ ïŧ ïş řėɠïşŧėřėḓ ȧŧ ŧħė şėŀėƈŧėḓ ḓėşŧïñȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "ingest.requested_destination": {
+        "en": "Requested destination: {value}",
+        "ja": "指定した登録先: {value}",
+        "qps-ploc": "⟦Řėɋůėşŧėḓ ḓėşŧïñȧŧïőñ: {value} ŀőřėɱ ïṗşů⟧"
+      },
       "setup.draft_context_changed": {
         "en": "Your account or settings scope changed, or access expired. Unsaved settings were cleared. Reload this page and sign in again if needed before editing.",
         "ja": "アカウントや設定の対象が変わったか、アクセスが切れました。未保存の設定を消去しました。ページを再読み込みし、必要なら再ログインしてから編集してください。",
