@@ -46,6 +46,7 @@ import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { linkMemberExternalIdentity } from '../organization/member-identity-link.js';
 import {
+  externalIdentityBindingDenied,
   isValidMemberId,
   readMemberProfile,
   type MemberRegistryPathOptions,
@@ -733,20 +734,27 @@ export async function completeOidcLogin(
   const suspended = /suspended/i.test(message);
   const unbound = !suspended && unboundError instanceof AuthnError && unboundError.status === 403;
   if (unbound && tx.link) {
+    // Audit reasons are fixed strings: registry errors can quote the raw
+    // subject and other members' ids.
+    const linkFail = (reason: string, status: number) =>
+      fail(deps, surfaceId, 'link_failed', reason, status);
     try {
-      const target = readMemberProfile(tx.link, deps.memberRegistry ?? {});
-      if (target?.status !== 'active') {
-        return fail(deps, surfaceId, 'link_failed', 'link target missing or inactive', 403);
+      const registry = deps.memberRegistry ?? {};
+      // Decide "unbound" from the registry itself, fail closed: an identity
+      // held by ANY member (suspended included) or an unverifiable registry
+      // is never re-bound.
+      if (externalIdentityBindingDenied(iss, subject, registry)) {
+        return linkFail('identity bound elsewhere or registry unverifiable', 409);
       }
+      const target = readMemberProfile(tx.link, registry);
+      if (target?.status !== 'active') return linkFail('link target missing or inactive', 403);
       if (deps.linkIdentity) deps.linkIdentity(tx.link, { issuer: iss, subject });
-      else linkMemberExternalIdentity(tx.link, { issuer: iss, subject }, deps.memberRegistry ?? {});
+      else linkMemberExternalIdentity(tx.link, { issuer: iss, subject }, registry);
       const memberId = resolveBoundMember();
-      if (memberId !== tx.link) {
-        return fail(deps, surfaceId, 'link_failed', 'linked identity resolved elsewhere', 409);
-      }
+      if (memberId !== tx.link) return linkFail('linked identity resolved elsewhere', 409);
       return succeed(memberId, true);
-    } catch (error) {
-      return fail(deps, surfaceId, 'link_failed', `link failed: ${errorText(error)}`, 409);
+    } catch {
+      return linkFail('link write failed', 409);
     }
   }
   record(deps, {

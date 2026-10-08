@@ -24026,23 +24026,33 @@
       },
       "sso_link_title": {
         "en": "Link your identity provider account",
-        "ja": "IdP アカウントを紐付ける"
+        "ja": "IdP アカウントを紐付ける",
+        "qps-ploc": "⟦Ŀïñķ ẏőůř ïḓėñŧïŧẏ ṗřőṽïḓėř ȧƈƈőůñŧ ŀőřėɱ ïṗşůɱ⟧"
       },
       "sso_link_lead": {
         "en": "Sign in with your identity provider once to link that account to you. From then on you can sign in to every surface with it.",
-        "ja": "IdP で一度サインインすると、そのアカウントがあなたに紐付きます。以後はそのアカウントで全サーフェスにサインインできます。"
+        "ja": "IdP で一度サインインすると、そのアカウントがあなたに紐付きます。以後はそのアカウントで全サーフェスにサインインできます。",
+        "qps-ploc": "⟦Şïɠñ ïñ ẇïŧħ ẏőůř ïḓėñŧïŧẏ ṗřőṽïḓėř őñƈė ŧő ŀïñķ ŧħȧŧ ȧƈƈőůñŧ ŧő ẏőů. Ƒřőɱ ŧħėñ őñ ẏőů ƈȧñ şïɠñ ïñ ŧő ėṽėřẏ şůřƒȧƈė ẇïŧħ ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
       },
       "sso_link_button": {
         "en": "Link my account",
-        "ja": "自分のアカウントを紐付ける"
+        "ja": "自分のアカウントを紐付ける",
+        "qps-ploc": "⟦Ŀïñķ ɱẏ ȧƈƈőůñŧ ŀőřė⟧"
       },
       "sso_linked": {
         "en": "Your identity provider account is linked.",
-        "ja": "IdP アカウントを紐付けました。"
+        "ja": "IdP アカウントを紐付けました。",
+        "qps-ploc": "⟦Ẏőůř ïḓėñŧïŧẏ ṗřőṽïḓėř ȧƈƈőůñŧ ïş ŀïñķėḓ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "sso_link_owner_only": {
+        "en": "Only an owner of every organization you belong to can link an account here, and only while signed in with a token or session. Ask an owner to bind it under Settings › Organization and members.",
+        "ja": "ここで紐付けできるのは、所属するすべての組織で owner の人だけです(トークンかセッションでサインインしている必要があります)。owner に「設定 › 組織とメンバー」で紐付けてもらってください。",
+        "qps-ploc": "⟦Őñŀẏ ȧñ őẇñėř őƒ ėṽėřẏ őřɠȧñïẑȧŧïőñ ẏőů ƀėŀőñɠ ŧő ƈȧñ ŀïñķ ȧñ ȧƈƈőůñŧ ħėřė, ȧñḓ őñŀẏ ẇħïŀė şïɠñėḓ ïñ ẇïŧħ ȧ ŧőķėñ őř şėşşïőñ. Ȧşķ ȧñ őẇñėř ŧő ƀïñḓ ïŧ ůñḓėř Şėŧŧïñɠş › Őřɠȧñïẑȧŧïőñ ȧñḓ ɱėɱƀėřş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
       },
       "sso_link_unavailable": {
         "en": "Linking is not available yet. Save the SSO settings first.",
-        "ja": "まだ紐付けできません。先に SSO 設定を保存してください。"
+        "ja": "まだ紐付けできません。先に SSO 設定を保存してください。",
+        "qps-ploc": "⟦Ŀïñķïñɠ ïş ñőŧ ȧṽȧïŀȧƀŀė ẏėŧ. Şȧṽė ŧħė ŞŞŐ şėŧŧïñɠş ƒïřşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       },
       "sso_link_hint": {
         "en": "After signing in with your identity provider, bind the issuer and subject shown on screen to your member under Settings › Organization and members.",
@@ -28363,7 +28373,8 @@
       },
       "failed_link_failed": {
         "en": "This identity provider account could not be linked. It may already belong to another member, or your member is not active. Ask an owner to check Settings › Organization and members.",
-        "ja": "この IdP アカウントは紐付けできませんでした。すでに別のメンバーに紐付いているか、あなたのメンバーが有効ではない可能性があります。owner に「設定 › 組織とメンバー」を確認してもらってください。"
+        "ja": "この IdP アカウントは紐付けできませんでした。すでに別のメンバーに紐付いているか、あなたのメンバーが有効ではない可能性があります。owner に「設定 › 組織とメンバー」を確認してもらってください。",
+        "qps-ploc": "⟦Ŧħïş ïḓėñŧïŧẏ ṗřőṽïḓėř ȧƈƈőůñŧ ƈőůŀḓ ñőŧ ƀė ŀïñķėḓ. Ïŧ ɱȧẏ ȧŀřėȧḓẏ ƀėŀőñɠ ŧő ȧñőŧħėř ɱėɱƀėř, őř ẏőůř ɱėɱƀėř ïş ñőŧ ȧƈŧïṽė. Ȧşķ ȧñ őẇñėř ŧő ƈħėƈķ Şėŧŧïñɠş › Őřɠȧñïẑȧŧïőñ ȧñḓ ɱėɱƀėřş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ⟧"
       },
       "failed_logout_blocked": {
         "en": "A sign-out request from another site was ignored, so you are still signed in. Use the sign-out control in this app to sign out.",

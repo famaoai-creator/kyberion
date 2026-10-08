@@ -169,7 +169,7 @@ export KYBERION_OIDC_PROVIDER_LABEL=Microsoft
 
 1. owner が concierge の「設定 › 組織とメンバー」で、対象 member の「SSO」欄に `issuer`(`KYBERION_OIDC_ISSUER` と同じ値)と `subject`(`sub`)を入力して紐付けます。API は `PATCH /api/members/<member_id>` の `external_identity`(紐付け)/ `external_identity_remove`(解除)です。紐付けはその member の**全 tenant の権限**をそのアカウントに与える操作なので、member が所属するすべての tenant で owner であることが必要です。1 組の `issuer`+`subject` は 1 人の member にしか紐付けられません(重複は 409)。
 2. 利用者が先にサインインを試すと、未登録画面に `issuer` / `subject` が表示されます。これを管理者に伝えれば、そのまま貼り付けて紐付けられます。
-3. **自分で紐付ける**: トークン(`/signin`)などで concierge にサインイン済みの member は、`/setup/sso` の「自分のアカウントを紐付ける」から IdP でサインインすると、そのアカウントを自分に紐付けられます(`POST /api/setup/link-identity`)。紐付け先の member はサインイン中の viewer からサーバー側で決まり、HMAC 署名付きのログイン transaction cookie(10 分)にだけ入ります。callback では、未紐付けのアカウントだけを紐付けます。別の member に紐付いたアカウントは拒否し(「紐付けできませんでした」)、その member としてサインインさせることもしません。停止中の member にも紐付けません。監査には member id と subject のダイジェストだけを残します。
+3. **自分で紐付ける**: トークン(`/signin`)などで concierge にサインイン済みで、**自分が所属するすべての tenant で owner** の member は(1. の紐付けと同じ条件。トークンの範囲が絞られていればその範囲で判定。loopback だけで資格情報が無い場合は不可)、`/setup/sso` の「自分のアカウントを紐付ける」から IdP でサインインすると、そのアカウントを自分に紐付けられます(`POST /api/setup/link-identity`)。紐付け先の member はサインイン中の viewer からサーバー側で決まり、HMAC 署名付きのログイン transaction cookie(10 分)にだけ入ります。callback では、未紐付けのアカウントだけを紐付けます。別の member に紐付いたアカウントは拒否し(「紐付けできませんでした」)、その member としてサインインさせることもしません。停止中の member にも紐付けません。監査には member id と subject のダイジェストだけを残します。
 4. 紐付けた member の `memberships`(tenant ごとの役割)が、そのまま閲覧・操作の範囲になります。詳細は [external-identity-member-mapping](../../knowledge/product/architecture/external-identity-member-mapping.md)。
 
 ## 確認手順
