@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile, safeExistsSync } from '../secure-io.js';
@@ -23,6 +23,11 @@ import {
   extractSurfaceSessionToken,
   parseCookieHeader,
 } from './surface-session-cookie.js';
+
+// Hermetic: never read the checkout's real connection documents (session key, SSO settings).
+vi.mock('../secret/secret-guard.js', () => ({
+  secretGuard: { loadConnectionDocument: () => ({}) },
+}));
 
 const ISSUER = 'https://idp.example.com';
 const CLIENT_ID = 'kyberion-client';
