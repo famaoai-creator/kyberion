@@ -255,7 +255,8 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       evidence?: string[],
       teamRole?: string,
       actorId?: string,
-      actorType?: 'agent' | 'human' | 'service'
+      actorType?: 'agent' | 'human' | 'service',
+      provider?: string
     ) {
       return _recordEvidence({
         missionId,
@@ -265,6 +266,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         teamRole,
         actorId,
         actorType,
+        provider,
         getGitHash,
         syncProjectLedgerIfLinked: syncProjectLedgerIfLinkedInternal,
       }).then(() => syncProjectOperationalStateIfLinked(missionId));
@@ -275,7 +277,8 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       reviewerAgentId: string,
       findings?: ArtifactReviewFinding[],
       reviewerTeamRole?: 'reviewer' | 'qa',
-      specialistRoles?: string[]
+      specialistRoles?: string[],
+      provider?: string
     ) {
       return _recordArtifactReview({
         missionId,
@@ -284,6 +287,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         findings,
         reviewerTeamRole,
         specialistRoles,
+        provider,
         getGitHash,
       }).then((result) => syncProjectOperationalStateIfLinked(missionId).then(() => result));
     },

@@ -396,6 +396,64 @@ describe('mission retrospective loop', () => {
     expect(stats.evidence_timing.edited_after_record).toEqual(['T-2']);
   });
 
+  describe('usage_unrecorded', () => {
+    const removeUsageFixtures = () => {
+      fs.rmSync(path.join(tmpRoot, 'work', 'metrics'), { recursive: true, force: true });
+      fs.rmSync(path.join(tmpRoot, 'active', 'shared', 'observability'), {
+        recursive: true,
+        force: true,
+      });
+    };
+    const completeTasks = () =>
+      fs.writeFileSync(
+        path.join(missionDir, 'NEXT_TASKS.json'),
+        JSON.stringify([
+          { task_id: 'T-1', status: 'completed', assigned_to: { role: 'implementer' } },
+          { task_id: 'T-2', status: 'done', assigned_to: { role: 'reviewer' } },
+          { task_id: 'T-3', status: 'planned', assigned_to: { role: 'qa' } },
+        ])
+      );
+
+    it('flags completed tasks with zero usage entries and says so in the report', async () => {
+      removeUsageFixtures();
+      completeTasks();
+      const stats = mod.collectMissionExecutionStats(MISSION);
+      expect(stats.tasks_completed).toBe(2);
+      expect(stats.token_usage.entries).toBe(0);
+      expect(stats.resource_usage.entries).toBe(0);
+      expect(stats.usage_unrecorded).toBe(true);
+
+      backendName.value = 'stub';
+      const result = await mod.runMissionRetrospective(MISSION);
+      expect(fs.readFileSync(result.report_path, 'utf8')).toMatch(
+        // vocabulary is not seeded under the fixture root, so t() yields the key
+        /retro_usage_unrecorded|Usage not recorded|使用量が未記録/u
+      );
+    });
+
+    it('is false when no task is completed, or when a direct_cli estimate was recorded', async () => {
+      removeUsageFixtures();
+      // Nothing completed yet: zero usage is not a gap.
+      expect(mod.collectMissionExecutionStats(MISSION).usage_unrecorded).toBe(false);
+
+      completeTasks();
+      const { MetricsCollector } = await import('../metrics.js');
+      const { recordDirectCliTaskUsage } = await import('./mission-direct-cli-usage.js');
+      const entry = recordDirectCliTaskUsage({
+        missionId: MISSION,
+        taskId: 'T-1',
+        event: 'record_evidence',
+        actorId: 'codex-implementer',
+        collector: new MetricsCollector({ metricsDir: path.join(tmpRoot, 'work', 'metrics') }),
+      });
+      expect(entry).toMatchObject({ status: 'estimated', source: 'direct_cli', cost_usd: 0 });
+
+      const stats = mod.collectMissionExecutionStats(MISSION);
+      expect(stats.resource_usage).toEqual({ entries: 1, cost_usd: 0 });
+      expect(stats.usage_unrecorded).toBe(false);
+    });
+  });
+
   it('does not flag a closing burst for a short mission', () => {
     const base = Date.parse('2026-10-06T10:00:00.000Z');
     fs.writeFileSync(

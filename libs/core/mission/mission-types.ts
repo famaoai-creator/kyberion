@@ -361,6 +361,7 @@ export const VALUE_FLAGS = new Set([
   '--team-role',
   '--actor-id',
   '--actor-type',
+  '--provider',
   '--evidence',
   '--note',
   '--supersedes',
