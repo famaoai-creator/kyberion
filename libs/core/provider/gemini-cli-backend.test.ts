@@ -166,7 +166,7 @@ describe('gemini-cli-backend sandbox projection', () => {
       options: { model: 'gemini-test-model' },
       profile: 'explorer',
       promptVia: 'stdin',
-      cwd: '/scratch/cwd',
+      cwd: '/tmp/llm-cwd',
     });
 
     const args = spawnMock.mock.calls[0]?.[1] as string[];
@@ -181,7 +181,7 @@ describe('gemini-cli-backend sandbox projection', () => {
       '--model',
       'gemini-test-model',
     ]);
-    expect(spawnMock.mock.calls[0]?.[2]?.cwd).toBe('/scratch/cwd');
+    expect(spawnMock.mock.calls[0]?.[2]?.cwd).toBe('/tmp/llm-cwd');
     expect(stdin).toBe('SYS\n\nuser 91be');
   });
 });
