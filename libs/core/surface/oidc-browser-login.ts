@@ -42,6 +42,7 @@ import {
   verifyJwtSignature,
   type OidcConfig,
 } from '../authn-providers.js';
+import { withExecutionContext } from '../authority.js';
 import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { linkMemberExternalIdentity } from '../organization/member-identity-link.js';
@@ -743,13 +744,23 @@ export async function completeOidcLogin(
       // Decide "unbound" from the registry itself, fail closed: an identity
       // held by ANY member (suspended included) or an unverifiable registry
       // is never re-bound.
-      if (externalIdentityBindingDenied(iss, subject, registry)) {
-        return linkFail('identity bound elsewhere or registry unverifiable', 409);
-      }
-      const target = readMemberProfile(tx.link, registry);
+      // Member profiles live under the personal tier: read inside an
+      // authorized execution context, as the authn providers do.
+      const held = withExecutionContext('sovereign_concierge', () =>
+        externalIdentityBindingDenied(iss, subject, registry)
+      );
+      if (held) return linkFail('identity bound elsewhere or registry unverifiable', 409);
+      const link = tx.link;
+      const target = withExecutionContext('sovereign_concierge', () =>
+        readMemberProfile(link, registry)
+      );
       if (target?.status !== 'active') return linkFail('link target missing or inactive', 403);
-      if (deps.linkIdentity) deps.linkIdentity(tx.link, { issuer: iss, subject });
-      else linkMemberExternalIdentity(tx.link, { issuer: iss, subject }, registry);
+      if (deps.linkIdentity) deps.linkIdentity(link, { issuer: iss, subject });
+      else {
+        withExecutionContext('sovereign_concierge', () =>
+          linkMemberExternalIdentity(link, { issuer: iss, subject }, registry)
+        );
+      }
       const memberId = resolveBoundMember();
       if (memberId !== tx.link) return linkFail('linked identity resolved elsewhere', 409);
       return succeed(memberId, true);
