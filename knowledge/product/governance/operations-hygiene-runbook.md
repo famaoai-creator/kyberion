@@ -155,6 +155,18 @@ gets clean JSON.
 4. **"Created" on CI but not locally:** a fresh checkout shows files a dev tree hides, because a
    rewrite that does not grow a file is not reported. Reproduce by deleting the file and re-running
    the suspect suite.
+5. **Reported only on CI, even from a fresh tree:** CI runs with a different identity. Reproduce
+   with the CI environment, not your shell's:
+   `KYBERION_PERSONA=worker MISSION_ROLE=mission_controller KYBERION_TEST_LEAK_STRICT=1 pnpm test -- --suite core`.
+   Persona-dependent code paths (stores that only persist for some roles, default-tenant bootstrap)
+   diverge between the two.
+6. **A suite must write a live registry** (tenant index, trust ledger, design index): snapshot it in
+   `beforeAll` and restore it in `afterAll` through one fixture helper, so a failing test cannot
+   leave the registry changed for the next suite.
+
+Writers and readers of the same file must resolve the path the same way. A reader through
+`pathResolver.shared()` and a writer through `path.join(rootDir, …)` diverge under the sandbox:
+the test passes against the sandbox while the writer leaks into live state.
 
 ## §6 Tenant scope and governed facades
 
@@ -176,7 +188,12 @@ gets clean JSON.
 - **Validate under the caller's authority.** Registry reads that validate a caller's input
   (tenant registered, active) run under the caller's authority before entering a narrow
   internal-role fence such as `withExecutionContext('infrastructure_sentinel', …)`. Run inside the
-  fence, they fail with `ROLE_VIOLATION` on `knowledge/personal/tenants/`.
+  fence, they fail with `ROLE_VIOLATION` on `knowledge/personal/tenants/`. Validate on creation and
+  whenever an update changes the tenant; a plain re-sync of an existing item does not re-validate,
+  so suspending a tenant does not strand its imported items.
+- **Evidence stays in the tenant's scope.** A per-tenant command (activation probe, readiness
+  report) that runs a repository-wide check keeps only the lines about its own tenant in the
+  evidence it writes, and points at the repository-wide command for the rest.
 
 **Procedure:**
 
