@@ -189,6 +189,8 @@ describe('vitest live-state sandbox', () => {
       shared('logs/audit/audit-2026-10-06.jsonl'),
       shared('observability/ops-alerts.jsonl'),
       shared('inbox/entries.jsonl'),
+      shared('runtime/intent-contract-memory.json'),
+      shared('runtime/audit/chain-key'),
       resolve('active/audit/system-ledger.jsonl'),
       rootResolve('active/shared/runtime/peer-messaging/tenants/acme/peers/p/inbox.jsonl'),
     ]) {
