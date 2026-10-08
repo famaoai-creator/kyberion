@@ -191,6 +191,8 @@ describe('vitest live-state sandbox', () => {
       shared('inbox/entries.jsonl'),
       shared('runtime/intent-contract-memory.json'),
       shared('runtime/audit/chain-key'),
+      rootResolve('active/shared/runtime/provider-cache.json'),
+      rootResolve('active/shared/runtime/tenant-rate-limit-state.json'),
       resolve('active/audit/system-ledger.jsonl'),
       rootResolve('active/shared/runtime/peer-messaging/tenants/acme/peers/p/inbox.jsonl'),
     ]) {
