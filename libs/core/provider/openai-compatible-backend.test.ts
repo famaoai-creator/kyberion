@@ -278,6 +278,7 @@ describe('openai-compatible-backend', () => {
   });
 
   it('rejects model file tools that traverse a symbolic link', async () => {
+    fs.mkdirSync(path.join(process.cwd(), 'active/shared/tmp'), { recursive: true });
     const tempDir = fs.mkdtempSync(path.join(process.cwd(), 'active/shared/tmp/openai-tool-'));
     const targetDir = path.join(tempDir, 'target');
     const linkDir = path.join(tempDir, 'linked');
