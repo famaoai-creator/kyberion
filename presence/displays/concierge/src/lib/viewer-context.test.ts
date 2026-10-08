@@ -16,6 +16,14 @@ function tokenHash(token: string): string {
 // every test (operations-hygiene-runbook §5). Only the tests that vi.doMock the
 // token registry need a fresh module graph: they call mockRegistryModule(), and
 // afterEach drops that mocked graph again so later tests re-bind the real one.
+//
+// Caveat: env read at import time is frozen at the first import, so a test
+// must not rely on stubbing such a variable per test unless it builds a fresh
+// module graph (as mockRegistryModule() does). Today viewer-context and its
+// imports read KYBERION_* per call; chronos-mirror-v2's api-guard.ts is the
+// example of a module that captures KYBERION_API_TOKEN /
+// KYBERION_LOCALADMIN_TOKEN / KYBERION_ALLOW_UNAUTH_REMOTE /
+// KYBERION_LOCALHOST_AUTOADMIN at load.
 let registryMocked = false;
 
 function mockRegistryModule(factory: () => Promise<Record<string, unknown>>): void {

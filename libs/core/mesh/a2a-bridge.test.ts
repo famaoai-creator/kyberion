@@ -114,12 +114,16 @@ vi.mock('../governance/governance-action-recorder.js', () => ({
 // stack under it are imported once per file (the first `await import`; later
 // ones hit the module cache). Re-importing that stack per test repeated its
 // module initialisation every test (operations-hygiene-runbook §5). The
-// a2aBridge singleton lives on globalThis and was shared across tests already;
-// per-test state is the mocks, re-armed below, and the seams reset in the
-// nested describes.
+// a2aBridge singleton lives on globalThis; per-test state is reset through
+// _resetA2ABridgeForTests() (handles, runtime contexts, per-agent semaphores),
+// the mocks re-armed below, and the seams reset in the nested describes.
 describe('a2a-bridge', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  beforeEach(async () => {
+    const { _resetA2ABridgeForTests } = await import('./a2a-bridge.js');
+    _resetA2ABridgeForTests();
+    // Reset, not just clear: queued mock*Once values and implementations a
+    // test set must not leak into whichever test runs next.
+    vi.resetAllMocks();
     mocks.getAgentRuntimeHandle.mockReturnValue(null);
     mocks.toSupervisorEnsurePayload.mockImplementation((payload: any) => payload);
     mocks.resolveAgentSelectionHints.mockImplementation((manifest: any) => ({
@@ -1039,6 +1043,30 @@ describe('a2a-bridge', () => {
   });
 
   describe('AA-04 Conversation store and rehydration', () => {
+    // Each test gets a ready nerve-agent runtime of its own instead of
+    // inheriting the manifest / runtime mocks left by whichever test ran before.
+    beforeEach(() => {
+      const mockHandle = {
+        agentId: 'nerve-agent',
+        getRecord: () => ({ sessionId: 'sess-new' }),
+      };
+      mocks.getAgentManifest.mockReturnValue({
+        provider: 'gemini',
+        modelId: 'gemini-2.5-pro',
+        systemPrompt: 'agent',
+        capabilities: ['delegate'],
+      });
+      mocks.get.mockReturnValue({ status: 'ready' });
+      mocks.getAgentRuntimeHandle.mockReturnValue(mockHandle);
+      mocks.ensureAgentRuntimeViaDaemon.mockResolvedValue({
+        agent_id: 'nerve-agent',
+        provider: 'gemini',
+        session_id: 'sess-new',
+      });
+      mocks.createSupervisorBackedAgentHandle.mockReturnValue(mockHandle);
+      mocks.readConversationHistory.mockReturnValue([]);
+    });
+
     it('appends conversation turns and rehydrates on session change', async () => {
       const { a2aBridge } = await import('./a2a-bridge.js');
       const mockHandle = {
