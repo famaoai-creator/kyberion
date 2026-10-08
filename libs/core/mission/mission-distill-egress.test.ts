@@ -8,12 +8,31 @@ import type { ZodType } from 'zod';
  * distillation falls back to the structural (no-LLM) path.
  */
 
-const hoisted = vi.hoisted(() => ({ missionPath: '', llmCalls: [] as string[] }));
+const hoisted = vi.hoisted(() => ({
+  missionPath: '',
+  llmCalls: [] as string[],
+  tenantRegistryRootDir: '',
+  dropTier: false,
+}));
+
+vi.mock('./mission-state.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./mission-state.js')>();
+  return {
+    ...actual,
+    loadState: (...args: Parameters<typeof actual.loadState>) => {
+      const state = actual.loadState(...args);
+      if (!state || !hoisted.dropTier) return state;
+      const { tier: _tier, ...rest } = state;
+      return rest as typeof state;
+    },
+  };
+});
 
 // The real adaptive loop and egress gate run; only the policy and command
 // availability are pinned so the verdict does not depend on locally
 // installed CLIs. `claude` is declared training_use 'unknown' in the shipped
-// provider-egress-policy.json, and no tenant attests it here.
+// provider-egress-policy.json, and no tenant attests it unless a test
+// points the gate at a fixture tenant registry.
 vi.mock('./mission-llm.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./mission-llm.js')>();
   return {
@@ -26,6 +45,11 @@ vi.mock('./mission-llm.js', async (importOriginal) => {
     ) =>
       actual.runAdaptiveStructuredLlmProfile<T>(purpose, prompt, schema, {
         ...options,
+        ...(options.egress && hoisted.tenantRegistryRootDir
+          ? {
+              egress: { ...options.egress, tenantRegistryRootDir: hoisted.tenantRegistryRootDir },
+            }
+          : {}),
         policy: {
           default_profile: 'claude',
           profiles: { claude: { command: 'claude', args: [], adapter: 'distill-egress-claude' } },
@@ -50,14 +74,16 @@ vi.mock('../ledger.js', async (importOriginal) => {
 import * as pathResolver from '../path-resolver.js';
 import { withExecutionContext } from '../authority.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { _resetProviderEgressPolicyCacheForTests } from '../provider/provider-egress-gate.js';
 import { registerStructuredRunner } from './mission-llm.js';
 import { distillMission } from './mission-distill.js';
 import { loadState } from './mission-state.js';
 
 const MISSION_ID = 'MSN-DISTILL-EGRESS-001';
 hoisted.missionPath = pathResolver.shared(`tmp/mission-distill-egress-${process.pid}`);
+const FIXTURE_ROOT = pathResolver.shared(`tmp/mission-distill-egress-fixture-${process.pid}`);
 
-function writeMissionState(tier: 'public' | 'confidential'): void {
+function writeMissionState(tier: 'public' | 'confidential' | undefined, tenantSlug?: string): void {
   withExecutionContext('ecosystem_architect', () => {
     safeRmSync(hoisted.missionPath, { recursive: true, force: true });
     safeMkdir(hoisted.missionPath, { recursive: true });
@@ -65,7 +91,8 @@ function writeMissionState(tier: 'public' | 'confidential'): void {
       `${hoisted.missionPath}/mission-state.json`,
       JSON.stringify({
         mission_id: MISSION_ID,
-        tier,
+        ...(tier ? { tier } : {}),
+        ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
         status: 'distilling',
         execution_mode: 'local',
         priority: 1,
@@ -137,6 +164,21 @@ describe('distillMission provider egress gate', () => {
     });
   });
 
+  it('treats a mission state without a tier as confidential', async () => {
+    // loadState schema-rejects a tier-less file, so the state on disk is a
+    // public one and only the in-memory copy distill sees loses its tier —
+    // proving the default, not the file, keeps the content local.
+    writeMissionState('public');
+    hoisted.dropTier = true;
+    try {
+      await runDistill().catch(() => undefined);
+    } finally {
+      hoisted.dropTier = false;
+    }
+
+    expect(hoisted.llmCalls).toEqual([]);
+  });
+
   it('still sends a public mission to the provider', async () => {
     writeMissionState('public');
     await runDistill();
@@ -144,5 +186,66 @@ describe('distillMission provider egress gate', () => {
     expect(hoisted.llmCalls).toHaveLength(1);
     expect(hoisted.llmCalls[0]).toContain(MISSION_ID);
     expect(loadState(MISSION_ID)?.distillation).toMatchObject({ mode: 'llm', llm_used: true });
+  });
+
+  describe('with a tenant that attests the provider', () => {
+    const policyPath = `${FIXTURE_ROOT}/provider-egress-policy.json`;
+    const registryRoot = `${FIXTURE_ROOT}/registry`;
+
+    beforeEach(() => {
+      withExecutionContext('ecosystem_architect', () => {
+        safeMkdir(`${registryRoot}/knowledge/personal/tenants`, { recursive: true });
+        safeWriteFile(
+          `${registryRoot}/knowledge/personal/tenants/acme.json`,
+          JSON.stringify({
+            tenant_slug: 'acme',
+            display_name: 'Acme',
+            status: 'active',
+            assigned_role: 'owner',
+            provider_attestations: {
+              claude: { training_use: 'none', attested_at: new Date().toISOString() },
+            },
+          })
+        );
+        safeWriteFile(
+          policyPath,
+          JSON.stringify({
+            version: '1.2.0',
+            providers: { claude: { egress: 'external-api', training_use: 'unknown' } },
+            tier_policy: {
+              confidential: { mode: 'approved-only', approved_providers: [] },
+              personal: { mode: 'local-only-or-approved', approved_providers: [] },
+            },
+          })
+        );
+      });
+      process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH = policyPath;
+      hoisted.tenantRegistryRootDir = registryRoot;
+      _resetProviderEgressPolicyCacheForTests();
+    });
+
+    afterEach(() => {
+      delete process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH;
+      hoisted.tenantRegistryRootDir = '';
+      _resetProviderEgressPolicyCacheForTests();
+      withExecutionContext('ecosystem_architect', () => {
+        safeRmSync(FIXTURE_ROOT, { recursive: true, force: true });
+      });
+    });
+
+    it("sends the tenant's confidential mission to a provider it attests training_use 'none'", async () => {
+      writeMissionState('confidential', 'acme');
+      await runDistill();
+
+      expect(hoisted.llmCalls).toHaveLength(1);
+      expect(loadState(MISSION_ID)?.distillation).toMatchObject({ mode: 'llm', llm_used: true });
+    });
+
+    it('still withholds a confidential mission of a tenant without that attestation', async () => {
+      writeMissionState('confidential');
+      await runDistill();
+
+      expect(hoisted.llmCalls).toEqual([]);
+    });
   });
 });

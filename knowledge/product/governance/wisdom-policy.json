@@ -30,10 +30,22 @@
         "response_format": "json_envelope"
       },
       "claude": {
-        "description": "Claude CLI fallback when codex/gemini are unavailable — print mode, JSON result envelope",
+        "description": "Claude CLI fallback when codex/gemini are unavailable — print mode, single tool-less turn, JSON result envelope",
         "command": "claude",
         "adapter": "claude-cli",
-        "args": ["-p", "--output-format", "json"],
+        "args": [
+          "-p",
+          "--output-format",
+          "json",
+          "--max-turns",
+          "1",
+          "--tools",
+          "",
+          "--strict-mcp-config",
+          "--setting-sources=",
+          "--disable-slash-commands",
+          "--no-session-persistence"
+        ],
         "prompt_via": "stdin",
         "timeout_ms": 180000,
         "response_format": "json_envelope"

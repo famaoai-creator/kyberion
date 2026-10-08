@@ -8,7 +8,10 @@ import * as pathResolver from '../path-resolver.js';
 vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
 import {
   inspectLlmResolution,
+  invokeLlm,
   invokeShellProfile,
+  llmProfileProviderId,
+  llmShellScratchCwd,
   type LlmPolicyConfig,
   parseLlmResponse,
   probeLlmCommandAvailability,
@@ -204,7 +207,8 @@ describe('mission-llm resolution', () => {
         adapter: 'test-local-llm',
       },
       'hello world',
-      z.object({ answer: z.number() })
+      z.object({ answer: z.number() }),
+      { egress: { dataTier: 'public' } }
     );
 
     expect(result).toEqual({ answer: 11 });
@@ -240,6 +244,7 @@ describe('mission-llm resolution', () => {
       'hello world',
       z.object({ answer: z.number() }),
       {
+        egress: { dataTier: 'public' },
         isCommandAvailable: (command) => ({
           available: command === 'heavy-cmd' || command === 'standard-cmd',
         }),
@@ -320,10 +325,10 @@ describe('shipped wisdom-policy claude profile', () => {
     expect(profile).toMatchObject({
       command: 'claude',
       adapter: 'claude-cli',
-      args: ['-p', '--output-format', 'json'],
       prompt_via: 'stdin',
       response_format: 'json_envelope',
     });
+    expect(profile.args.slice(0, 3)).toEqual(['-p', '--output-format', 'json']);
   });
 
   it('keeps codex first when every backend is available', () => {
@@ -417,6 +422,49 @@ describe('LLM prompt transport', () => {
       })
     ).toThrow(/prompt_via "stdin"/);
   });
+
+  it('ships the claude profile as a single tool-less turn without user settings', () => {
+    const claude = readJson<{ llm: LlmPolicyConfig }>(
+      pathResolver.knowledge('product/governance/wisdom-policy.json')
+    ).llm.profiles.claude;
+    // Same flags as the repo's tool-less claude turn (agent-adapter.ts) plus
+    // the --max-turns flag the shell backend uses.
+    expect(claude.args.join(' ')).toContain('--max-turns 1');
+    const toolsAt = claude.args.indexOf('--tools');
+    expect(toolsAt).toBeGreaterThanOrEqual(0);
+    expect(claude.args[toolsAt + 1]).toBe('');
+    for (const flag of [
+      '--strict-mcp-config',
+      '--setting-sources=',
+      '--disable-slash-commands',
+      '--no-session-persistence',
+    ]) {
+      expect(claude.args).toContain(flag);
+    }
+  });
+
+  it('runs the claude profile from a scratch cwd with its flags and the system prompt on stdin', async () => {
+    process.env.KYBERION_CLAUDE_CLI_BIN = process.execPath;
+    const shipped = readJson<{ llm: LlmPolicyConfig }>(
+      pathResolver.knowledge('product/governance/wisdom-policy.json')
+    ).llm.profiles.claude;
+    // node stands in for claude: it echoes stdin, argv and cwd inside the
+    // print-mode JSON envelope the profile parses.
+    const envelopeEcho =
+      "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>process.stdout.write(JSON.stringify({type:'result',result:JSON.stringify({stdin:d,argv:process.argv.slice(1),cwd:process.cwd()})})))";
+    const received = await runStructuredLlmProfile(
+      { ...shipped, args: ['-e', envelopeEcho, '--', ...shipped.args] },
+      'mission prompt 51c2',
+      z.object({ stdin: z.string(), argv: z.array(z.string()), cwd: z.string() }),
+      { systemPrompt: 'SYSTEM: return JSON', egress: { dataTier: 'public' } }
+    );
+
+    expect(received.stdin).toBe('SYSTEM: return JSON\n\nmission prompt 51c2');
+    expect(received.argv.join(' ')).toContain(shipped.args.join(' '));
+    expect(received.argv.join(' ')).not.toContain('51c2');
+    expect(received.cwd).not.toBe(pathResolver.rootDir());
+    expect(received.cwd).toBe(llmShellScratchCwd());
+  });
 });
 
 describe('runAdaptiveStructuredLlmProfile provider egress gate', () => {
@@ -485,5 +533,89 @@ describe('runAdaptiveStructuredLlmProfile provider egress gate', () => {
     });
     expect(result).toEqual({ answer: 1 });
     expect(calls).toEqual(['claude']);
+  });
+
+  it('treats an omitted egress scope as confidential', async () => {
+    await expect(
+      runAdaptiveStructuredLlmProfile('distill', 'undeclared prompt', schema, {
+        policy,
+        isCommandAvailable: () => ({ available: true }),
+      })
+    ).rejects.toThrow(/All LLM models exhausted/);
+    expect(calls).toEqual([]);
+  });
+
+  it('gates runStructuredLlmProfile, failing closed without a declared tier', async () => {
+    await expect(
+      runStructuredLlmProfile(policy.profiles.heavy, 'undeclared prompt', schema)
+    ).rejects.toThrow(/PROVIDER_EGRESS_DENIED/);
+    expect(calls).toEqual([]);
+    await expect(
+      runStructuredLlmProfile(policy.profiles.heavy, 'public prompt', schema, {
+        egress: { dataTier: 'public' },
+      })
+    ).resolves.toEqual({ answer: 1 });
+  });
+});
+
+describe('invokeLlm provider egress gate', () => {
+  const originalBin = process.env.KYBERION_CLAUDE_CLI_BIN;
+  const policy = {
+    default_profile: 'heavy',
+    profiles: {
+      heavy: {
+        command: 'claude',
+        adapter: 'claude-cli',
+        args: ['-e', "process.stdout.write('ran')"],
+      },
+    },
+  };
+
+  beforeEach(() => {
+    process.env.KYBERION_CLAUDE_CLI_BIN = process.execPath;
+  });
+
+  afterEach(() => {
+    if (originalBin === undefined) delete process.env.KYBERION_CLAUDE_CLI_BIN;
+    else process.env.KYBERION_CLAUDE_CLI_BIN = originalBin;
+  });
+
+  it('does not run a non-attested provider when the tier is omitted', () => {
+    expect(() => invokeLlm('undeclared prompt', 'summarize', policy)).toThrow(
+      /PROVIDER_EGRESS_DENIED/
+    );
+  });
+
+  it('runs it for a declared public payload', () => {
+    expect(
+      invokeLlm('public prompt', 'summarize', policy, { egress: { dataTier: 'public' } })
+    ).toBe('ran');
+  });
+});
+
+describe('llmProfileProviderId', () => {
+  it('derives the provider from the command the shell runner executes', () => {
+    expect(llmProfileProviderId({ command: 'claude', args: [], adapter: 'claude-cli' })).toBe(
+      'claude'
+    );
+    expect(llmProfileProviderId({ command: 'gemini', args: [], adapter: 'shell-json' })).toBe(
+      'gemini'
+    );
+    expect(llmProfileProviderId({ command: '/opt/bin/claude', args: [] })).toBe('claude');
+  });
+
+  it('rejects a shell profile whose adapter and command name different providers', () => {
+    expect(llmProfileProviderId({ command: 'codex', args: [], adapter: 'claude-cli' })).toBe(
+      undefined
+    );
+  });
+
+  it('uses the adapter for dedicated runners that resolve their own binary', () => {
+    expect(llmProfileProviderId({ command: 'codex', args: [], adapter: 'codex-cli' })).toBe(
+      'codex'
+    );
+    expect(llmProfileProviderId({ command: 'gemini', args: [], adapter: 'gemini-cli' })).toBe(
+      'gemini'
+    );
   });
 });
