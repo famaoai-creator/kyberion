@@ -280,7 +280,9 @@ export type OffboardTargetKind =
   /** DA-08: one data-vault cache entry whose projectId equals the scope id. */
   | 'data_vault_entry'
   /** Tenant-scoped feedback, intent, audit, and collaboration runtime state. */
-  | 'tenant_learning_tree';
+  | 'tenant_learning_tree'
+  /** The tenant's partition of the resource-usage ledger (one per tier). */
+  | 'tenant_usage_ledger';
 
 export interface OffboardTarget {
   /** Repo-relative POSIX path. */
@@ -341,6 +343,8 @@ export const INGEST_CURSORS_REPO_SUBPATH = 'active/shared/runtime/ingest-cursors
 export const INGEST_DEDUP_REGISTRY_REPO_PATH =
   'active/shared/runtime/ingest/content-hash-registry.jsonl';
 const INGEST_QUOTA_REPO_SUBPATH = 'active/shared/runtime/ingest/quota';
+/** Mirrors metrics.ts RESOURCE_USAGE_LEDGER_ROOT (`<root>/<tier>/<tenant>/resource-usage.jsonl`). */
+export const USAGE_LEDGER_REPO_SUBPATH = 'active/shared/runtime/usage-ledger';
 
 const SCOPE_TIERS = ['personal', 'confidential', 'public'] as const;
 
@@ -760,6 +764,14 @@ export function collectScopeTargets(
       const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
       if (subtreePath && safeExistsSync(subtreePath)) {
         targets.push({ path: subtree, kind: 'ingest_cursors_tree' });
+      }
+    }
+    // The tenant's usage-ledger partitions must not outlive the tenant.
+    for (const tier of SCOPE_TIERS) {
+      const subtree = `${USAGE_LEDGER_REPO_SUBPATH}/${tier}/${id}`;
+      const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
+      if (subtreePath && safeExistsSync(subtreePath)) {
+        targets.push({ path: subtree, kind: 'tenant_usage_ledger' });
       }
     }
   }

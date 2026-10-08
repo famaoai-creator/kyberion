@@ -833,6 +833,48 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     expect(verification.leftovers.length).toBeGreaterThan(0);
   });
 
+  it("purges the tenant's resource-usage ledger partitions through the audited ceremony", () => {
+    const ledger = (tier: string, tenant: string) =>
+      `active/shared/runtime/usage-ledger/${tier}/${tenant}`;
+    writeJsonl(`${ledger('confidential', TENANT)}/resource-usage.jsonl`, [{ usage_id: 'a-1' }]);
+    writeJsonl(`${ledger('public', TENANT)}/resource-usage.jsonl`, [{ usage_id: 'a-2' }]);
+    writeJsonl(`${ledger('confidential', 'tenant-beta')}/resource-usage.jsonl`, [
+      { usage_id: 'b-1' },
+    ]);
+
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.targets).toEqual(
+      expect.arrayContaining([
+        { path: ledger('confidential', TENANT), kind: 'tenant_usage_ledger' },
+        { path: ledger('public', TENANT), kind: 'tenant_usage_ledger' },
+      ])
+    );
+    expect(dryRun.targets.map((t) => t.path)).not.toContain(ledger('confidential', 'tenant-beta'));
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-10-08T01:02:03.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    expect(result.verification).toEqual({ clean: true, leftovers: [] });
+    expect(fs.existsSync(abs(ledger('confidential', TENANT)))).toBe(false);
+    expect(fs.existsSync(abs(ledger('public', TENANT)))).toBe(false);
+    expect(fs.existsSync(abs(ledger('confidential', 'tenant-beta')))).toBe(true);
+    // Export-before-delete, and every removal audited.
+    expect(
+      fs.existsSync(
+        abs(`${result.export_path}/${ledger('confidential', TENANT)}/resource-usage.jsonl`)
+      )
+    ).toBe(true);
+    const softDeletes = auditEvents().filter((e) => e.event === 'SCOPE_OFFBOARD_SOFT_DELETE');
+    expect(softDeletes.map((e) => e.path)).toEqual(
+      expect.arrayContaining([ledger('confidential', TENANT), ledger('public', TENANT)])
+    );
+  });
+
   it('keeps a dedup line with a dangerous JSON key as an unreadable record', () => {
     seedIngestResidue();
     fs.appendFileSync(
