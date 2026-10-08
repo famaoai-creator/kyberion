@@ -184,6 +184,10 @@ export interface ProviderEgressCheckResult {
 
 const DENY_PREFIX = '[PROVIDER_EGRESS_DENIED]';
 
+function deny(reason: string): ProviderEgressCheckResult {
+  return { allowed: false, reason };
+}
+
 function denyAndAlert(
   input: ProviderEgressCheckInput,
   reason: string
@@ -200,7 +204,7 @@ function denyAndAlert(
       recommendation:
         'If this provider should receive this tier, add it to provider-egress-policy.json' +
         ' (tier_policy.<tier>.approved_providers), record a tenant provider attestation with ' +
-        "'pnpm tenant attest-provider', or mark it 'local-only' if it truly never leaves this machine.",
+        "'pnpm onboarding llm attest' (or 'pnpm tenant attest-provider'), or mark it 'local-only' if it truly never leaves this machine.",
       dedupe_key: `provider-egress-denied:${input.provider || 'unknown'}:${input.dataTier}`,
     });
   } catch (err) {
@@ -333,7 +337,13 @@ function readTenantProfileAsPolicyInput(
   };
 }
 
-export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEgressCheckResult {
+/**
+ * Side-effect-free evaluation of the tier x egress rule. A denial carries the
+ * bare reason (no prefix) and emits no log line or ops-alert, so planning
+ * views (`describeProviderTierAvailability`) can ask "would this be allowed?"
+ * for every provider without raising an alert per hypothetical denial.
+ */
+function evaluateProviderEgress(input: ProviderEgressCheckInput): ProviderEgressCheckResult {
   const provider = String(input.provider || '').trim();
   const dataTier = input.dataTier;
 
@@ -342,7 +352,7 @@ export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEg
   if (dataTier === 'public') return { allowed: true };
 
   if (!provider) {
-    return denyAndAlert(input, `no provider identified for a ${dataTier} payload; fail-closed.`);
+    return deny(`no provider identified for a ${dataTier} payload; fail-closed.`);
   }
 
   const requestedTenantSlug = input.tenant_slug?.trim();
@@ -350,14 +360,12 @@ export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEg
   try {
     activeTenantSlug = resolveIdentityContext().tenantSlug?.trim();
   } catch (error) {
-    return denyAndAlert(
-      input,
+    return deny(
       `active tenant scope could not be resolved: ${error instanceof Error ? error.message : String(error)}`
     );
   }
   if (requestedTenantSlug && activeTenantSlug && requestedTenantSlug !== activeTenantSlug) {
-    return denyAndAlert(
-      input,
+    return deny(
       `tenant '${requestedTenantSlug}' conflicts with the active tenant scope '${activeTenantSlug}'.`
     );
   }
@@ -373,14 +381,10 @@ export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEg
       tenantPolicyInput = policyInput;
       const allowed = policyInput.allowed_reasoning_backends;
       if (allowed?.length && !allowed.includes(provider)) {
-        return denyAndAlert(
-          input,
-          `tenant '${input.tenant_slug}' does not allow provider '${provider}'.`
-        );
+        return deny(`tenant '${input.tenant_slug}' does not allow provider '${provider}'.`);
       }
     } catch (error) {
-      return denyAndAlert(
-        input,
+      return deny(
         `tenant '${input.tenant_slug}' could not be resolved: ${error instanceof Error ? error.message : String(error)}`
       );
     }
@@ -388,14 +392,12 @@ export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEg
 
   const loaded = loadProviderEgressPolicy();
   if (loaded.status === 'missing') {
-    return denyAndAlert(
-      input,
+    return deny(
       `provider-egress-policy.json not found; ${dataTier} egress fails closed until it is provisioned.`
     );
   }
   if (loaded.status === 'invalid') {
-    return denyAndAlert(
-      input,
+    return deny(
       `provider-egress-policy.json is invalid (${loaded.reason}); ${dataTier} egress fails closed until it is repaired.`
     );
   }
@@ -431,14 +433,12 @@ export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEg
     return { allowed: true };
   }
   if (attestation.status === 'expired') {
-    return denyAndAlert(
-      input,
+    return deny(
       `'${provider}' attestation for tenant '${tenantSlug}' expired on ${attestation.expires_at}; re-verify the plan's training-use terms before sending ${dataTier} material.`
     );
   }
   if (attestation.status === 'valid' && attestation.training_use !== 'none') {
-    return denyAndAlert(
-      input,
+    return deny(
       `tenant '${tenantSlug}' attests training_use '${attestation.training_use}' for '${provider}'.`
     );
   }
@@ -450,17 +450,111 @@ export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEg
   if (exceptions.includes(provider)) return { allowed: true };
 
   if (!declaration) {
-    return denyAndAlert(
-      input,
+    return deny(
       `'${provider}' is not declared in provider-egress-policy.json; a tenant attestation alone cannot establish its egress identity.`
     );
   }
 
   const trainingUse = declaration.training_use ?? 'unknown';
-  return denyAndAlert(
-    input,
+  return deny(
     `'${provider}' has training_use '${trainingUse}'; ${dataTier} material may only go to a provider attested 'none' (or an explicit approved_providers exception).`
   );
+}
+
+export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEgressCheckResult {
+  const result = evaluateProviderEgress(input);
+  if (result.allowed) return { allowed: true };
+  return denyAndAlert(input, result.reason || 'provider egress denied');
+}
+
+export type ProviderTierUsableBasis =
+  | 'public'
+  | 'local-only'
+  | 'policy-training-use-none'
+  | 'approved-providers-exception'
+  | 'tenant-attestation';
+
+export interface ProviderTierAvailability {
+  tier: TierLevel;
+  usable: Array<{ provider: string; basis: ProviderTierUsableBasis }>;
+  /** One-line consequence for the operator (what LLM work this tier can do). */
+  note: string;
+}
+
+export interface ProviderTierAvailabilityReport {
+  tenant_slug?: string;
+  policy_status: PolicyLoadResult['status'];
+  tiers: ProviderTierAvailability[];
+}
+
+const AVAILABILITY_TIERS: TierLevel[] = ['public', 'confidential', 'personal'];
+
+/**
+ * Per data tier, which declared providers may receive material of that tier
+ * for this tenant — the same rule `checkProviderEgress` enforces, evaluated
+ * without alerts, so onboarding and `tenant:activation plan` can show the
+ * operator the consequence of the current attestations before any work runs.
+ */
+export function describeProviderTierAvailability(
+  input: { tenant_slug?: string; tenant_registry_root_dir?: string } = {}
+): ProviderTierAvailabilityReport {
+  const loaded = loadProviderEgressPolicy();
+  const policy = loaded.status === 'ok' ? loaded.policy : undefined;
+  const providers = policy ? Object.keys(policy.providers).sort() : [];
+  const tenantSlug = input.tenant_slug?.trim() || undefined;
+  const tiers = AVAILABILITY_TIERS.map((tier): ProviderTierAvailability => {
+    const usable = providers
+      .filter(
+        (provider) =>
+          evaluateProviderEgress({
+            provider,
+            dataTier: tier,
+            ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+            ...(input.tenant_registry_root_dir
+              ? { tenant_registry_root_dir: input.tenant_registry_root_dir }
+              : {}),
+          }).allowed
+      )
+      .map((provider) => {
+        const declaration = policy!.providers[provider];
+        const exceptions =
+          tier === 'personal'
+            ? policy!.tier_policy.personal.approved_providers
+            : policy!.tier_policy.confidential.approved_providers;
+        const basis: ProviderTierUsableBasis =
+          tier === 'public'
+            ? 'public'
+            : declaration?.egress === 'local-only'
+              ? 'local-only'
+              : declaration?.training_use === 'none'
+                ? 'policy-training-use-none'
+                : exceptions.includes(provider)
+                  ? 'approved-providers-exception'
+                  : 'tenant-attestation';
+        return { provider, basis };
+      });
+    const names = usable.map((entry) => entry.provider).join(', ');
+    const external = usable.filter((entry) => entry.basis !== 'local-only');
+    const enableHint = tenantSlug
+      ? `attest a provider with 'pnpm onboarding llm attest --tenant ${tenantSlug} --provider <id> --training-use none ...' to enable it`
+      : "bind a tenant and attest a provider with 'pnpm onboarding llm attest' to enable it";
+    let note: string;
+    if (tier === 'public') {
+      note = usable.length > 0 ? `public: ${names}` : 'public: no provider declared';
+    } else if (usable.length === 0) {
+      note = `${tier}: none — LLM work on ${tier} material (e.g. mission distillation) is denied; ${enableHint}`;
+    } else if (external.length === 0) {
+      note = `${tier}: local-only (${names}) — no external provider is usable for ${tier} material; ${enableHint}`;
+    } else {
+      note = `${tier}: ${names}`;
+    }
+    return { tier, usable, note };
+  });
+  return {
+    ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+    policy_status: loaded.status,
+    tiers,
+  };
 }
 
 export class ProviderEgressDeniedError extends Error {

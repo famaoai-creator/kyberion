@@ -2787,6 +2787,10 @@
       "types": "./dist/profile-root.d.ts",
       "default": "./dist/profile-root.js"
     },
+    "./llm-selection-preferences": {
+      "types": "./dist/llm-selection-preferences.d.ts",
+      "default": "./dist/llm-selection-preferences.js"
+    },
     "./macos-automation-bridge": {
       "types": "./dist/macos-automation-bridge.d.ts",
       "default": "./dist/macos-automation-bridge.js"

@@ -24,6 +24,11 @@ export async function main(
     await firstJobMain(args.slice(1), print);
     return;
   }
+  if (args[0] === 'llm') {
+    const { main: llmMain } = await import('./onboarding_llm.js');
+    llmMain(args.slice(1), print);
+    return;
+  }
   if (args[0] === 'apply') {
     await applyOnboardingMain(args.slice(1), print);
     return;
