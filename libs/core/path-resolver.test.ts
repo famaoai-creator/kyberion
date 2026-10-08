@@ -201,6 +201,7 @@ describe('vitest live-state sandbox', () => {
       shared('runtime/background-review/nudge/session.json'),
       resolve('active/shared/runtime/mesh-hub/tenants/t/adapters/p/proposals.jsonl'),
       resolve('active/shared/observability/mesh-hub/tenants/t/adapters/p/events.jsonl'),
+      rootResolve('active/shared/runtime/apple-intelligence/module-cache/x.pcm'),
       shared('last_response.json'),
       resolve('active/audit/system-ledger.jsonl'),
       rootResolve('active/shared/runtime/peer-messaging/tenants/acme/peers/p/inbox.jsonl'),
