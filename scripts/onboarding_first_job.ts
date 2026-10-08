@@ -319,8 +319,19 @@ export async function tickFirstJob(tenant: string) {
 export async function main(args: string[] = [], print: (value: unknown) => void = () => undefined) {
   if (args.includes('--help') || args.includes('-h')) {
     print(
-      'Usage: pnpm onboarding first-job --tenant <new-test-tenant> [--apply --accept-plan <digest> | --tick]. Default: read-only plan.'
+      'Usage: pnpm onboarding first-job --tenant <new-test-tenant> [--apply --accept-plan <digest> | --tick | --status --request-id <UUID>]. Default: read-only plan.'
     );
+    return;
+  }
+  if (args.some((arg) => /^(?:--status|--request-id)(?:=|$)/.test(arg))) {
+    const { readFirstJobStatus, firstJobStatusUnavailable, parseFirstJobStatusArgs } =
+      await import('./onboarding_first_job_status.js');
+    const input = parseFirstJobStatusArgs(args);
+    const result = input
+      ? await readFirstJobStatus(input.tenant, input.requestId)
+      : firstJobStatusUnavailable();
+    print(JSON.stringify(result, null, 2));
+    if (result.status === 'unavailable') throw new ScriptExitError(1, '', true);
     return;
   }
   let tenant: string | undefined, accepted: string | undefined;

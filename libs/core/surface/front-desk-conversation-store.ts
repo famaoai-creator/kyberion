@@ -57,7 +57,7 @@ import {
 } from '../workforce/work-coordination.js';
 import { assertFrontDeskDispatchLockHeld } from './front-desk-dispatch-lock.js';
 import { assertFrontDeskRecoveryOutputsAbsent } from './front-desk-recovery-evidence.js';
-import { findDotCharter } from '../dot/dot-charter.js';
+import { findRepoDotCharter } from '../dot/dot-charter.js';
 import { firstJobApprovalEffect } from './first-job-approval-proof.js';
 import { loadApprovalRequest, computeApprovalPayloadHash } from '../governance/approval-store.js';
 import {
@@ -326,6 +326,16 @@ export function readFrontDeskConversationWork(
   return work;
 }
 
+/** Project only the selected durable task. Parent/sibling admissibility is checked separately. */
+export function readFrontDeskConversationRequestWork(
+  viewer: FrontDeskConversationViewer,
+  requestId: string
+): FrontDeskConversationWorkTask | undefined {
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(requestId))
+    throw new ConversationStoreError('invalid_history');
+  return readConversationWorkProjection(viewer, undefined, undefined, requestId).tasks[0];
+}
+
 export function readFrontDeskConversationArtifact(
   viewer: FrontDeskConversationViewer,
   selector: { request_id: string; revision: number; sha256: string }
@@ -346,7 +356,8 @@ export function readFrontDeskConversationArtifact(
 function readConversationWorkProjection(
   viewer: FrontDeskConversationViewer,
   locale?: SupportedLocale,
-  selector?: { request_id: string; revision: number; sha256: string }
+  selector?: { request_id: string; revision: number; sha256: string },
+  requestId?: string
 ): FrontDeskConversationWork & { artifactBody?: string } {
   const ref = conversationRef(viewer);
   return asStore(viewer, () => {
@@ -355,103 +366,106 @@ function readConversationWorkProjection(
       (transcript.executionRequests ?? []).map((request) => [request.binding.request_id, request])
     );
     let artifactBody: string | undefined;
-    const tasks: FrontDeskConversationWorkTask[] = (transcript.taskState?.tasks ?? []).map(
-      (task) => {
-        const turns = transcript.turns.filter((turn) => turn.routing?.taskIds.includes(task.id));
-        const workTurns = turns.filter(
-          (turn) => turn.routing?.kind === 'new_request' || turn.routing?.kind === 'followup'
-        );
-        const incomplete = workTurns.filter((turn) => turn.reply === undefined);
-        const turnState: FrontDeskConversationWorkTask['turnState'] = incomplete.some(
-          (turn) => turn.uncertain
-        )
-          ? 'uncertain'
-          : incomplete.some((turn) => !turn.retryable)
-            ? 'pending'
-            : incomplete.length > 0
-              ? 'not_started'
-              : workTurns.length > 0 || task.result
-                ? 'settled'
-                : 'unknown';
-        const request = requests.get(task.id);
-        // Persisted report text may describe a receipt that has since vanished.
-        // Its timestamp is a recorded event only; its success is never reused.
-        const reports = (transcript.executionReports ?? []).filter(
-          (report) => report.requestId === task.id
-        );
-        const row: FrontDeskConversationWorkTask = {
-          id: task.id,
-          title: storedText(task.title, CONVERSATION_TASK_MAX_TITLE),
-          sourceStatus: task.state === 'completed' ? 'answered' : task.state,
-          createdAt: task.createdAt,
-          lastRecordedAt: Math.max(
-            task.createdAt,
-            task.result?.at ?? 0,
-            request?.createdAt ?? 0,
-            ...turns.map((turn) => turn.createdAt),
-            ...reports.map((report) => report.createdAt)
-          ),
-          turnState,
-          ...(!request && task.result
-            ? { resultExcerpt: storedText(task.result.excerpt, CONVERSATION_TASK_MAX_EXCERPT) }
-            : {}),
-        };
-        if (!request) return row;
-        const selected =
-          selector?.request_id === request.binding.request_id &&
-          selector.revision === request.binding.revision;
-        const projection = executionProjection(viewer, request, locale, undefined, selected);
-        const verified =
-          projection?.status === 'work_completed' &&
-          typeof projection.artifactSha256 === 'string' &&
-          /^[a-f0-9]{64}$/.test(projection.artifactSha256) &&
-          Boolean(projection.artifactPath);
-        row.executionStatus =
-          projection?.status === 'work_completed' && !verified
-            ? 'uncertain'
-            : (projection?.status ?? 'unknown');
-        if (row.executionStatus === 'terminated_unstarted') {
-          row.turnState = 'settled';
-          row.lastRecordedAt = Math.max(
-            row.lastRecordedAt,
-            Date.parse(request.recoveryReceipt!.terminated_at)
-          );
-          return row; // Termination produces no artifact and no pending artifact fiction.
-        }
-        const workItemId = existingExecutionWorkItemId(viewer, request);
-        if (workItemId) row.workItemId = workItemId;
-        const pending = ['queued', 'awaiting_approval', 'running'].includes(row.executionStatus);
-        const binding = request.binding;
-        row.artifact = {
-          requestId: binding.request_id,
-          revision: binding.revision,
-          format: binding.receipt_format ?? 'readable',
-          ...(binding.parent_request_id
-            ? {
-                parentRequestId: binding.parent_request_id,
-                parentRevision: binding.parent_revision,
-                changeReason: 'format_change' as const,
-              }
-            : {}),
-          verification: verified ? 'verified' : pending ? 'pending' : 'unknown',
-          currentness: verified
-            ? 'latest_verified'
-            : pending
-              ? 'requested_pending'
-              : 'requested_unknown',
-        };
-        if (verified && selected && projection?.artifactSha256 === selector?.sha256)
-          artifactBody = projection?.artifactBody;
-        if (verified) {
-          row.verifiedAt = Date.now();
-          row.artifact.sha256 = projection!.artifactSha256;
-          row.artifact.verifiedAt = row.verifiedAt;
-        }
-        // Deliberately omit projection.text: success and failure summaries may
-        // contain internal artifact paths. The adapter localizes typed statuses.
-        return row;
-      }
+    const selectedTasks = (transcript.taskState?.tasks ?? []).filter(
+      (task) => requestId === undefined || task.id === requestId
     );
+    if (requestId !== undefined && selectedTasks.length > 1)
+      throw new ConversationStoreError('invalid_history');
+    const tasks: FrontDeskConversationWorkTask[] = selectedTasks.map((task) => {
+      const turns = transcript.turns.filter((turn) => turn.routing?.taskIds.includes(task.id));
+      const workTurns = turns.filter(
+        (turn) => turn.routing?.kind === 'new_request' || turn.routing?.kind === 'followup'
+      );
+      const incomplete = workTurns.filter((turn) => turn.reply === undefined);
+      const turnState: FrontDeskConversationWorkTask['turnState'] = incomplete.some(
+        (turn) => turn.uncertain
+      )
+        ? 'uncertain'
+        : incomplete.some((turn) => !turn.retryable)
+          ? 'pending'
+          : incomplete.length > 0
+            ? 'not_started'
+            : workTurns.length > 0 || task.result
+              ? 'settled'
+              : 'unknown';
+      const request = requests.get(task.id);
+      // Persisted report text may describe a receipt that has since vanished.
+      // Its timestamp is a recorded event only; its success is never reused.
+      const reports = (transcript.executionReports ?? []).filter(
+        (report) => report.requestId === task.id
+      );
+      const row: FrontDeskConversationWorkTask = {
+        id: task.id,
+        title: storedText(task.title, CONVERSATION_TASK_MAX_TITLE),
+        sourceStatus: task.state === 'completed' ? 'answered' : task.state,
+        createdAt: task.createdAt,
+        lastRecordedAt: Math.max(
+          task.createdAt,
+          task.result?.at ?? 0,
+          request?.createdAt ?? 0,
+          ...turns.map((turn) => turn.createdAt),
+          ...reports.map((report) => report.createdAt)
+        ),
+        turnState,
+        ...(!request && task.result
+          ? { resultExcerpt: storedText(task.result.excerpt, CONVERSATION_TASK_MAX_EXCERPT) }
+          : {}),
+      };
+      if (!request) return row;
+      const selected =
+        selector?.request_id === request.binding.request_id &&
+        selector.revision === request.binding.revision;
+      const projection = executionProjection(viewer, request, locale, undefined, selected);
+      const verified =
+        projection?.status === 'work_completed' &&
+        typeof projection.artifactSha256 === 'string' &&
+        /^[a-f0-9]{64}$/.test(projection.artifactSha256) &&
+        Boolean(projection.artifactPath);
+      row.executionStatus =
+        projection?.status === 'work_completed' && !verified
+          ? 'uncertain'
+          : (projection?.status ?? 'unknown');
+      if (row.executionStatus === 'terminated_unstarted') {
+        row.turnState = 'settled';
+        row.lastRecordedAt = Math.max(
+          row.lastRecordedAt,
+          Date.parse(request.recoveryReceipt!.terminated_at)
+        );
+        return row; // Termination produces no artifact and no pending artifact fiction.
+      }
+      const workItemId = existingExecutionWorkItemId(viewer, request);
+      if (workItemId) row.workItemId = workItemId;
+      const pending = ['queued', 'awaiting_approval', 'running'].includes(row.executionStatus);
+      const binding = request.binding;
+      row.artifact = {
+        requestId: binding.request_id,
+        revision: binding.revision,
+        format: binding.receipt_format ?? 'readable',
+        ...(binding.parent_request_id
+          ? {
+              parentRequestId: binding.parent_request_id,
+              parentRevision: binding.parent_revision,
+              changeReason: 'format_change' as const,
+            }
+          : {}),
+        verification: verified ? 'verified' : pending ? 'pending' : 'unknown',
+        currentness: verified
+          ? 'latest_verified'
+          : pending
+            ? 'requested_pending'
+            : 'requested_unknown',
+      };
+      if (verified && selected && projection?.artifactSha256 === selector?.sha256)
+        artifactBody = projection?.artifactBody;
+      if (verified) {
+        row.verifiedAt = Date.now();
+        row.artifact.sha256 = projection!.artifactSha256;
+        row.artifact.verifiedAt = row.verifiedAt;
+      }
+      // Deliberately omit projection.text: success and failure summaries may
+      // contain internal artifact paths. The adapter localizes typed statuses.
+      return row;
+    });
     const byId = new Map(tasks.map((task) => [task.id, task]));
     for (const task of tasks) {
       if (task.artifact?.verification !== 'verified') continue;
@@ -1241,7 +1255,7 @@ function verifiedTerminalRecovery(request: FrontDeskExecutionRequest, rootDir?: 
     if (!approval || computeApprovalPayloadHash({ value: approval }) !== receipt.approval_hash)
       return false;
     const mapping = getFrontDeskExecutionMapping(request.binding);
-    const charter = mapping ? findDotCharter(mapping.dotId, rootDir)?.charter : undefined;
+    const charter = mapping ? findRepoDotCharter(mapping.dotId, rootDir)?.charter : undefined;
     if (!mapping || !charter || charter.dot_id !== latest.dot_id) return false;
     const effect = firstJobApprovalEffect(charter, request.binding);
     const expected = frontDeskExecutionProposal(request.binding);

@@ -1,5 +1,5 @@
 /** Server-only diagnostic scope validation, shared by readiness and atomic reservation. */
-import { findDotCharter, assertFrontDeskDiagnosticDotCharter } from '../dot/dot-charter.js';
+import { findRepoDotCharter, assertFrontDeskDiagnosticDotCharter } from '../dot/dot-charter.js';
 import type { FrontDeskExecutionMapping } from './front-desk-execution-contract.js';
 
 export function isFirstJobDiagnosticMapping(
@@ -23,7 +23,7 @@ export function isFirstJobDiagnosticMapping(
   )
     return false;
   try {
-    const charter = findDotCharter(mapping.dotId)?.charter;
+    const charter = findRepoDotCharter(mapping.dotId)?.charter;
     if (!charter || charter.status !== 'active') return false;
     assertFrontDeskDiagnosticDotCharter(charter);
     // 'all' here represents no organization/project binding. It is accepted only

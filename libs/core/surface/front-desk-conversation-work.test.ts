@@ -51,19 +51,17 @@ vi.mock('../workforce/work-coordination.js', () => ({
 }));
 vi.mock('../dot/dot-dispatch.js', () => ({ currentDotActions: () => [] }));
 vi.mock('../dot/dot-charter.js', () => ({
-  listDotCharters: () => [
-    {
-      charter: {
-        dot_id: 'receipt-dot',
-        scope: {
-          tier: 'public',
-          tenant_slug: 'tenant-a',
-          organization_id: 'org-a',
-          project_id: 'project-a',
-        },
+  findRepoDotCharter: () => ({
+    charter: {
+      dot_id: 'receipt-dot',
+      scope: {
+        tier: 'public',
+        tenant_slug: 'tenant-a',
+        organization_id: 'org-a',
+        project_id: 'project-a',
       },
     },
-  ],
+  }),
 }));
 vi.mock('../dot/dot-executor-reports.js', () => ({
   readDotWorkResults: () => structuredClone(state.results),

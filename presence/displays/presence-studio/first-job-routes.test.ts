@@ -20,17 +20,22 @@ const state = vi.hoisted(() => ({
   run: vi.fn(),
   charter: undefined as DotCharter | undefined,
 }));
-vi.mock('@agent/core/dot/dot-charter', async (original) => ({
-  ...(await original<typeof import('@agent/core/dot/dot-charter')>()),
-  findDotCharter: () => {
+vi.mock('@agent/core/dot/dot-charter', async (original) => {
+  const readCharter = () => {
     state.charterReads++;
     if (state.revokeCharterAt && state.charterReads >= state.revokeCharterAt && state.charter)
       state.charter.status = 'paused';
     return state.charter
       ? { path: 'dots/receipt-dot.json', charter: structuredClone(state.charter) }
       : undefined;
-  },
-}));
+  };
+  return {
+    ...(await original<typeof import('@agent/core/dot/dot-charter')>()),
+    findDotCharter: readCharter,
+    // Diagnostic admission uses the repo-only reader; retain the same revocation clock.
+    findRepoDotCharter: readCharter,
+  };
+});
 vi.mock('@agent/core/surface/channel-surface', () => ({
   runSurfaceMessageConversation: state.run,
 }));

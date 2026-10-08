@@ -551,6 +551,49 @@ export function findDotCharter(
   return undefined;
 }
 
+/**
+ * Resolve only repository-owned charters. A repo-level identity owns its ID
+ * regardless of tenant duplicates (resolveDotIdOwner); no registry, tenant
+ * knowledge, overlay resolution or activation-history scan is necessary.
+ * Missing/unreadable/ambiguous repo evidence never falls back to tenant scans.
+ */
+export function findRepoDotCharter(
+  dotId: string,
+  rootDir = pathResolver.rootDir()
+): LoadedDotCharter | undefined {
+  const root = path.resolve(rootDir);
+  const dir = assertSafeRepositoryPath(dotCharterDir(root), {
+    rootDir: root,
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(dir)) return undefined;
+  if (!safeLstat(dir).isDirectory()) throw new Error('repo_dot_charter_directory_unavailable');
+  const matches: LoadedDotCharter[] = [];
+  for (const name of safeReaddir(dir).sort()) {
+    if (!name.endsWith('.json')) continue;
+    const file = assertSafeRepositoryPath(path.join(dir, name), {
+      rootDir: root,
+      allowMissingLeaf: false,
+    });
+    if (!safeLstat(file).isFile()) throw new Error('repo_dot_charter_file_unavailable');
+    const value = parseSafeJsonObjectInput(
+      String(safeReadFile(file, { encoding: 'utf8' })),
+      'repo dot charter'
+    );
+    let charter: DotCharter;
+    try {
+      charter = validateDotCharter(value, file);
+    } catch (error) {
+      // A known unrelated invalid schema cannot hide a competing target identity.
+      if (typeof value.dot_id === 'string' && value.dot_id !== dotId) continue;
+      throw error;
+    }
+    if (charter.dot_id === dotId) matches.push({ path: file, charter });
+  }
+  if (matches.length > 1) throw new Error('repo_dot_charter_identity_ambiguous');
+  return matches[0];
+}
+
 /** The one deterministic pipeline supported by the opt-in first-job diagnostic. */
 export const FRONT_DESK_DIAGNOSTIC_PIPELINE = 'pipelines/front-desk-request-receipt.json';
 
@@ -614,7 +657,7 @@ export function requireCurrentFrontDeskDiagnosticDot(
   rootDir?: string
 ): DotCharter {
   assertFrontDeskDiagnosticDotCharter(charter);
-  const current = findDotCharter(charter.dot_id, rootDir)?.charter;
+  const current = findRepoDotCharter(charter.dot_id, rootDir)?.charter;
   if (
     !current ||
     current.status !== 'active' ||
