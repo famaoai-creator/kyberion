@@ -7,6 +7,8 @@ import {
   approvalRequestLogicalPath,
   approvalStoreRoots,
   computeApprovalPayloadHash,
+  claimApprovalApply,
+  recordApprovalApplyResult,
   createApprovalRequest,
   cancelApprovalRequest,
   loadApprovalRequest,
@@ -311,5 +313,97 @@ describe('approval-store path normalization', () => {
     expect(() => approvalActionCacheKey({ action: 'secret:set', targetClass: '  ' })).toThrow(
       'action and targetClass'
     );
+  });
+});
+
+describe('durable approval apply claims', () => {
+  function approved() {
+    const record = createApprovalRequest('mission_controller', {
+      channel: 'apply-claim-test',
+      threadTs: '1',
+      correlationId: 'claim-test',
+      requestedBy: 'claim-test-operator',
+      kind: 'secret_mutation',
+      draft: { title: 'Claim fixture', summary: 'Hermetic apply claim fixture' },
+    });
+    return decideApprovalRequest('mission_controller', {
+      channel: record.channel,
+      requestId: record.id,
+      decision: 'approved',
+      decidedBy: 'operator',
+    });
+  }
+  function claim(record: ReturnType<typeof approved>) {
+    return claimApprovalApply('mission_controller', {
+      channel: record.channel,
+      requestId: record.id,
+      appliedBy: 'claim-test-operator',
+      expectedRecordHash: computeApprovalPayloadHash({ record }),
+    });
+  }
+  it('persists an apply-start claim without pretending the effect completed', () => {
+    const record = approved();
+    const claimed = claim(record);
+    expect(claimed.status).toBe('approved');
+    expect(claimed.applyResult).toBeUndefined();
+    expect(claimed.applyClaim.startedBy).toBe('claim-test-operator');
+    const reloaded = loadApprovalRequest(record.channel, record.id)!;
+    expect(reloaded.applyClaim).toEqual(claimed.applyClaim);
+    expect(() => claim(reloaded)).toThrow('already started; recovery required');
+  });
+  it('rejects a stale checked snapshot before claiming', () => {
+    const record = approved();
+    claim(record);
+    expect(() => claim(record)).toThrow('changed before apply');
+  });
+  it('requires the claim ID for the receipt and never overwrites a terminal receipt', () => {
+    const record = approved();
+    const claimed = claim(record);
+    const params = {
+      channel: record.channel,
+      requestId: record.id,
+      applyResult: { result: 'success' as const, appliedBy: 'claim-test-operator' },
+    };
+    expect(() => recordApprovalApplyResult('mission_controller', params)).toThrow(
+      'claim does not match'
+    );
+    expect(() =>
+      recordApprovalApplyResult('mission_controller', { ...params, claimId: 'wrong' })
+    ).toThrow('claim does not match');
+    const applied = recordApprovalApplyResult('mission_controller', {
+      ...params,
+      claimId: claimed.applyClaim.claimId,
+    });
+    expect(applied.status).toBe('applied');
+    expect(applied.applyClaim).toEqual(claimed.applyClaim);
+    expect(() =>
+      recordApprovalApplyResult('mission_controller', {
+        ...params,
+        claimId: claimed.applyClaim.claimId,
+        applyResult: { result: 'failed' },
+      })
+    ).toThrow('already recorded');
+    expect(loadApprovalRequest(record.channel, record.id)?.applyResult?.result).toBe('success');
+  });
+  it('rejects a receipt claiming an attempt that never started', () => {
+    const record = approved();
+    expect(() =>
+      recordApprovalApplyResult('mission_controller', {
+        channel: record.channel,
+        requestId: record.id,
+        claimId: 'missing',
+        applyResult: { result: 'success' },
+      })
+    ).toThrow('claim is missing');
+  });
+  it('preserves legacy receipt callers that did not opt into a claim', () => {
+    const record = approved();
+    expect(
+      recordApprovalApplyResult('mission_controller', {
+        channel: record.channel,
+        requestId: record.id,
+        applyResult: { result: 'success' },
+      }).status
+    ).toBe('applied');
   });
 });
