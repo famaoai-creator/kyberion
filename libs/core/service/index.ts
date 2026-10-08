@@ -27,3 +27,4 @@ export * from './service-runtime-policy.js';
 export * from './service-runtime-registry.js';
 export * from './service-secret-resolver.js';
 export * from './service-validator.js';
+export * from './operator-service-connection.js';

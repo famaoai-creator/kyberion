@@ -50,7 +50,7 @@
       "kind": "ui",
       "description": "Concierge (秘書室) — CEO executive-secretary surface: intent inbox, approval queue, outcome feed, exception feed",
       "command": "node",
-      "args": ["node_modules/next/dist/bin/next", "start", "-H", "127.0.0.1", "-p", "3050"],
+      "args": ["server/local-server.ts", "--port", "3050"],
       "cwd": "presence/displays/concierge",
       "shutdownPolicy": "detached",
       "startupMode": "workspace-app",
@@ -259,10 +259,7 @@
       "description": "Background terminal bridge service for runtime sessions",
       "command": "node",
       "args": ["dist/presence/bridge/terminal/server.js"],
-      "env": {
-        "KYBERION_PERSONA": "sovereign",
-        "MISSION_ROLE": "infrastructure_sentinel"
-      },
+      "env": { "KYBERION_PERSONA": "sovereign", "MISSION_ROLE": "infrastructure_sentinel" },
       "cwd": ".",
       "shutdownPolicy": "detached",
       "startupMode": "background",
@@ -288,10 +285,7 @@
       "description": "Managed voice ingress service that emits governed voice stimuli and reflects them into the expressive surface.",
       "command": "node",
       "args": ["dist/satellites/voice-hub/server.js"],
-      "env": {
-        "KYBERION_PERSONA": "sovereign",
-        "MISSION_ROLE": "surface_runtime"
-      },
+      "env": { "KYBERION_PERSONA": "sovereign", "MISSION_ROLE": "surface_runtime" },
       "cwd": ".",
       "shutdownPolicy": "detached",
       "startupMode": "background",

@@ -61,7 +61,21 @@ describe('service harness contract', () => {
         approval_required: true,
       });
     }
-    expect(descriptor.operation_count).toBe(19);
+    expect(descriptor.operation_count).toBe(20);
+  });
+
+  it('exposes fixed provider authentication checks as read-only captures', () => {
+    for (const [service, action] of [
+      ['github', 'authenticated_user'],
+      ['slack', 'auth_test'],
+    ]) {
+      expect(assertServiceCaptureOperation(service, action)).toMatchObject({
+        action,
+        kind: 'capture',
+        risk: 'read',
+        approval_required: false,
+      });
+    }
   });
 
   it('classifies github-mcp create_issue as write-gated, not capture', () => {

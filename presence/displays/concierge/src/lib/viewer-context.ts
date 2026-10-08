@@ -25,6 +25,7 @@ import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundati
 import type { HeadlessViewerScope } from '@agent/core/headless-surface-contract';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface/surface-authorization';
 import { toWireError } from '@agent/core/wire-error';
+import { conciergePeerAddress, isLoopbackPeer } from './loopback-peer';
 
 const CONCIERGE_RATE_LIMIT_WINDOW_MS = 60_000;
 const CONCIERGE_RATE_LIMIT_GET = 180;
@@ -58,17 +59,6 @@ export class ConciergeViewerError extends Error {
   }
 }
 
-function isLoopbackRequest(req: NextRequest): boolean {
-  const directIp = (req as NextRequest & { ip?: string }).ip;
-  const peerIp =
-    directIp ||
-    (getRegisteredEnvBool('KYBERION_TRUST_PROXY') === true
-      ? req.headers.get('x-real-ip')?.trim() ||
-        req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-      : undefined);
-  return peerIp === '127.0.0.1' || peerIp === '::1' || peerIp === '::ffff:127.0.0.1';
-}
-
 /**
  * The request credential: an Authorization bearer wins, then the browser
  * `kyberion_session` cookie. `source` lets callers apply the CSRF check to
@@ -92,7 +82,7 @@ function bearerToken(req: NextRequest): string | null {
 }
 
 function conciergeClientAddress(req: NextRequest): string {
-  const directIp = (req as NextRequest & { ip?: string }).ip?.trim();
+  const directIp = conciergePeerAddress(req)?.trim();
   if (directIp) return directIp;
   if (getRegisteredEnvBool('KYBERION_TRUST_PROXY') === true) {
     return (
@@ -223,7 +213,7 @@ export function resolveTierAccess(
 }
 
 export function resolveConciergeViewerContext(req: NextRequest): ConciergeViewerContext {
-  const local = isLoopbackRequest(req);
+  const local = isLoopbackPeer(req);
   const token = bearerToken(req);
   const registry = token ? registrations() : null;
   const apiToken = getRegisteredEnvText('KYBERION_API_TOKEN');

@@ -6,6 +6,8 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import {
+  claimApprovalApply,
+  computeApprovalPayloadHash,
   createApprovalRequest,
   decideApprovalRequest,
   loadApprovalRequest,
@@ -17,6 +19,7 @@ import {
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { ledger } from '../ledger.js';
+import { withLock } from '../lock-utils.js';
 import { evaluateAutonomousOpsAction } from '../governance/autonomous-ops-gate.js';
 import { buildDecisionCard } from '../governance/decision-card.js';
 import {
@@ -50,7 +53,7 @@ export interface ProposeSecretIntroductionInput {
   storageChannel?: string;
   requestedBy?: string;
   requestedByContext?: ApprovalRequesterContext;
-  /** When true (default for risk=low + terminal/concierge surface), auto-approve after create. */
+  /** Enable policy auto-approval only for low-risk local surfaces; never bypasses risk checks. */
   autoApproveLocal?: boolean;
   decidedBy?: string;
 }
@@ -64,12 +67,28 @@ export interface ProposeSecretIntroductionResult {
   channel: string;
 }
 
+/** Server-resolved authority only. Never populate this contract from request JSON. */
+export interface SecretIntroductionApplyExpectation {
+  principalId: string;
+  serviceId: string;
+  secretKey: string;
+  storageChannel: 'concierge';
+  channel: 'concierge';
+}
+
+/** UTF-8 byte limit for tokens collected by the Web operator surface. */
+export const SECRET_INTRODUCTION_WEB_TOKEN_MAX_BYTES = 16 * 1024;
+export const SECRET_INTRODUCTION_RECOVERY_REQUIRED =
+  '[SECRET_INTRODUCTION] apply incomplete; recovery required before another attempt';
+
 export interface ApplySecretIntroductionInput {
   approvalId: string;
   value: string;
   channel?: string;
   storageChannel?: string;
   appliedBy?: string;
+  /** Opt in to the strict, server-bound Web operator contract. */
+  expected?: SecretIntroductionApplyExpectation;
 }
 
 export interface ApplySecretIntroductionResult {
@@ -118,7 +137,6 @@ function resolveChannels(input: { channel?: string; storageChannel?: string }): 
 
 function shouldAutoApprove(input: ProposeSecretIntroductionInput): boolean {
   if (input.autoApproveLocal === false) return false;
-  if (input.autoApproveLocal === true) return true;
   const risk = input.riskLevel || 'low';
   if (risk !== 'low') return false;
   const surface = input.requestedByContext?.surface;
@@ -248,73 +266,208 @@ export function proposeSecretIntroduction(
   };
 }
 
+function assertWebExpectation(expected: SecretIntroductionApplyExpectation): SecretIdentity {
+  if (
+    !expected.principalId?.trim() ||
+    expected.principalId !== expected.principalId.trim() ||
+    expected.channel !== 'concierge' ||
+    expected.storageChannel !== 'concierge'
+  ) {
+    throw new Error('[SECRET_INTRODUCTION] invalid server apply expectation');
+  }
+  const identity = resolveSecretIdentity(expected.serviceId, expected.secretKey);
+  if (identity.serviceId !== expected.serviceId || identity.secretKey !== expected.secretKey) {
+    throw new Error('[SECRET_INTRODUCTION] server apply identity must be canonical');
+  }
+  return identity;
+}
+
+function assertWebToken(value: string): void {
+  if (
+    typeof value !== 'string' ||
+    !value.trim() ||
+    /[\r\n\0]/.test(value) ||
+    Buffer.byteLength(value, 'utf8') > SECRET_INTRODUCTION_WEB_TOKEN_MAX_BYTES
+  ) {
+    throw new Error('[SECRET_INTRODUCTION] token must be a bounded non-empty single line');
+  }
+}
+
+function checkedApplyRecord(
+  record: ApprovalRequestRecord | null,
+  input: ApplySecretIntroductionInput,
+  identity: SecretIdentity,
+  channels: { channel: string; storageChannel: string }
+): ApprovalRequestRecord {
+  if (!record) throw new Error('[SECRET_INTRODUCTION] approval not found');
+  if (record.kind !== 'secret_mutation') {
+    throw new Error('[SECRET_INTRODUCTION] approval is not a secret_mutation');
+  }
+  if (record.applyResult?.result === 'success' || record.status === 'applied') {
+    throw new Error('[SECRET_INTRODUCTION] approval was already applied');
+  }
+  if (record.applyClaim || record.applyResult) {
+    throw new Error(SECRET_INTRODUCTION_RECOVERY_REQUIRED);
+  }
+  if (record.status !== 'approved') {
+    throw new Error('[SECRET_INTRODUCTION] approval must be approved before apply');
+  }
+  if (!record.target?.serviceId || !record.target?.secretKey) {
+    throw new Error('[SECRET_INTRODUCTION] approval is missing target identity');
+  }
+  const target = resolveSecretIdentity(record.target.serviceId, record.target.secretKey);
+  if (target.serviceId !== identity.serviceId || target.secretKey !== identity.secretKey) {
+    throw new Error('[SECRET_INTRODUCTION] approval target does not match');
+  }
+  const expiresAt = Date.parse(record.expiresAt ?? '');
+  // Existing CLI records can omit expiry, but any supplied expiry fails closed.
+  if (
+    (input.expected || record.expiresAt !== undefined) &&
+    (!Number.isFinite(expiresAt) || expiresAt <= Date.now())
+  ) {
+    throw new Error('[SECRET_INTRODUCTION] approval has expired or has no valid expiry');
+  }
+  if (input.expected) {
+    const expected = input.expected;
+    if (
+      channels.channel !== expected.channel ||
+      channels.storageChannel !== expected.storageChannel ||
+      record.channel !== expected.channel ||
+      record.storageChannel !== expected.storageChannel ||
+      record.requestedBy !== expected.principalId ||
+      record.requestedByContext?.actorId !== expected.principalId ||
+      record.target.serviceId !== expected.serviceId ||
+      record.target.secretKey !== expected.secretKey ||
+      (record.target.mutation !== 'set' && record.target.mutation !== 'rotate') ||
+      record.target.store !== 'os_keychain' ||
+      (input.appliedBy !== undefined && input.appliedBy !== expected.principalId)
+    ) {
+      throw new Error(
+        '[SECRET_INTRODUCTION] approval does not match the server principal and target'
+      );
+    }
+  }
+  return record;
+}
+
 /**
  * Apply an approved secret introduction: dual-write keychain + connection doc.
- * The secret value must be supplied by the collector; it is never read from the approval record.
+ * The secret value is never persisted in the approval or included in errors.
+ * Service locking serializes writers; the durable claim separately fences
+ * replay after a process crash or a partially completed write.
  */
 export async function applySecretIntroduction(
   input: ApplySecretIntroductionInput
 ): Promise<ApplySecretIntroductionResult> {
+  const expectedIdentity = input.expected ? assertWebExpectation(input.expected) : undefined;
+  if (input.expected) assertWebToken(input.value);
   const value = assertNonEmptySecret(input.value);
-  const { channel, storageChannel } = resolveChannels(input);
-  const record = loadApprovalRequest(storageChannel, input.approvalId);
-  if (!record) {
-    throw new Error(`[SECRET_INTRODUCTION] approval not found: ${input.approvalId}`);
+  const channels = resolveChannels({
+    channel: input.channel ?? input.expected?.channel,
+    storageChannel: input.storageChannel ?? input.expected?.storageChannel,
+  });
+  if (
+    input.expected &&
+    (channels.channel !== input.expected.channel ||
+      channels.storageChannel !== input.expected.storageChannel)
+  ) {
+    throw new Error('[SECRET_INTRODUCTION] approval channel does not match server expectation');
   }
-  if (record.kind !== 'secret_mutation') {
-    throw new Error(`[SECRET_INTRODUCTION] approval ${input.approvalId} is not a secret_mutation`);
+  const initial = expectedIdentity
+    ? undefined
+    : loadApprovalRequest(channels.storageChannel, input.approvalId);
+  if (!expectedIdentity && (!initial?.target?.serviceId || !initial?.target?.secretKey)) {
+    throw new Error('[SECRET_INTRODUCTION] approval is missing target identity');
   }
-  if (record.status !== 'approved') {
-    throw new Error(
-      `[SECRET_INTRODUCTION] approval ${input.approvalId} is ${record.status}; must be approved before apply`
+  const identity =
+    expectedIdentity ??
+    resolveSecretIdentity(initial!.target!.serviceId, initial!.target!.secretKey);
+  return withLock('secret-introduction-service-' + identity.serviceId, async () => {
+    // Read again only after obtaining the async service lock, including on CLI paths.
+    const record = checkedApplyRecord(
+      loadApprovalRequest(channels.storageChannel, input.approvalId),
+      input,
+      identity,
+      channels
     );
-  }
-  if (!record.target?.serviceId || !record.target?.secretKey) {
-    throw new Error(
-      `[SECRET_INTRODUCTION] approval ${input.approvalId} is missing target identity`
-    );
-  }
-  if (record.applyResult?.result === 'success') {
-    throw new Error(`[SECRET_INTRODUCTION] approval ${input.approvalId} was already applied`);
-  }
-
-  const identity = resolveSecretIdentity(record.target.serviceId, record.target.secretKey);
-  const appliedBy = input.appliedBy || getRegisteredEnvText('MISSION_ROLE') || 'operator';
-
-  try {
-    await storeSecret(identity.keychainService, identity.keychainAccount, value);
-    const stored = storeConnectionDocument(
-      identity.serviceId,
-      { [identity.connectionField]: value },
-      {
-        actor: 'secret_introduction',
-        missionId: getRegisteredEnvText('MISSION_ID') || undefined,
-      }
-    );
-
-    recordApprovalApplyResult('mission_controller', {
-      channel: record.channel || channel,
-      storageChannel: record.storageChannel || storageChannel,
-      requestId: record.id,
-      applyResult: {
-        appliedAt: nowIso(),
+    const appliedBy =
+      input.expected?.principalId ||
+      input.appliedBy ||
+      getRegisteredEnvText('MISSION_ROLE') ||
+      'operator';
+    let claimId: string;
+    try {
+      claimId = claimApprovalApply('mission_controller', {
+        channel: record.channel,
+        storageChannel: channels.storageChannel,
+        requestId: record.id,
         appliedBy,
-        result: 'success',
-        auditRef: `fingerprint:${fingerprintValue(value)}`,
-      },
-    });
+        expectedRecordHash: computeApprovalPayloadHash({ record }),
+      }).applyClaim.claimId;
+    } catch {
+      // A claim persistence failure may already have left the durable fence.
+      throw new Error(SECRET_INTRODUCTION_RECOVERY_REQUIRED);
+    }
 
-    ledger.record('CONFIG_CHANGE', {
-      mission_id: getRegisteredEnvText('MISSION_ID') || 'None',
-      role: appliedBy,
-      config_target: 'secret_introduction',
-      config_scope: 'apply',
-      service_id: identity.serviceId,
-      changed_keys: stored.changedKeys,
-      approval_id: record.id,
-      fingerprint: fingerprintValue(value),
-    });
+    let stored: ReturnType<typeof storeConnectionDocument>;
+    try {
+      await storeSecret(identity.keychainService, identity.keychainAccount, value);
+      stored = storeConnectionDocument(
+        identity.serviceId,
+        { [identity.connectionField]: value },
+        {
+          actor: 'secret_introduction',
+          missionId: getRegisteredEnvText('MISSION_ID') || undefined,
+        }
+      );
+    } catch {
+      try {
+        recordApprovalApplyResult('mission_controller', {
+          channel: record.channel,
+          storageChannel: channels.storageChannel,
+          requestId: record.id,
+          claimId,
+          applyResult: {
+            appliedAt: nowIso(),
+            appliedBy,
+            result: 'failed',
+            auditRef: 'secret-introduction:storage-incomplete:recovery-required',
+          },
+        });
+      } catch {
+        // The persisted claim still blocks retries when even receipt storage fails.
+      }
+      throw new Error(SECRET_INTRODUCTION_RECOVERY_REQUIRED);
+    }
 
+    try {
+      recordApprovalApplyResult('mission_controller', {
+        channel: record.channel,
+        storageChannel: channels.storageChannel,
+        requestId: record.id,
+        claimId,
+        applyResult: {
+          appliedAt: nowIso(),
+          appliedBy,
+          result: 'success',
+          auditRef: 'fingerprint:' + fingerprintValue(value),
+        },
+      });
+      ledger.record('CONFIG_CHANGE', {
+        mission_id: getRegisteredEnvText('MISSION_ID') || 'None',
+        role: appliedBy,
+        config_target: 'secret_introduction',
+        config_scope: 'apply',
+        service_id: identity.serviceId,
+        changed_keys: stored.changedKeys,
+        approval_id: record.id,
+        fingerprint: fingerprintValue(value),
+      });
+    } catch {
+      // Both stores may now contain the value. Do not report a rollback or
+      // overwrite a successful receipt merely because its audit append failed.
+      throw new Error(SECRET_INTRODUCTION_RECOVERY_REQUIRED);
+    }
     return {
       approvalId: record.id,
       status: 'applied',
@@ -322,20 +475,7 @@ export async function applySecretIntroduction(
       changedKeys: stored.changedKeys,
       connectionPath: stored.path,
     };
-  } catch (error) {
-    recordApprovalApplyResult('mission_controller', {
-      channel: record.channel || channel,
-      storageChannel: record.storageChannel || storageChannel,
-      requestId: record.id,
-      applyResult: {
-        appliedAt: nowIso(),
-        appliedBy,
-        result: 'failed',
-        auditRef: error instanceof Error ? error.message : String(error),
-      },
-    });
-    throw error;
-  }
+  });
 }
 
 /** Report which governed suffixes are present (never returns values). */

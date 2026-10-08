@@ -21,6 +21,11 @@ export async function main(
     await runOrganizationMember(args.slice(1));
     return;
   }
+  if (args[0] === 'identity') {
+    const { runOrganizationIdentity } = await import('./organization_identity.js');
+    await runOrganizationIdentity(args.slice(1));
+    return;
+  }
   if (args[0] === 'operation' && args[1] === 'run' && args[2] === 'execute') {
     // Load the pipeline engine so it registers the nested-pipeline runner.
     await import('./run_pipeline.js');

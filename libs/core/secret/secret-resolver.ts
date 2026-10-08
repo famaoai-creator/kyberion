@@ -143,17 +143,20 @@ export function resolveSecretSync(input: ResolveSecretInput): string | null {
   try {
     const result = resolver.resolve(input);
     if (result instanceof Promise) {
+      // A sync fallback must still consume a later rejection. Otherwise an
+      // upstream error can escape as an unhandled rejection with secret-bearing text.
+      void result.catch(() => {
+        logger.warn('[secret-resolver] Async resolver rejected after sync fallback.');
+      });
       // Can't block a sync caller; surface a warning and fall through.
       logger.warn(
-        `[secret-resolver] ${resolver.name} is async; sync callers fall back to vault. Use resolveSecretAsync instead.`
+        '[secret-resolver] Async resolver unavailable to sync caller; using local fallback.'
       );
       return null;
     }
     return result;
   } catch (err: any) {
-    logger.warn(
-      `[secret-resolver] ${resolver.name} failed for ${input.key}: ${err?.message ?? err}`
-    );
+    logger.warn('[secret-resolver] Upstream resolution failed; continuing with local fallback.');
     return null;
   }
 }
@@ -165,9 +168,7 @@ export async function resolveSecretAsync(input: ResolveSecretInput): Promise<str
     const result = await resolver.resolve(input);
     return result ?? null;
   } catch (err: any) {
-    logger.warn(
-      `[secret-resolver] ${resolver.name} failed for ${input.key}: ${err?.message ?? err}`
-    );
+    logger.warn('[secret-resolver] Upstream resolution failed; continuing with local fallback.');
     return null;
   }
 }
@@ -187,7 +188,7 @@ export class ChainSecretResolver implements SecretResolver {
         if (result != null) return result;
       } catch (err: any) {
         logger.warn(
-          `[secret-resolver:chain] ${resolver.name} threw for ${input.key}: ${err?.message ?? err}`
+          '[secret-resolver:chain] Upstream resolution failed; continuing with the next resolver.'
         );
       }
     }

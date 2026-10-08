@@ -103,6 +103,23 @@ function enforcePayloadSize(options: AxiosRequestConfig) {
   }
 }
 
+/** Structured transport status only; never retains the provider response, headers, or cause. */
+export class SecureFetchError extends Error {
+  readonly httpStatus?: number;
+
+  constructor(message: string, httpStatus?: number) {
+    super(message);
+    if (
+      typeof httpStatus === 'number' &&
+      Number.isInteger(httpStatus) &&
+      httpStatus >= 100 &&
+      httpStatus <= 599
+    ) {
+      this.httpStatus = httpStatus;
+    }
+  }
+}
+
 export async function secureFetch<T = unknown>(options: SecureFetchOptions): Promise<T> {
   const { kyberion_allow_local_network, kyberion_egress_context, ...axiosOptions } =
     options as SecureFetchOptions & {
@@ -221,7 +238,10 @@ export async function secureFetch<T = unknown>(options: SecureFetchOptions): Pro
     const response = isRecord(err) && isRecord(err.response) ? err.response : undefined;
     const status = typeof response?.status === 'number' ? ` (${response.status})` : '';
     const message = err instanceof Error ? err.message : String(err);
-    throw new Error(`Network Error: ${message}${status}`);
+    throw new SecureFetchError(
+      `Network Error: ${message}${status}`,
+      typeof response?.status === 'number' ? response.status : undefined
+    );
   }
 }
 export interface SecureFetchOptions extends AxiosRequestConfig {

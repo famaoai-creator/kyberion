@@ -4535,6 +4535,10 @@
       "types": "./dist/organization/member-registry.d.ts",
       "default": "./dist/organization/member-registry.js"
     },
+    "./organization/identity-directory": {
+      "types": "./dist/organization/identity-directory.d.ts",
+      "default": "./dist/organization/identity-directory.js"
+    },
     "./knowledge/memory-notebook": {
       "types": "./dist/knowledge/memory-notebook.d.ts",
       "default": "./dist/knowledge/memory-notebook.js"
@@ -5714,6 +5718,10 @@
     "./service/service-engine": {
       "types": "./dist/service/service-engine.d.ts",
       "default": "./dist/service/service-engine.js"
+    },
+    "./service/operator-service-connection": {
+      "types": "./dist/service/operator-service-connection.d.ts",
+      "default": "./dist/service/operator-service-connection.js"
     },
     "./service/service-engine-admission": {
       "types": "./dist/service/service-engine-admission.d.ts",
