@@ -250,6 +250,20 @@ the test passes against the sandbox while the writer leaks into live state.
   `--disable-slash-commands`, `--no-session-persistence`), and start them in an
   empty directory on the scratch floor (`active/shared/tmp/system/<domain>/`), not the repository
   root.
+  - The dedicated `codex-cli` and `gemini-cli` structured runners in `mission-llm.ts` do the same.
+    They request the KD-05 `explorer` projection from the provider descriptors
+    (`reasoning-providers/*.json` `permission_profiles`): codex `--sandbox read-only` and gemini
+    `--sandbox --approval-mode plan`. They start in `llmShellScratchCwd()`, and the prompt goes on
+    stdin (codex `exec … -`; gemini gets a fixed `-p` instruction that the CLI appends to stdin).
+    Other callers of `runCodexCliQuery` / `runGeminiCliQuery` keep their own mode.
+  - **Residual risk:** neither CLI can switch its tools off the way `claude --tools ""` does.
+    - Codex `read-only` still lets the model run read-only shell commands. Its sandbox does not
+      limit reads to the cwd, and the scratch cwd is inside the checkout, so codex can still find
+      the repository's `AGENTS.md`. This is why the descriptor refuses codex for the `planner` tier.
+    - Gemini plan mode keeps read-only tools. `--sandbox` confines them to a container or Seatbelt
+      profile, so on a host without one the runner fails, and `mission-llm` falls back to the next
+      profile.
+    - For tenant-tier payloads, rely on the egress gate and prefer the `claude` profile.
 
 **Procedure:**
 
