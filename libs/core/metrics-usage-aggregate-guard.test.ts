@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import * as fs from 'node:fs';
+import { safeAppendFileSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import * as path from 'node:path';
 import { MetricsCollector } from './metrics.js';
 
@@ -21,8 +21,8 @@ describe('resource-usage operator aggregate under a tenant binding', () => {
   const usageRoot = path.join(base, 'usage-ledger');
   const collector = () => new MetricsCollector({ metricsDir, resourceUsageRoot: usageRoot });
 
-  beforeEach(() => fs.rmSync(base, { recursive: true, force: true }));
-  afterEach(() => fs.rmSync(base, { recursive: true, force: true }));
+  beforeEach(() => safeRmSync(base, { recursive: true, force: true }));
+  afterEach(() => safeRmSync(base, { recursive: true, force: true }));
 
   it("withholds another tenant's partition and legacy rows from { all: true }", () => {
     const mc = collector();
@@ -42,7 +42,7 @@ describe('resource-usage operator aggregate under a tenant binding', () => {
     }
     // tenant-b data from an unbound writer: its partition plus a pre-partition legacy row.
     const tenantB = path.join(usageRoot, 'confidential', 'tenant-b');
-    fs.mkdirSync(tenantB, { recursive: true });
+    safeMkdir(tenantB, { recursive: true });
     const row = (usageId: string, tenant: string) =>
       `${JSON.stringify({
         type: 'resource_usage',
@@ -50,9 +50,9 @@ describe('resource-usage operator aggregate under a tenant binding', () => {
         cost_usd: 0,
         scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenant },
       })}\n`;
-    fs.writeFileSync(path.join(tenantB, 'resource-usage.jsonl'), row('b-1', 'tenant-b'));
-    fs.appendFileSync(path.join(metricsDir, 'resource-usage.jsonl'), row('legacy-b', 'tenant-b'));
-    fs.appendFileSync(path.join(metricsDir, 'resource-usage.jsonl'), row('legacy-a', 'tenant-a'));
+    safeWriteFile(path.join(tenantB, 'resource-usage.jsonl'), row('b-1', 'tenant-b'));
+    safeAppendFileSync(path.join(metricsDir, 'resource-usage.jsonl'), row('legacy-b', 'tenant-b'));
+    safeAppendFileSync(path.join(metricsDir, 'resource-usage.jsonl'), row('legacy-a', 'tenant-a'));
 
     const seen = mc
       .loadResourceUsageHistory({ all: true })
