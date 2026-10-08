@@ -24,7 +24,7 @@ import {
   type EventScope,
   type EventScopeInput,
 } from '../event-scope.js';
-import { safeExistsSync, safeReaddir } from '../secure-io.js';
+import { safeExistsSync, safeFsyncFile, safeReaddir } from '../secure-io.js';
 import {
   getDefaultWorkerEventStream,
   type WorkerEventPayloadMap,
@@ -150,6 +150,13 @@ export interface ApprovalWorkflowState {
   approvals: ApprovalRecord[];
 }
 
+/** Durable at-most-once fence; an interrupted attempt requires explicit operator recovery. */
+export interface ApprovalApplyClaim {
+  claimId: string;
+  startedAt: string;
+  startedBy: string;
+}
+
 export interface ApprovalApplyResult {
   appliedAt?: string;
   appliedBy?: string;
@@ -212,6 +219,7 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   risk?: ApprovalRiskProfile;
   workflow?: ApprovalWorkflowState;
   applyResult?: ApprovalApplyResult;
+  applyClaim?: ApprovalApplyClaim;
   /** SO-04 Task 3: present only for approval requests created by mission steering. */
   steering?: ApprovalSteeringAction;
   track_id?: string;
@@ -1319,19 +1327,93 @@ export function drainPendingSteeringApprovalExecutions(): Promise<void> {
   return Promise.all(Array.from(pendingSteeringApprovalExecutions)).then(() => undefined);
 }
 
+/**
+ * Claim an exact approved snapshot before any external side effect. The claim
+ * survives process crashes and terminal receipts never erase it. This is an
+ * at-most-once fence, not an automatic retry or rollback mechanism.
+ */
+export function claimApprovalApply(
+  role: GovernedArtifactRole,
+  params: {
+    channel: string;
+    storageChannel?: string;
+    requestId: string;
+    appliedBy: string;
+    expectedRecordHash: string;
+  }
+): ApprovalRequestRecord & { applyClaim: ApprovalApplyClaim } {
+  return withApprovalRecordLock(role, params, () => {
+    const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
+    const record = loadApprovalRequest(storageChannel, params.requestId);
+    if (!record) throw new Error('[POLICY_VIOLATION] Approval request not found');
+    if (params.expectedRecordHash !== computeApprovalPayloadHash({ record })) {
+      throw new Error('[POLICY_VIOLATION] Approval request changed before apply');
+    }
+    if (record.status !== 'approved' || isApprovalRequestExpired(record)) {
+      throw new Error('[POLICY_VIOLATION] A current approved request is required before apply');
+    }
+    if (record.applyClaim || record.applyResult) {
+      throw new Error('[POLICY_VIOLATION] Approval apply already started; recovery required');
+    }
+    if (!params.appliedBy.trim()) {
+      throw new Error('[POLICY_VIOLATION] Approval apply requires an actor');
+    }
+    const updated = {
+      ...record,
+      applyClaim: { claimId: randomUUID(), startedAt: nowIso(), startedBy: params.appliedBy },
+    };
+    const claimPath = writeGovernedArtifactJson(
+      role,
+      approvalRequestLogicalPath(storageChannel, record.id),
+      updated
+    );
+    // The side effect must not start until the claim is flushed successfully.
+    safeFsyncFile(claimPath);
+    appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+      ts: nowIso(),
+      event: 'apply_started',
+      request_id: record.id,
+      correlation_id: record.correlationId,
+      channel: record.channel,
+      thread_ts: record.threadTs,
+      apply_claim: updated.applyClaim,
+    });
+    return updated;
+  });
+}
+
 /** Persist an approval request's terminal apply outcome (SO-04 Task 3). */
 export function recordApprovalApplyResult(
+  role: GovernedArtifactRole,
+  params: Parameters<typeof recordApprovalApplyResultUnlocked>[1]
+): ApprovalRequestRecord {
+  return withApprovalRecordLock(role, params, () =>
+    recordApprovalApplyResultUnlocked(role, params)
+  );
+}
+
+function recordApprovalApplyResultUnlocked(
   role: GovernedArtifactRole,
   params: {
     channel: string;
     storageChannel?: string;
     requestId: string;
     applyResult: ApprovalApplyResult;
+    claimId?: string;
   }
 ): ApprovalRequestRecord {
   const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
   const record = loadApprovalRequest(storageChannel, params.requestId);
   if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+  if (record.applyClaim && params.claimId !== record.applyClaim.claimId) {
+    throw new Error('[POLICY_VIOLATION] Approval apply claim does not match');
+  }
+  if (params.claimId && !record.applyClaim) {
+    throw new Error('[POLICY_VIOLATION] Approval apply claim is missing');
+  }
+  if (record.applyClaim && record.applyResult) {
+    throw new Error('[POLICY_VIOLATION] Approval apply result is already recorded');
+  }
   // Only secret_mutation advances status into applied/failed. Pipeline and
   // steering resumes keep status=approved so await_decision / hasBoundApproval
   // still recognize the grant after the async apply receipt lands.

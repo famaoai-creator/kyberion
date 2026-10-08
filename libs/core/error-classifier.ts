@@ -215,7 +215,12 @@ export function explainPolicyViolation(errorText: string): PolicyViolationDiagno
  * Classify an error. Accepts an Error, string, or { message, code } object.
  * Returns a structured classification with a recommended remediation.
  */
-export function classifyError(err: unknown): ErrorClassification {
+export function classifyError(
+  err: unknown,
+  options: {
+    /** Sensitive callers may classify in memory without persisting provider text. */ recordUnclassified?: boolean;
+  } = {}
+): ErrorClassification {
   let message: string;
   let code: string | number | undefined;
 
@@ -251,12 +256,14 @@ export function classifyError(err: unknown): ErrorClassification {
     }
   }
 
-  recordUnclassifiedError(message, code);
+  if (options.recordUnclassified !== false) recordUnclassifiedError(message, code);
   return {
     category: 'unknown',
     label: 'Unclassified error',
     remediation:
-      'No rule matched this error. The error has been recorded in the unclassified-error registry for rule proposal.',
+      options.recordUnclassified === false
+        ? 'No rule matched this error. Sensitive provider details were not recorded.'
+        : 'No rule matched this error. The error has been recorded in the unclassified-error registry for rule proposal.',
     detail,
     ruleId: 'fallback',
   };

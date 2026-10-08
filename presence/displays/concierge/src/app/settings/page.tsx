@@ -21,6 +21,7 @@ import {
 } from '../../lib/setup-auxiliary-response';
 import {
   orderSectionsForFirstRun,
+  resolveSelectedServices,
   SETTINGS_SECTION_ORDER,
   type SettingsSectionId,
 } from '../../lib/settings-view';
@@ -299,9 +300,11 @@ export default function SettingsPage() {
           current.length ? current : existingVoice.sample_refs || []
         );
       }
-      const loadedServices = next.service_catalog
-        .filter((service) => service.configured || DEFAULT_SERVICES.includes(service.id))
-        .map((service) => service.id);
+      const loadedServices = resolveSelectedServices(
+        next.service_catalog,
+        next.selected_services,
+        DEFAULT_SERVICES
+      );
       loadServices(loadedServices);
       setError(null);
     } catch (err) {

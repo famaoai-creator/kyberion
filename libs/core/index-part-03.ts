@@ -238,6 +238,8 @@ export * from './service/service-preset-policy.js';
 
 export * from './service/service-harness.js';
 
+export * from './service/operator-service-connection.js';
+
 export {
   getServiceEndpointRecord,
   loadServiceEndpointsCatalog,

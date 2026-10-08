@@ -15,6 +15,8 @@ import {
 const FIXTURE_ROOT = pathResolver.sharedTmp(`analyze-role-assumptions-${process.pid}`);
 /** Fixture-relative import prefix, built so repo import scanners do not read it as ours. */
 const CORE = ['..', 'libs', 'core'].join('/');
+const NEXT_CORE = ['..', '..', '..', 'libs', 'core'].join('/');
+const ROUTE_CORE = ['..', '..', '..', '..', '..', '..', 'libs', 'core'].join('/');
 const CHILD_PROCESS = ['node', 'child_process'].join(':');
 
 const FILES: Record<string, string> = {
@@ -31,7 +33,25 @@ const FILES: Record<string, string> = {
     version: 1,
     surfaces: [
       { id: 'literal-surface', command: 'node', args: ['dist/apps/literal.js'] },
+      {
+        id: 'custom-next-surface',
+        command: 'node',
+        args: ['server/start.ts'],
+        cwd: 'apps/next-workspace',
+      },
       { id: 'wrapper-surface', command: 'node', args: ['dist/apps/wrapper.js'] },
+      {
+        id: 'unknown-next-surface',
+        command: 'node',
+        args: ['server/start.ts'],
+        cwd: 'apps/unknown-next',
+      },
+      {
+        id: 'plain-node-surface',
+        command: 'node',
+        args: ['server/start.ts'],
+        cwd: 'apps/plain-workspace',
+      },
       { id: 'union-surface', command: 'node', args: ['dist/apps/union.js'] },
       { id: 'dynamic-surface', command: 'node', args: ['dist/apps/dynamic.js'] },
       { id: 'require-surface', command: 'node', args: ['dist/apps/required.js'] },
@@ -44,6 +64,59 @@ const FILES: Record<string, string> = {
       { id: 'rawwrite-surface', command: 'node', args: ['dist/apps/rawwrite.js'] },
     ],
   }),
+  'apps/next-workspace/package.json': JSON.stringify({
+    name: '@fixture/next-app',
+    dependencies: { next: '16.3.8' },
+  }),
+  'apps/next-workspace/server/start.ts': [
+    // Fixture source uses native Node TypeScript; split the specifier so the
+    // repository NodeNext text scanner does not mistake this string for a host import.
+    "import { admit } from '" + './peer.ts' + "';",
+    "import { withExecutionContext } from '" + NEXT_CORE + "/authority.js';",
+    "withExecutionContext('role_next_server', () => admit());",
+  ].join('\n'),
+  'apps/next-workspace/server/peer.ts': [
+    "import { withExecutionContext } from '" + NEXT_CORE + "/authority.js';",
+    "export function admit() { withExecutionContext('role_next_peer', () => undefined); }",
+  ].join('\n'),
+  'apps/next-workspace/src/app/api/check/route.ts': [
+    "import { withExecutionContext } from '" + ROUTE_CORE + "/authority.js';",
+    "export function GET() { return withExecutionContext('role_next_route', () => 'ok'); }",
+  ].join('\n'),
+  'apps/next-workspace/src/app/page.tsx': 'export default function Page() { return <main />; }',
+  'apps/next-workspace/server/types.d.mts': 'export declare function declarationOnly(): void;',
+  'apps/next-workspace/server/types.d.cts': 'export declare function declarationOnly(): void;',
+  'apps/next-workspace/server/peer.test.ts': 'export const testOnly = true;',
+  'apps/next-workspace/dist/server.mjs': 'export const compiledOnly = true;',
+  'apps/next-workspace/.next/server.mjs': 'export const generatedOnly = true;',
+  'apps/next-workspace/node_modules/outsider/index.mjs': 'export const dependencyOnly = true;',
+  'server/start.ts': 'export const wrongWorkingDirectory = true;',
+  'apps/outsider/src/app/route.js': 'export const outsideApp = true;',
+  'apps/plain-workspace/package.json': JSON.stringify({
+    name: '@fixture/plain-app',
+    dependencies: {},
+  }),
+  'apps/plain-workspace/server/start.ts': [
+    "import { withExecutionContext } from '" + NEXT_CORE + "/authority.js';",
+    "withExecutionContext('role_plain_server', () => undefined);",
+  ].join('\n'),
+  'apps/plain-workspace/src/app/api/check/route.ts': [
+    "import { withExecutionContext } from '" + ROUTE_CORE + "/authority.js';",
+    "export function GET() { return withExecutionContext('role_not_a_next_route', () => 'ok'); }",
+  ].join('\n'),
+  'apps/unknown-next/package.json': JSON.stringify({
+    name: '@fixture/unknown-next',
+    dependencies: { next: '16.3.8' },
+  }),
+  'apps/unknown-next/server/start.ts': [
+    "import { loadRelative, loadComputed } from '" + './peer.ts' + "';",
+    "void loadRelative(); void loadComputed('runtime-input');",
+  ].join('\n'),
+  'apps/unknown-next/server/peer.ts': [
+    "export async function loadRelative() { return import('./missing-peer.ts'); }",
+    'export async function loadComputed(specifier: string) { return import(specifier); }',
+  ].join('\n'),
+  'apps/unknown-next/src/app/api/check/route.ts': 'export function GET() { return 0; }',
   'libs/core/authority.ts': [
     'export function withExecutionContext<T>(role: string, fn: () => T): T {',
     '  return fn();',
@@ -201,6 +274,47 @@ describe('RN-02 role assumption reachability analysis', () => {
 
   afterAll(() => {
     safeRmSync(FIXTURE_ROOT, { recursive: true, force: true });
+  });
+
+  it('analyzes custom native TypeScript Next server and dynamically discovered route roles without outsiders', () => {
+    const surface = report.system_roles.custom_next_surface;
+    expect(surface.entries).toEqual([
+      'apps/next-workspace/server/peer.ts',
+      'apps/next-workspace/server/start.ts',
+      'apps/next-workspace/src/app/api/check/route.ts',
+      'apps/next-workspace/src/app/page.tsx',
+    ]);
+    expect(Object.keys(surface.reachable_roles)).toEqual([
+      'role_next_peer',
+      'role_next_route',
+      'role_next_server',
+    ]);
+    expect(surface.unresolved_sites).toEqual([]);
+  });
+
+  it('fails closed on unknown relative and computed imports in a custom server peer chain', () => {
+    const surface = report.system_roles.unknown_next_surface;
+    expect(surface.entries).toEqual([
+      'apps/unknown-next/server/peer.ts',
+      'apps/unknown-next/server/start.ts',
+      'apps/unknown-next/src/app/api/check/route.ts',
+    ]);
+    expect(surface.unresolved_sites).toEqual([
+      'apps/unknown-next/server/peer.ts#loadComputed',
+      'apps/unknown-next/server/peer.ts#loadRelative',
+    ]);
+    expect(report.unresolved_sites['apps/unknown-next/server/peer.ts#loadComputed'][0]).toMatch(
+      /computed specifier/
+    );
+    expect(report.unresolved_sites['apps/unknown-next/server/peer.ts#loadRelative'][0]).toMatch(
+      /missing-peer/
+    );
+  });
+
+  it('does not invent Next route discovery for an unrelated Node package', () => {
+    const surface = report.system_roles.plain_node_surface;
+    expect(surface.entries).toEqual(['apps/plain-workspace/server/start.ts']);
+    expect(Object.keys(surface.reachable_roles)).toEqual(['role_plain_server']);
   });
 
   it('resolves literal roles and reaches roles assumed by called library functions', () => {

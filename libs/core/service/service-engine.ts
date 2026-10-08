@@ -1,4 +1,9 @@
 import { createLogger } from '../logger.js';
+import {
+  consumeOperatorServiceProbeAdmission,
+  OperatorServiceProbeError,
+} from './operator-service-connection-admission.js';
+import { SecureFetchError } from '../network.js';
 import { loadServiceEndpointsCatalog } from './service-endpoint-registry.js';
 import { fetchWithVaultCache } from '../data-vault.js';
 import { resolveServiceBinding } from './service-binding.js';
@@ -71,15 +76,18 @@ export async function executeServicePreset(
   params: any,
   auth: 'none' | 'secret-guard' = 'none',
   cacheOpts?: ServicePresetCacheOptions,
-  tenantBindingCapability?: object
+  tenantBindingCapability?: object,
+  operatorProbeCapability?: object
 ): Promise<any> {
-  const endpoints = loadServiceEndpointsCatalog();
-  const serviceConfig = endpoints.services[serviceId];
+  const probe = operatorProbeCapability
+    ? consumeOperatorServiceProbeAdmission(operatorProbeCapability, serviceId, action)
+    : undefined;
+  const serviceConfig = probe?.serviceConfig || loadServiceEndpointsCatalog().services[serviceId];
   if (!serviceConfig || !serviceConfig.preset_path) {
     throw new Error(`No preset path defined for service: ${serviceId}`);
   }
 
-  const preset = getServicePresetRecord(serviceId, serviceConfig.preset_path);
+  const preset = probe?.preset || getServicePresetRecord(serviceId, serviceConfig.preset_path);
   if (!preset) {
     throw new Error(`No service preset found for: ${serviceId}`);
   }
@@ -90,7 +98,8 @@ export async function executeServicePreset(
 
   const alternatives = op.alternatives || [{ ...op, type: op.type || 'api' }];
   const envelope = resolveRequestEnvelope(params);
-  const connection = loadConnectionWithFallback(serviceId);
+  // A probe must not load or template the rest of a global connection document.
+  const connection = probe ? {} : loadConnectionWithFallback(serviceId);
   const mergedParams = {
     ...mergeParamsWithConnection(
       {
@@ -104,7 +113,7 @@ export async function executeServicePreset(
   };
 
   // Auth resolution
-  const binding = resolveServiceBinding(serviceId, auth);
+  const binding = probe?.binding || resolveServiceBinding(serviceId, auth);
   for (const alt of alternatives) {
     try {
       const resolved = await executeServicePresetAlternative({
@@ -117,10 +126,23 @@ export async function executeServicePreset(
         envelope,
         mergedParams,
         binding,
+        operatorProbe: Boolean(probe),
       });
       if (resolved) return resolved.result;
     } catch (err: any) {
-      logger.error(`  [ENGINE] Alternative failed: ${err.message}`);
+      if (probe) {
+        // Neither provider errors nor request headers may reach logs or the Web result.
+        throw new OperatorServiceProbeError(
+          err instanceof SecureFetchError && err.httpStatus === 401
+            ? 'authentication_failed'
+            : 'unavailable'
+        );
+      }
+      logger.error(
+        binding.authMode === 'secret-guard'
+          ? '[ENGINE] Authenticated service alternative failed; provider diagnostics withheld.'
+          : `  [ENGINE] Alternative failed: ${err.message}`
+      );
     }
   }
   throw new Error(`All service alternatives failed for ${serviceId}:${action}`);
