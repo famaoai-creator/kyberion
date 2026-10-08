@@ -331,6 +331,11 @@ export function subscribeJsonl<T = unknown>(
  * truncation or in-place rewrite (size regression, inode change, head or
  * consumed-tail fingerprint change) drops the cache and replays from byte 0,
  * so the result never diverges from a full read.
+ *
+ * Returned rows are frozen and shared across calls: callers must not mutate
+ * them. The cache keeps each ledger's parsed history resident for the life of
+ * the process (bounded by `maxSizeMB` per call), which is the trade for
+ * O(appended) reads; use it only for ledgers whose history must stay whole.
  */
 const LEDGER_TAIL_CHECK_BYTES = 64;
 const DEFAULT_LEDGER_MAX_SIZE_MB = 100;
@@ -347,6 +352,14 @@ interface CachedLedger {
 }
 
 const ledgerCache = new Map<string, CachedLedger>();
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+  }
+  return value;
+}
 
 function consumedTailHash(filePath: string, offset: number): string {
   if (offset <= 0) return '';
@@ -406,7 +419,9 @@ export function readJsonLinesCached<T>(
   }
   const batch = cached.tail.read();
   if (batch.rotated) cached.rows = [];
-  for (const record of batch.records) cached.rows.push(record);
+  // Rows are shared by every later call in this process; freeze them so a
+  // caller that mutates a row cannot corrupt the cache for everyone else.
+  for (const record of batch.records) cached.rows.push(deepFreeze(record));
   cached.tailCheck = consumedTailHash(resolved, batch.cursor.offset);
   cached.size = stat.size;
   cached.mtimeMs = stat.mtimeMs;
