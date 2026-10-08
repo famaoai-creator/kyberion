@@ -184,6 +184,12 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/health/',
   'shared/runtime/state/',
   'shared/runtime/reasoning-failover-events.jsonl',
+  // Learned intent→contract outcomes; task-session completion and intent
+  // reconciliation record into it from many suites.
+  'shared/runtime/intent-contract-memory.json',
+  // Audit hash-chain key (chain-integrity.ts); pairs with the sandboxed
+  // shared/logs/audit/ so a test chain is keyed and verified inside the sandbox.
+  'shared/runtime/audit/',
 ];
 export const VITEST_LIVE_SANDBOX_ROOT = 'active/shared/runtime/vitest-live';
 
