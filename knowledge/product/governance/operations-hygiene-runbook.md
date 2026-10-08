@@ -269,6 +269,10 @@ the test passes against the sandbox while the writer leaks into live state.
     `--sandbox --approval-mode plan`. They start in `llmShellScratchCwd()`, and the prompt goes on
     stdin (codex `exec … -`; gemini gets a fixed `-p` instruction that the CLI appends to stdin).
     Other callers of `runCodexCliQuery` / `runGeminiCliQuery` keep their own mode.
+  - The runners forward only `bin`, `model` and `timeout_ms` from a policy profile. Once a
+    permission profile is set, `runCodexCliQuery` / `runGeminiCliQuery` also drop caller
+    `extraArgs` that would widen it (sandbox, approval, yolo, `--dangerously-*`, `--add-dir`,
+    `-c sandbox*|approval_policy*`). Do not forward a whole profile object as CLI options.
   - **Residual risk:** neither CLI can switch its tools off the way `claude --tools ""` does.
     - Codex `read-only` still lets the model run read-only shell commands. Its sandbox does not
       limit reads to the cwd, and the scratch cwd is inside the checkout, so codex can still find
@@ -276,6 +280,12 @@ the test passes against the sandbox while the writer leaks into live state.
     - Gemini plan mode keeps read-only tools. `--sandbox` confines them to a container or Seatbelt
       profile, so on a host without one the runner fails, and `mission-llm` falls back to the next
       profile.
+    - Gemini stdin covers only the process Kyberion spawns. With `--sandbox`, the gemini launcher
+      may re-spawn itself inside the sandbox and re-inject the stdin it read into that child's `-p`
+      argv. This is not verified here; treat the prompt as possibly visible in the sandbox's
+      process table.
+    - A gemini build that ignores piped stdin sees only the fixed instruction. The strict schema
+      then fails, so the call fails closed and `mission-llm` moves on to the next profile.
     - For tenant-tier payloads, rely on the egress gate and prefer the `claude` profile.
 
 **Procedure:**

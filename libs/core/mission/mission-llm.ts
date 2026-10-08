@@ -122,6 +122,27 @@ function inferAdapter(profile: LlmProfile): string {
   return profile.adapter || 'shell-json';
 }
 
+/**
+ * CLI options a dedicated runner takes from a policy profile. Only these
+ * whitelisted fields are forwarded: forwarding the whole profile would let a
+ * profile (org / user override) inject `cwd` or permission-widening
+ * `extraArgs` past the runner's read-only projection.
+ */
+export function structuredRunnerCliOptions(profile: LlmProfile): {
+  bin?: string;
+  model?: string;
+  timeoutMs?: number;
+} {
+  const record = profile as LlmProfile & { bin?: unknown; model?: unknown };
+  return {
+    ...(typeof record.bin === 'string' && record.bin ? { bin: record.bin } : {}),
+    ...(typeof record.model === 'string' && record.model ? { model: record.model } : {}),
+    ...(typeof profile.timeout_ms === 'number' && profile.timeout_ms > 0
+      ? { timeoutMs: profile.timeout_ms }
+      : {}),
+  };
+}
+
 function registerDefaultStructuredRunners(): void {
   // Runbook §7: the dedicated provider runners answer one-shot structured
   // queries, so they run without write access (read-only / no-write
@@ -134,7 +155,7 @@ function registerDefaultStructuredRunners(): void {
       schema,
       mode: 'read-only',
       profile: 'explorer',
-      options: { ...(profile as any), cwd: llmShellScratchCwd() },
+      options: { ...structuredRunnerCliOptions(profile), cwd: llmShellScratchCwd() },
     });
   });
 
@@ -146,7 +167,7 @@ function registerDefaultStructuredRunners(): void {
       profile: 'explorer',
       promptVia: 'stdin',
       cwd: llmShellScratchCwd(),
-      options: profile as any,
+      options: structuredRunnerCliOptions(profile),
     });
   });
 

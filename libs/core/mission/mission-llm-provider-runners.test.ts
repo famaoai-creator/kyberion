@@ -42,7 +42,10 @@ type FakeChild = EventEmitter & {
 };
 
 /** The runners forward the profile as CLI options, so `bin` pins a fake binary. */
-type RunnerProfile = LlmProfile & { bin: string };
+type RunnerProfile = LlmProfile & { bin: string; extraArgs?: string[]; cwd?: string };
+
+// A profile override must not re-widen the runner's projection or move its cwd.
+const WIDENING_FIELDS = { cwd: '/elsewhere/repo-root', timeout_ms: 45_000 };
 
 interface SpawnCall {
   bin: string;
@@ -160,5 +163,61 @@ describe('mission-llm gemini-cli runner (runbook §7)', () => {
     expect(call!.stdin).toBe(`SYSTEM: return JSON\n\n${PROMPT_MARKER}`);
     expect(call!.cwd).toBe(llmShellScratchCwd());
     expect(call!.cwd).not.toBe(pathResolver.rootDir());
+  });
+});
+
+describe('mission-llm structured runners ignore widening profile fields', () => {
+  it('keeps codex read-only and in the scratch cwd despite profile extraArgs and cwd', async () => {
+    const calls = captureSpawn((call) => {
+      const outputPath = call.args[call.args.indexOf('--output-last-message') + 1]!;
+      safeWriteFile(outputPath, JSON.stringify({ answer: 3 }));
+      return '';
+    });
+
+    await runStructuredLlmProfile(
+      {
+        command: 'codex',
+        args: [],
+        adapter: 'codex-cli',
+        bin: 'fake-codex',
+        extraArgs: ['--sandbox', 'workspace-write', '--dangerously-bypass-approvals-and-sandbox'],
+        ...WIDENING_FIELDS,
+      } satisfies RunnerProfile,
+      PROMPT_MARKER,
+      schema,
+      { egress: { dataTier: 'public' } }
+    );
+
+    const [call] = calls;
+    expect(call!.args.filter((arg) => arg === '--sandbox')).toHaveLength(1);
+    expect(call!.args).toContain('read-only');
+    expect(call!.args).not.toContain('workspace-write');
+    expect(call!.args.some((arg) => arg.startsWith('--dangerously-'))).toBe(false);
+    expect(call!.cwd).toBe(llmShellScratchCwd());
+  });
+
+  it('keeps gemini in plan mode and in the scratch cwd despite profile extraArgs and cwd', async () => {
+    const calls = captureSpawn(() => JSON.stringify({ response: JSON.stringify({ answer: 4 }) }));
+
+    await runStructuredLlmProfile(
+      {
+        command: 'gemini',
+        args: [],
+        adapter: 'gemini-cli',
+        bin: 'fake-gemini',
+        extraArgs: ['--approval-mode', 'yolo', '-y'],
+        ...WIDENING_FIELDS,
+      } satisfies RunnerProfile,
+      PROMPT_MARKER,
+      schema,
+      { egress: { dataTier: 'public' } }
+    );
+
+    const [call] = calls;
+    expect(call!.args.filter((arg) => arg === '--approval-mode')).toHaveLength(1);
+    expect(call!.args).toContain('plan');
+    expect(call!.args).not.toContain('yolo');
+    expect(call!.args).not.toContain('-y');
+    expect(call!.cwd).toBe(llmShellScratchCwd());
   });
 });
