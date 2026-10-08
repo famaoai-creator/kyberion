@@ -4535,6 +4535,10 @@
       "types": "./dist/organization/member-registry.d.ts",
       "default": "./dist/organization/member-registry.js"
     },
+    "./organization/identity-directory": {
+      "types": "./dist/organization/identity-directory.d.ts",
+      "default": "./dist/organization/identity-directory.js"
+    },
     "./knowledge/memory-notebook": {
       "types": "./dist/knowledge/memory-notebook.d.ts",
       "default": "./dist/knowledge/memory-notebook.js"
