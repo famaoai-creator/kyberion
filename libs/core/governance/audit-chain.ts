@@ -225,6 +225,29 @@ export function registerAuditForwarderPublisher(publisher: AuditForwarderPublish
   };
 }
 
+/**
+ * Runs `fn` as the tenant audit mirror's own store-writer, bound to `tenantSlug`.
+ * authority.ts registers it (the audit chain sits below authority in the
+ * import graph, so it cannot import withExecutionContext itself).
+ */
+export type TenantMirrorWriterContext = <T>(tenantSlug: string, fn: () => T) => T;
+let tenantMirrorWriterContext: TenantMirrorWriterContext | undefined;
+
+/**
+ * G17: the mirror under customer/{slug}/logs/audit/ is part of the chain's own
+ * persistence, like the master file. Writing it under the caller's identity
+ * failed whenever the caller was inside a narrow store-writer assumption (e.g.
+ * work coordination as infrastructure_sentinel), which left the mirror short
+ * of the master chain (tenant_mirror_count_mismatch).
+ */
+export function registerTenantMirrorWriterContext(context: TenantMirrorWriterContext): void {
+  tenantMirrorWriterContext = context;
+}
+
+function asTenantMirrorWriter<T>(tenantSlug: string, fn: () => T): T {
+  return tenantMirrorWriterContext ? tenantMirrorWriterContext(tenantSlug, fn) : fn();
+}
+
 function testAuditChainIo(): AuditChainIo | undefined {
   if (!isVitestProcess()) return undefined;
   return (
@@ -695,26 +718,34 @@ class AuditChainImpl {
     // chain still holds the entry, and verifyTenantMirrors() skips slugs with no
     // mirror directory, so master and mirror stay consistent.
     if (entry.tenantSlug && isValidTenantSlug(entry.tenantSlug)) {
+      const tenantSlug = entry.tenantSlug;
+      const io = auditIo;
       try {
-        const stanceDir = path.join(rootDir(), 'customer', entry.tenantSlug);
-        const safeStanceDir = safeAuditPath(stanceDir, { allowMissingLeaf: true });
-        if (!safeStanceDir || !auditIo.exists(safeStanceDir)) return;
-        const tenantAuditDir = path.join(safeStanceDir, 'logs', 'audit');
-        const safeTenantAuditDir = safeAuditPath(tenantAuditDir, { allowMissingLeaf: true });
-        if (!safeTenantAuditDir) return;
-        if (!auditIo.exists(safeTenantAuditDir)) {
-          auditIo.mkdir(safeTenantAuditDir);
-        }
-        const date = entry.timestamp.slice(0, 10);
-        const mirrorFile = safeAuditPath(path.join(safeTenantAuditDir, `audit-${date}.jsonl`), {
-          allowMissingLeaf: true,
-        });
-        if (!mirrorFile) return;
-        auditIo.append(mirrorFile, `${JSON.stringify(entry)}\n`);
+        // G17: the mirror is the chain's own store, written under its
+        // tenant-bound store-writer role, never under the caller's identity.
+        asTenantMirrorWriter(tenantSlug, () => this.appendTenantMirror(io, tenantSlug, entry));
       } catch (err: any) {
-        logger.warn(`[AUDIT_CHAIN] Tenant mirror failed for ${entry.tenantSlug}: ${err.message}`);
+        logger.warn(`[AUDIT_CHAIN] Tenant mirror failed for ${tenantSlug}: ${err.message}`);
       }
     }
+  }
+
+  private appendTenantMirror(io: AuditChainIo, tenantSlug: string, entry: AuditEntry): void {
+    const stanceDir = path.join(rootDir(), 'customer', tenantSlug);
+    const safeStanceDir = safeAuditPath(stanceDir, { allowMissingLeaf: true });
+    if (!safeStanceDir || !io.exists(safeStanceDir)) return;
+    const tenantAuditDir = path.join(safeStanceDir, 'logs', 'audit');
+    const safeTenantAuditDir = safeAuditPath(tenantAuditDir, { allowMissingLeaf: true });
+    if (!safeTenantAuditDir) return;
+    if (!io.exists(safeTenantAuditDir)) {
+      io.mkdir(safeTenantAuditDir);
+    }
+    const date = entry.timestamp.slice(0, 10);
+    const mirrorFile = safeAuditPath(path.join(safeTenantAuditDir, `audit-${date}.jsonl`), {
+      allowMissingLeaf: true,
+    });
+    if (!mirrorFile) return;
+    io.append(mirrorFile, `${JSON.stringify(entry)}\n`);
   }
 
   private getFilePath(timestamp: string): string {
