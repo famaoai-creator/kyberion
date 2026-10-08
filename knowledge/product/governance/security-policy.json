@@ -59,6 +59,7 @@
       "active/shared/artifacts/confidential/"
     ],
     "shared_prefixes": [
+      "knowledge/confidential/tenants/index.json",
       "knowledge/confidential/tenant-groups/",
       "knowledge/confidential/heuristics/",
       "knowledge/confidential/relationships/",

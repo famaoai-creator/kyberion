@@ -138,6 +138,21 @@ describe('tier-guard tenant scope (IP-1)', () => {
     expect(result.reason).toMatch(/tenant\.scope_violation/);
   });
 
+  it('treats the tenant design-override index as a shared registry, not a tenant named "tenants"', () => {
+    process.env.KYBERION_TENANT = 'acme-corp';
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    const index = validateReadPermission(
+      path.join(ROOT, 'knowledge/confidential/tenants/index.json')
+    );
+    if (!index.allowed) expect(index.reason).not.toMatch(/tenant\.scope_violation/);
+    // Only the registry file is shared; the directory is not a free-for-all.
+    const sibling = validateReadPermission(
+      path.join(ROOT, 'knowledge/confidential/tenants/other.json')
+    );
+    expect(sibling.allowed).toBe(false);
+    expect(sibling.reason).toMatch(/tenant\.scope_violation/);
+  });
+
   it.each([
     ['mission', 'active/missions/confidential/other-tenant/MSN-FOO/evidence/leak.json'],
     ['project', 'active/projects/confidential/other-tenant/PRJ-FOO/state.json'],
