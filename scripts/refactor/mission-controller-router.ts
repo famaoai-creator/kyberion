@@ -293,7 +293,8 @@ export interface MissionControllerRoutingContext {
     evidence?: string[],
     teamRole?: string,
     actorId?: string,
-    actorType?: 'agent' | 'human' | 'service'
+    actorType?: 'agent' | 'human' | 'service',
+    provider?: string
   ) => Awaitable<void>;
   recordArtifactReview: (
     missionId: string,
@@ -301,7 +302,8 @@ export interface MissionControllerRoutingContext {
     reviewerAgentId: string,
     findings?: unknown[],
     reviewerTeamRole?: 'reviewer' | 'qa',
-    specialistRoles?: string[]
+    specialistRoles?: string[],
+    provider?: string
   ) => Awaitable<unknown>;
   reconcileExistingWork: (
     missionId: string,
@@ -1126,7 +1128,8 @@ export async function runMissionControllerAction(
         parseCsvOption('--evidence', context.argv),
         getValue('--team-role', context.argv),
         getValue('--actor-id', context.argv),
-        parseAllowedValue(getValue('--actor-type', context.argv), '--actor-type', ACTOR_TYPES)
+        parseAllowedValue(getValue('--actor-type', context.argv), '--actor-type', ACTOR_TYPES),
+        getValue('--provider', context.argv)
       );
       break;
     case 'review-task': {
@@ -1144,7 +1147,8 @@ export async function runMissionControllerAction(
         arg3!,
         findings,
         reviewerTeamRole,
-        specialistRoles
+        specialistRoles,
+        getValue('--provider', context.argv)
       );
       break;
     }

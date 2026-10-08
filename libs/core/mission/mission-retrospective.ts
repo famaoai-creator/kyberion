@@ -111,6 +111,11 @@ export interface MissionExecutionStats {
     entries: number;
     cost_usd: number;
   };
+  /** Tasks marked completed in NEXT_TASKS.json. */
+  tasks_completed: number;
+  /** True when tasks were completed but no usage entry of any kind exists —
+   *  the zeros above mean "not recorded", never "free". */
+  usage_unrecorded: boolean;
   item_outcomes: Array<{
     task_id: string;
     team_role: string;
@@ -120,6 +125,10 @@ export interface MissionExecutionStats {
     model_id?: string;
   }>;
 }
+
+/** Mirrors MISSION_TASK_COMPLETED_STATUSES (mission-lifecycle-completion.ts),
+ *  kept local so the retrospective does not pull in the lifecycle module graph. */
+const COMPLETED_TASK_STATUSES = new Set(['done', 'completed', 'accepted', 'reviewed']);
 
 function collectMissionUsageStats(
   missionId: string
@@ -412,6 +421,8 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
       by_model: {},
     },
     resource_usage: { entries: 0, cost_usd: 0 },
+    tasks_completed: 0,
+    usage_unrecorded: false,
     item_outcomes: [],
   };
   Object.assign(stats, collectMissionUsageStats(missionId));
@@ -430,6 +441,11 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
     }
   })();
   stats.task_total = nextTasks.length;
+  stats.tasks_completed = nextTasks.filter((task) =>
+    COMPLETED_TASK_STATUSES.has(String(task.status || '').toLowerCase())
+  ).length;
+  stats.usage_unrecorded =
+    stats.tasks_completed > 0 && stats.token_usage.entries + stats.resource_usage.entries === 0;
   for (const task of nextTasks) {
     const assignedTo = isRecord(task.assigned_to) ? task.assigned_to : undefined;
     const role = String(assignedTo?.role || 'unassigned');
@@ -846,6 +862,9 @@ export async function runMissionRetrospective(
     JSON.stringify(stats, null, 2),
     '```',
     '',
+    ...(stats.usage_unrecorded
+      ? [t('mission_ops:retro_usage_unrecorded', { count: stats.tasks_completed }), '']
+      : []),
     ...(stats.evidence_timing.closing_burst || stats.evidence_timing.edited_after_record.length > 0
       ? [
           t('mission_ops:retro_evidence_freshness', {

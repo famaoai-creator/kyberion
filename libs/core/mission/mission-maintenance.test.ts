@@ -1,25 +1,46 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as pathResolver from '../path-resolver.js';
 import {
+  safeExec,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
+import { MetricsCollector } from '../metrics.js';
 import {
   ensureRecoveryScaffold,
   loadMissionFlightRecorderAtPath,
+  recordEvidence,
   recordTask,
   shouldSkipResumeEntry,
   RESUME_IDEMPOTENCY_WINDOW_MS,
 } from './mission-maintenance.js';
+import { inferProviderFromActorId } from './mission-direct-cli-usage.js';
 
 const mocks = vi.hoisted(() => ({ spawnManagedProcess: vi.fn() }));
+// Route the shared usage ledger to a per-test collector so record-evidence
+// never appends to the operator's work/metrics/resource-usage.jsonl.
+const usageCollector = vi.hoisted(() => ({ current: null as null | MetricsCollector }));
 
 vi.mock('../managed-process.js', () => ({
   spawnManagedProcess: mocks.spawnManagedProcess,
 }));
+vi.mock('../metrics.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../metrics.js')>();
+  const fallback = new actual.MetricsCollector({ persist: false });
+  return {
+    ...actual,
+    metrics: new Proxy(fallback, {
+      get: (target, prop) => {
+        const active = usageCollector.current || target;
+        const value = Reflect.get(active, prop);
+        return typeof value === 'function' ? value.bind(active) : value;
+      },
+    }),
+  };
+});
 
 describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
   const now = new Date('2026-05-07T12:00:00.000Z');
@@ -307,5 +328,88 @@ describe('mission resume worker recovery ceremony', () => {
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
     }
+  });
+});
+
+describe('direct-CLI usage accounting', () => {
+  it('record-evidence appends an estimated direct_cli usage entry when it completes a task', async (ctx) => {
+    const missionId = `MSN-MAINTENANCE-USAGE-${process.pid}-${Date.now()}`;
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    const metricsDir = pathResolver.sharedTmp(`direct-cli-usage-test-${process.pid}-${Date.now()}`);
+    const previousRole = process.env.MISSION_ROLE;
+    process.env.MISSION_ROLE = 'mission_controller';
+    ctx.onTestFinished(() => {
+      usageCollector.current = null;
+      safeRmSync(missionPath, { recursive: true, force: true });
+      safeRmSync(metricsDir, { recursive: true, force: true });
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+    });
+    safeMkdir(`${missionPath}/evidence`, { recursive: true });
+    safeExec('git', ['init', '-q'], { cwd: missionPath });
+    safeWriteFile(
+      `${missionPath}/mission-state.json`,
+      JSON.stringify({
+        mission_id: missionId,
+        tier: 'public',
+        status: 'active',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'worker',
+        confidence_score: 1,
+        git: { branch: 'main', start_commit: 'start', latest_commit: 'latest', checkpoints: [] },
+        history: [],
+      })
+    );
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify([
+        { task_id: 'impl', status: 'planned', deliverable: 'evidence/report.md' },
+        { task_id: 'later', status: 'planned', deliverable: 'evidence/missing.md' },
+      ])
+    );
+    safeWriteFile(`${missionPath}/evidence/report.md`, '# report\n');
+
+    const collector = new MetricsCollector({ metricsDir });
+    usageCollector.current = collector;
+    const common = {
+      missionId,
+      note: 'done',
+      actorId: 'codex-implementer',
+      getGitHash: () => 'hash',
+      syncProjectLedgerIfLinked: async () => undefined,
+    };
+    await recordEvidence({ ...common, taskId: 'impl' });
+    // Deliverable missing → the task is not completed → no usage entry.
+    await recordEvidence({ ...common, taskId: 'later', provider: 'claude' });
+
+    const entries = collector.loadResourceUsageHistory();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      type: 'resource_usage',
+      resource_kind: 'llm',
+      actor_id: 'codex-implementer',
+      mission_id: missionId,
+      quantity: 0,
+      cost_usd: 0,
+      status: 'estimated',
+      source: 'direct_cli',
+      scope: { scope_kind: 'task', mission_id: missionId, task_id: 'impl' },
+      metadata: {
+        task_id: 'impl',
+        event: 'record_evidence',
+        estimated: true,
+        provider: 'codex',
+        prompt_tokens: null,
+        completion_tokens: null,
+        total_tokens: null,
+      },
+    });
+  });
+
+  it('infers the provider only from a known provider-id prefix', () => {
+    expect(inferProviderFromActorId('claude-opus-reviewer')).toBe('claude');
+    expect(inferProviderFromActorId('implementation-architect')).toBeUndefined();
+    expect(inferProviderFromActorId(undefined)).toBeUndefined();
   });
 });
