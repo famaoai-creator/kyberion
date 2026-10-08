@@ -1,6 +1,8 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  awaitChildWithDeadline,
+  ChildDeadlineError,
   installGracefulShutdown,
   startSerialTickLoop,
   type ShutdownProcess,
@@ -147,5 +149,66 @@ describe('installGracefulShutdown', () => {
     expect(process.exitCode).toBe(1);
     await vi.advanceTimersByTimeAsync(10);
     expect(exit).toHaveBeenCalledWith(1);
+  });
+});
+
+describe('awaitChildWithDeadline', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  function fakeChild(exitOn: NodeJS.Signals[] = ['SIGTERM']) {
+    const emitter = new EventEmitter();
+    const kill = vi.fn((signal?: NodeJS.Signals) => {
+      if (signal && exitOn.includes(signal))
+        queueMicrotask(() => emitter.emit('exit', null, signal));
+      return true;
+    });
+    const child = {
+      kill,
+      once: (event: string, listener: (...args: any[]) => void) => emitter.once(event, listener),
+    };
+    return { emitter, kill, child };
+  }
+
+  it('resolves on exit 0 and rejects on a non-zero exit', async () => {
+    const ok = fakeChild();
+    const okRun = awaitChildWithDeadline(ok.child, { label: 'tick', deadlineMs: 1000 });
+    ok.emitter.emit('exit', 0, null);
+    await expect(okRun).resolves.toBeUndefined();
+
+    const bad = fakeChild();
+    const badRun = awaitChildWithDeadline(bad.child, { label: 'tick', deadlineMs: 1000 });
+    bad.emitter.emit('exit', 3, null);
+    await expect(badRun).rejects.toThrow('tick failed with exit code 3');
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(bad.kill).not.toHaveBeenCalled();
+  });
+
+  it("turns a spawn 'error' into a rejection instead of an unhandled crash", async () => {
+    const { emitter, child } = fakeChild();
+    const run = awaitChildWithDeadline(child, { label: 'tick', deadlineMs: 1000 });
+    emitter.emit('error', new Error('spawn ENOENT'));
+    await expect(run).rejects.toThrow('spawn ENOENT');
+  });
+
+  it('kills the child at the deadline and escalates to SIGKILL when SIGTERM is ignored', async () => {
+    const polite = fakeChild(['SIGTERM']);
+    const politeRun = awaitChildWithDeadline(polite.child, { label: 'tick', deadlineMs: 1000 });
+    const politeResult = expect(politeRun).rejects.toBeInstanceOf(ChildDeadlineError);
+    await vi.advanceTimersByTimeAsync(1000);
+    await politeResult;
+    expect(polite.kill).toHaveBeenCalledWith('SIGTERM');
+    expect(polite.kill).not.toHaveBeenCalledWith('SIGKILL');
+
+    const stubborn = fakeChild([]);
+    const stubbornRun = awaitChildWithDeadline(stubborn.child, {
+      label: 'tick',
+      deadlineMs: 1000,
+      killGraceMs: 500,
+    });
+    const stubbornResult = expect(stubbornRun).rejects.toThrow('exceeded its 1000ms deadline');
+    await vi.advanceTimersByTimeAsync(1500);
+    await stubbornResult;
+    expect(stubborn.kill.mock.calls.map(([signal]) => signal)).toEqual(['SIGTERM', 'SIGKILL']);
   });
 });
