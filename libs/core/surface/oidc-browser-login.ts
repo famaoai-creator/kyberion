@@ -48,6 +48,10 @@ import {
   trimTrailingSlashes,
 } from './surface-session-cookie.js';
 import type { SurfaceLoginFailureCode, SurfaceLoginView } from './surface-login-pages.js';
+import {
+  loadStoredOidcLoginSettings,
+  type StoredOidcLoginSettings,
+} from './oidc-login-settings.js';
 
 export const DEFAULT_SESSION_TTL_SECONDS = 8 * 60 * 60;
 const TX_TTL_SECONDS = 10 * 60;
@@ -92,6 +96,8 @@ export interface OidcLoginDeps {
   /** Returns the parsed JSON body; throws on a non-2xx or transport failure. */
   fetchJson?: (request: OidcLoginFetchRequest) => Promise<unknown>;
   audit?: (event: OidcLoginAuditEvent) => void;
+  /** Stored (secret-guard) settings lookup; defaults to the real document outside tests. */
+  storedSettings?: () => StoredOidcLoginSettings | null;
 }
 
 function authnDeps(deps: OidcLoginDeps): AuthnResolveDeps {
@@ -147,9 +153,22 @@ export interface OidcLoginConfigResolution {
   missing: string[];
 }
 
+function storedSettings(deps: OidcLoginDeps): StoredOidcLoginSettings | null {
+  if (deps.storedSettings) return deps.storedSettings();
+  // Hermetic tests stub process.env; a developer's real stored document must
+  // not leak into them.
+  if (deps.env || isVitestProcess()) return null;
+  return loadStoredOidcLoginSettings();
+}
+
 export function resolveOidcLoginConfig(deps: OidcLoginDeps = {}): OidcLoginConfigResolution {
-  const issuer = envText(deps, 'KYBERION_OIDC_ISSUER');
-  const clientId = envText(deps, 'KYBERION_OIDC_CLIENT_ID');
+  const envIssuer = envText(deps, 'KYBERION_OIDC_ISSUER');
+  const envClientId = envText(deps, 'KYBERION_OIDC_CLIENT_ID');
+  // All-or-nothing precedence: the environment set never mixes with the
+  // stored one.
+  const stored = envIssuer || envClientId ? null : storedSettings(deps);
+  const issuer = stored?.issuer ?? envIssuer;
+  const clientId = stored?.client_id ?? envClientId;
   const missing: string[] = [];
   if (!issuer) missing.push('KYBERION_OIDC_ISSUER');
   if (!clientId) missing.push('KYBERION_OIDC_CLIENT_ID');
@@ -161,12 +180,13 @@ export function resolveOidcLoginConfig(deps: OidcLoginDeps = {}): OidcLoginConfi
     config: {
       issuer: normalizeIssuer(issuer),
       clientId,
-      clientSecret: envText(deps, 'KYBERION_OIDC_CLIENT_SECRET'),
-      scopes: envText(deps, 'KYBERION_OIDC_SCOPES') ?? 'openid',
-      providerLabel: envText(deps, 'KYBERION_OIDC_PROVIDER_LABEL') ?? 'SSO',
+      clientSecret: stored ? stored.client_secret : envText(deps, 'KYBERION_OIDC_CLIENT_SECRET'),
+      scopes: (stored ? stored.scopes : envText(deps, 'KYBERION_OIDC_SCOPES')) ?? 'openid',
+      providerLabel:
+        (stored ? stored.provider_label : envText(deps, 'KYBERION_OIDC_PROVIDER_LABEL')) ?? 'SSO',
       sessionTtlSeconds:
         Number.isFinite(ttl) && ttl >= 60 ? Math.floor(ttl) : DEFAULT_SESSION_TTL_SECONDS,
-      publicBaseUrl: envText(deps, 'KYBERION_OIDC_PUBLIC_BASE_URL'),
+      publicBaseUrl: stored?.public_base_url ?? envText(deps, 'KYBERION_OIDC_PUBLIC_BASE_URL'),
       publicBaseUrlBySurface: parseBaseUrls(envText(deps, 'KYBERION_OIDC_PUBLIC_BASE_URLS')),
     },
   };
