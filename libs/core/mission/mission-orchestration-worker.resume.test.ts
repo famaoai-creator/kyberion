@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { withExecutionContext } from '../authority.js';
 
@@ -49,8 +49,18 @@ async function seedMissionState(
 }
 
 describe('mission-orchestration-worker resume replay', () => {
+  // No vi.resetModules(): the worker and the secure-io / tier-guard / authority
+  // stack under it are imported once per file, here, and every later `await
+  // import` hits the module cache. Re-importing that stack per test repeated its
+  // module initialisation every test (operations-hygiene-runbook §5); importing
+  // it up front also keeps that one-time load out of the first test's timeout.
+  // Per-test state is the mocks and the fixture paths removed in afterEach.
+  beforeAll(async () => {
+    process.env.MISSION_ROLE = 'mission_controller';
+    await import('./mission-orchestration-worker.js');
+  }, 60_000);
+
   beforeEach(() => {
-    vi.resetModules();
     vi.clearAllMocks();
     process.env.MISSION_ROLE = 'mission_controller';
   });

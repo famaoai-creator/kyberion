@@ -110,10 +110,20 @@ vi.mock('../governance/governance-action-recorder.js', () => ({
     mocks.logAction(agentId, `${operation}:${reason}`, violation),
 }));
 
+// No vi.resetModules(): a2a-bridge and the secure-io / tier-guard / authority
+// stack under it are imported once per file (the first `await import`; later
+// ones hit the module cache). Re-importing that stack per test repeated its
+// module initialisation every test (operations-hygiene-runbook §5). The
+// a2aBridge singleton lives on globalThis; per-test state is reset through
+// _resetA2ABridgeForTests() (handles, runtime contexts, per-agent semaphores),
+// the mocks re-armed below, and the seams reset in the nested describes.
 describe('a2a-bridge', () => {
-  beforeEach(() => {
-    vi.resetModules();
-    vi.clearAllMocks();
+  beforeEach(async () => {
+    const { _resetA2ABridgeForTests } = await import('./a2a-bridge.js');
+    _resetA2ABridgeForTests();
+    // Reset, not just clear: queued mock*Once values and implementations a
+    // test set must not leak into whichever test runs next.
+    vi.resetAllMocks();
     mocks.getAgentRuntimeHandle.mockReturnValue(null);
     mocks.toSupervisorEnsurePayload.mockImplementation((payload: any) => payload);
     mocks.resolveAgentSelectionHints.mockImplementation((manifest: any) => ({
@@ -657,11 +667,6 @@ describe('a2a-bridge', () => {
     beforeEach(async () => {
       process.env.KYBERION_A2A_SECRET = 'ni02-bridge-test-secret';
       delete process.env.KYBERION_NHI_ACTOR;
-      // The a2aBridge singleton lives on globalThis (Symbol.for) and survives
-      // vi.resetModules(): a stale instance would keep using the PREVIOUS
-      // module generation's signature/identity modules while the test imports
-      // fresh ones. Drop it so this generation rebuilds a consistent instance.
-      delete (globalThis as Record<symbol, unknown>)[Symbol.for('@kyberion/a2a-bridge')];
       const { _resetA2ASecretCacheForTests } = await import('./a2a-envelope-signature.js');
       _resetA2ASecretCacheForTests();
     });
@@ -681,8 +686,6 @@ describe('a2a-bridge', () => {
       const { safeExistsSync, safeRmSync } = await import('../secure-io.js');
       const tmpDir = pathResolver.rootResolve(`active/shared/tmp/ni02-bridge-tests-${process.pid}`);
       if (safeExistsSync(tmpDir)) safeRmSync(tmpDir, { recursive: true, force: true });
-      // Leave no cross-generation singleton behind for later describes.
-      delete (globalThis as Record<symbol, unknown>)[Symbol.for('@kyberion/a2a-bridge')];
     });
 
     function baseRouteMocks(agentId: string) {
@@ -838,8 +841,6 @@ describe('a2a-bridge', () => {
 
     beforeEach(async () => {
       process.env.KYBERION_A2A_SECRET = 'ni03-bridge-test-secret';
-      // See NI-02 describe: the a2aBridge singleton survives vi.resetModules().
-      delete (globalThis as Record<symbol, unknown>)[Symbol.for('@kyberion/a2a-bridge')];
       const { _resetA2ASecretCacheForTests } = await import('./a2a-envelope-signature.js');
       _resetA2ASecretCacheForTests();
     });
@@ -849,7 +850,6 @@ describe('a2a-bridge', () => {
       else process.env.KYBERION_A2A_SECRET = savedSecret;
       const { _resetA2ASecretCacheForTests } = await import('./a2a-envelope-signature.js');
       _resetA2ASecretCacheForTests();
-      delete (globalThis as Record<symbol, unknown>)[Symbol.for('@kyberion/a2a-bridge')];
     });
 
     function baseRouteMocks(agentId: string) {
@@ -1043,6 +1043,30 @@ describe('a2a-bridge', () => {
   });
 
   describe('AA-04 Conversation store and rehydration', () => {
+    // Each test gets a ready nerve-agent runtime of its own instead of
+    // inheriting the manifest / runtime mocks left by whichever test ran before.
+    beforeEach(() => {
+      const mockHandle = {
+        agentId: 'nerve-agent',
+        getRecord: () => ({ sessionId: 'sess-new' }),
+      };
+      mocks.getAgentManifest.mockReturnValue({
+        provider: 'gemini',
+        modelId: 'gemini-2.5-pro',
+        systemPrompt: 'agent',
+        capabilities: ['delegate'],
+      });
+      mocks.get.mockReturnValue({ status: 'ready' });
+      mocks.getAgentRuntimeHandle.mockReturnValue(mockHandle);
+      mocks.ensureAgentRuntimeViaDaemon.mockResolvedValue({
+        agent_id: 'nerve-agent',
+        provider: 'gemini',
+        session_id: 'sess-new',
+      });
+      mocks.createSupervisorBackedAgentHandle.mockReturnValue(mockHandle);
+      mocks.readConversationHistory.mockReturnValue([]);
+    });
+
     it('appends conversation turns and rehydrates on session change', async () => {
       const { a2aBridge } = await import('./a2a-bridge.js');
       const mockHandle = {
