@@ -12,21 +12,24 @@ area, and the automated check that enforces the rule. A defect class that recurs
 was missing or unenforced. Fix the defect, then extend this runbook or its gate in the same PR.
 
 **Audience.** Anyone (human or agent) who changes CI workflows, runtime stores, daemons, child
-processes, library logging, tests, tenant-scoped facades, or LLM/provider calls.
+processes, library logging, tests, tenant-scoped facades, LLM/provider calls, generators that
+write mission evidence, or project lifecycle commands.
 
 **Origin.** MSN-OPS-GAPS-20261008 (organization `kyberion-ops`, project `PRJ-OPS-IMPROVEMENT`).
 That mission closed 16 gaps from the 2026-10-08 operations survey. Several had been fixed before and
 had regressed.
 
-| Class                         | Gate / check                                                       | Section |
-| ----------------------------- | ------------------------------------------------------------------ | ------- |
-| CI workflow drift             | `ci-workflow-contract` (scope `pr`)                                | §1      |
-| Undeclared runtime stores     | `runtime-store-retention` (scope `pr`), janitor `uncovered*` lists | §2      |
-| Daemons and child processes   | unit tests per daemon; this checklist in review                    | §3      |
-| stdout / logging in libraries | eslint `no-console` on `libs/`                                     | §4      |
-| Test pollution and host deps  | Vitest leak guard, strict in CI (`KYBERION_TEST_LEAK_STRICT=1`)    | §5      |
-| Tenant scope and facade env   | `tier-guard-tenant` tests, facade binding tests                    | §6      |
-| LLM / provider calls          | per-call-site egress tests (e.g. `mission-distill-egress.test.ts`) | §7      |
+| Class                         | Gate / check                                                          | Section |
+| ----------------------------- | --------------------------------------------------------------------- | ------- |
+| CI workflow drift             | `ci-workflow-contract` (scope `pr`)                                   | §1      |
+| Undeclared runtime stores     | `runtime-store-retention` (scope `pr`), janitor `uncovered*` lists    | §2      |
+| Daemons and child processes   | unit tests per daemon; this checklist in review                       | §3      |
+| stdout / logging in libraries | eslint `no-console` on `libs/`                                        | §4      |
+| Test pollution and host deps  | Vitest leak guard, strict in CI (`KYBERION_TEST_LEAK_STRICT=1`)       | §5      |
+| Tenant scope and facade env   | `tier-guard-tenant` tests, facade binding tests                       | §6      |
+| LLM / provider calls          | per-call-site egress tests (e.g. `mission-distill-egress.test.ts`)    | §7      |
+| Mission evidence overwrites   | generator and phase-pipeline tests in `mission-retrospective.test.ts` | §8      |
+| Project lifecycle facades     | lifecycle regressions in `project-management.test.ts`                 | §9      |
 
 ---
 
@@ -284,18 +287,46 @@ the test passes against the sandbox while the writer leaks into live state.
 
 ---
 
-## Maintenance
+## §8 Mission evidence: generated files and recorded deliverables
 
-When a defect class not listed here recurs:
+**Rule:** a generator never writes to a path that a task records as its deliverable. Generated
+artifacts (stats, reports, manifests written by `finish`, `verify`, dispatch or any other automatic
+step) get their own file names.
 
-1. Add a section with the rule, the procedure, and the gate or test that enforces it.
-2. Link the section from [kyberion-development-practices](./kyberion-development-practices.md) and
-   the pre-PR checklist.
-3. Record the incident in the mission's retrospective.
+- A task's `deliverable` path (from `mission-workflow-catalog.json` and the other workflow
+  templates) belongs to whoever records it with `record-evidence`. Writing it from a generator
+  silently replaces recorded evidence.
+- A generator also does not create a deliverable path when the file is absent. Task
+  auto-completion trusts the existence of the deliverable (`tryAutoCompleteTaskFromEvidence`), so a
+  generated placeholder would close a task that nobody did.
+- Example: `mission finish` runs the retrospective generator. It writes
+  `evidence/retrospective-stats.md` and `evidence/retrospective.json`. It never writes
+  `evidence/retrospective.md`, which is the hand-written deliverable of the retrospective task
+  (MSN-OPS-ROUND3-20261008).
+- Pipeline templates count as generators. The `pipeline_ref` template of a `judgment`, `review` or
+  `approval` phase may read evidence, but must not target that phase's deliverable. Only a
+  `deterministic` phase's deliverable is the pipeline's own output. Resolve mission paths through
+  the engine-derived `{{mission_evidence_dir}}`, never a hand-built `active/missions/{{mission_id}}`
+  (which skips the tier directory). Example: `post-release-retrospective` writes
+  `evidence/retrospective-packet.md`, not `evidence/retrospective.md`.
 
-A rule without an enforcing check is a candidate for the next gate.
+**Procedure:**
 
-## §7 Project lifecycle facade parity
+1. When you add or change a write under a mission's `evidence/`, grep the workflow templates for
+   the path (`grep -rn '"deliverable": "evidence/<name>"' knowledge/product/`). If a template
+   declares it, pick a different name.
+2. Add a test that fails if the generator overwrites the path: seed a hand-written file at the
+   deliverable path, run the generator, and assert the file is byte-identical and that the
+   generated output is in its own file. Also assert that the generated path is not a declared
+   deliverable (pattern: `mission-retrospective.test.ts`). The same file checks every
+   non-deterministic phase's `pipeline_ref` template against the phase's deliverables; keep it
+   green when you add or edit a phase pipeline.
+3. Update every reader and link of a renamed generated file in the same PR: `report_path`
+   consumers, `notifyOperator` `link_hint`, phase docs and playbooks.
+
+---
+
+## §9 Project lifecycle facade parity
 
 **Rule.** Dedicated lifecycle commands and generic status updates must execute the
 same guarded facade. Archive checks live missions, task sessions and unfinished
@@ -310,3 +341,16 @@ restore archived records.
 **Gate.** Run the focused lifecycle regressions in
 `libs/core/project/project-management.test.ts` and build core plus the repo CLI.
 These cover archive entry-point parity, restore, and track state/projection changes.
+
+---
+
+## Maintenance
+
+When a defect class not listed here recurs:
+
+1. Add a section with the rule, the procedure, and the gate or test that enforces it.
+2. Link the section from [kyberion-development-practices](./kyberion-development-practices.md) and
+   the pre-PR checklist.
+3. Record the incident in the mission's retrospective.
+
+A rule without an enforcing check is a candidate for the next gate.
