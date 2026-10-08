@@ -68,7 +68,17 @@ function isolationProbe(input: TenantActivationProbeInput, deps: TenantActivatio
     problems.push(`tenant registry: ${error instanceof Error ? error.message : String(error)}`);
   }
   const check = deps.registryCheck();
-  if (check.exitCode !== 0) problems.push(`check:tenant-registry failed:\n${check.output}`);
+  if (check.exitCode !== 0) {
+    // The registry check reports every tenant; keep only this tenant's lines in
+    // this tenant's evidence so other tenants' slugs never land in it.
+    const own = check.output
+      .split('\n')
+      .filter((line) => line.includes(input.tenantSlug))
+      .join('\n');
+    problems.push(
+      `check:tenant-registry failed${own ? `:\n${own}` : ''} (run \`pnpm check -- --only tenant-registry\` for the full report)`
+    );
+  }
   return problems.length
     ? { passed: false, detail: problems.join('\n') }
     : { passed: true, detail: 'strict isolation declared; check:tenant-registry OK' };
