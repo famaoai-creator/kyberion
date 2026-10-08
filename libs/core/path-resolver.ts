@@ -205,6 +205,9 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/background-review/nudge/',
   'shared/runtime/mesh-hub/',
   'shared/observability/mesh-hub/',
+  // swiftc output and module cache of the Apple FM bridge (macOS only; a test
+  // that compiles it must not populate the operator's binary cache).
+  'shared/runtime/apple-intelligence/',
   // Latest skill response for the reflex-terminal feedback loop (skill-wrapper).
   'shared/last_response.json',
 ];
