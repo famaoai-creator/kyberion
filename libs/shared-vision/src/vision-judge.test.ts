@@ -75,6 +75,28 @@ describe('consultVision()', () => {
     expect(result).toEqual(options[1]);
   });
 
+  it('keeps stdout clean: the dialogue and the prompt go to stderr (G13)', async () => {
+    mockQuestion.mockImplementation((_: string, cb: (a: string) => void) => cb('opt-c'));
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    try {
+      const readline = await import('node:readline');
+      const { consultVision } = await import('./vision-judge.js');
+      await expect(consultVision('stdout context', options)).resolves.toEqual(options[2]);
+      expect(readline.createInterface).toHaveBeenCalledWith(
+        expect.objectContaining({ output: process.stderr })
+      );
+      expect(stderr).toHaveBeenCalledWith(expect.stringContaining('Context: stdout context'));
+      expect(stdout).not.toHaveBeenCalled();
+      expect(log).not.toHaveBeenCalled();
+    } finally {
+      stdout.mockRestore();
+      stderr.mockRestore();
+      log.mockRestore();
+    }
+  });
+
   // Feature: project-quality-improvement, Property 7: consultVisionの選択一貫性
   describe('Property 7: consultVisionの選択一貫性', () => {
     it('任意の有効なオプション配列とインデックスに対して、対応するオプションを返す', async () => {
