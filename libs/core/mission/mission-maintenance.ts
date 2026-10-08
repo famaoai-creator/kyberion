@@ -1310,40 +1310,13 @@ function appendMissionPurgeAudit(record: Record<string, unknown>): void {
 }
 
 /**
- * Human-readable candidate table for `purgeMissions` (one string per line).
- * The library never writes it to stdout itself: stdout belongs to the caller
- * (e.g. the weekly-audit pipeline op emits structured JSON there). The CLI
- * renders it via `PurgeMissionsOptions.onCandidates`.
+ * Never writes to stdout (the weekly-audit op emits JSON there): `onCandidates`
+ * lets the CLI render its table before any mission is moved.
  */
-export function formatPurgeCandidateTable(
-  rootDir: string,
-  candidates: PurgeMissionCandidate[]
-): string[] {
-  return [
-    '',
-    `  Missions matching purge policies: ${candidates.length}`,
-    '',
-    ...candidates.map(
-      (candidate) =>
-        `    ${candidate.mission.padEnd(30)} → ${path.relative(rootDir, candidate.targetPath)}  (${candidate.policyName})`
-    ),
-    '',
-  ];
-}
-
-export interface PurgeMissionsOptions {
-  /**
-   * Called once with the matched candidates before any mission is moved, so
-   * an interactive caller can render the preview table (see
-   * `formatPurgeCandidateTable`) ahead of the archive log lines.
-   */
-  onCandidates?: (candidates: PurgeMissionCandidate[]) => void;
-}
-
 export async function purgeMissions(
   rootDir: string,
   dryRun = false,
-  options: PurgeMissionsOptions = {}
+  options: { onCandidates?: (candidates: PurgeMissionCandidate[]) => void } = {}
 ): Promise<PurgeMissionsResult> {
   const { adfPath, policies } = loadMissionLifecyclePolicies();
   if (!policies) {
@@ -1406,11 +1379,7 @@ export async function purgeMissions(
     return { status: 'ok', adfPath, dryRun, candidates: [], archived: [] };
   }
 
-  if (options.onCandidates) {
-    options.onCandidates(candidates);
-  } else {
-    logger.info(`Missions matching purge policies: ${candidates.length}`);
-  }
+  options.onCandidates?.(candidates);
 
   if (dryRun) {
     logger.info('Dry run complete. No missions were moved. Run "purge --execute" to apply.');

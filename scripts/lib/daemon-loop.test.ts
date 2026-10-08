@@ -7,6 +7,7 @@ import {
   startSerialTickLoop,
   type ShutdownProcess,
   type ShutdownSignal,
+  type SupervisableChild,
 } from './daemon-loop.js';
 
 function deferred<T = void>() {
@@ -24,7 +25,7 @@ describe('startSerialTickLoop', () => {
   afterEach(() => vi.useRealTimers());
 
   it('never overlaps ticks: the next tick is armed only after the previous settles', async () => {
-    const gates: Array<ReturnType<typeof deferred>> = [];
+    const gates: Array<{ resolve: () => void }> = [];
     let concurrent = 0;
     let maxConcurrent = 0;
     const tick = vi.fn(async () => {
@@ -163,10 +164,7 @@ describe('awaitChildWithDeadline', () => {
         queueMicrotask(() => emitter.emit('exit', null, signal));
       return true;
     });
-    const child = {
-      kill,
-      once: (event: string, listener: (...args: any[]) => void) => emitter.once(event, listener),
-    };
+    const child: SupervisableChild = { kill, once: emitter.once.bind(emitter) };
     return { emitter, kill, child };
   }
 
