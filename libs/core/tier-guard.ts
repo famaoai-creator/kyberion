@@ -290,6 +290,7 @@ function hasAuthorityAccess(
 function tenantScopeConfig(policy: any): {
   protectedPrefixes: string[];
   sharedPrefixes: string[];
+  systemRegistryReads: Array<{ path: string; roles: string[] }>;
   requireTenantBinding: boolean;
   slugPattern: RegExp;
   brokerRequirements: {
@@ -314,6 +315,20 @@ function tenantScopeConfig(policy: any): {
     sharedPrefixes: Array.isArray(cfg.shared_prefixes)
       ? cfg.shared_prefixes
       : ['knowledge/confidential/heuristics/', 'knowledge/confidential/relationships/'],
+    systemRegistryReads: Array.isArray(cfg.system_registry_reads)
+      ? cfg.system_registry_reads.filter(
+          (entry: unknown): entry is { path: string; roles: string[] } =>
+            Boolean(entry) &&
+            typeof (entry as { path?: unknown }).path === 'string' &&
+            Array.isArray((entry as { roles?: unknown }).roles) &&
+            (entry as { roles: unknown[] }).roles.every((role) => typeof role === 'string')
+        )
+      : [
+          {
+            path: 'knowledge/confidential/tenants/index.json',
+            roles: ['check_tenant_registry_consistency'],
+          },
+        ],
     // Tenant-qualified protected paths and shared groups require a
     // server-resolved binding. Unpartitioned legacy roots remain governed by
     // the existing tier/persona checks until their storage migration lands.
@@ -492,10 +507,26 @@ function checkTenantScope(
         expiresAt?: string;
       }
     | undefined,
-  authorities: Authority[]
+  authorities: Authority[],
+  access: { kind: 'read' | 'write'; role?: string } = { kind: 'write' }
 ): { allowed: boolean; reason?: string } | null {
   if (authorities.includes('SUDO')) return null;
   const cfg = tenantScopeConfig(policy);
+  // Cross-tenant registry files (e.g. the tenant design-override index under
+  // knowledge/confidential/tenants/) are not a tenant's data, but they list
+  // every tenant. Only the named system reader roles may READ them, whatever
+  // the tenant binding, and every such read is audited. Writes and every
+  // other role keep the normal tenant classification (denied when bound).
+  if (access.kind === 'read' && access.role) {
+    const role = access.role;
+    const registry = cfg.systemRegistryReads.find(
+      (entry) => pathStartsWith(relativePath, entry.path) && entry.roles.includes(role)
+    );
+    if (registry) {
+      recordRegistryRead({ relativePath, role, tenantSlug });
+      return null;
+    }
+  }
   const groupDenial = checkTenantGroupScope(relativePath, tenantSlug, brokeredTenants);
   if (groupDenial) return groupDenial;
   const isSharedPath = cfg.sharedPrefixes.some((prefix) => pathStartsWith(relativePath, prefix));
@@ -714,6 +745,24 @@ function recordBrokerAccess(input: {
   });
 }
 
+function recordRegistryRead(input: {
+  relativePath: string;
+  role: string;
+  tenantSlug: string | undefined;
+}): void {
+  recordTenantAudit({
+    agentId: 'tier-guard',
+    action: 'tenant.registry_read',
+    operation: input.relativePath,
+    result: 'allowed',
+    reason: `System registry reader '${input.role}' read cross-tenant registry '${input.relativePath}'.`,
+    metadata: {
+      role: input.role,
+      ...(input.tenantSlug ? { tenant_slug: input.tenantSlug } : {}),
+    },
+  });
+}
+
 function recordGroupAccess(input: {
   relativePath: string;
   groupId: string;
@@ -921,7 +970,8 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
     tenantSlug,
     brokeredTenants,
     brokerApproval,
-    authorities
+    authorities,
+    { kind: 'read', role: currentRole }
   );
   if (tenantDenial) return tenantDenial;
 

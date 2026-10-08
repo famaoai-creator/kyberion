@@ -3,12 +3,7 @@ import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeMkdir,
-  safeWriteFile,
-} from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from '../secure-io.js';
 import {
   assertMemoryScope,
   memoryScopeAllowsRead,
@@ -66,8 +61,10 @@ function loadEntries(missionId: string): MissionWorkingMemoryEntry[] {
 function saveEntries(missionId: string, entries: MissionWorkingMemoryEntry[]): void {
   try {
     const p = mwmPersistPath(missionId);
-    const dir = path.dirname(p);
-    if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+    // Persist beside an existing mission only: creating the directory here
+    // fabricated an orphan active/missions/confidential/<ID>/ for any id
+    // (unknown missions, test fixtures). Without one, memory stays in-process.
+    if (!safeExistsSync(path.dirname(p))) return;
     const validated = missionWorkingMemoryCatalog(p).validate(entries, p);
     safeWriteFile(p, JSON.stringify(validated, null, 2));
   } catch {

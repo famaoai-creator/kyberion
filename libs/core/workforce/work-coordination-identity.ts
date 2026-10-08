@@ -36,7 +36,29 @@ export function normalizeWorkItemContext(
   return context;
 }
 
-export function buildWorkItemCreation(input: CreateWorkItemInput, rootDir?: string): WorkItem {
+/**
+ * Reject a work item whose tenant is not registered and active. Call it under
+ * the CALLER's authority, before entering the store fence: the fence assumes
+ * infrastructure_sentinel, which may not read the personal-tier tenant
+ * registry, so validating inside it failed every tenant-scoped create.
+ */
+export function assertWorkItemTenantRegistered(
+  input: Pick<CreateWorkItemInput, 'context' | 'projectId'>,
+  rootDir?: string
+): void {
+  const tenantSlug = input.context?.tenant_slug;
+  if (
+    tenantSlug &&
+    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !isVitestProcess())
+  ) {
+    resolveTenant(tenantSlug, {
+      rootDir,
+      env: process.env,
+    });
+  }
+}
+
+export function buildWorkItemCreation(input: CreateWorkItemInput): WorkItem {
   const title = String(input.title || '').trim();
   const description = String(input.description || '').trim();
   if (!title) {
@@ -47,15 +69,6 @@ export function buildWorkItemCreation(input: CreateWorkItemInput, rootDir?: stri
   }
   const now = nowIso();
   const context = normalizeWorkItemContext(input.context || {}, input.projectId);
-  if (
-    context.tenant_slug &&
-    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !isVitestProcess())
-  ) {
-    resolveTenant(context.tenant_slug, {
-      rootDir,
-      env: process.env,
-    });
-  }
   const item: WorkItem = {
     item_id: input.itemId || randomId('witem'),
     title,

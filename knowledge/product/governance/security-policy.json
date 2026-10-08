@@ -65,6 +65,12 @@
       "active/organizations/personal/shared/",
       "active/organizations/public/shared/"
     ],
+    "system_registry_reads": [
+      {
+        "path": "knowledge/confidential/tenants/index.json",
+        "roles": ["check_tenant_registry_consistency"]
+      }
+    ],
     "broker_requirements": {
       "require_approved_by": true,
       "require_approved_at": true,

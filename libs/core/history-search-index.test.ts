@@ -7,6 +7,7 @@ import { safeExec, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   historySearchDatabasePath,
   indexHistoryEntry,
+  probeHistorySearchBackend,
   rebuildMissionHistorySearchIndex,
   rebuildHistorySearchIndex,
   rebuildPublicHistorySearchIndexFromLocalSources,
@@ -64,7 +65,18 @@ function entry(
   };
 }
 
+// Host binary: sqlite3 with FTS5 trigram. Skip (not fail) on hosts without it;
+// CI installs it (see .github/workflows), so coverage is kept there.
+const SQLITE_BACKEND = probeHistorySearchBackend();
+const itWithSqlite = it.skipIf(!SQLITE_BACKEND.available);
+
 describe('history-search-index', () => {
+  it('probes the sqlite3 backend once and explains why it is unavailable', () => {
+    expect(probeHistorySearchBackend()).toBe(SQLITE_BACKEND);
+    if (SQLITE_BACKEND.available) expect(SQLITE_BACKEND.reason).toBeUndefined();
+    else expect(SQLITE_BACKEND.reason).toMatch(/^sqlite3 with FTS5 trigram unavailable: /);
+  });
+
   it('rejects a configured database outside active/shared', () => {
     process.env.KYBERION_HISTORY_SEARCH_DB = '/tmp/kyberion-history.sqlite';
     expect(() => historySearchDatabasePath()).toThrow(/must stay under active\/shared/);
@@ -82,7 +94,7 @@ describe('history-search-index', () => {
     }
   });
 
-  it('keeps the FTS triggers usable under sqlite trusted_schema=0', () => {
+  itWithSqlite('keeps the FTS triggers usable under sqlite trusted_schema=0', () => {
     // Apple's bundled sqlite3 defaults to trusted_schema=0, which forbids using
     // a virtual table inside a trigger body. The index syncs history_fts from
     // triggers, so without the pragma every write — and therefore every search —
@@ -174,7 +186,7 @@ describe('history-search-index', () => {
     else process.env.MISSION_ID = previousMissionId;
   });
 
-  it('finds Japanese substrings with zero-LLM FTS and returns nearby context', () => {
+  itWithSqlite('finds Japanese substrings with zero-LLM FTS and returns nearby context', () => {
     process.env.KYBERION_HISTORY_SEARCH_DB = DB_PATH;
     rebuildHistorySearchIndex([
       entry({ entryId: 'before', content: '請求書の対象月を確認します。' }),
@@ -194,27 +206,30 @@ describe('history-search-index', () => {
     );
   });
 
-  it('enforces tier isolation and ranks scheduled history below interactive history', () => {
-    process.env.KYBERION_HISTORY_SEARCH_DB = DB_PATH;
-    rebuildHistorySearchIndex([
-      entry({ entryId: 'interactive', content: 'リリース報告を確認した。' }),
-      entry({ entryId: 'cron', content: 'リリース報告を確認した。', scheduled: true }),
-      entry({ entryId: 'personal', content: '個人のリリース報告。', tier: 'personal' }),
-      entry({ entryId: 'subagent', content: 'リリース報告の内部検討。', subagent: true }),
-    ]);
+  itWithSqlite(
+    'enforces tier isolation and ranks scheduled history below interactive history',
+    () => {
+      process.env.KYBERION_HISTORY_SEARCH_DB = DB_PATH;
+      rebuildHistorySearchIndex([
+        entry({ entryId: 'interactive', content: 'リリース報告を確認した。' }),
+        entry({ entryId: 'cron', content: 'リリース報告を確認した。', scheduled: true }),
+        entry({ entryId: 'personal', content: '個人のリリース報告。', tier: 'personal' }),
+        entry({ entryId: 'subagent', content: 'リリース報告の内部検討。', subagent: true }),
+      ]);
 
-    const publicResults = searchHistory({ query: 'リリース報告', tiers: ['public'] }).results;
-    expect(publicResults.map((result) => result.entryId)).toEqual(['interactive', 'cron']);
-    expect(publicResults.every((result) => result.tier === 'public')).toBe(true);
-    expect(searchHistory({ query: 'リリース報告', tiers: ['public'] }).results).not.toContainEqual(
-      expect.objectContaining({ entryId: 'subagent' })
-    );
-    expect(searchHistory({ query: 'リリース報告', tiers: ['personal'] }).results).toContainEqual(
-      expect.objectContaining({ entryId: 'personal', tier: 'personal' })
-    );
-  });
+      const publicResults = searchHistory({ query: 'リリース報告', tiers: ['public'] }).results;
+      expect(publicResults.map((result) => result.entryId)).toEqual(['interactive', 'cron']);
+      expect(publicResults.every((result) => result.tier === 'public')).toBe(true);
+      expect(
+        searchHistory({ query: 'リリース報告', tiers: ['public'] }).results
+      ).not.toContainEqual(expect.objectContaining({ entryId: 'subagent' }));
+      expect(searchHistory({ query: 'リリース報告', tiers: ['personal'] }).results).toContainEqual(
+        expect.objectContaining({ entryId: 'personal', tier: 'personal' })
+      );
+    }
+  );
 
-  it('repairs a missing FTS index on the next query', () => {
+  itWithSqlite('repairs a missing FTS index on the next query', () => {
     process.env.KYBERION_HISTORY_SEARCH_DB = DB_PATH;
     indexHistoryEntry(entry({ entryId: 'repair-me', content: '復旧対象の会話です。' }));
     safeExec('sqlite3', [
@@ -227,7 +242,7 @@ describe('history-search-index', () => {
     expect(report.results[0]?.entryId).toBe('repair-me');
   });
 
-  it('deduplicates repeated source entries during a full rebuild', () => {
+  itWithSqlite('deduplicates repeated source entries during a full rebuild', () => {
     process.env.KYBERION_HISTORY_SEARCH_DB = DB_PATH;
     const duplicate = entry({ entryId: 'duplicate', content: '重複する履歴です。' });
     rebuildHistorySearchIndex([duplicate, { ...duplicate, sourceId: 'same-source-again' }]);
@@ -243,7 +258,7 @@ describe('history-search-index', () => {
     expect(resolveHistoryTier({ text: 'private', tier: 'confidential' })).toBe('confidential');
   });
 
-  it('skips malformed persisted traces before indexing their spans', () => {
+  itWithSqlite('skips malformed persisted traces before indexing their spans', () => {
     process.env.KYBERION_HISTORY_SEARCH_DB = DB_PATH;
     const validTrace = {
       traceId: `trace-${process.pid}-${Date.now()}`,
@@ -287,7 +302,7 @@ describe('history-search-index', () => {
     expect(searchHistory({ query: INVALID_TRACE_TOKEN, tiers: ['public'] }).results).toEqual([]);
   });
 
-  it('skips directory entries that only look like persisted history files', () => {
+  itWithSqlite('skips directory entries that only look like persisted history files', () => {
     const directoryPath = pathResolver.rootResolve(PRIVATE_CONVERSATION_PATH);
     const directoryToken = `historydirectorytoken${process.pid}${Date.now()}`;
     withExecutionContext('mission_controller', () => {
@@ -302,54 +317,57 @@ describe('history-search-index', () => {
     }
   });
 
-  it('rebuilds and searches an isolated private mission index only with matching mission authority', () => {
-    withExecutionContext('mission_controller', () => {
-      safeMkdir(pathResolver.rootResolve(PRIVATE_MISSION_PATH), { recursive: true });
-      safeWriteFile(
-        pathResolver.rootResolve(`${PRIVATE_MISSION_PATH}/mission-state.json`),
-        JSON.stringify(
-          missionState({
-            history: [
-              {
-                ts: '2026-07-18T00:00:00.000Z',
-                event: 'PRIVATE_CHECK',
-                note: 'confidential invoice recovery',
-              },
-            ],
-          })
-        )
-      );
-      safeWriteFile(
-        pathResolver.rootResolve(PRIVATE_CONVERSATION_PATH),
-        `${JSON.stringify({
-          ts: '2026-07-18T00:01:00.000Z',
-          sender: 'private-worker',
-          receiver: 'mission-controller',
-          performative: 'request',
-          prompt: 'confidential invoice recovery detail',
-          result: 'private result',
-          mission_id: PRIVATE_MISSION_ID,
-          tier: 'confidential',
-        })}\n${JSON.stringify(['malformed conversation row'])}\n${JSON.stringify({ tier: 'confidential', prompt: { unexpected: true } })}\n`
-      );
-    });
+  itWithSqlite(
+    'rebuilds and searches an isolated private mission index only with matching mission authority',
+    () => {
+      withExecutionContext('mission_controller', () => {
+        safeMkdir(pathResolver.rootResolve(PRIVATE_MISSION_PATH), { recursive: true });
+        safeWriteFile(
+          pathResolver.rootResolve(`${PRIVATE_MISSION_PATH}/mission-state.json`),
+          JSON.stringify(
+            missionState({
+              history: [
+                {
+                  ts: '2026-07-18T00:00:00.000Z',
+                  event: 'PRIVATE_CHECK',
+                  note: 'confidential invoice recovery',
+                },
+              ],
+            })
+          )
+        );
+        safeWriteFile(
+          pathResolver.rootResolve(PRIVATE_CONVERSATION_PATH),
+          `${JSON.stringify({
+            ts: '2026-07-18T00:01:00.000Z',
+            sender: 'private-worker',
+            receiver: 'mission-controller',
+            performative: 'request',
+            prompt: 'confidential invoice recovery detail',
+            result: 'private result',
+            mission_id: PRIVATE_MISSION_ID,
+            tier: 'confidential',
+          })}\n${JSON.stringify(['malformed conversation row'])}\n${JSON.stringify({ tier: 'confidential', prompt: { unexpected: true } })}\n`
+        );
+      });
 
-    process.env.MISSION_ID = PRIVATE_MISSION_ID;
-    expect(resolveMissionHistoryScope(PRIVATE_MISSION_ID)).toMatchObject({
-      missionId: PRIVATE_MISSION_ID,
-      tier: 'confidential',
-    });
-    expect(rebuildMissionHistorySearchIndex(PRIVATE_MISSION_ID)).toBe(2);
-    const report = searchMissionHistory({
-      missionId: PRIVATE_MISSION_ID,
-      query: 'confidential invoice',
-      maxResults: 10,
-    });
-    expect(report.rebuilt).toBe(true);
-    expect(report.results.length).toBeGreaterThan(0);
-    expect(report.results.every((result) => result.tier === 'confidential')).toBe(true);
-    expect(report.results.some((result) => result.sourceType === 'conversation')).toBe(true);
-  });
+      process.env.MISSION_ID = PRIVATE_MISSION_ID;
+      expect(resolveMissionHistoryScope(PRIVATE_MISSION_ID)).toMatchObject({
+        missionId: PRIVATE_MISSION_ID,
+        tier: 'confidential',
+      });
+      expect(rebuildMissionHistorySearchIndex(PRIVATE_MISSION_ID)).toBe(2);
+      const report = searchMissionHistory({
+        missionId: PRIVATE_MISSION_ID,
+        query: 'confidential invoice',
+        maxResults: 10,
+      });
+      expect(report.rebuilt).toBe(true);
+      expect(report.results.length).toBeGreaterThan(0);
+      expect(report.results.every((result) => result.tier === 'confidential')).toBe(true);
+      expect(report.results.some((result) => result.sourceType === 'conversation')).toBe(true);
+    }
+  );
 
   it('denies private search when the active mission does not match', () => {
     withExecutionContext('mission_controller', () => {

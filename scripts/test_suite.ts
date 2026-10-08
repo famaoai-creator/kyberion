@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult } from '@agent/core/secure-io';
 import {
@@ -77,12 +78,26 @@ export function buildVitestArgs(suite: TestSuite, extraArgs: readonly string[] =
   return ['vitest', 'run', ...suiteArgs, ...options];
 }
 
+/**
+ * Test-run switches the Vitest child must see. safeExec passes only its env
+ * allowlist, so without this CI's KYBERION_TEST_LEAK_STRICT=1 never reached
+ * tests/vitest-active-leak-guard.ts and leaks only warned.
+ */
+export function buildVitestEnv(
+  env?: Record<string, string | undefined>
+): Record<string, string | undefined> {
+  return {
+    KYBERION_TEST_LEAK_STRICT: getRegisteredEnvText('KYBERION_TEST_LEAK_STRICT', { env }),
+  };
+}
+
 export function runTestSuite(argv: readonly string[]): number {
   const { suite, vitestArgs } = parseTestSuiteArgs(argv);
   const args = buildVitestArgs(suite, vitestArgs);
   const vitestEntry = pathResolver.rootResolve('node_modules/vitest/vitest.mjs');
   const result = safeExecResult(process.execPath, [vitestEntry, ...args.slice(1)], {
     cwd: pathResolver.rootDir(),
+    env: buildVitestEnv(),
     // The core suite streams steadily for 20min+ on the slowest shared
     // runners (ubuntu, worse with --coverage); lower caps SIGTERMed healthy
     // runs (exit 143). The workflows' own job timeouts remain the backstop

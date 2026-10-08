@@ -23,7 +23,10 @@ import { runActionItemReminderSweep } from '../scripts/action_item_reminders.js'
 
 const MISSION_ID = 'MSN-MEETING-E2E-001';
 const WORK_ITEM_ID = 'WITEM-MEETING-E2E-001';
-const CUSTOMER_SLUG = 'demo';
+// A slug of its own: other suites (mission-lifecycle) create and delete
+// customer/demo concurrently, which removed this suite's deliverables mid-run.
+// afterEach removes customer/<slug> so nothing is left in the live tree.
+const CUSTOMER_SLUG = `mtv-e2e-${process.pid}`;
 const ROOT = pathResolver.rootDir();
 const MISSION_DIR = pathResolver.tenantMissionDir(MISSION_ID, CUSTOMER_SLUG, 'confidential');
 const CUSTOMER_ROOT = path.join(ROOT, 'customer', CUSTOMER_SLUG);
@@ -99,6 +102,8 @@ describe('meeting-to-value e2e', () => {
     setWorkCoordinationNamespace(null);
     vi.useRealTimers();
     safeRmSync(MISSION_DIR, { recursive: true, force: true });
+    // The tenant partition is this suite's own (pid-scoped slug); drop it too.
+    safeRmSync(path.dirname(MISSION_DIR), { recursive: true, force: true });
     safeRmSync(CUSTOMER_ROOT, { recursive: true, force: true });
     safeRmSync(REPORT_PATH, { force: true });
     for (const message of listSlackOutboxMessages()) {
