@@ -14,6 +14,7 @@ import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import {
   resolveActiveProviderPermissionArgs,
   resolveEffectiveProviderPermissionProfile,
+  resolveProviderPermissionArgs,
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
 import {
@@ -462,24 +463,58 @@ export function buildGeminiCliBackendFromEnv(
   return backend;
 }
 
+/**
+ * Static headless instruction used when the prompt travels on stdin. The
+ * gemini CLI appends `-p` to the input read from a piped stdin, so mission
+ * content never appears in argv (process table, ARG_MAX).
+ */
+export const GEMINI_STDIN_PROMPT_INSTRUCTION =
+  'Answer the request given on stdin. Return exactly one JSON object.';
+
 export async function runGeminiCliQuery<T>(params: {
   systemPrompt: string;
   userPrompt: string;
   schema: ZodType<T>;
   options?: GeminiCliBackendOptions;
+  /**
+   * KD-05 capability profile. When set, the gemini-cli descriptor's
+   * permission projection (`permission_profiles`) replaces the historical
+   * `-y` (yolo) flag; an ambient sandbox policy may only narrow it. Omit to
+   * keep the historical argv byte-identical for existing callers.
+   */
+  profile?: ProviderPermissionProfileName;
+  /** `stdin` keeps the prompt out of argv (runbook §7). Defaults to `argv`. */
+  promptVia?: 'argv' | 'stdin';
+  /** Child working directory. Defaults to the parent's cwd. */
+  cwd?: string;
 }): Promise<T> {
   const backendOptions = params.options || {};
   const bin = backendOptions.bin ?? 'gemini';
   const model = backendOptions.model ?? resolveRuntimeModelId('gemini-default');
   const timeoutMs = backendOptions.timeoutMs ?? 5 * 60 * 1000;
   const extraArgs = backendOptions.extraArgs ?? [];
+  const prompt = `${params.systemPrompt}\n\n${params.userPrompt}`;
+  const viaStdin = params.promptVia === 'stdin';
+  const effectiveProfile = params.profile
+    ? resolveEffectiveProviderPermissionProfile('gemini', params.profile)
+    : undefined;
+  let permissionArgs: readonly string[] = ['-y'];
+  if (effectiveProfile) {
+    const resolution = resolveProviderPermissionArgs(effectiveProfile, 'gemini');
+    if (resolution.kind === 'refused') {
+      throw new Error(
+        `[gemini-cli] permission profile "${effectiveProfile}" refused: ${resolution.reason}`
+      );
+    }
+    permissionArgs = resolution.args;
+  }
 
   const args = [
     '-p',
-    `${params.systemPrompt}\n\n${params.userPrompt}`,
+    viaStdin ? GEMINI_STDIN_PROMPT_INSTRUCTION : prompt,
     '-o',
     'json',
-    '-y',
+    ...permissionArgs,
     ...(model ? ['--model', model] : []),
     ...extraArgs,
   ];
@@ -488,11 +523,14 @@ export async function runGeminiCliQuery<T>(params: {
     const spawnEnv = buildDelegationSpawnEnv({
       provider: 'gemini',
       sessionId: newDelegationSessionId('gemini'),
+      ...(params.cwd ? { cwd: params.cwd } : {}),
+      ...(effectiveProfile ? { profile: effectiveProfile } : {}),
     });
     const child = spawnWithDelegationEnv(spawnEnv, () =>
       spawn(bin, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
         env: spawnEnv.env,
+        ...(params.cwd ? { cwd: params.cwd } : {}),
       })
     );
     let out = '';
@@ -515,6 +553,7 @@ export async function runGeminiCliQuery<T>(params: {
       clearTimeout(timer);
       reject(new Error(`[gemini-cli] spawn failed: ${(spawnErr as Error).message}`));
     });
+    if (viaStdin) child.stdin.write(prompt);
     child.stdin.end();
   });
 
