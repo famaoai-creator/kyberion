@@ -12,10 +12,14 @@
  *   which `checkProviderEgress` already honours.
  *
  * Writes are dry-run unless `--apply`; an attestation also needs `--accept`
- * (a human statement about the purchased plan). Default stays deny: nothing
- * here attests a provider on the operator's behalf.
+ * (a human statement about the purchased plan), and `training_use none` —
+ * the one that opens confidential egress — additionally needs an approved
+ * human approval request. Default stays deny: nothing here attests a
+ * provider or approves a request on the operator's behalf.
+ *
+ * The exported helpers are shared with the interactive onboarding wizard.
  */
-import { withExecutionContext } from '@agent/core/authority';
+import { resolveIdentityContext, withExecutionContext } from '@agent/core/authority';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import {
@@ -24,12 +28,20 @@ import {
   saveLlmSelectionPreferences,
   validateLlmSelectionPreferences,
 } from '@agent/core/llm-selection-preferences';
-import { attestTenantProvider } from '@agent/core/organization/tenant-governance';
+import {
+  attestTenantProvider,
+  captureAttestationInvoker,
+  requestTenantProviderAttestationApproval,
+  type AttestationInvoker,
+  type ProviderAttestationApprovalRequest,
+  type TenantProviderAttestationResult,
+} from '@agent/core/organization/tenant-governance';
 import {
   describeProviderTierAvailability,
   loadProviderEgressPolicy,
   type ProviderTierAvailabilityReport,
 } from '@agent/core/provider/provider-egress-gate';
+import { loadReasoningRoutePolicy } from '@agent/core/reasoning/reasoning-route-resolver';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import { guardCliArgsNormalized, type CliGuardSpec } from './lib/cli-guard.js';
 import {
@@ -79,6 +91,8 @@ const SPECS: Record<Verb, CliGuardSpec> = {
       { flag: '--basis', value: '<url|ref>' },
       { flag: '--attested-by', value: '<who>' },
       { flag: '--valid-for-days', value: '<n>' },
+      { flag: '--request-approval' },
+      { flag: '--approval-request-id', value: '<id>' },
       { flag: '--apply' },
       { flag: '--accept' },
       { flag: '--json' },
@@ -91,17 +105,20 @@ export function onboardingLlmUsage(): string {
     'Usage: pnpm onboarding llm <show|select|attest> [options]',
     '  show   [--tenant <slug>] [--json]',
     '         Current backend/model selection and, per data tier, which providers may receive',
-    '         material for LLM work (with --tenant: that tenant’s attestations apply).',
+    '         material for LLM work and why the others are denied (--tenant, else the active',
+    '         tenant scope).',
     '  select --backend <mode> [--model <model-id>] [--apply] [--json]',
     '         Record the reasoning backend (reasoning-backend-policy allowed_modes) and model',
     '         (model registry) in the operator LLM selection. Dry-run without --apply.',
     '  attest --tenant <slug> --provider <id> --training-use <none|used|unknown>',
     '         [--plan <text> --basis <url|ref> --attested-by <who>] [--valid-for-days <n>]',
-    '         [--apply --accept] [--json]',
-    '         State how this tenant’s plan with a provider treats data. training_use none',
-    '         (with plan, basis and attested-by) lets confidential/personal material reach that',
-    '         provider for this tenant only; it is audited and expires. Nothing is attested',
-    '         by default; --apply --accept is your explicit confirmation.',
+    '         [--request-approval | --apply --accept [--approval-request-id <id>]] [--json]',
+    '         State how this tenant’s plan with a provider treats data. used/unknown are',
+    '         recorded with --apply --accept. none (with plan, basis, attested-by) lets',
+    '         confidential/personal material reach that provider for this tenant only, so it',
+    '         needs a human approval: --request-approval opens one, a human runs',
+    '         `pnpm kyberion approvals --approve <id>`, then re-run with the same values and',
+    '         --apply --accept --approval-request-id <id>. Audited; expires.',
   ].join('\n');
 }
 
@@ -109,6 +126,14 @@ function optionValue(argv: readonly string[], flag: string): string | undefined 
   const index = argv.indexOf(flag);
   const value = index >= 0 ? argv[index + 1] : undefined;
   return value && !value.startsWith('--') ? value : undefined;
+}
+
+function ambientTenant(): string | undefined {
+  try {
+    return resolveIdentityContext().tenantSlug?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function requireTenant(argv: readonly string[], required: boolean): string | undefined {
@@ -123,9 +148,23 @@ function requireTenant(argv: readonly string[], required: boolean): string | und
   return tenant;
 }
 
-function availabilityFor(
+/**
+ * The tenant a view applies: `--tenant`, else the ambient scope. A process
+ * bound to one tenant may not look at another tenant's attestations.
+ */
+function effectiveTenant(requested: string | undefined): string | undefined {
+  const ambient = ambientTenant();
+  if (requested && ambient && requested !== ambient) {
+    throw new Error(
+      `--tenant '${requested}' conflicts with the active tenant scope '${ambient}'; unset KYBERION_TENANT or pass the same tenant.`
+    );
+  }
+  return requested || ambient;
+}
+
+export function availabilityFor(
   tenantSlug: string | undefined,
-  options: OnboardingLlmOptions
+  options: OnboardingLlmOptions = {}
 ): ProviderTierAvailabilityReport {
   return withExecutionContext(
     'sovereign_concierge',
@@ -141,22 +180,210 @@ function availabilityFor(
   );
 }
 
-function formatAvailability(report: ProviderTierAvailabilityReport): string[] {
-  return [
-    `LLM availability by data tier${report.tenant_slug ? ` (tenant ${report.tenant_slug})` : ' (no tenant)'}:`,
-    ...report.tiers.map((tier) => `  ${tier.note}`),
-  ];
+export function formatAvailability(report: ProviderTierAvailabilityReport): string[] {
+  const tenantLabel =
+    report.tenant_source === 'none'
+      ? ' (no tenant)'
+      : ` (tenant ${report.tenant_slug}${report.tenant_source === 'ambient' ? ', from the active tenant scope' : ''})`;
+  const lines = [`LLM availability by data tier${tenantLabel}:`];
+  for (const tier of report.tiers) {
+    lines.push(`  ${tier.note}`);
+    if (tier.tier === 'public') continue;
+    for (const entry of tier.usable) lines.push(`    ✔ ${entry.provider} (${entry.basis})`);
+    // One reason per denied provider would flood the screen; the first one
+    // explains the shape, the full list is in --json.
+    if (tier.denied.length > 0) {
+      lines.push(
+        `    ✘ denied: ${tier.denied.map((entry) => entry.provider).join(', ')} — e.g. ${tier.denied[0]!.reason}`
+      );
+    }
+  }
+  return lines;
 }
 
 /** Accept `claude-opus-5-5` as shorthand for the registry id `anthropic:claude-opus-5-5`. */
-function resolveModelId(model: string, registered: readonly string[]): string {
+export function resolveModelId(model: string, registered: readonly string[]): string {
   if (registered.includes(model)) return model;
   const matches = registered.filter((id) => id.endsWith(`:${model}`));
   return matches.length === 1 ? matches[0]! : model;
 }
 
+/** The model the route policy uses for this backend when none is chosen. */
+export function defaultModelForBackend(
+  backend: string,
+  registered: readonly string[]
+): string | undefined {
+  const policy = loadReasoningRoutePolicy();
+  const profile = Object.values(policy.profiles).find((entry) => entry.mode === backend);
+  const ref = profile?.model ?? profile?.model_ref;
+  if (ref && registered.includes(ref)) return ref;
+  return registered[0];
+}
+
+export interface LlmSelectionChange {
+  selection: { provider: string; model_id?: string };
+  storage_path: string;
+  /** `.env.local` line rewritten so the choice takes effect (only that key). */
+  env_local_change?: { path: string; key: string; from: string; to: string };
+  warnings: string[];
+}
+
+/** Validate a backend/model choice without writing anything. */
+export function planLlmSelection(input: {
+  backend: string;
+  model?: string;
+  envLocalPath?: string;
+}): LlmSelectionChange {
+  const backend = normalizeReasoningBackendChoice(input.backend);
+  if (!backend) {
+    throw new Error(
+      `Invalid --backend '${input.backend}'. Allowed (reasoning-backend-policy.json allowed_modes): ${listReasoningBackendChoices().join(', ')}`
+    );
+  }
+  const envLocalPath = input.envLocalPath ?? defaultEnvLocalPath();
+  // The runtime must be selectable here (credentials, endpoint or CLI present)
+  // and the model must be in the governed registry.
+  const snapshot = getLlmSelectionSnapshot();
+  const candidate = snapshot.candidates.find((entry) => entry.provider === backend);
+  const model = input.model?.trim()
+    ? resolveModelId(input.model.trim(), candidate?.model_ids ?? [])
+    : undefined;
+  const validated = validateLlmSelectionPreferences(
+    { provider: backend, ...(model ? { model_id: model } : {}) },
+    snapshot
+  );
+  // A persisted KYBERION_REASONING_BACKEND (the wizard writes one) wins over
+  // the selection file in shells that load .env.local, so an explicit choice
+  // updates that one line too.
+  const persisted = readPersistedReasoningBackend(envLocalPath);
+  const shellBackend = getRegisteredEnvText('KYBERION_REASONING_BACKEND')?.trim();
+  return {
+    selection: validated,
+    storage_path: snapshot.storage_path,
+    ...(persisted && persisted !== backend
+      ? {
+          env_local_change: {
+            path: envLocalPath,
+            key: 'KYBERION_REASONING_BACKEND',
+            from: persisted,
+            to: backend,
+          },
+        }
+      : {}),
+    warnings:
+      shellBackend && shellBackend !== backend && shellBackend !== persisted
+        ? [
+            `KYBERION_REASONING_BACKEND=${shellBackend} is exported in this shell and overrides the selection; unset it.`,
+          ]
+        : [],
+  };
+}
+
+/** Record a validated backend/model choice and audit it as `actor`. */
+export function applyLlmSelection(input: {
+  backend: string;
+  model?: string;
+  envLocalPath?: string;
+  actor: string;
+}): LlmSelectionChange {
+  const plan = planLlmSelection(input);
+  return withExecutionContext('sovereign_concierge', () => {
+    const saved = saveLlmSelectionPreferences(plan.selection);
+    if (plan.env_local_change) {
+      persistReasoningBackend(plan.env_local_change.to, plan.env_local_change.path);
+    }
+    auditChain.record({
+      agentId: input.actor,
+      action: 'onboarding.llm_select',
+      operation: 'reasoning:llm-selection',
+      result: 'completed',
+      metadata: {
+        provider: saved.preferences.provider,
+        ...(saved.preferences.model_id ? { model_id: saved.preferences.model_id } : {}),
+        storage_path: saved.storage_path,
+        ...(plan.env_local_change ? { env_local_change: plan.env_local_change } : {}),
+      },
+    });
+    return {
+      ...plan,
+      selection: {
+        provider: saved.preferences.provider,
+        ...(saved.preferences.model_id ? { model_id: saved.preferences.model_id } : {}),
+      },
+      storage_path: saved.storage_path,
+    };
+  });
+}
+
+function describeSelection(change: LlmSelectionChange, dryRun: boolean): string[] {
+  const prefix = dryRun ? '[dry-run] would record' : 'Recorded';
+  const env = change.env_local_change;
+  return [
+    `${prefix} backend=${change.selection.provider}${change.selection.model_id ? ` model=${change.selection.model_id}` : ''} in ${change.storage_path}`,
+    ...(env
+      ? [
+          `${dryRun ? '[dry-run] would update' : 'Updated'} ${env.path}: ${env.key} ${env.from} -> ${env.to} (other lines unchanged)`,
+        ]
+      : []),
+    ...change.warnings.map((warning) => `warning: ${warning}`),
+  ];
+}
+
+export interface ProviderAttestationInput {
+  tenant: string;
+  provider: string;
+  training_use: 'none' | 'used' | 'unknown';
+  plan?: string;
+  basis?: string;
+  attested_by?: string;
+  valid_for_days?: number;
+  approvalRequestId?: string;
+  invoker: AttestationInvoker;
+  tenantRegistryRootDir?: string;
+}
+
+function toCoreAttestation(input: ProviderAttestationInput) {
+  return {
+    invoker: input.invoker,
+    slug: input.tenant,
+    provider: input.provider,
+    training_use: input.training_use,
+    ...(input.plan ? { plan: input.plan } : {}),
+    ...(input.basis ? { basis: input.basis } : {}),
+    ...(input.attested_by ? { attested_by: input.attested_by } : {}),
+    ...(input.valid_for_days !== undefined ? { valid_for_days: input.valid_for_days } : {}),
+    ...(input.approvalRequestId ? { approvalRequestId: input.approvalRequestId } : {}),
+    ...(input.tenantRegistryRootDir ? { rootDir: input.tenantRegistryRootDir } : {}),
+  };
+}
+
+/** Open (or reuse) the human approval a `training_use: none` attestation needs. */
+export function requestProviderAttestationApproval(
+  input: ProviderAttestationInput
+): ProviderAttestationApprovalRequest {
+  return withExecutionContext(
+    'sovereign_concierge',
+    () => requestTenantProviderAttestationApproval(toCoreAttestation(input)),
+    undefined,
+    input.tenant
+  );
+}
+
+/** Record an attestation (an approved request is required for `none`). */
+export function applyProviderAttestation(
+  input: ProviderAttestationInput
+): TenantProviderAttestationResult {
+  return withExecutionContext(
+    'sovereign_concierge',
+    () => attestTenantProvider(toCoreAttestation(input)),
+    undefined,
+    input.tenant
+  );
+}
+
 function show(argv: readonly string[], print: Print, options: OnboardingLlmOptions): void {
-  const tenant = requireTenant(argv, false);
+  const requested = requireTenant(argv, false);
+  const tenant = effectiveTenant(requested);
   const selection = withExecutionContext('sovereign_concierge', () =>
     loadLlmSelectionPreferences()
   );
@@ -164,7 +391,10 @@ function show(argv: readonly string[], print: Print, options: OnboardingLlmOptio
   const persistedBackend = readPersistedReasoningBackend(
     options.envLocalPath ?? defaultEnvLocalPath()
   );
-  const availability = availabilityFor(tenant, options);
+  const availability: ProviderTierAvailabilityReport = {
+    ...availabilityFor(tenant, options),
+    tenant_source: requested ? 'argument' : tenant ? 'ambient' : 'none',
+  };
   const result = {
     selection,
     env_backend: envBackend,
@@ -179,7 +409,9 @@ function show(argv: readonly string[], print: Print, options: OnboardingLlmOptio
   print(
     [
       `Reasoning selection: ${selection ? `${selection.provider}${selection.model_id ? ` (model ${selection.model_id})` : ''}` : '(none recorded — auto-discovery)'}`,
-      ...(envBackend ? [`KYBERION_REASONING_BACKEND=${envBackend} (environment wins)`] : []),
+      ...(envBackend && envBackend !== selection?.provider
+        ? [`KYBERION_REASONING_BACKEND=${envBackend} (environment wins)`]
+        : []),
       `Allowed backends: ${result.allowed_backends.join(', ')}`,
       ...formatAvailability(availability),
     ].join('\n')
@@ -187,102 +419,30 @@ function show(argv: readonly string[], print: Print, options: OnboardingLlmOptio
 }
 
 function select(argv: readonly string[], print: Print, options: OnboardingLlmOptions): void {
-  const rawBackend = optionValue(argv, '--backend');
-  if (!rawBackend) throw new Error('select requires --backend <mode>');
-  const backend = normalizeReasoningBackendChoice(rawBackend);
-  if (!backend) {
-    throw new Error(
-      `Invalid --backend '${rawBackend}'. Allowed (reasoning-backend-policy.json allowed_modes): ${listReasoningBackendChoices().join(', ')}`
-    );
-  }
-  const rawModel = optionValue(argv, '--model')?.trim();
-  const apply = argv.includes('--apply');
-  const envLocalPath = options.envLocalPath ?? defaultEnvLocalPath();
-
-  // Validate before any write: the runtime must be selectable here (credentials,
-  // endpoint or CLI present) and the model must be in the governed registry.
-  const snapshot = getLlmSelectionSnapshot();
-  const candidate = snapshot.candidates.find((entry) => entry.provider === backend);
-  const model = rawModel ? resolveModelId(rawModel, candidate?.model_ids ?? []) : undefined;
-  const validated = validateLlmSelectionPreferences(
-    { provider: backend, ...(model ? { model_id: model } : {}) },
-    snapshot
-  );
-
-  // A persisted KYBERION_REASONING_BACKEND (the wizard writes one) wins over
-  // the selection file, so an explicit choice must update it too or it would
-  // silently not take effect.
-  const persistedBackend = readPersistedReasoningBackend(envLocalPath);
-  const envLocalNeedsUpdate = Boolean(persistedBackend && persistedBackend !== backend);
-  const shellBackend = getRegisteredEnvText('KYBERION_REASONING_BACKEND')?.trim();
-  const warnings =
-    shellBackend && shellBackend !== backend && shellBackend !== persistedBackend
-      ? [
-          `KYBERION_REASONING_BACKEND=${shellBackend} is exported in this shell and overrides the selection; unset it.`,
-        ]
-      : [];
-
-  if (!apply) {
-    const plan = {
-      dry_run: true,
-      selection: validated,
-      storage_path: snapshot.storage_path,
-      ...(envLocalNeedsUpdate
-        ? { env_local_update: { path: envLocalPath, from: persistedBackend, to: backend } }
-        : {}),
-      warnings,
-    };
+  const backend = optionValue(argv, '--backend');
+  if (!backend) throw new Error('select requires --backend <mode>');
+  const model = optionValue(argv, '--model');
+  const input = {
+    backend,
+    ...(model ? { model } : {}),
+    ...(options.envLocalPath ? { envLocalPath: options.envLocalPath } : {}),
+  };
+  if (!argv.includes('--apply')) {
+    const plan = planLlmSelection(input);
     print(
       argv.includes('--json')
-        ? JSON.stringify(plan, null, 2)
-        : [
-            `[dry-run] would record backend=${validated.provider}${validated.model_id ? ` model=${validated.model_id}` : ''} in ${snapshot.storage_path}`,
-            ...(envLocalNeedsUpdate
-              ? [
-                  `[dry-run] would update KYBERION_REASONING_BACKEND ${persistedBackend} -> ${backend} in ${envLocalPath}`,
-                ]
-              : []),
-            ...warnings.map((warning) => `warning: ${warning}`),
-            'Re-run with --apply to record it.',
-          ].join('\n')
+        ? JSON.stringify({ dry_run: true, ...plan }, null, 2)
+        : [...describeSelection(plan, true), 'Re-run with --apply to record it.'].join('\n')
     );
     return;
   }
-
-  const saved = withExecutionContext('sovereign_concierge', () => {
-    const result = saveLlmSelectionPreferences(validated);
-    if (envLocalNeedsUpdate) persistReasoningBackend(backend, envLocalPath);
-    auditChain.record({
-      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
-      action: 'onboarding.llm_select',
-      operation: 'reasoning:llm-selection',
-      result: 'completed',
-      metadata: {
-        provider: result.preferences.provider,
-        ...(result.preferences.model_id ? { model_id: result.preferences.model_id } : {}),
-        storage_path: result.storage_path,
-        ...(envLocalNeedsUpdate ? { env_local_updated: envLocalPath } : {}),
-      },
-    });
-    return result;
-  });
-  const output = {
-    applied: true,
-    selection: saved.preferences,
-    storage_path: saved.storage_path,
-    ...(envLocalNeedsUpdate ? { env_local_updated: envLocalPath } : {}),
-    warnings,
-  };
+  // Attribute the audit entry to whoever asked, not the facade's elevation.
+  const actor = captureAttestationInvoker().actor;
+  const change = applyLlmSelection({ ...input, actor });
   print(
     argv.includes('--json')
-      ? JSON.stringify(output, null, 2)
-      : [
-          `Recorded backend=${saved.preferences.provider}${saved.preferences.model_id ? ` model=${saved.preferences.model_id}` : ''} in ${saved.storage_path}`,
-          ...(envLocalNeedsUpdate
-            ? [`Updated KYBERION_REASONING_BACKEND=${backend} in ${envLocalPath}`]
-            : []),
-          ...warnings.map((warning) => `warning: ${warning}`),
-        ].join('\n')
+      ? JSON.stringify({ applied: true, ...change }, null, 2)
+      : describeSelection(change, false).join('\n')
   );
 }
 
@@ -321,8 +481,9 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
   if (validForDays !== undefined && (!Number.isFinite(validForDays) || validForDays <= 0)) {
     throw new Error('--valid-for-days must be a finite positive number');
   }
-
-  const request = {
+  const approvalRequestId = optionValue(argv, '--approval-request-id');
+  // Capture who asked (and their tenant binding) before any elevation.
+  const input: ProviderAttestationInput = {
     tenant,
     provider,
     training_use: trainingUse,
@@ -330,7 +491,29 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
     ...(basis ? { basis } : {}),
     ...(attestedBy ? { attested_by: attestedBy } : {}),
     ...(validForDays !== undefined ? { valid_for_days: validForDays } : {}),
+    ...(approvalRequestId ? { approvalRequestId } : {}),
+    invoker: captureAttestationInvoker(),
+    ...(options.tenantRegistryRootDir
+      ? { tenantRegistryRootDir: options.tenantRegistryRootDir }
+      : {}),
   };
+  const json = argv.includes('--json');
+
+  if (argv.includes('--request-approval')) {
+    const request = requestProviderAttestationApproval(input);
+    const applyCommand = `pnpm onboarding llm attest --tenant ${tenant} --provider ${provider} --training-use none --plan ... --basis ... --attested-by ...${validForDays !== undefined ? ` --valid-for-days ${validForDays}` : ''} --apply --accept --approval-request-id ${request.request_id}`;
+    print(
+      json
+        ? JSON.stringify({ ...request, apply_command: applyCommand }, null, 2)
+        : [
+            `${request.created ? 'Opened' : 'Reusing'} approval request ${request.request_id} (${request.status}${request.expires_at ? `, expires ${request.expires_at}` : ''})`,
+            `A human decides with: ${request.approve_command}`,
+            `Then apply with the same values: ${applyCommand}`,
+          ].join('\n')
+    );
+    return;
+  }
+
   const apply = argv.includes('--apply');
   if (apply && !argv.includes('--accept')) {
     throw new Error(
@@ -338,32 +521,29 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
     );
   }
   if (!apply) {
-    const availability = availabilityFor(tenant, options);
-    const preview = { dry_run: true, attestation: request, current_availability: availability };
+    const availability = availabilityFor(effectiveTenant(tenant), options);
+    const needsApproval = trainingUse === 'none' && !approvalRequestId;
+    const preview = {
+      dry_run: true,
+      attestation: { ...input, invoker: undefined },
+      ...(needsApproval ? { needs_approval: 'run with --request-approval first' } : {}),
+      current_availability: availability,
+    };
     print(
-      argv.includes('--json')
+      json
         ? JSON.stringify(preview, null, 2)
         : [
             `[dry-run] would attest tenant=${tenant} provider=${provider} training_use=${trainingUse}`,
             ...formatAvailability(availability),
-            'Re-run with --apply --accept to record it.',
+            needsApproval
+              ? 'training_use none opens confidential egress: run with --request-approval, have a human approve it, then --apply --accept --approval-request-id <id>.'
+              : 'Re-run with --apply --accept to record it.',
           ].join('\n')
     );
     return;
   }
 
-  const recorded = withExecutionContext('sovereign_concierge', () =>
-    attestTenantProvider({
-      slug: tenant,
-      provider,
-      training_use: trainingUse,
-      ...(plan ? { plan } : {}),
-      ...(basis ? { basis } : {}),
-      ...(attestedBy ? { attested_by: attestedBy } : {}),
-      ...(validForDays !== undefined ? { valid_for_days: validForDays } : {}),
-      ...(options.tenantRegistryRootDir ? { rootDir: options.tenantRegistryRootDir } : {}),
-    })
-  );
+  const recorded = applyProviderAttestation(input);
   const availability = availabilityFor(tenant, options);
   const output = {
     applied: true,
@@ -371,14 +551,15 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
     provider,
     attestation: recorded.attestation,
     profile_path: recorded.profile_path,
+    ...(recorded.approval ? { approval: recorded.approval } : {}),
     availability,
   };
   print(
-    argv.includes('--json')
+    json
       ? JSON.stringify(output, null, 2)
       : [
           `Attested tenant=${tenant} provider=${provider} training_use=${recorded.attestation.training_use}${recorded.attestation.expires_at ? ` (expires ${recorded.attestation.expires_at})` : ''}`,
-          `Recorded in ${recorded.profile_path}; audit action tenant.attest_provider`,
+          `Recorded in ${recorded.profile_path}; audit action tenant.attest_provider${recorded.approval ? ` (approved by ${recorded.approval.approved_by}, request ${recorded.approval.request_id})` : ''}`,
           ...formatAvailability(availability),
         ].join('\n')
   );
