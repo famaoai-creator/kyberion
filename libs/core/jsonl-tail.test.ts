@@ -1,11 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver, sharedTmp } from './path-resolver.js';
+import * as secureIo from './secure-io.js';
+import { readJsonLines } from './foundation/json.js';
+import { getFoundationIo } from './foundation/io.js';
 import {
   createJsonlTail,
   detectRotation,
+  readJsonLinesCached,
+  resetJsonLinesCache,
   splitCompleteLines,
   EMPTY_JSONL_CURSOR,
 } from './jsonl-tail.js';
@@ -188,6 +193,88 @@ describe('jsonl-tail', () => {
 
     it('改行が無ければ何も消費しない', () => {
       expect(splitCompleteLines('partial')).toEqual({ lines: [], consumedChars: 0 });
+    });
+  });
+  describe('readJsonLinesCached (G01 bounded ledger replay)', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+      resetJsonLinesCache();
+    });
+
+    /** Bytes read through range reads during `fn`; any whole-file read fails the test. */
+    const rangeBytesDuring = (fn: () => void): number => {
+      const range = vi.spyOn(secureIo, 'safeReadFileRange');
+      const whole = vi.spyOn(secureIo, 'safeReadFile');
+      const foundationRead = vi.spyOn(getFoundationIo(), 'readFile');
+      fn();
+      const total = range.mock.calls.reduce((sum, [, , length]) => sum + Number(length), 0);
+      expect(whole).not.toHaveBeenCalled();
+      expect(foundationRead).not.toHaveBeenCalled();
+      vi.restoreAllMocks();
+      return total;
+    };
+
+    it('returns exactly what readJsonLines(skip) returns, incl. malformed and unterminated lines', () => {
+      fs.writeFileSync(file, '{"n":1}\nnot-json\n\n{"n":2}\r\n{"n":3}');
+      const expected = readJsonLines(file, { onMalformed: 'skip' });
+      expect(readJsonLinesCached(file)).toEqual(expected);
+      expect(expected).toEqual([{ n: 1 }, { n: 2 }, { n: 3 }]);
+      // the unterminated record is completed by the next append, never doubled
+      fs.appendFileSync(file, '\n{"n":4}\n');
+      expect(readJsonLinesCached(file)).toEqual(readJsonLines(file, { onMalformed: 'skip' }));
+    });
+
+    it('returns frozen rows so a mutating caller cannot corrupt later reads', () => {
+      append({ n: 1, nested: { v: 1 } });
+      const first = readJsonLinesCached<{ n: number; nested: { v: number } }>(file);
+      expect(Object.isFrozen(first[0])).toBe(true);
+      expect(() => {
+        (first[0] as { n: number }).n = 99;
+      }).toThrow(TypeError);
+      expect(readJsonLinesCached<{ n: number }>(file)[0].n).toBe(1);
+    });
+
+    it('parses only the appended bytes on later calls, and nothing when the file is unchanged', () => {
+      const big = 'x'.repeat(200);
+      append(...Array.from({ length: 500 }, (_, n) => ({ n, big })));
+      const fullSize = fs.statSync(file).size;
+      expect(readJsonLinesCached(file)).toHaveLength(500);
+
+      expect(rangeBytesDuring(() => readJsonLinesCached(file))).toBe(0);
+
+      append({ n: 500, big });
+      let rows: unknown[] = [];
+      const bytes = rangeBytesDuring(() => {
+        rows = readJsonLinesCached(file);
+      });
+      expect(rows).toHaveLength(501);
+      expect(rows.at(-1)).toEqual({ n: 500, big });
+      // fingerprint prefix + consumed-tail check + the one new row — not the history
+      expect(bytes).toBeLessThan(fullSize / 10);
+    });
+
+    it('replays from scratch after an in-place rewrite that keeps the size and head bytes', () => {
+      append({ id: 'a', v: 1 }, { id: 'b', v: 1 });
+      expect(readJsonLinesCached(file)).toEqual([
+        { id: 'a', v: 1 },
+        { id: 'b', v: 1 },
+      ]);
+      fs.writeFileSync(
+        file,
+        `${JSON.stringify({ id: 'a', v: 1 })}\n${JSON.stringify({ id: 'b', v: 2 })}\n`
+      );
+      append({ id: 'c', v: 1 });
+      expect(readJsonLinesCached(file)).toEqual(readJsonLines(file, { onMalformed: 'skip' }));
+    });
+
+    it('returns [] for a missing file and starts over after it is truncated', () => {
+      expect(readJsonLinesCached(file)).toEqual([]);
+      append({ n: 1 }, { n: 2 });
+      expect(readJsonLinesCached(file)).toHaveLength(2);
+      fs.writeFileSync(file, '');
+      expect(readJsonLinesCached(file)).toEqual([]);
+      append({ n: 9 });
+      expect(readJsonLinesCached(file)).toEqual([{ n: 9 }]);
     });
   });
 });

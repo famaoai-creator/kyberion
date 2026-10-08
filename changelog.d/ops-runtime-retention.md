@@ -1,0 +1,7 @@
+---
+category: Fixed
+---
+
+- **Runtime ledgers are no longer invisible to retention** — the top-level files under `active/shared/runtime/` (`dot-wake-ledger.jsonl`, `dot-token-usage.jsonl`, `dot-inbox.jsonl`, `mission_queue.jsonl`, `reasoning-failover-events.jsonl`, …) and the runtime subdirectories that had no rule (`service-receipts`, `recordings`, `discussions`, bridge thread histories, leases, `generated-pipelines`, `delivery-packs`, …) now have entries in `storage-retention-catalog.json`. `service-receipts` expire after 90 days; `generated-pipelines`, `role-assumption-trace` and `realtime-voice-conversations` after 30. Load-bearing state is `review_required`. The janitor report has a new `uncoveredRuntimeFiles` list for top-level files that have no entry.
+- **Resident dot wakes no longer re-read the whole wake/token ledger** — the due-ness check, wake circuit, the skipped-wake dedupe and `dotTokensUsedToday` now parse only the rows appended since the previous call (`readJsonLinesCached` in `libs/core/jsonl-tail.ts`). Results are unchanged, and `JsonlTail` now uses range reads instead of loading the whole file on each pass.
+- **New `runtime-store-retention` check gate** (`pnpm check -- --only runtime-store-retention`, part of the `pr` scope). It fails when code references an `active/shared/runtime/<name>` store that has no retention-catalog entry. To fix a failure, add the entry. Paths that are not real stores go in the file's exemption list, each with a reason.

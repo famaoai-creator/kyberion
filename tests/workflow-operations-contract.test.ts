@@ -122,7 +122,7 @@ describe('Workflow operations contract', () => {
     const stale = read('.github/workflows/stale.yml');
     const triage = read('docs/developer/ISSUE_TRIAGE.md');
 
-    expect(stale).toContain('actions/stale@v9');
+    expect(stale).toContain('actions/stale@v10');
     expect(stale).toContain('days-before-issue-stale: 90');
     expect(stale).toContain('days-before-pr-stale: 30');
     expect(stale).toContain('stale-issue-label: stale');

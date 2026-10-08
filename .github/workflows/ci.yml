@@ -16,14 +16,21 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same PR supersedes the running checks; main pushes and
+# scheduled runs are never cancelled (contract: operations-hygiene runbook §CI).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   lint-and-validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       matrix:
         node-version: [24]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Kyberion
         uses: ./.github/actions/setup-kyberion
@@ -42,7 +49,7 @@ jobs:
           pnpm run release:source-archive -- --check --output active/shared/exports/ci/kyberion-source.tar.gz
           pnpm kyberion release install-smoke --ref "${GITHUB_SHA}"
       - name: Upload source archive evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: kyberion-source-archive
           path: |
@@ -67,12 +74,18 @@ jobs:
         run: pnpm run check:commit-subject
 
       - name: Lint check
+        # pr-validation.yml static-checks owns this on pull requests.
+        if: github.event_name != 'pull_request'
         run: pnpm run lint
 
       - name: Format check
+        # pr-validation.yml static-checks owns this on pull requests.
+        if: github.event_name != 'pull_request'
         run: pnpm exec prettier --check package.json .github/workflows/ci.yml .github/workflows/pr-validation.yml .github/workflows/release.yml .github/workflows/cross-os.yml .github/actions/setup-kyberion/action.yml
 
       - name: TypeScript type check
+        # pr-validation.yml static-checks owns this on pull requests.
+        if: github.event_name != 'pull_request'
         run: pnpm run typecheck
 
       - name: Validate capability discovery
@@ -110,7 +123,7 @@ jobs:
     needs: lint-and-validate
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Kyberion
         uses: ./.github/actions/setup-kyberion
@@ -151,7 +164,7 @@ jobs:
     needs: lint-and-validate
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Kyberion
         uses: ./.github/actions/setup-kyberion
@@ -166,7 +179,7 @@ jobs:
 
       - name: Upload intent smoke logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: intent-smoke-logs
           path: active/shared/tmp/intent-smoke
@@ -174,6 +187,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: [lint-and-validate, intent-smoke]
     strategy:
       fail-fast: false
@@ -184,17 +198,27 @@ jobs:
             command: pnpm run test
           - test-suite: core
             command: pnpm test -- --suite core --coverage
+            pr-duplicate: true
           - test-suite: actuators
             command: pnpm test -- --suite actuators
+            pr-duplicate: true
           - test-suite: scripts
             command: pnpm test -- --suite scripts
           - test-suite: integration
             command: pnpm test -- --suite integration
     steps:
-      - uses: actions/checkout@v4
+      # core and actuators run in pr-validation.yml on pull requests; keep the
+      # job (and its check name) but skip the duplicate work there.
+      - name: Skip suite already covered by pr-validation
+        if: ${{ github.event_name == 'pull_request' && matrix.pr-duplicate }}
+        run: echo "::notice::${{ matrix.test-suite }} runs in pr-validation.yml on pull requests"
+
+      - uses: actions/checkout@v5
+        if: ${{ !(github.event_name == 'pull_request' && matrix.pr-duplicate) }}
 
       # Native PDF engine CJK embedding test needs a CJK font on Linux
       - name: Install CJK fonts
+        if: ${{ !(github.event_name == 'pull_request' && matrix.pr-duplicate) }}
         run: |
           export DEBIAN_FRONTEND=noninteractive
           for source in /etc/apt/sources.list.d/*azure* /etc/apt/sources.list.d/*microsoft*; do
@@ -239,14 +263,17 @@ jobs:
           done
 
       - name: Setup Kyberion
+        if: ${{ !(github.event_name == 'pull_request' && matrix.pr-duplicate) }}
         uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
 
       - name: Build project
+        if: ${{ !(github.event_name == 'pull_request' && matrix.pr-duplicate) }}
         run: pnpm run build
 
       - name: Run ${{ matrix.test-suite }} tests
+        if: ${{ !(github.event_name == 'pull_request' && matrix.pr-duplicate) }}
         continue-on-error: ${{ matrix.experimental == true }}
         env:
           KYBERION_PERSONA: ${{ matrix.test-suite == 'core' && 'worker' || '' }}
@@ -254,8 +281,8 @@ jobs:
         run: ${{ matrix.command }}
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        if: matrix.test-suite == 'core' && always()
+        uses: actions/upload-artifact@v6
+        if: ${{ (matrix.test-suite == 'core' && always()) && !(github.event_name == 'pull_request' && matrix.pr-duplicate) }}
         with:
           name: coverage-report
           path: coverage/
@@ -263,8 +290,9 @@ jobs:
 
   security:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Kyberion
         uses: ./.github/actions/setup-kyberion
