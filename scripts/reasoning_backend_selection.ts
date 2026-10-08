@@ -112,17 +112,26 @@ export function readPersistedEnvValue(
   return value || null;
 }
 
-/** Persist one non-secret operator preference in `.env.local`. */
+/**
+ * Persist one non-secret operator preference in `.env.local`.
+ *
+ * Only the one `KEY=` line changes. `.env.local` usually also holds secrets,
+ * so the write is atomic (safeWriteFile: temp + rename) and keeps the
+ * existing file mode; a new file is created owner-only (0600) rather than
+ * world-readable.
+ */
 export function persistEnvValue(
   key: string,
   value: string,
   envLocalPath: string = defaultEnvLocalPath()
 ): string {
   let content = '';
+  let mode = 0o600;
   if (safeExistsSync(envLocalPath)) {
     content = readReasoningSelectionTextFile(envLocalPath);
+    mode = safeLstat(envLocalPath).mode & 0o777;
   }
-  safeWriteFile(envLocalPath, upsertEnvVarLine(content, key, value));
+  safeWriteFile(envLocalPath, upsertEnvVarLine(content, key, value), { mode });
   return envLocalPath;
 }
 

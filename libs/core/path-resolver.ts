@@ -205,6 +205,9 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/background-review/nudge/',
   'shared/runtime/mesh-hub/',
   'shared/observability/mesh-hub/',
+  // Tier/tenant-partitioned resource-usage ledgers (metrics.ts
+  // RESOURCE_USAGE_LEDGER_ROOT); the shared `metrics` collector appends to them.
+  'shared/runtime/usage-ledger/',
   // Mission history FTS indexes (history-search-index.ts).
   'shared/runtime/history-search/',
   // swiftc output and module cache of the Apple FM bridge (macOS only; a test

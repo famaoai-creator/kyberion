@@ -223,6 +223,14 @@ class A2ABridgeImpl {
   private knownManifestIds: Set<string> | null = null;
   private runtimeContexts: Map<string, string> = new Map();
 
+  /** Test seam: forget every agent handle, response handler and runtime context. */
+  resetStateForTests(): void {
+    this.handles.clear();
+    this.responseHandlers.clear();
+    this.knownManifestIds = null;
+    this.runtimeContexts.clear();
+  }
+
   /**
    * Route an A2A envelope to the target agent and return a result envelope.
    */
@@ -1143,3 +1151,13 @@ if (!globalRegistry[GLOBAL_KEY]) {
 export const a2aBridge = globalRegistry[GLOBAL_KEY] as A2ABridgeImpl;
 
 registerA2ARoute((envelope) => a2aBridge.route(envelope));
+
+/**
+ * Test seam: return the process-wide bridge to its freshly constructed state —
+ * no agent handles, response handlers, runtime contexts or per-agent
+ * semaphores — so tests sharing one module instance cannot bleed into each other.
+ */
+export function _resetA2ABridgeForTests(): void {
+  a2aBridge.resetStateForTests();
+  agentSemaphores.clear();
+}

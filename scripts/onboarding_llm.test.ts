@@ -2,10 +2,12 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   pathResolver,
+  safeChmodSync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeRmSync,
+  safeStat,
   safeWriteFile,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/authority';
@@ -24,6 +26,16 @@ vi.mock('@agent/core/provider/provider-discovery', async (importOriginal) => ({
 vi.mock('@agent/core/ops-alert', () => ({ sendOpsAlert: vi.fn() }));
 
 import { auditChain } from '@agent/core/governance/audit-chain';
+import {
+  approvalEventLogicalPath,
+  approvalRequestLogicalPath,
+  decideApprovalRequest,
+  loadApprovalRequest,
+} from '@agent/core/governance/approval-store';
+import {
+  captureAttestationInvoker,
+  PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
+} from '@agent/core/organization/tenant-governance';
 import { checkProviderEgress } from '@agent/core/provider/provider-egress-gate';
 import { resolveReasoningRoute } from '@agent/core/reasoning/reasoning-route-resolver';
 import { main } from './onboarding_llm.js';
@@ -138,25 +150,34 @@ describe('pnpm onboarding llm', () => {
     });
   });
 
-  it('updates a conflicting persisted KYBERION_REASONING_BACKEND so the choice takes effect', () => {
+  it('rewrites only the KYBERION_REASONING_BACKEND line, keeps a 0600 mode, and says what changed', () => {
     const envLocal = path.join(ROOT, 'env.local');
-    safeWriteFile(envLocal, 'KYBERION_REASONING_BACKEND=codex-cli\nOTHER=1\n');
-    run(['select', '--backend', 'anthropic', '--apply']);
-    const content = String(safeReadFile(envLocal, { encoding: 'utf8' }));
-    expect(content).toContain('KYBERION_REASONING_BACKEND=anthropic');
-    expect(content).toContain('OTHER=1');
+    safeWriteFile(envLocal, 'SECRET_TOKEN=abc\nKYBERION_REASONING_BACKEND=codex-cli\nOTHER=1\n', {
+      mode: 0o600,
+    });
+    safeChmodSync(envLocal, 0o600);
+    const output = run(['select', '--backend', 'anthropic', '--apply']).join('\n');
+    expect(output).toContain(
+      `Updated ${envLocal}: KYBERION_REASONING_BACKEND codex-cli -> anthropic (other lines unchanged)`
+    );
+    expect(String(safeReadFile(envLocal, { encoding: 'utf8' }))).toBe(
+      'SECRET_TOKEN=abc\nKYBERION_REASONING_BACKEND=anthropic\nOTHER=1\n'
+    );
+    expect(safeStat(envLocal).mode & 0o777).toBe(0o600);
   });
 
-  it('records an attestation only with --apply --accept, audited, for that tenant only', () => {
-    writeTenant('acme');
-    writeTenant('other');
-    const egress = (tenant: string) =>
-      checkProviderEgress({
-        provider: 'claude',
-        dataTier: 'confidential',
-        tenant_slug: tenant,
-        tenant_registry_root_dir: path.join(ROOT, 'repo'),
-      }).allowed;
+  it('attributes the selection audit to the invoking identity, not the elevation', () => {
+    const invoker = captureAttestationInvoker().actor;
+    run(['select', '--backend', 'anthropic', '--apply']);
+    const entry = record.mock.calls.find(
+      ([call]) => (call as { action?: string }).action === 'onboarding.llm_select'
+    )?.[0] as { agentId: string };
+    expect(entry.agentId).toBe(invoker);
+    expect(entry.agentId).not.toMatch(/sovereign/);
+  });
+
+  describe('attest', () => {
+    const requestIds: string[] = [];
     const args = [
       'attest',
       '--tenant',
@@ -172,46 +193,167 @@ describe('pnpm onboarding llm', () => {
       '--attested-by',
       'human:owner',
     ];
+    const egress = (tenant: string) =>
+      checkProviderEgress({
+        provider: 'claude',
+        dataTier: 'confidential',
+        tenant_slug: tenant,
+        tenant_registry_root_dir: path.join(ROOT, 'repo'),
+      }).allowed;
 
-    // Default deny, and the dry-run shows the operator the consequence.
-    expect(egress('acme')).toBe(false);
-    const preview = run(args).join('\n');
-    expect(preview).toContain('[dry-run] would attest tenant=acme provider=claude');
-    expect(preview).toMatch(/confidential: local-only \(laya-mlx\)/);
-    expect(() => run([...args, '--apply'])).toThrow(/requires --accept/);
-    expect(egress('acme')).toBe(false);
-    expect(record).not.toHaveBeenCalled();
+    function humanApproves(id: string): void {
+      const pending = loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id)!;
+      decideApprovalRequest('mission_controller', {
+        channel: pending.channel,
+        storageChannel: pending.storageChannel,
+        requestId: id,
+        decision: 'approved',
+        decidedBy: 'human-owner',
+        decidedByRole: 'sovereign',
+        authMethod: 'manual',
+        decidedByType: 'human',
+        authenticated: true,
+        payloadHash: pending.accountability?.payloadHash,
+        effectBinding: pending.accountability?.effectBinding,
+      });
+    }
 
-    const applied = JSON.parse(run([...args, '--apply', '--accept', '--json'])[0]!);
-    expect(applied.attestation).toMatchObject({ training_use: 'none', plan: 'Claude Team' });
-    expect(record).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'tenant.attest_provider', tenantSlug: 'acme' })
-    );
-    const confidential = applied.availability.tiers.find(
-      (tier: { tier: string }) => tier.tier === 'confidential'
-    );
-    expect(confidential.usable).toContainEqual({ provider: 'claude', basis: 'tenant-attestation' });
-    expect(egress('acme')).toBe(true);
-    expect(egress('other')).toBe(false);
+    beforeEach(() => {
+      writeTenant('acme');
+      writeTenant('other');
+    });
+
+    afterEach(() => {
+      for (const id of requestIds.splice(0)) {
+        safeRmSync(approvalRequestLogicalPath(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id), {
+          force: true,
+        });
+      }
+      safeRmSync(approvalEventLogicalPath(PROVIDER_ATTESTATION_APPROVAL_CHANNEL), { force: true });
+    });
+
+    it('training_use none: request approval, a human approves, then apply — audited with the approver', () => {
+      // Default deny, and the dry-run shows the consequence and the approval step.
+      expect(egress('acme')).toBe(false);
+      const preview = run(args).join('\n');
+      expect(preview).toContain('[dry-run] would attest tenant=acme provider=claude');
+      expect(preview).toMatch(/confidential: local-only \(laya-mlx\)/);
+      expect(preview).toContain('--request-approval');
+      expect(() => run([...args, '--apply'])).toThrow(/requires --accept/);
+      // --apply --accept alone is not enough for none.
+      expect(() => run([...args, '--apply', '--accept'])).toThrow(/needs a human approval/);
+      expect(egress('acme')).toBe(false);
+
+      const request = JSON.parse(run([...args, '--request-approval', '--json'])[0]!);
+      requestIds.push(request.request_id);
+      expect(request.approve_command).toBe(
+        `pnpm kyberion approvals --approve ${request.request_id}`
+      );
+      expect(() =>
+        run([...args, '--apply', '--accept', '--approval-request-id', request.request_id])
+      ).toThrow(/is pending/);
+      expect(record).not.toHaveBeenCalled();
+
+      humanApproves(request.request_id);
+      const applied = JSON.parse(
+        run([
+          ...args,
+          '--apply',
+          '--accept',
+          '--approval-request-id',
+          request.request_id,
+          '--json',
+        ])[0]!
+      );
+      expect(applied.approval).toEqual({
+        request_id: request.request_id,
+        approved_by: 'human-owner',
+      });
+      expect(record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'tenant.attest_provider',
+          tenantSlug: 'acme',
+          metadata: expect.objectContaining({ approved_by: 'human-owner' }),
+        })
+      );
+      const confidential = applied.availability.tiers.find(
+        (tier: { tier: string }) => tier.tier === 'confidential'
+      );
+      expect(confidential.usable).toContainEqual({
+        provider: 'claude',
+        basis: 'tenant-attestation',
+      });
+      expect(egress('acme')).toBe(true);
+      expect(egress('other')).toBe(false);
+    });
+
+    it('a request approved for one plan does not apply to another', () => {
+      const request = JSON.parse(run([...args, '--request-approval', '--json'])[0]!);
+      requestIds.push(request.request_id);
+      humanApproves(request.request_id);
+      const otherPlan = args.map((value) => (value === 'Claude Team' ? 'Claude Free' : value));
+      expect(() =>
+        run([...otherPlan, '--apply', '--accept', '--approval-request-id', request.request_id])
+      ).toThrow(/different training_use\/plan/);
+      expect(egress('acme')).toBe(false);
+    });
+
+    it('records used/unknown with --apply --accept and no approval', () => {
+      const used = ['attest', '--tenant', 'acme', '--provider', 'codex', '--training-use', 'used'];
+      expect(() => run([...used, '--apply'])).toThrow(/requires --accept/);
+      const applied = JSON.parse(run([...used, '--apply', '--accept', '--json'])[0]!);
+      expect(applied.attestation.training_use).toBe('used');
+      expect(applied.approval).toBeUndefined();
+    });
+
+    it('refuses to attest for another tenant from a tenant-bound process', () => {
+      const used = ['attest', '--tenant', 'acme', '--provider', 'codex', '--training-use', 'used'];
+      expect(() =>
+        withExecutionContext(
+          'mission_controller',
+          () => run([...used, '--apply', '--accept']),
+          undefined,
+          'other'
+        )
+      ).toThrow(/cross-tenant attestation refused/);
+    });
+
+    it('rejects an unknown provider, a missing training_use statement and missing evidence', () => {
+      expect(() =>
+        run(['attest', '--tenant', 'acme', '--provider', 'nope', '--training-use', 'none'])
+      ).toThrow(/Unknown --provider 'nope'/);
+      expect(() => run(['attest', '--tenant', 'acme', '--provider', 'claude'])).toThrow(
+        /explicit --training-use/
+      );
+      expect(() =>
+        run(['attest', '--tenant', 'acme', '--provider', 'claude', '--training-use', 'none'])
+      ).toThrow(/requires --plan, --basis, --attested-by/);
+    });
   });
 
-  it('rejects an unknown provider and a missing training_use statement', () => {
-    writeTenant('acme');
-    expect(() =>
-      run(['attest', '--tenant', 'acme', '--provider', 'nope', '--training-use', 'none'])
-    ).toThrow(/Unknown --provider 'nope'/);
-    expect(() => run(['attest', '--tenant', 'acme', '--provider', 'claude'])).toThrow(
-      /explicit --training-use/
-    );
-    expect(() =>
-      run(['attest', '--tenant', 'acme', '--provider', 'claude', '--training-use', 'none'])
-    ).toThrow(/requires --plan, --basis, --attested-by/);
-  });
-
-  it('show reports per-tier availability for a tenant', () => {
+  it('show reports the effective tenant and why each tier denies providers', () => {
     writeTenant('acme');
     const output = run(['show', '--tenant', 'acme']).join('\n');
     expect(output).toContain('LLM availability by data tier (tenant acme)');
     expect(output).toContain('pnpm onboarding llm attest --tenant acme');
+    expect(output).toMatch(/✘ denied: .*claude.* — e\.g\. /);
+    expect(output).toContain('✔ laya-mlx (local-only)');
+
+    const ambient = withExecutionContext(
+      'mission_controller',
+      () => run(['show', '--json']),
+      undefined,
+      'acme'
+    );
+    const report = JSON.parse(ambient[0]!).availability;
+    expect(report).toMatchObject({ tenant_slug: 'acme', tenant_source: 'ambient' });
+    expect(() =>
+      withExecutionContext(
+        'mission_controller',
+        () => run(['show', '--tenant', 'other']),
+        undefined,
+        'acme'
+      )
+    ).toThrow(/conflicts with the active tenant scope 'acme'/);
   });
 });

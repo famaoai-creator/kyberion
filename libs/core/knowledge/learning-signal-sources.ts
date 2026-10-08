@@ -534,6 +534,7 @@ export const executionMetricSource: LearningSignalSource = {
         });
       }
     }
+    // Tenant-free clusters: the system partition only, never tenant usage.
     return [...observations, ...detectCostSpikes(metrics.loadResourceUsageHistory(), window)];
   },
 };

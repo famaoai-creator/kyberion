@@ -53,7 +53,9 @@ describe('generation cost settlement', () => {
     expect(first.status).toBe('settled');
     expect(first.actual_cost_usd).toBe(1.25);
     expect(second.settlement_id).toBe(first.settlement_id);
-    expect(collector.loadResourceUsageHistory()).toHaveLength(1);
+    // Tenant usage lands in the tenant partition, never the system ledger.
+    expect(collector.loadResourceUsageHistory()).toHaveLength(0);
+    expect(collector.loadResourceUsageHistory({ scope: tenantScope })).toHaveLength(1);
     expect(
       listGenerationCostSettlements({
         rootDir: testRoot,
@@ -178,5 +180,5 @@ describe('generation cost settlement', () => {
 });
 
 function collectorEntries() {
-  return new MetricsCollector({ metricsDir }).loadResourceUsageHistory();
+  return new MetricsCollector({ metricsDir }).loadResourceUsageHistory({ scope: tenantScope });
 }

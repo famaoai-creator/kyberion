@@ -915,6 +915,37 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
     };
   }
 
+  // Tenant-partitioned runtime state (e.g. the resource-usage ledger under
+  // active/shared/runtime/usage-ledger/<tier>/<tenant>/) carries no tier read
+  // gate, but a tenant-bound reader must still never cross tenants.
+  if (
+    pathStartsWith(relativePath, 'active/shared/runtime/') &&
+    /\/(?:personal|confidential)\//u.test(relativePath)
+  ) {
+    const loaded = loadPolicy();
+    if (loaded.status === 'loaded') {
+      const cfg = tenantScopeConfig(loaded.policy);
+      if (extractTenantFromProtectedPrefix(relativePath, cfg.protectedPrefixes)) {
+        const identity = resolvePolicyIdentityContext();
+        const denial = checkTenantScope(
+          loaded.policy,
+          relativePath,
+          identity.tenantSlug,
+          identity.brokeredTenants,
+          identity.brokerApproval,
+          identity.authorities,
+          { kind: 'read', role: identity.role }
+        );
+        return denial ?? { allowed: true };
+      }
+    } else if (
+      loaded.status === 'corrupt' &&
+      pathStartsWith(relativePath, 'active/shared/runtime/usage-ledger/')
+    ) {
+      return CORRUPT_POLICY_DENIAL;
+    }
+  }
+
   const organizationStatePath =
     pathStartsWith(relativePath, 'active/organizations/personal') ||
     pathStartsWith(relativePath, 'active/organizations/confidential') ||

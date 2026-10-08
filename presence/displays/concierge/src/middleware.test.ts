@@ -77,7 +77,14 @@ describe('concierge middleware', () => {
   });
 
   it('keeps /login, /signin and auth routes reachable', () => {
-    for (const p of ['/login', '/signin', '/auth/start', '/auth/callback', '/logout']) {
+    for (const p of [
+      '/login',
+      '/signin',
+      '/setup/first-run',
+      '/auth/start',
+      '/auth/callback',
+      '/logout',
+    ]) {
       expect(run(p, NAV).headers.get('location')).toBeNull();
     }
   });

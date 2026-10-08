@@ -294,28 +294,45 @@ pnpm onboarding llm select --backend claude-cli --model claude-opus-5-5 --apply
 - 環境変数 `KYBERION_REASONING_BACKEND` は選択より優先される。`.env.local` に別の値が保存されていると、
   それを読み込んだシェルでは選択が効かないため、`--apply` でその行も更新する。シェルで export している
   値は上書きできないので、警告に従って unset する。
-- 選択は監査台帳に `onboarding.llm_select` として記録される。
+- `.env.local` は `KYBERION_REASONING_BACKEND` の 1 行だけを書き換え（変更前後を表示する）、原子的に書き込み、
+  既存のファイル権限（例 0600）を保つ。新規作成時は 0600。
+- 選択は監査台帳に `onboarding.llm_select` として、実行者付きで記録される。
 
 provider への送信は既定で拒否される。shipped policy では claude / codex / gemini などの
 `training_use` が `unknown` のため、confidential・personal の material（mission distill など）は
 local-only provider 以外に送られない。契約しているプランが学習に使わないことを確認できたら、
-tenant ごとに明示的に attest する。
+tenant ごとに明示的に attest する。`training_use none` は confidential の送信を開くため、人間の
+承認（approval gate）を通してからでないと記録されない。
 
 ```bash
+# 1. 内容を確認する（dry-run）。同じ値をこの後の手順でも使う
 pnpm onboarding llm attest --tenant <tenant-slug> --provider claude --training-use none \
-  --plan "<契約プラン名>" --basis <規約の URL または契約の参照> --attested-by human:<owner>
-# 表示内容を確認してから、人間の受け入れとして --apply --accept を付けて記録する
-pnpm onboarding llm attest ... --valid-for-days 180 --apply --accept
+  --plan "<契約プラン名>" --basis <規約の URL または契約の参照> --attested-by human:<owner> \
+  --valid-for-days 180
+# 2. 承認依頼を作る。承認コマンドと記録コマンドが表示される
+pnpm onboarding llm attest ...（同じ値） --request-approval
+# 3. 人間が承認する（エージェントは代わりに承認しない）
+pnpm kyberion approvals --approve <request-id>
+# 4. 同じ値で、人間の受け入れとして記録する
+pnpm onboarding llm attest ...（同じ値） --apply --accept --approval-request-id <request-id>
 ```
 
 - `--provider` は `provider-egress-policy.json` に宣言された id だけを受け付ける。`--training-use none`
   には `--plan`・`--basis`・`--attested-by` が必須。`--apply` だけでは書き込まず、`--accept` が要る。
+- 承認依頼は tenant・provider・training_use・plan・basis・attested-by・有効日数に hash で結び付く。
+  承認済みで期限内（72 時間）の依頼で、値が完全に一致するときだけ記録される。未承認・却下・値の違う依頼は
+  拒否され、同じ承認は 1 回しか使えない。承認は認証済みの人間だけが行え、エージェントの決定は承認ストアが拒否する。
+- `--training-use used` / `unknown` は送信を開かないので、承認なしで `--apply --accept` だけで記録できる。
 - attestation は tenant profile（`knowledge/personal/tenants/<tenant-slug>.json` の
-  `provider_attestations`）に保存され、監査台帳に `tenant.attest_provider` として記録される。
-  `pnpm tenant attest-provider` と同じ経路で、有効期限（既定 180 日）が切れると再び拒否になる。
-- 許可されるのはその tenant だけ。他の tenant の confidential は引き続き拒否される。
-- 結果は出力の「LLM availability by data tier」と、Step 7 の `tenant:activation plan` の
-  `llm_availability` で確認できる。
+  `provider_attestations`）に保存され、監査台帳に `tenant.attest_provider` として、実行者と（承認済みなら）
+  承認者付きで記録される。`pnpm tenant attest-provider` も同じ経路・同じ条件（`--apply --accept`、
+  none は `--request-approval` → `--approval-request-id`）で動く。
+- `--valid-for-days` は policy の `attestation_ttl_days`（既定 180 日）を超えられない。期限が切れると再び拒否になる。
+- 許可されるのはその tenant だけ。他の tenant に束縛されたプロセスからは attest できない。
+- 結果は出力の「LLM availability by data tier」（tier ごとに使える provider と根拠、拒否された provider と理由）と、
+  Step 7 の `tenant:activation plan` の `llm_availability` で確認できる。
+- 対話型の `pnpm onboarding` でも、バックエンドを選んだ後にモデルを選び、tenant 登録の後に attest を
+  選べる（既定は「しない」）。none を選ぶと承認依頼を作り、承認コマンドを表示する。
 
 ### Step 6: customer stance と organization を結合する（C）
 

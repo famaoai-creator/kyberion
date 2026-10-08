@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
@@ -33,10 +33,18 @@ vi.mock('@agent/core/async-utils', async (importOriginal) => ({
   retry: mocks.retry,
 }));
 
+// Imported once per file: re-importing the secure-io / tier-guard / authority
+// stack per test with vi.resetModules() repeats its module initialisation
+// (operations-hygiene-runbook §5). The actuator keeps no per-test module state.
+let handleAction: typeof import('./index.js').handleAction;
+
 describe('email-actuator', () => {
+  beforeAll(async () => {
+    ({ handleAction } = await import('./index.js'));
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
     mocks.safeExistsSync.mockReturnValue(true);
     mocks.safeLstat.mockReturnValue({ isFile: () => true });
   });
@@ -44,7 +52,6 @@ describe('email-actuator', () => {
   it('creates a draft from direct parameters', async () => {
     mocks.createDraft.mockResolvedValue({ message: 'draft-created' });
 
-    const { handleAction } = await import('./index.js');
     const result = await handleAction({
       action: 'create_draft',
       params: {
@@ -66,7 +73,6 @@ describe('email-actuator', () => {
     mocks.safeReadFile.mockReturnValue('Hello from file');
     mocks.sendEmail.mockResolvedValue({ message: 'sent' });
 
-    const { handleAction } = await import('./index.js');
     const result = await handleAction({
       action: 'send_from_file',
       params: {
@@ -87,8 +93,6 @@ describe('email-actuator', () => {
   });
 
   it('rejects a body_file outside the repository', async () => {
-    const { handleAction } = await import('./index.js');
-
     await expect(
       handleAction({
         action: 'send_from_file',
@@ -103,7 +107,6 @@ describe('email-actuator', () => {
 
   it('rejects a body_file that is not a regular file', async () => {
     mocks.safeLstat.mockReturnValue({ isFile: () => false });
-    const { handleAction } = await import('./index.js');
 
     await expect(
       handleAction({
@@ -118,8 +121,6 @@ describe('email-actuator', () => {
   });
 
   it('rejects unknown operations', async () => {
-    const { handleAction } = await import('./index.js');
-
     await expect(
       handleAction({
         action: 'forward',

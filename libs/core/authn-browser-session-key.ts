@@ -1,4 +1,5 @@
 /** Shared browser-session key lookup, without authentication-provider registration. */
+import { withExecutionContext } from './authority.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { secretGuard } from './secret/secret-guard.js';
 import type { AuthnResolveDeps } from './authn-principal-resolver.js';
@@ -19,8 +20,14 @@ export function browserSessionKey(deps?: AuthnResolveDeps): Buffer | null {
   )?.trim();
   if (envKey) return strong(envKey);
   try {
-    const doc = secretGuard.loadConnectionDocument('kyberion-browser-session') as
-      { hmac_key?: string } | undefined;
+    // Connection documents live under the personal tier: surfaces call this
+    // from unauthenticated login routes, outside any execution context.
+    const doc = withExecutionContext(
+      'sovereign_concierge',
+      () =>
+        secretGuard.loadConnectionDocument('kyberion-browser-session') as
+          { hmac_key?: string } | undefined
+    );
     return strong(doc?.hmac_key?.trim());
   } catch {
     return null;

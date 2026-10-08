@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const secureIo = vi.hoisted(() => ({
   assertSafeRepositoryPath: (filePath: string) => {
@@ -74,7 +74,12 @@ vi.mock('./foundation/io.js', () => ({
 describe('deliverable inbox', () => {
   let tmpRoot: string;
 
-  beforeEach(() => {
+  // One fixture root and one module instance per file: path-resolver binds
+  // KYBERION_ROOT and deliverable-inbox its INBOX_PATH at import time, so the
+  // module is imported once, after the root is set, instead of
+  // vi.resetModules() + re-import per test (operations-hygiene-runbook §5).
+  // Per-test isolation is the wiped runtime tree in beforeEach.
+  beforeAll(async () => {
     tmpRoot = path.join(os.tmpdir(), `kyberion-inbox-${randomUUID()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
@@ -85,12 +90,20 @@ describe('deliverable inbox', () => {
       path.join(schemaDir, 'deliverable-inbox-entry.schema.json')
     );
     process.env.KYBERION_ROOT = tmpRoot;
+    await import('./deliverable-inbox.js');
   });
 
-  afterEach(async () => {
+  beforeEach(() => {
+    // Everything but the package.json marker and the copied schema.
+    for (const entry of fs.readdirSync(tmpRoot)) {
+      if (entry === 'package.json' || entry === 'knowledge') continue;
+      fs.rmSync(path.join(tmpRoot, entry), { recursive: true, force: true });
+    }
+  });
+
+  afterAll(() => {
     delete process.env.KYBERION_ROOT;
     fs.rmSync(tmpRoot, { recursive: true, force: true });
-    vi.resetModules();
   });
 
   it('rejects malformed inbox lock records', async () => {

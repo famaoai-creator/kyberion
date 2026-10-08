@@ -56,7 +56,9 @@
       "active/shared/cache/personal/",
       "active/shared/cache/confidential/",
       "active/shared/artifacts/personal/",
-      "active/shared/artifacts/confidential/"
+      "active/shared/artifacts/confidential/",
+      "active/shared/runtime/usage-ledger/personal/",
+      "active/shared/runtime/usage-ledger/confidential/"
     ],
     "shared_prefixes": [
       "knowledge/confidential/tenant-groups/",

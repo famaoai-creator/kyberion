@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Review & Distillation'
 tags: [governance, lifecycle, review]
-last_updated: 2026-09-30
+last_updated: 2026-10-08
 runtime_stages: [verification, delivery, retrospective]
 ---
 
@@ -15,7 +15,7 @@ Capitalize on experience and perform environmental cleansing.
 
 1. **Victory Condition Check**: Verify that all mission goals have been met with objective evidence.
 2. **Evidence first, promotion second**: preserve raw distillation under the mission's `evidence/distillation.md`. Queueing is not approval or publication. A steward classifies its knowledge domain, selects and shapes durable lessons from the evidence set, then approves and promotes only the curated candidate.
-3. **Task Closure**: Complete the final report and move the mission folder to the archive.
+3. **Task Closure**: Complete the final report and move the mission folder to the archive. The retrospective task's deliverable `evidence/retrospective.md` is written by the team and recorded with `record-evidence` before `finish`. `finish` runs the retrospective generator, which writes the deterministic stats and improvement proposals to `evidence/retrospective-stats.md` and `evidence/retrospective.json`; it never creates or overwrites `evidence/retrospective.md`.
 4. **Audit Reporting**: Include results from security scanners, test runners, and performance metrics in the final summary.
 5. **Unhandled Intent Reconcile**: Run `pnpm pipeline --input pipelines/reconcile-unhandled-intents.json` during review so newly surfaced unhandled intents are written to proposals and summarized before closure.
 

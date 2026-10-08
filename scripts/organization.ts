@@ -3,8 +3,9 @@ import { runOrganizationOperatingModel } from './organization_operating_model.js
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 
 /**
- * The organization facade owns the operating model, role authoring and
- * member identity links (`member link-identity`).
+ * The organization facade owns the operating model, role authoring,
+ * member identity links (`member link-identity`) and the first-run setup
+ * bootstrap (`first-run code`).
  * Role authoring remains implemented in its focused module, but callers no
  * longer need a second top-level `org` entrypoint to reach it.
  */
@@ -19,6 +20,11 @@ export async function main(
   if (args[0] === 'member') {
     const { runOrganizationMember } = await import('./organization_member.js');
     await runOrganizationMember(args.slice(1));
+    return;
+  }
+  if (args[0] === 'first-run') {
+    const { runOrganizationFirstRun } = await import('./organization_first_run.js');
+    await runOrganizationFirstRun(args.slice(1));
     return;
   }
   if (args[0] === 'identity') {

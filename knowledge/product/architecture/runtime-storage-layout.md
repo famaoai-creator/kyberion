@@ -3,7 +3,7 @@ title: Runtime Storage Layout
 category: Architecture
 tags: [storage, artifacts, workspace, tmp, cache, staging, tier, multi-tenant, retention]
 importance: 8
-last_updated: 2026-10-04
+last_updated: 2026-10-08
 runtime_stages: [alignment, execution, review]
 ---
 
@@ -149,6 +149,43 @@ lives under the tenant namespace. The older flat dot ledgers directly under
 category-only text for tenant dots. One `storage-retention-catalog.json` entry
 covers `active/shared/runtime/dot`. See
 [resident-dot-model](./resident-dot-model.md).
+
+### Resource-usage ledger
+
+Usage accounting (`MetricsCollector.recordResourceUsage`, `libs/core/metrics.ts`)
+is placed by the record's own `scope`; callers do not choose the file:
+
+| Record scope                                      | Place                                                                             |
+| ------------------------------------------------- | --------------------------------------------------------------------------------- |
+| none, or `public` without a tenant (system)       | `work/metrics/resource-usage.jsonl` (legacy repo-wide file)                       |
+| carries a `tenant_slug`, or personal/confidential | `active/shared/runtime/usage-ledger/<tier>/<tenant\|shared>/resource-usage.jsonl` |
+
+- `loadResourceUsageHistory()` reads the system partition only;
+  `{ scope }` reads one owner's partition (`includeSystem` adds the system
+  one — the mission retrospective uses its mission's tier/tenant),
+  `{ tenants }` reads every tier partition of those tenants (tenant cost
+  report) and `{ all: true }` is the operator aggregate (cost report, HUD).
+- `usage-ledger/{personal,confidential}/` are `tenant_scope.protected_prefixes`:
+  tier-guard denies a tenant-bound process another tenant's partition on read
+  and write, so the operator aggregate skips what the caller may not see.
+- Rows written to the system file before partitioning stay there as
+  **legacy**: each reader filters them by the row's own scope, so a tenant
+  reader still sees its own old rows and the system reader never sees tenant
+  rows; in every read mode a legacy tier row also inherits tier-guard's read
+  decision for its partition, so a tenant-bound process never sees another
+  tenant's old rows. There is no split command — the file is not rewritten,
+  so nothing can be lost or duplicated by a half-run migration. The one
+  exception is tenant offboarding (`scope-offboarding.ts`): it exports the
+  tenant's legacy rows, then removes them with one atomic, audited,
+  approval-gated rewrite, and soft-deletes the tenant's partitions.
+- A tenant-bound process that records a personal/confidential row without a
+  tenant gets its bound tenant stamped on (a bound process may not write
+  `<tier>/shared/`). A row that still cannot be written is logged at warn,
+  never dropped silently.
+- Persona tier gating is unchanged: like the old shared file, the partitions
+  carry no persona read gate of their own, so an unbound process of any
+  persona can read confidential usage rows. Only the tenant binding narrows
+  access.
 
 ## 3. Surface visibility
 
