@@ -39,6 +39,12 @@ import {
   type SettingsRole,
   type SettingsTenantView,
 } from '../../lib/settings-types';
+import {
+  useSettingsDraft,
+  useSettingsDraftSession,
+  isOnboardingSaveReceipt,
+  notificationSaveReceipt,
+} from '../../lib/use-settings-draft';
 import { useVoiceSelection } from '../../lib/use-voice-selection';
 import { useTrainingAssignments } from '../../lib/use-training-assignments';
 import { useRecordingConsent } from '../../lib/use-recording-consent';
@@ -133,20 +139,32 @@ export default function SettingsPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<Notice>(null);
   const [busy, setBusy] = React.useState(false);
-  const [profile, setProfile] = React.useState({
-    name: '',
-    primary_domain: '',
-    vision: '',
-    agent_id: 'sovereign-agent',
-  });
-  const [services, setServices] = React.useState<string[]>(DEFAULT_SERVICES);
+  const profileDraft = useSettingsDraft(
+    {
+      name: '',
+      primary_domain: '',
+      vision: '',
+      agent_id: 'sovereign-agent',
+    },
+    sameProfile
+  );
+  const {
+    draft: profile,
+    set: setProfile,
+    saved: savedProfile,
+    load: loadProfile,
+    acknowledge: ackProfile,
+  } = profileDraft;
+  const servicesDraft = useSettingsDraft<string[]>(DEFAULT_SERVICES, sameServices);
+  const {
+    draft: services,
+    set: setServices,
+    saved: savedServices,
+    load: loadServices,
+    acknowledge: ackServices,
+  } = servicesDraft;
   // UI-06 save bar: the last loaded (= saved) values, so grouped unsaved
   // changes across プロフィール / サービス連携 / 通知 can be saved or discarded.
-  const [savedProfile, setSavedProfile] = React.useState<ProfileDraft | null>(null);
-  const [savedServices, setSavedServices] = React.useState<string[] | null>(null);
-  const [savedNotif, setSavedNotif] = React.useState<{ surface: string; target: string } | null>(
-    null
-  );
   const [saveBarPhase, setSaveBarPhase] = React.useState<'idle' | 'saving' | 'saved' | 'error'>(
     'idle'
   );
@@ -163,7 +181,17 @@ export default function SettingsPage() {
   });
   const [notifChannels, setNotifChannels] = React.useState<NotificationChannelOption[]>([]);
   const [notifCurrent, setNotifCurrent] = React.useState<NotificationTarget | null>(null);
-  const [notif, setNotif] = React.useState({ surface: 'none', target: '' });
+  const notifDraft = useSettingsDraft(
+    { surface: 'none', target: '' },
+    (a, b) => a.surface === b.surface && a.target.trim() === b.target.trim()
+  );
+  const {
+    draft: notif,
+    set: setNotif,
+    saved: savedNotif,
+    load: loadNotif,
+    acknowledge: ackNotif,
+  } = notifDraft;
   const [plugins, setPlugins] = React.useState<PluginEntry[]>([]);
   const [pluginConfirm, setPluginConfirm] = React.useState<PluginConfirmState>(null);
   const [configPresets, setConfigPresets] = React.useState<ConfigPreset[]>([]);
@@ -215,11 +243,31 @@ export default function SettingsPage() {
   const voiceChunksRef = React.useRef<Blob[]>([]);
   const sectionRefs = React.useRef<Partial<Record<SettingsSectionId, HTMLElement | null>>>({});
 
+  const setupRef = React.useRef(setup);
+  setupRef.current = setup;
+  const textRef = React.useRef(t);
+  textRef.current = t;
+  const savePending = React.useRef(false);
+  const draftSession = useSettingsDraftSession(() => {
+    profileDraft.clear();
+    servicesDraft.clear();
+    notifDraft.clear();
+    setSetup(null);
+    setNotice(null);
+    setBusy(false);
+    setError(textRef.current('setup.draft_context_changed'));
+  });
+
   const refresh = React.useCallback(async () => {
+    const current = draftSession.startRead('setup');
     try {
+      if (!(await draftSession.check()) || !current()) return;
       const response = await fetch('/api/setup', { cache: 'no-store' });
+      if (!draftSession.inspect(response)) return;
       const next = parseSetupResponse(await response.json().catch(() => null));
+      if (!current()) return;
       if (!response.ok || !next) throw new Error('Invalid setup response');
+      if (!(await draftSession.check()) || !current()) return;
       setSetup(next);
       const loadedProfile = {
         name: next.profile.name,
@@ -227,8 +275,7 @@ export default function SettingsPage() {
         vision: next.profile.vision,
         agent_id: next.profile.agent_id || 'sovereign-agent',
       };
-      setProfile(loadedProfile);
-      setSavedProfile(loadedProfile);
+      loadProfile(loadedProfile);
       const tenantProfile = next.tenant.catalog.find(
         (tenant) => tenant.tenant_slug === next.tenant.active_slug
       );
@@ -255,19 +302,33 @@ export default function SettingsPage() {
       const loadedServices = next.service_catalog
         .filter((service) => service.configured || DEFAULT_SERVICES.includes(service.id))
         .map((service) => service.id);
-      setServices(loadedServices);
-      setSavedServices(loadedServices);
+      loadServices(loadedServices);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (!current()) return;
+      if (setupRef.current)
+        setNotice({ text: textRef.current('setup.draft_refresh_failed'), error: true });
+      else
+        setError(
+          err instanceof Error && err.message === 'settings_context_unavailable'
+            ? textRef.current('setup.draft_context_unavailable')
+            : err instanceof Error
+              ? err.message
+              : String(err)
+        );
     }
-  }, []);
+  }, [draftSession, loadProfile, loadServices]);
 
   const refreshNotifications = React.useCallback(async () => {
+    const current = draftSession.startRead('notifications');
     try {
+      if (!(await draftSession.check()) || !current()) return;
       const response = await fetch('/api/notification-preferences', { cache: 'no-store' });
+      if (!draftSession.inspect(response)) return;
       const parsed = parseNotificationPreferencesResponse(await response.json().catch(() => null));
+      if (!current()) return;
       if (!response.ok || !parsed) throw new Error('Invalid notification preferences response');
+      if (!(await draftSession.check()) || !current()) return;
       setNotifChannels(parsed.channels);
       setNotifCurrent(parsed.preferences.default_channel);
       const loadedNotif = parsed.preferences.default_channel
@@ -276,13 +337,12 @@ export default function SettingsPage() {
             target: parsed.preferences.default_channel.target,
           }
         : { surface: 'none', target: '' };
-      setNotif(loadedNotif);
-      setSavedNotif(loadedNotif);
+      loadNotif(loadedNotif);
     } catch {
-      // The notification pane keeps its last known state; the diagnostics
-      // checklist from /api/setup still reports the authoritative status.
+      if (current())
+        setNotice({ text: textRef.current('setup.draft_refresh_failed'), error: true });
     }
-  }, []);
+  }, [draftSession, loadNotif]);
 
   const refreshPlugins = React.useCallback(async () => {
     try {
@@ -553,25 +613,59 @@ export default function SettingsPage() {
     return () => observer.disconnect();
   }, [setup]);
 
-  const saveNotification = React.useCallback(async (): Promise<boolean> => {
-    setBusy(true);
-    try {
-      const response = await fetch('/api/notification-preferences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ surface: notif.surface, channel: notif.target.trim() }),
-      });
-      if (!response.ok) throw new Error('Notification save failed');
-      setNotice({ text: t('setup.notification_saved') });
-      await Promise.all([refreshNotifications(), refresh()]);
-      return true;
-    } catch (err) {
-      setNotice({ text: err instanceof Error ? err.message : String(err), error: true });
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }, [notif, refresh, refreshNotifications, t]);
+  const saveNotification = React.useCallback(
+    async (grouped = false): Promise<boolean> => {
+      if (savePending.current && !grouped) return false;
+      if (!grouped) savePending.current = true;
+      const epoch = draftSession.epoch();
+      const submitted = { ...notif };
+      setBusy(true);
+      let submittedRequest = false;
+      try {
+        if (!(await draftSession.check(epoch))) return false;
+        draftSession.advance('notifications');
+        submittedRequest = true;
+        const response = await fetch('/api/notification-preferences', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ surface: submitted.surface, channel: submitted.target.trim() }),
+        });
+        if (!draftSession.current(epoch) || !draftSession.inspect(response)) return false;
+        const receipt = notificationSaveReceipt(await response.json().catch(() => null));
+        if (!draftSession.current(epoch)) return false;
+        const saved = receipt === null ? { surface: 'none', target: '' } : receipt;
+        if (
+          !response.ok ||
+          !saved ||
+          saved.surface !== submitted.surface ||
+          (submitted.surface !== 'none' && saved.target !== submitted.target.trim())
+        )
+          throw new Error('Unconfirmed notification save');
+        if (!(await draftSession.check(epoch))) return false;
+        draftSession.advance('notifications');
+        ackNotif(submitted, saved);
+        setNotifCurrent(receipt ?? null);
+        setNotice({ text: t('setup.notification_saved') });
+        await Promise.all([refreshNotifications(), refresh()]);
+        return draftSession.current(epoch);
+      } catch {
+        if (draftSession.current(epoch))
+          setNotice({
+            text: t(
+              submittedRequest ? 'setup.draft_save_unconfirmed' : 'setup.draft_context_unavailable'
+            ),
+            error: true,
+          });
+        return false;
+      } finally {
+        if (!grouped) {
+          savePending.current = false;
+          setBusy(false);
+        }
+      }
+    },
+    [notif, draftSession, ackNotif, refresh, refreshNotifications, t]
+  );
 
   const connectOAuth = React.useCallback(
     async (serviceId: string, serviceLabel: string) => {
@@ -611,13 +705,27 @@ export default function SettingsPage() {
   );
 
   const applyOnboarding = React.useCallback(
-    async (includeVoice: boolean): Promise<boolean> => {
-      if (!setup) return false;
+    async (includeVoice: boolean, grouped = false): Promise<boolean> => {
+      if (!setup || (savePending.current && !grouped)) return false;
+      if (!grouped) savePending.current = true;
+      const epoch = draftSession.epoch();
+      const submitted = { ...profile };
+      const submittedServices = [...services];
+      const saved = {
+        name: submitted.name.trim() || 'user',
+        primary_domain: submitted.primary_domain.trim() || 'personal operations',
+        vision: submitted.vision.trim() || t('setup.default_vision'),
+        agent_id: submitted.agent_id.trim() || 'sovereign-agent',
+      };
       setBusy(true);
+      let submittedRequest = false;
       try {
+        if (!(await draftSession.check(epoch))) return false;
         const providerPriority = setup.providers?.priority?.length
           ? setup.providers.priority
           : ['codex-cli'];
+        draftSession.advance('setup');
+        submittedRequest = true;
         const response = await fetch('/api/setup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -626,12 +734,12 @@ export default function SettingsPage() {
             draft: {
               version: '1.0.0',
               identity: {
-                name: profile.name.trim() || 'user',
+                name: saved.name,
                 language: 'ja',
                 interaction_style: 'Concierge',
-                primary_domain: profile.primary_domain.trim() || 'personal operations',
-                vision: profile.vision.trim() || t('setup.default_vision'),
-                agent_id: profile.agent_id.trim() || 'sovereign-agent',
+                primary_domain: saved.primary_domain,
+                vision: saved.vision,
+                agent_id: saved.agent_id,
               },
               voice: {
                 enabled: includeVoice,
@@ -641,7 +749,7 @@ export default function SettingsPage() {
                 engine_id: 'mlx_audio_qwen3',
                 sample_refs: voiceSampleRefs.slice(0, 3),
               },
-              services: services.map((service_id) => ({
+              services: submittedServices.map((service_id) => ({
                 service_id,
                 auth_mode:
                   service_id === 'browser' || service_id === 'voice-hub' ? 'session' : 'oauth',
@@ -664,20 +772,48 @@ export default function SettingsPage() {
             },
           }),
         });
-        if (!response.ok) throw new Error('Onboarding failed');
+        if (!draftSession.current(epoch) || !draftSession.inspect(response)) return false;
+        const receipt = await response.json().catch(() => null);
+        if (!draftSession.current(epoch)) return false;
+        if (!response.ok || !isOnboardingSaveReceipt(receipt))
+          throw new Error('Unconfirmed onboarding save');
+        if (!(await draftSession.check(epoch))) return false;
+        draftSession.advance('setup');
+        ackProfile(submitted, saved);
+        ackServices(submittedServices);
         setNotice({
           text: includeVoice ? t('setup.voice_registered') : t('setup.onboarding_saved'),
         });
         await refresh();
-        return true;
-      } catch (err) {
-        setNotice({ text: err instanceof Error ? err.message : String(err), error: true });
+        return draftSession.current(epoch);
+      } catch {
+        if (draftSession.current(epoch))
+          setNotice({
+            text: t(
+              submittedRequest ? 'setup.draft_save_unconfirmed' : 'setup.draft_context_unavailable'
+            ),
+            error: true,
+          });
         return false;
       } finally {
-        setBusy(false);
+        if (!grouped) {
+          savePending.current = false;
+          setBusy(false);
+        }
       }
     },
-    [profile, refresh, services, setup, t, voice, voiceSampleRefs]
+    [
+      profile,
+      refresh,
+      services,
+      setup,
+      t,
+      voice,
+      voiceSampleRefs,
+      draftSession,
+      ackProfile,
+      ackServices,
+    ]
   );
 
   const saveManagement = React.useCallback(async () => {
@@ -831,11 +967,12 @@ export default function SettingsPage() {
   const profileDirty = savedProfile !== null && !sameProfile(profile, savedProfile);
   const servicesDirty = savedServices !== null && !sameServices(services, savedServices);
   const notifDirty =
-    savedNotif !== null &&
-    (notif.surface !== savedNotif.surface || notif.target.trim() !== savedNotif.target);
+    savedNotif === null
+      ? notifDraft.edited
+      : notif.surface !== savedNotif.surface || notif.target.trim() !== savedNotif.target;
   const anyDirty = profileDirty || servicesDirty || notifDirty;
   const saveBarState: SaveBarState =
-    saveBarPhase === 'saving'
+    savePending.current || saveBarPhase === 'saving'
       ? 'saving'
       : saveBarPhase === 'error' && anyDirty
         ? 'error'
@@ -849,18 +986,33 @@ export default function SettingsPage() {
   // share the onboarding draft (`apply_onboarding`), 通知 its own route —
   // exactly the calls their per-section buttons make.
   const saveAll = async () => {
-    setSaveBarPhase('saving');
-    let ok = true;
-    if (profileDirty || servicesDirty) ok = (await applyOnboarding(false)) && ok;
-    if (notifDirty && !(notif.surface !== 'none' && !notif.target.trim())) {
-      ok = (await saveNotification()) && ok;
+    if (savePending.current) return;
+    if (notifDirty && notif.surface !== 'none' && !notif.target.trim()) {
+      setNotice({ text: t('api.notification_target'), error: true });
+      setSaveBarPhase('error');
+      return;
     }
-    setSaveBarPhase(ok ? 'saved' : 'error');
+    savePending.current = true;
+    const epoch = draftSession.epoch();
+    setSaveBarPhase('saving');
+    setBusy(true);
+    try {
+      let ok = true;
+      if (profileDirty || servicesDirty) ok = (await applyOnboarding(false, true)) && ok;
+      if (notifDirty && draftSession.current(epoch)) ok = (await saveNotification(true)) && ok;
+      if (!draftSession.current(epoch)) return;
+      setSaveBarPhase(ok ? 'saved' : 'error');
+      if (!ok) setNotice({ text: t('setup.draft_batch_incomplete'), error: true });
+    } finally {
+      savePending.current = false;
+      setBusy(false);
+    }
   };
   const discardAll = () => {
-    if (savedProfile) setProfile(savedProfile);
-    if (savedServices) setServices(savedServices);
-    if (savedNotif) setNotif(savedNotif);
+    if (savePending.current) return;
+    profileDraft.discard();
+    servicesDraft.discard();
+    notifDraft.discard();
     setSaveBarPhase('idle');
   };
 
@@ -1140,6 +1292,13 @@ export default function SettingsPage() {
           <SaveBar
             id="settings-save"
             state={saveBarState}
+            message={
+              saveBarState === 'error'
+                ? notice?.error
+                  ? notice.text
+                  : t('setup.draft_batch_incomplete')
+                : undefined
+            }
             save_action={{ id: 'settings.save' }}
             discard_action={{ id: 'settings.discard' }}
           />

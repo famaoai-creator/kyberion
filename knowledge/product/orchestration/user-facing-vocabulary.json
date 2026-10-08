@@ -14080,6 +14080,31 @@
         "en": "Requested destination: {value}",
         "ja": "指定した登録先: {value}",
         "qps-ploc": "⟦Řėɋůėşŧėḓ ḓėşŧïñȧŧïőñ: {value} ŀőřėɱ ïṗşů⟧"
+      },
+      "setup.draft_context_changed": {
+        "en": "Your account or settings scope changed, or access expired. Unsaved settings were cleared. Reload this page and sign in again if needed before editing.",
+        "ja": "アカウントや設定の対象が変わったか、アクセスが切れました。未保存の設定を消去しました。ページを再読み込みし、必要なら再ログインしてから編集してください。",
+        "qps-ploc": "⟦Ẏőůř ȧƈƈőůñŧ őř şėŧŧïñɠş şƈőṗė ƈħȧñɠėḓ, őř ȧƈƈėşş ėẋṗïřėḓ. Ůñşȧṽėḓ şėŧŧïñɠş ẇėřė ƈŀėȧřėḓ. Řėŀőȧḓ ŧħïş ṗȧɠė ȧñḓ şïɠñ ïñ ȧɠȧïñ ïƒ ñėėḓėḓ ƀėƒőřė ėḓïŧïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀő⟧"
+      },
+      "setup.draft_refresh_failed": {
+        "en": "The latest settings could not be loaded. Your edits are still here. Reload when you are ready to discard unsaved edits.",
+        "ja": "最新の設定を取得できませんでした。編集中の内容は残っています。未保存の編集を破棄してよいときに再読み込みしてください。",
+        "qps-ploc": "⟦Ŧħė ŀȧŧėşŧ şėŧŧïñɠş ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. Ẏőůř ėḓïŧş ȧřė şŧïŀŀ ħėřė. Řėŀőȧḓ ẇħėñ ẏőů ȧřė řėȧḓẏ ŧő ḓïşƈȧřḓ ůñşȧṽėḓ ėḓïŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "setup.draft_save_unconfirmed": {
+        "en": "The save result could not be confirmed. Your edits are still here. Check the saved settings before saving again.",
+        "ja": "保存結果を確認できませんでした。編集中の内容は残っています。再度保存する前に、保存済みの設定を確認してください。",
+        "qps-ploc": "⟦Ŧħė şȧṽė řėşůŀŧ ƈőůŀḓ ñőŧ ƀė ƈőñƒïřɱėḓ. Ẏőůř ėḓïŧş ȧřė şŧïŀŀ ħėřė. Ƈħėƈķ ŧħė şȧṽėḓ şėŧŧïñɠş ƀėƒőřė şȧṽïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "setup.draft_batch_incomplete": {
+        "en": "Not all settings could be confirmed as saved. Confirmed changes were kept; remaining edits are still here. Check before saving again.",
+        "ja": "すべての設定の保存を確認できませんでした。確認済みの変更は保持し、残りの編集も残しています。再度保存する前に確認してください。",
+        "qps-ploc": "⟦Ñőŧ ȧŀŀ şėŧŧïñɠş ƈőůŀḓ ƀė ƈőñƒïřɱėḓ ȧş şȧṽėḓ. Ƈőñƒïřɱėḓ ƈħȧñɠėş ẇėřė ķėṗŧ; řėɱȧïñïñɠ ėḓïŧş ȧřė şŧïŀŀ ħėřė. Ƈħėƈķ ƀėƒőřė şȧṽïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈ⟧"
+      },
+      "setup.draft_context_unavailable": {
+        "en": "Your account and settings scope could not be verified. No save was sent. Your edits are still here; check your connection before trying again.",
+        "ja": "アカウントと設定の対象を確認できなかったため、保存を送信していません。編集中の内容は残っています。接続状況を確認してから再度お試しください。",
+        "qps-ploc": "⟦Ẏőůř ȧƈƈőůñŧ ȧñḓ şėŧŧïñɠş şƈőṗė ƈőůŀḓ ñőŧ ƀė ṽėřïƒïėḓ. Ñő şȧṽė ẇȧş şėñŧ. Ẏőůř ėḓïŧş ȧřė şŧïŀŀ ħėřė; ƈħėƈķ ẏőůř ƈőññėƈŧïőñ ƀėƒőřė ŧřẏïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
       }
     },
     "onboarding": {
