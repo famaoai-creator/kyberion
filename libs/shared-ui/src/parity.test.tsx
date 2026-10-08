@@ -341,6 +341,28 @@ for (const locale of LOCALES) {
 // every nav-rail context / brand variant and the list progress edge values.
 const EXTRA_SCENARIOS: FixtureScenario[] = [
   {
+    id: 'nav-rail-consecutive-groups',
+    title: 'labelled groups, mixed flat items and footer',
+    components: [
+      {
+        id: 'grouped-rail',
+        type: 'ui:nav-rail',
+        props: {
+          items: [
+            { id: 'a', label: 'A', href: '/a', group_label: ' Work ' },
+            { id: 'b', label: 'B', href: '/b', group_label: 'Work', active: true },
+            { id: 'c', label: 'C', action: 'c', group_label: 'Manage' },
+            { id: 'd', label: 'D', href: '/d' },
+            { id: 'e', label: 'E', href: '/e', group_label: 'Work' },
+            { id: 'f', label: 'F', href: '/f', group_label: '  ' },
+            { id: 'g', label: 'G', href: '/g', group_label: '<Unsafe & label>' },
+          ],
+          footer_items: [{ id: 'help', label: 'Help', href: '/help', group_label: 'Support' }],
+        },
+      },
+    ],
+  },
+  {
     id: 'nav-rail-context-link-logo',
     title: 'context link + logo',
     components: [

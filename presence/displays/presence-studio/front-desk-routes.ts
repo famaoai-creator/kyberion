@@ -23,6 +23,7 @@ import {
 } from '@agent/core/organization/member-registry';
 import {
   FRONT_DESK_HELP_LINK,
+  readAvailableFrontDeskSurfaces,
   frontDeskRoleFromViewer,
   readFrontDeskSurfacePorts,
   readFrontDeskSurfaceUrls,
@@ -257,8 +258,8 @@ export function registerFrontDeskRoutes(app: express.Express): void {
 
   // FD-00 / FD-01: the shared front-desk rail reads its menu + labels from
   // here so presence-studio and concierge never drift (libs/core/front-desk-nav.ts
-  // is the single source of the 5-item menu).
-  app.get('/api/front-desk/nav', (req, res) => {
+  // is the shared existing-feature catalog).
+  app.get('/api/front-desk/nav', async (req, res) => {
     try {
       const resolved = resolvePresenceStudioViewerContext(req);
       const requestedTenant = readSurfaceStringParam(req.query.tenant) || undefined;
@@ -271,11 +272,15 @@ export function registerFrontDeskRoutes(app: express.Express): void {
       const role = resolvePresenceStudioNavRole(viewer);
       const items = resolveFrontDeskMenu({
         currentSurface: 'presence-studio',
+        availableSurfaces: await readAvailableFrontDeskSurfaces(),
         ports: readFrontDeskSurfacePorts(),
         urls: readFrontDeskSurfaceUrls(),
         role,
       }).map((item) => ({
         id: item.id,
+        group_label: catalogT(item.group_key as VocabularyKey, undefined, locale),
+        icon: item.icon,
+        scope_query_style: item.scope_query_style,
         label: catalogT(item.label_key as VocabularyKey, undefined, locale),
         sublabel: catalogT(item.sublabel_key as VocabularyKey, undefined, locale),
         href: item.href,

@@ -23,13 +23,6 @@ import { renderA2UI } from '/shared-ui/kyberion-ui.js';
 const TENANT_STORAGE_KEY = 'front-desk.tenant';
 
 /** Rail item id -> kyberion-base icon name (`KB_ICON_PATHS`). */
-const NAV_ICONS = {
-  home: 'home',
-  ask: 'chat',
-  decide: 'approval',
-  progress: 'chart',
-  settings: 'settings',
-};
 
 const prefs = window.KyberionPrefs || {
   locale: () => 'en',
@@ -148,25 +141,30 @@ function tenantContext(nav, me) {
  * same markup / CSS) as the concierge React rail.
  */
 function railComponents(nav, me, current) {
-  const helpActive = window.location.pathname.indexOf('/help') === 0;
+  const pathname = window.location.pathname;
+  const actualCurrent =
+    pathname === '/work'
+      ? 'workspace'
+      : pathname === '/first-job'
+        ? 'first-job'
+        : pathname === '/help' || pathname.startsWith('/help/')
+          ? 'help'
+          : current;
   const items = (nav.items || [])
-    .filter((item) => item.allowed !== false)
+    .filter((item) => item.allowed === true)
     .map((item) => ({
       id: item.id,
       label: item.label,
       hint: item.sublabel,
-      href: prefs.scopedUrl ? prefs.scopedUrl(item.href) : item.href,
-      icon: NAV_ICONS[item.id],
-      active: Boolean(current) && item.id === current,
+      href: prefs.scopedUrl ? prefs.scopedUrl(item.href, item.scope_query_style) : item.href,
+      icon: item.icon,
+      group_label: item.group_label,
+      active: Boolean(actualCurrent) && item.id === actualCurrent,
     }));
-  const footer = nav.help
-    ? [{ id: 'help', label: nav.help.label, href: nav.help.href, icon: 'help', active: helpActive }]
-    : [];
   const props = {
     label: nav.aria_label,
     brand: { name: 'Kyberion', subtitle: nav.brand_tagline || undefined },
     items,
-    footer_items: footer,
   };
   const context = tenantContext(nav, me);
   if (context) props.context = context;
@@ -174,12 +172,15 @@ function railComponents(nav, me, current) {
 }
 
 function drawRail(el, nav, me, current) {
+  let tenantGeneration = 0;
   return render(el, railComponents(nav, me, current), {
     onAction(action) {
       if (!action || action.id !== TENANT_SWITCH_ACTION) return;
       const slug = action.payload && action.payload.value;
       if (typeof slug !== 'string' || !slug) return;
+      const generation = ++tenantGeneration;
       loadMe(slug).then((next) => {
+        if (generation !== tenantGeneration) return;
         if (!next || !next.viewing || next.viewing.tenant_slug !== slug) return;
         storeTenant(slug);
         if (prefs.setTenant) prefs.setTenant(slug);
@@ -230,11 +231,14 @@ function mountDisplayControls() {
  * placeholder stays until the menu has loaded; a fetch failure never blocks
  * the rest of the page.
  */
+let mountGeneration = 0;
 function mount(el, options) {
+  const generation = ++mountGeneration;
   mountDisplayControls().catch(() => null);
   if (!el) return Promise.resolve(null);
   const current = (options && options.current) || null;
   const ready = loadMe(readStoredTenant()).then((me) => {
+    if (generation !== mountGeneration) return [null, null];
     const tenant = me && me.viewing ? me.viewing.tenant_slug : readStoredTenant();
     if (prefs.setTenant) prefs.setTenant(tenant);
     navPromise = null;
@@ -243,6 +247,7 @@ function mount(el, options) {
   window.FrontDeskRail.ready = ready;
   return ready
     .then(([nav, me]) => {
+      if (generation !== mountGeneration) return null;
       if (!nav) return null;
       return drawRail(el, nav, me, current).then(() => nav);
     })
