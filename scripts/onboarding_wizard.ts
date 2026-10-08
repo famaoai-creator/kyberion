@@ -58,6 +58,7 @@ import {
   formatReasoningSummary,
   markReasoningStubAcknowledged,
 } from './onboarding_reasoning.js';
+import { promptProviderAttestation, promptReasoningModel } from './onboarding_llm_prompts.js';
 import {
   generateOnboardingRunbookSkill,
   onboardingRunbookSkillPath,
@@ -655,6 +656,20 @@ async function runReasoningPhase(state: OnboardingState, print: Print): Promise<
             `KYBERION_REASONING_BACKEND=${selection} を ${envLocal} に永続化しました`
           )
         );
+        // The model for that backend, validated against the model registry
+        // and recorded in the operator LLM selection (same path as
+        // `pnpm onboarding llm select`).
+        try {
+          await promptReasoningModel(selection, { ask, print, t });
+        } catch (error) {
+          print(
+            t(
+              `Model selection skipped: ${error instanceof Error ? error.message : String(error)}`,
+              // i18n-exempt: bilingual prompt pair (JA side intentional)
+              `モデル選択をスキップしました: ${error instanceof Error ? error.message : String(error)}`
+            )
+          );
+        }
       }
     }
   }
@@ -964,6 +979,26 @@ async function runTenantsPhase(state: OnboardingState, print: Print): Promise<vo
       },
       `onboarding-tenant-${tenantSlug}`
     );
+  }
+
+  // Opt-in (default no): let a provider receive a tenant's confidential
+  // material. `none` only opens a human approval request; the wizard never
+  // approves it.
+  if (interactive && !expressMode) {
+    try {
+      await promptProviderAttestation(
+        entries.map((entry) => entry.tenant_slug),
+        { ask, print, t }
+      );
+    } catch (error) {
+      print(
+        t(
+          `Provider attestation skipped: ${error instanceof Error ? error.message : String(error)}`,
+          // i18n-exempt: bilingual prompt pair (JA side intentional)
+          `provider の宣言をスキップしました: ${error instanceof Error ? error.message : String(error)}`
+        )
+      );
+    }
   }
 
   state.tenants = { entries };

@@ -6,7 +6,18 @@ vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
 import { withExecutionContext } from '../authority.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { checkProviderEgress } from '../provider/provider-egress-gate.js';
-import { attestTenantProvider, mutateTenant } from './tenant-governance.js';
+import {
+  attestTenantProvider,
+  mutateTenant,
+  PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
+  requestTenantProviderAttestationApproval,
+} from './tenant-governance.js';
+import {
+  approvalEventLogicalPath,
+  approvalRequestLogicalPath,
+  decideApprovalRequest,
+  loadApprovalRequest,
+} from '../governance/approval-store.js';
 import { readTenantProfile, recordTenantProviderAttestation } from './tenant-registry.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
@@ -96,64 +107,13 @@ describe('tenant lifecycle preserves provider policy state', () => {
     ).toThrow('requires plan, basis, attested_by');
   });
 
-  it('records an audited attestation that opens confidential egress for that tenant only', () => {
-    const record = vi.spyOn(auditChain, 'record').mockImplementation(() => ({}) as never);
-    try {
-      withExecutionContext('sovereign_concierge', () =>
-        mutateTenant({ verb: 'create', slug: 'beta', rootDir, apply: true })
-      );
-      const egress = (slug: string) =>
-        checkProviderEgress({
-          provider: 'codex',
-          dataTier: 'confidential',
-          tenant_slug: slug,
-          tenant_registry_root_dir: rootDir,
-        }).allowed;
-      // Default stays deny: no attestation, no confidential egress.
-      expect(egress('beta')).toBe(false);
-
-      const result = withExecutionContext('sovereign_concierge', () =>
-        attestTenantProvider({
-          slug: 'beta',
-          provider: 'codex',
-          training_use: 'none',
-          plan: 'ChatGPT Enterprise',
-          basis: 'https://openai.com/enterprise-privacy',
-          attested_by: 'human:owner',
-          rootDir,
-        })
-      );
-      expect(result.attestation).toMatchObject({
-        training_use: 'none',
-        plan: 'ChatGPT Enterprise',
-        attested_by: 'human:owner',
-      });
-      expect(result.profile_path).toContain(path.join('knowledge', 'personal', 'tenants'));
-      expect(record).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'tenant.attest_provider',
-          tenantSlug: 'beta',
-          metadata: expect.objectContaining({ provider: 'codex', training_use: 'none' }),
-        })
-      );
-      expect(egress('beta')).toBe(true);
-      // The attestation belongs to beta: acme still cannot send to codex.
-      expect(egress('acme')).toBe(false);
-    } finally {
-      record.mockRestore();
-    }
-  });
-
   it('rejects an attestation for a provider the egress policy does not declare', () => {
     expect(() =>
       withExecutionContext('sovereign_concierge', () =>
         attestTenantProvider({
           slug: 'acme',
           provider: 'not-a-provider',
-          training_use: 'none',
-          plan: 'x',
-          basis: 'y',
-          attested_by: 'z',
+          training_use: 'unknown',
           rootDir,
         })
       )
@@ -162,5 +122,191 @@ describe('tenant lifecycle preserves provider policy state', () => {
       withExecutionContext('sovereign_concierge', () => readTenantProfile('acme', { rootDir }))
         ?.provider_attestations?.['not-a-provider']
     ).toBeUndefined();
+  });
+});
+
+describe('training_use none attestations go through the human approval gate', () => {
+  const parent = pathResolver.sharedTmp('tenant-governance-approval-tests');
+  let rootDir = '';
+  let record: ReturnType<typeof vi.spyOn>;
+  const requestIds: string[] = [];
+
+  const claim = {
+    slug: 'beta',
+    provider: 'codex',
+    training_use: 'none' as const,
+    plan: 'ChatGPT Enterprise',
+    basis: 'https://openai.com/enterprise-privacy',
+    attested_by: 'human:owner',
+  };
+
+  function egress(slug: string): boolean {
+    return checkProviderEgress({
+      provider: 'codex',
+      dataTier: 'confidential',
+      tenant_slug: slug,
+      tenant_registry_root_dir: rootDir,
+    }).allowed;
+  }
+
+  function requestApproval(overrides: Partial<typeof claim> = {}): string {
+    const request = withExecutionContext('sovereign_concierge', () =>
+      requestTenantProviderAttestationApproval({
+        ...claim,
+        ...overrides,
+        rootDir,
+        invoker: { actor: 'agent-requester' },
+      })
+    );
+    requestIds.push(request.request_id);
+    expect(request.approve_command).toBe(`pnpm kyberion approvals --approve ${request.request_id}`);
+    return request.request_id;
+  }
+
+  function decide(
+    requestId: string,
+    decision: 'approved' | 'rejected',
+    decider: { type: 'human' | 'ai_agent'; authenticated: boolean } = {
+      type: 'human',
+      authenticated: true,
+    }
+  ): void {
+    const pending = loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, requestId)!;
+    decideApprovalRequest('mission_controller', {
+      channel: pending.channel,
+      storageChannel: pending.storageChannel,
+      requestId,
+      decision,
+      decidedBy: 'human-owner',
+      decidedByRole: 'sovereign',
+      authMethod: 'manual',
+      decidedByType: decider.type,
+      authenticated: decider.authenticated,
+      payloadHash: pending.accountability?.payloadHash,
+      effectBinding: pending.accountability?.effectBinding,
+    });
+  }
+
+  function apply(approvalRequestId?: string, overrides: Partial<typeof claim> = {}) {
+    return withExecutionContext('sovereign_concierge', () =>
+      attestTenantProvider({
+        ...claim,
+        ...overrides,
+        rootDir,
+        invoker: { actor: 'operator-cli' },
+        ...(approvalRequestId ? { approvalRequestId } : {}),
+      })
+    );
+  }
+
+  beforeEach(() => {
+    rootDir = path.join(parent, `fixture-${process.pid}-${Date.now()}-${Math.random()}`);
+    safeMkdir(path.join(rootDir, 'knowledge', 'personal', 'tenants'), { recursive: true });
+    record = vi.spyOn(auditChain, 'record').mockImplementation(() => ({}) as never);
+    withExecutionContext('sovereign_concierge', () => {
+      mutateTenant({ verb: 'create', slug: 'beta', rootDir, apply: true });
+      mutateTenant({ verb: 'create', slug: 'gamma', rootDir, apply: true });
+    });
+    record.mockClear();
+  });
+
+  afterEach(() => {
+    record.mockRestore();
+    for (const id of requestIds.splice(0)) {
+      safeRmSync(approvalRequestLogicalPath(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id), {
+        force: true,
+      });
+    }
+    safeRmSync(approvalEventLogicalPath(PROVIDER_ATTESTATION_APPROVAL_CHANNEL), { force: true });
+    safeRmSync(rootDir, { recursive: true, force: true });
+  });
+
+  it('refuses to write without an approval request', () => {
+    expect(() => apply()).toThrow(/needs a human approval/);
+    expect(egress('beta')).toBe(false);
+    expect(record).not.toHaveBeenCalled();
+  });
+
+  it('refuses a pending, a rejected and a mismatched request', () => {
+    const pending = requestApproval();
+    expect(() => apply(pending)).toThrow(/is pending/);
+
+    const mismatched = requestApproval({ plan: 'Free tier' });
+    decide(mismatched, 'approved');
+    expect(() => apply(mismatched)).toThrow(/different training_use\/plan/);
+
+    // The pending request above is reused for the same claim; reject it.
+    decide(pending, 'rejected');
+    expect(() => apply(pending)).toThrow(/is rejected/);
+    expect(egress('beta')).toBe(false);
+    expect(record).not.toHaveBeenCalled();
+  });
+
+  it('writes and audits with the approver once a human approves the exact claim — once', () => {
+    const id = requestApproval();
+    decide(id, 'approved');
+    const result = apply(id);
+    expect(result.approval).toEqual({ request_id: id, approved_by: 'human-owner' });
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentId: 'operator-cli',
+        action: 'tenant.attest_provider',
+        tenantSlug: 'beta',
+        metadata: expect.objectContaining({
+          provider: 'codex',
+          training_use: 'none',
+          approved_by: 'human-owner',
+          approval_request_id: id,
+        }),
+      })
+    );
+    expect(egress('beta')).toBe(true);
+    expect(egress('gamma')).toBe(false);
+    // At most once: the approval cannot be replayed to refresh the claim.
+    expect(() => apply(id)).toThrow(/already used/);
+  });
+
+  it('cannot be approved by an agent or an unauthenticated decider', () => {
+    const id = requestApproval();
+    expect(() => decide(id, 'approved', { type: 'ai_agent', authenticated: true })).toThrow(
+      /requires a human decider/
+    );
+    expect(() => decide(id, 'approved', { type: 'human', authenticated: false })).toThrow(
+      /authenticated human/
+    );
+    expect(() => apply(id)).toThrow(/is pending/);
+  });
+
+  it('records used/unknown without approval (they never open egress)', () => {
+    const result = apply(undefined, { training_use: 'used' } as never);
+    expect(result.attestation.training_use).toBe('used');
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: 'operator-cli', action: 'tenant.attest_provider' })
+    );
+    expect(egress('beta')).toBe(false);
+  });
+
+  it('refuses a cross-tenant request and a validity beyond the policy TTL', () => {
+    expect(() =>
+      withExecutionContext(
+        'sovereign_concierge',
+        () => requestTenantProviderAttestationApproval({ ...claim, slug: 'beta', rootDir }),
+        undefined,
+        'gamma'
+      )
+    ).toThrow(/cross-tenant attestation refused/);
+    expect(() =>
+      withExecutionContext('sovereign_concierge', () =>
+        attestTenantProvider({
+          ...claim,
+          training_use: 'unknown',
+          rootDir,
+          invoker: { actor: 'x', tenantSlug: 'gamma' },
+        })
+      )
+    ).toThrow(/cross-tenant attestation refused/);
+    expect(() => requestApproval({ valid_for_days: 365 } as never)).toThrow(
+      /exceeds the policy attestation_ttl_days \(180\)/
+    );
   });
 });

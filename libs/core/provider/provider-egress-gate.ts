@@ -204,7 +204,7 @@ function denyAndAlert(
       recommendation:
         'If this provider should receive this tier, add it to provider-egress-policy.json' +
         ' (tier_policy.<tier>.approved_providers), record a tenant provider attestation with ' +
-        "'pnpm onboarding llm attest' (or 'pnpm tenant attest-provider'), or mark it 'local-only' if it truly never leaves this machine.",
+        "'pnpm onboarding llm attest --request-approval' (training_use none needs a human approval; or 'pnpm tenant attest-provider'), or mark it 'local-only' if it truly never leaves this machine.",
       dedupe_key: `provider-egress-denied:${input.provider || 'unknown'}:${input.dataTier}`,
     });
   } catch (err) {
@@ -343,13 +343,18 @@ function readTenantProfileAsPolicyInput(
  * views (`describeProviderTierAvailability`) can ask "would this be allowed?"
  * for every provider without raising an alert per hypothetical denial.
  */
-function evaluateProviderEgress(input: ProviderEgressCheckInput): ProviderEgressCheckResult {
+type EvaluatedProviderEgress = ProviderEgressCheckResult & {
+  /** Which rule allowed it (set only when allowed). */
+  basis?: ProviderTierUsableBasis;
+};
+
+function evaluateProviderEgress(input: ProviderEgressCheckInput): EvaluatedProviderEgress {
   const provider = String(input.provider || '').trim();
   const dataTier = input.dataTier;
 
   // Public always fails open, independent of policy file health — a broken
   // or absent policy must never block ordinary public-tier work.
-  if (dataTier === 'public') return { allowed: true };
+  if (dataTier === 'public') return { allowed: true, basis: 'public' };
 
   if (!provider) {
     return deny(`no provider identified for a ${dataTier} payload; fail-closed.`);
@@ -414,7 +419,7 @@ function evaluateProviderEgress(input: ProviderEgressCheckInput): ProviderEgress
       ? policy.tier_policy.confidential.approved_providers
       : policy.tier_policy.personal.approved_providers;
   // Local inference never leaves the machine, so training use cannot apply.
-  if (declaration?.egress === 'local-only') return { allowed: true };
+  if (declaration?.egress === 'local-only') return { allowed: true, basis: 'local-only' };
 
   // The tenant's own attestation wins over the repository default: it is the
   // one that knows which plan was actually purchased. The shipped policy
@@ -430,7 +435,7 @@ function evaluateProviderEgress(input: ProviderEgressCheckInput): ProviderEgress
     attestation.training_use === 'none' &&
     (declaration || exceptions.includes(provider))
   ) {
-    return { allowed: true };
+    return { allowed: true, basis: 'tenant-attestation' };
   }
   if (attestation.status === 'expired') {
     return deny(
@@ -443,11 +448,13 @@ function evaluateProviderEgress(input: ProviderEgressCheckInput): ProviderEgress
     );
   }
 
-  if (declaration?.training_use === 'none') return { allowed: true };
+  if (declaration?.training_use === 'none')
+    return { allowed: true, basis: 'policy-training-use-none' };
   // An operator may still allow a provider whose terms are not declared. That
   // is an exception, named as one in reports rather than reading like a
   // derived approval.
-  if (exceptions.includes(provider)) return { allowed: true };
+  if (exceptions.includes(provider))
+    return { allowed: true, basis: 'approved-providers-exception' };
 
   if (!declaration) {
     return deny(
@@ -476,13 +483,18 @@ export type ProviderTierUsableBasis =
 
 export interface ProviderTierAvailability {
   tier: TierLevel;
+  /** Providers allowed for this tier, with the rule that allowed each one. */
   usable: Array<{ provider: string; basis: ProviderTierUsableBasis }>;
+  /** Providers denied for this tier, with the gate's reason. */
+  denied: Array<{ provider: string; reason: string }>;
   /** One-line consequence for the operator (what LLM work this tier can do). */
   note: string;
 }
 
 export interface ProviderTierAvailabilityReport {
+  /** The tenant whose attestations were applied (argument, else the ambient scope). */
   tenant_slug?: string;
+  tenant_source: 'argument' | 'ambient' | 'none';
   policy_status: PolicyLoadResult['status'];
   tiers: ProviderTierAvailability[];
 }
@@ -491,9 +503,10 @@ const AVAILABILITY_TIERS: TierLevel[] = ['public', 'confidential', 'personal'];
 
 /**
  * Per data tier, which declared providers may receive material of that tier
- * for this tenant — the same rule `checkProviderEgress` enforces, evaluated
- * without alerts, so onboarding and `tenant:activation plan` can show the
- * operator the consequence of the current attestations before any work runs.
+ * for this tenant — the same rule `checkProviderEgress` enforces (including
+ * which rule allowed it, or why it denied), evaluated without alerts, so
+ * onboarding and `tenant:activation plan` can show the operator the
+ * consequence of the current attestations before any work runs.
  */
 export function describeProviderTierAvailability(
   input: { tenant_slug?: string; tenant_registry_root_dir?: string } = {}
@@ -501,38 +514,34 @@ export function describeProviderTierAvailability(
   const loaded = loadProviderEgressPolicy();
   const policy = loaded.status === 'ok' ? loaded.policy : undefined;
   const providers = policy ? Object.keys(policy.providers).sort() : [];
-  const tenantSlug = input.tenant_slug?.trim() || undefined;
+  const requested = input.tenant_slug?.trim() || undefined;
+  let ambient: string | undefined;
+  try {
+    ambient = resolveIdentityContext().tenantSlug?.trim() || undefined;
+  } catch {
+    ambient = undefined;
+  }
+  const tenantSlug = requested || ambient;
+  const tenantSource: ProviderTierAvailabilityReport['tenant_source'] = requested
+    ? 'argument'
+    : ambient
+      ? 'ambient'
+      : 'none';
   const tiers = AVAILABILITY_TIERS.map((tier): ProviderTierAvailability => {
-    const usable = providers
-      .filter(
-        (provider) =>
-          evaluateProviderEgress({
-            provider,
-            dataTier: tier,
-            ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
-            ...(input.tenant_registry_root_dir
-              ? { tenant_registry_root_dir: input.tenant_registry_root_dir }
-              : {}),
-          }).allowed
-      )
-      .map((provider) => {
-        const declaration = policy!.providers[provider];
-        const exceptions =
-          tier === 'personal'
-            ? policy!.tier_policy.personal.approved_providers
-            : policy!.tier_policy.confidential.approved_providers;
-        const basis: ProviderTierUsableBasis =
-          tier === 'public'
-            ? 'public'
-            : declaration?.egress === 'local-only'
-              ? 'local-only'
-              : declaration?.training_use === 'none'
-                ? 'policy-training-use-none'
-                : exceptions.includes(provider)
-                  ? 'approved-providers-exception'
-                  : 'tenant-attestation';
-        return { provider, basis };
+    const usable: ProviderTierAvailability['usable'] = [];
+    const denied: ProviderTierAvailability['denied'] = [];
+    for (const provider of providers) {
+      const result = evaluateProviderEgress({
+        provider,
+        dataTier: tier,
+        ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+        ...(input.tenant_registry_root_dir
+          ? { tenant_registry_root_dir: input.tenant_registry_root_dir }
+          : {}),
       });
+      if (result.allowed) usable.push({ provider, basis: result.basis ?? 'public' });
+      else denied.push({ provider, reason: result.reason || 'denied' });
+    }
     const names = usable.map((entry) => entry.provider).join(', ');
     const external = usable.filter((entry) => entry.basis !== 'local-only');
     const enableHint = tenantSlug
@@ -548,10 +557,11 @@ export function describeProviderTierAvailability(
     } else {
       note = `${tier}: ${names}`;
     }
-    return { tier, usable, note };
+    return { tier, usable, denied, note };
   });
   return {
     ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+    tenant_source: tenantSource,
     policy_status: loaded.status,
     tiers,
   };

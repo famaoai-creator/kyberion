@@ -714,6 +714,21 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/organization/tenant-governance.ts#attestTenantProvider (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/tenant-governance.ts#attestTenantProvider (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/tenant-governance.ts#requestTenantProviderAttestationApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/plugin/plugin-managed-install.ts#ensurePluginApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -2216,7 +2231,12 @@
       "unresolved": []
     },
     {
-      "site": "scripts/onboarding_llm.ts#attest",
+      "site": "scripts/onboarding_llm.ts#applyLlmSelection",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/onboarding_llm.ts#applyProviderAttestation",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -2226,7 +2246,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/onboarding_llm.ts#select",
+      "site": "scripts/onboarding_llm.ts#requestProviderAttestationApproval",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
