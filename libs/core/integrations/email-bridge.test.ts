@@ -170,7 +170,7 @@ describe('SmtpEmailProvider', () => {
     expect(result.provider).toBe('smtp');
     expect(mocks.spawn).toHaveBeenCalledWith(
       'python3',
-      expect.arrayContaining(['-c', expect.stringContaining('import smtplib')]),
+      expect.arrayContaining(['-c', expect.stringContaining('smtplib.SMTP(')]),
       expect.any(Object)
     );
   });
@@ -216,6 +216,38 @@ describe('email child supervision (G12)', () => {
       status: 'failed',
       provider: 'mac_mailapp',
       error: 'osascript spawn osascript ENOENT',
+    });
+  });
+
+  it('keeps SMTP credentials and the message out of argv; sends them as JSON on stdin (G20)', async () => {
+    process.env.KYBERION_SMTP_PASS = 'pa55-SECRET-word';
+    const fakeChild = Object.assign(createFakeChild(), {
+      stdin: Object.assign(new EventEmitter(), { end: vi.fn() }),
+    });
+    mocks.spawn.mockReturnValue(fakeChild);
+    const promise = new SmtpEmailProvider().send({
+      to: 'a@example.com',
+      subject: 'Quarterly',
+      body: 'private body text',
+    });
+    fakeChild.stdout.emit('data', 'ok');
+    fakeChild.emit('close', 0);
+    await expect(promise).resolves.toMatchObject({ status: 'succeeded' });
+
+    const [command, argv, options] = mocks.spawn.mock.calls[0];
+    expect(command).toBe('python3');
+    const argvText = JSON.stringify(argv);
+    expect(argvText).not.toContain('pa55-SECRET-word');
+    expect(argvText).not.toContain('private body text');
+    expect(argvText).not.toContain('smtp.example.com');
+    expect(options.stdio[0]).toBe('pipe');
+    expect(JSON.parse(fakeChild.stdin.end.mock.calls[0][0])).toMatchObject({
+      host: 'smtp.example.com',
+      user: 'user',
+      pass: 'pa55-SECRET-word',
+      to: 'a@example.com',
+      subject: 'Quarterly',
+      body: 'private body text',
     });
   });
 

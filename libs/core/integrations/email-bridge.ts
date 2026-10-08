@@ -150,6 +150,28 @@ export class MacMailAppEmailProvider implements EmailProvider {
   }
 }
 
+/** Reads `{host, port, user, pass, from, to, subject, body}` as JSON from stdin. */
+const SMTP_SEND_SCRIPT = `
+import json, smtplib, ssl, sys
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+p = json.load(sys.stdin)
+msg = MIMEMultipart()
+msg['From'] = p['from']
+msg['To'] = p['to']
+msg['Subject'] = p['subject']
+msg.attach(MIMEText(p['body'], 'plain', 'utf-8'))
+
+ctx = ssl.create_default_context()
+with smtplib.SMTP(p['host'], int(p['port'])) as server:
+    server.ehlo()
+    server.starttls(context=ctx)
+    server.login(p['user'], p['pass'])
+    server.sendmail(p['from'], p['to'], msg.as_string())
+print("ok")
+`.trim();
+
 export class SmtpEmailProvider implements EmailProvider {
   readonly id = 'smtp';
   readonly display_name = 'SMTP';
@@ -185,31 +207,18 @@ export class SmtpEmailProvider implements EmailProvider {
     const subject = params.subject ?? '(no subject)';
     const body = params.body ?? '';
 
-    const pythonScript = `
-import smtplib, ssl
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-
-msg = MIMEMultipart()
-msg['From'] = ${JSON.stringify(from)}
-msg['To'] = ${JSON.stringify(to)}
-msg['Subject'] = ${JSON.stringify(subject)}
-msg.attach(MIMEText(${JSON.stringify(body)}, 'plain', 'utf-8'))
-
-ctx = ssl.create_default_context()
-with smtplib.SMTP(${JSON.stringify(host)}, ${port}) as server:
-    server.ehlo()
-    server.starttls(context=ctx)
-    server.login(${JSON.stringify(user)}, ${JSON.stringify(pass)})
-    server.sendmail(${JSON.stringify(from)}, ${JSON.stringify(to)}, msg.as_string())
-print("ok")
-`.trim();
+    // G20: the script is static; credentials and the message travel as JSON on
+    // stdin so no secret ever appears in argv / process listings.
+    const payload = JSON.stringify({ host, port, user, pass, from, to, subject, body });
 
     return new Promise((resolve) => {
-      const child = spawn('python3', ['-c', pythonScript], {
+      const child = spawn('python3', ['-c', SMTP_SEND_SCRIPT], {
         cwd: pathResolver.rootDir(),
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: ['pipe', 'pipe', 'pipe'],
       });
+      // A child that dies before reading stdin must not crash the caller (EPIPE).
+      child.stdin?.on('error', () => undefined);
+      child.stdin?.end(payload);
 
       let stdout = '';
       let stderr = '';
