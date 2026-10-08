@@ -1,5 +1,5 @@
 /* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
 import { getAdapterDefault } from '../actuator/adapter-default-preferences.js';
@@ -23,6 +23,35 @@ export interface EmailBackendCandidate {
   status: 'ready' | 'needs_setup' | 'unsupported';
   selectable: boolean;
   reason: string;
+}
+
+/** Bound for one mail send/draft child (Mail.app automation or an SMTP round trip). */
+export const EMAIL_COMMAND_TIMEOUT_MS = 60_000;
+
+/**
+ * Settle a mail child exactly once: on 'close', on spawn 'error' (missing
+ * osascript/python3 — without a listener that crashes the process), or when
+ * the kill timer fires (a hung Mail.app or SMTP server).
+ */
+function superviseEmailChild(
+  child: ChildProcess,
+  onSettled: (outcome: { code: number | null; error?: string }) => void,
+  timeoutMs = EMAIL_COMMAND_TIMEOUT_MS
+): void {
+  let settled = false;
+  const settle = (outcome: { code: number | null; error?: string }): void => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    onSettled(outcome);
+  };
+  const timer = setTimeout(() => {
+    child.kill('SIGKILL');
+    settle({ code: null, error: `timed out after ${timeoutMs / 1000}s and was killed` });
+  }, timeoutMs);
+  timer.unref?.();
+  child.on('error', (error) => settle({ code: null, error: error.message }));
+  child.on('close', (code) => settle({ code }));
 }
 
 function buildJxaScript(op: 'create_draft' | 'send', params: EmailParams): string {
@@ -100,8 +129,8 @@ export class MacMailAppEmailProvider implements EmailProvider {
         stderr += String(chunk);
       });
 
-      child.on('close', (code) => {
-        if (code === 0 && stdout.trim() === 'ok') {
+      superviseEmailChild(child, ({ code, error }) => {
+        if (!error && code === 0 && stdout.trim() === 'ok') {
           resolve({
             status: 'succeeded',
             provider: this.id,
@@ -111,13 +140,37 @@ export class MacMailAppEmailProvider implements EmailProvider {
           resolve({
             status: 'failed',
             provider: this.id,
-            error: stderr.trim() || `JXA script failed with exit code ${code}`,
+            error: error
+              ? `osascript ${error}`
+              : stderr.trim() || `JXA script failed with exit code ${code}`,
           });
         }
       });
     });
   }
 }
+
+/** Reads `{host, port, user, pass, from, to, subject, body}` as JSON from stdin. */
+const SMTP_SEND_SCRIPT = `
+import json, smtplib, ssl, sys
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+p = json.load(sys.stdin)
+msg = MIMEMultipart()
+msg['From'] = p['from']
+msg['To'] = p['to']
+msg['Subject'] = p['subject']
+msg.attach(MIMEText(p['body'], 'plain', 'utf-8'))
+
+ctx = ssl.create_default_context()
+with smtplib.SMTP(p['host'], int(p['port'])) as server:
+    server.ehlo()
+    server.starttls(context=ctx)
+    server.login(p['user'], p['pass'])
+    server.sendmail(p['from'], p['to'], msg.as_string())
+print("ok")
+`.trim();
 
 export class SmtpEmailProvider implements EmailProvider {
   readonly id = 'smtp';
@@ -154,31 +207,18 @@ export class SmtpEmailProvider implements EmailProvider {
     const subject = params.subject ?? '(no subject)';
     const body = params.body ?? '';
 
-    const pythonScript = `
-import smtplib, ssl
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-
-msg = MIMEMultipart()
-msg['From'] = ${JSON.stringify(from)}
-msg['To'] = ${JSON.stringify(to)}
-msg['Subject'] = ${JSON.stringify(subject)}
-msg.attach(MIMEText(${JSON.stringify(body)}, 'plain', 'utf-8'))
-
-ctx = ssl.create_default_context()
-with smtplib.SMTP(${JSON.stringify(host)}, ${port}) as server:
-    server.ehlo()
-    server.starttls(context=ctx)
-    server.login(${JSON.stringify(user)}, ${JSON.stringify(pass)})
-    server.sendmail(${JSON.stringify(from)}, ${JSON.stringify(to)}, msg.as_string())
-print("ok")
-`.trim();
+    // G20: the script is static; credentials and the message travel as JSON on
+    // stdin so no secret ever appears in argv / process listings.
+    const payload = JSON.stringify({ host, port, user, pass, from, to, subject, body });
 
     return new Promise((resolve) => {
-      const child = spawn('python3', ['-c', pythonScript], {
+      const child = spawn('python3', ['-c', SMTP_SEND_SCRIPT], {
         cwd: pathResolver.rootDir(),
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: ['pipe', 'pipe', 'pipe'],
       });
+      // A child that dies before reading stdin must not crash the caller (EPIPE).
+      child.stdin?.on('error', () => undefined);
+      child.stdin?.end(payload);
 
       let stdout = '';
       let stderr = '';
@@ -190,8 +230,8 @@ print("ok")
         stderr += String(chunk);
       });
 
-      child.on('close', (code) => {
-        if (code === 0 && stdout.trim() === 'ok') {
+      superviseEmailChild(child, ({ code, error }) => {
+        if (!error && code === 0 && stdout.trim() === 'ok') {
           resolve({
             status: 'succeeded',
             provider: this.id,
@@ -201,7 +241,9 @@ print("ok")
           resolve({
             status: 'failed',
             provider: this.id,
-            error: stderr.trim() || `SMTP python execution failed with exit code ${code}`,
+            error: error
+              ? `SMTP python3 ${error}`
+              : stderr.trim() || `SMTP python execution failed with exit code ${code}`,
           });
         }
       });

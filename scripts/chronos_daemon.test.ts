@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { EventEmitter } from 'node:events';
 
 import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -9,9 +10,11 @@ import {
   assertRegisteredTenantPipeline,
   buildTenantRunEnv,
   collectTenantPipelineFiles,
+  createChronosShutdown,
   requireTenantPipelineTrust,
   resolveTenantRuntimeEnv,
 } from './chronos_daemon.js';
+import { installGracefulShutdown, type SerialTickStopOutcome } from './lib/daemon-loop.js';
 
 describe('chronos pipeline scope', () => {
   const roots: string[] = [];
@@ -276,5 +279,54 @@ describe('chronos pipeline scope', () => {
         }
       });
     });
+  });
+});
+
+describe('chronos graceful shutdown (G09 review)', () => {
+  const previousExitCode = process.exitCode;
+  afterEach(() => {
+    process.exitCode = previousExitCode;
+  });
+
+  function harness(outcome: SerialTickStopOutcome) {
+    const events: string[] = [];
+    const emitter = new EventEmitter();
+    const exit = vi.fn((code: number) => events.push(`exit:${code}`));
+    const trigger = installGracefulShutdown({
+      name: 'chronos-test',
+      forceExitAfterMs: 60_000,
+      proc: { once: (event, listener) => emitter.once(event, listener), exit },
+      shutdown: createChronosShutdown({
+        stopLoop: async () => {
+          events.push('stop-loop');
+          return outcome;
+        },
+        stopSampler: () => events.push('stop-sampler'),
+        releaseLease: () => events.push('release-lease'),
+        recordHeartbeat: (details) => events.push(`heartbeat:${String(details.in_flight_tick)}`),
+      }),
+    });
+    return { events, exit, trigger };
+  }
+
+  it('on timed_out keeps the lease until the synchronous exit (no window for a second leader)', async () => {
+    const { events, exit, trigger } = harness('timed_out');
+    await trigger('SIGTERM');
+    expect(events).toEqual([
+      'stop-sampler',
+      'stop-loop',
+      'heartbeat:timed_out',
+      'release-lease',
+      'exit:0',
+    ]);
+    expect(exit).toHaveBeenCalledTimes(1);
+  });
+
+  it('on a drained tick releases the lease and lets the event loop drain (no immediate exit)', async () => {
+    const { events, exit, trigger } = harness('drained');
+    await trigger('SIGINT');
+    expect(events).toEqual(['stop-sampler', 'stop-loop', 'heartbeat:drained', 'release-lease']);
+    expect(exit).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(0);
   });
 });

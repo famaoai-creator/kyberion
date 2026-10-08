@@ -9,21 +9,26 @@ on:
   pull_request:
     branches: [main, develop]
 
+# A newer push to the same PR supersedes the running checks; main pushes and
+# scheduled runs are never cancelled (contract: operations-hygiene runbook §CI).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   gates:
     name: pr-gates
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Setup Kyberion
         uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
-      - name: Build @agent/core
-        run: pnpm --filter '@agent/core' build
       - name: Build project
         run: pnpm run build
       - name: Run manifest-driven PR checks
@@ -32,20 +37,23 @@ jobs:
   static:
     name: static-checks
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Setup Kyberion
         uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
-      - name: Build @agent/core
-        run: pnpm --filter '@agent/core' build
       - name: Build project
         run: pnpm run build
       - name: Check PR title
-        run: pnpm run check:pr-title -- --title "${{ github.event.pull_request.title }}"
+        # Pass the title through env: interpolating it into the script would let
+        # a crafted PR title run shell commands.
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: pnpm run check:pr-title -- --title "$PR_TITLE"
       - name: Type check
         run: pnpm run typecheck
       - name: Lint check
@@ -56,6 +64,7 @@ jobs:
   test-core:
     name: core-tests (shard ${{ matrix.shard }}/${{ matrix.total }})
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     permissions:
       contents: read
     strategy:
@@ -64,7 +73,7 @@ jobs:
         shard: [1, 2, 3, 4]
         total: [4]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Native PDF engine CJK embedding test needs a CJK font on Linux
       - name: Install CJK fonts
@@ -115,8 +124,6 @@ jobs:
         uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
-      - name: Build @agent/core
-        run: pnpm --filter '@agent/core' build
       - name: Build project
         run: pnpm run build
 
@@ -129,16 +136,15 @@ jobs:
   test-extra:
     name: actuator/boundary/security tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Setup Kyberion
         uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
-      - name: Build @agent/core
-        run: pnpm --filter '@agent/core' build
       - name: Build project
         run: pnpm run build
 
@@ -155,17 +161,16 @@ jobs:
   vital:
     name: vital-check
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Setup Kyberion
         uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
-      - name: Build @agent/core
-        run: pnpm --filter '@agent/core' build
       - name: Build project
         run: pnpm run build
 
@@ -178,7 +183,7 @@ jobs:
 
       - name: Comment vital check report on PR
         if: github.event_name == 'pull_request' && always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
@@ -227,7 +232,7 @@ jobs:
 
       - name: Upload vital check artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: vital-check-reports
           path: |

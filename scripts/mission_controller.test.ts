@@ -20,6 +20,7 @@ import {
   extractMissionStartCreateOptionsFromArgv,
   extractProjectRelationshipOptionsFromArgv,
   buildHelpText,
+  formatPurgeCandidateTable,
   handoffMission,
   main,
   resolveMissionStartCreateInputFromArgv,
@@ -1604,6 +1605,23 @@ describe('mission controller router — archive verb (AL-03)', () => {
     await missionControllerRouter.runMissionControllerAction(sweep);
     expect(sweep.archiveMissions).toHaveBeenCalledWith({ missionId: undefined, execute: true });
     expect(sweep.purgeMissions).not.toHaveBeenCalled();
+  });
+
+  it('renders the purge preview table on the CLI side (G08)', () => {
+    const lines = formatPurgeCandidateTable('/repo', [
+      {
+        mission: 'MSN-OLD-FAILED',
+        targetPath: '/repo/active/archive/failed_missions/MSN-OLD-FAILED',
+        policyName: 'purge-orphaned',
+      },
+    ]);
+    expect(lines).toEqual([
+      '',
+      '  Missions matching purge policies: 1',
+      '',
+      `    ${'MSN-OLD-FAILED'.padEnd(30)} → active/archive/failed_missions/MSN-OLD-FAILED  (purge-orphaned)`,
+      '',
+    ]);
   });
 
   it("keeps the existing 'purge' argv contract unchanged (dry-run by default, --execute to apply)", async () => {

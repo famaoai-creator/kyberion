@@ -584,12 +584,37 @@ async function reenterMissionFromReview(missionId: string) {
   return result;
 }
 
+/** Human-readable purge preview table (one string per line), rendered by the CLI only. */
+export function formatPurgeCandidateTable(
+  rootDir: string,
+  candidates: ReadonlyArray<{ mission: string; targetPath: string; policyName: string }>
+): string[] {
+  return [
+    '',
+    `  Missions matching purge policies: ${candidates.length}`,
+    '',
+    ...candidates.map(
+      (candidate) =>
+        `    ${candidate.mission.padEnd(30)} → ${path.relative(rootDir, candidate.targetPath)}  (${candidate.policyName})`
+    ),
+    '',
+  ];
+}
+
 async function purgeMissions(dryRun: boolean = false): Promise<void> {
   const { missionSystem } = await import('./refactor/mission-system.js');
   // AL-01: purgeMissions now returns a structured PurgeMissionsResult; the
   // CLI router's context type is (dryRun?) => Awaitable<void> and never
   // consumed a return value, so drop it here to keep the thin-router contract.
-  await missionSystem.purgeMissions(dryRun);
+  // The library returns rows and never writes to stdout (G08); the human
+  // table is rendered here, before any archive log lines.
+  await missionSystem.purgeMissions(dryRun, {
+    onCandidates: (candidates) => {
+      for (const line of formatPurgeCandidateTable(ROOT_DIR, candidates)) {
+        printOutput(line);
+      }
+    },
+  });
 }
 
 async function archiveMissions(
