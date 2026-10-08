@@ -12432,9 +12432,9 @@
         "qps-ploc": "⟦Řėşŧőřïñɠ ẏőůř ƈőñṽėřşȧŧïőñ… ŀőřėɱ ïṗş⟧"
       },
       "dock.history.failed": {
-        "en": "Your conversation could not be restored. Check your connection or sign in again.",
-        "ja": "前回の会話を読み込めませんでした。接続やログイン状態をご確認ください。",
-        "qps-ploc": "⟦Ẏőůř ƈőñṽėřşȧŧïőñ ƈőůŀḓ ñőŧ ƀė řėşŧőřėḓ. Ƈħėƈķ ẏőůř ƈőññėƈŧïőñ őř şïɠñ ïñ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+        "en": "Your conversation could not be restored. Check your connection, then try loading again. This will not resend a request.",
+        "ja": "会話を読み込めませんでした。接続を確認し、もう一度読み込んでください。依頼は再送されません。",
+        "qps-ploc": "⟦Ẏőůř ƈőñṽėřşȧŧïőñ ƈőůŀḓ ñőŧ ƀė řėşŧőřėḓ. Ƈħėƈķ ẏőůř ƈőññėƈŧïőñ, ŧħėñ ŧřẏ ŀőȧḓïñɠ ȧɠȧïñ. Ŧħïş ẇïŀŀ ñőŧ řėşėñḓ ȧ řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
       },
       "dock.history.retry": {
         "en": "Try loading again",
@@ -13985,6 +13985,31 @@
         "en": "Show more files",
         "ja": "次のファイルを表示",
         "qps-ploc": "⟦Şħőẇ ɱőřė ƒïŀėş ŀőřė⟧"
+      },
+      "dock.history.signin": {
+        "en": "Your session could not be verified. Sign in, then load the conversation again. Requests will not be resent automatically.",
+        "ja": "ログイン状態を確認できませんでした。サインインしてから会話を読み込み直してください。依頼が自動的に再送されることはありません。",
+        "qps-ploc": "⟦Ẏőůř şėşşïőñ ƈőůŀḓ ñőŧ ƀė ṽėřïƒïėḓ. Şïɠñ ïñ, ŧħėñ ŀőȧḓ ŧħė ƈőñṽėřşȧŧïőñ ȧɠȧïñ. Řėɋůėşŧş ẇïŀŀ ñőŧ ƀė řėşėñŧ ȧůŧőɱȧŧïƈȧŀŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "dock.history.forbidden": {
+        "en": "Access to this conversation or action was denied. Check the selected organization and project, or ask your administrator to confirm your access. Load again after access is resolved; this will not resend a request.",
+        "ja": "この会話または操作へのアクセスが拒否されました。選択中の組織・プロジェクトを確認するか、管理者に権限の確認を依頼してください。解決後に読み込み直しても、依頼は再送されません。",
+        "qps-ploc": "⟦Ȧƈƈėşş ŧő ŧħïş ƈőñṽėřşȧŧïőñ őř ȧƈŧïőñ ẇȧş ḓėñïėḓ. Ƈħėƈķ ŧħė şėŀėƈŧėḓ őřɠȧñïẑȧŧïőñ ȧñḓ ṗřőĵėƈŧ, őř ȧşķ ẏőůř ȧḓɱïñïşŧřȧŧőř ŧő ƈőñƒïřɱ ẏőůř ȧƈƈėşş. Ŀőȧḓ ȧɠȧïñ ȧƒŧėř ȧƈƈėşş ïş řėşőŀṽėḓ; ŧħïş ẇïŀŀ ñőŧ řėşėñḓ ȧ řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "dock.history.scope_changed": {
+        "en": "The account or selected scope changed. Load the conversation again before continuing. Earlier requests will not be resent automatically.",
+        "ja": "アカウントまたは選択中の範囲が変わりました。続ける前に会話を読み込み直してください。以前の依頼が自動的に再送されることはありません。",
+        "qps-ploc": "⟦Ŧħė ȧƈƈőůñŧ őř şėŀėƈŧėḓ şƈőṗė ƈħȧñɠėḓ. Ŀőȧḓ ŧħė ƈőñṽėřşȧŧïőñ ȧɠȧïñ ƀėƒőřė ƈőñŧïñůïñɠ. Ėȧřŀïėř řėɋůėşŧş ẇïŀŀ ñőŧ ƀė řėşėñŧ ȧůŧőɱȧŧïƈȧŀŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈï⟧"
+      },
+      "dock.history.revision_changed": {
+        "en": "This receipt version can no longer be used for the change. Load the conversation again, then choose the current version. The change will not be resent automatically.",
+        "ja": "この成果物の版では変更を続けられません。会話を読み込み直して、現在の版を選び直してください。変更依頼が自動的に再送されることはありません。",
+        "qps-ploc": "⟦Ŧħïş řėƈėïṗŧ ṽėřşïőñ ƈȧñ ñő ŀőñɠėř ƀė ůşėḓ ƒőř ŧħė ƈħȧñɠė. Ŀőȧḓ ŧħė ƈőñṽėřşȧŧïőñ ȧɠȧïñ, ŧħėñ ƈħőőşė ŧħė ƈůřřėñŧ ṽėřşïőñ. Ŧħė ƈħȧñɠė ẇïŀŀ ñőŧ ƀė řėşėñŧ ȧůŧőɱȧŧïƈȧŀŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ï⟧"
+      },
+      "dock.history.signin_action": {
+        "en": "Sign in",
+        "ja": "サインイン",
+        "qps-ploc": "⟦Şïɠñ ïñ ŀőř⟧"
       }
     },
     "onboarding": {

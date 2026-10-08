@@ -123,3 +123,24 @@ it('accepts a non-executing intake response without synthesizing control actions
   expect(parsed.nextActions).toBeUndefined();
   expect(parsed.promoted).toBeUndefined();
 });
+
+it.each([401, 403])(
+  'invalidates trusted history for status %s independently of body error fields',
+  (status) => {
+    for (const raw of [
+      {},
+      { error: 'upstream_proxy_denied' },
+      { retry_safe: true },
+      { error: 'conversation_not_started', retry_safe: true },
+    ]) {
+      expect(conversationFailurePolicy(status, raw).invalidateHistory).toBe(true);
+    }
+  }
+);
+
+it.each([400, 404, 409, 422, 500, 503])(
+  'does not classify an unrelated %s failure as an authentication or stale-scope invalidation',
+  (status) => {
+    expect(conversationFailurePolicy(status, {}).invalidateHistory).toBe(false);
+  }
+);
