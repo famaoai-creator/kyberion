@@ -93,11 +93,13 @@ function storeTenant(slug: string): void {
  * front-desk surfaces render the same `.kb-nav-rail` markup.
  */
 
-/** `/` -> decide, `/setup` or `/settings` -> settings; every other path has no current rail item. */
-function currentItemId(pathname: string | null): FrontDeskNavItemPayload['id'] | null {
+/** Settings subpages share its current marker; first-run bootstrap remains outside feature navigation. */
+export function currentItemId(pathname: string | null): FrontDeskNavItemPayload['id'] | null {
   if (pathname === '/') return 'decide';
   if (pathname === '/ingest') return 'ingest';
-  if (pathname === '/setup' || pathname === '/settings') return 'settings';
+  if (pathname === '/setup/first-run') return null;
+  if (pathname === '/setup' || pathname?.startsWith('/setup/') || pathname === '/settings')
+    return 'settings';
   return null;
 }
 
