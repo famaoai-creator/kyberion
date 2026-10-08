@@ -258,10 +258,20 @@ function testAuditChainIo(): AuditChainIo | undefined {
 }
 let auditChainInstance: AuditChainImpl | undefined;
 
-/** Install the secure persistence boundary after both modules have initialized. */
-export function registerAuditChainIo(io: AuditChainIo): void {
+/**
+ * Install the secure persistence boundary after both modules have initialized.
+ * Returns a restore function that reinstalls the previous boundary (if `io` is
+ * still the installed one), so a suite that swaps in a fixture can undo it.
+ */
+export function registerAuditChainIo(io: AuditChainIo): () => void {
+  const previous = auditIo;
   auditIo = io;
   auditChainInstance?.initializeFromDisk();
+  return () => {
+    if (auditIo !== io) return;
+    auditIo = previous;
+    if (previous) auditChainInstance?.initializeFromDisk();
+  };
 }
 
 function safeAuditPath(

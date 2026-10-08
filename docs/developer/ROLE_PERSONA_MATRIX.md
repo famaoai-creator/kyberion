@@ -88,7 +88,8 @@ If you need to explain this to someone else, use this phrasing:
 | `chronos_localadmin` | `worker` | Local Chronos administration for deterministic coordination and runtime control. | It does not imply Slack-specific transport authority. |
 | `chronos_token_registry_reader` | `worker` | Reads the Chronos viewer token registry (`knowledge/personal/connections/chronos-access.json`) so a surface can resolve a bearer/cookie viewer token (TR-01). | It grants no other personal-tier read and no role write grant (persona `worker`, so only worker / `default_allow` write paths remain); it does not imply viewer, operator or admin authority. |
 | `surface_runtime` | `worker` | Reconciliation and supervision of managed runtime surfaces. | It does not imply Slack transport or channel ingress. |
-| `infrastructure_sentinel` | `worker` | Coordination and observability for infrastructure-backed surfaces. | It does not imply mission lifecycle control. |
+| `infrastructure_sentinel` | `worker` | Coordination and observability for infrastructure-backed surfaces. | It does not imply mission lifecycle control or any `customer/` write. |
+| `audit_mirror_writer` | `worker` | Writes the audit chain's per-tenant mirror (`customer/<tenant>/logs/audit/`), bound to the entry's tenant; assumed only by the audit chain's mirror seam. | Its role grant covers no read, no other tenant's mirror and no other path; only the persona `worker` / `default_allow` paths every worker identity has remain. |
 | `service_actuator` | not auto-inferred | Service integration helper for connection documents and auth-grant aware reads. | It does not imply a persona default or broad write permissions. |
 | `ruthless_auditor` | `analyst` | Audit and forensic review. | It does not imply operator write access. |
 | `cyber_security` | `analyst` | Security analysis and security knowledge maintenance. | It does not imply customer onboarding authority. |
