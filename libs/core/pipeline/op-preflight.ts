@@ -8,6 +8,16 @@
 
 import { assertModuleInvariant } from '../invariants.js';
 import { findPluginGrantDenial } from '../shell/sandbox-policy.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('op-preflight');
+
+function reportObserverError(error: unknown): void {
+  const detail = error instanceof Error ? (error.stack ?? error.message) : String(error);
+  logger.error(
+    `[OP_PREFLIGHT_OUTCOME_OBSERVER_ERROR] an outcome observer threw — ${detail} | next: fix the registered observer; the preflight decision is unaffected`
+  );
+}
 
 export type OpPreflightDecision = 'allow' | 'block' | 'ask';
 
@@ -423,12 +433,10 @@ function finalizePreflightResult(
       try {
         const returned: unknown = observer(callSnapshot, snapshot);
         if (isPromiseLike(returned)) {
-          Promise.resolve(returned).then(undefined, (error: unknown) => {
-            console.error('[OP_PREFLIGHT_OUTCOME_OBSERVER_ERROR]', error);
-          });
+          Promise.resolve(returned).then(undefined, reportObserverError);
         }
       } catch (error) {
-        console.error('[OP_PREFLIGHT_OUTCOME_OBSERVER_ERROR]', error);
+        reportObserverError(error);
       }
     }
   }

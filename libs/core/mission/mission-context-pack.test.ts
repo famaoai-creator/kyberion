@@ -1325,7 +1325,8 @@ describe('loadKnowledgeHintsIfPossible (KP-03 knowledge slices)', () => {
       { path: 'knowledge/product/architecture/a.md', title: 'A', excerpt: 'ex-a', tags: [] },
     ];
     vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue(searchResult as any);
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // knowledge-slices logs through the shared logger, which writes to stderr.
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 
     const hints = await loadKnowledgeHintsIfPossible({
       missionState: baseMissionState(),
@@ -1335,8 +1336,8 @@ describe('loadKnowledgeHintsIfPossible (KP-03 knowledge slices)', () => {
 
     expect(hints).toHaveLength(1);
     expect(hints[0].path).toBe('knowledge/product/architecture/a.md');
-    expect(warnSpy).toHaveBeenCalled();
-    warnSpy.mockRestore();
+    expect(stderrSpy.mock.calls.map((call) => String(call[0])).join('')).toContain('[WARN]');
+    stderrSpy.mockRestore();
   });
 });
 

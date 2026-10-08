@@ -500,7 +500,7 @@ function resolveDelegatedRootScope(): ExecutionScope | undefined {
   delegationMemo = { policy: cachedRoleAssumptionPolicy, scope };
   traceRoleAssumption(normalizedSystemRole, parsed.role, allowed, 'delegation');
   if (!allowed) {
-    console.warn(
+    logger.warn(
       `[ROLE_DELEGATION_DENIED] a process running as SYSTEM_ROLE=${normalizedSystemRole} ` +
         `may not run as delegated role '${parsed.role}'; it runs as ${normalizedSystemRole} ` +
         `with persona ${DENIED_DELEGATION_PERSONA}. Allowed roles are governed by ` +

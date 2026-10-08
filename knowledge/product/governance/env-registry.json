@@ -1548,6 +1548,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_GENERATION_SCHEDULE_TICK_TIMEOUT_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Hard deadline (ms) for one generation-schedule daemon tick child; on expiry the child is killed (SIGTERM, then SIGKILL) and an ops alert is raised. Leave unset for max(5 x interval, 15 min).",
+      "subsystem": "media-generation",
+      "documented": true
+    },
+    {
       "name": "KYBERION_GLOBAL_INFLIGHT_LIMIT",
       "category": "tuning",
       "type": "number",

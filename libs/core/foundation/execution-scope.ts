@@ -1,5 +1,10 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { getRegisteredEnvText } from './env.js';
+import { createLogger } from '../logger.js';
+
+// logger.ts depends only on foundation/env + foundation/time, so importing it
+// here adds no cycle (foundation/lock-utils.ts does the same).
+const logger = createLogger('execution-scope');
 
 /**
  * RA-01: the in-process execution scope set by `withExecutionContext` /
@@ -126,7 +131,7 @@ export function currentExecutionScope(): ExecutionScope | undefined {
   if (role && isAcceptedRole(role)) return scope;
   if (role && !warnedRejectedRoles.has(role)) {
     warnedRejectedRoles.add(role);
-    console.warn(
+    logger.warn(
       `[ROLE_ASSUMPTION_IGNORED] an execution scope carries role '${role}', which this process may not assume; it is ignored.`
     );
   }

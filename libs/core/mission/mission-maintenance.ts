@@ -1309,7 +1309,15 @@ function appendMissionPurgeAudit(record: Record<string, unknown>): void {
   }
 }
 
-export async function purgeMissions(rootDir: string, dryRun = false): Promise<PurgeMissionsResult> {
+/**
+ * Never writes to stdout (the weekly-audit op emits JSON there): `onCandidates`
+ * lets the CLI render its table before any mission is moved.
+ */
+export async function purgeMissions(
+  rootDir: string,
+  dryRun = false,
+  options: { onCandidates?: (candidates: PurgeMissionCandidate[]) => void } = {}
+): Promise<PurgeMissionsResult> {
   const { adfPath, policies } = loadMissionLifecyclePolicies();
   if (!policies) {
     return { status: 'adf_missing', adfPath, dryRun, candidates: [], archived: [] };
@@ -1371,15 +1379,7 @@ export async function purgeMissions(rootDir: string, dryRun = false): Promise<Pu
     return { status: 'ok', adfPath, dryRun, candidates: [], archived: [] };
   }
 
-  console.log('');
-  console.log(`  Missions matching purge policies: ${candidates.length}`);
-  console.log('');
-  for (const candidate of candidates) {
-    console.log(
-      `    ${candidate.mission.padEnd(30)} → ${path.relative(rootDir, candidate.targetPath)}  (${candidate.policyName})`
-    );
-  }
-  console.log('');
+  options.onCandidates?.(candidates);
 
   if (dryRun) {
     logger.info('Dry run complete. No missions were moved. Run "purge --execute" to apply.');

@@ -86,10 +86,15 @@ describe('costTierForReasoningMode', () => {
     getReasoningProviderDescriptorMock.mockImplementationOnce(() => {
       throw new Error('[REASONING_PROVIDER_REGISTRY_INVALID] provider entry 0 is not valid');
     });
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    // Warns through createLogger('voice-speculative-policy') -> stderr.
+    const warnSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
       expect(costTierForReasoningMode('claude-cli')).toBe('metered');
-      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(
+        warnSpy.mock.calls.filter(([line]) =>
+          String(line).includes('reasoning provider registry failed to load')
+        )
+      ).toHaveLength(1);
     } finally {
       warnSpy.mockRestore();
     }
