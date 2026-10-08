@@ -24,7 +24,13 @@ describe('vitest live-state leak guard', () => {
 
   it('snapshots the gitignored live roots outside active/', () => {
     expect(LIVE_STATE_ROOTS).toEqual(
-      expect.arrayContaining(['active', 'knowledge/personal', 'knowledge/confidential', 'customer'])
+      expect.arrayContaining([
+        'active',
+        'knowledge/personal',
+        'knowledge/confidential',
+        'customer',
+        'work/metrics',
+      ])
     );
   });
 
