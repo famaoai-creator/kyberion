@@ -552,6 +552,11 @@ describe('the gate reads the tenant profile as its own policy input', () => {
     ]);
     expect(byTier.personal.usable).toEqual([{ provider: 'clean', basis: 'tenant-attestation' }]);
     expect(byTier.confidential.note).toBe('confidential: clean');
+    // The denial reason comes from the gate's own evaluation, per provider.
+    expect(byTier.confidential.denied).toEqual([
+      { provider: 'dirty', reason: "tenant 'acme' attests training_use 'used' for 'dirty'." },
+    ]);
+    expect(acme.tenant_source).toBe('argument');
 
     // Another tenant without an attestation gets nothing for confidential —
     // and is told how to enable it.

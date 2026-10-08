@@ -600,7 +600,7 @@ function checkLlmProfileEgress(
       component: 'mission-llm',
       what: `skipped LLM profile "${label}" for ${egress.dataTier} ${purpose} payload`,
       why: reason,
-      next: "declare the payload tier (egress.dataTier), attest the provider's training_use 'none' for the tenant (pnpm onboarding llm attest, or pnpm tenant attest-provider), or use a local-only provider",
+      next: "declare the payload tier (egress.dataTier), attest the provider's training_use 'none' for the tenant (pnpm onboarding llm attest --request-approval, then a human approves it), or use a local-only provider",
       evidence: 'knowledge/product/governance/provider-egress-policy.json',
     })
   );
