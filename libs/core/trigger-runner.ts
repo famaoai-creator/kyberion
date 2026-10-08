@@ -27,7 +27,7 @@ import { loadAuthorityRoleIndex } from './organization/authority-role-registry.j
 import { auditChain } from './governance/audit-chain.js';
 import { resolveAssumedRole, resolveRole } from './authority.js';
 import { createLogger } from './logger.js';
-import { withLock } from './foundation/lock-utils.js';
+import { releaseLock, withLock } from './foundation/lock-utils.js';
 import {
   armWatch,
   type ManagedProcessWatchHandle,
@@ -568,17 +568,30 @@ export function createTriggerRunner(options: TriggerRunnerOptions = {}): Trigger
   return new TriggerRunner(options);
 }
 
+function triggerLeaderLockId(leaderId: string): string {
+  return `trigger-leader-${leaderId.replace(/[^a-zA-Z0-9_-]/gu, '_')}`;
+}
+
 /** Run one scheduler tick under an inter-process leader lease. */
 export async function withTriggerLeaderLease<T>(
   leaderId: string,
   fn: () => Promise<T>
 ): Promise<T | undefined> {
   try {
-    return await withLock(`trigger-leader-${leaderId.replace(/[^a-zA-Z0-9_-]/gu, '_')}`, fn, 1);
+    return await withLock(triggerLeaderLockId(leaderId), fn, 1);
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('[LOCK_TIMEOUT]')) return undefined;
     throw error;
   }
+}
+
+/**
+ * Release the leader lease on daemon shutdown when a tick was abandoned
+ * mid-flight. A no-op unless this process owns the lease (releaseLock is
+ * pid-checked), so it never steals another leader's lease.
+ */
+export function releaseTriggerLeaderLease(leaderId: string): void {
+  releaseLock(triggerLeaderLockId(leaderId));
 }
 
 export interface TriggerWatchOptions extends Omit<ManagedProcessWatchOptions, 'onEvent'> {
