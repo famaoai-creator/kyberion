@@ -85,6 +85,10 @@ describe('SB-01 stimuli-journal rotation under SYSTEM_ROLE=slack_bridge', () => 
   });
 
   beforeEach(() => {
+    // Per-test isolation: no test may inherit a role/persona left by another;
+    // afterAll restores the values saved in beforeAll.
+    delete process.env.MISSION_ROLE;
+    delete process.env.KYBERION_PERSONA;
     authority.resetRoleAssumptionPolicyCache();
     fs.writeFileSync(journalPath(), journalLines(20));
   });
