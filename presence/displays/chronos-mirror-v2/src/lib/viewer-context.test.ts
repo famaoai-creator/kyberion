@@ -8,6 +8,14 @@ import type { ViewerContext } from './viewer-context';
 // every test (operations-hygiene-runbook §5). Only the tests that vi.doMock the
 // token registry need a fresh module graph: they call mockRegistryModule(), and
 // afterEach drops that mocked graph again so later tests re-bind the real one.
+//
+// Caveat: env read at import time is frozen at the first import. api-guard.ts
+// (imported by viewer-context) captures KYBERION_API_TOKEN,
+// KYBERION_LOCALADMIN_TOKEN, KYBERION_ALLOW_UNAUTH_REMOTE and
+// KYBERION_LOCALHOST_AUTOADMIN at module load, so a test must not rely on
+// stubbing those per test for api-guard behaviour unless it builds a fresh
+// module graph (as mockRegistryModule() does). viewer-context itself re-reads
+// them on every call.
 let registryMocked = false;
 
 function mockRegistryModule(factory: () => Promise<Record<string, unknown>>): void {

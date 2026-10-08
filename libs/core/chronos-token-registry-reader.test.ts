@@ -226,8 +226,11 @@ describe('TR-01 chronos_token_registry_reader', () => {
 
   it('reads the registry as the reader role through the authn seam (deps.registrations unset)', async () => {
     process.env.SYSTEM_ROLE = 'concierge';
-    // vi.doMock needs a fresh module graph; the other tests share `modules`.
-    vi.resetModules();
+    // No vi.resetModules(): nothing else in this file loads surface-authn, so
+    // its first import below binds the mocked registry while authority stays
+    // the shared instance. A second module generation here would re-register
+    // its own role validator and root-scope provider in the process-global
+    // execution-scope registry and break the tests that run after it.
     const rolesDuringRead: Array<string | undefined> = [];
     vi.doMock('./chronos-access-registry.js', async () => {
       const actual = await vi.importActual<typeof import('./chronos-access-registry.js')>(
@@ -264,7 +267,6 @@ describe('TR-01 chronos_token_registry_reader', () => {
       expect(authority.resolveRole()).toBe('concierge');
     } finally {
       vi.doUnmock('./chronos-access-registry.js');
-      vi.resetModules();
     }
   });
 

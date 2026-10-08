@@ -280,20 +280,6 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     clearWorkCoordinationNamespace();
   });
 
-  it('does not install reasoning backends during import', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-    try {
-      await import('./mission-orchestration-worker.js');
-      expect(errorSpy).not.toHaveBeenCalled();
-      expect(logSpy).not.toHaveBeenCalled();
-    } finally {
-      errorSpy.mockRestore();
-      logSpy.mockRestore();
-    }
-  });
-
   it(
     'dispatches planned next tasks and marks them completed after acceptance',
     { timeout: 120_000 },
@@ -2714,5 +2700,28 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
         failover: true,
       });
     });
+  });
+});
+
+// The one legitimate fresh-import case in this file: the assertion is about
+// what importing the worker does, so it needs its own module graph whatever
+// order the tests run in. It lives outside the describe above so its reset
+// cannot split that describe's beforeEach/afterEach across two module
+// generations.
+describe('mission-orchestration-worker import', { timeout: 60_000 }, () => {
+  it('does not install reasoning backends during import', async () => {
+    process.env.MISSION_ROLE = 'mission_controller';
+    vi.resetModules();
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      await import('./mission-orchestration-worker.js');
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(logSpy).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+      logSpy.mockRestore();
+    }
   });
 });
