@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 import { assertSafeRepositoryPath, safeLstat, safeReadFileRange } from '../secure-io.js';
 import { getWorkItem } from '../workforce/work-coordination.js';
 import { currentDotActions } from '../dot/dot-dispatch.js';
-import { listDotCharters } from '../dot/dot-charter.js';
+import { findRepoDotCharter } from '../dot/dot-charter.js';
 import { readDotWorkResults } from '../dot/dot-executor-reports.js';
 import type { FrontDeskArtifactVerification } from '../dot/dot-state-paths.js';
 import type { SurfaceViewerScope } from './surface-mutation-guard.js';
@@ -83,9 +83,7 @@ export function projectFrontDeskExecution(
     return { status: 'queued', text: t('front_desk:execution_queued', {}, options.locale) };
   if (item.status === 'in_progress')
     return { status: 'running', text: t('front_desk:execution_running', {}, options.locale) };
-  const charter = listDotCharters(options.rootDir).find(
-    (value) => value.charter.dot_id === mapping.dotId
-  )?.charter;
+  const charter = findRepoDotCharter(mapping.dotId, options.rootDir)?.charter;
   if (
     !charter ||
     charter.scope.tier !== 'public' ||
