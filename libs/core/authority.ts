@@ -53,6 +53,7 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   chronos_localadmin: 'worker',
   chronos_token_registry_reader: 'worker',
   scope_locale_reader: 'worker',
+  audit_mirror_writer: 'worker',
   service_actuator: 'worker',
   surface_runtime: 'worker',
   // context roles
@@ -1116,11 +1117,12 @@ registerIdentityContextResolver(resolveIdentityContext);
 
 /**
  * G17: the audit chain's tenant mirror (customer/{slug}/logs/audit/) is written
- * as infrastructure_sentinel bound to the entry's tenant — a shared core
- * store-writer role whose grant on that path is tenant-parameterised — so the
- * mirror never depends on (or borrows) the caller's own grants.
+ * as audit_mirror_writer bound to the entry's tenant — a dedicated shared core
+ * store-writer role whose only grant is that tenant-parameterised path — so the
+ * mirror never depends on (or borrows) the caller's own grants, and no other
+ * store writer or resident dot (infrastructure_sentinel) holds a customer/ grant.
  */
-const TENANT_AUDIT_MIRROR_WRITER_ROLE = 'infrastructure_sentinel';
+const TENANT_AUDIT_MIRROR_WRITER_ROLE = 'audit_mirror_writer';
 // Guarded lookup, as in secure-io's registerOptionalAuditIo: a test's reduced
 // audit-chain mock may not export the seam.
 try {
