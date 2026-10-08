@@ -113,10 +113,21 @@ export interface ShutdownProcess {
   exit(code: number): void;
 }
 
+/**
+ * Returned by a shutdown routine that must not leave a gap between its last
+ * step and process exit (e.g. releasing a leader lease while abandoned work
+ * is still running): `beforeExit` runs, then the process exits synchronously
+ * in the same turn — no forced-exit grace window.
+ */
+export interface ImmediateExitRequest {
+  exitImmediately: true;
+  beforeExit?: () => void;
+}
+
 export interface GracefulShutdownOptions {
   name: string;
   /** Bounded shutdown routine: stop timers, drain work, record heartbeat, release locks. */
-  shutdown: (signal: ShutdownSignal) => Promise<void> | void;
+  shutdown: (signal: ShutdownSignal) => Promise<void | ImmediateExitRequest> | void;
   /**
    * After `shutdown` settles the exit code is set to 0 and the event loop is
    * allowed to drain; if a stray handle keeps it alive, force-exit after this
@@ -142,8 +153,9 @@ export function installGracefulShutdown(
     shuttingDown = (async () => {
       logger.info(`[${options.name}] ${signal} received; shutting down`);
       let exitCode = 0;
+      let immediate: ImmediateExitRequest | undefined;
       try {
-        await options.shutdown(signal);
+        immediate = (await options.shutdown(signal)) || undefined;
       } catch (error) {
         exitCode = 1;
         logger.error(
@@ -151,6 +163,18 @@ export function installGracefulShutdown(
         );
       }
       setProcessExitCode(exitCode);
+      if (immediate?.exitImmediately) {
+        try {
+          immediate.beforeExit?.();
+        } catch (error) {
+          exitCode = 1;
+          logger.error(
+            `[${options.name}] final shutdown step failed — ${error instanceof Error ? error.message : String(error)} | next: inspect the daemon leader lock | evidence: ${signal}`
+          );
+        }
+        proc.exit(exitCode);
+        return;
+      }
       const forceExit = setTimeout(() => proc.exit(exitCode), forceExitAfterMs);
       forceExit.unref?.();
     })();

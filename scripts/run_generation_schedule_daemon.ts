@@ -42,6 +42,8 @@ export function resolveTickDeadlineMs(
 
 const TICK_DEADLINE_MS = resolveTickDeadlineMs(DEFAULT_INTERVAL_MS);
 let currentChild: ChildProcess | null = null;
+/** Set before the shutdown forwards the signal: a child killed by it is a cancellation, not a failure. */
+let shuttingDown = false;
 
 /**
  * EV-05: this loop previously recorded no heartbeat, so `daemon_watchdog` could
@@ -66,16 +68,37 @@ async function runTick(): Promise<void> {
   }
 }
 
-async function runTickAndReport(): Promise<void> {
-  recordDaemonHeartbeat(DAEMON_ID, { status: 'running', details: { phase: 'tick' } });
+export interface TickReportDeps {
+  runTick: () => Promise<void>;
+  isShuttingDown: () => boolean;
+  recordHeartbeat: typeof recordDaemonHeartbeat;
+  sendAlert: typeof sendOpsAlert;
+}
+
+export async function runTickAndReport(
+  deps: TickReportDeps = {
+    runTick,
+    isShuttingDown: () => shuttingDown,
+    recordHeartbeat: recordDaemonHeartbeat,
+    sendAlert: sendOpsAlert,
+  }
+): Promise<void> {
+  deps.recordHeartbeat(DAEMON_ID, { status: 'running', details: { phase: 'tick' } });
   try {
-    await runTick();
+    await deps.runTick();
   } catch (err: any) {
     const message = err?.message ?? String(err);
+    if (deps.isShuttingDown()) {
+      // The shutdown forwarded SIGTERM/SIGINT to this child: an expected
+      // cancellation — no error heartbeat, no ops alert (a deploy mid-tick
+      // must not page anyone). The stopping heartbeat follows from shutdown.
+      logger.info(`[generation-schedule-daemon] tick cancelled by shutdown: ${message}`);
+      return;
+    }
     const timedOut = err instanceof ChildDeadlineError;
     logger.error(`[generation-schedule-daemon] tick error: ${message}`);
-    recordDaemonHeartbeat(DAEMON_ID, { status: 'error', details: { error: message } });
-    sendOpsAlert({
+    deps.recordHeartbeat(DAEMON_ID, { status: 'error', details: { error: message } });
+    deps.sendAlert({
       severity: 'warning',
       title: timedOut ? 'Generation schedule tick timed out' : 'Generation schedule tick failed',
       context: {
@@ -105,10 +128,14 @@ async function main(_args: string[] = []) {
 
   // Serial loop: the next tick is armed DEFAULT_INTERVAL_MS after the previous
   // one settles (same cadence as the old infinite loop + sleep).
-  const loop = startSerialTickLoop({ intervalMs: DEFAULT_INTERVAL_MS, tick: runTickAndReport });
+  const loop = startSerialTickLoop({
+    intervalMs: DEFAULT_INTERVAL_MS,
+    tick: () => runTickAndReport(),
+  });
   installGracefulShutdown({
     name: DAEMON_ID,
     shutdown: async (signal) => {
+      shuttingDown = true;
       clearInterval(runtimeHealthSampler);
       // Forward the signal so the tick child stops with us instead of being orphaned.
       currentChild?.kill(signal);
