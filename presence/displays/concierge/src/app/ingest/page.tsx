@@ -2,8 +2,7 @@
 
 import * as React from 'react';
 import { useConciergeI18n } from '../../lib/use-concierge-i18n';
-import { parseSetupResponse } from '../../lib/setup-response';
-import { parseConciergeIngestResponse } from '../../lib/ingest-response';
+import { useIngestFlow } from '../../lib/use-ingest-flow';
 
 /**
  * CS-03 文書取込 — the ingest ceremony as a dedicated page (linked from the
@@ -12,122 +11,97 @@ import { parseConciergeIngestResponse } from '../../lib/ingest-response';
  * explicitly committing it — an honest two-step ceremony.
  */
 
-type TenantOption = {
-  tenant_slug: string;
-  display_name: string;
-};
-
-type IngestSummary = {
-  dry_run: boolean;
-  outcome: 'committed' | 'would_commit' | 'duplicate';
-  target_path?: string;
-  file_name: string;
-  tenant: string;
-};
-
 const FORMAT_OPTIONS = ['docx', 'pdf', 'xlsx', 'html', 'markdown', 'text'] as const;
 
 export default function IngestPage() {
   const { t } = useConciergeI18n();
-  const [tenants, setTenants] = React.useState<TenantOption[]>([]);
-  const [tenant, setTenant] = React.useState('');
-  const [file, setFile] = React.useState<File | null>(null);
-  const [format, setFormat] = React.useState('');
-  const [dryRun, setDryRun] = React.useState(true);
-  const [busy, setBusy] = React.useState(false);
+  const flow = useIngestFlow();
+  const {
+    tenants,
+    selection: { file, tenant, format },
+    dryRun,
+    pending,
+    result,
+    failure,
+    uncertain,
+    access,
+    loading,
+    loadError,
+  } = flow;
+  const busy = pending !== null;
+  const disabled = busy || loading || loadError || access !== null;
   const [dragOver, setDragOver] = React.useState(false);
-  const [notice, setNotice] = React.useState<{ text: string; error?: boolean } | null>(null);
-  const [result, setResult] = React.useState<IngestSummary | null>(null);
-  const [loadError, setLoadError] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
-
   React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        // Tenant candidates come from the same catalog the /setup tenant
-        // section uses (tenant registry via /api/setup).
-        const response = await fetch('/api/setup', { cache: 'no-store' });
-        const setup = parseSetupResponse(await response.json().catch(() => null));
-        if (!response.ok || !setup) throw new Error('Invalid setup response');
-        if (cancelled) return;
-        const catalog: TenantOption[] = setup.tenant.catalog;
-        setTenants(catalog);
-        setTenant(String(setup.tenant.active_slug || catalog[0]?.tenant_slug || ''));
-        setLoadError(null);
-      } catch (error) {
-        if (!cancelled) setLoadError(error instanceof Error ? error.message : String(error));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const acceptFile = React.useCallback((next: File | null) => {
-    setFile(next);
-    setResult(null);
-    setNotice(null);
-  }, []);
-
-  const submit = React.useCallback(
-    async (asDryRun: boolean) => {
-      if (!file || !tenant || busy) return;
-      setBusy(true);
-      setNotice(null);
-      try {
-        const form = new FormData();
-        form.set('file', file);
-        form.set('tenant', tenant);
-        if (format) form.set('format', format);
-        if (asDryRun) form.set('dry_run', 'true');
-        const response = await fetch('/api/ingest', { method: 'POST', body: form });
-        const parsed = parseConciergeIngestResponse(await response.json().catch(() => null));
-        if (!response.ok || !parsed) throw new Error('Invalid ingest response');
-        setResult(parsed.summary);
-        setNotice({ text: parsed.message });
-        if (parsed.summary.outcome === 'committed') {
-          // The ceremony is complete — the next upload starts fresh.
-          setFile(null);
-          if (fileInputRef.current) fileInputRef.current.value = '';
-        }
-      } catch (error) {
-        setResult(null);
-        setNotice({ text: error instanceof Error ? error.message : String(error), error: true });
-      } finally {
-        setBusy(false);
-      }
-    },
-    [busy, file, format, tenant]
-  );
-
-  if (loadError) {
-    return <div className="notice error">{t('ingest.load_error', { error: loadError })}</div>;
-  }
+    if (!file && fileInputRef.current) fileInputRef.current.value = '';
+  }, [file]);
 
   return (
     <section className="pane ingest-pane" aria-label={t('ingest.title')}>
       <h2>{t('ingest.title')}</h2>
       <p className="pane-subtitle">{t('ingest.description')}</p>
 
+      {loading ? <p role="status">{t('ingest.loading')}</p> : null}
+      {loadError || access ? (
+        <div className="notice error" role="alert">
+          <p>
+            {t(
+              access === 401
+                ? 'ingest.signin_required'
+                : access === 403
+                  ? 'ingest.access_denied'
+                  : 'ingest.prepare_failed'
+            )}
+          </p>
+          {access === 401 ? <a href="/signin">{t('ingest.signin')}</a> : null}
+          <button
+            type="button"
+            className="action-button secondary"
+            disabled={busy || loading}
+            onClick={flow.reload}
+          >
+            {t('ingest.reload')}
+          </button>
+        </div>
+      ) : null}
+      {!loading && !loadError && !access && tenants.length === 0 ? (
+        <div>
+          <p role="status">{t('ingest.no_destination')}</p>
+          <button type="button" className="action-button secondary" onClick={flow.reload}>
+            {t('ingest.reload')}
+          </button>
+        </div>
+      ) : null}
+      {uncertain ? (
+        <div className="notice error" role="alert">
+          <p>
+            {t('ingest.commit_uncertain', {
+              file: uncertain.file?.name || '',
+              tenant: uncertain.tenant,
+            })}
+          </p>
+          <p>{t('ingest.uncertain_guidance')}</p>
+        </div>
+      ) : null}
       <div
         className={`ingest-dropzone${dragOver ? ' dragover' : ''}`}
         onDragOver={(event) => {
           event.preventDefault();
-          setDragOver(true);
+          if (!disabled) setDragOver(true);
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={(event) => {
           event.preventDefault();
           setDragOver(false);
           const dropped = event.dataTransfer.files?.[0];
-          if (dropped) acceptFile(dropped);
+          if (dropped && !disabled) flow.changeSelection({ file: dropped });
         }}
       >
         <p className="item-body">{file ? file.name : t('ingest.drop_hint')}</p>
         <button
           type="button"
           className="action-button secondary"
+          disabled={disabled}
           onClick={() => fileInputRef.current?.click()}
         >
           {t('ingest.choose_file')}
@@ -136,13 +110,20 @@ export default function IngestPage() {
           ref={fileInputRef}
           type="file"
           hidden
-          onChange={(event) => acceptFile(event.target.files?.[0] || null)}
+          disabled={disabled}
+          onChange={(event) => {
+            if (!disabled) flow.changeSelection({ file: event.target.files?.[0] || null });
+          }}
         />
       </div>
 
       <label className="field-label">
         {t('ingest.tenant_label')}
-        <select value={tenant} onChange={(event) => setTenant(event.target.value)}>
+        <select
+          disabled={disabled}
+          value={tenant}
+          onChange={(event) => flow.changeSelection({ tenant: event.target.value })}
+        >
           {tenants.map((option) => (
             <option key={option.tenant_slug} value={option.tenant_slug}>
               {option.display_name} ({option.tenant_slug})
@@ -153,7 +134,11 @@ export default function IngestPage() {
 
       <label className="field-label">
         {t('ingest.format_label')}
-        <select value={format} onChange={(event) => setFormat(event.target.value)}>
+        <select
+          disabled={disabled}
+          value={format}
+          onChange={(event) => flow.changeSelection({ format: event.target.value })}
+        >
           <option value="">{t('ingest.format_auto')}</option>
           {FORMAT_OPTIONS.map((option) => (
             <option key={option} value={option}>
@@ -167,7 +152,8 @@ export default function IngestPage() {
         <input
           type="checkbox"
           checked={dryRun}
-          onChange={(event) => setDryRun(event.target.checked)}
+          disabled={disabled || uncertain !== null}
+          onChange={(event) => flow.changeDryRun(event.target.checked)}
         />{' '}
         {t('ingest.dry_run_label')}
       </label>
@@ -177,40 +163,50 @@ export default function IngestPage() {
         <button
           type="button"
           className="action-button"
-          disabled={!file || !tenant || busy}
-          onClick={() => void submit(dryRun)}
+          disabled={!file || !tenant || disabled}
+          onClick={() => void flow.submit(dryRun)}
         >
           {dryRun ? t('ingest.submit_preview') : t('ingest.submit_commit')}
         </button>
       </div>
-      {busy ? <p className="item-meta">{t('ingest.busy')}</p> : null}
+      {busy ? (
+        <p className="item-meta" role="status">
+          {t(pending === 'commit' ? 'ingest.filing' : 'ingest.busy')}
+        </p>
+      ) : null}
 
-      {notice ? (
-        <div className={`notice${notice.error ? ' error' : ''}`} style={{ marginTop: 12 }}>
-          {notice.text}
+      {failure ? (
+        <div className="notice error" role="alert">
+          <p>{failure.detail}</p>
+          <p>{t(failure.key)}</p>
         </div>
       ) : null}
 
       {result ? (
-        <div className="item-card">
+        <div className="item-card" role="status">
           <p className="item-title">
             {result.file_name}
             <span className={`status-chip${result.outcome === 'duplicate' ? '' : ' ok'}`}>
-              {t(`ingest.outcome.${result.outcome}` as Parameters<typeof t>[0])}
+              {t(
+                result.outcome === 'duplicate'
+                  ? 'ingest.duplicate_label'
+                  : (`ingest.outcome.${result.outcome}` as Parameters<typeof t>[0])
+              )}
             </span>
           </p>
-          {result.target_path ? (
+          {result.target_path && result.outcome !== 'duplicate' ? (
             <p className="item-meta">{t('ingest.target_path', { value: result.target_path })}</p>
           ) : null}
-          <p className="item-meta">{t('ingest.tenant_note', { value: result.tenant })}</p>
-          {result.dry_run && result.outcome === 'would_commit' && file ? (
+          <p className="item-meta">{t('ingest.requested_destination', { value: result.tenant })}</p>
+          {result.outcome === 'duplicate' ? <p>{t('ingest.duplicate_note')}</p> : null}
+          {flow.canConfirm ? (
             <div className="button-row">
-              {/* The honest second step: commit exactly what was previewed. */}
+              {/* The honest second step: submit the reviewed client selection (not a server-bound token). */}
               <button
                 type="button"
                 className="action-button"
-                disabled={busy}
-                onClick={() => void submit(false)}
+                disabled={disabled}
+                onClick={() => void flow.submit(false, true)}
               >
                 {t('ingest.commit_after_preview')}
               </button>

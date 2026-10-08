@@ -23,7 +23,10 @@ function hasSafeTree(value: unknown): boolean {
   );
 }
 
-export function parseConciergeIngestResponse(value: unknown):
+export function parseConciergeIngestResponse(
+  value: unknown,
+  expected?: { tenant: string; dryRun: boolean }
+):
   | {
       summary: ConciergeIngestSummary;
       message: string;
@@ -43,6 +46,10 @@ export function parseConciergeIngestResponse(value: unknown):
     typeof summary.dry_run !== 'boolean' ||
     typeof summary.outcome !== 'string' ||
     !INGEST_OUTCOMES.has(summary.outcome) ||
+    (summary.dry_run && summary.outcome === 'committed') ||
+    (!summary.dry_run && summary.outcome === 'would_commit') ||
+    (expected !== undefined &&
+      (summary.tenant !== expected.tenant || summary.dry_run !== expected.dryRun)) ||
     (summary.target_path !== undefined && typeof summary.target_path !== 'string') ||
     typeof summary.file_name !== 'string' ||
     typeof summary.tenant !== 'string'
@@ -59,4 +66,16 @@ export function parseConciergeIngestResponse(value: unknown):
     },
     message: value.message,
   };
+}
+
+/** Only known pre-execution rejection statuses use this bounded, text-only detail. */
+export function parseConciergeIngestError(value: unknown): string | undefined {
+  return isRecord(value) &&
+    value.ok === false &&
+    hasSafeTree(value) &&
+    typeof value.error === 'string' &&
+    value.error.trim().length > 0 &&
+    value.error.length <= 500
+    ? value.error
+    : undefined;
 }
