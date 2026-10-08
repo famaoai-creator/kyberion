@@ -52,8 +52,7 @@
         "active/shared/runtime/",
         "presence/bridge/runtime/",
         "../../../Library/LaunchAgents/",
-        "active/shared/tmp/",
-        "customer/${KYBERION_TENANT}/logs/audit/"
+        "active/shared/tmp/"
       ]
     },
     "slack_bridge": {
@@ -105,6 +104,9 @@
     },
     "scope_locale_reader": {
       "allow": []
+    },
+    "audit_mirror_writer": {
+      "allow": ["customer/${KYBERION_TENANT}/logs/audit/"]
     },
     "surface_runtime": {
       "allow": [

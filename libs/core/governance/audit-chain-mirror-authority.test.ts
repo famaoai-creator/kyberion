@@ -10,7 +10,10 @@ import { auditChain, registerAuditChainIo, type AuditChainIo } from './audit-cha
 // entry inside work coordination's infrastructure_sentinel store fence, so the
 // tenant mirror (customer/{slug}/logs/audit/) was written as an unbound
 // sentinel and denied. The mirror is the chain's own store: it is written as
-// infrastructure_sentinel bound to the entry's tenant, whatever the caller is.
+// the dedicated audit_mirror_writer role bound to the entry's tenant, whatever
+// the caller is. infrastructure_sentinel (also bound by resident dots) holds no
+// customer/ grant at all.
+const MIRROR_WRITER = 'audit_mirror_writer';
 const TENANT = 'mirror-authority-co';
 const OTHER_TENANT = 'mirror-other-co';
 const ENV_KEYS = ['KYBERION_PERSONA', 'MISSION_ROLE', 'KYBERION_SUDO', 'KYBERION_TENANT'] as const;
@@ -37,21 +40,35 @@ describe('audit chain tenant mirror authority', () => {
     }
   });
 
-  it('grants the tenant-bound store-writer only its own tenant mirror', () => {
+  const allowedAs = (role: string, slug: string | undefined, file: string): boolean =>
+    withExecutionContext(role, () => validateWritePermission(file).allowed, undefined, slug);
+
+  it('grants the tenant-bound mirror writer only its own tenant mirror', () => {
     const allowed = (slug: string | undefined, file: string): boolean =>
-      withExecutionContext(
-        'infrastructure_sentinel',
-        () => validateWritePermission(file).allowed,
-        undefined,
-        slug
-      );
+      allowedAs(MIRROR_WRITER, slug, file);
 
     expect(allowed(TENANT, mirrorPath(TENANT))).toBe(true);
     expect(allowed(TENANT, mirrorPath(OTHER_TENANT))).toBe(false);
+    expect(allowed(OTHER_TENANT, mirrorPath(TENANT))).toBe(false);
     expect(allowed(undefined, mirrorPath(TENANT))).toBe(false);
     expect(
       allowed(TENANT, path.join(pathResolver.rootDir(), 'customer', TENANT, 'customer.json'))
     ).toBe(false);
+    // No infrastructure_sentinel scope rides along with the mirror grant.
+    expect(
+      allowed(
+        TENANT,
+        path.join(pathResolver.rootDir(), 'active', 'shared', 'coordination', 'channels', 'x.json')
+      )
+    ).toBe(false);
+  });
+
+  it('no longer grants infrastructure_sentinel any tenant mirror', () => {
+    expect(allowedAs('infrastructure_sentinel', TENANT, mirrorPath(TENANT))).toBe(false);
+    expect(allowedAs('infrastructure_sentinel', OTHER_TENANT, mirrorPath(OTHER_TENANT))).toBe(
+      false
+    );
+    expect(allowedAs('infrastructure_sentinel', undefined, mirrorPath(TENANT))).toBe(false);
   });
 
   it('writes the mirror as the tenant-bound writer even inside an unbound sentinel fence', () => {
@@ -93,7 +110,7 @@ describe('audit chain tenant mirror authority', () => {
     const mirror = appends.find((entry) => entry.file.includes(`customer${path.sep}${TENANT}`));
     expect(mirror).toEqual({
       file: expect.stringContaining(path.join('customer', TENANT, 'logs', 'audit')),
-      role: 'infrastructure_sentinel',
+      role: MIRROR_WRITER,
       tenant: TENANT,
       allowed: true,
     });
