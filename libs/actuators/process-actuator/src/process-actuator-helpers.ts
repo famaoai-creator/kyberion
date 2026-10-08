@@ -203,6 +203,7 @@ const main = async () => {
   const inputPath = resolveProcessPath(String(argv.input), false);
   const input = readProcessJson(inputPath, 'process action input');
   const result = await handleAction(parseProcessAction(input));
+  // eslint-disable-next-line no-console -- CLI entry: stdout carries this command's JSON result
   console.log(JSON.stringify(result, null, 2));
 };
 
