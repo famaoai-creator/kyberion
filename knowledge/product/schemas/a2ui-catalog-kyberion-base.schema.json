@@ -1091,6 +1091,7 @@
         "stale",
         "stopped",
         "unavailable",
+        "validating",
         "working"
       ],
       "description": "Canonical dashboard status vocabulary (libs/core/ux-vocabulary.ts renderStatus domains)."

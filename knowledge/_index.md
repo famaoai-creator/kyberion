@@ -429,6 +429,7 @@
 - [Sovereign Autonomous Agent Protocol (SAAP)](./product/orchestration/autonomous-agent-protocol.md) (public | Ecosystem Architect)
 - [Sovereign Onboarding Protocol (moved)](./product/orchestration/onboarding-protocol.md) (public | Unknown)
 - [Stakeholder Consensus Protocol](./product/orchestration/stakeholder-consensus-protocol.md) (public | Ecosystem Architect)
+- [Stale-Build Troubleshooting Runbook](./product/orchestration/stale-build-troubleshooting-runbook.md) (public | Unknown)
 - [Standard SDLC Loop Fragment Proposal](./product/orchestration/standard-sdlc-loop-fragment-proposal.md) (public | Unknown)
 - [Standard SDLC Loop Fragment Spec](./product/orchestration/standard-sdlc-loop-fragment-spec.md) (public | Unknown)
 - [Supported Actuators Catalog / サポートアクチュエータ一覧](./product/orchestration/supported-actuators.md) (public | Antigravity)
