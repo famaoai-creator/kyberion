@@ -10,6 +10,7 @@ import {
 } from '../secure-io.js';
 import { isRecord, readTextFile } from '../foundation/text.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { registeredServiceAccessCredentialPresent } from '../service/operator-service-connection-catalog.js';
 import * as path from 'node:path';
 import type { AgentProvider } from './agent-registry.js';
 
@@ -342,18 +343,12 @@ export function validateRequirements(
     }
   }
 
-  // Services are validated by checking known service configs
-  // For now, service check = env vars for that service exist
-  const SERVICE_ENV_MAP: Record<string, string[]> = {
-    slack: ['SLACK_BOT_TOKEN'],
-    github: ['GITHUB_TOKEN'],
-  };
+  // Registered bearer runtimes use the same catalog credential candidates as
+  // execution, including locally introduced ACCESS_TOKEN values. Presence is
+  // not authentication or a TIBA grant. Explicit requires.env above is unchanged.
   for (const service of req.services || []) {
-    const requiredEnvs = SERVICE_ENV_MAP[service] || [];
-    for (const envVar of requiredEnvs) {
-      if (!getRegisteredEnvText(envVar)) {
-        reasons.push(`Service "${service}" requires env: ${envVar}`);
-      }
+    if (registeredServiceAccessCredentialPresent(service) === false) {
+      reasons.push(`Service "${service}" requires an access credential`);
     }
   }
 

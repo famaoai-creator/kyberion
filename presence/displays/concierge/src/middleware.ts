@@ -49,6 +49,8 @@ export function middleware(req: NextRequest): NextResponse {
   return NextResponse.redirect(new URL(target, req.url), 302);
 }
 
+// Share the local adapter's process-only proof registry. Edge isolates cannot.
 export const config = {
+  runtime: 'nodejs',
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };

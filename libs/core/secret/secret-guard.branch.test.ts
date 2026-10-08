@@ -248,7 +248,8 @@ describe('secret-guard branch coverage', () => {
     expect(stored.changedKeys).toEqual(['nested', 'token']);
     expect(mocks.safeWriteFile).toHaveBeenCalledWith(
       expect.stringContaining('.bak'),
-      expect.any(String)
+      expect.any(String),
+      { mode: 0o600 }
     );
     expect(mocks.ledgerRecord).toHaveBeenCalledWith(
       'CONFIG_CHANGE',

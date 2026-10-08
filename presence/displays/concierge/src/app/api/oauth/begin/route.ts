@@ -4,9 +4,11 @@ import { getRegisteredEnvText } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult, safeExistsSync } from '@agent/core/secure-io';
 import { loadSurfaceManifest, probeSurfaceHealth } from '@agent/core/surface/surface-runtime';
-import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
+import {
+  operatorServiceError,
+  resolveOperatorServiceAccess,
+} from '../../../../lib/operator-service-access';
 import { readRequestObject } from '../../../../lib/request-input';
-import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,10 +65,8 @@ async function ensureOAuthCallbackSurface(): Promise<void> {
 }
 
 export async function POST(req: NextRequest) {
-  const denied = requireConciergeMutationAccess(req);
-  if (denied) return denied;
-  const resolved = resolveConciergeViewer(req);
-  if (resolved.response) return resolved.response;
+  const access = resolveOperatorServiceAccess(req);
+  if (access.response) return access.response;
 
   try {
     const parsedBody = await readRequestObject(req, 'request body', ['service_id']);
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
       redirect_uri: redirectUri,
       state: session.state,
     });
-  } catch (error) {
-    return conciergeErrorResponse(error);
+  } catch {
+    return operatorServiceError('unavailable', 503);
   }
 }

@@ -134,7 +134,7 @@ describe('browser onboarding', () => {
     const result = await applyBrowserOnboarding(validDraft());
 
     expect(result.ok).toBe(true);
-    expect(result.artifacts).toHaveLength(7);
+    expect(result.artifacts).toHaveLength(6);
     expect(
       result.artifacts.every((artifact) =>
         path.resolve(artifact).startsWith(path.resolve(PROFILE_ROOT))
@@ -152,17 +152,46 @@ describe('browser onboarding', () => {
       name: 'Browser Operator',
       vision: 'Configure Kyberion safely from a browser.',
     });
-    expect(
-      JSON.parse(
-        String(
-          safeReadFile(path.join(PROFILE_ROOT, 'connections/github.json'), { encoding: 'utf8' })
-        )
-      )
-    ).toMatchObject({
-      service_id: 'github',
-      status: 'proposed',
-      credential_ref: null,
-    });
+    expect(safeExistsSync(path.join(PROFILE_ROOT, 'connections/github.json'))).toBe(false);
+  });
+
+  it.each([
+    [
+      'personal plaintext',
+      '{"access_token":"synthetic-preserved-token","refresh_token":"synthetic-refresh"}\n',
+    ],
+    [
+      'customer encrypted',
+      '{"encrypted":true,"ciphertext":"opaque-synthetic-ciphertext","iv":"test-iv"}\n',
+    ],
+  ])('never replaces %s credentials when saving settings', async (_label, original) => {
+    const { applyBrowserOnboarding } = await import('./browser-onboarding.js');
+    const connectionPath = path.join(PROFILE_ROOT, 'connections/github.json');
+    safeWriteFile(connectionPath, original, { mkdir: true, encoding: 'utf8' });
+    for (const services of [validDraft().services, [], validDraft().services]) {
+      const result = await applyBrowserOnboarding({ ...validDraft(), services });
+      expect(String(safeReadFile(connectionPath, { encoding: 'utf8' }))).toBe(original);
+      expect(result.artifacts).not.toContain(connectionPath);
+    }
+  });
+
+  it('keeps selection metadata out of new credential documents', async () => {
+    const { applyBrowserOnboarding, getBrowserOnboardingState, previewBrowserOnboarding } =
+      await import('./browser-onboarding.js');
+    const draft = {
+      ...validDraft(),
+      services: [
+        { service_id: 'notion', auth_mode: 'oauth', required: false },
+        ...validDraft().services,
+      ],
+    };
+    const preview = previewBrowserOnboarding(draft);
+    expect(preview.effects.some((effect) => effect.path.includes('/connections/'))).toBe(false);
+    await applyBrowserOnboarding(draft);
+    expect(safeExistsSync(path.join(PROFILE_ROOT, 'connections'))).toBe(false);
+    expect(getBrowserOnboardingState().onboarding).toMatchObject({ services: draft.services });
+    await applyBrowserOnboarding({ ...draft, services: [] });
+    expect(getBrowserOnboardingState().onboarding).toMatchObject({ services: [] });
   });
 
   it('persists the selected reasoning provider and routes the default role through it', async () => {

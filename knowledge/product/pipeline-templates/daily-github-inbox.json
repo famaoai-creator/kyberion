@@ -25,6 +25,7 @@
       "produces": { "channel": "open_issues", "type": "ServiceResult" },
       "params": {
         "service_id": "github",
+        "auth": "secret-guard",
         "action": "list_issues",
         "params": {
           "owner": "{{owner}}",
@@ -41,6 +42,7 @@
       "produces": { "channel": "open_pulls", "type": "ServiceResult" },
       "params": {
         "service_id": "github",
+        "auth": "secret-guard",
         "action": "list_pulls",
         "params": {
           "owner": "{{owner}}",
@@ -57,6 +59,7 @@
       "produces": { "channel": "workflow_runs", "type": "ServiceResult" },
       "params": {
         "service_id": "github",
+        "auth": "secret-guard",
         "action": "actions_list_runs",
         "params": {
           "owner": "{{owner}}",

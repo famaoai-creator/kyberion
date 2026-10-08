@@ -65,6 +65,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/agent/agent-prompt-approval.ts#createApprovalStorePromptPort (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/agent/agent-prompt-approval.ts#createApprovalStorePromptPort (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -204,6 +209,11 @@
       "unresolved": [
         "role argument `charter.authority.authority_role` could not be resolved at libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases"
       ]
+    },
+    {
+      "site": "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
     },
     {
       "site": "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases (via libs/core/workforce/artifact-store.ts#withRole)",
@@ -597,6 +607,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mission/mission-maintenance.ts#approveScopeChange (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mission/mission-maintenance.ts#approveScopeChange (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -724,6 +739,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/plugin/plugin-view-actions.ts#executeApprovedPluginViewAction (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/plugin/plugin-view-actions.ts#executeApprovedPluginViewAction (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -768,6 +788,11 @@
     {
       "site": "libs/core/script-harness.ts#defineGenerator",
       "roles": ["ecosystem_architect"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/secret/secret-introduction.ts#applySecretIntroduction (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
       "unresolved": []
     },
     {
@@ -1520,6 +1545,31 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/app/api/secrets/apply/route.ts#POST",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/secrets/introduce/route.ts#GET",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/secrets/introduce/route.ts#POST",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/services/operator/route.ts#GET",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/services/operator/route.ts#POST",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/app/api/setup/route.ts#GET",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -1949,6 +1999,11 @@
     {
       "site": "scripts/company_onboarding.ts#onboardAiCompany",
       "roles": ["mission_controller", "sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/config_mission.ts#cmdApply (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
       "unresolved": []
     },
     {
@@ -3347,6 +3402,8 @@
     },
     "concierge": {
       "entries": [
+        "presence/displays/concierge/server/local-peer.ts",
+        "presence/displays/concierge/server/local-server.ts",
         "presence/displays/concierge/src/app/api/agent-avatar/[expression]/route.ts",
         "presence/displays/concierge/src/app/api/approvals/[id]/route.ts",
         "presence/displays/concierge/src/app/api/charters/route.ts",
@@ -3388,6 +3445,7 @@
         "presence/displays/concierge/src/app/api/response-status/route.ts",
         "presence/displays/concierge/src/app/api/secrets/apply/route.ts",
         "presence/displays/concierge/src/app/api/secrets/introduce/route.ts",
+        "presence/displays/concierge/src/app/api/services/operator/route.ts",
         "presence/displays/concierge/src/app/api/setup/avatar-actions.ts",
         "presence/displays/concierge/src/app/api/setup/avatar-generation/route.ts",
         "presence/displays/concierge/src/app/api/setup/route.ts",
@@ -3422,6 +3480,7 @@
         "presence/displays/concierge/src/app/outcome-files.tsx",
         "presence/displays/concierge/src/app/page.tsx",
         "presence/displays/concierge/src/app/review-checkin.tsx",
+        "presence/displays/concierge/src/app/settings/operator-services-api.ts",
         "presence/displays/concierge/src/app/settings/page.tsx",
         "presence/displays/concierge/src/app/settings/sections/AdvancedSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/AvatarGenerationPanel.tsx",
@@ -3431,6 +3490,7 @@
         "presence/displays/concierge/src/app/settings/sections/InvitesPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/MembersSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/NotificationsSection.tsx",
+        "presence/displays/concierge/src/app/settings/sections/OperatorServiceRegistrationPanel.tsx",
         "presence/displays/concierge/src/app/settings/sections/OrgReadinessPane.tsx",
         "presence/displays/concierge/src/app/settings/sections/PluginsSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/ProfileSection.tsx",
@@ -3472,6 +3532,7 @@
         "presence/displays/concierge/src/lib/mutation-response.ts",
         "presence/displays/concierge/src/lib/observation-review-types.ts",
         "presence/displays/concierge/src/lib/observation-review.ts",
+        "presence/displays/concierge/src/lib/operator-service-access.ts",
         "presence/displays/concierge/src/lib/org-readiness-server.ts",
         "presence/displays/concierge/src/lib/org-readiness-view.ts",
         "presence/displays/concierge/src/lib/outcome-files-client.ts",

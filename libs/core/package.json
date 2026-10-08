@@ -5719,6 +5719,10 @@
       "types": "./dist/service/service-engine.d.ts",
       "default": "./dist/service/service-engine.js"
     },
+    "./service/operator-service-connection": {
+      "types": "./dist/service/operator-service-connection.d.ts",
+      "default": "./dist/service/operator-service-connection.js"
+    },
     "./service/service-engine-admission": {
       "types": "./dist/service/service-engine-admission.d.ts",
       "default": "./dist/service/service-engine-admission.js"

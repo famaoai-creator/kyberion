@@ -146,6 +146,27 @@ export interface ServicePresetAlternativeExecutionContext {
   envelope: ReturnType<typeof resolveRequestEnvelope>;
   mergedParams: Record<string, any>;
   binding: ReturnType<typeof resolveServiceBinding>;
+  /** Set only by the admitted, fixed authentication probe. */
+  operatorProbe?: boolean;
+}
+
+function alternativeRetryOptions(input: ServicePresetAlternativeExecutionContext) {
+  if (input.operatorProbe) return { maxRetries: 0 };
+  const options = buildRetryOptions(input.serviceConfig, input.preset, input.alt, {
+    // Authenticated provider failures may echo credentials. Classify for retry
+    // in memory only; never feed raw text to the unclassified-error registry.
+    recordUnclassifiedErrors: input.binding.authMode !== 'secret-guard',
+  });
+  return input.binding.authMode === 'secret-guard'
+    ? {
+        ...options,
+        onRetry: (_error: Error, attempt: number) => {
+          logger.warn(
+            '[ENGINE] Authenticated service request failed; retry attempt ' + attempt + '.'
+          );
+        },
+      }
+    : options;
 }
 
 export async function executeServicePresetAlternative(
@@ -163,22 +184,19 @@ export async function executeServicePresetAlternative(
       throw new Error('CLI execution disabled.');
     }
 
-    const rawOutput = await retry(
-      async () => {
-        const args = (input.alt.args || []).map((a: any) => {
-          const resolved = resolveTemplateValue(a, runtimeVars);
-          return typeof resolved === 'string' ? resolved : JSON.stringify(resolved);
-        });
-        const execEnv = buildPresetProcessEnv(
-          stripUnresolvedTemplateValues(
-            resolveTemplateValue(input.alt.env || {}, runtimeVars)
-          ) as Record<string, unknown>
-        );
-        logger.info(`🚀 [ENGINE:CLI] Executing ${bin}`);
-        return execEnv ? safeExec(bin, args, { env: execEnv }) : safeExec(bin, args);
-      },
-      buildRetryOptions(input.serviceConfig, input.preset, input.alt)
-    );
+    const rawOutput = await retry(async () => {
+      const args = (input.alt.args || []).map((a: any) => {
+        const resolved = resolveTemplateValue(a, runtimeVars);
+        return typeof resolved === 'string' ? resolved : JSON.stringify(resolved);
+      });
+      const execEnv = buildPresetProcessEnv(
+        stripUnresolvedTemplateValues(
+          resolveTemplateValue(input.alt.env || {}, runtimeVars)
+        ) as Record<string, unknown>
+      );
+      logger.info(`🚀 [ENGINE:CLI] Executing ${bin}`);
+      return execEnv ? safeExec(bin, args, { env: execEnv }) : safeExec(bin, args);
+    }, alternativeRetryOptions(input));
 
     const parsed = parseServiceCliOutput(rawOutput);
     return { result: normalizePresetResult(parsed, input.alt.output_mapping) };
@@ -192,23 +210,20 @@ export async function executeServicePresetAlternative(
       ) as Record<string, unknown>
     );
 
-    const mcpResult = await retry(
-      async () => {
-        logger.info(`🚀 [ENGINE:MCP_HTTP] Executing ${remoteUrl} for ${input.action}`);
-        return await executeRemoteMcp(
-          remoteUrl,
-          {
-            action: input.alt.mcp_action || 'call_tool',
-            name: resolveVars(input.alt.tool_name || input.action, runtimeVars),
-            arguments: input.alt.payload_template
-              ? resolveTemplateValue(input.alt.payload_template, runtimeVars)
-              : input.params,
-          },
-          mcpHeaders ? { headers: mcpHeaders } : undefined
-        );
-      },
-      buildRetryOptions(input.serviceConfig, input.preset, input.alt)
-    );
+    const mcpResult = await retry(async () => {
+      logger.info(`🚀 [ENGINE:MCP_HTTP] Executing ${remoteUrl} for ${input.action}`);
+      return await executeRemoteMcp(
+        remoteUrl,
+        {
+          action: input.alt.mcp_action || 'call_tool',
+          name: resolveVars(input.alt.tool_name || input.action, runtimeVars),
+          arguments: input.alt.payload_template
+            ? resolveTemplateValue(input.alt.payload_template, runtimeVars)
+            : input.params,
+        },
+        mcpHeaders ? { headers: mcpHeaders } : undefined
+      );
+    }, alternativeRetryOptions(input));
 
     return { result: normalizePresetResult(mcpResult, input.alt.output_mapping) };
   }
@@ -226,89 +241,86 @@ export async function executeServicePresetAlternative(
       ) as Record<string, unknown>
     );
 
-    const mcpResult = await retry(
-      async () => {
-        logger.info(`🚀 [ENGINE:MCP] Executing ${bin} for ${input.action}`);
-        return await executeMcp(
-          bin,
-          args,
-          {
-            action: input.alt.mcp_action || 'call_tool',
-            name: resolveVars(input.alt.tool_name || input.action, runtimeVars),
-            arguments: input.alt.payload_template
-              ? resolveTemplateValue(input.alt.payload_template, runtimeVars)
-              : input.params,
-          },
-          mcpEnv ? { env: mcpEnv } : undefined
-        );
-      },
-      buildRetryOptions(input.serviceConfig, input.preset, input.alt)
-    );
+    const mcpResult = await retry(async () => {
+      logger.info(`🚀 [ENGINE:MCP] Executing ${bin} for ${input.action}`);
+      return await executeMcp(
+        bin,
+        args,
+        {
+          action: input.alt.mcp_action || 'call_tool',
+          name: resolveVars(input.alt.tool_name || input.action, runtimeVars),
+          arguments: input.alt.payload_template
+            ? resolveTemplateValue(input.alt.payload_template, runtimeVars)
+            : input.params,
+        },
+        mcpEnv ? { env: mcpEnv } : undefined
+      );
+    }, alternativeRetryOptions(input));
 
     return { result: normalizePresetResult(mcpResult, input.alt.output_mapping) };
   }
 
   if (input.alt.type === 'api') {
-    const result = await retry(
-      async () => {
-        const baseUrl = resolveVars(
-          input.alt.base_url ||
-            input.preset.base_url ||
-            input.serviceConfig.base_url ||
-            input.mergedParams.base_url,
-          runtimeVars
-        );
-        if (!baseUrl) {
-          throw new Error(`No base_url resolved for service "${input.serviceId}"`);
-        }
-        const apiPath = resolveVars(input.alt.path, runtimeVars);
-        const method = input.alt.method || 'GET';
-        const authQuery = buildApiKeyQueryAuth(
-          input.alt.auth_strategy || input.preset.auth_strategy,
-          input.alt.auth_params || input.preset.auth_params,
-          input.binding,
-          runtimeVars
-        );
-        const rawQuery = input.envelope.query ?? (method === 'GET' ? input.params : undefined);
-        const rawPayload = input.alt.payload_template
-          ? resolveTemplateValue(input.alt.payload_template, input.mergedParams)
-          : input.envelope.hasBody
-            ? input.envelope.body
-            : input.params;
-        const headers = {
-          ...(input.preset.headers || {}),
-          ...(input.alt.headers || {}),
-          ...buildAuthHeaders(input.alt.auth_strategy || input.preset.auth_strategy, input.binding),
-        };
-        const payload = prepareRequestBody(rawPayload, headers);
-        const requestParams = isPlainObject(rawQuery)
-          ? {
-              ...(resolveTemplateValue(rawQuery, runtimeVars) as Record<string, unknown>),
-              ...authQuery,
-            }
-          : Object.keys(authQuery).length > 0
-            ? authQuery
-            : undefined;
+    const result = await retry(async () => {
+      const baseUrl = resolveVars(
+        input.alt.base_url ||
+          input.preset.base_url ||
+          input.serviceConfig.base_url ||
+          input.mergedParams.base_url,
+        runtimeVars
+      );
+      if (!baseUrl) {
+        throw new Error(`No base_url resolved for service "${input.serviceId}"`);
+      }
+      const apiPath = resolveVars(input.alt.path, runtimeVars);
+      const method = input.alt.method || 'GET';
+      const authQuery = buildApiKeyQueryAuth(
+        input.alt.auth_strategy || input.preset.auth_strategy,
+        input.alt.auth_params || input.preset.auth_params,
+        input.binding,
+        runtimeVars
+      );
+      const rawQuery = input.envelope.query ?? (method === 'GET' ? input.params : undefined);
+      const rawPayload = input.alt.payload_template
+        ? resolveTemplateValue(input.alt.payload_template, input.mergedParams)
+        : input.envelope.hasBody
+          ? input.envelope.body
+          : input.params;
+      const headers = {
+        ...(input.preset.headers || {}),
+        ...(input.alt.headers || {}),
+        ...buildAuthHeaders(input.alt.auth_strategy || input.preset.auth_strategy, input.binding),
+      };
+      const payload = prepareRequestBody(rawPayload, headers);
+      const requestParams = isPlainObject(rawQuery)
+        ? {
+            ...(resolveTemplateValue(rawQuery, runtimeVars) as Record<string, unknown>),
+            ...authQuery,
+          }
+        : Object.keys(authQuery).length > 0
+          ? authQuery
+          : undefined;
 
-        logger.info(`🚀 [ENGINE:API] Executing ${input.serviceId}:${input.action}`);
-        return await secureFetch({
-          method: method as any,
-          url: `${baseUrl}/${apiPath}`,
-          headers,
-          data: method !== 'GET' ? payload : undefined,
-          params: requestParams ?? (method === 'GET' ? payload : undefined),
-          authenticateRequest:
-            Object.keys(authQuery).length > 0 ||
-            Boolean(headers.Authorization) ||
-            Boolean(headers.authorization),
-          kyberion_allow_local_network:
-            Boolean(input.alt.allow_local_network) ||
-            Boolean(input.preset.allow_local_network) ||
-            Boolean(input.serviceConfig.allow_local_network),
-        });
-      },
-      buildRetryOptions(input.serviceConfig, input.preset, input.alt)
-    );
+      logger.info(`🚀 [ENGINE:API] Executing ${input.serviceId}:${input.action}`);
+      return await secureFetch({
+        ...(input.operatorProbe
+          ? { maxRedirects: 0, maxContentLength: 65536, timeout: 10000 }
+          : {}),
+        method: method as any,
+        url: `${baseUrl}/${apiPath}`,
+        headers,
+        data: method !== 'GET' ? payload : undefined,
+        params: requestParams ?? (method === 'GET' ? payload : undefined),
+        authenticateRequest:
+          Object.keys(authQuery).length > 0 ||
+          Boolean(headers.Authorization) ||
+          Boolean(headers.authorization),
+        kyberion_allow_local_network:
+          Boolean(input.alt.allow_local_network) ||
+          Boolean(input.preset.allow_local_network) ||
+          Boolean(input.serviceConfig.allow_local_network),
+      });
+    }, alternativeRetryOptions(input));
 
     return { result: normalizePresetResult(result, input.alt.output_mapping) };
   }

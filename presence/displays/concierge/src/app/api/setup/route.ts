@@ -248,6 +248,21 @@ export function GET(req: NextRequest) {
           durable_identities: managedAgents,
         },
         service_catalog: serviceCatalog,
+        ...(Array.isArray((onboarding.onboarding as { services?: unknown[] } | null)?.services)
+          ? {
+              selected_services: (
+                onboarding.onboarding as { services: unknown[] }
+              ).services.flatMap((service) => {
+                const id =
+                  service && typeof service === 'object'
+                    ? (service as { service_id?: unknown }).service_id
+                    : undefined;
+                return typeof id === 'string' && serviceCatalog.some((entry) => entry.id === id)
+                  ? [id]
+                  : [];
+              }),
+            }
+          : {}),
         connections,
         providers: onboarding.providers,
         diagnostics,

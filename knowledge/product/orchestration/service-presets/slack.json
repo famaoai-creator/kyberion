@@ -4,6 +4,16 @@
   "base_url": "https://slack.com/api",
   "auth_strategy": "Bearer",
   "operations": {
+    "auth_test": {
+      "type": "api",
+      "path": "auth.test",
+      "method": "POST",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "description": "Read-only identity check. Slack documents POST auth.test; ok must be true.",
+      "parameters": {}
+    },
     "post_message": {
       "type": "auto",
       "alternatives": [

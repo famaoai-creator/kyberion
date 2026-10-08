@@ -4,6 +4,16 @@
   "base_url": "https://api.github.com",
   "auth_strategy": "Bearer",
   "operations": {
+    "authenticated_user": {
+      "type": "api",
+      "path": "user",
+      "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "description": "Read-only authentication check for the currently bound token.",
+      "parameters": {}
+    },
     "create_issue": {
       "type": "api",
       "path": "repos/{{owner}}/{{repo}}/issues",
