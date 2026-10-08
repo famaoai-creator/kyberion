@@ -183,6 +183,46 @@ function runSql(sql: string, json = false): string {
   return result.stdout;
 }
 
+export interface HistorySearchBackendAvailability {
+  available: boolean;
+  /** Why the backend is unusable on this host; absent when available. */
+  reason?: string;
+}
+
+let backendAvailability: HistorySearchBackendAvailability | undefined;
+
+/**
+ * Whether this host can run the history index: a `sqlite3` CLI on PATH whose
+ * build has FTS5 with the trigram tokenizer (SQLite >= 3.34). Probed once per
+ * process against an in-memory database, so it never touches active/.
+ * Tests gate on it (`describe.skipIf(!probeHistorySearchBackend().available)`)
+ * instead of failing on minimal hosts without the binary.
+ */
+export function probeHistorySearchBackend(
+  options: { refresh?: boolean } = {}
+): HistorySearchBackendAvailability {
+  if (backendAvailability && !options.refresh) return backendAvailability;
+  let detail: string | undefined;
+  try {
+    const result = safeExecResult('sqlite3', [':memory:'], {
+      timeoutMs: 10_000,
+      maxOutputMB: 1,
+      input: "CREATE VIRTUAL TABLE probe USING fts5(content, tokenize='trigram');\n",
+    });
+    if (result.status !== 0) {
+      detail =
+        String(result.stderr || '').trim() || result.error?.message || `exit ${result.status}`;
+    }
+  } catch (error) {
+    detail = error instanceof Error ? error.message : String(error);
+  }
+  backendAvailability =
+    detail === undefined
+      ? { available: true }
+      : { available: false, reason: `sqlite3 with FTS5 trigram unavailable: ${detail}` };
+  return backendAvailability;
+}
+
 const SCHEMA_SQL = `
 PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS history_entries (

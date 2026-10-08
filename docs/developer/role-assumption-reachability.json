@@ -1902,6 +1902,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/check_tenant_registry_consistency.ts#collectTenantSystems",
+      "roles": ["check_tenant_registry_consistency"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/check_type_ratchet.ts#checkTypeRatchet",
       "roles": ["ecosystem_architect"],
       "unresolved": []

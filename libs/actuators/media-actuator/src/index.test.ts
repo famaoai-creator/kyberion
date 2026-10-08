@@ -21,6 +21,19 @@ import { resetCurrentScope } from '@agent/core/scope-context';
 
 const ROOT = rootDir();
 
+function tenantDesignFixture(tenantSlug: string): () => void {
+  const tenantDir = path.resolve(ROOT, `knowledge/confidential/${tenantSlug}`);
+  const idx = path.resolve(ROOT, 'knowledge/confidential/tenants/index.json'); // live index: restored
+  const keep = safeExistsSync(path.dirname(idx)) ? idx : path.dirname(idx);
+  const prev = safeExistsSync(idx) ? String(safeReadFile(idx, { encoding: 'utf8' })) : null;
+  safeRmSync(tenantDir, { recursive: true, force: true });
+  return () => {
+    safeRmSync(tenantDir, { recursive: true, force: true });
+    if (prev === null) safeRmSync(keep, { recursive: true, force: true });
+    else safeWriteFile(idx, prev);
+  };
+}
+
 const mocks = vi.hoisted(() => ({
   recognize: vi.fn(),
   documentOcr: vi.fn(),
@@ -669,11 +682,8 @@ describe('media-actuator pdf to pptx bridge', () => {
 
   it('persists pptx brand registration when save_brand_to_confidential runs as a sink step', async () => {
     const tenantSlug = '__pptx_sink_persist_test';
+    const cleanupTenant = tenantDesignFixture(tenantSlug);
     const confDir = path.resolve(ROOT, `knowledge/confidential/${tenantSlug}/design`);
-    safeRmSync(path.resolve(ROOT, `knowledge/confidential/${tenantSlug}`), {
-      recursive: true,
-      force: true,
-    });
 
     try {
       const result = await handleAction({
@@ -743,10 +753,7 @@ describe('media-actuator pdf to pptx bridge', () => {
         true
       );
     } finally {
-      safeRmSync(path.resolve(ROOT, `knowledge/confidential/${tenantSlug}`), {
-        recursive: true,
-        force: true,
-      });
+      cleanupTenant();
     }
   });
 
@@ -755,10 +762,7 @@ describe('media-actuator pdf to pptx bridge', () => {
     const confDir = path.resolve(ROOT, `knowledge/confidential/${tenantSlug}/design`);
     const prevPersona = process.env.KYBERION_PERSONA;
     process.env.KYBERION_PERSONA = 'sovereign';
-    safeRmSync(path.resolve(ROOT, `knowledge/confidential/${tenantSlug}`), {
-      recursive: true,
-      force: true,
-    });
+    const cleanupTenant = tenantDesignFixture(tenantSlug);
 
     try {
       const result = await handleAction({
@@ -868,11 +872,8 @@ describe('media-actuator pdf to pptx bridge', () => {
         true
       );
     } finally {
+      cleanupTenant();
       process.env.KYBERION_PERSONA = prevPersona;
-      safeRmSync(path.resolve(ROOT, `knowledge/confidential/${tenantSlug}`), {
-        recursive: true,
-        force: true,
-      });
     }
   });
 
