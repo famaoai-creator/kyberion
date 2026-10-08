@@ -152,5 +152,20 @@ describe('work item tenant validation authority', () => {
         },
       })
     ).toThrow(/suspended|tenant/i);
+    // A re-sync that moves the item to another tenant is validated like a creation.
+    expect(() =>
+      importExternalWorkItem({
+        source: 'github',
+        sourceRef,
+        title: 'imported item',
+        description: 'from an external tracker',
+        status: 'backlog',
+        context: {
+          tenant_slug: 'wc-unregistered-tenant',
+          project_id: 'PRJ-WC-AUTH',
+          work_shape: 'routine_operation',
+        },
+      })
+    ).toThrow(/tenant/i);
   });
 });

@@ -1475,10 +1475,16 @@ export function importExternalWorkItem(input: {
   // Tenant registration gates creation only (as before): re-syncing an item
   // that already exists keeps working even if its tenant was later suspended.
   // Checked under the caller's authority, outside the store fence.
-  const alreadyImported = listWorkItems({ source: input.source }).some(
+  // A re-sync that moves the item to a different tenant is validated like a
+  // creation, so an import can never re-home an item onto an unregistered tenant.
+  const previous = listWorkItems({ source: input.source }).find(
     (item) => item.source_ref === input.sourceRef
   );
-  if (!alreadyImported) {
+  const changesTenant =
+    previous !== undefined &&
+    input.context?.tenant_slug !== undefined &&
+    input.context.tenant_slug !== previous.context?.tenant_slug;
+  if (!previous || changesTenant) {
     assertWorkItemTenantRegistered(input, coordinationRootOverride || undefined);
   }
   return withCoordinationMutation(() => {

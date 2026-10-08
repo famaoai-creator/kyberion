@@ -77,7 +77,8 @@ function printOutput<T>(output: SkillOutput<T>) {
 
   // Persistence for Feedback Loop: Save the latest response via Secure IO
   try {
-    const sharedPath = path.join(pathResolver.rootDir(), 'active/shared/last_response.json');
+    // Through shared() so the Vitest sandbox applies to the writer as well as the reader.
+    const sharedPath = pathResolver.shared('last_response.json');
     safeWriteFile(sharedPath, JSON.stringify(output, null, 2));
   } catch (_) {
     /* Silent fail for background persistence */

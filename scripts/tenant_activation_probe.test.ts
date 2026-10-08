@@ -93,6 +93,22 @@ describe('tenant activation probe', () => {
     expect(record.status).toBe('ready');
   });
 
+  it("keeps other tenants out of this tenant's registry-failure evidence", async () => {
+    seed(true);
+    const result = await runTenantActivationProbes(
+      { ...scope, nhiIds: [], serviceIds: [], rootDir },
+      deps({
+        registryCheck: () => ({
+          exitCode: 1,
+          output: `- other-tenant-xyz: missing profile\n- ${scope.tenantSlug}: isolation drift`,
+        }),
+      })
+    );
+    const detail = result.results.isolation_probe.detail;
+    expect(detail).toContain(`${scope.tenantSlug}: isolation drift`);
+    expect(detail).not.toContain('other-tenant-xyz');
+  });
+
   it('fails each probe with the reason an operator can act on', async () => {
     seed(false);
     const result = await runTenantActivationProbes(
