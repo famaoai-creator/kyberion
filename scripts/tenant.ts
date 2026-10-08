@@ -1,5 +1,8 @@
 import {
   attestTenantProvider,
+  captureAttestationInvoker,
+  requestTenantProviderAttestationApproval,
+  type AttestTenantProviderInput,
   mutateTenant,
   type TenantLifecycleVerb,
   listTenants,
@@ -30,6 +33,9 @@ type Args = {
   attestedBy?: string;
   validForDays?: number;
   apply: boolean;
+  accept: boolean;
+  requestApproval: boolean;
+  approvalRequestId?: string;
   json: boolean;
 };
 
@@ -51,11 +57,16 @@ function parseArgs(argv: string[]): Args {
       ? command
       : 'help') as Args['command'],
     apply: false,
+    accept: false,
+    requestApproval: false,
     json: false,
   };
   for (let i = 0; i < rest.length; i += 1) {
     const arg = rest[i];
     if (arg === '--apply') result.apply = true;
+    else if (arg === '--accept') result.accept = true;
+    else if (arg === '--request-approval') result.requestApproval = true;
+    else if (arg === '--approval-request-id') result.approvalRequestId = rest[++i];
     else if (arg === '--json') result.json = true;
     else if (arg === '--slug' || arg === '--tenant') result.slug = rest[++i];
     else if (arg === '--display-name') result.displayName = rest[++i];
@@ -77,7 +88,12 @@ function usage(): string {
     'Usage: pnpm tenant <create|update|suspend|resume|archive|list|show|attest-provider> [slug] [options]',
     '  attest-provider records how this installation is contracted with a provider:',
     '    --provider <id> --training-use <none|used|unknown> [--plan <text>] [--basis <url|ref>]',
-    '    [--attested-by <who>] [--valid-for-days <n>]   (none requires all three evidence fields; --apply)',
+    '    [--attested-by <who>] [--valid-for-days <n>]   (none requires all three evidence fields)',
+    '    Writes only with --apply --accept (--accept is your statement about the plan terms);',
+    '    otherwise it is a dry-run. training_use none opens confidential egress, so it also',
+    '    needs a human approval: --request-approval opens it, a human runs',
+    '    pnpm kyberion approvals --approve <id>, then re-run with',
+    '    --apply --accept --approval-request-id <id>. used/unknown need no approval.',
     '  Attestations are written to the tenant profile under knowledge/personal/, which is',
     '  outside git: a contract is a fact about your account, not about the project.',
     '  The provider must be declared in provider-egress-policy.json; every attestation is',
@@ -89,7 +105,11 @@ function usage(): string {
   ].join('\n');
 }
 
-export function main(argv: string[] = [], print: Print = () => undefined): void {
+export function main(
+  argv: string[] = [],
+  print: Print = () => undefined,
+  options: { rootDir?: string } = {}
+): void {
   const args = parseArgs(argv);
   if (args.command === 'help') {
     print(usage());
@@ -132,26 +152,70 @@ export function main(argv: string[] = [], print: Print = () => undefined): void 
     ) {
       throw new Error('attest-provider requires --valid-for-days to be a finite positive number');
     }
+    if (args.apply && !args.accept) {
+      throw new Error(
+        'attest-provider --apply requires --accept: the attestation is your statement about the plan’s training-use terms'
+      );
+    }
     if (!args.apply) {
       print(
         JSON.stringify(
-          { dryRun: true, slug: args.slug, provider: args.provider, training_use: trainingUse },
+          {
+            dryRun: true,
+            slug: args.slug,
+            provider: args.provider,
+            training_use: trainingUse,
+            ...(trainingUse === 'none' && !args.approvalRequestId
+              ? { needs_approval: 'run with --request-approval first' }
+              : {}),
+          },
           null,
           2
         )
       );
       return;
     }
-    const result = withExecutionContext('sovereign_concierge', () =>
-      attestTenantProvider({
-        slug: args.slug!,
-        provider: args.provider!,
-        training_use: trainingUse,
-        ...(args.plan ? { plan: args.plan } : {}),
-        ...(args.basis ? { basis: args.basis } : {}),
-        ...(args.attestedBy ? { attested_by: args.attestedBy } : {}),
-        ...(typeof args.validForDays === 'number' ? { valid_for_days: args.validForDays } : {}),
-      })
+    // Capture who asked (and their tenant binding) before elevating.
+    const invoker = captureAttestationInvoker();
+    const attestInput: AttestTenantProviderInput = {
+      invoker,
+      slug: args.slug!,
+      provider: args.provider!,
+      training_use: trainingUse,
+      ...(args.plan ? { plan: args.plan } : {}),
+      ...(args.basis ? { basis: args.basis } : {}),
+      ...(args.attestedBy ? { attested_by: args.attestedBy } : {}),
+      ...(typeof args.validForDays === 'number' ? { valid_for_days: args.validForDays } : {}),
+      ...(options.rootDir ? { rootDir: options.rootDir } : {}),
+      ...(args.approvalRequestId ? { approvalRequestId: args.approvalRequestId } : {}),
+    };
+    if (args.requestApproval) {
+      const request = withExecutionContext(
+        'sovereign_concierge',
+        () => requestTenantProviderAttestationApproval(attestInput),
+        undefined,
+        args.slug
+      );
+      print(
+        JSON.stringify(
+          {
+            ...request,
+            next: [
+              `A human decides: ${request.approve_command}`,
+              `Then apply: pnpm tenant attest-provider ${args.slug} --provider ${args.provider} --training-use none ... --apply --accept --approval-request-id ${request.request_id}`,
+            ],
+          },
+          null,
+          2
+        )
+      );
+      return;
+    }
+    const result = withExecutionContext(
+      'sovereign_concierge',
+      () => attestTenantProvider(attestInput),
+      undefined,
+      args.slug
     );
     print(JSON.stringify(result.attestation, null, 2));
     return;

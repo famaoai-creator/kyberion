@@ -453,6 +453,48 @@ describe('mission retrospective loop', () => {
       expect(stats.resource_usage).toEqual({ entries: 1, cost_usd: 0 });
       expect(stats.usage_unrecorded).toBe(false);
     });
+
+    it("counts a tenant mission's partitioned entries, never another tenant's", async () => {
+      removeUsageFixtures();
+      completeTasks();
+      const statePath = path.join(missionDir, 'mission-state.json');
+      const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+      fs.writeFileSync(
+        statePath,
+        JSON.stringify({ ...state, tier: 'confidential', tenant_slug: 'tenant-a' })
+      );
+      const { MetricsCollector } = await import('../metrics.js');
+      const { recordDirectCliTaskUsage } = await import('./mission-direct-cli-usage.js');
+      for (const [taskId, tenant] of [
+        ['T-1', 'tenant-a'],
+        ['T-2', 'tenant-a'],
+        ['T-1', 'tenant-b'],
+      ] as const) {
+        recordDirectCliTaskUsage({
+          missionId: MISSION,
+          taskId,
+          event: 'record_evidence',
+          actorId: 'codex-implementer',
+          state: { tier: 'confidential', tenant_slug: tenant },
+          collector: new MetricsCollector(),
+        });
+      }
+      const ledger = (tenant: string) =>
+        path.join(
+          tmpRoot,
+          'active/shared/runtime/usage-ledger/confidential',
+          tenant,
+          'resource-usage.jsonl'
+        );
+      expect(fs.readFileSync(ledger('tenant-a'), 'utf8').trim().split('\n')).toHaveLength(2);
+      expect(fs.existsSync(path.join(tmpRoot, 'work', 'metrics', 'resource-usage.jsonl'))).toBe(
+        false
+      );
+
+      const stats = mod.collectMissionExecutionStats(MISSION);
+      expect(stats.resource_usage).toEqual({ entries: 2, cost_usd: 0 });
+      expect(stats.usage_unrecorded).toBe(false);
+    });
   });
 
   it('does not flag a closing burst for a short mission', () => {
@@ -751,5 +793,101 @@ describe('mission retrospective loop', () => {
     expect(backendPrompt).not.toHaveBeenCalled();
     expect(notify).not.toHaveBeenCalled();
     expect(fs.readFileSync(result.report_path, 'utf8')).toContain('stub backend');
+  });
+
+  it('never overwrites the hand-written evidence/retrospective.md deliverable', async () => {
+    backendName.value = 'stub';
+    const handWrittenPath = path.join(missionDir, 'evidence', 'retrospective.md');
+    const handWritten = Buffer.from('# Retrospective\n\nRecorded via record-evidence.\n', 'utf8');
+    fs.writeFileSync(handWrittenPath, handWritten);
+
+    const result = await mod.runMissionRetrospective(MISSION);
+
+    expect(fs.readFileSync(handWrittenPath).equals(handWritten)).toBe(true);
+    expect(result.report_path).toBe(path.join(missionDir, 'evidence', 'retrospective-stats.md'));
+    expect(fs.readFileSync(result.report_path, 'utf8')).toContain(
+      `# Mission Retrospective — ${MISSION}`
+    );
+    expect(fs.existsSync(path.join(missionDir, 'evidence', 'retrospective.json'))).toBe(true);
+  });
+
+  it('writes generated files only to paths no workflow template declares as a deliverable', () => {
+    const catalog: unknown = JSON.parse(
+      fs.readFileSync(
+        path.resolve(process.cwd(), 'knowledge/product/governance/mission-workflow-catalog.json'),
+        'utf8'
+      )
+    );
+    const deliverables = new Set<string>();
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) return node.forEach(walk);
+      if (!node || typeof node !== 'object') return;
+      for (const [key, value] of Object.entries(node)) {
+        if (key === 'deliverable' && typeof value === 'string') deliverables.add(value);
+        else walk(value);
+      }
+    };
+    walk(catalog);
+    expect(deliverables.has('evidence/retrospective.md')).toBe(true);
+    for (const generated of [mod.RETROSPECTIVE_STATS_REPORT, 'evidence/retrospective.json']) {
+      expect(deliverables.has(generated)).toBe(false);
+    }
+  });
+
+  it('keeps phase pipelines from writing the deliverable a non-deterministic phase records', () => {
+    // A judgment / review / approval phase's deliverable is authored by the
+    // team and recorded via record-evidence. The phase's pipeline_ref template
+    // may read evidence, but must not target that deliverable path (in its
+    // context or steps) — a pipeline write would truncate the recorded file or
+    // satisfy the task with boilerplate. Deterministic phases are the
+    // pipeline's own output and are exempt.
+    const repoRoot = process.cwd();
+    const catalog: unknown = JSON.parse(
+      fs.readFileSync(
+        path.join(repoRoot, 'knowledge/product/governance/mission-workflow-catalog.json'),
+        'utf8'
+      )
+    );
+    type Phase = { id?: string; kind?: string; pipeline_ref?: string; default_tasks?: unknown };
+    const phases: Phase[] = [];
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) return node.forEach(walk);
+      if (!node || typeof node !== 'object') return;
+      const record = node as Record<string, unknown>;
+      if (typeof record.pipeline_ref === 'string') phases.push(record as Phase);
+      Object.values(record).forEach(walk);
+    };
+    walk(catalog);
+
+    const violations: string[] = [];
+    let checked = 0;
+    for (const phase of phases) {
+      if (phase.kind === 'deterministic' || !phase.pipeline_ref) continue;
+      const templatePath = path.join(repoRoot, phase.pipeline_ref);
+      if (!fs.existsSync(templatePath)) continue;
+      const template = JSON.parse(fs.readFileSync(templatePath, 'utf8')) as Record<string, unknown>;
+      const writable = JSON.stringify({ context: template.context, steps: template.steps });
+      const tasks = Array.isArray(phase.default_tasks) ? phase.default_tasks : [];
+      for (const task of tasks as Array<{ deliverable?: unknown }>) {
+        if (typeof task.deliverable !== 'string') continue;
+        checked += 1;
+        const fileName = task.deliverable.replace(/^evidence\//u, '');
+        const escaped = fileName.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+        if (new RegExp(`(?:evidence|\\}\\})/${escaped}(?![\\w.-])`, 'u').test(writable)) {
+          violations.push(
+            `${phase.id} (${phase.kind}) → ${phase.pipeline_ref}: ${task.deliverable}`
+          );
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+    expect(violations).toEqual([]);
+  });
+
+  it('does not create evidence/retrospective.md when no deliverable was recorded', async () => {
+    backendName.value = 'stub';
+    const result = await mod.runMissionRetrospective(MISSION);
+    expect(path.basename(result.report_path)).toBe('retrospective-stats.md');
+    expect(fs.existsSync(path.join(missionDir, 'evidence', 'retrospective.md'))).toBe(false);
   });
 });

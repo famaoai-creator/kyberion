@@ -23874,6 +23874,176 @@
         "ja": "組織のアカウントでサインインする",
         "qps-ploc": "⟦Şïɠñ ïñ ẇïŧħ ẏőůř őřɠȧñïẑȧŧïőñ ȧƈƈőůñŧ ïñşŧėȧḓ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
       },
+      "first_run_title": {
+        "en": "Set up Kyberion",
+        "ja": "Kyberion の初回セットアップ",
+        "qps-ploc": "⟦Şėŧ ůṗ Ķẏƀėřïőñ ŀőřė⟧"
+      },
+      "first_run_lead": {
+        "en": "No one can sign in from a browser yet. Use the one-time setup code issued on the server to create the owner.",
+        "ja": "まだブラウザからサインインできる管理者がいません。サーバーで発行した一回限りのセットアップコードを使って、管理者(owner)を作成します。",
+        "qps-ploc": "⟦Ñő őñė ƈȧñ şïɠñ ïñ ƒřőɱ ȧ ƀřőẇşėř ẏėŧ. Ůşė ŧħė őñė-ŧïɱė şėŧůṗ ƈőḓė ïşşůėḓ őñ ŧħė şėřṽėř ŧő ƈřėȧŧė ŧħė őẇñėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
+      },
+      "first_run_code_label": {
+        "en": "Setup code",
+        "ja": "セットアップコード",
+        "qps-ploc": "⟦Şėŧůṗ ƈőḓė ŀőř⟧"
+      },
+      "first_run_code_hint": {
+        "en": "Run pnpm organization first-run code on the server to get one.",
+        "ja": "サーバーで pnpm organization first-run code を実行すると表示されます。",
+        "qps-ploc": "⟦Řůñ ṗñṗɱ őřɠȧñïẑȧŧïőñ ƒïřşŧ-řůñ ƈőḓė őñ ŧħė şėřṽėř ŧő ɠėŧ őñė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "first_run_tenant_slug_label": {
+        "en": "Organization ID (lowercase letters, digits and hyphens)",
+        "ja": "組織 ID(英小文字・数字・ハイフン)",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ÏḒ (ŀőẇėřƈȧşė ŀėŧŧėřş, ḓïɠïŧş ȧñḓ ħẏṗħėñş) ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "first_run_tenant_name_label": {
+        "en": "Organization name",
+        "ja": "組織の表示名",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ñȧɱė ŀőřėɱ⟧"
+      },
+      "first_run_display_name_label": {
+        "en": "Your name",
+        "ja": "あなたの表示名",
+        "qps-ploc": "⟦Ẏőůř ñȧɱė ŀőř⟧"
+      },
+      "first_run_submit": {
+        "en": "Set up",
+        "ja": "セットアップする",
+        "qps-ploc": "⟦Şėŧ ůṗ ŀőř⟧"
+      },
+      "first_run_claimed": {
+        "en": "First-time setup is already complete. Please sign in.",
+        "ja": "初回セットアップは完了しています。サインインしてください。",
+        "qps-ploc": "⟦Ƒïřşŧ-ŧïɱė şėŧůṗ ïş ȧŀřėȧḓẏ ƈőɱṗŀėŧė. Ṗŀėȧşė şïɠñ ïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "first_run_signin_link": {
+        "en": "Go to sign in",
+        "ja": "サインインへ",
+        "qps-ploc": "⟦Ɠő ŧő şïɠñ ïñ ŀőřė⟧"
+      },
+      "first_run_error_code": {
+        "en": "The setup code is wrong, expired or already used. Issue a new one on the server.",
+        "ja": "セットアップコードが違うか、期限切れか、使用済みです。サーバーで新しいコードを発行してください。",
+        "qps-ploc": "⟦Ŧħė şėŧůṗ ƈőḓė ïş ẇřőñɠ, ėẋṗïřėḓ őř ȧŀřėȧḓẏ ůşėḓ. Ïşşůė ȧ ñėẇ őñė őñ ŧħė şėřṽėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "first_run_error_input": {
+        "en": "Check the values you entered.",
+        "ja": "入力内容を確認してください。",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė ṽȧŀůėş ẏőů ėñŧėřėḓ. ŀőřėɱ ïṗş⟧"
+      },
+      "first_run_error_generic": {
+        "en": "Setup failed. Please try again.",
+        "ja": "セットアップに失敗しました。もう一度お試しください。",
+        "qps-ploc": "⟦Şėŧůṗ ƒȧïŀėḓ. Ṗŀėȧşė ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşů⟧"
+      },
+      "first_run_done_title": {
+        "en": "Owner created",
+        "ja": "管理者を作成しました",
+        "qps-ploc": "⟦Őẇñėř ƈřėȧŧėḓ ŀőřė⟧"
+      },
+      "first_run_token_lead": {
+        "en": "This access token is shown only once. Keep it somewhere safe: it signs you in on /signin and works as a Bearer token on the other surfaces. This browser is already signed in.",
+        "ja": "このアクセストークンは一度だけ表示されます。安全な場所に保管してください。/signin でのサインインや、他のサーフェスへの Bearer トークンとして使えます。このブラウザはすでにサインイン済みです。",
+        "qps-ploc": "⟦Ŧħïş ȧƈƈėşş ŧőķėñ ïş şħőẇñ őñŀẏ őñƈė. Ķėėṗ ïŧ şőɱėẇħėřė şȧƒė: ïŧ şïɠñş ẏőů ïñ őñ /şïɠñïñ ȧñḓ ẇőřķş ȧş ȧ Ƀėȧřėř ŧőķėñ őñ ŧħė őŧħėř şůřƒȧƈėş. Ŧħïş ƀřőẇşėř ïş ȧŀřėȧḓẏ şïɠñėḓ ïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşů⟧"
+      },
+      "first_run_finish": {
+        "en": "Open Concierge",
+        "ja": "Concierge を開く",
+        "qps-ploc": "⟦Őṗėñ Ƈőñƈïėřɠė ŀőřė⟧"
+      },
+      "sso_title": {
+        "en": "Single sign-on (OIDC)",
+        "ja": "シングルサインオン(OIDC)",
+        "qps-ploc": "⟦Şïñɠŀė şïɠñ-őñ (ŐÏḒƇ) ŀőřėɱ ⟧"
+      },
+      "sso_lead": {
+        "en": "Settings are stored securely and apply to every surface without a restart. Environment variables, when set, take precedence.",
+        "ja": "設定は安全に保存され、再起動なしで全サーフェスに反映されます。環境変数が設定されている場合はそちらが優先されます。",
+        "qps-ploc": "⟦Şėŧŧïñɠş ȧřė şŧőřėḓ şėƈůřėŀẏ ȧñḓ ȧṗṗŀẏ ŧő ėṽėřẏ şůřƒȧƈė ẇïŧħőůŧ ȧ řėşŧȧřŧ. Ėñṽïřőñɱėñŧ ṽȧřïȧƀŀėş, ẇħėñ şėŧ, ŧȧķė ṗřėƈėḓėñƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+      },
+      "sso_issuer_label": {
+        "en": "Issuer URL",
+        "ja": "Issuer URL",
+        "qps-ploc": "⟦Ïşşůėř ŮŘĿ ŀőř⟧"
+      },
+      "sso_client_id_label": {
+        "en": "Client ID",
+        "ja": "クライアント ID",
+        "qps-ploc": "⟦Ƈŀïėñŧ ÏḒ ŀőř⟧"
+      },
+      "sso_client_secret_label": {
+        "en": "Client secret",
+        "ja": "クライアントシークレット",
+        "qps-ploc": "⟦Ƈŀïėñŧ şėƈřėŧ ŀőřė⟧"
+      },
+      "sso_client_secret_keep": {
+        "en": "Leave empty to keep the saved secret.",
+        "ja": "空欄のままなら保存済みの値を維持します。",
+        "qps-ploc": "⟦Ŀėȧṽė ėɱṗŧẏ ŧő ķėėṗ ŧħė şȧṽėḓ şėƈřėŧ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "sso_provider_label_label": {
+        "en": "Button label (e.g. Google)",
+        "ja": "ボタンの表示名(例: Google)",
+        "qps-ploc": "⟦Ƀůŧŧőñ ŀȧƀėŀ (ė.ɠ. Ɠőőɠŀė) ŀőřėɱ ïṗ⟧"
+      },
+      "sso_public_base_url_label": {
+        "en": "Public URL (only for remote access)",
+        "ja": "公開 URL(リモートから使う場合のみ)",
+        "qps-ploc": "⟦Ṗůƀŀïƈ ŮŘĿ (őñŀẏ ƒőř řėɱőŧė ȧƈƈėşş) ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "sso_save": {
+        "en": "Save",
+        "ja": "保存する",
+        "qps-ploc": "⟦Şȧṽė ŀőř⟧"
+      },
+      "sso_saved": {
+        "en": "Saved.",
+        "ja": "保存しました。",
+        "qps-ploc": "⟦Şȧṽėḓ. ŀőř⟧"
+      },
+      "sso_env_overrides": {
+        "en": "Environment variables are set and take precedence over these settings.",
+        "ja": "環境変数が設定されているため、こちらの設定より優先されます。",
+        "qps-ploc": "⟦Ėñṽïřőñɱėñŧ ṽȧřïȧƀŀėş ȧřė şėŧ ȧñḓ ŧȧķė ṗřėƈėḓėñƈė őṽėř ŧħėşė şėŧŧïñɠş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "sso_session_env_weak": {
+        "en": "KYBERION_SESSION_SECRET is set but shorter than 32 bytes. Fix or remove it.",
+        "ja": "KYBERION_SESSION_SECRET が 32 バイト未満です。修正するか削除してください。",
+        "qps-ploc": "⟦ĶẎɃĖŘÏŐÑ_ŞĖŞŞÏŐÑ_ŞĖƇŘĖŦ ïş şėŧ ƀůŧ şħőřŧėř ŧħȧñ 32 ƀẏŧėş. Ƒïẋ őř řėɱőṽė ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "sso_redirect_lead": {
+        "en": "Register these redirect URIs with your identity provider:",
+        "ja": "IdP に次のリダイレクト URI を登録してください:",
+        "qps-ploc": "⟦Řėɠïşŧėř ŧħėşė řėḓïřėƈŧ ŮŘÏş ẇïŧħ ẏőůř ïḓėñŧïŧẏ ṗřőṽïḓėř: ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "sso_egress_hint": {
+        "en": "Identity providers other than Google and Microsoft must be allowed in knowledge/product/governance/egress-policy.json.",
+        "ja": "Google と Microsoft 以外の IdP は、knowledge/product/governance/egress-policy.json で通信先を許可する必要があります。",
+        "qps-ploc": "⟦Ïḓėñŧïŧẏ ṗřőṽïḓėřş őŧħėř ŧħȧñ Ɠőőɠŀė ȧñḓ Ɱïƈřőşőƒŧ ɱůşŧ ƀė ȧŀŀőẇėḓ ïñ ķñőẇŀėḓɠė/ṗřőḓůƈŧ/ɠőṽėřñȧñƈė/ėɠřėşş-ṗőŀïƈẏ.ĵşőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
+      },
+      "sso_link_hint": {
+        "en": "After signing in with your identity provider, bind the issuer and subject shown on screen to your member under Settings › Organization and members.",
+        "ja": "IdP でサインインしたら、画面に表示される issuer と subject を「設定 › 組織とメンバー」で自分に紐付けてください。",
+        "qps-ploc": "⟦Ȧƒŧėř şïɠñïñɠ ïñ ẇïŧħ ẏőůř ïḓėñŧïŧẏ ṗřőṽïḓėř, ƀïñḓ ŧħė ïşşůėř ȧñḓ şůƀĵėƈŧ şħőẇñ őñ şƈřėėñ ŧő ẏőůř ɱėɱƀėř ůñḓėř Şėŧŧïñɠş › Őřɠȧñïẑȧŧïőñ ȧñḓ ɱėɱƀėřş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ⟧"
+      },
+      "sso_error_field": {
+        "en": "Invalid value: {field}",
+        "ja": "入力値が正しくありません: {field}",
+        "qps-ploc": "⟦Ïñṽȧŀïḓ ṽȧŀůė: {field} ŀőřėɱ ï⟧"
+      },
+      "sso_error_forbidden": {
+        "en": "Only an owner of every organization can change sign-in settings.",
+        "ja": "サインイン設定を変更できるのは、すべての組織の owner だけです。",
+        "qps-ploc": "⟦Őñŀẏ ȧñ őẇñėř őƒ ėṽėřẏ őřɠȧñïẑȧŧïőñ ƈȧñ ƈħȧñɠė şïɠñ-ïñ şėŧŧïñɠş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "sso_error_generic": {
+        "en": "Could not save. Please try again.",
+        "ja": "保存できませんでした。もう一度お試しください。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ şȧṽė. Ṗŀėȧşė ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ⟧"
+      },
       "decide_filter_no_tenant": {
         "en": "Not tied to an organization",
         "ja": "組織に属さないもの",
@@ -28185,6 +28355,11 @@
         "en": "Surface",
         "ja": "サーフェス",
         "qps-ploc": "⟦Şůřƒȧƈė ŀőř⟧"
+      },
+      "setup_link": {
+        "en": "Start first-time setup",
+        "ja": "初回セットアップを始める",
+        "qps-ploc": "⟦Şŧȧřŧ ƒïřşŧ-ŧïɱė şėŧůṗ ŀőřėɱ ï⟧"
       },
       "lead": {
         "en": "Sign in with your organization account to continue.",

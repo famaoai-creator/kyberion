@@ -133,7 +133,8 @@ class CodexCliQuery {
         'never',
         '-C',
         this.cwd,
-        ...this.extraArgs,
+        // With a projection in force, extras must not re-widen it.
+        ...(effectiveProfile ? stripCodexPermissionArgs(this.extraArgs) : this.extraArgs),
         '-',
       ];
 
@@ -264,6 +265,37 @@ class CodexCliQuery {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     return path.join(pathResolver.sharedTmp(), `kyberion-${prefix}-${id}.${extension}`);
   }
+}
+
+/**
+ * Drop caller extras that would override a permission projection: sandbox
+ * selection (`--sandbox`/`-s`, `--full-auto`), sandbox bypass
+ * (`--dangerously-*`), extra writable roots (`--add-dir`) and `-c`/`--config`
+ * overrides of `sandbox*` / `approval_policy` keys.
+ */
+export function stripCodexPermissionArgs(extraArgs: readonly string[]): string[] {
+  const withValue = new Set(['--sandbox', '-s', '--add-dir']);
+  const isPermissionConfig = (value: string | undefined) =>
+    /^(sandbox|approval_policy)/u.test(value ?? '');
+  const filtered: string[] = [];
+  for (let index = 0; index < extraArgs.length; index += 1) {
+    const arg = extraArgs[index]!;
+    if (withValue.has(arg)) {
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith('--sandbox=') || arg.startsWith('--add-dir=')) continue;
+    if (arg === '--full-auto' || arg.startsWith('--dangerously-')) continue;
+    if (arg === '-c' || arg === '--config') {
+      if (isPermissionConfig(extraArgs[index + 1])) {
+        index += 1;
+        continue;
+      }
+    }
+    if (arg.startsWith('--config=') && isPermissionConfig(arg.slice('--config='.length))) continue;
+    filtered.push(arg);
+  }
+  return filtered;
 }
 
 /** Map the provider-neutral live voice tier to Codex's fast model family. */

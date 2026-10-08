@@ -90,15 +90,19 @@ pnpm onboarding:context first-work --customer-slug <customer-slug> \
 
 tenant を登録したら、使うモデルと provider への送信許可を決める（標準フロー Step 5.1）。
 どちらも dry-run が既定で、attestation は `--apply --accept` で人間が明示したときだけ記録される。
+`training_use none`（confidential の送信を開く）はさらに人間の承認が要る。`used` / `unknown` は承認不要。
 
 ```bash
-pnpm onboarding llm show --tenant <tenant-slug>   # tier ごとに使える provider を表示する
+pnpm onboarding llm show --tenant <tenant-slug>   # tier ごとに使える provider と拒否理由を表示する
 pnpm onboarding llm select --backend <mode> [--model <model-id>] --apply
 pnpm onboarding llm attest --tenant <tenant-slug> --provider <id> --training-use none \
-  --plan "<plan>" --basis <url|ref> --attested-by human:<owner> --apply --accept
+  --plan "<plan>" --basis <url|ref> --attested-by human:<owner> --request-approval
+pnpm kyberion approvals --approve <request-id>     # 人間が承認する
+pnpm onboarding llm attest ...（同じ値） --apply --accept --approval-request-id <request-id>
 ```
 
 attest しない限り、confidential・personal の material は local-only 以外の provider に送られない。
+対話型の `pnpm onboarding` でもモデル選択と attest（既定は「しない」、none は承認依頼の作成まで）を行える。
 `tenant:activation plan` の `llm_availability` で結果を確認する。
 
 未登録、`suspended`、`archived`、または reserved scope 名の tenant は先へ進めない。

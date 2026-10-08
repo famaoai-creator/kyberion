@@ -12,21 +12,24 @@ area, and the automated check that enforces the rule. A defect class that recurs
 was missing or unenforced. Fix the defect, then extend this runbook or its gate in the same PR.
 
 **Audience.** Anyone (human or agent) who changes CI workflows, runtime stores, daemons, child
-processes, library logging, tests, tenant-scoped facades, or LLM/provider calls.
+processes, library logging, tests, tenant-scoped facades, LLM/provider calls, generators that
+write mission evidence, or project lifecycle commands.
 
 **Origin.** MSN-OPS-GAPS-20261008 (organization `kyberion-ops`, project `PRJ-OPS-IMPROVEMENT`).
 That mission closed 16 gaps from the 2026-10-08 operations survey. Several had been fixed before and
 had regressed.
 
-| Class                         | Gate / check                                                       | Section |
-| ----------------------------- | ------------------------------------------------------------------ | ------- |
-| CI workflow drift             | `ci-workflow-contract` (scope `pr`)                                | §1      |
-| Undeclared runtime stores     | `runtime-store-retention` (scope `pr`), janitor `uncovered*` lists | §2      |
-| Daemons and child processes   | unit tests per daemon; this checklist in review                    | §3      |
-| stdout / logging in libraries | eslint `no-console` on `libs/`                                     | §4      |
-| Test pollution and host deps  | Vitest leak guard, strict in CI (`KYBERION_TEST_LEAK_STRICT=1`)    | §5      |
-| Tenant scope and facade env   | `tier-guard-tenant` tests, facade binding tests                    | §6      |
-| LLM / provider calls          | per-call-site egress tests (e.g. `mission-distill-egress.test.ts`) | §7      |
+| Class                         | Gate / check                                                          | Section |
+| ----------------------------- | --------------------------------------------------------------------- | ------- |
+| CI workflow drift             | `ci-workflow-contract` (scope `pr`)                                   | §1      |
+| Undeclared runtime stores     | `runtime-store-retention` (scope `pr`), janitor `uncovered*` lists    | §2      |
+| Daemons and child processes   | unit tests per daemon; this checklist in review                       | §3      |
+| stdout / logging in libraries | eslint `no-console` on `libs/`                                        | §4      |
+| Test pollution and host deps  | Vitest leak guard, strict in CI (`KYBERION_TEST_LEAK_STRICT=1`)       | §5      |
+| Tenant scope and facade env   | `tier-guard-tenant` tests, facade binding tests                       | §6      |
+| LLM / provider calls          | per-call-site egress tests (e.g. `mission-distill-egress.test.ts`)    | §7      |
+| Mission evidence overwrites   | generator and phase-pipeline tests in `mission-retrospective.test.ts` | §8      |
+| Project lifecycle facades     | lifecycle regressions in `project-management.test.ts`                 | §9      |
 
 ---
 
@@ -151,7 +154,10 @@ gets clean JSON.
   (`resetRoleAssumptionPolicyCache()`, rewriting the fixture file). Each re-import repeats all
   module-level initialisation of that stack, and the pattern has crashed macOS Vitest workers
   with SIGSEGV (`stimuli-journal-rotation-role.test.ts`, 2026-10). Keep `vi.resetModules()` for
-  the tests that need a fresh instance, for example after `vi.doMock`.
+  the tests that need a fresh instance, for example after `vi.doMock`. Import a heavy stack in
+  `beforeAll` with an explicit hook timeout (e.g. `60_000`) so its one-time load is not charged
+  to the first test's 10s budget ([WRITING_TESTS](../../../docs/developer/WRITING_TESTS.md#fixture-roots)
+  lists the accepted exceptions).
 
 **Procedure when the leak guard reports a file** (`active/shared/tmp/vitest-active-leaks.json`):
 
@@ -238,8 +244,12 @@ the test passes against the sandbox while the writer leaks into live state.
     `approved_providers` exceptions to make a call site work.
   - To enable LLM work on confidential/personal material for a tenant, the operator attests the
     provider's plan explicitly with `pnpm onboarding llm attest` (`--training-use none` plus
-    `--plan`, `--basis`, `--attested-by`, then `--apply --accept`). It uses the same store and
-    audit action `tenant.attest_provider` as `pnpm tenant attest-provider`. Never attest on the
+    `--plan`, `--basis`, `--attested-by`). Because `none` opens confidential egress it needs a
+    human approval: `--request-approval` opens a hash-bound request, a human runs
+    `pnpm kyberion approvals --approve <id>`, then the same command with `--apply`, `--accept`
+    and `--approval-request-id <id>` records it once. `used`/`unknown` never open egress and need only
+    `--apply --accept`. `pnpm tenant attest-provider` follows the same rules, store and audit
+    action (`tenant.attest_provider`, with actor and approver). Never attest or approve on the
     operator's behalf. `pnpm onboarding llm show --tenant <slug>` and `tenant:activation plan`
     (`llm_availability`) show which providers each tier can use. See
     [onboarding-flow Step 5.1](./onboarding-flow.md).
@@ -263,6 +273,10 @@ the test passes against the sandbox while the writer leaks into live state.
     `--sandbox --approval-mode plan`. They start in `llmShellScratchCwd()`, and the prompt goes on
     stdin (codex `exec … -`; gemini gets a fixed `-p` instruction that the CLI appends to stdin).
     Other callers of `runCodexCliQuery` / `runGeminiCliQuery` keep their own mode.
+  - The runners forward only `bin`, `model` and `timeout_ms` from a policy profile. Once a
+    permission profile is set, `runCodexCliQuery` / `runGeminiCliQuery` also drop caller
+    `extraArgs` that would widen it (sandbox, approval, yolo, `--dangerously-*`, `--add-dir`,
+    `-c sandbox*|approval_policy*`). Do not forward a whole profile object as CLI options.
   - **Residual risk:** neither CLI can switch its tools off the way `claude --tools ""` does.
     - Codex `read-only` still lets the model run read-only shell commands. Its sandbox does not
       limit reads to the cwd, and the scratch cwd is inside the checkout, so codex can still find
@@ -270,6 +284,12 @@ the test passes against the sandbox while the writer leaks into live state.
     - Gemini plan mode keeps read-only tools. `--sandbox` confines them to a container or Seatbelt
       profile, so on a host without one the runner fails, and `mission-llm` falls back to the next
       profile.
+    - Gemini stdin covers only the process Kyberion spawns. With `--sandbox`, the gemini launcher
+      may re-spawn itself inside the sandbox and re-inject the stdin it read into that child's `-p`
+      argv. This is not verified here; treat the prompt as possibly visible in the sandbox's
+      process table.
+    - A gemini build that ignores piped stdin sees only the fixed instruction. The strict schema
+      then fails, so the call fails closed and `mission-llm` moves on to the next profile.
     - For tenant-tier payloads, rely on the egress gate and prefer the `claude` profile.
 
 **Procedure:**
@@ -284,18 +304,46 @@ the test passes against the sandbox while the writer leaks into live state.
 
 ---
 
-## Maintenance
+## §8 Mission evidence: generated files and recorded deliverables
 
-When a defect class not listed here recurs:
+**Rule:** a generator never writes to a path that a task records as its deliverable. Generated
+artifacts (stats, reports, manifests written by `finish`, `verify`, dispatch or any other automatic
+step) get their own file names.
 
-1. Add a section with the rule, the procedure, and the gate or test that enforces it.
-2. Link the section from [kyberion-development-practices](./kyberion-development-practices.md) and
-   the pre-PR checklist.
-3. Record the incident in the mission's retrospective.
+- A task's `deliverable` path (from `mission-workflow-catalog.json` and the other workflow
+  templates) belongs to whoever records it with `record-evidence`. Writing it from a generator
+  silently replaces recorded evidence.
+- A generator also does not create a deliverable path when the file is absent. Task
+  auto-completion trusts the existence of the deliverable (`tryAutoCompleteTaskFromEvidence`), so a
+  generated placeholder would close a task that nobody did.
+- Example: `mission finish` runs the retrospective generator. It writes
+  `evidence/retrospective-stats.md` and `evidence/retrospective.json`. It never writes
+  `evidence/retrospective.md`, which is the hand-written deliverable of the retrospective task
+  (MSN-OPS-ROUND3-20261008).
+- Pipeline templates count as generators. The `pipeline_ref` template of a `judgment`, `review` or
+  `approval` phase may read evidence, but must not target that phase's deliverable. Only a
+  `deterministic` phase's deliverable is the pipeline's own output. Resolve mission paths through
+  the engine-derived `{{mission_evidence_dir}}`, never a hand-built `active/missions/{{mission_id}}`
+  (which skips the tier directory). Example: `post-release-retrospective` writes
+  `evidence/retrospective-packet.md`, not `evidence/retrospective.md`.
 
-A rule without an enforcing check is a candidate for the next gate.
+**Procedure:**
 
-## §7 Project lifecycle facade parity
+1. When you add or change a write under a mission's `evidence/`, grep the workflow templates for
+   the path (`grep -rn '"deliverable": "evidence/<name>"' knowledge/product/`). If a template
+   declares it, pick a different name.
+2. Add a test that fails if the generator overwrites the path: seed a hand-written file at the
+   deliverable path, run the generator, and assert the file is byte-identical and that the
+   generated output is in its own file. Also assert that the generated path is not a declared
+   deliverable (pattern: `mission-retrospective.test.ts`). The same file checks every
+   non-deterministic phase's `pipeline_ref` template against the phase's deliverables; keep it
+   green when you add or edit a phase pipeline.
+3. Update every reader and link of a renamed generated file in the same PR: `report_path`
+   consumers, `notifyOperator` `link_hint`, phase docs and playbooks.
+
+---
+
+## §9 Project lifecycle facade parity
 
 **Rule.** Dedicated lifecycle commands and generic status updates must execute the
 same guarded facade. Archive checks live missions, task sessions and unfinished
@@ -310,3 +358,16 @@ restore archived records.
 **Gate.** Run the focused lifecycle regressions in
 `libs/core/project/project-management.test.ts` and build core plus the repo CLI.
 These cover archive entry-point parity, restore, and track state/projection changes.
+
+---
+
+## Maintenance
+
+When a defect class not listed here recurs:
+
+1. Add a section with the rule, the procedure, and the gate or test that enforces it.
+2. Link the section from [kyberion-development-practices](./kyberion-development-practices.md) and
+   the pre-PR checklist.
+3. Record the incident in the mission's retrospective.
+
+A rule without an enforcing check is a candidate for the next gate.

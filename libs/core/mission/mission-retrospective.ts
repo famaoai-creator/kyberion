@@ -126,12 +126,33 @@ export interface MissionExecutionStats {
   }>;
 }
 
+/**
+ * Mission-relative path of the generated stats + proposals report. Distinct
+ * from `evidence/retrospective.md`, the recorded deliverable of the
+ * retrospective task, which the generator must never touch.
+ */
+export const RETROSPECTIVE_STATS_REPORT = 'evidence/retrospective-stats.md';
+
 /** Mirrors MISSION_TASK_COMPLETED_STATUSES (mission-lifecycle-completion.ts),
  *  kept local so the retrospective does not pull in the lifecycle module graph. */
 const COMPLETED_TASK_STATUSES = new Set(['done', 'completed', 'accepted', 'reviewed']);
 
+/**
+ * The mission's own tier/tenant, from its state record: the resource-usage
+ * ledger is partitioned by it. Unknown (no state) reads the system partition only.
+ */
+function missionUsageScope(
+  missionPath: string | null
+): { tier: MissionState['tier']; tenant_slug?: string } | undefined {
+  if (!missionPath) return undefined;
+  const state = loadMissionStateAtPath(safeMissionArtifactPath(missionPath, 'mission-state.json'));
+  if (!state?.tier) return undefined;
+  return { tier: state.tier, ...(state.tenant_slug ? { tenant_slug: state.tenant_slug } : {}) };
+}
+
 function collectMissionUsageStats(
-  missionId: string
+  missionId: string,
+  missionScope?: { tier: MissionState['tier']; tenant_slug?: string }
 ): Pick<MissionExecutionStats, 'token_usage' | 'resource_usage'> {
   const tokenUsage: MissionExecutionStats['token_usage'] = {
     prompt_tokens: 0,
@@ -209,7 +230,11 @@ function collectMissionUsageStats(
     tokenUsage.entries += 1;
   }
 
-  for (const entry of metricsCollector.loadResourceUsageHistory()) {
+  // The mission's own partition plus the system one (a runtime scope that
+  // resolved to public still carries this mission's id); never another tenant's.
+  for (const entry of metricsCollector.loadResourceUsageHistory(
+    missionScope ? { scope: missionScope, includeSystem: true } : undefined
+  )) {
     if (String(entry.mission_id || '').toUpperCase() !== missionId.toUpperCase()) continue;
     resourceUsage.entries += 1;
     resourceUsage.cost_usd += Number(entry.cost_usd) || 0;
@@ -425,7 +450,7 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
     usage_unrecorded: false,
     item_outcomes: [],
   };
-  Object.assign(stats, collectMissionUsageStats(missionId));
+  Object.assign(stats, collectMissionUsageStats(missionId, missionUsageScope(missionPath)));
   if (!missionPath) return stats;
 
   const nextTasks = (() => {
@@ -886,9 +911,14 @@ export async function runMissionRetrospective(
     '',
     t('mission_ops:retro_queue_footer', { path: IMPROVEMENT_QUEUE_PATH }),
   ];
+  // The generated report gets its own file name. `evidence/retrospective.md`
+  // is the hand-written deliverable of the template's retrospective task
+  // (recorded via record-evidence before finish) and is never written here.
   const reportPath = missionPath
-    ? safeMissionArtifactPath(missionPath, 'evidence/retrospective.md')
-    : safeRepositoryPath(pathResolver.shared(path.join('tmp', `retrospective-${missionId}.md`)));
+    ? safeMissionArtifactPath(missionPath, RETROSPECTIVE_STATS_REPORT)
+    : safeRepositoryPath(
+        pathResolver.shared(path.join('tmp', `retrospective-stats-${missionId}.md`))
+      );
   safeMkdir(path.dirname(reportPath), { recursive: true });
   safeWriteFile(reportPath, reportLines.join('\n'));
   if (missionPath) {
