@@ -10,6 +10,11 @@ process.env.KYBERION_KNOWLEDGE_ROOT = TEST_KNOWLEDGE_ROOT;
 const AGENT_ID = 'Test-Agent-X';
 const LEDGER_PATH = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
 const RUN_ID = Date.now();
+// KYBERION_KNOWLEDGE_ROOT above does not move pathResolver.knowledge(), so the
+// verify flow writes the LIVE trust ledger. Snapshot it and restore it in
+// afterAll so a run neither leaves fixture agents in it nor creates it.
+const LEDGER_DIR_EXISTED = fs.existsSync(path.dirname(LEDGER_PATH));
+const LEDGER_BEFORE = fs.existsSync(LEDGER_PATH) ? fs.readFileSync(LEDGER_PATH, 'utf8') : null;
 
 // KP-07 (knowledge-store hygiene): mission_controller's checkPrerequisites()
 // gates mission creation on a full "sovereign profile" (my-identity.json +
@@ -71,6 +76,10 @@ describe('A2A Mission Lifecycle & Trust Engine Integration', { concurrent: false
   });
 
   afterAll(() => {
+    if (LEDGER_BEFORE !== null) fs.writeFileSync(LEDGER_PATH, LEDGER_BEFORE);
+    else if (!LEDGER_DIR_EXISTED)
+      fs.rmSync(path.dirname(LEDGER_PATH), { recursive: true, force: true });
+    else fs.rmSync(LEDGER_PATH, { force: true });
     fs.rmSync(TEST_KNOWLEDGE_ROOT, { recursive: true, force: true });
     // KP-07: remove the isolated customer overlay used for the sovereign
     // profile gate (see CUSTOMER_SLUG above) and restore the env var so it
