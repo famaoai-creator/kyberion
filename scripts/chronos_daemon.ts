@@ -36,7 +36,11 @@ import {
   enqueueChronosDelivery,
   validateChronosDeliveryTarget,
 } from '@agent/core/chronos-delivery';
-import { createTriggerRunner, withTriggerLeaderLease } from '@agent/core/trigger-runner';
+import {
+  createTriggerRunner,
+  releaseTriggerLeaderLease,
+  withTriggerLeaderLease,
+} from '@agent/core/trigger-runner';
 import { sweepAwaitStateRuns } from '@agent/core/pipeline/pipeline-await-resume';
 import { executeServicePreset } from '@agent/core/service/service-engine';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
@@ -50,8 +54,11 @@ import type { ChronosDeliveryTarget } from '@agent/core/chronos-delivery';
 import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 import { runSteps } from './run_pipeline.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { installGracefulShutdown, startSerialTickLoop } from './lib/daemon-loop.js';
 
 const TICK_INTERVAL_MS = 60_000;
+/** Bound on waiting for an in-flight tick during SIGTERM/SIGINT shutdown. */
+const SHUTDOWN_GRACE_MS = 30_000;
 const triggerRunner = createTriggerRunner();
 
 // ---------------------------------------------------------------------------
@@ -728,17 +735,43 @@ async function main(_args: string[] = []): Promise<void> {
 
   syncSchedulesFromAdf();
 
-  // First tick immediately on startup
-  await tick();
-
-  setInterval(async () => {
-    try {
-      syncSchedulesFromAdf(); // picks up new/changed schedule fields
+  // G09: a self-rescheduling loop with an in-flight guard — the next tick is
+  // armed only after the previous one settles, so a slow tick is never raced
+  // by the next one (which the leader lease then misreported as "another
+  // scheduler leader owns this tick"). The first tick runs immediately and a
+  // failure there stays fatal.
+  let firstTickDone = false;
+  const loop = startSerialTickLoop({
+    intervalMs: TICK_INTERVAL_MS,
+    tick: async () => {
+      if (firstTickDone) syncSchedulesFromAdf(); // picks up new/changed schedule fields
+      firstTickDone = true;
       await tick();
-    } catch (err: any) {
-      logger.error(`[CHRONOS] Tick error: ${err.message}`);
-    }
-  }, TICK_INTERVAL_MS);
+    },
+    onError: (err: any) => logger.error(`[CHRONOS] Tick error: ${err?.message ?? String(err)}`),
+  });
+  installGracefulShutdown({
+    name: 'chronos-daemon',
+    shutdown: async (signal) => {
+      clearInterval(runtimeHealthSampler);
+      const inFlightTick = await loop.stop(SHUTDOWN_GRACE_MS);
+      if (inFlightTick === 'timed_out') {
+        logger.warn(
+          `[CHRONOS] in-flight tick did not settle within ${SHUTDOWN_GRACE_MS}ms — abandoning it | next: check the scheduled run state and rerun it if needed | evidence: ${signal}`
+        );
+      }
+      // withLock releases the lease when a tick settles; an abandoned tick
+      // would otherwise leave it held until stale-lock reclaim.
+      releaseTriggerLeaderLease('chronos-daemon');
+      recordDaemonHeartbeat('chronos-daemon', {
+        status: 'stopping',
+        details: { state: 'stopped', signal, in_flight_tick: inFlightTick },
+      });
+      logger.info(`[CHRONOS] Stopped (${signal}, in-flight tick: ${inFlightTick}).`);
+    },
+  });
+
+  await loop.firstTick;
 
   recordDaemonHeartbeat('chronos-daemon', {
     status: 'running',
