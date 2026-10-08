@@ -413,6 +413,7 @@ const main = async () => {
   const result = await handleAction(
     parseMeetingActionInput(readJson<unknown>(inputPath, { label: 'meeting action input' }))
   );
+  // eslint-disable-next-line no-console -- CLI entry: stdout carries this command's JSON result
   console.log(JSON.stringify(result, null, 2));
 };
 

@@ -541,6 +541,7 @@ const main = async () => {
       'file action input'
     ) as unknown as FileAction
   );
+  // eslint-disable-next-line no-console -- CLI entry: stdout carries this command's JSON result
   console.log(JSON.stringify(result, null, 2));
 };
 

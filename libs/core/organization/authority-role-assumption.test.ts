@@ -438,7 +438,7 @@ describe('S1 scope integrity', () => {
 
   it('ignores a scope run directly on the global storage with a role RA-02 rejects', () => {
     process.env.SYSTEM_ROLE = 'slack_bridge';
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
       const seen = rawStorage().run(
         { tenantBound: false, assumedRole: 'chronos_localadmin', assumedPersona: 'sovereign' },
@@ -539,7 +539,7 @@ describe('DR-01 delegated child role', () => {
     // The parent-side env still claims the role; the child must not trust it.
     expect(process.env.KYBERION_PERSONA).toBe('worker');
     process.env.KYBERION_PERSONA = 'sovereign';
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
       expect(resolveRole()).toBe('slack_bridge');
       expect(resolveExecutionPersona()).not.toBe('sovereign');
@@ -603,7 +603,7 @@ describe('DR-01 delegated child role', () => {
     expect(inferPersonaFromRole('nexus_daemon')).toBe('sovereign');
     becomeChild(buildExecutionEnv({ SYSTEM_ROLE: 'nexus_daemon' }, 'chronos_localadmin'));
     process.env.KYBERION_PERSONA = 'sovereign';
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
       expect(resolveRole()).toBe('nexus_daemon');
       expect(resolveExecutionPersona()).toBe('worker');
@@ -644,7 +644,7 @@ describe('DR-01 delegated child role', () => {
     const storage = (globalThis as unknown as Record<symbol, Registry>)[
       Symbol.for('kyberion.core.execution-scope.v1')
     ].storage;
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
       const role = storage.run({ tenantBound: false, assumedRole: 'chronos_localadmin' }, () =>
         resolveRole()

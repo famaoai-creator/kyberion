@@ -2,6 +2,9 @@ import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { getFoundationIo } from '../foundation/io.js';
 import * as pathResolver from '../path-resolver.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('role-assumption-trace');
 
 /**
  * RN-01: opt-in observation of in-process role assumptions.
@@ -68,7 +71,7 @@ export function resetRoleAssumptionTraceState(): void {
 function rejectTracePath(value: string, reason: string): null {
   if (warnedPath !== value) {
     warnedPath = value;
-    console.warn(
+    logger.warn(
       `[ROLE_ASSUMPTION_TRACE] ignoring ${ROLE_ASSUMPTION_TRACE_ENV}=${value}: ${reason}`
     );
   }
@@ -230,7 +233,7 @@ export function traceRoleAssumption(
   } catch (err) {
     try {
       disabledReason = err instanceof Error ? err.message : String(err);
-      console.warn(`[ROLE_ASSUMPTION_TRACE] disabled after a failure: ${disabledReason}`);
+      logger.warn(`[ROLE_ASSUMPTION_TRACE] disabled after a failure: ${disabledReason}`);
     } catch {
       disabledReason = disabledReason ?? 'trace failure';
     }
