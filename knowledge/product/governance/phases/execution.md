@@ -91,9 +91,10 @@ template task is recorded while the work happens**. Verified end to end on 2026-
    `--actor-id` is not optional in practice: `review-task` computes reviewer independence
    from the actor ids recorded for the review target, and without them review is rejected
    ("implementer identity is missing"). When `record-evidence` (or `review-task`) completes a
-   task it also appends an estimated `source: direct_cli` usage entry (tokens/cost not
-   observed, recorded as null/0) to the resource-usage ledger; pass `--provider <id>` when the
-   provider is not the `--actor-id` prefix, so the retrospective can tell unrecorded usage
+   task (and each task it completes by cascade) it also appends an estimated
+   `source: direct_cli` usage entry (tokens/cost not observed, recorded as null/0) to the
+   resource-usage ledger; pass `--provider <id>` (a known provider id; unknown values are
+   dropped) when the provider is not the `--actor-id` prefix, so the retrospective can tell unrecorded usage
    (`usage_unrecorded`) from free work.
 
 4. **Review with a different agent.** After an independent reviewer (a distinct subagent,
