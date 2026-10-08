@@ -63,6 +63,8 @@ export interface SurfaceAuthRouteRequest {
   referrerOrigin?: string | null;
   /** Where a surface that supports pasted access tokens (concierge `/signin`) offers that path. */
   tokenSignInHref?: string;
+  /** First-run setup page, supplied by the adapter only while setup is still open. */
+  firstRunSetupHref?: string;
 }
 
 export interface SurfaceAuthRouteResponse {
@@ -246,7 +248,12 @@ export async function handleSurfaceAuthRoute(
       if (method !== 'GET' && method !== 'HEAD') return notAllowed(req);
       const { config, missing } = resolveOidcLoginConfig(deps);
       if (!config) {
-        return html(req, 200, { kind: 'unconfigured', missing, tokenHref: req.tokenSignInHref });
+        return html(req, 200, {
+          kind: 'unconfigured',
+          missing,
+          tokenHref: req.tokenSignInHref,
+          setupHref: req.firstRunSetupHref,
+        });
       }
       if (req.searchParams.get('error')) {
         return html(req, 200, { kind: 'failed', code: 'idp_error' });
@@ -263,6 +270,7 @@ export async function handleSurfaceAuthRoute(
         providerLabel: config.providerLabel,
         startHref: startHref(next),
         tokenHref: req.tokenSignInHref,
+        setupHref: req.firstRunSetupHref,
       });
     }
 

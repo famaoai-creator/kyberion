@@ -5899,6 +5899,14 @@
       "types": "./dist/surface/oidc-browser-login.d.ts",
       "default": "./dist/surface/oidc-browser-login.js"
     },
+    "./surface/oidc-login-settings": {
+      "types": "./dist/surface/oidc-login-settings.d.ts",
+      "default": "./dist/surface/oidc-login-settings.js"
+    },
+    "./surface/first-run-setup": {
+      "types": "./dist/surface/first-run-setup.d.ts",
+      "default": "./dist/surface/first-run-setup.js"
+    },
     "./surface/surface-auth-routes": {
       "types": "./dist/surface/surface-auth-routes.d.ts",
       "default": "./dist/surface/surface-auth-routes.js"
