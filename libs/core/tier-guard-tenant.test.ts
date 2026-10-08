@@ -138,6 +138,44 @@ describe('tier-guard tenant scope (IP-1)', () => {
     expect(result.reason).toMatch(/tenant\.scope_violation/);
   });
 
+  describe('cross-tenant registry index (knowledge/confidential/tenants/index.json)', () => {
+    const INDEX = 'knowledge/confidential/tenants/index.json';
+
+    it('denies a tenant-bound actor both writing and reading it', () => {
+      process.env.KYBERION_TENANT = 'acme-corp';
+      process.env.KYBERION_PERSONA = 'ecosystem_architect';
+      const write = validateWritePermission(path.join(ROOT, INDEX));
+      expect(write.allowed).toBe(false);
+      expect(write.reason).toMatch(/tenant\.scope_violation/);
+      const read = validateReadPermission(path.join(ROOT, INDEX));
+      expect(read.allowed).toBe(false);
+      expect(read.reason).toMatch(/tenant\.scope_violation/);
+    });
+
+    it('lets only the system registry reader role read it, audited, and never write it', async () => {
+      process.env.KYBERION_TENANT_SCOPE_REQUIRED = '1';
+      delete process.env.KYBERION_PERSONA;
+      const { auditChain } = await import('./governance/audit-chain.js');
+      vi.mocked(auditChain.record).mockClear();
+      const asReader = <T>(fn: () => T): T =>
+        withExecutionContext('check_tenant_registry_consistency', fn, undefined, 'acme-corp');
+      expect(asReader(() => validateReadPermission(path.join(ROOT, INDEX)))).toEqual({
+        allowed: true,
+      });
+      const write = asReader(() => validateWritePermission(path.join(ROOT, INDEX)));
+      expect(write.allowed).toBe(false);
+      // The reader role does not open the rest of the directory either.
+      const sibling = asReader(() =>
+        validateReadPermission(path.join(ROOT, 'knowledge/confidential/tenants/other.json'))
+      );
+      expect(sibling.allowed).toBe(false);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(vi.mocked(auditChain.record)).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'tenant.registry_read', result: 'allowed' })
+      );
+    });
+  });
+
   it.each([
     ['mission', 'active/missions/confidential/other-tenant/MSN-FOO/evidence/leak.json'],
     ['project', 'active/projects/confidential/other-tenant/PRJ-FOO/state.json'],

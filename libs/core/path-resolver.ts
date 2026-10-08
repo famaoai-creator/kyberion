@@ -184,6 +184,34 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/health/',
   'shared/runtime/state/',
   'shared/runtime/reasoning-failover-events.jsonl',
+  // Learned intent→contract outcomes; task-session completion and intent
+  // reconciliation record into it from many suites.
+  'shared/runtime/intent-contract-memory.json',
+  // Audit hash-chain key (chain-integrity.ts); pairs with the sandboxed
+  // shared/logs/audit/ so a test chain is keyed and verified inside the sandbox.
+  'shared/runtime/audit/',
+  // Provider discovery disk cache: suites that probe or seed it must not
+  // rewrite the operator's cache (and a fresh CI checkout must stay clean).
+  'shared/runtime/provider-cache.json',
+  // Tenant token-bucket state and its lock (tenant-rate-limiter.ts).
+  'shared/runtime/tenant-rate-limit-state.json',
+  'shared/runtime/tenant-rate-limit-state.json.lock',
+  // Found by a strict full run on a fresh tree (files the run created).
+  'shared/runtime/agent-supervisor/a2a-secret',
+  'shared/runtime/current_mission_focus.json',
+  'shared/runtime/external-service-registry.json',
+  'shared/runtime/oauth/',
+  'shared/runtime/voice-loopback-receipts/',
+  'shared/runtime/background-review/nudge/',
+  'shared/runtime/mesh-hub/',
+  'shared/observability/mesh-hub/',
+  // Mission history FTS indexes (history-search-index.ts).
+  'shared/runtime/history-search/',
+  // swiftc output and module cache of the Apple FM bridge (macOS only; a test
+  // that compiles it must not populate the operator's binary cache).
+  'shared/runtime/apple-intelligence/',
+  // Latest skill response for the reflex-terminal feedback loop (skill-wrapper).
+  'shared/last_response.json',
 ];
 export const VITEST_LIVE_SANDBOX_ROOT = 'active/shared/runtime/vitest-live';
 

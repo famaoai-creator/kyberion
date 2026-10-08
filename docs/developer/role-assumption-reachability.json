@@ -1902,6 +1902,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/check_tenant_registry_consistency.ts#collectTenantSystems",
+      "roles": ["check_tenant_registry_consistency"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/check_type_ratchet.ts#checkTypeRatchet",
       "roles": ["ecosystem_architect"],
       "unresolved": []
@@ -3456,6 +3461,7 @@
         "presence/displays/concierge/src/lib/surface-auth-route.ts",
         "presence/displays/concierge/src/lib/tenant-context.ts",
         "presence/displays/concierge/src/lib/use-concierge-i18n.ts",
+        "presence/displays/concierge/src/lib/use-ingest-flow.ts",
         "presence/displays/concierge/src/lib/use-recording-consent.ts",
         "presence/displays/concierge/src/lib/use-settings-draft.ts",
         "presence/displays/concierge/src/lib/use-training-assignments.ts",
