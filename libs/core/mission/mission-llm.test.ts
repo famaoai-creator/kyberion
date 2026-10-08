@@ -1,10 +1,15 @@
 import { z } from 'zod';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readJson } from '../foundation/json.js';
 import * as pathResolver from '../path-resolver.js';
-import { safeReadFile } from '../secure-io.js';
+
+// checkProviderEgress raises an ops-alert on every denial; keep the shared
+// ops-alerts sink untouched by these tests.
+vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
 import {
   inspectLlmResolution,
   invokeShellProfile,
+  type LlmPolicyConfig,
   parseLlmResponse,
   probeLlmCommandAvailability,
   registerStructuredRunner,
@@ -274,10 +279,8 @@ describe('probeLlmCommandAvailability', () => {
 
 describe('shipped wisdom-policy claude profile', () => {
   const originalProfile = process.env.KYBERION_WISDOM_LLM_PROFILE;
-  const shippedPolicy = JSON.parse(
-    safeReadFile(pathResolver.knowledge('product/governance/wisdom-policy.json'), {
-      encoding: 'utf8',
-    }) as string
+  const shippedPolicy = readJson<{ llm: LlmPolicyConfig }>(
+    pathResolver.knowledge('product/governance/wisdom-policy.json')
   ).llm;
 
   beforeEach(() => {
@@ -317,7 +320,8 @@ describe('shipped wisdom-policy claude profile', () => {
     expect(profile).toMatchObject({
       command: 'claude',
       adapter: 'claude-cli',
-      args: ['-p', '{prompt}', '--output-format', 'json'],
+      args: ['-p', '--output-format', 'json'],
+      prompt_via: 'stdin',
       response_format: 'json_envelope',
     });
   });
@@ -368,5 +372,118 @@ describe('claude binary resolution', () => {
     // A pinned binary is never second-guessed by the PATH fallback.
     process.env.KYBERION_CLAUDE_CLI_BIN = `${process.execPath}-missing-claude`;
     expect(probeLlmCommandAvailability('claude').available).toBe(false);
+  });
+});
+
+describe('LLM prompt transport', () => {
+  const originalBin = process.env.KYBERION_CLAUDE_CLI_BIN;
+  // Echoes what the child received: its stdin and its argv.
+  const echoScript =
+    "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>process.stdout.write(JSON.stringify({stdin:d,argv:process.argv.slice(1)})))";
+
+  afterEach(() => {
+    if (originalBin === undefined) delete process.env.KYBERION_CLAUDE_CLI_BIN;
+    else process.env.KYBERION_CLAUDE_CLI_BIN = originalBin;
+  });
+
+  it('ships the claude profile with the prompt on stdin, never in argv', () => {
+    const claude = readJson<{ llm: LlmPolicyConfig }>(
+      pathResolver.knowledge('product/governance/wisdom-policy.json')
+    ).llm.profiles.claude;
+    expect(claude.prompt_via).toBe('stdin');
+    expect(claude.args).not.toContain('{prompt}');
+  });
+
+  it('hands a prompt_via=stdin claude profile the prompt on stdin and not in argv', () => {
+    process.env.KYBERION_CLAUDE_CLI_BIN = process.execPath;
+    const prompt = 'CONFIDENTIAL mission evidence 8f3a';
+    const raw = invokeShellProfile(prompt, {
+      command: 'claude',
+      args: ['-e', echoScript],
+      prompt_via: 'stdin',
+      timeout_ms: 10_000,
+    });
+    const received = JSON.parse(raw) as { stdin: string; argv: string[] };
+    expect(received.stdin).toBe(prompt);
+    expect(received.argv.join(' ')).not.toContain('8f3a');
+  });
+
+  it('refuses a stdin profile that still carries a {prompt} argv placeholder', () => {
+    expect(() =>
+      invokeShellProfile('secret', {
+        command: process.execPath,
+        args: ['-e', '0', '{prompt}'],
+        prompt_via: 'stdin',
+      })
+    ).toThrow(/prompt_via "stdin"/);
+  });
+});
+
+describe('runAdaptiveStructuredLlmProfile provider egress gate', () => {
+  const calls: string[] = [];
+  const disposers: Array<() => void> = [];
+  const schema = z.object({ answer: z.number() });
+  // `claude` is declared training_use 'unknown' in the shipped
+  // provider-egress-policy.json and no tenant attests it here.
+  const policy = {
+    default_profile: 'heavy',
+    purpose_map: { distill: 'heavy' },
+    profiles: {
+      heavy: { command: 'claude', args: [], adapter: 'egress-gate-claude' },
+    },
+  };
+
+  beforeEach(() => {
+    calls.length = 0;
+    disposers.push(
+      registerStructuredRunner('egress-gate-claude', async () => {
+        calls.push('claude');
+        return { answer: 1 };
+      })
+    );
+  });
+
+  afterEach(() => {
+    while (disposers.length) disposers.pop()?.();
+  });
+
+  it('never invokes a non-attested provider for confidential material', async () => {
+    await expect(
+      runAdaptiveStructuredLlmProfile('distill', 'confidential prompt', schema, {
+        policy,
+        isCommandAvailable: () => ({ available: true }),
+        egress: { dataTier: 'confidential' },
+      })
+    ).rejects.toThrow(/All LLM models exhausted/);
+    expect(calls).toEqual([]);
+  });
+
+  it('denies a profile whose provider cannot be identified', async () => {
+    disposers.push(
+      registerStructuredRunner('egress-gate-unknown', async () => {
+        calls.push('unknown');
+        return { answer: 2 };
+      })
+    );
+    await expect(
+      runAdaptiveStructuredLlmProfile('distill', 'personal prompt', schema, {
+        policy: {
+          profiles: { heavy: { command: 'mystery-llm', args: [], adapter: 'egress-gate-unknown' } },
+        },
+        isCommandAvailable: () => ({ available: true }),
+        egress: { dataTier: 'personal' },
+      })
+    ).rejects.toThrow(/All LLM models exhausted/);
+    expect(calls).toEqual([]);
+  });
+
+  it('still invokes the provider for public material', async () => {
+    const result = await runAdaptiveStructuredLlmProfile('distill', 'public prompt', schema, {
+      policy,
+      isCommandAvailable: () => ({ available: true }),
+      egress: { dataTier: 'public' },
+    });
+    expect(result).toEqual({ answer: 1 });
+    expect(calls).toEqual(['claude']);
   });
 });

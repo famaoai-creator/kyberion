@@ -12,7 +12,7 @@ area, and the automated check that enforces the rule. A defect class that recurs
 was missing or unenforced. Fix the defect, then extend this runbook or its gate in the same PR.
 
 **Audience.** Anyone (human or agent) who changes CI workflows, runtime stores, daemons, child
-processes, library logging, tests, or tenant-scoped facades.
+processes, library logging, tests, tenant-scoped facades, or LLM/provider calls.
 
 **Origin.** MSN-OPS-GAPS-20261008 (organization `kyberion-ops`, project `PRJ-OPS-IMPROVEMENT`).
 That mission closed 16 gaps from the 2026-10-08 operations survey. Several had been fixed before and
@@ -26,6 +26,7 @@ had regressed.
 | stdout / logging in libraries | eslint `no-console` on `libs/`                                     | §4      |
 | Test pollution and host deps  | Vitest leak guard, strict in CI (`KYBERION_TEST_LEAK_STRICT=1`)    | §5      |
 | Tenant scope and facade env   | `tier-guard-tenant` tests, facade binding tests                    | §6      |
+| LLM / provider calls          | per-call-site egress tests (e.g. `mission-distill-egress.test.ts`) | §7      |
 
 ---
 
@@ -209,6 +210,31 @@ the test passes against the sandbox while the writer leaks into live state.
      `KYBERION_TENANT_SCOPE_REQUIRED=true` and `KYBERION_PERSONA=sovereign`.
    - Remove the throwaway state afterwards: `customer/`, `knowledge/personal/tenants/`,
      `knowledge/confidential/`, `active/organizations/`.
+
+---
+
+## §7 LLM and provider calls
+
+**Rules:**
+
+- **Check provider egress for the data tier before every send.** Any path that hands mission or
+  tenant content to an LLM provider (CLI or API) first calls `checkProviderEgress` (provider, data
+  tier, tenant) from `libs/core/provider/provider-egress-gate.ts` for each candidate provider. Resolve the provider with `providerIdForReasoningIdentifier`; an unknown provider is
+  denied above `public`. Skip a denied provider and degrade (next provider, or a no-LLM path) — do
+  not add `approved_providers` exceptions to make a call site work. `mission distill` does this
+  through the `egress` option of `runAdaptiveStructuredLlmProfile`
+  (`libs/core/mission/mission-llm.ts`).
+- **Prompts and secrets go on stdin, never argv.** argv is visible in the process table and is capped
+  at about 128 KB per argument. Shell-invoked LLM profiles use `prompt_via: "stdin"` (the `claude`
+  profile in `wisdom-policy.json` does); the same applies to passwords and tokens for any CLI.
+
+**Procedure:**
+
+1. When you add a call site that sends content to a provider, derive the tier from the content's
+   source (mission `state.tier`, `highestTierForPaths` for knowledge paths) and gate it as above.
+2. Add a test that fails without the gate: a confidential payload with only a non-attested provider
+   must not invoke it, and a public payload still does. Mock `../ops-alert.js` so denials do not
+   write to the shared ops-alert sink.
 
 ---
 

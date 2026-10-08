@@ -33,7 +33,8 @@
         "description": "Claude CLI fallback when codex/gemini are unavailable — print mode, JSON result envelope",
         "command": "claude",
         "adapter": "claude-cli",
-        "args": ["-p", "{prompt}", "--output-format", "json"],
+        "args": ["-p", "--output-format", "json"],
+        "prompt_via": "stdin",
         "timeout_ms": 180000,
         "response_format": "json_envelope"
       }
