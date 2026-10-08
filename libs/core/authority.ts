@@ -15,6 +15,7 @@ import { Persona, Authority, ExecutionMode, IdentityContext } from './types.js';
 import { getServiceAuthorities } from './service/service-authority-map.js';
 import { createLogger } from './logger.js';
 import { registerIdentityContextResolver } from './identity-context-bridge.js';
+import * as auditChainModule from './governance/audit-chain.js';
 import {
   currentExecutionScope,
   executionPersonaText,
@@ -1112,6 +1113,27 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
 }
 
 registerIdentityContextResolver(resolveIdentityContext);
+
+/**
+ * G17: the audit chain's tenant mirror (customer/{slug}/logs/audit/) is written
+ * as infrastructure_sentinel bound to the entry's tenant — a shared core
+ * store-writer role whose grant on that path is tenant-parameterised — so the
+ * mirror never depends on (or borrows) the caller's own grants.
+ */
+const TENANT_AUDIT_MIRROR_WRITER_ROLE = 'infrastructure_sentinel';
+// Guarded lookup, as in secure-io's registerOptionalAuditIo: a test's reduced
+// audit-chain mock may not export the seam.
+try {
+  const register = (auditChainModule as unknown as Record<string, unknown>)
+    .registerTenantMirrorWriterContext;
+  if (typeof register === 'function') {
+    (register as typeof auditChainModule.registerTenantMirrorWriterContext)((tenantSlug, fn) =>
+      withExecutionContext(TENANT_AUDIT_MIRROR_WRITER_ROLE, fn, undefined, tenantSlug)
+    );
+  }
+} catch {
+  // A reduced adapter simply has no tenant mirror seam.
+}
 
 /**
  * Checks if the current context has a specific authority.

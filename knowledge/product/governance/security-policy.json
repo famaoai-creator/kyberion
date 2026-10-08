@@ -448,7 +448,8 @@
         "active/shared/observability/",
         "active/shared/runtime/",
         "presence/bridge/runtime/",
-        "active/shared/tmp/"
+        "active/shared/tmp/",
+        "customer/${KYBERION_TENANT}/logs/audit/"
       ]
     },
     "slack_bridge": {

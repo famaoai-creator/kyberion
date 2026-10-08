@@ -193,11 +193,16 @@ export async function createMission(args: {
   ) {
     resolveTenant(tenantSlug, { rootDir });
   }
-  withExecutionContext(
-    'knowledge_steward',
-    () => ensureDefaultTenantProfile(),
-    'ecosystem_architect'
-  );
+  // The default-tenant bootstrap writes the operator's gitignored personal
+  // tier (knowledge/personal/tenants/default.json), which no Vitest sandbox
+  // covers; like resolveTenant above, a test run skips it (G18).
+  if (!isVitestProcess()) {
+    withExecutionContext(
+      'knowledge_steward',
+      () => ensureDefaultTenantProfile(),
+      'ecosystem_architect'
+    );
+  }
 
   const upperId = id.toUpperCase();
   assertValidMissionId(upperId);

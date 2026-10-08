@@ -1,6 +1,6 @@
 ---
 title: 'Kyberion Development Practices — Hard-Won Rules for Changing This Repo'
-last_updated: 2026-10-06
+last_updated: 2026-10-08
 ---
 
 # Kyberion Development Practices — Hard-Won Rules for Changing This Repo
@@ -143,7 +143,9 @@ leftovers. A test may not depend on:
 - **leaks are reported, not silent** — `tests/vitest-active-leak-guard.ts`
   (Vitest `globalSetup`) lists every file a run created or grew in live
   `active/` outside `active/shared/tmp`, `active/shared/cache` and
-  `vitest-*` roots, in `active/shared/tmp/vitest-active-leaks.json`;
+  `vitest-*` roots, and in the gitignored `knowledge/personal/`,
+  `knowledge/confidential/` and `customer/` trees, in
+  `active/shared/tmp/vitest-active-leaks.json`;
   `KYBERION_TEST_LEAK_STRICT=1` fails the run. Check it after a full run;
 - **the calendar** — absolute dates in fixtures rot; freeze
   `vi.useFakeTimers({ now, toFake: ['Date'] })` for the WHOLE flow, not
