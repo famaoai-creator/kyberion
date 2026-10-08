@@ -15,26 +15,34 @@ export interface TieBreakOption {
   vision_alignment_hint?: string; // AI's guess on how it fits the Vision
 }
 
+/**
+ * The tie-break dialogue is interactive UI, not command output: it goes to
+ * stderr (prompt included) so a caller's stdout stays parseable.
+ */
+function say(line: string): void {
+  process.stderr.write(`${line}\n`);
+}
+
 export async function consultVision(
   context: string,
   options: TieBreakOption[]
 ): Promise<TieBreakOption> {
   logger.warn(`🚨 [VISION_JUDGE] Logical Deadlock Detected in: ${context}`);
 
-  console.log(chalk.cyan('\n--- Vision Tie-break Required ---'));
-  console.log(chalk.white(`Context: ${context}`));
-  console.log(
+  say(chalk.cyan('\n--- Vision Tie-break Required ---'));
+  say(chalk.white(`Context: ${context}`));
+  say(
     chalk.gray('The following options are logically similar. Please decide based on your Vision:')
   );
 
   options.forEach((opt, idx) => {
-    console.log(`${idx + 1}. [${opt.id}] ${opt.description} (Logic: ${opt.logic_score})`);
+    say(`${idx + 1}. [${opt.id}] ${opt.description} (Logic: ${opt.logic_score})`);
     if (opt.vision_alignment_hint) {
-      console.log(chalk.italic.yellow(`   💡 AI Thought: ${opt.vision_alignment_hint}`));
+      say(chalk.italic.yellow(`   💡 AI Thought: ${opt.vision_alignment_hint}`));
     }
   });
 
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
 
   return new Promise((resolve) => {
     const ask = () => {
@@ -48,7 +56,7 @@ export async function consultVision(
           logger.success(`✅ Vision set to: ${selected.id}`);
           resolve(selected);
         } else {
-          console.log(chalk.red('Invalid selection. Try again.'));
+          say(chalk.red('Invalid selection. Try again.'));
           ask();
         }
       });

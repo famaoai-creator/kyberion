@@ -260,25 +260,29 @@ describe('op preflight waterfall', () => {
     });
 
     it('logs an async observer rejection instead of leaving it unhandled (S7)', async () => {
-      const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
       registerOpPreflightOutcomeObserver(async () => {
         throw new Error('async observer boom');
       });
       const result = await runOpPreflight({ op: 'demo:op', params: {}, source: 'pipeline' });
       expect(result.decision).toBe('allow');
       for (let i = 0; i < 5; i += 1) await Promise.resolve();
-      expect(spy).toHaveBeenCalledWith('[OP_PREFLIGHT_OUTCOME_OBSERVER_ERROR]', expect.any(Error));
+      expect(spy).toHaveBeenCalledWith(
+        expect.stringMatching(/\[OP_PREFLIGHT_OUTCOME_OBSERVER_ERROR\].*async observer boom/)
+      );
       spy.mockRestore();
     });
 
     it('swallows and logs a throwing observer without affecting the call', async () => {
-      const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
       registerOpPreflightOutcomeObserver(() => {
         throw new Error('observer boom');
       });
       const result = await runOpPreflight({ op: 'demo:op', params: {}, source: 'pipeline' });
       expect(result.decision).toBe('allow');
-      expect(spy).toHaveBeenCalledWith('[OP_PREFLIGHT_OUTCOME_OBSERVER_ERROR]', expect.any(Error));
+      expect(spy).toHaveBeenCalledWith(
+        expect.stringMatching(/\[OP_PREFLIGHT_OUTCOME_OBSERVER_ERROR\].*observer boom/)
+      );
       spy.mockRestore();
     });
 

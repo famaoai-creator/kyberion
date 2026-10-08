@@ -44,7 +44,7 @@ describe('knowledge-slices: manifest loading (fail-open)', () => {
     const warnSpy = vitestSpyConsoleWarn();
     expect(loadKnowledgeSlicesFile(p)).toBeNull();
     expect(loadKnowledgeSlicesFile(p)).toBeNull(); // cached; still fail-open
-    expect(warnSpy.mock.calls.length).toBe(1); // warned exactly once despite two calls
+    expect(knowledgeSliceWarnings(warnSpy)).toBe(1); // warned exactly once despite two calls
     warnSpy.mockRestore();
   });
 
@@ -55,7 +55,7 @@ describe('knowledge-slices: manifest loading (fail-open)', () => {
     });
     const warnSpy = vitestSpyConsoleWarn();
     expect(loadKnowledgeSlicesFile(p)).toBeNull();
-    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(knowledgeSliceWarnings(warnSpy)).toBe(1);
     warnSpy.mockRestore();
   });
 
@@ -357,5 +357,10 @@ describe('knowledge-slices: minimal glob matcher', () => {
 });
 
 function vitestSpyConsoleWarn() {
-  return vi.spyOn(console, 'warn').mockImplementation(() => {});
+  // knowledge-slices warns through createLogger('knowledge-slices') -> stderr.
+  return vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+}
+
+function knowledgeSliceWarnings(spy: { mock: { calls: unknown[][] } }): number {
+  return spy.mock.calls.filter(([line]) => String(line).includes('[knowledge-slices]')).length;
 }
