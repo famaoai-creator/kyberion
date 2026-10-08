@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { MissionWorkingMemory } from './mission-working-memory.js';
 
 describe('mission-working-memory', () => {
@@ -97,6 +97,30 @@ describe('mission-working-memory', () => {
       withExecutionContext('mission_controller', () =>
         safeRmSync(missionDir, { recursive: true, force: true })
       );
+    }
+  });
+
+  it('persists beside an existing mission but never fabricates a mission directory', () => {
+    const missing = `MSN-MWM-MISSING-${randomUUID()}`.toUpperCase();
+    const existing = `MSN-MWM-EXISTING-${randomUUID()}`.toUpperCase();
+    const missingDir = pathResolver.active(path.join('missions', 'confidential', missing));
+    const existingDir = pathResolver.active(path.join('missions', 'confidential', existing));
+    withExecutionContext('mission_controller', () => safeMkdir(existingDir, { recursive: true }));
+    try {
+      withExecutionContext('mission_controller', () => {
+        const memory = new MissionWorkingMemory();
+        memory.write({ mission_id: missing, key: 'k', value: 'v', writer_agent: 'test' });
+        memory.write({ mission_id: existing, key: 'k', value: 'v', writer_agent: 'test' });
+        // In-process memory still holds the entry for the unknown mission.
+        expect(memory.list({ missionId: missing })).toHaveLength(1);
+        expect(safeExistsSync(missingDir)).toBe(false);
+        expect(safeExistsSync(path.join(existingDir, '.mwm-entries.json'))).toBe(true);
+      });
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(existingDir, { recursive: true, force: true });
+        safeRmSync(missingDir, { recursive: true, force: true });
+      });
     }
   });
 });
