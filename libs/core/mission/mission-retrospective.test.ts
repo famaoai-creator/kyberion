@@ -439,11 +439,12 @@ describe('mission retrospective loop', () => {
       completeTasks();
       const { MetricsCollector } = await import('../metrics.js');
       const { recordDirectCliTaskUsage } = await import('./mission-direct-cli-usage.js');
-      const entry = recordDirectCliTaskUsage({
+      const [entry] = recordDirectCliTaskUsage({
         missionId: MISSION,
         taskId: 'T-1',
         event: 'record_evidence',
         actorId: 'codex-implementer',
+        state: { tier: 'public' },
         collector: new MetricsCollector({ metricsDir: path.join(tmpRoot, 'work', 'metrics') }),
       });
       expect(entry).toMatchObject({ status: 'estimated', source: 'direct_cli', cost_usd: 0 });
