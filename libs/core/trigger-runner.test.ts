@@ -13,8 +13,10 @@ import {
   TriggerRunner,
   assertNoEscalation,
   normalizeTriggerRecord,
+  releaseTriggerLeaderLease,
   resolveCurrentTriggerAuthority,
   runWakeTrigger,
+  withTriggerLeaderLease,
 } from './trigger-runner.js';
 import { auditChain } from './governance/audit-chain.js';
 import { deriveTraceOrigin } from './analysis/trace.js';
@@ -294,5 +296,24 @@ describe('QM-02 trigger runner', () => {
     } finally {
       safeRmSync(store, { recursive: true, force: true });
     }
+  });
+});
+
+describe('trigger leader lease shutdown release', () => {
+  it('releases a lease held by an abandoned in-flight tick so the next leader can run', async () => {
+    const leaderId = `lease-release-test-${process.pid}-${randomUUID()}`;
+    let releaseTick!: () => void;
+    const abandoned = withTriggerLeaderLease(
+      leaderId,
+      () => new Promise<string>((resolve) => (releaseTick = () => resolve('late')))
+    );
+    // Lease is held: a second tick is skipped.
+    await expect(withTriggerLeaderLease(leaderId, async () => 'second')).resolves.toBeUndefined();
+
+    releaseTriggerLeaderLease(leaderId);
+    await expect(withTriggerLeaderLease(leaderId, async () => 'next')).resolves.toBe('next');
+
+    releaseTick();
+    await expect(abandoned).resolves.toBe('late');
   });
 });
