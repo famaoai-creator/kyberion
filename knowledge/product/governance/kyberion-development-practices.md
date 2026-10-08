@@ -102,6 +102,10 @@ dist/scripts/check_golden_output.js --rebaseline`); `vital-check` is
 
 How-to with examples: [docs/developer/WRITING_TESTS.md](../../../docs/developer/WRITING_TESTS.md).
 
+Recurrence-prevention rules for operational defects (CI workflows, runtime stores, daemons,
+library stdout, test pollution, tenant-scoped facades) and the gates that enforce them:
+[operations-hygiene-runbook](./operations-hygiene-runbook.md).
+
 13 tests were green for weeks only because this dev box had the right
 leftovers. A test may not depend on:
 
