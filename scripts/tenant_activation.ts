@@ -13,6 +13,7 @@ import {
   type TenantActivationProbeRefs,
 } from '@agent/core/organization/tenant-activation';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
+import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
@@ -102,10 +103,39 @@ export function main(argv: string[] = [], print: Print = () => undefined): void 
   // Activation reads the tenant registry (personal tier) and writes the receipt
   // beside the customer overlay: the governed onboarding authority, the same
   // role `pnpm tenant` assumes, so the operator needs no exported persona.
+  // The facade also binds the tenant and organization it was asked about, so
+  // tenant-scoped reads (organization state, probe evidence) pass a required
+  // tenant binding without the operator exporting KYBERION_TENANT, and every
+  // subcommand needs the same environment.
+  const { tenantSlug, organizationId } = activationScope(argv);
   if (command === 'probe') {
-    return withExecutionContextAsync('sovereign_concierge', () => probe(argv, print));
+    return withExecutionContextAsync(
+      'sovereign_concierge',
+      () => probe(argv, print),
+      undefined,
+      tenantSlug,
+      organizationId
+    );
   }
-  withExecutionContext('sovereign_concierge', () => dispatch(command, argv, print));
+  withExecutionContext(
+    'sovereign_concierge',
+    () => dispatch(command, argv, print),
+    undefined,
+    tenantSlug,
+    organizationId
+  );
+}
+
+/** Tenant binding for the facade's execution scope, from its own --tenant-slug. */
+export function activationScope(argv: string[]): {
+  tenantSlug?: string;
+  organizationId?: string;
+} {
+  const tenantSlug = value(argv, '--tenant-slug');
+  if (tenantSlug !== undefined && !isValidTenantSlug(tenantSlug)) {
+    throw new Error(`--tenant-slug '${tenantSlug}' is not a valid tenant slug`);
+  }
+  return { tenantSlug, organizationId: value(argv, '--organization-id') };
 }
 
 function dispatch(command: string, argv: string[], print: Print): void {

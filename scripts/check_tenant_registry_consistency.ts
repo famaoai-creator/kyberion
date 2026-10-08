@@ -40,6 +40,7 @@ import { loadTenantDesignOverrideIndex } from '@agent/core/organization/tenant-d
 import { isValidTenantSlug, TENANT_SLUG_PATTERN } from '@agent/core/foundation/scope';
 import { listProjectRecords } from '@agent/core/project/project-registry';
 import { pathResolver } from '@agent/core/path-resolver';
+import { withExecutionContext } from '@agent/core/authority';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -54,6 +55,8 @@ import {
 export const EXCEPTIONS_RELATIVE_PATH =
   'knowledge/product/governance/tenant-registry-exceptions.json';
 const CONFIDENTIAL_INDEX_RELATIVE_PATH = 'knowledge/confidential/tenants/index.json';
+/** Holds the read grant on the index (security-policy.json authority_role_permissions). */
+const REGISTRY_READER_ROLE = 'check_tenant_registry_consistency';
 
 export type { TenantRegistryException } from '@agent/core/organization/tenant-registry-exceptions';
 
@@ -105,8 +108,16 @@ export function collectTenantSystems(options: CheckOptions = {}): TenantSystemsS
     allowMissingLeaf: true,
     rootDir,
   });
-  if (safeExistsSync(indexPath)) {
-    const indexPayload = loadTenantDesignOverrideIndex(rootDir, { fallbackOnInvalid: false });
+  // The index lists every tenant, so a tenant-bound caller (e.g. the
+  // tenant:activation probe) may not read it. Read it as the governed system
+  // registry reader: tier-guard allows that role a read-only, audited access
+  // (security-policy.json tenant_scope.system_registry_reads).
+  const indexPayload = withExecutionContext(REGISTRY_READER_ROLE, () =>
+    safeExistsSync(indexPath)
+      ? loadTenantDesignOverrideIndex(rootDir, { fallbackOnInvalid: false })
+      : null
+  );
+  if (indexPayload) {
     confidentialIndex = indexPayload.tenants.map((entry) => entry.id).sort();
   } else {
     notes.push(`(b) ${CONFIDENTIAL_INDEX_RELATIVE_PATH} not present — treated as empty set`);
