@@ -752,4 +752,50 @@ describe('mission retrospective loop', () => {
     expect(notify).not.toHaveBeenCalled();
     expect(fs.readFileSync(result.report_path, 'utf8')).toContain('stub backend');
   });
+
+  it('never overwrites the hand-written evidence/retrospective.md deliverable', async () => {
+    backendName.value = 'stub';
+    const handWrittenPath = path.join(missionDir, 'evidence', 'retrospective.md');
+    const handWritten = Buffer.from('# Retrospective\n\nRecorded via record-evidence.\n', 'utf8');
+    fs.writeFileSync(handWrittenPath, handWritten);
+
+    const result = await mod.runMissionRetrospective(MISSION);
+
+    expect(fs.readFileSync(handWrittenPath).equals(handWritten)).toBe(true);
+    expect(result.report_path).toBe(path.join(missionDir, 'evidence', 'retrospective-stats.md'));
+    expect(fs.readFileSync(result.report_path, 'utf8')).toContain(
+      `# Mission Retrospective — ${MISSION}`
+    );
+    expect(fs.existsSync(path.join(missionDir, 'evidence', 'retrospective.json'))).toBe(true);
+  });
+
+  it('writes generated files only to paths no workflow template declares as a deliverable', () => {
+    const catalog: unknown = JSON.parse(
+      fs.readFileSync(
+        path.resolve(process.cwd(), 'knowledge/product/governance/mission-workflow-catalog.json'),
+        'utf8'
+      )
+    );
+    const deliverables = new Set<string>();
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) return node.forEach(walk);
+      if (!node || typeof node !== 'object') return;
+      for (const [key, value] of Object.entries(node)) {
+        if (key === 'deliverable' && typeof value === 'string') deliverables.add(value);
+        else walk(value);
+      }
+    };
+    walk(catalog);
+    expect(deliverables.has('evidence/retrospective.md')).toBe(true);
+    for (const generated of [mod.RETROSPECTIVE_STATS_REPORT, 'evidence/retrospective.json']) {
+      expect(deliverables.has(generated)).toBe(false);
+    }
+  });
+
+  it('does not create evidence/retrospective.md when no deliverable was recorded', async () => {
+    backendName.value = 'stub';
+    const result = await mod.runMissionRetrospective(MISSION);
+    expect(path.basename(result.report_path)).toBe('retrospective-stats.md');
+    expect(fs.existsSync(path.join(missionDir, 'evidence', 'retrospective.md'))).toBe(false);
+  });
 });

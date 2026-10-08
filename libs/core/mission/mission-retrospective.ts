@@ -126,6 +126,13 @@ export interface MissionExecutionStats {
   }>;
 }
 
+/**
+ * Mission-relative path of the generated stats + proposals report. Distinct
+ * from `evidence/retrospective.md`, the recorded deliverable of the
+ * retrospective task, which the generator must never touch.
+ */
+export const RETROSPECTIVE_STATS_REPORT = 'evidence/retrospective-stats.md';
+
 /** Mirrors MISSION_TASK_COMPLETED_STATUSES (mission-lifecycle-completion.ts),
  *  kept local so the retrospective does not pull in the lifecycle module graph. */
 const COMPLETED_TASK_STATUSES = new Set(['done', 'completed', 'accepted', 'reviewed']);
@@ -886,9 +893,14 @@ export async function runMissionRetrospective(
     '',
     t('mission_ops:retro_queue_footer', { path: IMPROVEMENT_QUEUE_PATH }),
   ];
+  // The generated report gets its own file name. `evidence/retrospective.md`
+  // is the hand-written deliverable of the template's retrospective task
+  // (recorded via record-evidence before finish) and is never written here.
   const reportPath = missionPath
-    ? safeMissionArtifactPath(missionPath, 'evidence/retrospective.md')
-    : safeRepositoryPath(pathResolver.shared(path.join('tmp', `retrospective-${missionId}.md`)));
+    ? safeMissionArtifactPath(missionPath, RETROSPECTIVE_STATS_REPORT)
+    : safeRepositoryPath(
+        pathResolver.shared(path.join('tmp', `retrospective-stats-${missionId}.md`))
+      );
   safeMkdir(path.dirname(reportPath), { recursive: true });
   safeWriteFile(reportPath, reportLines.join('\n'));
   if (missionPath) {
