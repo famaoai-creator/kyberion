@@ -81,10 +81,14 @@ vi.mock('@agent/core/protocol-service-lifecycle', async () => {
   };
 });
 
+// The script is imported once per file (the first `await import` below; later
+// ones hit the module cache). Re-importing the @agent/core / secure-io /
+// authority stack per test with vi.resetModules() repeated its module
+// initialisation every test (operations-hygiene-runbook §5); the script keeps
+// no module state, so the mocks reset in beforeEach are the only per-test state.
 describe('run_generation_schedule', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
     mocks.safeExistsSync.mockReturnValue(true);
   });
 

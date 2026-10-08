@@ -8,8 +8,22 @@ function tokenHash(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
+// viewer-context (and the secure-io / tier-guard / authority stack under it) is
+// imported once per file and reused from the module cache; re-importing that
+// stack per test with vi.resetModules() repeated its module initialisation
+// every test (operations-hygiene-runbook §5). Only the tests that vi.doMock the
+// token registry need a fresh module graph: they call mockRegistryModule(), and
+// afterEach drops that mocked graph again so later tests re-bind the real one.
+let registryMocked = false;
+
+function mockRegistryModule(factory: () => Promise<Record<string, unknown>>): void {
+  vi.resetModules();
+  registryMocked = true;
+  vi.doMock('@agent/core/chronos-access-registry', factory);
+}
+
 function mockRegistrations(entries: unknown[]): void {
-  vi.doMock('@agent/core/chronos-access-registry', async () => ({
+  mockRegistryModule(async () => ({
     ...(await vi.importActual<typeof import('@agent/core/chronos-access-registry')>(
       '@agent/core/chronos-access-registry'
     )),
@@ -19,13 +33,16 @@ function mockRegistrations(entries: unknown[]): void {
 
 describe('concierge viewer-context tier masking', () => {
   beforeEach(() => {
-    vi.resetModules();
     vi.unstubAllEnvs();
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.doUnmock('@agent/core/chronos-access-registry');
+    if (registryMocked) {
+      registryMocked = false;
+      vi.resetModules();
+    }
   });
 
   it('never grants the personal tier to a loopback localadmin viewer', async () => {
@@ -80,7 +97,7 @@ describe('concierge viewer-context tier masking', () => {
 
   it('TR-01: reads the token registry under the narrow reader role under SYSTEM_ROLE', async () => {
     const rolesDuringRead: string[] = [];
-    vi.doMock('@agent/core/chronos-access-registry', async () => {
+    mockRegistryModule(async () => {
       const actual = await vi.importActual<typeof import('@agent/core/chronos-access-registry')>(
         '@agent/core/chronos-access-registry'
       );

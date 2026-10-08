@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => {
   const route = vi.fn();
@@ -79,8 +79,19 @@ vi.mock('../libs/core/mission/mission-task-events.js', () => ({
 }));
 
 describe('agent collaboration e2e', { concurrent: false }, () => {
+  // The worker stack is imported once per file, here, and every later
+  // `await import` hits the module cache. Re-importing the secure-io /
+  // tier-guard / authority stack per test with vi.resetModules() repeated its
+  // module initialisation every test (operations-hygiene-runbook §5); importing
+  // it up front also keeps that one-time load out of the first test's timeout.
+  // Per-test state is reset through the work-coordination namespace/store and
+  // the mocks in beforeEach.
+  beforeAll(async () => {
+    process.env.MISSION_ROLE = 'mission_controller';
+    await import('../libs/core/mission/mission-orchestration-worker.js');
+  }, 60_000);
+
   beforeEach(async () => {
-    vi.resetModules();
     vi.resetAllMocks();
     process.env.MISSION_ROLE = 'mission_controller';
     const { missionDir } = await import('../libs/core/path-resolver.js');
