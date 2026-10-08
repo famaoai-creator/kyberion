@@ -205,6 +205,8 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/background-review/nudge/',
   'shared/runtime/mesh-hub/',
   'shared/observability/mesh-hub/',
+  // Mission history FTS indexes (history-search-index.ts).
+  'shared/runtime/history-search/',
   // swiftc output and module cache of the Apple FM bridge (macOS only; a test
   // that compiles it must not populate the operator's binary cache).
   'shared/runtime/apple-intelligence/',
