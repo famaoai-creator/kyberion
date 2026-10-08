@@ -1,5 +1,5 @@
 /* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
 import { getAdapterDefault } from '../actuator/adapter-default-preferences.js';
@@ -23,6 +23,35 @@ export interface EmailBackendCandidate {
   status: 'ready' | 'needs_setup' | 'unsupported';
   selectable: boolean;
   reason: string;
+}
+
+/** Bound for one mail send/draft child (Mail.app automation or an SMTP round trip). */
+export const EMAIL_COMMAND_TIMEOUT_MS = 60_000;
+
+/**
+ * Settle a mail child exactly once: on 'close', on spawn 'error' (missing
+ * osascript/python3 — without a listener that crashes the process), or when
+ * the kill timer fires (a hung Mail.app or SMTP server).
+ */
+function superviseEmailChild(
+  child: ChildProcess,
+  onSettled: (outcome: { code: number | null; error?: string }) => void,
+  timeoutMs = EMAIL_COMMAND_TIMEOUT_MS
+): void {
+  let settled = false;
+  const settle = (outcome: { code: number | null; error?: string }): void => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    onSettled(outcome);
+  };
+  const timer = setTimeout(() => {
+    child.kill('SIGKILL');
+    settle({ code: null, error: `timed out after ${timeoutMs / 1000}s and was killed` });
+  }, timeoutMs);
+  timer.unref?.();
+  child.on('error', (error) => settle({ code: null, error: error.message }));
+  child.on('close', (code) => settle({ code }));
 }
 
 function buildJxaScript(op: 'create_draft' | 'send', params: EmailParams): string {
@@ -100,8 +129,8 @@ export class MacMailAppEmailProvider implements EmailProvider {
         stderr += String(chunk);
       });
 
-      child.on('close', (code) => {
-        if (code === 0 && stdout.trim() === 'ok') {
+      superviseEmailChild(child, ({ code, error }) => {
+        if (!error && code === 0 && stdout.trim() === 'ok') {
           resolve({
             status: 'succeeded',
             provider: this.id,
@@ -111,7 +140,9 @@ export class MacMailAppEmailProvider implements EmailProvider {
           resolve({
             status: 'failed',
             provider: this.id,
-            error: stderr.trim() || `JXA script failed with exit code ${code}`,
+            error: error
+              ? `osascript ${error}`
+              : stderr.trim() || `JXA script failed with exit code ${code}`,
           });
         }
       });
@@ -190,8 +221,8 @@ print("ok")
         stderr += String(chunk);
       });
 
-      child.on('close', (code) => {
-        if (code === 0 && stdout.trim() === 'ok') {
+      superviseEmailChild(child, ({ code, error }) => {
+        if (!error && code === 0 && stdout.trim() === 'ok') {
           resolve({
             status: 'succeeded',
             provider: this.id,
@@ -201,7 +232,9 @@ print("ok")
           resolve({
             status: 'failed',
             provider: this.id,
-            error: stderr.trim() || `SMTP python execution failed with exit code ${code}`,
+            error: error
+              ? `SMTP python3 ${error}`
+              : stderr.trim() || `SMTP python execution failed with exit code ${code}`,
           });
         }
       });

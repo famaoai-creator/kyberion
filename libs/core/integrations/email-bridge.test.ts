@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
   EmailBackendRegistry,
   EmailPolicyRouter,
+  EMAIL_COMMAND_TIMEOUT_MS,
   MacMailAppEmailProvider,
   SmtpEmailProvider,
 } from './email-bridge.js';
@@ -172,5 +173,63 @@ describe('SmtpEmailProvider', () => {
       expect.arrayContaining(['-c', expect.stringContaining('import smtplib')]),
       expect.any(Object)
     );
+  });
+});
+
+describe('email child supervision (G12)', () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    process.env = {
+      ...originalEnv,
+      KYBERION_SMTP_HOST: 'smtp.example.com',
+      KYBERION_SMTP_USER: 'user',
+      KYBERION_SMTP_PASS: 'pass',
+    };
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    vi.useRealTimers();
+  });
+
+  function createFakeChild() {
+    const fakeChild = new EventEmitter() as EventEmitter & {
+      stdout: EventEmitter;
+      stderr: EventEmitter;
+      kill: ReturnType<typeof vi.fn>;
+    };
+    fakeChild.stdout = new EventEmitter();
+    fakeChild.stderr = new EventEmitter();
+    fakeChild.kill = vi.fn();
+    return fakeChild;
+  }
+
+  it("resolves failed (instead of crashing) when osascript emits 'error'", async () => {
+    const fakeChild = createFakeChild();
+    mocks.spawn.mockReturnValue(fakeChild);
+    const promise = new MacMailAppEmailProvider().send({ to: 'a@example.com' });
+    fakeChild.emit('error', new Error('spawn osascript ENOENT'));
+    fakeChild.emit('close', -2);
+    await expect(promise).resolves.toMatchObject({
+      status: 'failed',
+      provider: 'mac_mailapp',
+      error: 'osascript spawn osascript ENOENT',
+    });
+  });
+
+  it('kills a hung python3 SMTP child at the deadline and reports failed', async () => {
+    vi.useFakeTimers();
+    const fakeChild = createFakeChild();
+    mocks.spawn.mockReturnValue(fakeChild);
+    const promise = new SmtpEmailProvider().send({ to: 'a@example.com' });
+    await vi.advanceTimersByTimeAsync(EMAIL_COMMAND_TIMEOUT_MS);
+    expect(fakeChild.kill).toHaveBeenCalledWith('SIGKILL');
+    await expect(promise).resolves.toMatchObject({
+      status: 'failed',
+      provider: 'smtp',
+      error: 'SMTP python3 timed out after 60s and was killed',
+    });
   });
 });
