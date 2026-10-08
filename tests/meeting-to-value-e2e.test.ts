@@ -102,6 +102,8 @@ describe('meeting-to-value e2e', () => {
     setWorkCoordinationNamespace(null);
     vi.useRealTimers();
     safeRmSync(MISSION_DIR, { recursive: true, force: true });
+    // The tenant partition is this suite's own (pid-scoped slug); drop it too.
+    safeRmSync(path.dirname(MISSION_DIR), { recursive: true, force: true });
     safeRmSync(CUSTOMER_ROOT, { recursive: true, force: true });
     safeRmSync(REPORT_PATH, { force: true });
     for (const message of listSlackOutboxMessages()) {

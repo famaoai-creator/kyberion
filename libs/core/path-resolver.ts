@@ -205,6 +205,8 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/background-review/nudge/',
   'shared/runtime/mesh-hub/',
   'shared/observability/mesh-hub/',
+  // Latest skill response for the reflex-terminal feedback loop (skill-wrapper).
+  'shared/last_response.json',
 ];
 export const VITEST_LIVE_SANDBOX_ROOT = 'active/shared/runtime/vitest-live';
 
