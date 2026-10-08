@@ -34,10 +34,13 @@ export function IdentityLinkSection() {
         window.location.assign(data.location);
         return;
       }
+      const code = typeof data?.error === 'string' ? data.error : '';
       setError(
-        data?.error === 'sso_not_configured'
+        code === 'sso_not_configured'
           ? frontDeskText('sso_link_unavailable', locale)
-          : frontDeskText('sso_error_generic', locale)
+          : response.status === 403
+            ? frontDeskText('sso_link_owner_only', locale)
+            : frontDeskText('sso_error_generic', locale)
       );
     } catch {
       setError(frontDeskText('sso_error_generic', locale));

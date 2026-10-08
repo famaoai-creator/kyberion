@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { withExecutionContext } from '@agent/core/authority';
 import { linkMemberExternalIdentity } from '@agent/core/organization/member-identity-link';
+import { readMemberProfile } from '@agent/core/organization/member-registry';
 import { handleSurfaceAuthRoute } from '@agent/core/surface/surface-auth-routes';
 import { isLoopbackPeer } from './loopback-peer';
 import { getRegisteredEnvBool } from '@agent/core/foundation/env';
@@ -14,6 +15,9 @@ export const CONCIERGE_TOKEN_SIGNIN_HREF = '/signin';
 /** Self-link writes a member profile, which needs the concierge's personal-tier authority. */
 function linkIdentity(memberId: string, identity: { issuer: string; subject: string }): void {
   withExecutionContext('sovereign_concierge', () => {
+    // Re-checked inside the write context: a suspension since the callback's
+    // own check must still win.
+    if (readMemberProfile(memberId)?.status !== 'active') throw new Error('member not active');
     const result = linkMemberExternalIdentity(memberId, identity);
     if (result.status === 'member_not_found') throw new Error('member not found');
   });

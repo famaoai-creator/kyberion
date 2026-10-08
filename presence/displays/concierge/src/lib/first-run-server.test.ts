@@ -5,6 +5,13 @@ const mocks = vi.hoisted(() => ({
   isInstanceOwner: vi.fn(),
   resolveMember: vi.fn(),
   startLink: vi.fn(),
+  roleForTenant: vi.fn(),
+  viewedRole: vi.fn(),
+}));
+
+vi.mock('./front-desk-member', () => ({
+  conciergeFrontDeskRoleForTenant: mocks.roleForTenant,
+  resolveConciergeFrontDeskRole: mocks.viewedRole,
 }));
 
 vi.mock('@agent/core/authority', () => ({
@@ -109,11 +116,27 @@ describe('first-run-server', () => {
 
   describe('startIdentityLinkForViewer', () => {
     const request = { requestOrigin: 'http://localhost:3050', loopback: false, next: '/x' };
+    const linkViewer = {
+      ...viewer,
+      tenantSlugs: ['acme', 'beta'],
+      organizationIds: 'all' as const,
+      projectIds: 'all' as const,
+      tierAccess: [],
+    } as unknown as Parameters<typeof startIdentityLinkForViewer>[0];
+    const activeOwner = {
+      member_id: 'owner',
+      status: 'active',
+      memberships: [
+        { tenant_slug: 'acme', role: 'owner' },
+        { tenant_slug: 'beta', role: 'owner' },
+      ],
+    };
 
     it('seals the member resolved from the viewer, never anything else', async () => {
-      mocks.resolveMember.mockReturnValue({ member_id: 'owner', status: 'active' });
+      mocks.resolveMember.mockReturnValue(activeOwner);
+      mocks.roleForTenant.mockReturnValue('owner');
       mocks.startLink.mockResolvedValue({ ok: true, location: 'https://idp/a', setCookies: ['c'] });
-      const result = await startIdentityLinkForViewer(viewer, request);
+      const result = await startIdentityLinkForViewer(linkViewer, request);
       expect(result).toEqual({ ok: true, location: 'https://idp/a', setCookies: ['c'] });
       expect(mocks.startLink).toHaveBeenCalledWith({
         surfaceId: 'concierge',
@@ -125,21 +148,52 @@ describe('first-run-server', () => {
     });
 
     it('refuses a viewer without an active member', async () => {
-      mocks.resolveMember.mockReturnValue({ member_id: 'owner', status: 'suspended' });
-      expect(await startIdentityLinkForViewer(viewer, request)).toMatchObject({
+      mocks.resolveMember.mockReturnValue({ ...activeOwner, status: 'suspended' });
+      expect(await startIdentityLinkForViewer(linkViewer, request)).toMatchObject({
         ok: false,
         status: 403,
         error: 'member_required',
       });
       mocks.resolveMember.mockReturnValue(null);
-      expect(await startIdentityLinkForViewer(viewer, request)).toMatchObject({ status: 403 });
+      expect(await startIdentityLinkForViewer(linkViewer, request)).toMatchObject({
+        status: 403,
+      });
       expect(mocks.startLink).not.toHaveBeenCalled();
     });
 
+    it('requires owner on every tenant of the member, within the viewer scope (PATCH parity)', async () => {
+      mocks.resolveMember.mockReturnValue(activeOwner);
+      mocks.roleForTenant.mockImplementation((_viewer: unknown, tenant: string) =>
+        tenant === 'acme' ? 'owner' : 'viewer'
+      );
+      expect(await startIdentityLinkForViewer(linkViewer, request)).toMatchObject({
+        ok: false,
+        status: 403,
+        error: 'owner_required',
+      });
+      expect(mocks.roleForTenant).toHaveBeenCalledWith(linkViewer, 'beta');
+      mocks.resolveMember.mockReturnValue({ ...activeOwner, memberships: [] });
+      mocks.viewedRole.mockReturnValue('approver');
+      expect(await startIdentityLinkForViewer(linkViewer, request)).toMatchObject({
+        error: 'owner_required',
+      });
+      expect(mocks.startLink).not.toHaveBeenCalled();
+    });
+
+    it('refuses a credential-less loopback viewer', async () => {
+      const loopback = { ...linkViewer, source: 'loopback' } as typeof linkViewer;
+      expect(await startIdentityLinkForViewer(loopback, request)).toMatchObject({
+        status: 403,
+        error: 'credential_required',
+      });
+      expect(mocks.resolveMember).not.toHaveBeenCalled();
+    });
+
     it('reports missing SSO settings distinctly', async () => {
-      mocks.resolveMember.mockReturnValue({ member_id: 'owner', status: 'active' });
+      mocks.resolveMember.mockReturnValue(activeOwner);
+      mocks.roleForTenant.mockReturnValue('owner');
       mocks.startLink.mockResolvedValue({ ok: false, view: { kind: 'unconfigured', missing: [] } });
-      expect(await startIdentityLinkForViewer(viewer, request)).toMatchObject({
+      expect(await startIdentityLinkForViewer(linkViewer, request)).toMatchObject({
         status: 409,
         error: 'sso_not_configured',
       });

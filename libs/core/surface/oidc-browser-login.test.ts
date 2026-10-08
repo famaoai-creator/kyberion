@@ -412,6 +412,85 @@ describe('OIDC browser login (mock IdP)', () => {
       expect(readMemberProfile('carol', { rootDir: memberRoot })?.external_identities).toEqual([]);
     });
 
+    it('never re-binds an identity held by a suspended member', async () => {
+      seedMember(null);
+      seedOther({ issuer: ISSUER, subject: 'idp-subject-1' });
+      const davePath = `${memberRoot}/knowledge/personal/members/dave.json`;
+      const dave = readMemberProfile('dave', { rootDir: memberRoot })!;
+      safeWriteFile(davePath, JSON.stringify({ ...dave, status: 'suspended' }));
+      const idp = makeIdp();
+      const linkIdentity = vi.fn();
+      const { result } = await runLogin(
+        { ...linkDeps(), fetchJson: idp.fetchJson, linkIdentity },
+        idp,
+        { linkMemberId: 'carol' }
+      );
+      expect(result).toMatchObject({ ok: false, view: { kind: 'suspended' } });
+      expect(linkIdentity).not.toHaveBeenCalled();
+    });
+
+    it('keeps raw subjects and other member ids out of audit when the write fails', async () => {
+      seedMember(null);
+      const idp = makeIdp();
+      const audit = vi.fn();
+      const linkIdentity = vi.fn(() => {
+        throw new Error(
+          "external identity 'https://idp.example.com#idp-subject-1' is already bound to member 'dave'"
+        );
+      });
+      const { result } = await runLogin(
+        { ...linkDeps(audit), fetchJson: idp.fetchJson, linkIdentity },
+        idp,
+        { linkMemberId: 'carol' }
+      );
+      expect(result).toMatchObject({ ok: false, view: { code: 'link_failed' } });
+      const logged = JSON.stringify(audit.mock.calls);
+      expect(logged).not.toContain('idp-subject-1');
+      expect(logged).not.toContain('dave');
+    });
+
+    it('a forged transaction cannot carry a link intent', async () => {
+      seedMember(null);
+      const idp = makeIdp();
+      const started = await startOidcLogin(
+        {
+          surfaceId: 'concierge',
+          requestOrigin: 'https://desk.example.com',
+          loopback: false,
+        },
+        { env: baseEnv(), fetchJson: idp.fetchJson }
+      );
+      if (started.ok === false) throw new Error('start failed');
+      const [prefixAndPayload, signature] =
+        started.transactionCookie.value.split('.').length === 2
+          ? started.transactionCookie.value.split('.')
+          : [
+              started.transactionCookie.value.slice(
+                0,
+                started.transactionCookie.value.lastIndexOf('.')
+              ),
+              started.transactionCookie.value.slice(
+                started.transactionCookie.value.lastIndexOf('.') + 1
+              ),
+            ];
+      const payload = JSON.parse(
+        Buffer.from(prefixAndPayload!.slice('kyt1.'.length), 'base64url').toString('utf8')
+      );
+      const forged = `kyt1.${Buffer.from(JSON.stringify({ ...payload, link: 'carol' })).toString('base64url')}.${signature}`;
+      const url = new URL(started.location);
+      idp.state.nonceFor.set('code-f', url.searchParams.get('nonce') ?? '');
+      const result = await completeOidcLogin(
+        {
+          surfaceId: 'concierge',
+          query: { code: 'code-f', state: url.searchParams.get('state') },
+          transactionCookie: forged,
+        },
+        { ...linkDeps(), fetchJson: idp.fetchJson }
+      );
+      expect(result).toMatchObject({ ok: false, view: { kind: 'failed', code: 'expired' } });
+      expect(readMemberProfile('carol', { rootDir: memberRoot })?.external_identities).toEqual([]);
+    });
+
     it('refuses to link to a suspended or missing member', async () => {
       seedMember(null, 'suspended');
       const idp = makeIdp();
