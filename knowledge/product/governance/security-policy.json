@@ -448,8 +448,7 @@
         "active/shared/observability/",
         "active/shared/runtime/",
         "presence/bridge/runtime/",
-        "active/shared/tmp/",
-        "customer/${KYBERION_TENANT}/logs/audit/"
+        "active/shared/tmp/"
       ]
     },
     "slack_bridge": {
@@ -561,6 +560,10 @@
     "scope_locale_reader": {
       "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/locale.json"],
       "allow_write": []
+    },
+    "audit_mirror_writer": {
+      "allow_read": [],
+      "allow_write": ["customer/${KYBERION_TENANT}/logs/audit/"]
     },
     "generation_scheduler": {
       "allow_read": ["knowledge/personal/tenants/"],

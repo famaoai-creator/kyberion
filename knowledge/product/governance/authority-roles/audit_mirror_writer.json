@@ -1,0 +1,9 @@
+{
+  "role": "audit_mirror_writer",
+  "description": "G17 follow-up: dedicated store-writer of the audit chain's per-tenant mirror (customer/<tenant>/logs/audit/). libs/core/authority.ts registers it as the audit chain's tenant mirror writer context, always bound to the entry's tenant, so the grant resolves through ${KYBERION_TENANT} to that one tenant's mirror directory. It grants no read and no other write; nothing else assumes it (resident dots and coordination store writers run as infrastructure_sentinel, which has no customer/ grant).",
+  "default_persona": "worker",
+  "write_scopes": ["customer/${KYBERION_TENANT}/logs/audit/"],
+  "scope_classes": ["audit"],
+  "allowed_actuators": [],
+  "tier_access": ["public"]
+}

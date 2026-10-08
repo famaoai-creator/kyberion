@@ -86,7 +86,7 @@
     },
     {
       "site": "libs/core/authority.ts#<module>",
-      "roles": ["infrastructure_sentinel"],
+      "roles": ["audit_mirror_writer"],
       "unresolved": []
     },
     {
@@ -2793,6 +2793,12 @@
         }
       ],
       "reachable_roles": {
+        "audit_mirror_writer": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/agent/agent-route-helpers.ts#<module>",
+            "libs/core/authority.ts#<module>"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
@@ -2849,8 +2855,11 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "presence/displays/chronos-mirror-v2/src/app/api/agent/agent-route-helpers.ts#<module>",
-            "libs/core/authority.ts#<module>"
+            "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -3063,6 +3072,12 @@
         }
       ],
       "reachable_roles": {
+        "audit_mirror_writer": {
+          "example_path": [
+            "presence/displays/computer-surface/server.ts#<module>",
+            "libs/core/authority.ts#<module>"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "scripts/mission_controller.ts#handoffMission [child process]",
@@ -3125,8 +3140,22 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "presence/displays/computer-surface/server.ts#<module>",
-            "libs/core/authority.ts#<module>"
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -3532,6 +3561,12 @@
         }
       ],
       "reachable_roles": {
+        "audit_mirror_writer": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/charters/route.ts#<module>",
+            "libs/core/authority.ts#<module>"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
@@ -3590,8 +3625,14 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "presence/displays/concierge/src/app/api/charters/route.ts#<module>",
-            "libs/core/authority.ts#<module>"
+            "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "ingest_commit": {
@@ -3763,6 +3804,20 @@
         }
       ],
       "reachable_roles": {
+        "audit_mirror_writer": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/authority.ts#<module>"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
@@ -3819,7 +3874,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/authority.ts#<module>"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -3980,7 +4036,7 @@
       "reviewed_infeasible": [],
       "child_process_entries": [],
       "reachable_roles": {
-        "infrastructure_sentinel": {
+        "audit_mirror_writer": {
           "example_path": [
             "scripts/event_intake_surface.ts#<module>",
             "scripts/lib/harness.ts#<module>",
@@ -3993,6 +4049,7 @@
       "policy_roles_not_reachable": [
         "chronos_gateway",
         "chronos_tenant_runner",
+        "infrastructure_sentinel",
         "knowledge_steward",
         "organization_operator",
         "scope_locale_reader",
@@ -4042,6 +4099,22 @@
         }
       ],
       "reachable_roles": {
+        "audit_mirror_writer": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/authority.ts#<module>"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "satellites/imessage-bridge/src/index.ts#<module>",
@@ -4106,7 +4179,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/authority.ts#<module>"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -4317,6 +4391,20 @@
         }
       ],
       "reachable_roles": {
+        "audit_mirror_writer": {
+          "example_path": [
+            "scripts/mcp_server.ts#<module>",
+            "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
+            "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
+            "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/authority.ts#<module>"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "scripts/mcp_server.ts#<module>",
@@ -4377,7 +4465,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/authority.ts#<module>"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -4619,6 +4708,25 @@
         }
       ],
       "reachable_roles": {
+        "audit_mirror_writer": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/agent-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/agent-actuator/src/agent-actuator-helpers.ts#handleAction",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/authority.ts#<module>"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "presence/bridge/nexus-daemon.ts#<module>",
@@ -4933,7 +5041,7 @@
       "reviewed_infeasible": [],
       "child_process_entries": [],
       "reachable_roles": {
-        "infrastructure_sentinel": {
+        "audit_mirror_writer": {
           "example_path": [
             "scripts/oauth_callback_surface.ts#<module>",
             "libs/core/governance.ts#<module>",
@@ -4965,6 +5073,7 @@
       "policy_roles_not_reachable": [
         "chronos_gateway",
         "chronos_tenant_runner",
+        "infrastructure_sentinel",
         "knowledge_steward",
         "organization_operator",
         "scope_locale_reader",
@@ -5042,6 +5151,22 @@
         }
       ],
       "reachable_roles": {
+        "audit_mirror_writer": {
+          "example_path": [
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store.ts#decideApprovalRequest",
+            "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/authority.ts#<module>"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
@@ -5117,7 +5242,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/authority.ts#<module>"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -5317,6 +5443,25 @@
         }
       ],
       "reachable_roles": {
+        "audit_mirror_writer": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/authority.ts#<module>"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "scripts/mission_controller.ts#handoffMission [child process]",
@@ -5401,7 +5546,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/authority.ts#<module>"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -5627,6 +5773,12 @@
         }
       ],
       "reachable_roles": {
+        "audit_mirror_writer": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "libs/core/authority.ts#<module>"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
@@ -5666,7 +5818,14 @@
         "infrastructure_sentinel": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
-            "libs/core/authority.ts#<module>"
+            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -5844,6 +6003,21 @@
         }
       ],
       "reachable_roles": {
+        "audit_mirror_writer": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/authority.ts#<module>"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
@@ -5904,7 +6078,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/authority.ts#<module>"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -6072,6 +6247,9 @@
       "reviewed_infeasible": [],
       "child_process_entries": [],
       "reachable_roles": {
+        "audit_mirror_writer": {
+          "example_path": ["scripts/surface_runtime.ts#<module>", "libs/core/authority.ts#<module>"]
+        },
         "chronos_gateway": {
           "example_path": [
             "scripts/surface_runtime.ts#startSurfaceById",
@@ -6080,7 +6258,11 @@
           ]
         },
         "infrastructure_sentinel": {
-          "example_path": ["scripts/surface_runtime.ts#<module>", "libs/core/authority.ts#<module>"]
+          "example_path": [
+            "scripts/surface_runtime.ts#startSurfaceById",
+            "scripts/surface_runtime.ts#recordProtocolSurfaceLifecycle",
+            "libs/core/protocol-service-lifecycle.ts#recordProtocolServiceLifecycle"
+          ]
         },
         "mission_controller": {
           "example_path": [
@@ -6165,6 +6347,9 @@
         }
       ],
       "reachable_roles": {
+        "audit_mirror_writer": {
+          "example_path": ["scripts/config_mission.ts#<module>", "libs/core/authority.ts#<module>"]
+        },
         "chronos_gateway": {
           "example_path": [
             "scripts/run_pipeline.ts#<module>",
@@ -6203,7 +6388,15 @@
           ]
         },
         "infrastructure_sentinel": {
-          "example_path": ["scripts/config_mission.ts#<module>", "libs/core/authority.ts#<module>"]
+          "example_path": [
+            "scripts/run_pipeline.ts#<module>",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
         },
         "knowledge_steward": {
           "example_path": [
@@ -6381,6 +6574,20 @@
         }
       ],
       "reachable_roles": {
+        "audit_mirror_writer": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/authority.ts#<module>"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
@@ -6437,7 +6644,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/authority.ts#<module>"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -6598,7 +6806,7 @@
       "reviewed_infeasible": [],
       "child_process_entries": [],
       "reachable_roles": {
-        "infrastructure_sentinel": {
+        "audit_mirror_writer": {
           "example_path": [
             "presence/bridge/terminal/server.ts#<module>",
             "presence/bridge/terminal/auth.ts#<module>",
@@ -6654,6 +6862,17 @@
         }
       ],
       "reachable_roles": {
+        "audit_mirror_writer": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/authority.ts#<module>"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
@@ -6702,7 +6921,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/authority.ts#<module>"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
@@ -6894,6 +7114,17 @@
         }
       ],
       "reachable_roles": {
+        "audit_mirror_writer": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "libs/core/governance/kill-switch.ts#<module>",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/authority.ts#<module>"
+          ]
+        },
         "chronos_gateway": {
           "example_path": [
             "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
@@ -6942,7 +7173,8 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "libs/core/authority.ts#<module>"
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
         "knowledge_steward": {
