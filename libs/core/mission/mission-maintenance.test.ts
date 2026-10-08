@@ -1,25 +1,51 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as pathResolver from '../path-resolver.js';
 import {
+  safeExec,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
+import { MetricsCollector } from '../metrics.js';
+import { logger } from '../core.js';
 import {
   ensureRecoveryScaffold,
   loadMissionFlightRecorderAtPath,
+  recordArtifactReview,
+  recordEvidence,
   recordTask,
   shouldSkipResumeEntry,
   RESUME_IDEMPOTENCY_WINDOW_MS,
 } from './mission-maintenance.js';
+import { inferProviderFromActorId, recordDirectCliTaskUsage } from './mission-direct-cli-usage.js';
 
 const mocks = vi.hoisted(() => ({ spawnManagedProcess: vi.fn() }));
+// Route the shared usage ledger to a per-test collector so record-evidence
+// never appends to the operator's work/metrics/resource-usage.jsonl.
+const usageCollector = vi.hoisted(() => ({
+  current: null as null | Pick<MetricsCollector, 'recordResourceUsage'>,
+}));
 
 vi.mock('../managed-process.js', () => ({
   spawnManagedProcess: mocks.spawnManagedProcess,
 }));
+vi.mock('../metrics.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../metrics.js')>();
+  const fallback = new actual.MetricsCollector({ persist: false });
+  return {
+    ...actual,
+    metrics: new Proxy(fallback, {
+      get: (target, prop) => {
+        const current = usageCollector.current;
+        const active = current && prop in current ? current : target;
+        const value = Reflect.get(active, prop);
+        return typeof value === 'function' ? value.bind(active) : value;
+      },
+    }),
+  };
+});
 
 describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
   const now = new Date('2026-05-07T12:00:00.000Z');
@@ -307,5 +333,245 @@ describe('mission resume worker recovery ceremony', () => {
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
       else process.env.MISSION_ROLE = previousRole;
     }
+  });
+});
+
+describe('direct-CLI usage accounting', () => {
+  type FixtureTask = Record<string, unknown>;
+
+  /** Seed a git-backed fixture mission in the live mission tree; cleaned up after the test. */
+  function seedMission(
+    ctx: { onTestFinished: (fn: () => void) => void },
+    tasks: FixtureTask[],
+    files: string[]
+  ) {
+    const missionId = `MSN-MAINTENANCE-USAGE-${process.pid}-${Date.now()}`;
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    const metricsDir = pathResolver.sharedTmp(`direct-cli-usage-test-${process.pid}-${Date.now()}`);
+    const previousRole = process.env.MISSION_ROLE;
+    process.env.MISSION_ROLE = 'mission_controller';
+    ctx.onTestFinished(() => {
+      usageCollector.current = null;
+      safeRmSync(missionPath, { recursive: true, force: true });
+      safeRmSync(metricsDir, { recursive: true, force: true });
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+    });
+    safeMkdir(`${missionPath}/evidence`, { recursive: true });
+    safeExec('git', ['init', '-q'], { cwd: missionPath });
+    safeWriteFile(
+      `${missionPath}/mission-state.json`,
+      JSON.stringify({
+        mission_id: missionId,
+        tier: 'public',
+        status: 'active',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'worker',
+        confidence_score: 1,
+        git: { branch: 'main', start_commit: 'start', latest_commit: 'latest', checkpoints: [] },
+        history: [],
+      })
+    );
+    safeWriteFile(`${missionPath}/NEXT_TASKS.json`, JSON.stringify(tasks));
+    for (const file of files) safeWriteFile(`${missionPath}/${file}`, `# ${file}\n`);
+    const collector = new MetricsCollector({ metricsDir });
+    usageCollector.current = collector;
+    const readTasks = (): FixtureTask[] =>
+      JSON.parse(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string);
+    return { missionId, missionPath, collector, readTasks };
+  }
+
+  const evidenceArgs = (missionId: string) => ({
+    missionId,
+    note: 'done',
+    actorId: 'codex-implementer',
+    getGitHash: () => 'hash',
+    syncProjectLedgerIfLinked: async () => undefined,
+  });
+
+  it('record-evidence appends one estimated direct_cli entry per completed task, never twice', async (ctx) => {
+    const { missionId, collector } = seedMission(
+      ctx,
+      [
+        { task_id: 'impl', status: 'planned', deliverable: 'evidence/report.md' },
+        { task_id: 'later', status: 'planned', deliverable: 'evidence/missing.md' },
+      ],
+      ['evidence/report.md']
+    );
+    await recordEvidence({ ...evidenceArgs(missionId), taskId: 'impl' });
+    // Re-recording an already-completed task adds no second entry.
+    await recordEvidence({ ...evidenceArgs(missionId), taskId: 'impl' });
+    // Deliverable missing → the task is not completed → no usage entry.
+    await recordEvidence({ ...evidenceArgs(missionId), taskId: 'later', provider: 'claude' });
+
+    const entries = collector.loadResourceUsageHistory();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      type: 'resource_usage',
+      resource_kind: 'llm',
+      actor_id: 'codex-implementer',
+      mission_id: missionId,
+      quantity: 0,
+      cost_usd: 0,
+      status: 'estimated',
+      source: 'direct_cli',
+      scope: { scope_kind: 'task', tier: 'public', mission_id: missionId, task_id: 'impl' },
+      metadata: {
+        task_id: 'impl',
+        event: 'record_evidence',
+        estimated: true,
+        provider: 'codex',
+        prompt_tokens: null,
+        completion_tokens: null,
+        total_tokens: null,
+      },
+    });
+  });
+
+  it('records an entry for each task completed by cascade', async (ctx) => {
+    const { missionId, collector } = seedMission(
+      ctx,
+      [
+        { task_id: 'design', status: 'planned', deliverable: 'evidence/design.md' },
+        {
+          task_id: 'build',
+          status: 'planned',
+          deliverable: 'evidence/build.md',
+          dependencies: ['design'],
+        },
+      ],
+      ['evidence/design.md', 'evidence/build.md']
+    );
+    await recordEvidence({ ...evidenceArgs(missionId), taskId: 'design' });
+    const entries = collector.loadResourceUsageHistory();
+    expect(entries.map((entry) => entry.metadata?.task_id)).toEqual(['design', 'build']);
+    expect(entries[1].metadata).toMatchObject({ cascaded_from: 'design' });
+  });
+
+  it('a throwing usage collector does not block evidence recording', async (ctx) => {
+    const { missionId, readTasks } = seedMission(
+      ctx,
+      [{ task_id: 'impl', status: 'planned', deliverable: 'evidence/report.md' }],
+      ['evidence/report.md']
+    );
+    usageCollector.current = {
+      recordResourceUsage: () => {
+        throw new Error('ledger unavailable');
+      },
+    };
+    await expect(
+      recordEvidence({ ...evidenceArgs(missionId), taskId: 'impl' })
+    ).resolves.toBeUndefined();
+    expect(readTasks()[0].status).toBe('completed');
+  });
+
+  it('review-task records a review_task entry with the reviewer as actor', async (ctx) => {
+    const { missionId, collector } = seedMission(
+      ctx,
+      [
+        { task_id: 'impl', status: 'planned', deliverable: 'evidence/report.md' },
+        {
+          task_id: 'impl-review',
+          status: 'planned',
+          review_target: 'impl',
+          deliverable: 'evidence/review.md',
+          dependencies: ['impl'],
+        },
+      ],
+      ['evidence/report.md', 'evidence/review.md']
+    );
+    await recordEvidence({ ...evidenceArgs(missionId), taskId: 'impl' });
+    const result = await recordArtifactReview({
+      missionId,
+      reviewTaskId: 'impl-review',
+      reviewerAgentId: 'claude-reviewer',
+      findings: [],
+      specialistRoles: ['code-reviewer'],
+      getGitHash: () => 'hash',
+    });
+    expect(result.taskCompleted).toBe(true);
+    const review = collector
+      .loadResourceUsageHistory()
+      .filter((entry) => entry.metadata?.event === 'review_task');
+    expect(review).toHaveLength(1);
+    expect(review[0]).toMatchObject({
+      actor_id: 'claude-reviewer',
+      status: 'estimated',
+      source: 'direct_cli',
+      scope: { task_id: 'impl-review' },
+      metadata: { task_id: 'impl-review', provider: 'claude' },
+    });
+  });
+});
+
+describe('recordDirectCliTaskUsage', () => {
+  const base = {
+    missionId: 'MSN-USAGE-UNIT',
+    taskId: 'T-1',
+    event: 'record_evidence' as const,
+  };
+
+  it('keeps a confidential mission scoped to its tier and tenant', () => {
+    const [entry] = recordDirectCliTaskUsage({
+      ...base,
+      actorId: 'agent-x',
+      state: { tier: 'confidential', tenant_slug: 'acme-co' },
+      collector: new MetricsCollector({ persist: false }),
+    });
+    expect(entry.scope).toMatchObject({
+      scope_kind: 'task',
+      tier: 'confidential',
+      tenant_slug: 'acme-co',
+      mission_id: 'MSN-USAGE-UNIT',
+      task_id: 'T-1',
+    });
+  });
+
+  it('records nothing (and warns) for a confidential mission without a tenant — never downgraded', () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const recordResourceUsage = vi.fn(new MetricsCollector({ persist: false }).recordResourceUsage);
+    try {
+      const entries = recordDirectCliTaskUsage({
+        ...base,
+        state: { tier: 'confidential' },
+        collector: { recordResourceUsage },
+      });
+      expect(entries).toEqual([]);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('usage entry not recorded'));
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('drops an unknown --provider with a warning instead of tagging the entry llm', () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    try {
+      const [entry] = recordDirectCliTaskUsage({
+        ...base,
+        actorId: 'implementation-architect',
+        provider: 'not-a-provider',
+        state: { tier: 'public' },
+        collector: new MetricsCollector({ persist: false }),
+      });
+      expect(entry.resource_kind).toBe('other');
+      expect(entry.metadata).not.toHaveProperty('provider');
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("'not-a-provider' ignored"));
+      const [known] = recordDirectCliTaskUsage({
+        ...base,
+        provider: 'Gemini',
+        state: { tier: 'public' },
+        collector: new MetricsCollector({ persist: false }),
+      });
+      expect(known).toMatchObject({ resource_kind: 'llm', metadata: { provider: 'gemini' } });
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('infers the provider only from a known provider-id prefix', () => {
+    expect(inferProviderFromActorId('claude-opus-reviewer')).toBe('claude');
+    expect(inferProviderFromActorId('implementation-architect')).toBeUndefined();
+    expect(inferProviderFromActorId(undefined)).toBeUndefined();
   });
 });

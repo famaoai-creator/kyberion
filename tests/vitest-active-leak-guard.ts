@@ -5,9 +5,9 @@
  * inbox, …). Tests must write to `active/shared/tmp/` or a `vitest-*`
  * redirect root (see `approvalStoreRoots`). The gitignored roots outside
  * `active/` hold live state too — the tenant registry and personal tier
- * (`knowledge/personal/`), tenant knowledge (`knowledge/confidential/`) and
- * customer stance overlays (`customer/`) — and git status cannot see writes
- * there. This guard snapshots every root in `LIVE_STATE_ROOTS` before the run
+ * (`knowledge/personal/`), tenant knowledge (`knowledge/confidential/`),
+ * customer stance overlays (`customer/`) and the metrics ledgers
+ * (`work/metrics/`) — and git status cannot see writes there. This guard snapshots every root in `LIVE_STATE_ROOTS` before the run
  * and, after it, lists every file the run created or grew outside the
  * sandboxes, so a new leak is visible instead of silently mixing fixture data
  * into an operator's mission list, audit trail or tenant registry.
@@ -27,6 +27,9 @@ export const LIVE_STATE_ROOTS = [
   'knowledge/personal',
   'knowledge/confidential',
   'customer',
+  // Execution-metrics and resource-usage ledgers (the shared `metrics`
+  // collector); path-resolver maps them into the Vitest live sandbox.
+  'work/metrics',
 ];
 
 /** Repo-relative prefixes tests may write freely. */
