@@ -6,8 +6,9 @@ import { IdentityLinkSection } from '../identity-link-section';
 import { SsoSettingsForm } from '../sso-settings-form';
 
 /**
- * SSO outside first-run setup: any signed-in member may link their own IdP
- * account; the settings form is instance owner only (enforced by the API).
+ * SSO outside first-run setup: self-link needs owner on every tenant of the
+ * signed-in member, and the settings form is instance owner only (both
+ * enforced by the API).
  */
 export default function SsoSettingsPage() {
   const { locale } = useConciergeI18n();
