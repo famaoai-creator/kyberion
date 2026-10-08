@@ -219,14 +219,28 @@ the test passes against the sandbox while the writer leaks into live state.
 
 - **Check provider egress for the data tier before every send.** Any path that hands mission or
   tenant content to an LLM provider (CLI or API) first calls `checkProviderEgress` (provider, data
-  tier, tenant) from `libs/core/provider/provider-egress-gate.ts` for each candidate provider. Resolve the provider with `providerIdForReasoningIdentifier`; an unknown provider is
-  denied above `public`. Skip a denied provider and degrade (next provider, or a no-LLM path) — do
-  not add `approved_providers` exceptions to make a call site work. `mission distill` does this
-  through the `egress` option of `runAdaptiveStructuredLlmProfile`
-  (`libs/core/mission/mission-llm.ts`).
+  tier, tenant) from `libs/core/provider/provider-egress-gate.ts` for each candidate provider.
+  - Identify the provider that actually receives the prompt: for a shell-run profile that is the
+    command, not the adapter name. An unknown provider, or an adapter and command naming different
+    providers, is denied above `public`.
+  - An omitted data tier is treated as `confidential` (fail closed). Callers with public content
+    say so explicitly.
+  - Skip a denied provider and degrade (next provider, or a no-LLM path). Do not add
+    `approved_providers` exceptions to make a call site work.
+  - In `libs/core/mission/mission-llm.ts`, `runAdaptiveStructuredLlmProfile`,
+    `runStructuredLlmProfile` and `invokeLlm` all take an `egress` option and apply this gate;
+    `mission distill` passes the mission tier and tenant.
 - **Prompts and secrets go on stdin, never argv.** argv is visible in the process table and is capped
   at about 128 KB per argument. Shell-invoked LLM profiles use `prompt_via: "stdin"` (the `claude`
-  profile in `wisdom-policy.json` does); the same applies to passwords and tokens for any CLI.
+  profile in `wisdom-policy.json` does), and the system prompt travels on stdin with the prompt.
+  The same applies to passwords and tokens for any CLI.
+- **Provider CLIs run tool-less from a scratch cwd.** A model that passed the gate for one payload
+  must not be able to read other files. Run provider CLIs for one-shot answers with tools disabled
+  and a single turn (for `claude`, the flags of the `claude` profile in `wisdom-policy.json`:
+  `--max-turns 1`, `--tools ""`, `--strict-mcp-config`, `--setting-sources=`,
+  `--disable-slash-commands`, `--no-session-persistence`), and start them in an
+  empty directory on the scratch floor (`active/shared/tmp/system/<domain>/`), not the repository
+  root.
 
 **Procedure:**
 
@@ -235,6 +249,8 @@ the test passes against the sandbox while the writer leaks into live state.
 2. Add a test that fails without the gate: a confidential payload with only a non-attested provider
    must not invoke it, and a public payload still does. Mock `../ops-alert.js` so denials do not
    write to the shared ops-alert sink.
+3. For a new provider CLI invocation, assert in a test that argv carries the tool-disabling flags
+   and no prompt text, and that the child's cwd is not the repository root.
 
 ---
 
