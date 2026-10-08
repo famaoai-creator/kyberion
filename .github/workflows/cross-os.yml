@@ -15,6 +15,12 @@ on:
     # Weekly to catch ecosystem drift (Node minor releases, OS package changes).
     - cron: '0 4 * * 1'
 
+# A newer push to the same PR supersedes the running checks; main pushes and
+# scheduled runs are never cancelled (contract: operations-hygiene runbook §CI).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build-and-smoke:
     permissions:
@@ -38,7 +44,7 @@ jobs:
           - os: windows-latest
             shard: 3
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # GitHub's macOS runner SQLite may not include the FTS5 extension used by
       # the history search index. SQLite is keg-only in Homebrew, so add its
@@ -121,7 +127,9 @@ jobs:
         env:
           KYBERION_PERSONA: worker
           MISSION_ROLE: mission_controller
-        if: runner.os != 'Windows'
+        # On pull requests pr-validation.yml runs the Linux core shards; this
+        # workflow adds the macOS coverage only.
+        if: runner.os != 'Windows' && !(runner.os == 'Linux' && github.event_name == 'pull_request')
         run: pnpm test -- --suite core --shard=${{ matrix.shard }}/${{ matrix.total }}
 
       - name: Unit tests (Windows native)
@@ -152,7 +160,8 @@ jobs:
         run: pnpm exec vitest run libs/core/virtual/os-accessibility-detector.live.test.ts
 
       - name: Governance boundary tests
-        if: runner.os != 'Windows'
+        # pr-validation.yml test-extra runs these on Linux for pull requests.
+        if: runner.os != 'Windows' && !(runner.os == 'Linux' && github.event_name == 'pull_request')
         run: pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts
 
       - name: Meeting participation dry-run
