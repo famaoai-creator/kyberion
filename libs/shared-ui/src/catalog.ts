@@ -57,6 +57,7 @@ export const KB_STATUS_TONE_MAP: Readonly<Record<KbStatus, KbStatusTone>> = Obje
   busy: 'info',
   review: 'info',
   distilling: 'info',
+  validating: 'info',
   needs_clarification: 'warning',
   needs_external_assets: 'warning',
   needs_assets: 'warning',

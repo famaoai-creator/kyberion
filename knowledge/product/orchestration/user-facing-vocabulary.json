@@ -25983,6 +25983,11 @@
         "ja": "利用不可",
         "qps-ploc": "⟦Ůñȧṽȧïŀȧƀŀė ŀőř⟧"
       },
+      "status_validating": {
+        "en": "Validating",
+        "ja": "検証中",
+        "qps-ploc": "⟦Ṽȧŀïḓȧŧïñɠ ŀőř⟧"
+      },
       "status_working": {
         "en": "Working",
         "ja": "処理中",
