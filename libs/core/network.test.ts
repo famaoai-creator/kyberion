@@ -40,6 +40,32 @@ describe('secureFetch', () => {
     _resetEgressPolicyCacheForTests();
   });
 
+  it('retains a safe HTTP status without retaining the provider response or request', async () => {
+    const { secureFetch, SecureFetchError } = await import('./network.js');
+    mocks.axios.mockRejectedValue(
+      Object.assign(new Error('Request failed'), {
+        response: {
+          status: 401,
+          data: { token: 'private-response' },
+          headers: { authorization: 'private-header' },
+        },
+        config: { headers: { Authorization: 'private-request' } },
+      })
+    );
+    const error = await secureFetch({ url: 'https://api.github.com/user' }).catch(
+      (error: unknown) => error
+    );
+    expect(error).toBeInstanceOf(SecureFetchError);
+    expect(error).toMatchObject({
+      httpStatus: 401,
+      message: 'Network Error: Request failed (401)',
+    });
+    expect(error).not.toHaveProperty('response');
+    expect(error).not.toHaveProperty('config');
+    expect(error).not.toHaveProperty('cause');
+    expect(JSON.stringify(error)).not.toContain('private-');
+  });
+
   it('uses the canonical security policy without a fallback catalog', async () => {
     const source = safeReadFile(pathResolver.rootResolve('libs/core/network.ts'), {
       encoding: 'utf8',
