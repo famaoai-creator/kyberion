@@ -37,17 +37,52 @@ export interface Workspace {
   list(dir: string): string[];
 }
 
+/**
+ * A workspace is a snapshot for one analysis run: the analyzer asks for the
+ * same relative paths, file kinds and directory listings tens of thousands of
+ * times (module resolution, isProjectSource, unit ids), and each uncached
+ * answer costs a path.relative or a secure-io stat. Answers are memoised per
+ * workspace, so create a fresh workspace after changing the files it reads.
+ */
 export function createWorkspace(root: string): Workspace {
-  const exists = (file: string): boolean => safeExistsSync(file);
+  const relCache = new Map<string, string>();
+  const kindCache = new Map<string, 'file' | 'directory' | 'other' | 'missing'>();
+  const listCache = new Map<string, string[]>();
+  const kindOf = (file: string): 'file' | 'directory' | 'other' | 'missing' => {
+    let kind = kindCache.get(file);
+    if (kind === undefined) {
+      if (!safeExistsSync(file)) kind = 'missing';
+      else {
+        const stat = safeStat(file);
+        kind = stat.isFile() ? 'file' : stat.isDirectory() ? 'directory' : 'other';
+      }
+      kindCache.set(file, kind);
+    }
+    return kind;
+  };
   return {
     root,
-    rel: (file) => toPosix(path.relative(root, file)),
+    rel: (file) => {
+      let rel = relCache.get(file);
+      if (rel === undefined) {
+        rel = toPosix(path.relative(root, file));
+        relCache.set(file, rel);
+      }
+      return rel;
+    },
     abs: (rel) => path.join(root, rel),
-    exists,
-    isFile: (file) => exists(file) && safeStat(file).isFile(),
-    isDirectory: (file) => exists(file) && safeStat(file).isDirectory(),
+    exists: (file) => kindOf(file) !== 'missing',
+    isFile: (file) => kindOf(file) === 'file',
+    isDirectory: (file) => kindOf(file) === 'directory',
     read: (file) => readTextFile(file),
-    list: (dir) => (exists(dir) ? safeReaddir(dir).sort() : []),
+    list: (dir) => {
+      let entries = listCache.get(dir);
+      if (entries === undefined) {
+        entries = kindOf(dir) !== 'missing' ? safeReaddir(dir).sort() : [];
+        listCache.set(dir, entries);
+      }
+      return [...entries];
+    },
   };
 }
 
@@ -55,7 +90,20 @@ export function createWorkspace(root: string): Workspace {
 // launchers in this source graph use erasable TS; see the local-peer adapter note.
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts'];
 
+const projectSourceCache = new WeakMap<Workspace, Map<string, boolean>>();
+
 export function isProjectSource(ws: Workspace, file: string): boolean {
+  let cache = projectSourceCache.get(ws);
+  if (!cache) projectSourceCache.set(ws, (cache = new Map()));
+  let result = cache.get(file);
+  if (result === undefined) {
+    result = computeIsProjectSource(ws, file);
+    cache.set(file, result);
+  }
+  return result;
+}
+
+function computeIsProjectSource(ws: Workspace, file: string): boolean {
   const rel = ws.rel(file);
   return (
     !rel.startsWith('..') &&
