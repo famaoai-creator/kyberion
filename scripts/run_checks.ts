@@ -29,7 +29,7 @@ const gateManifestCatalog = defineCatalog<GateManifest>({
 });
 
 const VALID_SCOPES = new Set<Gate['scope']>(['pr', 'full', 'release']);
-const DEFAULT_GATE_TIMEOUT_MS = 120_000;
+export const DEFAULT_GATE_TIMEOUT_MS = 120_000;
 const MAX_CONCURRENT_GATES = 6;
 
 // `pnpm run` and `pnpm exec` may reconcile the workspace node_modules tree

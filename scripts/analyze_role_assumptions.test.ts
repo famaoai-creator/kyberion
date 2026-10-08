@@ -62,6 +62,7 @@ const FILES: Record<string, string> = {
       { id: 'launch-surface', command: 'node', args: ['dist/apps/launch.js'] },
       { id: 'other-surface', command: 'node', args: ['dist/apps/other.js'] },
       { id: 'rawwrite-surface', command: 'node', args: ['dist/apps/rawwrite.js'] },
+      { id: 'member-surface', command: 'node', args: ['dist/apps/members.js'] },
     ],
   }),
   'apps/next-workspace/package.json': JSON.stringify({
@@ -147,6 +148,39 @@ const FILES: Record<string, string> = {
     "  const role: 'union_a' | 'union_b' = flag ? 'union_a' : 'union_b';",
     '  withExecutionContext(role, () => undefined);',
     '}',
+  ].join('\n'),
+  // Declarations reached only through a member access (`x.name`): the
+  // analyzer skips accesses whose name no project source declares, so each
+  // way of declaring a member name must stay visible to it.
+  'libs/core/members.ts': [
+    "import { withExecutionContext } from './authority.js';",
+    "function inner(): void { withExecutionContext('role_renamed_export', () => undefined); }",
+    'export { inner as renamedExport };',
+    'export default function (): void {',
+    "  withExecutionContext('role_default_export', () => undefined);",
+    '}',
+    'export function notAccessed(): void {',
+    "  withExecutionContext('role_not_accessed', () => undefined);",
+    '}',
+    "const KEY = 'viaComputedKey';",
+    'export class Service {',
+    "  compute(): void { withExecutionContext('role_typed_member', () => undefined); }",
+    '}',
+    'export class Keyed {',
+    "  [KEY](): void { withExecutionContext('role_computed_member', () => undefined); }",
+    '}',
+    'export class Unused {',
+    "  idle(): void { withExecutionContext('role_unused_member', () => undefined); }",
+    '}',
+  ].join('\n'),
+  'apps/members.ts': [
+    `import * as members from '${CORE}/members.js';`,
+    `import type { Keyed, Service, Unused } from '${CORE}/members.js';`,
+    'export function useService(service: Service): void { service.compute(); }',
+    'export function useKeyed(keyed: Keyed): void { keyed.viaComputedKey(); }',
+    'export type Untouched = Unused;',
+    'members.renamedExport();',
+    'members.default();',
   ].join('\n'),
   'apps/literal.ts': [
     `import { withExecutionContext } from '${CORE}/authority.js';`,
@@ -323,6 +357,17 @@ describe('RN-02 role assumption reachability analysis', () => {
     expect(surface.unresolved_sites).toEqual([]);
     // role_extra is granted but provably unreachable.
     expect(surface.policy_roles_not_reachable).toEqual(['role_extra']);
+  });
+
+  it('follows member accesses to renamed, default, typed and computed-key declarations only', () => {
+    const surface = report.system_roles.member_surface;
+    expect(Object.keys(surface.reachable_roles)).toEqual([
+      'role_computed_member',
+      'role_default_export',
+      'role_renamed_export',
+      'role_typed_member',
+    ]);
+    expect(surface.unresolved_sites).toEqual([]);
   });
 
   it('attributes a forwarded role to the wrapper call site, not the declared union', () => {
