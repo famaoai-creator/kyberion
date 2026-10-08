@@ -54,6 +54,7 @@ const STATUS_KEY_MAP: Record<UxStatusDomain, Record<string, string>> = {
     review: 'status:mission_review',
     recovered: 'status:mission_recovered',
     paused: 'status:mission_paused',
+    validating: 'status:mission_validating',
     distilling: 'status:mission_distilling',
     archived: 'status:mission_archived',
   },
