@@ -11,7 +11,7 @@ import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord } from '../foundation/text.js';
 import * as pathResolver from '../path-resolver.js';
 import { safeExec } from '../secure-io.js';
-import { runCodexCliQuery } from '../provider/codex-cli-query.js';
+import { resolveCodexBinary, runCodexCliQuery } from '../provider/codex-cli-query.js';
 import { runGeminiCliQuery } from '../provider/gemini-cli-backend.js';
 import {
   loadOrganizationProfile,
@@ -162,19 +162,29 @@ export function probeLlmCommandAvailability(command: string): {
   available: boolean;
   reason?: string;
 } {
-  const cached = commandAvailabilityCache.get(command);
+  // The codex-cli adapter refuses project-local shims; probe the binary it would
+  // actually run, so a shim on PATH does not make a codex profile look available.
+  let executable = command;
+  if (command === 'codex') {
+    try {
+      executable = resolveCodexBinary();
+    } catch (err: unknown) {
+      return { available: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+  }
+  const cached = commandAvailabilityCache.get(executable);
   if (cached) return cached;
 
   try {
-    safeExec(command, ['--version'], { timeoutMs: 5_000, maxOutputMB: 1 });
+    safeExec(executable, ['--version'], { timeoutMs: 5_000, maxOutputMB: 1 });
     const result = { available: true };
-    commandAvailabilityCache.set(command, result);
+    commandAvailabilityCache.set(executable, result);
     return result;
   } catch (err: any) {
     const reason =
       err?.stderr?.toString?.().trim?.() || err?.message || `failed to execute ${command}`;
     const result = { available: false, reason };
-    commandAvailabilityCache.set(command, result);
+    commandAvailabilityCache.set(executable, result);
     return result;
   }
 }

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   inspectLlmResolution,
   parseLlmResponse,
+  probeLlmCommandAvailability,
   registerStructuredRunner,
   resolveLlmConfig,
   runStructuredLlmProfile,
@@ -246,5 +247,24 @@ describe('mission-llm resolution', () => {
 
     expect(result).toEqual({ answer: 11 });
     expect(calls).toEqual(['heavy', 'standard']);
+  });
+});
+
+describe('probeLlmCommandAvailability', () => {
+  const originalBin = process.env.KYBERION_CODEX_CLI_BIN;
+
+  afterEach(() => {
+    if (originalBin === undefined) delete process.env.KYBERION_CODEX_CLI_BIN;
+    else process.env.KYBERION_CODEX_CLI_BIN = originalBin;
+  });
+
+  // The codex-cli adapter runs resolveCodexBinary(), not `codex` from PATH; a
+  // project-local shim answering `codex --version` must not make the profile
+  // look available, or the adaptive loop never reaches the next profile.
+  it('probes the codex binary the adapter would run', () => {
+    process.env.KYBERION_CODEX_CLI_BIN = process.execPath;
+    expect(probeLlmCommandAvailability('codex')).toEqual({ available: true });
+    process.env.KYBERION_CODEX_CLI_BIN = `${process.execPath}-missing-codex`;
+    expect(probeLlmCommandAvailability('codex').available).toBe(false);
   });
 });
