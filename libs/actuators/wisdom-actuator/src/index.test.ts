@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { indexHistoryEntry } from '@agent/core/history-search-index';
+import { indexHistoryEntry, probeHistorySearchBackend } from '@agent/core/history-search-index';
 import {
   registerActuatorForwardingPort,
   resetActuatorForwardingPort,
@@ -292,37 +292,42 @@ describe('wisdom-actuator handleAction', () => {
     }
   });
 
-  it('exposes public history search through the capture pipeline op', async () => {
-    process.env.KYBERION_HISTORY_SEARCH_DB = 'active/shared/tmp/wisdom-history-search.test.sqlite';
-    indexHistoryEntry({
-      entryId: 'wisdom-history-hit',
-      sourceType: 'conversation',
-      sourceId: 'test-session',
-      sessionId: 'test-session',
-      timestamp: '2026-07-18T00:00:00.000Z',
-      content: '公開履歴の請求書を確認しました。',
-      tier: 'public',
-    });
+  // Needs the sqlite3 host binary (FTS5 trigram); skipped where it is absent.
+  it.skipIf(!probeHistorySearchBackend().available)(
+    'exposes public history search through the capture pipeline op',
+    async () => {
+      process.env.KYBERION_HISTORY_SEARCH_DB =
+        'active/shared/tmp/wisdom-history-search.test.sqlite';
+      indexHistoryEntry({
+        entryId: 'wisdom-history-hit',
+        sourceType: 'conversation',
+        sourceId: 'test-session',
+        sessionId: 'test-session',
+        timestamp: '2026-07-18T00:00:00.000Z',
+        content: '公開履歴の請求書を確認しました。',
+        tier: 'public',
+      });
 
-    const { handleAction } = await import('./index.js');
-    const result = await handleAction({
-      action: 'pipeline',
-      steps: [
-        {
-          type: 'capture',
-          op: 'history_search',
-          params: { query: '請求書' },
-        },
-      ],
-      context: {},
-    });
+      const { handleAction } = await import('./index.js');
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'capture',
+            op: 'history_search',
+            params: { query: '請求書' },
+          },
+        ],
+        context: {},
+      });
 
-    expect(result.status).toBe('succeeded');
-    expect(result.context.history_search_results.results).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ entryId: 'wisdom-history-hit', tier: 'public' }),
-      ])
-    );
-    delete process.env.KYBERION_HISTORY_SEARCH_DB;
-  });
+      expect(result.status).toBe('succeeded');
+      expect(result.context.history_search_results.results).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ entryId: 'wisdom-history-hit', tier: 'public' }),
+        ])
+      );
+      delete process.env.KYBERION_HISTORY_SEARCH_DB;
+    }
+  );
 });
