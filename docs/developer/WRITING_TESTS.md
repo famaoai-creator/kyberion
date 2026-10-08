@@ -87,7 +87,7 @@ Import a heavy stack (the mission worker, `@agent/core`) in `beforeAll` with an 
 Accepted uses of `vi.resetModules()`:
 
 - **Once in `beforeAll`, when a static top-level import already bound `path-resolver`** before `KYBERION_ROOT` was stubbed (`scripts/onboarding_first_job*.test.ts`, `scripts/front_desk_execution_step.test.ts`).
-- **Only inside the tests that `vi.doMock`.** Drop the mocked graph again afterwards (`viewer-context.test.ts` in both presence displays).
+- **Only inside the tests that `vi.doMock`.** Drop the mocked graph again afterwards (`viewer-context.test.ts` in both presence displays). If the module that imports the mocked dependency is not loaded yet, skip the reset: `vi.doMock` applies to its first import. A second module generation re-registers process-global hooks, such as the execution-scope role validator, and later tests in the file see them (`chronos-token-registry-reader.test.ts`).
 - **Per test, when the module keeps module-level caches that have no reset hook** and each test feeds different fixture data (`libs/core/authority.branch.test.ts`, whose storage stack is mocked).
 
 `libs/core/stimuli-journal-rotation-role.test.ts` and `scripts/virtual_office.test.ts` are working examples.
