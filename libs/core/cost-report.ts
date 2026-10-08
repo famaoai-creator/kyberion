@@ -1,4 +1,9 @@
-import { metrics, type ResourceUsageReadScope, type ResourceUsageStatus } from './metrics.js';
+import {
+  metrics,
+  type ExecutionMetricsReadScope,
+  type ResourceUsageReadScope,
+  type ResourceUsageStatus,
+} from './metrics.js';
 import { eventScopeMatches, type EventScope, type EventScopeFilter } from './event-scope.js';
 import { resolveScopeForRecord } from './scope-migration.js';
 import { normalizeUsageCause, type UsageCause } from './usage-accounting.js';
@@ -216,12 +221,25 @@ export function resourceUsageReadFor(filter?: EventScopeFilter): ResourceUsageRe
   return tenants ? { tenants } : { all: true };
 }
 
+/**
+ * Execution-metrics partitions a cost report reads. A tenant filter reads those
+ * tenants' partitions plus the system partition: unscoped rows (attributed by
+ * mission id) are still matched to the tenant by the report's scope filter.
+ * Without a filter it is the operator aggregate, as for resource usage.
+ */
+export function executionMetricsReadFor(filter?: EventScopeFilter): ExecutionMetricsReadScope {
+  const read = resourceUsageReadFor(filter);
+  return 'tenants' in read ? { ...read, includeSystem: true } : read;
+}
+
 export function buildCostReportFromHistory(
   options: { since?: string; until?: string; scopeFilter?: EventScopeFilter } = {}
 ): CostReport {
   return buildCostReport(
     [
-      ...(metrics.loadHistory() as CostLedgerEntry[]),
+      ...(metrics.loadHistory({
+        read: executionMetricsReadFor(options.scopeFilter),
+      }) as CostLedgerEntry[]),
       ...(metrics.loadResourceUsageHistory(
         resourceUsageReadFor(options.scopeFilter)
       ) as CostLedgerEntry[]),

@@ -629,7 +629,7 @@ export async function runSoakEnduranceHarness(
     metricsFile,
     persist: false,
   });
-  const latencyRegressions = historyCollector.detectRegressions(1.2);
+  const latencyRegressions = historyCollector.detectRegressions(1.2, { all: true });
   const resourceSamples = evidenceRoot
     ? persistLiveResourceHistory(evidenceRoot, samples)
     : samples;

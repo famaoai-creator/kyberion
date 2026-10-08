@@ -107,9 +107,9 @@ export function collectHealthRollupLines(
   try {
     const thresholds = loadHealthThresholds();
     const degradation = evaluateDegradation({
-      regressions: metrics.detectRegressions(
-        thresholds.regression_multiplier
-      ) as LatencyRegression[],
+      regressions: metrics.detectRegressions(thresholds.regression_multiplier, {
+        all: true,
+      }) as LatencyRegression[],
       demotedProviders: listDemotedProviders(discoverProviders()),
       thresholds,
     });

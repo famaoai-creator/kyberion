@@ -51,6 +51,7 @@ import {
   TRASH_REPO_SUBPATH,
 } from './storage-janitor.js';
 import { RETENTION_CATALOG_REPO_PATH } from './storage-retention-catalog.js';
+import { PARTITIONED_RUNTIME_LEDGER_ROOTS } from './storage-layout.js';
 import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
 import { revokeGrantsForTenantBestEffort } from './task/task-scoped-grants.js';
 import { assertPhysicalScopeSegment } from './physical-namespace.js';
@@ -282,7 +283,9 @@ export type OffboardTargetKind =
   /** Tenant-scoped feedback, intent, audit, and collaboration runtime state. */
   | 'tenant_learning_tree'
   /** The tenant's partition of the resource-usage ledger (one per tier). */
-  | 'tenant_usage_ledger';
+  | 'tenant_usage_ledger'
+  /** The tenant's partition of the execution-metrics ledger (one per tier). */
+  | 'tenant_execution_metrics';
 
 export interface OffboardTarget {
   /** Repo-relative POSIX path. */
@@ -325,6 +328,8 @@ export interface OffboardScopeResult {
   dedup_registry?: OffboardDedupRegistryResult;
   /** Tenant rows pruned from the shared (pre-partition) resource-usage ledger. */
   usage_ledger_legacy?: OffboardDedupRegistryResult;
+  /** Tenant rows pruned from the shared (pre-partition) execution-metrics ledger. */
+  execution_metrics_legacy?: OffboardDedupRegistryResult;
   /** EG-10: registry-backed artifact ownership query for the offboarded scope. */
   artifact_registry?: { matched: number; registry_path: string; records_retained: boolean };
   /** DA-08: automatic post-execute leftover check (execute mode only). */
@@ -345,14 +350,55 @@ export const INGEST_CURSORS_REPO_SUBPATH = 'active/shared/runtime/ingest-cursors
 export const INGEST_DEDUP_REGISTRY_REPO_PATH =
   'active/shared/runtime/ingest/content-hash-registry.jsonl';
 const INGEST_QUOTA_REPO_SUBPATH = 'active/shared/runtime/ingest/quota';
-/** Mirrors metrics.ts RESOURCE_USAGE_LEDGER_ROOT (`<root>/<tier>/<tenant>/resource-usage.jsonl`). */
-export const USAGE_LEDGER_REPO_SUBPATH = 'active/shared/runtime/usage-ledger';
+/** metrics.ts RESOURCE_USAGE_LEDGER_ROOT (`<root>/<tier>/<tenant>/resource-usage.jsonl`). */
+export const USAGE_LEDGER_REPO_SUBPATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.resource_usage;
 /**
  * The repo-wide (system) resource-usage ledger. Rows written before the
  * ledger was partitioned may still carry a tenant scope; offboarding prunes
  * them line by line like the dedup registry.
  */
 export const USAGE_LEDGER_LEGACY_REPO_PATH = 'work/metrics/resource-usage.jsonl';
+/** metrics.ts EXECUTION_METRICS_LEDGER_ROOT (`<root>/<tier>/<tenant>/execution-metrics.jsonl`). */
+export const EXECUTION_METRICS_REPO_SUBPATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.execution_metrics;
+/** The repo-wide (system) execution-metrics ledger; pre-partition rows are pruned like usage rows. */
+export const EXECUTION_METRICS_LEGACY_REPO_PATH = 'work/metrics/execution-metrics.jsonl';
+
+/**
+ * The partitioned metrics ledgers (metrics.ts) and their offboarding ceremony:
+ * the tenant's `<root>/<tier>/<tenant>/` partitions are exported + soft-deleted
+ * as targets; its pre-partition rows of the system file are exported, then
+ * removed by one atomic, approval-gated, audited rewrite.
+ */
+interface MetricsLedgerOffboarding {
+  result_key: 'usage_ledger_legacy' | 'execution_metrics_legacy';
+  partition_root: string;
+  target_kind: OffboardTargetKind;
+  legacy_path: string;
+  export_file: string;
+  audit_event: string;
+  row_label: string;
+}
+
+const METRICS_LEDGERS: readonly MetricsLedgerOffboarding[] = [
+  {
+    result_key: 'usage_ledger_legacy',
+    partition_root: USAGE_LEDGER_REPO_SUBPATH,
+    target_kind: 'tenant_usage_ledger',
+    legacy_path: USAGE_LEDGER_LEGACY_REPO_PATH,
+    export_file: 'usage-ledger-legacy-removed.jsonl',
+    audit_event: 'SCOPE_OFFBOARD_USAGE_LEDGER_PRUNE',
+    row_label: 'resource-usage',
+  },
+  {
+    result_key: 'execution_metrics_legacy',
+    partition_root: EXECUTION_METRICS_REPO_SUBPATH,
+    target_kind: 'tenant_execution_metrics',
+    legacy_path: EXECUTION_METRICS_LEGACY_REPO_PATH,
+    export_file: 'execution-metrics-legacy-removed.jsonl',
+    audit_event: 'SCOPE_OFFBOARD_EXECUTION_METRICS_PRUNE',
+    row_label: 'execution-metrics',
+  },
+];
 
 const SCOPE_TIERS = ['personal', 'confidential', 'public'] as const;
 
@@ -774,12 +820,14 @@ export function collectScopeTargets(
         targets.push({ path: subtree, kind: 'ingest_cursors_tree' });
       }
     }
-    // The tenant's usage-ledger partitions must not outlive the tenant.
-    for (const tier of SCOPE_TIERS) {
-      const subtree = `${USAGE_LEDGER_REPO_SUBPATH}/${tier}/${id}`;
-      const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
-      if (subtreePath && safeExistsSync(subtreePath)) {
-        targets.push({ path: subtree, kind: 'tenant_usage_ledger' });
+    // The tenant's metrics-ledger partitions must not outlive the tenant.
+    for (const ledger of METRICS_LEDGERS) {
+      for (const tier of SCOPE_TIERS) {
+        const subtree = `${ledger.partition_root}/${tier}/${id}`;
+        const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
+        if (subtreePath && safeExistsSync(subtreePath)) {
+          targets.push({ path: subtree, kind: ledger.target_kind });
+        }
       }
     }
   }
@@ -880,7 +928,7 @@ function computeDedupRegistryPrune(tenantSlug: string): DedupRegistryPrune {
   return result;
 }
 
-/** Tenant of a resource-usage row (canonical `tenant_slug`, legacy `tenant_id`). */
+/** Tenant of a metrics-ledger row (canonical `tenant_slug`, legacy `tenant_id`). */
 function usageRowTenant(record: unknown): string {
   if (!record || typeof record !== 'object') return '';
   const scope = (record as { scope?: unknown }).scope;
@@ -894,15 +942,16 @@ function usageRowTenant(record: unknown): string {
 }
 
 /**
- * Which pre-partition rows of the shared resource-usage ledger belong to this
- * tenant (by the row's own scope)? Corrupt lines are kept, as in the dedup
- * registry prune.
+ * Which pre-partition rows of a shared metrics ledger belong to this tenant
+ * (by the row's own scope)? Corrupt lines are kept, as in the dedup registry
+ * prune.
  */
-function computeUsageLedgerLegacyPrune(tenantSlug: string): DedupRegistryPrune {
+function computeLegacyLedgerPrune(
+  ledger: MetricsLedgerOffboarding,
+  tenantSlug: string
+): DedupRegistryPrune {
   const result: DedupRegistryPrune = { removedLines: [], keptLines: [] };
-  const ledgerAbs = safeOptionalRepositoryPath(
-    pathResolver.rootResolve(USAGE_LEDGER_LEGACY_REPO_PATH)
-  );
+  const ledgerAbs = safeOptionalRepositoryPath(pathResolver.rootResolve(ledger.legacy_path));
   if (!ledgerAbs || !safeExistsSync(ledgerAbs) || !safeLstat(ledgerAbs).isFile()) return result;
   const tenant = tenantSlug.trim().toLowerCase();
   for (const line of readTextFile(ledgerAbs).split('\n')) {
@@ -911,7 +960,7 @@ function computeUsageLedgerLegacyPrune(tenantSlug: string): DedupRegistryPrune {
     let matches = false;
     try {
       matches =
-        usageRowTenant(parseSafeJsonInput(trimmed, 'resource usage JSONL entry')) === tenant;
+        usageRowTenant(parseSafeJsonInput(trimmed, `${ledger.row_label} JSONL entry`)) === tenant;
     } catch {
       /* corrupt line: keep it — the ledger readers skip it anyway */
     }
@@ -961,9 +1010,11 @@ export function verifyScopeOffboarded(
         `${INGEST_DEDUP_REGISTRY_REPO_PATH} (${registryLeft} line(s) referencing ${knowledgeRoot})`
       );
     }
-    const usageLeft = computeUsageLedgerLegacyPrune(id).removedLines.length;
-    if (usageLeft > 0) {
-      leftovers.push(`${USAGE_LEDGER_LEGACY_REPO_PATH} (${usageLeft} legacy row(s) of '${id}')`);
+    for (const ledger of METRICS_LEDGERS) {
+      const rowsLeft = computeLegacyLedgerPrune(ledger, id).removedLines.length;
+      if (rowsLeft > 0) {
+        leftovers.push(`${ledger.legacy_path} (${rowsLeft} legacy row(s) of '${id}')`);
+      }
     }
   }
 
@@ -1057,14 +1108,20 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
     if (dedupPrune && dedupPrune.removedLines.length > 0) {
       result.dedup_registry = { matched: dedupPrune.removedLines.length, removed: 0 };
     }
-    const usagePrune = scopeType === 'tenant' ? computeUsageLedgerLegacyPrune(scopeId) : null;
-    if (usagePrune && usagePrune.removedLines.length > 0) {
-      result.usage_ledger_legacy = { matched: usagePrune.removedLines.length, removed: 0 };
+    const ledgerPrunes =
+      scopeType === 'tenant'
+        ? METRICS_LEDGERS.map((ledger) => ({
+            ledger,
+            prune: computeLegacyLedgerPrune(ledger, scopeId),
+          })).filter(({ prune }) => prune.removedLines.length > 0)
+        : [];
+    for (const { ledger, prune } of ledgerPrunes) {
+      result[ledger.result_key] = { matched: prune.removedLines.length, removed: 0 };
     }
     if (
       result.targets.length === 0 &&
       !result.dedup_registry &&
-      !result.usage_ledger_legacy &&
+      ledgerPrunes.length === 0 &&
       !result.artifact_registry
     ) {
       result.status = 'not_found';
@@ -1083,6 +1140,9 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
         ...(result.dedup_registry ? { dedup_registry_matched: result.dedup_registry.matched } : {}),
         ...(result.usage_ledger_legacy
           ? { usage_ledger_legacy_matched: result.usage_ledger_legacy.matched }
+          : {}),
+        ...(result.execution_metrics_legacy
+          ? { execution_metrics_legacy_matched: result.execution_metrics_legacy.matched }
           : {}),
         ...(result.artifact_registry
           ? { artifact_registry_matched: result.artifact_registry.matched }
@@ -1147,17 +1207,16 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
         export_file: `${result.export_path}/${dedupExportFile}`,
       };
     }
-    // The tenant's pre-partition rows of the shared usage ledger, verbatim.
-    const usageExportFile = 'usage-ledger-legacy-removed.jsonl';
-    if (usagePrune && usagePrune.removedLines.length > 0) {
-      const usageExportPath = assertSafeRepositoryPath(path.join(exportDirAbs, usageExportFile), {
+    // The tenant's pre-partition rows of the shared metrics ledgers, verbatim.
+    for (const { ledger, prune } of ledgerPrunes) {
+      const exportPath = assertSafeRepositoryPath(path.join(exportDirAbs, ledger.export_file), {
         allowMissingLeaf: true,
       });
-      safeWriteFile(usageExportPath, `${usagePrune.removedLines.join('\n')}\n`);
-      result.usage_ledger_legacy = {
-        matched: usagePrune.removedLines.length,
+      safeWriteFile(exportPath, `${prune.removedLines.join('\n')}\n`);
+      result[ledger.result_key] = {
+        matched: prune.removedLines.length,
         removed: 0,
-        export_file: `${result.export_path}/${usageExportFile}`,
+        export_file: `${result.export_path}/${ledger.export_file}`,
       };
     }
     const manifestPath = assertSafeRepositoryPath(path.join(exportDirAbs, 'manifest.json'), {
@@ -1177,6 +1236,9 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
           ...(result.dedup_registry ? { dedup_registry: result.dedup_registry } : {}),
           ...(result.usage_ledger_legacy
             ? { usage_ledger_legacy: result.usage_ledger_legacy }
+            : {}),
+          ...(result.execution_metrics_legacy
+            ? { execution_metrics_legacy: result.execution_metrics_legacy }
             : {}),
           policy_ref: RETENTION_CATALOG_REPO_PATH,
         },
@@ -1229,34 +1291,29 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
       });
     }
 
-    // Same for the tenant's pre-partition rows of the shared usage ledger:
+    // Same for the tenant's pre-partition rows of the shared metrics ledgers:
     // exported above, then removed by one atomic rewrite (secure-io writes
     // through a temp file + rename), audited like every other purge.
-    if (usagePrune && usagePrune.removedLines.length > 0) {
-      const ledgerAbs = assertSafeRepositoryPath(
-        pathResolver.rootResolve(USAGE_LEDGER_LEGACY_REPO_PATH),
-        { allowMissingLeaf: true }
-      );
-      safeWriteFile(
-        ledgerAbs,
-        usagePrune.keptLines.length > 0 ? `${usagePrune.keptLines.join('\n')}\n` : ''
-      );
-      if (result.usage_ledger_legacy) {
-        result.usage_ledger_legacy.removed = usagePrune.removedLines.length;
-      }
+    for (const { ledger, prune } of ledgerPrunes) {
+      const ledgerAbs = assertSafeRepositoryPath(pathResolver.rootResolve(ledger.legacy_path), {
+        allowMissingLeaf: true,
+      });
+      safeWriteFile(ledgerAbs, prune.keptLines.length > 0 ? `${prune.keptLines.join('\n')}\n` : '');
+      const summary = result[ledger.result_key];
+      if (summary) summary.removed = prune.removedLines.length;
       appendRetentionAudit({
-        event: 'SCOPE_OFFBOARD_USAGE_LEDGER_PRUNE',
+        event: ledger.audit_event,
         scope_type: scopeType,
         scope_id: scopeId,
-        path: USAGE_LEDGER_LEGACY_REPO_PATH,
-        removed_lines: usagePrune.removedLines.length,
-        kept_lines: usagePrune.keptLines.length,
+        path: ledger.legacy_path,
+        removed_lines: prune.removedLines.length,
+        kept_lines: prune.keptLines.length,
         export_path: result.export_path,
         approved_by: approvedBy,
         approved_at: approvedAt,
         purpose,
         policy_ref: RETENTION_CATALOG_REPO_PATH,
-        reason: 'offboarding removed the tenant’s legacy resource-usage rows after export',
+        reason: `offboarding removed the tenant’s legacy ${ledger.row_label} rows after export`,
       });
     }
 

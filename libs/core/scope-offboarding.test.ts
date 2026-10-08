@@ -915,6 +915,79 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     });
   });
 
+  it("purges the tenant's execution-metrics partitions and legacy rows through the same ceremony", () => {
+    const partition = (tier: string, tenant: string) =>
+      `active/shared/runtime/execution-metrics/${tier}/${tenant}`;
+    writeJsonl(`${partition('confidential', TENANT)}/execution-metrics.jsonl`, [
+      { component: 'anthropic-sdk', duration_ms: 1 },
+    ]);
+    writeJsonl(`${partition('personal', TENANT)}/execution-metrics.jsonl`, [
+      { component: 'agent-runtime:ask', duration_ms: 2 },
+    ]);
+    writeJsonl(`${partition('confidential', 'tenant-beta')}/execution-metrics.jsonl`, [
+      { component: 'beta', duration_ms: 3 },
+    ]);
+    const legacyLedger = 'work/metrics/execution-metrics.jsonl';
+    writeJsonl(legacyLedger, [
+      { component: 'legacy-a', scope: { tier: 'confidential', tenant_slug: TENANT } },
+      { component: 'legacy-b', scope: { tier: 'confidential', tenant_slug: 'tenant-beta' } },
+      { component: 'legacy-sys', mission_id: 'MSN-SYS' },
+      '{corrupt line',
+    ]);
+
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.targets).toEqual(
+      expect.arrayContaining([
+        { path: partition('confidential', TENANT), kind: 'tenant_execution_metrics' },
+        { path: partition('personal', TENANT), kind: 'tenant_execution_metrics' },
+      ])
+    );
+    expect(dryRun.targets.map((t) => t.path)).not.toContain(
+      partition('confidential', 'tenant-beta')
+    );
+    expect(dryRun.execution_metrics_legacy).toEqual({ matched: 1, removed: 0 });
+
+    const denied = offboardScope({ scopeType: 'tenant', scopeId: TENANT, mode: 'execute' });
+    expect(denied.status).toBe('approval_required');
+    expect(fs.readFileSync(abs(legacyLedger), 'utf8')).toContain('legacy-a');
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-10-08T01:02:03.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    expect(result.verification).toEqual({ clean: true, leftovers: [] });
+    expect(fs.existsSync(abs(partition('confidential', TENANT)))).toBe(false);
+    expect(fs.existsSync(abs(partition('personal', TENANT)))).toBe(false);
+    expect(fs.existsSync(abs(partition('confidential', 'tenant-beta')))).toBe(true);
+    expect(
+      fs.existsSync(
+        abs(`${result.export_path}/${partition('confidential', TENANT)}/execution-metrics.jsonl`)
+      )
+    ).toBe(true);
+    const kept = fs.readFileSync(abs(legacyLedger), 'utf8');
+    expect(kept).not.toContain('legacy-a');
+    expect(kept).toContain('legacy-b');
+    expect(kept).toContain('legacy-sys');
+    expect(kept).toContain('{corrupt line');
+    expect(result.execution_metrics_legacy).toMatchObject({ matched: 1, removed: 1 });
+    expect(
+      fs.readFileSync(abs(`${result.export_path}/execution-metrics-legacy-removed.jsonl`), 'utf8')
+    ).toContain('legacy-a');
+    expect(
+      auditEvents().find((e) => e.event === 'SCOPE_OFFBOARD_EXECUTION_METRICS_PRUNE')
+    ).toMatchObject({
+      scope_id: TENANT,
+      path: legacyLedger,
+      removed_lines: 1,
+      kept_lines: 3,
+      approved_by: 'operator@example',
+    });
+  });
+
   it('keeps a dedup line with a dangerous JSON key as an unreadable record', () => {
     seedIngestResidue();
     fs.appendFileSync(

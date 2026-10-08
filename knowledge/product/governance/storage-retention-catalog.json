@@ -663,7 +663,13 @@
       "path": "active/shared/runtime/usage-ledger",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Tier/tenant-partitioned resource-usage ledgers (libs/core/metrics.ts RESOURCE_USAGE_LEDGER_ROOT): <tier>/<tenant|shared>/resource-usage.jsonl for usage whose scope carries a tenant or a personal/confidential tier; untenanted public usage stays in work/metrics/resource-usage.jsonl. Append-only cost/accounting evidence read by mission retrospectives, cost reports and generation-cost dedup, so no TTL deletion; personal/confidential subtrees are tenant_scope protected prefixes."
+      "note": "Tier/tenant-partitioned resource-usage ledgers (libs/core/metrics.ts RESOURCE_USAGE_LEDGER_ROOT): <tier>/<tenant|shared>/resource-usage.jsonl for usage whose scope carries a tenant or a personal/confidential tier; untenanted public usage stays in work/metrics/resource-usage.jsonl. Append-only cost/accounting evidence read by mission retrospectives, cost reports and generation-cost dedup, so no TTL deletion; personal/confidential subtrees are tenant_scope protected prefixes and follow the knowledge-tier persona read rules."
+    },
+    {
+      "path": "active/shared/runtime/execution-metrics",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Tier/tenant-partitioned execution-metrics ledgers (libs/core/metrics.ts EXECUTION_METRICS_LEDGER_ROOT): <tier>/<tenant|shared>/execution-metrics.jsonl for MetricsCollector.record rows whose scope carries a tenant or a personal/confidential tier; untenanted public rows stay in work/metrics/execution-metrics.jsonl. Append-only latency/token/cost evidence read by cost reports, budget and spend guards, mission retrospectives and health regressions, so no TTL deletion; personal/confidential subtrees are tenant_scope protected prefixes and follow the knowledge-tier persona read rules; tenant offboarding exports and soft-deletes a tenant's partitions."
     },
     {
       "path": "active/shared/runtime/discussions",
