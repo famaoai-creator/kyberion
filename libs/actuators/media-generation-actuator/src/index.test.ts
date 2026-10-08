@@ -205,6 +205,11 @@ vi.mock('@actuator/system', () => ({
   handleAction: mocks.handleSystemAction,
 }));
 
+// The actuator is imported once per file (the first `await import` in a test;
+// later ones hit the module cache). Re-importing the secure-io / tier-guard /
+// authority stack per test with vi.resetModules() repeated its module
+// initialisation every test (operations-hygiene-runbook §5). Per-test state is
+// the mocks (reset here) and the foundation IO re-registered in beforeEach.
 function resetTestDoubles(): void {
   mocks.safeReadFile.mockReset();
   mocks.resetSafeReadFile();
@@ -273,7 +278,6 @@ async function installMockFoundationIo(): Promise<void> {
 describe('prompt style pack injection (E2E-02 Task 4)', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    vi.resetModules();
     resetTestDoubles();
     await installMockFoundationIo();
   });
@@ -333,7 +337,6 @@ describe('prompt style pack injection (E2E-02 Task 4)', () => {
 describe('media-generation-actuator', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    vi.resetModules();
     resetTestDoubles();
     await installMockFoundationIo();
   });
