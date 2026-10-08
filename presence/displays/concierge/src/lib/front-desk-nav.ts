@@ -17,6 +17,7 @@ import {
   readFrontDeskSurfaceUrls,
   resolveFrontDeskMenu,
   type FrontDeskRole,
+  type FrontDeskAvailableSurfaces,
   type FrontDeskSurfacePorts,
 } from '@agent/core/front-desk-nav';
 
@@ -24,6 +25,9 @@ export type FrontDeskLocale = 'ja' | 'en';
 
 export interface FrontDeskNavItem {
   id: string;
+  group_label: string;
+  icon: string;
+  scope_query_style: 'snake' | 'camel';
   label: string;
   sublabel: string;
   href: string;
@@ -56,6 +60,7 @@ export interface BuildFrontDeskNavPayloadInput {
   role: FrontDeskRole;
   /** Injectable for tests; defaults to the real manifest-backed reader. */
   ports?: Partial<FrontDeskSurfacePorts>;
+  availableSurfaces?: FrontDeskAvailableSurfaces;
 }
 
 export function buildFrontDeskNavPayload(
@@ -67,7 +72,13 @@ export function buildFrontDeskNavPayload(
     ...(input.ports ?? readFrontDeskSurfacePorts()),
   };
   const urls = input.ports ? undefined : readFrontDeskSurfaceUrls();
-  const menu = resolveFrontDeskMenu({ currentSurface: 'concierge', ports, urls, role });
+  const menu = resolveFrontDeskMenu({
+    currentSurface: 'concierge',
+    ports,
+    urls,
+    role,
+    availableSurfaces: input.availableSurfaces,
+  });
   const tr = (key: string) => t(key as VocabularyKey, undefined, locale);
   // `FRONT_DESK_HELP_LINK.surface` is a fixed presence-studio literal today,
   // but this stays a runtime string comparison (not a type narrowing) so it
@@ -84,6 +95,9 @@ export function buildFrontDeskNavPayload(
     current_surface: 'concierge',
     items: menu.map((item) => ({
       id: item.id,
+      group_label: tr(item.group_key),
+      icon: item.icon,
+      scope_query_style: item.scope_query_style,
       label: tr(item.label_key),
       sublabel: tr(item.sublabel_key),
       href: item.href,

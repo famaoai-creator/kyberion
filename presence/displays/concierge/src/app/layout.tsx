@@ -4,7 +4,7 @@ import * as React from 'react';
 import './kyberion-ui-tokens.css';
 import './kyberion-ui.css';
 import './globals.css';
-import { readFrontDeskSurfacePorts, readFrontDeskSurfaceUrls } from '@agent/core/front-desk-nav';
+import { readFrontDeskSurfaceUrls } from '@agent/core/front-desk-nav';
 import { THEME_BOOTSTRAP_SCRIPT } from '../lib/concierge-theme';
 import { ConciergeShell } from './concierge-shell';
 import { ConciergeHeader } from './concierge-header';
@@ -26,13 +26,6 @@ export const metadata = {
 export const viewport = { themeColor: '#1d4ed8' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // FD-00c follow-up: `RootLayout` has no `'use client'` directive, so it is
-  // a Server Component — it may read the surface manifest directly and pass
-  // the resolved (never hardcoded) ports down as a plain serializable prop.
-  // `CommandPalette` needs them to build its 3 cross-surface hrefs without
-  // importing `@agent/core/front-desk-nav` itself (that module pulls in
-  // `surface-runtime`/`secure-io`, which cannot be bundled for the browser).
-  const frontDeskPorts = readFrontDeskSurfacePorts();
   const frontDeskUrls = readFrontDeskSurfaceUrls();
 
   return (
@@ -55,7 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           overlays={
             <>
               <ConversationDock progressHref={frontDeskUrls['presence-studio'] + '/progress'} />
-              <CommandPalette frontDeskPorts={frontDeskPorts} frontDeskUrls={frontDeskUrls} />
+              <CommandPalette />
             </>
           }
         >

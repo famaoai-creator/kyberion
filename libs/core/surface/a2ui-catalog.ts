@@ -277,6 +277,8 @@ export type KbActionRef = {
 } & ({ href: string; action?: never } | { action: KbAction | string; href?: never });
 
 export interface KbNavItem {
+  /** Consecutive items with the same non-empty label form an accessible navigation group. */
+  group_label?: string;
   id: string;
   label: string;
   hint?: string;
