@@ -208,6 +208,9 @@ const VITEST_LIVE_SUBTREES = [
   // Tier/tenant-partitioned resource-usage ledgers (metrics.ts
   // RESOURCE_USAGE_LEDGER_ROOT); the shared `metrics` collector appends to them.
   'shared/runtime/usage-ledger/',
+  // Tier/tenant-partitioned execution-metrics ledgers (metrics.ts
+  // EXECUTION_METRICS_LEDGER_ROOT); the shared collector's `record` appends to them.
+  'shared/runtime/execution-metrics/',
   // Mission history FTS indexes (history-search-index.ts).
   'shared/runtime/history-search/',
   // swiftc output and module cache of the Apple FM bridge (macOS only; a test
