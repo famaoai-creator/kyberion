@@ -21,6 +21,25 @@ import { resetCurrentScope } from '@agent/core/scope-context';
 
 const ROOT = rootDir();
 
+/**
+ * save_brand_to_confidential registers the tenant in the live tenant
+ * design-override index. Snapshot it before the test and restore it after, so
+ * fixture tenants never land in (or create) the operator's index.
+ */
+function preserveTenantDesignIndex(): () => void {
+  const indexPath = path.resolve(ROOT, 'knowledge/confidential/tenants/index.json');
+  const indexDir = path.dirname(indexPath);
+  const dirExisted = safeExistsSync(indexDir);
+  const before = safeExistsSync(indexPath)
+    ? (safeReadFile(indexPath, { encoding: 'utf8' }) as string)
+    : null;
+  return () => {
+    if (before !== null) safeWriteFile(indexPath, before);
+    else if (!dirExisted) safeRmSync(indexDir, { recursive: true, force: true });
+    else safeRmSync(indexPath, { force: true });
+  };
+}
+
 const mocks = vi.hoisted(() => ({
   recognize: vi.fn(),
   documentOcr: vi.fn(),
@@ -669,6 +688,7 @@ describe('media-actuator pdf to pptx bridge', () => {
 
   it('persists pptx brand registration when save_brand_to_confidential runs as a sink step', async () => {
     const tenantSlug = '__pptx_sink_persist_test';
+    const restoreTenantIndex = preserveTenantDesignIndex();
     const confDir = path.resolve(ROOT, `knowledge/confidential/${tenantSlug}/design`);
     safeRmSync(path.resolve(ROOT, `knowledge/confidential/${tenantSlug}`), {
       recursive: true,
@@ -743,6 +763,7 @@ describe('media-actuator pdf to pptx bridge', () => {
         true
       );
     } finally {
+      restoreTenantIndex();
       safeRmSync(path.resolve(ROOT, `knowledge/confidential/${tenantSlug}`), {
         recursive: true,
         force: true,
@@ -752,6 +773,7 @@ describe('media-actuator pdf to pptx bridge', () => {
 
   it('persists web brand registration as a web theme pack', async () => {
     const tenantSlug = '__web_theme_pack_test';
+    const restoreTenantIndex = preserveTenantDesignIndex();
     const confDir = path.resolve(ROOT, `knowledge/confidential/${tenantSlug}/design`);
     const prevPersona = process.env.KYBERION_PERSONA;
     process.env.KYBERION_PERSONA = 'sovereign';
@@ -868,6 +890,7 @@ describe('media-actuator pdf to pptx bridge', () => {
         true
       );
     } finally {
+      restoreTenantIndex();
       process.env.KYBERION_PERSONA = prevPersona;
       safeRmSync(path.resolve(ROOT, `knowledge/confidential/${tenantSlug}`), {
         recursive: true,
