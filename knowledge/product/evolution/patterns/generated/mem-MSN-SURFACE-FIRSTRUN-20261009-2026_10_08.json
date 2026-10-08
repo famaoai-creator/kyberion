@@ -1,0 +1,23 @@
+{
+  "record_id": "mem-MSN-SURFACE-FIRSTRUN-20261009-2026_10_08",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Unauthenticated bootstrap endpoints: prove host access with a one-time host-issued code",
+  "summary": "When a surface must be usable before any sign-in exists (first-run setup), gate the unauthenticated endpoint on a one-time code issued on the host CLI rather than on loopback, Host or X-Forwarded-For, which Next.js surfaces cannot prove.",
+  "candidate_id": "mem-MSN-SURFACE-FIRSTRUN-20261009-2026_10_08",
+  "evidence_refs": [
+    "active/missions/public/MSN-SURFACE-FIRSTRUN-20261009/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-SURFACE-FIRSTRUN-20261009/evidence/test-report.md",
+    "active/missions/public/MSN-SURFACE-FIRSTRUN-20261009/evidence/implementation-report.md"
+  ],
+  "created_at": "2026-10-08T15:33:41.300Z",
+  "applicability": ["mission", "mission:MSN-SURFACE-FIRSTRUN-20261009"],
+  "reusable_steps": [
+    "When a surface must be usable before any sign-in exists (first-run setup), gate the unauthenticated endpoint on a one-time code issued on the host CLI rather than on loopback, Host or X-Forwarded-For, which Next",
+    "js surfaces cannot prove"
+  ],
+  "expected_outcome": "Applies to any Kyberion surface endpoint that must work before authentication exists (first-run owner claim, initial SSO configuration).\n\nRules:\n1. Proof of server access = a code issued by a host CLI (`pnpm organization first-run code`). Store only a salted SHA-256 hash, an expiry (default 30 min) and a failed-attempt counter in a secret-guard document; compare with timingSafeEqual; lock after N failures; consume the code before any write so one code never authorizes two claims.\n2. Put the code in the URL fragment (`#code=`) so it never reaches server or proxy logs; the page clears it with history.replaceState.\n3. Validate input before spending an attempt, but disclose registry state (tenant/member suspended) only after a valid code, without consuming it.\n4. Decide \"still open\" fail-closed: an explicit claimed marker OR any active owner that can already sign in (registry token or bound IdP identity), scanned with the strict member listing (`listMemberIdsStrict`) so an unreadable registry never reopens the bootstrap.\n5. Instance-wide settings saved from the surface (OIDC) go to secret-guard with `backup: false` so a rotated/cleared secret does not linger in a .bak; responses expose only `client_secret_set`. Environment variables keep precedence as a whole set, so env-configured deployments are unaffected.\n6. Accept and document residual risks instead of over-engineering: unauthenticated lockout is DoS only (host reissues the code); Next.js rate-limit keys collapse to a shared bucket without KYBERION_TRUST_PROXY.",
+  "source_branch": "feat/surface-first-run-setup-20261009",
+  "source_commit": "126f49ff2b76925088168e40ab12c432cfe3e68e"
+}

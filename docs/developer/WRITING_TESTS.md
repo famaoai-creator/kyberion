@@ -82,6 +82,14 @@ afterAll(() => {
 
 Do not call `vi.resetModules()` and re-import the secure-io / tier-guard / authority stack in every test. Each re-import repeats that stack's module initialisation, and the pattern has crashed macOS Vitest workers ([operations-hygiene-runbook §5](../../knowledge/product/governance/operations-hygiene-runbook.md#5-tests-pollution-and-host-dependencies)). Use `vi.resetModules()` only when a test needs a fresh instance, for example after `vi.doMock`.
 
+Import a heavy stack (the mission worker, `@agent/core`) in `beforeAll` with an explicit hook timeout, for example `beforeAll(async () => { await import('./mission-orchestration-worker.js'); }, 60_000)`. Its one-time load then does not count against the first test's 10s budget.
+
+Accepted uses of `vi.resetModules()`:
+
+- **Once in `beforeAll`, when a static top-level import already bound `path-resolver`** before `KYBERION_ROOT` was stubbed (`scripts/onboarding_first_job*.test.ts`, `scripts/front_desk_execution_step.test.ts`).
+- **Only inside the tests that `vi.doMock`.** Drop the mocked graph again afterwards (`viewer-context.test.ts` in both presence displays). If the module that imports the mocked dependency is not loaded yet, skip the reset: `vi.doMock` applies to its first import. A second module generation re-registers process-global hooks, such as the execution-scope role validator, and later tests in the file see them (`chronos-token-registry-reader.test.ts`).
+- **Per test, when the module keeps module-level caches that have no reset hook** and each test feeds different fixture data (`libs/core/authority.branch.test.ts`, whose storage stack is mocked).
+
 `libs/core/stimuli-journal-rotation-role.test.ts` and `scripts/virtual_office.test.ts` are working examples.
 
 ### Fixture missions in the live tree

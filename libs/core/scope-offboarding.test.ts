@@ -833,6 +833,88 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     expect(verification.leftovers.length).toBeGreaterThan(0);
   });
 
+  it("purges the tenant's resource-usage ledger partitions through the audited ceremony", () => {
+    const ledger = (tier: string, tenant: string) =>
+      `active/shared/runtime/usage-ledger/${tier}/${tenant}`;
+    writeJsonl(`${ledger('confidential', TENANT)}/resource-usage.jsonl`, [{ usage_id: 'a-1' }]);
+    writeJsonl(`${ledger('public', TENANT)}/resource-usage.jsonl`, [{ usage_id: 'a-2' }]);
+    writeJsonl(`${ledger('confidential', 'tenant-beta')}/resource-usage.jsonl`, [
+      { usage_id: 'b-1' },
+    ]);
+    // Pre-partition rows in the shared ledger: two of this tenant (one via the
+    // legacy tenant_id alias), one of tenant-beta, one system row, one corrupt.
+    const legacyLedger = 'work/metrics/resource-usage.jsonl';
+    writeJsonl(legacyLedger, [
+      { usage_id: 'legacy-a', scope: { tier: 'confidential', tenant_slug: TENANT } },
+      { usage_id: 'legacy-a2', scope: { tier: 'confidential', tenant_id: TENANT } },
+      { usage_id: 'legacy-b', scope: { tier: 'confidential', tenant_slug: 'tenant-beta' } },
+      { usage_id: 'legacy-sys', scope: { tier: 'public' } },
+      '{corrupt line',
+    ]);
+
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.targets).toEqual(
+      expect.arrayContaining([
+        { path: ledger('confidential', TENANT), kind: 'tenant_usage_ledger' },
+        { path: ledger('public', TENANT), kind: 'tenant_usage_ledger' },
+      ])
+    );
+    expect(dryRun.targets.map((t) => t.path)).not.toContain(ledger('confidential', 'tenant-beta'));
+    expect(dryRun.usage_ledger_legacy).toEqual({ matched: 2, removed: 0 });
+    expect(fs.readFileSync(abs(legacyLedger), 'utf8')).toContain('legacy-a');
+
+    // Removal is approval-gated: nothing is pruned without one.
+    const denied = offboardScope({ scopeType: 'tenant', scopeId: TENANT, mode: 'execute' });
+    expect(denied.status).toBe('approval_required');
+    expect(fs.readFileSync(abs(legacyLedger), 'utf8')).toContain('legacy-a2');
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-10-08T01:02:03.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    expect(result.verification).toEqual({ clean: true, leftovers: [] });
+    expect(fs.existsSync(abs(ledger('confidential', TENANT)))).toBe(false);
+    expect(fs.existsSync(abs(ledger('public', TENANT)))).toBe(false);
+    expect(fs.existsSync(abs(ledger('confidential', 'tenant-beta')))).toBe(true);
+    // Export-before-delete, and every removal audited.
+    expect(
+      fs.existsSync(
+        abs(`${result.export_path}/${ledger('confidential', TENANT)}/resource-usage.jsonl`)
+      )
+    ).toBe(true);
+    const softDeletes = auditEvents().filter((e) => e.event === 'SCOPE_OFFBOARD_SOFT_DELETE');
+    expect(softDeletes.map((e) => e.path)).toEqual(
+      expect.arrayContaining([ledger('confidential', TENANT), ledger('public', TENANT)])
+    );
+    // Legacy rows: exported verbatim, pruned from the shared ledger, audited.
+    const kept = fs.readFileSync(abs(legacyLedger), 'utf8');
+    expect(kept).not.toContain('"legacy-a"');
+    expect(kept).not.toContain('legacy-a2');
+    expect(kept).toContain('legacy-b');
+    expect(kept).toContain('legacy-sys');
+    expect(kept).toContain('{corrupt line');
+    expect(result.usage_ledger_legacy).toMatchObject({ matched: 2, removed: 2 });
+    const removedCopy = fs.readFileSync(
+      abs(`${result.export_path}/usage-ledger-legacy-removed.jsonl`),
+      'utf8'
+    );
+    expect(removedCopy).toContain('legacy-a');
+    expect(removedCopy).toContain('legacy-a2');
+    expect(removedCopy).not.toContain('legacy-b');
+    expect(
+      auditEvents().find((e) => e.event === 'SCOPE_OFFBOARD_USAGE_LEDGER_PRUNE')
+    ).toMatchObject({
+      scope_id: TENANT,
+      removed_lines: 2,
+      kept_lines: 3,
+      approved_by: 'operator@example',
+    });
+  });
+
   it('keeps a dedup line with a dangerous JSON key as an unreadable record', () => {
     seedIngestResidue();
     fs.appendFileSync(

@@ -2,9 +2,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { ViewerContext } from './viewer-context';
 
+// viewer-context (and the secure-io / tier-guard / authority stack under it) is
+// imported once per file and reused from the module cache; re-importing that
+// stack per test with vi.resetModules() repeated its module initialisation
+// every test (operations-hygiene-runbook §5). Only the tests that vi.doMock the
+// token registry need a fresh module graph: they call mockRegistryModule(), and
+// afterEach drops that mocked graph again so later tests re-bind the real one.
+//
+// Caveat: env read at import time is frozen at the first import. api-guard.ts
+// (imported by viewer-context) captures KYBERION_API_TOKEN,
+// KYBERION_LOCALADMIN_TOKEN, KYBERION_ALLOW_UNAUTH_REMOTE and
+// KYBERION_LOCALHOST_AUTOADMIN at module load, so a test must not rely on
+// stubbing those per test for api-guard behaviour unless it builds a fresh
+// module graph (as mockRegistryModule() does). viewer-context itself re-reads
+// them on every call.
+let registryMocked = false;
+
+function mockRegistryModule(factory: () => Promise<Record<string, unknown>>): void {
+  vi.resetModules();
+  registryMocked = true;
+  vi.doMock('@agent/core/chronos-access-registry', factory);
+}
+
 describe('viewer-context', () => {
   beforeEach(() => {
-    vi.resetModules();
     vi.unstubAllEnvs();
   });
 
@@ -12,6 +33,10 @@ describe('viewer-context', () => {
     vi.unstubAllEnvs();
     vi.doUnmock('@agent/core');
     vi.doUnmock('@agent/core/chronos-access-registry');
+    if (registryMocked) {
+      registryMocked = false;
+      vi.resetModules();
+    }
   });
 
   it('resolves loopback compatibility access to all tenants', async () => {
@@ -39,7 +64,7 @@ describe('viewer-context', () => {
   });
 
   it('binds an unregistered API token to the server tenant', async () => {
-    vi.doMock('@agent/core/chronos-access-registry', async () => ({
+    mockRegistryModule(async () => ({
       ...(await vi.importActual<typeof import('@agent/core/chronos-access-registry')>(
         '@agent/core/chronos-access-registry'
       )),
@@ -61,7 +86,7 @@ describe('viewer-context', () => {
   });
 
   it('rejects a remote unregistered token without a server tenant', async () => {
-    vi.doMock('@agent/core/chronos-access-registry', async () => ({
+    mockRegistryModule(async () => ({
       ...(await vi.importActual<typeof import('@agent/core/chronos-access-registry')>(
         '@agent/core/chronos-access-registry'
       )),
@@ -178,7 +203,7 @@ describe('viewer-context', () => {
     const { createHash, randomBytes } = await import('node:crypto');
     const token = randomBytes(24).toString('hex');
     const rolesDuringRead: string[] = [];
-    vi.doMock('@agent/core/chronos-access-registry', async () => {
+    mockRegistryModule(async () => {
       const actual = await vi.importActual<typeof import('@agent/core/chronos-access-registry')>(
         '@agent/core/chronos-access-registry'
       );

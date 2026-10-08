@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { isRecord } from '@agent/core/foundation';
-import { metrics } from '@agent/core/metrics';
+import { metrics, RESOURCE_USAGE_LEDGER_ROOT } from '@agent/core/metrics';
 import { pathResolver } from '@agent/core/path-resolver';
 import { traceLogDir } from '@agent/core/trace';
 import { validateTraceReplay } from '@agent/core/analysis/trace-schema';
@@ -42,6 +42,18 @@ function todaysTraceFile(): string {
   return path.join(traceLogDir(), `traces-${day}.jsonl`);
 }
 
+/** Usage-ledger records counted by `resource_kind` (llm, api, saas, …). */
+export function countUsageByKind(
+  records: ReadonlyArray<{ resource_kind?: string }>
+): StatsData['usageByKind'] {
+  const counts = new Map<string, number>();
+  for (const record of records) {
+    const kind = String(record.resource_kind || 'other');
+    counts.set(kind, (counts.get(kind) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([kind, count]) => ({ kind, count }));
+}
+
 export function loadStats(): StatsData {
   let components: StatsData['components'] = [];
   try {
@@ -66,12 +78,10 @@ export function loadStats(): StatsData {
   } catch {
     // regression detection is best-effort
   }
-  const usageCounts = new Map<string, number>();
+  let usageByKind: StatsData['usageByKind'] = [];
   try {
-    for (const record of metrics.loadResourceUsageHistory()) {
-      const kind = String((record as any).kind ?? 'other');
-      usageCounts.set(kind, (usageCounts.get(kind) ?? 0) + 1);
-    }
+    // Operator HUD: the governed aggregate over every partition this process may read.
+    usageByKind = countUsageByKind(metrics.loadResourceUsageHistory({ all: true }));
   } catch {
     // no resource usage history yet
   }
@@ -90,13 +100,17 @@ export function loadStats(): StatsData {
   return {
     components,
     regressions,
-    usageByKind: [...usageCounts.entries()].map(([kind, count]) => ({ kind, count })),
+    usageByKind,
     traces,
   };
 }
 
 export function statsWatchPaths(): string[] {
-  return [traceLogDir(), pathResolver.resolve('work/metrics')];
+  return [
+    traceLogDir(),
+    pathResolver.resolve('work/metrics'),
+    pathResolver.rootResolve(RESOURCE_USAGE_LEDGER_ROOT),
+  ];
 }
 
 export function statsViewModel(data: StatsData, i18n: I18n): PanelViewModel {

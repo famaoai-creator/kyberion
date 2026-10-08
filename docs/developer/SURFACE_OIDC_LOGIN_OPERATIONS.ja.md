@@ -1,7 +1,7 @@
 ---
 title: サーフェス OIDC ログイン 運用手順
 tags: [surfaces, authentication, oidc, sso, google, entra, multi-tenant]
-last_updated: 2026-09-30
+last_updated: 2026-10-09
 ---
 
 # サーフェス OIDC ログイン 運用手順
@@ -55,9 +55,38 @@ surface ──Set-Cookie: kyberion_session=kys1.…──▶ browser   (HttpOnly
 - cookie 認証の変更系リクエスト(POST/PUT/PATCH/DELETE)は、`Origin`(または `Referer`)のホストが自分のホストと一致しなければ 403 です(CSRF 対策)。ヘッダー認証にはこの検査はかかりません。
 - ログアウト(`/logout`)は cookie を消します。無状態のため、盗まれた cookie を期限前に失効させる仕組みはありません。その場合は member を停止するか `KYBERION_SESSION_SECRET` を入れ替えてください(全セッションが無効になります)。
 
+## 初回セットアップ(画面から設定する)
+
+ブラウザからサインインできる owner がまだ居ない環境では、concierge の画面で owner の作成・アクセストークンの発行・SSO 設定までを済ませられます。環境変数の編集とサーフェスの再起動は要りません。
+
+```bash
+# ホストで実行(一回限りのセットアップコードと URL が表示される)
+pnpm organization first-run code            # --ttl-minutes 30 --url http://localhost:3050
+pnpm organization first-run status          # まだ開いているか
+```
+
+1. 表示された `http://localhost:3050/setup/first-run#code=…` を開き、組織 ID・組織名・自分の表示名を入れて「セットアップする」。
+2. owner に紐付くアクセストークンが**一度だけ**表示されます。このタブはそのトークンでサインイン済みになります。他のサーフェスでは `/signin` や Bearer ヘッダーで使います。
+3. 続けて SSO の issuer / client id / client secret を保存します。画面に出るリダイレクト URI を IdP に登録します。
+4. IdP でサインインし、未登録画面に出た `issuer` / `subject` を「設定 › 組織とメンバー」の SSO 欄で自分に紐付けます。
+
+- コードは SHA-256 ハッシュだけを secret-guard(`kyberion-first-run`)に保存します。既定 30 分、失敗 5 回で失効、使用で失効します。再発行すると前のコードは無効になります。
+- URL のコードは fragment(`#code=`)に置くので、サーバーやプロキシのログには残りません。
+- 一度 claim すると永久に閉じます。owner がトークンか IdP 紐付けを既に持つ環境では最初から閉じています。
+- claim API は自ホストの Origin からの要求だけを受け付け、クライアントあたり 10 回/分に制限します。
+
+### 画面から保存した SSO 設定
+
+`/setup/sso`(設定 › 組織とメンバー › SSO 欄のリンク)で後から変更できます。変更できるのは**登録済みの全 tenant で owner** の member だけです(インスタンス全体の設定のため)。
+
+- 保存先は secret-guard の `kyberion-oidc`。client secret は応答に含めず、空欄で保存すると既存の値を維持します。
+- セッション署名鍵が無ければ `kyberion-browser-session` に自動生成します。`KYBERION_SESSION_SECRET` が 32 バイト未満で設定されている場合は自動生成せず警告します(環境変数の鍵が優先されるため)。
+- `KYBERION_OIDC_ISSUER` か `KYBERION_OIDC_CLIENT_ID` が環境変数にあると、環境変数**一式**が使われ、画面の設定は無視されます(混在させません)。
+- 保存は監査ログ(`surface_sso_settings`)と secret-guard の `CONFIG_CHANGE` に残ります。
+
 ## 設定
 
-すべて環境変数(`knowledge/product/governance/env-registry.json` に登録済み)。**全サーフェス(プロセス/ホスト)で同じ値**にします。
+環境変数(`knowledge/product/governance/env-registry.json` に登録済み)で与える場合は、**全サーフェス(プロセス/ホスト)で同じ値**にします。画面から保存する場合は上の「初回セットアップ」を参照してください。
 
 | 変数                             | 必須       | 内容                                                                                                                                                                                                                                |
 | -------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

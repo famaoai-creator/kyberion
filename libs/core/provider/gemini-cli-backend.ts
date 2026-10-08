@@ -57,6 +57,27 @@ export interface GeminiCliBackendOptions {
   extraArgs?: string[];
 }
 
+/**
+ * Drop caller extras that would override a permission projection (yolo,
+ * sandbox and approval-mode flags), so extras can never widen it.
+ */
+export function stripGeminiPermissionArgs(extraArgs: readonly string[]): string[] {
+  const filtered: string[] = [];
+  for (let index = 0; index < extraArgs.length; index += 1) {
+    const arg = extraArgs[index]!;
+    if (arg === '-y' || arg === '--yolo' || arg === '--sandbox' || arg.startsWith('--sandbox=')) {
+      continue;
+    }
+    if (arg === '--approval-mode') {
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith('--approval-mode=')) continue;
+    filtered.push(arg);
+  }
+  return filtered;
+}
+
 export class GeminiCliBackend implements ReasoningBackend {
   readonly name = 'gemini-cli';
   private readonly bin: string;
@@ -76,21 +97,7 @@ export class GeminiCliBackend implements ReasoningBackend {
     active = resolveActiveProviderPermissionArgs('gemini')
   ): readonly string[] {
     if (!active) return this.extraArgs;
-
-    const filtered: string[] = [];
-    for (let index = 0; index < this.extraArgs.length; index += 1) {
-      const arg = this.extraArgs[index]!;
-      if (arg === '-y' || arg === '--yolo' || arg === '--sandbox' || arg.startsWith('--sandbox=')) {
-        continue;
-      }
-      if (arg === '--approval-mode') {
-        index += 1;
-        continue;
-      }
-      if (arg.startsWith('--approval-mode=')) continue;
-      filtered.push(arg);
-    }
-    return [...filtered, ...active];
+    return [...stripGeminiPermissionArgs(this.extraArgs), ...active];
   }
 
   async divergePersonas(input: DivergeHypothesisInput): Promise<HypothesisSketch[]> {
@@ -307,7 +314,8 @@ export class GeminiCliBackend implements ReasoningBackend {
     const lines = stdout.split('\n');
     const jsonStartIdx = lines.findIndex((l) => l.trim().startsWith('{'));
     if (jsonStartIdx === -1) {
-      throw new Error(`[gemini-cli] could not find JSON in stdout: ${stdout}`);
+      // Truncated: model output can echo the prompt, which must not reach logs in full.
+      throw new Error(`[gemini-cli] could not find JSON in stdout: ${stdout.slice(0, 500)}`);
     }
     const cleanStdout = lines.slice(jsonStartIdx).join('\n');
 
@@ -323,7 +331,7 @@ export class GeminiCliBackend implements ReasoningBackend {
     const responseStr = cliResult.response;
     if (!responseStr) {
       throw new Error(
-        `[gemini-cli] CLI result missing 'response' field: ${JSON.stringify(cliResult)}`
+        `[gemini-cli] CLI result missing 'response' field: ${JSON.stringify(cliResult).slice(0, 500)}`
       );
     }
 
@@ -466,7 +474,16 @@ export function buildGeminiCliBackendFromEnv(
 /**
  * Static headless instruction used when the prompt travels on stdin. The
  * gemini CLI appends `-p` to the input read from a piped stdin, so mission
- * content never appears in argv (process table, ARG_MAX).
+ * content stays out of the argv this process spawns (process table, ARG_MAX).
+ *
+ * Caveats (unverified here, no gemini binary in CI):
+ * - With `--sandbox`, the gemini launcher may re-spawn itself inside the
+ *   sandbox and re-inject the stdin it read into the sandboxed child's `-p`
+ *   argv. The guarantee covers the process started here, not necessarily
+ *   that child.
+ * - A gemini build that ignores piped stdin sees only this instruction; the
+ *   strict schema then fails, so the call fails closed and mission-llm moves
+ *   on to the next profile.
  */
 export const GEMINI_STDIN_PROMPT_INSTRUCTION =
   'Answer the request given on stdin. Return exactly one JSON object.';
@@ -508,6 +525,8 @@ export async function runGeminiCliQuery<T>(params: {
     }
     permissionArgs = resolution.args;
   }
+  // With a projection in force, extras must not re-widen it (`-y`, ...).
+  const callerArgs = effectiveProfile ? stripGeminiPermissionArgs(extraArgs) : extraArgs;
 
   const args = [
     '-p',
@@ -516,7 +535,7 @@ export async function runGeminiCliQuery<T>(params: {
     'json',
     ...permissionArgs,
     ...(model ? ['--model', model] : []),
-    ...extraArgs,
+    ...callerArgs,
   ];
 
   const stdout = await new Promise<string>((resolve, reject) => {
@@ -560,7 +579,7 @@ export async function runGeminiCliQuery<T>(params: {
   const lines = stdout.split('\n');
   const jsonStartIdx = lines.findIndex((l) => l.trim().startsWith('{'));
   if (jsonStartIdx === -1) {
-    throw new Error(`[gemini-cli] could not find JSON in stdout: ${stdout}`);
+    throw new Error(`[gemini-cli] could not find JSON in stdout: ${stdout.slice(0, 500)}`);
   }
   const cleanStdout = lines.slice(jsonStartIdx).join('\n');
   const cliResult = parseSafeJsonInput(cleanStdout, 'Gemini CLI response') as {
@@ -568,7 +587,7 @@ export async function runGeminiCliQuery<T>(params: {
   };
   if (typeof cliResult.response !== 'string' || !cliResult.response) {
     throw new Error(
-      `[gemini-cli] CLI result missing 'response' field: ${JSON.stringify(cliResult)}`
+      `[gemini-cli] CLI result missing 'response' field: ${JSON.stringify(cliResult).slice(0, 500)}`
     );
   }
   const responseStr = cliResult.response;

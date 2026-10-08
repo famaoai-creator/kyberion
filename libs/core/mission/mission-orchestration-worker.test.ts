@@ -145,7 +145,11 @@ vi.mock('./mission-task-events.js', () => ({
 // but regularly past the 10s default on shared CI runners.
 describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
   beforeEach(async () => {
-    vi.resetModules();
+    // No vi.resetModules(): the module under test and the secure-io / tier-guard /
+    // authority stack under it are imported once per file (the first `await
+    // import`; later ones hit the module cache). Re-importing that stack per test
+    // repeated its module initialisation every test (operations-hygiene-runbook §5).
+    // Per-test state is reset through the work-coordination namespace/store and the mocks.
     vi.resetAllMocks();
     process.env.MISSION_ROLE = 'mission_controller';
     const { missionDir, pathResolver } = await import('../path-resolver.js');
@@ -274,20 +278,6 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     }
     clearWorkCoordinationStore();
     clearWorkCoordinationNamespace();
-  });
-
-  it('does not install reasoning backends during import', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-    try {
-      await import('./mission-orchestration-worker.js');
-      expect(errorSpy).not.toHaveBeenCalled();
-      expect(logSpy).not.toHaveBeenCalled();
-    } finally {
-      errorSpy.mockRestore();
-      logSpy.mockRestore();
-    }
   });
 
   it(
@@ -2710,5 +2700,28 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
         failover: true,
       });
     });
+  });
+});
+
+// The one legitimate fresh-import case in this file: the assertion is about
+// what importing the worker does, so it needs its own module graph whatever
+// order the tests run in. It lives outside the describe above so its reset
+// cannot split that describe's beforeEach/afterEach across two module
+// generations.
+describe('mission-orchestration-worker import', { timeout: 60_000 }, () => {
+  it('does not install reasoning backends during import', async () => {
+    process.env.MISSION_ROLE = 'mission_controller';
+    vi.resetModules();
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      await import('./mission-orchestration-worker.js');
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(logSpy).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+      logSpy.mockRestore();
+    }
   });
 });

@@ -79,6 +79,9 @@ template task is recorded while the work happens**. Verified end to end on 2026-
    `evidence/implementation-report.md`, `evidence/test-report.md`,
    `evidence/REVIEW-execution-implement.md`, `evidence/delivery-report.md`,
    `evidence/retrospective.md`). A task closes only when _that_ file exists.
+   `finish` writes its generated execution stats and improvement proposals to
+   `evidence/retrospective-stats.md` / `evidence/retrospective.json` and never touches
+   `evidence/retrospective.md`: write the retrospective yourself.
 3. **Close each task as its phase ends**, in dependency order — write the deliverable
    (real content: requirements from the user's words, the plan, test output, PR / merge
    commit, …) and run:
