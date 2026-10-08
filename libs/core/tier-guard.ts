@@ -313,7 +313,13 @@ function tenantScopeConfig(policy: any): {
       : ['knowledge/confidential/'],
     sharedPrefixes: Array.isArray(cfg.shared_prefixes)
       ? cfg.shared_prefixes
-      : ['knowledge/confidential/heuristics/', 'knowledge/confidential/relationships/'],
+      : [
+          // Cross-tenant registry file (tenant design-override index): its
+          // `tenants` segment is a registry partition, not a tenant slug.
+          'knowledge/confidential/tenants/index.json',
+          'knowledge/confidential/heuristics/',
+          'knowledge/confidential/relationships/',
+        ],
     // Tenant-qualified protected paths and shared groups require a
     // server-resolved binding. Unpartitioned legacy roots remain governed by
     // the existing tier/persona checks until their storage migration lands.
