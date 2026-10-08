@@ -5,6 +5,7 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReaddir,
+  safeRmdirSync,
   safeRmSync,
   safeUnlinkSync,
   safeWriteFile,
@@ -19,12 +20,18 @@ import {
   listManagedProjects,
   loadProjectOperatingSystemArtifactMap,
   reconcileProjectOperationalState,
+  archiveManagedProject,
+  restoreManagedProject,
+  updateManagedProject,
+  updateManagedProjectTrack,
 } from './project-management.js';
 import { loadProjectRecord, saveProjectRecord } from './project-registry.js';
 import { saveProjectOperationalState } from './project-operational-state-registry.js';
 import { saveProjectTrackRecord } from './project-track-registry.js';
 import { saveState } from '../mission/mission-state.js';
 import { withExecutionContextAsync } from '../authority.js';
+import { auditChain } from '../governance/audit-chain.js';
+import * as organizationOperatingModel from '../organization/organization-operating-model.js';
 import type { MissionState } from '../mission/mission-types.js';
 import {
   clearWorkCoordinationNamespace,
@@ -53,6 +60,15 @@ function cleanupJsonFiles(directory: string, prefix: string): void {
 }
 
 function cleanup(): void {
+  const lifecycleWorkspace = pathResolver.projectWorkspaceDir(
+    PROJECT_ID,
+    'confidential',
+    'tenant-pmc-test'
+  );
+  safeRmSync(lifecycleWorkspace, { recursive: true, force: true });
+  const tenantWorkspace = path.dirname(lifecycleWorkspace);
+  if (safeExistsSync(tenantWorkspace) && safeReaddir(tenantWorkspace).length === 0)
+    safeRmdirSync(tenantWorkspace);
   safeRmSync(PERSISTED_SCOPE_ENV_PATH, { force: true });
   cleanupJsonFiles(pathResolver.shared('runtime/projects'), 'PRJ-PMC-');
   cleanupJsonFiles(pathResolver.shared('runtime/project-tracks'), 'TRK-PMC-');
@@ -62,6 +78,10 @@ function cleanup(): void {
   const foreignMissionPath = pathResolver.missionDir('MSN-PMC-FOREIGN', 'confidential');
   if (safeExistsSync(foreignMissionPath))
     safeRmSync(foreignMissionPath, { recursive: true, force: true });
+  safeRmSync(
+    pathResolver.tenantMissionDir('MSN-PMC-LIFECYCLE', 'tenant-pmc-test', 'confidential'),
+    { recursive: true, force: true }
+  );
   const workerMissionPath = pathResolver.tenantMissionDir(
     'MSN-PMC-WORKER-SCOPE',
     'tenant-pmc-test',
@@ -126,6 +146,16 @@ function cleanup(): void {
 }
 
 describe('project-management facade', () => {
+  function lifecycleProject() {
+    return createManagedProject({
+      project_id: PROJECT_ID,
+      name: 'Lifecycle',
+      summary: 'Lifecycle fixture',
+      tier: 'confidential',
+      tenant_slug: 'tenant-pmc-test',
+      status: 'active',
+    });
+  }
   beforeEach(() => {
     setWorkCoordinationNamespace('project-management-facade-test');
     clearWorkCoordinationStore();
@@ -138,6 +168,7 @@ describe('project-management facade', () => {
   afterEach(() => {
     process.env.KYBERION_PERSONA = 'sovereign';
     process.env.MISSION_ROLE = 'sovereign';
+    process.env.KYBERION_TENANT = 'tenant-pmc-test';
     clearWorkCoordinationStore();
     clearWorkCoordinationNamespace();
     cleanup();
@@ -151,6 +182,190 @@ describe('project-management facade', () => {
     else process.env.MISSION_ID = ORIGINAL_MISSION_ID;
     if (ORIGINAL_SCOPE_ENV_PATH === undefined) delete process.env.KYBERION_SCOPE_ENV_PATH;
     else process.env.KYBERION_SCOPE_ENV_PATH = ORIGINAL_SCOPE_ENV_PATH;
+  });
+
+  it('uses the same archive guard for dedicated and generic updates', () => {
+    lifecycleProject();
+    createManagedProjectTrack({
+      project_id: PROJECT_ID,
+      track_id: 'TRK-PMC-LIFECYCLE',
+      name: 'Track',
+      summary: 'Delivery',
+    });
+    expect(() => archiveManagedProject(PROJECT_ID)).toThrow(
+      'Complete or archive project tracks first'
+    );
+    expect(() =>
+      updateManagedProject(PROJECT_ID, { status: 'archived', name: 'Rejected' })
+    ).toThrow('Complete or archive project tracks first');
+    expect(loadProjectRecord(PROJECT_ID)?.name).toBe('Lifecycle');
+  });
+
+  it('edits archived metadata and restores explicitly with synchronized state', () => {
+    lifecycleProject();
+    saveProjectOperationalState({
+      project_id: PROJECT_ID,
+      name: 'Lifecycle',
+      summary: 'Lifecycle fixture',
+      tier: 'confidential',
+      tenant_slug: 'tenant-pmc-test',
+      status: 'active',
+    });
+    archiveManagedProject(PROJECT_ID);
+    expect(updateManagedProject(PROJECT_ID, { metadata: { note: 'Retained' } }).status).toBe(
+      'archived'
+    );
+    expect(() => updateManagedProject(PROJECT_ID, { status: 'active' })).toThrow(
+      'explicit lifecycle operation'
+    );
+    expect(restoreManagedProject(PROJECT_ID).status).toBe('active');
+    const view = getProjectManagementView(PROJECT_ID);
+    expect(view.project.metadata?.note).toBe('Retained');
+    expect(view.operational_states.every((state) => state.status === 'active')).toBe(true);
+    expect(() => restoreManagedProject(PROJECT_ID)).toThrow('not archived');
+  });
+
+  it('keeps live task sessions reachable through project and track lifecycle guards', () => {
+    lifecycleProject();
+    const trackId = 'TRK-PMC-LIFECYCLE';
+    createManagedProjectTrack({
+      project_id: PROJECT_ID,
+      track_id: trackId,
+      name: 'Track',
+      summary: 'Delivery',
+    });
+    saveTaskSession(
+      createTaskSession({
+        sessionId: 'TSK-PMC-TEST-LIFECYCLE',
+        surface: 'project-controller',
+        taskType: 'analysis',
+        status: 'paused',
+        goal: { summary: 'Paused delivery', success_condition: 'Delivery resumed' },
+        projectContext: {
+          project_id: PROJECT_ID,
+          track_id: trackId,
+          tenant_slug: 'tenant-pmc-test',
+          tier: 'confidential',
+        },
+      })
+    );
+    expect(() => archiveManagedProject(PROJECT_ID)).toThrow('active task sessions');
+    expect(() => updateManagedProject(PROJECT_ID, { status: 'archived' })).toThrow(
+      'active task sessions'
+    );
+    expect(() => updateManagedProjectTrack(trackId, { status: 'completed' })).toThrow(
+      'active task sessions'
+    );
+    expect(loadProjectRecord(PROJECT_ID)?.status).toBe('active');
+  });
+
+  it('blocks both archive paths with a live mission and denies worker lifecycle writes', async () => {
+    lifecycleProject();
+    const mission: MissionState = {
+      mission_id: 'MSN-PMC-LIFECYCLE',
+      mission_type: 'development',
+      tier: 'confidential',
+      tenant_slug: 'tenant-pmc-test',
+      status: 'active',
+      execution_mode: 'local',
+      priority: 1,
+      assigned_persona: 'worker',
+      confidence_score: 1,
+      relationships: { project: { project_id: PROJECT_ID } },
+      git: {
+        branch: 'mission/lifecycle',
+        start_commit: 'fixture',
+        latest_commit: 'fixture',
+        checkpoints: [],
+      },
+      history: [],
+    };
+    await saveState(mission.mission_id, mission);
+    expect(() => archiveManagedProject(PROJECT_ID)).toThrow('active missions');
+    expect(() => updateManagedProject(PROJECT_ID, { status: 'archived' })).toThrow(
+      'active missions'
+    );
+    process.env.KYBERION_PERSONA = 'worker';
+    process.env.MISSION_ROLE = 'worker';
+    process.env.KYBERION_PROJECT_ID = PROJECT_ID;
+    process.env.MISSION_ID = mission.mission_id;
+    expect(() => updateManagedProject(PROJECT_ID, { status: 'archived' })).toThrow('mission owner');
+    expect(() =>
+      createManagedProjectTrack({
+        project_id: PROJECT_ID,
+        track_id: 'TRK-PMC-LIFECYCLE',
+        name: 'Denied',
+        summary: 'Denied',
+      })
+    ).toThrow('mission owner');
+  });
+
+  it('rolls back project and operational state if lifecycle audit fails', () => {
+    lifecycleProject();
+    saveProjectOperationalState({
+      project_id: PROJECT_ID,
+      name: 'Lifecycle',
+      summary: 'Lifecycle fixture',
+      tier: 'confidential',
+      tenant_slug: 'tenant-pmc-test',
+      status: 'active',
+    });
+    const failAudit = vi.spyOn(auditChain, 'record').mockImplementation(() => {
+      throw new Error('audit unavailable');
+    });
+    try {
+      expect(() => archiveManagedProject(PROJECT_ID)).toThrow('audit unavailable');
+      expect(loadProjectRecord(PROJECT_ID)?.status).toBe('active');
+      expect(
+        getProjectManagementView(PROJECT_ID).operational_states.every(
+          (state) => state.status === 'active'
+        )
+      ).toBe(true);
+    } finally {
+      failAudit.mockRestore();
+    }
+  });
+
+  it('requires an active scoped organization before restoring its project', () => {
+    const project = lifecycleProject();
+    saveProjectRecord({ ...project, organization_id: 'ORG-PMC-TEST', status: 'archived' });
+    const organization = vi
+      .spyOn(organizationOperatingModel, 'loadOrganizationOperationalState')
+      .mockReturnValue({ status: 'paused' } as never);
+    try {
+      expect(() => restoreManagedProject(PROJECT_ID)).toThrow('Activate organization');
+      expect(organization).toHaveBeenCalledWith('ORG-PMC-TEST', {
+        tier: 'confidential',
+        tenantSlug: 'tenant-pmc-test',
+      });
+      expect(loadProjectRecord(PROJECT_ID)?.status).toBe('archived');
+    } finally {
+      organization.mockRestore();
+    }
+  });
+
+  it('updates track requirements and reconciles lifecycle and default references', () => {
+    lifecycleProject();
+    const trackId = 'TRK-PMC-LIFECYCLE';
+    createManagedProjectTrack({
+      project_id: PROJECT_ID,
+      track_id: trackId,
+      name: 'Track',
+      summary: 'Delivery',
+    });
+    updateManagedProjectTrack(trackId, { name: 'Revised', required_artifacts: ['report'] });
+    expect(getProjectManagementView(PROJECT_ID).tracks[0].required_artifacts).toEqual(['report']);
+    updateManagedProjectTrack(trackId, { status: 'paused' });
+    expect(loadProjectRecord(PROJECT_ID)?.default_track_id).toBeUndefined();
+    expect(loadProjectRecord(PROJECT_ID)?.active_tracks).toEqual([]);
+    updateManagedProjectTrack(trackId, { status: 'active' });
+    expect(loadProjectRecord(PROJECT_ID)?.default_track_id).toBe(trackId);
+    updateManagedProjectTrack(trackId, { status: 'completed' });
+    expect(() => updateManagedProjectTrack(trackId, { status: 'active' })).toThrow(
+      'Invalid track transition'
+    );
+    updateManagedProjectTrack(trackId, { status: 'archived' });
+    expect(archiveManagedProject(PROJECT_ID).status).toBe('archived');
   });
 
   it('creates a managed Project and repairs registry drift', () => {
