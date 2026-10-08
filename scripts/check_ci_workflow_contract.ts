@@ -67,14 +67,38 @@ function collectUses(value: unknown, out: string[]): void {
   }
 }
 
+/**
+ * A SHA-pinned ref (`actions/checkout@<40 hex> # v5`) carries its version only
+ * in the trailing comment, which the YAML parser drops; recover it from the raw
+ * text so pinning to a SHA cannot bypass the runtime rule.
+ */
+export function resolvePinnedRefs(uses: string[], rawText: string): string[] {
+  return uses.map((ref) => {
+    const sha = /^([^@\s]+)@([0-9a-f]{40})$/u.exec(ref.trim());
+    if (!sha) return ref;
+    const escaped = ref.trim().replace(/[.*+?^${}()|[\]\\/]/gu, '\\$&');
+    const comment = new RegExp(`${escaped}\\s*#\\s*v(\\d+)`, 'u').exec(rawText);
+    return comment ? `${sha[1]}@v${comment[1]}` : ref;
+  });
+}
+
 export function checkActionRuntime(file: string, uses: string[]): CiWorkflowViolation[] {
   const violations: CiWorkflowViolation[] = [];
   for (const ref of uses) {
-    const match = /^([^@\s]+)@v(\d+)(?:[.\d]*)$/u.exec(ref.trim());
-    if (!match) continue;
-    const [, action, major] = match;
-    const minimum = MIN_ACTION_MAJORS[action!];
-    if (minimum !== undefined && Number(major) < minimum) {
+    const trimmed = ref.trim();
+    const action = trimmed.split('@')[0]!;
+    const minimum = MIN_ACTION_MAJORS[action];
+    if (minimum === undefined) continue;
+    const match = /^[^@\s]+@v(\d+)(?:[.\d]*)$/u.exec(trimmed);
+    if (!match) {
+      violations.push({
+        file,
+        rule: 'action-runtime',
+        detail: `${ref} has no verifiable major; pin a \`v${minimum}\`+ tag, or a SHA followed by a \`# v${minimum}\`+ comment`,
+      });
+      continue;
+    }
+    if (Number(match[1]) < minimum) {
       violations.push({
         file,
         rule: 'action-runtime',
@@ -85,7 +109,11 @@ export function checkActionRuntime(file: string, uses: string[]): CiWorkflowViol
   return violations;
 }
 
-export function checkWorkflowDocument(file: string, doc: unknown): CiWorkflowViolation[] {
+export function checkWorkflowDocument(
+  file: string,
+  doc: unknown,
+  rawText = ''
+): CiWorkflowViolation[] {
   const violations: CiWorkflowViolation[] = [];
   const workflow = asRecord(doc);
   if (!workflow) return [{ file, rule: 'job-timeout', detail: 'workflow is not a YAML mapping' }];
@@ -133,16 +161,16 @@ export function checkWorkflowDocument(file: string, doc: unknown): CiWorkflowVio
 
   const uses: string[] = [];
   collectUses(workflow.jobs, uses);
-  violations.push(...checkActionRuntime(file, uses));
+  violations.push(...checkActionRuntime(file, resolvePinnedRefs(uses, rawText)));
   return violations;
 }
 
-function readYaml(relativePath: string): unknown {
+function readRaw(relativePath: string): string {
   const absolute = pathResolver.rootResolve(relativePath);
   if (!safeExistsSync(absolute) || !safeLstat(absolute).isFile()) {
     throw new Error(`${relativePath} must be a regular file`);
   }
-  return yaml.load(readTextFile(absolute));
+  return readTextFile(absolute);
 }
 
 export function checkCiWorkflowContract(): CiWorkflowViolation[] {
@@ -152,11 +180,15 @@ export function checkCiWorkflowContract(): CiWorkflowViolation[] {
     .filter((name) => /\.ya?ml$/u.test(name))
     .sort()
     .map((name) => path.posix.join(WORKFLOW_DIR, name));
-  for (const file of files) violations.push(...checkWorkflowDocument(file, readYaml(file)));
+  for (const file of files) {
+    const raw = readRaw(file);
+    violations.push(...checkWorkflowDocument(file, yaml.load(raw), raw));
+  }
   for (const file of ACTION_FILES) {
+    const raw = readRaw(file);
     const uses: string[] = [];
-    collectUses(asRecord(readYaml(file))?.runs, uses);
-    violations.push(...checkActionRuntime(file, uses));
+    collectUses(asRecord(yaml.load(raw))?.runs, uses);
+    violations.push(...checkActionRuntime(file, resolvePinnedRefs(uses, raw)));
   }
   return violations;
 }

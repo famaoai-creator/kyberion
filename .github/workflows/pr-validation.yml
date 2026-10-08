@@ -47,7 +47,11 @@ jobs:
       - name: Build project
         run: pnpm run build
       - name: Check PR title
-        run: pnpm run check:pr-title -- --title "${{ github.event.pull_request.title }}"
+        # Pass the title through env: interpolating it into the script would let
+        # a crafted PR title run shell commands.
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: pnpm run check:pr-title -- --title "$PR_TITLE"
       - name: Type check
         run: pnpm run typecheck
       - name: Lint check

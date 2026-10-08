@@ -3,6 +3,7 @@ import {
   checkActionRuntime,
   checkCiWorkflowContract,
   checkWorkflowDocument,
+  resolvePinnedRefs,
 } from './check_ci_workflow_contract.js';
 
 describe('check_ci_workflow_contract', () => {
@@ -75,5 +76,19 @@ describe('check_ci_workflow_contract', () => {
       },
     });
     expect(violations.map((v) => v.rule)).toEqual(['redundant-core-build']);
+  });
+
+  it('reads the major of a SHA-pinned action from its trailing comment', () => {
+    const sha = 'a'.repeat(40);
+    const raw = `      - uses: actions/checkout@${sha} # v4.2.2\n      - uses: actions/setup-node@${'b'.repeat(40)}\n`;
+    const refs = resolvePinnedRefs(
+      [`actions/checkout@${sha}`, `actions/setup-node@${'b'.repeat(40)}`],
+      raw
+    );
+    expect(refs[0]).toBe('actions/checkout@v4');
+    expect(checkActionRuntime('wf.yml', refs).map((v) => v.detail)).toEqual([
+      expect.stringContaining('deprecated Node runtime'),
+      expect.stringContaining('no verifiable major'),
+    ]);
   });
 });
