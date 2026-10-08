@@ -159,7 +159,9 @@ gets clean JSON.
    with the CI environment, not your shell's:
    `KYBERION_PERSONA=worker MISSION_ROLE=mission_controller KYBERION_TEST_LEAK_STRICT=1 pnpm test -- --suite core`.
    Persona-dependent code paths (stores that only persist for some roles, default-tenant bootstrap)
-   diverge between the two.
+   diverge between the two. Platform-only code paths (for example the macOS Apple FM bridge compiling
+   into `active/shared/runtime/apple-intelligence/`) leak only on that OS's runner; read the
+   leak report of every matrix leg, not just Linux.
 6. **A suite must write a live registry** (tenant index, trust ledger, design index): snapshot it in
    `beforeAll` and restore it in `afterAll` through one fixture helper, so a failing test cannot
    leave the registry changed for the next suite.
