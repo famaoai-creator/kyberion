@@ -42,7 +42,11 @@ describe('mission-orchestration-events', () => {
   });
 
   beforeEach(() => {
-    vi.resetModules();
+    // No vi.resetModules(): the module under test and the secure-io / tier-guard /
+    // authority stack under it are imported once per file (the first `await
+    // import`; later ones hit the module cache). Re-importing that stack per test
+    // repeated its module initialisation every test (operations-hygiene-runbook §5).
+    // Per-test state is the mocks; every event is written to its own path.
     vi.clearAllMocks();
     process.env.MISSION_ROLE = 'mission_controller';
   });
