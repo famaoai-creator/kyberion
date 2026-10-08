@@ -394,6 +394,12 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
     const entries = deps.readMetricsHistory
       ? deps.readMetricsHistory()
       : metrics.loadHistory({
+          // A tenant budget reads that tenant's partitions plus the system one
+          // (dot-attributed and unscoped rows are matched below); the global
+          // budget reads every partition this process may read.
+          read: scope.tenant_slug
+            ? { tenants: [scope.tenant_slug], includeSystem: true }
+            : { all: true },
           strict: true,
           onMalformed: (line, raw) => {
             malformed.push({ line, day: MALFORMED_DAY_PATTERN.exec(raw)?.[1] });

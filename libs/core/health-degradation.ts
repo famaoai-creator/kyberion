@@ -210,7 +210,9 @@ export function runDegradationWatch(deps: DegradationWatchDeps = {}): {
   const thresholds = deps.thresholds ?? loadHealthThresholds();
   const regressions =
     deps.regressions ??
-    (metrics.detectRegressions(thresholds.regression_multiplier) as LatencyRegression[]);
+    (metrics.detectRegressions(thresholds.regression_multiplier, {
+      all: true,
+    }) as LatencyRegression[]);
   const demotedProviders = deps.demotedProviders ?? listDemotedProviders(discoverProviders());
   const runtimeSamples =
     deps.runtimeSamples ?? loadRuntimeHealthSamples(thresholds.trend_window_ms, deps.now);

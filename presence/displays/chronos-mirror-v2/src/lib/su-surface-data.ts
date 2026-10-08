@@ -1,4 +1,5 @@
 import { MetricsCollector } from '@agent/core/metrics';
+import { executionMetricsReadFor } from '@agent/core/cost-report';
 import { eventScopeMatches, type EventScopeFilter } from '@agent/core/event-scope';
 import {
   listGenerationCostSettlements,
@@ -452,7 +453,11 @@ export function collectCostSummary(
     scopeFilter?: EventScopeFilter;
   } = {}
 ): CostSummary {
-  const history = new MetricsCollector({ persist: false }).loadHistory();
+  // The viewer's tenants (plus unscoped rows, matched below by mission id), or
+  // the governed aggregate; tier-guard applies the viewer's tenant and persona.
+  const history = new MetricsCollector({ persist: false }).loadHistory({
+    read: executionMetricsReadFor(input.scopeFilter),
+  });
   const generationSettlements = listGenerationCostSettlements({
     scopeFilter: input.scopeFilter,
     since: input.since,

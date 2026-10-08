@@ -128,7 +128,9 @@ let cachedEntries: UsageEntry[] | null = null;
 
 function loadUsageEntries(now: number): UsageEntry[] {
   if (cachedEntries && now - cachedAt < CACHE_TTL_MS) return cachedEntries;
-  cachedEntries = metrics.loadHistory() as UsageEntry[];
+  // Every partition this process may read: tier-guard withholds other
+  // tenants' partitions and tiers the persona may not read.
+  cachedEntries = metrics.loadHistory({ read: { all: true } }) as UsageEntry[];
   cachedAt = now;
   return cachedEntries;
 }

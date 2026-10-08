@@ -189,3 +189,20 @@ export function protectedStorageFloorPrefixes(): string[] {
     (['personal', 'confidential'] as const).map((tier) => `${STORAGE_FLOOR_ROOTS[floor]}/${tier}/`)
   );
 }
+
+/**
+ * Tier/tenant-partitioned runtime ledgers (state purpose, runtime-storage-layout):
+ * `<root>/<tier>/<tenant|shared>/<file>.jsonl`, written by `libs/core/metrics.ts`.
+ * Their personal/confidential subtrees are tenant_scope protected prefixes in
+ * security-policy.json; tier-guard gives reads of them the tenant check plus the
+ * persona read rules of `knowledge/<tier>/`, and tenant offboarding purges them.
+ */
+export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
+  resource_usage: 'active/shared/runtime/usage-ledger',
+  execution_metrics: 'active/shared/runtime/execution-metrics',
+} as const;
+
+/** `<root>/<tier>/` prefixes of one partitioned runtime ledger (mirrored in security-policy.json). */
+export function partitionedLedgerProtectedPrefixes(root: string): string[] {
+  return (['personal', 'confidential'] as const).map((tier) => `${root}/${tier}/`);
+}

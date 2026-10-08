@@ -167,7 +167,9 @@ function collectMissionUsageStats(
   const metricsCollector = new MetricsCollector({ persist: false });
   const metricCorrelationIds = new Set<string>();
 
-  for (const entry of metricsCollector.loadHistory()) {
+  // As for resource usage below: the mission's own partition plus the system one.
+  const missionRead = missionScope ? { scope: missionScope, includeSystem: true } : undefined;
+  for (const entry of metricsCollector.loadHistory({ read: missionRead })) {
     if (String(entry.mission_id || '').toUpperCase() !== missionId.toUpperCase()) continue;
     if (entry.correlation_id) metricCorrelationIds.add(String(entry.correlation_id));
     const usage = entry.usage as Record<string, unknown> | undefined;
@@ -232,9 +234,7 @@ function collectMissionUsageStats(
 
   // The mission's own partition plus the system one (a runtime scope that
   // resolved to public still carries this mission's id); never another tenant's.
-  for (const entry of metricsCollector.loadResourceUsageHistory(
-    missionScope ? { scope: missionScope, includeSystem: true } : undefined
-  )) {
+  for (const entry of metricsCollector.loadResourceUsageHistory(missionRead)) {
     if (String(entry.mission_id || '').toUpperCase() !== missionId.toUpperCase()) continue;
     resourceUsage.entries += 1;
     resourceUsage.cost_usd += Number(entry.cost_usd) || 0;

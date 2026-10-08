@@ -1,6 +1,10 @@
 import path from 'node:path';
 import { isRecord } from '@agent/core/foundation';
-import { metrics, RESOURCE_USAGE_LEDGER_ROOT } from '@agent/core/metrics';
+import {
+  metrics,
+  EXECUTION_METRICS_LEDGER_ROOT,
+  RESOURCE_USAGE_LEDGER_ROOT,
+} from '@agent/core/metrics';
 import { pathResolver } from '@agent/core/path-resolver';
 import { traceLogDir } from '@agent/core/trace';
 import { validateTraceReplay } from '@agent/core/analysis/trace-schema';
@@ -57,7 +61,8 @@ export function countUsageByKind(
 export function loadStats(): StatsData {
   let components: StatsData['components'] = [];
   try {
-    const report: any = metrics.reportFromHistory();
+    // Operator HUD: the governed aggregate over every partition this process may read.
+    const report: any = metrics.reportFromHistory({ all: true });
     const bySkill: Record<string, ComponentStats> = report?.bySkill ?? report ?? {};
     components = Object.entries(bySkill)
       .filter(([, stats]) => typeof stats === 'object' && stats !== null && 'count' in stats)
@@ -69,7 +74,7 @@ export function loadStats(): StatsData {
   }
   let regressions: string[] = [];
   try {
-    const detected: any = metrics.detectRegressions();
+    const detected: any = metrics.detectRegressions(undefined, { all: true });
     if (Array.isArray(detected)) {
       regressions = detected
         .slice(0, 5)
@@ -110,6 +115,7 @@ export function statsWatchPaths(): string[] {
     traceLogDir(),
     pathResolver.resolve('work/metrics'),
     pathResolver.rootResolve(RESOURCE_USAGE_LEDGER_ROOT),
+    pathResolver.rootResolve(EXECUTION_METRICS_LEDGER_ROOT),
   ];
 }
 

@@ -326,7 +326,9 @@ function collectCostSummary(
     budgetUsd?: number;
   } = {}
 ): OperatorHomeCostSummary {
-  const history = new MetricsCollector({ persist: false }).loadHistory();
+  // Operator aggregate: every partition this process may read (tier-guard
+  // skips other tenants' and persona-denied tiers); mission ids narrow below.
+  const history = new MetricsCollector({ persist: false }).loadHistory({ read: { all: true } });
   const sinceIso = input.since || '';
   const missionFilter = (input.missionId || '').trim().toUpperCase();
   const missionIds = input.missionIds
