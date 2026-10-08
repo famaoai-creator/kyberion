@@ -214,6 +214,13 @@ const VITEST_LIVE_SUBTREES = [
   'shared/last_response.json',
 ];
 export const VITEST_LIVE_SANDBOX_ROOT = 'active/shared/runtime/vitest-live';
+/**
+ * Live stores OUTSIDE `active/` (repo-root-relative). Same sandbox, under a
+ * `repo/` segment so they cannot collide with the active-relative subtrees.
+ * `work/metrics/` holds the execution-metrics and resource-usage ledgers that
+ * the shared `metrics` collector appends to from many code paths.
+ */
+const VITEST_LIVE_REPO_SUBTREES = ['work/metrics/'];
 
 /** Map an absolute path inside a live subtree to the Vitest sandbox; other paths pass through. */
 export function vitestLivePath(absolutePath: string): string {
@@ -222,14 +229,18 @@ export function vitestLivePath(absolutePath: string): string {
   // (KYBERION_ROOT pointed at a temp tree, in this process or a spawned child)
   // is already isolated and must resolve identically in parent and child.
   if (PROJECT_ROOT_DIR !== CODE_REPOSITORY_ROOT) return absolutePath;
+  const pool = (getProcessEnv('VITEST_POOL_ID') || '0').replace(/[^\w-]/g, '');
+  const sandbox = path.join(PROJECT_ROOT_DIR, VITEST_LIVE_SANDBOX_ROOT, `pool-${pool}`);
+  const repoRelative = path.relative(PROJECT_ROOT_DIR, absolutePath).split(path.sep).join('/');
+  if (VITEST_LIVE_REPO_SUBTREES.some((prefix) => `${repoRelative}/`.startsWith(prefix))) {
+    return path.join(sandbox, 'repo', repoRelative);
+  }
   const relative = path.relative(ACTIVE_ROOT, absolutePath).split(path.sep).join('/');
   if (relative.startsWith('..') || path.isAbsolute(relative)) return absolutePath;
   const hit = VITEST_LIVE_SUBTREES.some((prefix) =>
     prefix.endsWith('/') ? `${relative}/`.startsWith(prefix) : relative === prefix
   );
-  if (!hit) return absolutePath;
-  const pool = (getProcessEnv('VITEST_POOL_ID') || '0').replace(/[^\w-]/g, '');
-  return path.join(PROJECT_ROOT_DIR, VITEST_LIVE_SANDBOX_ROOT, `pool-${pool}`, relative);
+  return hit ? path.join(sandbox, relative) : absolutePath;
 }
 
 export function shared(subPath = '') {
