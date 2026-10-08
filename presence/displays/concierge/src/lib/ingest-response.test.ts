@@ -57,3 +57,26 @@ describe('concierge ingest response boundary', () => {
     expect(parseConciergeIngestResponse(unsafe)).toBeUndefined();
   });
 });
+
+it.each([
+  [true, 'committed'],
+  [false, 'would_commit'],
+])('rejects incompatible phase %s outcome %s', (dry_run, outcome) => {
+  expect(
+    parseConciergeIngestResponse({
+      ok: true,
+      summary: { dry_run, outcome, tenant: 'alpha', file_name: 'report.txt' },
+      message: 'x',
+    })
+  ).toBeUndefined();
+});
+it('binds a valid response to the requested tenant and phase, not the unsanitized filename', () => {
+  const value = {
+    ok: true,
+    summary: { dry_run: true, outcome: 'would_commit', tenant: 'alpha', file_name: 'report_.txt' },
+    message: 'x',
+  };
+  expect(parseConciergeIngestResponse(value, { tenant: 'alpha', dryRun: true })).toBeDefined();
+  expect(parseConciergeIngestResponse(value, { tenant: 'beta', dryRun: true })).toBeUndefined();
+  expect(parseConciergeIngestResponse(value, { tenant: 'alpha', dryRun: false })).toBeUndefined();
+});
