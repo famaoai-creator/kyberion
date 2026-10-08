@@ -25108,6 +25108,146 @@
         "en": "Refresh the saved status.",
         "ja": "保存済みの状態を更新してください。",
         "qps-ploc": "⟦Řėƒřėşħ ŧħė şȧṽėḓ şŧȧŧůş. ŀőřėɱ ïṗ⟧"
+      },
+      "nav_group_work": {
+        "en": "Daily work",
+        "ja": "仕事",
+        "qps-ploc": "⟦Ḓȧïŀẏ ẇőřķ ŀőř⟧"
+      },
+      "nav_group_resources": {
+        "en": "Materials and learning",
+        "ja": "資料・学習",
+        "qps-ploc": "⟦Ɱȧŧėřïȧŀş ȧñḓ ŀėȧřñïñɠ ŀőřėɱ ï⟧"
+      },
+      "nav_group_manage": {
+        "en": "Management",
+        "ja": "管理",
+        "qps-ploc": "⟦Ɱȧñȧɠėɱėñŧ ŀőř⟧"
+      },
+      "nav_workspace": {
+        "en": "Workspace",
+        "ja": "作業スペース",
+        "qps-ploc": "⟦Ẇőřķşṗȧƈė ŀőř⟧"
+      },
+      "nav_workspace_sub": {
+        "en": "Conversation, voice, mail and outcomes",
+        "ja": "会話・音声・メール・成果物",
+        "qps-ploc": "⟦Ƈőñṽėřşȧŧïőñ, ṽőïƈė, ɱȧïŀ ȧñḓ őůŧƈőɱėş ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "nav_missions": {
+        "en": "Missions",
+        "ja": "ミッション",
+        "qps-ploc": "⟦Ɱïşşïőñş ŀőř⟧"
+      },
+      "nav_missions_sub": {
+        "en": "Inspect ongoing missions",
+        "ja": "進行中のミッションを確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ őñɠőïñɠ ɱïşşïőñş ŀőřėɱ ï⟧"
+      },
+      "nav_work_items": {
+        "en": "Work items",
+        "ja": "作業一覧",
+        "qps-ploc": "⟦Ẇőřķ ïŧėɱş ŀőř⟧"
+      },
+      "nav_work_items_sub": {
+        "en": "Review and organize assigned work",
+        "ja": "割り当てられた作業を確認・整理",
+        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ őřɠȧñïẑė ȧşşïɠñėḓ ẇőřķ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "nav_deliverables": {
+        "en": "Deliverables",
+        "ja": "成果物",
+        "qps-ploc": "⟦Ḓėŀïṽėřȧƀŀėş ŀőř⟧"
+      },
+      "nav_deliverables_sub": {
+        "en": "Browse delivered results",
+        "ja": "届いた成果物を見る",
+        "qps-ploc": "⟦Ƀřőẇşė ḓėŀïṽėřėḓ řėşůŀŧş ŀőřėɱ ï⟧"
+      },
+      "nav_ingest": {
+        "en": "Import materials",
+        "ja": "資料の取込",
+        "qps-ploc": "⟦Ïɱṗőřŧ ɱȧŧėřïȧŀş ŀőřėɱ⟧"
+      },
+      "nav_ingest_sub": {
+        "en": "Preview and import a document",
+        "ja": "文書を確認して取り込む",
+        "qps-ploc": "⟦Ṗřėṽïėẇ ȧñḓ ïɱṗőřŧ ȧ ḓőƈůɱėñŧ ŀőřėɱ ïṗş⟧"
+      },
+      "nav_knowledge": {
+        "en": "Knowledge",
+        "ja": "ナレッジ",
+        "qps-ploc": "⟦Ķñőẇŀėḓɠė ŀőř⟧"
+      },
+      "nav_knowledge_sub": {
+        "en": "Browse reusable knowledge",
+        "ja": "再利用できる知識を見る",
+        "qps-ploc": "⟦Ƀřőẇşė řėůşȧƀŀė ķñőẇŀėḓɠė ŀőřėɱ ïṗ⟧"
+      },
+      "nav_discussion": {
+        "en": "Discussion",
+        "ja": "ディスカッション",
+        "qps-ploc": "⟦Ḓïşƈůşşïőñ ŀőř⟧"
+      },
+      "nav_discussion_sub": {
+        "en": "Review shared discussions",
+        "ja": "共有の議論を確認",
+        "qps-ploc": "⟦Řėṽïėẇ şħȧřėḓ ḓïşƈůşşïőñş ŀőřėɱ ïṗ⟧"
+      },
+      "nav_first_job": {
+        "en": "First job",
+        "ja": "はじめての仕事",
+        "qps-ploc": "⟦Ƒïřşŧ ĵőƀ ŀőř⟧"
+      },
+      "nav_first_job_sub": {
+        "en": "Check setup and try the diagnostic flow",
+        "ja": "準備状況を確認して診断を試す",
+        "qps-ploc": "⟦Ƈħėƈķ şėŧůṗ ȧñḓ ŧřẏ ŧħė ḓïȧɠñőşŧïƈ ƒŀőẇ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "nav_help_sub": {
+        "en": "Guides and training",
+        "ja": "使い方・トレーニング",
+        "qps-ploc": "⟦Ɠůïḓėş ȧñḓ ŧřȧïñïñɠ ŀőřėɱ ⟧"
+      },
+      "nav_organization": {
+        "en": "Organization",
+        "ja": "組織",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
+      },
+      "nav_organization_sub": {
+        "en": "Services, objectives and projects",
+        "ja": "サービス・目標・プロジェクト",
+        "qps-ploc": "⟦Şėřṽïƈėş, őƀĵėƈŧïṽėş ȧñḓ ṗřőĵėƈŧş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "nav_operations": {
+        "en": "Agent operations",
+        "ja": "エージェント運用",
+        "qps-ploc": "⟦Ȧɠėñŧ őṗėřȧŧïőñş ŀőřėɱ⟧"
+      },
+      "nav_operations_sub": {
+        "en": "Inspect agent operations",
+        "ja": "エージェントの運用を確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ȧɠėñŧ őṗėřȧŧïőñş ŀőřėɱ ï⟧"
+      },
+      "nav_surfaces": {
+        "en": "Surface controls",
+        "ja": "画面の管理",
+        "qps-ploc": "⟦Şůřƒȧƈė ƈőñŧřőŀş ŀőřėɱ⟧"
+      },
+      "nav_surfaces_sub": {
+        "en": "Inspect managed screens and services",
+        "ja": "管理対象の画面・サービスを確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ɱȧñȧɠėḓ şƈřėėñş ȧñḓ şėřṽïƈėş ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "nav_diagnostics": {
+        "en": "Diagnostics",
+        "ja": "診断",
+        "qps-ploc": "⟦Ḓïȧɠñőşŧïƈş ŀőř⟧"
+      },
+      "nav_diagnostics_sub": {
+        "en": "Inspect runtime diagnostics",
+        "ja": "実行環境を診断",
+        "qps-ploc": "⟦Ïñşṗėƈŧ řůñŧïɱė ḓïȧɠñőşŧïƈş ŀőřėɱ ïṗ⟧"
       }
     },
     "operator": {

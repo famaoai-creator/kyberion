@@ -73,6 +73,7 @@
 - [Discussion Room — facilitated multi-agent discussion](./product/architecture/discussion-room.md) (public | Ecosystem Architect)
 - [Enterprise Operating Kernel](./product/architecture/enterprise-operating-kernel.md) (public | Ecosystem Architect)
 - [Execution Improvement Report](./product/architecture/execution-improvement-report.md) (public | Unknown)
+- [Existing front-desk navigation](./product/architecture/front-desk-navigation.md) (public | Unknown)
 - [External Identity → Member Mapping and the Human Role Model](./product/architecture/external-identity-member-mapping.md) (public | ecosystem_architect)
 - [Gateway Coordination Model](./product/architecture/gateway-coordination-model.md) (public | Ecosystem Architect)
 - [Google Drive Ingest & Storage Adapter Model](./product/architecture/google-drive-ingest-adapter.md) (public | Ecosystem Architect)

@@ -1,6 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const loadSurfaceManifestMock = vi.hoisted(() => vi.fn());
+const healthFetchMock = vi.hoisted(() => vi.fn());
+const resolveBrowserUrlMock = vi.hoisted(() => vi.fn());
+vi.mock('./surface/surface-url.js', () => ({ resolveSurfaceBrowserUrl: resolveBrowserUrlMock }));
 
 vi.mock('./surface/surface-runtime.js', () => ({
   loadSurfaceManifest: loadSurfaceManifestMock,
@@ -13,6 +16,7 @@ import {
   frontDeskRoleAllows,
   frontDeskRoleFromViewer,
   readFrontDeskSurfacePorts,
+  readAvailableFrontDeskSurfaces,
   resolveFrontDeskMenu,
   type FrontDeskRole,
 } from './front-desk-nav.js';
@@ -20,22 +24,46 @@ import { t, type VocabularyKey } from './t.js';
 
 beforeEach(() => {
   loadSurfaceManifestMock.mockReset();
+  healthFetchMock.mockReset();
+  vi.stubGlobal('fetch', healthFetchMock);
+  resolveBrowserUrlMock.mockReset();
 });
 
+afterEach(() => vi.unstubAllGlobals());
+
 describe('FRONT_DESK_MENU', () => {
-  it('has exactly 5 items in home/ask/decide/progress/settings order', () => {
+  it('lists existing destinations in stable groups without an item limit', () => {
     expect(FRONT_DESK_MENU.map((item) => item.id)).toEqual([
       'home',
       'ask',
       'decide',
       'progress',
+      'workspace',
+      'missions',
+      'work-items',
+      'deliverables',
+      'ingest',
+      'knowledge',
+      'discussion',
+      'first-job',
+      'help',
+      'organization',
+      'operations',
+      'surface-control',
+      'diagnostics',
       'settings',
     ]);
+    expect(new Set(FRONT_DESK_MENU.map((item) => item.id)).size).toBe(FRONT_DESK_MENU.length);
+    expect(FRONT_DESK_MENU.every((item) => !item.path.startsWith('/api/'))).toBe(true);
   });
 
   it('resolves every label_key/sublabel_key to a non-empty ja and en string with no internal leftovers or port numbers', () => {
     const forbiddenPatterns = [/Approval Inbox/i, /Hold To Talk/i, /3031/, /3050/];
-    const keys = FRONT_DESK_MENU.flatMap((item) => [item.label_key, item.sublabel_key]);
+    const keys = FRONT_DESK_MENU.flatMap((item) => [
+      item.label_key,
+      item.sublabel_key,
+      item.group_key,
+    ]);
     for (const key of keys) {
       for (const locale of ['en', 'ja'] as const) {
         const text = t(key as VocabularyKey, undefined, locale);
@@ -48,11 +76,14 @@ describe('FRONT_DESK_MENU', () => {
     }
   });
 
-  it('defines the help link outside the 5-item menu', () => {
+  it('keeps the help compatibility link aligned with its catalog entry', () => {
     expect(FRONT_DESK_HELP_LINK.id).toBe('help');
     const helpText = t(FRONT_DESK_HELP_LINK.label_key as VocabularyKey, undefined, 'ja');
     expect(helpText.length).toBeGreaterThan(0);
-    expect(FRONT_DESK_MENU.some((item) => (item as { id: string }).id === 'help')).toBe(false);
+    expect(FRONT_DESK_MENU.find((item) => item.id === 'help')).toMatchObject({
+      surface: FRONT_DESK_HELP_LINK.surface,
+      path: FRONT_DESK_HELP_LINK.path,
+    });
   });
 });
 
@@ -178,5 +209,113 @@ describe('readFrontDeskSurfacePorts', () => {
     expect(ports).toEqual(DEFAULT_FRONT_DESK_PORTS);
     expect(typeof ports['presence-studio']).toBe('number');
     expect(typeof ports.concierge).toBe('number');
+  });
+});
+
+describe('optional destinations', () => {
+  it('omits unavailable surfaces without guessed ports', () => {
+    const menu = resolveFrontDeskMenu({ currentSurface: 'concierge', role: 'owner' });
+    expect(menu.map((item) => item.id)).toEqual([
+      'home',
+      'ask',
+      'decide',
+      'progress',
+      'workspace',
+      'ingest',
+      'first-job',
+      'help',
+      'settings',
+    ]);
+    expect(
+      menu.some(
+        (item) => item.surface === 'chronos-mirror-v2' || item.surface === 'operator-surface'
+      )
+    ).toBe(false);
+  });
+  it('uses verified optional bases and preserves section selection', () => {
+    const menu = resolveFrontDeskMenu({
+      currentSurface: 'concierge',
+      role: 'owner',
+      availableSurfaces: {
+        'chronos-mirror-v2': 'http://localhost:4300/',
+        'operator-surface': 'http://localhost:4331',
+      },
+    });
+    expect(menu).toHaveLength(FRONT_DESK_MENU.length);
+    expect(menu.find((item) => item.id === 'missions')?.href).toBe(
+      'http://localhost:4300/?section=missions'
+    );
+    expect(menu.some((item) => item.id === 'monitor')).toBe(false);
+    expect(menu.find((item) => item.id === 'missions')?.scope_query_style).toBe('snake');
+  });
+  it.each(['viewer', 'operator', 'approver', 'owner'] as const)(
+    'keeps role gates for %s with all surfaces available',
+    (role) => {
+      const menu = resolveFrontDeskMenu({
+        currentSurface: 'presence-studio',
+        role,
+        availableSurfaces: {
+          'chronos-mirror-v2': 'http://localhost:4300',
+          'operator-surface': 'http://localhost:4331',
+        },
+      });
+      for (const item of menu) expect(item.allowed).toBe(frontDeskRoleAllows(role, item.min_role));
+      expect(menu.find((item) => item.id === 'settings')?.allowed).toBe(role === 'owner');
+    }
+  );
+});
+
+describe('readAvailableFrontDeskSurfaces', () => {
+  const enabled = () =>
+    loadSurfaceManifestMock.mockReturnValue({
+      surfaces: [
+        { id: 'chronos-mirror-v2', enabled: true, port: 3000, healthPath: '/api/healthz' },
+        { id: 'operator-surface', enabled: true, port: 3331, healthPath: '/' },
+      ],
+    });
+  it.each(['http://127.0.0.1:3000', 'http://localhost:3000', 'http://[::1]:3000'])(
+    'probes the exact configured origin %s',
+    async (base) => {
+      enabled();
+      resolveBrowserUrlMock.mockReturnValue(base);
+      healthFetchMock.mockResolvedValue({ ok: true });
+      expect(await readAvailableFrontDeskSurfaces()).toEqual({ 'chronos-mirror-v2': base });
+      expect(String(healthFetchMock.mock.calls[0][0])).toBe(base + '/api/healthz');
+      expect(healthFetchMock.mock.calls[0][1]).toMatchObject({ redirect: 'error' });
+      expect(healthFetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+      expect(healthFetchMock).toHaveBeenCalledTimes(1);
+    }
+  );
+  it.each([
+    'http://remote.example:3000',
+    'https://localhost:3000',
+    'http://localhost:4000',
+    'http://localhost:3000/unknown',
+  ])('omits unverified target %s', async (base) => {
+    enabled();
+    resolveBrowserUrlMock.mockReturnValue(base);
+    expect(await readAvailableFrontDeskSurfaces()).toEqual({});
+    expect(healthFetchMock).not.toHaveBeenCalled();
+  });
+  it('omits disabled, unhealthy, missing and invalid configurations', async () => {
+    loadSurfaceManifestMock.mockReturnValueOnce({
+      surfaces: [
+        { id: 'chronos-mirror-v2', enabled: false, port: 3000, healthPath: '/api/healthz' },
+      ],
+    });
+    expect(await readAvailableFrontDeskSurfaces()).toEqual({});
+    expect(healthFetchMock).not.toHaveBeenCalled();
+    enabled();
+    resolveBrowserUrlMock.mockReturnValue('http://localhost:3000');
+    healthFetchMock.mockResolvedValue({ ok: false });
+    expect(await readAvailableFrontDeskSurfaces()).toEqual({});
+    healthFetchMock.mockRejectedValue(new Error('connect failed or timeout'));
+    expect(await readAvailableFrontDeskSurfaces()).toEqual({});
+    resolveBrowserUrlMock.mockReturnValue('invalid');
+    expect(await readAvailableFrontDeskSurfaces()).toEqual({});
+    loadSurfaceManifestMock.mockImplementation(() => {
+      throw new Error('missing');
+    });
+    expect(await readAvailableFrontDeskSurfaces()).toEqual({});
   });
 });

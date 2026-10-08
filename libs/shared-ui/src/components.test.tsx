@@ -116,6 +116,39 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
     expect(out).toContain('<span class="kb-nav-rail__item" data-nav-id="x">');
   });
 
+  it('NavRail: flat items retain exact markup, including blank group labels', () => {
+    const item = { id: 'home', label: 'Home', href: '/' };
+    const expected =
+      '<nav class="kb-nav-rail" aria-label="Navigation"><ul class="kb-nav-rail__list"><li><a href="/" class="kb-nav-rail__item" data-nav-id="home"><span class="kb-nav-rail__text"><span class="kb-nav-rail__label">Home</span></span></a></li></ul></nav>';
+    expect(html(<NavRail items={[item]} />)).toBe(expected);
+    expect(html(<NavRail items={[{ ...item, group_label: '  ' }]} />)).toBe(expected);
+  });
+
+  it('NavRail: consecutive labelled groups preserve all destinations and footer groups', () => {
+    const out = html(
+      <NavRail
+        items={[
+          { id: 'a', label: 'A', href: '/a', group_label: ' Work ' },
+          { id: 'b', label: 'B', href: '/b', group_label: 'Work', active: true },
+          { id: 'c', label: 'C', action: 'c', group_label: 'Manage' },
+          { id: 'd', label: 'D', href: '/d' },
+          { id: 'e', label: 'E', href: '/e', group_label: 'Work' },
+        ]}
+        footer_items={[{ id: 'help', label: 'Help', href: '/help', group_label: 'Support' }]}
+      />
+    );
+    expect(out.match(/class="kb-nav-rail__group"/g)).toHaveLength(4);
+    expect(out.match(/aria-label="Work"/g)).toHaveLength(2);
+    expect(out).toContain(
+      '<span class="kb-nav-rail__group-label" aria-hidden="true">Work</span><ul class="kb-nav-rail__list" aria-label="Work">'
+    );
+    for (const id of ['a', 'b', 'c', 'd', 'e', 'help'])
+      expect(out).toContain('data-nav-id="' + id + '"');
+    expect(out).toContain('aria-current="page"');
+    expect(out).toContain('<button type="button" class="kb-nav-rail__item" data-nav-id="c"');
+    expect(out).toContain('aria-label="Support"');
+  });
+
   it('NavRail: brand slot (mark / safe logo) and context slot variants', () => {
     const out = htmlJa(
       <NavRail
