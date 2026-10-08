@@ -21,6 +21,9 @@
  *
  * An IdP account that is not a bound member never receives a session: with a
  * public IdP such as Google, "authenticated" would otherwise mean "anyone".
+ * The one exception is a self-link: a caller that already authenticated a
+ * member starts the login with `linkMemberId`, which is sealed into the
+ * transaction; the callback then binds an unbound identity to that member.
  *
  * Network access goes through `secureFetch` (egress policy + audit) unless a
  * caller injects `deps.fetchJson`. The id_token is never stored.
@@ -41,7 +44,12 @@ import {
 } from '../authn-providers.js';
 import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
 import { auditChain } from '../governance/audit-chain.js';
-import type { MemberRegistryPathOptions } from '../organization/member-registry.js';
+import { linkMemberExternalIdentity } from '../organization/member-identity-link.js';
+import {
+  isValidMemberId,
+  readMemberProfile,
+  type MemberRegistryPathOptions,
+} from '../organization/member-registry.js';
 import {
   SURFACE_LOGIN_TX_COOKIE_PREFIX,
   sanitizeNextPath,
@@ -98,6 +106,11 @@ export interface OidcLoginDeps {
   audit?: (event: OidcLoginAuditEvent) => void;
   /** Stored (secret-guard) settings lookup; defaults to the real document outside tests. */
   storedSettings?: () => StoredOidcLoginSettings | null;
+  /**
+   * Self-link writer. Adapters wrap it in an execution context allowed to
+   * write member profiles; defaults to `linkMemberExternalIdentity`.
+   */
+  linkIdentity?: (memberId: string, identity: { issuer: string; subject: string }) => void;
 }
 
 function authnDeps(deps: OidcLoginDeps): AuthnResolveDeps {
@@ -351,6 +364,8 @@ interface LoginTransaction {
   redirectUri: string;
   surface: string;
   exp: number;
+  /** Member to bind an unbound identity to (self-link); set only by an authenticated caller. */
+  link?: string;
 }
 
 export function loginTransactionCookieName(surfaceId: string): string {
@@ -411,11 +426,20 @@ export async function startOidcLogin(
     requestOrigin: string;
     loopback: boolean;
     next?: string | null;
+    /**
+     * Self-link: the member the caller has ALREADY authenticated. Never pass a
+     * client-supplied value — whoever completes this login gets bound to it.
+     */
+    linkMemberId?: string | null;
   },
   deps: OidcLoginDeps = {}
 ): Promise<StartOidcLoginResult> {
   const { config, missing } = resolveOidcLoginConfig(deps);
   if (!config) return { ok: false, view: { kind: 'unconfigured', missing } };
+  const link = input.linkMemberId ?? undefined;
+  if (link !== undefined && (!isValidMemberId(link) || link.startsWith('ext-'))) {
+    return { ok: false, view: { kind: 'failed', code: 'link_failed' } };
+  }
   const origin = resolveOidcRedirectOrigin(config, input);
   if (!origin) {
     return {
@@ -462,7 +486,15 @@ export async function startOidcLogin(
     redirectUri,
     surface: input.surfaceId,
     exp: nowSec + TX_TTL_SECONDS,
+    ...(link ? { link } : {}),
   };
+  if (link) {
+    record(deps, {
+      operation: `${input.surfaceId}/start`,
+      result: 'completed',
+      metadata: { link_member_id: link },
+    });
+  }
   return {
     ok: true,
     location: authorize.toString(),
@@ -485,6 +517,8 @@ export type CompleteOidcLoginResult =
       sessionToken: string;
       sessionTtlSeconds: number;
       memberId: string;
+      /** True when this callback bound the identity (self-link). */
+      linked?: boolean;
     }
   | { ok: false; status: number; view: SurfaceLoginView };
 
@@ -648,7 +682,7 @@ export async function completeOidcLogin(
   } catch (error) {
     return fail(deps, surfaceId, 'session_unavailable', errorText(error), 503);
   }
-  try {
+  const resolveBoundMember = (): string => {
     const resolution = resolveAuthnPrincipal(
       { credential: { type: 'bearer', token: minted.token } },
       {
@@ -660,10 +694,18 @@ export async function completeOidcLogin(
     );
     const memberId = resolution.principal.memberId;
     if (!memberId) throw new AuthnError(403, 'scope_denied', 'not a bound member');
+    return memberId;
+  };
+  const succeed = (memberId: string, linked: boolean): CompleteOidcLoginResult => {
     record(deps, {
       operation: `${surfaceId}/callback`,
       result: 'completed',
-      metadata: { idp_issuer: iss, subject_digest: subjectDigest, member_id: memberId },
+      metadata: {
+        idp_issuer: iss,
+        subject_digest: subjectDigest,
+        member_id: memberId,
+        ...(linked ? { linked: true } : {}),
+      },
     });
     return {
       ok: true,
@@ -671,22 +713,53 @@ export async function completeOidcLogin(
       sessionToken: minted.token,
       sessionTtlSeconds: config.sessionTtlSeconds,
       memberId,
+      ...(linked ? { linked: true } : {}),
     };
-  } catch (error) {
-    const message = errorText(error);
-    const suspended = /suspended/i.test(message);
-    record(deps, {
-      operation: `${surfaceId}/callback`,
-      result: 'error',
-      reason: suspended ? 'member suspended' : 'identity not bound to a member',
-      metadata: { idp_issuer: iss, subject_digest: subjectDigest },
-    });
-    if (suspended) return { ok: false, status: 403, view: { kind: 'suspended' } };
-    if (error instanceof AuthnError && error.status === 403) {
-      return { ok: false, status: 403, view: { kind: 'unbound', issuer: iss, subject } };
+  };
+
+  let unboundError: unknown;
+  try {
+    const memberId = resolveBoundMember();
+    // A self-link must never sign the browser in as somebody else.
+    if (tx.link && memberId !== tx.link) {
+      return fail(deps, surfaceId, 'link_failed', 'identity already bound to another member', 409);
     }
-    return { ok: false, status: 500, view: { kind: 'failed', code: 'session_unavailable' } };
+    return succeed(memberId, false);
+  } catch (error) {
+    unboundError = error;
   }
+
+  const message = errorText(unboundError);
+  const suspended = /suspended/i.test(message);
+  const unbound = !suspended && unboundError instanceof AuthnError && unboundError.status === 403;
+  if (unbound && tx.link) {
+    try {
+      const target = readMemberProfile(tx.link, deps.memberRegistry ?? {});
+      if (target?.status !== 'active') {
+        return fail(deps, surfaceId, 'link_failed', 'link target missing or inactive', 403);
+      }
+      if (deps.linkIdentity) deps.linkIdentity(tx.link, { issuer: iss, subject });
+      else linkMemberExternalIdentity(tx.link, { issuer: iss, subject }, deps.memberRegistry ?? {});
+      const memberId = resolveBoundMember();
+      if (memberId !== tx.link) {
+        return fail(deps, surfaceId, 'link_failed', 'linked identity resolved elsewhere', 409);
+      }
+      return succeed(memberId, true);
+    } catch (error) {
+      return fail(deps, surfaceId, 'link_failed', `link failed: ${errorText(error)}`, 409);
+    }
+  }
+  record(deps, {
+    operation: `${surfaceId}/callback`,
+    result: 'error',
+    reason: suspended ? 'member suspended' : 'identity not bound to a member',
+    metadata: { idp_issuer: iss, subject_digest: subjectDigest },
+  });
+  if (suspended) return { ok: false, status: 403, view: { kind: 'suspended' } };
+  if (unbound) {
+    return { ok: false, status: 403, view: { kind: 'unbound', issuer: iss, subject } };
+  }
+  return { ok: false, status: 500, view: { kind: 'failed', code: 'session_unavailable' } };
 }
 
 function record(deps: OidcLoginDeps, event: OidcLoginAuditEvent): void {

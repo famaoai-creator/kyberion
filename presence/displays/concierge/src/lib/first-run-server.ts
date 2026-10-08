@@ -10,7 +10,7 @@
  *    the authenticated viewer, never from the request body.
  */
 
-import { withExecutionContext } from '@agent/core/authority';
+import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import {
   FirstRunError,
   claimFirstRun,
@@ -29,6 +29,7 @@ import {
   resolveOidcLoginConfig,
   resolveOidcRedirectOrigin,
 } from '@agent/core/surface/oidc-browser-login';
+import { startSurfaceIdentityLink } from '@agent/core/surface/surface-auth-routes';
 import { resolveMemberByPrincipal } from '@agent/core/organization/member-registry';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import type { ConciergeViewerContext } from './viewer-context';
@@ -129,6 +130,51 @@ export function viewerIsInstanceOwner(viewer: Viewer): boolean {
   } catch {
     return false;
   }
+}
+
+export type IdentityLinkStart =
+  | { ok: true; location: string; setCookies: string[] }
+  | { ok: false; status: 403 | 409 | 503; error: string };
+
+/**
+ * Start "link my IdP account" for the authenticated viewer. The member is the
+ * one the viewer resolves to server-side; nothing in the request selects it.
+ */
+export async function startIdentityLinkForViewer(
+  viewer: Viewer,
+  request: { requestOrigin: string; loopback: boolean; next?: string | null }
+): Promise<IdentityLinkStart> {
+  let memberId: string | undefined;
+  try {
+    memberId = withExecutionContext('sovereign_concierge', () => {
+      const member = resolveMemberByPrincipal({
+        principalId: viewer.principalId,
+        source: viewer.source,
+        registrationLabel: viewer.registrationLabel,
+        memberId: viewer.memberId,
+      });
+      return member?.status === 'active' ? member.member_id : undefined;
+    });
+  } catch {
+    memberId = undefined;
+  }
+  if (!memberId) return { ok: false, status: 403, error: 'member_required' };
+  const linkMemberId = memberId;
+  const started = await withExecutionContextAsync('sovereign_concierge', () =>
+    startSurfaceIdentityLink({
+      surfaceId: 'concierge',
+      requestOrigin: request.requestOrigin,
+      loopback: request.loopback,
+      linkMemberId,
+      next: request.next,
+    })
+  );
+  if (started.ok === false) {
+    return started.view.kind === 'unconfigured'
+      ? { ok: false, status: 409, error: 'sso_not_configured' }
+      : { ok: false, status: 503, error: 'link_unavailable' };
+  }
+  return started;
 }
 
 /** Redirect URIs to register at the IdP, one per login surface (deduplicated). */

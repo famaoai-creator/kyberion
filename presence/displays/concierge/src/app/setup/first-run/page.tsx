@@ -5,6 +5,7 @@ import { createSigninRequestGuard } from '../../../lib/signin-request-guard';
 import { useConciergeI18n } from '../../../lib/use-concierge-i18n';
 import { frontDeskText } from '../../../lib/i18n';
 import { storeFrontDeskToken } from '../../../lib/front-desk-auth-token';
+import { IdentityLinkSection } from '../identity-link-section';
 import { SsoSettingsForm } from '../sso-settings-form';
 
 /**
@@ -134,6 +135,7 @@ export default function FirstRunSetupPage() {
           </p>
         ) : null}
         {tokenStored ? <SsoSettingsForm /> : null}
+        {tokenStored ? <IdentityLinkSection /> : null}
         <div className="button-row">
           {tokenStored ? (
             <a className="action-button" href="/">
