@@ -11,6 +11,12 @@ import {
   createJxaCalendarBackend,
   type CalendarBackendRegistry,
   type CalendarBackendAdapter,
+  type CalendarEvent,
+  type CalendarEventDeleteResult,
+  type CalendarEventMutation,
+  type CalendarFreeBusyEntry,
+  type CalendarSlotResult,
+  type CalendarSummary,
   type CalendarTarget,
   type CalendarParams,
 } from './calendar-backend.js';
@@ -318,17 +324,102 @@ export async function handleAction(
   }
 }
 
-// Keep the historical direct exports on the macOS implementation for callers
-// that explicitly use the JXA surface. Normal actuator dispatch goes through
-// resolveCalendarBackend and may select gws.
+// Typed client facade — registry-backed by default so callers get the
+// selected backend (auto / explicit) without touching dispatch envelopes.
+// `*OnJxa` variants preserve the historical macOS-direct surface.
 const jxaBackend = createJxaCalendarBackend();
 
-export const listCalendars = (): ReturnType<typeof jxaBackend.listCalendars> =>
-  jxaBackend.listCalendars();
-export const listEvents = (params: CalendarParams): ReturnType<typeof jxaBackend.listEvents> =>
-  jxaBackend.listEvents(params);
+function backendFor(
+  params: CalendarParams,
+  registry: CalendarBackendRegistry
+): CalendarBackendAdapter {
+  return registry.resolve(params.backend || 'auto');
+}
+
+export const listCalendars = (
+  params: CalendarParams = {},
+  registry: CalendarBackendRegistry = calendarBackendRegistry
+): Promise<CalendarSummary[]> => backendFor(params, registry).listCalendars(params);
+export const listEvents = (
+  params: CalendarParams,
+  registry: CalendarBackendRegistry = calendarBackendRegistry
+): Promise<CalendarEvent[]> => backendFor(params, registry).listEvents(params);
 export const queryFreeBusy = (
-  params: CalendarParams
-): ReturnType<typeof jxaBackend.queryFreeBusy> => jxaBackend.queryFreeBusy(params);
-export const createEvent = (params: CalendarParams): ReturnType<typeof jxaBackend.createEvent> =>
-  jxaBackend.createEvent(params);
+  params: CalendarParams,
+  registry: CalendarBackendRegistry = calendarBackendRegistry
+): Promise<CalendarFreeBusyEntry[]> => backendFor(params, registry).queryFreeBusy(params);
+export const findSlots = (
+  params: CalendarParams,
+  registry: CalendarBackendRegistry = calendarBackendRegistry
+): Promise<CalendarSlotResult> => {
+  const adapter = backendFor(params, registry);
+  if (!adapter.findSlots) {
+    throw new Error(
+      `calendar-actuator: backend '${adapter.id}' does not provide the temporal slot capability`
+    );
+  }
+  return adapter.findSlots(params);
+};
+export const createEvent = (
+  params: CalendarParams,
+  registry: CalendarBackendRegistry = calendarBackendRegistry
+): Promise<CalendarEventMutation> => backendFor(params, registry).createEvent(params);
+export const updateEvent = (
+  params: CalendarParams,
+  registry: CalendarBackendRegistry = calendarBackendRegistry
+): Promise<CalendarEventMutation> => {
+  const adapter = backendFor(params, registry);
+  if (!adapter.updateEvent) {
+    throw new Error(
+      `calendar-actuator: backend '${adapter.id}' does not provide the event update capability`
+    );
+  }
+  return adapter.updateEvent(params);
+};
+export const deleteEvent = (
+  params: CalendarParams,
+  registry: CalendarBackendRegistry = calendarBackendRegistry
+): Promise<CalendarEventDeleteResult> => {
+  const adapter = backendFor(params, registry);
+  if (!adapter.deleteEvent) {
+    throw new Error(
+      `calendar-actuator: backend '${adapter.id}' does not provide the event delete capability`
+    );
+  }
+  return adapter.deleteEvent(params);
+};
+
+/** Backend ids in registration order. */
+export const listBackends = (
+  registry: CalendarBackendRegistry = calendarBackendRegistry
+): string[] => registry.ids();
+
+/** Capability summary for help / discovery output. */
+export const describeBackendCapabilities = (
+  registry: CalendarBackendRegistry = calendarBackendRegistry
+): ReturnType<CalendarBackendRegistry['describeCapabilities']> => registry.describeCapabilities();
+
+/**
+ * Composite: pick the first free slot for the requested duration and
+ * create the event there. Returns the chosen slot alongside the
+ * backend mutation so pipelines need one call instead of two.
+ */
+export async function scheduleInFirstSlot(
+  params: CalendarParams & { duration_minutes: number },
+  registry: CalendarBackendRegistry = calendarBackendRegistry
+): Promise<{ slot: CalendarSlotResult['slots'][number]; event: CalendarEventMutation }> {
+  const slots = await findSlots(params, registry);
+  const slot = slots.slots[0];
+  if (!slot) throw new Error('calendar-actuator: no free slot in the requested window');
+  const event = await createEvent(
+    { ...params, start_date: slot.start, end_date: slot.end },
+    registry
+  );
+  return { slot, event };
+}
+
+// Explicit macOS-direct surface for callers that need JXA semantics.
+export const listCalendarsOnJxa = (): ReturnType<typeof jxaBackend.listCalendars> =>
+  jxaBackend.listCalendars();
+export const listEventsOnJxa = (params: CalendarParams): ReturnType<typeof jxaBackend.listEvents> =>
+  jxaBackend.listEvents(params);

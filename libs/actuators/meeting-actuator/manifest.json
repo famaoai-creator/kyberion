@@ -1,7 +1,7 @@
 {
   "actuator_id": "meeting-actuator",
-  "version": "1.2.0",
-  "description": "Abstracted online meeting bridge (Zoom, Teams, Google Meet)",
+  "version": "1.3.0",
+  "description": "Layered online-meeting bridge: session transport (Zoom/Teams/Meet join-leave-speak-listen-chat-status) plus intelligence (action items, facilitation, reminders), target resolution, and guided dialogue. Single-op `{ op, params }`, legacy `{ action, params }`, and pipeline envelopes are all accepted.",
   "contract_schema": "knowledge/product/schemas/meeting-action.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
@@ -10,34 +10,68 @@
   },
   "capabilities": [
     {
-      "op": "join",
+      "op": "check_consent",
+      "description": "Check voice consent without speaking",
       "platforms": ["darwin", "linux", "win32"],
-      "effect": "write"
+      "effect": "read"
     },
     {
-      "op": "leave",
+      "op": "join",
+      "description": "Join a meeting via the configured driver (playwright / chrome-extension / auto)",
       "platforms": ["darwin", "linux", "win32"],
       "effect": "write"
     },
+    { "op": "leave", "platforms": ["darwin", "linux", "win32"], "effect": "write" },
     {
       "op": "speak",
+      "description": "Speak text (voice-consent gated)",
       "platforms": ["darwin", "linux", "win32"],
       "effect": "write"
     },
+    { "op": "listen", "platforms": ["darwin", "linux", "win32"], "effect": "read" },
+    { "op": "chat", "platforms": ["darwin", "linux", "win32"], "effect": "write" },
+    { "op": "status", "platforms": ["darwin", "linux", "win32"], "effect": "read" },
     {
-      "op": "listen",
+      "op": "resolve_next_target",
+      "description": "Pick the calendar event to join now (pure, calendar → meeting URL)",
       "platforms": ["darwin", "linux", "win32"],
       "effect": "read"
     },
     {
-      "op": "chat",
+      "op": "normalize_transcript",
+      "description": "Normalize VTT/plain transcript to [mm:ss] Speaker: text",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    { "op": "extract_action_items", "platforms": ["darwin", "linux", "win32"], "effect": "write" },
+    {
+      "op": "generate_facilitation_script",
       "platforms": ["darwin", "linux", "win32"],
       "effect": "write"
     },
     {
-      "op": "status",
+      "op": "generate_reminder_message",
       "platforms": ["darwin", "linux", "win32"],
-      "effect": "read"
-    }
+      "effect": "write"
+    },
+    {
+      "op": "run_action_item_reminder_sweep",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "execute_self_action_items",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "track_pending_action_items",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    { "op": "audit_speaker_fairness", "platforms": ["darwin", "linux", "win32"], "effect": "read" },
+    { "op": "conduct_1on_1", "platforms": ["darwin", "linux", "win32"], "effect": "write" },
+    { "op": "hearing_session", "platforms": ["darwin", "linux", "win32"], "effect": "write" },
+    { "op": "tutor_session", "platforms": ["darwin", "linux", "win32"], "effect": "write" }
   ]
 }
