@@ -6,11 +6,14 @@ import {
   defaultTenantKnowledgeRoot,
   listTenantProfileSlugs,
   readTenantProfile,
+  recordTenantProviderAttestation,
   tenantProfilePath,
   writeTenantProfile,
+  type RecordProviderAttestationInput,
   type TenantProfile,
   type TenantRegistryPathOptions,
 } from './tenant-registry.js';
+import { loadProviderEgressPolicy } from '../provider/provider-egress-gate.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeMkdir } from '../secure-io.js';
 
@@ -140,4 +143,65 @@ export function showTenant(slug: string, options: TenantRegistryPathOptions = {}
   const profile = readTenantProfile(slug, options);
   if (!profile) throw new Error(`Tenant '${slug}' does not exist.`);
   return profile;
+}
+
+export interface TenantProviderAttestationResult {
+  slug: string;
+  provider: string;
+  attestation: NonNullable<TenantProfile['provider_attestations']>[string];
+  profile_path: string;
+}
+
+/**
+ * Governed entry point for recording a tenant provider attestation — shared by
+ * `pnpm tenant attest-provider` and `pnpm onboarding llm attest`.
+ *
+ * Only providers declared in provider-egress-policy.json can be attested: the
+ * gate never lets an attestation invent an egress identity, so recording one
+ * for an unknown id would only produce a claim that silently does nothing.
+ * Every attestation is written to the audit chain (action
+ * `tenant.attest_provider`), because it is what lets confidential material
+ * leave the machine.
+ */
+export function attestTenantProvider(
+  input: RecordProviderAttestationInput & { actor?: string }
+): TenantProviderAttestationResult {
+  const provider = input.provider?.trim();
+  if (!provider) throw new Error('[tenant-governance] provider is required.');
+  const loaded = loadProviderEgressPolicy();
+  if (loaded.status !== 'ok') {
+    throw new Error(
+      `[tenant-governance] provider-egress-policy.json is ${loaded.status}; cannot verify provider '${provider}'.`
+    );
+  }
+  const known = Object.keys(loaded.policy.providers).sort();
+  if (!known.includes(provider)) {
+    throw new Error(
+      `[tenant-governance] unknown provider '${provider}'. Declared providers: ${known.join(', ')}.`
+    );
+  }
+  const profile = recordTenantProviderAttestation({ ...input, provider });
+  const attestation = profile.provider_attestations![provider]!;
+  const options: TenantRegistryPathOptions = input.rootDir ? { rootDir: input.rootDir } : {};
+  auditChain.record({
+    agentId: input.actor || getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
+    action: 'tenant.attest_provider',
+    operation: `tenant:${profile.tenant_slug}:provider:${provider}`,
+    result: 'completed',
+    tenantSlug: profile.tenant_slug,
+    metadata: {
+      provider,
+      training_use: attestation.training_use,
+      ...(attestation.plan ? { plan: attestation.plan } : {}),
+      ...(attestation.basis ? { basis: attestation.basis } : {}),
+      ...(attestation.attested_by ? { attested_by: attestation.attested_by } : {}),
+      ...(attestation.expires_at ? { expires_at: attestation.expires_at } : {}),
+    },
+  });
+  return {
+    slug: profile.tenant_slug,
+    provider,
+    attestation,
+    profile_path: tenantProfilePath(profile.tenant_slug, options),
+  };
 }

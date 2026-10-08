@@ -2216,6 +2216,26 @@
       "unresolved": []
     },
     {
+      "site": "scripts/onboarding_llm.ts#attest",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/onboarding_llm.ts#availabilityFor",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/onboarding_llm.ts#select",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/onboarding_llm.ts#show",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/onboarding_runbook_skill.ts#generateOnboardingRunbookSkill",
       "roles": ["sovereign_concierge"],
       "unresolved": []
