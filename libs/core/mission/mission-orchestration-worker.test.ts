@@ -145,7 +145,11 @@ vi.mock('./mission-task-events.js', () => ({
 // but regularly past the 10s default on shared CI runners.
 describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
   beforeEach(async () => {
-    vi.resetModules();
+    // No vi.resetModules(): the module under test and the secure-io / tier-guard /
+    // authority stack under it are imported once per file (the first `await
+    // import`; later ones hit the module cache). Re-importing that stack per test
+    // repeated its module initialisation every test (operations-hygiene-runbook §5).
+    // Per-test state is reset through the work-coordination namespace/store and the mocks.
     vi.resetAllMocks();
     process.env.MISSION_ROLE = 'mission_controller';
     const { missionDir, pathResolver } = await import('../path-resolver.js');
