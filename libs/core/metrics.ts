@@ -23,6 +23,7 @@ import {
   type StorageDataTier,
   type StoragePartition,
 } from './storage-layout.js';
+import { validateReadPermission } from './tier-guard.js';
 const logger = createLogger('metrics');
 
 interface SloTarget {
@@ -677,8 +678,17 @@ export class MetricsCollector {
   loadResourceUsageHistory(read?: ResourceUsageReadScope): ResourceUsageRecord[] {
     const legacy = this._readUsageFile(this._metricsPath(this._resourceUsageFile));
     if (read && 'all' in read && read.all) {
+      // A legacy tier row is visible only where its partition would be: it
+      // inherits tier-guard's read decision for that partition's ledger path.
+      const readable = new Map<string, boolean>();
+      const legacyVisible = legacy.filter((record) => {
+        const key = recordPartitionKey(record);
+        if (key === partitionKey(SYSTEM_PARTITION)) return true;
+        if (!readable.has(key)) readable.set(key, this._partitionReadable(record));
+        return readable.get(key) === true;
+      });
       return [
-        ...legacy,
+        ...legacyVisible,
         ...this._partitionUsageFiles().flatMap((filePath) => this._readUsageFile(filePath)),
       ];
     }
@@ -717,6 +727,15 @@ export class MetricsCollector {
       ),
       { allowMissingLeaf: true }
     );
+  }
+
+  private _partitionReadable(record: ResourceUsageRecord): boolean {
+    try {
+      const partition = resourceUsagePartition(record.scope);
+      return validateReadPermission(this._partitionUsagePath(partition)).allowed;
+    } catch {
+      return false;
+    }
   }
 
   private _readUsageFile(filePath: string): ResourceUsageRecord[] {
