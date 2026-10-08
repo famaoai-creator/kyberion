@@ -69,6 +69,7 @@ import { gcMissionRuntimeResidue } from '../scope-offboarding.js';
 import { retireIdentitiesForScopeBestEffort } from '../nhi-lifecycle-governance.js';
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { generateMissionWorkReconciliationScaffold } from './mission-work-reconciliation.js';
+import { recordDirectCliTaskUsage } from './mission-direct-cli-usage.js';
 import {
   computeApprovalPayloadHash,
   isApprovalRequestExpired,
@@ -881,6 +882,7 @@ export async function recordEvidence(args: {
   teamRole?: string;
   actorId?: string;
   actorType?: MissionActorType;
+  provider?: string; // estimated usage entry; inferred from actorId when omitted
   getGitHash: (cwd: string) => string;
   syncProjectLedgerIfLinked: (missionId: string) => Promise<void>;
 }): Promise<void> {
@@ -951,6 +953,7 @@ export async function recordEvidence(args: {
     const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.taskId);
     if (autoComplete.completed) {
       logger.info(`✅ Task "${args.taskId}" auto-completed (${autoComplete.reason}).`);
+      recordDirectCliTaskUsage({ ...args, ...autoComplete, state, event: 'record_evidence' });
       for (const cascadedId of autoComplete.cascaded) {
         logger.info(`✅ Task "${cascadedId}" auto-completed (dependencies satisfied via cascade).`);
       }
@@ -1027,6 +1030,7 @@ export async function recordArtifactReview(args: {
   findings?: ArtifactReviewFinding[];
   reviewerTeamRole?: 'reviewer' | 'qa';
   specialistRoles?: string[];
+  provider?: string; // estimated usage entry; inferred from reviewerAgentId when omitted
   getGitHash: (cwd: string) => string;
 }): Promise<RecordArtifactReviewResult> {
   const upperId = args.missionId.toUpperCase();
@@ -1179,6 +1183,9 @@ export async function recordArtifactReview(args: {
   if (evaluation.ready) {
     const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.reviewTaskId);
     taskCompleted = autoComplete.completed;
+    const reviewer = { taskId: args.reviewTaskId, actorId: args.reviewerAgentId, state };
+    if (taskCompleted)
+      recordDirectCliTaskUsage({ ...args, ...autoComplete, ...reviewer, event: 'review_task' });
     for (const cascadedId of autoComplete.cascaded) {
       logger.info(`✅ Task "${cascadedId}" auto-completed (dependencies satisfied via cascade).`);
     }

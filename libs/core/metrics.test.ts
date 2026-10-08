@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import * as pathResolver from './path-resolver.js';
 import {
   MetricsCollector,
   resolveCostRatesFromRegistry,
@@ -427,5 +428,23 @@ describe('metrics core', () => {
     const source = fs.readFileSync(path.join(process.cwd(), 'libs/core/metrics.ts'), 'utf8');
     expect(source).toContain('sloTargetsCatalog(safeCandidate).load()');
     expect(source).not.toContain('readJson<{');
+  });
+
+  it('the default metrics dir lands in the Vitest live sandbox, never the live work/metrics', () => {
+    const usageFile = pathResolver.resolve('work/metrics/resource-usage.jsonl');
+    expect(
+      usageFile.startsWith(path.join(pathResolver.rootDir(), pathResolver.VITEST_LIVE_SANDBOX_ROOT))
+    ).toBe(true);
+    const usageId = `metrics-default-dir-test-${process.pid}-${Date.now()}`;
+    new MetricsCollector().recordResourceUsage({
+      usage_id: usageId,
+      resource_kind: 'other',
+      quantity: 0,
+      unit: 'task',
+      status: 'estimated',
+      source: 'metrics-test',
+    });
+    const persisted = fs.readFileSync(usageFile, 'utf8');
+    expect(persisted).toContain(usageId);
   });
 });
