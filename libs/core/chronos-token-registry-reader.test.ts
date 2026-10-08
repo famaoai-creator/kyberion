@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash, randomBytes } from 'node:crypto';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * TR-01: Chronos runs under SYSTEM_ROLE=chronos_mirror_v2, which cannot read
@@ -33,20 +33,29 @@ function runtimeToken(): { token: string; hash: string } {
   return { token, hash: createHash('sha256').update(token).digest('hex') };
 }
 
-async function loadModules() {
-  vi.resetModules();
-  const authority = await import('./authority.js');
-  const registry = await import('./chronos-access-registry.js');
-  const tierGuard = await import('./tier-guard.js');
-  const secureIo = await import('./secure-io.js');
-  authority.resetRoleAssumptionPolicyCache();
-  return { authority, registry, tierGuard, secureIo };
+type LoadedModules = {
+  authority: typeof import('./authority.js');
+  registry: typeof import('./chronos-access-registry.js');
+  tierGuard: typeof import('./tier-guard.js');
+  secureIo: typeof import('./secure-io.js');
+};
+
+// Imported ONCE per file, after KYBERION_ROOT is set (path-resolver binds the
+// root at import time). Re-importing the secure-io / tier-guard / authority
+// stack per test with vi.resetModules() repeated its module initialisation
+// every test (operations-hygiene-runbook §5). Per-test state is reset through
+// the modules' own seam (resetRoleAssumptionPolicyCache) in loadModules().
+let modules: LoadedModules;
+
+async function loadModules(): Promise<LoadedModules> {
+  modules.authority.resetRoleAssumptionPolicyCache();
+  return modules;
 }
 
 describe('TR-01 chronos_token_registry_reader', () => {
   let issued: { token: string; hash: string };
 
-  beforeAll(() => {
+  beforeAll(async () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-chronos-token-reader-'));
     fs.writeFileSync(path.join(root, 'package.json'), '{"name":"hermetic"}\n');
     fs.writeFileSync(path.join(root, 'AGENTS.md'), '# hermetic\n');
@@ -73,27 +82,34 @@ describe('TR-01 chronos_token_registry_reader', () => {
       '{"api":"placeholder"}\n'
     );
     fs.writeFileSync(path.join(root, 'knowledge/personal/tenants/acme-corp.json'), '{}\n');
-  });
-
-  afterAll(() => {
-    if (root) fs.rmSync(root, { recursive: true, force: true });
-  });
-
-  beforeEach(() => {
     for (const key of ENV_KEYS) {
       original[key] = process.env[key];
       delete process.env[key];
     }
     process.env.KYBERION_ROOT = root;
-    process.env.SYSTEM_ROLE = 'chronos_mirror_v2';
+    modules = {
+      authority: await import('./authority.js'),
+      registry: await import('./chronos-access-registry.js'),
+      tierGuard: await import('./tier-guard.js'),
+      secureIo: await import('./secure-io.js'),
+    };
   });
 
-  afterEach(() => {
+  afterAll(() => {
     for (const key of ENV_KEYS) {
       if (original[key] === undefined) delete process.env[key];
       else process.env[key] = original[key];
     }
-    vi.resetModules();
+    if (root) fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  beforeEach(() => {
+    // Per-test isolation: no test inherits a role/persona left by another;
+    // afterAll restores the values saved in beforeAll.
+    for (const key of ENV_KEYS) {
+      if (key !== 'KYBERION_ROOT') delete process.env[key];
+    }
+    process.env.SYSTEM_ROLE = 'chronos_mirror_v2';
   });
 
   it('cannot read the registry under the ambient chronos_mirror_v2 role', async () => {
@@ -210,6 +226,7 @@ describe('TR-01 chronos_token_registry_reader', () => {
 
   it('reads the registry as the reader role through the authn seam (deps.registrations unset)', async () => {
     process.env.SYSTEM_ROLE = 'concierge';
+    // vi.doMock needs a fresh module graph; the other tests share `modules`.
     vi.resetModules();
     const rolesDuringRead: Array<string | undefined> = [];
     vi.doMock('./chronos-access-registry.js', async () => {
@@ -247,6 +264,7 @@ describe('TR-01 chronos_token_registry_reader', () => {
       expect(authority.resolveRole()).toBe('concierge');
     } finally {
       vi.doUnmock('./chronos-access-registry.js');
+      vi.resetModules();
     }
   });
 
