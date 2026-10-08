@@ -244,8 +244,12 @@ the test passes against the sandbox while the writer leaks into live state.
     `approved_providers` exceptions to make a call site work.
   - To enable LLM work on confidential/personal material for a tenant, the operator attests the
     provider's plan explicitly with `pnpm onboarding llm attest` (`--training-use none` plus
-    `--plan`, `--basis`, `--attested-by`, then `--apply --accept`). It uses the same store and
-    audit action `tenant.attest_provider` as `pnpm tenant attest-provider`. Never attest on the
+    `--plan`, `--basis`, `--attested-by`). Because `none` opens confidential egress it needs a
+    human approval: `--request-approval` opens a hash-bound request, a human runs
+    `pnpm kyberion approvals --approve <id>`, then the same command with `--apply`, `--accept`
+    and `--approval-request-id <id>` records it once. `used`/`unknown` never open egress and need only
+    `--apply --accept`. `pnpm tenant attest-provider` follows the same rules, store and audit
+    action (`tenant.attest_provider`, with actor and approver). Never attest or approve on the
     operator's behalf. `pnpm onboarding llm show --tenant <slug>` and `tenant:activation plan`
     (`llm_availability`) show which providers each tier can use. See
     [onboarding-flow Step 5.1](./onboarding-flow.md).
