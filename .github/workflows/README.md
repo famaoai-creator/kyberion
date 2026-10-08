@@ -30,6 +30,25 @@ The execution workflows are expected to separate **package/app build** from **op
 
 They must not depend on removed `skills` scripts or on stale package-local build artifacts.
 
+## Workflow contract (enforced)
+
+The `ci-workflow-contract` gate (`scripts/check_ci_workflow_contract.ts`, scope `pr`) fails when:
+
+- a job has no `timeout-minutes` (the 360-minute default can hold a runner for six hours);
+- a `pull_request` workflow has no top-level `concurrency` with `cancel-in-progress`
+  (use the `${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}` group
+  and cancel only for `pull_request` events, so `main` and scheduled runs are never cancelled);
+- an action is pinned below its first Node 24 major (see `MIN_ACTION_MAJORS`);
+- a job runs `pnpm --filter '@agent/core' build` before `pnpm run build` (the full build already
+  builds every workspace package).
+
+**One owner per suite on pull requests.** `pr-validation.yml` owns the PR run of the core suite
+(4 shards), the actuator suite, governance boundary tests, lint, typecheck and format. On
+`pull_request` events `ci.yml` skips its `core`/`actuators` matrix entries and its lint/format/
+typecheck steps, and `cross-os.yml` skips the Linux core shards and boundary tests; all of them
+still run on `main` pushes and on the weekly schedule. Before adding a test step to a workflow,
+check which workflow already owns that suite for pull requests.
+
 ## CI Workflow
 
 `ci.yml` performs:
