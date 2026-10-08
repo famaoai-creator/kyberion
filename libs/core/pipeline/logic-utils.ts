@@ -42,6 +42,40 @@ export function getPathValue(ctx: any, pathLike?: string): any {
   return current;
 }
 
+const LINE_TERMINATOR = /[\n\r\u2028\u2029]/;
+
+/**
+ * Linear-time equivalent of `str.replace(/{{(.*?)}}/g, fn)`: the regex form
+ * rescans to the end of input from every `{{`, which is quadratic on
+ * uncontrolled strings like `{{{{a{{{{a...`. Like `.`, a token never spans a
+ * line terminator.
+ */
+function replaceTemplateTokens(
+  str: string,
+  replacer: (match: string, token: string) => string
+): string {
+  let out = '';
+  let cursor = 0;
+  let searchFrom = 0;
+  while (searchFrom < str.length) {
+    const start = str.indexOf('{{', searchFrom);
+    if (start < 0) break;
+    const end = str.indexOf('}}', start + 2);
+    if (end < 0) break;
+    const token = str.slice(start + 2, end);
+    const lineBreak = token.search(LINE_TERMINATOR);
+    if (lineBreak >= 0) {
+      // No match can start before the line break and cross it.
+      searchFrom = start + 2 + lineBreak + 1;
+      continue;
+    }
+    out += str.slice(cursor, start) + replacer(str.slice(start, end + 2), token);
+    cursor = end + 2;
+    searchFrom = cursor;
+  }
+  return out + str.slice(cursor);
+}
+
 export function resolveVars(val: any, ctx: any): any {
   if (typeof val !== 'string') return val;
 
@@ -61,8 +95,8 @@ export function resolveVars(val: any, ctx: any): any {
   }
 
   // Multi-variable or mixed string: "Hello {{name|World}}" → interpolated string
-  return val.replace(/{{(.*?)}}/g, (match, p) => {
-    const token = String(p).trim();
+  return replaceTemplateTokens(val, (match, p) => {
+    const token = p.trim();
     if (token.startsWith('@')) {
       const resolved = resolvePathToken(token);
       return resolved !== undefined ? resolved : match; // unknown domain → keep literal

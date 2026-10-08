@@ -195,12 +195,9 @@ export async function dispatchMeetingIntelligenceOp(
           ? { enforce_restricted_actions: Boolean(params.enforce_restricted_actions) }
           : {}),
       });
-      if (params.output_path) {
-        safeWriteFile(
-          resolveMeetingPath(String(params.output_path)),
-          JSON.stringify(result, null, 2)
-        );
-      }
+      // Items are persisted by the action-item store (evidence/action-items.jsonl);
+      // pipelines pass that same file as `output_path`, so writing the result
+      // there would clobber the store.
       return result;
     }
     case 'normalize_transcript': {

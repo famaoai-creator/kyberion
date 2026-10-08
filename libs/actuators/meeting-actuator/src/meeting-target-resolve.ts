@@ -71,8 +71,14 @@ function platformOf(url: string): JoinablePlatform | undefined {
   return (resolveMeetingPlatformByHost(host, pathname)?.id as JoinablePlatform) ?? undefined;
 }
 
+const TRAILING_URL_PUNCTUATION = new Set(['.', ',', ';', ':', '!', '?']);
+
+// Linear trailing-punctuation trim (an anchored `[...]+$` regex backtracks
+// quadratically on long punctuation runs).
 function cleanUrl(raw: string): string {
-  return raw.replace(/[.,;:!?]+$/u, '');
+  let end = raw.length;
+  while (end > 0 && TRAILING_URL_PUNCTUATION.has(raw[end - 1])) end -= 1;
+  return raw.slice(0, end);
 }
 
 function stripMarkup(text: string): string {
