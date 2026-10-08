@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateNativePdf } from '../engine.js';
+import { pickCjkFontSource } from '../primitives.js';
 import { distillPdfDesign } from '../../pdf-utils.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -87,21 +88,25 @@ describe('Native PDF 2.0 Engine - Binary Generation', () => {
     expect(t).toContain('3053'); // 'こ'
   });
 
-  it('should embed a CJK subset font for Japanese text by default', async () => {
-    ensureDir(OUT);
-    const protocol = {
-      version: '1.0.0',
-      generatedAt: new Date().toISOString(),
-      source: { format: 'markdown', body: '日本語フォント埋め込み', title: 'Embed CJK' },
-    } as unknown as Parameters<typeof generateNativePdf>[0];
-    await generateNativePdf(protocol, OUT, { compress: false });
-    const t = fs.readFileSync(OUT, 'binary');
-    expect(t).toContain('/Subtype /Type0');
-    expect(t).toContain('/Subtype /CIDFontType2');
-    expect(t).toContain('/FontFile2');
-    expect(t).toContain('/ToUnicode');
-    expect(t).toContain('/Encoding /Identity-H');
-  });
+  // Needs a CJK font (bundled NotoSansJP, Hiragino, or fonts-noto-cjk); skipped where absent.
+  it.skipIf(!pickCjkFontSource())(
+    'should embed a CJK subset font for Japanese text by default',
+    async () => {
+      ensureDir(OUT);
+      const protocol = {
+        version: '1.0.0',
+        generatedAt: new Date().toISOString(),
+        source: { format: 'markdown', body: '日本語フォント埋め込み', title: 'Embed CJK' },
+      } as unknown as Parameters<typeof generateNativePdf>[0];
+      await generateNativePdf(protocol, OUT, { compress: false });
+      const t = fs.readFileSync(OUT, 'binary');
+      expect(t).toContain('/Subtype /Type0');
+      expect(t).toContain('/Subtype /CIDFontType2');
+      expect(t).toContain('/FontFile2');
+      expect(t).toContain('/ToUnicode');
+      expect(t).toContain('/Encoding /Identity-H');
+    }
+  );
 
   it('should generate PDF with precise coordinates from aesthetic elements', async () => {
     ensureDir(OUT);
