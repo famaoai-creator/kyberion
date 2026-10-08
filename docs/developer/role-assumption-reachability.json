@@ -85,6 +85,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/authority.ts#<module>",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/browser/browser-onboarding.ts#applyBrowserOnboarding",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -2837,11 +2842,8 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "presence/displays/chronos-mirror-v2/src/app/api/agent/agent-route-helpers.ts#<module>",
+            "libs/core/authority.ts#<module>"
           ]
         },
         "knowledge_steward": {
@@ -3115,22 +3117,8 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "scripts/mission_controller.ts#handoffMission [child process]",
-            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
-            "libs/core/mission/mission-system.ts#buildMissionSystem",
-            "libs/core/mission/mission-maintenance.ts#resumeMission",
-            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
-            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
-            "libs/core/mission/mission-orchestration-worker.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
-            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
-            "scripts/mission_controller.ts#<module> [child process]",
-            "libs/core/governance/kill-switch.ts#<module>",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "presence/displays/computer-surface/server.ts#<module>",
+            "libs/core/authority.ts#<module>"
           ]
         },
         "knowledge_steward": {
@@ -3592,14 +3580,8 @@
         },
         "infrastructure_sentinel": {
           "example_path": [
-            "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
-            "scripts/mission_controller.ts#<module> [child process]",
-            "libs/core/governance/kill-switch.ts#<module>",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "presence/displays/concierge/src/app/api/charters/route.ts#<module>",
+            "libs/core/authority.ts#<module>"
           ]
         },
         "ingest_commit": {
@@ -3826,8 +3808,7 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "libs/core/authority.ts#<module>"
           ]
         },
         "knowledge_steward": {
@@ -3986,12 +3967,20 @@
       "entries": ["scripts/event_intake_surface.ts"],
       "reviewed_infeasible": [],
       "child_process_entries": [],
-      "reachable_roles": {},
+      "reachable_roles": {
+        "infrastructure_sentinel": {
+          "example_path": [
+            "scripts/event_intake_surface.ts#<module>",
+            "scripts/lib/harness.ts#<module>",
+            "libs/core/script-harness.ts#<module>",
+            "libs/core/authority.ts#<module>"
+          ]
+        }
+      },
       "unresolved_sites": [],
       "policy_roles_not_reachable": [
         "chronos_gateway",
         "chronos_tenant_runner",
-        "infrastructure_sentinel",
         "knowledge_steward",
         "organization_operator",
         "scope_locale_reader",
@@ -4105,8 +4094,7 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "libs/core/authority.ts#<module>"
           ]
         },
         "knowledge_steward": {
@@ -4376,8 +4364,7 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "libs/core/authority.ts#<module>"
           ]
         },
         "knowledge_steward": {
@@ -4931,6 +4918,13 @@
       "reviewed_infeasible": [],
       "child_process_entries": [],
       "reachable_roles": {
+        "infrastructure_sentinel": {
+          "example_path": [
+            "scripts/oauth_callback_surface.ts#<module>",
+            "libs/core/governance.ts#<module>",
+            "libs/core/authority.ts#<module>"
+          ]
+        },
         "sovereign_concierge": {
           "example_path": [
             "scripts/oauth_callback_surface.ts#<module>",
@@ -4956,7 +4950,6 @@
       "policy_roles_not_reachable": [
         "chronos_gateway",
         "chronos_tenant_runner",
-        "infrastructure_sentinel",
         "knowledge_steward",
         "organization_operator",
         "scope_locale_reader",
@@ -5109,8 +5102,7 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "libs/core/authority.ts#<module>"
           ]
         },
         "knowledge_steward": {
@@ -5393,8 +5385,7 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "libs/core/authority.ts#<module>"
           ]
         },
         "knowledge_steward": {
@@ -5658,14 +5649,7 @@
         "infrastructure_sentinel": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
-            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
-            "scripts/mission_controller.ts#<module> [child process]",
-            "libs/core/governance/kill-switch.ts#<module>",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "libs/core/authority.ts#<module>"
           ]
         },
         "knowledge_steward": {
@@ -5902,8 +5886,7 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "libs/core/authority.ts#<module>"
           ]
         },
         "knowledge_steward": {
@@ -6078,11 +6061,7 @@
           ]
         },
         "infrastructure_sentinel": {
-          "example_path": [
-            "scripts/surface_runtime.ts#startSurfaceById",
-            "scripts/surface_runtime.ts#recordProtocolSurfaceLifecycle",
-            "libs/core/protocol-service-lifecycle.ts#recordProtocolServiceLifecycle"
-          ]
+          "example_path": ["scripts/surface_runtime.ts#<module>", "libs/core/authority.ts#<module>"]
         },
         "mission_controller": {
           "example_path": [
@@ -6205,15 +6184,7 @@
           ]
         },
         "infrastructure_sentinel": {
-          "example_path": [
-            "scripts/run_pipeline.ts#<module>",
-            "scripts/pipeline-execution-part-results.ts#main",
-            "libs/core/governance/kill-switch.ts#KillSwitchImpl",
-            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
-            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
-          ]
+          "example_path": ["scripts/config_mission.ts#<module>", "libs/core/authority.ts#<module>"]
         },
         "knowledge_steward": {
           "example_path": [
@@ -6446,8 +6417,7 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "libs/core/authority.ts#<module>"
           ]
         },
         "knowledge_steward": {
@@ -6606,7 +6576,22 @@
       "entries": ["presence/bridge/terminal/server.ts"],
       "reviewed_infeasible": [],
       "child_process_entries": [],
-      "reachable_roles": {},
+      "reachable_roles": {
+        "infrastructure_sentinel": {
+          "example_path": [
+            "presence/bridge/terminal/server.ts#<module>",
+            "presence/bridge/terminal/auth.ts#<module>",
+            "libs/core/surface/surface-mutation-guard.ts#<module>",
+            "libs/core/chronos-access-registry.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/scope-migration.ts#<module>",
+            "libs/core/tool/runtime-scope.ts#<module>",
+            "libs/core/agent/agent-identity.ts#<module>",
+            "libs/core/authority.ts#<module>"
+          ]
+        }
+      },
       "unresolved_sites": ["libs/core/shell/pty-engine.ts#PtyRegistry"],
       "policy_roles_not_reachable": []
     },
@@ -6696,8 +6681,7 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "libs/core/authority.ts#<module>"
           ]
         },
         "knowledge_steward": {
@@ -6936,8 +6920,7 @@
             "libs/core/governance/kill-switch.ts#KillSwitchImpl",
             "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
-            "scripts/dot_supervisor_extensions.ts#<module>",
-            "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+            "libs/core/authority.ts#<module>"
           ]
         },
         "knowledge_steward": {
