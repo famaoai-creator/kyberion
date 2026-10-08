@@ -660,6 +660,12 @@
       "note": "G02: learning-signal harvest cursor/cluster state (libs/core/knowledge/learning-signal-adapter.ts STATE_DOMAIN); the adapter prunes clusters itself (CLUSTER_RETENTION_DAYS)."
     },
     {
+      "path": "active/shared/runtime/usage-ledger",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Tier/tenant-partitioned resource-usage ledgers (libs/core/metrics.ts RESOURCE_USAGE_LEDGER_ROOT): <tier>/<tenant|shared>/resource-usage.jsonl for usage whose scope carries a tenant or a personal/confidential tier; untenanted public usage stays in work/metrics/resource-usage.jsonl. Append-only cost/accounting evidence read by mission retrospectives, cost reports and generation-cost dedup, so no TTL deletion; personal/confidential subtrees are tenant_scope protected prefixes."
+    },
+    {
       "path": "active/shared/runtime/discussions",
       "artifact_class": "log",
       "action": "review_required",

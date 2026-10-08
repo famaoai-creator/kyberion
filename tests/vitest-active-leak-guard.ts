@@ -28,7 +28,9 @@ export const LIVE_STATE_ROOTS = [
   'knowledge/confidential',
   'customer',
   // Execution-metrics and resource-usage ledgers (the shared `metrics`
-  // collector); path-resolver maps them into the Vitest live sandbox.
+  // collector); path-resolver maps them into the Vitest live sandbox. The
+  // tier/tenant-partitioned usage ledgers live under `active/` (covered above,
+  // active/shared/runtime/usage-ledger/) and are sandboxed the same way.
   'work/metrics',
 ];
 
