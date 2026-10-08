@@ -249,11 +249,11 @@ export function saveOidcLoginSettings(
     updated_at: nowIso(),
   };
   if (secret !== undefined) patch.client_secret = secret === '' ? null : secret;
-  secretGuard.storeConnectionDocument(
-    OIDC_SETTINGS_DOCUMENT,
-    patch,
-    options.actor ? { actor: options.actor } : {}
-  );
+  // No .bak sibling: a cleared or rotated client secret must not linger on disk.
+  secretGuard.storeConnectionDocument(OIDC_SETTINGS_DOCUMENT, patch, {
+    backup: false,
+    ...(options.actor ? { actor: options.actor } : {}),
+  });
   const sessionKey = ensureBrowserSessionKey(options.actor);
   return {
     summary: summarizeOidcLoginSettings(),

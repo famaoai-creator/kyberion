@@ -156,7 +156,7 @@ export function listMemberIds(options: MemberRegistryPathOptions = {}): string[]
  * which the deny scans translate into "cannot disprove → deny"). A truly
  * missing/empty directory still returns `[]`.
  */
-function listMemberIdsStrict(options: MemberRegistryPathOptions = {}): string[] {
+export function listMemberIdsStrict(options: MemberRegistryPathOptions = {}): string[] {
   const dir = memberProfileDir(options);
   const safeDir = assertSafeRepositoryPath(dir, {
     allowMissingLeaf: true,

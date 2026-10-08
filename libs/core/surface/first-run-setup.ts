@@ -21,7 +21,7 @@ import { nowIso } from '../foundation/time.js';
 import { auditChain } from '../governance/audit-chain.js';
 import {
   isValidMemberId,
-  listMemberIds,
+  listMemberIdsStrict,
   readMemberProfile,
   writeMemberProfile,
   type MemberProfile,
@@ -154,7 +154,7 @@ function generateCode(): string {
  */
 function ownerCanSignIn(options: FirstRunOptions): boolean {
   try {
-    for (const memberId of listMemberIds(registryOptions(options))) {
+    for (const memberId of listMemberIdsStrict(registryOptions(options))) {
       const member = readMemberProfile(memberId, registryOptions(options));
       if (
         member?.status === 'active' &&
@@ -288,16 +288,6 @@ export function claimFirstRun(
   }
 
   if (readFirstRunStatus(options).state === 'claimed') throw new FirstRunError('claimed');
-  const registry = registryOptions(options);
-  const existingTenant = readTenantProfile(tenantSlug, registry);
-  if (existingTenant && existingTenant.status !== 'active') {
-    throw new FirstRunError('tenant_unavailable');
-  }
-  const existingMember = readMemberProfile(memberId, registry);
-  if (existingMember && existingMember.status !== 'active') {
-    throw new FirstRunError('member_unavailable');
-  }
-
   try {
     checkCode(input.code, options);
   } catch (error) {
@@ -308,6 +298,19 @@ export function claimFirstRun(
     });
     throw error;
   }
+
+  // Registry state is only disclosed to a valid code holder; the code stays
+  // usable so the operator can retry with another tenant / member id.
+  const registry = registryOptions(options);
+  const existingTenant = readTenantProfile(tenantSlug, registry);
+  if (existingTenant && existingTenant.status !== 'active') {
+    throw new FirstRunError('tenant_unavailable');
+  }
+  const existingMember = readMemberProfile(memberId, registry);
+  if (existingMember && existingMember.status !== 'active') {
+    throw new FirstRunError('member_unavailable');
+  }
+
   // Consume before any write: a code never authorizes two claims.
   storeDocument({ code_hash: null, code_expires_at: null, failed_attempts: 0 });
 
