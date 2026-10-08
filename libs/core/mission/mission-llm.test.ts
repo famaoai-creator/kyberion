@@ -1,7 +1,10 @@
 import { z } from 'zod';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import * as pathResolver from '../path-resolver.js';
+import { safeReadFile } from '../secure-io.js';
 import {
   inspectLlmResolution,
+  invokeShellProfile,
   parseLlmResponse,
   probeLlmCommandAvailability,
   registerStructuredRunner,
@@ -266,5 +269,104 @@ describe('probeLlmCommandAvailability', () => {
     expect(probeLlmCommandAvailability('codex')).toEqual({ available: true });
     process.env.KYBERION_CODEX_CLI_BIN = `${process.execPath}-missing-codex`;
     expect(probeLlmCommandAvailability('codex').available).toBe(false);
+  });
+});
+
+describe('shipped wisdom-policy claude profile', () => {
+  const originalProfile = process.env.KYBERION_WISDOM_LLM_PROFILE;
+  const shippedPolicy = JSON.parse(
+    safeReadFile(pathResolver.knowledge('product/governance/wisdom-policy.json'), {
+      encoding: 'utf8',
+    }) as string
+  ).llm;
+
+  beforeEach(() => {
+    delete process.env.KYBERION_WISDOM_LLM_PROFILE;
+  });
+
+  afterEach(() => {
+    if (originalProfile === undefined) delete process.env.KYBERION_WISDOM_LLM_PROFILE;
+    else process.env.KYBERION_WISDOM_LLM_PROFILE = originalProfile;
+  });
+
+  it('selects the claude profile when codex and gemini are unavailable', () => {
+    const isCommandAvailable = (command: string) => ({
+      available: command === 'claude',
+      reason: command === 'claude' ? undefined : 'not installed',
+    });
+    const status = inspectLlmResolution('distill', shippedPolicy, {
+      userTools: {},
+      organizationProfile: null,
+      isCommandAvailable,
+    });
+
+    expect(status.selectedProfile).toBe('claude');
+    expect(status.selectedCommand).toBe('claude');
+    expect(status.checkedProfiles.map((entry) => entry.name)).toEqual([
+      'heavy',
+      'standard',
+      'light',
+      'claude',
+    ]);
+
+    const profile = resolveLlmConfig('distill', shippedPolicy, {
+      userTools: {},
+      organizationProfile: null,
+      isCommandAvailable,
+    });
+    expect(profile).toMatchObject({
+      command: 'claude',
+      adapter: 'claude-cli',
+      args: ['-p', '{prompt}', '--output-format', 'json'],
+      response_format: 'json_envelope',
+    });
+  });
+
+  it('keeps codex first when every backend is available', () => {
+    const status = inspectLlmResolution('distill', shippedPolicy, {
+      userTools: {},
+      organizationProfile: null,
+      isCommandAvailable: () => ({ available: true }),
+    });
+
+    expect(status.selectedProfile).toBe('heavy');
+    expect(status.selectedCommand).toBe('codex');
+    expect(status.checkedProfiles.map((entry) => entry.name)).toEqual(['heavy']);
+  });
+
+  it('parses the claude print-mode JSON result envelope', () => {
+    const stdout = JSON.stringify({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      result: '```json\n{"answer": 7}\n```',
+    });
+    expect(parseLlmResponse(stdout, shippedPolicy.profiles.claude.response_format)).toEqual({
+      answer: 7,
+    });
+  });
+});
+
+describe('claude binary resolution', () => {
+  const originalBin = process.env.KYBERION_CLAUDE_CLI_BIN;
+
+  afterEach(() => {
+    if (originalBin === undefined) delete process.env.KYBERION_CLAUDE_CLI_BIN;
+    else process.env.KYBERION_CLAUDE_CLI_BIN = originalBin;
+  });
+
+  it('probes and runs the pinned KYBERION_CLAUDE_CLI_BIN instead of PATH claude', () => {
+    process.env.KYBERION_CLAUDE_CLI_BIN = process.execPath;
+    expect(probeLlmCommandAvailability('claude')).toEqual({ available: true });
+    const stdout = invokeShellProfile('{"ok":true}', {
+      command: 'claude',
+      args: ['-e', 'process.stdout.write(process.argv[1])', '{prompt}'],
+      timeout_ms: 10_000,
+    });
+    expect(stdout).toBe('{"ok":true}');
+
+    // A pinned binary is never second-guessed by the PATH fallback.
+    process.env.KYBERION_CLAUDE_CLI_BIN = `${process.execPath}-missing-claude`;
+    expect(probeLlmCommandAvailability('claude').available).toBe(false);
   });
 });

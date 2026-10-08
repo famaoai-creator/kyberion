@@ -28,6 +28,14 @@
         "args": [],
         "timeout_ms": 30000,
         "response_format": "json_envelope"
+      },
+      "claude": {
+        "description": "Claude CLI fallback when codex/gemini are unavailable — print mode, JSON result envelope",
+        "command": "claude",
+        "adapter": "claude-cli",
+        "args": ["-p", "{prompt}", "--output-format", "json"],
+        "timeout_ms": 180000,
+        "response_format": "json_envelope"
       }
     },
     "purpose_map": {

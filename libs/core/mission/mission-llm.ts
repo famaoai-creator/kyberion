@@ -11,7 +11,9 @@ import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord } from '../foundation/text.js';
 import * as pathResolver from '../path-resolver.js';
 import { safeExec } from '../secure-io.js';
+import { resolveClaudeCliFallbackCandidates } from '../provider/claude-cli-resolution.js';
 import { resolveCodexBinary, runCodexCliQuery } from '../provider/codex-cli-query.js';
+import { resolveProviderCliCommand } from '../provider/provider-managed-env.js';
 import { runGeminiCliQuery } from '../provider/gemini-cli-backend.js';
 import {
   loadOrganizationProfile,
@@ -158,20 +160,10 @@ export function isToolAvailable(command: string, userTools: UserLlmTools): boole
   return userTools.available.includes(command);
 }
 
-export function probeLlmCommandAvailability(command: string): {
-  available: boolean;
-  reason?: string;
-} {
-  // The codex-cli adapter refuses project-local shims; probe the binary it would
-  // actually run, so a shim on PATH does not make a codex profile look available.
-  let executable = command;
-  if (command === 'codex') {
-    try {
-      executable = resolveCodexBinary();
-    } catch (err: unknown) {
-      return { available: false, reason: err instanceof Error ? err.message : String(err) };
-    }
-  }
+function probeExecutableVersion(
+  executable: string,
+  command: string
+): { available: boolean; reason?: string } {
   const cached = commandAvailabilityCache.get(executable);
   if (cached) return cached;
 
@@ -189,10 +181,58 @@ export function probeLlmCommandAvailability(command: string): {
   }
 }
 
+/**
+ * Resolve the claude binary the same way provider discovery does
+ * (`checkClaude`): KYBERION_CLAUDE_CLI_BIN / managed env first, then — unless
+ * the operator pinned a binary — the real CLIs outside `node_modules/.bin`, so
+ * the pnpm placeholder shim does not hide an installed `claude`.
+ */
+function resolveClaudeExecutable(): {
+  executable: string | null;
+  availability: { available: boolean; reason?: string };
+} {
+  const primary = resolveProviderCliCommand('claude');
+  const primaryAvailability = probeExecutableVersion(primary, 'claude');
+  if (primaryAvailability.available) {
+    return { executable: primary, availability: primaryAvailability };
+  }
+  if (!getRegisteredEnvText('KYBERION_CLAUDE_CLI_BIN')?.trim()) {
+    for (const candidate of resolveClaudeCliFallbackCandidates()) {
+      if (candidate === primary) continue;
+      const fallback = probeExecutableVersion(candidate, 'claude');
+      if (fallback.available) return { executable: candidate, availability: fallback };
+    }
+  }
+  return { executable: null, availability: primaryAvailability };
+}
+
+export function probeLlmCommandAvailability(command: string): {
+  available: boolean;
+  reason?: string;
+} {
+  // The codex-cli adapter refuses project-local shims; probe the binary it would
+  // actually run, so a shim on PATH does not make a codex profile look available.
+  let executable = command;
+  if (command === 'codex') {
+    try {
+      executable = resolveCodexBinary();
+    } catch (err: unknown) {
+      return { available: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+  }
+  if (command === 'claude') return resolveClaudeExecutable().availability;
+  return probeExecutableVersion(executable, command);
+}
+
 export function invokeShellProfile(prompt: string, profile: LlmProfile): string {
   const args = profile.args.map((arg) => (arg === '{prompt}' ? prompt : arg));
   const timeoutMs = profile.timeout_ms || 120_000;
-  const stdout = safeExec(profile.command, args, { timeoutMs });
+  // Run the claude binary the probe admitted, not whatever `claude` PATH yields.
+  const executable =
+    profile.command === 'claude'
+      ? (resolveClaudeExecutable().executable ?? profile.command)
+      : profile.command;
+  const stdout = safeExec(executable, args, { timeoutMs });
   return stdout;
 }
 
