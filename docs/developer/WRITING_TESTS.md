@@ -125,10 +125,10 @@ Some gates fail when a test adds something new:
 
 ## After a full run
 
-`tests/vitest-active-leak-guard.ts` (a Vitest `globalSetup`) snapshots `active/` before the run. Afterwards it lists every file the run created or grew outside `active/shared/tmp`, `active/shared/cache` and `vitest-*` roots:
+`tests/vitest-active-leak-guard.ts` (a Vitest `globalSetup`) snapshots the live-state roots before the run: `active/` and the gitignored roots outside it (`knowledge/personal/`, `knowledge/confidential/`, `customer/`), which `git status` cannot show. Afterwards it lists every file the run created or grew outside `active/shared/tmp`, `active/shared/cache` and `vitest-*` roots:
 
 ```text
-[vitest-active-leak-guard] tests wrote 3 file(s) into live active/ state … | evidence: active/shared/tmp/vitest-active-leaks.json
+[vitest-active-leak-guard] tests wrote 3 file(s) into live state (active/, knowledge/personal/, …) … | evidence: active/shared/tmp/vitest-active-leaks.json
 ```
 
 Open `active/shared/tmp/vitest-active-leaks.json` to see the files. Fix a leak in one of these ways:
@@ -136,5 +136,7 @@ Open `active/shared/tmp/vitest-active-leaks.json` to see the files. Fix a leak i
 - route the writer through `pathResolver` or `vitestLivePath`;
 - add the store's subtree to `VITEST_LIVE_SUBTREES`;
 - move the test to a fixture root.
+
+`vitestLivePath` maps only `active/` subtrees. A write to `knowledge/personal/` (for example the tenant registry) or to `customer/` needs a fixture root, a mock, or a skip of that code path under Vitest. Do not sandbox those trees: tier-guard authority depends on the real path.
 
 Set `KYBERION_TEST_LEAK_STRICT=1` to make the run fail on any leak. Also check `git status`: tracked files must never change during a test run.
