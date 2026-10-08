@@ -19,7 +19,7 @@ tags:
   ]
 importance: 9
 author: Codex
-last_updated: 2026-09-30
+last_updated: 2026-10-08
 role_affinity: [ecosystem_architect, solution_architect]
 applies_to: [pull_request, github_actions, origin/main]
 status: active
@@ -160,6 +160,7 @@ GitHub の web 画面は merge driver を使わないので、衝突表示が出
 | `active/shared/runtime/` に新しい store を追加        | 同じ PR で `storage-retention-catalog.json` に entry を追加し、`pnpm check -- --scope pr --only runtime-store-retention` を緑にする。hot path で増え続ける ledger を全件読みしない（`readJsonLinesCached`）。→ [operations-hygiene-runbook §2](./operations-hygiene-runbook.md)                                                                                                                                  |
 | daemon、常駐 loop、child process                      | in-flight guard、SIGTERM/SIGINT 処理、停止 heartbeat、child の deadline と `'error'` listener を確認する。library は stdout に書かない（`no-console`）。→ [operations-hygiene-runbook §3–§4](./operations-hygiene-runbook.md)                                                                                                                                                                                    |
 | テスト追加・変更                                      | 実行後に `active/shared/tmp/vitest-active-leaks.json` が空であること（CI は strict）。host binary 依存は所有 module の probe で skip する。→ [operations-hygiene-runbook §5](./operations-hygiene-runbook.md)                                                                                                                                                                                                    |
+| mission `evidence/` に書く generator                  | template が `deliverable` として宣言する path に書かない（存在しないときに作るのも禁止）。生成物には別のファイル名を使い、手書き deliverable が byte 単位で残る test を追加する。→ [operations-hygiene-runbook §8](./operations-hygiene-runbook.md)                                                                                                                                                              |
 | 大規模変更、release、CI failure repair                | `pnpm run validate` または `pnpm check -- --scope full` を実行し、全 test suite と未実行項目を PR 本文へ記録する。                                                                                                                                                                                                                                                                                               |
 | locale 解決・語彙文字列の変更                         | CI と同じ環境 `env -u KYBERION_LOCALE LANG=C.UTF-8 LC_ALL=C.UTF-8 CI=true ./node_modules/.bin/vitest run` でも全 suite を流す（日本語ロケールの開発機は locale 未固定の test を隠す）。→ [multi-branch-audit-delivery-lessons](../orchestration/multi-branch-audit-delivery-lessons.md)                                                                                                                          |     |
 
