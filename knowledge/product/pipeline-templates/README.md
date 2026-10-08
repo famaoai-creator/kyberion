@@ -43,7 +43,7 @@ House pattern (see `pipelines/daily-routine.json` and `pipelines/meeting-watcher
 - enable only after tenant `owner` / `repo` / secrets are filled
 - do not add Slack `post_message` (or any write) to a scheduled morning job unless the write stays behind approval
 
-`daily-github-inbox.json` ships with `schedule.enabled=false` (weekdays 08:00 Asia/Tokyo). After copy + fill-in, set `enabled: true` or register it explicitly. Delivery in the template is a local digest under `active/shared/tmp/`; Slack is an optional later step, not the default path.
+`daily-github-inbox.json` ships with `schedule.enabled=false` (weekdays 08:00 Asia/Tokyo). After copy + fill-in, set `enabled: true` or register it explicitly. Delivery in the template is a local digest under `active/shared/tmp/`; Slack is an optional later step, not the default path. The GitHub REST steps use `auth: secret-guard` and can consume a locally registered access token; execution still needs a separately authorized mission temporal grant or scoped daemon identity. Registration and a successful authentication check do not grant task authority or repository permissions.
 
 ## Notable templates
 

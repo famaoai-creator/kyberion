@@ -51,6 +51,8 @@ export function createWorkspace(root: string): Workspace {
   };
 }
 
+// Deliberately retain the established TypeScript analysis boundary. Native Node
+// launchers in this source graph use erasable TS; see the local-peer adapter note.
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts'];
 
 export function isProjectSource(ws: Workspace, file: string): boolean {
@@ -60,13 +62,14 @@ export function isProjectSource(ws: Workspace, file: string): boolean {
     !rel.includes('node_modules/') &&
     !rel.includes('/dist/') &&
     !rel.startsWith('dist/') &&
-    !rel.endsWith('.d.ts') &&
+    !rel.split('/').includes('.next') &&
+    !/\.d\.[cm]?ts$/.test(rel) &&
     SOURCE_EXTENSIONS.some((ext) => rel.endsWith(ext))
   );
 }
 
 function isTestFile(rel: string): boolean {
-  return /\.(test|spec)\.tsx?$/.test(rel) || /(^|\/)(__tests__|test|tests)\//.test(rel);
+  return /\.(test|spec)\.[cm]?[jt]sx?$/.test(rel) || /(^|\/)(__tests__|test|tests)\//.test(rel);
 }
 
 export function collectSources(ws: Workspace, dir: string): string[] {
@@ -84,11 +87,11 @@ export function collectSources(ws: Workspace, dir: string): string[] {
 function sourceForDistTarget(ws: Workspace, packageDir: string, target: string): string | null {
   const cleaned = target.replace(/^\.\//, '');
   const withoutDist = cleaned.replace(/^dist\//, '');
-  const stem = withoutDist.replace(/\.(m?js|d\.ts)$/, '');
+  const stem = withoutDist.replace(/\.(?:d\.[cm]?ts|[cm]?js|jsx)$/, '');
   for (const candidate of [stem, `src/${stem}`]) {
     for (const ext of SOURCE_EXTENSIONS) {
       const file = path.join(packageDir, `${candidate}${ext}`);
-      if (ws.isFile(file)) return file;
+      if (isProjectSource(ws, file) && ws.isFile(file)) return file;
     }
   }
   return null;
@@ -137,6 +140,7 @@ function loadWorkspacePackages(ws: Workspace): Map<string, WorkspacePackage> {
 }
 
 function tryFile(ws: Workspace, base: string): string | null {
+  if (!isWithinRoot(ws.root, path.resolve(base))) return null;
   if (SOURCE_EXTENSIONS.some((ext) => base.endsWith(ext)) && ws.isFile(base)) return base;
   const stripped = base.replace(/\.(m?js|cjs|jsx)$/, '');
   for (const ext of SOURCE_EXTENSIONS) {
@@ -242,9 +246,9 @@ function nextAppEntries(ws: Workspace, appDir: string): string[] {
   });
 }
 
-/** Root package.json script body for `pnpm <script>` surface commands. */
-function rootPackageScript(ws: Workspace, name: string): string | null {
-  const manifestPath = ws.abs('package.json');
+/** Package script body in the launcher's actual working directory. */
+function packageScript(ws: Workspace, dir: string, name: string): string | null {
+  const manifestPath = path.join(dir, 'package.json');
   if (!ws.isFile(manifestPath)) return null;
   const manifest = readSafeJsonFile<{ scripts?: Record<string, string> }>(
     manifestPath,
@@ -254,46 +258,81 @@ function rootPackageScript(ws: Workspace, name: string): string | null {
   return typeof script === 'string' ? script : null;
 }
 
+/** A manifest-owned workspace app, not dependency code or an arbitrary directory. */
+function isWorkspaceNextApp(ws: Workspace, dir: string): boolean {
+  if (!isWithinRoot(ws.root, dir)) return false;
+  const manifestPath = path.join(dir, 'package.json');
+  if (!ws.isFile(manifestPath)) return false;
+  const manifest = readSafeJsonFile<{
+    dependencies?: Record<string, unknown>;
+    devDependencies?: Record<string, unknown>;
+  }>(manifestPath, 'Next workspace package manifest');
+  const dependency = manifest.dependencies?.next ?? manifest.devDependencies?.next;
+  return (
+    typeof dependency === 'string' &&
+    ['app', 'pages', 'src/app', 'src/pages'].some((entry) => ws.isDirectory(path.join(dir, entry)))
+  );
+}
+
 function entriesForCommand(ws: Workspace, entry: SurfaceManifestEntry): string[] {
   const args = entry.args ?? [];
-  // Workspace Next.js launchers execute dependency code, but authority belongs
-  // to the app sources in their declared working directory.
+  const cwd = path.resolve(ws.root, entry.cwd ?? '.');
+  if (!isWithinRoot(ws.root, cwd)) return [];
+  // Next discovers routes without static imports. Include every app source,
+  // including a real custom server, rather than hiding dynamically loaded routes.
+  const withAppSources = (files: string[]): string[] =>
+    [
+      ...new Set(
+        files.length > 0 && isWorkspaceNextApp(ws, cwd)
+          ? [...files, ...nextAppEntries(ws, cwd)]
+          : files
+      ),
+    ].sort(compareCodeUnits);
   if (
     entry.command === 'node' &&
     args[0]?.replace(/\\/g, '/') === 'node_modules/next/dist/bin/next' &&
     entry.cwd
   ) {
-    return nextAppEntries(ws, ws.abs(entry.cwd));
+    return nextAppEntries(ws, cwd);
   }
   if (entry.command === 'pnpm') {
     const dirIndex = args.indexOf('--dir');
     if (dirIndex >= 0 && args[dirIndex + 1]) {
-      return nextAppEntries(ws, ws.abs(args[dirIndex + 1]));
+      const dir = path.resolve(cwd, args[dirIndex + 1]);
+      return isWithinRoot(ws.root, dir) ? nextAppEntries(ws, dir) : [];
     }
-    // `pnpm <script>`: follow the root package.json script to its entry file.
-    const script = args[0] ? rootPackageScript(ws, args[0]) : null;
+    const script = args[0] ? packageScript(ws, cwd, args[0]) : null;
     if (script) {
-      return script
-        .split(/\s+/u)
-        .map((token) => sourceForScriptReference(ws, token))
-        .filter((source): source is string => Boolean(source));
+      return withAppSources(
+        script
+          .split(/\s+/u)
+          .map((token) => sourceForScriptReference(ws, token, cwd))
+          .filter((source): source is string => Boolean(source))
+      );
     }
   }
   const files: string[] = [];
   for (const arg of args) {
-    const source = sourceForScriptReference(ws, arg);
+    const source = sourceForScriptReference(ws, arg, cwd);
     if (source) files.push(source);
   }
-  return files;
+  return withAppSources(files);
 }
 
 /**
- * `dist/x/y.js`, `x/y.ts`, `./x/y.js`, `pkg/dist/y.js` → the TypeScript
- * source, when it exists (a workspace package's `dist/` maps to its `src/`).
+ * Resolve a runtime script relative to its working directory. Dist references
+ * map back to authored sources; dependency, generated, declaration and outside
+ * paths never become analyzer roots.
  */
-export function sourceForScriptReference(ws: Workspace, reference: string): string | null {
-  const cleaned = reference.replace(/^\.\//, '').replace(/^dist\//, '');
-  if (!/\.(m?[jt]s|tsx)$/.test(cleaned)) return null;
+export function sourceForScriptReference(
+  ws: Workspace,
+  reference: string,
+  cwd: string = ws.root
+): string | null {
+  if (!/\.(?:[cm]?[jt]s|[jt]sx)$/.test(reference)) return null;
+  const absolute = path.resolve(cwd, reference);
+  if (!isWithinRoot(ws.root, absolute)) return null;
+  const cleaned = ws.rel(absolute).replace(/^dist\//, '');
   const candidates = [cleaned];
   if (cleaned.includes('/dist/')) candidates.push(cleaned.replace('/dist/', '/src/'));
   for (const candidate of candidates) {
@@ -354,7 +393,7 @@ export function createProgram(
     getSourceFile(fileName, languageVersion) {
       if (sourceFiles.has(fileName)) return sourceFiles.get(fileName);
       let sourceFile: ts.SourceFile | undefined;
-      if (ws.isFile(fileName)) {
+      if (isProjectSource(ws, fileName) && ws.isFile(fileName)) {
         const kind = fileName.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
         sourceFile = ts.createSourceFile(fileName, ws.read(fileName), languageVersion, true, kind);
       }
@@ -377,7 +416,11 @@ export function createProgram(
           resolvedModule: resolvedFileName
             ? {
                 resolvedFileName,
-                extension: resolvedFileName.endsWith('.tsx') ? ts.Extension.Tsx : ts.Extension.Ts,
+                extension: resolvedFileName.endsWith('.tsx')
+                  ? ts.Extension.Tsx
+                  : resolvedFileName.endsWith('.mts')
+                    ? ts.Extension.Mts
+                    : ts.Extension.Ts,
                 isExternalLibraryImport: false,
               }
             : undefined,

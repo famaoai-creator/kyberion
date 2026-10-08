@@ -236,7 +236,8 @@ function resolveRetryPolicy(...sources: Array<Record<string, unknown> | undefine
 export function buildRetryOptions(
   serviceConfig: Record<string, unknown>,
   preset: Record<string, unknown>,
-  operation: Record<string, any>
+  operation: Record<string, any>,
+  options: { recordUnclassifiedErrors?: boolean } = {}
 ): Required<RetryPolicy> & { shouldRetry: (error: Error) => boolean } {
   const retryableCategories = new Set<string>();
   for (const source of [serviceConfig, preset, operation]) {
@@ -253,7 +254,9 @@ export function buildRetryOptions(
   };
 
   const shouldRetry = (error: Error) => {
-    const classification = classifyError(error);
+    const classification = classifyError(error, {
+      recordUnclassified: options.recordUnclassifiedErrors,
+    });
     if (retryableCategories.size > 0) {
       return retryableCategories.has(classification.category);
     }

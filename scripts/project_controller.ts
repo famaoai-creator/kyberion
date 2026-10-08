@@ -8,6 +8,7 @@ import {
   getProjectManagementView,
   listManagedProjects,
   reconcileProjectOperationalState,
+  restoreManagedProject,
   updateManagedProjectTrack,
   updateManagedProject,
 } from '@agent/core/project/project-management';
@@ -34,6 +35,18 @@ function optionValue(argv: string[], name: string): string | undefined {
 
 function hasFlag(argv: string[], name: string): boolean {
   return argv.includes(name);
+}
+
+function validateOptions(argv: string[], options: string[], flags = ['--json']): void {
+  for (let index = 0; index < argv.length; index++) {
+    const token = argv[index];
+    if (!token.startsWith('--')) continue;
+    if (flags.includes(token)) continue;
+    if (!options.includes(token)) throw new Error(`Unknown option: ${token}`);
+    if (!argv[index + 1] || argv[index + 1].startsWith('--'))
+      throw new Error(`${token} requires a value`);
+    index++;
+  }
 }
 
 function requiredOption(argv: string[], name: string): string {
@@ -69,8 +82,15 @@ function printProjectList(): void {
 }
 
 function printHelp(): void {
+  const trackHelp =
+    '  track update <TRACK_ID> [--name <TEXT>] [--summary <TEXT>] [--status <planned|active|paused|completed|archived>] [--tenant-slug <SLUG>] [--track-type <TYPE>] [--lifecycle-model <MODEL>] [--primary-locale <LOCALE>] [--release-id <ID>] [--change-scope <TEXT>] [--gate-profile-id <ID>] [--required-artifacts <CSV>] [--metadata <JSON>] [--json]';
+  const lifecycleHelp =
+    '  restore <PROJECT_ID> [--reason <TEXT>] [--json]; track pause|resume|complete|archive <TRACK_ID> [--reason <TEXT>] [--json]';
   printOutput(
-    `Project controller\n\nCommands:\n  list [--json]\n  show <PROJECT_ID> [--json]\n  create --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--project-path <PATH>] [--pipeline-refs <CSV>] [--objective-ids <CSV>] [--status <STATUS>] [--primary-locale <LOCALE>] [--dry-run] [--json]\n  scaffold <PROJECT_ID> [--json]\n  track create --track-id <ID> --project-id <ID> --name <NAME> --summary <TEXT> [--track-type <TYPE>] [--lifecycle-model <MODEL>] [--status <STATUS>] [--release-id <ID>] [--required-artifacts <CSV>] [--json]\n  track update --track-id <ID> --tenant-slug <SLUG> [--json]\n  update|update-status <PROJECT_ID> [--name <NAME>] [--summary <TEXT>] [--status <STATUS>] [--primary-locale <LOCALE>] [--pipeline-refs <CSV>] [--objective-ids <CSV>] [--metadata <JSON>] [--json]\n  archive <PROJECT_ID> [--reason <TEXT>] [--json]\n  reconcile [PROJECT_ID] [--dry-run|--apply] [--cross-scope] [--json]\n  bootstrap --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--utterance <TEXT>] [--track-id <ID>] [--track-name <NAME>] [--pipeline-refs <CSV>] [--service-bindings <CSV>] [--json]\n\nReconcile defaults to dry-run; pass --apply to repair registry and operational state. Pass --cross-scope as sovereign to audit state records outside the project's tenant/tier.`
+    `Project controller\n\nCommands:\n  list [--json]\n  show <PROJECT_ID> [--json]\n  create --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--project-path <PATH>] [--pipeline-refs <CSV>] [--objective-ids <CSV>] [--status <STATUS>] [--primary-locale <LOCALE>] [--dry-run] [--json]\n  scaffold <PROJECT_ID> [--json]\n  track create --track-id <ID> --project-id <ID> --name <NAME> --summary <TEXT> [--track-type <TYPE>] [--lifecycle-model <MODEL>] [--status <STATUS>] [--release-id <ID>] [--required-artifacts <CSV>] [--json]\n  track update --track-id <ID> --tenant-slug <SLUG> [--json]\n  update|update-status <PROJECT_ID> [--name <NAME>] [--summary <TEXT>] [--status <STATUS>] [--primary-locale <LOCALE>] [--pipeline-refs <CSV>] [--objective-ids <CSV>] [--metadata <JSON>] [--json]\n  archive <PROJECT_ID> [--reason <TEXT>] [--json]\n  reconcile [PROJECT_ID] [--dry-run|--apply] [--cross-scope] [--json]\n  bootstrap --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--utterance <TEXT>] [--track-id <ID>] [--track-name <NAME>] [--pipeline-refs <CSV>] [--service-bindings <CSV>] [--json]\n\nReconcile defaults to dry-run; pass --apply to repair registry and operational state. Pass --cross-scope as sovereign to audit state records outside the project's tenant/tier.`.replace(
+      '  track update --track-id <ID> --tenant-slug <SLUG> [--json]',
+      `${trackHelp}\n${lifecycleHelp}`
+    )
   );
 }
 
@@ -182,10 +202,67 @@ async function mainImpl(args: string[] = []): Promise<void> {
     }
     case 'track': {
       const [trackCommand, ...trackArgv] = argv;
-      if (trackCommand === 'update') {
-        const record = updateManagedProjectTrack(requiredOption(trackArgv, '--track-id'), {
-          tenant_slug: requiredOption(trackArgv, '--tenant-slug'),
-        });
+      if (['update', 'pause', 'resume', 'complete', 'archive'].includes(trackCommand)) {
+        validateOptions(trackArgv, [
+          '--track-id',
+          '--tenant-slug',
+          '--name',
+          '--summary',
+          '--status',
+          '--track-type',
+          '--lifecycle-model',
+          '--primary-locale',
+          '--release-id',
+          '--change-scope',
+          '--gate-profile-id',
+          '--required-artifacts',
+          '--metadata',
+          '--reason',
+        ]);
+        const patch: Parameters<typeof updateManagedProjectTrack>[1] = {};
+        const textFields = [
+          'tenant_slug',
+          'name',
+          'summary',
+          'primary_locale',
+          'release_id',
+          'change_scope',
+          'gate_profile_id',
+        ] as const;
+        for (const field of textFields) {
+          const value = optionValue(trackArgv, `--${field.replaceAll('_', '-')}`);
+          if (value !== undefined) patch[field] = value;
+        }
+        if (optionValue(trackArgv, '--track-type'))
+          patch.track_type = parseTrackType(optionValue(trackArgv, '--track-type'));
+        if (optionValue(trackArgv, '--lifecycle-model'))
+          patch.lifecycle_model = parseLifecycleModel(optionValue(trackArgv, '--lifecycle-model'));
+        if (optionValue(trackArgv, '--status'))
+          patch.status = parseTrackStatus(optionValue(trackArgv, '--status'));
+        if (hasFlag(trackArgv, '--required-artifacts'))
+          patch.required_artifacts = csvOption(trackArgv, '--required-artifacts') || [];
+        const metadata = parseProjectMetadata(optionValue(trackArgv, '--metadata'));
+        if (metadata) patch.metadata = metadata;
+        const lifecycleStatus: Record<string, ProjectTrackRecord['status']> = {
+          pause: 'paused',
+          resume: 'active',
+          complete: 'completed',
+          archive: 'archived',
+        };
+        if (trackCommand !== 'update') {
+          if (patch.status !== undefined)
+            throw new Error('--status cannot be combined with a track lifecycle command');
+          patch.status = lifecycleStatus[trackCommand];
+          const reason = optionValue(trackArgv, '--reason');
+          if (reason) patch.metadata = { ...patch.metadata, lifecycle_reason: reason };
+        } else if (hasFlag(trackArgv, '--reason'))
+          throw new Error('--reason requires a track lifecycle command');
+        if (!Object.keys(patch).length) throw new Error('Track update requires at least one field');
+        const trackId =
+          trackArgv[0] && !trackArgv[0].startsWith('--')
+            ? trackArgv[0]
+            : requiredOption(trackArgv, '--track-id');
+        const record = updateManagedProjectTrack(trackId, patch);
         if (hasFlag(trackArgv, '--json')) jsonOutput(record);
         else printOutput(`Updated project track ${record.track_id}`);
         return;
@@ -208,6 +285,18 @@ async function mainImpl(args: string[] = []): Promise<void> {
           : {}),
         ...(optionValue(trackArgv, '--release-id')
           ? { release_id: optionValue(trackArgv, '--release-id') }
+          : {}),
+        ...(optionValue(trackArgv, '--change-scope')
+          ? { change_scope: optionValue(trackArgv, '--change-scope') }
+          : {}),
+        ...(optionValue(trackArgv, '--gate-profile-id')
+          ? { gate_profile_id: optionValue(trackArgv, '--gate-profile-id') }
+          : {}),
+        ...(optionValue(trackArgv, '--primary-locale')
+          ? { primary_locale: optionValue(trackArgv, '--primary-locale') }
+          : {}),
+        ...(parseProjectMetadata(optionValue(trackArgv, '--metadata'))
+          ? { metadata: parseProjectMetadata(optionValue(trackArgv, '--metadata')) }
           : {}),
         ...(csvOption(trackArgv, '--required-artifacts')
           ? { required_artifacts: csvOption(trackArgv, '--required-artifacts') }
@@ -254,6 +343,16 @@ async function mainImpl(args: string[] = []): Promise<void> {
     }
     case 'update':
     case 'update-status': {
+      validateOptions(argv, [
+        '--project-id',
+        '--name',
+        '--summary',
+        '--status',
+        '--primary-locale',
+        '--pipeline-refs',
+        '--objective-ids',
+        '--metadata',
+      ]);
       const projectId = positional || requiredOption(argv, '--project-id');
       const metadataRaw = optionValue(argv, '--metadata');
       const patch = {
@@ -279,10 +378,19 @@ async function mainImpl(args: string[] = []): Promise<void> {
       return;
     }
     case 'archive': {
+      validateOptions(argv, ['--project-id', '--reason']);
       const projectId = positional || requiredOption(argv, '--project-id');
       const record = archiveManagedProject(projectId, optionValue(argv, '--reason'));
       if (json) jsonOutput(record);
       else printOutput(`Archived project ${record.project_id}`);
+      return;
+    }
+    case 'restore': {
+      validateOptions(argv, ['--project-id', '--reason']);
+      const projectId = positional || requiredOption(argv, '--project-id');
+      const record = restoreManagedProject(projectId, optionValue(argv, '--reason'));
+      if (json) jsonOutput(record);
+      else printOutput(`Restored project ${record.project_id}`);
       return;
     }
     case 'reconcile': {

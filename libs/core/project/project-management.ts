@@ -19,12 +19,7 @@ import {
   saveProjectOperationalState,
   type ProjectOperationalState,
 } from './project-operational-state-registry.js';
-import {
-  listProjectTracksForProject,
-  loadProjectTrackRecord,
-  saveProjectTrackRecord,
-  type ProjectTrackRecord,
-} from './project-track-registry.js';
+import { listProjectTracksForProject, loadProjectTrackRecord } from './project-track-registry.js';
 import { assertManagedProjectTrackScope } from './project-track-scope.js';
 
 function kyberionEnv(name: string): string | undefined {
@@ -89,6 +84,12 @@ import {
   workerProjectScopeId,
 } from './project-view-scope.js';
 import { projectLineageTasks } from './project-task-view.js';
+import { createProjectTrackMutations } from './project-track-mutations.js';
+import {
+  ACTIVE_TASK_SESSION_STATUSES,
+  assertProjectCanArchive,
+  assertProjectLifecycleOwner,
+} from './project-lifecycle-guards.js';
 
 export interface ProjectManagementView {
   project: ProjectRecord;
@@ -195,34 +196,9 @@ export interface ProjectBootstrapResult {
   work_items: ProjectBootstrapWorkItem[];
 }
 
-export interface ManagedProjectTrackCreateInput {
-  track_id: string;
-  project_id: string;
-  name: string;
-  summary: string;
-  track_type?: ProjectTrackRecord['track_type'];
-  lifecycle_model?: ProjectTrackRecord['lifecycle_model'];
-  status?: ProjectTrackRecord['status'];
-  tier?: ProjectTrackRecord['tier'];
-  primary_locale?: string;
-  release_id?: string;
-  change_scope?: string;
-  gate_profile_id?: string;
-  required_artifacts?: string[];
-  metadata?: Record<string, unknown>;
-}
+export type { ManagedProjectTrackCreateInput } from './project-track-mutations.js';
 
 const ACTIVE_MISSION_STATUSES = ACTIVE_PROJECT_MISSION_STATUSES;
-const ACTIVE_TASK_SESSION_STATUSES = new Set([
-  'awaiting_instruction',
-  'collecting_requirements',
-  'planning',
-  'awaiting_confirmation',
-  'executing',
-  'verifying',
-  'blocked',
-  'paused',
-]);
 
 function normalizeId(value: string, label: string): string {
   const normalized = String(value || '').trim();
@@ -230,139 +206,13 @@ function normalizeId(value: string, label: string): string {
   return normalized;
 }
 
-export function createManagedProjectTrack(
-  input: ManagedProjectTrackCreateInput
-): ProjectTrackRecord {
-  const projectId = normalizeId(input.project_id, 'project_id');
-  const trackId = normalizeId(input.track_id, 'track_id');
-  const name = normalizeId(input.name, 'name');
-  const summary = normalizeId(input.summary, 'summary');
-  const project = loadProjectRecord(projectId);
-  if (!project) throw new Error(`Project not found: ${projectId}`);
-  if (loadProjectTrackRecord(trackId)) throw new Error(`Project track already exists: ${trackId}`);
-  const tier = input.tier || project.tier;
-  if (tier !== project.tier) {
-    throw new Error(
-      `Project track tier '${tier}' must match project tier '${project.tier}' (${projectId}).`
-    );
+export const { createManagedProjectTrack, updateManagedProjectTrack } = createProjectTrackMutations(
+  {
+    reconcile: (projectId) => {
+      reconcileProjectOperationalState(projectId, { apply: true });
+    },
   }
-  const record: ProjectTrackRecord = {
-    track_id: trackId,
-    project_id: projectId,
-    name,
-    summary,
-    status: input.status || 'active',
-    track_type: input.track_type || 'release',
-    lifecycle_model: input.lifecycle_model || 'continuous_delivery',
-    tier,
-    ...(project.tenant_slug ? { tenant_slug: project.tenant_slug } : {}),
-    ...(input.primary_locale || project.primary_locale
-      ? { primary_locale: input.primary_locale || project.primary_locale }
-      : {}),
-    ...(input.release_id ? { release_id: input.release_id } : {}),
-    ...(input.change_scope ? { change_scope: input.change_scope } : {}),
-    ...(input.gate_profile_id ? { gate_profile_id: input.gate_profile_id } : {}),
-    ...(input.required_artifacts ? { required_artifacts: [...input.required_artifacts] } : {}),
-    ...(input.metadata ? { metadata: { ...input.metadata } } : {}),
-  };
-  const currentDefaultTrack = project.default_track_id
-    ? loadProjectTrackRecord(project.default_track_id)
-    : null;
-  const hasUsableDefaultTrack = Boolean(
-    currentDefaultTrack &&
-    currentDefaultTrack.status === 'active' &&
-    isTrackInProjectScope(currentDefaultTrack, project)
-  );
-  const stateQuery = {
-    projectId,
-    tier: project.tier,
-    tenantSlug: project.tenant_slug,
-  };
-  const previousStatePaths = listProjectOperationalStatePaths(stateQuery);
-  const previousStates = listProjectOperationalStates(stateQuery);
-  const trackPath = saveProjectTrackRecord(record);
-  try {
-    saveProjectRecord({
-      ...project,
-      ...(hasUsableDefaultTrack || record.status !== 'active' ? {} : { default_track_id: trackId }),
-      active_tracks:
-        record.status === 'active'
-          ? sortedUnique([...(project.active_tracks || []), trackId])
-          : sortedUnique(project.active_tracks),
-    });
-    reconcileProjectOperationalState(projectId, { apply: true });
-    auditChain.record({
-      agentId: kyberionEnv('KYBERION_PERSONA') || 'project_controller',
-      action: 'project.track_created',
-      operation: `create:${trackId}`,
-      result: 'completed',
-      metadata: { project_id: projectId, track_id: trackId, tier },
-    });
-  } catch (error) {
-    safeUnlinkSync(trackPath);
-    try {
-      saveProjectRecord(project);
-      for (const statePath of listProjectOperationalStatePaths(stateQuery)) {
-        if (!previousStatePaths.includes(statePath)) safeUnlinkSync(statePath);
-      }
-      for (const state of previousStates) saveProjectOperationalState(state);
-    } catch {
-      // Preserve the original failure; the next governed reconcile reports any residue.
-    }
-    throw error;
-  }
-  return record;
-}
-
-export function updateManagedProjectTrack(
-  trackId: string,
-  patch: Pick<ProjectTrackRecord, 'tenant_slug'>
-): ProjectTrackRecord {
-  const current = loadProjectTrackRecord(normalizeId(trackId, 'track_id'));
-  if (!current) throw new Error(`Project track not found: ${trackId}`);
-  const project = loadProjectRecord(current.project_id);
-  if (!project) throw new Error(`Project not found: ${current.project_id}`);
-  if (patch.tenant_slug && patch.tenant_slug !== project.tenant_slug) {
-    throw new Error(
-      `Project track tenant '${patch.tenant_slug}' must match project tenant '${project.tenant_slug || 'shared'}'.`
-    );
-  }
-  const next = {
-    ...current,
-    ...(patch.tenant_slug ? { tenant_slug: patch.tenant_slug } : {}),
-  };
-  const stateQuery = {
-    projectId: current.project_id,
-    tier: project.tier,
-    tenantSlug: project.tenant_slug,
-  };
-  const previousStatePaths = listProjectOperationalStatePaths(stateQuery);
-  const previousStates = listProjectOperationalStates(stateQuery);
-  saveProjectTrackRecord(next);
-  try {
-    reconcileProjectOperationalState(current.project_id, { apply: true });
-    auditChain.record({
-      agentId: kyberionEnv('KYBERION_PERSONA') || 'project_controller',
-      action: 'project.track_updated',
-      operation: `update:${current.track_id}`,
-      result: 'completed',
-      metadata: { project_id: current.project_id, track_id: current.track_id },
-    });
-  } catch (error) {
-    try {
-      saveProjectTrackRecord(current);
-      saveProjectRecord(project);
-      for (const statePath of listProjectOperationalStatePaths(stateQuery)) {
-        if (!previousStatePaths.includes(statePath)) safeUnlinkSync(statePath);
-      }
-      for (const state of previousStates) saveProjectOperationalState(state);
-    } catch {
-      // Preserve the original failure; the next governed reconcile reports any residue.
-    }
-    throw error;
-  }
-  return next;
-}
+);
 
 export function assertManagedProjectId(value: string): string {
   const normalized = normalizeId(value, 'project_id');
@@ -686,13 +536,39 @@ export function updateManagedProject(
     >
   >
 ): ProjectRecord {
+  return updateManagedProjectInternal(projectId, patch);
+}
+
+function updateManagedProjectInternal(
+  projectId: string,
+  patch: Partial<
+    Pick<
+      ProjectRecord,
+      | 'name'
+      | 'summary'
+      | 'status'
+      | 'primary_locale'
+      | 'metadata'
+      | 'pipeline_refs'
+      | 'objective_ids'
+    >
+  >,
+  restoring = false
+): ProjectRecord {
+  assertProjectLifecycleOwner();
   const current = loadProjectRecord(normalizeId(projectId, 'project_id'));
   if (!current) throw new Error(`Project not found: ${projectId}`);
-  if (current.status === 'archived' && patch.status !== 'archived') {
+  if (
+    current.status === 'archived' &&
+    patch.status !== undefined &&
+    patch.status !== 'archived' &&
+    !restoring
+  ) {
     throw new Error(
       `Archived project must be restored through an explicit lifecycle operation: ${projectId}`
     );
   }
+  if (patch.status === 'archived') assertProjectCanArchive(current);
   const next = {
     ...current,
     ...patch,
@@ -700,15 +576,71 @@ export function updateManagedProject(
     ...(patch.objective_ids ? { objective_ids: sortedUnique(patch.objective_ids) } : {}),
   } satisfies ProjectRecord;
   if (patch.objective_ids) assertProjectObjectiveLinks(next);
-  saveProjectRecord(next);
-  auditChain.record({
-    agentId: kyberionEnv('KYBERION_PERSONA') || 'project_controller',
-    action: 'project.updated',
-    operation: `update:${current.project_id}`,
-    result: 'completed',
-    metadata: { project_id: current.project_id, fields: Object.keys(patch) },
-  });
-  return next;
+  const stateQuery = {
+    projectId: current.project_id,
+    tier: current.tier,
+    tenantSlug: current.tenant_slug,
+  };
+  const previousStates = listProjectOperationalStates(stateQuery);
+  const previousStatePaths = listProjectOperationalStatePaths(stateQuery);
+  try {
+    saveProjectRecord(next);
+    reconcileProjectOperationalState(current.project_id, { apply: true });
+    for (const state of listProjectOperationalStates(stateQuery)) {
+      saveProjectOperationalState({
+        ...state,
+        name: next.name,
+        summary: next.summary,
+        status: next.status,
+        updated_at: nowIso(),
+      });
+    }
+    auditChain.record({
+      agentId: kyberionEnv('KYBERION_PERSONA') || 'project_controller',
+      action: restoring
+        ? 'project.restored'
+        : patch.status === 'archived'
+          ? 'project.archived'
+          : 'project.updated',
+      operation: `update:${current.project_id}`,
+      result: 'completed',
+      metadata: { project_id: current.project_id, fields: Object.keys(patch) },
+    });
+  } catch (error) {
+    try {
+      saveProjectRecord(current);
+      for (const statePath of listProjectOperationalStatePaths(stateQuery)) {
+        if (!previousStatePaths.includes(statePath)) safeUnlinkSync(statePath);
+      }
+      for (const state of previousStates) saveProjectOperationalState(state);
+    } catch {
+      // Preserve the original failure; governed reconciliation reports any residue.
+    }
+    throw error;
+  }
+  return loadProjectRecord(current.project_id)!;
+}
+
+export function restoreManagedProject(
+  projectId: string,
+  reason = 'Project restored'
+): ProjectRecord {
+  const current = loadProjectRecord(normalizeId(projectId, 'project_id'));
+  if (!current) throw new Error(`Project not found: ${projectId}`);
+  if (current.status !== 'archived') throw new Error(`Project is not archived: ${projectId}`);
+  if (current.organization_id) {
+    const organization = loadOrganizationOperationalState(current.organization_id, {
+      tier: current.tier,
+      tenantSlug: current.tenant_slug,
+    });
+    if (!organization || organization.status !== 'active')
+      throw new Error(`Activate organization before restoring project: ${current.organization_id}`);
+  }
+  return updateManagedProjectInternal(
+    projectId,
+    { status: 'active', metadata: { lifecycle_reason: reason, restored_at: nowIso() } },
+    true
+  );
 }
 
 export function archiveManagedProject(
@@ -717,21 +649,10 @@ export function archiveManagedProject(
 ): ProjectRecord {
   const current = loadProjectRecord(normalizeId(projectId, 'project_id'));
   if (!current) throw new Error(`Project not found: ${projectId}`);
-  const activeMissions = projectMissions(current.project_id).filter((mission) =>
-    ACTIVE_MISSION_STATUSES.has(mission.status)
-  );
-  if (activeMissions.length > 0) {
-    throw new Error(
-      `Cannot archive project with active missions: ${activeMissions.map((mission) => mission.mission_id).join(', ')}`
-    );
-  }
-  const archived = updateManagedProject(current.project_id, {
+  return updateManagedProject(current.project_id, {
     status: 'archived',
     metadata: { lifecycle_reason: reason, archived_at: nowIso() },
   });
-  const closed = { ...archived, active_missions: [], active_tracks: [], active_task_sessions: [] };
-  saveProjectRecord(closed);
-  return closed;
 }
 
 export function getProjectManagementView(

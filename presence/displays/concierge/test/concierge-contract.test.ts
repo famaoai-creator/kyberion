@@ -41,6 +41,25 @@ describe('concierge surface contract', () => {
     }
   });
 
+  it('keeps all global credential paths behind stricter local-operator admission', () => {
+    for (const route of [
+      'src/app/api/secrets/introduce/route.ts',
+      'src/app/api/secrets/apply/route.ts',
+      'src/app/api/oauth/begin/route.ts',
+      'src/app/api/services/operator/route.ts',
+    ]) {
+      const source = safeReadFile(path.join(appDir, route));
+      expect(source, route).toContain('resolveOperatorServiceAccess(req)');
+      expect(source, route).toContain('if (access.response) return access.response;');
+    }
+    const guard = safeReadFile(path.join(appDir, 'src/lib/operator-service-access.ts'));
+    expect(guard).toContain('requireConciergeMutationAccess(req)');
+    expect(guard).toContain('resolveConciergeViewer(req)');
+    expect(guard).toContain('isLoopbackPeer(req)');
+    expect(guard).toContain("viewer.source !== 'loopback'");
+    expect(guard).toMatch(/viewer\.memberId\s*\|\|\s*viewer\.registrationLabel/);
+  });
+
   it('gates every decide-effect route on owner/approver membership role', () => {
     // FD-10 wave 2 / review B4: once a member is resolved, decision effects
     // must be positively allowed by that member's role for the viewed tenant
@@ -50,8 +69,6 @@ describe('concierge surface contract', () => {
       'src/app/api/outcomes/[id]/route.ts',
       'src/app/api/memory-queue/[id]/route.ts',
       'src/app/api/hygiene/[id]/route.ts',
-      'src/app/api/secrets/introduce/route.ts',
-      'src/app/api/secrets/apply/route.ts',
       'src/app/api/plugins/[id]/route.ts',
     ];
     for (const route of decideRoutes) {
@@ -86,8 +103,6 @@ describe('concierge surface contract', () => {
       'src/app/api/outcomes/[id]/route.ts',
       'src/app/api/memory-queue/[id]/route.ts',
       'src/app/api/hygiene/[id]/route.ts',
-      'src/app/api/secrets/introduce/route.ts',
-      'src/app/api/secrets/apply/route.ts',
       'src/app/api/plugins/[id]/route.ts',
     ];
     for (const route of decideRoutes) {
@@ -180,7 +195,10 @@ describe('concierge surface contract', () => {
     expect(voiceSection).toContain('<AvatarPicker');
     expect(voiceSection).toContain('allow_camera');
     expect(voiceSection).toContain("t('setup.camera_fallback')");
-    expect(servicesSection).toContain("t('setup.services_title')");
+    expect(servicesSection).toContain("t('settings.operator_selections_title')");
+    expect(servicesSection).toContain('<OperatorServiceRegistrationPanel');
+    expect(servicesSection).not.toContain('<IntroduceSecretPanel');
+    expect(servicesSection).not.toContain('oauthCapable');
     expect(advancedSection).toContain("t('setup.management_title')");
     expect(setupPage).toContain("action: 'save_management'");
     expect(messages).toContain('プロフィールと接続準備を保存');

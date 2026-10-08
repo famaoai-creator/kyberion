@@ -83,3 +83,19 @@ export function orderSectionsForFirstRun(
   const rest = SETTINGS_CARD_SECTION_ORDER.filter((id) => !incompleteSections.has(id));
   return [...incomplete, ...rest];
 }
+
+/** An explicit empty saved selection is authoritative; only old receipts use defaults. */
+export function resolveSelectedServices(
+  catalog: ReadonlyArray<{ id: string; configured: boolean }>,
+  persisted: readonly string[] | undefined,
+  defaults: readonly string[]
+): string[] {
+  const selected =
+    persisted === undefined
+      ? catalog
+          .filter((service) => service.configured || defaults.includes(service.id))
+          .map((service) => service.id)
+      : persisted;
+  const allowed = new Set(catalog.map((service) => service.id));
+  return [...new Set(selected)].filter((id) => allowed.has(id));
+}

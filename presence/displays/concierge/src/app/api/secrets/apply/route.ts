@@ -1,68 +1,72 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { applySecretIntroduction } from '@agent/core/secret/secret-introduction';
-import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
-import { readRequestObject } from '../../../../lib/request-input';
-import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
+import { withExecutionContextAsync } from '@agent/core/authority';
+import { loadApprovalRequest } from '@agent/core/governance/approval-store';
 import {
-  conciergeDecisionDenied,
-  resolveConciergeDecidedBy,
-} from '../../../../lib/front-desk-member';
+  applySecretIntroduction,
+  SECRET_INTRODUCTION_RECOVERY_REQUIRED,
+} from '@agent/core/secret/secret-introduction';
+import { readRequestObject } from '../../../../lib/request-input';
+import {
+  operatorServiceError,
+  resolveOperatorServiceAccess,
+} from '../../../../lib/operator-service-access';
 
 export const dynamic = 'force-dynamic';
 
+/** Legacy secret form shares the same local-only, principal-bound contract. */
 export async function POST(req: NextRequest) {
-  const denied = requireConciergeMutationAccess(req);
-  if (denied) return denied;
-  const resolved = resolveConciergeViewer(req);
-  if (resolved.response) return resolved.response;
-  const decisionDenied = conciergeDecisionDenied(resolved.context);
-  if (decisionDenied) return decisionDenied;
-  const decidedBy = resolveConciergeDecidedBy(resolved.context);
-
+  const access = resolveOperatorServiceAccess(req);
+  if (access.response) return access.response;
+  const parsed = await readRequestObject(req, 'request body', [
+    'approvalId',
+    'value',
+    'channel',
+    'storageChannel',
+  ]);
+  if (!parsed.ok) return operatorServiceError('invalid_request');
+  const { body } = parsed;
+  if (
+    typeof body.approvalId !== 'string' ||
+    !/^[a-f0-9-]{36}$/i.test(body.approvalId) ||
+    typeof body.value !== 'string' ||
+    !body.value ||
+    (body.channel !== undefined && body.channel !== 'concierge') ||
+    (body.storageChannel !== undefined && body.storageChannel !== 'concierge')
+  ) {
+    return operatorServiceError('invalid_request');
+  }
   try {
-    const parsedBody = await readRequestObject(req, 'request body', [
-      'approvalId',
-      'value',
-      'channel',
-      'storageChannel',
-    ]);
-    if (!parsedBody.ok) {
-      return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
-    }
-    const { body } = parsedBody;
-    const approvalId = typeof body.approvalId === 'string' ? body.approvalId.trim() : '';
-    const value = typeof body.value === 'string' ? body.value : '';
-    if (!approvalId || !value) {
-      return NextResponse.json(
-        { ok: false, error: 'approvalId and value are required' },
-        { status: 400 }
-      );
-    }
-
-    try {
+    return await withExecutionContextAsync('sovereign_concierge', async () => {
+      const record = loadApprovalRequest('concierge', body.approvalId as string);
+      if (!record?.target?.serviceId || !record.target.secretKey)
+        return operatorServiceError('approval_required', 403);
+      const principalId = access.principal.principalId!;
       const applied = await applySecretIntroduction({
-        approvalId,
-        value,
-        channel: typeof body.channel === 'string' ? body.channel : 'concierge',
-        storageChannel: typeof body.storageChannel === 'string' ? body.storageChannel : 'concierge',
-        appliedBy: decidedBy?.id ?? 'concierge',
+        approvalId: body.approvalId as string,
+        value: body.value as string,
+        appliedBy: principalId,
+        expected: {
+          principalId,
+          serviceId: record.target.serviceId,
+          secretKey: record.target.secretKey,
+          channel: 'concierge',
+          storageChannel: 'concierge',
+        },
       });
-
-      return NextResponse.json({
-        ok: true,
-        approvalId: applied.approvalId,
-        status: applied.status,
-        envName: applied.identity.envName,
-        changedKeys: applied.changedKeys,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (/must be approved/i.test(message)) {
-        return NextResponse.json({ ok: false, error: message }, { status: 403 });
-      }
-      throw error;
-    }
+      return NextResponse.json(
+        {
+          ok: true,
+          approvalId: applied.approvalId,
+          status: applied.status,
+          envName: applied.identity.envName,
+          changedKeys: applied.changedKeys,
+        },
+        { headers: { 'Cache-Control': 'no-store' } }
+      );
+    });
   } catch (error) {
-    return conciergeErrorResponse(error, 500);
+    return error instanceof Error && error.message === SECRET_INTRODUCTION_RECOVERY_REQUIRED
+      ? operatorServiceError('recovery_required', 409)
+      : operatorServiceError('approval_required', 403);
   }
 }

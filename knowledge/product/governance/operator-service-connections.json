@@ -1,0 +1,48 @@
+{
+  "$schema": "../schemas/operator-service-connections.schema.json",
+  "version": "1.0.0",
+  "services": [
+    {
+      "serviceId": "github",
+      "label": "GitHub",
+      "secretKey": "ACCESS_TOKEN",
+      "authOperation": "authenticated_user",
+      "setupUrl": "https://github.com/settings/personal-access-tokens",
+      "scopeNotice": "Authentication confirms this token only. Repository access and write permissions still depend on its permissions and repository selection.",
+      "probe": {
+        "baseUrl": "https://api.github.com",
+        "path": "user",
+        "method": "GET",
+        "successRules": [
+          {
+            "field": "id",
+            "kind": "positive_integer"
+          },
+          {
+            "field": "login",
+            "kind": "non_empty_string"
+          }
+        ]
+      }
+    },
+    {
+      "serviceId": "slack",
+      "label": "Slack",
+      "secretKey": "ACCESS_TOKEN",
+      "authOperation": "auth_test",
+      "setupUrl": "https://api.slack.com/apps",
+      "scopeNotice": "Authentication confirms this token only. App installation, channel membership, message permissions and Socket Mode require separate setup.",
+      "probe": {
+        "baseUrl": "https://slack.com/api",
+        "path": "auth.test",
+        "method": "POST",
+        "successRules": [
+          {
+            "field": "ok",
+            "kind": "true"
+          }
+        ]
+      }
+    }
+  ]
+}
