@@ -77,7 +77,11 @@ vi.mock('../agent/agent-runtime-supervisor.js', async () => {
 
 describe('surface-runtime-orchestrator ask-only work authority', () => {
   beforeEach(() => {
-    vi.resetModules();
+    // No vi.resetModules(): the module under test and the secure-io / tier-guard /
+    // authority stack under it are imported once per file (the first `await
+    // import`; later ones hit the module cache). Re-importing that stack per test
+    // repeated its module initialisation every test (operations-hygiene-runbook §5).
+    // Per-test state is the mocks, re-armed below.
     vi.clearAllMocks();
     mocks.resolveSurfaceIntent.mockReturnValue({});
     mocks.getAgentRuntimeHandle.mockReturnValue({
