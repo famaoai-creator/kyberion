@@ -953,7 +953,7 @@ export async function recordEvidence(args: {
     const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.taskId);
     if (autoComplete.completed) {
       logger.info(`✅ Task "${args.taskId}" auto-completed (${autoComplete.reason}).`);
-      recordDirectCliTaskUsage({ ...args, state, event: 'record_evidence' });
+      recordDirectCliTaskUsage({ ...args, ...autoComplete, state, event: 'record_evidence' });
       for (const cascadedId of autoComplete.cascaded) {
         logger.info(`✅ Task "${cascadedId}" auto-completed (dependencies satisfied via cascade).`);
       }
@@ -1184,7 +1184,8 @@ export async function recordArtifactReview(args: {
     const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.reviewTaskId);
     taskCompleted = autoComplete.completed;
     const reviewer = { taskId: args.reviewTaskId, actorId: args.reviewerAgentId, state };
-    if (taskCompleted) recordDirectCliTaskUsage({ ...args, ...reviewer, event: 'review_task' });
+    if (taskCompleted)
+      recordDirectCliTaskUsage({ ...args, ...autoComplete, ...reviewer, event: 'review_task' });
     for (const cascadedId of autoComplete.cascaded) {
       logger.info(`✅ Task "${cascadedId}" auto-completed (dependencies satisfied via cascade).`);
     }
