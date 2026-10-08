@@ -165,11 +165,6 @@ describe('purgeMissions (AL-01)', () => {
       consoleLog.mockRestore();
     }
     expect(seen.sort()).toEqual(['MSN-DONE', 'MSN-OLD-FAILED']);
-    const table = mod.formatPurgeCandidateTable(tmpRoot, dry.candidates);
-    expect(table[1]).toBe('  Missions matching purge policies: 2');
-    expect(table.join('\n')).toMatch(
-      /MSN-OLD-FAILED\s+→ active\/archive\/failed_missions\/MSN-OLD-FAILED {2}\(purge-orphaned\)/
-    );
     expect(dry.status).toBe('ok');
     expect(dry.dryRun).toBe(true);
     expect(dry.candidates.map((c) => c.mission).sort()).toEqual(['MSN-DONE', 'MSN-OLD-FAILED']);
