@@ -259,7 +259,7 @@ export function settleGenerationProviderCost(
       const usageId = `generation-provider-cost:${job.job_id}`;
       const collector = options.metricsCollector || metrics;
       const alreadyRecorded = collector
-        .loadResourceUsageHistory()
+        .loadResourceUsageHistory({ scope })
         .some((entry) => entry.usage_id === usageId);
       if (!alreadyRecorded) {
         try {
