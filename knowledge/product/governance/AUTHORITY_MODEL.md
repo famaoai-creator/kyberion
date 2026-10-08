@@ -108,8 +108,12 @@ Persona も同じスコープに従います（`resolveExecutionPersona()`）。
 **ロール引き受けポリシー（多層防御）**: `SYSTEM_ROLE` が設定されたプロセスが引き受けられるのは、次のいずれかのロールだけです。それ以外を引き受けようとすると、`fn` を実行する前に `[ROLE_ASSUMPTION_DENIED]` で失敗します。
 
 - `SYSTEM_ROLE` 自身（常に許可）
-- [`role-assumption-policy.json`](./role-assumption-policy.json) の `shared_core_roles`（`libs/core` が自分のストアへ書くために呼び出し元の代わりに内部で引き受ける、範囲の狭いロール: `chronos_gateway`、`infrastructure_sentinel`、`knowledge_steward`、`slack_bridge`、`surface_runtime`）。広い権限を持つ `ecosystem_architect` / `mission_controller` / `sovereign_concierge` は共有せず、到達可能性で裏付けられたサーフェスごとに `may_assume` に理由付きで載せます。stimuli journal（`presence/bridge/runtime/stimuli.jsonl`）の追記とローテーションは、呼び出し元の引き受けに依存しないよう `infrastructure_sentinel` で書き込みます（SB-01）
+- [`role-assumption-policy.json`](./role-assumption-policy.json) の `shared_core_roles`（`libs/core` が自分のストアへ書くために呼び出し元の代わりに内部で引き受ける、範囲の狭いロール。一覧はこのファイルの `shared_core_roles.roles` が正本で、ここには写しません）。広い権限を持つ `ecosystem_architect` / `mission_controller` / `sovereign_concierge` は共有せず、到達可能性で裏付けられたサーフェスごとに `may_assume` に理由付きで載せます。stimuli journal（`presence/bridge/runtime/stimuli.jsonl`）の追記とローテーションは、呼び出し元の引き受けに依存しないよう `infrastructure_sentinel` で書き込みます（SB-01）
 - 同ファイルの `system_roles.<system role>.may_assume`
+
+**テナント監査ミラーの書き込みロール（G17）**: 監査チェーンのテナント別ミラー（`customer/<tenant>/logs/audit/`）は、`libs/core/authority.ts` が登録する seam を通じて、専用の共有コアロール `audit_mirror_writer` がエントリのテナントに束縛された状態で書き込みます。ロールとしての付与は `customer/${KYBERION_TENANT}/logs/audit/` への書き込みだけです（読み取り付与なし。Persona は `worker` なので、すべての worker が持つ `default_allow` と worker Persona の書き込み先は残ります）。`infrastructure_sentinel`（コーディネーションストアや resident dot が使う）は `customer/` への付与を持ちません。
+
+残るリスク: `withExecutionContext` はプロセス内のどのコードからも呼べるため、同じプロセスのコードは任意のテナントに束縛して `audit_mirror_writer` を引き受け、そのテナントのミラーにエントリを追記できます（`shared_core_roles` なので `SYSTEM_ROLE` の下でも拒否されません）。これは以前の `infrastructure_sentinel` への付与と同じ性質で、範囲がミラーのディレクトリだけに狭まっただけです。ミラーへの偽造・追加エントリはミラー単体では見分けられず、マスターチェーンとの突き合わせ（`auditChain.verifyTenantMirrors()`、`pnpm audit:verify` の `tenant_mirror_*` の所見）でのみ検出できます。ミラーを監査の正本として扱わず、必ずマスターチェーンと照合してください。
 
 **読み取り専用の狭いロール（TR-01）**: 個人 tier を読めないサーフェスのロールが特定の 1 ファイルだけを読む必要がある場合は、広いロールを引き受けず、そのファイルだけを許可する専用ロールを作ります。`chronos_token_registry_reader` は viewer token registry（`knowledge/personal/connections/chronos-access.json`、SHA-256 ハッシュのみ）の読み取りだけを許可し（`security-policy.json` の `allow_read` はこのファイルそのもの、`allow_write` は空。ロールとしての書き込み権限はなく、Persona `worker` と `default_allow` の書き込み先だけが残ります）、Chronos / Concierge の viewer 解決と `authn-providers` の `registry-token` プロバイダーが `withExecutionContext(CHRONOS_TOKEN_REGISTRY_READER_ROLE, …)` で使います。registry を実際に読む `chronos_mirror_v2` / `concierge` の `may_assume` にだけ載っています（`computer_surface` / `presence_studio` は `registrations: null` を渡すため registry を読みません）。
 
