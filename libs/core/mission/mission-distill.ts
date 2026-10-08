@@ -309,6 +309,13 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     const llmPolicy: LlmPolicyConfig | undefined = wisdomPolicy?.llm;
     wisdom = await runAdaptiveStructuredLlmProfile('distill', fullPrompt, WISDOM_SCHEMA, {
       policy: llmPolicy,
+      // The prompt carries the mission state and evidence: providers must
+      // clear the tier egress gate before they see it.
+      egress: {
+        // A state without a tier is treated as confidential (fail closed).
+        dataTier: state.tier || 'confidential',
+        ...(state.tenant_slug ? { tenantSlug: state.tenant_slug } : {}),
+      },
       systemPrompt:
         "You are Kyberion's Wisdom Distiller. Return exactly one JSON object matching the schema.",
     });

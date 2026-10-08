@@ -6,6 +6,7 @@
 import { type ZodType } from 'zod';
 import * as customerResolver from '../customer-resolver.js';
 import { logger } from '../core.js';
+import { formatDiagnostic } from '../logger.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord } from '../foundation/text.js';
@@ -13,7 +14,12 @@ import * as pathResolver from '../path-resolver.js';
 import { safeExec } from '../secure-io.js';
 import { resolveClaudeCliFallbackCandidates } from '../provider/claude-cli-resolution.js';
 import { resolveCodexBinary, runCodexCliQuery } from '../provider/codex-cli-query.js';
+import {
+  checkProviderEgress,
+  providerIdForReasoningIdentifier,
+} from '../provider/provider-egress-gate.js';
 import { resolveProviderCliCommand } from '../provider/provider-managed-env.js';
+import type { TierLevel } from '../types.js';
 import { runGeminiCliQuery } from '../provider/gemini-cli-backend.js';
 import {
   loadOrganizationProfile,
@@ -29,6 +35,12 @@ export interface LlmProfile {
   timeout_ms?: number;
   response_format?: string;
   adapter?: string;
+  /**
+   * How the shell-json runner hands over the prompt. `stdin` keeps mission
+   * content out of argv (process table, ARG_MAX); `argv` (default) substitutes
+   * the `{prompt}` placeholder in `args`.
+   */
+  prompt_via?: 'argv' | 'stdin';
 }
 
 export interface LlmPolicyConfig {
@@ -225,14 +237,22 @@ export function probeLlmCommandAvailability(command: string): {
 }
 
 export function invokeShellProfile(prompt: string, profile: LlmProfile): string {
-  const args = profile.args.map((arg) => (arg === '{prompt}' ? prompt : arg));
+  const viaStdin = profile.prompt_via === 'stdin';
+  if (viaStdin && profile.args.includes('{prompt}')) {
+    throw new Error(
+      `LLM profile "${profile.command}" sets prompt_via "stdin" but also has a {prompt} argv placeholder — remove the placeholder so the prompt never reaches argv`
+    );
+  }
+  const args = viaStdin
+    ? [...profile.args]
+    : profile.args.map((arg) => (arg === '{prompt}' ? prompt : arg));
   const timeoutMs = profile.timeout_ms || 120_000;
   // Run the claude binary the probe admitted, not whatever `claude` PATH yields.
   const executable =
     profile.command === 'claude'
       ? (resolveClaudeExecutable().executable ?? profile.command)
       : profile.command;
-  const stdout = safeExec(executable, args, { timeoutMs });
+  const stdout = safeExec(executable, args, { timeoutMs, ...(viaStdin ? { input: prompt } : {}) });
   return stdout;
 }
 
@@ -473,6 +493,25 @@ function isQuotaError(err: unknown): boolean {
   );
 }
 
+export interface LlmEgressScope {
+  /** Most sensitive tier represented in the prompt. */
+  dataTier: TierLevel;
+  /** Tenant the material belongs to, when above public. */
+  tenantSlug?: string;
+}
+
+/**
+ * Egress-policy provider id for a profile: the adapter (`codex-cli`,
+ * `gemini-cli`, `claude-cli`) first, then the command. Undefined means
+ * unknown, which the gate denies for non-public tiers.
+ */
+export function llmProfileProviderId(profile: LlmProfile): string | undefined {
+  return (
+    providerIdForReasoningIdentifier(profile.adapter) ??
+    providerIdForReasoningIdentifier(profile.command)
+  );
+}
+
 /**
  * Runs a structured LLM query with automatic model fallback on quota exhaustion.
  */
@@ -484,9 +523,15 @@ export async function runAdaptiveStructuredLlmProfile<T>(
     systemPrompt?: string;
     policy?: LlmPolicyConfig;
     isCommandAvailable?: (command: string) => { available: boolean; reason?: string };
+    /**
+     * Highest data tier in `prompt` (and its tenant). Above `public`, each
+     * candidate's provider must pass `checkProviderEgress` before it runs;
+     * denied profiles are skipped.
+     */
+    egress?: LlmEgressScope;
   } = {}
 ): Promise<T> {
-  const { policy, systemPrompt, isCommandAvailable } = options;
+  const { policy, systemPrompt, isCommandAvailable, egress } = options;
   const candidateNames = resolveCandidateProfileNames(purpose, policy);
   const profiles = policy?.profiles || {};
 
@@ -502,6 +547,27 @@ export async function runAdaptiveStructuredLlmProfile<T>(
     if (!profile) {
       logger.info(`  [Skip] ${name}: not configured`);
       continue;
+    }
+
+    if (egress && egress.dataTier !== 'public') {
+      const provider = llmProfileProviderId(profile);
+      const decision = checkProviderEgress({
+        provider: provider ?? '',
+        dataTier: egress.dataTier,
+        ...(egress.tenantSlug ? { tenant_slug: egress.tenantSlug } : {}),
+      });
+      if (!decision.allowed) {
+        logger.warn(
+          formatDiagnostic({
+            component: 'mission-llm',
+            what: `skipped LLM profile "${name}" for ${egress.dataTier} ${purpose} payload`,
+            why: decision.reason || `provider '${provider ?? '(unknown)'}' egress denied`,
+            next: "attest the provider's training_use 'none' for the tenant (pnpm tenant attest-provider) or use a local-only provider",
+            evidence: 'knowledge/product/governance/provider-egress-policy.json',
+          })
+        );
+        continue;
+      }
     }
 
     const availability =
