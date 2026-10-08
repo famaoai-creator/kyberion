@@ -186,6 +186,14 @@
       "rationale": "Keeps all text bridges on the shared turn/thread/typing lifecycle."
     },
     {
+      "id": "runtime-store-retention",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_runtime_store_retention.ts"],
+      "owner": "operations",
+      "rationale": "Fails when source references an active/shared/runtime/<name> store with no storage-retention-catalog entry, so new ledgers and runtime dirs cannot grow unbounded and invisible to the janitor."
+    },
+    {
       "id": "ci-gate-parity",
       "scope": "pr",
       "executable": "node",
