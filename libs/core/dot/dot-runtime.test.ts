@@ -204,6 +204,44 @@ describe('runDotWake', () => {
     expect(third.reason).toContain('token_cap_per_day');
   });
 
+  it('G01: token/wake ledger reads replay only new rows, never the whole history', () => {
+    const now = () => new Date('2026-10-02T10:00:00Z');
+    const deps = { rootDir: TEST_ROOT, now };
+    // History from earlier days plus today's first row.
+    for (let index = 0; index < 300; index += 1) {
+      recordDotTokenUsage('repo-guardian', 5, {
+        rootDir: TEST_ROOT,
+        now: () => new Date(Date.UTC(2026, 8, 1 + (index % 30), 12)),
+      });
+    }
+    recordDotTokenUsage('repo-guardian', 7, deps);
+    expect(dotTokensUsedToday('repo-guardian', deps)).toBe(7);
+    recordDotWakeOutcome(CHARTER, undefined, 'skipped', deps);
+
+    const wholeFileReads = vi.spyOn(getFoundationIo(), 'readFile');
+    recordDotTokenUsage('repo-guardian', 3, deps);
+    expect(dotTokensUsedToday('repo-guardian', deps)).toBe(10);
+    // a skipped wake's dedupe check is a ledger read on the hot path
+    recordDotWakeOutcome(
+      CHARTER,
+      { key: 'cron:x@1', trigger: { kind: 'cron' } } as never,
+      'skipped',
+      deps
+    );
+    recordDotWakeOutcome(
+      CHARTER,
+      { key: 'cron:x@1', trigger: { kind: 'cron' } } as never,
+      'skipped',
+      deps
+    );
+    const ledgerReads = wholeFileReads.mock.calls.filter(
+      ([file]) => file.endsWith(DOT_TOKEN_USAGE_PATH) || file.endsWith(DOT_WAKE_LEDGER_PATH)
+    );
+    expect(ledgerReads).toEqual([]);
+    wholeFileReads.mockRestore();
+    expect(readDotWakeLedger(deps).filter((row) => row.trigger_key === 'cron:x@1')).toHaveLength(1);
+  });
+
   it('maps charter budget onto the goal loop and records the ledger', async () => {
     writeCharter(CHARTER);
     let seen: { maxTurns?: number; toolRole?: string; budget?: object } = {};
