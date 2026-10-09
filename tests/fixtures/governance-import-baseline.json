@@ -249,6 +249,7 @@
     "scripts/setup_oauth.ts",
     "scripts/surface_runtime.ts",
     "scripts/ts-loader-cache.test.ts",
+    "scripts/ts-loader-resolve.test.ts",
     "scripts/voice_upgrade.ts",
     "scripts/write_core_dist_scope.test.ts",
     "tests/knowledge-taxonomy-contract.test.ts",
