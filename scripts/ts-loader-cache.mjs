@@ -113,8 +113,16 @@ export function tsLoaderCacheKey(filePath, source) {
   );
 }
 
+/**
+ * Entries deliberately do not end in a code extension (.js/.mjs/...): repository
+ * scanners (boundary tests, lint and governance gates) walk the tree by
+ * extension, and a cached copy of `libs/core/*.ts` would show up as a second,
+ * unregistered importer of every restricted module.
+ */
+export const TS_LOADER_CACHE_ENTRY_EXTENSION = '.transpiled';
+
 function cacheEntryPath(dir, key) {
-  return join(dir, key.slice(0, 2), `${key}.js`);
+  return join(dir, key.slice(0, 2), `${key}${TS_LOADER_CACHE_ENTRY_EXTENSION}`);
 }
 
 function readCachedTranspile(dir, key) {

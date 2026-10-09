@@ -10,7 +10,12 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { transpileWithCache, tsLoaderCacheDir, tsLoaderCacheKey } from './ts-loader-cache.mjs';
+import {
+  TS_LOADER_CACHE_ENTRY_EXTENSION,
+  transpileWithCache,
+  tsLoaderCacheDir,
+  tsLoaderCacheKey,
+} from './ts-loader-cache.mjs';
 
 // Every case runs against a sandbox: sources and cache live under a per-test
 // directory in active/shared/tmp/, passed as `projectRoot` and
@@ -72,6 +77,15 @@ describe('ts-loader transpile cache', () => {
     expect(after.outputText).not.toContain('"before"');
     expect(before.outputText).toContain('"before"');
     expect(cacheEntries()).toHaveLength(2);
+  });
+
+  it('stores entries under a non-code extension, invisible to repository code scanners', () => {
+    transpile('export const scanned = false;\n');
+    const [entry] = cacheEntries();
+    expect(entry.endsWith(TS_LOADER_CACHE_ENTRY_EXTENSION)).toBe(true);
+    // The boundary tests (foundation-io, process-boundary, runtime-child-process)
+    // select files with this pattern.
+    expect(/\.(ts|tsx|js|jsx|mjs|cjs|mts|cts)$/.test(entry)).toBe(false);
   });
 
   it('keys on the file path, not only the content (the inline source map names the file)', () => {
