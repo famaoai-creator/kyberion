@@ -1,5 +1,7 @@
 'use client';
 
+import { frontDeskFetch as fetch } from '../../lib/front-desk-fetch';
+
 import * as React from 'react';
 import {
   Button,
@@ -676,7 +678,7 @@ export default function SettingsPage() {
       setOauthMessage(null);
       const oauthWindow = window.open('', '_blank', 'noopener');
       try {
-        const response = await fetch('/api/oauth/begin', {
+        const response = await globalThis.fetch('/api/oauth/begin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ service_id: serviceId }),

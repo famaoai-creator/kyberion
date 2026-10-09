@@ -1,9 +1,11 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, createElement } from 'react';
 import { installFakeDom } from '../../../../libs/shared-ui/vanilla/fake-dom.test-support.js';
+import { frontDeskFetch } from '../src/lib/front-desk-fetch';
 import { useVoice, type UseVoiceResult } from '../src/lib/use-voice';
 import type { VoiceListenOnceResponse } from '../src/lib/voice-types';
 
+const createPlayer = vi.hoisted(() => vi.fn());
 const player = vi.hoisted(() => ({
   setLipsync: vi.fn(),
   followHostSpeech: vi.fn(),
@@ -14,7 +16,10 @@ const player = vi.hoisted(() => ({
   speak: vi.fn(),
 }));
 vi.mock('../../../../libs/shared-ui/vanilla/speech-player.js', () => ({
-  createSpeechPlayer: () => player,
+  createSpeechPlayer: (options: unknown) => {
+    createPlayer(options);
+    return player;
+  },
 }));
 
 let dom: ReturnType<typeof installFakeDom>;
@@ -62,6 +67,7 @@ function stubVoice(listen: () => Promise<Response>) {
 }
 beforeAll(async () => {
   dom = installFakeDom({
+    sessionStorage: { getItem: () => null },
     localStorage: { getItem: () => null, setItem: () => undefined },
     setInterval: poll,
     clearInterval: clearPoll,
@@ -266,3 +272,11 @@ it.each(['speaking', 'idle'] as const)(
     ]);
   }
 );
+
+it('injects member transport into the shared speech player', async () => {
+  stubVoice(async () => response(spokenReply));
+  const voice = mountVoice();
+  await flush();
+  act(() => voice().attachLipsync({}));
+  expect(createPlayer).toHaveBeenCalledWith(expect.objectContaining({ fetchImpl: frontDeskFetch }));
+});

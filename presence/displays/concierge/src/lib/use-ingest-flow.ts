@@ -1,5 +1,7 @@
 'use client';
 
+import { frontDeskFetch as fetch } from './front-desk-fetch';
+
 import * as React from 'react';
 import type { ConciergeMessageKey } from './i18n';
 import { parseSetupResponse } from './setup-response';

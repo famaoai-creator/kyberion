@@ -297,7 +297,10 @@ describe('concierge surface contract', () => {
     const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
     expect(page).not.toContain('window.prompt');
     expect(page).toContain("t('home.change_send')");
-    expect(page).toContain("new EventSource('/api/events')");
+    expect(page).toContain('startSummaryWatch');
+    expect(fs.readFileSync(path.join(appDir, 'src/lib/summary-watch.ts'), 'utf8')).toContain(
+      "new EventSource('/api/events')"
+    );
   });
 
   it('mounts the conversation dock through the shared i18n mechanism', () => {
@@ -601,7 +604,7 @@ describe('concierge surface contract', () => {
     const flow = safeReadFile(path.join(appDir, 'src/lib/use-ingest-flow.ts'));
     expect(flow).toContain('setDryRun] = React.useState(true)');
     expect(page).toContain("t('ingest.commit_after_preview')");
-    expect(rail).toContain("t('header.ingest')");
+    expect(rail).toContain("pathname === '/ingest'");
     expect(messages).toContain('資料の取込');
     expect(messages).toContain('まず内容を確認する');
   });
@@ -833,18 +836,14 @@ describe('concierge surface contract', () => {
     const palette = fs.readFileSync(path.join(appDir, 'src/app/command-palette.tsx'), 'utf8');
     const layout = fs.readFileSync(path.join(appDir, 'src/app/layout.tsx'), 'utf8');
     const css = fs.readFileSync(path.join(appDir, 'src/app/globals.css'), 'utf8');
-    // FD-00c follow-up: CommandPalette takes a `frontDeskPorts` prop
-    // (manifest-resolved, read server-side in layout.tsx) instead of a bare
-    // `<CommandPalette />` — see test/front-desk-contract.test.ts for the
-    // no-hardcoded-port assertion.
-    expect(layout).toContain(
-      '<CommandPalette frontDeskPorts={frontDeskPorts} frontDeskUrls={frontDeskUrls} />'
-    );
+    // Navigation is resolved by the authenticated server catalog.
+    expect(layout).toContain('<CommandPalette />');
+    expect(palette).toContain('/api/front-desk/nav');
     expect(palette).toContain('role="dialog"');
     expect(palette).toContain('aria-modal');
-    expect(palette).toContain('prefers-reduced-motion');
-    // Navigation and dock-opening only — no fetch, no mutation.
-    expect(palette).not.toContain('fetch(');
+    expect(css).toContain('prefers-reduced-motion');
+    // Read-only navigation discovery never performs a mutation.
+    expect(palette).not.toMatch(/method:\s*['"](?:POST|PUT|PATCH|DELETE)['"]/);
     // Keyboard focus is visible across the surface.
     expect(css).toContain(':focus-visible');
   });

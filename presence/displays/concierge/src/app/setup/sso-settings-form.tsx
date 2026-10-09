@@ -1,9 +1,10 @@
 'use client';
 
+import { frontDeskFetch as fetch } from '../../lib/front-desk-fetch';
+
 import * as React from 'react';
 import { useConciergeI18n } from '../../lib/use-concierge-i18n';
 import { frontDeskText } from '../../lib/i18n';
-import { attachFrontDeskAuthHeaders } from '../../lib/front-desk-auth-token';
 
 /**
  * SSO (OIDC) settings, stored server-side in secret-guard by
@@ -50,7 +51,6 @@ export function SsoSettingsForm() {
     void (async () => {
       try {
         const response = await fetch('/api/setup/oidc', {
-          headers: attachFrontDeskAuthHeaders(),
           cache: 'no-store',
         });
         if (response.status === 401 || response.status === 403) {
@@ -71,7 +71,7 @@ export function SsoSettingsForm() {
     try {
       const response = await fetch('/api/setup/oidc', {
         method: 'PUT',
-        headers: attachFrontDeskAuthHeaders({ 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           issuer,
           client_id: clientId,

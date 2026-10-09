@@ -1,3 +1,5 @@
+import { frontDeskFetch } from '../../lib/front-desk-fetch';
+
 /**
  * UI-06 settings: the file / secret network calls the settings page makes,
  * lifted out of the components unchanged so the shared form components
@@ -24,7 +26,7 @@ export async function postSetupUpload(input: {
   form.set('profile_id', input.profileId);
   form.set('source', input.source);
   form.set('file', input.file);
-  return fetch('/api/setup', { method: 'POST', body: form });
+  return frontDeskFetch('/api/setup', { method: 'POST', body: form });
 }
 
 /** Normalize any Blob the avatar picker hands over into a named File. */

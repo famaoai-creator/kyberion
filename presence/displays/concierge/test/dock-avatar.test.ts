@@ -23,7 +23,7 @@ let dom: ReturnType<typeof installFakeDom>;
 let client: typeof import('react-dom/client');
 
 beforeAll(async () => {
-  dom = installFakeDom();
+  dom = installFakeDom({ sessionStorage: { getItem: () => null } });
   client = await import('react-dom/client');
 });
 afterAll(() => dom.restore());

@@ -134,7 +134,7 @@ let dom: ReturnType<typeof installFakeDom>;
 let client: typeof import('react-dom/client');
 let unmount: (() => void) | undefined;
 beforeAll(async () => {
-  dom = installFakeDom();
+  dom = installFakeDom({ sessionStorage: { getItem: () => null } });
   client = await import('react-dom/client');
 });
 afterEach(() => {
