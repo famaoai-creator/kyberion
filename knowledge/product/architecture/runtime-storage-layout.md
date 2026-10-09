@@ -190,7 +190,7 @@ tokens, cost per component call) share one mechanism:
   without the `mission_controller` role) sees only the system partition and
   the tiers it may read.
 - **Reports say when they are partial.** Report and summary readers (cost
-  report, operator home, Chronos cost summary, terminal HUD, `pnpm doctor`,
+  report, operator home, Chronos cost summary, terminal HUD, `pnpm kyberion doctor`,
   soak) pass `onWithheld` and call `metricsWithheldNotice`: one `warn` line
   in the diagnostic format, and the output itself carries
   "N metrics partition(s) withheld for this persona — totals are partial"
