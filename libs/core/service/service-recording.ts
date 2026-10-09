@@ -50,6 +50,8 @@ export interface ServiceRecording {
     note?: string;
     /** SHA-256 of the recording content excluding the review envelope. */
     content_hash?: string;
+    /** The `service-recording-review` approval request that decided this review. */
+    approval_request_id?: string;
     decisions: Array<{
       step_id: string;
       status: 'pending' | 'approved' | 'rejected';

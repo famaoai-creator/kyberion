@@ -376,6 +376,15 @@ local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
     and a decider the surface took from its caller (`deciderIdentitySource: 'caller_supplied'`).
     Refusals are audited (`separation_of_duties` / `denied`). A surface whose token proves only
     possession (the mission brief page) resolves the decider server-side.
+  - The terminal has one operator principal (`libs/core/governance/cli-operator-principal.ts`):
+    the local owner member, recorded as `user:<member_id>` both as `requestedBy` when a CLI or
+    script opens a request and as `decidedBy` for `pnpm kyberion approvals --approve`; the
+    onboarding name goes to `requestedByDisplayName` / `decidedByDisplayName` and is never
+    compared. A CLI run inside an agent session (`KYBERION_AGENT_ID`, `KYBERION_NHI_ID`,
+    `KYBERION_RUN_ORIGIN=agent`, or a provider harness marker such as `CLAUDECODE`) opens requests
+    as `agent:<…>`, so a human approving it is not a self-approval. With the setting on, a terminal
+    with no owner member (`pnpm organization member ensure-owner` provisions it) or an approval
+    typed inside an agent session is refused with a diagnostic, never recorded under a placeholder.
   - Every consumer that turns an approved record into an effect checks it first under a consumer
     id (`assertApprovalUsable` / `approvalUsabilityRefusal`); the registry is
     `libs/core/governance/approval-sod-consumers.contract.test.ts`. A decision recorded while
@@ -386,9 +395,16 @@ local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
     blocks approving decisions and approval use even with the setting off (fail closed,
     diagnostic message); plugin activation degrades to `pending_approval` with a warning, and a
     pending DOT autonomy promotion stays pending until the next sweep.
-  - Known limits (string identities, the CLI persona-vs-name gap, policy/service deciders, flows
-    outside the approval store such as `service_recording review`) are listed in
-    [approval-gate-design](./approval-gate-design.md).
+  - An approved record that was not yet claimed or applied can be withdrawn with
+    `pnpm kyberion approvals --revoke <id> [--reason …]` (`revokeApprovalRequest`: by its requester,
+    one of its approvers or the local owner; audited as `approval_decision` / `revoke` and a
+    `revoked` event). Whatever the setting, `evaluateApprovalUsability` refuses a revoked record
+    for every consumer, and separation-of-duties refusals name the revoke command.
+  - `service_recording review` decides through the store (`service-recording-review` channel,
+    requested at `capture` or `request-review`); promotion re-checks the approval
+    (`service_recording_promotion`).
+  - Known limits (string identities, a human typing into an agent session's shell, policy/service
+    deciders) are listed in [approval-gate-design](./approval-gate-design.md).
 - **Prompts and secrets go on stdin, never argv.** argv is visible in the process table and is capped
   at about 128 KB per argument. Shell-invoked LLM profiles use `prompt_via: "stdin"` (the `claude`
   profile in `wisdom-policy.json` does), and the system prompt travels on stdin with the prompt.
@@ -440,13 +456,22 @@ local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
 5. When you add an approval request creator, record the real requester identity in
    `requestedBy` (and `requestedByContext.actorId`), never an empty string: with separation of
    duties on, a request without a requester cannot be approved (gate:
-   `libs/core/governance/approval-separation-of-duties.test.ts`).
+   `libs/core/governance/approval-separation-of-duties.test.ts`). A creator that runs in a CLI or
+   script takes its default from `resolveCliApprovalRequester({ explicit, legacy })`, never from
+   the persona, a component name or `resolveOperatorDisplayName()`; a terminal decision goes
+   through `decideApprovalFromCli` (gates: `scripts/approvals_cli_identity.test.ts`,
+   `approval-sod-consumers.contract.test.ts`).
 6. When you add code that turns an approved record into an effect, call
    `assertApprovalUsable(record, { consumer })` before the effect. When you add a decision surface
    that takes the decider from its caller instead of a resolved session, pass
    `deciderIdentitySource: 'caller_supplied'`; when it falls back to a placeholder decider id,
    add that id to `APPROVAL_PLACEHOLDER_DECIDERS` (gates: approval-separation-of-duties.test.ts,
-   `approval-actuator-sod.test.ts`).
+   `approval-actuator-sod.test.ts`). A consumer that only runs the check while separation of
+   duties is on must still run it on a record it can load, so a revoked approval is refused
+   (gate: `approval-revocation.test.ts`, contract test).
+7. Never add an approve/reject flow that writes its decision outside the approval store (as
+   `service_recording review` did): open a hash-bound request in its own channel, decide it with
+   `decideApprovalRequest`, and register the consumer that turns it into an effect.
 
 **Profile timeouts are hard limits.** Since #1006 the codex/gemini structured runners honour a
 profile's `timeout_ms`; before that they used their 5-minute adapter default. A timeout is not a

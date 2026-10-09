@@ -56,6 +56,7 @@ import {
   PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
   requestTenantProviderAttestationApproval,
 } from '@agent/core/organization/tenant-governance';
+import { CLI_AGENT_SESSION_ENV } from '@agent/core/governance/cli-operator-principal';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync } from '@agent/core/secure-io';
 import {
@@ -65,24 +66,8 @@ import {
 } from '../libs/core/governance/__tests__/sod-overlay.js';
 import { main as kyberionHome } from './kyberion_home.js';
 
-/** Every agent-session marker `detectCliAgentPrincipal` reads; blank = plain terminal. */
-const AGENT_MARKERS = [
-  'KYBERION_AGENT_ID',
-  'KYBERION_NHI_ID',
-  'KYBERION_RUN_ORIGIN',
-  'CLAUDECODE',
-  'CODEX_CLI',
-  'CODEX_VERSION',
-  'TERM_PROGRAM',
-  'GEMINI_CLI',
-  'GROK_CLI',
-  'CURSOR_AGENT',
-  'OPENCODE_CLI',
-  'AI_AGENT',
-];
-
 function plainTerminal(): void {
-  for (const name of AGENT_MARKERS) vi.stubEnv(name, '');
+  for (const name of CLI_AGENT_SESSION_ENV) vi.stubEnv(name, '');
 }
 
 const claim = {
