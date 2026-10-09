@@ -197,6 +197,12 @@ gets clean JSON.
     starts and `await Promise.allSettled(...)` them in `afterEach` (with an explicit hook timeout)
     before cleanup. A module-level seam registration must be safe to re-evaluate
     (part-core registers with an unexported `replaceKey`; a supersede logs a warning).
+    The same race re-created catalog seams (`Seam task-intent-builder is already registered in
+the catalog`, 2026-10). Every `createSeam({ catalog: coreSeamCatalog })` declares
+    `owner: '<its own repo-relative path>'`. The catalog lets a second definition with the same
+    owner and multiplicity replace the stale entry (with a warning) and still rejects any other
+    duplicate. `libs/core/seam-reevaluation.test.ts` re-evaluates defining modules and fails on
+    a catalog seam without its own path as owner.
   - **A per-test mock that reaches a cached catalog.** `safeExistsSync.mockReturnValue(false)`,
     meant for one artifact, also answered the media-backend registry's directory check. The test
     passed only when an earlier test had already cached the registry. Route governed catalog paths
