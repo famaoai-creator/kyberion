@@ -243,14 +243,11 @@ function handleInboxSubcommand(argv: {
   printOutput(ui('recorder:recorder_inbox_summary'));
 }
 
-function handleApprovalsSubcommand(argv: {
-  approve?: string;
-  deny?: string;
-  revoke?: string;
-  reason?: string;
-  note?: string;
+type ApprovalsArgv = Partial<Record<'approve' | 'deny' | 'revoke' | 'reason' | 'note', string>> & {
   json?: boolean;
-}): void {
+};
+
+function handleApprovalsSubcommand(argv: ApprovalsArgv): void {
   if (argv.revoke) {
     const requestId = String(argv.revoke);
     const request = findRevocableApproval(requestId);
@@ -259,13 +256,8 @@ function handleApprovalsSubcommand(argv: {
       throw new ScriptExitError(1, '', true);
     }
     const revoked = revokeApprovalFromCli(request, { reason: argv.reason || argv.note });
-    printOutput(
-      ui('recorder:recorder_approval_updated', {
-        id: revoked.id,
-        status: 'revoked',
-        title: revoked.title,
-      })
-    );
+    const { id, title } = revoked;
+    printOutput(ui('recorder:recorder_approval_updated', { id, title, status: 'revoked' }));
     return;
   }
   const pending = listApprovalRequests({ status: 'pending' });
@@ -1394,16 +1386,7 @@ async function mainImpl(args: string[] = []): Promise<void> {
       });
       return;
     case 'approvals':
-      handleApprovalsSubcommand(
-        argv as {
-          approve?: string;
-          deny?: string;
-          revoke?: string;
-          reason?: string;
-          note?: string;
-          json?: boolean;
-        }
-      );
+      handleApprovalsSubcommand(argv as ApprovalsArgv);
       return;
     case 'deals':
       if (argv['ingest-audio']) {
