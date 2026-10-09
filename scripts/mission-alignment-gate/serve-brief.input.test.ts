@@ -67,7 +67,7 @@ describe('mission brief decider identity (separation of duties)', () => {
         encoding: 'utf8',
       }) || ''
     );
-    expect(source).toContain('const { decidedBy, pageName } = resolveBriefDecider(body);');
+    expect(source).toContain('const { decidedBy, pageName, refusal } = resolveBriefDecider(body);');
     expect(source.match(/body\?\.decidedBy/g)).toHaveLength(1);
   });
 });

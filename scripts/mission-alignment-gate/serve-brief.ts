@@ -24,7 +24,11 @@ import { randomBytes } from 'node:crypto';
 
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { applySurfaceApprovalDecision } from '@agent/core/surface/surface-approval-ui';
-import { resolveOperatorDisplayName } from '@agent/core/surface/operator-identity';
+import { isSeparationOfDutiesEnabled } from '@agent/core/governance/approval-store';
+import {
+  CLI_OPERATOR_PROVISION_COMMAND,
+  resolveCliOperatorIdentity,
+} from '@agent/core/governance/cli-operator-principal';
 import { findMissionPath } from '@agent/core/path-resolver';
 import {
   listApprovalRequests,
@@ -56,18 +60,37 @@ export function parseDecisionRequestBody(raw: string): Record<string, unknown> {
 
 /**
  * Who decided, resolved server-side. The page token proves possession of the
- * loopback page, not identity, so the decider is the operator identity this
- * process runs as (the same `resolveOperatorDisplayName()` the CLI
- * `pnpm kyberion approvals --approve` records) — never the page's `decidedBy`.
- * A name typed on the page is kept only as a note for the audit trail.
+ * loopback page, not identity, so the decider is the operator this process
+ * runs as — the same local owner principal (`user:<member_id>`, else the
+ * onboarding display name) that `pnpm kyberion approvals --approve` records
+ * (`resolveCliOperatorIdentity()`) — never the page's `decidedBy`. A name
+ * typed on the page is kept only as a note for the audit trail. With
+ * separation of duties on and no owner member, an approval is refused rather
+ * than recorded under a name that cannot prove separation.
  */
 export function resolveBriefDecider(body: Record<string, unknown>): {
   decidedBy: string;
   pageName?: string;
+  refusal?: string;
 } {
-  const decidedBy = resolveOperatorDisplayName();
+  const identity = resolveCliOperatorIdentity();
+  const decidedBy = identity.principalId ?? identity.displayName;
   const typed = typeof body?.decidedBy === 'string' ? body.decidedBy.trim().slice(0, 200) : '';
-  return { decidedBy, ...(typed && typed !== decidedBy ? { pageName: typed } : {}) };
+  let refusal: string | undefined;
+  if (body?.decision === 'approved' && !identity.principalId) {
+    try {
+      if (isSeparationOfDutiesEnabled()) {
+        refusal = `separation of duties is on and this machine has no stable operator identity; run \`${CLI_OPERATOR_PROVISION_COMMAND}\` and reload`;
+      }
+    } catch (error) {
+      refusal = error instanceof Error ? error.message : String(error);
+    }
+  }
+  return {
+    decidedBy,
+    ...(typed && typed !== decidedBy && typed !== identity.displayName ? { pageName: typed } : {}),
+    ...(refusal ? { refusal } : {}),
+  };
 }
 
 async function main(args: string[] = [], print: Print = () => undefined): Promise<void> {
@@ -185,7 +208,8 @@ async function main(args: string[] = [], print: Print = () => undefined): Promis
     if (!decision)
       return json(res, 400, { ok: false, error: 'decision must be approved|rejected' });
     // The decider is resolved server-side; the page's name is only a note.
-    const { decidedBy, pageName } = resolveBriefDecider(body);
+    const { decidedBy, pageName, refusal } = resolveBriefDecider(body);
+    if (refusal) return json(res, 403, { ok: false, error: refusal });
     const pageNote = pageName ? `name entered on the brief page: ${pageName}` : '';
     const bodyNote = typeof body?.note === 'string' ? body.note.trim() : '';
     const note = [bodyNote, pageNote].filter(Boolean).join(' | ');

@@ -60,6 +60,15 @@ const AGENT_HARNESS_MARKERS: ReadonlyArray<{ env: string; equals?: string; agent
   { env: 'OPENCODE_CLI', agent: 'opencode-cli' },
 ];
 
+/** Every environment variable {@link detectCliAgentPrincipal} reads (tests blank them). */
+export const CLI_AGENT_SESSION_ENV: readonly string[] = [
+  'KYBERION_AGENT_ID',
+  'KYBERION_NHI_ID',
+  'KYBERION_RUN_ORIGIN',
+  ...new Set(AGENT_HARNESS_MARKERS.map((marker) => marker.env)),
+  'AI_AGENT',
+];
+
 function envText(env: Env, name: string): string {
   return getRegisteredEnvText(name, { env })?.trim() ?? '';
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
+import { evaluateApprovalUsability, type ApprovalRequestRecord } from './approval-store.js';
 
 /**
  * Registration ceremony for separation of duties: every consumer that turns an
@@ -46,6 +47,11 @@ const SOD_CONSUMERS: ReadonlyArray<{ file: string; consumer: string }> = [
   { file: 'scripts/organization_decision_approval.ts', consumer: 'organization_decision' },
   { file: 'scripts/org.ts', consumer: 'org_security_policy_write' },
   { file: 'scripts/personal-workbench/actions.ts', consumer: 'personal_workbench' },
+  { file: 'scripts/service_recording.ts', consumer: 'service_recording_review' },
+  {
+    file: 'libs/core/service/service-recording-review-approval.ts',
+    consumer: 'service_recording_promotion',
+  },
 ];
 
 /** Surfaces that record `deciderIdentitySource: 'caller_supplied'`. */
@@ -97,9 +103,31 @@ describe('separation-of-duties consumer registry', () => {
     expect(doc).toContain(`\`${file}\``);
   });
 
-  it('the decider of the mission brief surface is resolved server-side', () => {
+  it('the decider of the mission brief surface is the server-resolved operator principal', () => {
     expect(read('scripts/mission-alignment-gate/serve-brief.ts')).toContain(
-      'resolveOperatorDisplayName()'
+      'resolveCliOperatorIdentity()'
     );
+  });
+
+  it('terminal decisions record the operator principal, never the display name', () => {
+    expect(read('scripts/lib/approval-cli-decision.ts')).toContain('resolveCliApprovalDecider(');
+    for (const file of ['scripts/kyberion_home.ts', 'scripts/cli.ts']) {
+      const source = read(file);
+      expect(source).toContain('decideApprovalFromCli(');
+      expect(source).not.toMatch(/decidedBy:\s*resolveOperatorDisplayName\(\)/);
+    }
+  });
+
+  it('a revoked record is unusable for every consumer, whatever the separation setting', () => {
+    const revoked = {
+      id: 'revoked-probe',
+      status: 'approved',
+      requestedBy: 'agent:planner',
+      decidedBy: 'user:alice',
+      revocation: { revokedBy: 'user:alice', revokedAt: '2026-10-09T00:00:00.000Z' },
+    } as unknown as ApprovalRequestRecord;
+    for (const { consumer } of SOD_CONSUMERS) {
+      expect(evaluateApprovalUsability(revoked, { consumer })?.violation).toBe('revoked');
+    }
   });
 });

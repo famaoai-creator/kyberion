@@ -200,6 +200,7 @@ Where the identity is saved, and where baseline-check L3 looks, depends on the a
   - `pnpm onboarding apply --identity <path/to/identity.json>` — apply the identity from a JSON file (Path B)
     - Copy the template [`knowledge/public/templates/onboarding/identity.example.json`](../knowledge/public/templates/onboarding/identity.example.json). Validating with `--dry-run` first is safest.
   - `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 pnpm onboarding` — proceed with default values on purpose (for evaluation environments)
+- **Operator identity for approvals**: the terminal records approvals as the local owner member (`user:owner`, `knowledge/personal/members/owner.json`), with your onboarding name kept beside it for display. Opening the concierge or presence-studio creates this member; from a terminal only, run `pnpm organization member ensure-owner` (idempotent). It is needed when separation of duties is switched on (`approval-policy.json` `separation_of_duties.enabled`): without it, opening or approving a request from the terminal stops with a diagnostic.
 - **To start over**: `pnpm onboarding reset` removes the onboarding state and the generated identity / vision / agent artifacts.
 - **Physical changes**:
   - `customer/{slug}/my-identity.json` is created. When `KYBERION_CUSTOMER` is unset, it is `knowledge/personal/my-identity.json`.
