@@ -27,7 +27,6 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import { isRecord } from '../foundation/text.js';
 import {
-  evaluateApprovalUsability,
   createApprovalRequest,
   computeApprovalPayloadHash,
   listApprovalRequests,
@@ -35,7 +34,11 @@ import {
   type ApprovalRequestRecord,
 } from '../governance/approval-store.js';
 import { withExecutionContext } from '../authority.js';
-import { createLogger } from '../logger.js';
+import {
+  resolveActivationStatus,
+  type PluginActivationStatus,
+  type PluginIntegrity,
+} from './plugin-activation-status.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   findDisallowedOfficialOnlySeam,
@@ -85,8 +88,6 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 
-const pluginInstallLogger = createLogger('plugin-managed-install');
-
 export interface PluginManifestDiagnostic {
   code: string;
   message: string;
@@ -100,8 +101,7 @@ export interface PluginManifestInfo {
   raw: Record<string, unknown>;
 }
 
-export type PluginActivationStatus =
-  'activatable' | 'pending_approval' | 'blocked_broken_manifest' | 'blocked_digest_mismatch';
+export type { PluginActivationStatus } from './plugin-activation-status.js';
 
 export interface ManagedPluginRecord {
   pluginId: string;
@@ -560,36 +560,6 @@ function ensurePluginApprovalRequest(params: {
     risk: { level: 'medium', restartScope: 'none', requiresStrongAuth: false },
     accountability: { finalDecision: 'human_only', payloadHash, effectBinding },
   });
-}
-
-type PluginIntegrity = 'verified' | 'legacy' | 'mismatch';
-
-/** Exported for tests only. */
-export function resolveActivationStatus(params: {
-  diagnostics: PluginManifestDiagnostic[];
-  trust: PluginTrustLabel;
-  integrity: PluginIntegrity;
-  approval?: ApprovalRequestRecord;
-}): PluginActivationStatus {
-  if (params.diagnostics.some((d) => d.severity === 'error')) return 'blocked_broken_manifest';
-  if (params.integrity === 'mismatch') return 'blocked_digest_mismatch';
-  // Official provenance needs no approval (its digest is recorded, not approved).
-  if (params.trust === 'official') return 'activatable';
-  // Legacy non-official records (no digest) must be re-installed and re-approved.
-  if (params.integrity === 'legacy') return 'pending_approval';
-  if (params.approval?.status !== 'approved') return 'pending_approval';
-  // Separation of duties: an unusable approval does not activate. This runs
-  // on every plugin load, so it evaluates without auditing each pass, and an
-  // unreadable approval policy degrades to pending instead of throwing out of
-  // plugin listing/loading.
-  try {
-    return evaluateApprovalUsability(params.approval) ? 'pending_approval' : 'activatable';
-  } catch (error) {
-    pluginInstallLogger.warn(
-      `plugin approval not usable — ${error instanceof Error ? error.message : String(error)} | next: fix the approval policy, then reload plugins | evidence: approval ${params.approval.id}`
-    );
-    return 'pending_approval';
-  }
 }
 
 function writeManagedRecord(managedDir: string, record: ManagedPluginRecord): void {
