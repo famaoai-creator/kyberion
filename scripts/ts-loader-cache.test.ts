@@ -15,6 +15,7 @@ import {
   tsLoaderCacheDir,
   tsLoaderCacheKey,
 } from './ts-loader-cache.mjs';
+import { resolvePrivateCacheDir } from '../libs/core/private-host-cache.mjs';
 
 // Sources live in a per-test sandbox under active/shared/tmp/ (passed as
 // `projectRoot`); the cache lives in a private os tmp directory, so neither the
@@ -326,4 +327,47 @@ describe('ts-loader transpile cache', () => {
     expect(hit.cacheHit).toBe(true);
     expect(hit.outputText).toBe(expected);
   }, 60_000);
+
+  describe('private host cache location (shared with the STT discovery cache)', () => {
+    it('decides containment on the realpath, so a workspace link under node_modules cannot escape', () => {
+      // pnpm links workspace packages: node_modules/@ws/pkg -> ../../libs/pkg (source tree).
+      const project = path.join(tmpRoot, 'project');
+      fs.mkdirSync(path.join(project, 'libs', 'pkg'), { recursive: true });
+      fs.mkdirSync(path.join(project, 'node_modules', '@ws'), { recursive: true });
+      fs.symlinkSync(
+        path.join(project, 'libs', 'pkg'),
+        path.join(project, 'node_modules', '@ws', 'pkg'),
+        'dir'
+      );
+      const viaLink = path.join(project, 'node_modules', '@ws', 'pkg', 'cache');
+      expect(
+        resolvePrivateCacheDir({ projectRoot: project, name: 'x', override: viaLink })
+      ).toBeNull();
+      expect(tsLoaderCacheDir({ KYBERION_TS_LOADER_CACHE_DIR: viaLink }, project)).toBeNull();
+      const real = path.join(project, 'node_modules', '.cache', 'x');
+      expect(resolvePrivateCacheDir({ projectRoot: project, name: 'x', override: real })).toBe(
+        real
+      );
+      expect(resolvePrivateCacheDir({ projectRoot: project, name: 'x' })).toBe(real);
+    });
+
+    it('is off on Windows unless KYBERION_WINDOWS_PRIVATE_CACHE=1 (no uid or mode bits to check)', () => {
+      const project = path.join(tmpRoot, 'project');
+      fs.mkdirSync(project, { recursive: true });
+      expect(
+        resolvePrivateCacheDir({ projectRoot: project, name: 'x', env: {}, platform: 'win32' })
+      ).toBeNull();
+      expect(
+        resolvePrivateCacheDir({
+          projectRoot: project,
+          name: 'x',
+          env: { KYBERION_WINDOWS_PRIVATE_CACHE: '1' },
+          platform: 'win32',
+        })
+      ).toBe(path.join(project, 'node_modules', '.cache', 'x'));
+      expect(
+        resolvePrivateCacheDir({ projectRoot: project, name: 'x', env: {}, platform: 'linux' })
+      ).toBe(path.join(project, 'node_modules', '.cache', 'x'));
+    });
+  });
 });
