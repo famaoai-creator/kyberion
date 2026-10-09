@@ -553,7 +553,7 @@ a link in a readable location exposed `knowledge/personal/` to readers below tha
 
 - **Every guarded path is checked twice: literal and canonical.** secure-io routes every write-type
   helper through `guardWritePath` and every read through `guardReadPath` /
-  `assertCanonicalReadable` (`libs/core/secure-io.ts`). Both the literal path and the canonical
+  `assertCanonicalReadable` (`libs/core/secure-io-path-guard.ts`, used only by `secure-io.ts`). Both the literal path and the canonical
   path (realpath of the deepest existing ancestor plus the missing tail, a dangling link followed by
   hand) must pass. Never add a write or read helper that calls `validate*Permission` on the literal
   path only.
