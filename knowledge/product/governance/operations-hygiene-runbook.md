@@ -375,7 +375,9 @@ local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
     request without a requester, an empty or placeholder decider (`APPROVAL_PLACEHOLDER_DECIDERS`),
     and a decider the surface took from its caller (`deciderIdentitySource: 'caller_supplied'`).
     Refusals are audited (`separation_of_duties` / `denied`). A surface whose token proves only
-    possession (the mission brief page) resolves the decider server-side.
+    possession (the mission brief page) resolves the decider server-side, and with the setting on
+    refuses every approval (rejections still pass): any local process can open the page, so the
+    operator approves on Chronos, presence-studio or the terminal TTY challenge instead.
   - The terminal has one operator principal (`libs/core/governance/cli-operator-principal.ts`):
     the local owner member, recorded as `user:<member_id>` both as `requestedBy` when a CLI or
     script opens a request and as `decidedBy` for `pnpm kyberion approvals --approve`; the
@@ -391,8 +393,10 @@ local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
     presence-studio). With it off, a decision typed in an agent session is recorded as
     `caller_supplied` with `decidedInAgentSession`, so it fails a later re-check.
   - **This is best effort, not a security boundary.** Agent-session markers are environment
-    variables an agent can clear, and an agent driving a PTY (for example terminal-actuator) can
-    read and type the challenge code. The strong path for a separated approval is an authenticated
+    variables an agent can clear, and anything that gives an agent a pseudo-terminal can read and
+    type the challenge code: terminal-actuator, but equally `script`, `expect`, `unbuffer` or a shell
+    coproc. The challenge times out after 120s (`[POLICY_VIOLATION] challenge timed out`) and
+    records nothing. The strong path for a separated approval is an authenticated
     surface (Chronos or presence-studio).
   - Every consumer that turns an approved record into an effect checks it first under a consumer
     id (`assertApprovalUsable` / `approvalUsabilityRefusal`); the registry is

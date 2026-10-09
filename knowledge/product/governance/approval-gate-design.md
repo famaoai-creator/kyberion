@@ -52,9 +52,11 @@ mission brief
     - `libs/actuators/approval-actuator/src/approval-actuator-helpers.ts`（approval-actuator の `decide` op）
   - mission brief の承認ページ（`scripts/mission-alignment-gate/serve-brief.ts`）は、ページの token が
     所持しか証明しないため、決定者をページから受け取らない。CLI と同じ `resolveCliOperatorIdentity()`
-    （下記の operator principal）でサーバー側が決め、ページで入力された名前は note に残すだけ。agent の
-    セッション内で起動したサーバーは、ON では承認を受け付けず、OFF では決定を `caller_supplied`（agent の
-    principal 付き）として記録する（端末と同じ規則）。
+    （下記の operator principal）でサーバー側が決め、ページで入力された名前は note に残すだけ。ON では
+    このページからの承認をすべて拒否する（却下は通る）。token は所持しか証明せず、ローカルのどの process
+    でもページを GET できるため、誰が承認したかを示せない。承認は Chronos か presence-studio、または端末の
+    TTY チャレンジ（`pnpm kyberion approvals --approve <id>`）で行う。OFF では従来どおりで、agent の
+    セッション内で起動したサーバーの決定は `caller_supplied`（agent の principal 付き）として記録する。
 - **CLI の identity**: 端末（CLI と script）は 1 つの operator principal を使う
   （`libs/core/governance/cli-operator-principal.ts`）。この machine の owner member（chronos /
   presence-studio の loopback viewer と同じ member）を `user:<member_id>` として、CLI や script が依頼を
@@ -174,8 +176,9 @@ mission brief
     すぎない環境変数で、agent は消せる（`env -u CLAUDECODE …`）。目印の無い agent の依頼は owner として
     記録され、人の承認は自己承認として拒否される（拒否側）。人が agent のセッションのシェルに打った依頼は
     agent の依頼として記録され、本人の承認が通る（false negative）。
-  - ON の TTY チャレンジは、目印を消した agent が非対話で `--approve` するのを止めるが、PTY を操作できる
-    agent（例: terminal-actuator 経由）は表示されたコードを読んで入力できる。
+  - ON の TTY チャレンジは、目印を消した agent が非対話で `--approve` するのを止めるが、擬似端末（PTY）を
+    得た agent は表示されたコードを読んで入力できる。PTY は terminal-actuator に限らず、`script`、`expect`、
+    `unbuffer`、シェルの coproc などで誰でも作れる。チャレンジは 120 秒で打ち切られ、何も記録しない。
   - 依頼者と別の人の承認を agent に対して確実にするには、認証済みの surface（Chronos か presence-studio。
     検証済みのセッションから `user:<member_id>` を記録する）で承認する。これが強い経路である。
 - **service recording の review の依頼者。** review の依頼は `capture`（または `request-review`）を
@@ -187,10 +190,22 @@ mission brief
 - **依頼者が値を決められる誤一致（false positive）。** `requestedBy` などは依頼側が書くので、依頼者が承認者の
   identity を名乗ると、その承認者の承認が拒否される。拒否側に倒れるだけで承認が不正に通ることはないが、
   承認の妨害には使える。
-- **policy / service の決定者は別 principal として扱う。** veto window の自動決定（`policy:veto-window`）や
-  secret introduction の自動承認（`policy:secret-introduction-local-low-risk`）は人の名前ではないが、
-  代替値の一覧には入れていないので、依頼者と文字列が違えば「別の principal」とみなされ承認が通る。
-  これらの自動決定を SoD の対象にするかは、それぞれの policy（veto window、secret introduction の自動承認条件）で決める。
+- **policy の自動決定は設計上 SoD の対象外（人は関与しない）。** 次の 2 つは `decidedByType: 'service'`、
+  `authenticated: false` で記録され、決定者の文字列が依頼者と違うので、ON でも分離の判定を通る。
+  どちらも「別の人が承認した」ことは示さない。ON でも挙動は変えない。
+  - **veto window（`policy:veto-window`、`approval-veto-window.ts`）。** policy で決めた設計である。
+    autonomous-ops gate が `veto` と判定した操作だけが対象で、通知が人に届いたこと（surface の受領）を
+    確認してから時計が動き、稼働時間内の沈黙だけを数える。届かなければ通常の人の決定に戻り、
+    停止中（operations halt）は進まない。決めているのは operator が書いた autonomy policy で、
+    依頼ごとの承認者ではない。
+  - **secret introduction の自動承認（`policy:secret-introduction-local-low-risk`、
+    `secret/secret-introduction.ts`）。** risk が `low` で、依頼の surface がローカル（`terminal` /
+    `chronos` / `api`、または未指定）のときだけ、作成直後に自動承認する。値は承認後にその場で
+    入力させ、承認 JSON には入らない。理由: ローカルの operator が自分の credential を登録する操作に、
+    同じ人の 2 回目の確認を挟んでも分離にならないため。`--no-auto-approve`（Web は
+    `autoApprove: false`）で通常の承認待ちになり、そのときは SoD が効く。
+    注意: risk と自動承認の有無は依頼側が指定する（既定は `low` と自動承認あり）ので、
+    これは依頼者の自己申告に基づく例外である。
 - **対象外の承認経路。** approval-store を通らない独自の承認は設定の対象外（`service_recording review`
   は store を通るようにした）。
 - 確実に分離するには、承認を依頼者とは別の認証済み member（chronos / presence-studio の `user:<member_id>`）が行う。
