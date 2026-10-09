@@ -64,6 +64,18 @@ function typescriptVersionId() {
   return typescriptVersion;
 }
 
+/**
+ * Whether ts-loader answers workspace TypeScript resolutions itself (see
+ * resolveTsSourceDirectly in ts-loader.mjs). Bootstrap code cannot use
+ * `@agent/core/foundation/env`, so the switch is read here, beside the cache's.
+ */
+export function tsLoaderFastResolveEnabled(env = process.env) {
+  const flag = String(env.KYBERION_TS_LOADER_FAST_RESOLVE ?? '')
+    .trim()
+    .toLowerCase();
+  return !(flag === '0' || flag === 'false' || flag === 'off');
+}
+
 /** Cache directory, or null when the cache is switched off. Read per call so tests can toggle it. */
 export function tsLoaderCacheDir(env = process.env) {
   const flag = String(env.KYBERION_TS_LOADER_CACHE ?? '')
