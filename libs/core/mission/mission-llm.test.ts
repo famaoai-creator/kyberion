@@ -7,6 +7,7 @@ import * as pathResolver from '../path-resolver.js';
 // ops-alerts sink untouched by these tests.
 vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
 import {
+  BUILTIN_FALLBACK,
   inspectLlmResolution,
   invokeLlm,
   invokeShellProfile,
@@ -341,6 +342,16 @@ describe('shipped wisdom-policy claude profile', () => {
     expect(status.selectedProfile).toBe('heavy');
     expect(status.selectedCommand).toBe('codex');
     expect(status.checkedProfiles.map((entry) => entry.name)).toEqual(['heavy']);
+  });
+
+  it('gives every shipped profile a provider-CLI-sized timeout (runbook §7)', () => {
+    // Since the codex/gemini runners honour timeout_ms, a timeout is a hard
+    // failure: runAdaptiveStructuredLlmProfile falls through only on quota
+    // errors. A `codex exec` turn on the default model needs well over 30s.
+    for (const [name, profile] of Object.entries(shippedPolicy.profiles)) {
+      expect(profile.timeout_ms, name).toBeGreaterThanOrEqual(BUILTIN_FALLBACK.timeout_ms!);
+      expect(profile.timeout_ms, name).toBeLessThanOrEqual(300_000);
+    }
   });
 
   it('parses the claude print-mode JSON result envelope', () => {
