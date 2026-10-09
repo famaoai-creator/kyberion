@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
@@ -64,12 +64,15 @@ function asDataOnlyPersona(): void {
 describe('secure-io symlink canonicalization (data-only persona)', () => {
   const saved: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {};
 
-  beforeAll(() => {
+  // Rebuilt per test so a case that (on vulnerable code) mutates the target
+  // cannot change the starting state of the next one.
+  function resetFixtures(): void {
+    fs.rmSync(abs(protectedRel), { recursive: true, force: true });
     fs.mkdirSync(abs(protectedRel), { recursive: true });
     fs.writeFileSync(path.join(abs(protectedRel), 'existing.txt'), 'protected');
     fs.mkdirSync(abs(personalRel), { recursive: true });
     fs.writeFileSync(path.join(abs(personalRel), 'secret.txt'), 'personal-tier secret');
-  });
+  }
 
   afterAll(() => {
     fs.rmSync(abs(protectedRel), { recursive: true, force: true });
@@ -84,6 +87,7 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     }
     fs.rmSync(abs(scratchRel), { recursive: true, force: true });
     fs.mkdirSync(abs(scratchRel), { recursive: true });
+    resetFixtures();
     asDataOnlyPersona();
   });
 
