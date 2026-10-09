@@ -177,7 +177,7 @@ gets clean JSON.
   lists the accepted exceptions).
 - A test must not depend on load or order. Run a suspect file with
   `--sequence.shuffle --sequence.seed=<n>` (at least 222, 7 and 20261008) and under parallel load
-  before calling it fixed. Four defect classes caused the 2026-10 load and order failures:
+  before calling it fixed. Five defect classes caused the 2026-10 load and order failures:
   - **A real child process for code the test could call in process.** A spawned
     `node --import ts-loader.mjs scripts/x.ts` or `dist/...` CLI spends seconds on start-up
     (transpiling, loading the core stack, re-reading the 290KB `libs/core/package.json` for every
@@ -203,6 +203,18 @@ the catalog`, 2026-10). Every `createSeam({ catalog: coreSeamCatalog })` declare
     owner and multiplicity replace the stale entry (with a warning) and still rejects any other
     duplicate. `libs/core/seam-reevaluation.test.ts` re-evaluates defining modules and fails on
     a catalog seam without its own path as owner.
+  - **A per-pool store shared by consecutive files.** The test approval store
+    (`active/shared/runtime/vitest-approvals/pool-<n>/`) outlives a test file.
+    `operations-halt.enforcement.test.ts` left a `Merge PR 7` notice in
+    `autonomy/actions.jsonl`, and `approval-decision-routing.test.ts` failed whenever it ran next
+    in the same pool (2026-10). A writer clears its channels in `afterEach`; a reader asserts only
+    on what it appended. The `tests/vitest-approval-store-guard.ts` setup file clears the pool
+    store before and after every file, so the leftovers of one file never reach the next. It
+    fails a file that left records behind under `KYBERION_TEST_LEAK_STRICT=1`, unless the file is
+    on the shrink-only `tests/fixtures/approval-store-leftover-baseline.json` (34 files at
+    introduction). Reproduce such a pair by running the writer and then the reader with
+    `--maxWorkers=1` (both get pool 1). To see a reader's dependence, use a config without the
+    guard in `setupFiles`.
   - **A per-test mock that reaches a cached catalog.** `safeExistsSync.mockReturnValue(false)`,
     meant for one artifact, also answered the media-backend registry's directory check. The test
     passed only when an earlier test had already cached the registry. Route governed catalog paths
@@ -241,7 +253,7 @@ the catalog`, 2026-10). Every `createSeam({ catalog: coreSeamCatalog })` declare
    `execFileSync` with its caller (a `--require` preload in `NODE_OPTIONS` that wraps
    `node:child_process` and calls `syncBuiltinESMExports()`). Large `(idle)` time in the worker
    means it is waiting on a child or on transforms.
-3. Fix the cause (the four classes above). Raise a timeout only for work that is legitimately heavy,
+3. Fix the cause (the classes above). Raise a timeout only for work that is legitimately heavy,
    such as a cold stack import in `beforeAll` or a real CLI end-to-end suite, and record the
    measurement next to it.
 4. Force a timeout (`--testTimeout=<small>`) and check that only the timed-out test fails.
