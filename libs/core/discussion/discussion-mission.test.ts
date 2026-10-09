@@ -1,4 +1,15 @@
 import { afterAll, describe, expect, it, vi } from 'vitest';
+vi.mock('../customer-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../customer-resolver.js')>();
+  const { customerRootWithSodOverlay } =
+    await import('../governance/__tests__/sod-overlay-state.js');
+  return { ...actual, customerRoot: customerRootWithSodOverlay(actual.customerRoot) };
+});
+import {
+  clearSeparationOfDuties,
+  setSeparationOfDuties,
+} from '../governance/__tests__/sod-overlay.js';
+
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReadFile, safeReaddir, safeRmSync } from '@agent/core/secure-io';
@@ -34,6 +45,7 @@ const { issueChronosMissionFromProposal } = await import('../surface/surface-mis
 
 const ROLE = 'chronos_localadmin';
 const ID = 'test-mission-handoff';
+const SOD_ID = 'test-mission-handoff-sod';
 
 afterAll(() => {
   withExecutionContext('mission_controller', () => {
@@ -45,14 +57,18 @@ afterAll(() => {
         for (const name of safeReaddir(artifactDir)) {
           const file = `${artifactDir}/${name}`;
           if (
-            String(safeReadFile(file, { encoding: 'utf8' })).includes(`"discussion_id": "${ID}"`)
+            [ID, SOD_ID].some((id) =>
+              String(safeReadFile(file, { encoding: 'utf8' })).includes(`"discussion_id": "${id}"`)
+            )
           ) {
             safeRmSync(file, { force: true });
           }
         }
       }
-      const dir = pathResolver.shared(`runtime/discussions/${ID}`);
-      if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
+      for (const id of [ID, SOD_ID]) {
+        const dir = pathResolver.shared(`runtime/discussions/${id}`);
+        if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
+      }
     } finally {
       if (previous === undefined) delete process.env.KYBERION_SUDO;
       else process.env.KYBERION_SUDO = previous;
@@ -132,6 +148,58 @@ describe('approved decision → mission', () => {
         withExecutionContextAsync(ROLE, () => issueMissionForDiscussion(ID, 'reviewer'))
       ).rejects.toThrow(/already started/u);
     } finally {
+      clearWorkCoordinationNamespace();
+    }
+  });
+});
+
+describe('approved decision → mission, separation of duties', () => {
+  it('refuses to start a mission from a self-approval once separation of duties is on', async () => {
+    withExecutionContext(ROLE, () =>
+      createDiscussionRoom({
+        id: SOD_ID,
+        goal: 'Adopt staged rollout',
+        scope: { tenant_slug: 'demo', project_id: 'proj-m' },
+        config: { turn_delay_ms: 0, speaker: 'scripted', locale: 'en' },
+      })
+    );
+    await withExecutionContext(ROLE, () =>
+      ensureDiscussionRunning(SOD_ID, {
+        speaker: new ScriptedDiscussionSpeaker(),
+        sleep: async () => undefined,
+      })
+    );
+    setWorkCoordinationNamespace(`discussion-mission-sod-${Date.now()}`);
+    vi.mocked(issueChronosMissionFromProposal).mockClear();
+    try {
+      setSeparationOfDuties(false);
+      const result = withExecutionContext(ROLE, () =>
+        reviewDiscussion(SOD_ID, 'reviewer', { verdict: 'accept', request_mission: true })
+      );
+      const approvalId = result.mission_approval_id!;
+      // The reviewer who requested the mission also approves it (allowed while off).
+      withExecutionContext('mission_controller', () =>
+        decideApprovalRequest('mission_controller', {
+          channel: 'chronos',
+          requestId: approvalId,
+          decision: 'approved',
+          decidedBy: 'reviewer',
+          decidedByRole: 'owner',
+          authMethod: 'surface_session',
+          decidedByType: 'human',
+          authenticated: true,
+        })
+      );
+      setSeparationOfDuties(true);
+      expect(
+        withLiveMissionStatus(readDiscussionRoom(SOD_ID)!).outcomes.mission?.approval_status
+      ).toBe('unknown');
+      await expect(
+        withExecutionContextAsync(ROLE, () => issueMissionForDiscussion(SOD_ID, 'reviewer'))
+      ).rejects.toThrow(/Separation of duties/u);
+      expect(issueChronosMissionFromProposal).not.toHaveBeenCalled();
+    } finally {
+      clearSeparationOfDuties();
       clearWorkCoordinationNamespace();
     }
   });
