@@ -24,6 +24,12 @@ import {
   type ApprovalRequestRecord,
 } from '../governance/approval-store.js';
 import { serviceRecordingContentHash, type ServiceRecording } from './service-recording.js';
+import { markApprovalConsumed } from '../governance/approval-revocation.js';
+import {
+  approvalRequesterActorId,
+  resolveApprovalRequesterInput,
+  type ApprovalRequesterInput,
+} from '../governance/approval-requester.js';
 
 export const SERVICE_RECORDING_REVIEW_CHANNEL = 'service-recording-review';
 
@@ -65,12 +71,13 @@ export function findServiceRecordingReviewRequest(
 export function requestServiceRecordingReview(params: {
   recording: ServiceRecording;
   recordingRef: string;
-  requestedBy: string;
-  requestedByDisplayName?: string;
+  /** Resolved by the entry point; resolved only when a request is opened. */
+  requester: ApprovalRequesterInput;
 }): ApprovalRequestRecord {
   const existing = findServiceRecordingReviewRequest(params.recording);
   if (existing) return existing;
   const { recording } = params;
+  const requester = resolveApprovalRequesterInput(params.requester);
   const binding = serviceRecordingReviewBinding(recording);
   const highRisk = recording.steps.filter((step) => step.risk_class === 'high').length;
   return createApprovalRequest('mission_controller', {
@@ -78,10 +85,8 @@ export function requestServiceRecordingReview(params: {
     storageChannel: SERVICE_RECORDING_REVIEW_CHANNEL,
     threadTs: recording.recording_id,
     correlationId: binding,
-    requestedBy: params.requestedBy,
-    ...(params.requestedByDisplayName
-      ? { requestedByDisplayName: params.requestedByDisplayName }
-      : {}),
+    requestedBy: requester.requestedBy,
+    ...(requester.displayName ? { requestedByDisplayName: requester.displayName } : {}),
     kind: 'channel-approval',
     draft: {
       title: `Service recording review: ${recording.target.name}`,
@@ -97,7 +102,7 @@ export function requestServiceRecordingReview(params: {
     },
     requestedByContext: {
       surface: 'terminal',
-      actorId: params.requestedBy,
+      actorId: approvalRequesterActorId(requester),
       actorRole: 'service-recording',
     },
     justification: { reason: 'service recording review', requestedEffects: [binding] },
@@ -124,8 +129,9 @@ export function assertServiceRecordingReviewApproval(
     if (!isSeparationOfDutiesEnabled()) return;
     throw new Error(
       `[POLICY_VIOLATION] Separation of duties: the review of ${recordingRef} was not recorded in the approval store, ` +
-        'so who approved it cannot be checked — re-review it with ' +
-        `\`service_recording review --recording ${recordingRef} --approve\` (decided by a principal other than the requester).`
+        'so who approved it cannot be checked. Open a review request with ' +
+        `\`service_recording request-review --recording ${recordingRef}\`. ` +
+        reviewSeparationHint(recordingRef)
     );
   }
   const approval = loadApprovalRequest(SERVICE_RECORDING_REVIEW_CHANNEL, requestId);
@@ -144,6 +150,37 @@ export function assertServiceRecordingReviewApproval(
   }
   assertApprovalUsable(approval, {
     consumer: 'service_recording_promotion',
-    rerequestHint: `re-review it with \`service_recording review --recording ${recordingRef} --approve\``,
+    rerequestHint: `open a new review request with \`service_recording request-review --recording ${recordingRef}\` (${reviewSeparationHint(recordingRef)})`,
+  });
+}
+
+/** How a separated review approval can be obtained (no dead end). */
+export function reviewSeparationHint(recordingRef: string): string {
+  return (
+    'Under separation of duties the approval must come from a principal other than the one who ' +
+    'requested the review: a different member deciding on an authenticated surface (Chronos or ' +
+    'presence-studio), or — on a review request someone else opened — ' +
+    `\`service_recording review --recording ${recordingRef} --approve\` in an interactive terminal, ` +
+    'answering its challenge.'
+  );
+}
+
+/**
+ * Promotion is a one-shot effect: record that it used the review approval
+ * (`markApprovalConsumed`), so the approval cannot promote twice and a later
+ * revoke reports it as consumed. A legacy review (no approval id, allowed only
+ * while separation of duties is off) has nothing to consume.
+ */
+export function consumeServiceRecordingReviewApproval(
+  recording: ServiceRecording,
+  consumedBy: string
+): void {
+  const requestId = recording.review?.approval_request_id;
+  if (!requestId) return;
+  markApprovalConsumed('mission_controller', {
+    channel: SERVICE_RECORDING_REVIEW_CHANNEL,
+    requestId,
+    consumer: 'service_recording_promotion',
+    consumedBy,
   });
 }

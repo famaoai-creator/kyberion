@@ -27,6 +27,7 @@ import { applySurfaceApprovalDecision } from '@agent/core/surface/surface-approv
 import { isSeparationOfDutiesEnabled } from '@agent/core/governance/approval-store';
 import {
   CLI_OPERATOR_PROVISION_COMMAND,
+  detectCliAgentPrincipal,
   resolveCliOperatorIdentity,
 } from '@agent/core/governance/cli-operator-principal';
 import { findMissionPath } from '@agent/core/path-resolver';
@@ -64,23 +65,37 @@ export function parseDecisionRequestBody(raw: string): Record<string, unknown> {
  * runs as — the same local owner principal (`user:<member_id>`, else the
  * onboarding display name) that `pnpm kyberion approvals --approve` records
  * (`resolveCliOperatorIdentity()`) — never the page's `decidedBy`. A name
- * typed on the page is kept only as a note for the audit trail. With
- * separation of duties on and no owner member, an approval is refused rather
- * than recorded under a name that cannot prove separation.
+ * typed on the page is kept only as a note for the audit trail.
+ *
+ * Same rules as the terminal (`scripts/lib/approval-cli-decision.ts`): with
+ * separation of duties on, approvals are refused when this server runs in an
+ * agent session or has no owner member (the page token proves possession
+ * only; the strong path is Chronos or presence-studio). With it off, a server
+ * started in an agent session records its decisions as `caller_supplied`
+ * with the agent principal, so they can never pass a later re-check.
+ * Agent-session markers are advisory environment variables (best effort).
  */
-export function resolveBriefDecider(body: Record<string, unknown>): {
+export function resolveBriefDecider(
+  body: Record<string, unknown>,
+  env: Record<string, string | undefined> = process.env
+): {
   decidedBy: string;
   pageName?: string;
   refusal?: string;
+  deciderIdentitySource?: 'caller_supplied';
+  decidedInAgentSession?: string;
 } {
   const identity = resolveCliOperatorIdentity();
+  const agent = detectCliAgentPrincipal(env);
   const decidedBy = identity.principalId ?? identity.displayName;
   const typed = typeof body?.decidedBy === 'string' ? body.decidedBy.trim().slice(0, 200) : '';
   let refusal: string | undefined;
-  if (body?.decision === 'approved' && !identity.principalId) {
+  if (body?.decision === 'approved' && (agent || !identity.principalId)) {
     try {
       if (isSeparationOfDutiesEnabled()) {
-        refusal = `separation of duties is on and this machine has no stable operator identity; run \`${CLI_OPERATOR_PROVISION_COMMAND}\` and reload`;
+        refusal = agent
+          ? `separation of duties is on and this brief server runs inside an agent session (${agent}); approve on an authenticated surface (Chronos or presence-studio), or serve the brief from your own terminal`
+          : `separation of duties is on and this machine has no stable operator identity; run \`${CLI_OPERATOR_PROVISION_COMMAND}\` and reload`;
       }
     } catch (error) {
       refusal = error instanceof Error ? error.message : String(error);
@@ -90,6 +105,9 @@ export function resolveBriefDecider(body: Record<string, unknown>): {
     decidedBy,
     ...(typed && typed !== decidedBy && typed !== identity.displayName ? { pageName: typed } : {}),
     ...(refusal ? { refusal } : {}),
+    ...(agent
+      ? { deciderIdentitySource: 'caller_supplied' as const, decidedInAgentSession: agent }
+      : {}),
   };
 }
 
@@ -208,7 +226,8 @@ async function main(args: string[] = [], print: Print = () => undefined): Promis
     if (!decision)
       return json(res, 400, { ok: false, error: 'decision must be approved|rejected' });
     // The decider is resolved server-side; the page's name is only a note.
-    const { decidedBy, pageName, refusal } = resolveBriefDecider(body);
+    const decider = resolveBriefDecider(body);
+    const { decidedBy, pageName, refusal } = decider;
     if (refusal) return json(res, 403, { ok: false, error: refusal });
     const pageNote = pageName ? `name entered on the brief page: ${pageName}` : '';
     const bodyNote = typeof body?.note === 'string' ? body.note.trim() : '';
@@ -246,6 +265,12 @@ async function main(args: string[] = [], print: Print = () => undefined): Promis
         channel: approval.channel,
         threadTs: approval.threadTs,
         decidedBy,
+        ...(decider.deciderIdentitySource
+          ? { deciderIdentitySource: decider.deciderIdentitySource }
+          : {}),
+        ...(decider.decidedInAgentSession
+          ? { decidedInAgentSession: decider.decidedInAgentSession }
+          : {}),
         storageChannel: ALIGNMENT_CHANNEL,
         ...(note ? { note } : {}),
         ...(reasonCategory ? { reasonCategory } : {}),

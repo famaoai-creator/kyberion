@@ -1,6 +1,15 @@
 /**
  * One stable principal for the terminal CLI's approval records.
  *
+ * Trust: everything here is best effort. The terminal cannot authenticate the
+ * person at the keyboard. Agent-session markers (environment variables) are
+ * advisory — an agent can clear them — and the TTY challenge the terminal asks
+ * for under separation of duties (`scripts/lib/approval-cli-decision.ts`) can
+ * be answered by an agent driving a PTY (for example through
+ * terminal-actuator). The strong path for a separated approval is an
+ * authenticated surface (Chronos or presence-studio), which records
+ * `user:<member_id>` from a verified session.
+ *
  * The terminal runs on this machine as its local owner — the same member the
  * chronos / presence-studio loopback viewer resolves to
  * (`resolveMemberByPrincipal({ source: 'loopback' })`). Approval requests the
@@ -24,6 +33,7 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { resolveMemberByPrincipal } from '../organization/member-registry.js';
 import { resolveOperatorDisplayName } from '../surface/operator-identity.js';
 import { resolveSeparationOfDutiesPolicy } from './approval-policy.js';
+import type { ApprovalRequesterRef } from './approval-requester.js';
 
 type Env = Record<string, string | undefined>;
 
@@ -122,45 +132,54 @@ function missingIdentityError(side: 'request' | 'decision', evidence: string): E
   );
 }
 
-export interface CliApprovalRequester {
-  requestedBy: string;
-  requestedByDisplayName?: string;
-  source: 'explicit' | 'agent' | 'operator' | 'legacy';
+export interface CliApprovalRequester extends ApprovalRequesterRef {
+  /** The detected principal; always recorded (`requestedByContext.actorId`). */
+  actorId: string;
+  /** How the detected principal was found. */
+  source: 'agent' | 'operator' | 'legacy';
 }
 
 /**
- * Who opens an approval request from a CLI or script. Order: an explicit
- * `--requested-by` (caller's choice, unchanged) → the agent session the CLI
- * runs in → the local owner member → the caller's legacy value (only while
- * separation of duties is off; with it on this throws a diagnostic instead).
+ * Who opens an approval request from a CLI or script. The detected principal
+ * is the agent session the CLI runs in, else the local owner member, else the
+ * caller's legacy value (only while separation of duties is off; with it on
+ * this throws a diagnostic). It is always recorded as `actorId`; an explicit
+ * `--requested-by` becomes `requestedBy` and adds an identity, so an owner
+ * cannot hide behind `--requested-by agent:x` and then approve.
  */
 export function resolveCliApprovalRequester(
   params: CliOperatorPrincipalOptions & { explicit?: string | null; legacy: string }
 ): CliApprovalRequester {
-  const explicit = params.explicit?.trim();
-  if (explicit) return { requestedBy: explicit, source: 'explicit' };
+  const explicit = params.explicit?.trim() || undefined;
   const agent = detectCliAgentPrincipal(params.env);
-  if (agent) return { requestedBy: agent, source: 'agent' };
   const identity = resolveCliOperatorIdentity(params);
-  if (identity.principalId) {
-    return {
-      requestedBy: identity.principalId,
-      requestedByDisplayName: identity.displayName,
+  let detected: Pick<CliApprovalRequester, 'actorId' | 'source' | 'displayName'>;
+  if (agent) detected = { actorId: agent, source: 'agent' };
+  else if (identity.principalId) {
+    detected = {
+      actorId: identity.principalId,
       source: 'operator',
+      displayName: identity.displayName,
     };
-  }
-  if (resolveSeparationOfDutiesPolicy().enabled) {
+  } else if (resolveSeparationOfDutiesPolicy().enabled) {
     throw missingIdentityError(
       'request',
-      `no active owner member (would have recorded '${params.legacy}')`
+      `no active owner member (would have recorded '${explicit ?? params.legacy}')`
     );
-  }
-  return { requestedBy: params.legacy, source: 'legacy' };
+  } else detected = { actorId: params.legacy, source: 'legacy' };
+  return { requestedBy: explicit ?? detected.actorId, ...detected };
 }
 
 export interface CliApprovalDecider {
   decidedBy: string;
   decidedByDisplayName: string;
+  /**
+   * Set when the terminal is an agent session (separation of duties off):
+   * the decision is recorded as `caller_supplied`, so it can never pass a later
+   * separation-of-duties re-check.
+   */
+  deciderIdentitySource?: 'caller_supplied';
+  decidedInAgentSession?: string;
 }
 
 /**
@@ -175,8 +194,8 @@ export function resolveCliApprovalDecider(
   params: CliOperatorPrincipalOptions & { decision: 'approved' | 'rejected' }
 ): CliApprovalDecider {
   const identity = resolveCliOperatorIdentity(params);
+  const agent = detectCliAgentPrincipal(params.env);
   if (params.decision === 'approved' && resolveSeparationOfDutiesPolicy().enabled) {
-    const agent = detectCliAgentPrincipal(params.env);
     if (agent) {
       throw new Error(
         `[POLICY_VIOLATION] approval decision blocked — separation of duties is on and this command runs inside an agent session (${agent}), ` +
@@ -195,5 +214,8 @@ export function resolveCliApprovalDecider(
   return {
     decidedBy: identity.principalId ?? identity.displayName,
     decidedByDisplayName: identity.displayName,
+    ...(agent
+      ? { deciderIdentitySource: 'caller_supplied' as const, decidedInAgentSession: agent }
+      : {}),
   };
 }

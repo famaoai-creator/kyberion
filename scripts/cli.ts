@@ -1079,7 +1079,7 @@ async function applyApprovalDecision(
   }
 
   const decision = command === 'approve' ? 'approved' : 'rejected';
-  const decided = decideApprovalFromCli(request, {
+  const decided = await decideApprovalFromCli(request, {
     decision,
     note: `decision submitted from terminal via pnpm kyberion ${command}`,
   });
@@ -1103,15 +1103,10 @@ async function applyApprovalDecision(
 
 async function requestProjectTrust(inputPath: string, json = false): Promise<void> {
   const { createProjectTrustApprovalRequest } = await import('@agent/core/project/project-trust');
-  const { resolveCliApprovalRequester } =
-    await import('@agent/core/governance/cli-operator-principal');
-  const requester = resolveCliApprovalRequester({ legacy: resolveOperatorDisplayName() });
+  const { cliApprovalRequester } = await import('./lib/cli-approval-requester.js');
   const record = createProjectTrustApprovalRequest({
     inputPath,
-    requestedBy: requester.requestedBy,
-    ...(requester.requestedByDisplayName
-      ? { requestedByDisplayName: requester.requestedByDisplayName }
-      : {}),
+    requester: cliApprovalRequester(undefined, resolveOperatorDisplayName()),
   });
   if (json) {
     printText(JSON.stringify(record, null, 2));

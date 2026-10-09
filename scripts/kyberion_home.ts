@@ -247,7 +247,7 @@ type ApprovalsArgv = Partial<Record<'approve' | 'deny' | 'revoke' | 'reason' | '
   json?: boolean;
 };
 
-function handleApprovalsSubcommand(argv: ApprovalsArgv): void {
+async function handleApprovalsSubcommand(argv: ApprovalsArgv): Promise<void> {
   if (argv.revoke) {
     const requestId = String(argv.revoke);
     const request = findRevocableApproval(requestId);
@@ -268,7 +268,7 @@ function handleApprovalsSubcommand(argv: ApprovalsArgv): void {
       printOutput(ui('recorder:recorder_approvals_not_found', { id: requestId }));
       throw new ScriptExitError(1, '', true);
     }
-    const decided = decideApprovalFromCli(request, {
+    const decided = await decideApprovalFromCli(request, {
       decision: argv.approve ? 'approved' : 'rejected',
       note: argv.note || 'decided via pnpm kyberion approvals',
     });
@@ -1386,7 +1386,7 @@ async function mainImpl(args: string[] = []): Promise<void> {
       });
       return;
     case 'approvals':
-      handleApprovalsSubcommand(argv as ApprovalsArgv);
+      await handleApprovalsSubcommand(argv as ApprovalsArgv);
       return;
     case 'deals':
       if (argv['ingest-audio']) {

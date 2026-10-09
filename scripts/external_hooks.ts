@@ -11,7 +11,7 @@
  * authenticated human approved its exact content
  * (`ensureTrustedExternalHooksRegistered`); editing the file voids the approval.
  */
-import { resolveCliApprovalRequester } from '@agent/core/governance/cli-operator-principal';
+import { cliApprovalRequester } from './lib/cli-approval-requester.js';
 import * as path from 'node:path';
 import {
   discoverExternalHookConfigs,
@@ -95,10 +95,7 @@ export function requestExternalHookTrust(inputPath: string, requestedBy?: string
   const request = withExecutionContext('mission_controller', () =>
     createProjectTrustApprovalRequest({
       inputPath: relative,
-      requestedBy: resolveCliApprovalRequester({
-        explicit: requestedBy,
-        legacy: 'external-hooks-cli',
-      }).requestedBy,
+      requester: cliApprovalRequester(requestedBy, 'external-hooks-cli'),
       // The approver authorizes shell commands from a hook config, not a pipeline.
       resource: { kind: 'external-hook-config', source: discovered.source },
     })

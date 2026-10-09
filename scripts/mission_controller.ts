@@ -555,10 +555,11 @@ async function requestMissionWorkReconciliationApproval(
 ) {
   const { createMissionWorkReconciliationApprovalRequest } =
     await import('@agent/core/mission/mission-work-reconciliation');
+  const { missionControllerRequester } = await import('./lib/cli-approval-requester.js');
   const result = createMissionWorkReconciliationApprovalRequest({
     missionId,
     manifestPath,
-    requestedBy,
+    requester: missionControllerRequester(requestedBy),
   });
   printOutput(JSON.stringify(result, null, 2));
   return result;

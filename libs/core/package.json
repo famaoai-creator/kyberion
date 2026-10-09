@@ -3795,6 +3795,10 @@
       "types": "./dist/governance/approval-store.d.ts",
       "default": "./dist/governance/approval-store.js"
     },
+    "./governance/approval-requester": {
+      "types": "./dist/governance/approval-requester.d.ts",
+      "default": "./dist/governance/approval-requester.js"
+    },
     "./governance/approval-revocation": {
       "types": "./dist/governance/approval-revocation.d.ts",
       "default": "./dist/governance/approval-revocation.js"

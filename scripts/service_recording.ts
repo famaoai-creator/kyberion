@@ -18,6 +18,7 @@ import { nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertApprovalUsable } from '@agent/core/governance/approval-store';
 import { resolveCliApprovalRequester } from '@agent/core/governance/cli-operator-principal';
+import type { ApprovalRequesterInput } from '@agent/core/governance/approval-requester';
 import {
   findServiceRecordingReviewRequest,
   requestServiceRecordingReview,
@@ -151,15 +152,12 @@ function reviewRequester(args: Record<string, string>) {
 
 function openReview(
   loaded: { absolute: string; value: ServiceRecording },
-  requester: ReturnType<typeof reviewRequester>
+  requester: ApprovalRequesterInput
 ) {
   return requestServiceRecordingReview({
     recording: loaded.value,
     recordingRef: pathResolver.toRepoRelative(loaded.absolute),
-    requestedBy: requester.requestedBy,
-    ...(requester.requestedByDisplayName
-      ? { requestedByDisplayName: requester.requestedByDisplayName }
-      : {}),
+    requester,
   });
 }
 
@@ -200,7 +198,7 @@ function capture(args: Record<string, string>): CommandResult {
 function requestReview(args: Record<string, string>): CommandResult {
   if (!args.recording) throw new Error('request-review requires --recording');
   const loaded = loadRecording(args.recording);
-  const review = openReview(loaded, reviewRequester(args));
+  const review = openReview(loaded, () => reviewRequester(args));
   return {
     value: {
       status: review.status === 'pending' ? 'review-requested' : `review-${review.status}`,
@@ -246,7 +244,7 @@ function candidate(args: Record<string, string>): CommandResult {
   };
 }
 
-function review(args: Record<string, string>): CommandResult {
+async function review(args: Record<string, string>): Promise<CommandResult> {
   if (!args.recording || (args.approve !== 'true' && args.reject !== 'true')) {
     throw new Error('review requires --recording and exactly one of --approve/--reject');
   }
@@ -257,13 +255,13 @@ function review(args: Record<string, string>): CommandResult {
   // audit). A recording captured before reviews were requested at capture
   // gets its request here — with no prior requester on record.
   let request = findServiceRecordingReviewRequest(loaded.value);
-  if (!request) request = openReview(loaded, reviewRequester(args));
+  if (!request) request = openReview(loaded, () => reviewRequester(args));
   if (request.status === 'approved' && status === 'rejected') {
     request = revokeApprovalFromCli(request, {
       reason: args.note || 'recording review rejected after approval',
     });
   } else if (request.status === 'pending') {
-    request = decideApprovalFromCli(request, {
+    request = await decideApprovalFromCli(request, {
       decision: status,
       note: args.note || `service recording review of ${recordingRef}`,
     });
