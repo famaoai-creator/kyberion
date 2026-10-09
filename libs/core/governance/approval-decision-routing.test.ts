@@ -83,17 +83,31 @@ describe('routeAutonomousDecision', () => {
     });
   });
 
+  // The notice log is append-only and shared by every file in this pool, so
+  // assert only on what the test itself appended, never on an empty store.
+  const noticesAppendedBy = (act: () => unknown) => {
+    const before = listAutonomousActionNotices().length;
+    act();
+    return listAutonomousActionNotices().slice(before);
+  };
+
   it('lets the agent proceed on auto and leaves a notice for the digest', () => {
-    const routed = route({ decision: 'auto', vetoWindowMinutes: undefined });
+    let routed: ReturnType<typeof route> | undefined;
+    const appended = noticesAppendedBy(() => {
+      routed = route({ decision: 'auto', vetoWindowMinutes: undefined });
+    });
     expect(routed).toMatchObject({ level: 'none', proceed: true, parked: false, notified: false });
     expect(notifications.notifyOperatorSync).not.toHaveBeenCalled();
-    expect(listAutonomousActionNotices().map((notice) => notice.title)).toEqual(['Merge PR 42']);
+    expect(appended.map((notice) => notice.title)).toEqual(['Merge PR 42']);
   });
 
   it('never proceeds in shadow mode and reports nothing as done', () => {
-    const routed = route({ decision: 'auto', allowed: false, shadow: true });
-    expect(routed.proceed).toBe(false);
-    expect(listAutonomousActionNotices()).toEqual([]);
+    let routed: ReturnType<typeof route> | undefined;
+    const appended = noticesAppendedBy(() => {
+      routed = route({ decision: 'auto', allowed: false, shadow: true });
+    });
+    expect(routed?.proceed).toBe(false);
+    expect(appended).toEqual([]);
   });
 
   it('parks a veto, pushes the card once and starts the clock only on delivery', () => {
