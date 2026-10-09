@@ -52,13 +52,6 @@
       "note": "Storage-layout cache partition (personal): derived, re-generable data (digest-keyed sidecars, model/build trees). Deletion only costs a rebuild; anything that cannot be rebuilt belongs in runtime/ state instead."
     },
     {
-      "path": "active/shared/cache/system/local-stt-discovery",
-      "artifact_class": "cache",
-      "ttl_days": 1,
-      "action": "delete",
-      "note": "Cross-process local STT discovery result (libs/core/local-stt-discovery.ts): one candidates.json rewritten atomically, keyed by platform, PATH, registry content and the managed python bins with their mtimes, valid for KYBERION_STT_DISCOVERY_CACHE_TTL_MS (default 10 min); managed-tool installs (voice setup, tool-runtime setup, env:bootstrap) reset it. Host binary paths and versions only; deleting it costs one probe. Cache hits do not refresh the file's mtime: the janitor's mtime TTL measures time since the last probe, not since the last use. (The scripts/ts-loader.mjs transpile cache is not on this floor: it holds executable code and lives in node_modules/.cache/kyberion-ts-loader/, outside every agent-writable tree, pruned by the loader itself.)"
-    },
-    {
       "path": "active/shared/artifacts",
       "artifact_class": "report",
       "action": "review_required",

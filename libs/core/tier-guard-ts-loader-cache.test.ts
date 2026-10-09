@@ -18,6 +18,11 @@ vi.mock('./governance/audit-chain.js', () => ({
  */
 const ROOT = pathResolver.rootDir();
 const CACHE_ENTRY = path.join(ROOT, 'node_modules/.cache/kyberion-ts-loader/ab/ab00.transpiled');
+// The local STT discovery cache decides which binary the speech-to-text bridge runs (review H2).
+const STT_CACHE_ENTRY = path.join(
+  ROOT,
+  'node_modules/.cache/kyberion-stt-discovery/candidates.json'
+);
 const OLD_CACHE_ENTRY = path.join(ROOT, 'active/shared/cache/system/ts-loader/ab/ab00.transpiled');
 const ENV_KEYS = [
   'KYBERION_TENANT',
@@ -49,7 +54,7 @@ beforeAll(async () => {
   ) as Policy;
 }, 60_000);
 
-describe('ts-loader transpile cache location is not writable by governed personas', () => {
+describe('private host caches (ts-loader, STT discovery) are not writable by governed personas', () => {
   const saved: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {};
   beforeEach(() => {
     for (const key of ENV_KEYS) {
@@ -69,7 +74,10 @@ describe('ts-loader transpile cache location is not writable by governed persona
     expect(personas.length).toBeGreaterThan(3);
     const allowed = personas.filter((persona) => {
       process.env.KYBERION_PERSONA = persona;
-      return validateWritePermission(CACHE_ENTRY).allowed;
+      return (
+        validateWritePermission(CACHE_ENTRY).allowed ||
+        validateWritePermission(STT_CACHE_ENTRY).allowed
+      );
     });
     expect(allowed).toEqual([]);
   });
@@ -80,7 +88,10 @@ describe('ts-loader transpile cache location is not writable by governed persona
     const allowed = roles.filter((role) => {
       process.env.KYBERION_PERSONA = 'worker';
       process.env.MISSION_ROLE = role;
-      return validateWritePermission(CACHE_ENTRY).allowed;
+      return (
+        validateWritePermission(CACHE_ENTRY).allowed ||
+        validateWritePermission(STT_CACHE_ENTRY).allowed
+      );
     });
     expect(allowed).toEqual([]);
   });
@@ -89,5 +100,11 @@ describe('ts-loader transpile cache location is not writable by governed persona
     process.env.KYBERION_PERSONA = 'finance_controller';
     expect(validateWritePermission(OLD_CACHE_ENTRY).allowed).toBe(true);
     expect(validateWritePermission(CACHE_ENTRY).allowed).toBe(false);
+    expect(
+      validateWritePermission(
+        path.join(ROOT, 'active/shared/cache/system/local-stt-discovery/candidates.json')
+      ).allowed
+    ).toBe(true);
+    expect(validateWritePermission(STT_CACHE_ENTRY).allowed).toBe(false);
   });
 });
