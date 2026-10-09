@@ -270,6 +270,15 @@ local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
   rewrite other tenants' entries (deny-unless-brokered). Read such a file through a governed
   system-scope reader (the pattern of `check_tenant_registry_consistency`'s read grant), and write it
   only through a governed store-writer.
+- **Document duplicate evidence belongs to the selected tenant.** The explicit ingest ceremony
+  reads committed asset hashes from that tenant's information-asset ledger. Never use the
+  standalone actuator's shared hash registry to decide whether a tenant import may land, and
+  never add a second hash-registration write after the card/ledger commit. A legacy global
+  registry is neither migration authority nor proof that the selected destination has the file;
+  leave it untouched. Preserve historical-hash and source-version/reparse semantics. Verify with
+  `scripts/ingest.dedup-ordering.test.ts`: identical bytes into two tenants, independent updates,
+  read-only previews, foreign legacy rows, a failed ledger append, and a retry after a committed
+  ledger entry with no registry record. This does not claim concurrent commit atomicity.
 - **Facades carry their own binding.** A governed facade binds the tenant and organization it was
   given (`--tenant-slug`, `--organization-id`) via
   `withExecutionContext(role, fn, undefined, tenantSlug, organizationId)`. An operator must never
