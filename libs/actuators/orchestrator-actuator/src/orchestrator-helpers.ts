@@ -1077,7 +1077,16 @@ async function opApply(op: string, params: any, ctx: any) {
       if (safeExistsSync(target)) safeUnlinkSync(target);
       if (!safeExistsSync(path.dirname(target)))
         safeMkdir(path.dirname(target), { recursive: true });
-      safeSymlinkSync(source, target, params.type || 'dir');
+      // Only 'dir' / 'file' links: a declarative pipeline must not choose a
+      // Windows junction (no privilege needed, absolute target). secure-io
+      // also enforces this and requires write scope on the canonical source.
+      const linkType = params.type ?? 'dir';
+      if (linkType !== 'dir' && linkType !== 'file') {
+        throw new Error(
+          `[SECURITY] symlink op: type must be 'dir' or 'file' (got '${String(linkType)}')`
+        );
+      }
+      safeSymlinkSync(source, target, linkType);
       break;
     case 'git_checkpoint':
       await retry(
