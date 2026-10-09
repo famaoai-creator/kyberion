@@ -381,9 +381,11 @@ local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
     `libs/core/governance/approval-sod-consumers.contract.test.ts`. A decision recorded while
     the setting was off cannot take effect after it is on, and re-request helpers never hand back
     such a record.
-  - An unreadable `approval-policy.json` blocks approving decisions and approval use even with
-    the setting off (fail closed, diagnostic message); only plugin activation degrades to
-    `pending_approval` with a warning.
+  - A missing `approval-policy.json` (no customer overlay and no product file) means the shipped
+    default (off), logged once at debug. A file that is present but unreadable or schema-invalid
+    blocks approving decisions and approval use even with the setting off (fail closed,
+    diagnostic message); plugin activation degrades to `pending_approval` with a warning, and a
+    pending DOT autonomy promotion stays pending until the next sweep.
   - Known limits (string identities, the CLI persona-vs-name gap, policy/service deciders, flows
     outside the approval store such as `service_recording review`) are listed in
     [approval-gate-design](./approval-gate-design.md).
