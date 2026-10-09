@@ -16,7 +16,7 @@
 
 import { parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
+import { safeExecResult, safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import path from 'node:path';
 
@@ -278,11 +278,33 @@ function checkNoSecretValues(): void {
   });
 }
 
+/**
+ * libs/core/dist/package.json (written by scripts/write_core_dist_scope.mjs at
+ * the end of the core build) must carry the same `#imports` map and shims the
+ * current libs/core/package.json would generate; a dist built before an
+ * `#imports` change resolves the old map. The writer is plain node (it runs
+ * before secure-io exists in dist), so it is asked in a child process.
+ */
+function checkCoreDistScope(): void {
+  const writer = pathResolver.rootResolve('scripts/write_core_dist_scope.mjs');
+  const result = safeExecResult(process.execPath, [writer, '--check'], {
+    cwd: pathResolver.rootDir(),
+    timeoutMs: 30_000,
+    maxOutputMB: 1,
+  });
+  if (result.status === 0) return;
+  const detail =
+    (result.stderr || result.error?.message || 'unknown error').trim() ||
+    `exit ${String(result.status)}`;
+  failures.push({ clause: 'core-dist-scope.current', detail });
+}
+
 export function checkPackagingContract(): ClauseFailure[] {
   failures.length = 0;
   checkImageTierIsolation();
   checkPackageExportKeys();
   checkPackageExportTargets();
+  checkCoreDistScope();
   checkCoreSubpathExports();
   checkNoSecretValues();
   return [...failures];
