@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { logger } from './core.js';
 import { ensureAgentRuntime, registerAgentRuntimeEnsurer } from './agent/agent-runtime-port.js';
 import { coreSeamCatalog } from './seam.js';
 import {
@@ -76,5 +77,69 @@ describe('remaining sole seam ports', () => {
     await expect(dispatchThroughMissionWorkerCore('payload', {})).rejects.toThrow(
       'Mission worker core dispatcher is not initialized'
     );
+  });
+
+  it('lets the owner of a replace key supersede its stale registration, with a warning', async () => {
+    // A module-registry reset racing an in-flight import evaluates
+    // mission-orchestration-worker-part-core twice against one port instance;
+    // the second module-level registration presents the same key and must not
+    // throw SEAM_DUPLICATE_PROVIDER.
+    const replaceKey = Symbol('test-owner');
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    try {
+      const releaseStale = registerMissionWorkerCoreDispatcher(async () => 'stale', undefined, {
+        replaceKey,
+      });
+      expect(warn).not.toHaveBeenCalled();
+      const release = registerMissionWorkerCoreDispatcher(async () => 'fresh', undefined, {
+        replaceKey,
+      });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toMatch(
+        /^\[MISSION_WORKER_CORE\] superseding .+ — .+ \| next: .+ \| evidence: seam=mission-worker-core-dispatcher/
+      );
+      await expect(dispatchThroughMissionWorkerCore('payload', {})).resolves.toBe('fresh');
+      releaseStale(); // a no-op once superseded
+      await expect(dispatchThroughMissionWorkerCore('payload', {})).resolves.toBe('fresh');
+      release();
+      await expect(dispatchThroughMissionWorkerCore('payload', {})).rejects.toThrow(
+        'Mission worker core dispatcher is not initialized'
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('never lets a caller without the replace key evict a keyed registration', async () => {
+    const release = registerMissionWorkerCoreDispatcher(async () => 'builtin', undefined, {
+      replaceKey: Symbol('owner'),
+    });
+    try {
+      expect(() => registerMissionWorkerCoreDispatcher(async () => 'intruder')).toThrow(
+        /already registered/
+      );
+      expect(() =>
+        registerMissionWorkerCoreDispatcher(async () => 'intruder', undefined, {
+          replaceKey: Symbol('owner'), // same description, different key
+        })
+      ).toThrow(/already registered/);
+      await expect(dispatchThroughMissionWorkerCore('payload', {})).resolves.toBe('builtin');
+    } finally {
+      release();
+    }
+  });
+
+  it('keeps rejecting a keyed registration when another provider holds the seam', async () => {
+    const dispose = registerMissionWorkerCoreDispatcher(async () => 'double');
+    try {
+      expect(() =>
+        registerMissionWorkerCoreDispatcher(async () => 'builtin', undefined, {
+          replaceKey: Symbol('owner'),
+        })
+      ).toThrow(/already registered/);
+      await expect(dispatchThroughMissionWorkerCore('payload', {})).resolves.toBe('double');
+    } finally {
+      dispose();
+    }
   });
 });
