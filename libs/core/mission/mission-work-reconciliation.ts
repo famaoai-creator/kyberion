@@ -2,7 +2,12 @@
  * Adopt work completed outside dispatch-workitems without weakening the mission exit gate.
  */
 
-import { resolveCliApprovalRequester } from '../governance/cli-operator-principal.js';
+import {
+  approvalRequesterActorId,
+  resolveApprovalRequesterInput,
+  type ApprovalRequesterInput,
+  type ApprovalRequesterRef,
+} from '../governance/approval-requester.js';
 import * as nodePath from 'node:path';
 import { appendMissionExecutionLedgerEntry } from './mission-team-binding.js';
 import {
@@ -273,6 +278,12 @@ export function createMissionWorkReconciliationApprovalRequest(input: {
   missionId: string;
   manifestPath: string;
   requestedBy?: string;
+  /**
+   * The requester the entry point resolved (the terminal: agent session or
+   * local owner, `cli-operator-principal.ts`). Without it, `requestedBy` or
+   * the legacy persona/USER default is recorded.
+   */
+  requester?: ApprovalRequesterInput;
 }): ApprovalRequestRecord {
   assertMissionControllerAuthority();
   const missionId = input.missionId.toUpperCase();
@@ -305,21 +316,23 @@ export function createMissionWorkReconciliationApprovalRequest(input: {
   );
   if (existing) return existing;
 
-  // CLI-opened (mission_controller): the agent session or the local owner
-  // member, so a human deciding an agent's request is never a self-approval.
-  const requestedBy = resolveCliApprovalRequester({
-    explicit: input.requestedBy,
-    legacy:
-      getRegisteredEnvText('KYBERION_PERSONA') ||
-      getRegisteredEnvText('USER') ||
-      'mission_controller',
-  }).requestedBy;
+  const requester: ApprovalRequesterRef = input.requester
+    ? resolveApprovalRequesterInput(input.requester)
+    : {
+        requestedBy:
+          input.requestedBy?.trim() ||
+          getRegisteredEnvText('KYBERION_PERSONA') ||
+          getRegisteredEnvText('USER') ||
+          'mission_controller',
+      };
+  const requestedBy = requester.requestedBy;
   return createApprovalRequest('mission_controller', {
     channel: MISSION_RECONCILIATION_APPROVAL_CHANNEL,
     storageChannel: MISSION_RECONCILIATION_APPROVAL_CHANNEL,
     threadTs: missionId,
     correlationId: effectBinding,
     requestedBy,
+    ...(requester.displayName ? { requestedByDisplayName: requester.displayName } : {}),
     kind: 'mission_gate',
     draft: {
       title: `Adopt externally completed work: ${missionId}`,
@@ -330,7 +343,7 @@ export function createMissionWorkReconciliationApprovalRequest(input: {
     source: { missionId },
     requestedByContext: {
       surface: 'terminal',
-      actorId: requestedBy,
+      actorId: approvalRequesterActorId(requester),
       actorRole: 'mission-work-reconciliation',
       missionId,
     },

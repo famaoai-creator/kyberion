@@ -402,6 +402,10 @@ export function applySurfaceApprovalDecision(params: {
   reasonCategory?: RejectionReasonCategory;
   /** A rejection that asks the requester to revise and re-submit. */
   changeInstruction?: string;
+  /** `caller_supplied` when the surface could not resolve the decider (see ApprovalDeciderIdentitySource). */
+  deciderIdentitySource?: 'caller_supplied';
+  /** Agent session the deciding process ran in (recorded with the decision). */
+  decidedInAgentSession?: string;
 }): ApprovalRequestRecord {
   const storageChannel = params.storageChannel || params.surface;
   const record = loadApprovalRequest(storageChannel, params.requestId);
@@ -430,6 +434,12 @@ export function applySurfaceApprovalDecision(params: {
     ...(params.reasonCategory ? { reasonCategory: params.reasonCategory } : {}),
     ...(params.changeInstruction !== undefined
       ? { changeInstruction: params.changeInstruction }
+      : {}),
+    ...(params.deciderIdentitySource
+      ? { deciderIdentitySource: params.deciderIdentitySource }
+      : {}),
+    ...(params.decidedInAgentSession
+      ? { decidedInAgentSession: params.decidedInAgentSession }
       : {}),
   });
 }

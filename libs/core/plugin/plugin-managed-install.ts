@@ -20,6 +20,10 @@
  * `blocked_digest_mismatch`. Records written before digests existed are
  * treated as `pending_approval` until re-installed and re-approved.
  */
+import {
+  approvalRequesterActorId,
+  type ApprovalRequesterRef,
+} from '../governance/approval-requester.js';
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { parseSafeJsonObjectValue, readJson } from '../foundation/json.js';
@@ -138,7 +142,12 @@ export interface InstallPluginManagedParams {
   sourcePath: string;
   managedRoot?: string;
   curatedOriginPrefixes?: DerivePluginTrustOptions['curatedOriginPrefixes'];
-  requestedBy?: string;
+  /**
+   * Who asks for the activation approval. A function is resolved only when a
+   * request is actually opened (an official plugin, or a reused request, never
+   * calls it) — the terminal's resolver can fail under separation of duties.
+   */
+  requestedBy?: PluginApprovalRequester;
   approvalChannel?: string;
   missionId?: string;
   /** Tenant used to scope confidential fs grants (other tenants are always denied). */
@@ -501,6 +510,19 @@ function pluginApprovalEffectBinding(pluginId: string): string {
   return `plugin-install:activate:${pluginId}`;
 }
 
+/** A plugin approval requester: a value, or a function resolved only when a request is opened. */
+export type PluginApprovalRequester =
+  string | ApprovalRequesterRef | (() => string | ApprovalRequesterRef);
+
+function resolvePluginApprovalRequester(
+  input: PluginApprovalRequester | undefined
+): ApprovalRequesterRef {
+  const value = typeof input === 'function' ? input() : input;
+  if (value === undefined) return { requestedBy: 'plugin-installer' };
+  if (typeof value === 'string') return { requestedBy: value.trim() || 'plugin-installer' };
+  return value;
+}
+
 /**
  * Ensures a cancel-defaulted human approval request exists for activating a
  * non-official plugin. Never auto-approves: a fresh request is created in
@@ -510,7 +532,7 @@ function pluginApprovalEffectBinding(pluginId: string): string {
 function ensurePluginApprovalRequest(params: {
   binding: PluginApprovalBinding;
   permissionSummary: string;
-  requestedBy?: string;
+  requestedBy?: PluginApprovalRequester;
   channel: string;
   missionId?: string;
 }): ApprovalRequestRecord {
@@ -527,7 +549,8 @@ function ensurePluginApprovalRequest(params: {
   );
   if (existing) return existing;
 
-  const requestedBy = params.requestedBy?.trim() || 'plugin-installer';
+  const requester = resolvePluginApprovalRequester(params.requestedBy);
+  const requestedBy = requester.requestedBy;
   return createApprovalRequest('mission_controller', {
     channel: params.channel,
     storageChannel: params.channel,
@@ -548,7 +571,7 @@ function ensurePluginApprovalRequest(params: {
     kind: 'channel-approval',
     requestedByContext: {
       surface: 'system',
-      actorId: requestedBy,
+      actorId: approvalRequesterActorId(requester),
       actorRole: 'plugin-installer',
       missionId: params.missionId,
     },
