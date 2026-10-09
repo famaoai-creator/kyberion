@@ -1093,31 +1093,34 @@ export function main(argv: string[] = [], print: (value: unknown) => void = () =
   }
 }
 
+/** The CLI entry point; exported so tests can drive the flag handling in process. */
+export const runDashboard = defineScript({
+  name: 'dashboard',
+  run: ({ argv, json, quiet, dryRun, check, print }) => {
+    const bounded = json || quiet || dryRun || check || argv.includes('--once');
+    if (json) {
+      const snapshot = renderDashboardSnapshot(argv);
+      print(snapshot);
+      return snapshot;
+    }
+    if (quiet) {
+      renderDashboardSnapshot(argv);
+      return;
+    }
+    if (bounded) {
+      render(argv, {
+        interactive: false,
+        log: (...values) => print(values.map((value) => String(value)).join(' ')),
+        clearOutput: print,
+      });
+      return;
+    }
+    main(argv, print);
+  },
+});
+
 if (
   isDirectScript(import.meta.url, 'sovereign_dashboard.ts') ||
   isDirectScript(import.meta.url, 'sovereign_dashboard.js')
 )
-  void defineScript({
-    name: 'dashboard',
-    run: ({ argv, json, quiet, dryRun, check, print }) => {
-      const bounded = json || quiet || dryRun || check || argv.includes('--once');
-      if (json) {
-        const snapshot = renderDashboardSnapshot(argv);
-        print(snapshot);
-        return snapshot;
-      }
-      if (quiet) {
-        renderDashboardSnapshot(argv);
-        return;
-      }
-      if (bounded) {
-        render(argv, {
-          interactive: false,
-          log: (...values) => print(values.map((value) => String(value)).join(' ')),
-          clearOutput: print,
-        });
-        return;
-      }
-      main(argv, print);
-    },
-  })();
+  void runDashboard();

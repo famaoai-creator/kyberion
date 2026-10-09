@@ -62,6 +62,8 @@ const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
   ],
   // Orchestration-worker white-box suites: vi.mock of internal collaborators
   // (a2a route, supervisor, ledger, task events) requires source-module paths.
+  // best-of-n-judge also mocks the worker context's record-task child and
+  // backend bootstrap (operations-hygiene-runbook §5).
   ...([
     'tests/agent-collaboration-e2e.test.ts',
     'tests/best-of-n-judge.test.ts',
@@ -80,6 +82,9 @@ const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
           '../libs/core/path-resolver.js',
           '../libs/core/secure-io.js',
           '../libs/core/workforce/work-coordination.js',
+          ...(testPath === 'tests/best-of-n-judge.test.ts'
+            ? ['../libs/core/mission/mission-orchestration-worker-part-context.js']
+            : []),
         ],
       ] as [string, string[]]
   ) as Array<[string, string[]]>),
