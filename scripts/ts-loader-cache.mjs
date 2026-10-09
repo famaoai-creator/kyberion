@@ -140,6 +140,21 @@ export function tsLoaderFastResolveEnabled(env = process.env) {
   return !isOffFlag(env.KYBERION_TS_LOADER_FAST_RESOLVE);
 }
 
+/**
+ * Whether Node was asked to keep symlinked paths (flag, NODE_OPTIONS or
+ * NODE_PRESERVE_SYMLINKS). The loader's direct resolution returns realpaths, so
+ * it stands aside then and lets the default resolver decide.
+ */
+export function preservesSymlinks(execArgv = process.execArgv, env = process.env) {
+  const flags = new Set(['--preserve-symlinks', '--preserve-symlinks-main']);
+  if (execArgv.some((arg) => flags.has(arg.split('=')[0]))) return true;
+  const nodeOptions = String(env.NODE_OPTIONS ?? '')
+    .split(/\s+/u)
+    .filter(Boolean);
+  if (nodeOptions.some((arg) => flags.has(arg.split('=')[0]))) return true;
+  return String(env.NODE_PRESERVE_SYMLINKS ?? '').trim() === '1';
+}
+
 function relativeInside(root, target) {
   const rel = relative(root, target);
   if (!rel || rel.startsWith('..') || isAbsolute(rel)) return rel === '' ? '' : null;
