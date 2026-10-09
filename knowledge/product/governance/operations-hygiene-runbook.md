@@ -279,6 +279,10 @@ Rules:
 - **Change the loader's compiler options → bump `TS_LOADER_CACHE_VERSION`** in
   `scripts/ts-loader-cache.mjs`. The key names the options symbolically so that a cache hit does not
   load TypeScript.
+- **Cached code never carries a code extension.** Transpile-cache entries end in `.transpiled`.
+  Repository scanners (the foundation-io, process-boundary and runtime-child-process boundary
+  tests, lint and governance gates) select files by extension and not all of them skip `active/`;
+  `.js` entries made every cached `libs/core` module a second, unregistered importer.
 - **Never cache data.** The transpile cache skips `active/`, `knowledge/`, `customer/` and `vault/`
   sources: the system partition holds repository code only.
 - **Tests point caches at a sandbox.** Unit tests pass `KYBERION_TS_LOADER_CACHE_DIR` /
