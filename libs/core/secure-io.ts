@@ -243,27 +243,212 @@ export function validateFileSize(filePath: string, maxSizeMB = DEFAULT_MAX_FILE_
   return stat.size;
 }
 
+/*
+ * ---------------------------------------------------------------------------
+ * Symlink canonicalization for the permission guards.
+ *
+ * The tier guard classifies a path as written, but the OS follows symbolic
+ * links in every component. Without canonicalization a persona that may write
+ * `active/shared/tmp/` can plant `tmp/link -> scripts/` and then write
+ * `tmp/link/x.ts` into a code path it may only read (and a reader can read
+ * `knowledge/personal/` through a link placed in a lower tier). Every guarded
+ * operation therefore checks the canonical (physical) path as well as the
+ * literal one; both must pass.
+ *
+ * - `follow`: the operation follows a symlink leaf (open, append, copy dest,
+ *   chmod, read). Every component is resolved.
+ * - `leaf`: the operation acts on the directory entry itself and never
+ *   follows the leaf (rename, unlink, rm, rmdir, lstat, readlink, creating a
+ *   link). Only the parent is resolved; the leaf name is kept.
+ *
+ * The canonical path is mapped back into the logical root space
+ * (`pathResolver.rootDir()`), so a checkout reached through a symlinked
+ * prefix (macOS `/var -> /private/var`, a fixture root) keeps classifying
+ * against the same policy prefixes. The Vitest live-subtree remap is not
+ * re-applied: the literal path was already remapped by `pathResolver.resolve`
+ * and the canonical path names the physical location the OS will touch,
+ * which is exactly what the guard must judge.
+ *
+ * No per-directory realpath cache: a cached "known real" directory can be
+ * replaced by a symlink by any process between calls, which would silently
+ * reopen this hole. Only the repository root's realpath is cached (it is not
+ * writable through secure-io). See the runbook section "secure-io symlink
+ * canonicalization" for the measured cost.
+ * ---------------------------------------------------------------------------
+ */
+type CanonicalMode = 'follow' | 'leaf';
+
+// eslint-disable-next-line no-var
+var realRootCache: { root: string; real: string } | undefined;
+
+function realProjectRoot(): string {
+  const root = path.resolve(pathResolver.rootDir());
+  if (realRootCache?.root === root) return realRootCache.real;
+  let real = root;
+  try {
+    real = fs.realpathSync.native(root);
+  } catch {
+    // An unresolvable root leaves the logical root as the comparison base;
+    // every path below it then fails canonicalization and is refused.
+  }
+  realRootCache = { root, real };
+  return real;
+}
+
+/** Physical path of `absPath`: realpath of the deepest existing entry plus the missing tail. */
+function physicalPath(absPath: string, hops = 0): string {
+  // Literal bound (no module const): the secure-io bootstrap cycle can reach
+  // this before lexical bindings initialize. 40 matches Linux MAXSYMLINKS.
+  if (hops > 40) {
+    throw Object.assign(new Error('too many symbolic links'), { code: 'ELOOP' });
+  }
+  const missing: string[] = [];
+  let existing = absPath;
+  while (!entryExists(existing)) {
+    const parent = path.dirname(existing);
+    if (parent === existing) break;
+    missing.unshift(path.basename(existing));
+    existing = parent;
+  }
+  try {
+    return path.join(fs.realpathSync.native(existing), ...missing);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    // `existing` is a dangling symlink (lstat sees it, realpath cannot follow
+    // it). A write through it would create its target, so follow it by hand,
+    // relative to its real parent so `..` in the link text resolves the way
+    // the OS resolves it.
+    const parentReal = fs.realpathSync.native(path.dirname(existing));
+    const target = path.resolve(parentReal, fs.readlinkSync(existing));
+    return physicalPath(path.join(target, ...missing), hops + 1);
+  }
+}
+
+function isInside(base: string, candidate: string): string | undefined {
+  const relative = path.relative(base, candidate);
+  if (relative === '') return '';
+  if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    return undefined;
+  }
+  return relative;
+}
+
+/**
+ * Canonical path used by the permission guards (see the block comment above).
+ * Fails closed: a component that cannot be resolved (loop, permission error)
+ * throws instead of falling back to the literal path.
+ */
+function canonicalGuardPath(resolved: string, mode: CanonicalMode): string {
+  const absolute = path.resolve(resolved);
+  let physical: string;
+  try {
+    physical =
+      mode === 'follow'
+        ? physicalPath(absolute)
+        : path.join(physicalPath(path.dirname(absolute)), path.basename(absolute));
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? 'unknown';
+    throw new Error(
+      `[SECURITY] Refusing access to ${resolved}: a path component does not resolve (${code})`
+    );
+  }
+  const relative = isInside(realProjectRoot(), physical);
+  if (relative === undefined) return physical;
+  const logicalRoot = path.resolve(pathResolver.rootDir());
+  return relative === '' ? logicalRoot : path.join(logicalRoot, relative);
+}
+
+/**
+ * Write-side companion of `validateWritePermission`: the literal path is
+ * expected to have passed already; this checks the canonical path when it
+ * differs. Returns the canonical path (for tier detection).
+ */
+function assertCanonicalWritable(
+  resolved: string,
+  displayPath: string,
+  mode: CanonicalMode = 'follow'
+): string {
+  const canonical = canonicalGuardPath(resolved, mode);
+  if (canonical === path.resolve(resolved)) return canonical;
+  assertSensitivePathAllowed(canonical, 'write', isSensitivePathMediated());
+  const guard = validateWritePermission(canonical);
+  if (!guard.allowed) {
+    throw new Error(
+      `[SECURITY] Write through symbolic link denied: ${displayPath} resolves to ${canonical}. ${guard.reason ?? ''}`.trim()
+    );
+  }
+  return canonical;
+}
+
+/** Read-side companion of `validateReadPermission` (see assertCanonicalWritable). */
+function assertCanonicalReadable(
+  resolved: string,
+  displayPath: string,
+  mode: CanonicalMode = 'follow'
+): string {
+  const canonical = canonicalGuardPath(resolved, mode);
+  if (canonical === path.resolve(resolved)) return canonical;
+  assertSensitivePathAllowed(canonical, 'read', isSensitivePathMediated());
+  const guard = validateReadPermission(canonical);
+  if (!guard.allowed) {
+    throw new Error(
+      `[SECURITY] Read through symbolic link denied: ${displayPath} resolves to ${canonical}. ${guard.reason ?? ''}`.trim()
+    );
+  }
+  return canonical;
+}
+
+/**
+ * The one write guard every write-type helper uses: sensitive-path deny list,
+ * literal write permission, then canonical write permission. Returns the
+ * literal resolved path (the operation itself still runs on it) and the
+ * canonical path (where the bytes actually land).
+ */
+function guardWritePath(
+  filePath: string,
+  mode: CanonicalMode = 'follow',
+  operation = 'write'
+): { resolved: string; canonical: string } {
+  assertSensitivePathAllowed(filePath, operation, isSensitivePathMediated());
+  const resolved = pathResolver.resolve(filePath);
+  const guard = validateWritePermission(resolved);
+  if (!guard.allowed) throw new Error(guard.reason);
+  const canonical = assertCanonicalWritable(resolved, filePath, mode);
+  return { resolved, canonical };
+}
+
+/** Read counterpart of guardWritePath; `deny` formats the literal-denial message. */
+function guardReadPath(
+  filePath: string,
+  deny: (reason: string | undefined) => string,
+  mode: CanonicalMode = 'follow'
+): string {
+  assertSensitivePathAllowed(filePath, 'read', isSensitivePathMediated());
+  const resolved = pathResolver.resolve(filePath);
+  const guard = validateReadPermission(resolved);
+  if (!guard.allowed) throw new Error(deny(guard.reason));
+  assertCanonicalReadable(resolved, filePath, mode);
+  return resolved;
+}
+
 /**
  * Shared read-side guard used by every function that reads an existing
  * repository file directly (as opposed to the stricter, symlink-rejecting
  * `assertSafeRepositoryPath` used by model-facing tools). Validates the
- * sensitive-path deny list and the tier/role read permission, then returns
- * the resolved absolute path. Does not check existence or file type —
- * callers do that themselves since they differ (e.g. `safeReadFile` allows
- * following a symlink to a regular file; `safeReadFileTail` does not).
+ * sensitive-path deny list and the tier/role read permission on both the
+ * literal and the canonical path, then returns the resolved absolute path.
+ * Does not check existence or file type — callers do that themselves since
+ * they differ (e.g. `safeReadFile` allows following a symlink to a regular
+ * file; `safeReadFileTail` does not).
  */
 function assertReadableRepositoryFile(filePath: string, label: string): string {
   if (!filePath) {
     throw new Error(`Missing required ${label} file path`);
   }
-
-  assertSensitivePathAllowed(filePath, 'read', isSensitivePathMediated());
-  const resolved = pathResolver.resolve(filePath);
-  const guard = validateReadPermission(resolved);
-  if (!guard.allowed) {
-    throw new Error(`[SECURITY] Read access denied to ${filePath}: ${guard.reason}`);
-  }
-  return resolved;
+  return guardReadPath(
+    filePath,
+    (reason) => `[SECURITY] Read access denied to ${filePath}: ${reason}`
+  );
 }
 
 /**
@@ -454,13 +639,7 @@ export function safeWriteFile(
   options: SafeWriteOptions = {}
 ): void {
   const { mkdir = true } = options;
-  assertSensitivePathAllowed(filePath, 'write', isSensitivePathMediated());
-  const resolved = pathResolver.resolve(filePath);
-
-  const guard = validateWritePermission(resolved);
-  if (!guard.allowed) {
-    throw new Error(guard.reason);
-  }
+  const { resolved, canonical } = guardWritePath(filePath);
 
   // Policy engine gate (with re-entrancy guard to avoid infinite loop
   // since policyEngine.evaluate -> loadFromFile -> safeReadFile)
@@ -470,7 +649,8 @@ export function safeWriteFile(
       const policyDecision = policyEngine.evaluate({
         agentId: executionPersonaText() || 'unknown',
         operation: 'file_write',
-        target_tier: detectTier(resolved),
+        // The tier where the bytes land: the canonical path, not a link in a lower tier.
+        target_tier: detectTier(canonical),
         // Root operator processes are sovereign-tier by default; subagent
         // spawns can downgrade via KYBERION_AGENT_TIER so sovereign-shield
         // (personal-tier isolation) has real firing context.
@@ -491,7 +671,7 @@ export function safeWriteFile(
           result: 'failed',
           reason: policyDecision.message || 'policy violation',
           metadata: {
-            target_tier: detectTier(resolved),
+            target_tier: detectTier(canonical),
           },
         });
         throw new Error(
@@ -583,10 +763,7 @@ export function safeAppendFileSync(
   data: string | Buffer,
   options: any = 'utf8'
 ): void {
-  assertSensitivePathAllowed(filePath, 'write', isSensitivePathMediated());
-  const resolved = pathResolver.resolve(filePath);
-  const guard = validateWritePermission(resolved);
-  if (!guard.allowed) throw new Error(guard.reason);
+  const { resolved } = guardWritePath(filePath);
   fs.appendFileSync(resolved, data, options);
 }
 
@@ -606,6 +783,9 @@ export function safeCopyFileSync(srcPath: string, destPath: string): void {
   if (!writeGuard.allowed) {
     throw new Error(writeGuard.reason);
   }
+  // copyfile follows a symlink at either end.
+  assertCanonicalReadable(resolvedSrc, srcPath, 'follow');
+  assertCanonicalWritable(resolvedDest, destPath, 'follow');
   fs.copyFileSync(resolvedSrc, resolvedDest);
 }
 
@@ -629,17 +809,42 @@ export function safeMoveSync(srcPath: string, destPath: string): void {
   if (!writeGuard.allowed) {
     throw new Error(writeGuard.reason);
   }
+  // rename(2) never follows the leaf at either end — it moves or replaces
+  // the directory entry itself — but it does follow symlinked parents.
+  assertCanonicalReadable(resolvedSrc, srcPath, 'leaf');
+  assertCanonicalWritable(resolvedSrc, srcPath, 'leaf');
+  assertCanonicalWritable(resolvedDest, destPath, 'leaf');
   fs.renameSync(resolvedSrc, resolvedDest);
 }
 
+/** Link kinds safeSymlinkSync creates. `junction` is refused (see safeSymlinkSync). */
+export type SafeSymlinkType = 'file' | 'dir';
+
 /**
  * Create a symlink safely with permission validation.
+ *
+ * A link is a standing write grant on its target: every later write through
+ * the link lands in the target. So the caller must be allowed to WRITE the
+ * canonical target (not merely read it), the target must resolve inside the
+ * repository, and the link's own location must be writable. The link is
+ * stored relative so it keeps pointing inside the checkout when it moves.
+ *
+ * `junction` is refused: Windows junctions need no symlink privilege, always
+ * store an absolute target and are followed by every Win32 API, so they are
+ * the one link kind an unprivileged pipeline could use to redirect a
+ * directory to an arbitrary absolute path. No caller needs one; `dir` and
+ * `file` cover the supported cases (the type is ignored outside Windows).
  */
 export function safeSymlinkSync(
   targetPath: string,
   linkPath: string,
-  type?: fs.symlink.Type
+  type?: SafeSymlinkType
 ): void {
+  if (type !== undefined && type !== 'file' && type !== 'dir') {
+    throw new Error(
+      `[SECURITY] safeSymlinkSync refuses link type '${String(type)}' — only 'file' and 'dir' are allowed`
+    );
+  }
   assertSensitivePathAllowed(targetPath, 'read', isSensitivePathMediated());
   assertSensitivePathAllowed(linkPath, 'write', isSensitivePathMediated());
   const resolvedTarget = pathResolver.resolve(targetPath);
@@ -651,6 +856,22 @@ export function safeSymlinkSync(
   const linkGuard = validateWritePermission(resolvedLink);
   if (!linkGuard.allowed) {
     throw new Error(linkGuard.reason);
+  }
+  assertCanonicalWritable(resolvedLink, linkPath, 'leaf');
+  const canonicalTarget = canonicalGuardPath(resolvedTarget, 'follow');
+  if (isInside(path.resolve(pathResolver.rootDir()), canonicalTarget) === undefined) {
+    throw new Error(
+      `[SECURITY] Refusing to create a symbolic link to ${targetPath}: it resolves outside the repository (${canonicalTarget})`
+    );
+  }
+  for (const candidate of new Set([path.resolve(resolvedTarget), canonicalTarget])) {
+    assertSensitivePathAllowed(candidate, 'write', isSensitivePathMediated());
+    const writeGuard = validateWritePermission(candidate);
+    if (!writeGuard.allowed) {
+      throw new Error(
+        `[SECURITY] Refusing to create a symbolic link to ${targetPath}: the target is outside the caller's write scope. ${writeGuard.reason ?? ''}`.trim()
+      );
+    }
   }
   const dir = path.dirname(resolvedLink);
   if (!fs.existsSync(dir)) {
@@ -666,10 +887,10 @@ export function safeRmSync(
   targetPath: string,
   options: fs.RmOptions = { recursive: true, force: true }
 ): void {
-  assertSensitivePathAllowed(targetPath, 'write', isSensitivePathMediated());
-  const resolved = pathResolver.resolve(targetPath);
-  const guard = validateWritePermission(resolved);
-  if (!guard.allowed) throw new Error(guard.reason);
+  // rm removes a symlink leaf itself (never its target) and recursion does
+  // not descend through links, but a symlinked PARENT would redirect the
+  // removal into another scope — so the parent is canonicalized.
+  const { resolved } = guardWritePath(targetPath, 'leaf');
   if (fs.existsSync(resolved)) {
     fs.rmSync(resolved, options);
   }
@@ -679,10 +900,8 @@ export function safeRmSync(
  * Unlink a file safely.
  */
 export function safeUnlinkSync(filePath: string): void {
-  assertSensitivePathAllowed(filePath, 'write', isSensitivePathMediated());
-  const resolved = pathResolver.resolve(filePath);
-  const guard = validateWritePermission(resolved);
-  if (!guard.allowed) throw new Error(guard.reason);
+  // unlink removes the entry itself; only a symlinked parent can redirect it.
+  const { resolved } = guardWritePath(filePath, 'leaf');
   if (fs.existsSync(resolved)) fs.unlinkSync(resolved);
 }
 
@@ -691,10 +910,7 @@ export function safeUnlinkSync(filePath: string): void {
  * directories — the exact invariant the janitor's empty-dir prune relies on.
  */
 export function safeRmdirSync(dirPath: string): void {
-  assertSensitivePathAllowed(dirPath, 'write', isSensitivePathMediated());
-  const resolved = pathResolver.resolve(dirPath);
-  const guard = validateWritePermission(resolved);
-  if (!guard.allowed) throw new Error(guard.reason);
+  const { resolved } = guardWritePath(dirPath, 'leaf');
   if (fs.existsSync(resolved)) fs.rmdirSync(resolved);
 }
 
@@ -705,10 +921,7 @@ export function safeMkdir(
   dirPath: string,
   options: fs.MakeDirectoryOptions = { recursive: true }
 ): void {
-  assertSensitivePathAllowed(dirPath, 'write', isSensitivePathMediated());
-  const resolved = pathResolver.resolve(dirPath);
-  const guard = validateWritePermission(resolved);
-  if (!guard.allowed) throw new Error(guard.reason);
+  const { resolved } = guardWritePath(dirPath);
   if (!fs.existsSync(resolved)) {
     fs.mkdirSync(resolved, options);
   }
@@ -728,10 +941,7 @@ export function ensureDir(
  * Open a file for append safely and return the file descriptor.
  */
 export function safeOpenAppendFile(filePath: string): number {
-  assertSensitivePathAllowed(filePath, 'write', isSensitivePathMediated());
-  const resolved = pathResolver.resolve(filePath);
-  const guard = validateWritePermission(resolved);
-  if (!guard.allowed) throw new Error(guard.reason);
+  const { resolved } = guardWritePath(filePath);
   const dir = path.dirname(resolved);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -744,10 +954,7 @@ export function safeOpenAppendFile(filePath: string): number {
  * when another process already owns the path.
  */
 export function safeCreateExclusiveFileSync(filePath: string, data: string | Buffer = ''): void {
-  assertSensitivePathAllowed(filePath, 'write', isSensitivePathMediated());
-  const resolved = pathResolver.resolve(filePath);
-  const guard = validateWritePermission(resolved);
-  if (!guard.allowed) throw new Error(guard.reason);
+  const { resolved } = guardWritePath(filePath);
   const dir = path.dirname(resolved);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -781,10 +988,7 @@ export function safeCreateExclusiveFileSync(filePath: string, data: string | Buf
  * path of safeCreateExclusiveFileSync.
  */
 export function safePublishExclusiveFileSync(filePath: string, data: string | Buffer): void {
-  assertSensitivePathAllowed(filePath, 'write', isSensitivePathMediated());
-  const resolved = pathResolver.resolve(filePath);
-  const guard = validateWritePermission(resolved);
-  if (!guard.allowed) throw new Error(guard.reason);
+  const { resolved } = guardWritePath(filePath);
   const dir = path.dirname(resolved);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -835,6 +1039,15 @@ export function safeLinkExclusiveSync(fromPath: string, toPath: string): void {
   }
   const writeGuard = validateWritePermission(resolvedTo);
   if (!writeGuard.allowed) throw new Error(writeGuard.reason);
+  // A hard link is a second name for the same inode: appending through the
+  // new name modifies the original. Require write on the source as well, and
+  // judge both ends by where they physically are (link(2) does not follow
+  // the source leaf; the destination entry is created, never followed).
+  const sourceWriteGuard = validateWritePermission(resolvedFrom);
+  if (!sourceWriteGuard.allowed) throw new Error(sourceWriteGuard.reason);
+  assertCanonicalReadable(resolvedFrom, fromPath, 'leaf');
+  assertCanonicalWritable(resolvedFrom, fromPath, 'leaf');
+  assertCanonicalWritable(resolvedTo, toPath, 'leaf');
   fs.linkSync(resolvedFrom, resolvedTo);
 }
 
@@ -855,10 +1068,7 @@ export function safeFileAgeMs(filePath: string): number | undefined {
  * Safely fsync an existing file for durability.
  */
 export function safeFsyncFile(filePath: string): void {
-  assertSensitivePathAllowed(filePath, 'write', isSensitivePathMediated());
-  const resolved = pathResolver.resolve(filePath);
-  const guard = validateWritePermission(resolved);
-  if (!guard.allowed) throw new Error(guard.reason);
+  const { resolved } = guardWritePath(filePath);
   const fd = fs.openSync(resolved, 'r+');
   try {
     fs.fsyncSync(fd);
@@ -873,10 +1083,7 @@ export function safeFsyncFile(filePath: string): void {
  * Only allowed within write-permitted paths.
  */
 export function safeChmodSync(filePath: string, mode: number): void {
-  assertSensitivePathAllowed(filePath, 'write', isSensitivePathMediated());
-  const resolved = pathResolver.resolve(filePath);
-  const guard = validateWritePermission(resolved);
-  if (!guard.allowed) throw new Error(guard.reason);
+  const { resolved } = guardWritePath(filePath);
   fs.chmodSync(resolved, mode);
 }
 
@@ -1392,6 +1599,7 @@ export function safeReaddir(dirPath: string): string[] {
       `[ROLE_VIOLATION] Role is NOT authorized to read directory '${dirPath}'. ${check.reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`
     );
   }
+  assertCanonicalReadable(resolved, dirPath, 'follow');
   return fs.readdirSync(resolved);
 }
 
@@ -1407,6 +1615,7 @@ export function safeStat(filePath: string): fs.Stats {
       `[ROLE_VIOLATION] Role is NOT authorized to stat path '${filePath}'. ${check.reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`
     );
   }
+  assertCanonicalReadable(resolved, filePath, 'follow');
   return fs.statSync(resolved);
 }
 
@@ -1422,6 +1631,7 @@ export function safeLstat(filePath: string): fs.Stats {
       `[ROLE_VIOLATION] Role is NOT authorized to lstat path '${filePath}'. ${check.reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`
     );
   }
+  assertCanonicalReadable(resolved, filePath, 'leaf');
   return fs.lstatSync(resolved);
 }
 
@@ -1488,6 +1698,7 @@ export function safeReadlink(filePath: string): string {
       `[ROLE_VIOLATION] Role is NOT authorized to readlink path '${filePath}'. ${check.reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`
     );
   }
+  assertCanonicalReadable(resolved, filePath, 'leaf');
   return fs.readlinkSync(resolved);
 }
 
@@ -1504,6 +1715,7 @@ export function safeStatfs(targetPath: string): { freeBytes: number; totalBytes:
       `[ROLE_VIOLATION] Role is NOT authorized to statfs path '${targetPath}'. ${check.reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`
     );
   }
+  assertCanonicalReadable(resolved, targetPath, 'follow');
   const stats = fs.statfsSync(resolved);
   return {
     freeBytes: Number(stats.bavail) * Number(stats.bsize),
