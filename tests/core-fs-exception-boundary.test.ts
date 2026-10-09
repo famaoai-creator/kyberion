@@ -71,6 +71,9 @@ const allowedCoreFsImports = [
   // Fixture setup needs raw fs to create symlinks and verify 0600/0700 modes.
   'libs/core/secret/secret-bridge.test.ts',
   'libs/core/secure-io.branch.test.ts',
+  // Plant links with raw node:fs to model links created outside secure-io.
+  'libs/core/secure-io.symlink-canonical.test.ts',
+  'libs/core/secure-io.symlink-root-alias.test.ts',
   'libs/core/secure-io.test.ts',
   'libs/core/secure-io.ts',
   'libs/core/security-boundary.contract.test.ts',
