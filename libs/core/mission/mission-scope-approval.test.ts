@@ -9,6 +9,7 @@ vi.mock('../customer-resolver.js', async (importOriginal) => {
 import {
   clearSeparationOfDuties,
   setSeparationOfDuties,
+  useSeparationOfDutiesOverlay,
 } from '../governance/__tests__/sod-overlay.js';
 
 import * as pathResolver from '../path-resolver.js';
@@ -133,6 +134,11 @@ afterEach(() => {
   if (previousSudo === undefined) delete process.env.KYBERION_SUDO;
   else process.env.KYBERION_SUDO = previousSudo;
 });
+
+// Per-test overlay file for switching separation of duties on/off.
+useSeparationOfDutiesOverlay(
+  pathResolver.sharedTmp(`sod-overlay-mission-scope-approval-${process.pid}.json`)
+);
 
 describe('mission scope approval requests', () => {
   it('creates a hash-bound mission_gate request showing what is being approved', () => {
