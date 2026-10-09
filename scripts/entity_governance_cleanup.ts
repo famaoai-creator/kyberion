@@ -1,5 +1,6 @@
 /** EG-11: one-time cleanup mission. Dry-run is the default; apply is an
  * explicitly approved, soft-delete-only operation with an evidence receipt. */
+import { resolveCliApprovalRequester } from '@agent/core/governance/cli-operator-principal';
 import * as path from 'node:path';
 import {
   assertApprovalUsable,
@@ -371,7 +372,13 @@ export function main(argv: string[] = [], print: Print = () => undefined): void 
   const requestedByIndex = argv.indexOf('--requested-by');
   const requestedBy = requestedByIndex >= 0 ? argv[requestedByIndex + 1] : undefined;
   if (requestApproval) {
-    const result = openCleanupApproval({ missionId, ...(requestedBy ? { requestedBy } : {}) });
+    const result = openCleanupApproval({
+      missionId,
+      requestedBy: resolveCliApprovalRequester({
+        explicit: requestedBy,
+        legacy: 'entity-governance-controller',
+      }).requestedBy,
+    });
     print(JSON.stringify(result, null, 2));
     if (result.reason) throw new ScriptExitError(1, '', true);
     return;

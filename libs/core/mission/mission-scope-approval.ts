@@ -22,6 +22,7 @@
  * apply side would close a dependency cycle.
  */
 
+import { resolveCliApprovalRequester } from '../governance/cli-operator-principal.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import {
   evaluateApprovalUsability,
@@ -135,11 +136,15 @@ export function createMissionScopeApprovalRequest(input: {
   );
   if (existing) return existing;
 
-  const requestedBy =
-    input.requestedBy?.trim() ||
-    getRegisteredEnvText('KYBERION_PERSONA') ||
-    getRegisteredEnvText('USER') ||
-    'mission_controller';
+  // CLI-opened (mission_controller): the agent session or the local owner
+  // member, so a human deciding an agent's request is never a self-approval.
+  const requestedBy = resolveCliApprovalRequester({
+    explicit: input.requestedBy,
+    legacy:
+      getRegisteredEnvText('KYBERION_PERSONA') ||
+      getRegisteredEnvText('USER') ||
+      'mission_controller',
+  }).requestedBy;
   const details = buildScopeApprovalDetails({
     missionId,
     currentGoal: String(input.currentGoal || '').trim(),
