@@ -1,6 +1,7 @@
 ---
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
-tags: [governance, operations, ci, retention, daemons, tests, recurrence-prevention]
+tags:
+  [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
 last_updated: 2026-10-09
 ---
 
@@ -30,6 +31,7 @@ had regressed.
 | LLM / provider calls          | per-call-site egress tests (e.g. `mission-distill-egress.test.ts`)    | §7      |
 | Mission evidence overwrites   | generator and phase-pipeline tests in `mission-retrospective.test.ts` | §8      |
 | Project lifecycle facades     | lifecycle regressions in `project-management.test.ts`                 | §9      |
+| secure-io symlink escapes     | `secure-io.symlink-canonical.test.ts`, `secure-io.symlink-root-alias` | §10     |
 
 ---
 
@@ -534,6 +536,66 @@ restore archived records.
 **Gate.** Run the focused lifecycle regressions in
 `libs/core/project/project-management.test.ts` and build core plus the repo CLI.
 These cover archive entry-point parity, restore, and track state/projection changes.
+
+---
+
+## §10 secure-io symlink canonicalization
+
+**Defect class.** The tier guard (`validateWritePermission` / `validateReadPermission`) judges a
+path as written, but the OS follows symbolic links in every component. On main before this fix a
+data-only persona (`KYBERION_PERSONA=worker MISSION_ROLE=finance_controller`) could call
+`safeSymlinkSync('scripts', 'active/shared/tmp/link')` (the target needed only _read_ permission)
+and then `safeWriteFile('active/shared/tmp/link/x.ts', …)` — landing code in `scripts/`. The same
+link turned every write helper (append, copy, move, mkdir, rm) into a write anywhere readable, and
+a link in a readable location exposed `knowledge/personal/` to readers below that tier.
+
+**Rules:**
+
+- **Every guarded path is checked twice: literal and canonical.** secure-io routes every write-type
+  helper through `guardWritePath` and every read through `guardReadPath` /
+  `assertCanonicalReadable` (`libs/core/secure-io.ts`). Both the literal path and the canonical
+  path (realpath of the deepest existing ancestor plus the missing tail, a dangling link followed by
+  hand) must pass. Never add a write or read helper that calls `validate*Permission` on the literal
+  path only.
+- **Pick the mode by what the syscall follows.** `follow` for operations that follow a final link
+  (open, append, copy, chmod, mkdir, read, stat, statfs). `leaf` for operations on the entry itself
+  (rename source and destination, unlink, rm, rmdir, lstat, readlink, link creation, hard-link
+  source): only the parent is canonicalized, so removing or moving a link stays possible.
+- **The canonical path lives in the logical root space.** A canonical path under
+  `realpath(rootDir())` is re-expressed under `rootDir()`, so a checkout reached through a linked
+  prefix (macOS `/var`, a fixture root) keeps matching policy prefixes. The Vitest live-subtree
+  remap is applied once, by `pathResolver.resolve`, to the literal path; the canonical path is the
+  physical location and is never remapped again.
+- **A symlink is a standing write grant.** `safeSymlinkSync` requires write permission on the
+  canonical target, refuses targets that resolve outside the repository, stores the link relative,
+  and accepts only `dir` / `file`. `junction` is refused there and in the orchestrator `symlink`
+  pipeline op: a junction needs no privilege on Windows and always stores an absolute target.
+- **Hard links need write on the source.** `safeLinkExclusiveSync` requires write permission on the
+  source as well, because appending through the new name modifies the original inode.
+- **Out-of-repository reads stay vault-only.** A read whose canonical path leaves the repository
+  passes only through a registered vault mount (`isAllowedVaultMountPath`), the same rule as a
+  literal absolute path. Vault mounts are read-only; writes through them are refused.
+
+**Procedure.** When you add a filesystem helper to secure-io, call `guardWritePath(path, mode)` or
+`guardReadPath(...)` instead of the bare tier-guard functions, and pick the mode from the table
+above. When a test needs a link, create it inside `active/shared/tmp/` with a target the test
+persona may write (`safeSymlinkSync`), or plant it with raw `node:fs` when the test models a link
+created outside secure-io. A link target in `os.tmpdir()` is outside the repository and is refused.
+
+**Cost.** realpath(3) walks every component: about 30 µs per call at depth 15 on the CI VM. Parent
+directories are therefore served from a per-process cache that is re-verified on every hit
+(`stat(literal dir)` and `lstat(cached real dir)` must both match the cached inode); every secure-io
+move / rm / rmdir / unlink / symlink clears it. Measured on the shared CI VM (median µs/op, 2,000
+ops × 5 runs, deep path in `active/shared/tmp/`), main → this fix: append 423–538 → 412–540,
+read 108–146 → 114–140, stat 53–79 → 64–82, mkdir (existing) 380–503 → 391–466; safeWriteFile is
+dominated by fsync (1.4–8 ms) and unchanged within noise. Without the cache the same run cost
++25–40 µs per read and +60–130 µs per mkdir.
+
+**Gate.** `libs/core/secure-io.symlink-canonical.test.ts` (symlink-then-write, append, mkdir,
+dangling link, copy/move through a linked parent, rm/unlink, reads into `knowledge/personal/`,
+junction refusal, legitimate links in scope, cache invalidation after a directory swap, Vitest
+remap) and `libs/core/secure-io.symlink-root-alias.test.ts` (checkout behind a linked prefix).
+Each attack case fails on the pre-fix code.
 
 ---
 
