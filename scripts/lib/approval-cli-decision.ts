@@ -186,7 +186,7 @@ export function findRevocableApproval(
  */
 export function revokeApprovalFromCli(
   request: ApprovalRequestRecord,
-  params: CliOperatorPrincipalOptions & { reason?: string }
+  params: Pick<CliOperatorPrincipalOptions, 'env'> & { reason?: string }
 ): ApprovalRequestRecord {
   const base = {
     channel: request.channel,
@@ -196,12 +196,7 @@ export function revokeApprovalFromCli(
   };
   const agent = detectCliAgentPrincipal(params.env);
   if (agent) return revokeApprovalRequest('mission_controller', { ...base, revokedBy: agent });
-  const identity = resolveCliOperatorIdentity(params);
-  if (identity.principalId) {
-    return revokeApprovalAsLocalOwner('mission_controller', {
-      ...base,
-      ...(params.rootDir ? { rootDir: params.rootDir } : {}),
-    });
-  }
+  const identity = resolveCliOperatorIdentity();
+  if (identity.principalId) return revokeApprovalAsLocalOwner('mission_controller', base);
   return revokeApprovalRequest('mission_controller', { ...base, revokedBy: identity.displayName });
 }
