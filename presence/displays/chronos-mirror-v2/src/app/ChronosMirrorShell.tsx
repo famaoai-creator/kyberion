@@ -504,7 +504,10 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
                         ? costSummary.totalTokens.toLocaleString(chronosSpeechLocale())
                         : '-'
                     }
-                    description={`${costSummary?.missionCount || 0} ${uxText('chronos_diagnostics_missions', locale)}`}
+                    description={
+                      costSummary?.partialNotice ||
+                      `${costSummary?.missionCount || 0} ${uxText('chronos_diagnostics_missions', locale)}`
+                    }
                   />
                   <Metric
                     label={uxText('chronos_diagnostics_budget', locale)}

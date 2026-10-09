@@ -941,9 +941,12 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
         );
         if (denial) return denial;
         const ledgerTier = partitionedLedgerTier(protectedMatch.prefix);
-        return ledgerTier
-          ? personaTierReadDecision(loaded.policy, `knowledge/${ledgerTier}`, identity)
-          : { allowed: true };
+        if (!ledgerTier) return { allowed: true };
+        // A narrow governed reader role (e.g. metrics_cap_reader, assumed by
+        // libs/core for cap enforcement) holds an explicit read grant on the
+        // ledger root itself; it never widens knowledge/ access.
+        if (ledgerRoleReadGrant(loaded.policy, relativePath, identity)) return { allowed: true };
+        return personaTierReadDecision(loaded.policy, `knowledge/${ledgerTier}`, identity);
       }
     } else if (
       loaded.status === 'corrupt' &&
@@ -1017,6 +1020,34 @@ function partitionedLedgerTier(prefix: string): 'personal' | 'confidential' | un
     }
   }
   return undefined;
+}
+
+/**
+ * Does the current role hold an explicit `allow_read` grant that names a
+ * partitioned ledger root (or a partition below it) and covers this path?
+ * Only role grants naming the ledger itself count — a broad ancestor such as
+ * `active/shared/` does not — so this admits exactly the governed ledger
+ * reader roles declared in security-policy.json.
+ */
+function ledgerRoleReadGrant(
+  policy: any,
+  relativePath: string,
+  identity: ReturnType<typeof resolvePolicyIdentityContext>
+): boolean {
+  if (!identity.role) return false;
+  const patterns: unknown = policy.authority_role_permissions?.[identity.role]?.allow_read;
+  if (!Array.isArray(patterns)) return false;
+  const missionId = resolveProjectScope().missionId;
+  return patterns.some((pattern) => {
+    if (typeof pattern !== 'string') return false;
+    const expanded = expandPolicyPath(pattern, missionId, identity.tenantSlug);
+    if (expanded === null) return false;
+    return (
+      Object.values(PARTITIONED_RUNTIME_LEDGER_ROOTS).some((root) =>
+        pathStartsWith(expanded, root)
+      ) && pathStartsWith(relativePath, expanded)
+    );
+  });
 }
 
 /**

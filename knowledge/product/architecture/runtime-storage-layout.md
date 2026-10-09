@@ -186,10 +186,29 @@ tokens, cost per component call) share one mechanism:
   check. There is no separate persona table. Aggregate readers skip a denied
   partition instead of failing and log a `debug` line in the diagnostic
   format (`<ledger> partition skipped — … | next: … | evidence: <path>`).
-  Consequence: a process whose persona may not read a tier (e.g. a plain
-  `worker` without the `mission_controller` role) sees only the system
-  partition and the tiers it may read — including in the spend guard and
-  the budget governor.
+  A process whose persona may not read a tier (e.g. a plain `worker`
+  without the `mission_controller` role) sees only the system partition and
+  the tiers it may read.
+- **Reports say when they are partial.** Report and summary readers (cost
+  report, operator home, Chronos cost summary, terminal HUD, `pnpm doctor`,
+  soak) pass `onWithheld` and call `metricsWithheldNotice`: one `warn` line
+  in the diagnostic format, and the output itself carries
+  "N metrics partition(s) withheld for this persona — totals are partial"
+  (`partial_notice` / `partialNotice`, a `PARTIAL:` line in text output).
+- **Enforcers never under-count.** Cap and limit enforcers (spend guard, org
+  budget governor, generation-cost dedup) read only through
+  `aggregateMetricsForEnforcement`: it assumes the governed read-only role
+  `metrics_cap_reader` (security-policy `authority_role_permissions`: the two
+  ledger roots, no `knowledge/`, no write), bound to the caller's tenant, so
+  every tier of the enforcer's scope is counted whatever the caller's
+  persona while tenant isolation still holds. The caller gets numbers only —
+  sums of measure names declared before any row is read; the per-row
+  classifier runs inside the read and keeps no rows. It is logged at `debug`
+  per call rather than audited: it runs on every reasoning call, returns no
+  row content, and the role's grant is read-only and narrow. Tier-guard
+  admits the role only through a role grant that names a ledger root
+  (`ledgerRoleReadGrant`), so broad grants such as `active/shared/` never
+  bypass the persona gate.
 - Rows written to a system file before partitioning stay there as
   **legacy**: each reader filters them by the row's own scope, so a tenant
   reader still sees its own old rows and the system reader never sees tenant
