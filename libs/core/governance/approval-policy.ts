@@ -4,6 +4,9 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { isInjectionSuspected } from '../injection-signal.js';
 import { resolveConfiguredPosture } from '../security-screen.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('approval-policy');
 
 export interface ApprovalPolicyRule {
   id: string;
@@ -108,13 +111,40 @@ export function loadApprovalPolicy(): ApprovalPolicyFile {
  * replaces the product default wholesale. There is no per-tenant or
  * per-organization override.
  */
+/** Whether any approval-policy.json exists (customer overlay or product default). */
+function approvalPolicyFilePresent(): boolean {
+  const customerPolicyPath = customerResolver.customerRoot('policy/approval-policy.json');
+  const candidates = [
+    ...(customerPolicyPath ? [customerPolicyPath] : []),
+    pathResolver.knowledge('product/governance/approval-policy.json'),
+  ];
+  return candidates.some((candidate) =>
+    safeExistsSync(assertSafeRepositoryPath(candidate, { allowMissingLeaf: true }))
+  );
+}
+
+let missingPolicyLogged = false;
+
 export function resolveSeparationOfDutiesPolicy(): { enabled: boolean } {
+  // No policy file at all (e.g. a scratch root without the knowledge tree):
+  // use the shipped default — separation of duties off — which grants
+  // nothing beyond today's behaviour. Only a file that is present but
+  // unreadable or schema-invalid fails closed below.
+  if (!approvalPolicyFilePresent()) {
+    if (!missingPolicyLogged) {
+      missingPolicyLogged = true;
+      logger.debug(
+        'approval-policy.json not found — separation_of_duties uses the shipped default (off)'
+      );
+    }
+    return { enabled: false };
+  }
   let policy: ApprovalPolicyFile;
   try {
     policy = loadApprovalPolicy();
   } catch (error) {
-    // Fail closed, but say why: without the policy the store cannot know
-    // whether separation of duties applies, so no approval is decided or used.
+    // A present but unreadable / schema-invalid policy fails closed, with the
+    // reason: the store cannot know whether separation of duties applies.
     let policyPath = 'knowledge/product/governance/approval-policy.json';
     try {
       policyPath = approvalPolicyCatalog.path();
