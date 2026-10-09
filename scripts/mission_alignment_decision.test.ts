@@ -21,7 +21,7 @@ vi.mock('@agent/core/governance/approval-store', () => ({
   listApprovalRequests: mocks.listApprovalRequests,
   computeApprovalPayloadHash: mocks.computeApprovalPayloadHash,
   // Separation of duties is covered by approval-separation-of-duties.test.ts.
-  assertApprovalUsable: vi.fn(),
+  approvalUsabilityRefusal: vi.fn(() => undefined),
 }));
 
 vi.mock('@agent/core/path-resolver', async (importOriginal) => {
