@@ -24,6 +24,7 @@ import { randomBytes } from 'node:crypto';
 
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { applySurfaceApprovalDecision } from '@agent/core/surface/surface-approval-ui';
+import { resolveOperatorDisplayName } from '@agent/core/surface/operator-identity';
 import { findMissionPath } from '@agent/core/path-resolver';
 import {
   listApprovalRequests,
@@ -51,6 +52,22 @@ function argValue(flag: string, args: string[]): string | undefined {
 
 export function parseDecisionRequestBody(raw: string): Record<string, unknown> {
   return parseSafeJsonObjectInput(raw, 'decision request') ?? {};
+}
+
+/**
+ * Who decided, resolved server-side. The page token proves possession of the
+ * loopback page, not identity, so the decider is the operator identity this
+ * process runs as (the same `resolveOperatorDisplayName()` the CLI
+ * `pnpm kyberion approvals --approve` records) — never the page's `decidedBy`.
+ * A name typed on the page is kept only as a note for the audit trail.
+ */
+export function resolveBriefDecider(body: Record<string, unknown>): {
+  decidedBy: string;
+  pageName?: string;
+} {
+  const decidedBy = resolveOperatorDisplayName();
+  const typed = typeof body?.decidedBy === 'string' ? body.decidedBy.trim().slice(0, 200) : '';
+  return { decidedBy, ...(typed && typed !== decidedBy ? { pageName: typed } : {}) };
 }
 
 async function main(args: string[] = [], print: Print = () => undefined): Promise<void> {
@@ -165,11 +182,13 @@ async function main(args: string[] = [], print: Print = () => undefined): Promis
     }
     const decision =
       body?.decision === 'approved' || body?.decision === 'rejected' ? body.decision : null;
-    const decidedBy = typeof body?.decidedBy === 'string' ? body.decidedBy.trim() : '';
     if (!decision)
       return json(res, 400, { ok: false, error: 'decision must be approved|rejected' });
-    // The audit trail is worthless without a name attached to the verdict.
-    if (!decidedBy) return json(res, 400, { ok: false, error: 'decidedBy is required' });
+    // The decider is resolved server-side; the page's name is only a note.
+    const { decidedBy, pageName } = resolveBriefDecider(body);
+    const pageNote = pageName ? `name entered on the brief page: ${pageName}` : '';
+    const bodyNote = typeof body?.note === 'string' ? body.note.trim() : '';
+    const note = [bodyNote, pageNote].filter(Boolean).join(' | ');
 
     // Never trust the page's idea of which request it is deciding: resolve the
     // mission's current approval server-side and require the two to agree.
@@ -204,7 +223,7 @@ async function main(args: string[] = [], print: Print = () => undefined): Promis
         threadTs: approval.threadTs,
         decidedBy,
         storageChannel: ALIGNMENT_CHANNEL,
-        ...(typeof body?.note === 'string' && body.note.trim() ? { note: body.note.trim() } : {}),
+        ...(note ? { note } : {}),
         ...(reasonCategory ? { reasonCategory } : {}),
       });
       print(
