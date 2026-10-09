@@ -836,6 +836,16 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/service/service-recording-review-approval.ts#consumeServiceRecordingReviewApproval (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/service/service-recording-review-approval.ts#consumeServiceRecordingReviewApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/service/service-recording-review-approval.ts#requestServiceRecordingReview (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -2353,6 +2363,16 @@
     {
       "site": "scripts/org.ts#main",
       "roles": ["ecosystem_architect"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/organization_decision_approval.ts#consumeDecisionApprovalRef (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/organization_decision_approval.ts#consumeDecisionApprovalRef (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
       "unresolved": []
     },
     {
