@@ -6,6 +6,7 @@
  * the master still contains entries for that tenant. The operation is dry-run
  * by default and requires an authenticated Sovereign approval to apply.
  */
+import { resolveCliApprovalRequester } from '@agent/core/governance/cli-operator-principal';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { auditChain, normalizePersistedAuditEntry } from '@agent/core/governance/audit-chain';
@@ -493,7 +494,13 @@ export function main(argv: string[] = []) {
   const requestedByIndex = argv.indexOf('--requested-by');
   const requestedBy = requestedByIndex >= 0 ? argv[requestedByIndex + 1] : undefined;
   if (requestApproval) {
-    const result = openAuditMirrorApproval({ missionId, ...(requestedBy ? { requestedBy } : {}) });
+    const result = openAuditMirrorApproval({
+      missionId,
+      requestedBy: resolveCliApprovalRequester({
+        explicit: requestedBy,
+        legacy: 'audit-mirror-controller',
+      }).requestedBy,
+    });
     return { result, failed: Boolean(result.reason) };
   }
   return {

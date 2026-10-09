@@ -6,6 +6,7 @@
  * Values come from a TTY hidden prompt or --from-file under active/shared/tmp/.
  */
 
+import { resolveCliApprovalRequester } from '@agent/core/governance/cli-operator-principal';
 import * as path from 'node:path';
 import * as readline from 'node:readline';
 import {
@@ -155,16 +156,17 @@ export async function runSecretCli(
       typeof flags.reason === 'string' && flags.reason.trim()
         ? flags.reason.trim()
         : `Introduce ${identity.envName}`;
+    const requester = resolveCliApprovalRequester({ legacy: 'operator' });
     const proposed = proposeSecretIntroduction({
       serviceId,
       secretKey,
       reason,
       autoApproveLocal: flags['no-auto-approve'] !== true,
       channel: 'terminal',
-      requestedBy: 'operator',
+      requestedBy: requester.requestedBy,
       requestedByContext: {
         surface: 'terminal',
-        actorId: 'operator',
+        actorId: requester.requestedBy,
         actorRole: 'sovereign',
       },
     });

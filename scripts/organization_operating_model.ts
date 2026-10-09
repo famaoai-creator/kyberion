@@ -1,3 +1,4 @@
+import { resolveCliApprovalRequester } from '@agent/core/governance/cli-operator-principal';
 import {
   buildOrganizationManagementView,
   buildOrganizationOperationRecord,
@@ -1130,7 +1131,10 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
         ? requestDecisionApproval({
             decision,
             chosenOption: parsed.chosenOption!,
-            requestedBy: parsed.requestedBy || process.env.MISSION_ROLE || 'organization-cli',
+            requestedBy: resolveCliApprovalRequester({
+              explicit: parsed.requestedBy,
+              legacy: process.env.MISSION_ROLE || 'organization-cli',
+            }).requestedBy,
             rationale: parsed.rationale,
           })
         : undefined;

@@ -149,6 +149,7 @@ function isProjectTrustRequest(record: ApprovalRequestRecord, relativePath: stri
 export function createProjectTrustApprovalRequest(params: {
   inputPath: string;
   requestedBy?: string;
+  requestedByDisplayName?: string;
   /** Defaults to a project-local pipeline. */
   resource?: ProjectTrustResource;
 }): ApprovalRequestRecord {
@@ -188,6 +189,9 @@ export function createProjectTrustApprovalRequest(params: {
     threadTs: binding,
     correlationId: binding,
     requestedBy,
+    ...(params.requestedByDisplayName
+      ? { requestedByDisplayName: params.requestedByDisplayName }
+      : {}),
     kind: 'channel-approval',
     draft: {
       title: card.title,
