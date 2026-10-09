@@ -3,7 +3,7 @@ title: Runtime Storage Layout
 category: Architecture
 tags: [storage, artifacts, workspace, tmp, cache, staging, tier, multi-tenant, retention]
 importance: 8
-last_updated: 2026-10-08
+last_updated: 2026-10-09
 runtime_stages: [alignment, execution, review]
 ---
 
@@ -70,6 +70,25 @@ The floors (`tmp`, `staging`, `cache`, `artifacts`) share one partition rule
   `active/missions/confidential/<tenant>/<id>/artifacts/`).
 - A path directly under a floor root without a partition segment is
   **legacy**: it predates this layout and carries no governing tier.
+
+### Process start-up caches (cache floor, system partition)
+
+Two platform caches keep repeated child processes cheap. Both hold
+repository code or host facts only, never tenant data, so they live in
+`cache/system/`. Deleting either only costs the next process the work again.
+
+| Domain                              | Writer                                                          | Content and key                                                                                                                                                                                                          | Retention / off switch                                                               |
+| ----------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `cache/system/ts-loader/`           | `scripts/ts-loader-cache.mjs` (used by `scripts/ts-loader.mjs`) | One transpiled module per file, `<2 hex>/<sha256>.js`; key = loader cache version + TypeScript version + options + absolute path + source. Sources under `active/`, `knowledge/`, `customer/`, `vault/` are never cached | 7 days (catalog entry); `KYBERION_TS_LOADER_CACHE=0`                                 |
+| `cache/system/local-stt-discovery/` | `libs/core/local-stt-discovery.ts`                              | `candidates.json`: detected local STT backends (binary paths, versions); key = platform + PATH + registry content                                                                                                        | 10 minutes in-file (`KYBERION_STT_DISCOVERY_CACHE_TTL_MS`, `0` = off), 1 day catalog |
+
+The ts-loader cache is the one deliberate exception to "write through
+secure-io": the loader is what makes TypeScript importable, so it cannot
+import secure-io (itself TypeScript). It uses `node:fs` on its own cache
+tree only (governance import baseline), writes a unique temp file and
+renames it into place so concurrent processes read whole entries, and
+treats every cache error as a miss. The STT cache writes through secure-io
+(`safeWriteFile` is atomic).
 
 ### Owner scope (deterministic placement)
 
