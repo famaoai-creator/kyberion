@@ -65,6 +65,23 @@ had regressed.
 4. Run `pnpm check -- --only ci-workflow-contract` and the prettier format check over the workflow
    files.
 
+**Gate budgets (`pnpm check`).** `scripts/run_checks.ts` runs up to 6 gates at once with a 120s
+default per gate (`DEFAULT_GATE_TIMEOUT_MS`). A gate that times out on busy runs:
+
+1. Time it alone and under the concurrent run, and profile it (`node --cpu-prof`). Make it faster
+   first, and measure each optimisation separately, comparing CPU time across alternating runs in
+   separate processes. Wall time on a shared host is too noisy. Example: `role-assumption-reachability`
+   saved about 20% of its CPU (~41s to ~32s) by memoising workspace lookups, with a byte-identical
+   report. A member-name prefilter looked faster in one wall-clock run but saved nothing in CPU, so it
+   was dropped rather than kept as unproven soundness risk in a security gate.
+2. If it still needs more time, give that gate a `timeout_ms` in `ci-gates.json` and state the
+   measurement in its rationale (`Budget: …`). Do not raise the global default.
+   `scripts/run_checks.test.ts` pins the default and the role-assumption budget.
+3. Prove the gate still fails on a stale or broken input after the speed-up.
+4. A pruning optimisation that a gate's verdict depends on needs a switch that turns it off, plus a
+   differential test that compares the output with the switch on and off over fixtures for every
+   case the pruning reasons about.
+
 ## §2 Runtime stores and retention
 
 **Rule.** Every path directly under `active/shared/runtime/` must have an entry in
@@ -186,6 +203,19 @@ Writers and readers of the same file must resolve the path the same way. A reade
 `pathResolver.shared()` and a writer through `path.join(rootDir, …)` diverge under the sandbox:
 the test passes against the sandbox while the writer leaks into live state.
 
+**Real-process tests: size the budget from the child count.** A test that spawns
+`node --import ./scripts/ts-loader.mjs` children pays a cold start per child: the loader transpiles
+every imported `libs/core` source again (about 5s of CPU per child, 10s on a loaded 4-vCPU host).
+`front-desk-recovery.engine.integration.test.ts` runs up to 17 sequential child batches. Its 180s
+local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
+
+- Bound each child with its own timer, using the same value locally and on CI.
+- Size each test's timeout from its sequential child batches at the loaded per-batch cost
+  (`engineTestBudget(batches)`). Use the same value locally and on CI, not a flat local constant.
+- In `afterAll`, stop the children and wait for `'exit'`, not `'close'`, because a grandchild can
+  hold the pipes. Bound the wait with a grace period, then send SIGKILL to any survivor. Remove the
+  fixture roots in a `finally` block, and give the hook an explicit timeout.
+
 ## §6 Tenant scope and governed facades
 
 **Rules:**
@@ -301,6 +331,27 @@ the test passes against the sandbox while the writer leaks into live state.
    write to the shared ops-alert sink.
 3. For a new provider CLI invocation, assert in a test that argv carries the tool-disabling flags
    and no prompt text, and that the child's cwd is not the repository root.
+
+**Profile timeouts are hard limits.** Since #1006 the codex/gemini structured runners honour a
+profile's `timeout_ms`; before that they used their 5-minute adapter default. A timeout is not a
+quota error, so `runAdaptiveStructuredLlmProfile` does not fall through to the next profile: the
+call fails.
+
+- Size `timeout_ms` for a full provider CLI turn, not for the model's answer alone. A `codex exec`
+  turn includes process start, sandbox setup and the user's default model and effort. The only
+  in-repo latency figure (4.3s, `realtime-media-session-architecture.md`) is for a one-sentence
+  reply on a fast model at `low` effort, which the wisdom profiles do not request.
+- `wisdom-policy.json` profiles stay between the 120s built-in fallback and 300s. The codex `light`
+  profile (summarize, classify) was 30s and is now 120s, the same as `standard` (gemini) and
+  `BUILTIN_FALLBACK`. `heavy` (codex) and `claude` stay at 180s for distillation.
+  `mission-llm.test.ts` enforces this range for provider-CLI adapters (`codex-cli`, `gemini-cli`,
+  `claude-cli`). A profile without `timeout_ms` counts as its runtime default (300s for the
+  codex/gemini runners, 120s for the shell runner). Going above the 300s ceiling needs a recorded
+  justification in that test.
+- These limits suit batch callers. Today the only production caller is `mission distill`
+  (`runAdaptiveStructuredLlmProfile('distill', ...)`, run by `mission_controller`). No interactive
+  or surface path calls a wisdom profile synchronously. Such a caller must set its own shorter
+  timeout rather than rely on the profile value.
 
 ---
 

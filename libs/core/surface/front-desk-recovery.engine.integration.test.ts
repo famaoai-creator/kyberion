@@ -19,6 +19,19 @@ const fixtureId = () => randomBytes(6).toString('hex');
 const rootBase = path.join(sourceRoot, 'active/shared/tmp', 'recovery-engine-' + fixtureId());
 let root: string;
 const children: ManagedProcessHandle[] = [];
+// Each run() starts fresh `node --import ts-loader` children, and every cold
+// start transpiles the libs/core graph the worker imports (about 5s of CPU,
+// 10s on a loaded 4-vCPU host) before the fixture does any work. A flat 180s
+// local budget failed the 17-batch test on a busy machine (214s at load 20,
+// ~12.6s per batch) while CI (CI=true, 600s) stayed green. Budgets are the
+// same locally and on CI: a hung child fails on its own timer in start(), and
+// each test's backstop is sized from its sequential child batches.
+const CHILD_TIMEOUT_MS = 120000;
+const PER_BATCH_BUDGET_MS = 30000;
+const engineTestBudget = (batches: number): number =>
+  Math.max(180000, batches * PER_BATCH_BUDGET_MS);
+/** Grace for children to exit on SIGTERM in afterAll before SIGKILL. */
+const CHILD_EXIT_GRACE_MS = 10000;
 type EngineValue = {
   preparationError?: string;
   strictRecovery: { ok: boolean; reason?: string };
@@ -113,15 +126,12 @@ function start(
     readyReject = reject;
   });
   const result = new Promise<Result>((resolve, reject) => {
-    const timer = setTimeout(
-      () => {
-        const error = new Error('child timed out: ' + stderr + stdout);
-        readyReject(error);
-        reject(error);
-        stopManagedProcess(handle.resourceId, handle.child);
-      },
-      process.env.CI ? 120000 : 60000
-    );
+    const timer = setTimeout(() => {
+      const error = new Error('child timed out: ' + stderr + stdout);
+      readyReject(error);
+      reject(error);
+      stopManagedProcess(handle.resourceId, handle.child);
+    }, CHILD_TIMEOUT_MS);
     handle.child.stdout?.on('data', (chunk) => {
       stdout += String(chunk);
       if (stdout.includes('READY\n')) readyResolve();
@@ -180,10 +190,36 @@ beforeEach(() => {
   root = path.join(rootBase, fixtureId());
   seedFirstJobTestRoot(sourceRoot, root);
 }, 60000);
-afterAll(() => {
-  for (const child of children) stopManagedProcess(child.resourceId, child.child);
-  safeRmSync(rootBase, { recursive: true, force: true });
-});
+const hasExited = (child: ManagedProcessHandle['child']): boolean =>
+  child.exitCode !== null || child.signalCode !== null;
+
+/** Resolves on 'exit' (not 'close': a grandchild may hold the pipes) or after `ms`. */
+function waitForExit(child: ManagedProcessHandle['child'], ms: number): Promise<void> {
+  if (hasExited(child)) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    child.once('exit', () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+}
+
+afterAll(async () => {
+  // A child left running by a timed-out test may still be writing into its
+  // fixture root: stop every child, give it a grace period, SIGKILL any
+  // survivor (one that ignores SIGTERM or was already signalled), and only
+  // then remove the tree. The removal runs even if stopping throws.
+  try {
+    for (const child of children) stopManagedProcess(child.resourceId, child.child);
+    await Promise.all(children.map(({ child }) => waitForExit(child, CHILD_EXIT_GRACE_MS)));
+    const survivors = children.filter(({ child }) => !hasExited(child));
+    for (const { child } of survivors) child.kill('SIGKILL');
+    await Promise.all(survivors.map(({ child }) => waitForExit(child, CHILD_EXIT_GRACE_MS)));
+  } finally {
+    safeRmSync(rootBase, { recursive: true, force: true });
+  }
+}, 60000);
 
 describe('real-process parked recovery fences and restart', () => {
   it(
@@ -202,7 +238,7 @@ describe('real-process parked recovery fences and restart', () => {
         originalApprovalUnchanged: true,
       });
     },
-    process.env.CI ? 600000 : 180000
+    engineTestBudget(1)
   );
 
   it(
@@ -218,7 +254,7 @@ describe('real-process parked recovery fences and restart', () => {
       expect(actual.value.originalApprovalUnchanged).toBe(true);
       expect(actual.value.workItem).toBeNull();
     },
-    process.env.CI ? 600000 : 180000
+    engineTestBudget(1)
   );
 
   it(
@@ -248,7 +284,7 @@ describe('real-process parked recovery fences and restart', () => {
         value: { isolated: true },
       });
     },
-    process.env.CI ? 600000 : 180000
+    engineTestBudget(4)
   );
 
   it(
@@ -324,7 +360,7 @@ describe('real-process parked recovery fences and restart', () => {
         'only a separate explicit new UUID can now reserve new work'
       ).toMatchObject({ ok: true });
     },
-    process.env.CI ? 600000 : 180000
+    engineTestBudget(17)
   );
   it(
     'admits one distinct revision only after the old child is strictly terminal, preserving verified parent bytes',
@@ -386,6 +422,6 @@ describe('real-process parked recovery fences and restart', () => {
       expect(final.parentArtifact.body).toBe(seeded.value.parentBody);
       expect(final.originalApprovalUnchanged).toBe(true);
     },
-    process.env.CI ? 600000 : 180000
+    engineTestBudget(9)
   );
 });
