@@ -243,6 +243,9 @@ describe('Package boundary contract', () => {
       'scripts/check_install_script_allowlist.ts',
       'scripts/check_lockfile_commit_gate.ts',
       'scripts/check_pinned_deps.ts',
+      // The TypeScript loader itself: it runs before any TypeScript or dist exists and
+      // shares the private-host-cache trust rules (plain .mjs) with libs/core.
+      'scripts/ts-loader-cache.mjs',
     ]);
     expect(matches.filter((match) => !sourceImportExceptions.has(match))).toEqual([]);
   });
