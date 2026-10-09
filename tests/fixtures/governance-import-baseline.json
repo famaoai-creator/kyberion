@@ -154,6 +154,7 @@
     "scripts/reconcile_knowledge_scopes.entrypoint.test.ts",
     "scripts/run_realtime_voice_conversation.test.ts",
     "scripts/ts-loader-cache.mjs",
+    "scripts/ts-loader-cache.test.ts",
     "scripts/ts-loader.mjs",
     "scripts/virtual_office.test.ts",
     "scripts/voice_consent.test.ts",
