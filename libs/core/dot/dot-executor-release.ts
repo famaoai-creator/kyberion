@@ -11,7 +11,7 @@
 import { withExecutionContext } from '../authority.js';
 import { AUTONOMY_APPROVAL_CHANNEL } from '../governance/approval-decision-card.js';
 import {
-  assertApprovalUsable,
+  approvalUsabilityRefusal,
   createApprovalRequest,
   isApprovalRequestExpired,
   listApprovalRequests,
@@ -229,11 +229,8 @@ function releaseRefusal(
   if (record.veto || record.accountability?.finalDecision !== 'human_only') {
     return 'not a human-only decision';
   }
-  try {
-    assertApprovalUsable(record, { consumer: 'dot_release' });
-  } catch (error) {
-    return error instanceof Error ? error.message : String(error);
-  }
+  const sodRefusal = approvalUsabilityRefusal(record, 'dot_release');
+  if (sodRefusal) return sodRefusal;
   if (
     record.expiresAt &&
     (!record.decidedAt || Date.parse(record.decidedAt) > Date.parse(record.expiresAt))

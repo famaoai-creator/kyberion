@@ -3,21 +3,15 @@ import { nowIso } from '@agent/core/foundation';
 import { enforceApprovalGate } from '@agent/core/governance/approval-gate';
 import { charterInputForDecision } from '@agent/core/governance/charter-call-site';
 import {
-  assertApprovalUsable,
+  approvalUsabilityRefusal,
   isApprovalRequestExpired,
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
 import { evaluateDecisionRights, resolveDecisionRightsMatrix } from '@agent/core/decision-rights';
 import type { GovernedArtifactRole } from '@agent/core/artifacts';
 
-function isUsableApproval(request: ApprovalRequestRecord): boolean {
-  try {
-    assertApprovalUsable(request, { consumer: 'approval_actuator_request_review' });
-    return true;
-  } catch {
-    return false;
-  }
-}
+const isUsableApproval = (request: ApprovalRequestRecord): boolean =>
+  !approvalUsabilityRefusal(request, 'approval_actuator_request_review');
 
 export interface EvaluateDecisionRightsInput {
   operation_id: string;

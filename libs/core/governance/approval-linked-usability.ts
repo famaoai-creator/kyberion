@@ -8,7 +8,7 @@ import {
   assertApprovalUsable,
   isSeparationOfDutiesEnabled,
 } from './approval-separation-of-duties.js';
-import { loadApprovalRequest, type ApprovalRequestRecord } from './approval-store.js';
+import { loadApprovalRequest } from './approval-store.js';
 
 /**
  * Held actions: the linked shared-store decision must still be usable (e.g.
@@ -37,16 +37,4 @@ export function heldApprovalRefusal(
   }
 }
 
-/** The refusal message when an approved record is not usable (audited), else undefined. */
-export function approvalUsabilityRefusal(
-  record: ApprovalRequestRecord | null | undefined,
-  consumer: string
-): string | undefined {
-  if (!record) return undefined;
-  try {
-    assertApprovalUsable(record, { consumer });
-    return undefined;
-  } catch (error) {
-    return error instanceof Error ? error.message : String(error);
-  }
-}
+export { approvalUsabilityRefusal } from './approval-separation-of-duties.js';

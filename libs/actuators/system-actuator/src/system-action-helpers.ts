@@ -6,7 +6,7 @@ import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { randomUUID } from 'node:crypto';
 import { createApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
 import {
-  assertApprovalUsable,
+  approvalUsabilityRefusal,
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
 import {
@@ -29,14 +29,8 @@ import { executePipeline } from './system-pipeline-helpers.js';
 import { resolveSystemClickCoordinate } from './system-mark-target.js';
 
 /** Separation of duties: an unusable approval is treated as missing (refusal audited). */
-function isUsableComputerApproval(request: ApprovalRequestRecord): boolean {
-  try {
-    assertApprovalUsable(request, { consumer: 'system_actuator_computer' });
-    return true;
-  } catch {
-    return false;
-  }
-}
+const isUsableComputerApproval = (request: ApprovalRequestRecord): boolean =>
+  !approvalUsabilityRefusal(request, 'system_actuator_computer');
 
 export interface SystemPipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';

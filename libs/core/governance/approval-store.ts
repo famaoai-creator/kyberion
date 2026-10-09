@@ -462,6 +462,7 @@ export function validateHumanFinalDecision(params: {
 export {
   APPROVAL_PLACEHOLDER_DECIDERS,
   approvalRequesterIdentities,
+  approvalUsabilityRefusal,
   assertApprovalUsable,
   evaluateApprovalUsability,
   evaluateSeparationOfDuties,
