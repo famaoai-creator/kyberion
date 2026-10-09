@@ -54,6 +54,28 @@ const SOD_CONSUMERS: ReadonlyArray<{ file: string; consumer: string }> = [
   },
 ];
 
+/**
+ * A consumer that skips its usability check while separation of duties is off
+ * would let a revoked approval through (revocation is refused whatever the
+ * setting). Only these files may branch on the setting being off, each for the
+ * stated reason; any other consumer file doing so fails the contract.
+ */
+const SOD_OFF_GUARD_EXCEPTIONS: Readonly<Record<string, string>> = {
+  'libs/core/governance/approval-linked-usability.ts':
+    'a held action whose linked record is missing is not checked while off (as before); a linked record that exists is always checked',
+  'libs/core/governance/approval-gate.ts':
+    'a session-cache grant whose seed record is missing is kept while off (as before); a seed that exists is always checked',
+  'libs/core/governance/approval-store.ts':
+    'decide-time enforcement (enforceSeparationOfDutiesOnDecision) only; apply_claim calls assertApprovalUsable unconditionally',
+  'libs/core/service/service-recording-review-approval.ts':
+    'a legacy review written before reviews went through the store has no record to check; accepted only while off',
+  'scripts/mission-alignment-gate/serve-brief.ts':
+    'identity refusals (no owner member, agent session) apply only while on; the decision itself goes through the store',
+};
+
+const SOD_OFF_GUARD =
+  /!\s*(?:isSeparationOfDutiesEnabled\(\)|resolveSeparationOfDutiesPolicy\(\)\.enabled)/;
+
 /** Surfaces that record `deciderIdentitySource: 'caller_supplied'`. */
 const CALLER_SUPPLIED_SURFACES = [
   'libs/core/governance/approval-cowork-adapter.ts',
@@ -115,6 +137,25 @@ describe('separation-of-duties consumer registry', () => {
       const source = read(file);
       expect(source).toContain('decideApprovalFromCli(');
       expect(source).not.toMatch(/decidedBy:\s*resolveOperatorDisplayName\(\)/);
+    }
+  });
+
+  it('no consumer skips its usability check while separation of duties is off, except the listed ones', () => {
+    expect('if (!isSeparationOfDutiesEnabled()) return;').toMatch(SOD_OFF_GUARD);
+    expect('if (!resolveSeparationOfDutiesPolicy().enabled) return null;').toMatch(SOD_OFF_GUARD);
+    const files = new Set([
+      ...SOD_CONSUMERS.map((entry) => entry.file),
+      'scripts/mission-alignment-gate/serve-brief.ts',
+    ]);
+    const offenders = [...files].filter(
+      (file) => SOD_OFF_GUARD.test(read(file)) && !(file in SOD_OFF_GUARD_EXCEPTIONS)
+    );
+    expect(offenders).toEqual([]);
+    for (const [file, reason] of Object.entries(SOD_OFF_GUARD_EXCEPTIONS)) {
+      expect(reason.length).toBeGreaterThan(20);
+      expect(read(file)).toMatch(
+        /isSeparationOfDutiesEnabled\(\)|resolveSeparationOfDutiesPolicy\(\)/
+      );
     }
   });
 

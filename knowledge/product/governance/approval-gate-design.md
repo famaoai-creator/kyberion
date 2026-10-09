@@ -52,7 +52,9 @@ mission brief
     - `libs/actuators/approval-actuator/src/approval-actuator-helpers.ts`（approval-actuator の `decide` op）
   - mission brief の承認ページ（`scripts/mission-alignment-gate/serve-brief.ts`）は、ページの token が
     所持しか証明しないため、決定者をページから受け取らない。CLI と同じ `resolveCliOperatorIdentity()`
-    （下記の operator principal）でサーバー側が決め、ページで入力された名前は note に残すだけ。
+    （下記の operator principal）でサーバー側が決め、ページで入力された名前は note に残すだけ。agent の
+    セッション内で起動したサーバーは、ON では承認を受け付けず、OFF では決定を `caller_supplied`（agent の
+    principal 付き）として記録する（端末と同じ規則）。
 - **CLI の identity**: 端末（CLI と script）は 1 つの operator principal を使う
   （`libs/core/governance/cli-operator-principal.ts`）。この machine の owner member（chronos /
   presence-studio の loopback viewer と同じ member）を `user:<member_id>` として、CLI や script が依頼を
@@ -62,32 +64,56 @@ mission brief
   - agent のセッション内（`KYBERION_AGENT_ID`、`KYBERION_NHI_ID`、`KYBERION_RUN_ORIGIN=agent`、または
     `CLAUDECODE` などの provider CLI の目印）で CLI が依頼を開くと、依頼者は `agent:<…>`
     （例 `agent:claude-code`）になる。そのため agent が開いた依頼を人が承認しても自己承認にはならない。
-  - 明示の `--requested-by` は従来どおりそのまま記録する。
+  - 検出した principal（agent のセッション、なければ owner member）は常に
+    `requestedByContext.actorId` に記録する。明示の `--requested-by` は `requestedBy` になり、identity を
+    1 つ足すだけで、検出した principal を置き換えない（`approvalRequesterIdentities` は両方を見る）。
+    owner が `--requested-by agent:x` で依頼を開いて自分で承認しても、自己承認として拒否される。
+  - 依頼者の解決は CLI の入口で行い（`scripts/lib/cli-approval-requester.ts`、
+    `scripts/lib/cli-attestation-invoker.ts`）、library（mission の scope-approve と reconcile-work、
+    provider attestation、project trust、plugin install、service recording）は解決済みの依頼者を引数で
+    受け取る。依頼を実際に開くときだけ解決する（既存の依頼を再利用するとき、official plugin のように
+    依頼が要らないときは解決しない）。
   - owner member が無いとき: OFF では従来の値（persona、component 名、表示名）を記録する。ON では依頼も
     承認も `[POLICY_VIOLATION] approval … blocked — … no stable operator identity` で止まり、
     `pnpm organization member ensure-owner`（owner member を作る。冪等）を案内する。代替値で記録はしない。
   - ON で、agent のセッション内から `--approve` すると止まる（agent が人の代わりに決めないため。セッション内
     では両者を区別できない）。自分の端末から実行する。却下は止めない。
+  - ON で端末から承認するには、対話的な端末（stdin と stdout がともに TTY）で、依頼の要約と一緒に表示される
+    使い捨てのコードを入力する必要がある（`scripts/lib/approval-cli-decision.ts`）。一致したときだけ承認し、
+    決定に `decidedVia: 'cli_tty_challenge'` を記録する。省略するフラグは無い。TTY が無いときは、認証済みの
+    surface（Chronos か presence-studio）を案内して拒否する。`pnpm kyberion approve`、
+    `service_recording review --approve` も同じ helper を通る。OFF では従来どおりで、確認は求めない。
+  - OFF で agent のセッション内から決定すると、`decidedBy` は owner のまま、`deciderIdentitySource:
+'caller_supplied'` と `decidedInAgentSession`（agent の principal）を記録し、監査台帳にも残す。後で ON に
+    すると、このレコードは `unverified_decider` として利用時に拒否される。
   - この identity を使う依頼の作成元: `pnpm onboarding llm attest … --request-approval`（provider
     attestation）、`pnpm kyberion project-trust request`、`pnpm kyberion hooks trust`（external hooks）、
     `kyberion secret introduce`、mission の `scope-approve --request-approval` と `reconcile-work`、
     organization decision の `transition … --request-approval`、`entity_governance_cleanup` と
     `audit_mirror_reconcile` の `--request-approval`、`pnpm plugin:install`（third-party）、
     `service_recording capture` / `request-review`。
-- **承認の取り消し（revoke）**: 承認済みで、まだ claim も適用もされていないレコードは
-  `pnpm kyberion approvals --revoke <id> [--reason "…"]`（`libs/core/governance/approval-revocation.ts` の `revokeApprovalRequest`）で取り消せる。
+- **承認の取り消し（revoke）**: `pnpm kyberion approvals --revoke <id> [--reason "…"]`
+  （`libs/core/governance/approval-revocation.ts`）は承認済みレコードを取り消し、以後の利用を拒否する。
+  すでに起きた効果は元に戻らない。
   - status は `approved` のまま（決定があった事実は証跡として残る）で、`revocation`（誰が・いつ・理由）が
     付く。`evaluateApprovalUsability` は SoD の設定に関係なく取り消されたレコードを拒否するので、下記の
-    すべての consumer で効果にならない。再依頼の入口は取り消されたレコードを返さず、新しい依頼を開く。
+    すべての consumer で以後の効果にならない。再依頼の入口は取り消されたレコードを返さず、新しい依頼を開く。
     session cache の付与も消える。
   - 取り消せる人: 依頼者（自分の依頼の取り下げ。cancel と同じ）、承認した principal（自分の決定の
-    取り下げ）、または local owner（`revokerAuthority: 'owner'`。サーバー側で owner member を解決した
-    surface だけが付ける。CLI は owner member として実行するときに付ける）。取り消しは権限を減らすだけ
-    なので、そのレコードに責任を持つ人なら誰でもよい、という承認の責任モデルに合わせた。surface の
-    代替値は identity にならない。
-  - 取り消せないもの: pending（cancel を使う）、rejected などの承認以外、claim 済み・適用済み
-    （効果が始まっている）、steering の依頼（承認した時点で効果が始まる）。
-  - 監査: 監査台帳（`approval_decision` / `revoke`）と、その channel のイベントログ（`revoked`）。
+    取り下げ）、または local owner。owner の権限は呼び出し側が主張できず、`revokeApprovalAsLocalOwner` が
+    member registry（loopback の owner member）からサーバー側で解決する。CLI は agent のセッションでなく
+    owner member があるときにこれを使う。取り消しは権限を減らすだけなので、そのレコードに責任を持つ人なら
+    誰でもよい、という承認の責任モデルに合わせた。surface の代替値は identity にならない。
+  - 一度きりの効果（one-shot）: apply claim を取る consumer（`apply_claim`）に加えて、claim を取らない
+    one-shot の consumer は効果の直前に `markApprovalConsumed` で消費を記録する。対象は
+    `service_recording_promotion`（procedure の登録）と `organization_decision`（承認済み決定の保存）。
+    消費済みの承認は 2 回目の利用も revoke も拒否される（revoke は「すでに消費済み」と報告する）。
+    それ以外の claim を取らない consumer は、効果のたびに利用可否を確かめ直す（例: `pipeline_bound_approval`
+    は run の再開のたびに確かめる）ので、revoke 以降の利用が拒否される。それ以前の利用は取り消せない。
+  - 取り消せないもの: pending（cancel を使う）、rejected などの承認以外、claim 済み・適用済み・消費済み
+    （一度きりの効果がすでに起きた）、steering の依頼（承認した時点で効果が始まる）。
+  - 監査: 監査台帳（`approval_decision` / `revoke`）と、その channel のイベントログ（`revoked`、消費は
+    `consumed`）。
 - **ON・利用時**: 承認済みレコードを効果に変える箇所は、次の consumer id で同じ判定をやり直す
   （`assertApprovalUsable` / `approvalUsabilityRefusal`、拒否は `use:<consumer id>` として監査）。OFF のときに
   記録された自己承認などは、ON にした後では効果にならない。一覧は
@@ -110,8 +136,8 @@ mission brief
     `libs/core/service/service-recording-review-approval.ts`）
 - **利用できない承認の扱い**: 利用時の拒否メッセージは「この承認は再利用されない。新しい承認を依頼し、
   別の、サーバーが識別した principal に決定してもらう」と、分かる場合は再依頼の正確なコマンドを示す
-  （held action の場合は held action 自体を依頼し直すよう示す）。承認済みでまだ使われていないレコードなら、
-  承認済みに見えないよう取り消すコマンド（`pnpm kyberion approvals --revoke <id>`）も示す。再依頼の入口（`enforceApprovalGate`、provider attestation の `--request-approval`、
+  （held action の場合は held action 自体を依頼し直すよう示す）。承認済みで claim も適用もされていないレコードなら、
+  以後の利用を止めるコマンド（`pnpm kyberion approvals --revoke <id>`）も示す。再依頼の入口（`enforceApprovalGate`、provider attestation の `--request-approval`、
   approval-actuator の `request_review`、mission の scope-approve と reconcile-work、project trust、
   background review、agent prompt）は、利用できない承認済みレコードを返さず、新しい依頼を開く。
   承認ゲートは、使える候補が残っていないときだけ（新しい依頼を開くときに）1 回監査する。
@@ -143,15 +169,21 @@ mission brief
   - NFKC で同一化されない見た目の似た文字（例: ラテン文字の `a` とキリル文字の `а`）。
   - 依頼を作った人間ではなく component 名を依頼者として記録する作成元
     （`<surface>_surface_steering`、`system-actuator`、`pipeline:<runId>` など）。
-- **端末の agent 判定は環境変数による。** agent のセッションの目印（`KYBERION_AGENT_ID` など、
-  provider CLI の `CLAUDECODE` など）が無い agent が CLI を実行すると、その依頼は owner として記録され、
-  人の承認は自己承認として拒否される（拒否側）。逆に、人が agent のセッションのシェルに打った依頼は
-  agent の依頼として記録され、本人の承認が通る（false negative）。同じ理由で、ON では agent の
-  セッション内からの `--approve` を止めている。
+- **端末の判定は best effort で、セキュリティ境界ではない。** 端末は操作している人を認証できない。
+  - agent のセッションの目印（`KYBERION_AGENT_ID` など、provider CLI の `CLAUDECODE` など）は参考情報に
+    すぎない環境変数で、agent は消せる（`env -u CLAUDECODE …`）。目印の無い agent の依頼は owner として
+    記録され、人の承認は自己承認として拒否される（拒否側）。人が agent のセッションのシェルに打った依頼は
+    agent の依頼として記録され、本人の承認が通る（false negative）。
+  - ON の TTY チャレンジは、目印を消した agent が非対話で `--approve` するのを止めるが、PTY を操作できる
+    agent（例: terminal-actuator 経由）は表示されたコードを読んで入力できる。
+  - 依頼者と別の人の承認を agent に対して確実にするには、認証済みの surface（Chronos か presence-studio。
+    検証済みのセッションから `user:<member_id>` を記録する）で承認する。これが強い経路である。
 - **service recording の review の依頼者。** review の依頼は `capture`（または `request-review`）を
   実行した principal が開く。依頼の無い recording を `review` すると、その場で review する人を依頼者として
-  依頼を開くので、ON では本人の承認が拒否され、別の principal の承認が必要になる。依頼より前に書かれた
-  review（`approval_request_id` が無い）は、ON では promotion で拒否される。
+  依頼を開くので、ON では本人の承認が拒否され、別の principal の承認が必要になる: 別の member が認証済みの
+  surface（Chronos か presence-studio）で決定するか、他の人が開いた依頼なら対話的な端末で
+  `service_recording review --approve` を実行してチャレンジに答える。依頼より前に書かれた review
+  （`approval_request_id` が無い）は、ON では promotion で拒否され、拒否メッセージは同じ手順を示す。
 - **依頼者が値を決められる誤一致（false positive）。** `requestedBy` などは依頼側が書くので、依頼者が承認者の
   identity を名乗ると、その承認者の承認が拒否される。拒否側に倒れるだけで承認が不正に通ることはないが、
   承認の妨害には使える。

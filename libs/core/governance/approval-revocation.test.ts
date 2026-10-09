@@ -1,5 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const owner = vi.hoisted(() => ({ present: true }));
+vi.mock('../organization/member-registry.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../organization/member-registry.js')>();
+  return {
+    ...actual,
+    resolveMemberByPrincipal: (input: { source: string }) =>
+      input.source === 'loopback' && owner.present
+        ? { member_id: 'owner', display_name: 'Alice Example', status: 'active' }
+        : null,
+  };
+});
 vi.mock('../customer-resolver.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../customer-resolver.js')>();
   const { customerRootWithSodOverlay } = await import('./__tests__/sod-overlay-state.js');
@@ -25,7 +36,11 @@ import {
   clearSessionApprovalCache,
   type ApprovalRequestRecord,
 } from './approval-store.js';
-import { revokeApprovalRequest } from './approval-revocation.js';
+import {
+  markApprovalConsumed,
+  revokeApprovalAsLocalOwner,
+  revokeApprovalRequest,
+} from './approval-revocation.js';
 import {
   clearSeparationOfDuties,
   setSeparationOfDuties,
@@ -92,7 +107,7 @@ function events(): Array<Record<string, unknown>> {
     .map((line) => JSON.parse(line) as Record<string, unknown>);
 }
 
-describe('revoking an approved, not yet applied approval', () => {
+describe('revoking an approved approval (further uses refused)', () => {
   let audit: ReturnType<typeof vi.spyOn>;
   const created: string[] = [];
   const overlayDir = pathResolver.sharedTmp(`approval-revocation-${process.pid}`);
@@ -175,12 +190,58 @@ describe('revoking an approved, not yet applied approval', () => {
     expect(() => revoke(byOwner, 'user:mallory')).toThrow(
       /cannot be revoked: user:mallory is neither its requester, one of its approvers, nor the local owner/
     );
-    expect(() => revoke(byOwner, 'sovereign-user', { revokerAuthority: 'owner' })).toThrow(
-      /empty or a surface placeholder/
+    expect(() => revoke(byOwner, 'sovereign-user')).toThrow(/empty or a surface placeholder/);
+    // Claiming to be the owner proves nothing: owner authority is resolved server-side.
+    expect(() => revoke(byOwner, 'user:owner')).toThrow(/neither its requester/);
+    const asOwner = revokeApprovalAsLocalOwner(role, { channel, requestId: byOwner.id });
+    expect(asOwner.revocation).toMatchObject({
+      revokedBy: 'user:owner',
+      revokedByDisplayName: 'Alice Example',
+    });
+    expect(
+      events().find((e) => e.event === 'revoked' && e.request_id === byOwner.id)
+    ).toMatchObject({ revoker_authority: 'owner' });
+
+    owner.present = false;
+    try {
+      const noOwner = approve(track(openRequest('agent:planner')));
+      expect(() => revokeApprovalAsLocalOwner(role, { channel, requestId: noOwner.id })).toThrow(
+        /no active owner member/
+      );
+    } finally {
+      owner.present = true;
+    }
+  });
+
+  it('a one-shot consumption is recorded once, and a later revoke reports it consumed', () => {
+    const approved = approve(track(openRequest()));
+    const consume = () =>
+      markApprovalConsumed(role, {
+        channel,
+        requestId: approved.id,
+        consumer: 'organization_decision',
+        consumedBy: 'organization-cli',
+      });
+    expect(consume().consumption).toMatchObject({ consumer: 'organization_decision' });
+    expect(() => consume()).toThrow(/was already used by organization_decision/);
+    expect(() => revoke(approved, 'user:alice')).toThrow(
+      /already consumed by organization_decision .* one-shot effect has happened/
     );
-    expect(revoke(byOwner, 'user:owner', { revokerAuthority: 'owner' }).revocation?.revokedBy).toBe(
-      'user:owner'
-    );
+    expect(events().find((e) => e.event === 'consumed')).toMatchObject({
+      request_id: approved.id,
+      consumer: 'organization_decision',
+    });
+
+    const revoked = approve(track(openRequest()));
+    revoke(revoked, 'user:alice');
+    expect(() =>
+      markApprovalConsumed(role, {
+        channel,
+        requestId: revoked.id,
+        consumer: 'organization_decision',
+        consumedBy: 'organization-cli',
+      })
+    ).toThrow(/was revoked/);
   });
 
   it('refuses pending, claimed, already revoked and rejected records', () => {
@@ -233,7 +294,9 @@ describe('revoking an approved, not yet applied approval', () => {
     const self = approve(track(openRequest('user:alice')));
     setSeparationOfDuties(true);
     expect(() => assertApprovalUsable(self, { consumer: 'approval_gate' })).toThrow(
-      new RegExp(`withdraw it .* run \`pnpm kyberion approvals --revoke ${self.id}\``)
+      new RegExp(
+        `revoke it \\(further uses refused\\), run \`pnpm kyberion approvals --revoke ${self.id}\``
+      )
     );
   });
 });

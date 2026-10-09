@@ -1275,7 +1275,7 @@ async function mainImpl(args: string[] = []): Promise<void> {
     .option('deny', { type: 'string', description: 'approvals: reject request id' })
     .option('revoke', {
       type: 'string',
-      description: 'approvals: withdraw an approved, not yet applied request id',
+      description: 'approvals: revoke an approved request id (further uses refused)',
     })
     .option('reason', { type: 'string', description: 'approvals: revocation reason' })
     .option('note', { type: 'string', description: 'approvals: decision note' })

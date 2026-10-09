@@ -60,10 +60,18 @@ import {
   attestTenantProvider,
   captureAttestationInvoker,
   mutateTenant,
+  type AttestationInvoker,
   PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
   requestTenantProviderAttestationApproval,
 } from '@agent/core/organization/tenant-governance';
-import { CLI_AGENT_SESSION_ENV } from '@agent/core/governance/cli-operator-principal';
+import {
+  CLI_AGENT_SESSION_ENV,
+  resolveCliApprovalRequester,
+} from '@agent/core/governance/cli-operator-principal';
+import { evaluateApprovalUsability } from '@agent/core/governance/approval-store';
+import { decideApprovalFromCli } from './lib/approval-cli-decision.js';
+import { captureCliAttestationInvoker } from './lib/cli-attestation-invoker.js';
+import { ttyIo } from './lib/tty-io.test-support.js';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { main as kyberionHome } from './kyberion_home.js';
@@ -109,8 +117,10 @@ describe('terminal approvals record one stable operator principal', () => {
   const requestIds: string[] = [];
 
   /** `pnpm onboarding llm attest … --request-approval`, as the CLI runs it. */
-  function requestFromCli(overrides: Partial<typeof claim> = {}): string {
-    const invoker = captureAttestationInvoker();
+  function requestFromCli(
+    overrides: Partial<typeof claim> = {},
+    invoker: AttestationInvoker = captureCliAttestationInvoker()
+  ): string {
     const request = withExecutionContext('sovereign_concierge', () =>
       requestTenantProviderAttestationApproval({ ...claim, ...overrides, rootDir, invoker })
     );
@@ -120,6 +130,15 @@ describe('terminal approvals record one stable operator principal', () => {
 
   async function approveFromCli(id: string): Promise<void> {
     await kyberionHome(['approvals', '--approve', id]);
+  }
+
+  /** The shared terminal decision with an interactive terminal answering `answer`. */
+  function approveAtTty(id: string, answer: (code: string) => string = (code) => code) {
+    return decideApprovalFromCli(stored(id), {
+      decision: 'approved',
+      note: 'tty test',
+      io: ttyIo(answer),
+    });
   }
 
   const stored = (id: string) => loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id)!;
@@ -153,27 +172,99 @@ describe('terminal approvals record one stable operator principal', () => {
     expect(stored(id)).toMatchObject({
       requestedBy: 'user:owner',
       requestedByDisplayName: 'Alice Example',
+      requestedByContext: expect.objectContaining({ actorId: 'user:owner' }),
     });
 
-    await expect(approveFromCli(id)).rejects.toThrow(
+    // Even past the TTY challenge, the store refuses the self-approval.
+    await expect(approveAtTty(id)).rejects.toThrow(
       /\[POLICY_VIOLATION\] Separation of duties: approval refused because the decider is the same principal/
     );
     expect(stored(id).status).toBe('pending');
   });
 
-  it('with SoD on, still lets the human approve a request an agent session opened', async () => {
+  it('with SoD on, clearing the agent markers is not enough: a non-interactive approve is refused', async () => {
     setSeparationOfDuties(true);
     vi.stubEnv('CLAUDECODE', '1');
     const id = requestFromCli();
     expect(stored(id).requestedBy).toBe('agent:claude-code');
 
+    // `env -u CLAUDECODE -u AI_AGENT pnpm kyberion approvals --approve <id>` from the agent.
     plainTerminal();
-    await approveFromCli(id);
+    await expect(approveFromCli(id)).rejects.toThrow(
+      /approval decision blocked — separation of duties is on and this terminal is not interactive.*Chronos or presence-studio/
+    );
+    expect(stored(id).status).toBe('pending');
+  });
+
+  it('with SoD on, a wrong TTY challenge answer is refused', async () => {
+    setSeparationOfDuties(true);
+    vi.stubEnv('CLAUDECODE', '1');
+    const id = requestFromCli();
+    plainTerminal();
+    await expect(approveAtTty(id, () => 'not-the-code')).rejects.toThrow(
+      /approval decision cancelled — the typed challenge did not match/
+    );
+    expect(stored(id).status).toBe('pending');
+  });
+
+  it('with SoD on, the human approves an agent-opened request by answering the TTY challenge', async () => {
+    setSeparationOfDuties(true);
+    vi.stubEnv('CLAUDECODE', '1');
+    const id = requestFromCli();
+    plainTerminal();
+    await approveAtTty(id);
     expect(stored(id)).toMatchObject({
       status: 'approved',
       decidedBy: 'user:owner',
       decidedByDisplayName: 'Alice Example',
+      decidedVia: 'cli_tty_challenge',
     });
+    expect(evaluateApprovalUsability(stored(id))).toBeNull();
+  });
+
+  it('with SoD on, an owner request opened with --requested-by agent:x is still a self-approval', async () => {
+    setSeparationOfDuties(true);
+    // What a CLI entry point does with `--requested-by agent:x` from the owner's terminal.
+    const invoker: AttestationInvoker = {
+      ...captureAttestationInvoker(),
+      approvalRequester: resolveCliApprovalRequester({ explicit: 'agent:x', legacy: 'operator' }),
+    };
+    const id = requestFromCli({}, invoker);
+    expect(stored(id)).toMatchObject({
+      requestedBy: 'agent:x',
+      requestedByContext: expect.objectContaining({ actorId: 'user:owner' }),
+    });
+    await expect(approveAtTty(id)).rejects.toThrow(
+      /Separation of duties: approval refused because the decider is the same principal/
+    );
+  });
+
+  it('with SoD off, an approval typed in an agent session is caller_supplied and fails a later SoD re-check', async () => {
+    vi.stubEnv('KYBERION_AGENT_ID', 'planner');
+    const id = requestFromCli();
+    // Same agent session approves (SoD off: no challenge, nothing refused).
+    await approveFromCli(id);
+    expect(stored(id)).toMatchObject({
+      status: 'approved',
+      decidedBy: 'user:owner',
+      decidedByIdentitySource: 'caller_supplied',
+      decidedInAgentSession: 'agent:planner',
+    });
+    expect(evaluateApprovalUsability(stored(id))).toBeNull();
+
+    setSeparationOfDuties(true);
+    expect(evaluateApprovalUsability(stored(id))?.violation).toBe('unverified_decider');
+    plainTerminal();
+    expect(() =>
+      withExecutionContext('sovereign_concierge', () =>
+        attestTenantProvider({
+          ...claim,
+          rootDir,
+          invoker: { actor: 'operator-cli' },
+          approvalRequestId: id,
+        })
+      )
+    ).toThrow(/decider identity was supplied by the caller/);
   });
 
   it('with SoD on, refuses to approve from inside an agent session', async () => {

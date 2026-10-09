@@ -132,12 +132,12 @@ export function isSeparationOfDutiesEnabled(): boolean {
 
 /**
  * Why an approved record cannot be turned into an effect: a separation-of-duties
- * violation (only while the setting is on), or `revoked` — withdrawn through
+ * violation (only while the setting is on), or `revoked` — revoked through
  * `revokeApprovalRequest`, refused whatever the setting.
  */
 export type ApprovalUnusableReason = SeparationOfDutiesViolation | 'revoked';
 
-/** The command that withdraws an approved-but-unused record. */
+/** The command that revokes an approved record (further uses refused). */
 export function approvalRevokeCommand(requestId: string): string {
   return `pnpm kyberion approvals --revoke ${requestId}`;
 }
@@ -242,7 +242,7 @@ export function assertApprovalUsable(
     const reason = `Separation of duties: approval ${record.id} cannot be used because ${SEPARATION_OF_DUTIES_MESSAGES[refusal.violation]}`;
     const withdraw =
       record.status === 'approved' && !record.applyClaim && !record.applyResult
-        ? ` To withdraw it so it no longer reads as approved, run \`${approvalRevokeCommand(record.id)}\`.`
+        ? ` To revoke it (further uses refused), run \`${approvalRevokeCommand(record.id)}\`.`
         : '';
     message =
       `[POLICY_VIOLATION] ${reason}. This approval is ${record.status} and is never reused — ` +

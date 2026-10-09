@@ -9446,9 +9446,9 @@
         "qps-ploc": "⟦Ṗėñḓïñɠ ȧṗṗřőṽȧŀ ñőŧ ƒőůñḓ: {id} ŀőřėɱ ïṗşů⟧"
       },
       "recorder_approvals_revoke_not_found": {
-        "en": "Approved, not yet applied approval not found: {id}",
-        "ja": "承認済みで未適用の承認が見つかりません: {id}",
-        "qps-ploc": "⟦Ȧṗṗřőṽėḓ, ñőŧ ẏėŧ ȧṗṗŀïėḓ ȧṗṗřőṽȧŀ ñőŧ ƒőůñḓ: {id} ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+        "en": "Revocable approved approval not found: {id}",
+        "ja": "取り消せる承認済みの承認が見つかりません: {id}",
+        "qps-ploc": "⟦Řėṽőƈȧƀŀė ȧṗṗřőṽėḓ ȧṗṗřőṽȧŀ ñőŧ ƒőůñḓ: {id} ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "recorder_approval_updated": {
         "en": "✓ {id} → {status}: {title}",

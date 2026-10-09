@@ -33,7 +33,10 @@ import {
 } from '../workforce/work-coordination.js';
 import { compileSchemaFromPath } from '../schema-loader.js';
 import * as pathResolver from '../path-resolver.js';
-import { CLI_AGENT_SESSION_ENV } from '../governance/cli-operator-principal.js';
+import {
+  CLI_AGENT_SESSION_ENV,
+  resolveCliApprovalRequester,
+} from '../governance/cli-operator-principal.js';
 import {
   safeExec,
   safeExistsSync,
@@ -471,15 +474,20 @@ describe('mission existing work reconciliation', () => {
     }
   });
 
-  it('records the agent session, or else the local owner member, as the CLI requester', () => {
+  it('records the requester the entry point resolved, keeping the detected principal as actorId', () => {
     prepareMission();
     writeManifest(buildManifest());
     for (const name of CLI_AGENT_SESSION_ENV) vi.stubEnv(name, '');
     try {
       vi.stubEnv('CLAUDECODE', '1');
-      const byAgent = createMissionWorkReconciliationApprovalRequest({ missionId, manifestPath });
+      const byAgent = createMissionWorkReconciliationApprovalRequest({
+        missionId,
+        manifestPath,
+        requester: () => resolveCliApprovalRequester({ explicit: 'planner-bot', legacy: 'x' }),
+      });
       reconciliationApprovalIds.push(byAgent.id);
-      expect(byAgent.requestedBy).toBe('agent:claude-code');
+      expect(byAgent.requestedBy).toBe('planner-bot');
+      expect(byAgent.requestedByContext?.actorId).toBe('agent:claude-code');
     } finally {
       vi.unstubAllEnvs();
     }
