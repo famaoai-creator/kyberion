@@ -9,10 +9,14 @@ import {
   safeExistsSync,
   safeWriteFile,
   safeMkdir,
+  safeStat,
   assertSafeRepositoryPath,
 } from './secure-io.js';
 import { resolveStorageFloor, SYSTEM_PARTITION } from './storage-layout.js';
-import { resolveManagedToolPythonBin } from './tool/tool-runtime-registry.js';
+import {
+  locateManagedToolPythonBin,
+  resolveManagedToolPythonBin,
+} from './tool/tool-runtime-registry.js';
 
 export type LocalSttBackend = string;
 export type LocalSttSource = string;
@@ -259,11 +263,28 @@ export function discoverLocalSttBackends(
     (options.platform === undefined || options.platform === process.platform);
   if (!hostProbe) return runLocalSttDiscovery(options);
   const key = hostDiscoveryKey();
-  if (processMemo?.key === key) return cloneCandidates(processMemo.candidates);
-  const candidates = readDiscoveryDiskCache(key) ?? runLocalSttDiscovery(options);
-  processMemo = { key, candidates };
-  writeDiscoveryDiskCache(key, candidates);
+  const memoTtl = processMemoTtlMs();
+  if (processMemo?.key === key && memoTtl > 0 && Date.now() - processMemo.createdAtMs <= memoTtl) {
+    return cloneCandidates(withExistingBinaries(processMemo.candidates));
+  }
+  const cached = readDiscoveryDiskCache(key);
+  const candidates = cached ? withExistingBinaries(cached) : runLocalSttDiscovery(options);
+  if (memoTtl > 0) processMemo = { key, candidates, createdAtMs: Date.now() };
+  if (!cached) writeDiscoveryDiskCache(key, candidates);
   return cloneCandidates(candidates);
+}
+
+/** A cached candidate whose binary was removed since the probe is dropped, not returned. */
+function withExistingBinaries(candidates: LocalSttCandidate[]): LocalSttCandidate[] {
+  return candidates.filter((candidate) => {
+    const binary = candidate.executable ?? candidate.python_bin;
+    if (!binary) return true;
+    try {
+      return safeExistsSync(binary);
+    } catch {
+      return false;
+    }
+  });
 }
 
 /**
@@ -271,7 +292,14 @@ export function discoverLocalSttBackends(
  * for every python3.x in the registry, and a process asks for it from several
  * bridge installers, so one process probed every interpreter twice.
  *
- * - Per process: one probe per key (platform, PATH, registry content).
+ * - Key: platform, PATH, registry content, and each managed python bin with
+ *   its mtime (a new or recreated managed runtime changes the key).
+ * - Per process: one probe per key, for the same TTL as the disk cache.
+ * - Managed-tool installers (`voice setup --apply`, `tool-runtime setup`,
+ *   `env:bootstrap --apply`) call `resetLocalSttDiscoveryCache({ disk: true })`
+ *   when they finish, so a backend they just installed is seen at once. A
+ *   `pip install` into an existing runtime by hand is seen after one TTL.
+ * - A cached candidate whose binary no longer exists is dropped on a hit.
  * - Across processes: the same result in the cache floor
  *   (`active/shared/cache/system/local-stt-discovery/candidates.json`) for
  *   `KYBERION_STT_DISCOVERY_CACHE_TTL_MS` (default 10 minutes). It holds host
@@ -281,7 +309,8 @@ export function discoverLocalSttBackends(
  *   Set the TTL to 0 to switch the disk cache off. It is off under Vitest unless
  *   the TTL is set explicitly, so a test never reads the operator's probe.
  */
-let processMemo: { key: string; candidates: LocalSttCandidate[] } | null = null;
+let processMemo: { key: string; candidates: LocalSttCandidate[]; createdAtMs: number } | null =
+  null;
 
 const DEFAULT_DISK_CACHE_TTL_MS = 10 * 60 * 1000;
 const DISK_CACHE_VERSION = 1;
@@ -308,7 +337,44 @@ function hostDiscoveryKey(): string {
     .update(`v${DISK_CACHE_VERSION}\0${process.platform}\0${process.arch}\0`)
     .update(`${getProcessEnv('PATH') ?? ''}\0`)
     .update(registryText)
+    .update(`\0${managedRuntimeFingerprint()}`)
     .digest('hex');
+}
+
+/** Each managed-runtime python bin the registry probes, with its mtime (or `absent`). */
+function managedRuntimeFingerprint(): string {
+  let registry: LocalSttDiscoveryRegistry;
+  try {
+    registry = loadLocalSttDiscoveryRegistry();
+  } catch {
+    return 'registry-unreadable';
+  }
+  const toolIds = [
+    ...new Set(
+      registry.backends
+        .filter((record) => record.probe.kind === 'managed_python_module' && record.probe.tool_id)
+        .map((record) => String(record.probe.tool_id))
+    ),
+  ].sort();
+  return toolIds
+    .map((toolId) => {
+      try {
+        const bin = locateManagedToolPythonBin(toolId);
+        if (!bin) return `${toolId}=absent`;
+        return `${toolId}=${bin}@${safeStat(bin).mtimeMs}`;
+      } catch {
+        return `${toolId}=unknown`;
+      }
+    })
+    .join('|');
+}
+
+/** Process memo lifetime: the configured TTL (0 = off), else the default, also under Vitest. */
+function processMemoTtlMs(): number {
+  const raw = getProcessEnv('KYBERION_STT_DISCOVERY_CACHE_TTL_MS');
+  if (raw === undefined || raw.trim() === '') return DEFAULT_DISK_CACHE_TTL_MS;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
 function diskCacheTtlMs(): number {
