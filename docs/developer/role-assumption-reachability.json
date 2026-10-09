@@ -739,12 +739,12 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/plugin/plugin-managed-install.ts#ensurePluginApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/plugin/plugin-managed-install.ts#installPluginManaged",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
-      "site": "libs/core/plugin/plugin-managed-install.ts#installPluginManaged",
+      "site": "libs/core/plugin/plugin-managed-install.ts#openPluginApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
