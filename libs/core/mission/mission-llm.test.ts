@@ -7,6 +7,7 @@ import * as pathResolver from '../path-resolver.js';
 // ops-alerts sink untouched by these tests.
 vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
 import {
+  BUILTIN_FALLBACK,
   inspectLlmResolution,
   invokeLlm,
   invokeShellProfile,
@@ -353,6 +354,59 @@ describe('shipped wisdom-policy claude profile', () => {
     expect(parseLlmResponse(stdout, shippedPolicy.profiles.claude.response_format)).toEqual({
       answer: 7,
     });
+  });
+});
+
+/**
+ * Runbook §7: since #1006 the codex/gemini runners honour a profile's
+ * timeout_ms, and a timeout is a hard failure (runAdaptiveStructuredLlmProfile
+ * falls through only on quota errors). A provider-CLI turn (process start,
+ * sandbox, the user's default model and effort) needs well over 30s.
+ */
+describe('shipped wisdom-policy profile timeouts', () => {
+  const PROVIDER_CLI_ADAPTERS = new Set(['codex-cli', 'gemini-cli', 'claude-cli']);
+  /** Ceiling for one structured provider-CLI turn: the codex/gemini adapter default before #1006. */
+  const MAX_PROFILE_TIMEOUT_MS = 300_000;
+  /**
+   * Profiles allowed above MAX_PROFILE_TIMEOUT_MS, each with the reason. Add an
+   * entry only with a measured justification; none is needed today.
+   */
+  const LONG_TIMEOUT_JUSTIFICATIONS: Record<string, string> = {};
+  /** What the runtime uses when a profile omits timeout_ms. */
+  const effectiveTimeout = (profile: { adapter?: string; timeout_ms?: number }): number =>
+    profile.timeout_ms ??
+    (profile.adapter === 'codex-cli' || profile.adapter === 'gemini-cli'
+      ? 300_000 // runCodexCliQuery / GeminiCliBackend adapter default
+      : BUILTIN_FALLBACK.timeout_ms!); // invokeShellProfile default
+  const profiles = Object.entries(
+    readJson<{ llm: LlmPolicyConfig }>(
+      pathResolver.knowledge('product/governance/wisdom-policy.json')
+    ).llm.profiles ?? {}
+  );
+
+  it('gives provider-CLI profiles at least the built-in fallback timeout', () => {
+    const cliProfiles = profiles.filter(([, profile]) =>
+      PROVIDER_CLI_ADAPTERS.has(profile.adapter ?? '')
+    );
+    expect(cliProfiles.map(([name]) => name)).toEqual(
+      expect.arrayContaining(['heavy', 'standard', 'light', 'claude'])
+    );
+    for (const [name, profile] of cliProfiles) {
+      expect(effectiveTimeout(profile), name).toBeGreaterThanOrEqual(BUILTIN_FALLBACK.timeout_ms!);
+    }
+  });
+
+  it('keeps every profile under the ceiling unless a justification is recorded', () => {
+    for (const [name, profile] of profiles) {
+      if (LONG_TIMEOUT_JUSTIFICATIONS[name]) continue;
+      expect(effectiveTimeout(profile), name).toBeLessThanOrEqual(MAX_PROFILE_TIMEOUT_MS);
+    }
+  });
+
+  it('resolves an omitted timeout_ms to the runtime default for its adapter', () => {
+    expect(effectiveTimeout({ adapter: 'codex-cli' })).toBe(300_000);
+    expect(effectiveTimeout({ adapter: 'claude-cli' })).toBe(BUILTIN_FALLBACK.timeout_ms);
+    expect(effectiveTimeout({})).toBe(BUILTIN_FALLBACK.timeout_ms);
   });
 });
 
