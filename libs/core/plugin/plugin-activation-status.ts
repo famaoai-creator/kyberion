@@ -3,10 +3,10 @@
  * `plugin-managed-install.ts` — deliberately not re-exported from the plugin
  * barrel, so it is not part of the public API; tests import it directly.
  */
-import {
-  evaluateApprovalUsability,
-  type ApprovalRequestRecord,
-} from '../governance/approval-store.js';
+// Import the check from its own module (not approval-store) so this module
+// stays outside the approval-store import cycle.
+import { evaluateApprovalUsability } from '../governance/approval-separation-of-duties.js';
+import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import { createLogger } from '../logger.js';
 import type { PluginTrustLabel } from './plugin-source-trust.js';
 
