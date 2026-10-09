@@ -27,7 +27,7 @@ import { resolveSeparationOfDutiesPolicy } from './approval-policy.js';
 import { decideApprovalFromCowork } from './approval-cowork-adapter.js';
 import { enforceApprovalGate } from './approval-gate.js';
 import { createApprovalStorePromptPort } from '../agent/agent-prompt-approval.js';
-import { resolveActivationStatus } from '../plugin/plugin-managed-install.js';
+import { resolveActivationStatus } from '../plugin/plugin-activation-status.js';
 import { clearSessionApprovalCache } from './approval-store.js';
 import {
   APPROVAL_PLACEHOLDER_DECIDERS,

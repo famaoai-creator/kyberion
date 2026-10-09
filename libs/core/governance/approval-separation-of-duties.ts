@@ -136,7 +136,9 @@ export function isSeparationOfDutiesEnabled(): boolean {
  * off); otherwise the violation and the decider it concerns.
  */
 export function evaluateApprovalUsability(
-  record: ApprovalRequestRecord
+  record: ApprovalRequestRecord,
+  /** The consumer asking (registry: approval-sod-consumers.contract.test.ts); not audited. */
+  _context?: { consumer: string }
 ): { violation: SeparationOfDutiesViolation; decidedBy: string } | null {
   if (!resolveSeparationOfDutiesPolicy().enabled) return null;
   for (const decision of approvingDecisions(record)) {
