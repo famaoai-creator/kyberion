@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 
 const guardMocks = vi.hoisted(() => ({
@@ -40,7 +39,11 @@ describe('secure-io branch coverage', () => {
   let tmpDir = '';
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'secure-io-branch-'));
+    // Inside the checkout: safeSymlinkSync refuses link targets that resolve
+    // outside the repository, and the wrappers below create links.
+    const base = path.join(process.cwd(), 'active', 'shared', 'tmp', 'tests');
+    fs.mkdirSync(base, { recursive: true });
+    tmpDir = fs.mkdtempSync(path.join(base, 'secure-io-branch-'));
     guardMocks.validateWritePermission.mockReset();
     guardMocks.validateReadPermission.mockReset();
     guardMocks.validateWritePermission.mockReturnValue({ allowed: true, reason: '' });
