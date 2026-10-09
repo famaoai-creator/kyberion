@@ -228,3 +228,21 @@ export function assertApprovalUsable(
   });
   throw new Error(message);
 }
+
+/**
+ * The refusal message when an approved record is not usable (audited via
+ * {@link assertApprovalUsable}), else undefined. For consumers that report a
+ * reason or fall back instead of throwing.
+ */
+export function approvalUsabilityRefusal(
+  record: ApprovalRequestRecord | null | undefined,
+  consumer: string
+): string | undefined {
+  if (!record) return undefined;
+  try {
+    assertApprovalUsable(record, { consumer });
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}

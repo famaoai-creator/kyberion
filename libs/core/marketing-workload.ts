@@ -4,7 +4,7 @@ import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import {
-  assertApprovalUsable,
+  approvalUsabilityRefusal,
   computeApprovalPayloadHash,
   type ApprovalRequestRecord,
 } from './governance/approval-store.js';
@@ -608,13 +608,11 @@ export function validateSharedPublicationApproval(input: {
   if (request.storageChannel !== binding.storage_channel)
     reasons.push('shared approval storage channel changed');
   if (request.status !== 'approved') reasons.push(`shared approval request is ${request.status}`);
-  if (request.status === 'approved') {
-    try {
-      assertApprovalUsable(request, { consumer: 'marketing_publication' });
-    } catch (error) {
-      reasons.push(error instanceof Error ? error.message : String(error));
-    }
-  }
+  const sodRefusal =
+    request.status === 'approved'
+      ? approvalUsabilityRefusal(request, 'marketing_publication')
+      : undefined;
+  if (sodRefusal) reasons.push(sodRefusal);
   const expectedPayloadHash = computeApprovalPayloadHash(
     buildPublicationEffectPayload(input.approval)
   );
