@@ -272,6 +272,23 @@ describe('secure-io symlink canonicalization keeps the Vitest live-subtree remap
     expect(safeReadFile(`${liveRel}/state.json`)).toBe('{"ok":true}');
   });
 
+  it('still reads through a registered vault mount outside the repository, and never writes', async () => {
+    const os = await import('node:os');
+    const { mountToVault, unmountFromVault } = await import('./secret/vault-mount.js');
+    const host = fs.mkdtempSync(path.join(os.tmpdir(), 'secure-io-vault-'));
+    const name = `vitest-secure-io-${RUN}`;
+    fs.writeFileSync(path.join(host, 'doc.txt'), 'mounted');
+    try {
+      mountToVault(host, name);
+      expect(safeReadFile(`vault/mounts/${name}/doc.txt`)).toBe('mounted');
+      expect(() => safeWriteFile(`vault/mounts/${name}/new.txt`, 'x')).toThrow();
+      expect(fs.existsSync(path.join(host, 'new.txt'))).toBe(false);
+    } finally {
+      unmountFromVault(name);
+      fs.rmSync(host, { recursive: true, force: true });
+    }
+  });
+
   it('judges a link into the sandbox by the sandbox location, and allows it', () => {
     safeMkdir(scratchRel2);
     safeSymlinkSync(liveRel, `${scratchRel2}/live-link`, 'dir');

@@ -88,6 +88,11 @@ export function rawReadlinkSync(targetPath: string): string {
   return fs.readlinkSync(targetPath);
 }
 
+/** Canonical (all links resolved) path of an existing entry; throws when it does not resolve. */
+export function rawRealpathSync(targetPath: string): string {
+  return fs.realpathSync.native(targetPath);
+}
+
 export function rawSymlinkSync(target: string, linkPath: string): void {
   fs.symlinkSync(target, assertFoundationWritePath(linkPath));
 }
