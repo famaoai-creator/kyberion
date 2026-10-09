@@ -53,7 +53,7 @@ beforeAll(() => {
   safeWriteFile(path.join(fixture, 'a.ts'), "export const id: string = 'a';\n");
   safeWriteFile(path.join(fixture, 'b', 'index.ts'), "export const id: string = 'b';\n");
   safeWriteFile(path.join(fixture, 'c.mts'), "export const id: string = 'c';\n");
-  safeWriteFile(path.join(fixture, 'd.cts'), "exports.id = 'd' as string;\n");
+  safeWriteFile(path.join(fixture, 'd.cts'), "export const id: string = 'd';\n");
   safeWriteFile(path.join(fixture, 'plain.js'), "export const id = 'plain';\n");
   safeWriteFile(path.join(fixture, 'real', 'linked.ts'), "export const id: string = 'linked';\n");
   safeSymlinkSync(path.join(fixture, 'real', 'linked.ts'), path.join(fixture, 'linked.ts'));
