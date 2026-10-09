@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { stripVTControlCharacters } from 'node:util';
@@ -55,6 +55,40 @@ describe('mission orchestration dashboard contract', () => {
     expect(output).toContain('Vision:');
     expect(output).toContain('OKR:');
     expect(output).toContain('Approval audit:');
+  });
+
+  function expectCompanyOverview(text: string): void {
+    const output = stripVTControlCharacters(text);
+    expect(output).toContain('COMPANY OVERVIEW');
+    expect(output).toContain('Company:');
+    expect(output).toContain('Vision:');
+    expect(output).toContain('OKR:');
+    expect(output).toContain('Approval audit:');
+  }
+
+  it('prints the once-mode render through main(argv, print)', () => {
+    const printed: unknown[] = [];
+    dashboardScript.main(['--once', '--focus', 'onboarding'], (value) => printed.push(value));
+    expectCompanyOverview(printed.map((value) => String(value)).join('\n'));
+  });
+
+  it('routes --once through the CLI entry point to stdout without an exit code', async () => {
+    // runDashboard is the defineScript entry the `node scripts/sovereign_dashboard.ts`
+    // command runs: flag parsing, the bounded branch, and its log/clearOutput
+    // plumbing into the harness's console.log output.
+    const lines: string[] = [];
+    const log = vi.spyOn(console, 'log').mockImplementation((...values: unknown[]) => {
+      lines.push(values.map((value) => String(value)).join(' '));
+    });
+    const previousExitCode = process.exitCode;
+    try {
+      await dashboardScript.runDashboard(['--once', '--focus', 'onboarding']);
+      expect(process.exitCode).toBe(previousExitCode);
+    } finally {
+      log.mockRestore();
+      process.exitCode = previousExitCode;
+    }
+    expectCompanyOverview(lines.join('\n'));
   });
 
   it('shows mission intelligence in Chronos default view', () => {
