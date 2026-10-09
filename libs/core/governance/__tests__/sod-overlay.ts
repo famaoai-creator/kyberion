@@ -21,3 +21,9 @@ export function clearSeparationOfDuties(): void {
   sodOverlay.path = null;
   safeRmSync(overlayPath(), { force: true });
 }
+
+/** Replace the overlay with unparseable JSON (policy-read failure). */
+export function writeBrokenSeparationOfDutiesPolicy(): void {
+  safeWriteFile(overlayPath(), '{ not json');
+  sodOverlay.path = overlayPath();
+}

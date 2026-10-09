@@ -48,7 +48,11 @@ import {
   type RoutedDecision,
 } from '../governance/approval-decision-routing.js';
 import { approvalUsabilityRefusal } from '../governance/approval-linked-usability.js';
-import { loadApprovalRequest, type ApprovalRequestRecord } from '../governance/approval-store.js';
+import {
+  isSeparationOfDutiesEnabled,
+  loadApprovalRequest,
+  type ApprovalRequestRecord,
+} from '../governance/approval-store.js';
 import { VETO_WINDOW_DECIDER } from '../governance/approval-veto-window.js';
 import { auditChain } from '../governance/audit-chain.js';
 import {
@@ -889,6 +893,18 @@ export function runDotAutonomyStep(
       logger.warn(
         `promotion card ${pending.request_id} unreadable for ${c.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: retried next sweep | evidence: ${dotAutonomyStatePath(c)}`
       );
+    }
+    // An unreadable approval policy is not a separation-of-duties violation:
+    // leave the promotion pending (retried next sweep) instead of clearing it.
+    if (readable && approval && SETTLED_APPROVED.has(approval.status)) {
+      try {
+        isSeparationOfDutiesEnabled();
+      } catch (error) {
+        readable = false;
+        logger.warn(
+          `promotion card ${pending.request_id} not settled for ${c.dot_id} — ${error instanceof Error ? error.message : String(error)} | next: fix the approval policy; retried next sweep | evidence: ${dotAutonomyStatePath(c)}`
+        );
+      }
     }
     if (readable) {
       const human =
