@@ -460,6 +460,48 @@ describe('approval separation of duties', () => {
     ).toHaveLength(0);
   });
 
+  it('ON: when no usable candidate remains, the gate audits the most recently decided unusable approval', () => {
+    const correlationId = `sod-gate-latest-${process.pid}`;
+    const open = (title: string) =>
+      track(
+        createApprovalRequest('mission_controller', {
+          channel,
+          threadTs: title,
+          correlationId,
+          requestedBy: 'alice',
+          draft: { title, summary: 'gate candidate' },
+        })
+      );
+    const tick = () => {
+      const until = Date.now() + 5;
+      while (Date.now() < until) {
+        /* wait for the next millisecond tick */
+      }
+    };
+    setSeparationOfDuties(false);
+    const olderRequest = open('older');
+    tick();
+    const newerRequest = open('newer');
+    decide(newerRequest, 'alice');
+    tick();
+    decide(olderRequest, 'alice'); // decided last
+    setSeparationOfDuties(true);
+    const refused = enforceApprovalGate({
+      intentId: 'inspect-service',
+      operationId: 'inspect-service',
+      agentId: 'alice',
+      correlationId,
+      channel,
+      payload: { operation: 'restart', service: 'sod-latest' },
+    });
+    created.push(refused.requestId!);
+    const sodAudits = audit.mock.calls
+      .map(([entry]) => entry as { operation?: string; metadata?: { requestId?: string } })
+      .filter((entry) => entry.operation === 'separation_of_duties');
+    expect(sodAudits).toHaveLength(1);
+    expect(sodAudits[0]?.metadata?.requestId).toBe(olderRequest.id);
+  });
+
   it('ON: the agent prompt port opens a new request instead of reusing an unusable self-approval', () => {
     const port = createApprovalStorePromptPort();
     const request = {

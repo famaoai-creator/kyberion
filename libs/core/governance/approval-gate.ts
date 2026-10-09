@@ -470,15 +470,26 @@ export function enforceApprovalGate(
           (r: ApprovalRequestRecord) => !isLapsedRequest(r, now) && isUsableCandidate(r)
         );
   // Audit the refusal once — only when no usable candidate remains, i.e. on
-  // the call that opens the replacement request.
+  // the call that opens the replacement request — and for the most recently
+  // decided unusable approval.
+  const latestUnusable = unusable.reduce<ApprovalRequestRecord | undefined>(
+    (latest, r) =>
+      !latest ||
+      String(r.decidedAt ?? r.requestedAt) > String(latest.decidedAt ?? latest.requestedAt)
+        ? r
+        : latest,
+    undefined
+  );
   const staleRefusal =
-    !matched && unusable[0] ? approvalUsabilityRefusal(unusable[0], 'approval_gate') : undefined;
-  if (staleRefusal) {
+    !matched && latestUnusable
+      ? approvalUsabilityRefusal(latestUnusable, 'approval_gate')
+      : undefined;
+  if (staleRefusal && latestUnusable) {
     trace?.addEvent('approval.blocked', {
       operation_id: operationId,
       agent_id: agentId,
-      request_id: unusable[0]!.id,
-      request_status: unusable[0]!.status,
+      request_id: latestUnusable.id,
+      request_status: latestUnusable.status,
       reason: staleRefusal,
     });
   }
