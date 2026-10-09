@@ -12,11 +12,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  */
 const identity = vi.hoisted(() => ({ ownerPresent: true, displayName: 'Alice Example' }));
 
+// Separation of duties is switched through a customer overlay of the real
+// approval policy, the way an operator enables it.
+const sod = vi.hoisted(() => ({ overlayPath: null as string | null, file: '' }));
 vi.mock('@agent/core/customer-resolver', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/customer-resolver')>();
-  const { customerRootWithSodOverlay } =
-    await import('../libs/core/governance/__tests__/sod-overlay-state.js');
-  return { ...actual, customerRoot: customerRootWithSodOverlay(actual.customerRoot) };
+  return {
+    ...actual,
+    customerRoot: (subPath = '', ...rest: unknown[]) =>
+      subPath === 'policy/approval-policy.json' && sod.overlayPath
+        ? sod.overlayPath
+        : (actual.customerRoot as (...args: unknown[]) => string | null)(subPath, ...rest),
+  };
 });
 
 vi.mock('@agent/core/organization/member-registry', async (importOriginal) => {
@@ -58,13 +65,30 @@ import {
 } from '@agent/core/organization/tenant-governance';
 import { CLI_AGENT_SESSION_ENV } from '@agent/core/governance/cli-operator-principal';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeMkdir, safeRmSync } from '@agent/core/secure-io';
-import {
-  clearSeparationOfDuties,
-  setSeparationOfDuties,
-  useSeparationOfDutiesOverlay,
-} from '../libs/core/governance/__tests__/sod-overlay.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { main as kyberionHome } from './kyberion_home.js';
+
+function useSeparationOfDutiesOverlay(file: string): void {
+  sod.file = file;
+}
+
+function setSeparationOfDuties(enabled: boolean): void {
+  const product = JSON.parse(
+    String(
+      safeReadFile(pathResolver.knowledge('product/governance/approval-policy.json'), {
+        encoding: 'utf8',
+      })
+    )
+  );
+  safeMkdir(path.dirname(sod.file), { recursive: true });
+  safeWriteFile(sod.file, JSON.stringify({ ...product, separation_of_duties: { enabled } }));
+  sod.overlayPath = sod.file;
+}
+
+function clearSeparationOfDuties(): void {
+  sod.overlayPath = null;
+  if (sod.file) safeRmSync(sod.file, { force: true });
+}
 
 function plainTerminal(): void {
   for (const name of CLI_AGENT_SESSION_ENV) vi.stubEnv(name, '');
