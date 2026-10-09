@@ -52,6 +52,20 @@
       "note": "Storage-layout cache partition (personal): derived, re-generable data (digest-keyed sidecars, model/build trees). Deletion only costs a rebuild; anything that cannot be rebuilt belongs in runtime/ state instead."
     },
     {
+      "path": "active/shared/cache/system/ts-loader",
+      "artifact_class": "cache",
+      "ttl_days": 7,
+      "action": "delete",
+      "note": "Transpile cache of scripts/ts-loader.mjs (scripts/ts-loader-cache.mjs): one file per (loader version, TypeScript version, options, path, source hash), written by temp-file + rename. Every edit of a source adds an entry and orphans the old one, so a 7-day mtime TTL bounds growth; a deleted entry only costs one re-transpile. Repository code only (data trees active/, knowledge/, customer/, vault/ are never cached). Kill switch KYBERION_TS_LOADER_CACHE=0."
+    },
+    {
+      "path": "active/shared/cache/system/local-stt-discovery",
+      "artifact_class": "cache",
+      "ttl_days": 1,
+      "action": "delete",
+      "note": "Cross-process local STT discovery result (libs/core/local-stt-discovery.ts): one candidates.json rewritten atomically, keyed by platform, PATH and registry content, valid for KYBERION_STT_DISCOVERY_CACHE_TTL_MS (default 10 min). Host binary paths and versions only; deleting it costs one probe."
+    },
+    {
       "path": "active/shared/artifacts",
       "artifact_class": "report",
       "action": "review_required",
