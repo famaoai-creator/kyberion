@@ -1,5 +1,7 @@
 'use client';
 
+import { frontDeskFetch as fetch } from '../lib/front-desk-fetch';
+
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
 import { renderMessage } from '@agent/core/message-format';
@@ -11,7 +13,7 @@ import {
 } from '../lib/tenant-context';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { frontDeskText } from '../lib/i18n';
-import { attachFrontDeskAuthHeaders, isLoopbackHostname } from '../lib/front-desk-auth-token';
+import { getStoredFrontDeskToken, isLoopbackHostname } from '../lib/front-desk-auth-token';
 
 /**
  * FD-00c/FD-01c — the shared front-desk rail (plan §2.1/§2.2/§3 FD-00/FD-01).
@@ -115,23 +117,22 @@ export function FrontDeskRail() {
     setNav(null);
     setMe(null);
     const query = tenant ? `?tenant=${encodeURIComponent(tenant)}` : '';
-    return fetch(`/api/me${query}`, { headers: attachFrontDeskAuthHeaders() })
+    return fetch(`/api/me${query}`, { cache: 'no-store' })
       .then((res) => {
-        // FD-07 item 7: a remote (non-loopback) request with no/invalid
-        // token gets 401 from /api/me — send it to the "どなたですか？"
-        // sign-in screen. Loopback is server-bound and never 401s for a
-        // missing token, so this branch never fires there.
+        // A rejected bearer requires sign-in even on loopback. Never discard it
+        // and retry as the anonymous local operator.
         if (
           res.status === 401 &&
           typeof window !== 'undefined' &&
-          !isLoopbackHostname(window.location.hostname) &&
+          (getStoredFrontDeskToken() || !isLoopbackHostname(window.location.hostname)) &&
           window.location.pathname !== '/signin' &&
           window.location.pathname !== '/login' &&
           window.location.pathname !== '/setup/first-run'
         ) {
           const next = `${window.location.pathname}${window.location.search}`;
+          const signin = getStoredFrontDeskToken() ? '/signin' : '/login';
           window.location.assign(
-            next === '/' ? '/login' : `/login?next=${encodeURIComponent(next)}`
+            next === '/' ? signin : `${signin}?next=${encodeURIComponent(next)}`
           );
           return null;
         }
@@ -160,9 +161,7 @@ export function FrontDeskRail() {
     const generation = selectionGeneration.current;
     setNav(null);
     if (!me) return;
-    fetch(withSelectedTenant(`/api/front-desk/nav?locale=${locale}`, me.viewing?.tenant_slug), {
-      headers: attachFrontDeskAuthHeaders(),
-    })
+    fetch(withSelectedTenant(`/api/front-desk/nav?locale=${locale}`, me.viewing?.tenant_slug), {})
       .then((res) => (res.ok ? res.json() : null))
       .then((data: FrontDeskNavResponse | null) => {
         if (current && generation === selectionGeneration.current && data?.ok) setNav(data);

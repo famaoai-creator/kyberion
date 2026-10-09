@@ -1,6 +1,7 @@
 'use client';
 import * as React from 'react';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
+import { createOutcomeFileDownloadController } from '../lib/outcome-file-download';
 import { createOutcomeFilesController } from '../lib/outcome-files-client';
 import { createOutcomeFilesFocus } from '../lib/outcome-files-focus';
 export function OutcomeFiles({ entryId, revision }: { entryId: string; revision: string }) {
@@ -14,14 +15,29 @@ export function OutcomeFiles({ entryId, revision }: { entryId: string; revision:
     () => createOutcomeFilesController(entryId),
     [entryId, revision]
   );
+  const download = React.useMemo(
+    () => createOutcomeFileDownloadController(entryId),
+    [entryId, revision]
+  );
+  const downloadState = React.useSyncExternalStore(
+    download.subscribe,
+    download.getSnapshot,
+    download.getSnapshot
+  );
   const state = React.useSyncExternalStore(
     controller.subscribe,
     controller.getSnapshot,
     controller.getSnapshot
   );
   const focus = React.useMemo(() => createOutcomeFilesFocus(), []);
-  React.useEffect(() => () => controller.dispose(), [controller]);
-  React.useLayoutEffect(() => () => focus.cancel(), [controller, focus]);
+  React.useLayoutEffect(
+    () => () => {
+      controller.dispose();
+      download.dispose();
+      focus.cancel();
+    },
+    [controller, download, focus]
+  );
   React.useEffect(() => {
     const moved = (event: FocusEvent) => focus.moved(event.target);
     const pointed = (event: PointerEvent) => {
@@ -40,7 +56,8 @@ export function OutcomeFiles({ entryId, revision }: { entryId: string; revision:
     focus.complete(controller, state, panel.current, errorPanel.current);
   }, [controller, state, focus]);
   const loadFromControl = (event: React.MouseEvent<HTMLButtonElement>, append: boolean) => {
-    if (state.busy) return;
+    if (controller.getSnapshot().busy) return;
+    download.cancel();
     focus.begin(controller, event.currentTarget, append ? state.files.length : 0);
     void (append ? controller.loadMore() : controller.open());
   };
@@ -54,6 +71,7 @@ export function OutcomeFiles({ entryId, revision }: { entryId: string; revision:
         aria-controls={panelId}
         onClick={() => {
           focus.cancel();
+          download.cancel();
           if (state.open) controller.close();
           else void controller.open();
         }}
@@ -67,7 +85,7 @@ export function OutcomeFiles({ entryId, revision }: { entryId: string; revision:
         role="region"
         aria-labelledby={disclosureId}
         aria-live="polite"
-        aria-busy={state.busy}
+        aria-busy={state.busy || downloadState.busy}
         tabIndex={-1}
       >
         {state.open ? (
@@ -85,6 +103,7 @@ export function OutcomeFiles({ entryId, revision }: { entryId: string; revision:
                 </button>
               </div>
             ) : null}
+            {downloadState.error ? <p role="alert">{t('home.files_error')}</p> : null}
             {!state.busy && !state.error && state.total === 0 ? (
               <p>{t('home.files_empty')}</p>
             ) : null}
@@ -92,9 +111,18 @@ export function OutcomeFiles({ entryId, revision }: { entryId: string; revision:
               {state.files.map((file) => (
                 <li key={file.index} data-outcome-file-index={file.index}>
                   {file.status === 'available' ? (
-                    <a href={file.download_url} download>
+                    <button
+                      type="button"
+                      className="kb-btn kb-btn--secondary"
+                      aria-disabled={state.busy || downloadState.busy}
+                      aria-busy={downloadState.busy && downloadState.index === file.index}
+                      onClick={() => {
+                        if (!controller.getSnapshot().busy && !download.getSnapshot().busy)
+                          void download.download(file);
+                      }}
+                    >
                       {t('home.files_download', { name: file.name })}
-                    </a>
+                    </button>
                   ) : (
                     <span tabIndex={-1}>
                       {file.name ? file.name + ': ' : ''}
@@ -108,7 +136,7 @@ export function OutcomeFiles({ entryId, revision }: { entryId: string; revision:
                 </li>
               ))}
             </ul>
-            {state.busy ? <p>{t('home.files_loading')}</p> : null}
+            {state.busy || downloadState.busy ? <p>{t('home.files_loading')}</p> : null}
             {state.nextCursor && !state.error ? (
               <button
                 type="button"

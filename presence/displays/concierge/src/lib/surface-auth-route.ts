@@ -4,6 +4,8 @@ import { isLoopbackPeer } from './loopback-peer';
 import { getRegisteredEnvBool } from '@agent/core/foundation/env';
 import { resolveAuthClientKey } from '@agent/core/surface/surface-session-cookie';
 import { FIRST_RUN_SETUP_HREF, firstRunOpen } from './first-run-server';
+import { resolveLoginLocale } from '@agent/core/surface/surface-login-pages';
+import { FRONT_DESK_SIGNOUT_HEADERS, renderFrontDeskSignoutPage } from './front-desk-signout';
 
 export const CONCIERGE_SURFACE_ID = 'concierge';
 export const CONCIERGE_SURFACE_LABEL = 'Concierge';
@@ -36,7 +38,20 @@ export async function handleConciergeAuthRoute(req: NextRequest): Promise<Respon
       : {}),
   });
   if (!result) return new Response('Not found', { status: 404 });
-  const headers = new Headers(result.headers);
+  // Only the shared handler may authorize logout. Denials, unsupported methods,
+  // and every other auth route retain their original response unchanged.
+  const cleanup =
+    url.pathname === '/logout' &&
+    result.status === 302 &&
+    result.headers.Location === '/login?signedout=1';
+  const headers = new Headers(cleanup ? FRONT_DESK_SIGNOUT_HEADERS : result.headers);
   for (const cookie of result.setCookies) headers.append('Set-Cookie', cookie);
+  if (cleanup) {
+    const locale = resolveLoginLocale(
+      url.searchParams.get('lang'),
+      req.headers.get('accept-language')
+    );
+    return new Response(renderFrontDeskSignoutPage(locale), { status: 200, headers });
+  }
   return new Response(result.body || null, { status: result.status, headers });
 }

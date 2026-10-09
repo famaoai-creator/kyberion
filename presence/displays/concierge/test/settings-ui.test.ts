@@ -179,7 +179,7 @@ let client: ClientModule;
 let dom: ReturnType<typeof installFakeDom>;
 
 beforeAll(async () => {
-  dom = installFakeDom();
+  dom = installFakeDom({ sessionStorage: { getItem: () => null } });
   // The shared fake DOM has no <select>.options; react-dom reads it when a
   // controlled Select mounts. Local, test-only shim (option descendants).
   if (!Object.getOwnPropertyDescriptor(FakeElement.prototype, 'options')) {
