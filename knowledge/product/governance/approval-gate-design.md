@@ -46,31 +46,48 @@ mission brief
   - 依頼に依頼者の identity が記録されていない（`missing_requester`、fail closed）。
   - 決定者の identity が空、または surface の代替値（`missing_decider`）。代替値の一覧は
     `APPROVAL_PLACEHOLDER_DECIDERS`（`concierge`、`chronos-localadmin`、`sovereign-user` など）の 1 か所にある。
-  - 決定者の identity を呼び出し側が自由文字列で渡す surface（`unverified_decider`）。現在は MCP の
-    `kyberion.approval.decide` と approval-actuator の `decide` op がこれに当たり、決定に
-    `deciderIdentitySource: 'caller_supplied'` を記録する。ON ではこの 2 つから承認できない。
-- **ON・利用時**: 承認済みレコードを効果に変える箇所は、すべて `assertApprovalUsable(record)` で同じ判定を
-  やり直す。OFF のときに記録された自己承認などは、ON にした後では効果にならない（監査される）。
-  呼び出し箇所: `enforceApprovalGate`（一致した承認と session cache の両方）、`claimApprovalApply`、
-  project trust、DOT release と DOT dispatch、plugin view action の実行と plugin の有効化判定、MCP の
-  governed tool、pipeline の `core:await_decision` と `approval_ref` 束縛、mission の scope-approve と
-  reconcile-work、secret introduction、background review patch、peer runtime recovery、marketing
-  publication、held action の apply、agent prompt approval、system-actuator の computer 操作、
-  approval-actuator の `request_review`、および script 側の audit mirror reconcile、entity governance cleanup、
-  mission alignment gate、organization decision、security-policy の直接書き込み（`scripts/org.ts`）、personal workbench。
+  - 決定者の identity を呼び出し側が自由文字列で渡す surface（`unverified_decider`）。決定に
+    `deciderIdentitySource: 'caller_supplied'` を記録する surface は次の 2 つだけで、ON ではここから承認できない。
+    - `libs/core/governance/approval-cowork-adapter.ts`（MCP の `kyberion.approval.decide`）
+    - `libs/actuators/approval-actuator/src/approval-actuator-helpers.ts`（approval-actuator の `decide` op）
+  - mission brief の承認ページ（`scripts/mission-alignment-gate/serve-brief.ts`）は、ページの token が
+    所持しか証明しないため、決定者をページから受け取らない。CLI と同じ `resolveOperatorDisplayName()` で
+    サーバー側が決め、ページで入力された名前は note に残すだけ。
+- **ON・利用時**: 承認済みレコードを効果に変える箇所は、次の consumer id で同じ判定をやり直す
+  （`assertApprovalUsable` / `approvalUsabilityRefusal`、拒否は `use:<consumer id>` として監査）。OFF のときに
+  記録された自己承認などは、ON にした後では効果にならない。一覧は
+  `libs/core/governance/approval-sod-consumers.contract.test.ts` と一致させる。
+  - 承認ゲートと store: `approval_gate`、`approval_gate_session_cache`、`apply_claim`
+  - DOT: `dot_release`、`dot_dispatch`、`dot_autonomy_promotion`（拒否時は昇格待ちを監査付きで取り消す）、
+    `front_desk_execution`
+  - mission と discussion: `mission_scope_approve`、`mission_reconcile_work`、`discussion_mission`
+  - plugin と MCP: `plugin_view_action`、`mcp_governed_tool`（plugin の有効化判定は監査なしで判定し、
+    使えない承認は `pending_approval` にする）
+  - pipeline: `pipeline_await_decision`、`pipeline_bound_approval`
+  - その他の効果: `project_trust`、`secret_introduction`、`background_review_patch`、`peer_runtime_recovery`、
+    `marketing_publication`、`held_action_apply`（held action は取り消され、依存する held action も取り消される。
+    drain は他の held action を続ける）、`agent_prompt_approval`、`system_actuator_computer`、
+    `approval_actuator_request_review`
+  - script: `audit_mirror_reconcile`、`entity_governance_cleanup`、`mission_alignment_gate`、
+    `organization_decision`、`org_security_policy_write`（`scripts/org.ts`）、`personal_workbench`
 - **利用できない承認の扱い**: 承認済みレコードは取り消せない（cancel は pending だけが対象）。そのため
   利用時の拒否メッセージは「この承認は再利用されない。新しい承認を依頼し、別の、サーバーが識別した
-  principal に決定してもらう」と、分かる場合は再依頼の正確なコマンドを示す。`enforceApprovalGate` と
-  provider attestation の `--request-approval` と approval-actuator の `request_review` は、利用できない
-  承認済みレコードを再利用せず、新しい依頼を開く。
+  principal に決定してもらう」と、分かる場合は再依頼の正確なコマンドを示す（held action の場合は held action
+  自体を依頼し直すよう示す）。再依頼の入口（`enforceApprovalGate`、provider attestation の `--request-approval`、
+  approval-actuator の `request_review`、mission の scope-approve と reconcile-work、project trust、
+  background review、agent prompt）は、利用できない承認済みレコードを返さず、新しい依頼を開く。
+  承認ゲートは、使える候補が残っていないときだけ（新しい依頼を開くときに）1 回監査する。
 - 却下（`rejected`）は対象外。依頼者が自分の依頼を却下するのは取り下げにすぎない。
 - **比較する identity**: 依頼側は `requestedBy`、`requestedByContext.actorId`、`source.agentId` のすべて。
   決定側は `decidedBy`（staged workflow では承認済みの各 stage の `approvedBy` も）。どちらも NFKC 正規化・
   前後空白除去・小文字化し、principal 種別の接頭辞（`user:` `human:` `operator:` `member:` `principal:`
   `agent:` `service:` `persona:` `actor:` `policy:`）を外してから比較する。`user:alice` と `alice` は同じ principal。
-- **policy が読めないとき**: `approval-policy.json` が無い・壊れているときは、承認の決定と利用を
+- **policy が読めないとき（SoD が OFF でも）**: 承認の決定と、承認済みレコードの利用は、まず
+  `approval-policy.json` を読んで SoD の設定を確かめる。ファイルが無い・壊れているときは、SoD を OFF に
+  しているつもりでも、承認の決定と利用は
   `[POLICY_VIOLATION] approval decision blocked — approval-policy.json unreadable | next: fix <path> | evidence: <原因>`
-  で止める（却下は policy を読まないので通る）。
+  で止まる（fail closed）。却下は policy を読まないので通る。plugin の有効化判定だけは、例外を投げずに
+  `pending_approval` に落とし、診断の警告をログに出す（plugin 一覧や読み込みが止まらないように）。
 - **スコープ**: 設定は `approval-policy.json` 全体と同じく、有効な customer overlay
   （`customer/<slug>/policy/approval-policy.json`）がある場合はそれが product 既定を丸ごと置き換える。
   tenant・organization 単位の上書きはない（global 設定）。
@@ -88,6 +105,10 @@ mission brief
 - **依頼者が値を決められる誤一致（false positive）。** `requestedBy` などは依頼側が書くので、依頼者が承認者の
   identity を名乗ると、その承認者の承認が拒否される。拒否側に倒れるだけで承認が不正に通ることはないが、
   承認の妨害には使える。
+- **policy / service の決定者は別 principal として扱う。** veto window の自動決定（`policy:veto-window`）や
+  secret introduction の自動承認（`policy:secret-introduction-local-low-risk`）は人の名前ではないが、
+  代替値の一覧には入れていないので、依頼者と文字列が違えば「別の principal」とみなされ承認が通る。
+  これらの自動決定を SoD の対象にするかは、それぞれの policy（veto window、secret introduction の自動承認条件）で決める。
 - **対象外の承認経路。** approval-store を通らない独自の承認は設定の対象外。例:
   `scripts/service_recording.ts` の `review --approve`（recording に reviewer を直接書く）。
 - 確実に分離するには、承認を依頼者とは別の認証済み member（chronos / presence-studio の `user:<member_id>`）が行う。
