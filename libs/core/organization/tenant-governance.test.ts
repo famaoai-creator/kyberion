@@ -3,6 +3,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
 
+// Separation of duties is read from approval-policy.json; tests switch it on
+// through a customer overlay of the product policy (the real config path).
+const sod = vi.hoisted(() => ({ overlayPath: null as string | null }));
+vi.mock('../customer-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../customer-resolver.js')>();
+  return {
+    ...actual,
+    customerRoot: (subPath = '', ...rest: unknown[]) =>
+      subPath === 'policy/approval-policy.json' && sod.overlayPath
+        ? sod.overlayPath
+        : (actual.customerRoot as (...args: unknown[]) => string | null)(subPath, ...rest),
+  };
+});
+
 import { withExecutionContext } from '../authority.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { checkProviderEgress } from '../provider/provider-egress-gate.js';
@@ -20,7 +34,7 @@ import {
 } from '../governance/approval-store.js';
 import { readTenantProfile, recordTenantProviderAttestation } from './tenant-registry.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 
 describe('tenant lifecycle preserves provider policy state', () => {
   const parent = pathResolver.sharedTmp('tenant-governance-preserve-tests');
@@ -308,5 +322,61 @@ describe('training_use none attestations go through the human approval gate', ()
     expect(() => requestApproval({ valid_for_days: 365 } as never)).toThrow(
       /exceeds the policy attestation_ttl_days \(180\)/
     );
+  });
+
+  describe('with approval separation of duties switched on', () => {
+    const overlayPath = pathResolver.sharedTmp(`tenant-governance-sod-${process.pid}.json`);
+
+    beforeEach(() => {
+      const product = JSON.parse(
+        safeReadFile(pathResolver.knowledge('product/governance/approval-policy.json'), {
+          encoding: 'utf8',
+        }) as string
+      );
+      safeWriteFile(
+        overlayPath,
+        JSON.stringify({ ...product, separation_of_duties: { enabled: true } })
+      );
+      sod.overlayPath = overlayPath;
+    });
+
+    afterEach(() => {
+      sod.overlayPath = null;
+      safeRmSync(overlayPath, { force: true });
+    });
+
+    it('refuses a human approving the attestation they requested, and nothing is written', () => {
+      const request = withExecutionContext('sovereign_concierge', () =>
+        requestTenantProviderAttestationApproval({
+          ...claim,
+          rootDir,
+          invoker: { actor: 'human-owner' },
+        })
+      );
+      requestIds.push(request.request_id);
+      expect(() => decide(request.request_id, 'approved')).toThrow(
+        /\[POLICY_VIOLATION\] Separation of duties/
+      );
+      expect(record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: 'separation_of_duties',
+          result: 'denied',
+          metadata: expect.objectContaining({
+            requestId: request.request_id,
+            violation: 'self_approval',
+          }),
+        })
+      );
+      expect(() => apply(request.request_id)).toThrow(/is pending/);
+      expect(egress('beta')).toBe(false);
+    });
+
+    it('still applies an agent-requested attestation approved by a different human', () => {
+      const id = requestApproval();
+      decide(id, 'approved');
+      const result = apply(id);
+      expect(result.approval).toEqual({ request_id: id, approved_by: 'human-owner' });
+      expect(egress('beta')).toBe(true);
+    });
   });
 });

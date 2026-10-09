@@ -250,7 +250,18 @@ the test passes against the sandbox while the writer leaks into live state.
     and `--approval-request-id <id>` records it once. `used`/`unknown` never open egress and need only
     `--apply --accept`. `pnpm tenant attest-provider` follows the same rules, store and audit
     action (`tenant.attest_provider`, with actor and approver). Never attest or approve on the
-    operator's behalf. `pnpm onboarding llm show --tenant <slug>` and `tenant:activation plan`
+    operator's behalf.
+  - The `--request-approval` output prints the apply command with every bound value (plan,
+    basis, attested-by, valid-for-days) shell-quoted, so it applies as-is when pasted. A printed
+    follow-up command for a hash-bound approval must never elide a bound value (`...`): build
+    it from `providerAttestationApplyArgs` + `shellQuoteArg` in `tenant-governance.ts`.
+  - By default the requester may approve their own request. Setting
+    `separation_of_duties.enabled: true` in `approval-policy.json` (or the customer overlay)
+    makes the approval store refuse an approval whose decider equals the requester
+    (`[POLICY_VIOLATION] Separation of duties`, audited as `separation_of_duties` / `denied`).
+    A request with no recorded requester is refused while it is on (fail closed). The switch
+    is global, not per tenant or organization. See
+    [approval-gate-design](./approval-gate-design.md). `pnpm onboarding llm show --tenant <slug>` and `tenant:activation plan`
     (`llm_availability`) show which providers each tier can use. See
     [onboarding-flow Step 5.1](./onboarding-flow.md).
   - In `libs/core/mission/mission-llm.ts`, `runAdaptiveStructuredLlmProfile`,
@@ -301,6 +312,13 @@ the test passes against the sandbox while the writer leaks into live state.
    write to the shared ops-alert sink.
 3. For a new provider CLI invocation, assert in a test that argv carries the tool-disabling flags
    and no prompt text, and that the child's cwd is not the repository root.
+4. When a CLI prints a follow-up command for a hash-bound approval, test that the printed text,
+   split as a POSIX shell would, applies successfully once the request is approved (gate:
+   `scripts/onboarding_llm.test.ts` and `scripts/tenant.entrypoint.test.ts`).
+5. When you add an approval request creator, record the real requester identity in
+   `requestedBy` (and `requestedByContext.actorId`), never an empty string: with separation of
+   duties on, a request without a requester cannot be approved (gate:
+   `libs/core/governance/approval-separation-of-duties.test.ts`).
 
 ---
 
