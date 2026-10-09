@@ -13,7 +13,7 @@ import {
   createApprovalRequest,
   computeApprovalPayloadHash,
   expireApprovalRequest,
-  assertApprovalUsable,
+  evaluateApprovalUsability,
   isApprovalRequestExpired,
   isSeparationOfDutiesEnabled,
   listApprovalRequests,
@@ -24,6 +24,7 @@ import {
   type ApprovalRequestRecord,
   type ApprovalRequestSource,
 } from './approval-store.js';
+import { approvalUsabilityRefusal } from './approval-linked-usability.js';
 import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 import { auditChain } from './audit-chain.js';
 import type { TraceContext } from '../analysis/trace.js';
@@ -451,24 +452,14 @@ export function enforceApprovalGate(
   }
   // Separation of duties: an approved record whose decision fails the check
   // (e.g. a self-approval recorded while the setting was off) never grants
-  // the effect and never binds the correlation id — it is skipped (and the
-  // refusal audited by assertApprovalUsable), so a fresh request is opened
-  // below instead of leaving the operation stuck on an unusable approval.
+  // the effect and never binds the correlation id — it is skipped without
+  // auditing (this runs on every call), so a fresh request is opened below
+  // instead of leaving the operation stuck on an unusable approval.
+  const unusable: ApprovalRequestRecord[] = [];
   const isUsableCandidate = (r: ApprovalRequestRecord): boolean => {
-    if (r.status !== 'approved') return true;
-    try {
-      assertApprovalUsable(r, { consumer: 'approval_gate' });
-      return true;
-    } catch (error) {
-      trace?.addEvent('approval.blocked', {
-        operation_id: operationId,
-        agent_id: agentId,
-        request_id: r.id,
-        request_status: r.status,
-        reason: error instanceof Error ? error.message : String(error),
-      });
-      return false;
-    }
+    if (r.status !== 'approved' || !evaluateApprovalUsability(r)) return true;
+    unusable.push(r);
+    return false;
   };
   const matched =
     renewableExpiresAt === undefined
@@ -478,6 +469,19 @@ export function enforceApprovalGate(
       : sameCorrelation.find(
           (r: ApprovalRequestRecord) => !isLapsedRequest(r, now) && isUsableCandidate(r)
         );
+  // Audit the refusal once — only when no usable candidate remains, i.e. on
+  // the call that opens the replacement request.
+  const staleRefusal =
+    !matched && unusable[0] ? approvalUsabilityRefusal(unusable[0], 'approval_gate') : undefined;
+  if (staleRefusal) {
+    trace?.addEvent('approval.blocked', {
+      operation_id: operationId,
+      agent_id: agentId,
+      request_id: unusable[0]!.id,
+      request_status: unusable[0]!.status,
+      reason: staleRefusal,
+    });
+  }
 
   if (matched) {
     // An approved record that carries an expiry must not be reused past it —
@@ -587,13 +591,7 @@ export function enforceApprovalGate(
     (() => {
       if (!isSeparationOfDutiesEnabled()) return true;
       const seed = loadApprovalRequest(cached.storageChannel, cached.grantedByRequestId);
-      if (!seed) return false;
-      try {
-        assertApprovalUsable(seed, { consumer: 'approval_gate_session_cache' });
-        return true;
-      } catch {
-        return false;
-      }
+      return !!seed && !approvalUsabilityRefusal(seed, 'approval_gate_session_cache');
     })();
   if (cached && cachedUsable) {
     auditChain.record({

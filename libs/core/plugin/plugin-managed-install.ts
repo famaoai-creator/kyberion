@@ -35,6 +35,7 @@ import {
   type ApprovalRequestRecord,
 } from '../governance/approval-store.js';
 import { withExecutionContext } from '../authority.js';
+import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   findDisallowedOfficialOnlySeam,
@@ -83,6 +84,8 @@ import {
   safeStat,
   safeWriteFile,
 } from '../secure-io.js';
+
+const pluginInstallLogger = createLogger('plugin-managed-install');
 
 export interface PluginManifestDiagnostic {
   code: string;
@@ -575,8 +578,17 @@ function resolveActivationStatus(params: {
   if (params.integrity === 'legacy') return 'pending_approval';
   if (params.approval?.status !== 'approved') return 'pending_approval';
   // Separation of duties: an unusable approval does not activate. This runs
-  // on every plugin load, so it evaluates without auditing each pass.
-  return evaluateApprovalUsability(params.approval) ? 'pending_approval' : 'activatable';
+  // on every plugin load, so it evaluates without auditing each pass, and an
+  // unreadable approval policy degrades to pending instead of throwing out of
+  // plugin listing/loading.
+  try {
+    return evaluateApprovalUsability(params.approval) ? 'pending_approval' : 'activatable';
+  } catch (error) {
+    pluginInstallLogger.warn(
+      `plugin approval not usable — ${error instanceof Error ? error.message : String(error)} | next: fix the approval policy, then reload plugins | evidence: approval ${params.approval.id}`
+    );
+    return 'pending_approval';
+  }
 }
 
 function writeManagedRecord(managedDir: string, record: ManagedPluginRecord): void {
