@@ -30,8 +30,24 @@ import { fileURLToPath } from 'node:url';
 
 const CORE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'libs', 'core');
 
-const DEFAULT_EXPORT_PATTERN =
-  /(^|\n)\s*export\s+default\b|export\s*\{[^}]*\b(?:as\s+)?default\b[^}]*\}/u;
+/**
+ * Whether a module text exports a binding named `default`: `export default …`,
+ * `export * as default from`, or an export list entry `default` / `x as default`.
+ * `export { default as x }` re-exports another module's default under a new
+ * name and is not one (review L3).
+ */
+export function hasDefaultExport(text) {
+  if (/(^|[\n;{}])\s*export\s+default\b/u.test(text)) return true;
+  if (/export\s*\*\s*as\s+default\b/u.test(text)) return true;
+  for (const match of text.matchAll(/export\s*(?:type\s*)?\{([^}]*)\}/gu)) {
+    for (const specifier of match[1].split(',')) {
+      const parts = specifier.trim().split(/\s+/u).filter(Boolean);
+      if (parts.length === 1 && parts[0] === 'default') return true;
+      if (parts.length === 3 && parts[1] === 'as' && parts[2] === 'default') return true;
+    }
+  }
+  return false;
+}
 
 function isScopeOff(env) {
   return ['0', 'false', 'off'].includes(
@@ -57,7 +73,7 @@ export function buildDistScope(corePackage, readTarget = () => '') {
     }
     const file = target.slice(2);
     imports[key] = `./${file}`;
-    const hasDefault = DEFAULT_EXPORT_PATTERN.test(readTarget(file));
+    const hasDefault = hasDefaultExport(readTarget(file));
     shims.push({
       file,
       body: `export * from '../${file}';\n${hasDefault ? `export { default } from '../${file}';\n` : ''}`,
@@ -151,20 +167,40 @@ export function findDistScopeDrift({ coreDir = CORE_DIR, env = process.env } = {
   return drift.map((line) => `${line} — rebuild with \`pnpm --filter @agent/core run build\``);
 }
 
-// import.meta.main (Node >= 24.2) instead of comparing argv[1] with this
-// file's path: that comparison silently skipped the write under a symlinked
-// checkout. Only a direct run acts (an import, e.g. from a test, never writes);
-// the build passes --run explicitly, --check reports drift with exit code 1.
-if (import.meta.main) {
-  const cliArgs = process.argv.slice(2);
-  if (cliArgs.includes('--check')) {
-    const drift = findDistScopeDrift();
-    for (const line of drift) process.stderr.write(`[core-dist-scope] ${line}\n`);
-    process.exitCode = drift.length > 0 ? 1 : 0;
-  } else if (cliArgs.includes('--run')) {
-    writeDistScope();
-  } else {
-    process.stderr.write('usage: node scripts/write_core_dist_scope.mjs --run | --check\n');
-    process.exitCode = 2;
+/**
+ * What a module evaluation should do. `import.meta.main` (Node >= 24.2) tells a
+ * direct run from an import without comparing `process.argv[1]` with this
+ * file's path, which differ under a symlinked checkout and silently skipped the
+ * write (review M2). `package.json` engines still admits Node 24.0/24.1, where
+ * it is undefined: a direct run there fails loudly instead of doing nothing
+ * (review L2); an import (e.g. from a test) never acts.
+ */
+export function cliAction(main, argv = process.argv) {
+  const direct = main === true;
+  if (main === undefined) {
+    const entry = String(argv[1] ?? '');
+    return /(^|[\\/])write_core_dist_scope\.mjs$/u.test(entry) ? 'unsupported-node' : 'none';
   }
+  if (!direct) return 'none';
+  const args = argv.slice(2);
+  if (args.includes('--check')) return 'check';
+  if (args.includes('--run')) return 'run';
+  return 'usage';
+}
+
+const action = cliAction(import.meta.main);
+if (action === 'unsupported-node') {
+  process.stderr.write(
+    `[core-dist-scope] import.meta.main is undefined on Node ${process.version} — the dist-scope writer needs Node >= 24.2 | next: upgrade Node (package.json engines admits 24.0) | evidence: scripts/write_core_dist_scope.mjs\n`
+  );
+  process.exitCode = 1;
+} else if (action === 'check') {
+  const drift = findDistScopeDrift();
+  for (const line of drift) process.stderr.write(`[core-dist-scope] ${line}\n`);
+  process.exitCode = drift.length > 0 ? 1 : 0;
+} else if (action === 'run') {
+  writeDistScope();
+} else if (action === 'usage') {
+  process.stderr.write('usage: node scripts/write_core_dist_scope.mjs --run | --check\n');
+  process.exitCode = 2;
 }
