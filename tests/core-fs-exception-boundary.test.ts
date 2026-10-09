@@ -36,6 +36,12 @@ const allowedCoreFsImports = [
   'libs/core/pipeline/pipeline-scheduler.test.ts',
   'libs/core/environment-capability.test.ts',
   'libs/core/fs-primitives.ts',
+  // Private host caches (ts-loader transpile cache, STT discovery): they decide what
+  // gets executed, so they live in node_modules/.cache/, which secure-io refuses to
+  // every persona by design; owner/mode-checked raw fs on those directories only.
+  'libs/core/private-host-cache.mjs',
+  // Plants and inspects that private cache to prove a planted entry is never run.
+  'libs/core/local-stt-discovery.cache.test.ts',
   'libs/core/heuristic-feedback.test.ts',
   'libs/core/intent/intent-handoff.test.ts',
   'libs/core/jsonl-tail.test.ts',

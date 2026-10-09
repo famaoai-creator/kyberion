@@ -218,9 +218,6 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/apple-intelligence/',
   // Latest skill response for the reflex-terminal feedback loop (skill-wrapper).
   'shared/last_response.json',
-  // Cross-process local STT discovery cache (local-stt-discovery.ts): a test
-  // that enables it must not rewrite the operator's probe result.
-  'shared/cache/system/local-stt-discovery/',
 ];
 export const VITEST_LIVE_SANDBOX_ROOT = 'active/shared/runtime/vitest-live';
 /**
