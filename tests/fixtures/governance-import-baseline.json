@@ -170,6 +170,7 @@
     "tests/utils/assertion-extensions.ts",
     "tests/utils/test-utilities.test.ts",
     "tests/vitest-active-leak-guard.ts",
+    "tests/vitest-approval-store-guard.ts",
     "tests/vitest-network-guard.ts",
     "vitest.config.mts"
   ],

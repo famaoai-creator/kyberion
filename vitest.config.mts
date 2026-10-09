@@ -96,7 +96,8 @@ export default defineConfig({
     // combined-run flakes (writes landing in another suite's tmp root).
     pool: 'forks',
     maxWorkers: 4,
-    setupFiles: ['./tests/vitest-network-guard.ts'],
+    // The approval-store guard keeps per-pool approval state from leaking between files.
+    setupFiles: ['./tests/vitest-network-guard.ts', './tests/vitest-approval-store-guard.ts'],
     // Reports test writes that land in live state (active/, knowledge/personal/, customer/, …).
     globalSetup: ['./tests/vitest-active-leak-guard.ts'],
     coverage: {
