@@ -334,9 +334,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
    * candidate(s)" asks this instead.
    */
   liveCapabilities(): ReasoningLiveCapabilities {
-    // Ask the health registry per candidate provider: the argument-less
-    // `listDemotedProviders()` has no provider list to filter, so it cannot
-    // see a demotion on its own.
+    // Ask the health registry per candidate provider: the argument-less `listDemotedProviders()`
+    // has no provider list to filter, so it cannot see a demotion on its own.
     const now = Date.now();
     const live = this.candidates.filter((candidate) => {
       const provider = normalizeProviderName(candidate.provider);
