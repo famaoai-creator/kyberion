@@ -32,13 +32,19 @@ function makeTempRoot(): string {
   );
   // The org CLI loads @agent/core in a hermetic KYBERION_ROOT. Keep the
   // tracked schema catalog available there so module-level tenant-registry
-  // validation does not depend on the caller's real checkout path.
-  fs.symlinkSync(
+  // validation does not depend on the caller's real checkout path. Copied,
+  // not linked: secure-io refuses reads whose canonical path leaves the
+  // (fixture) repository root, so a link back into the real checkout fails.
+  fs.cpSync(
     path.join(workspaceRoot, 'knowledge', 'product', 'schemas'),
     path.join(root, 'knowledge', 'product', 'schemas'),
-    'dir'
+    { recursive: true }
   );
-  fs.symlinkSync(path.join(workspaceRoot, 'schemas'), path.join(root, 'schemas'), 'dir');
+  if (fs.existsSync(path.join(workspaceRoot, 'schemas'))) {
+    fs.cpSync(path.join(workspaceRoot, 'schemas'), path.join(root, 'schemas'), {
+      recursive: true,
+    });
+  }
   fs.writeFileSync(
     path.join(root, 'package.json'),
     JSON.stringify({ name: 'kyberion-test', private: true }, null, 2)
