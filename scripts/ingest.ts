@@ -3,7 +3,7 @@
  * scripts/ingest.ts — DA-05 explicit ingest ceremony CLI (案7 Hybrid
  * Sovereign Ledger). Drives the ingest-actuator handlers in-process:
  *
- *   parse_document → normalize_card → dedup (check) → ingest:commit → dedup (register)
+ *   parse_document → normalize_card → tenant ledger (check) → ingest:commit
  *
  * There is deliberately no auto-ingest / watch mode — an operator (or a
  * mission task) invokes this once per document, and the who/when/why is
@@ -18,8 +18,8 @@
  *
  * --dry-run stops before commit and prints what would happen (dedup check
  * runs in check-only mode — nothing is registered or written).
- * --root-dir is a test seam: tenant registry, ledger, landing root and dedup
- * registry all resolve under the given fixture root instead of the repo.
+ * --root-dir is a test seam: tenant registry, ledger and landing root
+ * all resolve under the given fixture root instead of the repo.
  *
  * Identity is explicit over implicit: without --ingested-by or an active
  * KYBERION_PERSONA / MISSION_ROLE, the ceremony refuses to run.
@@ -28,6 +28,7 @@
 import * as path from 'node:path';
 import {
   deriveAssetId,
+  findAssetByContentHash,
   findAssetBySource,
   tenantIngestKnowledgeRoot,
 } from '@agent/core/ingest-asset-ledger';
@@ -41,7 +42,6 @@ import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import {
   commitIngest,
-  dedupContent,
   normalizeCard,
   parseDocument,
   type IngestFormat,
@@ -323,11 +323,6 @@ export async function main(argv: string[] = [], print: Print = () => undefined):
   const sourceId = String(args.sourceId || path.basename(absFile)).trim();
   const fileStem = path.basename(absFile, path.extname(absFile));
   const relativeTarget = args.target || `ingest/${fileStem}.md`;
-  // In fixture mode the dedup registry moves under the fixture root too, so
-  // a --root-dir run never pollutes the real shared registry.
-  const registryPath = args.rootDir
-    ? path.join(rootDir, 'active/shared/runtime/ingest/content-hash-registry.jsonl')
-    : undefined;
 
   print(`[ingest] tenant=${args.tenant} file=${absFile} format=${format}`);
   print(`[ingest] source=${sourceSystem}::${sourceId} ingested_by=${ingestedBy}`);
@@ -354,8 +349,7 @@ export async function main(argv: string[] = [], print: Print = () => undefined):
 
   // 2.5 DA-06 PII gate (pre-check) + advisory tier proposal. The
   // authoritative gate lives inside ingest:commit; this early check keeps a
-  // blocked document from being registered in the dedup content-hash
-  // registry (which would mark the fixed re-ingest a duplicate).
+  // blocked document from being presented as ready to file by the dry-run.
   const scan = scanContent(normalized.card_markdown);
   const overrideRuleIds = String(args.overrideRules || '')
     .split(',')
@@ -392,17 +386,15 @@ export async function main(argv: string[] = [], print: Print = () => undefined):
     );
   }
 
-  // 3. dedup — check-only here. The content hash is registered only after the
-  // commit lands (step 5): registering first left a "seen" row behind whenever
-  // the commit failed, so the fixed re-ingest was misreported as a duplicate.
-  const dedupInput = {
-    content_sha256: ir.meta.content_sha256,
-    source_system: sourceSystem,
-    source_id: sourceId,
-    target_path: normalized.target_path,
-    ...(registryPath ? { registry_path: registryPath } : {}),
+  // 3. Only committed assets in the selected tenant prove a duplicate. A
+  // shared hash registry can suppress a valid import into another tenant and
+  // creates a second write that can fail after the card and ledger commit.
+  // Historical hashes retain the existing duplicate / --reparse semantics.
+  // Do not expose the matching record: this ceremony needs only its verdict.
+  const dedupCheck = {
+    duplicate: findAssetByContentHash(args.tenant, ir.meta.content_sha256, pathOptions) !== null,
+    registered: false,
   };
-  const dedupCheck = dedupContent({ ...dedupInput, register: false });
 
   const assetId = deriveAssetId(sourceSystem, sourceId);
   const prior = findAssetBySource(args.tenant, sourceSystem, sourceId, pathOptions);
@@ -475,8 +467,6 @@ export async function main(argv: string[] = [], print: Print = () => undefined):
     print(JSON.stringify(result, null, 2));
     return;
   }
-  // 5. register the content hash now that the card and ledger record exist.
-  dedupContent({ ...dedupInput, target_path: result.target_path, register: true });
   print(`[ingest] committed ${result.provenance_ref} → ${result.target_path}`);
   print(JSON.stringify(result.asset, null, 2));
 }
