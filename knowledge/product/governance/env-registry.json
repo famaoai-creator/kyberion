@@ -954,6 +954,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_CORE_DIST_SCOPE",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Core build step (scripts/write_core_dist_scope.mjs): 0 removes the generated libs/core/dist/package.json scope marker and #imports shims, so Node falls back to the 290KB libs/core/package.json for every dist module (old behaviour). Default on.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
       "name": "KYBERION_CURATION_ARCHIVE_HISTORY_PATH",
       "category": "path",
       "type": "path",
@@ -3688,6 +3697,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_STT_DISCOVERY_CACHE_TTL_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Lifetime of the cross-process local STT discovery cache (active/shared/cache/system/local-stt-discovery/). Default 600000 (10 min); 0 turns the disk cache off. Off under Vitest unless set.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
       "name": "KYBERION_STT_LANGUAGE",
       "category": "runtime",
       "type": "string",
@@ -4065,6 +4083,33 @@
       "description": "Trust x-forwarded-for and x-real-ip as the client peer for local-surface detection. Keep disabled unless a trusted reverse proxy overwrites these headers.",
       "documented": true,
       "subsystem": "surfaces"
+    },
+    {
+      "name": "KYBERION_TS_LOADER_CACHE",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Kill switch for the scripts/ts-loader.mjs transpile cache: 0/false/off transpiles every TypeScript module again in each process. Default on.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
+      "name": "KYBERION_TS_LOADER_CACHE_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Directory of the ts-loader transpile cache. Default active/shared/cache/system/ts-loader/ (cache floor, system partition); tests point it at a sandbox.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
+      "name": "KYBERION_TS_LOADER_FAST_RESOLVE",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "0 makes scripts/ts-loader.mjs hand workspace TypeScript resolutions back to Node's default resolver, which re-parses the nearest package.json exports map per module (old behaviour). Default on.",
+      "documented": true,
+      "subsystem": "runtime"
     },
     {
       "name": "KYBERION_TTS_ARGS",
