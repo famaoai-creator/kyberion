@@ -1,5 +1,10 @@
 import { withExecutionContext } from '../authority.js';
-import { createApprovalRequest, loadApprovalRequest } from '../governance/approval-store.js';
+import { approvalUsabilityRefusal } from '../governance/approval-linked-usability.js';
+import {
+  createApprovalRequest,
+  evaluateApprovalUsability,
+  loadApprovalRequest,
+} from '../governance/approval-store.js';
 import { issueChronosMissionFromProposal } from '../surface/surface-mission-proposals.js';
 import { loadArtifactRecord, saveArtifactRecord } from '../workforce/artifact-record.js';
 import { getWorkItem, updateWorkItem } from '../workforce/work-coordination.js';
@@ -81,6 +86,9 @@ function approvalStatus(
     if (!record) return 'unknown';
     if (record.status === 'pending') return 'pending';
     if (record.status === 'rejected') return 'rejected';
+    // Separation of duties: an approval that cannot be used is not shown as
+    // approved (no audit here — this runs on every view).
+    if (evaluateApprovalUsability(record)) return 'unknown';
     // approved / applied / failed all mean a human said yes.
     return 'approved';
   } catch {
@@ -122,6 +130,11 @@ export async function issueMissionForDiscussion(
     throw new DiscussionUserError('No mission start was requested for this discussion');
   if (mission.mission_id)
     throw new DiscussionUserError(`Mission already started: ${mission.mission_id}`);
+  const sodRefusal = approvalUsabilityRefusal(
+    loadApprovalRequest(mission.approval_channel, mission.approval_id),
+    'discussion_mission'
+  );
+  if (sodRefusal) throw new DiscussionUserError(sodRefusal);
   if (approvalStatus(room) !== 'approved') {
     throw new DiscussionUserError('The mission start has not been approved yet');
   }

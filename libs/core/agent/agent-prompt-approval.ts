@@ -10,6 +10,7 @@
 
 import { createHash } from 'node:crypto';
 import {
+  evaluateApprovalUsability,
   assertApprovalUsable,
   computeApprovalPayloadHash,
   createApprovalRequest,
@@ -50,7 +51,13 @@ export function createApprovalStorePromptPort(): AgentPromptApprovalPort {
       const existing = listApprovalRequests({
         storageChannels: [AGENT_PROMPT_APPROVAL_CHANNEL],
         status: ['pending', 'approved', 'rejected'],
-      }).find((record) => record.correlationId === correlationId && !record.applyResult);
+      }).find(
+        (record) =>
+          record.correlationId === correlationId &&
+          !record.applyResult &&
+          // Separation of duties: never hand back an approved record that cannot be used.
+          (record.status !== 'approved' || !evaluateApprovalUsability(record))
+      );
       if (existing) return { id: existing.id, created: false };
 
       const record = createApprovalRequest('mission_controller', {

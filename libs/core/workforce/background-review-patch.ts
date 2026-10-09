@@ -36,6 +36,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import {
+  evaluateApprovalUsability,
   assertApprovalUsable,
   computeApprovalPayloadHash,
   createApprovalRequest,
@@ -414,7 +415,9 @@ export function createBackgroundReviewApprovalRequest(
     (request) =>
       request.correlationId === candidateId &&
       request.accountability?.payloadHash === payloadHash &&
-      request.accountability?.effectBinding === effectBinding
+      request.accountability?.effectBinding === effectBinding &&
+      // Separation of duties: never hand back an approved record that cannot be used.
+      (request.status !== 'approved' || !evaluateApprovalUsability(request))
   );
   if (existing) return existing;
   return createApprovalRequest('mission_controller', {
