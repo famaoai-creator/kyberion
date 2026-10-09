@@ -1,7 +1,17 @@
 import { createHash } from 'node:crypto';
 import { unlinkSync } from 'node:fs';
 import * as path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+vi.mock('../customer-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../customer-resolver.js')>();
+  const { customerRootWithSodOverlay } =
+    await import('../governance/__tests__/sod-overlay-state.js');
+  return { ...actual, customerRoot: customerRootWithSodOverlay(actual.customerRoot) };
+});
+import {
+  clearSeparationOfDuties,
+  setSeparationOfDuties,
+} from '../governance/__tests__/sod-overlay.js';
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 import {
@@ -180,6 +190,56 @@ afterEach(() => {
 });
 
 describe('background-review-patch', () => {
+  it('re-request never hands back a self-approval that separation of duties makes unusable', () => {
+    const ref = targetRef('sod-rerequest');
+    const before = writePipeline(ref, {
+      action: 'pipeline',
+      name: 'background-review-patch-test',
+      version: '1.0.0',
+      steps: [{ id: 'before', role: 'sink', op: 'system:log', params: { message: 'before' } }],
+    });
+    const candidate = saveProposal({
+      candidateId: `PATCH-TEST-${process.pid}-SOD`,
+      targetRef: ref,
+      patch: {
+        operation: 'append_step',
+        step: { id: 'after', role: 'sink', op: 'system:log', params: { message: 'after' } },
+      },
+    });
+    const input = {
+      candidateId: candidate.candidate_id,
+      expectedSha256: createHash('sha256').update(before).digest('hex'),
+      requestedBy: 'operator-test',
+      missionId: 'MSN-BACKGROUND-REVIEW-PATCH-TEST',
+    };
+    try {
+      setSeparationOfDuties(false);
+      const first = createBackgroundReviewApprovalRequest(input);
+      createdApprovalRefs.push(first.id);
+      decideApprovalRequest('mission_controller', {
+        channel: first.channel,
+        storageChannel: first.storageChannel,
+        requestId: first.id,
+        decision: 'approved',
+        decidedBy: 'operator-test',
+        decidedByRole: 'sovereign',
+        authMethod: 'manual',
+        decidedByType: 'human',
+        authenticated: true,
+        payloadHash: first.accountability?.payloadHash,
+        effectBinding: first.accountability?.effectBinding,
+      });
+      expect(createBackgroundReviewApprovalRequest(input).id).toBe(first.id);
+      setSeparationOfDuties(true);
+      const second = createBackgroundReviewApprovalRequest(input);
+      createdApprovalRefs.push(second.id);
+      expect(second.id).not.toBe(first.id);
+      expect(second.status).toBe('pending');
+    } finally {
+      clearSeparationOfDuties();
+    }
+  });
+
   it('loads managed skill provenance through the canonical schema and skill binding', () => {
     const ref = writeManagedSkill('loader');
     const sidecar = pathResolver.rootResolve(
