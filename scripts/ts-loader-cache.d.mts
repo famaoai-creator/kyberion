@@ -22,3 +22,11 @@ export function transpileWithCache(
 export function isTrustedStat(stat: { uid: number; mode: number }, uid: number | null): boolean;
 
 export function preservesSymlinks(execArgv?: readonly string[], env?: NodeJS.ProcessEnv): boolean;
+
+export function resolvePrivateCacheDir(options: {
+  projectRoot: string;
+  name: string;
+  override?: string;
+  env?: NodeJS.ProcessEnv;
+  platform?: NodeJS.Platform;
+}): string | null;
