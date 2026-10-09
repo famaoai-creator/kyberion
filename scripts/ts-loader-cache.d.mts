@@ -20,3 +20,5 @@ export function transpileWithCache(
 ): { outputText: string; cacheHit: boolean };
 
 export function isTrustedStat(stat: { uid: number; mode: number }, uid: number | null): boolean;
+
+export function preservesSymlinks(execArgv?: readonly string[], env?: NodeJS.ProcessEnv): boolean;

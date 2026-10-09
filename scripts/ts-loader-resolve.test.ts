@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
+import { preservesSymlinks } from './ts-loader-cache.mjs';
 
 // Differential test for the loader's direct TypeScript resolution
 // (resolveTsSourceDirectly in scripts/ts-loader.mjs): with the switch on and
@@ -22,7 +23,10 @@ const SPECIFIERS = [
   '@agent/core/path-resolver', // workspace package (dist or source)
 ];
 
-function runProbe(fastResolve: '1' | '0'): {
+function runProbe(
+  fastResolve: '1' | '0',
+  extraEnv: NodeJS.ProcessEnv = {}
+): {
   status: number | null;
   stdout: string;
   stderr: string;
@@ -38,6 +42,7 @@ function runProbe(fastResolve: '1' | '0'): {
         ...process.env,
         KYBERION_TS_LOADER_FAST_RESOLVE: fastResolve,
         KYBERION_TS_LOADER_CACHE: '0',
+        ...extraEnv,
       },
     }
   );
@@ -91,4 +96,27 @@ describe('ts-loader direct TypeScript resolution', () => {
     expect(fastOut['./d.cjs'].id).toBe('d');
     expect(fastOut['./linked.js'].url).toContain('/real/linked.ts');
   }, 150_000);
+
+  it('stands aside under --preserve-symlinks given through NODE_OPTIONS (symlink URL kept)', () => {
+    const env = { NODE_OPTIONS: '--preserve-symlinks' };
+    const fast = runProbe('1', env);
+    const slow = runProbe('0', env);
+    expect(fast.status).toBe(0);
+    expect(slow.status).toBe(0);
+    const fastOut = JSON.parse(fast.stdout);
+    expect(fastOut).toEqual(JSON.parse(slow.stdout));
+    expect(fastOut['./linked.js'].url).not.toContain('/real/linked.ts');
+  }, 150_000);
+
+  it('detects every way of asking Node to preserve symlinks', () => {
+    expect(preservesSymlinks([], {})).toBe(false);
+    expect(preservesSymlinks(['--preserve-symlinks'], {})).toBe(true);
+    expect(preservesSymlinks(['--preserve-symlinks-main'], {})).toBe(true);
+    expect(
+      preservesSymlinks([], { NODE_OPTIONS: '--max-old-space-size=4096 --preserve-symlinks' })
+    ).toBe(true);
+    expect(preservesSymlinks([], { NODE_OPTIONS: '--preserve-symlinks-main' })).toBe(true);
+    expect(preservesSymlinks([], { NODE_PRESERVE_SYMLINKS: '1' })).toBe(true);
+    expect(preservesSymlinks([], { NODE_OPTIONS: '--import ./x.mjs' })).toBe(false);
+  });
 });

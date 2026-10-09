@@ -12,7 +12,13 @@ import { readFileSync, existsSync, realpathSync } from 'node:fs';
 import { dirname, extname, resolve as resolvePath } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { registerHooks } from 'node:module';
-import { transpileWithCache, tsLoaderFastResolveEnabled } from './ts-loader-cache.mjs';
+import {
+  preservesSymlinks,
+  transpileWithCache,
+  tsLoaderFastResolveEnabled,
+} from './ts-loader-cache.mjs';
+
+const PRESERVE_SYMLINKS = preservesSymlinks();
 
 const TS_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts']);
 const JS_LIKE_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']);
@@ -81,14 +87,14 @@ function resolveWorkspacePackageToSource(specifier) {
  * `libs/core/*.ts` module that is the ~290KB `libs/core/package.json`, about
  * half of a cold child's start-up. The load hook decides the format of these
  * files anyway, so nothing is lost. Same URL as the default resolver (realpath,
- * as without --preserve-symlinks); `KYBERION_TS_LOADER_FAST_RESOLVE=0` restores
+ * as without --preserve-symlinks; with it, in argv or NODE_OPTIONS, it stands aside); `KYBERION_TS_LOADER_FAST_RESOLVE=0` restores
  * the default-resolver path (differential test: ts-loader-resolve.test.ts).
  */
 function resolveTsSourceDirectly(candidate) {
   const ext = extname(candidate);
   if (!TS_EXTENSIONS.has(ext)) return null;
   if (!tsLoaderFastResolveEnabled()) return null;
-  if (process.execArgv.includes('--preserve-symlinks')) return null;
+  if (PRESERVE_SYMLINKS) return null;
   let real;
   try {
     real = realpathSync(candidate);
