@@ -11,7 +11,7 @@
 import { createHash } from 'node:crypto';
 import {
   evaluateApprovalUsability,
-  assertApprovalUsable,
+  approvalUsabilityRefusal,
   computeApprovalPayloadHash,
   createApprovalRequest,
   listApprovalRequests,
@@ -103,12 +103,7 @@ export function createApprovalStorePromptPort(): AgentPromptApprovalPort {
       if (record.decidedByType !== 'human') return 'closed';
       if (record.status === 'approved' || record.status === 'applied') {
         // Separation of duties: an unusable approval is never relayed.
-        try {
-          assertApprovalUsable(record, { consumer: 'agent_prompt_approval' });
-        } catch {
-          return 'closed';
-        }
-        return 'approved';
+        return approvalUsabilityRefusal(record, 'agent_prompt_approval') ? 'closed' : 'approved';
       }
       if (record.status === 'rejected') return 'rejected';
       return 'closed';
