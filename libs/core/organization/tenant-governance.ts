@@ -2,6 +2,10 @@ import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { auditChain } from '../governance/audit-chain.js';
 import {
+  resolveCliApprovalRequester,
+  type CliApprovalRequester,
+} from '../governance/cli-operator-principal.js';
+import {
   evaluateApprovalUsability,
   claimApprovalApply,
   computeApprovalPayloadHash,
@@ -176,6 +180,13 @@ export interface AttestationInvoker {
   actor: string;
   /** The tenant scope the invoking process was bound to, if any. */
   tenantSlug?: string;
+  /**
+   * The approval requester of a CLI invocation (`cli-operator-principal.ts`):
+   * the agent session or the local owner member. Absent for non-CLI callers.
+   */
+  approvalRequester?: CliApprovalRequester;
+  /** Why no approval requester could be resolved (separation of duties on). */
+  approvalRequesterError?: string;
 }
 
 /**
@@ -200,9 +211,19 @@ export function captureAttestationInvoker(): AttestationInvoker {
     persona && persona !== 'unknown'
       ? persona
       : getRegisteredEnvText('KYBERION_PERSONA')?.trim() || 'operator';
+  const actor = role ? `${base}:${role}` : base;
+  let approvalRequester: CliApprovalRequester | undefined;
+  let approvalRequesterError: string | undefined;
+  try {
+    approvalRequester = resolveCliApprovalRequester({ legacy: actor });
+  } catch (error) {
+    approvalRequesterError = error instanceof Error ? error.message : String(error);
+  }
   return {
-    actor: role ? `${base}:${role}` : base,
+    actor,
     ...(tenantSlug ? { tenantSlug } : {}),
+    ...(approvalRequester ? { approvalRequester } : {}),
+    ...(approvalRequesterError ? { approvalRequesterError } : {}),
   };
 }
 
@@ -474,8 +495,18 @@ export function requestTenantProviderAttestationApproval(
       approve_command: approveCommand(existing.id),
     };
   }
+  if (!input.actor && input.invoker?.approvalRequesterError) {
+    throw new Error(input.invoker.approvalRequesterError);
+  }
   const requestedBy =
-    input.actor || input.invoker?.actor || getRegisteredEnvText('KYBERION_PERSONA') || 'operator';
+    input.actor ||
+    input.invoker?.approvalRequester?.requestedBy ||
+    input.invoker?.actor ||
+    getRegisteredEnvText('KYBERION_PERSONA') ||
+    'operator';
+  const requestedByDisplayName = input.actor
+    ? undefined
+    : input.invoker?.approvalRequester?.requestedByDisplayName;
   // A stale approval must not open egress long after the decision context
   // moved on (72h, the scope-approve precedent).
   const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
@@ -496,6 +527,7 @@ export function requestTenantProviderAttestationApproval(
     threadTs: `${slug}:${provider}`,
     correlationId: effectBinding,
     requestedBy,
+    ...(requestedByDisplayName ? { requestedByDisplayName } : {}),
     expiresAt,
     kind: 'mission_gate',
     draft: {

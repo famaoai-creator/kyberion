@@ -5,8 +5,11 @@ import type { FirstJobDecisionProof } from '../surface/first-job-approval-proof.
 import { auditChain } from './audit-chain.js';
 import { resolveSeparationOfDutiesPolicy } from './approval-policy.js';
 import {
+  APPROVAL_PLACEHOLDER_DECIDERS,
+  approvalRequesterIdentities,
   assertApprovalUsable,
   auditSeparationOfDutiesRefusal,
+  normalizeApprovalPrincipalId,
   evaluateSeparationOfDuties,
   SEPARATION_OF_DUTIES_MESSAGES,
   type ApprovalDeciderIdentitySource,
@@ -204,9 +207,13 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   threadTs: string;
   correlationId: string;
   requestedBy: string;
+  /** Human-readable name of the requester (display only, never compared). */
+  requestedByDisplayName?: string;
   requestedAt: string;
   decidedAt?: string;
   decidedBy?: string;
+  /** Human-readable name of the decider (display only, never compared). */
+  decidedByDisplayName?: string;
   /** Durable copy of the decision identity used by fail-closed consumers. */
   decidedByType?: ApprovalRecord['decidedByType'];
   /** How the surface obtained `decidedBy` (see ApprovalDeciderIdentitySource). */
@@ -251,6 +258,19 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   changeRequest?: ApprovalChangeRequest;
   /** Autonomous-operation P1-7: present when silence after delivery lets the request proceed. */
   veto?: ApprovalVetoWindow;
+  /**
+   * Set by {@link revokeApprovalRequest}: the approval was withdrawn before it
+   * was applied. The status stays `approved` (the decision happened), but
+   * `evaluateApprovalUsability` refuses it for every consumer.
+   */
+  revocation?: ApprovalRevocation;
+}
+
+export interface ApprovalRevocation {
+  revokedBy: string;
+  revokedByDisplayName?: string;
+  revokedAt: string;
+  reason?: string;
 }
 
 export interface ApprovalChangeRequest {
@@ -462,6 +482,7 @@ export function validateHumanFinalDecision(params: {
 export {
   APPROVAL_PLACEHOLDER_DECIDERS,
   approvalRequesterIdentities,
+  approvalRevokeCommand,
   approvalUsabilityRefusal,
   assertApprovalUsable,
   evaluateApprovalUsability,
@@ -469,6 +490,7 @@ export {
   isSeparationOfDutiesEnabled,
   normalizeApprovalPrincipalId,
   type ApprovalDeciderIdentitySource,
+  type ApprovalUnusableReason,
   type SeparationOfDutiesViolation,
 } from './approval-separation-of-duties.js';
 
@@ -564,6 +586,8 @@ export function createApprovalRequest(
     threadTs: string;
     correlationId: string;
     requestedBy: string;
+    /** Display name of the requester (see `cli-operator-principal.ts`). */
+    requestedByDisplayName?: string;
     draft: ApprovalRequestDraft;
     sourceText?: string;
     kind?: ApprovalRequestRecord['kind'];
@@ -601,6 +625,9 @@ export function createApprovalRequest(
     threadTs: params.threadTs,
     correlationId: params.correlationId,
     requestedBy: params.requestedBy,
+    ...(params.requestedByDisplayName
+      ? { requestedByDisplayName: params.requestedByDisplayName }
+      : {}),
     requestedAt: nowIso(),
     status: 'pending',
     title: params.draft.title,
@@ -854,6 +881,115 @@ export function cancelApprovalRequestsBySource(
 }
 
 /**
+ * Withdraw an approval that was granted but not yet used: the record keeps
+ * `status: approved` (the decision happened and stays evidence) and gains a
+ * `revocation`, which every consumer's `evaluateApprovalUsability` check
+ * refuses. Only before any effect: a claimed or applied record, or a steering
+ * request whose effect starts at decision time, cannot be revoked.
+ *
+ * Who may revoke follows the approval accountability model — revoking only
+ * removes authority, so anyone accountable for the record may do it: its
+ * requester (withdrawing their own ask, as with cancel), any principal that
+ * approved it (withdrawing their own decision), or the local owner member
+ * (`revokerAuthority: 'owner'`, asserted only by a surface that resolved the
+ * owner server-side). Surface placeholders never prove identity. Audited to
+ * the audit chain and the channel's event log.
+ */
+export function revokeApprovalRequest(
+  role: GovernedArtifactRole,
+  params: {
+    channel: string;
+    storageChannel?: string;
+    requestId: string;
+    revokedBy: string;
+    revokedByDisplayName?: string;
+    revokerAuthority?: 'owner';
+    reason?: string;
+  }
+): ApprovalRequestRecord {
+  return withApprovalRecordLock(role, params, () => {
+    const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
+    const record = loadApprovalRequest(storageChannel, params.requestId);
+    if (!record)
+      throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+    const refuse = (why: string): never => {
+      throw new Error(`[POLICY_VIOLATION] Approval ${record.id} cannot be revoked: ${why}`);
+    };
+    if (record.revocation) refuse(`it was already revoked by ${record.revocation.revokedBy}`);
+    if (record.status === 'pending') refuse('it is still pending — cancel it instead');
+    if (record.status !== 'approved') refuse(`it is ${record.status}, not approved`);
+    if (record.applyClaim || record.applyResult) {
+      refuse('it was already claimed or applied, so its effect has started');
+    }
+    if (record.steering) refuse('its effect starts when it is approved (steering request)');
+    const revoker = normalizeApprovalPrincipalId(params.revokedBy);
+    if (!revoker || APPROVAL_PLACEHOLDER_DECIDERS.has(revoker)) {
+      refuse('the revoking identity is empty or a surface placeholder');
+    }
+    const accountable = new Set([
+      ...approvalRequesterIdentities(record),
+      ...[record.decidedBy, ...(record.workflow?.approvals ?? []).map((a) => a.approvedBy)]
+        .map(normalizeApprovalPrincipalId)
+        .filter(Boolean),
+    ]);
+    if (params.revokerAuthority !== 'owner' && !accountable.has(revoker)) {
+      refuse(
+        `${params.revokedBy} is neither its requester, one of its approvers, nor the local owner`
+      );
+    }
+    const revocation: ApprovalRevocation = {
+      revokedBy: params.revokedBy,
+      ...(params.revokedByDisplayName ? { revokedByDisplayName: params.revokedByDisplayName } : {}),
+      revokedAt: nowIso(),
+      ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+    };
+    const updated: ApprovalRequestRecord = { ...record, revocation };
+    writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, record.id), updated);
+    appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+      ts: revocation.revokedAt,
+      event: 'revoked',
+      request_id: record.id,
+      correlation_id: record.correlationId,
+      revoked_by: revocation.revokedBy,
+      revoker_authority: params.revokerAuthority ?? 'accountable_principal',
+      reason: revocation.reason,
+      channel: record.channel,
+      thread_ts: record.threadTs,
+    });
+    auditChain.record({
+      agentId: params.revokedBy,
+      action: 'approval_decision',
+      operation: 'revoke',
+      result: 'completed',
+      reason: revocation.reason ?? 'approval revoked before use',
+      correlationId: record.correlationId,
+      metadata: {
+        requestId: record.id,
+        channel: record.channel,
+        decidedBy: record.decidedBy,
+        requestedBy: record.requestedBy,
+        revokerAuthority: params.revokerAuthority ?? 'accountable_principal',
+      },
+    });
+    for (const [key, entry] of sessionApprovalCache) {
+      if (entry.grantedByRequestId === record.id) sessionApprovalCache.delete(key);
+    }
+    projectApprovalWorkerEvent(
+      'approval_response',
+      {
+        request_id: record.id,
+        correlation_id: record.correlationId,
+        status: 'cancelled',
+        decided_by: revocation.revokedBy,
+        channel: record.channel,
+      },
+      approvalWorkerEventSource(updated)
+    );
+    return updated;
+  });
+}
+
+/**
  * LC-10 (bridge ask-why): attach a rejection reason AFTER the decision was
  * recorded — bridges decide via a button first and ask "why" as a follow-up.
  * Updates the rejected workflow entry and appends a dedicated event so the
@@ -983,6 +1119,8 @@ function decideApprovalRequestUnlocked(
     requestId: string;
     decision: 'approved' | 'rejected';
     decidedBy: string;
+    /** Display name of the decider (see `cli-operator-principal.ts`). */
+    decidedByDisplayName?: string;
     decidedByRole?: string;
     authMethod?: ApprovalRecord['authMethod'];
     decidedByType?: 'human' | 'ai_agent' | 'service';
@@ -1148,6 +1286,7 @@ function decideApprovalRequestUnlocked(
   const {
     changeRequest: priorChangeRequest,
     decidedByIdentitySource: _priorIdentitySource,
+    decidedByDisplayName: _priorDisplayName,
     ...recordWithoutChangeRequest
   } = record;
   const updated: ApprovalRequestRecord = {
@@ -1158,6 +1297,7 @@ function decideApprovalRequestUnlocked(
     status: params.decision,
     decidedAt,
     decidedBy: params.decidedBy,
+    ...(params.decidedByDisplayName ? { decidedByDisplayName: params.decidedByDisplayName } : {}),
     ...(params.deciderIdentitySource
       ? { decidedByIdentitySource: params.deciderIdentitySource }
       : {}),

@@ -2,6 +2,7 @@
  * Adopt work completed outside dispatch-workitems without weakening the mission exit gate.
  */
 
+import { resolveCliApprovalRequester } from '../governance/cli-operator-principal.js';
 import * as nodePath from 'node:path';
 import { appendMissionExecutionLedgerEntry } from './mission-team-binding.js';
 import {
@@ -304,11 +305,15 @@ export function createMissionWorkReconciliationApprovalRequest(input: {
   );
   if (existing) return existing;
 
-  const requestedBy =
-    input.requestedBy?.trim() ||
-    getRegisteredEnvText('KYBERION_PERSONA') ||
-    getRegisteredEnvText('USER') ||
-    'mission_controller';
+  // CLI-opened (mission_controller): the agent session or the local owner
+  // member, so a human deciding an agent's request is never a self-approval.
+  const requestedBy = resolveCliApprovalRequester({
+    explicit: input.requestedBy,
+    legacy:
+      getRegisteredEnvText('KYBERION_PERSONA') ||
+      getRegisteredEnvText('USER') ||
+      'mission_controller',
+  }).requestedBy;
   return createApprovalRequest('mission_controller', {
     channel: MISSION_RECONCILIATION_APPROVAL_CHANNEL,
     storageChannel: MISSION_RECONCILIATION_APPROVAL_CHANNEL,

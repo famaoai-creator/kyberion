@@ -1024,7 +1024,7 @@ async function printApprovalRequests(channelArg?: string): Promise<void> {
     printText(`- ${chalk.bold(request.id)} [${request.kind}]`);
     printText(`  ${request.title}`);
     printText(
-      `  status: ${request.status} · channel: ${request.storageChannel} · requested by: ${request.requestedBy}`
+      `  status: ${request.status} · channel: ${request.storageChannel} · requested by: ${request.requestedBy}${request.requestedByDisplayName ? ` (${request.requestedByDisplayName})` : ''}`
     );
     if (request.target) {
       printText(
@@ -1063,8 +1063,8 @@ async function applyApprovalDecision(
     });
   }
 
-  const { decideApprovalRequest, listApprovalRequests } =
-    await import('@agent/core/governance/approval-store');
+  const { listApprovalRequests } = await import('@agent/core/governance/approval-store');
+  const { decideApprovalFromCli } = await import('./lib/approval-cli-decision.js');
   const requests = listApprovalRequests({
     storageChannels: channelArg ? [channelArg] : undefined,
     status: 'pending',
@@ -1079,18 +1079,8 @@ async function applyApprovalDecision(
   }
 
   const decision = command === 'approve' ? 'approved' : 'rejected';
-  const decided = decideApprovalRequest('mission_controller', {
-    channel: request.channel,
-    storageChannel: request.storageChannel,
-    requestId: request.id,
+  const decided = decideApprovalFromCli(request, {
     decision,
-    decidedBy: resolveOperatorDisplayName(),
-    decidedByRole: 'sovereign',
-    authMethod: 'manual',
-    decidedByType: 'human',
-    authenticated: true,
-    payloadHash: request.accountability?.payloadHash,
-    effectBinding: request.accountability?.effectBinding,
     note: `decision submitted from terminal via pnpm kyberion ${command}`,
   });
 
@@ -1113,9 +1103,15 @@ async function applyApprovalDecision(
 
 async function requestProjectTrust(inputPath: string, json = false): Promise<void> {
   const { createProjectTrustApprovalRequest } = await import('@agent/core/project/project-trust');
+  const { resolveCliApprovalRequester } =
+    await import('@agent/core/governance/cli-operator-principal');
+  const requester = resolveCliApprovalRequester({ legacy: resolveOperatorDisplayName() });
   const record = createProjectTrustApprovalRequest({
     inputPath,
-    requestedBy: resolveOperatorDisplayName(),
+    requestedBy: requester.requestedBy,
+    ...(requester.requestedByDisplayName
+      ? { requestedByDisplayName: requester.requestedByDisplayName }
+      : {}),
   });
   if (json) {
     printText(JSON.stringify(record, null, 2));
