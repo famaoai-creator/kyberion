@@ -36,6 +36,8 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import {
+  evaluateApprovalUsability,
+  assertApprovalUsable,
   computeApprovalPayloadHash,
   createApprovalRequest,
   loadApprovalRequest,
@@ -311,6 +313,7 @@ function assertApprovedBackgroundReviewEffect(input: {
       `[POLICY_VIOLATION] Background-review approval request is not approved: ${input.approvalRef}`
     );
   }
+  assertApprovalUsable(request, { consumer: 'background_review_patch' });
   const payload = approvalPayload(input);
   const payloadHash = computeApprovalPayloadHash(payload);
   const effectBinding = approvalEffectBinding(input.candidateId, input.expectedSha256);
@@ -412,7 +415,9 @@ export function createBackgroundReviewApprovalRequest(
     (request) =>
       request.correlationId === candidateId &&
       request.accountability?.payloadHash === payloadHash &&
-      request.accountability?.effectBinding === effectBinding
+      request.accountability?.effectBinding === effectBinding &&
+      // Separation of duties: never hand back an approved record that cannot be used.
+      (request.status !== 'approved' || !evaluateApprovalUsability(request))
   );
   if (existing) return existing;
   return createApprovalRequest('mission_controller', {

@@ -313,8 +313,10 @@ pnpm onboarding llm attest --tenant <tenant-slug> --provider claude --training-u
 pnpm onboarding llm attest ...（同じ値） --request-approval
 # 3. 人間が承認する（エージェントは代わりに承認しない）
 pnpm kyberion approvals --approve <request-id>
-# 4. 同じ値で、人間の受け入れとして記録する
-pnpm onboarding llm attest ...（同じ値） --apply --accept --approval-request-id <request-id>
+# 4. 手順 2 で表示された記録コマンド（全値がクォート済み）をそのまま実行し、人間の受け入れとして記録する
+pnpm onboarding llm attest --tenant <tenant-slug> --provider claude --training-use none \
+  --plan '<契約プラン名>' --basis '<規約の URL>' --attested-by human:<owner> --valid-for-days 180 \
+  --apply --accept --approval-request-id <request-id>
 ```
 
 - `--provider` は `provider-egress-policy.json` に宣言された id だけを受け付ける。`--training-use none`
@@ -322,6 +324,19 @@ pnpm onboarding llm attest ...（同じ値） --apply --accept --approval-reques
 - 承認依頼は tenant・provider・training_use・plan・basis・attested-by・有効日数に hash で結び付く。
   承認済みで期限内（72 時間）の依頼で、値が完全に一致するときだけ記録される。未承認・却下・値の違う依頼は
   拒否され、同じ承認は 1 回しか使えない。承認は認証済みの人間だけが行え、エージェントの決定は承認ストアが拒否する。
+- 既定では、依頼者本人が承認しても通る（1 人の operator で運用する前提）。依頼者と承認者を必ず分けたい場合は
+  `approval-policy.json` の `separation_of_duties.enabled` を `true` にする（customer overlay
+  `customer/<slug>/policy/approval-policy.json` でもよい）。ON にすると、依頼者と同じ identity による承認は
+  `[POLICY_VIOLATION] Separation of duties` で拒否・監査され、依頼は pending のまま残る。OFF のときに
+  本人が承認した依頼は、ON にした後の手順 4 で拒否される。そのときはメッセージに出る `--request-approval`
+  付きのコマンドで新しい依頼を作り（古い承認は再利用されない）、別の人に承認してもらう。
+  - 既知の限界: 比較は記録された identity 文字列で行う。既定の CLI 経路では依頼者は CLI を実行した persona
+    （例 `sovereign`）、承認者は onboarding identity の名前になるため、同じ人が両方を行っても検出できない。
+    確実に分けるには、承認を chronos / presence-studio の認証済み member（`user:<member_id>`）が行う。
+    詳細は [approval-gate-design の職務分離](./approval-gate-design.md#職務分離separation-of-duties)。
+- 手順 2 の出力にある記録コマンドは POSIX シェル（sh / bash / zsh）用で、plan・basis・attested-by・有効日数を
+  含むすべての値をクォートして表示する。承認は値の hash に結び付くので、表示されたコマンドをそのまま貼り付けて
+  実行する。値にバックスラッシュや制御文字は使えない（入力時に拒否される）。
 - `--training-use used` / `unknown` は送信を開かないので、承認なしで `--apply --accept` だけで記録できる。
 - attestation は tenant profile（`knowledge/personal/tenants/<tenant-slug>.json` の
   `provider_attestations`）に保存され、監査台帳に `tenant.attest_provider` として、実行者と（承認済みなら）

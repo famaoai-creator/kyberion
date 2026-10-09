@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import { loadApprovalRequest } from '@agent/core/governance/approval-store';
+import { assertApprovalUsable, loadApprovalRequest } from '@agent/core/governance/approval-store';
 import {
   loadAuthorityRoleIndex as loadGovernedAuthorityRoleIndex,
   loadTeamRoleIndex as loadGovernedTeamRoleIndex,
@@ -797,6 +797,7 @@ function assertSecurityPolicyApproval(approvalId?: string): void {
       `[POLICY_VIOLATION] Approval '${approvalId}' is not an authenticated human approval bound to security-policy.json.`
     );
   }
+  assertApprovalUsable(approval, { consumer: 'org_security_policy_write' });
 }
 
 function upsertSecurityPolicy(

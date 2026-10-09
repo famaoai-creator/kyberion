@@ -1,4 +1,18 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+vi.mock('../customer-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../customer-resolver.js')>();
+  const { customerRootWithSodOverlay } =
+    await import('../governance/__tests__/sod-overlay-state.js');
+  return { ...actual, customerRoot: customerRootWithSodOverlay(actual.customerRoot) };
+});
+import {
+  clearSeparationOfDuties,
+  setSeparationOfDuties,
+  writeBrokenSeparationOfDutiesPolicy,
+  useSeparationOfDutiesOverlay,
+} from '../governance/__tests__/sod-overlay.js';
+import { pathResolver } from '../path-resolver.js';
+
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 
@@ -157,6 +171,11 @@ function dispatchDeps(base: DotDecisionLevel, now = T0): DotDispatchDeps {
 afterEach(() => {
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
 });
+
+// Per-test overlay file for switching separation of duties on/off.
+useSeparationOfDutiesOverlay(
+  pathResolver.sharedTmp(`sod-overlay-dot-autonomy-${process.pid}.json`)
+);
 
 describe('dot autonomy levels and state', () => {
   it('registers floor, relaxer, status and digest sections', () => {
@@ -674,6 +693,75 @@ describe('dot autonomy supervisor step', () => {
     expect(promoted.change).toMatchObject({ from: 'L2', to: 'L3' });
     expect(human.audits).toContain('promote');
     expect(dotAutonomyLevel(CHARTER, { rootDir: TEST_ROOT })).toBe('L3');
+  });
+
+  it('clears a pending promotion with an audited reason when separation of duties refuses the approval', () => {
+    const start = new Date(T0.getTime() - 86_400_000);
+    setLevel('L2', {}, start);
+    feedback('approved', new Date(T0.getTime() - 3_000), 'a1');
+    feedback('approved', new Date(T0.getTime() - 2_000), 'a2');
+    outcome('improved', new Date(T0.getTime() - 1_000), 'o1');
+    expect(runDotAutonomyStep(CHARTER, stepDeps(T0).deps).promotion_requested?.to).toBe('L3');
+    const selfApproved = {
+      id: 'req-promo',
+      status: 'approved',
+      requestedBy: 'famao',
+      decidedBy: 'famao',
+      decidedByType: 'human',
+      correlationId: 'promo',
+      channel: 'operator',
+    } as ApprovalRequestRecord;
+    try {
+      setSeparationOfDuties(true);
+      const later = stepDeps(new Date(T0.getTime() + 60_000), { loadApproval: () => selfApproved });
+      const step = runDotAutonomyStep(CHARTER, later.deps);
+      expect(step.change).toBeUndefined();
+      expect(step.level).toBe('L2');
+      expect(step.promotion_cleared).toMatch(/^separation of duties: .*same principal/);
+      expect(later.audits).toContain('promotion_cleared');
+      expect(
+        readDotAutonomyState(CHARTER, { rootDir: TEST_ROOT }).pending_promotion
+      ).toBeUndefined();
+    } finally {
+      clearSeparationOfDuties();
+    }
+  });
+
+  it('keeps a pending promotion (no audit) when the approval policy is unreadable', () => {
+    const start = new Date(T0.getTime() - 86_400_000);
+    setLevel('L2', {}, start);
+    feedback('approved', new Date(T0.getTime() - 3_000), 'a1');
+    feedback('approved', new Date(T0.getTime() - 2_000), 'a2');
+    outcome('improved', new Date(T0.getTime() - 1_000), 'o1');
+    expect(runDotAutonomyStep(CHARTER, stepDeps(T0).deps).promotion_requested?.to).toBe('L3');
+    const approved = {
+      id: 'req-promo',
+      status: 'approved',
+      requestedBy: 'dot:org-ops',
+      decidedBy: 'famao',
+      decidedByType: 'human',
+      correlationId: 'promo',
+      channel: 'operator',
+    } as ApprovalRequestRecord;
+    try {
+      setSeparationOfDuties(true);
+      writeBrokenSeparationOfDutiesPolicy();
+      const later = stepDeps(new Date(T0.getTime() + 60_000), { loadApproval: () => approved });
+      const step = runDotAutonomyStep(CHARTER, later.deps);
+      expect(step.change).toBeUndefined();
+      expect(step.promotion_cleared).toBeUndefined();
+      expect(later.audits).not.toContain('promotion_cleared');
+      expect(
+        readDotAutonomyState(CHARTER, { rootDir: TEST_ROOT }).pending_promotion?.request_id
+      ).toBe('req-promo');
+
+      // Policy fixed: a legitimate approval by someone else now promotes.
+      setSeparationOfDuties(true);
+      const fixed = stepDeps(new Date(T0.getTime() + 120_000), { loadApproval: () => approved });
+      expect(runDotAutonomyStep(CHARTER, fixed.deps).change).toMatchObject({ to: 'L3' });
+    } finally {
+      clearSeparationOfDuties();
+    }
   });
 
   it('never opens a promotion card beyond max_level or below the policy bar', () => {

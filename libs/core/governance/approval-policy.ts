@@ -4,6 +4,9 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { isInjectionSuspected } from '../injection-signal.js';
 import { resolveConfiguredPosture } from '../security-screen.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('approval-policy');
 
 export interface ApprovalPolicyRule {
   id: string;
@@ -18,6 +21,10 @@ export interface ApprovalPolicyRule {
 
 interface ApprovalPolicyFile {
   version?: string;
+  /** See {@link resolveSeparationOfDutiesPolicy}. */
+  separation_of_duties?: {
+    enabled: boolean;
+  };
   rules?: ApprovalPolicyRule[];
   defaults?: {
     requires_approval?: boolean;
@@ -91,6 +98,64 @@ const HARD_CODED_DANGEROUS_RULES: Array<{
 
 export function loadApprovalPolicy(): ApprovalPolicyFile {
   return approvalPolicyCatalog.load();
+}
+
+/**
+ * Separation of duties for approval decisions (default off).
+ *
+ * When enabled, an approving decision whose decider identity equals the
+ * request's requester identity is refused — the choke point is
+ * `decideApprovalRequest` in `approval-store.ts`. The setting lives in
+ * `approval-policy.json` and therefore follows that file's existing scoping:
+ * the active customer overlay (`customer/{slug}/policy/approval-policy.json`)
+ * replaces the product default wholesale. There is no per-tenant or
+ * per-organization override.
+ */
+/** Whether any approval-policy.json exists (customer overlay or product default). */
+function approvalPolicyFilePresent(): boolean {
+  const customerPolicyPath = customerResolver.customerRoot('policy/approval-policy.json');
+  const candidates = [
+    ...(customerPolicyPath ? [customerPolicyPath] : []),
+    pathResolver.knowledge('product/governance/approval-policy.json'),
+  ];
+  return candidates.some((candidate) =>
+    safeExistsSync(assertSafeRepositoryPath(candidate, { allowMissingLeaf: true }))
+  );
+}
+
+let missingPolicyLogged = false;
+
+export function resolveSeparationOfDutiesPolicy(): { enabled: boolean } {
+  // No policy file at all (e.g. a scratch root without the knowledge tree):
+  // use the shipped default — separation of duties off — which grants
+  // nothing beyond today's behaviour. Only a file that is present but
+  // unreadable or schema-invalid fails closed below.
+  if (!approvalPolicyFilePresent()) {
+    if (!missingPolicyLogged) {
+      missingPolicyLogged = true;
+      logger.debug(
+        'approval-policy.json not found — separation_of_duties uses the shipped default (off)'
+      );
+    }
+    return { enabled: false };
+  }
+  let policy: ApprovalPolicyFile;
+  try {
+    policy = loadApprovalPolicy();
+  } catch (error) {
+    // A present but unreadable / schema-invalid policy fails closed, with the
+    // reason: the store cannot know whether separation of duties applies.
+    let policyPath = 'knowledge/product/governance/approval-policy.json';
+    try {
+      policyPath = approvalPolicyCatalog.path();
+    } catch {
+      /* keep the product default path in the message */
+    }
+    throw new Error(
+      `[POLICY_VIOLATION] approval decision blocked — approval-policy.json unreadable | next: fix ${policyPath} (schema: knowledge/product/schemas/approval-policy.schema.json) | evidence: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  return { enabled: policy.separation_of_duties?.enabled === true };
 }
 
 export function resolveApprovalPolicy(input: {

@@ -4,6 +4,8 @@ import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 
 import {
+  evaluateApprovalUsability,
+  assertApprovalUsable,
   computeApprovalPayloadHash,
   createApprovalRequest,
   isApprovalRequestExpired,
@@ -173,7 +175,9 @@ export function createProjectTrustApprovalRequest(params: {
   }).find(
     (record) =>
       isProjectTrustRequest(record, resolved.relative) &&
-      record.accountability?.payloadHash === payloadHash
+      record.accountability?.payloadHash === payloadHash &&
+      // Separation of duties: never hand back an approved record that cannot be used.
+      (record.status !== 'approved' || !evaluateApprovalUsability(record))
   );
   if (existing && !isApprovalRequestExpired(existing)) return existing;
 
@@ -236,6 +240,7 @@ export function assertProjectTrustApproval(requestId: string, inputPath: string)
       `[TRUST_REQUIRED] project-trust request ${record.id} lacks an authenticated human decision`
     );
   }
+  assertApprovalUsable(record, { consumer: 'project_trust' });
   const hash = contentHash(resolved.absolute);
   const expectedPayloadHash = computeApprovalPayloadHash(bindingPayload(resolved.relative, hash));
   if (record.accountability.payloadHash !== expectedPayloadHash) {

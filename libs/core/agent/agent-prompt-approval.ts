@@ -10,6 +10,8 @@
 
 import { createHash } from 'node:crypto';
 import {
+  evaluateApprovalUsability,
+  approvalUsabilityRefusal,
   computeApprovalPayloadHash,
   createApprovalRequest,
   listApprovalRequests,
@@ -49,7 +51,13 @@ export function createApprovalStorePromptPort(): AgentPromptApprovalPort {
       const existing = listApprovalRequests({
         storageChannels: [AGENT_PROMPT_APPROVAL_CHANNEL],
         status: ['pending', 'approved', 'rejected'],
-      }).find((record) => record.correlationId === correlationId && !record.applyResult);
+      }).find(
+        (record) =>
+          record.correlationId === correlationId &&
+          !record.applyResult &&
+          // Separation of duties: never hand back an approved record that cannot be used.
+          (record.status !== 'approved' || !evaluateApprovalUsability(record))
+      );
       if (existing) return { id: existing.id, created: false };
 
       const record = createApprovalRequest('mission_controller', {
@@ -93,7 +101,10 @@ export function createApprovalStorePromptPort(): AgentPromptApprovalPort {
       if (record.status === 'pending') return 'pending';
       // Fail closed: a decision not recorded as a person's is not relayed.
       if (record.decidedByType !== 'human') return 'closed';
-      if (record.status === 'approved' || record.status === 'applied') return 'approved';
+      if (record.status === 'approved' || record.status === 'applied') {
+        // Separation of duties: an unusable approval is never relayed.
+        return approvalUsabilityRefusal(record, 'agent_prompt_approval') ? 'closed' : 'approved';
+      }
       if (record.status === 'rejected') return 'rejected';
       return 'closed';
     },

@@ -21,6 +21,8 @@ import { findMissionPath } from '../path-resolver.js';
 import { getWorkItem, updateWorkItem } from '../workforce/work-coordination.js';
 import { logger } from '../core.js';
 import {
+  evaluateApprovalUsability,
+  assertApprovalUsable,
   computeApprovalPayloadHash,
   createApprovalRequest,
   isApprovalRequestExpired,
@@ -226,6 +228,7 @@ function assertReconciliationApproval(
   if (isApprovalRequestExpired(approval)) {
     throw new Error(`[POLICY_VIOLATION] reconciliation approval has expired: ${approval.id}`);
   }
+  assertApprovalUsable(approval, { consumer: 'mission_reconcile_work' });
   if (approval.source?.missionId?.toUpperCase() !== missionId.toUpperCase()) {
     throw new Error('[POLICY_VIOLATION] reconciliation approval is bound to a different mission');
   }
@@ -295,7 +298,9 @@ export function createMissionWorkReconciliationApprovalRequest(input: {
     (record) =>
       record.source?.missionId?.toUpperCase() === missionId &&
       record.accountability?.payloadHash === payloadHash &&
-      !isApprovalRequestExpired(record)
+      !isApprovalRequestExpired(record) &&
+      // Separation of duties: never hand back an approved record that cannot be used.
+      (record.status !== 'approved' || !evaluateApprovalUsability(record))
   );
   if (existing) return existing;
 

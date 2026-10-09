@@ -1,4 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+vi.mock('../customer-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../customer-resolver.js')>();
+  const { customerRootWithSodOverlay } =
+    await import('../governance/__tests__/sod-overlay-state.js');
+  return { ...actual, customerRoot: customerRootWithSodOverlay(actual.customerRoot) };
+});
+import {
+  clearSeparationOfDuties,
+  setSeparationOfDuties,
+  useSeparationOfDutiesOverlay,
+} from '../governance/__tests__/sod-overlay.js';
 
 import {
   approvalRequestLogicalPath,
@@ -17,7 +28,60 @@ import {
   PROJECT_TRUST_APPROVAL_CHANNEL,
 } from './project-trust.js';
 
+// Per-test overlay file for switching separation of duties on/off.
+useSeparationOfDutiesOverlay(
+  pathResolver.sharedTmp(`sod-overlay-project-trust-${process.pid}.json`)
+);
+
 describe('project trust approvals', () => {
+  it('re-request opens a new request instead of reusing a self-approval that separation of duties makes unusable', () => {
+    const inputPath = pathResolver.sharedTmp(`project-trust-sod-${process.pid}-${Date.now()}.json`);
+    safeWriteFile(inputPath, JSON.stringify({ pipeline_id: 'project-trust-sod', steps: [] }));
+    const ids: string[] = [];
+    try {
+      setSeparationOfDuties(false);
+      const first = createProjectTrustApprovalRequest({ inputPath, requestedBy: 'trust-operator' });
+      ids.push(first.id);
+      decideApprovalRequest('mission_controller', {
+        channel: first.channel,
+        storageChannel: first.storageChannel,
+        requestId: first.id,
+        decision: 'approved',
+        decidedBy: 'trust-operator',
+        decidedByRole: 'sovereign',
+        authMethod: 'manual',
+        decidedByType: 'human',
+        authenticated: true,
+        payloadHash: first.accountability?.payloadHash,
+        effectBinding: first.accountability?.effectBinding,
+      });
+      expect(
+        createProjectTrustApprovalRequest({ inputPath, requestedBy: 'trust-operator' }).id
+      ).toBe(first.id);
+      setSeparationOfDuties(true);
+      expect(() => assertProjectTrustApproval(first.id, inputPath)).toThrow(/Separation of duties/);
+      const second = createProjectTrustApprovalRequest({
+        inputPath,
+        requestedBy: 'trust-operator',
+      });
+      ids.push(second.id);
+      expect(second.id).not.toBe(first.id);
+    } finally {
+      clearSeparationOfDuties();
+      withExecutionContext('mission_controller', () => {
+        for (const id of ids) {
+          safeRmSync(
+            pathResolver.rootResolve(
+              approvalRequestLogicalPath(PROJECT_TRUST_APPROVAL_CHANNEL, id)
+            ),
+            { force: true }
+          );
+        }
+        safeRmSync(inputPath, { force: true });
+      });
+    }
+  });
+
   it('requires an approved human decision and rejects content drift', () => {
     const inputPath = pathResolver.sharedTmp(`project-trust-${process.pid}-${Date.now()}.json`);
     safeWriteFile(

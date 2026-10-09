@@ -240,7 +240,10 @@ as executed, and cannot be executed again.
 Self-approval policy: the requester may also approve and execute (Kyberion is
 commonly run by a single localadmin operator). It is not blocked; every audit
 event carries `self_approved: true` when the approver is also the requester or
-the executor, so reviews can find it.
+the executor, so reviews can find it. An installation that needs the requester and approver
+to differ sets `separation_of_duties.enabled: true` in `approval-policy.json`; the approval
+store then refuses a self-approval for plugin view actions like any other request (see
+[approval-gate-design](../governance/approval-gate-design.md)).
 
 Request sidecars are named by request time; a listing reads only the newest
 200, and queueing a new request prunes sidecars older than 7 days whose

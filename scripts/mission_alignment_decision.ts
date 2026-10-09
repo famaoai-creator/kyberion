@@ -37,6 +37,7 @@ import {
 } from './lib/harness.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import {
+  approvalUsabilityRefusal,
   computeApprovalPayloadHash,
   listApprovalRequests,
   type ApprovalRequestRecord,
@@ -152,6 +153,13 @@ export function assessAlignmentDecision(missionIdInput: string): AlignmentDecisi
     ...(record.decidedAt ? { decidedAt: record.decidedAt } : {}),
     ...(record.requestedByContext?.surface ? { surface: record.requestedByContext.surface } : {}),
   };
+
+  // Separation of duties: an unusable approval does not satisfy the gate.
+  const sodRefusal =
+    record.status === 'approved'
+      ? approvalUsabilityRefusal(record, 'mission_alignment_gate')
+      : undefined;
+  if (sodRefusal) return { ...base, verdict: 'pending', satisfied: false, reasons: [sodRefusal] };
 
   // Shadow mode (P4): remember what the operator decided so it can be compared
   // with what a standing mandate would have done. Record-only, once per mission.

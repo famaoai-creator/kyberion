@@ -60,6 +60,7 @@ import {
   readTextFile,
 } from '@agent/core/foundation';
 import {
+  assertApprovalUsable,
   computeApprovalPayloadHash,
   createApprovalRequest,
   listApprovalRequests,
@@ -241,6 +242,7 @@ function ensureMcpApproval(params: {
   if (approval.accountability?.effectBinding !== params.effectBinding) {
     throw new Error('[MCP_APPROVAL_EFFECT_MISMATCH] approval effect does not match request');
   }
+  assertApprovalUsable(approval, { consumer: 'mcp_governed_tool' });
   return { allowed: true, status: 'approved' };
 }
 

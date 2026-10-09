@@ -8,6 +8,8 @@ vi.mock('@agent/core/governance/approval-store', async (importOriginal) => ({
   ).computeApprovalPayloadHash,
   loadApprovalRequest: load,
   createApprovalRequest: create,
+  // Separation of duties is covered by approval-separation-of-duties.test.ts.
+  assertApprovalUsable: vi.fn(),
 }));
 
 import {

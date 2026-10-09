@@ -13,14 +13,18 @@ import {
   createApprovalRequest,
   computeApprovalPayloadHash,
   expireApprovalRequest,
+  evaluateApprovalUsability,
   isApprovalRequestExpired,
+  isSeparationOfDutiesEnabled,
   listApprovalRequests,
+  loadApprovalRequest,
   lookupSessionApprovalCache,
   recordSessionCacheAutoApproval,
   type ApprovalActionDescriptor,
   type ApprovalRequestRecord,
   type ApprovalRequestSource,
 } from './approval-store.js';
+import { approvalUsabilityRefusal } from './approval-linked-usability.js';
 import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 import { auditChain } from './audit-chain.js';
 import type { TraceContext } from '../analysis/trace.js';
@@ -446,10 +450,49 @@ export function enforceApprovalGate(
       }
     }
   }
+  // Separation of duties: an approved record whose decision fails the check
+  // (e.g. a self-approval recorded while the setting was off) never grants
+  // the effect and never binds the correlation id — it is skipped without
+  // auditing (this runs on every call), so a fresh request is opened below
+  // instead of leaving the operation stuck on an unusable approval.
+  const unusable: ApprovalRequestRecord[] = [];
+  const isUsableCandidate = (r: ApprovalRequestRecord): boolean => {
+    if (r.status !== 'approved' || !evaluateApprovalUsability(r)) return true;
+    unusable.push(r);
+    return false;
+  };
   const matched =
     renewableExpiresAt === undefined
-      ? sameCorrelation.find((r: ApprovalRequestRecord) => r.status !== 'expired')
-      : sameCorrelation.find((r: ApprovalRequestRecord) => !isLapsedRequest(r, now));
+      ? sameCorrelation.find(
+          (r: ApprovalRequestRecord) => r.status !== 'expired' && isUsableCandidate(r)
+        )
+      : sameCorrelation.find(
+          (r: ApprovalRequestRecord) => !isLapsedRequest(r, now) && isUsableCandidate(r)
+        );
+  // Audit the refusal once — only when no usable candidate remains, i.e. on
+  // the call that opens the replacement request — and for the most recently
+  // decided unusable approval.
+  const latestUnusable = unusable.reduce<ApprovalRequestRecord | undefined>(
+    (latest, r) =>
+      !latest ||
+      String(r.decidedAt ?? r.requestedAt) > String(latest.decidedAt ?? latest.requestedAt)
+        ? r
+        : latest,
+    undefined
+  );
+  const staleRefusal =
+    !matched && latestUnusable
+      ? approvalUsabilityRefusal(latestUnusable, 'approval_gate')
+      : undefined;
+  if (staleRefusal && latestUnusable) {
+    trace?.addEvent('approval.blocked', {
+      operation_id: operationId,
+      agent_id: agentId,
+      request_id: latestUnusable.id,
+      request_status: latestUnusable.status,
+      reason: staleRefusal,
+    });
+  }
 
   if (matched) {
     // An approved record that carries an expiry must not be reused past it —
@@ -551,7 +594,17 @@ export function enforceApprovalGate(
           source: params.source,
         })
       : null;
-  if (cached) {
+  // A standing session grant is only as good as the decision that seeded it:
+  // re-check that decision under the current separation-of-duties setting.
+  // An unusable seed falls through to opening a fresh request.
+  const cachedUsable =
+    cached !== null &&
+    (() => {
+      if (!isSeparationOfDutiesEnabled()) return true;
+      const seed = loadApprovalRequest(cached.storageChannel, cached.grantedByRequestId);
+      return !!seed && !approvalUsabilityRefusal(seed, 'approval_gate_session_cache');
+    })();
+  if (cached && cachedUsable) {
     auditChain.record({
       agentId,
       action: 'approval_gate',
