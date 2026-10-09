@@ -731,6 +731,7 @@ const taskIntentBuilderSeam = createSeam<TaskSessionIntentBuilder>({
   key: 'task-intent-builder',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/task/task-session.ts',
 });
 
 export function registerTaskIntentBuilder(

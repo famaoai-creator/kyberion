@@ -149,6 +149,7 @@ const meetingJoinDriverSeam = createSeam<MeetingJoinDriver>({
   key: 'meeting-join-driver',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/meeting/meeting-join-driver.ts',
 });
 const meetingJoinDriverDisposers = new Map<string, () => void>();
 

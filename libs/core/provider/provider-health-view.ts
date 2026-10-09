@@ -7,6 +7,7 @@ const healthyInstancesResolverSeam = createSeam<HealthyInstancesResolver>({
   key: 'provider-health-resolver',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/provider/provider-health-view.ts',
 });
 
 const DEFAULT_METADATA: SeamProviderMetadata = {

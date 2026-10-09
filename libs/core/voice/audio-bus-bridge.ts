@@ -29,6 +29,7 @@ const audioBusSeam = createSeam<AudioBusBridge>({
   key: 'audio-bus-bridge',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/voice/audio-bus-bridge.ts',
 });
 
 const registeredDisposers = new Map<string, () => void>();
