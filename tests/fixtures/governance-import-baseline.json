@@ -242,7 +242,6 @@
     "scripts/install_git_merge_driver.mjs",
     "scripts/kyberion_cli_entry.mjs",
     "scripts/oauth_callback_surface.test.ts",
-    "scripts/org.test.ts",
     "scripts/run_generation_schedule_daemon.ts",
     "scripts/run_realtime_voice_conversation.ts",
     "scripts/setup_oauth.ts",
@@ -250,7 +249,6 @@
     "scripts/voice_upgrade.ts",
     "tests/knowledge-taxonomy-contract.test.ts",
     "tests/managed-process.test.ts",
-    "tests/mission-orchestration-dashboard-contract.test.ts",
     "tests/utils/assertion-extensions.ts",
     "tests/utils/test-utilities.test.ts"
   ]
