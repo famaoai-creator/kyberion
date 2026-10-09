@@ -24,7 +24,11 @@ import { pathResolver } from '../path-resolver.js';
 import { safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { auditChain } from './audit-chain.js';
 import { resolveSeparationOfDutiesPolicy } from './approval-policy.js';
+import { decideApprovalFromCowork } from './approval-cowork-adapter.js';
+import { enforceApprovalGate } from './approval-gate.js';
 import {
+  APPROVAL_PLACEHOLDER_DECIDERS,
+  evaluateApprovalUsability,
   approvalEventLogicalPath,
   approvalRequestLogicalPath,
   claimApprovalApply,
@@ -229,9 +233,98 @@ describe('approval separation of duties', () => {
         requestId: record.id,
         appliedBy: 'alice',
         expectedRecordHash: computeApprovalPayloadHash({ record: approved }),
+        rerequestCommand: 'pnpm demo --request-approval',
       })
-    ).toThrow(/Separation of duties/);
+    ).toThrow(
+      /Separation of duties: approval .* cannot be used .*never reused — request a new approval with `pnpm demo --request-approval`.*pnpm kyberion approvals --approve <new-request-id>/
+    );
     expect(loadApprovalRequest(channel, record.id)?.applyClaim).toBeUndefined();
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'separation_of_duties',
+        metadata: expect.objectContaining({ stage: 'use:apply_claim' }),
+      })
+    );
+  });
+
+  it('ON: placeholder deciders count as no decider', () => {
+    setSeparationOfDuties(true);
+    for (const placeholder of [
+      'concierge',
+      'chronos-localadmin',
+      'sovereign-user',
+      'user:unknown',
+    ]) {
+      const record = track(request({ requestedBy: 'worker' }));
+      expect(() => decide(record, placeholder)).toThrow(/no real decider identity/);
+    }
+    expect(APPROVAL_PLACEHOLDER_DECIDERS.has('concierge')).toBe(true);
+  });
+
+  it('ON: a caller-supplied decider (MCP kyberion.approval.decide) is refused; OFF it passes', () => {
+    setSeparationOfDuties(true);
+    const refused = track(request({ requestedBy: 'worker' }));
+    expect(() =>
+      decideApprovalFromCowork({ requestId: refused.id, decision: 'approved', decidedBy: 'alice' })
+    ).toThrow(/supplied by the caller, not resolved by the server/);
+    expect(loadApprovalRequest(channel, refused.id)?.status).toBe('pending');
+
+    setSeparationOfDuties(false);
+    const allowed = track(request({ requestedBy: 'worker' }));
+    expect(
+      decideApprovalFromCowork({ requestId: allowed.id, decision: 'approved', decidedBy: 'alice' })
+        .decision
+    ).toBe('approved');
+    // The marker is durable: switching ON later makes the approval unusable.
+    const stored = loadApprovalRequest(channel, allowed.id)!;
+    expect(stored.decidedByIdentitySource).toBe('caller_supplied');
+    setSeparationOfDuties(true);
+    expect(evaluateApprovalUsability(stored)?.violation).toBe('unverified_decider');
+  });
+
+  it('ON: enforceApprovalGate refuses a self-approval (no expiry) recorded while OFF and opens a fresh request', () => {
+    setSeparationOfDuties(false);
+    const gate = () =>
+      enforceApprovalGate({
+        intentId: 'inspect-service',
+        operationId: 'inspect-service',
+        agentId: 'alice',
+        correlationId: `sod-gate-${process.pid}`,
+        channel,
+        payload: { operation: 'restart', service: 'sod-probe' },
+      });
+    const first = gate();
+    expect(first.allowed).toBe(false);
+    const opened = loadApprovalRequest(channel, first.requestId!)!;
+    created.push(opened.id);
+    expect(opened.expiresAt).toBeUndefined();
+    expect(decide(opened, 'alice').status).toBe('approved');
+    expect(gate()).toMatchObject({ allowed: true, requestId: opened.id });
+
+    setSeparationOfDuties(true);
+    const refused = gate();
+    expect(refused.allowed).toBe(false);
+    expect(refused.requestId).not.toBe(opened.id);
+    created.push(refused.requestId!);
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'separation_of_duties',
+        result: 'denied',
+        metadata: expect.objectContaining({
+          requestId: opened.id,
+          violation: 'self_approval',
+          stage: 'use:approval_gate',
+        }),
+      })
+    );
+  });
+
+  it('fails closed with a diagnostic when approval-policy.json is unreadable', () => {
+    safeWriteFile(overlayPath, '{ not json');
+    sod.overlayPath = overlayPath;
+    expect(() => resolveSeparationOfDutiesPolicy()).toThrow(
+      /\[POLICY_VIOLATION\] approval decision blocked — approval-policy\.json unreadable \| next: fix .* \| evidence: /
+    );
   });
 
   it('normalises principal ids and classifies violations', () => {

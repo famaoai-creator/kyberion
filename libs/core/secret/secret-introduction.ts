@@ -6,6 +6,7 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import {
+  assertApprovalUsable,
   claimApprovalApply,
   computeApprovalPayloadHash,
   createApprovalRequest,
@@ -312,6 +313,7 @@ function checkedApplyRecord(
   if (record.status !== 'approved') {
     throw new Error('[SECRET_INTRODUCTION] approval must be approved before apply');
   }
+  assertApprovalUsable(record, { consumer: 'secret_introduction' });
   if (!record.target?.serviceId || !record.target?.secretKey) {
     throw new Error('[SECRET_INTRODUCTION] approval is missing target identity');
   }

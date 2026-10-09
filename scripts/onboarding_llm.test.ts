@@ -356,7 +356,9 @@ describe('pnpm onboarding llm', () => {
       const lines = run([...tricky, '--request-approval']);
       const text = lines.join('\n');
       expect(text).not.toContain('...');
-      const printed = /Then apply with the same values: (.+)$/m.exec(text)?.[1];
+      const printed = /Then apply with the same values \(POSIX shell: sh\/bash\/zsh\): (.+)$/m.exec(
+        text
+      )?.[1];
       expect(printed).toBeDefined();
       const requestId = /approval request ([0-9a-f-]{36})/.exec(text)![1]!;
       requestIds.push(requestId);
@@ -376,6 +378,17 @@ describe('pnpm onboarding llm', () => {
       });
       expect(applied.approval).toEqual({ request_id: requestId, approved_by: 'human-owner' });
       expect(egress('acme')).toBe(true);
+    });
+
+    it('rejects a backslash or control character at parse time, before any dry-run output', () => {
+      const withValue = (flag: string, value: string) =>
+        args.map((entry, index) => (args[index - 1] === flag ? value : entry));
+      expect(() => run(withValue('--plan', 'C:\\plan'))).toThrow(
+        /--plan must not contain a backslash/
+      );
+      expect(() =>
+        run([...withValue('--attested-by', 'owner\u0007'), '--request-approval'])
+      ).toThrow(/--attested-by must not contain control characters/);
     });
 
     it('records used/unknown with --apply --accept and no approval', () => {

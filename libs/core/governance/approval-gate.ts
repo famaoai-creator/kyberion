@@ -13,8 +13,11 @@ import {
   createApprovalRequest,
   computeApprovalPayloadHash,
   expireApprovalRequest,
+  assertApprovalUsable,
   isApprovalRequestExpired,
+  isSeparationOfDutiesEnabled,
   listApprovalRequests,
+  loadApprovalRequest,
   lookupSessionApprovalCache,
   recordSessionCacheAutoApproval,
   type ApprovalActionDescriptor,
@@ -446,10 +449,35 @@ export function enforceApprovalGate(
       }
     }
   }
+  // Separation of duties: an approved record whose decision fails the check
+  // (e.g. a self-approval recorded while the setting was off) never grants
+  // the effect and never binds the correlation id — it is skipped (and the
+  // refusal audited by assertApprovalUsable), so a fresh request is opened
+  // below instead of leaving the operation stuck on an unusable approval.
+  const isUsableCandidate = (r: ApprovalRequestRecord): boolean => {
+    if (r.status !== 'approved') return true;
+    try {
+      assertApprovalUsable(r, { consumer: 'approval_gate' });
+      return true;
+    } catch (error) {
+      trace?.addEvent('approval.blocked', {
+        operation_id: operationId,
+        agent_id: agentId,
+        request_id: r.id,
+        request_status: r.status,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
+  };
   const matched =
     renewableExpiresAt === undefined
-      ? sameCorrelation.find((r: ApprovalRequestRecord) => r.status !== 'expired')
-      : sameCorrelation.find((r: ApprovalRequestRecord) => !isLapsedRequest(r, now));
+      ? sameCorrelation.find(
+          (r: ApprovalRequestRecord) => r.status !== 'expired' && isUsableCandidate(r)
+        )
+      : sameCorrelation.find(
+          (r: ApprovalRequestRecord) => !isLapsedRequest(r, now) && isUsableCandidate(r)
+        );
 
   if (matched) {
     // An approved record that carries an expiry must not be reused past it —
@@ -551,7 +579,23 @@ export function enforceApprovalGate(
           source: params.source,
         })
       : null;
-  if (cached) {
+  // A standing session grant is only as good as the decision that seeded it:
+  // re-check that decision under the current separation-of-duties setting.
+  // An unusable seed falls through to opening a fresh request.
+  const cachedUsable =
+    cached !== null &&
+    (() => {
+      if (!isSeparationOfDutiesEnabled()) return true;
+      const seed = loadApprovalRequest(cached.storageChannel, cached.grantedByRequestId);
+      if (!seed) return false;
+      try {
+        assertApprovalUsable(seed, { consumer: 'approval_gate_session_cache' });
+        return true;
+      } catch {
+        return false;
+      }
+    })();
+  if (cached && cachedUsable) {
     auditChain.record({
       agentId,
       action: 'approval_gate',

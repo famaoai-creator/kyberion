@@ -489,8 +489,12 @@ export async function runStepsInternal(
         return nextContext;
       },
       await_decision: async (dctx) => {
-        const { createApprovalRequest, isApprovalRequestExpired, loadApprovalRequest } =
-          await import('@agent/core/governance/approval-store');
+        const {
+          assertApprovalUsable,
+          createApprovalRequest,
+          isApprovalRequestExpired,
+          loadApprovalRequest,
+        } = await import('@agent/core/governance/approval-store');
         const { params, ctx, currentStep } = dctx;
         const approval = (params.approval || {}) as Record<string, unknown>;
         const stepId = currentStep?.id;
@@ -512,6 +516,7 @@ export async function runStepsInternal(
             suspended.approval_request_id
           );
           if (existing?.status === 'approved' || existing?.status === 'applied') {
+            assertApprovalUsable(existing, { consumer: 'pipeline_await_decision' });
             return {
               ...ctx,
               [String(params.export_as || 'decision')]: {

@@ -30,6 +30,7 @@ import {
 } from '@agent/core/llm-selection-preferences';
 import {
   attestTenantProvider,
+  assertPrintableCommandValue,
   captureAttestationInvoker,
   providerAttestationApplyArgs,
   requestTenantProviderAttestationApproval,
@@ -466,6 +467,10 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
   const plan = optionValue(argv, '--plan');
   const basis = optionValue(argv, '--basis');
   const attestedBy = optionValue(argv, '--attested-by');
+  // Parse-time: these values are echoed in a copy-pasteable command.
+  assertPrintableCommandValue('--plan', plan);
+  assertPrintableCommandValue('--basis', basis);
+  assertPrintableCommandValue('--attested-by', attestedBy);
   if (trainingUse === 'none') {
     const missing = [
       !plan?.trim() ? '--plan' : '',
@@ -529,11 +534,15 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
       .join(' ');
     print(
       json
-        ? JSON.stringify({ ...request, apply_command: applyCommand }, null, 2)
+        ? JSON.stringify(
+            { ...request, apply_command: applyCommand, apply_command_shell: 'posix' },
+            null,
+            2
+          )
         : [
             `${request.created ? 'Opened' : 'Reusing'} approval request ${request.request_id} (${request.status}${request.expires_at ? `, expires ${request.expires_at}` : ''})`,
             `A human decides with: ${request.approve_command}`,
-            `Then apply with the same values: ${applyCommand}`,
+            `Then apply with the same values (POSIX shell: sh/bash/zsh): ${applyCommand}`,
           ].join('\n')
     );
     return;

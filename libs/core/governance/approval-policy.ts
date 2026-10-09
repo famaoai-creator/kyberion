@@ -109,7 +109,23 @@ export function loadApprovalPolicy(): ApprovalPolicyFile {
  * per-organization override.
  */
 export function resolveSeparationOfDutiesPolicy(): { enabled: boolean } {
-  return { enabled: loadApprovalPolicy().separation_of_duties?.enabled === true };
+  let policy: ApprovalPolicyFile;
+  try {
+    policy = loadApprovalPolicy();
+  } catch (error) {
+    // Fail closed, but say why: without the policy the store cannot know
+    // whether separation of duties applies, so no approval is decided or used.
+    let policyPath = 'knowledge/product/governance/approval-policy.json';
+    try {
+      policyPath = approvalPolicyCatalog.path();
+    } catch {
+      /* keep the product default path in the message */
+    }
+    throw new Error(
+      `[POLICY_VIOLATION] approval decision blocked — approval-policy.json unreadable | next: fix ${policyPath} (schema: knowledge/product/schemas/approval-policy.schema.json) | evidence: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  return { enabled: policy.separation_of_duties?.enabled === true };
 }
 
 export function resolveApprovalPolicy(input: {

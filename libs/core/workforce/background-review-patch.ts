@@ -36,6 +36,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import {
+  assertApprovalUsable,
   computeApprovalPayloadHash,
   createApprovalRequest,
   loadApprovalRequest,
@@ -311,6 +312,7 @@ function assertApprovedBackgroundReviewEffect(input: {
       `[POLICY_VIOLATION] Background-review approval request is not approved: ${input.approvalRef}`
     );
   }
+  assertApprovalUsable(request, { consumer: 'background_review_patch' });
   const payload = approvalPayload(input);
   const payloadHash = computeApprovalPayloadHash(payload);
   const effectBinding = approvalEffectBinding(input.candidateId, input.expectedSha256);

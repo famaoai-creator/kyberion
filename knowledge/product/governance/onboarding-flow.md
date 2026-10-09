@@ -327,12 +327,16 @@ pnpm onboarding llm attest --tenant <tenant-slug> --provider claude --training-u
 - 既定では、依頼者本人が承認しても通る（1 人の operator で運用する前提）。依頼者と承認者を必ず分けたい場合は
   `approval-policy.json` の `separation_of_duties.enabled` を `true` にする（customer overlay
   `customer/<slug>/policy/approval-policy.json` でもよい）。ON にすると、依頼者と同じ identity による承認は
-  `[POLICY_VIOLATION] Separation of duties` で拒否・監査され、依頼は pending のまま残る。比較は記録された
-  identity 文字列（依頼者は CLI を実行した persona、承認者は onboarding identity の名前や `user:<member_id>`）で行うため、
-  同じ人が別の文字列で依頼と承認をすると検出できない点に注意する。詳細は
-  [approval-gate-design の職務分離](./approval-gate-design.md#職務分離separation-of-duties)。
-- 手順 2 の出力にある記録コマンドは、plan・basis・attested-by・有効日数を含むすべての値をシェル用に
-  クォートして表示する。承認は値の hash に結び付くので、表示されたコマンドをそのまま貼り付けて実行する。
+  `[POLICY_VIOLATION] Separation of duties` で拒否・監査され、依頼は pending のまま残る。OFF のときに
+  本人が承認した依頼は、ON にした後の手順 4 で拒否される。そのときはメッセージに出る `--request-approval`
+  付きのコマンドで新しい依頼を作り（古い承認は再利用されない）、別の人に承認してもらう。
+  - 既知の限界: 比較は記録された identity 文字列で行う。既定の CLI 経路では依頼者は CLI を実行した persona
+    （例 `sovereign`）、承認者は onboarding identity の名前になるため、同じ人が両方を行っても検出できない。
+    確実に分けるには、承認を chronos / presence-studio の認証済み member（`user:<member_id>`）が行う。
+    詳細は [approval-gate-design の職務分離](./approval-gate-design.md#職務分離separation-of-duties)。
+- 手順 2 の出力にある記録コマンドは POSIX シェル（sh / bash / zsh）用で、plan・basis・attested-by・有効日数を
+  含むすべての値をクォートして表示する。承認は値の hash に結び付くので、表示されたコマンドをそのまま貼り付けて
+  実行する。値にバックスラッシュや制御文字は使えない（入力時に拒否される）。
 - `--training-use used` / `unknown` は送信を開かないので、承認なしで `--apply --accept` だけで記録できる。
 - attestation は tenant profile（`knowledge/personal/tenants/<tenant-slug>.json` の
   `provider_attestations`）に保存され、監査台帳に `tenant.attest_provider` として、実行者と（承認済みなら）

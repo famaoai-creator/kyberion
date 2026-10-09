@@ -10,6 +10,7 @@
 
 import { createHash } from 'node:crypto';
 import {
+  assertApprovalUsable,
   computeApprovalPayloadHash,
   createApprovalRequest,
   listApprovalRequests,
@@ -93,7 +94,15 @@ export function createApprovalStorePromptPort(): AgentPromptApprovalPort {
       if (record.status === 'pending') return 'pending';
       // Fail closed: a decision not recorded as a person's is not relayed.
       if (record.decidedByType !== 'human') return 'closed';
-      if (record.status === 'approved' || record.status === 'applied') return 'approved';
+      if (record.status === 'approved' || record.status === 'applied') {
+        // Separation of duties: an unusable approval is never relayed.
+        try {
+          assertApprovalUsable(record, { consumer: 'agent_prompt_approval' });
+        } catch {
+          return 'closed';
+        }
+        return 'approved';
+      }
       if (record.status === 'rejected') return 'rejected';
       return 'closed';
     },

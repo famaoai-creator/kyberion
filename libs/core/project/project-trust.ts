@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 
 import {
+  assertApprovalUsable,
   computeApprovalPayloadHash,
   createApprovalRequest,
   isApprovalRequestExpired,
@@ -236,6 +237,7 @@ export function assertProjectTrustApproval(requestId: string, inputPath: string)
       `[TRUST_REQUIRED] project-trust request ${record.id} lacks an authenticated human decision`
     );
   }
+  assertApprovalUsable(record, { consumer: 'project_trust' });
   const hash = contentHash(resolved.absolute);
   const expectedPayloadHash = computeApprovalPayloadHash(bindingPayload(resolved.relative, hash));
   if (record.accountability.payloadHash !== expectedPayloadHash) {

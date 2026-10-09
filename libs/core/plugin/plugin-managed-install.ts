@@ -27,6 +27,7 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import { isRecord } from '../foundation/text.js';
 import {
+  evaluateApprovalUsability,
   createApprovalRequest,
   computeApprovalPayloadHash,
   listApprovalRequests,
@@ -572,7 +573,10 @@ function resolveActivationStatus(params: {
   if (params.trust === 'official') return 'activatable';
   // Legacy non-official records (no digest) must be re-installed and re-approved.
   if (params.integrity === 'legacy') return 'pending_approval';
-  return params.approval?.status === 'approved' ? 'activatable' : 'pending_approval';
+  if (params.approval?.status !== 'approved') return 'pending_approval';
+  // Separation of duties: an unusable approval does not activate. This runs
+  // on every plugin load, so it evaluates without auditing each pass.
+  return evaluateApprovalUsability(params.approval) ? 'pending_approval' : 'activatable';
 }
 
 function writeManagedRecord(managedDir: string, record: ManagedPluginRecord): void {

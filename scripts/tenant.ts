@@ -1,5 +1,6 @@
 import {
   attestTenantProvider,
+  assertPrintableCommandValue,
   captureAttestationInvoker,
   providerAttestationApplyArgs,
   requestTenantProviderAttestationApproval,
@@ -136,6 +137,10 @@ export function main(
     if (trainingUse !== 'none' && trainingUse !== 'used' && trainingUse !== 'unknown') {
       throw new Error('attest-provider requires --training-use <none|used|unknown>');
     }
+    // Parse-time: these values are echoed in a copy-pasteable command.
+    assertPrintableCommandValue('--plan', args.plan);
+    assertPrintableCommandValue('--basis', args.basis);
+    assertPrintableCommandValue('--attested-by', args.attestedBy);
     if (trainingUse === 'none') {
       const missing = [
         !args.plan?.trim() ? '--plan' : '',
@@ -205,7 +210,7 @@ export function main(
             ...request,
             next: [
               `A human decides: ${request.approve_command}`,
-              `Then apply: ${[
+              `Then apply (POSIX shell: sh/bash/zsh): ${[
                 'pnpm',
                 'tenant',
                 'attest-provider',

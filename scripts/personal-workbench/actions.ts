@@ -1,4 +1,5 @@
 import {
+  assertApprovalUsable,
   computeApprovalPayloadHash,
   createApprovalRequest,
   createCalendarEvent,
@@ -430,6 +431,7 @@ async function applyCalendarEventUnlocked(input: {
   if (approval.status !== 'approved' && approval.status !== 'applied') {
     throw new Error(`approval request is ${approval.status}; expected approved`);
   }
+  assertApprovalUsable(approval, { consumer: 'personal_workbench' });
   if (
     approval.accountability?.payloadHash &&
     approval.accountability.payloadHash !== proposal.payload_hash

@@ -173,6 +173,33 @@ describe('tenant attest-provider --request-approval prints an apply command that
     safeRmSync(rootDir, { recursive: true, force: true });
   });
 
+  it('rejects a backslash or control character at parse time', () => {
+    const base = ['attest-provider', 'acme', '--provider', 'codex', '--training-use', 'none'];
+    expect(() =>
+      main(
+        [...base, '--plan', 'C:\\plan', '--basis', 'b', '--attested-by', 'x', '--request-approval'],
+        () => undefined,
+        { rootDir }
+      )
+    ).toThrow(/--plan must not contain a backslash/);
+    expect(() =>
+      main(
+        [
+          ...base,
+          '--plan',
+          'p',
+          '--basis',
+          'b\nrm -rf',
+          '--attested-by',
+          'x',
+          '--request-approval',
+        ],
+        () => undefined,
+        { rootDir }
+      )
+    ).toThrow(/--basis must not contain control characters/);
+  });
+
   it('quotes every bound value so the pasted command applies', () => {
     const output: unknown[] = [];
     main(
@@ -198,7 +225,10 @@ describe('tenant attest-provider --request-approval prints an apply command that
     );
     const request = JSON.parse(String(output[0]));
     requestIds.push(request.request_id);
-    const printed = String(request.next[1]).replace(/^Then apply: /, '');
+    const printed = String(request.next[1]).replace(
+      /^Then apply \(POSIX shell: sh\/bash\/zsh\): /,
+      ''
+    );
     expect(printed).not.toContain('...');
     const words = shellWords(printed);
     expect(words.slice(0, 2)).toEqual(['pnpm', 'tenant']);

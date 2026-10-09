@@ -132,6 +132,9 @@ export function decideApprovalFromCowork(params: {
     requestId: params.requestId,
     decision: params.decision,
     decidedBy: params.decidedBy,
+    // `decided_by` is free text from the MCP caller, not resolved here: with
+    // separation of duties on, the store refuses such approvals.
+    deciderIdentitySource: 'caller_supplied',
     decidedByType: 'human',
     authenticated: true,
     payloadHash: target.accountability?.payloadHash,
