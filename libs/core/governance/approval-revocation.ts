@@ -85,12 +85,10 @@ interface RevokeParams {
  */
 export function revokeApprovalAsLocalOwner(
   role: GovernedArtifactRole,
-  params: RevokeParams & { rootDir?: string }
+  params: RevokeParams
 ): ApprovalRequestRecord {
-  const owner = resolveMemberByPrincipal(
-    { source: 'loopback' },
-    params.rootDir ? { rootDir: params.rootDir } : {}
-  );
+  // The registry root comes from the path resolver, never from the caller.
+  const owner = resolveMemberByPrincipal({ source: 'loopback' });
   if (!owner) {
     throw new Error(
       '[POLICY_VIOLATION] approval revoke blocked — this machine has no active owner member ' +

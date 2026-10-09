@@ -523,16 +523,34 @@ function resolvePluginApprovalRequester(
   return value;
 }
 
+/** The approval request already bound to exactly this plugin content and grant, if any. */
+function findPluginApprovalRequest(
+  binding: PluginApprovalBinding,
+  channel: string
+): ApprovalRequestRecord | undefined {
+  const correlationId = pluginApprovalCorrelationId(binding);
+  const payloadHash = pluginApprovalPayloadHash(binding);
+  const effectBinding = pluginApprovalEffectBinding(binding.pluginId);
+  return listApprovalRequests({ storageChannels: [channel] }).find(
+    (request) =>
+      request.correlationId === correlationId &&
+      request.accountability?.payloadHash === payloadHash &&
+      request.accountability?.effectBinding === effectBinding
+  );
+}
+
 /**
- * Ensures a cancel-defaulted human approval request exists for activating a
- * non-official plugin. Never auto-approves: a fresh request is created in
+ * Opens a cancel-defaulted human approval request for activating a
+ * non-official plugin. Never auto-approves: the request is created in
  * `pending` status and stays blocking until a human decides it via
  * `decideApprovalRequest` (approval-gate.ts's `enforceApprovalGate` pattern).
+ * The requester is resolved by the caller before anything lands in the
+ * managed tree, so a refusal there leaves no orphan copy.
  */
-function ensurePluginApprovalRequest(params: {
+function openPluginApprovalRequest(params: {
   binding: PluginApprovalBinding;
   permissionSummary: string;
-  requestedBy?: PluginApprovalRequester;
+  requester: ApprovalRequesterRef;
   channel: string;
   missionId?: string;
 }): ApprovalRequestRecord {
@@ -540,16 +558,7 @@ function ensurePluginApprovalRequest(params: {
   const correlationId = pluginApprovalCorrelationId(params.binding);
   const payloadHash = pluginApprovalPayloadHash(params.binding);
   const effectBinding = pluginApprovalEffectBinding(pluginId);
-
-  const existing = listApprovalRequests({ storageChannels: [params.channel] }).find(
-    (request) =>
-      request.correlationId === correlationId &&
-      request.accountability?.payloadHash === payloadHash &&
-      request.accountability?.effectBinding === effectBinding
-  );
-  if (existing) return existing;
-
-  const requester = resolvePluginApprovalRequester(params.requestedBy);
+  const requester = params.requester;
   const requestedBy = requester.requestedBy;
   return createApprovalRequest('mission_controller', {
     channel: params.channel,
@@ -1011,25 +1020,40 @@ export function installPluginManaged(params: InstallPluginManagedParams): Manage
       params.onPermissionsResolved?.({ pluginId, trust: trust.label, request, ...narrowed });
     }
 
+    // Bind and, when a new approval request is needed, resolve its requester
+    // on the staging copy (the digest is path-independent). A requester that
+    // refuses (for example no stable operator identity under separation of
+    // duties) then fails the install before anything lands in the managed tree.
+    let binding: PluginApprovalBinding;
+    let approval: ApprovalRequestRecord | undefined;
+    let newRequester: ApprovalRequesterRef | undefined;
+    try {
+      binding = {
+        pluginId,
+        trust: trust.label,
+        resolvedSourcePath: trust.resolvedSourcePath,
+        contentDigest: computePluginContentDigest(stagingDir),
+        manifestVersion: manifest?.version ?? null,
+        permissionsDigest: permissionsDigest(narrowed.granted),
+      };
+      if (trust.label !== 'official' && !brokenManifest) {
+        approval = findPluginApprovalRequest(binding, approvalChannel);
+        if (!approval) newRequester = resolvePluginApprovalRequester(params.requestedBy);
+      }
+    } catch (err) {
+      safeRmSync(stagingDir);
+      throw err;
+    }
+
     safeMkdir(managedRoot, { recursive: true });
     if (safeExistsSync(managedDir)) safeRmSync(managedDir);
     safeMoveSync(stagingDir, managedDir);
 
-    const binding: PluginApprovalBinding = {
-      pluginId,
-      trust: trust.label,
-      resolvedSourcePath: trust.resolvedSourcePath,
-      contentDigest: computePluginContentDigest(managedDir),
-      manifestVersion: manifest?.version ?? null,
-      permissionsDigest: permissionsDigest(narrowed.granted),
-    };
-
-    let approval: ApprovalRequestRecord | undefined;
-    if (trust.label !== 'official' && !brokenManifest) {
-      approval = ensurePluginApprovalRequest({
+    if (newRequester) {
+      approval = openPluginApprovalRequest({
         binding,
         permissionSummary: summarizePermissionDiff(narrowed.diff),
-        requestedBy: params.requestedBy,
+        requester: newRequester,
         channel: approvalChannel,
         missionId: params.missionId,
       });

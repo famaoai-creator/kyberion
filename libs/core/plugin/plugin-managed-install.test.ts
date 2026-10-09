@@ -147,6 +147,49 @@ describe('installPluginManaged', () => {
     expect(isManagedPluginActivationAllowed(refreshed!)).toBe(true);
   });
 
+  it('resolves a lazy requester before the move: a refusal leaves no managed copy; a reinstall with an open request never asks', () => {
+    const managedRoot = managedRootDir('lazy-requester');
+    const src = sourceDir('lazy-requester');
+    writeManifest(src, { plugin_id: 'lazy-requester-sample', version: '1.0.0' });
+    const pluginId = `lazy-requester-${process.pid}`;
+    const managedDir = path.join(managedRoot, pluginId);
+
+    expect(() =>
+      installPluginManaged({
+        pluginId,
+        sourcePath: src,
+        managedRoot,
+        requestedBy: () => {
+          throw new Error('[POLICY_VIOLATION] no stable operator identity');
+        },
+      })
+    ).toThrow(/no stable operator identity/);
+    expect(safeExistsSync(managedDir)).toBe(false);
+    expect(listManagedPlugins(managedRoot)).toEqual([]);
+
+    // Opens the request once...
+    const first = installPluginManaged({
+      pluginId,
+      sourcePath: src,
+      managedRoot,
+      requestedBy: () => 'test-suite',
+    });
+    expect(first.activationStatus).toBe('pending_approval');
+    // ...and the same content again reuses it without resolving a requester.
+    let asked = false;
+    const again = installPluginManaged({
+      pluginId,
+      sourcePath: src,
+      managedRoot,
+      requestedBy: () => {
+        asked = true;
+        throw new Error('must not be resolved');
+      },
+    });
+    expect(asked).toBe(false);
+    expect(again.approvalRequestId).toBe(first.approvalRequestId);
+  });
+
   it('discovers an Agent Plugins v1 root manifest without weakening provenance gating', () => {
     const managedRoot = managedRootDir('portable-manifest');
     const src = sourceDir('portable-manifest');
