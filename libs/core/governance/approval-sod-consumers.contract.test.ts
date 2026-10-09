@@ -1,3 +1,4 @@
+import * as ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
@@ -75,6 +76,108 @@ const SOD_OFF_GUARD_EXCEPTIONS: Readonly<Record<string, string>> = {
 
 const SOD_OFF_GUARD =
   /!\s*(?:isSeparationOfDutiesEnabled\(\)|resolveSeparationOfDutiesPolicy\(\)\.enabled)/;
+
+/**
+ * The mirror image: a usability check that runs only while separation of
+ * duties is on (`if (isSeparationOfDutiesEnabled()) assertApprovalUsable(…)`,
+ * `enabled && evaluateApprovalUsability(…)`, the else branch of a negated
+ * guard) also lets a revoked approval through while off. Only these files may
+ * do so, each for the stated reason.
+ */
+const SOD_ON_GUARD_EXCEPTIONS: Readonly<Record<string, string>> = {};
+
+const USABILITY_CHECKS = new Set([
+  'assertApprovalUsable',
+  'evaluateApprovalUsability',
+  'approvalUsabilityRefusal',
+]);
+
+/** True for `isSeparationOfDutiesEnabled()` / `resolveSeparationOfDutiesPolicy().enabled`, or a const bound to one. */
+function isSodEnabledExpr(node: ts.Node, aliases: ReadonlySet<string>): boolean {
+  if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+    return node.expression.text === 'isSeparationOfDutiesEnabled';
+  }
+  if (
+    ts.isPropertyAccessExpression(node) &&
+    node.name.text === 'enabled' &&
+    ts.isCallExpression(node.expression) &&
+    ts.isIdentifier(node.expression.expression) &&
+    node.expression.expression.text === 'resolveSeparationOfDutiesPolicy'
+  ) {
+    return true;
+  }
+  return ts.isIdentifier(node) && aliases.has(node.text);
+}
+
+/** Polarities (true = enabled, false = negated) of every SoD-enabled test inside `condition`. */
+function sodPolarities(condition: ts.Node, aliases: ReadonlySet<string>): boolean[] {
+  const found: boolean[] = [];
+  const visit = (node: ts.Node, positive: boolean) => {
+    if (isSodEnabledExpr(node, aliases)) {
+      found.push(positive);
+      return;
+    }
+    const negates =
+      ts.isPrefixUnaryExpression(node) && node.operator === ts.SyntaxKind.ExclamationToken;
+    ts.forEachChild(node, (child) => visit(child, negates ? !positive : positive));
+  };
+  visit(condition, true);
+  return found;
+}
+
+/** Usability checks in `source` that run only while separation of duties is on (line numbers). */
+function usabilityChecksUnderSodOn(source: string, fileName = 'probe.ts'): number[] {
+  const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
+  const aliases = new Set<string>();
+  const collectAliases = (node: ts.Node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      isSodEnabledExpr(node.initializer, aliases)
+    ) {
+      aliases.add(node.name.text);
+    }
+    ts.forEachChild(node, collectAliases);
+  };
+  collectAliases(file);
+  const guardedOn = (node: ts.Node): boolean => {
+    for (let child = node, parent = node.parent; parent; child = parent, parent = parent.parent) {
+      let condition: ts.Node | undefined;
+      let wantsPositive = true;
+      if (ts.isIfStatement(parent) && child !== parent.expression) {
+        condition = parent.expression;
+        wantsPositive = child === parent.thenStatement;
+      } else if (ts.isConditionalExpression(parent) && child !== parent.condition) {
+        condition = parent.condition;
+        wantsPositive = child === parent.whenTrue;
+      } else if (ts.isBinaryExpression(parent) && child === parent.right) {
+        const op = parent.operatorToken.kind;
+        if (op === ts.SyntaxKind.AmpersandAmpersandToken) condition = parent.left;
+        if (op === ts.SyntaxKind.BarBarToken || op === ts.SyntaxKind.QuestionQuestionToken) {
+          condition = parent.left;
+          wantsPositive = false;
+        }
+      }
+      if (condition && sodPolarities(condition, aliases).includes(wantsPositive)) return true;
+    }
+    return false;
+  };
+  const lines: number[] = [];
+  const visit = (node: ts.Node) => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      USABILITY_CHECKS.has(node.expression.text) &&
+      guardedOn(node)
+    ) {
+      lines.push(file.getLineAndCharacterOfPosition(node.getStart()).line + 1);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return lines;
+}
 
 /** Surfaces that record `deciderIdentitySource: 'caller_supplied'`. */
 const CALLER_SUPPLIED_SURFACES = [
@@ -156,6 +259,56 @@ describe('separation-of-duties consumer registry', () => {
       expect(read(file)).toMatch(
         /isSeparationOfDutiesEnabled\(\)|resolveSeparationOfDutiesPolicy\(\)/
       );
+    }
+  });
+
+  it('flags a usability check nested under a positive separation-of-duties conditional', () => {
+    const flagged = (code: string) => usabilityChecksUnderSodOn(code).length > 0;
+    expect(flagged('if (isSeparationOfDutiesEnabled()) assertApprovalUsable(r, o);')).toBe(true);
+    expect(
+      flagged(
+        'if (resolveSeparationOfDutiesPolicy().enabled) { const x = 1; evaluateApprovalUsability(r, o); }'
+      )
+    ).toBe(true);
+    expect(
+      flagged('const sod = isSeparationOfDutiesEnabled(); sod && assertApprovalUsable(r, o);')
+    ).toBe(true);
+    expect(
+      flagged('const v = isSeparationOfDutiesEnabled() ? evaluateApprovalUsability(r, o) : null;')
+    ).toBe(true);
+    expect(
+      flagged('if (!isSeparationOfDutiesEnabled()) { log(); } else { assertApprovalUsable(r, o); }')
+    ).toBe(true);
+    expect(flagged('!isSeparationOfDutiesEnabled() || approvalUsabilityRefusal(r, "x");')).toBe(
+      true
+    );
+    // Unconditional checks, or ones under the opposite polarity, are not this shape.
+    expect(flagged('assertApprovalUsable(r, o);')).toBe(false);
+    expect(flagged('if (record) assertApprovalUsable(r, o);')).toBe(false);
+    expect(
+      flagged('if (!isSeparationOfDutiesEnabled()) { log(); } assertApprovalUsable(r, o);')
+    ).toBe(false);
+    expect(
+      flagged('if (isSeparationOfDutiesEnabled()) refuse(); else assertApprovalUsable(r, o);')
+    ).toBe(false);
+  });
+
+  it('no consumer checks usability only while separation of duties is on, except the listed ones', () => {
+    const files = new Set([
+      ...SOD_CONSUMERS.map((entry) => entry.file),
+      ...Object.keys(SOD_OFF_GUARD_EXCEPTIONS),
+      'scripts/mission-alignment-gate/serve-brief.ts',
+      'scripts/lib/approval-cli-decision.ts',
+    ]);
+    const offenders = [...files]
+      .filter((file) => !(file in SOD_ON_GUARD_EXCEPTIONS))
+      .flatMap((file) =>
+        usabilityChecksUnderSodOn(read(file), file).map((line) => `${file}:${line}`)
+      );
+    expect(offenders).toEqual([]);
+    for (const [file, reason] of Object.entries(SOD_ON_GUARD_EXCEPTIONS)) {
+      expect(reason.length).toBeGreaterThan(20);
+      expect(usabilityChecksUnderSodOn(read(file), file).length).toBeGreaterThan(0);
     }
   });
 
