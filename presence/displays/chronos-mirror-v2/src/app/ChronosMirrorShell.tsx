@@ -504,7 +504,18 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
                         ? costSummary.totalTokens.toLocaleString(chronosSpeechLocale())
                         : '-'
                     }
-                    description={`${costSummary?.missionCount || 0} ${uxText('chronos_diagnostics_missions', locale)}`}
+                    description={
+                      typeof costSummary?.withheldPartitions === 'number' &&
+                      costSummary.withheldPartitions > 0
+                        ? uxMessage(
+                            'chronos_diagnostics_metrics_partial',
+                            { count: String(costSummary.withheldPartitions) },
+                            'Partial: {count} metrics partition(s) withheld for this persona',
+                            locale
+                          )
+                        : costSummary?.partialNotice ||
+                          `${costSummary?.missionCount || 0} ${uxText('chronos_diagnostics_missions', locale)}`
+                    }
                   />
                   <Metric
                     label={uxText('chronos_diagnostics_budget', locale)}

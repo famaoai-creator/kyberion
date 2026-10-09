@@ -15,6 +15,7 @@ import { createLogger, emitConsoleLine } from './logger.js';
 import type { AuditEntry } from './governance/audit-chain.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
+  PARTITIONED_RUNTIME_LEDGER_ROOTS,
   STORAGE_FLOOR_ROOTS,
   classifyStorageFloorPath,
   storageFloorTier,
@@ -915,9 +916,10 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
     };
   }
 
-  // Tenant-partitioned runtime state (e.g. the resource-usage ledger under
-  // active/shared/runtime/usage-ledger/<tier>/<tenant>/) carries no tier read
-  // gate, but a tenant-bound reader must still never cross tenants.
+  // Tier/tenant-partitioned runtime ledgers (resource usage, execution
+  // metrics: active/shared/runtime/<ledger>/<tier>/<tenant|shared>/) hold
+  // tier data outside knowledge/: a tenant-bound reader never crosses tenants,
+  // and a persona reads a partition only if it may read knowledge/<tier>/.
   if (
     pathStartsWith(relativePath, 'active/shared/runtime/') &&
     /\/(?:personal|confidential)\//u.test(relativePath)
@@ -925,7 +927,8 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
     const loaded = loadPolicy();
     if (loaded.status === 'loaded') {
       const cfg = tenantScopeConfig(loaded.policy);
-      if (extractTenantFromProtectedPrefix(relativePath, cfg.protectedPrefixes)) {
+      const protectedMatch = extractTenantFromProtectedPrefix(relativePath, cfg.protectedPrefixes);
+      if (protectedMatch) {
         const identity = resolvePolicyIdentityContext();
         const denial = checkTenantScope(
           loaded.policy,
@@ -936,11 +939,28 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
           identity.authorities,
           { kind: 'read', role: identity.role }
         );
-        return denial ?? { allowed: true };
+        if (denial) return denial;
+        const ledgerTier = partitionedLedgerTier(protectedMatch.prefix);
+        if (!ledgerTier) return { allowed: true };
+        // A narrow governed reader role (e.g. metrics_cap_reader, assumed by
+        // libs/core for cap enforcement) holds an explicit read grant on the
+        // ledger root itself; it never widens knowledge/ access.
+        if (ledgerRoleReadGrant(loaded.policy, relativePath, identity)) return { allowed: true };
+        // The partition mirrors knowledge/<tier>/<tenant>/ (knowledge/<tier>/ for
+        // the untenanted `shared` segment), so tenant-scoped roles that may read
+        // their own tenant's knowledge also read their own tenant's partition.
+        const ledgerTenant = protectedMatch.tenant;
+        const knowledgeMirror =
+          ledgerTenant && ledgerTenant !== 'shared'
+            ? `knowledge/${ledgerTier}/${ledgerTenant}`
+            : `knowledge/${ledgerTier}`;
+        return personaTierReadDecision(loaded.policy, knowledgeMirror, identity);
       }
     } else if (
       loaded.status === 'corrupt' &&
-      pathStartsWith(relativePath, 'active/shared/runtime/usage-ledger/')
+      Object.values(PARTITIONED_RUNTIME_LEDGER_ROOTS).some((root) =>
+        pathStartsWith(relativePath, root)
+      )
     ) {
       return CORRUPT_POLICY_DENIAL;
     }
@@ -956,9 +976,6 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   const protectedProjectPath = projectTier === 'personal' || projectTier === 'confidential';
   const floorTier = storageFloorTier(relativePath);
   const protectedFloorPath = isProtectedStorageFloorTier(floorTier);
-  const organizationTier = relativePath.match(
-    /^active\/organizations\/(personal|confidential|public)(?:\/|$)/
-  )?.[1];
   if (
     !pathStartsWith(relativePath, 'knowledge') &&
     !organizationStatePath &&
@@ -982,30 +999,92 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   if (loaded.status === 'missing') return { allowed: true };
   if (loaded.status === 'corrupt') return CORRUPT_POLICY_DENIAL;
   const policy = loaded.policy;
-  const currentMission = resolveProjectScope().missionId;
+  const identity = resolvePolicyIdentityContext();
 
+  // Tenant scope — deny cross-tenant reads from confidential.
+  const tenantDenial = checkTenantScope(
+    policy,
+    relativePath,
+    identity.tenantSlug,
+    identity.brokeredTenants,
+    identity.brokerApproval,
+    identity.authorities,
+    { kind: 'read', role: identity.role }
+  );
+  if (tenantDenial) return tenantDenial;
+
+  return personaTierReadDecision(policy, relativePath, identity);
+}
+
+/**
+ * Tier of a partitioned runtime ledger's protected prefix
+ * (`active/shared/runtime/<ledger>/<tier>/`), or undefined for any other prefix.
+ */
+function partitionedLedgerTier(prefix: string): 'personal' | 'confidential' | undefined {
+  const normalized = normalizePath(prefix);
+  for (const root of Object.values(PARTITIONED_RUNTIME_LEDGER_ROOTS)) {
+    for (const tier of ['personal', 'confidential'] as const) {
+      if (normalized === `${root}/${tier}`) return tier;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Does the current role hold an explicit `allow_read` grant that names a
+ * partitioned ledger root (or a partition below it) and covers this path?
+ * Only role grants naming the ledger itself count — a broad ancestor such as
+ * `active/shared/` does not — so this admits exactly the governed ledger
+ * reader roles declared in security-policy.json.
+ */
+function ledgerRoleReadGrant(
+  policy: any,
+  relativePath: string,
+  identity: ReturnType<typeof resolvePolicyIdentityContext>
+): boolean {
+  if (!identity.role) return false;
+  const patterns: unknown = policy.authority_role_permissions?.[identity.role]?.allow_read;
+  if (!Array.isArray(patterns)) return false;
+  const missionId = resolveProjectScope().missionId;
+  return patterns.some((pattern) => {
+    if (typeof pattern !== 'string') return false;
+    const expanded = expandPolicyPath(pattern, missionId, identity.tenantSlug);
+    if (expanded === null) return false;
+    return (
+      Object.values(PARTITIONED_RUNTIME_LEDGER_ROOTS).some((root) =>
+        pathStartsWith(expanded, root)
+      ) && pathStartsWith(relativePath, expanded)
+    );
+  });
+}
+
+/**
+ * The persona/role/authority half of a protected-tier read decision (after the
+ * tenant check): SUDO scope, authority grants, role grants, persona grants,
+ * project scope, then the tier restriction. Partitioned runtime ledgers reuse
+ * it with their `knowledge/<tier>` path, so their persona rules are exactly
+ * those of the knowledge tier.
+ */
+function personaTierReadDecision(
+  policy: any,
+  relativePath: string,
+  identity: ReturnType<typeof resolvePolicyIdentityContext>
+): { allowed: boolean; reason?: string } {
   const {
     persona: currentPersona,
     role: currentRole,
     authorities,
     sudoScope,
     tenantSlug,
-    brokeredTenants,
-    brokerApproval,
-  } = resolvePolicyIdentityContext();
-
-  // Tenant scope — deny cross-tenant reads from confidential.
-  const tenantDenial = checkTenantScope(
-    policy,
-    relativePath,
-    tenantSlug,
-    brokeredTenants,
-    brokerApproval,
-    authorities,
-    { kind: 'read', role: currentRole }
-  );
-  if (tenantDenial) return tenantDenial;
-
+  } = identity;
+  const currentMission = resolveProjectScope().missionId;
+  const projectTier = relativePath.match(
+    /^active\/projects\/(personal|confidential|public)(?:\/|$)/
+  )?.[1];
+  const floorTier = storageFloorTier(relativePath);
+  const organizationTier = relativePath.match(
+    /^active\/organizations\/(personal|confidential|public)(?:\/|$)/
+  )?.[1];
   if (authorities.includes('SUDO') && hasScopedSudoAccess(relativePath, sudoScope))
     return { allowed: true };
   const floorPartitionPrefix = protectedFloorPartitionPrefix(relativePath);

@@ -280,6 +280,35 @@ local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
   fence, they fail with `ROLE_VIOLATION` on `knowledge/personal/tenants/`. Validate on creation and
   whenever an update changes the tenant; a plain re-sync of an existing item does not re-validate,
   so suspending a tenant does not strand its imported items.
+- **Tier data outside `knowledge/` keeps the knowledge tier's read rules.** A runtime ledger that
+  holds tenant or personal/confidential rows is partitioned
+  `active/shared/runtime/<ledger>/<tier>/<tenant|shared>/`, never appended to a repo-wide file.
+  Register its root in `PARTITIONED_RUNTIME_LEDGER_ROOTS` (`libs/core/storage-layout.ts`) and its
+  `<root>/{personal,confidential}/` prefixes in `tenant_scope.protected_prefixes`. Tier-guard then
+  applies the tenant check **and** the persona decision of `knowledge/<tier>/` to every read
+  (`personaTierReadDecision`) — never a second persona table. Aggregate readers skip a denied
+  partition with a diagnostic `debug` line instead of failing. Reuse the metrics ledgers'
+  `PartitionedMetricsLedger` and the offboarding `METRICS_LEDGERS` table
+  (`libs/core/scope-offboarding.ts`: export, approval-gated legacy-row prune, audit) instead of a
+  new mechanism.
+- **A read gate never weakens a cap.** A cap or limit enforcer reads gated ledgers only through
+  `aggregateMetricsForEnforcement` (`libs/core/metrics.ts`; governed read-only role
+  `metrics_cap_reader`, numbers only), never through a row reader, so a persona that may not read
+  the rows still has its spend counted. A report or summary built from a gated read passes
+  `onWithheld` and shows `metricsWithheldNotice` (one diagnostic warn + a "partial" line in its
+  output). Gate: `libs/core/metrics-enforcement-aggregate.test.ts`.
+- **Caps are evaluated where they are read.** A tenant-bound process evaluates spend caps per
+  bound tenant — policy (`spend-policy.json` `tenant_overrides`) and ledgers from the same
+  tenant — and ignores (debug-logs) a different requested tenant instead of mixing them; it never
+  refuses one, because tenant authorization is the scope layer's job (brokered missions, warn
+  posture). An unbound process evaluates the requested tenant, else globally. Compare slugs
+  trimmed and lower-cased. Any enforcement cache is keyed by tenant/day/mission, bounded, and kept
+  current by adding the process's own costed appends (zero-cost rows never invalidate it); only an
+  unattributable costed row invalidates. A budget evaluated over a scope wider
+  than what the process could read is `cost_status: 'partial'` with `withheld_partitions`.
+- **Never rewrite a hot ledger from a stale plan.** A prune of an append-only ledger (tenant
+  offboarding) recomputes, exports and rewrites under the same lock its appenders take
+  (`metricsLedgerLockId` + `withLockSync`); a plan computed earlier only sizes the dry run.
 - **Evidence stays in the tenant's scope.** A per-tenant command (activation probe, readiness
   report) that runs a repository-wide check keeps only the lines about its own tenant in the
   evidence it writes, and points at the repository-wide command for the rest.
@@ -290,7 +319,13 @@ local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
    the read through a governed system-scope reader instead of widening the policy. Add a
    `tier-guard-tenant.test.ts` case proving a tenant-bound context still cannot write (or, unless
    brokered, read) the file.
-2. Verify onboarding-flow commands with the real CLI in a throwaway worktree.
+2. When a store moves tenant rows out of a shared file, find every reader first
+   (`grep` the loader, e.g. `loadHistory(` / `loadResourceUsageHistory(`) and give each an explicit
+   read scope; a reader left on the default silently loses the tenant rows it used to see. Prove the
+   gate with the real tier-guard (pattern: `libs/core/metrics-ledger-persona-gate.test.ts` — one
+   persona allowed, one denied, aggregate read skips instead of throwing) and add a
+   `scope-offboarding.test.ts` case for the purge.
+3. Verify onboarding-flow commands with the real CLI in a throwaway worktree.
    - Create the throwaway company with `pnpm onboarding company … --slug probe-co --tenant-slug probe-co`.
    - Then run `tenant:activation plan|probe` and `work create-item` with `KYBERION_CUSTOMER`,
      `KYBERION_TENANT_SCOPE_REQUIRED=true` and `KYBERION_PERSONA=sovereign`.

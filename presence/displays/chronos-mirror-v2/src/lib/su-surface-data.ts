@@ -1,4 +1,5 @@
-import { MetricsCollector } from '@agent/core/metrics';
+import { MetricsCollector, metricsWithheldNotice } from '@agent/core/metrics';
+import { executionMetricsReadFor } from '@agent/core/cost-report';
 import { eventScopeMatches, type EventScopeFilter } from '@agent/core/event-scope';
 import {
   listGenerationCostSettlements,
@@ -64,6 +65,10 @@ export interface CostSummary {
   budgetUsd?: number;
   remainingUsd?: number | null;
   overBudget: boolean;
+  /** Set when tier-guard withheld metrics partitions from this viewer: totals are partial. */
+  partialNotice?: string;
+  /** Number of withheld partitions (set with partialNotice), for localized rendering. */
+  withheldPartitions?: number;
   generation: {
     actualUsd: number;
     settledJobs: number;
@@ -452,12 +457,21 @@ export function collectCostSummary(
     scopeFilter?: EventScopeFilter;
   } = {}
 ): CostSummary {
-  const history = new MetricsCollector({ persist: false }).loadHistory();
+  // The viewer's tenants (plus unscoped rows, matched below by mission id), or
+  // the governed aggregate; tier-guard applies the viewer's tenant and persona.
+  let withheld = 0;
+  const history = new MetricsCollector({ persist: false }).loadHistory({
+    read: executionMetricsReadFor(input.scopeFilter),
+    onWithheld: (partitions) => {
+      withheld += partitions;
+    },
+  });
+  const partialNotice = metricsWithheldNotice('chronos cost summary', withheld);
   const generationSettlements = listGenerationCostSettlements({
     scopeFilter: input.scopeFilter,
     since: input.since,
   });
-  return buildCostSummary({
+  const summary = buildCostSummary({
     history,
     generationSettlements,
     missionId: input.missionId,
@@ -466,6 +480,7 @@ export function collectCostSummary(
     budgetUsd: input.budgetUsd,
     scopeFilter: input.scopeFilter,
   });
+  return partialNotice ? { ...summary, partialNotice, withheldPartitions: withheld } : summary;
 }
 
 export function buildApprovalQueueItems(query: ApprovalQueueQuery = {}): ApprovalQueueItem[] {

@@ -30,7 +30,7 @@ Kyberion エコシステムへ参加するメンバーが、それぞれの役�
 **目標**: capability execution の実行性能を監視し、SLO 違反の検知と自動復旧（Self-healing）の仕組みを運用できる。
 
 - **Step 1: 観測**
-  - `work/metrics/`（`execution-metrics.jsonl` / `resource-usage.jsonl`）のデータ構造理解。テナント／confidential の使用量は `active/shared/runtime/usage-ledger/<tier>/<tenant|shared>/` に分割保存される（[runtime-storage-layout](../architecture/runtime-storage-layout.md)）
+  - `work/metrics/`（`execution-metrics.jsonl` / `resource-usage.jsonl`）のデータ構造理解。テナント／confidential の使用量と実行メトリクスは `active/shared/runtime/usage-ledger/<tier>/<tenant|shared>/` と `active/shared/runtime/execution-metrics/<tier>/<tenant|shared>/` に分割保存され、読み取りは knowledge 階層と同じペルソナ規則に従う（[runtime-storage-layout](../architecture/runtime-storage-layout.md)）
   - `pnpm dashboard`（`scripts/sovereign_dashboard.ts`）の実行と分析
 - **Step 2: 改善**
   - `pnpm check` の静的ゲートと TODO/FIXME スキャンによる技術負債の定量的評価

@@ -4,7 +4,7 @@ category: Roles
 tags: [roles, finance_controller, mission]
 importance: 7
 author: Ecosystem Architect
-last_updated: 2026-10-05
+last_updated: 2026-10-09
 kind: evergreen
 ---
 
@@ -18,6 +18,7 @@ kind: evergreen
 
 - **財務計画**: `financial-modeling-maestro`, `budget-variance-tracker`
 - **コスト最適化**: `unit-economics-optimizer`, `cloud-cost-estimator`
+- **部分集計の扱い**: コストレポートの `withheld_partitions` が 1 以上なら、ペルソナのティア規則で読めなかったメトリクス分割があり合計は過少。`resolveFinanceControllerDecision` は理由に「partial」を加え、完全な合計として扱わない（[runtime-storage-layout](../../architecture/runtime-storage-layout.md)）。
 - **インパクト分析**: `business-impact-analyzer`
 
 ## 3. 行動原則

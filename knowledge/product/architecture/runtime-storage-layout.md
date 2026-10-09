@@ -150,42 +150,118 @@ category-only text for tenant dots. One `storage-retention-catalog.json` entry
 covers `active/shared/runtime/dot`. See
 [resident-dot-model](./resident-dot-model.md).
 
-### Resource-usage ledger
+### Metrics ledgers (resource usage, execution metrics)
 
-Usage accounting (`MetricsCollector.recordResourceUsage`, `libs/core/metrics.ts`)
-is placed by the record's own `scope`; callers do not choose the file:
+Both ledgers of the shared `MetricsCollector` (`libs/core/metrics.ts`) place
+each row by the row's own `scope`; callers do not choose the file. Usage
+accounting (`recordResourceUsage`) and execution metrics (`record`: latency,
+tokens, cost per component call) share one mechanism:
 
-| Record scope                                      | Place                                                                             |
-| ------------------------------------------------- | --------------------------------------------------------------------------------- |
-| none, or `public` without a tenant (system)       | `work/metrics/resource-usage.jsonl` (legacy repo-wide file)                       |
-| carries a `tenant_slug`, or personal/confidential | `active/shared/runtime/usage-ledger/<tier>/<tenant\|shared>/resource-usage.jsonl` |
+| Record scope                                      | Resource usage                                                                    | Execution metrics                                                                         |
+| ------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| none, or `public` without a tenant (system)       | `work/metrics/resource-usage.jsonl` (legacy repo-wide file)                       | `work/metrics/execution-metrics.jsonl` (legacy repo-wide file; interventions too)         |
+| carries a `tenant_slug`, or personal/confidential | `active/shared/runtime/usage-ledger/<tier>/<tenant\|shared>/resource-usage.jsonl` | `active/shared/runtime/execution-metrics/<tier>/<tenant\|shared>/execution-metrics.jsonl` |
 
-- `loadResourceUsageHistory()` reads the system partition only;
+- Readers choose partitions with the same read scope
+  (`MetricsLedgerReadScope`): `loadResourceUsageHistory(read)` and
+  `loadHistory({ read })`. Omitted reads the system partition only;
   `{ scope }` reads one owner's partition (`includeSystem` adds the system
   one — the mission retrospective uses its mission's tier/tenant),
-  `{ tenants }` reads every tier partition of those tenants (tenant cost
-  report) and `{ all: true }` is the operator aggregate (cost report, HUD).
-- `usage-ledger/{personal,confidential}/` are `tenant_scope.protected_prefixes`:
+  `{ tenants }` reads every tier partition of those tenants (`includeSystem`
+  as above; tenant cost reports and tenant budgets add it for execution
+  metrics, whose unscoped rows are attributed by mission id) and
+  `{ all: true }` is the operator aggregate (cost report without a tenant
+  filter, terminal HUD, spend guard, health regressions, operator home).
+  `reportFromHistory(read)` / `detectRegressions(multiplier, read)` order the
+  merged rows by timestamp. Learning signals read the system partition only
+  (their clusters are tenant-free).
+- `<ledger>/{personal,confidential}/` are `tenant_scope.protected_prefixes`:
   tier-guard denies a tenant-bound process another tenant's partition on read
-  and write, so the operator aggregate skips what the caller may not see.
-- Rows written to the system file before partitioning stay there as
+  and write.
+- **Persona read gate.** A personal/confidential partition
+  `<tier>/<tenant>/` is readable only by a persona/role/authority that may
+  read `knowledge/<tier>/<tenant>/` (`knowledge/<tier>/` for the untenanted
+  `shared` segment): tier-guard reuses the knowledge decision
+  (`personaTierReadDecision` — SUDO scope, authority, role and persona
+  grants, tier restriction) for that mirror path, after the tenant check. So
+  tenant-scoped roles that read their tenant's knowledge (`slack_bridge`,
+  `chronos_tenant_runner`, `organization_operator`) also read that tenant's
+  partitions, never another tenant's. There is no separate persona table. Aggregate readers skip a denied
+  partition instead of failing and log a `debug` line in the diagnostic
+  format (`<ledger> partition skipped — … | next: … | evidence: <path>`).
+  A process whose persona may not read a tier (e.g. a plain `worker`
+  without the `mission_controller` role) sees only the system partition and
+  the tiers it may read.
+- **Reports say when they are partial.** Report and summary readers (cost
+  report, operator home, Chronos cost summary, terminal HUD, `pnpm kyberion doctor`,
+  soak) pass `onWithheld` and call `metricsWithheldNotice`: one `warn` line
+  in the diagnostic format, and the output itself carries
+  "N metrics partition(s) withheld for this persona — totals are partial"
+  (`partial_notice` / `partialNotice`, a `PARTIAL:` line in text output).
+- **Enforcers never under-count.** Cap and limit enforcers (spend guard, org
+  budget governor, generation-cost dedup) read only through
+  `aggregateMetricsForEnforcement`: it assumes the governed read-only role
+  `metrics_cap_reader` (security-policy `authority_role_permissions`: the two
+  ledger roots, no `knowledge/`, no write), bound to the caller's tenant, so
+  every tier of the enforcer's scope is counted whatever the caller's
+  persona while tenant isolation still holds. The caller gets numbers only —
+  sums of measure names declared before any row is read — and only an
+  allowlisted enforcer (`METRICS_ENFORCERS`) may call it. The per-row
+  classifier never sees a raw row: it gets `projectEnforcementRow`, a
+  whitelist of timestamp, cost, token counts, mission / usage / accounting
+  ids, tier / tenant / organization scope and the dot actor.
+  - Spend guard: a tenant-bound process always evaluates its bound tenant's
+    caps over that tenant's ledgers (a different requested tenant, e.g. a
+    brokered mission's, is debug-logged and ignored — authorization is the
+    scope layer's); an unbound process evaluates a requested tenant over
+    `{ tenants: [t], includeSystem: true }`, else the global caps. Slugs are
+    compared trimmed and lower-cased. Its short cache is keyed by
+    tenant/day/mission and bounded; costed rows the process appends are added
+    to matching entries at append time (`onExecutionMetricsAppend`), so
+    zero-cost bursts keep hitting the cache and only an unattributable costed
+    row drops entries.
+  - Budget governor: a scope wider than the bound tenant that could not see
+    every partition reports `cost_status: 'partial'` with
+    `withheld_partitions`, never a complete total. It is logged at `debug`
+    per call rather than audited: it runs on every reasoning call, returns no
+    row content, and the role's grant is read-only and narrow. Tier-guard
+    admits the role only through a role grant that names a ledger root
+    (`ledgerRoleReadGrant`), so broad grants such as `active/shared/` never
+    bypass the persona gate.
+- Rows written to a system file before partitioning stay there as
   **legacy**: each reader filters them by the row's own scope, so a tenant
   reader still sees its own old rows and the system reader never sees tenant
   rows; in every read mode a legacy tier row also inherits tier-guard's read
-  decision for its partition, so a tenant-bound process never sees another
-  tenant's old rows. There is no split command — the file is not rewritten,
-  so nothing can be lost or duplicated by a half-run migration. The one
-  exception is tenant offboarding (`scope-offboarding.ts`): it exports the
-  tenant's legacy rows, then removes them with one atomic, audited,
-  approval-gated rewrite, and soft-deletes the tenant's partitions.
+  decision (tenant and persona) for its partition, so it is visible only
+  where its partition would be. There is no split command — the file is not
+  rewritten, so nothing can be lost or duplicated by a half-run migration.
+  The one exception is tenant offboarding (`scope-offboarding.ts`): for each
+  ledger, under the ledger-file lock every appender also takes
+  (`metricsLedgerLockId`), it recomputes the tenant's legacy rows from the
+  file as it is at that moment, exports them, then removes them with one
+  atomic, audited, approval-gated rewrite
+  (`SCOPE_OFFBOARD_USAGE_LEDGER_PRUNE` / `SCOPE_OFFBOARD_EXECUTION_METRICS_PRUNE`),
+  so rows appended after the plan survive; it also exports + soft-deletes the
+  tenant's partitions.
+- A row's tenant comes from one resolver, `metricsRowTenant`
+  (`storage-layout.ts`): `scope.tenant_slug` / `scope.tenant_id`, then the
+  pre-canonical top-level `tenant_slug` / `tenant` / `tenant_id`. Placement,
+  legacy-row gating, offboarding and the budget governor all use it.
 - A tenant-bound process that records a personal/confidential row without a
   tenant gets its bound tenant stamped on (a bound process may not write
   `<tier>/shared/`). A row that still cannot be written is logged at warn,
   never dropped silently.
-- Persona tier gating is unchanged: like the old shared file, the partitions
-  carry no persona read gate of their own, so an unbound process of any
-  persona can read confidential usage rows. Only the tenant binding narrows
-  access.
+- An execution-metrics row whose scope cannot be placed (unknown tier,
+  invalid tenant slug) is still counted and never downgraded: it keeps its
+  tier (an unknown tier fails closed to `confidential`; `public` goes to the
+  system file), takes the bound tenant or the `shared` segment, drops its
+  tenant fields and is flagged `scope_invalid: true`; a warn line names the
+  producer's error. `recordResourceUsage` keeps throwing on an invalid scope
+  so its callers decide (e.g. direct-CLI usage warns and records nothing
+  rather than downgrade a confidential row).
+- An execution-metrics row without a `scope` or tenant field stays in the
+  system file even when it carries a tenant mission's `mission_id`:
+  placement follows the row's own scope and tenant only, as for usage rows.
 
 ## 3. Surface visibility
 

@@ -7,7 +7,7 @@ import {
   type EventScopeFilter,
   type EventScopeInput,
 } from './event-scope.js';
-import { metrics, MetricsCollector } from './metrics.js';
+import { aggregateMetricsForEnforcement, metrics, MetricsCollector } from './metrics.js';
 import { pathResolver } from './path-resolver.js';
 import { physicalScopedPath } from './physical-namespace.js';
 import { withLockSync } from './foundation/lock-utils.js';
@@ -258,9 +258,19 @@ export function settleGenerationProviderCost(
     if (actualCost !== undefined) {
       const usageId = `generation-provider-cost:${job.job_id}`;
       const collector = options.metricsCollector || metrics;
-      const alreadyRecorded = collector
-        .loadResourceUsageHistory({ scope })
-        .some((entry) => entry.usage_id === usageId);
+      // Idempotency is enforcement: count the row in every tier of the job's
+      // scope whatever the caller's persona (numbers only, no rows returned).
+      const alreadyRecorded =
+        aggregateMetricsForEnforcement({
+          enforcer: 'generation_cost_dedup',
+          ledger: 'resource_usage',
+          read: { scope },
+          measures: ['matches'] as const,
+          accumulate: (row, add) => {
+            if (row.usage_id === usageId) add('matches', 1);
+          },
+          collector,
+        }).measures.matches > 0;
       if (!alreadyRecorded) {
         try {
           collector.recordResourceUsage({

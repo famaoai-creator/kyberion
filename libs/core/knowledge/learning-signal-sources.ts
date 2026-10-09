@@ -491,6 +491,7 @@ export const executionMetricSource: LearningSignalSource = {
     'Execution metrics outside missions: component errors, latency far above the component median, and daily cost spikes.',
   minOccurrences: 3,
   read(window) {
+    // Tenant-free clusters: the system partition only, never tenant rows.
     const history = metrics.loadHistory() as Row[];
     const durations = new Map<string, number[]>();
     for (const row of history) {
