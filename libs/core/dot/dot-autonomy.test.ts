@@ -8,6 +8,7 @@ vi.mock('../customer-resolver.js', async (importOriginal) => {
 import {
   clearSeparationOfDuties,
   setSeparationOfDuties,
+  writeBrokenSeparationOfDutiesPolicy,
 } from '../governance/__tests__/sod-overlay.js';
 
 import { randomUUID } from 'node:crypto';
@@ -714,6 +715,43 @@ describe('dot autonomy supervisor step', () => {
       expect(
         readDotAutonomyState(CHARTER, { rootDir: TEST_ROOT }).pending_promotion
       ).toBeUndefined();
+    } finally {
+      clearSeparationOfDuties();
+    }
+  });
+
+  it('keeps a pending promotion (no audit) when the approval policy is unreadable', () => {
+    const start = new Date(T0.getTime() - 86_400_000);
+    setLevel('L2', {}, start);
+    feedback('approved', new Date(T0.getTime() - 3_000), 'a1');
+    feedback('approved', new Date(T0.getTime() - 2_000), 'a2');
+    outcome('improved', new Date(T0.getTime() - 1_000), 'o1');
+    expect(runDotAutonomyStep(CHARTER, stepDeps(T0).deps).promotion_requested?.to).toBe('L3');
+    const approved = {
+      id: 'req-promo',
+      status: 'approved',
+      requestedBy: 'dot:org-ops',
+      decidedBy: 'famao',
+      decidedByType: 'human',
+      correlationId: 'promo',
+      channel: 'operator',
+    } as ApprovalRequestRecord;
+    try {
+      setSeparationOfDuties(true);
+      writeBrokenSeparationOfDutiesPolicy();
+      const later = stepDeps(new Date(T0.getTime() + 60_000), { loadApproval: () => approved });
+      const step = runDotAutonomyStep(CHARTER, later.deps);
+      expect(step.change).toBeUndefined();
+      expect(step.promotion_cleared).toBeUndefined();
+      expect(later.audits).not.toContain('promotion_cleared');
+      expect(
+        readDotAutonomyState(CHARTER, { rootDir: TEST_ROOT }).pending_promotion?.request_id
+      ).toBe('req-promo');
+
+      // Policy fixed: a legitimate approval by someone else now promotes.
+      setSeparationOfDuties(true);
+      const fixed = stepDeps(new Date(T0.getTime() + 120_000), { loadApproval: () => approved });
+      expect(runDotAutonomyStep(CHARTER, fixed.deps).change).toMatchObject({ to: 'L3' });
     } finally {
       clearSeparationOfDuties();
     }
