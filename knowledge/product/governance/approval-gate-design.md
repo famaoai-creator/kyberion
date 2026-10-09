@@ -82,12 +82,16 @@ mission brief
   決定側は `decidedBy`（staged workflow では承認済みの各 stage の `approvedBy` も）。どちらも NFKC 正規化・
   前後空白除去・小文字化し、principal 種別の接頭辞（`user:` `human:` `operator:` `member:` `principal:`
   `agent:` `service:` `persona:` `actor:` `policy:`）を外してから比較する。`user:alice` と `alice` は同じ principal。
-- **policy が読めないとき（SoD が OFF でも）**: 承認の決定と、承認済みレコードの利用は、まず
-  `approval-policy.json` を読んで SoD の設定を確かめる。ファイルが無い・壊れているときは、SoD を OFF に
-  しているつもりでも、承認の決定と利用は
-  `[POLICY_VIOLATION] approval decision blocked — approval-policy.json unreadable | next: fix <path> | evidence: <原因>`
-  で止まる（fail closed）。却下は policy を読まないので通る。plugin の有効化判定だけは、例外を投げずに
-  `pending_approval` に落とし、診断の警告をログに出す（plugin 一覧や読み込みが止まらないように）。
+- **policy ファイルが無いとき・壊れているとき**: 承認の決定と、承認済みレコードの利用は、まず
+  `approval-policy.json` を読んで SoD の設定を確かめる。
+  - ファイルが無い（customer overlay も product 既定も無い。例: knowledge を持たない作業用 root）ときは、
+    出荷時の既定（`separation_of_duties.enabled: false`）として扱い、debug ログを 1 行出す。既定は OFF なので、
+    これで新しく許されることは無く、SoD OFF の振る舞いは変わらない。
+  - ファイルはあるが読めない・schema に合わないときは、SoD を OFF にしているつもりでも、承認の決定と利用は
+    `[POLICY_VIOLATION] approval decision blocked — approval-policy.json unreadable | next: fix <path> | evidence: <原因>`
+    で止まる（fail closed）。却下は policy を読まないので通る。plugin の有効化判定だけは、例外を投げずに
+    `pending_approval` に落とし、診断の警告をログに出す（plugin 一覧や読み込みが止まらないように）。
+    DOT autonomy の昇格待ちは取り消さず、次の sweep で再試行する。
 - **スコープ**: 設定は `approval-policy.json` 全体と同じく、有効な customer overlay
   （`customer/<slug>/policy/approval-policy.json`）がある場合はそれが product 既定を丸ごと置き換える。
   tenant・organization 単位の上書きはない（global 設定）。
