@@ -8,6 +8,7 @@ vi.mock('../customer-resolver.js', async (importOriginal) => {
 import {
   clearSeparationOfDuties,
   setSeparationOfDuties,
+  useSeparationOfDutiesOverlay,
 } from '../governance/__tests__/sod-overlay.js';
 
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
@@ -76,6 +77,11 @@ afterAll(() => {
     }
   });
 });
+
+// Per-test overlay file for switching separation of duties on/off.
+useSeparationOfDutiesOverlay(
+  pathResolver.sharedTmp(`sod-overlay-discussion-mission-${process.pid}.json`)
+);
 
 describe('approved decision → mission', () => {
   it('starts the mission only after a human approves, and threads the id through the outputs', async () => {

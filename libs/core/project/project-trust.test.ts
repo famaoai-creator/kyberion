@@ -8,6 +8,7 @@ vi.mock('../customer-resolver.js', async (importOriginal) => {
 import {
   clearSeparationOfDuties,
   setSeparationOfDuties,
+  useSeparationOfDutiesOverlay,
 } from '../governance/__tests__/sod-overlay.js';
 
 import {
@@ -26,6 +27,11 @@ import {
   createProjectTrustApprovalRequest,
   PROJECT_TRUST_APPROVAL_CHANNEL,
 } from './project-trust.js';
+
+// Per-test overlay file for switching separation of duties on/off.
+useSeparationOfDutiesOverlay(
+  pathResolver.sharedTmp(`sod-overlay-project-trust-${process.pid}.json`)
+);
 
 describe('project trust approvals', () => {
   it('re-request opens a new request instead of reusing a self-approval that separation of duties makes unusable', () => {

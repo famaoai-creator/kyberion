@@ -8,6 +8,7 @@ vi.mock('./customer-resolver.js', async (importOriginal) => {
 import {
   clearSeparationOfDuties,
   setSeparationOfDuties,
+  useSeparationOfDutiesOverlay,
 } from './governance/__tests__/sod-overlay.js';
 
 import { pathResolver } from './path-resolver.js';
@@ -71,6 +72,11 @@ const linkOf = (record: { approvalRequest?: { storageChannel: string; requestId:
   storageChannel: record.approvalRequest!.storageChannel,
   requestId: record.approvalRequest!.requestId,
 });
+
+// Per-test overlay file for switching separation of duties on/off.
+useSeparationOfDutiesOverlay(
+  pathResolver.sharedTmp(`sod-overlay-held-reconcile-${process.pid}.json`)
+);
 
 describe('a held action whose approval was decided elsewhere', () => {
   it('picks up an approval the bridge never delivered, and can then apply once', async () => {

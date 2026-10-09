@@ -9,6 +9,7 @@ vi.mock('../customer-resolver.js', async (importOriginal) => {
 import {
   clearSeparationOfDuties,
   setSeparationOfDuties,
+  useSeparationOfDutiesOverlay,
 } from '../governance/__tests__/sod-overlay.js';
 
 import { Ajv } from 'ajv';
@@ -404,6 +405,11 @@ afterEach(() => {
   if (previousUser === undefined) delete process.env.USER;
   else process.env.USER = previousUser;
 });
+
+// Per-test overlay file for switching separation of duties on/off.
+useSeparationOfDutiesOverlay(
+  pathResolver.sharedTmp(`sod-overlay-mission-work-reconciliation-${process.pid}.json`)
+);
 
 describe('mission existing work reconciliation', () => {
   it('re-request opens a new request instead of reusing a self-approval that separation of duties makes unusable', () => {

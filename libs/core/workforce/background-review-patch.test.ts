@@ -11,6 +11,7 @@ vi.mock('../customer-resolver.js', async (importOriginal) => {
 import {
   clearSeparationOfDuties,
   setSeparationOfDuties,
+  useSeparationOfDutiesOverlay,
 } from '../governance/__tests__/sod-overlay.js';
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
@@ -188,6 +189,11 @@ afterEach(() => {
     }
   });
 });
+
+// Per-test overlay file for switching separation of duties on/off.
+useSeparationOfDutiesOverlay(
+  pathResolver.sharedTmp(`sod-overlay-background-review-patch-${process.pid}.json`)
+);
 
 describe('background-review-patch', () => {
   it('re-request never hands back a self-approval that separation of duties makes unusable', () => {

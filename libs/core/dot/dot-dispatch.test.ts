@@ -8,7 +8,9 @@ vi.mock('../customer-resolver.js', async (importOriginal) => {
 import {
   clearSeparationOfDuties,
   setSeparationOfDuties,
+  useSeparationOfDutiesOverlay,
 } from '../governance/__tests__/sod-overlay.js';
+import { pathResolver } from '../path-resolver.js';
 
 import { randomUUID } from 'node:crypto';
 
@@ -199,6 +201,11 @@ afterEach(() => {
   setDotBudgetThrottleForTests(undefined);
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
 });
+
+// Per-test overlay file for switching separation of duties on/off.
+useSeparationOfDutiesOverlay(
+  pathResolver.sharedTmp(`sod-overlay-dot-dispatch-${process.pid}.json`)
+);
 
 describe('dispatchDotProposals — decision and delegation', () => {
   it('delegates an auto action as a WorkItem stamped with the dot actor id', () => {
