@@ -205,6 +205,7 @@ describe('vitest live-state sandbox', () => {
       shared('runtime/history-search/history.sqlite'),
       shared('runtime/usage-ledger/confidential/acme/resource-usage.jsonl'),
       shared('last_response.json'),
+      rootResolve('active/shared/cache/system/local-stt-discovery/candidates.json'),
       resolve('active/audit/system-ledger.jsonl'),
       rootResolve('active/shared/runtime/peer-messaging/tenants/acme/peers/p/inbox.jsonl'),
     ]) {
