@@ -93,6 +93,7 @@ const intentExtractorSeam = createSeam<IntentExtractor>({
   key: 'intent-extractor',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/intent/intent-extractor.ts',
 });
 let registeredDisposer: (() => void) | null = null;
 

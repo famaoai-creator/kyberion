@@ -9,6 +9,7 @@ const sourceWalkerSeam = createSeam<SourceWalker>({
   key: 'ingest-source-walker',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/actuators/ingest-actuator/src/sources/index.ts',
 });
 
 function assertSourceWalker(walker: SourceWalker): void {
