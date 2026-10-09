@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
-import { safeExec, safeExistsSync, pathResolver } from '@agent/core';
+import { safeExec, safeExistsSync } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -58,10 +59,26 @@ function ensurePersonalFixtures() {
   if (!safeExistsSync(LEDGER_PATH)) fs.writeFileSync(LEDGER_PATH, JSON.stringify({}, null, 2));
 }
 
+// This suite is an end-to-end test of the mission_controller CLI, so each
+// step is a real child process (11 per run). Measured (operations-hygiene-
+// runbook §5): a cold `start` child takes ~6.5s at load 5 and 30s+ at load
+// ~25-35 on 4 cores (node start-up, the 90k-line bundle, local STT probes, an
+// intent-contract grandchild, the mission micro-repo); delegate/verify/cancel
+// take ~2s idle. The child budget and the per-scenario budget (4-5 children)
+// are sized for that load: the 30s safeExec default killed `start` mid-write
+// and left a writer-lease lock behind.
+const CHILD_TIMEOUT_MS = 120_000;
+const SUITE_OPTIONS = { concurrent: false, timeout: 300_000 };
+
 function runMissionController(...args: string[]) {
   ensurePersonalFixtures();
   return safeExec('node', ['dist/scripts/mission_controller.js', ...args], {
-    env: { ...process.env, MISSION_ROLE: 'mission_controller' },
+    // `stub` keeps the controller's reasoning bootstrap off the host's
+    // provider CLIs: under load the `start` child spent seconds probing them
+    // (`claude auth status` alone took 2.7-4.9s at load 24), and the
+    // trust-ledger flow under test never reaches a reasoning backend.
+    env: { ...process.env, MISSION_ROLE: 'mission_controller', KYBERION_REASONING_BACKEND: 'stub' },
+    timeoutMs: CHILD_TIMEOUT_MS,
   });
 }
 
@@ -69,7 +86,7 @@ function readLedger(): Record<string, any> {
   return JSON.parse(fs.readFileSync(LEDGER_PATH, 'utf8'));
 }
 
-describe('A2A Mission Lifecycle & Trust Engine Integration', { concurrent: false }, () => {
+describe('A2A Mission Lifecycle & Trust Engine Integration', SUITE_OPTIONS, () => {
   beforeAll(() => {
     process.env.MISSION_ROLE = 'mission_controller';
     ensurePersonalFixtures();
@@ -127,7 +144,7 @@ describe('A2A Mission Lifecycle & Trust Engine Integration', { concurrent: false
 
     // Cleanup for next test
     runMissionController('cancel', missionId, 'cleanup after verification flow');
-  }, 60000);
+  });
 
   it('Scenario 2: Failure Flow (Rejected & Score Decrease)', async () => {
     const FAIL_MISSION_ID = `MSN-TEST-LIFE-FAIL-${RUN_ID}`;
@@ -144,7 +161,7 @@ describe('A2A Mission Lifecycle & Trust Engine Integration', { concurrent: false
     expect(ledger[AGENT_ID].current_score).toBe(480);
 
     runMissionController('cancel', FAIL_MISSION_ID, 'cleanup after rejection flow');
-  }, 60000);
+  });
 
   it('Scenario 3: Trust Guardrail (Insufficient Score)', async () => {
     const GUARD_MISSION_ID = `MSN-TEST-LIFE-GUARD-${RUN_ID}`;
@@ -177,5 +194,5 @@ describe('A2A Mission Lifecycle & Trust Engine Integration', { concurrent: false
     }
 
     runMissionController('cancel', GUARD_MISSION_ID, 'cleanup after trust guardrail flow');
-  }, 60000);
+  });
 });
