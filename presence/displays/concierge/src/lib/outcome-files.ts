@@ -294,7 +294,7 @@ export function outcomeDownloadHeaders(name: string, contentType: string, length
     (character) => '%' + character.charCodeAt(0).toString(16).toUpperCase()
   );
   return {
-    'Cache-Control': 'private, no-store',
+    'Cache-Control': 'private, no-store, no-transform',
     'X-Content-Type-Options': 'nosniff',
     'Content-Security-Policy': "sandbox; default-src 'none'",
     'Referrer-Policy': 'no-referrer',

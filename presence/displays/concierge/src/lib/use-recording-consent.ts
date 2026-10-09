@@ -1,5 +1,7 @@
 'use client';
 
+import { frontDeskFetch as fetch } from './front-desk-fetch';
+
 import * as React from 'react';
 import { frontDeskText, type ConciergeLocale } from './i18n';
 import type { Notice } from './settings-types';

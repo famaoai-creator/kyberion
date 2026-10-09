@@ -1,7 +1,10 @@
 'use client';
 
+import { frontDeskFetch as fetch } from '../lib/front-desk-fetch';
+
 import { localeToBcp47 } from '@agent/core/locale-normalize';
 import * as React from 'react';
+import { startSummaryWatch } from '../lib/summary-watch';
 import {
   Badge,
   Button,
@@ -352,15 +355,15 @@ export default function ConciergePage() {
     return () => window.removeEventListener(TENANT_CHANGED_EVENT, onSwitch);
   }, []);
 
-  const refresh = React.useCallback(async () => {
+  const refresh = React.useCallback(async (signal?: AbortSignal) => {
     try {
-      const response = await fetch('/api/summary', { cache: 'no-store' });
+      const response = await fetch('/api/summary', { cache: 'no-store', signal });
       const nextSummary = parseConciergeSummaryResponse(await response.json().catch(() => null));
       if (!response.ok || !nextSummary) throw new Error('Invalid summary response');
       setSummary(nextSummary);
       setLoadError(null);
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : String(error));
+      if (!signal?.aborted) setLoadError(error instanceof Error ? error.message : String(error));
     }
   }, []);
 
@@ -419,37 +422,18 @@ export default function ConciergePage() {
   }, []);
 
   React.useEffect(() => {
-    void refresh();
     void refreshResponseStatus();
     void refreshHygiene();
     void refreshMemoryQueue();
-    // CS-01: live summary updates over SSE; degrade to the legacy 30 s
-    // polling only when the event stream is unavailable.
-    let source: EventSource | null = null;
-    let fallbackTimer: ReturnType<typeof setInterval> | null = null;
-    const startPollingFallback = () => {
-      if (!fallbackTimer) fallbackTimer = setInterval(() => void refresh(), 30_000);
-    };
-    try {
-      source = new EventSource('/api/events');
-      source.addEventListener('summary', (event) => {
-        try {
-          const nextSummary = parseConciergeSummaryEvent((event as MessageEvent).data);
-          if (!nextSummary) return;
-          setSummary(nextSummary);
-          setLoadError(null);
-        } catch {
-          // Keep the last good snapshot when one event fails to parse.
-        }
-      });
-      source.onerror = () => {
-        source?.close();
-        source = null;
-        startPollingFallback();
-      };
-    } catch {
-      startPollingFallback();
-    }
+    const stopSummaryWatch = startSummaryWatch({
+      refresh,
+      onSummary: (event) => {
+        const nextSummary = parseConciergeSummaryEvent(event.data);
+        if (!nextSummary) return;
+        setSummary(nextSummary);
+        setLoadError(null);
+      },
+    });
     const responseTimer = setInterval(() => void refreshResponseStatus(), 10_000);
     // The hygiene report scans mission directories; a relaxed cadence is
     // plenty for a list that changes on the order of days. The memory queue
@@ -457,8 +441,7 @@ export default function ConciergePage() {
     const hygieneTimer = setInterval(() => void refreshHygiene(), 60_000);
     const memoryTimer = setInterval(() => void refreshMemoryQueue(), 60_000);
     return () => {
-      source?.close();
-      if (fallbackTimer) clearInterval(fallbackTimer);
+      stopSummaryWatch();
       clearInterval(responseTimer);
       clearInterval(hygieneTimer);
       clearInterval(memoryTimer);

@@ -1,5 +1,7 @@
 'use client';
 
+import { frontDeskFetch as fetch } from './front-desk-fetch';
+
 import * as React from 'react';
 import type { ConciergeLocale } from './i18n';
 import { localeToBcp47 } from '@agent/core/locale-normalize';
@@ -193,6 +195,7 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
     playerRef.current = createSpeechPlayer({
       win: window,
       synthesizeUrl: '/api/voice/synthesize',
+      fetchImpl: fetch,
       lipsync: lipsyncRef.current,
       lang: speechLocale(localeRef.current),
       onState: (state, detail) => {
