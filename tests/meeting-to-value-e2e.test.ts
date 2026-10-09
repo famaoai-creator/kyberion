@@ -1,5 +1,17 @@
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// createMission composes a mission team, and team-role assignment resolves a
+// provider through discoverProviders(), which spawns every host provider CLI
+// (claude, codex, gh copilot, gemini, …) when no discovery cache exists — the
+// case on CI and in a fresh worktree. The flow under test never uses a
+// provider (the reasoning backend is the stub), so answer discovery with a
+// fixed, installed-nothing list instead of probing the host.
+vi.mock('../libs/core/provider/provider-discovery.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../libs/core/provider/provider-discovery.js')>();
+  return { ...actual, discoverProviders: () => [] };
+});
 import {
   clearWorkCoordinationStore,
   clearSlackOutboxMessage,
@@ -41,7 +53,26 @@ function readPipeline(): {
   return JSON.parse(safeReadFile(PIPELINE_PATH, { encoding: 'utf8' }) as string) as any;
 }
 
+// createMission initialises working memory by importing the compiled
+// working-memory actuator (dist/…/working-memory-actuator/src/index.js). Under
+// Vitest that first import transforms the module graph: measured 2026-10-09 it
+// was ~1.8s of a ~3.1s beforeEach on an idle 4-vCPU host, and pushed the hook
+// past its 10s budget under load. Load it once here, with an explicit hook
+// timeout, so the per-test hook only pays for the mission it creates. The import
+// is best-effort like createMission's own (dist/ may not be built).
+const WORKING_MEMORY_ACTUATOR = pathResolver.rootResolve(
+  'dist/libs/actuators/working-memory-actuator/src/index.js'
+);
+
 describe('meeting-to-value e2e', () => {
+  beforeAll(async () => {
+    try {
+      await import(/* @vite-ignore */ WORKING_MEMORY_ACTUATOR);
+    } catch {
+      // Not built: createMission skips working memory the same way.
+    }
+  }, 60_000);
+
   const originalMissionRole = process.env.MISSION_ROLE;
   const originalPersona = process.env.KYBERION_PERSONA;
   const originalCustomer = process.env.KYBERION_CUSTOMER;
