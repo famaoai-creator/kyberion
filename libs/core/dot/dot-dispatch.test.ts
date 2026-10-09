@@ -1,4 +1,17 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('../customer-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../customer-resolver.js')>();
+  const { customerRootWithSodOverlay } =
+    await import('../governance/__tests__/sod-overlay-state.js');
+  return { ...actual, customerRoot: customerRootWithSodOverlay(actual.customerRoot) };
+});
+import {
+  clearSeparationOfDuties,
+  setSeparationOfDuties,
+  useSeparationOfDutiesOverlay,
+} from '../governance/__tests__/sod-overlay.js';
+import { pathResolver } from '../path-resolver.js';
+
 import { randomUUID } from 'node:crypto';
 
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
@@ -188,6 +201,11 @@ afterEach(() => {
   setDotBudgetThrottleForTests(undefined);
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
 });
+
+// Per-test overlay file for switching separation of duties on/off.
+useSeparationOfDutiesOverlay(
+  pathResolver.sharedTmp(`sod-overlay-dot-dispatch-${process.pid}.json`)
+);
 
 describe('dispatchDotProposals — decision and delegation', () => {
   it('delegates an auto action as a WorkItem stamped with the dot actor id', () => {
@@ -484,6 +502,28 @@ describe('settleDotParkedActions + learning', () => {
     expect(readDotFeedback('org-ops', h.deps)[0]).toMatchObject({ outcome: 'approved' });
     // Settled once: nothing left to settle.
     expect(settleDotParkedActions(CHARTER, h.deps)).toHaveLength(0);
+  });
+
+  it('declines an approved action whose approval separation of duties refuses (no dispatch)', () => {
+    const h = harness('approve');
+    dispatchDotProposals(CHARTER, [PROPOSAL], h.deps);
+    // A placeholder decider (no real identity) cannot be proven separate.
+    h.approvals.set('req-1', {
+      ...approval('approved', 'concierge'),
+      id: 'req-1',
+      requestedBy: 'dot:org-ops',
+      correlationId: 'c',
+      channel: 'operator',
+    });
+    try {
+      setSeparationOfDuties(true);
+      const settled = settleDotParkedActions(CHARTER, h.deps);
+      expect(settled[0]).toMatchObject({ status: 'declined' });
+      expect(settled[0].reason).toMatch(/Separation of duties: .*no real decider identity/);
+      expect(h.items).toHaveLength(0);
+    } finally {
+      clearSeparationOfDuties();
+    }
   });
 
   it('declines an approved action whose tenant stopped taking work while it waited', () => {

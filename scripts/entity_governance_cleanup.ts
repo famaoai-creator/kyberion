@@ -2,6 +2,7 @@
  * explicitly approved, soft-delete-only operation with an evidence receipt. */
 import * as path from 'node:path';
 import {
+  assertApprovalUsable,
   computeApprovalPayloadHash,
   createApprovalRequest,
   listApprovalRequests,
@@ -244,6 +245,7 @@ function assertCleanupApproval(
       `[POLICY_VIOLATION] EG-11 requires an approved mission_gate request: ${approvalRequestId}`
     );
   }
+  assertApprovalUsable(approval, { consumer: 'entity_governance_cleanup' });
   if (approval.source?.missionId?.toUpperCase() !== missionId.trim().toUpperCase()) {
     throw new Error('[POLICY_VIOLATION] EG-11 approval is bound to a different mission');
   }

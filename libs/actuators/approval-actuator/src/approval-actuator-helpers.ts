@@ -194,6 +194,10 @@ export async function handleApprovalAction(input: ApprovalAction) {
           requestId: params.requestId,
           decision: params.decision,
           decidedBy: params.decidedBy,
+          // The decider comes from ADF parameters, not from a resolved
+          // session: with separation of duties on, the store refuses such
+          // approvals.
+          deciderIdentitySource: 'caller_supplied',
           decidedByRole: params.decidedByRole,
           authMethod: params.authMethod,
           decidedByType: params.decidedByType,

@@ -23,6 +23,12 @@ vi.mock('./approval-store.js', async (importOriginal) => ({
   listApprovalRequests: vi.fn(),
   lookupSessionApprovalCache: vi.fn(() => null),
   recordSessionCacheAutoApproval: vi.fn(),
+  // Separation of duties is covered by approval-separation-of-duties.test.ts.
+  // The SoD-on paths run against the real store in approval-separation-of-duties.test.ts.
+  assertApprovalUsable: vi.fn(),
+  evaluateApprovalUsability: vi.fn(() => null),
+  isSeparationOfDutiesEnabled: vi.fn(() => false),
+  loadApprovalRequest: vi.fn(),
   computeApprovalPayloadHash: (payload: Record<string, unknown> | undefined) =>
     JSON.stringify(payload || {}),
 }));

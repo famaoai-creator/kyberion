@@ -1,4 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('./customer-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./customer-resolver.js')>();
+  const { customerRootWithSodOverlay } =
+    await import('./governance/__tests__/sod-overlay-state.js');
+  return { ...actual, customerRoot: customerRootWithSodOverlay(actual.customerRoot) };
+});
+import {
+  clearSeparationOfDuties,
+  setSeparationOfDuties,
+  useSeparationOfDutiesOverlay,
+} from './governance/__tests__/sod-overlay.js';
+
 import { pathResolver } from './path-resolver.js';
 import { safeAppendFileSync, safeMkdir, safeRmSync } from './secure-io.js';
 import { auditChain } from './governance/audit-chain.js';
@@ -60,6 +72,11 @@ const linkOf = (record: { approvalRequest?: { storageChannel: string; requestId:
   storageChannel: record.approvalRequest!.storageChannel,
   requestId: record.approvalRequest!.requestId,
 });
+
+// Per-test overlay file for switching separation of duties on/off.
+useSeparationOfDutiesOverlay(
+  pathResolver.sharedTmp(`sod-overlay-held-reconcile-${process.pid}.json`)
+);
 
 describe('a held action whose approval was decided elsewhere', () => {
   it('picks up an approval the bridge never delivered, and can then apply once', async () => {
@@ -175,5 +192,73 @@ describe('a held action whose approval was decided elsewhere', () => {
       })
     ).toThrow(/not mission_controller/);
     expect(cp.getHeldAction(record.id)?.status).toBe('pending');
+  });
+});
+
+describe('a held action whose linked approval fails separation of duties', () => {
+  it('is cancelled (dependents too) and the drain of other held actions continues', async () => {
+    const cp = new CloudflareOsControlPlane();
+    const self = submitLinked(cp, 'demo:self');
+    const other = submitLinked(cp, 'demo:other');
+    const dependent = cp.submitHeldAction({
+      missionId: 'mission-r',
+      tenantSlug: 'tenant-a',
+      submittedBy: 'agent:x',
+      op: 'demo:dependent',
+      params: { n: 2 },
+      dependsOn: [self.id],
+      apply: async () => 'ok',
+    });
+    const decide = (record: typeof self, decidedBy: string) =>
+      decideApprovalRequest('mission_controller', {
+        ...linkOf(record),
+        decision: 'approved',
+        decidedBy,
+        decidedByType: 'human',
+        authenticated: true,
+        payloadHash: record.payloadHash,
+        effectBinding: record.effectBinding,
+      });
+    try {
+      setSeparationOfDuties(false);
+      decide(self, 'agent:x'); // the requester approves its own held action
+      decide(other, 'human:famao');
+      await drainPendingSteeringApprovalExecutions();
+      cp.reconcileLinkedApprovals();
+      cp.decideHeldAction(dependent.id, 'approved', {
+        resolvedBy: 'human:famao',
+        decidedByType: 'human',
+        authenticated: true,
+        payloadHash: dependent.payloadHash,
+        effectBinding: dependent.effectBinding,
+      });
+      expect(cp.getHeldAction(self.id)?.status).toBe('approved');
+
+      setSeparationOfDuties(true);
+      await expect(cp.drainHeldActions('mission-r')).resolves.toBeDefined();
+      expect(cp.getHeldAction(self.id)?.status).toBe('cancelled');
+      expect(cp.getHeldAction(dependent.id)?.status).toBe('cancelled');
+      expect(cp.getHeldAction(other.id)?.status).toBe('applied');
+      expect(auditChain.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: 'separation_of_duties',
+          result: 'denied',
+          reason: expect.stringMatching(/re-request the held action/),
+          metadata: expect.objectContaining({ stage: 'use:held_action_apply' }),
+        })
+      );
+      expect(auditChain.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'held_action',
+          operation: 'cancel',
+          metadata: expect.objectContaining({
+            heldActionId: self.id,
+            reason: 'separation_of_duties_refused',
+          }),
+        })
+      );
+    } finally {
+      clearSeparationOfDuties();
+    }
   });
 });
