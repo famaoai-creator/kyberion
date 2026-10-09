@@ -61,7 +61,8 @@ const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
     ['../libs/core/mission/mission-workflow-catalog.js'],
   ],
   // Orchestration-worker white-box suites: vi.mock of internal collaborators
-  // (a2a route, supervisor, ledger, task events) requires source-module paths.
+  // (a2a route, supervisor, ledger, task events, the worker context's
+  // record-task / backend bootstrap) requires source-module paths.
   ...([
     'tests/agent-collaboration-e2e.test.ts',
     'tests/best-of-n-judge.test.ts',
@@ -75,6 +76,7 @@ const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
           '../libs/core/agent/agent-runtime-supervisor.js',
           '../libs/core/ledger.js',
           '../libs/core/mission/mission-orchestration-worker.js',
+          '../libs/core/mission/mission-orchestration-worker-part-context.js',
           '../libs/core/mission/mission-task-events.js',
           '../libs/core/mission/mission-team-plan-composer.js',
           '../libs/core/path-resolver.js',

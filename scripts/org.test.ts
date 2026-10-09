@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 function makeTempRoot(): string {
@@ -111,7 +112,7 @@ describe('org role create', () => {
   }
 
   it('resolves existing authority roles through the governed directory loader', () => {
-    const source = fs.readFileSync(path.join(process.cwd(), 'scripts', 'org.ts'), 'utf8');
+    const source = fs.readFileSync(fileURLToPath(new URL('./org.ts', import.meta.url)), 'utf8');
 
     expect(source).toContain('loadAuthorityRoleDirectory(rootDir)[authorityRoleId]');
     expect(source).not.toContain('readJsonIfExists');
