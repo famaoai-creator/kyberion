@@ -2,7 +2,7 @@ import { timingSafeEqual, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { auditChain } from './governance/audit-chain.js';
 import { computeApprovalPayloadHash, decideApprovalRequest } from './governance/approval-store.js';
-import { assertLinkedApprovalUsable } from './governance/approval-linked-usability.js';
+import { heldApprovalRefusal } from './governance/approval-linked-usability.js';
 import {
   collectCascadeCancellations,
   assertAdoptable,
@@ -600,7 +600,8 @@ export class CloudflareOsControlPlane {
       return record;
     if (record.status !== 'approved')
       throw new Error(`[POLICY_VIOLATION] Held action ${id} is not approved`);
-    if (record.approvalRequest) assertLinkedApprovalUsable(record.approvalRequest, id); // SoD
+    const sod = record.approvalRequest && heldApprovalRefusal(record.approvalRequest, id); // audited
+    if (sod) return this.settleCancelled(record, 'separation_of_duties_refused');
     const by = assertNonEmpty(record.resolvedBy || '', 'resolvedBy');
     record.resolvedBy = by;
     // A dependent runs only after its dependencies were applied; one whose

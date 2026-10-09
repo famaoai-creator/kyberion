@@ -12,21 +12,29 @@ import { loadApprovalRequest, type ApprovalRequestRecord } from './approval-stor
 
 /**
  * Held actions: the linked shared-store decision must still be usable (e.g.
- * not a self-approval recorded while the setting was off). With the setting
- * on, a missing linked record fails closed.
+ * not a self-approval recorded while the setting was off). Returns the
+ * refusal (audited) or undefined. With the setting on, a missing linked record
+ * fails closed. The caller cancels the held action rather than throwing, so a
+ * drain of other held actions continues.
  */
-export function assertLinkedApprovalUsable(
+export function heldApprovalRefusal(
   link: { storageChannel: string; requestId: string },
   heldId: string
-): void {
-  if (!isSeparationOfDutiesEnabled()) return;
+): string | undefined {
+  if (!isSeparationOfDutiesEnabled()) return undefined;
   const linked = loadApprovalRequest(link.storageChannel, link.requestId);
   if (!linked) {
-    throw new Error(
-      `[POLICY_VIOLATION] Held action ${heldId} has no linked approval record to verify separation of duties`
-    );
+    return `[POLICY_VIOLATION] Held action ${heldId} has no linked approval record to verify separation of duties`;
   }
-  assertApprovalUsable(linked, { consumer: 'held_action_apply' });
+  try {
+    assertApprovalUsable(linked, {
+      consumer: 'held_action_apply',
+      rerequestHint: `held action ${heldId} is cancelled — re-request the held action so a new approval is opened`,
+    });
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
 }
 
 /** The refusal message when an approved record is not usable (audited), else undefined. */
