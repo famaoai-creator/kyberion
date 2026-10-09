@@ -67,6 +67,8 @@ export interface CostSummary {
   overBudget: boolean;
   /** Set when tier-guard withheld metrics partitions from this viewer: totals are partial. */
   partialNotice?: string;
+  /** Number of withheld partitions (set with partialNotice), for localized rendering. */
+  withheldPartitions?: number;
   generation: {
     actualUsd: number;
     settledJobs: number;
@@ -478,7 +480,7 @@ export function collectCostSummary(
     budgetUsd: input.budgetUsd,
     scopeFilter: input.scopeFilter,
   });
-  return partialNotice ? { ...summary, partialNotice } : summary;
+  return partialNotice ? { ...summary, partialNotice, withheldPartitions: withheld } : summary;
 }
 
 export function buildApprovalQueueItems(query: ApprovalQueueQuery = {}): ApprovalQueueItem[] {

@@ -946,7 +946,15 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
         // libs/core for cap enforcement) holds an explicit read grant on the
         // ledger root itself; it never widens knowledge/ access.
         if (ledgerRoleReadGrant(loaded.policy, relativePath, identity)) return { allowed: true };
-        return personaTierReadDecision(loaded.policy, `knowledge/${ledgerTier}`, identity);
+        // The partition mirrors knowledge/<tier>/<tenant>/ (knowledge/<tier>/ for
+        // the untenanted `shared` segment), so tenant-scoped roles that may read
+        // their own tenant's knowledge also read their own tenant's partition.
+        const ledgerTenant = protectedMatch.tenant;
+        const knowledgeMirror =
+          ledgerTenant && ledgerTenant !== 'shared'
+            ? `knowledge/${ledgerTier}/${ledgerTenant}`
+            : `knowledge/${ledgerTier}`;
+        return personaTierReadDecision(loaded.policy, knowledgeMirror, identity);
       }
     } else if (
       loaded.status === 'corrupt' &&

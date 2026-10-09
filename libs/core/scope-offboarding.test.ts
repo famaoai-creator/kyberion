@@ -99,6 +99,11 @@ vi.mock('./secure-io.js', async () => {
     loadJson: (p: string) => JSON.parse(actual.readFileSync(p, 'utf8')),
     safeMkdir: (p: string, opts: any) => actual.mkdirSync(p, opts),
     safeWriteFile: (p: string, data: string) => {
+      // Test hook (on globalThis, like the fixture root): runs before a write,
+      // e.g. to append ledger rows between offboarding's plan and its prune.
+      (
+        globalThis as { __kyberion_offboard_write_hook__?: (target: string) => void }
+      ).__kyberion_offboard_write_hook__?.(p);
       actual.mkdirSync(path.dirname(p), { recursive: true });
       actual.writeFileSync(p, data);
     },
@@ -986,6 +991,55 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
       kept_lines: 3,
       approved_by: 'operator@example',
     });
+  });
+
+  it('keeps rows appended to the hot ledger between plan and prune; prunes legacy top-level tenants', () => {
+    const legacyLedger = 'work/metrics/execution-metrics.jsonl';
+    writeJsonl(legacyLedger, [
+      { component: 'legacy-a', scope: { tier: 'confidential', tenant_slug: TENANT } },
+      // Pre-canonical rows name the tenant at top level only (shared resolver).
+      { component: 'legacy-top', tenant_slug: TENANT },
+      { component: 'legacy-sys' },
+    ]);
+    const hooks = globalThis as { __kyberion_offboard_write_hook__?: (target: string) => void };
+    let appended = false;
+    hooks.__kyberion_offboard_write_hook__ = (target) => {
+      // After the plan (the manifest is written once the plan is fixed) and
+      // before the prune, live appenders keep writing to the ledger.
+      if (appended || !target.endsWith('manifest.json')) return;
+      appended = true;
+      fs.appendFileSync(
+        abs(legacyLedger),
+        `${JSON.stringify({ component: 'late-other', scope: { tier: 'public' } })}\n` +
+          `${JSON.stringify({ component: 'late-tenant', scope: { tier: 'confidential', tenant_slug: TENANT } })}\n`
+      );
+    };
+    try {
+      const result = offboardScope({
+        scopeType: 'tenant',
+        scopeId: TENANT,
+        mode: 'execute',
+        approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+        nowIso: '2026-10-08T01:02:03.000Z',
+      });
+      expect(appended).toBe(true);
+      expect(result.status).toBe('offboarded');
+      const kept = fs.readFileSync(abs(legacyLedger), 'utf8');
+      expect(kept).toContain('legacy-sys');
+      expect(kept).toContain('late-other');
+      expect(kept).not.toContain('legacy-top');
+      expect(kept).not.toContain('late-tenant');
+      expect(result.execution_metrics_legacy).toMatchObject({ matched: 3, removed: 3 });
+      const exported = fs.readFileSync(
+        abs(`${result.export_path}/execution-metrics-legacy-removed.jsonl`),
+        'utf8'
+      );
+      expect(exported).toContain('late-tenant');
+      expect(exported).toContain('legacy-top');
+      expect(result.verification).toEqual({ clean: true, leftovers: [] });
+    } finally {
+      delete hooks.__kyberion_offboard_write_hook__;
+    }
   });
 
   it('keeps a dedup line with a dangerous JSON key as an unreadable record', () => {
