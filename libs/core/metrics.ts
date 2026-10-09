@@ -21,6 +21,8 @@ import {
   STORAGE_DATA_TIERS,
   SYSTEM_PARTITION,
   UNTENANTED_PARTITION_SEGMENT,
+  metricsLedgerLockId,
+  metricsRowTenant,
   partitionedLedgerProtectedPrefixes,
   storagePartitionSegments,
   type StorageDataTier,
@@ -29,6 +31,7 @@ import {
 import { validateReadPermission } from './tier-guard.js';
 import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 import { withExecutionContext } from './authority.js';
+import { withLockSync } from './foundation/lock-utils.js';
 const logger = createLogger('metrics');
 
 interface SloTarget {
@@ -132,16 +135,32 @@ function partitionKey(partition: StoragePartition): string {
   return storagePartitionSegments(partition).join('/');
 }
 
+/** Partition of a stored or new row (scope tier + metricsRowTenant); throws when unplaceable. */
+export function metricsRowPartition(row: { scope?: unknown }): StoragePartition {
+  const scope = row.scope;
+  if (scope !== undefined && (typeof scope !== 'object' || scope === null)) {
+    throw new Error('[METRICS_LEDGER_SCOPE_INVALID] scope is not an object');
+  }
+  const tenant = metricsRowTenant(row);
+  if (!scope && !tenant) return SYSTEM_PARTITION;
+  const partition = metricsLedgerPartition({
+    tier: (scope as UsageScopeRef | undefined)?.tier,
+    ...(tenant ? { tenant_slug: tenant } : {}),
+  });
+  storagePartitionSegments(partition); // throws on an invalid tenant slug
+  return partition;
+}
+
 /** Partition key of a stored record; a malformed scope never matches a scoped reader. */
 function recordPartitionKey(record: { scope?: unknown }): string {
   try {
-    const scope = record.scope;
-    if (scope !== undefined && (typeof scope !== 'object' || scope === null)) return '(invalid)';
-    return partitionKey(metricsLedgerPartition(scope as UsageScopeRef | undefined));
+    return partitionKey(metricsRowPartition(record));
   } catch {
     return '(invalid)';
   }
 }
+
+export { metricsLedgerLockId, metricsRowTenant };
 
 /**
  * Which partitions a metrics-ledger reader sees (both ledgers).
@@ -181,15 +200,61 @@ class PartitionedMetricsLedger {
     );
   }
 
-  /** File a row is appended to: the system file, or its tier/tenant partition (created). */
-  appendPath(scope: UsageScopeRef | undefined, systemFile: () => string): string {
-    const partition = metricsLedgerPartition(scope);
-    if (partition.kind === 'system') return systemFile();
-    // Tier/tenant data never falls back to the shared system file.
+  /**
+   * Append one row to its partition (created on demand) or, under the ledger
+   * lock, to the system file. A row whose scope cannot be placed (unknown
+   * tier, invalid tenant slug) is still counted, never downgraded: it keeps
+   * its tier (an unknown tier fails closed to confidential; a public one goes
+   * to the system file), takes the bound tenant or the `shared` segment,
+   * drops its tenant fields, is flagged `scope_invalid: true`, and a warn
+   * line names the producer's error.
+   */
+  append(row: Record<string, unknown>, systemFile: () => string): void {
+    let placed = row;
+    let partition: StoragePartition;
+    try {
+      partition = metricsRowPartition(row);
+    } catch (err) {
+      const {
+        scope: rawScope,
+        tenant_slug: _tenantSlug,
+        tenant: _tenant,
+        tenant_id: _tenantId,
+        ...rest
+      } = row;
+      const rawTier =
+        rawScope && typeof rawScope === 'object'
+          ? (rawScope as { tier?: unknown }).tier
+          : undefined;
+      const tier: StorageDataTier =
+        rawTier === 'public' || rawTier === 'personal' ? rawTier : 'confidential';
+      const bound = resolvePolicyIdentityContext().tenantSlug;
+      partition =
+        tier === 'public'
+          ? SYSTEM_PARTITION
+          : { kind: 'tier', tier, ...(bound ? { tenant: bound } : {}) };
+      placed = {
+        ...rest,
+        ...(tier === 'public' ? {} : { scope: { tier, ...(bound ? { tenant_slug: bound } : {}) } }),
+        scope_invalid: true,
+      };
+      logger.warn(
+        `${this.label} row scope cannot be placed — recorded in ${partitionKey(partition)} with scope_invalid (tier kept, never downgraded) | next: fix the producer's scope (tier personal/confidential/public, valid tenant slug) | evidence: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+    if (partition.kind === 'system') {
+      const filePath = systemFile();
+      withLockSync(metricsLedgerLockId(filePath), () => {
+        ensureRegularFile(filePath);
+        appendJsonLine(filePath, placed);
+      });
+      return;
+    }
     const filePath = this.partitionPath(partition);
     const dir = path.dirname(filePath);
     if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-    return filePath;
+    ensureRegularFile(filePath);
+    appendJsonLine(filePath, placed);
   }
 
   /**
@@ -217,8 +282,9 @@ class PartitionedMetricsLedger {
       const want = (partition: StoragePartition) => wanted.set(partitionKey(partition), partition);
       try {
         if (!read || ('includeSystem' in read && read.includeSystem)) want(SYSTEM_PARTITION);
-        if (read && 'scope' in read) want(metricsLedgerPartition(read.scope));
-        else if (read && 'tenants' in read) {
+        if (read && 'scope' in read) {
+          want(metricsLedgerPartition(withBoundTenant(read.scope as EventScopeInput)));
+        } else if (read && 'tenants' in read) {
           for (const tenant of read.tenants) {
             for (const tier of STORAGE_DATA_TIERS) want({ kind: 'tier', tier, tenant });
           }
@@ -253,9 +319,7 @@ class PartitionedMetricsLedger {
       if (!readable.has(key)) {
         let allowed = false;
         try {
-          const partitionPath = this.partitionPath(
-            metricsLedgerPartition(row.scope as UsageScopeRef | undefined)
-          );
+          const partitionPath = this.partitionPath(metricsRowPartition(row));
           allowed = this.permitted(partitionPath, 'legacy rows');
         } catch {
           allowed = false;
@@ -554,6 +618,8 @@ export interface ResourceUsageRecord {
   source: string;
   /** Canonical containment scope; legacy records may omit it. */
   scope?: EventScope;
+  /** Set when the producer's scope could not be placed; the row lives in the system partition. */
+  scope_invalid?: true;
   metadata?: Record<string, unknown>;
   cause?: UsageCause;
 }
@@ -634,6 +700,8 @@ export class MetricsCollector {
       throw new Error('resource usage cost_usd must be a finite non-negative number');
     }
     const missionId = input.mission_id || getRegisteredEnvText('MISSION_ID') || undefined;
+    // An invalid scope throws to the caller (its contract: e.g. direct-CLI
+    // usage warns and records nothing rather than downgrading a tier).
     const scope = input.scope ? normalizeEventScope(withBoundTenant(input.scope)) : undefined;
     const record: ResourceUsageRecord = {
       type: 'resource_usage',
@@ -1108,11 +1176,8 @@ export class MetricsCollector {
 
   private _appendToFile(entry: any) {
     try {
-      const filePath = this._executionLedger.appendPath(entry.scope, () =>
-        this._systemFilePath(this._metricsFile)
-      );
-      this._ensureRegularMetricsFile(filePath);
-      appendJsonLine(filePath, entry);
+      this._executionLedger.append(entry, () => this._systemFilePath(this._metricsFile));
+      executionMetricsGenerationCounter += 1;
     } catch (err) {
       // Best-effort: never block the operation, but never drop a row silently.
       logger.warn(
@@ -1123,11 +1188,9 @@ export class MetricsCollector {
 
   private _appendResourceUsage(entry: ResourceUsageRecord) {
     try {
-      const filePath = this._usageLedger.appendPath(entry.scope, () =>
+      this._usageLedger.append(entry as unknown as Record<string, unknown>, () =>
         this._systemFilePath(this._resourceUsageFile)
       );
-      this._ensureRegularMetricsFile(filePath);
-      appendJsonLine(filePath, entry);
     } catch (err) {
       // Best-effort: never block the operation, but never drop a row silently.
       logger.warn(
@@ -1169,6 +1232,23 @@ function executionRowScope(scope: unknown): unknown {
   }
 }
 
+function ensureRegularFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`metrics file must be a regular file: ${filePath}`);
+  }
+}
+
+let executionMetricsGenerationCounter = 0;
+
+/**
+ * In-process generation of the execution-metrics ledgers: bumped on every
+ * row this process appends, so cached enforcement totals are invalidated by
+ * the process's own spend instead of lagging a burst by the cache TTL.
+ */
+export function executionMetricsGeneration(): number {
+  return executionMetricsGenerationCounter;
+}
+
 export const metrics = new MetricsCollector();
 
 /**
@@ -1192,8 +1272,113 @@ export function metricsWithheldNotice(reader: string, partitions: number): strin
  */
 export const METRICS_CAP_READER_ROLE = 'metrics_cap_reader';
 
-/** Cap / limit enforcers allowed to use the enforcement aggregate. */
-export type MetricsEnforcer = 'spend_guard' | 'org_budget_governor' | 'generation_cost_dedup';
+/** Cap / limit enforcers allowed to use the enforcement aggregate (checked at runtime). */
+export const METRICS_ENFORCERS = [
+  'spend_guard',
+  'org_budget_governor',
+  'generation_cost_dedup',
+] as const;
+export type MetricsEnforcer = (typeof METRICS_ENFORCERS)[number];
+
+/**
+ * Interactive operator CLI producers (front-CLI session hooks such as
+ * recordCliUsage): their unattributed rows are reported, never a cap input.
+ */
+export const INTERACTIVE_CLI_PRODUCERS: ReadonlySet<string> = new Set(['claude-code-cli']);
+
+/**
+ * The whitelisted projection of a ledger row an enforcement classifier sees.
+ * Never task text, prompts, metadata or free-form fields — only what a cap
+ * needs: time, cost, token counts, mission / usage / accounting ids, the
+ * tier/tenant/organization scope and the dot actor.
+ */
+export interface EnforcementRowView {
+  readonly timestamp?: string;
+  /** Number when finite; null when present but not a finite number; undefined when absent. */
+  readonly cost_usd?: number | null;
+  readonly usage?: Readonly<{
+    prompt_tokens: number;
+    completion_tokens: number;
+    cache_read_tokens: number;
+    cache_write_tokens: number;
+    cache_write_1h_tokens: number;
+  }>;
+  readonly mission_id?: string;
+  readonly usage_id?: string;
+  readonly accounting_id?: string;
+  readonly dot_id?: string;
+  /** actor_id / agent / component when it names a dot (`dot:<id>`). */
+  readonly dot_actor?: string;
+  /** agent / component is an interactive operator CLI producer. */
+  readonly interactive_cli: boolean;
+  readonly scope?: Readonly<{
+    tier?: string;
+    tenant_slug?: string;
+    organization_id?: string;
+    scope_kind?: string;
+  }>;
+  /** metricsRowTenant(row), or undefined. */
+  readonly tenant_slug?: string;
+  /** scope.organization_id, else the legacy top-level organization_id. */
+  readonly organization_id?: string;
+}
+
+const text = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim() ? value : undefined;
+const tokenCount = (value: unknown): number => (Number(value) > 0 ? Number(value) : 0);
+
+/** Project a raw ledger row onto the enforcement whitelist. */
+export function projectEnforcementRow(row: unknown): EnforcementRowView {
+  const r = row && typeof row === 'object' ? (row as Record<string, unknown>) : {};
+  const scope =
+    r.scope && typeof r.scope === 'object' ? (r.scope as Record<string, unknown>) : null;
+  const u = r.usage && typeof r.usage === 'object' ? (r.usage as Record<string, unknown>) : null;
+  const cost = r.cost_usd;
+  const dotActor = [r.actor_id, r.agent, r.component].find(
+    (value): value is string => typeof value === 'string' && value.startsWith('dot:')
+  );
+  const tenant = metricsRowTenant(r);
+  const organization = text(scope?.organization_id) ?? text(r.organization_id);
+  return Object.freeze({
+    ...(typeof r.timestamp === 'string' ? { timestamp: r.timestamp } : {}),
+    ...(cost === undefined
+      ? {}
+      : { cost_usd: typeof cost === 'number' && Number.isFinite(cost) ? cost : null }),
+    ...(u
+      ? {
+          usage: Object.freeze({
+            prompt_tokens: tokenCount(u.prompt_tokens ?? u.input_tokens),
+            completion_tokens: tokenCount(u.completion_tokens ?? u.output_tokens),
+            cache_read_tokens: tokenCount(u.cache_read_tokens ?? u.cache_read_input_tokens),
+            cache_write_tokens: tokenCount(u.cache_write_tokens ?? u.cache_creation_input_tokens),
+            cache_write_1h_tokens: tokenCount(u.cache_write_1h_tokens),
+          }),
+        }
+      : {}),
+    ...(text(r.mission_id) ? { mission_id: text(r.mission_id) } : {}),
+    ...(text(r.usage_id) ? { usage_id: text(r.usage_id) } : {}),
+    ...(text(r.accounting_id) ? { accounting_id: text(r.accounting_id) } : {}),
+    ...(text(r.dot_id) ? { dot_id: text(r.dot_id) } : {}),
+    ...(dotActor ? { dot_actor: dotActor } : {}),
+    interactive_cli: [r.agent, r.component].some(
+      (value) => typeof value === 'string' && INTERACTIVE_CLI_PRODUCERS.has(value)
+    ),
+    ...(scope
+      ? {
+          scope: Object.freeze({
+            ...(text(scope.tier) ? { tier: text(scope.tier) } : {}),
+            ...(text(scope.tenant_slug) ? { tenant_slug: text(scope.tenant_slug) } : {}),
+            ...(text(scope.organization_id)
+              ? { organization_id: text(scope.organization_id) }
+              : {}),
+            ...(text(scope.scope_kind) ? { scope_kind: text(scope.scope_kind) } : {}),
+          }),
+        }
+      : {}),
+    ...(tenant ? { tenant_slug: tenant } : {}),
+    ...(organization ? { organization_id: organization } : {}),
+  });
+}
 
 export interface MetricsEnforcementTotals<M extends string> {
   /** Sums of the caller's pre-declared measures. */
@@ -1226,15 +1411,17 @@ export function aggregateMetricsForEnforcement<M extends string>(input: {
   ledger: 'execution_metrics' | 'resource_usage';
   read: MetricsLedgerReadScope;
   measures: readonly M[];
-  accumulate: (
-    row: Readonly<Record<string, unknown>>,
-    add: (measure: M, value: number) => void
-  ) => void;
+  accumulate: (row: EnforcementRowView, add: (measure: M, value: number) => void) => void;
   /** Execution metrics only: strict read with torn-line reporting (line number + day only). */
   strict?: boolean;
   onMalformed?: (lineNumber: number, day: string | undefined) => void;
   collector?: MetricsCollector;
 }): MetricsEnforcementTotals<M> {
+  if (!(METRICS_ENFORCERS as readonly string[]).includes(input.enforcer)) {
+    throw new Error(
+      `[METRICS_ENFORCEMENT_ENFORCER] '${String(input.enforcer)}' is not an allowlisted enforcer`
+    );
+  }
   const declared = new Set<string>(input.measures);
   const measures = Object.fromEntries(input.measures.map((m) => [m, 0])) as Record<M, number>;
   const add = (measure: M, value: number) => {
@@ -1270,7 +1457,8 @@ export function aggregateMetricsForEnforcement<M extends string>(input: {
     undefined,
     tenant
   );
-  for (const row of rows) input.accumulate(Object.freeze(row), add);
+  // The classifier sees the whitelisted projection only, never the raw row.
+  for (const row of rows) input.accumulate(projectEnforcementRow(row), add);
   logger.debug(
     `metrics enforcement aggregate — ${input.enforcer} read ${input.ledger} as ${METRICS_CAP_READER_ROLE} | next: none | evidence: rows=${rows.length} withheld=${withheld} tenant=${tenant ?? '(unbound)'}`
   );

@@ -44,6 +44,8 @@ export interface OperatorHomeCostSummary {
   overBudget: boolean;
   /** Set when tier-guard withheld metrics partitions from this reader: totals are partial. */
   partialNotice?: string;
+  /** Number of withheld partitions (set with partialNotice), for localized rendering. */
+  withheldPartitions?: number;
   missionBreakdown: Array<{
     missionId: string;
     tokens: number;
@@ -396,7 +398,7 @@ function collectCostSummary(
     budgetUsd,
     remainingUsd,
     overBudget: typeof budgetUsd === 'number' ? totalUsd > budgetUsd : false,
-    ...(partialNotice ? { partialNotice } : {}),
+    ...(partialNotice ? { partialNotice, withheldPartitions: withheld } : {}),
     missionBreakdown: Array.from(byMission.values()).sort((left, right) => right.usd - left.usd),
   };
 }

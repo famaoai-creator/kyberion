@@ -517,6 +517,14 @@ describe('mission retrospective loop', () => {
         });
       call(10, { tier: 'confidential', tenant_slug: 'tenant-a' });
       call(20); // unscoped, attributed by mission id only (system partition)
+      // Same tenant, another tier: still this mission's spend.
+      collector.record('anthropic-sdk', 1, 'success', {
+        mission_id: MISSION,
+        model: 'claude-fable-5',
+        usage: { prompt_tokens: 5, completion_tokens: 0 },
+        cost_usd: 0,
+        scope: { tier: 'personal', tenant_slug: 'tenant-a' },
+      });
       call(400, { tier: 'confidential', tenant_slug: 'tenant-b' });
       const partition = (tenant: string) =>
         path.join(
@@ -529,7 +537,7 @@ describe('mission retrospective loop', () => {
       expect(fs.readFileSync(partition('tenant-b'), 'utf8')).toContain(MISSION);
 
       const stats = mod.collectMissionExecutionStats(MISSION);
-      expect(stats.token_usage).toMatchObject({ prompt_tokens: 30, entries: 2 });
+      expect(stats.token_usage).toMatchObject({ prompt_tokens: 35, entries: 3 });
     });
   });
 
