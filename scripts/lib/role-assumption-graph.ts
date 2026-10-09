@@ -156,17 +156,6 @@ function mergeResolution(into: RoleResolution, from: RoleResolution): RoleResolu
   return into;
 }
 
-function isAssignmentTarget(node: ts.Node): boolean {
-  const parent = node.parent;
-  return (
-    !!parent &&
-    ts.isBinaryExpression(parent) &&
-    parent.left === node &&
-    parent.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
-    parent.operatorToken.kind <= ts.SyntaxKind.LastAssignment
-  );
-}
-
 function isInTypePosition(node: ts.Node): boolean {
   return ts.isTypeNode(node) && !ts.isExpressionWithTypeArguments(node);
 }
@@ -214,13 +203,6 @@ export class Analyzer {
     { inheritsByDefault: boolean; optionsIndex: number }
   >();
   private readonly projectFiles: readonly ts.SourceFile[];
-  /**
-   * Every name a project source can declare a member under (see
-   * collectDeclaredMemberNames). A `x.name` access whose name is not in this
-   * set cannot resolve to a project declaration, so it is skipped without
-   * asking the checker, which would type-check `x` to answer.
-   */
-  private readonly declaredMemberNames = new Set<string>(['default']);
 
   constructor(
     private readonly ws: Workspace,
@@ -234,7 +216,6 @@ export class Analyzer {
       .filter((sourceFile) => isProjectSource(ws, sourceFile.fileName));
     this.units = new UnitIndex(ws, this.projectFiles);
     this.indexKnownDeclarations();
-    this.collectDeclaredMemberNames();
     for (const sourceFile of this.projectFiles) this.scanFile(sourceFile);
     this.resolveForwards();
   }
@@ -259,53 +240,6 @@ export class Analyzer {
         }
       }
     }
-  }
-
-  /**
-   * Collect the names under which a project declaration can be reached by a
-   * property access: every identifier or private identifier in a declaration
-   * name position (members, properties, methods, accessors, enum members,
-   * parameters, export specifiers, ...), an expando assignment target
-   * (`fn.name = ...`), every string literal (quoted keys,
-   * `Object.defineProperty`), and the literal values of computed keys. This
-   * is a superset: a name only needs to be absent for the access to be
-   * skipped safely.
-   */
-  private collectDeclaredMemberNames(): void {
-    const names = this.declaredMemberNames;
-    const visit = (node: ts.Node): void => {
-      if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) {
-        const parent = node.parent as (ts.Node & { name?: ts.Node }) | undefined;
-        if (
-          parent?.name === node &&
-          (!ts.isPropertyAccessExpression(parent) || isAssignmentTarget(parent))
-        ) {
-          names.add(node.text);
-        }
-        return;
-      }
-      if (ts.isStringLiteralLike(node)) {
-        names.add(node.text);
-        return;
-      }
-      if (ts.isComputedPropertyName(node)) {
-        const values = this.literalStrings(this.checker.getTypeAtLocation(node.expression));
-        for (const value of values ?? []) names.add(value);
-      }
-      ts.forEachChild(node, visit);
-    };
-    for (const sourceFile of this.projectFiles) visit(sourceFile);
-  }
-
-  /** A `x.name` access whose name no project source declares (cannot reach a project unit). */
-  private isForeignMemberName(node: ts.Node): boolean {
-    const parent = node.parent;
-    return (
-      !!parent &&
-      ts.isPropertyAccessExpression(parent) &&
-      parent.name === node &&
-      !this.declaredMemberNames.has((node as ts.MemberName).text)
-    );
   }
 
   private addEdge(from: Unit, to: Unit | undefined): void {
@@ -645,7 +579,6 @@ export class Analyzer {
   ): ts.Declaration | undefined {
     const expression = unwrapExpression(call.expression);
     const nameNode = ts.isPropertyAccessExpression(expression) ? expression.name : expression;
-    if (this.isForeignMemberName(nameNode)) return undefined;
     const symbol = this.resolveAlias(this.checker.getSymbolAtLocation(nameNode));
     return symbol?.valueDeclaration ?? symbol?.declarations?.[0];
   }
@@ -711,7 +644,6 @@ export class Analyzer {
   }
 
   private scanIdentifier(unit: Unit, node: ts.Identifier | ts.PrivateIdentifier): void {
-    if (this.isForeignMemberName(node)) return;
     const parent = node.parent;
     let symbol: ts.Symbol | undefined;
     if (ts.isShorthandPropertyAssignment(parent) && parent.name === node) {
