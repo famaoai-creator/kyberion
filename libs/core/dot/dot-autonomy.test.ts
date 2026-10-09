@@ -9,7 +9,9 @@ import {
   clearSeparationOfDuties,
   setSeparationOfDuties,
   writeBrokenSeparationOfDutiesPolicy,
+  useSeparationOfDutiesOverlay,
 } from '../governance/__tests__/sod-overlay.js';
+import { pathResolver } from '../path-resolver.js';
 
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
@@ -169,6 +171,11 @@ function dispatchDeps(base: DotDecisionLevel, now = T0): DotDispatchDeps {
 afterEach(() => {
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
 });
+
+// Per-test overlay file for switching separation of duties on/off.
+useSeparationOfDutiesOverlay(
+  pathResolver.sharedTmp(`sod-overlay-dot-autonomy-${process.pid}.json`)
+);
 
 describe('dot autonomy levels and state', () => {
   it('registers floor, relaxer, status and digest sections', () => {
