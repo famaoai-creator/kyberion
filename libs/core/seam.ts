@@ -7,6 +7,7 @@
  */
 
 import { assertModuleInvariant } from './invariants.js';
+import { isVitestProcess } from './foundation/env.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('seam');
@@ -40,11 +41,14 @@ export interface SeamDefinition<T> {
    *
    * A module that creates a seam at load time can be evaluated twice against
    * one catalog instance — a `vi.resetModules()` racing an import still in
-   * flight (operations-hygiene-runbook §5). The catalog then lets the second
-   * evaluation replace the entry its owner registered before, with a warning,
-   * instead of throwing. A definition with a different (or no) owner, or a
-   * different multiplicity, is still rejected as a duplicate. It is an
-   * identity for re-evaluation, not a security boundary.
+   * flight (operations-hygiene-runbook §5). Under Vitest only, the catalog
+   * then lets the second evaluation replace the entry its owner registered
+   * before, with a warning, instead of throwing. A definition with a different
+   * (or no) owner, or a different multiplicity, is still rejected as a
+   * duplicate. Outside Vitest every re-registration throws
+   * `SEAM_DUPLICATE_PROVIDER`: there it means a real double load, and the owner
+   * is a plain string anyone can copy — an identity for test re-evaluation,
+   * not a security boundary.
    */
   owner?: string;
 }
@@ -102,7 +106,7 @@ export function createSeamCatalog(): SeamCatalog {
     register<T>(seam: Seam<T>) {
       const existing = seams.get(seam.key);
       if (existing) {
-        if (!isReevaluationOf(existing, seam)) {
+        if (!isVitestProcess() || !isReevaluationOf(existing, seam)) {
           throw new SeamError(
             'SEAM_DUPLICATE_PROVIDER',
             seam.key,
@@ -144,9 +148,10 @@ export function createSeamCatalog(): SeamCatalog {
 }
 
 /**
- * A second definition may replace a catalog entry only when it comes from the
- * same declared owner with the same multiplicity: that is the defining module
- * evaluated again, not a competing definition.
+ * Under Vitest, a second definition may replace a catalog entry only when it
+ * comes from the same declared owner with the same multiplicity: that is the
+ * defining module evaluated again after a module-registry reset, not a
+ * competing definition. Outside Vitest no replacement is allowed.
  */
 function isReevaluationOf(existing: Seam<unknown>, next: Seam<unknown>): boolean {
   return (

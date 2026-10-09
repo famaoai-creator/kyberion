@@ -69,12 +69,16 @@ describe('module-level seam creation under re-evaluation', () => {
     // Without an owner a re-evaluated module throws SEAM_DUPLICATE_PROVIDER;
     // with a copied owner, two different modules could replace each other.
     const root = pathResolver.rootDir();
-    const sources = ['libs/core', 'libs/actuators']
+    // Every tree that can import coreSeamCatalog: core, actuators, the shared
+    // libs (libs/shared-*), surfaces, satellites and scripts.
+    const scanned = /^(libs\/(core|actuators|shared-[^/]+)|presence|satellites|scripts)\//;
+    const sources = ['libs', 'presence', 'satellites', 'scripts']
       .flatMap((dir) => getAllFiles(path.join(root, dir)))
       .map((file) => path.relative(root, file).split(path.sep).join('/'))
+      .filter((rel) => scanned.test(rel))
       .filter((rel) => rel.endsWith('.ts') && !rel.endsWith('.d.ts'))
       .filter((rel) => !rel.endsWith('.test.ts') && !rel.includes('/dist/'))
-      .filter((rel) => !rel.includes('/node_modules/'));
+      .filter((rel) => !rel.includes('/node_modules/') && !rel.includes('/.next/'));
     const declarations: string[] = [];
     const missing: string[] = [];
     for (const rel of sources) {
