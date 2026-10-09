@@ -172,6 +172,7 @@
     "tests/vitest-active-leak-guard.ts",
     "tests/vitest-approval-store-guard.ts",
     "tests/vitest-network-guard.ts",
+    "tests/vitest-run-id.ts",
     "vitest.config.mts"
   ],
   "child_process_imports": [

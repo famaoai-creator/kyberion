@@ -12,12 +12,20 @@
  * read it (2026-10, operations-hygiene-runbook §5).
  *
  * Per test file this guard
- * - clears the pool store before the file starts, so a file never sees what an
- *   earlier (or crashed) file left behind, and
- * - after the file's own hooks have run (`sequence.hooks: 'stack'`), clears what
- *   the file left behind and reports it unless the file is on the baseline
+ * - clears the pool store at its own top level, which Vitest evaluates for
+ *   each file before importing the file, so a file never sees what an earlier
+ *   (or crashed) file left behind, yet keeps what it seeds at import time;
+ * - after the file's own hooks have run (`sequence.hooks: 'stack'`, pinned in
+ *   vitest.config.mts), clears what the file left behind and reports it unless
+ *   the file is on the baseline
  *   (`tests/fixtures/approval-store-leftover-baseline.json`); under
- *   `KYBERION_TEST_LEAK_STRICT=1` (CI) the report fails the file.
+ *   `KYBERION_TEST_LEAK_STRICT=1` (CI) the report fails the file. A baselined
+ *   file that left nothing gets a note, so the baseline shrinks.
+ *
+ * The pool directory includes the run nonce (`KYBERION_VITEST_RUN_ID`, set by
+ * `tests/vitest-run-id.ts`), so a second Vitest run in the same checkout never
+ * has its records wiped by this one. Without a pool id the guard does nothing:
+ * the store is then the shared base directory.
  *
  * It uses `node:fs` directly on purpose: importing the core stack here would put
  * path-resolver and secure-io in every test file's module graph before the
@@ -63,16 +71,19 @@ function loadBaseline(): Set<string> {
 const storeDir = poolApprovalStoreDir(ROOT, process.env);
 let testFile = '<unknown test file>';
 
+// Top level, not beforeAll: setup files are evaluated before the test file is
+// imported, and a beforeAll would also erase records the file seeds at import.
+if (storeDir) fs.rmSync(storeDir, { recursive: true, force: true });
+
 beforeAll(() => {
   const file = expect.getState().testPath;
   if (file) testFile = path.relative(ROOT, file).split(path.sep).join('/');
-  fs.rmSync(storeDir, { recursive: true, force: true });
 });
 
 afterAll(() => {
+  if (!storeDir) return;
   const leftovers = listStoreFiles(storeDir);
-  if (leftovers.length === 0) return;
-  fs.rmSync(storeDir, { recursive: true, force: true });
+  if (leftovers.length > 0) fs.rmSync(storeDir, { recursive: true, force: true });
   const verdict = leftoverVerdict({
     testFile,
     leftovers,
@@ -81,5 +92,7 @@ afterAll(() => {
     storeDir: path.relative(ROOT, storeDir),
   });
   if (verdict.action === 'fail') throw new Error(verdict.message);
-  if (verdict.action === 'warn') process.stderr.write(`\n${verdict.message}\n`);
+  if (verdict.action === 'warn' || verdict.action === 'note') {
+    process.stderr.write(`\n${verdict.message}\n`);
+  }
 });

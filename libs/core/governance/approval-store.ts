@@ -531,11 +531,16 @@ export function approvalStoreRoots(env: Record<string, string | undefined> = pro
   observability: string;
 } {
   if (isVitestProcess(env)) {
-    // Per worker: parallel test files that clear a channel must not race each other.
+    // Per run (KYBERION_VITEST_RUN_ID, set by tests/vitest-run-id.ts) and per
+    // worker: two Vitest runs in one checkout, and parallel files that clear a
+    // channel, must not race each other.
+    const run = env.KYBERION_VITEST_RUN_ID
+      ? `/run-${env.KYBERION_VITEST_RUN_ID.replace(/[^\w-]/g, '')}`
+      : '';
     const pool = env.VITEST_POOL_ID ? `/pool-${env.VITEST_POOL_ID.replace(/[^\w-]/g, '')}` : '';
     return {
-      coordination: `${VITEST_APPROVAL_STORE_ROOT}${pool}/coordination/channels`,
-      observability: `${VITEST_APPROVAL_STORE_ROOT}${pool}/observability/channels`,
+      coordination: `${VITEST_APPROVAL_STORE_ROOT}${run}${pool}/coordination/channels`,
+      observability: `${VITEST_APPROVAL_STORE_ROOT}${run}${pool}/observability/channels`,
     };
   }
   return {
