@@ -196,6 +196,7 @@ const surfaceProviderSeam = createSeam<SurfaceProviderDefinition>({
   key: 'surface-provider',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/surface/surface-interaction-model.ts',
 });
 
 export function registerSurfaceProvider(

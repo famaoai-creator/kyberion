@@ -63,6 +63,7 @@ const deploymentAdapterSeam = createSeam<DeploymentAdapter>({
   key: 'deployment-adapter',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/actuator/deployment-adapter.ts',
 });
 let registeredDisposer: (() => void) | null = null;
 

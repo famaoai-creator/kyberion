@@ -213,6 +213,7 @@ const authnProviderSeam = createSeam<AuthnProvider>({
   key: AUTHN_SEAM_ID,
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/authn-principal-resolver.ts',
 });
 
 export function registerAuthnProvider(

@@ -162,6 +162,7 @@ const environmentProbeSeam = createSeam<RegisteredProbe>({
   key: 'environment.capability-probe',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/environment-capability.ts',
 });
 const probeDisposers = new Map<string, () => void>();
 

@@ -61,6 +61,7 @@ const imageGenerationProviderSeam = createSeam<ImageGenerationProvider>({
   key: 'image-generation-provider',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/media/image-generation-bridge.ts',
 });
 
 const imageGenerationProviderDisposers = new Map<string, () => void>();

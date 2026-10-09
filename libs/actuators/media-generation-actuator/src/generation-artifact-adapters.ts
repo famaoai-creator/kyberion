@@ -152,6 +152,7 @@ const generationHistoryAdapterSeam = createSeam<GenerationHistoryAdapter>({
   key: 'media-generation-history-adapter',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/actuators/media-generation-actuator/src/generation-artifact-adapters.ts',
 });
 
 function normalizeProviderId(provider: string): string {

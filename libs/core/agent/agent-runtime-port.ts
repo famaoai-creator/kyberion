@@ -8,6 +8,7 @@ const agentRuntimeEnsurerSeam = createSeam<AgentRuntimeEnsurer>({
   key: 'agent-runtime-ensurer',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/agent/agent-runtime-port.ts',
 });
 
 const DEFAULT_METADATA: SeamProviderMetadata = {

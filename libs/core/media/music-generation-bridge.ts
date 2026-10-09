@@ -270,6 +270,7 @@ const musicGenerationProviderSeam = createSeam<MusicGenerationProvider>({
   key: MUSIC_GENERATION_PROVIDER_SEAM,
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/media/music-generation-bridge.ts',
 });
 const musicGenerationProviderDisposers = new Map<string, () => void>();
 let musicGenerationBuiltinsRegistered = false;

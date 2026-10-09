@@ -126,6 +126,7 @@ const providerBackendConstructorSeam = createSeam<ProviderBackendConstructor>({
   key: 'provider-backend-constructor',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/provider/provider-backend-resolver.ts',
 });
 const providerBackendConstructorDisposers = new Map<string, () => void>();
 const backendCache = new Map<string, ProviderBackendHandle | null>();

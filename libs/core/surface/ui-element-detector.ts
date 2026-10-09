@@ -94,6 +94,7 @@ const uiElementDetectorSeam = createSeam<UiElementDetector>({
   key: 'ui-element-detector',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/surface/ui-element-detector.ts',
 });
 
 const detectorDisposers = new Map<string, () => void>();

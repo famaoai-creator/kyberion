@@ -49,6 +49,7 @@ const a2aTransportSeam = createSeam<A2ATransport>({
   key: 'a2a-transport',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/actuators/network-actuator/src/a2a-transport.ts',
 });
 
 /** Register a named physical A2A transport. */

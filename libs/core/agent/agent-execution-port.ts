@@ -141,6 +141,7 @@ const agentExecutionPortSeam = createSeam<AgentExecutionPort>({
   key: 'agent-execution-port',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/agent/agent-execution-port.ts',
 });
 let registeredDisposer: (() => void) | null = null;
 

@@ -16,6 +16,7 @@ const identityContextResolverSeam = createSeam<IdentityContextResolver>({
   key: 'identity-context-resolver',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/identity-context-bridge.ts',
 });
 
 const defaultResolver: IdentityContextResolver = (tenantOverride) => {

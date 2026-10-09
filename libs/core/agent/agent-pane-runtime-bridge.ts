@@ -42,6 +42,7 @@ const paneRuntimeSeam = createSeam<AgentPaneRuntimeBridge>({
   key: 'agent-pane-runtime-bridge',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/agent/agent-pane-runtime-bridge.ts',
 });
 
 const registeredDisposers = new Map<string, () => void>();

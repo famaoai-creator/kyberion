@@ -75,6 +75,7 @@ const audioPlaybackSeam = createSeam<AudioPlaybackAdapter>({
   key: 'voice.audio-playback',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/voice/audio-playback.ts',
 });
 
 export function registerAudioPlaybackAdapter(

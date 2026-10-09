@@ -1329,6 +1329,7 @@ const reasoningBackendSeam = createSeam<ReasoningBackend>({
   key: 'reasoning-backend',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/reasoning/reasoning-backend.ts',
 });
 
 let registeredDisposer: (() => void) | null = null;
