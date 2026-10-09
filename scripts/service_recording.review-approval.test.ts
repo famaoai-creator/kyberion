@@ -54,13 +54,16 @@ import {
   listApprovalRequests,
   loadApprovalRequest,
 } from '@agent/core/governance/approval-store';
-import { revokeApprovalRequest } from '@agent/core/governance/approval-revocation';
+import { revokeApprovalAsLocalOwner } from '@agent/core/governance/approval-revocation';
 import { CLI_AGENT_SESSION_ENV } from '@agent/core/governance/cli-operator-principal';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import type { ServiceRecording } from '@agent/core/service/service-recording';
+import { decideApprovalFromCli } from './lib/approval-cli-decision.js';
+import { ttyIo } from './lib/tty-io.test-support.js';
 import {
   assertServiceRecordingReviewApproval,
+  consumeServiceRecordingReviewApproval,
   SERVICE_RECORDING_REVIEW_CHANNEL,
 } from '@agent/core/service/service-recording-review-approval';
 import { main } from './service_recording.js';
@@ -108,7 +111,7 @@ describe('service_recording review goes through the approval store', () => {
   const readRecording = (ref: string): ServiceRecording =>
     JSON.parse(String(safeReadFile(recordingPath(ref), { encoding: 'utf8' })));
 
-  async function capture(): Promise<{ ref: string; requestId: string }> {
+  async function capture(extra: string[] = []): Promise<{ ref: string; requestId: string }> {
     const recordingId = `svc-review-${process.pid}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     recordingIds.push(recordingId);
     const result = (await main([
@@ -119,6 +122,7 @@ describe('service_recording review goes through the approval store', () => {
       recordingId,
       '--calls',
       CALLS,
+      ...extra,
     ])) as { value: { recording_ref: string; review_request_id: string } };
     return { ref: result.value.recording_ref, requestId: result.value.review_request_id };
   }
@@ -156,11 +160,38 @@ describe('service_recording review goes through the approval store', () => {
     const { ref, requestId } = await capture();
     expect(stored(requestId).requestedBy).toBe('user:owner');
 
+    // Non-interactive: refused before anything is decided.
     await expect(main(['review', '--recording', ref, '--approve'])).rejects.toThrow(
+      /this terminal is not interactive/
+    );
+    // Interactive and past the challenge: the store refuses the self-approval.
+    await expect(
+      decideApprovalFromCli(stored(requestId), {
+        decision: 'approved',
+        note: 'self review',
+        io: ttyIo((code) => code),
+      })
+    ).rejects.toThrow(
       /\[POLICY_VIOLATION\] Separation of duties: approval refused because the decider is the same principal/
     );
     expect(stored(requestId).status).toBe('pending');
     expect(readRecording(ref).review?.status).toBe('pending');
+  });
+
+  it('with SoD on, --requested-by on capture adds an identity but does not hide the owner', async () => {
+    setSeparationOfDuties(true);
+    const { requestId } = await capture(['--requested-by', 'agent:x']);
+    expect(stored(requestId)).toMatchObject({
+      requestedBy: 'agent:x',
+      requestedByContext: expect.objectContaining({ actorId: 'user:owner' }),
+    });
+    await expect(
+      decideApprovalFromCli(stored(requestId), {
+        decision: 'approved',
+        note: 'self review',
+        io: ttyIo((code) => code),
+      })
+    ).rejects.toThrow(/the decider is the same principal/);
   });
 
   it('with SoD on, a human approves a recording an agent captured; the review points at the approval', async () => {
@@ -170,11 +201,21 @@ describe('service_recording review goes through the approval store', () => {
     expect(stored(requestId).requestedBy).toBe('agent:claude-code');
 
     plainTerminal();
+    // The human answers the TTY challenge (the review command then finds the approval).
+    await decideApprovalFromCli(stored(requestId), {
+      decision: 'approved',
+      note: 'review',
+      io: ttyIo((code) => code),
+    });
     const result = (await main(['review', '--recording', ref, '--approve'])) as {
       value: { status: string; review_request_id: string };
     };
     expect(result.value).toMatchObject({ status: 'approved', review_request_id: requestId });
-    expect(stored(requestId)).toMatchObject({ status: 'approved', decidedBy: 'user:owner' });
+    expect(stored(requestId)).toMatchObject({
+      status: 'approved',
+      decidedBy: 'user:owner',
+      decidedVia: 'cli_tty_challenge',
+    });
     const review = readRecording(ref).review!;
     expect(review).toMatchObject({
       status: 'approved',
@@ -208,16 +249,34 @@ describe('service_recording review goes through the approval store', () => {
     const { ref, requestId } = await capture();
     plainTerminal();
     await main(['review', '--recording', ref, '--approve']);
-    revokeApprovalRequest('mission_controller', {
+    revokeApprovalAsLocalOwner('mission_controller', {
       channel: SERVICE_RECORDING_REVIEW_CHANNEL,
       requestId,
-      revokedBy: 'user:owner',
-      revokerAuthority: 'owner',
       reason: 'wrong target',
     });
     expect(() => assertServiceRecordingReviewApproval(readRecording(ref), ref)).toThrow(
       /cannot be used because it was revoked by user:owner/
     );
+  });
+
+  it('promotion consumes the review approval once; a later revoke reports it consumed', async () => {
+    vi.stubEnv('CLAUDECODE', '1');
+    const { ref, requestId } = await capture();
+    plainTerminal();
+    await main(['review', '--recording', ref, '--approve']);
+    consumeServiceRecordingReviewApproval(readRecording(ref), 'test-promotion');
+    expect(stored(requestId).consumption).toMatchObject({
+      consumer: 'service_recording_promotion',
+    });
+    expect(() => consumeServiceRecordingReviewApproval(readRecording(ref), 'again')).toThrow(
+      /already used/
+    );
+    expect(() =>
+      revokeApprovalAsLocalOwner('mission_controller', {
+        channel: SERVICE_RECORDING_REVIEW_CHANNEL,
+        requestId,
+      })
+    ).toThrow(/already consumed by service_recording_promotion/);
   });
 
   it('a review written outside the store promotes only while SoD is off', async () => {
@@ -229,7 +288,7 @@ describe('service_recording review goes through the approval store', () => {
     expect(() => assertServiceRecordingReviewApproval(legacy, ref)).not.toThrow();
     setSeparationOfDuties(true);
     expect(() => assertServiceRecordingReviewApproval(legacy, ref)).toThrow(
-      /review of .* was not recorded in the approval store/
+      /review of .* was not recorded in the approval store.*service_recording request-review.*different member deciding on an authenticated surface \(Chronos or presence-studio\)/
     );
   });
 });

@@ -382,9 +382,18 @@ local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
     onboarding name goes to `requestedByDisplayName` / `decidedByDisplayName` and is never
     compared. A CLI run inside an agent session (`KYBERION_AGENT_ID`, `KYBERION_NHI_ID`,
     `KYBERION_RUN_ORIGIN=agent`, or a provider harness marker such as `CLAUDECODE`) opens requests
-    as `agent:<…>`, so a human approving it is not a self-approval. With the setting on, a terminal
-    with no owner member (`pnpm organization member ensure-owner` provisions it) or an approval
-    typed inside an agent session is refused with a diagnostic, never recorded under a placeholder.
+    as `agent:<…>`, so a human approving it is not a self-approval. The detected principal is always
+    kept as `requestedByContext.actorId`; `--requested-by` only adds an identity. With the setting
+    on, a terminal with no owner member (`pnpm organization member ensure-owner` provisions it) or an
+    approval typed inside an agent session is refused with a diagnostic, never recorded under a
+    placeholder, and a terminal approval needs an interactive TTY and a typed one-time code
+    (`decidedVia: 'cli_tty_challenge'`; no flag skips it; no TTY points at Chronos or
+    presence-studio). With it off, a decision typed in an agent session is recorded as
+    `caller_supplied` with `decidedInAgentSession`, so it fails a later re-check.
+  - **This is best effort, not a security boundary.** Agent-session markers are environment
+    variables an agent can clear, and an agent driving a PTY (for example terminal-actuator) can
+    read and type the challenge code. The strong path for a separated approval is an authenticated
+    surface (Chronos or presence-studio).
   - Every consumer that turns an approved record into an effect checks it first under a consumer
     id (`assertApprovalUsable` / `approvalUsabilityRefusal`); the registry is
     `libs/core/governance/approval-sod-consumers.contract.test.ts`. A decision recorded while
@@ -395,11 +404,14 @@ local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
     blocks approving decisions and approval use even with the setting off (fail closed,
     diagnostic message); plugin activation degrades to `pending_approval` with a warning, and a
     pending DOT autonomy promotion stays pending until the next sweep.
-  - An approved record that was not yet claimed or applied can be withdrawn with
-    `pnpm kyberion approvals --revoke <id> [--reason …]` (`revokeApprovalRequest`: by its requester,
-    one of its approvers or the local owner; audited as `approval_decision` / `revoke` and a
-    `revoked` event). Whatever the setting, `evaluateApprovalUsability` refuses a revoked record
-    for every consumer, and separation-of-duties refusals name the revoke command.
+  - `pnpm kyberion approvals --revoke <id> [--reason …]` revokes an approved record: further uses
+    are refused (an effect that already happened is not undone). Allowed for its requester, one of
+    its approvers, or the local owner — resolved server-side by `revokeApprovalAsLocalOwner`, never
+    asserted by the caller. Audited as `approval_decision` / `revoke` and a `revoked` event. Whatever
+    the setting, `evaluateApprovalUsability` refuses a revoked record for every consumer, and
+    separation-of-duties refusals name the revoke command. One-shot consumers that take no apply
+    claim record consumption with `markApprovalConsumed` (`service_recording_promotion`,
+    `organization_decision`), so the approval is used once and a later revoke reports it consumed.
   - `service_recording review` decides through the store (`service-recording-review` channel,
     requested at `capture` or `request-review`); promotion re-checks the approval
     (`service_recording_promotion`).
@@ -457,10 +469,13 @@ local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
    `requestedBy` (and `requestedByContext.actorId`), never an empty string: with separation of
    duties on, a request without a requester cannot be approved (gate:
    `libs/core/governance/approval-separation-of-duties.test.ts`). A creator that runs in a CLI or
-   script takes its default from `resolveCliApprovalRequester({ explicit, legacy })`, never from
-   the persona, a component name or `resolveOperatorDisplayName()`; a terminal decision goes
-   through `decideApprovalFromCli` (gates: `scripts/approvals_cli_identity.test.ts`,
-   `approval-sod-consumers.contract.test.ts`).
+   script resolves its requester at the CLI entry point (`scripts/lib/cli-approval-requester.ts`,
+   `resolveCliApprovalRequester({ explicit, legacy })`) and passes it to the library as a lazily
+   resolved `ApprovalRequesterInput` — never from the persona, a component name or
+   `resolveOperatorDisplayName()`, and never read from the environment inside `libs/`. Record
+   `approvalRequesterActorId(requester)` as `requestedByContext.actorId`, never a copy of
+   `requestedBy`. A terminal decision goes through `decideApprovalFromCli` (gates:
+   `scripts/approvals_cli_identity.test.ts`, `approval-sod-consumers.contract.test.ts`).
 6. When you add code that turns an approved record into an effect, call
    `assertApprovalUsable(record, { consumer })` before the effect. When you add a decision surface
    that takes the decider from its caller instead of a resolved session, pass
@@ -469,7 +484,11 @@ local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
    `approval-actuator-sod.test.ts`). A consumer that only runs the check while separation of
    duties is on must still run it on a record it can load, so a revoked approval is refused
    (gate: `approval-revocation.test.ts`, contract test).
-7. Never add an approve/reject flow that writes its decision outside the approval store (as
+7. A consumer must not skip its usability check while separation of duties is off: a revoked
+   approval is refused whatever the setting. The contract test fails on any
+   `!isSeparationOfDutiesEnabled()` guard in a consumer file outside its listed, justified
+   exceptions. A one-shot consumer without an apply claim calls `markApprovalConsumed`.
+8. Never add an approve/reject flow that writes its decision outside the approval store (as
    `service_recording review` did): open a hash-bound request in its own channel, decide it with
    `decideApprovalRequest`, and register the consumer that turns it into an effect.
 
