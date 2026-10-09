@@ -198,24 +198,33 @@ export function auditSeparationOfDutiesRefusal(params: {
  */
 export function assertApprovalUsable(
   record: ApprovalRequestRecord,
-  options: { consumer: string; rerequestCommand?: string }
+  options: {
+    consumer: string;
+    rerequestCommand?: string;
+    /** Replaces the default "how to get a new approval" sentence. */
+    rerequestHint?: string;
+  }
 ): void {
   const refusal = evaluateApprovalUsability(record);
   if (!refusal) return;
   const reason = `Separation of duties: approval ${record.id} cannot be used because ${SEPARATION_OF_DUTIES_MESSAGES[refusal.violation]}`;
+  const next =
+    options.rerequestHint ??
+    (options.rerequestCommand
+      ? `request a new approval with \`${options.rerequestCommand}\``
+      : 'request a new approval by re-running the command that opened this one');
+  const message =
+    `[POLICY_VIOLATION] ${reason}. This approval is ${record.status} and can no longer be cancelled or used; ` +
+    `it is never reused — ${next}, then have a different, server-identified principal decide it ` +
+    '(`pnpm kyberion approvals --approve <new-request-id>`).';
+  // The audit carries the full message, so the operator's next step is in
+  // the audit trail too (held actions settle without surfacing an error).
   auditSeparationOfDutiesRefusal({
     record,
     violation: refusal.violation,
     decidedBy: refusal.decidedBy,
     stage: `use:${options.consumer}`,
-    reason,
+    reason: message,
   });
-  const next = options.rerequestCommand
-    ? `request a new approval with \`${options.rerequestCommand}\``
-    : 'request a new approval by re-running the command that opened this one';
-  throw new Error(
-    `[POLICY_VIOLATION] ${reason}. This approval is ${record.status} and can no longer be cancelled or used; ` +
-      `it is never reused — ${next}, then have a different, server-identified principal decide it ` +
-      '(`pnpm kyberion approvals --approve <new-request-id>`).'
-  );
+  throw new Error(message);
 }
