@@ -3,6 +3,7 @@ import { withExecutionContext } from '../authority.js';
 import { withLockSync } from '../lock-utils.js';
 import type { FirstJobDecisionProof } from '../surface/first-job-approval-proof.js';
 import { auditChain } from './audit-chain.js';
+import { resolveSeparationOfDutiesPolicy } from './approval-policy.js';
 import type { HeldEffectSteeringAction } from './held-effect-bridge.js';
 import {
   appendGovernedArtifactJsonl,
@@ -445,6 +446,115 @@ export function validateHumanFinalDecision(params: {
       '[POLICY_VIOLATION] Approval effect binding does not match the requested operation'
     );
   }
+}
+
+/**
+ * Principal-type prefixes surfaces put in front of an identity
+ * (`user:<member_id>` from chronos / presence-studio, `agent:…`, `service:…`).
+ * They are stripped before comparison so `user:alice` and `alice` count as the
+ * same principal: under separation of duties a false match only refuses a
+ * decision, which is the safe direction.
+ */
+const APPROVAL_PRINCIPAL_PREFIX =
+  /^(?:user|human|operator|member|principal|agent|service|persona|actor|policy):/;
+
+/** Canonical form of an approval principal id for identity comparison. */
+export function normalizeApprovalPrincipalId(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  return value.normalize('NFKC').trim().toLowerCase().replace(APPROVAL_PRINCIPAL_PREFIX, '').trim();
+}
+
+/**
+ * Every identity a request records for whoever asked for it: `requestedBy`,
+ * the structured `requestedByContext.actorId`, and the originating
+ * `source.agentId`. Normalised and de-duplicated; empty when none is present.
+ */
+export function approvalRequesterIdentities(
+  record: Pick<ApprovalRequestRecord, 'requestedBy' | 'requestedByContext' | 'source'>
+): string[] {
+  const ids = [record.requestedBy, record.requestedByContext?.actorId, record.source?.agentId]
+    .map(normalizeApprovalPrincipalId)
+    .filter(Boolean);
+  return Array.from(new Set(ids));
+}
+
+export type SeparationOfDutiesViolation = 'self_approval' | 'missing_requester' | 'missing_decider';
+
+/**
+ * Pure separation-of-duties check. Returns the violation, or `null` when the
+ * decider is provably a different principal from every recorded requester.
+ * A request with no recorded requester (or a decision with no decider) cannot
+ * be proven separate, so it is a violation — fail closed.
+ */
+export function evaluateSeparationOfDuties(
+  record: Pick<ApprovalRequestRecord, 'requestedBy' | 'requestedByContext' | 'source'>,
+  decidedBy: unknown
+): SeparationOfDutiesViolation | null {
+  const decider = normalizeApprovalPrincipalId(decidedBy);
+  if (!decider) return 'missing_decider';
+  const requesters = approvalRequesterIdentities(record);
+  if (requesters.length === 0) return 'missing_requester';
+  return requesters.includes(decider) ? 'self_approval' : null;
+}
+
+const SEPARATION_OF_DUTIES_MESSAGES: Record<SeparationOfDutiesViolation, string> = {
+  self_approval: 'the decider is the same principal that requested it',
+  missing_requester: 'the request records no requester identity, so separation cannot be proven',
+  missing_decider: 'the decision carries no decider identity, so separation cannot be proven',
+};
+
+/**
+ * Enforce `approval-policy.json` `separation_of_duties` (default off) for an
+ * approving decision or the apply of one. Rejections are never subject to it:
+ * a requester declining their own request only withdraws it. A refusal is
+ * written to the audit chain and the channel's approval event log before it
+ * throws.
+ */
+function enforceSeparationOfDuties(
+  role: GovernedArtifactRole,
+  params: {
+    record: ApprovalRequestRecord;
+    storageChannel: string;
+    decidedBy: unknown;
+    stage: 'decide' | 'apply';
+  }
+): void {
+  if (!resolveSeparationOfDutiesPolicy().enabled) return;
+  const violation = evaluateSeparationOfDuties(params.record, params.decidedBy);
+  if (!violation) return;
+  const { record } = params;
+  const decidedBy = typeof params.decidedBy === 'string' ? params.decidedBy : '';
+  const reason = `Separation of duties: approval refused because ${SEPARATION_OF_DUTIES_MESSAGES[violation]}`;
+  auditChain.record({
+    agentId: 'approval-store',
+    action: 'approval_decision',
+    operation: 'separation_of_duties',
+    result: 'denied',
+    reason,
+    correlationId: record.correlationId,
+    metadata: {
+      requestId: record.id,
+      channel: record.channel,
+      stage: params.stage,
+      violation,
+      decidedBy,
+      requestedBy: record.requestedBy,
+      requesterIdentities: approvalRequesterIdentities(record),
+    },
+  });
+  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(params.storageChannel), {
+    ts: nowIso(),
+    event: 'separation_of_duties_refused',
+    request_id: record.id,
+    correlation_id: record.correlationId,
+    stage: params.stage,
+    violation,
+    decided_by: decidedBy,
+    requested_by: record.requestedBy,
+    channel: record.channel,
+    thread_ts: record.threadTs,
+  });
+  throw new Error(`[POLICY_VIOLATION] ${reason} (request ${record.id})`);
 }
 
 /**
@@ -1009,6 +1119,15 @@ function decideApprovalRequestUnlocked(
     effectBinding: params.effectBinding,
   });
 
+  if (params.decision === 'approved') {
+    enforceSeparationOfDuties(role, {
+      record,
+      storageChannel,
+      decidedBy: params.decidedBy,
+      stage: 'decide',
+    });
+  }
+
   const cacheDescriptor = params.decision === 'approved' ? params.sessionCache : undefined;
   if (cacheDescriptor) {
     // The session cache is a standing grant, so its seed is held to the
@@ -1358,6 +1477,14 @@ export function claimApprovalApply(
     if (!params.appliedBy.trim()) {
       throw new Error('[POLICY_VIOLATION] Approval apply requires an actor');
     }
+    // A decision recorded before separation of duties was switched on must
+    // not slip through at apply time.
+    enforceSeparationOfDuties(role, {
+      record,
+      storageChannel,
+      decidedBy: record.decidedBy,
+      stage: 'apply',
+    });
     const updated = {
       ...record,
       applyClaim: { claimId: randomUUID(), startedAt: nowIso(), startedBy: params.appliedBy },

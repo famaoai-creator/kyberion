@@ -18,6 +18,10 @@ export interface ApprovalPolicyRule {
 
 interface ApprovalPolicyFile {
   version?: string;
+  /** See {@link resolveSeparationOfDutiesPolicy}. */
+  separation_of_duties?: {
+    enabled: boolean;
+  };
   rules?: ApprovalPolicyRule[];
   defaults?: {
     requires_approval?: boolean;
@@ -91,6 +95,21 @@ const HARD_CODED_DANGEROUS_RULES: Array<{
 
 export function loadApprovalPolicy(): ApprovalPolicyFile {
   return approvalPolicyCatalog.load();
+}
+
+/**
+ * Separation of duties for approval decisions (default off).
+ *
+ * When enabled, an approving decision whose decider identity equals the
+ * request's requester identity is refused — the choke point is
+ * `decideApprovalRequest` in `approval-store.ts`. The setting lives in
+ * `approval-policy.json` and therefore follows that file's existing scoping:
+ * the active customer overlay (`customer/{slug}/policy/approval-policy.json`)
+ * replaces the product default wholesale. There is no per-tenant or
+ * per-organization override.
+ */
+export function resolveSeparationOfDutiesPolicy(): { enabled: boolean } {
+  return { enabled: loadApprovalPolicy().separation_of_duties?.enabled === true };
 }
 
 export function resolveApprovalPolicy(input: {
