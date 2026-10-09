@@ -210,11 +210,16 @@ tokens, cost per component call) share one mechanism:
   classifier never sees a raw row: it gets `projectEnforcementRow`, a
   whitelist of timestamp, cost, token counts, mission / usage / accounting
   ids, tier / tenant / organization scope and the dot actor.
-  - Spend guard: a tenant-bound process evaluates its caps per bound tenant
-    (policy and ledger read from the same tenant; a check for another tenant
-    is refused with `refused: 'tenant_mismatch'`); an unbound process
-    evaluates globally. Its short cache is keyed by that tenant, bounded, and
-    invalidated by the process's own appends (`executionMetricsGeneration`).
+  - Spend guard: a tenant-bound process always evaluates its bound tenant's
+    caps over that tenant's ledgers (a different requested tenant, e.g. a
+    brokered mission's, is debug-logged and ignored — authorization is the
+    scope layer's); an unbound process evaluates a requested tenant over
+    `{ tenants: [t], includeSystem: true }`, else the global caps. Slugs are
+    compared trimmed and lower-cased. Its short cache is keyed by
+    tenant/day/mission and bounded; costed rows the process appends are added
+    to matching entries at append time (`onExecutionMetricsAppend`), so
+    zero-cost bursts keep hitting the cache and only an unattributable costed
+    row drops entries.
   - Budget governor: a scope wider than the bound tenant that could not see
     every partition reports `cost_status: 'partial'` with
     `withheld_partitions`, never a complete total. It is logged at `debug`

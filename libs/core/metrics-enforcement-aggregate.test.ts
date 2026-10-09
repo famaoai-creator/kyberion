@@ -29,6 +29,7 @@ import { computeBudgetUsage } from './governance/org-budget-governor.js';
 import { buildCostReportFromHistory, formatCostReport } from './cost-report.js';
 import { validateReadPermission } from './tier-guard.js';
 import { withExecutionContext } from './authority.js';
+import { logger as coreLogger } from './core.js';
 import { runDegradationWatch } from './health-degradation.js';
 import { resolveFinanceControllerDecision } from './finance-controller.js';
 
@@ -54,6 +55,9 @@ const collector = new MetricsCollector({
   resourceUsageRoot: usageRoot,
   executionMetricsRoot: executionRoot,
   costRegistry: { models: {}, aliases: {}, default: { prompt: 0, completion: 0 } },
+  // Stands in for the shared ledgers the enforcers read (metrics.loadHistory is
+  // pointed at it below), so its costed appends update the spend cache.
+  sharedLedger: true,
 });
 const ENV_KEYS = ['KYBERION_PERSONA', 'MISSION_ROLE', 'KYBERION_TENANT', 'MISSION_ID'] as const;
 const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
@@ -267,29 +271,88 @@ describe('governed enforcement aggregate over persona-gated metrics ledgers', ()
       expect(b.allowed).toBe(false);
     });
 
-    it('B2: a bound process refuses to evaluate another tenant instead of mixing them', () => {
+    it('M1: a bound process ignores another requested tenant (e.g. brokered) — never refuses', () => {
+      seedSpend(TENANT_B, 7);
       setIdentity('worker');
       process.env.KYBERION_TENANT = TENANT;
-      const refused = check({ tenantId: TENANT_B });
-      expect(refused.allowed).toBe(false);
-      expect(refused.refused).toBe('tenant_mismatch');
-      expect(check({ tenantId: TENANT }).refused).toBeUndefined();
+      const debug = vi.spyOn(coreLogger, 'debug');
+      const result = check({ tenantId: TENANT_B });
+      expect(result).not.toHaveProperty('refused');
+      expect(result.allowed).toBe(true);
+      // The bound tenant's ledgers and caps apply, not the requested tenant's.
+      expect(result.daily_spent_usd).toBe(2);
+      expect(debug.mock.calls.map(String).join('\n')).toMatch(
+        /requested tenant ignored — .+ \| next: .+ \| evidence: requested=/
+      );
     });
 
-    it("S8: the process's own new spend invalidates the cached total immediately", () => {
+    it('M1: warn posture never blocks, whatever tenant is requested', () => {
+      seedSpend(TENANT_B, 7);
+      setIdentity('worker');
+      process.env.KYBERION_TENANT = TENANT;
+      const warn = spendGuard.checkSpendGuard({
+        now: NOW_FIXED,
+        policy: { posture: 'warn', daily_cap_usd: 1, mission_cap_usd: 1 },
+        tenantId: TENANT_B,
+        alert: vi.fn() as never,
+      });
+      expect(warn.breached).toEqual(['daily']);
+      expect(warn.allowed).toBe(true);
+    });
+
+    it('M1: a requested tenant differing only in case is the bound tenant', () => {
+      setIdentity('worker');
+      process.env.KYBERION_TENANT = TENANT;
+      const debug = vi.spyOn(coreLogger, 'debug');
+      const result = check({ tenantId: ` ${TENANT.toUpperCase()} ` });
+      expect(result.daily_spent_usd).toBe(2);
+      expect(debug.mock.calls.map(String).join('\n')).not.toMatch(/requested tenant ignored/);
+    });
+
+    it("L3: an unbound caller's requested tenant is read and capped as that tenant", () => {
+      seedSpend(TENANT_B, 7);
+      setIdentity('worker');
+      delete process.env.KYBERION_TENANT;
+      const a = check({ tenantId: TENANT });
+      expect(a.daily_spent_usd).toBe(2);
+      expect(a.allowed).toBe(true);
+      const b = check({ tenantId: TENANT_B });
+      expect(b.daily_spent_usd).toBe(7);
+      expect(b.allowed).toBe(false);
+      // Unbound without a requested tenant: the global caps over every ledger.
+      expect(check().daily_spent_usd).toBe(9);
+    });
+
+    it('M2: zero-cost bursts hit the cache; a costed append is added without a re-read', () => {
       setIdentity('worker');
       process.env.KYBERION_TENANT = TENANT;
       expect(check().daily_spent_usd).toBe(2);
+      const reads = spendGuard.spendGuardLedgerReads();
+      setIdentity('worker', 'mission_controller');
+      for (let i = 0; i < 20; i++) {
+        collector.record('reasoning:route-served', 0, 'success', {
+          scope: { tier: 'confidential', tenant_slug: TENANT },
+        });
+      }
+      setIdentity('worker');
+      expect(check().daily_spent_usd).toBe(2);
+      expect(spendGuard.spendGuardLedgerReads()).toBe(reads);
       setIdentity('worker', 'mission_controller');
       collector.record('anthropic-sdk', 1, 'success', {
         mission_id: MISSION,
         cost_usd: 4,
         scope: { tier: 'confidential', tenant_slug: TENANT },
       });
+      // Another tenant's costed row never reaches this tenant's cached total.
+      collector.record('anthropic-sdk', 1, 'success', {
+        cost_usd: 50,
+        scope: { tier: 'confidential', tenant_slug: TENANT_B },
+      });
       setIdentity('worker');
       const after = check();
       expect(after.daily_spent_usd).toBe(6);
       expect(after.allowed).toBe(false);
+      expect(spendGuard.spendGuardLedgerReads()).toBe(reads);
     });
 
     it('B2: a budget wider than the bound tenant is reported partial, never complete', () => {
@@ -340,6 +403,11 @@ describe('governed enforcement aggregate over persona-gated metrics ledgers', ()
       collector.record('odd-tier', 1, 'success', {
         cost_usd: 1,
         task: TASK_TEXT,
+        scope: { tier: 'internal', tenant_slug: 'Not A Slug Either' },
+      });
+      // L1: only the tier is bad — the row keeps its valid tenant (offboarding finds it).
+      collector.record('odd-tier-own-tenant', 1, 'success', {
+        cost_usd: 1,
         scope: { tier: 'internal', tenant_slug: TENANT },
       });
       collector.record('odd-public', 1, 'success', {
@@ -367,10 +435,15 @@ describe('governed enforcement aggregate over persona-gated metrics ledgers', ()
         .find((row) => row.component === 'odd-public');
       expect(odd).toMatchObject({ scope_invalid: true, cost_usd: 1 });
       expect(odd).not.toHaveProperty('scope');
-      expect(warnLines.filter((line) => /scope cannot be placed/.test(line))).toHaveLength(2);
-      // Both are still counted by an enforcer.
+      const ownTenant = read(
+        path.join(executionRoot, 'confidential', TENANT, 'execution-metrics.jsonl')
+      );
+      expect(ownTenant).toContain('odd-tier-own-tenant');
+      expect(failClosed).not.toContain('odd-tier-own-tenant');
+      expect(warnLines.filter((line) => /scope cannot be placed/.test(line))).toHaveLength(3);
+      // All are still counted by an enforcer.
       setIdentity('worker');
-      expect(check().daily_spent_usd).toBe(4);
+      expect(check().daily_spent_usd).toBe(5);
     });
 
     it('S7: the degradation watch and finance controller treat withheld partitions as partial', () => {

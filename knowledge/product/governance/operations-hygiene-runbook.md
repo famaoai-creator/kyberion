@@ -228,9 +228,12 @@ the test passes against the sandbox while the writer leaks into live state.
   output). Gate: `libs/core/metrics-enforcement-aggregate.test.ts`.
 - **Caps are evaluated where they are read.** A tenant-bound process evaluates spend caps per
   bound tenant — policy (`spend-policy.json` `tenant_overrides`) and ledgers from the same
-  tenant — and refuses a check for another tenant (`refused: 'tenant_mismatch'`) instead of mixing
-  them; an unbound process evaluates globally. Any enforcement cache is keyed by that tenant,
-  bounded, and invalidated by the process's own appends. A budget evaluated over a scope wider
+  tenant — and ignores (debug-logs) a different requested tenant instead of mixing them; it never
+  refuses one, because tenant authorization is the scope layer's job (brokered missions, warn
+  posture). An unbound process evaluates the requested tenant, else globally. Compare slugs
+  trimmed and lower-cased. Any enforcement cache is keyed by tenant/day/mission, bounded, and kept
+  current by adding the process's own costed appends (zero-cost rows never invalidate it); only an
+  unattributable costed row invalidates. A budget evaluated over a scope wider
   than what the process could read is `cost_status: 'partial'` with `withheld_partitions`.
 - **Never rewrite a hot ledger from a stale plan.** A prune of an append-only ledger (tenant
   offboarding) recomputes, exports and rewrites under the same lock its appenders take

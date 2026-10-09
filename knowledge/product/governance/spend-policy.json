@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/spend-policy.schema.json",
   "version": "1.0.0",
-  "description": "OP-01 spend guard policy. Generous starting caps in warn posture per the plan's risk note — observe the measured distribution before tightening or switching to block. Evaluation scope: a tenant-bound process evaluates daily/mission caps per bound tenant (that tenant's tenant_overrides entry, over that tenant's metrics partitions of every tier plus the system partition) and refuses a check for any other tenant; an unbound process evaluates the caps globally over every partition. Spend is read through the governed numbers-only enforcement aggregate, so the caller's persona never reduces it.",
+  "description": "OP-01 spend guard policy. Generous starting caps in warn posture per the plan's risk note — observe the measured distribution before tightening or switching to block. Evaluation scope: a tenant-bound process evaluates daily/mission caps per bound tenant (that tenant's tenant_overrides entry, over that tenant's metrics partitions of every tier plus the system partition) and ignores (debug-logs) a different requested tenant — tenant authorization is the scope layer's job, so brokered missions and warn posture are never blocked by it; an unbound process evaluates a requested tenant's caps over that tenant's partitions plus the system partition, or the global caps over every partition when none is requested. Tenant slugs are compared trimmed and lower-cased. Spend is read through the governed numbers-only enforcement aggregate, so the caller's persona never reduces it.",
   "posture": "warn",
   "daily_cap_usd": 50,
   "mission_cap_usd": 20,
