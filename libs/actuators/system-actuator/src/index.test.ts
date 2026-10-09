@@ -1142,7 +1142,7 @@ vi.mock('@agent/core/governance', () => ({
 
 // Separation of duties is covered by approval-separation-of-duties.test.ts.
 vi.mock('@agent/core/governance/approval-store', () => ({
-  assertApprovalUsable: vi.fn(),
+  approvalUsabilityRefusal: vi.fn(() => undefined),
 }));
 
 vi.mock('@agent/core/fs-utils', () => ({
