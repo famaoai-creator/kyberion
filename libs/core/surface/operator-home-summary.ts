@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { MetricsCollector } from '../metrics.js';
+import { MetricsCollector, metricsWithheldNotice } from '../metrics.js';
 import { listApprovalRequests } from '../governance/approval-store.js';
 import { listArtifactRecords } from '../workforce/artifact-record.js';
 import { buildNextAction, type NextAction } from '../next-action.js';
@@ -42,6 +42,10 @@ export interface OperatorHomeCostSummary {
   budgetUsd?: number;
   remainingUsd?: number | null;
   overBudget: boolean;
+  /** Set when tier-guard withheld metrics partitions from this reader: totals are partial. */
+  partialNotice?: string;
+  /** Number of withheld partitions (set with partialNotice), for localized rendering. */
+  withheldPartitions?: number;
   missionBreakdown: Array<{
     missionId: string;
     tokens: number;
@@ -326,7 +330,16 @@ function collectCostSummary(
     budgetUsd?: number;
   } = {}
 ): OperatorHomeCostSummary {
-  const history = new MetricsCollector({ persist: false }).loadHistory();
+  // Operator aggregate: every partition this process may read (tier-guard
+  // skips other tenants' and persona-denied tiers); mission ids narrow below.
+  let withheld = 0;
+  const history = new MetricsCollector({ persist: false }).loadHistory({
+    read: { all: true },
+    onWithheld: (partitions) => {
+      withheld += partitions;
+    },
+  });
+  const partialNotice = metricsWithheldNotice('operator home cost summary', withheld);
   const sinceIso = input.since || '';
   const missionFilter = (input.missionId || '').trim().toUpperCase();
   const missionIds = input.missionIds
@@ -385,6 +398,7 @@ function collectCostSummary(
     budgetUsd,
     remainingUsd,
     overBudget: typeof budgetUsd === 'number' ? totalUsd > budgetUsd : false,
+    ...(partialNotice ? { partialNotice, withheldPartitions: withheld } : {}),
     missionBreakdown: Array.from(byMission.values()).sort((left, right) => right.usd - left.usd),
   };
 }

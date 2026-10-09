@@ -1,10 +1,30 @@
 import path from 'node:path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import { pathResolver } from '@agent/core/path-resolver';
 import { describeOps, MEDIA_GENERATION_ACTIONS } from './op-catalog.js';
+
+// Governed product catalogs (the media-backend and voice-engine registries
+// under knowledge/product/) always see the real filesystem. A per-test
+// override such as `safeExistsSync.mockReturnValue(false)` models a missing
+// *artifact* only. Routing the catalogs' existence checks through that mock
+// made a test pass or fail depending on whether an earlier test had already
+// loaded (and cached) the registries, so the file failed under
+// `--sequence.shuffle --sequence.seed=222` (operations-hygiene-runbook §5).
+//
+// The prefix is the resolved `knowledge/product/` root, set by the secure-io
+// mock factory below (it runs before any module can call the mock). A
+// substring match would also have let `…/active/…/knowledge/product/…` and
+// similar non-catalog paths bypass the per-test mock.
+const governedProductRoot = vi.hoisted(() => ({ prefix: '' }));
+const isGovernedProductPath = vi.hoisted(() => (filePath: string): boolean => {
+  if (!governedProductRoot.prefix) {
+    throw new Error('governed product root is not resolved yet (secure-io mock not loaded)');
+  }
+  return String(filePath).replaceAll('\\', '/').startsWith(governedProductRoot.prefix);
+});
 
 const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
@@ -40,6 +60,9 @@ const COMFY_OUTPUT_DIR = pathResolver.sharedTmp('comfy/output');
 
 vi.mock('@agent/core/secure-io', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/secure-io')>();
+  // path-resolver does not import secure-io, so loading it here cannot recurse.
+  const { pathResolver: resolver } = await import('@agent/core/path-resolver');
+  governedProductRoot.prefix = `${resolver.rootResolve('knowledge/product').replaceAll('\\', '/')}/`;
   mocks.resetSafeReadFile.mockImplementation(() =>
     mocks.safeReadFile.mockImplementation((...args: Parameters<typeof actual.safeReadFile>) =>
       actual.safeReadFile(...args)
@@ -51,7 +74,11 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => {
     safeReadFile: mocks.safeReadFile,
     safeWriteFile: mocks.safeWriteFile,
     safeCopyFileSync: mocks.safeCopyFileSync,
-    safeExistsSync: mocks.safeExistsSync,
+    // See isGovernedProductPath: catalogs always see the real filesystem.
+    safeExistsSync: (filePath: string) =>
+      isGovernedProductPath(filePath)
+        ? actual.safeExistsSync(filePath)
+        : mocks.safeExistsSync(filePath),
     safeMkdir: mocks.safeMkdir,
     safeLstat: mocks.safeLstat,
   };
@@ -205,11 +232,22 @@ vi.mock('@actuator/system', () => ({
   handleAction: mocks.handleSystemAction,
 }));
 
-// The actuator is imported once per file (the first `await import` in a test;
-// later ones hit the module cache). Re-importing the secure-io / tier-guard /
-// authority stack per test with vi.resetModules() repeated its module
-// initialisation every test (operations-hygiene-runbook §5). Per-test state is
-// the mocks (reset here) and the foundation IO re-registered in beforeEach.
+// The actuator is imported once per file, in the beforeAll below; the
+// `await import` calls in tests hit the module cache. Re-importing the
+// secure-io / tier-guard / authority stack per test with vi.resetModules()
+// repeated its module initialisation every test (operations-hygiene-runbook
+// §5). Per-test state is the mocks (reset here) and the foundation IO
+// re-registered in beforeEach.
+//
+// The cold import is the file's heavy work: ~3s idle, and 40s+ at load ~35 on
+// 4 cores, where it used to be charged to the first tests in file order (each
+// timing out at 10s while the import was still running). The hook gets an
+// explicit budget for it.
+beforeAll(async () => {
+  await import('./index.js');
+  await import('./media-generation-helpers.js');
+}, 120_000);
+
 function resetTestDoubles(): void {
   mocks.safeReadFile.mockReset();
   mocks.resetSafeReadFile();
@@ -240,13 +278,14 @@ async function installMockFoundationIo(): Promise<void> {
   const actualSecureIo =
     await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
   const readFile = (filePath: string): string => {
-    const normalizedPath = String(filePath).replaceAll('\\', '/');
     const useActualFile =
       // Every governed product catalog (schemas, governance, orchestration)
       // must read the real file — a fixture stub returns manifest JSON for any
       // path, which fails schema validation.
-      normalizedPath.includes('/knowledge/product/') ||
-      normalizedPath.endsWith('/libs/actuators/media-generation-actuator/manifest.json');
+      isGovernedProductPath(filePath) ||
+      String(filePath)
+        .replaceAll('\\', '/')
+        .endsWith('/libs/actuators/media-generation-actuator/manifest.json');
     return String(
       useActualFile
         ? actualSecureIo.safeReadFile(filePath, { encoding: 'utf8' })
@@ -254,18 +293,17 @@ async function installMockFoundationIo(): Promise<void> {
     );
   };
   const loadJson = <T>(filePath: string): T => JSON.parse(readFile(filePath)) as T;
+  const exists = (filePath: string): boolean => {
+    if (isGovernedProductPath(filePath)) return actualSecureIo.safeExistsSync(filePath);
+    const mockedExists = mocks.safeExistsSync(filePath);
+    return typeof mockedExists === 'boolean' ? mockedExists : true;
+  };
   foundation.registerFoundationIo({
     loadJson,
-    loadJsonIfPresent: <T>(filePath: string): T | null => {
-      const mockedExists = mocks.safeExistsSync(filePath);
-      const exists = typeof mockedExists === 'boolean' ? mockedExists : true;
-      return exists ? loadJson<T>(filePath) : null;
-    },
+    loadJsonIfPresent: <T>(filePath: string): T | null =>
+      exists(filePath) ? loadJson<T>(filePath) : null,
     appendFile: (filePath, content) => mocks.safeWriteFile(filePath, content),
-    exists: (filePath) => {
-      const mockedExists = mocks.safeExistsSync(filePath);
-      return typeof mockedExists === 'boolean' ? mockedExists : true;
-    },
+    exists,
     readFile,
     stat: (filePath) => ({
       mtimeMs: 0,
@@ -951,18 +989,18 @@ describe('media-generation-actuator', () => {
       record_screen: { output: 'active/shared/tmp/capture.mp4' },
       pipeline: { steps: [] },
     };
+    // Compile the action schema once: compiling it per action (12x) made this
+    // test ~0.75s idle and >10s under parallel load (operations-hygiene-runbook §5).
+    const validate = compileSchemaFromPath(
+      new Ajv({ allErrors: true }),
+      pathResolver.rootResolve('knowledge/product/schemas/media-generation-action.schema.json')
+    );
     for (const action of actions) {
       const request =
         action === 'pipeline'
           ? { action, ...fixtures[action] }
           : { action, params: fixtures[action] };
-      expect(
-        compileSchemaFromPath(
-          new Ajv({ allErrors: true }),
-          pathResolver.rootResolve('knowledge/product/schemas/media-generation-action.schema.json')
-        )(request),
-        action
-      ).toBe(true);
+      expect(validate(request), action).toBe(true);
     }
   });
 

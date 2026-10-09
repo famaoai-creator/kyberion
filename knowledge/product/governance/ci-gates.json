@@ -289,8 +289,9 @@
         "scripts/analyze_role_assumptions.ts",
         "--check"
       ],
+      "timeout_ms": 240000,
       "owner": "security",
-      "rationale": "Keeps the call-level role assumption reachability report (docs/developer/role-assumption-reachability.json) current; role-assumption-policy.json must grant every reachable role (RN-02/RN-03)."
+      "rationale": "Keeps the call-level role assumption reachability report (docs/developer/role-assumption-reachability.json) current; role-assumption-policy.json must grant every reachable role (RN-02/RN-03). Budget: it type-checks scripts/, libs/core/ and libs/actuators/ as one TypeScript program (about 32s CPU, 40-50s wall alone on a loaded 4-vCPU host, 2-3x that while `pnpm check` runs 6 gates at once), so the 120s default timed out on busy runs."
     },
     {
       "id": "reasoning-provider-registry",

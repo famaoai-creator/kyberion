@@ -240,6 +240,8 @@ describe('tier-guard tenant scope (IP-1)', () => {
   it('uses the persisted project binding for worker tier policy when env is unset', () => {
     const scopePath = path.join(ROOT, 'active/shared/tmp/tier-guard-persisted-project-scope.env');
     fs.rmSync(scopePath, { force: true });
+    // A fresh worktree has no active/shared/tmp/ yet.
+    fs.mkdirSync(path.dirname(scopePath), { recursive: true });
     process.env.KYBERION_SCOPE_ENV_PATH = scopePath;
     process.env.KYBERION_PERSONA = 'worker';
     process.env.MISSION_ROLE = 'worker';

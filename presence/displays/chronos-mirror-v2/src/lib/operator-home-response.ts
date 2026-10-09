@@ -112,6 +112,8 @@ function isCostSummary(value: unknown): value is OperatorHomeCostSummary {
       value.remainingUsd !== null &&
       !isFiniteNonNegative(value.remainingUsd)) ||
     typeof value.overBudget !== 'boolean' ||
+    !isOptionalString(value.partialNotice) ||
+    (value.withheldPartitions !== undefined && !isNonNegativeInteger(value.withheldPartitions)) ||
     !Array.isArray(value.missionBreakdown)
   ) {
     return false;

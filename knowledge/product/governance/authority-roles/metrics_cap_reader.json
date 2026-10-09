@@ -1,0 +1,9 @@
+{
+  "role": "metrics_cap_reader",
+  "description": "R4: least-privilege, read-only reader of the tier/tenant-partitioned metrics ledgers (active/shared/runtime/execution-metrics/, active/shared/runtime/usage-ledger/). libs/core metrics.ts assumes it only inside aggregateMetricsForEnforcement, bound to the caller's tenant, so cap enforcers (spend guard, org budget governor, generation-cost dedup) count every tier of their scope whatever the caller's persona; the call returns numbers only, never rows. No write, no knowledge/ access (persona worker).",
+  "default_persona": "worker",
+  "write_scopes": [],
+  "scope_classes": [],
+  "allowed_actuators": [],
+  "tier_access": ["public", "confidential", "personal"]
+}

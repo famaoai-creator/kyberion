@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
+import { stripVTControlCharacters } from 'node:util';
 import { safeReadFile } from '@agent/core/secure-io';
 
 const rootDir = process.cwd();
@@ -11,6 +11,21 @@ function read(relPath: string): string {
 }
 
 describe('mission orchestration dashboard contract', () => {
+  let dashboardScript: typeof import('../scripts/sovereign_dashboard.js');
+
+  // The once-mode render used to run in a child `node --import ts-loader.mjs
+  // scripts/sovereign_dashboard.ts --once`. Measured (operations-hygiene-runbook
+  // §5): 4-7s per run, almost all of it process start-up — transpiling the
+  // script graph and Node re-reading the 290KB libs/core/package.json for every
+  // module's format lookup — not rendering. Under parallel load it crossed the
+  // 10s test budget. The render path is the same in-process
+  // (`renderDashboardSnapshot` drives `render(argv, { interactive: false })`),
+  // so the script is imported once here, with an explicit hook timeout for its
+  // cold load.
+  beforeAll(async () => {
+    dashboardScript = await import('../scripts/sovereign_dashboard.js');
+  }, 60_000);
+
   it('shows mission orchestration state in the sovereign dashboard', () => {
     const dashboard = read('scripts/sovereign_dashboard.ts');
     expect(dashboard).toContain('COMPANY OVERVIEW');
@@ -32,31 +47,48 @@ describe('mission orchestration dashboard contract', () => {
   });
 
   it('renders the company overview section in once mode', () => {
-    const output = execFileSync(
-      'node',
-      [
-        '--import',
-        path.join(rootDir, 'scripts', 'ts-loader.mjs'),
-        path.join(rootDir, 'scripts', 'sovereign_dashboard.ts'),
-        '--once',
-        '--focus',
-        'onboarding',
-      ],
-      {
-        cwd: rootDir,
-        env: {
-          ...process.env,
-          FORCE_COLOR: '0',
-        },
-        encoding: 'utf8',
-      }
-    );
+    const snapshot = dashboardScript.renderDashboardSnapshot(['--once', '--focus', 'onboarding']);
+    const output = stripVTControlCharacters(snapshot.output);
 
     expect(output).toContain('COMPANY OVERVIEW');
     expect(output).toContain('Company:');
     expect(output).toContain('Vision:');
     expect(output).toContain('OKR:');
     expect(output).toContain('Approval audit:');
+  });
+
+  function expectCompanyOverview(text: string): void {
+    const output = stripVTControlCharacters(text);
+    expect(output).toContain('COMPANY OVERVIEW');
+    expect(output).toContain('Company:');
+    expect(output).toContain('Vision:');
+    expect(output).toContain('OKR:');
+    expect(output).toContain('Approval audit:');
+  }
+
+  it('prints the once-mode render through main(argv, print)', () => {
+    const printed: unknown[] = [];
+    dashboardScript.main(['--once', '--focus', 'onboarding'], (value) => printed.push(value));
+    expectCompanyOverview(printed.map((value) => String(value)).join('\n'));
+  });
+
+  it('routes --once through the CLI entry point to stdout without an exit code', async () => {
+    // runDashboard is the defineScript entry the `node scripts/sovereign_dashboard.ts`
+    // command runs: flag parsing, the bounded branch, and its log/clearOutput
+    // plumbing into the harness's console.log output.
+    const lines: string[] = [];
+    const log = vi.spyOn(console, 'log').mockImplementation((...values: unknown[]) => {
+      lines.push(values.map((value) => String(value)).join(' '));
+    });
+    const previousExitCode = process.exitCode;
+    try {
+      await dashboardScript.runDashboard(['--once', '--focus', 'onboarding']);
+      expect(process.exitCode).toBe(previousExitCode);
+    } finally {
+      log.mockRestore();
+      process.exitCode = previousExitCode;
+    }
+    expectCompanyOverview(lines.join('\n'));
   });
 
   it('shows mission intelligence in Chronos default view', () => {

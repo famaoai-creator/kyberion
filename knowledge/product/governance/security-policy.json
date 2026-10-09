@@ -58,7 +58,9 @@
       "active/shared/artifacts/personal/",
       "active/shared/artifacts/confidential/",
       "active/shared/runtime/usage-ledger/personal/",
-      "active/shared/runtime/usage-ledger/confidential/"
+      "active/shared/runtime/usage-ledger/confidential/",
+      "active/shared/runtime/execution-metrics/personal/",
+      "active/shared/runtime/execution-metrics/confidential/"
     ],
     "shared_prefixes": [
       "knowledge/confidential/tenant-groups/",
@@ -561,6 +563,13 @@
     },
     "scope_locale_reader": {
       "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/locale.json"],
+      "allow_write": []
+    },
+    "metrics_cap_reader": {
+      "allow_read": [
+        "active/shared/runtime/execution-metrics/",
+        "active/shared/runtime/usage-ledger/"
+      ],
       "allow_write": []
     },
     "audit_mirror_writer": {
