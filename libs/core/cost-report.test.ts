@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCostReport,
   effectiveCostUsd,
+  executionMetricsReadFor,
   formatCostReport,
   type CostLedgerEntry,
 } from './cost-report.js';
@@ -136,5 +137,20 @@ describe('buildCostReport', () => {
     });
     expect(report.total_usd).toBe(0);
     expect(report.calls).toBe(0);
+  });
+});
+
+describe('executionMetricsReadFor (partitioned execution-metrics ledger)', () => {
+  it("reads a tenant report's partitions plus the system one, else the operator aggregate", () => {
+    expect(executionMetricsReadFor({ tenant_slug: 'client-a' })).toEqual({
+      tenants: ['client-a'],
+      includeSystem: true,
+    });
+    expect(executionMetricsReadFor({ tenant_slugs: ['client-a', 'client-b'] })).toEqual({
+      tenants: ['client-a', 'client-b'],
+      includeSystem: true,
+    });
+    expect(executionMetricsReadFor({ tenant_slugs: 'all' })).toEqual({ all: true });
+    expect(executionMetricsReadFor()).toEqual({ all: true });
   });
 });

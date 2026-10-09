@@ -86,11 +86,21 @@ Import a heavy stack (the mission worker, `@agent/core`) in `beforeAll` with an 
 
 Accepted uses of `vi.resetModules()`:
 
-- **Once in `beforeAll`, when a static top-level import already bound `path-resolver`** before `KYBERION_ROOT` was stubbed (`scripts/onboarding_first_job*.test.ts`, `scripts/front_desk_execution_step.test.ts`).
+- **Once in `beforeAll`, when a static top-level import already bound `path-resolver`** before `KYBERION_ROOT` was stubbed (`scripts/onboarding_first_job*.test.ts`, `scripts/front_desk_execution_step.test.ts`). This works only when the static import did not load the authority stack. Process-global singletons, such as the policy engine (`Symbol.for` on `globalThis`), survive the reset and keep the repository root, so writes under the fixture root fail closed with `Policy engine has no loaded policies`. In that case remove the static `@agent/core` imports instead (`scripts/org.test.ts`).
 - **Only inside the tests that `vi.doMock`.** Drop the mocked graph again afterwards (`viewer-context.test.ts` in both presence displays). If the module that imports the mocked dependency is not loaded yet, skip the reset: `vi.doMock` applies to its first import. A second module generation re-registers process-global hooks, such as the execution-scope role validator, and later tests in the file see them (`chronos-token-registry-reader.test.ts`).
 - **Per test, when the module keeps module-level caches that have no reset hook** and each test feeds different fixture data (`libs/core/authority.branch.test.ts`, whose storage stack is mocked).
 
 `libs/core/stimuli-journal-rotation-role.test.ts` and `scripts/virtual_office.test.ts` are working examples.
+
+### Tests that time out only under load
+
+The machine running your tests is often busy with other suites and agents. A test that passes alone and times out under load usually does real work it does not need ([operations-hygiene-runbook §5](../../knowledge/product/governance/operations-hygiene-runbook.md#5-tests-pollution-and-host-dependencies) has the measurement procedure):
+
+- **Call scripts in process.** Import the script once in `beforeAll` and call its exported `main(argv, print)` or render function (`scripts/org.test.ts`, `tests/mission-orchestration-dashboard-contract.test.ts`). A child `node` process costs seconds of start-up per call. Keep a child only when the CLI process is the subject, as in `tests/a2a-lifecycle.test.ts`. That suite passes `KYBERION_REASONING_BACKEND=stub` and an explicit, measured `timeoutMs`.
+- **Mock the edge that does the work.** A mocked transport does not stop a helper from spawning `mission_controller` or probing host CLIs (`tests/best-of-n-judge.test.ts`).
+- **Settle what a timed-out test started.** Vitest does not cancel a timed-out test, so its async work runs into the next test. Track the promises a test starts and `await Promise.allSettled(...)` them in `afterEach` before cleanup.
+- **Keep per-test mocks away from cached catalogs.** A mock that answers "this file does not exist" for one artifact must not answer the registry loader too. Otherwise the result depends on which test loaded the registry first (`libs/actuators/media-generation-actuator/src/index.test.ts`).
+- **Check order independence.** Run the file with `--sequence.shuffle --sequence.seed=222` (and a few other seeds).
 
 ### Fixture missions in the live tree
 

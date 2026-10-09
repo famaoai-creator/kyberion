@@ -62,6 +62,8 @@ const FILES: Record<string, string> = {
       { id: 'launch-surface', command: 'node', args: ['dist/apps/launch.js'] },
       { id: 'other-surface', command: 'node', args: ['dist/apps/other.js'] },
       { id: 'rawwrite-surface', command: 'node', args: ['dist/apps/rawwrite.js'] },
+      { id: 'member-surface', command: 'node', args: ['dist/apps/members.js'] },
+      { id: 'member-kinds-surface', command: 'node', args: ['dist/apps/member-kinds.js'] },
     ],
   }),
   'apps/next-workspace/package.json': JSON.stringify({
@@ -147,6 +149,92 @@ const FILES: Record<string, string> = {
     "  const role: 'union_a' | 'union_b' = flag ? 'union_a' : 'union_b';",
     '  withExecutionContext(role, () => undefined);',
     '}',
+  ].join('\n'),
+  // Declarations reached only through a member access (`x.name`).
+  'libs/core/members.ts': [
+    "import { withExecutionContext } from './authority.js';",
+    "function inner(): void { withExecutionContext('role_renamed_export', () => undefined); }",
+    'export { inner as renamedExport };',
+    'export default function (): void {',
+    "  withExecutionContext('role_default_export', () => undefined);",
+    '}',
+    'export function notAccessed(): void {',
+    "  withExecutionContext('role_not_accessed', () => undefined);",
+    '}',
+    "const KEY = 'viaComputedKey';",
+    'export class Service {',
+    "  compute(): void { withExecutionContext('role_typed_member', () => undefined); }",
+    '}',
+    'export class Keyed {',
+    "  [KEY](): void { withExecutionContext('role_computed_member', () => undefined); }",
+    '}',
+    'export class Unused {',
+    "  idle(): void { withExecutionContext('role_unused_member', () => undefined); }",
+    '}',
+  ].join('\n'),
+  'apps/members.ts': [
+    `import * as members from '${CORE}/members.js';`,
+    `import type { Keyed, Service, Unused } from '${CORE}/members.js';`,
+    'export function useService(service: Service): void { service.compute(); }',
+    'export function useKeyed(keyed: Keyed): void { keyed.viaComputedKey(); }',
+    'export type Untouched = Unused;',
+    'members.renamedExport();',
+    'members.default();',
+  ].join('\n'),
+  // Every way a member name can be declared, each reached only through a
+  // typed member access (type-only imports add no edge of their own).
+  'libs/core/member-kinds.ts': [
+    "import { withExecutionContext } from './authority.js';",
+    "export enum K { Go = 'goNow' }",
+    'export class EnumKeyed {',
+    "  [K.Go](): void { withExecutionContext('role_enum_key', () => undefined); }",
+    '}',
+    // `zzE` stands for a global, and the fixture program has no lib, so
+    // `Object` is declared here: only the shorthand property declares `zzE`.
+    'declare const Object: { assign<T, U>(target: T, source: U): T & U };',
+    'export function makeTool() {',
+    "  withExecutionContext('role_shorthand', () => undefined);",
+    '  return Object.assign(() => undefined, { zzE });',
+    '}',
+    'export class Fielded {',
+    "  run = (): void => { withExecutionContext('role_arrow_field', () => undefined); };",
+    '}',
+    'export class Getter {',
+    '  get value(): number {',
+    "    withExecutionContext('role_getter', () => undefined);",
+    '    return 1;',
+    '  }',
+    '}',
+    'export namespace Space {',
+    "  export function act(): void { withExecutionContext('role_namespace', () => undefined); }",
+    '}',
+    'export class Mapped {',
+    "  doThing(): void { withExecutionContext('role_mapped', () => undefined); }",
+    "  skip(): void { withExecutionContext('role_mapped_skipped', () => undefined); }",
+    '}',
+    'export type OnlyDo<T> = { [P in keyof T as P extends `do${string}` ? P : never]: T[P] };',
+    "const TPL = `tpl${'Key'}` as const;",
+    'export class Templated {',
+    "  [TPL](): void { withExecutionContext('role_template_key', () => undefined); }",
+    '}',
+  ].join('\n'),
+  'libs/core/barrel-impl.ts': [
+    "import { withExecutionContext } from './authority.js';",
+    "export function inner(): void { withExecutionContext('role_barrel', () => undefined); }",
+  ].join('\n'),
+  'libs/core/barrel.d.ts': "export { inner as viaBarrel } from './barrel-impl.js';",
+  'apps/member-kinds.ts': [
+    `import type { EnumKeyed, Fielded, Getter, Mapped, OnlyDo, Templated, makeTool } from '${CORE}/member-kinds.js';`,
+    `import { Space } from '${CORE}/member-kinds.js';`,
+    `import * as barrel from '${CORE}/barrel.js';`,
+    'export function useEnum(item: EnumKeyed): void { item.goNow(); }',
+    'export function useShorthand(make: typeof makeTool): void { make().zzE(); }',
+    'export function useField(item: Fielded): void { item.run(); }',
+    'export function useGetter(item: Getter): number { return item.value; }',
+    'export function useNamespace(): void { Space.act(); }',
+    'export function useMapped(item: OnlyDo<Mapped>): void { item.doThing(); }',
+    'export function useTemplate(item: Templated): void { item.tplKey(); }',
+    'export function useBarrel(): void { barrel.viaBarrel(); }',
   ].join('\n'),
   'apps/literal.ts': [
     `import { withExecutionContext } from '${CORE}/authority.js';`,
@@ -323,6 +411,32 @@ describe('RN-02 role assumption reachability analysis', () => {
     expect(surface.unresolved_sites).toEqual([]);
     // role_extra is granted but provably unreachable.
     expect(surface.policy_roles_not_reachable).toEqual(['role_extra']);
+  });
+
+  it('follows member accesses to renamed, default, typed and computed-key declarations only', () => {
+    const surface = report.system_roles.member_surface;
+    expect(Object.keys(surface.reachable_roles)).toEqual([
+      'role_computed_member',
+      'role_default_export',
+      'role_renamed_export',
+      'role_typed_member',
+    ]);
+    expect(surface.unresolved_sites).toEqual([]);
+  });
+
+  it('reaches every member-declaration kind through a typed member access', () => {
+    const surface = report.system_roles.member_kinds_surface;
+    expect(Object.keys(surface.reachable_roles)).toEqual(
+      expect.arrayContaining([
+        'role_arrow_field',
+        'role_enum_key',
+        'role_getter',
+        'role_mapped',
+        'role_namespace',
+        'role_shorthand',
+        'role_template_key',
+      ])
+    );
   });
 
   it('attributes a forwarded role to the wrapper call site, not the declared union', () => {

@@ -28,7 +28,12 @@ import { listDotCharters, type LoadedDotCharter } from '../dot/dot-charter.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { readJsonIfPresent, readJsonLines } from '../foundation/json.js';
 import { generationQuotaCounterPath } from '../generation-quota.js';
-import { metrics } from '../metrics.js';
+import {
+  aggregateMetricsForEnforcement,
+  projectEnforcementRow,
+  type EnforcementRowView,
+} from '../metrics.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
 import { sendOpsAlert } from '../ops-alert.js';
 import { pathResolver } from '../path-resolver.js';
 
@@ -63,6 +68,12 @@ export interface BudgetUsage {
    * unscoped, unattributed token-only rows lack cost — reported, never a pause.
    */
   cost_status?: 'unknown' | 'partial';
+  /**
+   * Metrics partitions the enforcement read could not see (e.g. other
+   * tenants' for a tenant-bound process evaluating a wider scope). When set,
+   * cost_status is at least 'partial': the totals are never complete.
+   */
+  withheld_partitions?: number;
   /**
    * dots / missions are tokens; generation is generation-quota units — report
    * only: never added to `tokens` and never an input to the throttle.
@@ -215,30 +226,16 @@ function nonEmpty(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
-/** Tenant/org of a metrics row: canonical `scope` first, then legacy top-level fields. */
-function metricsRowScope(e: Record<string, any>): OrgBudgetScope {
-  const scope = e.scope && typeof e.scope === 'object' ? e.scope : {};
-  return {
-    tenant_slug: nonEmpty(scope.tenant_slug) ?? nonEmpty(e.tenant_slug) ?? nonEmpty(e.tenant),
-    organization_id: nonEmpty(scope.organization_id) ?? nonEmpty(e.organization_id),
-  };
+/**
+ * Tenant/org of a metrics row, from the enforcement projection: the shared
+ * metricsRowTenant resolver (canonical scope, then legacy top-level fields).
+ */
+function metricsRowScope(e: EnforcementRowView): OrgBudgetScope {
+  return { tenant_slug: e.tenant_slug, organization_id: e.organization_id };
 }
 
-const DOT_ACTOR_PATTERN = /^dot:/;
 /** More torn history lines than this that belong to today make cost unknown. */
 const MAX_TODAY_MALFORMED = 2;
-const MALFORMED_DAY_PATTERN = /"timestamp"\s*:\s*"(\d{4}-\d{2}-\d{2})/;
-/**
- * Interactive operator CLI producers (front-CLI session hooks such as
- * recordCliUsage). Their unattributed rows are reported, never a cap input.
- */
-const INTERACTIVE_CLI_PRODUCERS = new Set(['claude-code-cli']);
-
-function isInteractiveCliRow(e: Record<string, unknown>): boolean {
-  return [e.agent, e.component].some(
-    (value) => typeof value === 'string' && INTERACTIVE_CLI_PRODUCERS.has(value)
-  );
-}
 
 interface MalformedHistoryLine {
   line: number;
@@ -254,15 +251,12 @@ interface MalformedHistoryLine {
  * blank lines are ignored, which can only place it earlier (fail closed).
  */
 function todayMalformedLines(
-  entries: Array<Record<string, any>>,
+  firstIndex: number,
   malformed: MalformedHistoryLine[],
   day: string
 ): number[] {
   if (malformed.length === 0) return [];
   let firstToday = Number.POSITIVE_INFINITY;
-  const firstIndex = entries.findIndex(
-    (e) => typeof e?.timestamp === 'string' && e.timestamp.slice(0, 10) === day
-  );
   if (firstIndex >= 0) {
     let line = firstIndex + 1;
     for (const m of [...malformed].sort((a, b) => a.line - b.line)) {
@@ -278,12 +272,9 @@ function todayMalformedLines(
 }
 
 /** Dot identity is an attribution label, never proof that a ledger charge exists. */
-function metricsDotId(e: Record<string, unknown>): string | undefined {
+function metricsDotId(e: EnforcementRowView): string | undefined {
   if (nonEmpty(e.dot_id)) return nonEmpty(e.dot_id);
-  const actor = [e.actor_id, e.agent, e.component].find(
-    (value) => typeof value === 'string' && DOT_ACTOR_PATTERN.test(value)
-  );
-  return typeof actor === 'string' ? nonEmpty(actor.slice(4)) : undefined;
+  return e.dot_actor ? nonEmpty(e.dot_actor.slice(4)) : undefined;
 }
 
 function accountingKey(
@@ -301,17 +292,16 @@ function accountingKey(
   ]);
 }
 
-function metricsTokens(entry: Record<string, any>): number {
+function metricsTokens(entry: EnforcementRowView): number {
   const u = entry.usage;
-  if (!u || typeof u !== 'object') return 0;
-  const sum = [
-    u.prompt_tokens,
-    u.completion_tokens,
-    u.cache_read_tokens ?? u.cache_read_input_tokens,
-    u.cache_write_tokens ?? u.cache_creation_input_tokens,
-    u.cache_write_1h_tokens,
-  ].reduce((acc: number, v) => acc + (Number(v) > 0 ? Number(v) : 0), 0);
-  return sum;
+  if (!u) return 0;
+  return (
+    u.prompt_tokens +
+    u.completion_tokens +
+    u.cache_read_tokens +
+    u.cache_write_tokens +
+    u.cache_write_1h_tokens
+  );
 }
 
 /** Missing legacy scope could belong here; an explicit different tenant/org cannot. */
@@ -385,32 +375,19 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
   //   reported in by_source.interactive only — never tokens, cost or status.
   let missions = 0;
   let interactive = 0;
+  let withheldPartitions = 0;
   let cost = 0;
   let costUnknown = false;
   let costPartial = false;
   const malformed: MalformedHistoryLine[] = [];
   const measuredDotTokens = new Map<string, number>();
   try {
-    const entries = deps.readMetricsHistory
-      ? deps.readMetricsHistory()
-      : metrics.loadHistory({
-          strict: true,
-          onMalformed: (line, raw) => {
-            malformed.push({ line, day: MALFORMED_DAY_PATTERN.exec(raw)?.[1] });
-          },
-        });
-    const malformedToday = todayMalformedLines(entries, malformed, day);
-    if (malformedToday.length > 0) {
-      const shown = malformedToday.slice(0, 10).join(', ');
-      const more = malformedToday.length > 10 ? ` (+${malformedToday.length - 10} more)` : '';
-      const unknown = malformedToday.length > MAX_TODAY_MALFORMED;
-      if (unknown) costUnknown = true;
-      logger.warn(
-        `metrics history has ${malformedToday.length} malformed line(s) for ${day} — ${unknown ? 'cost treated as unknown' : `skipped (cost unknown above ${MAX_TODAY_MALFORMED})`} | next: repair active/shared metrics history.jsonl | evidence: lines ${shown}${more}`
-      );
-    }
-    for (const e of entries) {
-      if (typeof e?.timestamp !== 'string' || e.timestamp.slice(0, 10) !== day) continue;
+    let index = 0;
+    let firstTodayIndex = -1;
+    const accumulate = (e: EnforcementRowView) => {
+      const rowIndex = index++;
+      if (typeof e?.timestamp !== 'string' || e.timestamp.slice(0, 10) !== day) return;
+      if (firstTodayIndex < 0) firstTodayIndex = rowIndex;
       const dotId = metricsDotId(e);
       const charterScope = dotId ? dotScope.get(dotId) : undefined;
       const explicitScope = metricsRowScope(e);
@@ -418,7 +395,7 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
         charterScope && !explicitScope.tenant_slug && !explicitScope.organization_id
           ? { ...charterScope }
           : explicitScope;
-      const hasUsage = e.usage && typeof e.usage === 'object';
+      const hasUsage = Boolean(e.usage);
       const hasCostEvidence = hasUsage || e.cost_usd !== undefined;
       const runtimeAttributed = Boolean(dotId || nonEmpty(e.accounting_id));
       const attributable =
@@ -437,12 +414,12 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
         ) {
           costUnknown = true;
         }
-        continue;
+        return;
       }
       const tokens = metricsTokens(e);
-      if (!attributable && isInteractiveCliRow(e)) {
+      if (!attributable && e.interactive_cli) {
         interactive += tokens;
-        continue;
+        return;
       }
       const accountingId = nonEmpty(e.accounting_id);
       if (dotId && accountingId) {
@@ -454,13 +431,52 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
       } else {
         missions += tokens;
       }
-      const c = Number(e.cost_usd);
-      if (e.cost_usd !== undefined && e.cost_usd !== null && Number.isFinite(c) && c >= 0)
-        cost += c;
+      const c = e.cost_usd;
+      if (typeof c === 'number' && c >= 0) cost += c;
       else if (hasCostEvidence) {
         if (attributable) costUnknown = true;
         else costPartial = true;
       }
+    };
+    if (deps.readMetricsHistory) {
+      // Injected rows get the same whitelisted projection as the governed read.
+      for (const e of deps.readMetricsHistory()) accumulate(projectEnforcementRow(e));
+    } else {
+      // A cap must count every tier of its scope whatever the caller's
+      // persona: the governed enforcement aggregate reads the ledgers as the
+      // metrics cap reader and returns numbers only. A tenant budget reads that
+      // tenant's partitions plus the system one (dot-attributed and unscoped
+      // rows are matched above); the global budget reads every partition.
+      withheldPartitions = aggregateMetricsForEnforcement({
+        enforcer: 'org_budget_governor',
+        ledger: 'execution_metrics',
+        read: scope.tenant_slug
+          ? { tenants: [scope.tenant_slug], includeSystem: true }
+          : { all: true },
+        measures: [],
+        accumulate: (row) => accumulate(row),
+        strict: true,
+        onMalformed: (line, malformedDay) => {
+          malformed.push({ line, day: malformedDay });
+        },
+      }).withheld_partitions;
+      if (withheldPartitions > 0) {
+        // A scope wider than the bound tenant: never present it as complete.
+        costPartial = true;
+        logger.warn(
+          `budget usage for ${scope.tenant_slug ?? '(global)'} is partial — ${withheldPartitions} metrics partition(s) withheld from this process | next: evaluate a wider budget from an unbound operator process | evidence: tenant binding ${getRegisteredEnvText('KYBERION_TENANT') ?? '(scoped)'}`
+        );
+      }
+    }
+    const malformedToday = todayMalformedLines(firstTodayIndex, malformed, day);
+    if (malformedToday.length > 0) {
+      const shown = malformedToday.slice(0, 10).join(', ');
+      const more = malformedToday.length > 10 ? ` (+${malformedToday.length - 10} more)` : '';
+      const unknown = malformedToday.length > MAX_TODAY_MALFORMED;
+      if (unknown) costUnknown = true;
+      logger.warn(
+        `metrics history has ${malformedToday.length} malformed line(s) for ${day} — ${unknown ? 'cost treated as unknown' : `skipped (cost unknown above ${MAX_TODAY_MALFORMED})`} | next: repair active/shared metrics history.jsonl | evidence: lines ${shown}${more}`
+      );
     }
   } catch (error) {
     costUnknown = true;
@@ -493,6 +509,7 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
     day,
     tokens: dots + missions,
     cost_usd: Math.round(cost * 100000) / 100000,
+    ...(withheldPartitions > 0 ? { withheld_partitions: withheldPartitions } : {}),
     ...(costUnknown
       ? { cost_status: 'unknown' as const }
       : costPartial
