@@ -226,6 +226,15 @@ the test passes against the sandbox while the writer leaks into live state.
   the rows still has its spend counted. A report or summary built from a gated read passes
   `onWithheld` and shows `metricsWithheldNotice` (one diagnostic warn + a "partial" line in its
   output). Gate: `libs/core/metrics-enforcement-aggregate.test.ts`.
+- **Caps are evaluated where they are read.** A tenant-bound process evaluates spend caps per
+  bound tenant — policy (`spend-policy.json` `tenant_overrides`) and ledgers from the same
+  tenant — and refuses a check for another tenant (`refused: 'tenant_mismatch'`) instead of mixing
+  them; an unbound process evaluates globally. Any enforcement cache is keyed by that tenant,
+  bounded, and invalidated by the process's own appends. A budget evaluated over a scope wider
+  than what the process could read is `cost_status: 'partial'` with `withheld_partitions`.
+- **Never rewrite a hot ledger from a stale plan.** A prune of an append-only ledger (tenant
+  offboarding) recomputes, exports and rewrites under the same lock its appenders take
+  (`metricsLedgerLockId` + `withLockSync`); a plan computed earlier only sizes the dry run.
 - **Evidence stays in the tenant's scope.** A per-tenant command (activation probe, readiness
   report) that runs a repository-wide check keeps only the lines about its own tenant in the
   evidence it writes, and points at the repository-wide command for the rest.

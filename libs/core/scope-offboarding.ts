@@ -51,7 +51,12 @@ import {
   TRASH_REPO_SUBPATH,
 } from './storage-janitor.js';
 import { RETENTION_CATALOG_REPO_PATH } from './storage-retention-catalog.js';
-import { PARTITIONED_RUNTIME_LEDGER_ROOTS } from './storage-layout.js';
+import {
+  PARTITIONED_RUNTIME_LEDGER_ROOTS,
+  metricsLedgerLockId,
+  metricsRowTenant,
+} from './storage-layout.js';
+import { withLockSync } from './foundation/lock-utils.js';
 import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
 import { revokeGrantsForTenantBestEffort } from './task/task-scoped-grants.js';
 import { assertPhysicalScopeSegment } from './physical-namespace.js';
@@ -928,19 +933,6 @@ function computeDedupRegistryPrune(tenantSlug: string): DedupRegistryPrune {
   return result;
 }
 
-/** Tenant of a metrics-ledger row (canonical `tenant_slug`, legacy `tenant_id`). */
-function usageRowTenant(record: unknown): string {
-  if (!record || typeof record !== 'object') return '';
-  const scope = (record as { scope?: unknown }).scope;
-  if (!scope || typeof scope !== 'object') return '';
-  const { tenant_slug: slug, tenant_id: id } = scope as {
-    tenant_slug?: unknown;
-    tenant_id?: unknown;
-  };
-  const tenant = typeof slug === 'string' && slug ? slug : typeof id === 'string' ? id : '';
-  return tenant.trim().toLowerCase();
-}
-
 /**
  * Which pre-partition rows of a shared metrics ledger belong to this tenant
  * (by the row's own scope)? Corrupt lines are kept, as in the dedup registry
@@ -960,7 +952,7 @@ function computeLegacyLedgerPrune(
     let matches = false;
     try {
       matches =
-        usageRowTenant(parseSafeJsonInput(trimmed, `${ledger.row_label} JSONL entry`)) === tenant;
+        metricsRowTenant(parseSafeJsonInput(trimmed, `${ledger.row_label} JSONL entry`)) === tenant;
     } catch {
       /* corrupt line: keep it — the ledger readers skip it anyway */
     }
@@ -1207,12 +1199,10 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
         export_file: `${result.export_path}/${dedupExportFile}`,
       };
     }
-    // The tenant's pre-partition rows of the shared metrics ledgers, verbatim.
+    // The tenant's pre-partition rows of the shared metrics ledgers are
+    // exported verbatim right before they are pruned, under the ledger lock
+    // (see below); the manifest names the export file now.
     for (const { ledger, prune } of ledgerPrunes) {
-      const exportPath = assertSafeRepositoryPath(path.join(exportDirAbs, ledger.export_file), {
-        allowMissingLeaf: true,
-      });
-      safeWriteFile(exportPath, `${prune.removedLines.join('\n')}\n`);
       result[ledger.result_key] = {
         matched: prune.removedLines.length,
         removed: 0,
@@ -1291,16 +1281,33 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
       });
     }
 
-    // Same for the tenant's pre-partition rows of the shared metrics ledgers:
-    // exported above, then removed by one atomic rewrite (secure-io writes
-    // through a temp file + rename), audited like every other purge.
-    for (const { ledger, prune } of ledgerPrunes) {
+    // Same for the tenant's pre-partition rows of the shared metrics ledgers.
+    // These files are hot (every metrics append): under the lock every
+    // appender takes, the prune is recomputed from the file as it is NOW,
+    // exported, then applied by one atomic rewrite (secure-io writes through a
+    // temp file + rename), so rows appended since the plan survive. Audited
+    // like every other purge.
+    for (const { ledger } of ledgerPrunes) {
       const ledgerAbs = assertSafeRepositoryPath(pathResolver.rootResolve(ledger.legacy_path), {
         allowMissingLeaf: true,
       });
-      safeWriteFile(ledgerAbs, prune.keptLines.length > 0 ? `${prune.keptLines.join('\n')}\n` : '');
+      const prune = withLockSync(metricsLedgerLockId(ledgerAbs), () => {
+        const current = computeLegacyLedgerPrune(ledger, scopeId);
+        const exportPath = assertSafeRepositoryPath(path.join(exportDirAbs, ledger.export_file), {
+          allowMissingLeaf: true,
+        });
+        safeWriteFile(exportPath, `${current.removedLines.join('\n')}\n`);
+        safeWriteFile(
+          ledgerAbs,
+          current.keptLines.length > 0 ? `${current.keptLines.join('\n')}\n` : ''
+        );
+        return current;
+      });
       const summary = result[ledger.result_key];
-      if (summary) summary.removed = prune.removedLines.length;
+      if (summary) {
+        summary.matched = prune.removedLines.length;
+        summary.removed = prune.removedLines.length;
+      }
       appendRetentionAudit({
         event: ledger.audit_event,
         scope_type: scopeType,

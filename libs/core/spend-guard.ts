@@ -15,7 +15,8 @@ import { logger } from './core.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { isVitestProcess } from './foundation/env.js';
-import { aggregateMetricsForEnforcement } from './metrics.js';
+import { aggregateMetricsForEnforcement, executionMetricsGeneration } from './metrics.js';
+import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { pathResolver } from './path-resolver.js';
 
@@ -41,14 +42,18 @@ export interface SpendGuardResult {
   mission_spent_usd?: number;
   mission_cap_usd?: number;
   breached: Array<'daily' | 'mission'>;
+  /** Set when the guard refused to evaluate (e.g. a tenant other than the bound one). */
+  refused?: 'tenant_mismatch';
 }
 
 export class SpendCapExceededError extends Error {
   constructor(public readonly result: SpendGuardResult) {
     super(
-      `[spend-guard] cap reached (${result.breached.join(', ')}): ` +
-        `daily $${result.daily_spent_usd.toFixed(2)}/$${result.daily_cap_usd} — ` +
-        'approve to continue or raise the cap in spend-policy.json'
+      result.refused
+        ? `[spend-guard] refused (${result.refused}): the requested tenant is not the bound tenant`
+        : `[spend-guard] cap reached (${result.breached.join(', ')}): ` +
+            `daily $${result.daily_spent_usd.toFixed(2)}/$${result.daily_cap_usd} — ` +
+            'approve to continue or raise the cap in spend-policy.json'
     );
     this.name = 'SpendCapExceededError';
   }
@@ -121,37 +126,79 @@ export function sumSpend(
 }
 
 // Reading the metrics ledgers is file I/O; cache briefly so the guard adds
-// no measurable latency to bursts of reasoning calls.
+// no measurable latency to bursts of reasoning calls. An entry is keyed by the
+// tenant whose ledgers were read and is valid only while this process has
+// appended no execution-metrics row since (executionMetricsGeneration), so a
+// burst cannot overrun the cap for the TTL. Expired entries are evicted and
+// the map is bounded.
 const CACHE_TTL_MS = 30_000;
-const cachedSpend = new Map<string, { at: number; spend: { daily: number; mission: number } }>();
+const CACHE_MAX_ENTRIES = 64;
+interface CachedSpend {
+  at: number;
+  generation: number;
+  spend: { daily: number; mission: number };
+}
+const cachedSpend = new Map<string, CachedSpend>();
 
 /** Test hook: drop cached spend totals. */
 export function resetSpendGuardCache(): void {
   cachedSpend.clear();
 }
 
+function rememberSpend(key: string, entry: CachedSpend): void {
+  for (const [cachedKey, cached] of cachedSpend) {
+    if (entry.at - cached.at >= CACHE_TTL_MS) cachedSpend.delete(cachedKey);
+  }
+  cachedSpend.delete(key);
+  while (cachedSpend.size >= CACHE_MAX_ENTRIES) {
+    const oldest = cachedSpend.keys().next().value;
+    if (oldest === undefined) break;
+    cachedSpend.delete(oldest);
+  }
+  cachedSpend.set(key, entry);
+}
+
 /**
- * Today's spend through the governed enforcement aggregate: every tier of
- * this process's scope, whatever its persona (a cap must never under-count),
- * as numbers only — the guard never receives ledger rows.
+ * Today's spend through the governed enforcement aggregate, as numbers only —
+ * the guard never receives ledger rows. A tenant-bound process reads its
+ * bound tenant's partitions (every tier) plus the system partition; an
+ * unbound process reads every partition (global evaluation).
  */
-function loadSpend(now: number, input: { sinceMs: number; missionId?: string }) {
-  const key = `${input.sinceMs}|${input.missionId ?? ''}`;
+function loadSpend(
+  now: number,
+  input: { sinceMs: number; missionId?: string; boundTenant?: string }
+) {
+  const key = `${input.boundTenant ?? '*'}|${input.sinceMs}|${input.missionId ?? ''}`;
+  const generation = executionMetricsGeneration();
   const hit = cachedSpend.get(key);
-  if (hit && now - hit.at < CACHE_TTL_MS) return hit.spend;
+  if (hit && now - hit.at < CACHE_TTL_MS && hit.generation === generation) return hit.spend;
   const totals = aggregateMetricsForEnforcement({
     enforcer: 'spend_guard',
     ledger: 'execution_metrics',
-    read: { all: true },
+    read: input.boundTenant ? { tenants: [input.boundTenant], includeSystem: true } : { all: true },
     measures: ['daily', 'mission'] as const,
     accumulate: (row, add) => {
-      const spend = sumSpend([row as UsageEntry], input);
+      const spend = sumSpend(
+        [
+          {
+            timestamp: row.timestamp,
+            cost_usd: row.cost_usd ?? undefined,
+            mission_id: row.mission_id,
+          },
+        ],
+        input
+      );
       add('daily', spend.daily);
       add('mission', spend.mission);
     },
   });
+  if (totals.withheld_partitions > 0) {
+    logger.warn(
+      `[spend-guard] spend for ${input.boundTenant ?? 'the global cap'} is partial — ${totals.withheld_partitions} metrics partition(s) withheld | next: evaluate global caps from an unbound operator process | evidence: tenant ${input.boundTenant ?? '(unbound)'}`
+    );
+  }
   const spend = { daily: totals.measures.daily, mission: totals.measures.mission };
-  cachedSpend.set(key, { at: now, spend });
+  rememberSpend(key, { at: now, generation, spend });
   return spend;
 }
 
@@ -168,13 +215,31 @@ export function checkSpendGuard(
   } = {}
 ): SpendGuardResult {
   const now = options.now ?? Date.now();
-  const tenantId = options.tenantId ?? getRegisteredEnvText('KYBERION_TENANT');
+  // A tenant-bound process evaluates its caps per bound tenant: the policy is
+  // resolved from the same tenant whose ledgers are read. A different
+  // requested tenant is refused rather than mixed. Unbound: global, as before.
+  const boundTenant = resolvePolicyIdentityContext().tenantSlug || undefined;
+  if (boundTenant && options.tenantId && options.tenantId !== boundTenant) {
+    logger.warn(
+      `[spend-guard] refused — requested tenant '${options.tenantId}' differs from the bound tenant '${boundTenant}' | next: evaluate the cap from a process bound to '${options.tenantId}' (or unbound) | evidence: spend-policy is resolved per bound tenant`
+    );
+    const refusedPolicy = options.policy ?? loadSpendPolicy();
+    return {
+      allowed: false,
+      posture: refusedPolicy.posture,
+      daily_spent_usd: 0,
+      daily_cap_usd: refusedPolicy.daily_cap_usd,
+      breached: [],
+      refused: 'tenant_mismatch',
+    };
+  }
+  const tenantId = boundTenant ?? options.tenantId ?? getRegisteredEnvText('KYBERION_TENANT');
   const policy = resolveSpendPolicyForTenant(options.policy ?? loadSpendPolicy(), tenantId);
   const startOfUtcDay = new Date(now).setUTCHours(0, 0, 0, 0);
   const missionId = options.missionId || getRegisteredEnvText('MISSION_ID') || undefined;
   const spend = options.entries
     ? sumSpend(options.entries, { sinceMs: startOfUtcDay, missionId })
-    : loadSpend(now, { sinceMs: startOfUtcDay, missionId });
+    : loadSpend(now, { sinceMs: startOfUtcDay, missionId, boundTenant });
 
   const breached: Array<'daily' | 'mission'> = [];
   if (spend.daily >= policy.daily_cap_usd) breached.push('daily');

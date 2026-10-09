@@ -17,7 +17,8 @@ vi.mock('./logger.js', async (importOriginal) => {
   };
 });
 
-import { validateReadPermission } from './tier-guard.js';
+import { validateReadPermission, validateWritePermission } from './tier-guard.js';
+import { withExecutionContext } from './authority.js';
 import {
   EXECUTION_METRICS_LEDGER_ROOT,
   MetricsCollector,
@@ -120,7 +121,54 @@ describe('metrics ledgers follow the knowledge-tier persona read rules (real tie
     }
   });
 
-  it('decides each partition path exactly like knowledge/<tier>/', () => {
+  it('checks the logical ledger path, not the Vitest sandbox copy', () => {
+    // secure-io remaps the bytes under Vitest; tier-guard must still see the
+    // logical, tenant-protected path or every assertion here is vacuous.
+    expect(path.relative(ROOT, executionRoot)).toBe(EXECUTION_METRICS_LEDGER_ROOT);
+    expect(path.relative(ROOT, usageRoot)).toBe(RESOURCE_USAGE_LEDGER_ROOT);
+    expect(pathResolver.shared('runtime/execution-metrics')).toContain('vitest-live');
+    // A tenant-bound writer may not write another tenant's partition (logical path).
+    process.env.KYBERION_TENANT = 'other-tenant';
+    expect(
+      validateWritePermission(
+        path.join(executionRoot, 'confidential', TENANT, 'execution-metrics.jsonl')
+      ).allowed
+    ).toBe(false);
+    delete process.env.KYBERION_TENANT;
+  });
+
+  it('lets a tenant-scoped role read its own tenant partition, never another tenant', () => {
+    setIdentity('worker');
+    const own = path.join(executionRoot, 'confidential', TENANT, 'execution-metrics.jsonl');
+    expect(validateReadPermission(own).allowed).toBe(false);
+    withExecutionContext(
+      'chronos_tenant_runner',
+      () => {
+        expect(validateReadPermission(own).allowed).toBe(true);
+        expect(
+          validateReadPermission(
+            path.join(usageRoot, 'confidential', TENANT, 'resource-usage.jsonl')
+          ).allowed
+        ).toBe(true);
+        expect(
+          validateReadPermission(
+            path.join(executionRoot, 'confidential', 'other-tenant', 'execution-metrics.jsonl')
+          ).allowed
+        ).toBe(false);
+        // A { scope } read without a tenant is stamped with the bound tenant, as writers are.
+        expect(
+          collector()
+            .loadHistory({ read: { scope: { tier: 'confidential' } } })
+            .map((row) => String(row.component))
+            .sort()
+        ).toEqual(['exec-confidential', 'exec-legacy-confidential']);
+      },
+      undefined,
+      TENANT
+    );
+  });
+
+  it('decides each partition path exactly like knowledge/<tier>/<tenant>/', () => {
     const cases = [
       { persona: 'worker', role: undefined },
       { persona: 'worker', role: 'mission_controller' },
@@ -130,7 +178,9 @@ describe('metrics ledgers follow the knowledge-tier persona read rules (real tie
     for (const { persona, role } of cases) {
       setIdentity(persona, role);
       for (const tier of ['personal', 'confidential']) {
-        const knowledge = validateReadPermission(path.join(ROOT, `knowledge/${tier}`)).allowed;
+        const knowledge = validateReadPermission(
+          path.join(ROOT, `knowledge/${tier}/${TENANT}`)
+        ).allowed;
         for (const [root, file] of [
           [RESOURCE_USAGE_LEDGER_ROOT, 'resource-usage.jsonl'],
           [EXECUTION_METRICS_LEDGER_ROOT, 'execution-metrics.jsonl'],

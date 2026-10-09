@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import { rootDir } from './path-resolver.js';
 import { isReservedScopeName, isValidTenantSlug } from './foundation/scope.js';
 
@@ -202,7 +203,45 @@ export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
   execution_metrics: 'active/shared/runtime/execution-metrics',
 } as const;
 
+/**
+ * Inter-process lock id of a metrics ledger file (foundation/lock-utils
+ * withLockSync). Every append to a system ledger file and tenant offboarding's
+ * read-filter-rewrite of it take the same lock, so a rewrite never loses an
+ * append made while it ran.
+ */
+export function metricsLedgerLockId(filePath: string): string {
+  const digest = createHash('sha256').update(path.resolve(filePath), 'utf8').digest('hex');
+  return `metrics-ledger-${digest}`;
+}
+
 /** `<root>/<tier>/` prefixes of one partitioned runtime ledger (mirrored in security-policy.json). */
 export function partitionedLedgerProtectedPrefixes(root: string): string[] {
   return (['personal', 'confidential'] as const).map((tier) => `${root}/${tier}/`);
+}
+
+function nonEmptyText(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+/**
+ * Tenant of a metrics-ledger row — the ONE resolver used for placement,
+ * legacy-row gating, tenant offboarding and the budget governor: the
+ * canonical `scope.tenant_slug` (legacy `scope.tenant_id`), then the
+ * pre-canonical top-level `tenant_slug` / `tenant` / `tenant_id` fields.
+ * Lower-cased; '' when the row names no tenant.
+ */
+export function metricsRowTenant(row: unknown): string {
+  if (!row || typeof row !== 'object') return '';
+  const record = row as Record<string, unknown>;
+  const scope =
+    record.scope && typeof record.scope === 'object'
+      ? (record.scope as Record<string, unknown>)
+      : {};
+  return (
+    nonEmptyText(scope.tenant_slug) ||
+    nonEmptyText(scope.tenant_id) ||
+    nonEmptyText(record.tenant_slug) ||
+    nonEmptyText(record.tenant) ||
+    nonEmptyText(record.tenant_id)
+  ).toLowerCase();
 }

@@ -33,6 +33,10 @@
     "cost_usd": { "type": "number", "minimum": 0 },
     "status": { "type": "string", "enum": ["actual", "estimated", "committed"] },
     "source": { "type": "string", "minLength": 1 },
+    "scope_invalid": {
+      "const": true,
+      "description": "The producer's scope could not be placed in a tier/tenant partition; the row was recorded in the system partition with its scope stripped (libs/core/metrics.ts)."
+    },
     "cause": {
       "type": "string",
       "enum": [

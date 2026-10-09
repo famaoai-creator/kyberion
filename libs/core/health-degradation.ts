@@ -14,7 +14,7 @@
 
 import { logger } from './core.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { metrics } from './metrics.js';
+import { metrics, metricsWithheldNotice } from './metrics.js';
 import {
   evaluateRuntimeHealthTrends,
   loadRuntimeHealthSamples,
@@ -58,6 +58,8 @@ export interface DegradationReport {
   generated_at: string;
   verdict: 'green' | 'yellow' | 'red';
   findings: DegradationFinding[];
+  /** Set when tier-guard withheld metrics partitions: latency findings are partial. */
+  partial_notice?: string;
 }
 
 export interface LatencyRegression {
@@ -208,15 +210,23 @@ export function runDegradationWatch(deps: DegradationWatchDeps = {}): {
   alert: OpsAlertReceipt | null;
 } {
   const thresholds = deps.thresholds ?? loadHealthThresholds();
+  let withheld = 0;
   const regressions =
     deps.regressions ??
-    (metrics.detectRegressions(thresholds.regression_multiplier, {
-      all: true,
-    }) as LatencyRegression[]);
+    (metrics.detectRegressions(
+      thresholds.regression_multiplier,
+      { all: true },
+      {
+        onWithheld: (partitions) => {
+          withheld = partitions;
+        },
+      }
+    ) as LatencyRegression[]);
+  const partialNotice = metricsWithheldNotice('health degradation watch', withheld);
   const demotedProviders = deps.demotedProviders ?? listDemotedProviders(discoverProviders());
   const runtimeSamples =
     deps.runtimeSamples ?? loadRuntimeHealthSamples(thresholds.trend_window_ms, deps.now);
-  const report = evaluateDegradation({
+  const evaluated = evaluateDegradation({
     regressions,
     runtimeSamples,
     demotedProviders,
@@ -224,6 +234,9 @@ export function runDegradationWatch(deps: DegradationWatchDeps = {}): {
     thresholds,
     now: deps.now,
   });
+  const report: DegradationReport = partialNotice
+    ? { ...evaluated, partial_notice: partialNotice }
+    : evaluated;
 
   if (report.verdict === 'green') {
     return { report, alert: null };
@@ -232,8 +245,14 @@ export function runDegradationWatch(deps: DegradationWatchDeps = {}): {
   const send = deps.alert ?? sendOpsAlert;
   const alert = send({
     severity: report.verdict === 'red' ? 'critical' : 'warning',
-    title: `System degradation detected (${report.verdict}): ${report.findings.length} finding(s)`,
-    context: { findings: report.findings, thresholds },
+    title:
+      `System degradation detected (${report.verdict}): ${report.findings.length} finding(s)` +
+      (report.partial_notice ? ' (partial: metrics partitions withheld)' : ''),
+    context: {
+      findings: report.findings,
+      thresholds,
+      ...(report.partial_notice ? { partial: report.partial_notice } : {}),
+    },
     recommendation:
       report.verdict === 'red'
         ? 'Investigate before continuing unattended operation: run pnpm kyberion doctor and inspect recent traces.'

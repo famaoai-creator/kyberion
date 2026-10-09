@@ -6126,6 +6126,11 @@
         "ja": "残り {amount}",
         "qps-ploc": "⟦{amount} řėɱȧïñïñɠ ŀőřėɱ⟧"
       },
+      "chronos_diagnostics_metrics_partial": {
+        "en": "Partial: {count} metrics partition(s) withheld for this persona",
+        "ja": "部分集計: このペルソナでは {count} 件のメトリクス分割を参照できません",
+        "qps-ploc": "⟦Ṗȧřŧïȧŀ: {count} ɱėŧřïƈş ṗȧřŧïŧïőñ(ş) ẇïŧħħėŀḓ ƒőř ŧħïş ṗėřşőñȧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
       "chronos_diagnostics_budget_unset": {
         "en": "Not set",
         "ja": "未設定",

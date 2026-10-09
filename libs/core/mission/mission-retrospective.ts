@@ -168,7 +168,14 @@ function collectMissionUsageStats(
   const metricCorrelationIds = new Set<string>();
 
   // As for resource usage below: the mission's own partition plus the system one.
-  const missionRead = missionScope ? { scope: missionScope, includeSystem: true } : undefined;
+  // A tenant mission reads every tier partition of its tenant (a row's tier
+  // may differ from the mission's) plus the system one; rows are then matched
+  // by mission_id below. An untenanted mission reads its tier's partition.
+  const missionRead = missionScope?.tenant_slug
+    ? { tenants: [missionScope.tenant_slug], includeSystem: true }
+    : missionScope
+      ? { scope: missionScope, includeSystem: true }
+      : undefined;
   for (const entry of metricsCollector.loadHistory({ read: missionRead })) {
     if (String(entry.mission_id || '').toUpperCase() !== missionId.toUpperCase()) continue;
     if (entry.correlation_id) metricCorrelationIds.add(String(entry.correlation_id));

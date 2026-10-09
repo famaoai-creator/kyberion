@@ -116,6 +116,25 @@ describe('execution-metrics ledger partitioning', () => {
     ]);
   });
 
+  it('places and gates legacy rows by the shared tenant resolver (top-level tenant fields)', () => {
+    const mc = collector();
+    record(mc, 'sys-1');
+    safeAppendFileSync(
+      systemFile,
+      `${JSON.stringify({ component: 'top-level-b', tenant_slug: 'tenant-b' })}\n` +
+        `${JSON.stringify({ component: 'legacy-tenant-field', tenant: 'tenant-b' })}\n`
+    );
+    expect(components(mc.loadHistory())).toEqual(['sys-1']);
+    expect(components(mc.loadHistory({ read: { tenants: ['tenant-b'] } }))).toEqual([
+      'legacy-tenant-field',
+      'top-level-b',
+    ]);
+    // A new row naming its tenant only at top level is placed in that tenant's partition.
+    mc.record('new-top-level', 1, 'success', { tenant_slug: 'tenant-c' });
+    expect(read(systemFile)).not.toContain('new-top-level');
+    expect(read(partitionFile('public', 'tenant-c'))).toContain('new-top-level');
+  });
+
   it('numbers malformed lines through the system file and partitions as one file', () => {
     safeMkdir(metricsDir, { recursive: true });
     safeWriteFile(systemFile, '{"component":"s1","timestamp":"t1"}\n{torn\n');

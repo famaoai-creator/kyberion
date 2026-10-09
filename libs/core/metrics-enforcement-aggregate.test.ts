@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { safeMkdir, safeRmSync } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 
 // Capture the metrics logger's warn lines; tier-guard and secure-io stay REAL.
@@ -29,6 +29,8 @@ import { computeBudgetUsage } from './governance/org-budget-governor.js';
 import { buildCostReportFromHistory, formatCostReport } from './cost-report.js';
 import { validateReadPermission } from './tier-guard.js';
 import { withExecutionContext } from './authority.js';
+import { runDegradationWatch } from './health-degradation.js';
+import { resolveFinanceControllerDecision } from './finance-controller.js';
 
 /**
  * R4 follow-up: cap enforcers count every tier of their scope whatever the
@@ -40,6 +42,7 @@ import { withExecutionContext } from './authority.js';
  */
 const ROOT = pathResolver.rootDir();
 const TENANT = `capg-${process.pid}`;
+const TENANT_B = `capb-${process.pid}`;
 const MISSION = `MSN-CAPG-${process.pid}`;
 const TASK_TEXT = 'secret task text for the confidential customer';
 const base = path.join(ROOT, 'active/shared/tmp/metrics-enforcement-aggregate-test');
@@ -66,9 +69,23 @@ function cleanup(): void {
   safeRmSync(base, { recursive: true, force: true });
   for (const root of [usageRoot, executionRoot]) {
     for (const tier of ['personal', 'confidential']) {
-      safeRmSync(path.join(root, tier, TENANT), { recursive: true, force: true });
+      // `shared` holds this suite's fail-closed rows (the logical root maps to
+      // this worker's Vitest sandbox).
+      for (const tenant of [TENANT, TENANT_B, 'shared']) {
+        safeRmSync(path.join(root, tier, tenant), { recursive: true, force: true });
+      }
     }
   }
+}
+
+/** Confidential spend of one tenant, written by an allowed, unbound writer. */
+function seedSpend(tenant: string, cost: number): void {
+  setIdentity('worker', 'mission_controller');
+  collector.record('anthropic-sdk', 1, 'success', {
+    mission_id: `${MISSION}-${tenant}`,
+    cost_usd: cost,
+    scope: { tier: 'confidential', tenant_slug: tenant },
+  });
 }
 
 /** $2 of confidential spend for this tenant's mission, written by an allowed writer. */
@@ -224,5 +241,162 @@ describe('governed enforcement aggregate over persona-gated metrics ledgers', ()
     expect(full.partial_notice).toBeUndefined();
     expect(formatCostReport(full).some((line) => line.startsWith('PARTIAL'))).toBe(false);
     expect(warnLines.filter((line) => line.startsWith('cost report:'))).toEqual([]);
+  });
+
+  describe('review fixes', () => {
+    const policy = { posture: 'block' as const, daily_cap_usd: 5, mission_cap_usd: 100 };
+    const check = (extra: { tenantId?: string } = {}) =>
+      spendGuard.checkSpendGuard({
+        now: NOW_FIXED,
+        policy,
+        alert: vi.fn() as never,
+        ...extra,
+      });
+    const NOW_FIXED = Date.now();
+
+    it('B1: never serves one bound tenant the cached spend of another', () => {
+      seedSpend(TENANT_B, 7);
+      setIdentity('worker');
+      process.env.KYBERION_TENANT = TENANT;
+      const a = check();
+      expect(a.daily_spent_usd).toBe(2);
+      expect(a.allowed).toBe(true);
+      process.env.KYBERION_TENANT = TENANT_B;
+      const b = check();
+      expect(b.daily_spent_usd).toBe(7);
+      expect(b.allowed).toBe(false);
+    });
+
+    it('B2: a bound process refuses to evaluate another tenant instead of mixing them', () => {
+      setIdentity('worker');
+      process.env.KYBERION_TENANT = TENANT;
+      const refused = check({ tenantId: TENANT_B });
+      expect(refused.allowed).toBe(false);
+      expect(refused.refused).toBe('tenant_mismatch');
+      expect(check({ tenantId: TENANT }).refused).toBeUndefined();
+    });
+
+    it("S8: the process's own new spend invalidates the cached total immediately", () => {
+      setIdentity('worker');
+      process.env.KYBERION_TENANT = TENANT;
+      expect(check().daily_spent_usd).toBe(2);
+      setIdentity('worker', 'mission_controller');
+      collector.record('anthropic-sdk', 1, 'success', {
+        mission_id: MISSION,
+        cost_usd: 4,
+        scope: { tier: 'confidential', tenant_slug: TENANT },
+      });
+      setIdentity('worker');
+      const after = check();
+      expect(after.daily_spent_usd).toBe(6);
+      expect(after.allowed).toBe(false);
+    });
+
+    it('B2: a budget wider than the bound tenant is reported partial, never complete', () => {
+      seedSpend(TENANT_B, 7);
+      setIdentity('worker');
+      process.env.KYBERION_TENANT = TENANT;
+      const deps = { listCharters: () => [], readDotTokenUsage: () => [] };
+      const global = computeBudgetUsage({}, deps);
+      expect(global.withheld_partitions).toBeGreaterThan(0);
+      expect(global.cost_status).toBe('partial');
+      const own = computeBudgetUsage({ tenant_slug: TENANT }, deps);
+      expect(own.withheld_partitions).toBeUndefined();
+      expect(own.cost_status).toBeUndefined();
+      expect(own.cost_usd).toBe(2);
+    });
+
+    it('S1: the classifier sees a whitelisted projection; enforcers are allowlisted', () => {
+      setIdentity('worker');
+      const seen: string[] = [];
+      metricsModule.aggregateMetricsForEnforcement({
+        enforcer: 'spend_guard',
+        ledger: 'execution_metrics',
+        read: { all: true },
+        measures: [],
+        accumulate: (row) => {
+          expect('task' in row).toBe(false);
+          expect('component' in row).toBe(false);
+          seen.push(JSON.stringify(row));
+        },
+        collector,
+      });
+      expect(seen).toHaveLength(2);
+      expect(seen.join('\n')).not.toContain(TASK_TEXT);
+      expect(() =>
+        metricsModule.aggregateMetricsForEnforcement({
+          enforcer: 'report_reader' as never,
+          ledger: 'execution_metrics',
+          read: { all: true },
+          measures: [],
+          accumulate: () => undefined,
+          collector,
+        })
+      ).toThrow(/METRICS_ENFORCEMENT_ENFORCER/);
+    });
+
+    it('S4: a row whose scope cannot be placed is still counted, never downgraded', () => {
+      setIdentity('worker', 'mission_controller');
+      collector.record('odd-tier', 1, 'success', {
+        cost_usd: 1,
+        task: TASK_TEXT,
+        scope: { tier: 'internal', tenant_slug: TENANT },
+      });
+      collector.record('odd-public', 1, 'success', {
+        cost_usd: 1,
+        scope: { tier: 'public', tenant_slug: 'Not A Slug' },
+      });
+      const read = (file: string) =>
+        safeExistsSync(file) ? String(safeReadFile(file, { encoding: 'utf8' })) : '';
+      // Unknown tier fails closed to confidential/<bound|shared>, never the system file.
+      const system = read(path.join(metricsDir, 'execution-metrics.jsonl'));
+      expect(system).not.toContain('odd-tier');
+      const failClosed = read(
+        path.join(executionRoot, 'confidential', 'shared', 'execution-metrics.jsonl')
+      );
+      expect(failClosed).toContain('odd-tier');
+      expect(JSON.parse(failClosed.trim().split('\n').pop() ?? '{}')).toMatchObject({
+        scope: { tier: 'confidential' },
+        scope_invalid: true,
+      });
+      // A public row with an invalid tenant is a system row without the tenant.
+      const odd = system
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as Record<string, unknown>)
+        .find((row) => row.component === 'odd-public');
+      expect(odd).toMatchObject({ scope_invalid: true, cost_usd: 1 });
+      expect(odd).not.toHaveProperty('scope');
+      expect(warnLines.filter((line) => /scope cannot be placed/.test(line))).toHaveLength(2);
+      // Both are still counted by an enforcer.
+      setIdentity('worker');
+      expect(check().daily_spent_usd).toBe(4);
+    });
+
+    it('S7: the degradation watch and finance controller treat withheld partitions as partial', () => {
+      vi.spyOn(metrics, 'detectRegressions').mockImplementation((_m, _r, options) => {
+        options?.onWithheld?.(2);
+        return [];
+      });
+      const { report } = runDegradationWatch({
+        demotedProviders: [],
+        runtimeSamples: [],
+        alert: vi.fn() as never,
+      });
+      expect(report.partial_notice).toMatch(/2 metrics partition\(s\) withheld/);
+      const decision = resolveFinanceControllerDecision({
+        financial: { periods: [] } as never,
+        okr: { objectives: [] } as never,
+        costReport: {
+          totalCostUsd: 1,
+          totalTokens: 10,
+          promptTokens: 5,
+          completionTokens: 5,
+          sourcePath: null,
+          withheldPartitions: 3,
+        },
+      });
+      expect(decision.reasons.join('\n')).toMatch(/partial \(3 metrics partition/);
+    });
   });
 });
