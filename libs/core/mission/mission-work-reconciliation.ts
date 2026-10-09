@@ -21,6 +21,7 @@ import { findMissionPath } from '../path-resolver.js';
 import { getWorkItem, updateWorkItem } from '../workforce/work-coordination.js';
 import { logger } from '../core.js';
 import {
+  assertApprovalUsable,
   computeApprovalPayloadHash,
   createApprovalRequest,
   isApprovalRequestExpired,
@@ -226,6 +227,7 @@ function assertReconciliationApproval(
   if (isApprovalRequestExpired(approval)) {
     throw new Error(`[POLICY_VIOLATION] reconciliation approval has expired: ${approval.id}`);
   }
+  assertApprovalUsable(approval, { consumer: 'mission_reconcile_work' });
   if (approval.source?.missionId?.toUpperCase() !== missionId.toUpperCase()) {
     throw new Error('[POLICY_VIOLATION] reconciliation approval is bound to a different mission');
   }

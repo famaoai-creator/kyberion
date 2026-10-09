@@ -30,6 +30,7 @@ import {
 import { isRecord } from '../foundation/text.js';
 import { safeCreateExclusiveFileSync, safeExistsSync, safeRmSync } from '../secure-io.js';
 import {
+  assertApprovalUsable,
   computeApprovalPayloadHash,
   createApprovalRequest,
   isApprovalRequestExpired,
@@ -678,6 +679,11 @@ export async function executeApprovedPluginViewAction(
   }
   if (isApprovalRequestExpired(approval, context.now ?? Date.now())) {
     refuse('PLUGIN_VIEW_APPROVAL_REQUIRED', `approval '${approval.id}' has expired`);
+  }
+  try {
+    assertApprovalUsable(approval, { consumer: 'plugin_view_action' });
+  } catch (error) {
+    refuse('PLUGIN_VIEW_APPROVAL_REQUIRED', error instanceof Error ? error.message : String(error));
   }
 
   let operation: ReturnType<typeof activePluginOperation>;

@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 
 import {
+  assertApprovalUsable,
   createApprovalRequest,
   loadApprovalRequest,
   type ApprovalRequestRecord,
@@ -243,6 +244,7 @@ function requireApproval(
   if (approval.status !== 'approved') {
     throw new Error(`peer_recovery_approval_not_approved:${approval.status}`);
   }
+  assertApprovalUsable(approval, { consumer: 'peer_runtime_recovery' });
   if (
     approval.accountability?.finalDecision !== 'human_only' ||
     !approval.decidedBy ||

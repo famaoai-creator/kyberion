@@ -10,6 +10,7 @@ import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { auditChain, normalizePersistedAuditEntry } from '@agent/core/governance/audit-chain';
 import {
+  assertApprovalUsable,
   computeApprovalPayloadHash,
   createApprovalRequest,
   listApprovalRequests,
@@ -315,6 +316,7 @@ function assertAuditMirrorApproval(
       `[POLICY_VIOLATION] SA-01 requires an approved mission_gate request: ${approvalRequestId}`
     );
   }
+  assertApprovalUsable(approval, { consumer: 'audit_mirror_reconcile' });
   if (approval.source?.missionId?.toUpperCase() !== missionId.trim().toUpperCase()) {
     throw new Error('[POLICY_VIOLATION] SA-01 approval is bound to a different mission');
   }

@@ -1,4 +1,5 @@
 import {
+  assertApprovalUsable,
   computeApprovalPayloadHash,
   createApprovalRequest,
   loadApprovalRequest,
@@ -114,6 +115,9 @@ export function verifyDecisionApprovalRef(
     throw new Error(
       'Approval reference does not contain an authenticated human decision bound to this organization decision.'
     );
+  }
+  if (status === 'approved') {
+    assertApprovalUsable(approval, { consumer: 'organization_decision' });
   }
   if (
     status === 'approved' &&

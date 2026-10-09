@@ -133,6 +133,8 @@ export interface ApprovalRecord {
   authenticated?: boolean;
   payloadHash?: string;
   effectBinding?: string;
+  /** How the surface obtained `approvedBy` (see ApprovalDeciderIdentitySource). */
+  deciderIdentitySource?: ApprovalDeciderIdentitySource;
 }
 
 export interface ApprovalAccountability {
@@ -200,6 +202,8 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   decidedBy?: string;
   /** Durable copy of the decision identity used by fail-closed consumers. */
   decidedByType?: ApprovalRecord['decidedByType'];
+  /** How the surface obtained `decidedBy` (see ApprovalDeciderIdentitySource). */
+  decidedByIdentitySource?: ApprovalDeciderIdentitySource;
   authenticated?: boolean;
   /**
    * MO-11 S-3: how the decider was authenticated. Previously this survived only
@@ -452,8 +456,9 @@ export function validateHumanFinalDecision(params: {
  * Principal-type prefixes surfaces put in front of an identity
  * (`user:<member_id>` from chronos / presence-studio, `agent:…`, `service:…`).
  * They are stripped before comparison so `user:alice` and `alice` count as the
- * same principal: under separation of duties a false match only refuses a
- * decision, which is the safe direction.
+ * same principal. Because the requester controls `requestedBy`, a requester
+ * can also make a later decider look like themselves (false positive); that
+ * only refuses a decision, which is the safe direction.
  */
 const APPROVAL_PRINCIPAL_PREFIX =
   /^(?:user|human|operator|member|principal|agent|service|persona|actor|policy):/;
@@ -463,6 +468,38 @@ export function normalizeApprovalPrincipalId(value: unknown): string {
   if (typeof value !== 'string') return '';
   return value.normalize('NFKC').trim().toLowerCase().replace(APPROVAL_PRINCIPAL_PREFIX, '').trim();
 }
+
+/**
+ * Decider ids that surfaces fall back to when they could not resolve who
+ * decided (`concierge` and `chronos-localadmin` without a session member,
+ * `sovereign-user` from `resolveOperatorDisplayName` without an onboarding
+ * identity, …). They name a surface, not a person, so under separation of
+ * duties they count as "no decider". This is the single list; compare after
+ * {@link normalizeApprovalPrincipalId}.
+ */
+export const APPROVAL_PLACEHOLDER_DECIDERS: ReadonlySet<string> = new Set([
+  'concierge',
+  'chronos-localadmin',
+  'sovereign-user',
+  'cowork-operator',
+  'mcp-client',
+  'operator',
+  'sovereign',
+  'human',
+  'user',
+  'unknown',
+  'unknown-human',
+  'anonymous',
+]);
+
+/**
+ * How the surface obtained the decider identity it records. `caller_supplied`
+ * marks a surface that takes the decider as free text from its caller (the
+ * MCP `kyberion.approval.decide` tool, the approval-actuator `decide` op), so
+ * the identity is a claim, not something the server resolved. Unmarked
+ * decisions come from surfaces that resolve the decider themselves.
+ */
+export type ApprovalDeciderIdentitySource = 'server_resolved' | 'caller_supplied';
 
 /**
  * Every identity a request records for whoever asked for it: `requestedBy`,
@@ -478,20 +515,24 @@ export function approvalRequesterIdentities(
   return Array.from(new Set(ids));
 }
 
-export type SeparationOfDutiesViolation = 'self_approval' | 'missing_requester' | 'missing_decider';
+export type SeparationOfDutiesViolation =
+  'self_approval' | 'missing_requester' | 'missing_decider' | 'unverified_decider';
 
 /**
- * Pure separation-of-duties check. Returns the violation, or `null` when the
- * decider is provably a different principal from every recorded requester.
- * A request with no recorded requester (or a decision with no decider) cannot
- * be proven separate, so it is a violation — fail closed.
+ * Pure separation-of-duties check for one decider. Returns the violation, or
+ * `null` when the decider is a server-resolved, non-placeholder principal
+ * different from every recorded requester. A request with no recorded
+ * requester (or a decision with no real decider) cannot be proven separate,
+ * so it is a violation — fail closed.
  */
 export function evaluateSeparationOfDuties(
   record: Pick<ApprovalRequestRecord, 'requestedBy' | 'requestedByContext' | 'source'>,
-  decidedBy: unknown
+  decidedBy: unknown,
+  identitySource?: ApprovalDeciderIdentitySource
 ): SeparationOfDutiesViolation | null {
+  if (identitySource === 'caller_supplied') return 'unverified_decider';
   const decider = normalizeApprovalPrincipalId(decidedBy);
-  if (!decider) return 'missing_decider';
+  if (!decider || APPROVAL_PLACEHOLDER_DECIDERS.has(decider)) return 'missing_decider';
   const requesters = approvalRequesterIdentities(record);
   if (requesters.length === 0) return 'missing_requester';
   return requesters.includes(decider) ? 'self_approval' : null;
@@ -500,61 +541,168 @@ export function evaluateSeparationOfDuties(
 const SEPARATION_OF_DUTIES_MESSAGES: Record<SeparationOfDutiesViolation, string> = {
   self_approval: 'the decider is the same principal that requested it',
   missing_requester: 'the request records no requester identity, so separation cannot be proven',
-  missing_decider: 'the decision carries no decider identity, so separation cannot be proven',
+  missing_decider:
+    'the decision carries no real decider identity (empty or a surface placeholder), so separation cannot be proven',
+  unverified_decider:
+    'the decider identity was supplied by the caller, not resolved by the server, so separation cannot be proven',
 };
 
 /**
- * Enforce `approval-policy.json` `separation_of_duties` (default off) for an
- * approving decision or the apply of one. Rejections are never subject to it:
- * a requester declining their own request only withdraws it. A refusal is
- * written to the audit chain and the channel's approval event log before it
- * throws.
+ * Every approving decision a record carries: the record-level decider plus
+ * each approved workflow stage (a staged workflow is decided per role).
  */
-function enforceSeparationOfDuties(
-  role: GovernedArtifactRole,
-  params: {
-    record: ApprovalRequestRecord;
-    storageChannel: string;
-    decidedBy: unknown;
-    stage: 'decide' | 'apply';
+function approvingDecisions(
+  record: ApprovalRequestRecord
+): Array<{ decidedBy: unknown; identitySource?: ApprovalDeciderIdentitySource }> {
+  const decisions: Array<{ decidedBy: unknown; identitySource?: ApprovalDeciderIdentitySource }> = [
+    { decidedBy: record.decidedBy, identitySource: record.decidedByIdentitySource },
+  ];
+  for (const approval of record.workflow?.approvals ?? []) {
+    if (approval.status !== 'approved') continue;
+    decisions.push({
+      decidedBy: approval.approvedBy,
+      identitySource: approval.deciderIdentitySource,
+    });
   }
-): void {
-  if (!resolveSeparationOfDutiesPolicy().enabled) return;
-  const violation = evaluateSeparationOfDuties(params.record, params.decidedBy);
-  if (!violation) return;
+  return decisions;
+}
+
+/** Whether `approval-policy.json` `separation_of_duties` is on (fails closed on an unreadable policy). */
+export function isSeparationOfDutiesEnabled(): boolean {
+  return resolveSeparationOfDutiesPolicy().enabled;
+}
+
+/**
+ * Whether an already-approved record may be turned into an effect under the
+ * current separation-of-duties setting. `null` when usable (or the setting is
+ * off); otherwise the violation and the decider it concerns.
+ */
+export function evaluateApprovalUsability(
+  record: ApprovalRequestRecord
+): { violation: SeparationOfDutiesViolation; decidedBy: string } | null {
+  if (!resolveSeparationOfDutiesPolicy().enabled) return null;
+  for (const decision of approvingDecisions(record)) {
+    const violation = evaluateSeparationOfDuties(
+      record,
+      decision.decidedBy,
+      decision.identitySource
+    );
+    if (violation) {
+      return {
+        violation,
+        decidedBy: typeof decision.decidedBy === 'string' ? decision.decidedBy : '',
+      };
+    }
+  }
+  return null;
+}
+
+function auditSeparationOfDutiesRefusal(params: {
+  record: ApprovalRequestRecord;
+  violation: SeparationOfDutiesViolation;
+  decidedBy: string;
+  stage: string;
+  reason: string;
+}): void {
   const { record } = params;
-  const decidedBy = typeof params.decidedBy === 'string' ? params.decidedBy : '';
-  const reason = `Separation of duties: approval refused because ${SEPARATION_OF_DUTIES_MESSAGES[violation]}`;
   auditChain.record({
     agentId: 'approval-store',
     action: 'approval_decision',
     operation: 'separation_of_duties',
     result: 'denied',
-    reason,
+    reason: params.reason,
     correlationId: record.correlationId,
     metadata: {
       requestId: record.id,
       channel: record.channel,
       stage: params.stage,
-      violation,
-      decidedBy,
+      violation: params.violation,
+      decidedBy: params.decidedBy,
       requestedBy: record.requestedBy,
       requesterIdentities: approvalRequesterIdentities(record),
     },
   });
+}
+
+/**
+ * The one check every consumer runs before turning an approved record into an
+ * effect (approval gate, project trust, DOT release, plugin view execute, MCP
+ * governed tools, pipeline approval steps, apply claims, …). With
+ * `separation_of_duties` off it is a no-op. With it on, a record whose
+ * approving decision fails the separation check — e.g. a self-approval
+ * recorded while the setting was off — is refused with `[POLICY_VIOLATION]`
+ * and audited. The record itself is left as it is; the message says how to get
+ * a usable approval.
+ *
+ * @param options.consumer  short name of the caller, recorded in the audit.
+ * @param options.rerequestCommand  exact command that opens a fresh request,
+ *   when the caller knows it.
+ */
+export function assertApprovalUsable(
+  record: ApprovalRequestRecord,
+  options: { consumer: string; rerequestCommand?: string }
+): void {
+  const refusal = evaluateApprovalUsability(record);
+  if (!refusal) return;
+  const reason = `Separation of duties: approval ${record.id} cannot be used because ${SEPARATION_OF_DUTIES_MESSAGES[refusal.violation]}`;
+  auditSeparationOfDutiesRefusal({
+    record,
+    violation: refusal.violation,
+    decidedBy: refusal.decidedBy,
+    stage: `use:${options.consumer}`,
+    reason,
+  });
+  const next = options.rerequestCommand
+    ? `request a new approval with \`${options.rerequestCommand}\``
+    : 'request a new approval by re-running the command that opened this one';
+  throw new Error(
+    `[POLICY_VIOLATION] ${reason}. This approval is ${record.status} and can no longer be cancelled or used; ` +
+      `it is never reused — ${next}, then have a different, server-identified principal decide it ` +
+      '(`pnpm kyberion approvals --approve <new-request-id>`).'
+  );
+}
+
+/**
+ * Enforce `approval-policy.json` `separation_of_duties` (default off) for an
+ * approving decision. Rejections are never subject to it: a requester
+ * declining their own request only withdraws it. A refusal is written to the
+ * audit chain and the channel's approval event log before it throws.
+ */
+function enforceSeparationOfDutiesOnDecision(
+  role: GovernedArtifactRole,
+  params: {
+    record: ApprovalRequestRecord;
+    storageChannel: string;
+    decidedBy: unknown;
+    identitySource?: ApprovalDeciderIdentitySource;
+  }
+): void {
+  if (!resolveSeparationOfDutiesPolicy().enabled) return;
+  const violation = evaluateSeparationOfDuties(
+    params.record,
+    params.decidedBy,
+    params.identitySource
+  );
+  if (!violation) return;
+  const { record } = params;
+  const decidedBy = typeof params.decidedBy === 'string' ? params.decidedBy : '';
+  const reason = `Separation of duties: approval refused because ${SEPARATION_OF_DUTIES_MESSAGES[violation]}`;
+  auditSeparationOfDutiesRefusal({ record, violation, decidedBy, stage: 'decide', reason });
   appendGovernedArtifactJsonl(role, approvalEventLogicalPath(params.storageChannel), {
     ts: nowIso(),
     event: 'separation_of_duties_refused',
     request_id: record.id,
     correlation_id: record.correlationId,
-    stage: params.stage,
+    stage: 'decide',
     violation,
     decided_by: decidedBy,
     requested_by: record.requestedBy,
     channel: record.channel,
     thread_ts: record.threadTs,
   });
-  throw new Error(`[POLICY_VIOLATION] ${reason} (request ${record.id})`);
+  throw new Error(
+    `[POLICY_VIOLATION] ${reason} (request ${record.id}). The request stays pending: a different, server-identified principal must decide it.`
+  );
 }
 
 /**
@@ -1028,6 +1176,11 @@ function decideApprovalRequestUnlocked(
     decidedByRole?: string;
     authMethod?: ApprovalRecord['authMethod'];
     decidedByType?: 'human' | 'ai_agent' | 'service';
+    /**
+     * `caller_supplied` when the surface took `decidedBy` as free text from
+     * its caller rather than resolving it (see ApprovalDeciderIdentitySource).
+     */
+    deciderIdentitySource?: ApprovalDeciderIdentitySource;
     authenticated?: boolean;
     payloadHash?: string;
     effectBinding?: string;
@@ -1120,11 +1273,11 @@ function decideApprovalRequestUnlocked(
   });
 
   if (params.decision === 'approved') {
-    enforceSeparationOfDuties(role, {
+    enforceSeparationOfDutiesOnDecision(role, {
       record,
       storageChannel,
       decidedBy: params.decidedBy,
-      stage: 'decide',
+      identitySource: params.deciderIdentitySource,
     });
   }
 
@@ -1174,12 +1327,19 @@ function decideApprovalRequestUnlocked(
             effectBinding: params.effectBinding,
             note: params.note,
             reasonCategory: params.reasonCategory,
+            ...(params.deciderIdentitySource
+              ? { deciderIdentitySource: params.deciderIdentitySource }
+              : {}),
           };
         }),
       }
     : undefined;
 
-  const { changeRequest: priorChangeRequest, ...recordWithoutChangeRequest } = record;
+  const {
+    changeRequest: priorChangeRequest,
+    decidedByIdentitySource: _priorIdentitySource,
+    ...recordWithoutChangeRequest
+  } = record;
   const updated: ApprovalRequestRecord = {
     ...recordWithoutChangeRequest,
     ...(priorChangeRequest && params.decision !== 'approved'
@@ -1188,6 +1348,9 @@ function decideApprovalRequestUnlocked(
     status: params.decision,
     decidedAt,
     decidedBy: params.decidedBy,
+    ...(params.deciderIdentitySource
+      ? { decidedByIdentitySource: params.deciderIdentitySource }
+      : {}),
     ...(params.decidedByType ? { decidedByType: params.decidedByType } : {}),
     ...(params.authenticated !== undefined ? { authenticated: params.authenticated } : {}),
     ...(params.authMethod ? { decidedAuthMethod: params.authMethod } : {}),
@@ -1459,6 +1622,8 @@ export function claimApprovalApply(
     requestId: string;
     appliedBy: string;
     expectedRecordHash: string;
+    /** Exact command that opens a fresh request, quoted in a refusal. */
+    rerequestCommand?: string;
   }
 ): ApprovalRequestRecord & { applyClaim: ApprovalApplyClaim } {
   return withApprovalRecordLock(role, params, () => {
@@ -1479,11 +1644,9 @@ export function claimApprovalApply(
     }
     // A decision recorded before separation of duties was switched on must
     // not slip through at apply time.
-    enforceSeparationOfDuties(role, {
-      record,
-      storageChannel,
-      decidedBy: record.decidedBy,
-      stage: 'apply',
+    assertApprovalUsable(record, {
+      consumer: 'apply_claim',
+      rerequestCommand: params.rerequestCommand,
     });
     const updated = {
       ...record,
