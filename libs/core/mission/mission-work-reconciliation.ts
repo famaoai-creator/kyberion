@@ -21,6 +21,7 @@ import { findMissionPath } from '../path-resolver.js';
 import { getWorkItem, updateWorkItem } from '../workforce/work-coordination.js';
 import { logger } from '../core.js';
 import {
+  evaluateApprovalUsability,
   assertApprovalUsable,
   computeApprovalPayloadHash,
   createApprovalRequest,
@@ -297,7 +298,9 @@ export function createMissionWorkReconciliationApprovalRequest(input: {
     (record) =>
       record.source?.missionId?.toUpperCase() === missionId &&
       record.accountability?.payloadHash === payloadHash &&
-      !isApprovalRequestExpired(record)
+      !isApprovalRequestExpired(record) &&
+      // Separation of duties: never hand back an approved record that cannot be used.
+      (record.status !== 'approved' || !evaluateApprovalUsability(record))
   );
   if (existing) return existing;
 

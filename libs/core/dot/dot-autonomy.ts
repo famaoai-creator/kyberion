@@ -47,6 +47,7 @@ import {
   type RouteAutonomousDecisionInput,
   type RoutedDecision,
 } from '../governance/approval-decision-routing.js';
+import { approvalUsabilityRefusal } from '../governance/approval-linked-usability.js';
 import { loadApprovalRequest, type ApprovalRequestRecord } from '../governance/approval-store.js';
 import { VETO_WINDOW_DECIDER } from '../governance/approval-veto-window.js';
 import { auditChain } from '../governance/audit-chain.js';
@@ -892,7 +893,13 @@ export function runDotAutonomyStep(
     if (readable) {
       const human =
         approval?.decidedByType === 'human' && approval.decidedBy !== VETO_WINDOW_DECIDER;
-      if (approval && SETTLED_APPROVED.has(approval.status) && human) {
+      // Separation of duties: an approval that cannot be used never promotes;
+      // the pending promotion is cleared with an audited reason below.
+      const sodRefusal =
+        approval && SETTLED_APPROVED.has(approval.status) && human
+          ? approvalUsabilityRefusal(approval, 'dot_autonomy_promotion')
+          : undefined;
+      if (approval && SETTLED_APPROVED.has(approval.status) && human && !sodRefusal) {
         const target = clampDotAutonomyLevel(c, pending.to);
         const from = state.level;
         if (dotAutonomyLevelRank(target) === dotAutonomyLevelRank(from) + 1) {
@@ -918,9 +925,11 @@ export function runDotAutonomyStep(
       ) {
         const why = !approval
           ? 'request missing'
-          : SETTLED_APPROVED.has(approval.status)
-            ? `approved without a human decider (${approval.decidedByType ?? 'unknown'})`
-            : `request ${approval.status}`;
+          : sodRefusal
+            ? `separation of duties: ${sodRefusal}`
+            : SETTLED_APPROVED.has(approval.status)
+              ? `approved without a human decider (${approval.decidedByType ?? 'unknown'})`
+              : `request ${approval.status}`;
         const { pending_promotion: _p, ...rest } = state;
         state = rest;
         result.promotion_cleared = why;

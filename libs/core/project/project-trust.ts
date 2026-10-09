@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 
 import {
+  evaluateApprovalUsability,
   assertApprovalUsable,
   computeApprovalPayloadHash,
   createApprovalRequest,
@@ -174,7 +175,9 @@ export function createProjectTrustApprovalRequest(params: {
   }).find(
     (record) =>
       isProjectTrustRequest(record, resolved.relative) &&
-      record.accountability?.payloadHash === payloadHash
+      record.accountability?.payloadHash === payloadHash &&
+      // Separation of duties: never hand back an approved record that cannot be used.
+      (record.status !== 'approved' || !evaluateApprovalUsability(record))
   );
   if (existing && !isApprovalRequestExpired(existing)) return existing;
 
