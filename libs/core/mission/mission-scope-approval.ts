@@ -24,6 +24,7 @@
 
 import { getRegisteredEnvText } from '../foundation/env.js';
 import {
+  evaluateApprovalUsability,
   computeApprovalPayloadHash,
   createApprovalRequest,
   isApprovalRequestExpired,
@@ -128,7 +129,9 @@ export function createMissionScopeApprovalRequest(input: {
     (record) =>
       record.source?.missionId?.toUpperCase() === missionId &&
       record.accountability?.payloadHash === payloadHash &&
-      !isApprovalRequestExpired(record)
+      !isApprovalRequestExpired(record) &&
+      // Separation of duties: never hand back an approved record that cannot be used.
+      (record.status !== 'approved' || !evaluateApprovalUsability(record))
   );
   if (existing) return existing;
 
