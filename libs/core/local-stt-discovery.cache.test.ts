@@ -1,9 +1,14 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { pathResolver } from './path-resolver.js';
 
 // Count every host probe the discovery runs. Each probe answers "not found", so
 // no backend is detected and the test never depends on the host's Python.
+// `osPython` (when set) is reported by `which python3` and imports mlx_whisper;
+// `managedBin` is the managed-runtime python the tool-runtime seam reports.
 const probes = vi.hoisted(() => ({
   calls: [] as string[],
+  osPython: null as string | null,
+  managedBin: null as string | null,
 }));
 
 vi.mock('./secure-io.js', async (importOriginal) => {
@@ -12,8 +17,23 @@ vi.mock('./secure-io.js', async (importOriginal) => {
     ...actual,
     safeExecResult: (command: string, args: string[]) => {
       probes.calls.push(`${command} ${args.join(' ')}`);
+      if (probes.osPython && command === 'which' && args[0] === 'python3') {
+        return { stdout: `${probes.osPython}\n`, stderr: '', status: 0 };
+      }
+      if (probes.osPython && command === probes.osPython) {
+        return { stdout: '1.0\n', stderr: '', status: 0 };
+      }
       return { stdout: '', stderr: '', status: 1 };
     },
+  };
+});
+
+vi.mock('./tool/tool-runtime-registry.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./tool/tool-runtime-registry.js')>();
+  return {
+    ...actual,
+    resolveManagedToolPythonBin: () => null,
+    locateManagedToolPythonBin: () => probes.managedBin,
   };
 });
 
@@ -31,11 +51,14 @@ beforeAll(async () => {
 
 beforeEach(() => {
   probes.calls.length = 0;
+  probes.osPython = null;
+  probes.managedBin = null;
   delete process.env.KYBERION_STT_DISCOVERY_CACHE_TTL_MS;
   discovery.resetLocalSttDiscoveryCache({ disk: true });
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   discovery.resetLocalSttDiscoveryCache({ disk: true });
   if (savedTtl === undefined) delete process.env.KYBERION_STT_DISCOVERY_CACHE_TTL_MS;
   else process.env.KYBERION_STT_DISCOVERY_CACHE_TTL_MS = savedTtl;
@@ -89,6 +112,56 @@ describe('local STT discovery cache', () => {
       ? String(secureIo.safeReadFile(file, { encoding: 'utf8' })).trim()
       : '{}';
     expect(body).toBe('{}');
+  });
+
+  it('expires the process memo after the same TTL as the disk cache', () => {
+    process.env.KYBERION_STT_DISCOVERY_CACHE_TTL_MS = '60000';
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-09T00:00:00Z'));
+    discovery.discoverLocalSttBackends();
+    const firstRun = probes.calls.length;
+    vi.setSystemTime(new Date('2026-10-09T00:00:30Z'));
+    discovery.discoverLocalSttBackends();
+    expect(probes.calls.length).toBe(firstRun);
+    // Past the TTL: both the memo and the disk entry have expired.
+    vi.setSystemTime(new Date('2026-10-09T00:01:01Z'));
+    discovery.discoverLocalSttBackends();
+    expect(probes.calls.length).toBe(firstRun * 2);
+  });
+
+  it('re-probes when a managed runtime python appears or is recreated (bin + mtime in the key)', () => {
+    const bin = pathResolver.sharedTmp(`stt-discovery-cache-test/${process.pid}/bin/python`);
+    discovery.discoverLocalSttBackends();
+    const firstRun = probes.calls.length;
+
+    secureIo.safeMkdir(bin.replace(/[\\/]python$/u, ''), { recursive: true });
+    secureIo.safeWriteFile(bin, '#!/bin/sh\n');
+    probes.managedBin = bin;
+    discovery.discoverLocalSttBackends();
+    expect(probes.calls.length).toBe(firstRun * 2);
+
+    // Same bin, new mtime (venv recreated): another probe.
+    const before = secureIo.safeStat(bin).mtimeMs;
+    while (secureIo.safeStat(bin).mtimeMs === before) {
+      secureIo.safeWriteFile(bin, `#!/bin/sh\n# recreated ${Date.now()}\n`);
+    }
+    discovery.discoverLocalSttBackends();
+    expect(probes.calls.length).toBe(firstRun * 3);
+    secureIo.safeRmSync(pathResolver.sharedTmp(`stt-discovery-cache-test/${process.pid}`), {
+      recursive: true,
+      force: true,
+    });
+  });
+
+  it('drops a cached candidate whose binary no longer exists', () => {
+    probes.osPython = '/kyberion-test-missing/bin/python3';
+    const fresh = discovery.discoverLocalSttBackends();
+    expect(fresh.some((c) => c.python_bin === probes.osPython)).toBe(true);
+    const callsAfterProbe = probes.calls.length;
+    // A memo hit: no new probe, and the vanished interpreter is not offered.
+    const hit = discovery.discoverLocalSttBackends();
+    expect(probes.calls.length).toBe(callsAfterProbe);
+    expect(hit.some((c) => c.python_bin === probes.osPython)).toBe(false);
   });
 
   describe('cross-process cache (TTL set)', () => {
