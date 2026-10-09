@@ -559,6 +559,32 @@ describe('approval separation of duties', () => {
     expect(resolveActivationStatus({ ...base, approval: approved })).toBe('pending_approval');
   });
 
+  it('a root with no approval policy file uses the shipped default (off): approvals stay usable', () => {
+    const productPolicy = 'product/governance/approval-policy.json';
+    const realKnowledge = pathResolver.knowledge.bind(pathResolver);
+    const spy = vi
+      .spyOn(pathResolver, 'knowledge')
+      .mockImplementation((sub?: string) =>
+        sub === productPolicy
+          ? pathResolver.sharedTmp(`no-approval-policy-${process.pid}/approval-policy.json`)
+          : realKnowledge(sub as string)
+      );
+    try {
+      sod.overlayPath = null;
+      expect(resolveSeparationOfDutiesPolicy()).toEqual({ enabled: false });
+      const record = track(request({ requestedBy: 'alice' }));
+      const approved = decide(record, 'alice');
+      expect(approved.status).toBe('approved');
+      expect(evaluateApprovalUsability(approved)).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
+    // A policy file that exists but is broken still fails closed.
+    safeWriteFile(overlayPath, '{ not json');
+    sod.overlayPath = overlayPath;
+    expect(() => resolveSeparationOfDutiesPolicy()).toThrow(/approval-policy\.json unreadable/);
+  });
+
   it('normalises principal ids and classifies violations', () => {
     expect(normalizeApprovalPrincipalId(' User:Ａlice ')).toBe('alice');
     expect(normalizeApprovalPrincipalId(undefined)).toBe('');
