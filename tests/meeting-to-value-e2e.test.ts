@@ -52,33 +52,29 @@ function readPipeline(): {
   return JSON.parse(safeReadFile(PIPELINE_PATH, { encoding: 'utf8' }) as string) as any;
 }
 
-// createMission initialises working memory by importing the compiled
-// working-memory actuator (dist/…/working-memory-actuator/src/index.js). Under
-// Vitest that first import transforms the module graph: measured 2026-10-09 it
-// was ~1.8s of a ~3.1s beforeEach on an idle 4-vCPU host, and pushed the hook
-// past its 10s budget under load. Load it once here, with an explicit hook
-// timeout, so the per-test hook only pays for the mission it creates. The import
-// is best-effort like createMission's own (dist/ may not be built).
-const WORKING_MEMORY_ACTUATOR = pathResolver.rootResolve(
-  'dist/libs/actuators/working-memory-actuator/src/index.js'
+// createMission loads much of its graph lazily: it imports the compiled
+// working-memory actuator (dist/…/working-memory-actuator/src/index.js) and
+// resolves persona, tenant and team configuration on first use. Under Vitest
+// that first call transforms the module graph: measured 2026-10-09 the import
+// alone was ~1.8s of a ~3.1s beforeEach on an idle 4-vCPU host, and under load
+// the hook passed its 10s budget. beforeAll therefore creates (and removes) one
+// throwaway mission with the suite's env, so the per-test hook only pays for
+// the mission it creates.
+const WARMUP_MISSION_ID = 'MSN-MEETING-E2E-WARMUP';
+const WARMUP_MISSION_DIR = pathResolver.tenantMissionDir(
+  WARMUP_MISSION_ID,
+  CUSTOMER_SLUG,
+  'confidential'
 );
 
 describe('meeting-to-value e2e', () => {
-  beforeAll(async () => {
-    try {
-      await import(/* @vite-ignore */ WORKING_MEMORY_ACTUATOR);
-    } catch {
-      // Not built: createMission skips working memory the same way.
-    }
-  }, 60_000);
-
   const originalMissionRole = process.env.MISSION_ROLE;
   const originalPersona = process.env.KYBERION_PERSONA;
   const originalCustomer = process.env.KYBERION_CUSTOMER;
   const originalTenant = process.env.KYBERION_TENANT;
   const originalReasoning = process.env.KYBERION_REASONING_BACKEND;
 
-  beforeEach(async () => {
+  const applySuiteEnv = (): void => {
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     process.env.KYBERION_CUSTOMER = CUSTOMER_SLUG;
@@ -86,6 +82,32 @@ describe('meeting-to-value e2e', () => {
     process.env.KYBERION_REASONING_BACKEND = 'stub';
     setWorkCoordinationNamespace(`meeting-to-value-e2e-${process.pid}`);
     clearWorkCoordinationStore();
+  };
+
+  beforeAll(async () => {
+    // Warm-up (see WARMUP_MISSION_ID). afterEach restores env and namespace.
+    applySuiteEnv();
+    safeRmSync(WARMUP_MISSION_DIR, { recursive: true, force: true });
+    try {
+      await createMission({
+        id: WARMUP_MISSION_ID,
+        tier: 'confidential',
+        tenantSlug: CUSTOMER_SLUG,
+        missionType: 'meeting_facilitation',
+        persona: 'ecosystem_architect',
+        rootDir: ROOT,
+      });
+    } finally {
+      safeRmSync(WARMUP_MISSION_DIR, { recursive: true, force: true });
+      clearWorkCoordinationStore();
+    }
+  }, 120_000);
+
+  // Explicit budget: even warm, the hook creates a real mission (about a dozen
+  // child processes for its repository). At 3x CPU oversubscription about 1 run
+  // in 14 still passed the 10s default (independent review, 2026-10-09).
+  beforeEach(async () => {
+    applySuiteEnv();
     safeRmSync(MISSION_DIR, { recursive: true, force: true });
     safeRmSync(CUSTOMER_ROOT, { recursive: true, force: true });
     safeRmSync(REPORT_PATH, { force: true });
@@ -124,7 +146,7 @@ describe('meeting-to-value e2e', () => {
         task_id: 'meeting-follow-up',
       },
     });
-  });
+  }, 30_000);
 
   afterEach(() => {
     resetReasoningBackend();
