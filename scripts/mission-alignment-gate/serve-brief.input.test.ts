@@ -108,13 +108,29 @@ describe('mission brief decider identity (separation of duties)', () => {
       });
     });
 
-    it('with SoD on, refuses to serve approvals from an agent session', () => {
+    it('with SoD on, refuses every approval on the page (token proves only possession), rejections pass', () => {
       fixture.owner = true;
       separationOfDuties(true);
-      expect(resolveBriefDecider({ decision: 'approved' }, { CLAUDECODE: '1' }).refusal).toMatch(
-        /runs inside an agent session \(agent:claude-code\).*Chronos or presence-studio/
+      // A plain owner terminal, with an owner member: still refused.
+      expect(resolveBriefDecider({ decision: 'approved' }, {}).refusal).toMatch(
+        /^\[POLICY_VIOLATION\] approval refused on the brief page — separation of duties is on and the page token proves only possession.*Chronos or presence-studio.*pnpm kyberion approvals --approve/
       );
-      expect(resolveBriefDecider({ decision: 'approved' }, {}).refusal).toBeUndefined();
+      expect(resolveBriefDecider({ decision: 'approved' }, { CLAUDECODE: '1' }).refusal).toMatch(
+        /proves only possession.*server in agent session agent:claude-code/
+      );
+      fixture.owner = false;
+      expect(resolveBriefDecider({ decision: 'approved' }, {}).refusal).toMatch(
+        /proves only possession/
+      );
+      expect(resolveBriefDecider({ decision: 'rejected' }, {}).refusal).toBeUndefined();
+    });
+
+    it('with SoD off, the page still approves from an owner terminal (unchanged)', () => {
+      fixture.owner = true;
+      separationOfDuties(false);
+      expect(resolveBriefDecider({ decision: 'approved' }, {})).toEqual({
+        decidedBy: 'user:owner',
+      });
     });
   });
 
