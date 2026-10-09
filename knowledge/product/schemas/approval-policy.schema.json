@@ -29,6 +29,13 @@
         "required": ["id", "requires_approval", "missing_requirements"]
       }
     },
+    "separation_of_duties": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "When enabled, an approving decision whose decider identity equals the request's requester identity is refused with [POLICY_VIOLATION] and audited. Default off.",
+      "properties": { "enabled": { "type": "boolean" } },
+      "required": ["enabled"]
+    },
     "defaults": {
       "type": "object",
       "additionalProperties": false,

@@ -30,8 +30,11 @@ import {
 } from '@agent/core/llm-selection-preferences';
 import {
   attestTenantProvider,
+  assertPrintableCommandValue,
   captureAttestationInvoker,
+  providerAttestationApplyArgs,
   requestTenantProviderAttestationApproval,
+  shellQuoteArg,
   type AttestationInvoker,
   type ProviderAttestationApprovalRequest,
   type TenantProviderAttestationResult,
@@ -464,6 +467,10 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
   const plan = optionValue(argv, '--plan');
   const basis = optionValue(argv, '--basis');
   const attestedBy = optionValue(argv, '--attested-by');
+  // Parse-time: these values are echoed in a copy-pasteable command.
+  assertPrintableCommandValue('--plan', plan);
+  assertPrintableCommandValue('--basis', basis);
+  assertPrintableCommandValue('--attested-by', attestedBy);
   if (trainingUse === 'none') {
     const missing = [
       !plan?.trim() ? '--plan' : '',
@@ -501,14 +508,41 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
 
   if (argv.includes('--request-approval')) {
     const request = requestProviderAttestationApproval(input);
-    const applyCommand = `pnpm onboarding llm attest --tenant ${tenant} --provider ${provider} --training-use none --plan ... --basis ... --attested-by ...${validForDays !== undefined ? ` --valid-for-days ${validForDays}` : ''} --apply --accept --approval-request-id ${request.request_id}`;
+    // Print every bound value verbatim and shell-quoted: the approval is
+    // hash-bound to plan/basis/attested_by/valid_for_days, so the command
+    // must apply as-is when pasted.
+    const applyCommand = [
+      'pnpm',
+      'onboarding',
+      'llm',
+      'attest',
+      '--tenant',
+      tenant,
+      ...providerAttestationApplyArgs(
+        {
+          provider,
+          training_use: trainingUse,
+          plan,
+          basis,
+          attested_by: attestedBy,
+          valid_for_days: validForDays,
+        },
+        request.request_id
+      ),
+    ]
+      .map(shellQuoteArg)
+      .join(' ');
     print(
       json
-        ? JSON.stringify({ ...request, apply_command: applyCommand }, null, 2)
+        ? JSON.stringify(
+            { ...request, apply_command: applyCommand, apply_command_shell: 'posix' },
+            null,
+            2
+          )
         : [
             `${request.created ? 'Opened' : 'Reusing'} approval request ${request.request_id} (${request.status}${request.expires_at ? `, expires ${request.expires_at}` : ''})`,
             `A human decides with: ${request.approve_command}`,
-            `Then apply with the same values: ${applyCommand}`,
+            `Then apply with the same values (POSIX shell: sh/bash/zsh): ${applyCommand}`,
           ].join('\n')
     );
     return;

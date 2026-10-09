@@ -359,9 +359,36 @@ local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
     operator's behalf. `pnpm onboarding llm show --tenant <slug>` and `tenant:activation plan`
     (`llm_availability`) show which providers each tier can use. See
     [onboarding-flow Step 5.1](./onboarding-flow.md).
+  - The `--request-approval` output prints the apply command for POSIX shells (sh, bash, zsh)
+    with every bound value (plan, basis, attested-by, valid-for-days) quoted, so it applies
+    as-is when pasted. A printed follow-up command for a hash-bound approval must never elide
+    a bound value (`...`): build it from `providerAttestationApplyArgs` + `shellQuoteArg` in
+    `tenant-governance.ts`, and reject values with a backslash or control characters at parse
+    time (`assertPrintableCommandValue`).
   - In `libs/core/mission/mission-llm.ts`, `runAdaptiveStructuredLlmProfile`,
     `runStructuredLlmProfile` and `invokeLlm` all take an `egress` option and apply this gate;
     `mission distill` passes the mission tier and tenant.
+- **Separation of duties is opt-in and enforced in two places.** By default the requester may
+  approve their own request. With `separation_of_duties.enabled: true` in `approval-policy.json`
+  (or the customer overlay; global, not per tenant or organization):
+  - `decideApprovalRequest` refuses an approval whose decider equals a recorded requester, a
+    request without a requester, an empty or placeholder decider (`APPROVAL_PLACEHOLDER_DECIDERS`),
+    and a decider the surface took from its caller (`deciderIdentitySource: 'caller_supplied'`).
+    Refusals are audited (`separation_of_duties` / `denied`). A surface whose token proves only
+    possession (the mission brief page) resolves the decider server-side.
+  - Every consumer that turns an approved record into an effect checks it first under a consumer
+    id (`assertApprovalUsable` / `approvalUsabilityRefusal`); the registry is
+    `libs/core/governance/approval-sod-consumers.contract.test.ts`. A decision recorded while
+    the setting was off cannot take effect after it is on, and re-request helpers never hand back
+    such a record.
+  - A missing `approval-policy.json` (no customer overlay and no product file) means the shipped
+    default (off), logged once at debug. A file that is present but unreadable or schema-invalid
+    blocks approving decisions and approval use even with the setting off (fail closed,
+    diagnostic message); plugin activation degrades to `pending_approval` with a warning, and a
+    pending DOT autonomy promotion stays pending until the next sweep.
+  - Known limits (string identities, the CLI persona-vs-name gap, policy/service deciders, flows
+    outside the approval store such as `service_recording review`) are listed in
+    [approval-gate-design](./approval-gate-design.md).
 - **Prompts and secrets go on stdin, never argv.** argv is visible in the process table and is capped
   at about 128 KB per argument. Shell-invoked LLM profiles use `prompt_via: "stdin"` (the `claude`
   profile in `wisdom-policy.json` does), and the system prompt travels on stdin with the prompt.
@@ -407,6 +434,19 @@ local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
    write to the shared ops-alert sink.
 3. For a new provider CLI invocation, assert in a test that argv carries the tool-disabling flags
    and no prompt text, and that the child's cwd is not the repository root.
+4. When a CLI prints a follow-up command for a hash-bound approval, test that the printed text,
+   split as a POSIX shell would, applies successfully once the request is approved (gate:
+   `scripts/onboarding_llm.test.ts` and `scripts/tenant.entrypoint.test.ts`).
+5. When you add an approval request creator, record the real requester identity in
+   `requestedBy` (and `requestedByContext.actorId`), never an empty string: with separation of
+   duties on, a request without a requester cannot be approved (gate:
+   `libs/core/governance/approval-separation-of-duties.test.ts`).
+6. When you add code that turns an approved record into an effect, call
+   `assertApprovalUsable(record, { consumer })` before the effect. When you add a decision surface
+   that takes the decider from its caller instead of a resolved session, pass
+   `deciderIdentitySource: 'caller_supplied'`; when it falls back to a placeholder decider id,
+   add that id to `APPROVAL_PLACEHOLDER_DECIDERS` (gates: approval-separation-of-duties.test.ts,
+   `approval-actuator-sod.test.ts`).
 
 **Profile timeouts are hard limits.** Since #1006 the codex/gemini structured runners honour a
 profile's `timeout_ms`; before that they used their 5-minute adapter default. A timeout is not a

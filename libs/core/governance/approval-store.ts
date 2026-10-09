@@ -3,6 +3,14 @@ import { withExecutionContext } from '../authority.js';
 import { withLockSync } from '../lock-utils.js';
 import type { FirstJobDecisionProof } from '../surface/first-job-approval-proof.js';
 import { auditChain } from './audit-chain.js';
+import { resolveSeparationOfDutiesPolicy } from './approval-policy.js';
+import {
+  assertApprovalUsable,
+  auditSeparationOfDutiesRefusal,
+  evaluateSeparationOfDuties,
+  SEPARATION_OF_DUTIES_MESSAGES,
+  type ApprovalDeciderIdentitySource,
+} from './approval-separation-of-duties.js';
 import type { HeldEffectSteeringAction } from './held-effect-bridge.js';
 import {
   appendGovernedArtifactJsonl,
@@ -132,6 +140,8 @@ export interface ApprovalRecord {
   authenticated?: boolean;
   payloadHash?: string;
   effectBinding?: string;
+  /** How the surface obtained `approvedBy` (see ApprovalDeciderIdentitySource). */
+  deciderIdentitySource?: ApprovalDeciderIdentitySource;
 }
 
 export interface ApprovalAccountability {
@@ -199,6 +209,8 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   decidedBy?: string;
   /** Durable copy of the decision identity used by fail-closed consumers. */
   decidedByType?: ApprovalRecord['decidedByType'];
+  /** How the surface obtained `decidedBy` (see ApprovalDeciderIdentitySource). */
+  decidedByIdentitySource?: ApprovalDeciderIdentitySource;
   authenticated?: boolean;
   /**
    * MO-11 S-3: how the decider was authenticated. Previously this survived only
@@ -445,6 +457,62 @@ export function validateHumanFinalDecision(params: {
       '[POLICY_VIOLATION] Approval effect binding does not match the requested operation'
     );
   }
+}
+
+export {
+  APPROVAL_PLACEHOLDER_DECIDERS,
+  approvalRequesterIdentities,
+  approvalUsabilityRefusal,
+  assertApprovalUsable,
+  evaluateApprovalUsability,
+  evaluateSeparationOfDuties,
+  isSeparationOfDutiesEnabled,
+  normalizeApprovalPrincipalId,
+  type ApprovalDeciderIdentitySource,
+  type SeparationOfDutiesViolation,
+} from './approval-separation-of-duties.js';
+
+/**
+ * Enforce `approval-policy.json` `separation_of_duties` (default off) for an
+ * approving decision. Rejections are never subject to it: a requester
+ * declining their own request only withdraws it. A refusal is written to the
+ * audit chain and the channel's approval event log before it throws.
+ */
+function enforceSeparationOfDutiesOnDecision(
+  role: GovernedArtifactRole,
+  params: {
+    record: ApprovalRequestRecord;
+    storageChannel: string;
+    decidedBy: unknown;
+    identitySource?: ApprovalDeciderIdentitySource;
+  }
+): void {
+  if (!resolveSeparationOfDutiesPolicy().enabled) return;
+  const violation = evaluateSeparationOfDuties(
+    params.record,
+    params.decidedBy,
+    params.identitySource
+  );
+  if (!violation) return;
+  const { record } = params;
+  const decidedBy = typeof params.decidedBy === 'string' ? params.decidedBy : '';
+  const reason = `Separation of duties: approval refused because ${SEPARATION_OF_DUTIES_MESSAGES[violation]}`;
+  auditSeparationOfDutiesRefusal({ record, violation, decidedBy, stage: 'decide', reason });
+  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(params.storageChannel), {
+    ts: nowIso(),
+    event: 'separation_of_duties_refused',
+    request_id: record.id,
+    correlation_id: record.correlationId,
+    stage: 'decide',
+    violation,
+    decided_by: decidedBy,
+    requested_by: record.requestedBy,
+    channel: record.channel,
+    thread_ts: record.threadTs,
+  });
+  throw new Error(
+    `[POLICY_VIOLATION] ${reason} (request ${record.id}). The request stays pending: a different, server-identified principal must decide it.`
+  );
 }
 
 /**
@@ -918,6 +986,11 @@ function decideApprovalRequestUnlocked(
     decidedByRole?: string;
     authMethod?: ApprovalRecord['authMethod'];
     decidedByType?: 'human' | 'ai_agent' | 'service';
+    /**
+     * `caller_supplied` when the surface took `decidedBy` as free text from
+     * its caller rather than resolving it (see ApprovalDeciderIdentitySource).
+     */
+    deciderIdentitySource?: ApprovalDeciderIdentitySource;
     authenticated?: boolean;
     payloadHash?: string;
     effectBinding?: string;
@@ -1009,6 +1082,15 @@ function decideApprovalRequestUnlocked(
     effectBinding: params.effectBinding,
   });
 
+  if (params.decision === 'approved') {
+    enforceSeparationOfDutiesOnDecision(role, {
+      record,
+      storageChannel,
+      decidedBy: params.decidedBy,
+      identitySource: params.deciderIdentitySource,
+    });
+  }
+
   const cacheDescriptor = params.decision === 'approved' ? params.sessionCache : undefined;
   if (cacheDescriptor) {
     // The session cache is a standing grant, so its seed is held to the
@@ -1055,12 +1137,19 @@ function decideApprovalRequestUnlocked(
             effectBinding: params.effectBinding,
             note: params.note,
             reasonCategory: params.reasonCategory,
+            ...(params.deciderIdentitySource
+              ? { deciderIdentitySource: params.deciderIdentitySource }
+              : {}),
           };
         }),
       }
     : undefined;
 
-  const { changeRequest: priorChangeRequest, ...recordWithoutChangeRequest } = record;
+  const {
+    changeRequest: priorChangeRequest,
+    decidedByIdentitySource: _priorIdentitySource,
+    ...recordWithoutChangeRequest
+  } = record;
   const updated: ApprovalRequestRecord = {
     ...recordWithoutChangeRequest,
     ...(priorChangeRequest && params.decision !== 'approved'
@@ -1069,6 +1158,9 @@ function decideApprovalRequestUnlocked(
     status: params.decision,
     decidedAt,
     decidedBy: params.decidedBy,
+    ...(params.deciderIdentitySource
+      ? { decidedByIdentitySource: params.deciderIdentitySource }
+      : {}),
     ...(params.decidedByType ? { decidedByType: params.decidedByType } : {}),
     ...(params.authenticated !== undefined ? { authenticated: params.authenticated } : {}),
     ...(params.authMethod ? { decidedAuthMethod: params.authMethod } : {}),
@@ -1340,6 +1432,8 @@ export function claimApprovalApply(
     requestId: string;
     appliedBy: string;
     expectedRecordHash: string;
+    /** Exact command that opens a fresh request, quoted in a refusal. */
+    rerequestCommand?: string;
   }
 ): ApprovalRequestRecord & { applyClaim: ApprovalApplyClaim } {
   return withApprovalRecordLock(role, params, () => {
@@ -1358,6 +1452,12 @@ export function claimApprovalApply(
     if (!params.appliedBy.trim()) {
       throw new Error('[POLICY_VIOLATION] Approval apply requires an actor');
     }
+    // A decision recorded before separation of duties was switched on must
+    // not slip through at apply time.
+    assertApprovalUsable(record, {
+      consumer: 'apply_claim',
+      rerequestCommand: params.rerequestCommand,
+    });
     const updated = {
       ...record,
       applyClaim: { claimId: randomUUID(), startedAt: nowIso(), startedBy: params.appliedBy },

@@ -71,6 +71,7 @@ import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { generateMissionWorkReconciliationScaffold } from './mission-work-reconciliation.js';
 import { recordDirectCliTaskUsage } from './mission-direct-cli-usage.js';
 import {
+  assertApprovalUsable,
   computeApprovalPayloadHash,
   isApprovalRequestExpired,
   loadApprovalRequest,
@@ -396,6 +397,7 @@ export function assertScopeChangeApproval(input: {
   if (isApprovalRequestExpired(approval)) {
     throw new Error(`[POLICY_VIOLATION] scope approval has expired: ${approval.id}`);
   }
+  assertApprovalUsable(approval, { consumer: 'mission_scope_approve' });
   if (approval.source?.missionId?.toUpperCase() !== missionId) {
     throw new Error('[POLICY_VIOLATION] scope approval is bound to a different mission');
   }

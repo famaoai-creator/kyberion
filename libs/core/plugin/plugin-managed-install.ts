@@ -34,6 +34,11 @@ import {
   type ApprovalRequestRecord,
 } from '../governance/approval-store.js';
 import { withExecutionContext } from '../authority.js';
+import {
+  resolveActivationStatus,
+  type PluginActivationStatus,
+  type PluginIntegrity,
+} from './plugin-activation-status.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   findDisallowedOfficialOnlySeam,
@@ -96,8 +101,7 @@ export interface PluginManifestInfo {
   raw: Record<string, unknown>;
 }
 
-export type PluginActivationStatus =
-  'activatable' | 'pending_approval' | 'blocked_broken_manifest' | 'blocked_digest_mismatch';
+export type { PluginActivationStatus } from './plugin-activation-status.js';
 
 export interface ManagedPluginRecord {
   pluginId: string;
@@ -556,23 +560,6 @@ function ensurePluginApprovalRequest(params: {
     risk: { level: 'medium', restartScope: 'none', requiresStrongAuth: false },
     accountability: { finalDecision: 'human_only', payloadHash, effectBinding },
   });
-}
-
-type PluginIntegrity = 'verified' | 'legacy' | 'mismatch';
-
-function resolveActivationStatus(params: {
-  diagnostics: PluginManifestDiagnostic[];
-  trust: PluginTrustLabel;
-  integrity: PluginIntegrity;
-  approval?: ApprovalRequestRecord;
-}): PluginActivationStatus {
-  if (params.diagnostics.some((d) => d.severity === 'error')) return 'blocked_broken_manifest';
-  if (params.integrity === 'mismatch') return 'blocked_digest_mismatch';
-  // Official provenance needs no approval (its digest is recorded, not approved).
-  if (params.trust === 'official') return 'activatable';
-  // Legacy non-official records (no digest) must be re-installed and re-approved.
-  if (params.integrity === 'legacy') return 'pending_approval';
-  return params.approval?.status === 'approved' ? 'activatable' : 'pending_approval';
 }
 
 function writeManagedRecord(managedDir: string, record: ManagedPluginRecord): void {

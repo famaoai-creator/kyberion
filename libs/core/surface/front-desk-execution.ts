@@ -26,7 +26,11 @@ import { runAsDotCharter } from '../dot/dot-key-results.js';
 import type { DotCharter, LoadedDotCharter } from '../dot/dot-charter.js';
 import type { FrontDeskArtifactVerification } from '../dot/dot-state-paths.js';
 import { AUTONOMY_APPROVAL_CHANNEL } from '../governance/approval-decision-card.js';
-import { loadApprovalRequest, isApprovalRequestExpired } from '../governance/approval-store.js';
+import {
+  assertApprovalUsable,
+  loadApprovalRequest,
+  isApprovalRequestExpired,
+} from '../governance/approval-store.js';
 import {
   frontDeskRuntimeScope,
   inspectFrontDeskExecution,
@@ -164,6 +168,7 @@ export function prepareFrontDeskExecution(
     isApprovalRequestExpired(approval, authorizationNow)
   )
     throw new Error('current human approval required');
+  assertApprovalUsable(approval, { consumer: 'front_desk_execution' });
   if (diagnostic && !hasVerifiedFirstJobDecision(approval, charter, binding, authorizationNow))
     throw new Error('verified first-job human approval required');
   if (approval.requestedBy !== 'dot:' + charter.dot_id)

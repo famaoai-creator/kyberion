@@ -1,7 +1,10 @@
 import {
   attestTenantProvider,
+  assertPrintableCommandValue,
   captureAttestationInvoker,
+  providerAttestationApplyArgs,
   requestTenantProviderAttestationApproval,
+  shellQuoteArg,
   type AttestTenantProviderInput,
   mutateTenant,
   type TenantLifecycleVerb,
@@ -134,6 +137,10 @@ export function main(
     if (trainingUse !== 'none' && trainingUse !== 'used' && trainingUse !== 'unknown') {
       throw new Error('attest-provider requires --training-use <none|used|unknown>');
     }
+    // Parse-time: these values are echoed in a copy-pasteable command.
+    assertPrintableCommandValue('--plan', args.plan);
+    assertPrintableCommandValue('--basis', args.basis);
+    assertPrintableCommandValue('--attested-by', args.attestedBy);
     if (trainingUse === 'none') {
       const missing = [
         !args.plan?.trim() ? '--plan' : '',
@@ -157,7 +164,8 @@ export function main(
         'attest-provider --apply requires --accept: the attestation is your statement about the plan’s training-use terms'
       );
     }
-    if (!args.apply) {
+    // --request-approval opens the approval request; it is not a dry-run.
+    if (!args.apply && !args.requestApproval) {
       print(
         JSON.stringify(
           {
@@ -202,7 +210,15 @@ export function main(
             ...request,
             next: [
               `A human decides: ${request.approve_command}`,
-              `Then apply: pnpm tenant attest-provider ${args.slug} --provider ${args.provider} --training-use none ... --apply --accept --approval-request-id ${request.request_id}`,
+              `Then apply (POSIX shell: sh/bash/zsh): ${[
+                'pnpm',
+                'tenant',
+                'attest-provider',
+                args.slug!,
+                ...providerAttestationApplyArgs(attestInput, request.request_id),
+              ]
+                .map(shellQuoteArg)
+                .join(' ')}`,
             ],
           },
           null,

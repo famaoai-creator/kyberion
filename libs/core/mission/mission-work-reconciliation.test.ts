@@ -1,5 +1,17 @@
 import * as nodePath from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('../customer-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../customer-resolver.js')>();
+  const { customerRootWithSodOverlay } =
+    await import('../governance/__tests__/sod-overlay-state.js');
+  return { ...actual, customerRoot: customerRootWithSodOverlay(actual.customerRoot) };
+});
+import {
+  clearSeparationOfDuties,
+  setSeparationOfDuties,
+  useSeparationOfDutiesOverlay,
+} from '../governance/__tests__/sod-overlay.js';
+
 import { Ajv } from 'ajv';
 import {
   clearWorkCoordinationNamespace,
@@ -394,7 +406,44 @@ afterEach(() => {
   else process.env.USER = previousUser;
 });
 
+// Per-test overlay file for switching separation of duties on/off.
+useSeparationOfDutiesOverlay(
+  pathResolver.sharedTmp(`sod-overlay-mission-work-reconciliation-${process.pid}.json`)
+);
+
 describe('mission existing work reconciliation', () => {
+  it('re-request opens a new request instead of reusing a self-approval that separation of duties makes unusable', () => {
+    prepareMission();
+    writeManifest(buildManifest());
+    const input = { missionId, manifestPath, requestedBy: 'human-reconciliation-operator' };
+    try {
+      setSeparationOfDuties(false);
+      const first = createMissionWorkReconciliationApprovalRequest(input);
+      reconciliationApprovalIds.push(first.id);
+      decideApprovalRequest('mission_controller', {
+        channel: first.channel,
+        storageChannel: first.storageChannel,
+        requestId: first.id,
+        decision: 'approved',
+        decidedBy: 'human-reconciliation-operator',
+        decidedByRole: 'sovereign',
+        authMethod: 'manual',
+        decidedByType: 'human',
+        authenticated: true,
+        payloadHash: first.accountability?.payloadHash,
+        effectBinding: first.accountability?.effectBinding,
+      });
+      expect(createMissionWorkReconciliationApprovalRequest(input).id).toBe(first.id);
+      setSeparationOfDuties(true);
+      const second = createMissionWorkReconciliationApprovalRequest(input);
+      reconciliationApprovalIds.push(second.id);
+      expect(second.id).not.toBe(first.id);
+      expect(second.status).toBe('pending');
+    } finally {
+      clearSeparationOfDuties();
+    }
+  });
+
   it('uses the governed USER accessor when no persona is configured', () => {
     prepareMission();
     writeManifest(buildManifest());

@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { auditChain } from '../governance/audit-chain.js';
 import {
+  evaluateApprovalUsability,
   claimApprovalApply,
   computeApprovalPayloadHash,
   createApprovalRequest,
@@ -227,6 +228,105 @@ export function providerAttestationEffectBinding(slug: string, provider: string)
   return `tenant:${slug}:attest-provider:${provider}`;
 }
 
+/**
+ * A value the CLI can print inside a copy-pasteable command: no control
+ * characters (they would break or forge the printed line) and no backslash
+ * (its meaning differs between shells). Attestation values are plan names,
+ * URLs and principal ids, so both CLIs reject these at parse time.
+ */
+export function assertPrintableCommandValue(flag: string, value: string | undefined): void {
+  if (value === undefined) return;
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f-\u009f]/.test(value)) {
+    throw new Error(`[tenant-governance] ${flag} must not contain control characters.`);
+  }
+  if (value.includes('\\')) {
+    throw new Error(
+      `[tenant-governance] ${flag} must not contain a backslash: the printed follow-up command could not be pasted reliably.`
+    );
+  }
+}
+
+/**
+ * POSIX shell (sh, bash, zsh) quoting for a printed, copy-pasteable command.
+ * A value stays bare only when it starts with a character no shell treats
+ * specially at the start of a word (so zsh `=cmd`, `~user` expansion and `#`
+ * comments cannot apply) and contains only shell-safe characters; anything
+ * else is single-quoted with embedded single quotes escaped. Values with
+ * control characters or a backslash are refused
+ * ({@link assertPrintableCommandValue}).
+ */
+export function shellQuoteArg(value: string): string {
+  assertPrintableCommandValue('value', value);
+  if (/^[A-Za-z0-9_./-][A-Za-z0-9_@%+=:,./-]*$/.test(value)) return value;
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
+ * The exact command that opens a fresh `training_use: none` approval request
+ * for this claim (POSIX shell, values quoted). Quoted in refusals so an
+ * operator whose approval cannot be used knows what to run next.
+ */
+export function providerAttestationRequestCommand(
+  input: Pick<
+    RecordProviderAttestationInput,
+    'slug' | 'provider' | 'training_use' | 'plan' | 'basis' | 'attested_by' | 'valid_for_days'
+  >
+): string {
+  return [
+    'pnpm',
+    'onboarding',
+    'llm',
+    'attest',
+    '--tenant',
+    input.slug,
+    '--provider',
+    input.provider,
+    '--training-use',
+    input.training_use,
+    ...(input.plan !== undefined ? ['--plan', input.plan] : []),
+    ...(input.basis !== undefined ? ['--basis', input.basis] : []),
+    ...(input.attested_by !== undefined ? ['--attested-by', input.attested_by] : []),
+    ...(typeof input.valid_for_days === 'number' && Number.isFinite(input.valid_for_days)
+      ? ['--valid-for-days', String(input.valid_for_days)]
+      : []),
+    '--request-approval',
+  ]
+    .map(shellQuoteArg)
+    .join(' ');
+}
+
+/**
+ * The flags that re-run an attestation apply with exactly the claim the
+ * approval is bound to. The approval's payload hash covers plan, basis,
+ * attested_by and valid_for_days, so a printed follow-up must carry them
+ * verbatim — eliding them would make the operator retype them exactly.
+ */
+export function providerAttestationApplyArgs(
+  input: Pick<
+    RecordProviderAttestationInput,
+    'provider' | 'training_use' | 'plan' | 'basis' | 'attested_by' | 'valid_for_days'
+  >,
+  approvalRequestId: string
+): string[] {
+  return [
+    '--provider',
+    input.provider,
+    '--training-use',
+    input.training_use,
+    ...(input.plan !== undefined ? ['--plan', input.plan] : []),
+    ...(input.basis !== undefined ? ['--basis', input.basis] : []),
+    ...(input.attested_by !== undefined ? ['--attested-by', input.attested_by] : []),
+    ...(typeof input.valid_for_days === 'number' && Number.isFinite(input.valid_for_days)
+      ? ['--valid-for-days', String(input.valid_for_days)]
+      : []),
+    '--apply',
+    '--accept',
+    '--approval-request-id',
+    approvalRequestId,
+  ];
+}
+
 /** The exact claim a human approves; the approval is bound to it by payload hash. */
 export function providerAttestationApprovalPayload(
   input: Pick<
@@ -261,6 +361,9 @@ function validateAttestationInput(input: AttestTenantProviderInput): {
   if (!provider) throw new Error('[tenant-governance] provider is required.');
   const slug = input.slug?.trim();
   if (!slug) throw new Error('[tenant-governance] tenant slug is required.');
+  assertPrintableCommandValue('--plan', input.plan);
+  assertPrintableCommandValue('--basis', input.basis);
+  assertPrintableCommandValue('--attested-by', input.attested_by);
   // A process bound to one tenant must not attest on behalf of another: the
   // attestation is what lets that tenant's confidential material leave.
   for (const scoped of [input.invoker?.tenantSlug, activeTenantSlug()]) {
@@ -357,7 +460,10 @@ export function requestTenantProviderAttestationApproval(
     (record) =>
       record.accountability?.payloadHash === payloadHash &&
       !record.applyClaim &&
-      !isApprovalRequestExpired(record)
+      !isApprovalRequestExpired(record) &&
+      // Separation of duties: an approved record that cannot be used is never
+      // handed back — a fresh request is opened instead of a stuck one.
+      (record.status !== 'approved' || !evaluateApprovalUsability(record))
   );
   if (existing) {
     return {
@@ -531,6 +637,7 @@ export function attestTenantProvider(
       requestId: checked.approval.id,
       appliedBy: actor,
       expectedRecordHash: computeApprovalPayloadHash({ record: checked.approval }),
+      rerequestCommand: providerAttestationRequestCommand({ ...input, slug, provider }),
     }).applyClaim.claimId;
     approved = { ...checked, claimId };
   }
