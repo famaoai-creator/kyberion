@@ -22,3 +22,10 @@ export function writeDistScope(options?: { coreDir?: string; env?: NodeJS.Proces
   written: boolean;
   distDir: string;
 };
+
+export function hasDefaultExport(text: string): boolean;
+
+export function cliAction(
+  main: boolean | undefined,
+  argv?: readonly string[]
+): 'none' | 'unsupported-node' | 'check' | 'run' | 'usage';

@@ -10,7 +10,13 @@ import {
   safeSymlinkSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { buildDistScope, findDistScopeDrift, writeDistScope } from './write_core_dist_scope.mjs';
+import {
+  buildDistScope,
+  cliAction,
+  findDistScopeDrift,
+  hasDefaultExport,
+  writeDistScope,
+} from './write_core_dist_scope.mjs';
 
 const realCorePackage = JSON.parse(
   String(safeReadFile(pathResolver.rootResolve('libs/core/package.json'), { encoding: 'utf8' }))
@@ -237,5 +243,75 @@ describe('core dist package scope', () => {
     for (const [file, keys] of Object.entries(namespaces)) {
       expect(keys.shim, file).toEqual(keys.target);
     }
+  });
+
+  it('detects a default export only where the module really has one', () => {
+    expect(hasDefaultExport('export default 1;')).toBe(true);
+    expect(hasDefaultExport('const x = 1;\nexport { x as default };')).toBe(true);
+    expect(hasDefaultExport("export { default } from './a.mjs';")).toBe(true);
+    expect(hasDefaultExport("export * as default from './a.mjs';")).toBe(true);
+    // Re-exporting another module's default under a new name is not a default export.
+    expect(hasDefaultExport("export { default as renamed } from './a.mjs';")).toBe(false);
+    expect(hasDefaultExport('export const value = 1;')).toBe(false);
+  });
+
+  it('generates shims whose namespace and default equal their targets (imported for real)', () => {
+    const targets: Record<string, string> = {
+      'plain.mjs': 'export const plain = 1;\n',
+      'with-default.mjs': "export const named = 'n';\nexport default 'the-default';\n",
+      'as-default.mjs': "const x = 'x-default';\nexport { x as default, x };\n",
+      'renamed.mjs': "export { default as renamed } from './with-default.mjs';\n",
+      'forwarded.mjs': "export { default } from './with-default.mjs';\n",
+    };
+    const imports: Record<string, string> = {};
+    for (const [file, text] of Object.entries(targets)) {
+      safeWriteFile(path.join(coreDir, file), text);
+      imports[`#${file.replace('.mjs', '')}`] = `./${file}`;
+    }
+    safeWriteFile(
+      path.join(coreDir, 'package.json'),
+      JSON.stringify({ name: '@fixture/core', type: 'module', imports })
+    );
+    writeDistScope({ coreDir, env: {} });
+    const files = Object.keys(targets);
+    const script = `
+      const out = {};
+      for (const file of ${JSON.stringify(files)}) {
+        const shim = await import(${JSON.stringify(path.join(coreDir, 'dist'))} + '/' + file);
+        const target = await import(${JSON.stringify(coreDir)} + '/' + file);
+        out[file] = {
+          shim: Object.keys(shim).sort(),
+          target: Object.keys(target).sort(),
+          shimDefault: shim.default ?? null,
+          targetDefault: target.default ?? null,
+        };
+      }
+      process.stdout.write(JSON.stringify(out));
+    `;
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+    expect(result.stderr).toBe('');
+    const namespaces = JSON.parse(result.stdout) as Record<
+      string,
+      { shim: string[]; target: string[]; shimDefault: unknown; targetDefault: unknown }
+    >;
+    for (const [file, ns] of Object.entries(namespaces)) {
+      expect(ns.shim, file).toEqual(ns.target);
+      expect(ns.shimDefault, file).toEqual(ns.targetDefault);
+    }
+    expect(namespaces['renamed.mjs']?.shim).toEqual(['renamed']);
+  });
+
+  it('fails loudly on a direct run where import.meta.main is missing (Node < 24.2)', () => {
+    const script = '/repo/scripts/write_core_dist_scope.mjs';
+    expect(cliAction(undefined, ['node', script, '--run'])).toBe('unsupported-node');
+    // Imported (e.g. from Vitest) on such a Node: nothing happens.
+    expect(cliAction(undefined, ['node', '/repo/node_modules/vitest/vitest.mjs'])).toBe('none');
+    expect(cliAction(false, ['node', script, '--run'])).toBe('none');
+    expect(cliAction(true, ['node', script, '--run'])).toBe('run');
+    expect(cliAction(true, ['node', script, '--check'])).toBe('check');
+    expect(cliAction(true, ['node', script])).toBe('usage');
   });
 });
