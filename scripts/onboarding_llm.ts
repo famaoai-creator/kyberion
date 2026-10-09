@@ -31,7 +31,9 @@ import {
 import {
   attestTenantProvider,
   captureAttestationInvoker,
+  providerAttestationApplyArgs,
   requestTenantProviderAttestationApproval,
+  shellQuoteArg,
   type AttestationInvoker,
   type ProviderAttestationApprovalRequest,
   type TenantProviderAttestationResult,
@@ -501,7 +503,30 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
 
   if (argv.includes('--request-approval')) {
     const request = requestProviderAttestationApproval(input);
-    const applyCommand = `pnpm onboarding llm attest --tenant ${tenant} --provider ${provider} --training-use none --plan ... --basis ... --attested-by ...${validForDays !== undefined ? ` --valid-for-days ${validForDays}` : ''} --apply --accept --approval-request-id ${request.request_id}`;
+    // Print every bound value verbatim and shell-quoted: the approval is
+    // hash-bound to plan/basis/attested_by/valid_for_days, so the command
+    // must apply as-is when pasted.
+    const applyCommand = [
+      'pnpm',
+      'onboarding',
+      'llm',
+      'attest',
+      '--tenant',
+      tenant,
+      ...providerAttestationApplyArgs(
+        {
+          provider,
+          training_use: trainingUse,
+          plan,
+          basis,
+          attested_by: attestedBy,
+          valid_for_days: validForDays,
+        },
+        request.request_id
+      ),
+    ]
+      .map(shellQuoteArg)
+      .join(' ');
     print(
       json
         ? JSON.stringify({ ...request, apply_command: applyCommand }, null, 2)

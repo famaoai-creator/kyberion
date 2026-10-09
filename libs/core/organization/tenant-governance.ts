@@ -227,6 +227,47 @@ export function providerAttestationEffectBinding(slug: string, provider: string)
   return `tenant:${slug}:attest-provider:${provider}`;
 }
 
+/**
+ * POSIX shell quoting for a printed, copy-pasteable command: a value made only
+ * of shell-safe characters stays bare, anything else is single-quoted with
+ * embedded single quotes escaped.
+ */
+export function shellQuoteArg(value: string): string {
+  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(value)) return value;
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
+ * The flags that re-run an attestation apply with exactly the claim the
+ * approval is bound to. The approval's payload hash covers plan, basis,
+ * attested_by and valid_for_days, so a printed follow-up must carry them
+ * verbatim — eliding them would make the operator retype them exactly.
+ */
+export function providerAttestationApplyArgs(
+  input: Pick<
+    RecordProviderAttestationInput,
+    'provider' | 'training_use' | 'plan' | 'basis' | 'attested_by' | 'valid_for_days'
+  >,
+  approvalRequestId: string
+): string[] {
+  return [
+    '--provider',
+    input.provider,
+    '--training-use',
+    input.training_use,
+    ...(input.plan !== undefined ? ['--plan', input.plan] : []),
+    ...(input.basis !== undefined ? ['--basis', input.basis] : []),
+    ...(input.attested_by !== undefined ? ['--attested-by', input.attested_by] : []),
+    ...(typeof input.valid_for_days === 'number' && Number.isFinite(input.valid_for_days)
+      ? ['--valid-for-days', String(input.valid_for_days)]
+      : []),
+    '--apply',
+    '--accept',
+    '--approval-request-id',
+    approvalRequestId,
+  ];
+}
+
 /** The exact claim a human approves; the approval is bound to it by payload hash. */
 export function providerAttestationApprovalPayload(
   input: Pick<

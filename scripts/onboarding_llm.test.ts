@@ -53,6 +53,41 @@ function run(argv: string[], options: Parameters<typeof main>[2] = {}): string[]
   return output;
 }
 
+/**
+ * Split a printed command the way a POSIX shell would for the quoting the CLI
+ * emits (bare words and single quotes). An unquoted metacharacter fails the
+ * test: it would be interpreted by the operator's shell, not passed through.
+ */
+function shellWords(command: string): string[] {
+  const words: string[] = [];
+  let current = '';
+  let inWord = false;
+  for (let i = 0; i < command.length; i += 1) {
+    const ch = command[i]!;
+    if (ch === "'") {
+      const end = command.indexOf("'", i + 1);
+      if (end < 0) throw new Error(`unterminated quote in: ${command}`);
+      current += command.slice(i + 1, end);
+      i = end;
+      inWord = true;
+    } else if (ch === '\\') {
+      current += command[++i] ?? '';
+      inWord = true;
+    } else if (/\s/.test(ch)) {
+      if (inWord) words.push(current);
+      current = '';
+      inWord = false;
+    } else if (/[;&|<>$`"(){}*?#~!]/.test(ch)) {
+      throw new Error(`unquoted shell metacharacter '${ch}' in: ${command}`);
+    } else {
+      current += ch;
+      inWord = true;
+    }
+  }
+  if (inWord) words.push(current);
+  return words;
+}
+
 function selectionFile(): string {
   return path.join(fixture.profileRoot, 'onboarding', 'llm-selection.json');
 }
@@ -296,6 +331,51 @@ describe('pnpm onboarding llm', () => {
         run([...otherPlan, '--apply', '--accept', '--approval-request-id', request.request_id])
       ).toThrow(/different training_use\/plan/);
       expect(egress('acme')).toBe(false);
+    });
+
+    it('prints a follow-up apply command that applies as-is when pasted', () => {
+      // Values with spaces, an apostrophe and shell metacharacters: eliding or
+      // mis-quoting any of them breaks the payload-hash binding.
+      const tricky = [
+        'attest',
+        '--tenant',
+        'acme',
+        '--provider',
+        'claude',
+        '--training-use',
+        'none',
+        '--plan',
+        "Claude Team (Acme's workspace)",
+        '--basis',
+        'https://www.anthropic.com/legal/commercial-terms?a=1&b=$HOME',
+        '--attested-by',
+        'human:owner',
+        '--valid-for-days',
+        '90',
+      ];
+      const lines = run([...tricky, '--request-approval']);
+      const text = lines.join('\n');
+      expect(text).not.toContain('...');
+      const printed = /Then apply with the same values: (.+)$/m.exec(text)?.[1];
+      expect(printed).toBeDefined();
+      const requestId = /approval request ([0-9a-f-]{36})/.exec(text)![1]!;
+      requestIds.push(requestId);
+
+      const words = shellWords(printed!);
+      expect(words.slice(0, 3)).toEqual(['pnpm', 'onboarding', 'llm']);
+      const json = JSON.parse(run([...tricky, '--request-approval', '--json'])[0]!);
+      expect(json.apply_command).toBe(printed);
+
+      humanApproves(requestId);
+      const applied = JSON.parse(run([...words.slice(3), '--json'])[0]!);
+      expect(applied.applied).toBe(true);
+      expect(applied.attestation).toMatchObject({
+        training_use: 'none',
+        plan: "Claude Team (Acme's workspace)",
+        basis: 'https://www.anthropic.com/legal/commercial-terms?a=1&b=$HOME',
+      });
+      expect(applied.approval).toEqual({ request_id: requestId, approved_by: 'human-owner' });
+      expect(egress('acme')).toBe(true);
     });
 
     it('records used/unknown with --apply --accept and no approval', () => {

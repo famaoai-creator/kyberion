@@ -1,7 +1,9 @@
 import {
   attestTenantProvider,
   captureAttestationInvoker,
+  providerAttestationApplyArgs,
   requestTenantProviderAttestationApproval,
+  shellQuoteArg,
   type AttestTenantProviderInput,
   mutateTenant,
   type TenantLifecycleVerb,
@@ -157,7 +159,8 @@ export function main(
         'attest-provider --apply requires --accept: the attestation is your statement about the plan’s training-use terms'
       );
     }
-    if (!args.apply) {
+    // --request-approval opens the approval request; it is not a dry-run.
+    if (!args.apply && !args.requestApproval) {
       print(
         JSON.stringify(
           {
@@ -202,7 +205,15 @@ export function main(
             ...request,
             next: [
               `A human decides: ${request.approve_command}`,
-              `Then apply: pnpm tenant attest-provider ${args.slug} --provider ${args.provider} --training-use none ... --apply --accept --approval-request-id ${request.request_id}`,
+              `Then apply: ${[
+                'pnpm',
+                'tenant',
+                'attest-provider',
+                args.slug!,
+                ...providerAttestationApplyArgs(attestInput, request.request_id),
+              ]
+                .map(shellQuoteArg)
+                .join(' ')}`,
             ],
           },
           null,
