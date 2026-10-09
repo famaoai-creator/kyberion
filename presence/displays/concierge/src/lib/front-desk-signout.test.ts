@@ -65,9 +65,13 @@ describe('explicit front-desk signout document', () => {
   it('uses the exact fixed script hash and forbids unrelated resources', () => {
     const en = renderFrontDeskSignoutPage('en');
     const ja = renderFrontDeskSignoutPage('ja');
-    const script = /<script>([\s\S]*)<\/script>/.exec(en)![1];
-    expect(script).toBe(FRONT_DESK_SIGNOUT_SCRIPT);
-    expect(ja).toContain('<script>' + script + '</script>');
+    const script = FRONT_DESK_SIGNOUT_SCRIPT;
+    // This renderer emits a fixed document, so assert its exact script suffix rather than parse HTML with a regexp.
+    for (const html of [en, ja]) {
+      expect(html.endsWith('<script>' + script + '</script></body></html>')).toBe(true);
+      expect(html.toLowerCase().split('<script')).toHaveLength(2);
+      expect(html.toLowerCase().split('</script')).toHaveLength(2);
+    }
     expect(FRONT_DESK_SIGNOUT_HEADERS['Content-Security-Policy']).toBe(
       `default-src 'none'; script-src 'sha256-${createHash('sha256').update(script).digest('base64')}'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'`
     );

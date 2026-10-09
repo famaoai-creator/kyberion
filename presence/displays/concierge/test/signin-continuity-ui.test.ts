@@ -89,7 +89,7 @@ beforeEach(() => {
     'fetch',
     vi.fn(async () => {
       throw new Error('Unexpected synthetic request');
-    }),
+    })
   );
 });
 afterEach(() => {
@@ -121,7 +121,7 @@ async function mount(page: 'signin' | 'first-run' = 'signin', path?: string) {
     unmount = undefined;
   };
   await act(async () =>
-    root.render(createElement(page === 'signin' ? SignInPage : FirstRunSetupPage)),
+    root.render(createElement(page === 'signin' ? SignInPage : FirstRunSetupPage))
   );
   return container;
 }
@@ -149,8 +149,8 @@ function serveFirstRun(response: Response | Promise<Response>) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (_url: string, init?: RequestInit) =>
-      init?.method === 'POST' ? response : json({ state: 'unclaimed' }),
-    ),
+      init?.method === 'POST' ? response : json({ state: 'unclaimed' })
+    )
   );
 }
 async function fillClaim(container: FakeElement) {
@@ -174,11 +174,11 @@ describe('explicit sign-in continuity', () => {
     values.set(TOKEN_KEY, 'synthetic-existing-token');
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => json({ ok: true })),
+      vi.fn(async () => json({ ok: true }))
     );
     const view = await mount(
       'signin',
-      '/signin?next=' + encodeURIComponent('/settings?tab=profile#identity'),
+      '/signin?next=' + encodeURIComponent('/settings?tab=profile#identity')
     );
     expect(values.get(TOKEN_KEY)).toBe('synthetic-existing-token');
     expect(storage.removeItem).not.toHaveBeenCalled();
@@ -193,18 +193,20 @@ describe('explicit sign-in continuity', () => {
         mode: 'same-origin',
         redirect: 'error',
         signal: expect.any(AbortSignal),
-      }),
+      })
     );
     expect(values.get(TOKEN_KEY)).toBe(SIGNIN_TOKEN);
     expect(storage.getItem).toHaveBeenCalledWith(TOKEN_KEY);
-    expect(assign).toHaveBeenCalledExactlyOnceWith('/settings?tab=profile#identity');
+    expect(assign).toHaveBeenCalledExactlyOnceWith(
+      'https://concierge.example.test/settings?tab=profile#identity'
+    );
   });
 
   it('accepts only one fetch from two synchronous clicks and blocks SSO while it is pending', async () => {
     const pending = deferred<Response>();
     vi.stubGlobal(
       'fetch',
-      vi.fn(() => pending.promise),
+      vi.fn(() => pending.promise)
     );
     const view = await mount();
     await input(view, 0, SIGNIN_TOKEN);
@@ -218,7 +220,7 @@ describe('explicit sign-in continuity', () => {
     expect(prevented).toBe(true);
     expect(storage.removeItem).not.toHaveBeenCalled();
     await act(async () => pending.resolve(json({ ok: true })));
-    expect(assign).toHaveBeenCalledExactlyOnceWith('/');
+    expect(assign).toHaveBeenCalledExactlyOnceWith('https://concierge.example.test/');
   });
 
   it.each(invalidations)(
@@ -227,7 +229,7 @@ describe('explicit sign-in continuity', () => {
       const body = deferred<unknown>();
       vi.stubGlobal(
         'fetch',
-        vi.fn(async () => ({ ok: true, json: () => body.promise }) as Response),
+        vi.fn(async () => ({ ok: true, json: () => body.promise }) as Response)
       );
       const view = await mount();
       await input(view, 0, SIGNIN_TOKEN);
@@ -240,7 +242,7 @@ describe('explicit sign-in continuity', () => {
       expect(storage.setItem).not.toHaveBeenCalled();
       expect(values.get(TOKEN_KEY)).toBe(kind === 'newer-auth' ? NEWER_TOKEN : undefined);
       expect(assign).not.toHaveBeenCalled();
-    },
+    }
   );
 
   it.each(['blocked', 'write-throws', 'write-noop'] as const)(
@@ -248,7 +250,7 @@ describe('explicit sign-in continuity', () => {
     async (failure) => {
       vi.stubGlobal(
         'fetch',
-        vi.fn(async () => json({ ok: true })),
+        vi.fn(async () => json({ ok: true }))
       );
       const view = await mount();
       await input(view, 0, SIGNIN_TOKEN);
@@ -258,7 +260,7 @@ describe('explicit sign-in continuity', () => {
       expect(view.textContent).toContain('signin_storage_error');
       expect(element(view, 'button').disabled).toBe(false);
       expect(values.has(TOKEN_KEY)).toBe(false);
-    },
+    }
   );
 
   it('retains the rejected credential and allows an explicit retry without a remount', async () => {
@@ -268,7 +270,7 @@ describe('explicit sign-in continuity', () => {
       vi
         .fn()
         .mockResolvedValueOnce(json({ ok: false }, 401))
-        .mockResolvedValueOnce(json({ ok: true })),
+        .mockResolvedValueOnce(json({ ok: true }))
     );
     const view = await mount();
     await input(view, 0, SIGNIN_TOKEN);
@@ -279,7 +281,7 @@ describe('explicit sign-in continuity', () => {
     await click(view);
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(values.get(TOKEN_KEY)).toBe(SIGNIN_TOKEN);
-    expect(assign).toHaveBeenCalledExactlyOnceWith('/');
+    expect(assign).toHaveBeenCalledExactlyOnceWith('https://concierge.example.test/');
   });
 
   it('intentionally clears the credential only when following the safe SSO link', async () => {
@@ -313,7 +315,7 @@ describe('explicit sign-in continuity', () => {
       expect(values.get(TOKEN_KEY)).toBe('synthetic-rejected-token');
       expect(fetch).not.toHaveBeenCalled();
       expect(assign).not.toHaveBeenCalled();
-    },
+    }
   );
 
   it.each([
@@ -323,16 +325,35 @@ describe('explicit sign-in continuity', () => {
     '/signin?next=%2Fsettings',
     '/signin/',
     '/%73ignin',
+    '/settings/../signin',
+    '/%73ignin%2f',
+    '/%2573ignin',
+    '/login/',
+    '/%6cogin',
+    '/settings/../auth/start',
+    '/settings/..//outside.example.test/private',
+    '/a/..//',
+    '/a/..//?x=1',
+    '/\\outside.example.test/private',
+    '/%2foutside.example.test/private',
+    '/%5coutside.example.test/private',
+    '/%252foutside.example.test/private',
+    '/%00outside.example.test/private',
+    '/%0aoutside.example.test/private',
+    '/%7foutside.example.test/private',
+    '/%zz',
+    'https://user:password@outside.example.test/private',
+    'javascript:alert(1)',
   ])('falls back to home for unsafe or self-loop next %s', async (next) => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => json({ ok: true })),
+      vi.fn(async () => json({ ok: true }))
     );
     const view = await mount('signin', '/signin?next=' + encodeURIComponent(next));
     expect(element(view, 'a').getAttribute('href')).toBe('/login');
     await input(view, 0, SIGNIN_TOKEN);
     await click(view);
-    expect(assign).toHaveBeenCalledExactlyOnceWith('/');
+    expect(assign).toHaveBeenCalledExactlyOnceWith('https://concierge.example.test/');
   });
 });
 
@@ -403,7 +424,7 @@ describe('first-run claim continuity', () => {
       expect(view.textContent).not.toContain('signin_storage_error');
       expect(view.querySelector('[data-testid="sso-settings"]')).not.toBeNull();
       expect(element(view, 'a').getAttribute('href')).toBe('/');
-    },
+    }
   );
 
   it.each(invalidations)(
@@ -426,7 +447,7 @@ describe('first-run claim continuity', () => {
       expect(view.querySelector('a')).toBeNull();
       if (kind !== 'unmount') expect(view.textContent).toContain(ISSUED_TOKEN);
       expect(posts()).toHaveLength(1);
-    },
+    }
   );
 
   it('reads the one-time fragment into the form and removes it before submitting', async () => {
@@ -435,11 +456,11 @@ describe('first-run claim continuity', () => {
     expect(window.history.replaceState).toHaveBeenCalledExactlyOnceWith(
       null,
       '',
-      '/setup/first-run',
+      '/setup/first-run'
     );
     expect(window.location.hash).toBe('');
     expect((element(view, 'input') as unknown as { value: string }).value).toBe(
-      'synthetic-fragment-code',
+      'synthetic-fragment-code'
     );
     expect(posts()).toHaveLength(0);
     expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/setup/first-run');
