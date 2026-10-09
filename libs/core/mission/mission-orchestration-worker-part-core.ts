@@ -59,7 +59,7 @@ import {
   publishTaskPrArtifacts,
   loadAllNextTasks,
 } from './mission-orchestration-worker-part-results.js';
-import { registerMissionWorkerCoreDispatcher } from './mission-orchestration-worker-dispatch-port.js';
+import { installBuiltinMissionWorkerCoreDispatcher } from './mission-orchestration-worker-dispatch-port.js';
 
 export async function dispatchPlannedMissionTaskCore(
   input: DispatchPlannedMissionTaskInput,
@@ -926,4 +926,4 @@ export async function dispatchPlannedMissionTaskCore(
   };
 }
 
-registerMissionWorkerCoreDispatcher(dispatchPlannedMissionTaskCore as any);
+installBuiltinMissionWorkerCoreDispatcher(dispatchPlannedMissionTaskCore as any);
