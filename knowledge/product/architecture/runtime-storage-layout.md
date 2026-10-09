@@ -77,34 +77,43 @@ Two platform caches keep repeated child processes cheap. Both hold
 repository code or host facts only, never tenant data. Deleting either only
 costs the next process the work again.
 
-| Cache                                                   | Writer                                                          | Content and key                                                                                                                                                                                                                                                                      | Retention / off switch                                                                    |
-| ------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| `node_modules/.cache/kyberion-ts-loader/` (not a floor) | `scripts/ts-loader-cache.mjs` (used by `scripts/ts-loader.mjs`) | One transpiled module per file, `<2 hex>/<sha256>.transpiled` (not a code extension, so repository scanners skip it); key = the cache module's own text + TypeScript version + absolute path + source. Sources under `active/`, `knowledge/`, `customer/`, `vault/` are never cached | Pruned by the loader (written > 30 days ago, at most daily); `KYBERION_TS_LOADER_CACHE=0` |
-| `active/shared/cache/system/local-stt-discovery/`       | `libs/core/local-stt-discovery.ts`                              | `candidates.json`: detected local STT backends (binary paths, versions); key = platform + PATH + registry content + managed python bins with mtimes                                                                                                                                  | 10 minutes in-file (`KYBERION_STT_DISCOVERY_CACHE_TTL_MS`, `0` = off), 1 day catalog      |
+| Cache                                                       | Writer                                                          | Content and key                                                                                                                                                                                                                                                                      | Retention / off switch                                                                             |
+| ----------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `node_modules/.cache/kyberion-ts-loader/` (not a floor)     | `scripts/ts-loader-cache.mjs` (used by `scripts/ts-loader.mjs`) | One transpiled module per file, `<2 hex>/<sha256>.transpiled` (not a code extension, so repository scanners skip it); key = the cache module's own text + TypeScript version + absolute path + source. Sources under `active/`, `knowledge/`, `customer/`, `vault/` are never cached | Pruned by the loader (written > 30 days ago, at most daily); `KYBERION_TS_LOADER_CACHE=0`          |
+| `node_modules/.cache/kyberion-stt-discovery/` (not a floor) | `libs/core/local-stt-discovery.ts`                              | `candidates.json`: (backend, source, binary, version) per detected local STT backend; key = platform + PATH + registry content + managed runtimes' bin lstat and site-packages mtimes                                                                                                | 10 minutes in-file (`KYBERION_STT_DISCOVERY_CACHE_TTL_MS`, `0` = off); managed installers clear it |
 
-**Trust-model exception: the transpile cache is not on a floor.** Its
+**Trust-model exception: neither cache is on a floor.** The transpile cache's
 entries are executed as code by whoever runs the loader (operator,
-mission_controller, CI). Every floor under `active/shared/` is writable by
-governed personas through secure-io (`default_allow`), so an entry there
-could be planted by a role that may write data but not code. The cache
-therefore lives in `node_modules/.cache/`, which secure-io denies to every
-persona and authority role (SUDO authority aside), and it is the one runtime
-store that bypasses secure-io and the retention catalog:
+mission_controller, CI), and the STT discovery result names the binaries the
+speech-to-text bridge executes. Every floor under `active/shared/` is
+writable by governed personas through secure-io (`default_allow`), so an
+entry there could be planted by a role that may write data but not code.
+Both therefore live in `node_modules/.cache/`, which secure-io denies to every
+persona and authority role (SUDO authority aside), and they are the only
+runtime stores that bypass secure-io and the retention catalog. The rules
+live in one module, `libs/core/private-host-cache.mjs`:
 
 - the loader is what makes TypeScript importable, so it cannot import
-  secure-io (itself TypeScript); it uses `node:fs` on this tree only
-  (governance import baseline);
+  secure-io (itself TypeScript), and secure-io refuses `node_modules/` by
+  design; the helper uses `node:fs` on these directories only (governance
+  import baseline, core-fs-exception-boundary);
 - the cache root must be owned by the running uid with no group/other write
-  bit; directories are created 0700 and entries 0600; each entry is opened
-  without following symlinks and `fstat`ed, and an entry with another owner
-  or a group/other write bit is deleted, never executed;
-- a `KYBERION_TS_LOADER_CACHE_DIR` override inside the checkout is honoured
-  only under `node_modules/`;
+  bit; directories are created 0700 and files 0600; each file is opened
+  without following symlinks and `fstat`ed, and one with another owner or a
+  group/other write bit is deleted, never used;
+- an override directory is honoured only outside the checkout or under its
+  `node_modules/`, judged on the realpath of its deepest existing ancestor;
+- on Windows (no uid, no POSIX mode) both caches are off unless
+  `KYBERION_WINDOWS_PRIVATE_CACHE=1`;
 - writes go to a unique temp file renamed into place, and every cache error
   is a miss.
 
-The STT cache holds data only, stays on the cache floor and writes through
-secure-io (`safeWriteFile` is atomic).
+The STT cache also re-validates on every hit: candidates are rebuilt from
+the governed registry, and a binary is accepted only where the probe could
+have found it (the tool's own managed python, or a PATH directory outside
+`active/`, `knowledge/`, `customer/`, `vault/`). A secure-io weakness that
+lets a persona write through a symlink into `node_modules/` is being fixed
+in secure-io itself (V4).
 
 ### Owner scope (deterministic placement)
 
