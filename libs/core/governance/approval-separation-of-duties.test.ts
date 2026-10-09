@@ -418,6 +418,48 @@ describe('approval separation of duties', () => {
     expect(sodAudits()).toBe(1);
   });
 
+  it('ON: the approval gate does not re-audit a stale unusable approval while a usable candidate exists', () => {
+    const correlationId = `sod-gate-stale-${process.pid}`;
+    const payload = { operation: 'restart', service: 'sod-stale' };
+    const open = (title: string) =>
+      track(
+        createApprovalRequest('mission_controller', {
+          channel,
+          threadTs: title,
+          correlationId,
+          requestedBy: 'alice',
+          draft: { title, summary: 'gate candidate' },
+        })
+      );
+    setSeparationOfDuties(false);
+    const pending = open('older-pending');
+    // The gate scans newest first: make sure the stale approval is newer.
+    const later = Date.now() + 5;
+    while (Date.now() < later) {
+      /* wait for the next millisecond tick */
+    }
+    const stale = open('newer-self-approved');
+    decide(stale, 'alice');
+    setSeparationOfDuties(true);
+    const gate = () =>
+      enforceApprovalGate({
+        intentId: 'inspect-service',
+        operationId: 'inspect-service',
+        agentId: 'alice',
+        correlationId,
+        channel,
+        payload,
+      });
+    for (let i = 0; i < 3; i += 1) {
+      expect(gate()).toMatchObject({ allowed: false, requestId: pending.id });
+    }
+    expect(
+      audit.mock.calls.filter(
+        ([entry]) => (entry as { operation?: string }).operation === 'separation_of_duties'
+      )
+    ).toHaveLength(0);
+  });
+
   it('ON: the agent prompt port opens a new request instead of reusing an unusable self-approval', () => {
     const port = createApprovalStorePromptPort();
     const request = {
