@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Onboarding'
 tags: [governance, lifecycle, onboarding]
-last_updated: 2026-10-08
+last_updated: 2026-10-09
 runtime_stages: [intake, classification]
 ---
 
@@ -62,6 +62,11 @@ pnpm onboarding apply --identity <reviewed-identity-json>
 
 GUI では concierge（`http://127.0.0.1:3050`）の `/settings` から保存できる。メンバーと承認者も
 ここで登録する。この段階では外部効果や mission を開始しない。
+
+端末は承認を local owner member（`user:owner`）として記録する（onboarding の名前は表示用）。concierge か
+presence-studio を開くと作られる。端末だけで使うなら `pnpm organization member ensure-owner` を
+実行する。職務分離（`separation_of_duties.enabled`）を有効にする場合は必須で、無いと端末からの承認依頼と
+承認が止まる。
 
 ### Step 4: baseline を all_clear にする
 
