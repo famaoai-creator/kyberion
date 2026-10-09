@@ -565,6 +565,13 @@
       "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/locale.json"],
       "allow_write": []
     },
+    "metrics_cap_reader": {
+      "allow_read": [
+        "active/shared/runtime/execution-metrics/",
+        "active/shared/runtime/usage-ledger/"
+      ],
+      "allow_write": []
+    },
     "audit_mirror_writer": {
       "allow_read": [],
       "allow_write": ["customer/${KYBERION_TENANT}/logs/audit/"]

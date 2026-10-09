@@ -28,7 +28,7 @@ import { listDotCharters, type LoadedDotCharter } from '../dot/dot-charter.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { readJsonIfPresent, readJsonLines } from '../foundation/json.js';
 import { generationQuotaCounterPath } from '../generation-quota.js';
-import { metrics } from '../metrics.js';
+import { aggregateMetricsForEnforcement } from '../metrics.js';
 import { sendOpsAlert } from '../ops-alert.js';
 import { pathResolver } from '../path-resolver.js';
 
@@ -227,7 +227,6 @@ function metricsRowScope(e: Record<string, any>): OrgBudgetScope {
 const DOT_ACTOR_PATTERN = /^dot:/;
 /** More torn history lines than this that belong to today make cost unknown. */
 const MAX_TODAY_MALFORMED = 2;
-const MALFORMED_DAY_PATTERN = /"timestamp"\s*:\s*"(\d{4}-\d{2}-\d{2})/;
 /**
  * Interactive operator CLI producers (front-CLI session hooks such as
  * recordCliUsage). Their unattributed rows are reported, never a cap input.
@@ -254,15 +253,12 @@ interface MalformedHistoryLine {
  * blank lines are ignored, which can only place it earlier (fail closed).
  */
 function todayMalformedLines(
-  entries: Array<Record<string, any>>,
+  firstIndex: number,
   malformed: MalformedHistoryLine[],
   day: string
 ): number[] {
   if (malformed.length === 0) return [];
   let firstToday = Number.POSITIVE_INFINITY;
-  const firstIndex = entries.findIndex(
-    (e) => typeof e?.timestamp === 'string' && e.timestamp.slice(0, 10) === day
-  );
   if (firstIndex >= 0) {
     let line = firstIndex + 1;
     for (const m of [...malformed].sort((a, b) => a.line - b.line)) {
@@ -391,32 +387,12 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
   const malformed: MalformedHistoryLine[] = [];
   const measuredDotTokens = new Map<string, number>();
   try {
-    const entries = deps.readMetricsHistory
-      ? deps.readMetricsHistory()
-      : metrics.loadHistory({
-          // A tenant budget reads that tenant's partitions plus the system one
-          // (dot-attributed and unscoped rows are matched below); the global
-          // budget reads every partition this process may read.
-          read: scope.tenant_slug
-            ? { tenants: [scope.tenant_slug], includeSystem: true }
-            : { all: true },
-          strict: true,
-          onMalformed: (line, raw) => {
-            malformed.push({ line, day: MALFORMED_DAY_PATTERN.exec(raw)?.[1] });
-          },
-        });
-    const malformedToday = todayMalformedLines(entries, malformed, day);
-    if (malformedToday.length > 0) {
-      const shown = malformedToday.slice(0, 10).join(', ');
-      const more = malformedToday.length > 10 ? ` (+${malformedToday.length - 10} more)` : '';
-      const unknown = malformedToday.length > MAX_TODAY_MALFORMED;
-      if (unknown) costUnknown = true;
-      logger.warn(
-        `metrics history has ${malformedToday.length} malformed line(s) for ${day} — ${unknown ? 'cost treated as unknown' : `skipped (cost unknown above ${MAX_TODAY_MALFORMED})`} | next: repair active/shared metrics history.jsonl | evidence: lines ${shown}${more}`
-      );
-    }
-    for (const e of entries) {
-      if (typeof e?.timestamp !== 'string' || e.timestamp.slice(0, 10) !== day) continue;
+    let index = 0;
+    let firstTodayIndex = -1;
+    const accumulate = (e: Readonly<Record<string, any>>) => {
+      const rowIndex = index++;
+      if (typeof e?.timestamp !== 'string' || e.timestamp.slice(0, 10) !== day) return;
+      if (firstTodayIndex < 0) firstTodayIndex = rowIndex;
       const dotId = metricsDotId(e);
       const charterScope = dotId ? dotScope.get(dotId) : undefined;
       const explicitScope = metricsRowScope(e);
@@ -443,12 +419,12 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
         ) {
           costUnknown = true;
         }
-        continue;
+        return;
       }
       const tokens = metricsTokens(e);
       if (!attributable && isInteractiveCliRow(e)) {
         interactive += tokens;
-        continue;
+        return;
       }
       const accountingId = nonEmpty(e.accounting_id);
       if (dotId && accountingId) {
@@ -467,6 +443,38 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
         if (attributable) costUnknown = true;
         else costPartial = true;
       }
+    };
+    if (deps.readMetricsHistory) {
+      for (const e of deps.readMetricsHistory()) accumulate(e);
+    } else {
+      // A cap must count every tier of its scope whatever the caller's
+      // persona: the governed enforcement aggregate reads the ledgers as the
+      // metrics cap reader and returns numbers only. A tenant budget reads that
+      // tenant's partitions plus the system one (dot-attributed and unscoped
+      // rows are matched above); the global budget reads every partition.
+      aggregateMetricsForEnforcement({
+        enforcer: 'org_budget_governor',
+        ledger: 'execution_metrics',
+        read: scope.tenant_slug
+          ? { tenants: [scope.tenant_slug], includeSystem: true }
+          : { all: true },
+        measures: [],
+        accumulate: (row) => accumulate(row as Readonly<Record<string, any>>),
+        strict: true,
+        onMalformed: (line, malformedDay) => {
+          malformed.push({ line, day: malformedDay });
+        },
+      });
+    }
+    const malformedToday = todayMalformedLines(firstTodayIndex, malformed, day);
+    if (malformedToday.length > 0) {
+      const shown = malformedToday.slice(0, 10).join(', ');
+      const more = malformedToday.length > 10 ? ` (+${malformedToday.length - 10} more)` : '';
+      const unknown = malformedToday.length > MAX_TODAY_MALFORMED;
+      if (unknown) costUnknown = true;
+      logger.warn(
+        `metrics history has ${malformedToday.length} malformed line(s) for ${day} — ${unknown ? 'cost treated as unknown' : `skipped (cost unknown above ${MAX_TODAY_MALFORMED})`} | next: repair active/shared metrics history.jsonl | evidence: lines ${shown}${more}`
+      );
     }
   } catch (error) {
     costUnknown = true;

@@ -28,6 +28,7 @@ import {
 } from './storage-layout.js';
 import { validateReadPermission } from './tier-guard.js';
 import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
+import { withExecutionContext } from './authority.js';
 const logger = createLogger('metrics');
 
 interface SloTarget {
@@ -201,12 +202,15 @@ class PartitionedMetricsLedger {
   select<T extends { scope?: unknown }>(
     legacy: T[],
     read: MetricsLedgerReadScope | undefined,
-    readFile: (filePath: string) => T[]
+    readFile: (filePath: string) => T[],
+    onWithheld?: (partitions: number) => void
   ): T[] {
     let rows: T[];
     let files: string[];
+    // Partitions (keyed `<tier>/<tenant|shared>`) tier-guard withheld from this reader.
+    const withheld = new Set<string>();
     if (read && 'all' in read && read.all) {
-      rows = this.visibleLegacyRows(legacy);
+      rows = this.visibleLegacyRows(legacy, withheld);
       files = this.partitionFiles();
     } else {
       const wanted = new Map<string, StoragePartition>();
@@ -228,16 +232,20 @@ class PartitionedMetricsLedger {
         );
         return [];
       }
-      rows = this.visibleLegacyRows(legacy.filter((row) => wanted.has(recordPartitionKey(row))));
+      rows = this.visibleLegacyRows(
+        legacy.filter((row) => wanted.has(recordPartitionKey(row))),
+        withheld
+      );
     }
     for (const filePath of files) {
-      if (this.readable(filePath)) rows.push(...readFile(filePath));
+      if (this.readable(filePath, withheld)) rows.push(...readFile(filePath));
     }
+    if (onWithheld && withheld.size > 0) onWithheld(withheld.size);
     return rows;
   }
 
   /** Legacy rows this process may see: system rows, plus tier rows whose partition it may read. */
-  private visibleLegacyRows<T extends { scope?: unknown }>(rows: T[]): T[] {
+  private visibleLegacyRows<T extends { scope?: unknown }>(rows: T[], withheld: Set<string>): T[] {
     const readable = new Map<string, boolean>();
     return rows.filter((row) => {
       const key = recordPartitionKey(row);
@@ -252,6 +260,7 @@ class PartitionedMetricsLedger {
         } catch {
           allowed = false;
         }
+        if (!allowed) withheld.add(key);
         readable.set(key, allowed);
       }
       return readable.get(key) === true;
@@ -259,13 +268,16 @@ class PartitionedMetricsLedger {
   }
 
   /** An existing partition file this process may read (tier-guard: tenant + persona). */
-  private readable(filePath: string): boolean {
+  private readable(filePath: string, withheld: Set<string>): boolean {
     try {
       if (!safeExistsSync(filePath)) return false;
     } catch {
       return false;
     }
-    return this.permitted(filePath, 'partition');
+    const allowed = this.permitted(filePath, 'partition');
+    if (!allowed)
+      withheld.add(path.relative(this.root, path.dirname(filePath)).split(path.sep).join('/'));
+    return allowed;
   }
 
   private permitted(filePath: string, what: string): boolean {
@@ -851,6 +863,8 @@ export class MetricsCollector {
       strict?: boolean;
       onMalformed?: (lineNumber: number, rawLine: string) => void;
       read?: ExecutionMetricsReadScope;
+      /** Called with the number of partitions tier-guard withheld from this reader (if any). */
+      onWithheld?: (partitions: number) => void;
     } = {}
   ) {
     let lineOffset = 0;
@@ -887,18 +901,23 @@ export class MetricsCollector {
     };
     try {
       const system = readFile(this._metricsPath(this._metricsFile), false);
-      return this._executionLedger.select(system, options.read, (filePath) => {
-        if (options.strict) return readFile(filePath, true);
-        try {
-          return readFile(filePath, true);
-        } catch (err) {
-          // Lenient readers lose one unreadable partition, not the whole history.
-          logger.debug(
-            `execution metrics partition skipped — unreadable file | next: repair or remove it | evidence: ${filePath}: ${err}`
-          );
-          return [];
-        }
-      });
+      return this._executionLedger.select(
+        system,
+        options.read,
+        (filePath) => {
+          if (options.strict) return readFile(filePath, true);
+          try {
+            return readFile(filePath, true);
+          } catch (err) {
+            // Lenient readers lose one unreadable partition, not the whole history.
+            logger.debug(
+              `execution metrics partition skipped — unreadable file | next: repair or remove it | evidence: ${filePath}: ${err}`
+            );
+            return [];
+          }
+        },
+        options.onWithheld
+      );
     } catch (error) {
       if (options.strict) throw error;
       return [];
@@ -913,11 +932,15 @@ export class MetricsCollector {
    * In every mode a legacy tier row is visible only where its partition would
    * be: it inherits tier-guard's read decision for that partition's path.
    */
-  loadResourceUsageHistory(read?: ResourceUsageReadScope): ResourceUsageRecord[] {
+  loadResourceUsageHistory(
+    read?: ResourceUsageReadScope,
+    options: { onWithheld?: (partitions: number) => void } = {}
+  ): ResourceUsageRecord[] {
     return this._usageLedger.select(
       this._readUsageFile(this._metricsPath(this._resourceUsageFile)),
       read,
-      (filePath) => this._readUsageFile(filePath)
+      (filePath) => this._readUsageFile(filePath),
+      options.onWithheld
     );
   }
 
@@ -941,8 +964,11 @@ export class MetricsCollector {
    * partitions (default: the system partition); operator surfaces pass
    * `{ all: true }`. Rows are ordered by timestamp across partitions.
    */
-  reportFromHistory(read?: ExecutionMetricsReadScope) {
-    const entries = chronological(this.loadHistory({ read }));
+  reportFromHistory(
+    read?: ExecutionMetricsReadScope,
+    options: { onWithheld?: (partitions: number) => void } = {}
+  ) {
+    const entries = chronological(this.loadHistory({ read, onWithheld: options.onWithheld }));
     const bySkill: Record<string, any> = {};
     const sloPathCandidates = [
       pathResolver.resolve('knowledge/product/orchestration/slo-targets.json'),
@@ -1044,8 +1070,12 @@ export class MetricsCollector {
   }
 
   /** Latency regressions per skill; `read` as in reportFromHistory. */
-  detectRegressions(thresholdMultiplier = 1.5, read?: ExecutionMetricsReadScope) {
-    const entries = chronological(this.loadHistory({ read }));
+  detectRegressions(
+    thresholdMultiplier = 1.5,
+    read?: ExecutionMetricsReadScope,
+    options: { onWithheld?: (partitions: number) => void } = {}
+  ) {
+    const entries = chronological(this.loadHistory({ read, onWithheld: options.onWithheld }));
     const bySkill: Record<string, any[]> = {};
     for (const entry of entries) {
       if (!bySkill[entry.skill]) bySkill[entry.skill] = [];
@@ -1140,3 +1170,111 @@ function executionRowScope(scope: unknown): unknown {
 }
 
 export const metrics = new MetricsCollector();
+
+/**
+ * User-facing notice for a report or summary built from a partial metrics
+ * read: logs ONE warn line in the diagnostic format and returns the sentence
+ * the report shows, or undefined when nothing was withheld.
+ */
+export function metricsWithheldNotice(reader: string, partitions: number): string | undefined {
+  if (!(partitions > 0)) return undefined;
+  const notice = `${partitions} metrics partition(s) withheld for this persona — totals are partial`;
+  logger.warn(
+    `${reader}: ${notice} | next: run as a persona/role allowed to read knowledge/<tier>/ (or the tenant) for full totals | evidence: ${partitions} personal/confidential ledger partition(s) denied by tier-guard`
+  );
+  return notice;
+}
+
+/**
+ * Governed system-scope reader of the partitioned metrics ledgers, assumed only
+ * inside aggregateMetricsForEnforcement (security-policy.json
+ * authority_role_permissions: read-only grant on the two ledger roots).
+ */
+export const METRICS_CAP_READER_ROLE = 'metrics_cap_reader';
+
+/** Cap / limit enforcers allowed to use the enforcement aggregate. */
+export type MetricsEnforcer = 'spend_guard' | 'org_budget_governor' | 'generation_cost_dedup';
+
+export interface MetricsEnforcementTotals<M extends string> {
+  /** Sums of the caller's pre-declared measures. */
+  measures: Record<M, number>;
+  /** Rows the accumulator was given. */
+  rows: number;
+  /** Partitions still withheld (e.g. another tenant's, for a tenant-bound caller). */
+  withheld_partitions: number;
+}
+
+/**
+ * Totals for a cap or limit enforcer, over EVERY tier of the requested scope,
+ * whatever the caller's persona. The read runs as METRICS_CAP_READER_ROLE,
+ * bound to the caller's tenant (tier-guard still denies other tenants'
+ * partitions), so a persona that may not read knowledge/<tier>/ still has its
+ * own personal/confidential spend counted — without being granted row access.
+ *
+ * Only numbers leave this call: the measure names are declared before any row
+ * is read, `add` accepts only those names and finite numbers, and the result
+ * carries no row, id, scope or text. The `accumulate` classifier runs inside
+ * the governed read and must not retain rows (enforcers keep only numeric,
+ * caller-derived state).
+ *
+ * Logged at debug per call (diagnostic format), not audited: enforcers run on
+ * every reasoning call, the output is numbers only, and the role's grant is
+ * read-only on two roots (see runtime-storage-layout "Metrics ledgers").
+ */
+export function aggregateMetricsForEnforcement<M extends string>(input: {
+  enforcer: MetricsEnforcer;
+  ledger: 'execution_metrics' | 'resource_usage';
+  read: MetricsLedgerReadScope;
+  measures: readonly M[];
+  accumulate: (
+    row: Readonly<Record<string, unknown>>,
+    add: (measure: M, value: number) => void
+  ) => void;
+  /** Execution metrics only: strict read with torn-line reporting (line number + day only). */
+  strict?: boolean;
+  onMalformed?: (lineNumber: number, day: string | undefined) => void;
+  collector?: MetricsCollector;
+}): MetricsEnforcementTotals<M> {
+  const declared = new Set<string>(input.measures);
+  const measures = Object.fromEntries(input.measures.map((m) => [m, 0])) as Record<M, number>;
+  const add = (measure: M, value: number) => {
+    if (!declared.has(measure)) {
+      throw new Error(`[METRICS_ENFORCEMENT_MEASURE] undeclared measure '${String(measure)}'`);
+    }
+    if (Number.isFinite(value)) measures[measure] += value;
+  };
+  const collector = input.collector ?? metrics;
+  let withheld = 0;
+  const onWithheld = (partitions: number) => {
+    withheld = partitions;
+  };
+  const tenant = resolvePolicyIdentityContext().tenantSlug;
+  const rows = withExecutionContext(
+    METRICS_CAP_READER_ROLE,
+    (): Array<Record<string, unknown>> =>
+      input.ledger === 'execution_metrics'
+        ? collector.loadHistory({
+            read: input.read,
+            strict: input.strict,
+            onWithheld,
+            ...(input.onMalformed
+              ? {
+                  onMalformed: (line: number, raw: string) =>
+                    input.onMalformed?.(line, MALFORMED_DAY.exec(raw)?.[1]),
+                }
+              : {}),
+          })
+        : (collector.loadResourceUsageHistory(input.read, { onWithheld }) as unknown as Array<
+            Record<string, unknown>
+          >),
+    undefined,
+    tenant
+  );
+  for (const row of rows) input.accumulate(Object.freeze(row), add);
+  logger.debug(
+    `metrics enforcement aggregate — ${input.enforcer} read ${input.ledger} as ${METRICS_CAP_READER_ROLE} | next: none | evidence: rows=${rows.length} withheld=${withheld} tenant=${tenant ?? '(unbound)'}`
+  );
+  return { measures, rows: rows.length, withheld_partitions: withheld };
+}
+
+const MALFORMED_DAY = /"timestamp"\s*:\s*"(\d{4}-\d{2}-\d{2})/;
