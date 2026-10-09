@@ -259,8 +259,8 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   /** Autonomous-operation P1-7: present when silence after delivery lets the request proceed. */
   veto?: ApprovalVetoWindow;
   /**
-   * Set by {@link revokeApprovalRequest}: the approval was withdrawn before it
-   * was applied. The status stays `approved` (the decision happened), but
+   * Set by `revokeApprovalRequest`: the approval was revoked and further uses
+   * are refused. The status stays `approved` (the decision happened), but
    * `evaluateApprovalUsability` refuses it for every consumer.
    */
   revocation?: ApprovalRevocation;
