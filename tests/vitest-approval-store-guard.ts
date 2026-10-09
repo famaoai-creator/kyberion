@@ -25,10 +25,11 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, expect } from 'vitest';
 import { leftoverVerdict, poolApprovalStoreDir } from './approval-store-guard-policy.js';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE_PATH = path.join(ROOT, 'tests', 'fixtures', 'approval-store-leftover-baseline.json');
 
 function listStoreFiles(dir: string): string[] {
