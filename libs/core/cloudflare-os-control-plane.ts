@@ -1,13 +1,8 @@
 import { timingSafeEqual, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { auditChain } from './governance/audit-chain.js';
-import {
-  assertApprovalUsable,
-  computeApprovalPayloadHash,
-  decideApprovalRequest,
-  isSeparationOfDutiesEnabled,
-  loadApprovalRequest,
-} from './governance/approval-store.js';
+import { computeApprovalPayloadHash, decideApprovalRequest } from './governance/approval-store.js';
+import { assertLinkedApprovalUsable } from './governance/approval-linked-usability.js';
 import {
   collectCascadeCancellations,
   assertAdoptable,
@@ -605,20 +600,7 @@ export class CloudflareOsControlPlane {
       return record;
     if (record.status !== 'approved')
       throw new Error(`[POLICY_VIOLATION] Held action ${id} is not approved`);
-    // Separation of duties: the linked shared-store decision must still be
-    // usable (e.g. not a self-approval recorded while the setting was off).
-    if (record.approvalRequest && isSeparationOfDutiesEnabled()) {
-      const linked = loadApprovalRequest(
-        record.approvalRequest.storageChannel,
-        record.approvalRequest.requestId
-      );
-      if (!linked) {
-        throw new Error(
-          `[POLICY_VIOLATION] Held action ${id} has no linked approval record to verify separation of duties`
-        );
-      }
-      assertApprovalUsable(linked, { consumer: 'held_action_apply' });
-    }
+    if (record.approvalRequest) assertLinkedApprovalUsable(record.approvalRequest, id); // SoD
     const by = assertNonEmpty(record.resolvedBy || '', 'resolvedBy');
     record.resolvedBy = by;
     // A dependent runs only after its dependencies were applied; one whose
