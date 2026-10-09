@@ -179,7 +179,7 @@ gets clean JSON.
     (`SeamError: Provider mission-worker-core is already registered`). Track the promises a test
     starts and `await Promise.allSettled(...)` them in `afterEach` (with an explicit hook timeout)
     before cleanup. A module-level seam registration must be safe to re-evaluate
-    (`installBuiltinMissionWorkerCoreDispatcher`).
+    (part-core registers with an unexported `replaceKey`; a supersede logs a warning).
   - **A per-test mock that reaches a cached catalog.** `safeExistsSync.mockReturnValue(false)`,
     meant for one artifact, also answered the media-backend registry's directory check. The test
     passed only when an earlier test had already cached the registry. Route governed catalog paths

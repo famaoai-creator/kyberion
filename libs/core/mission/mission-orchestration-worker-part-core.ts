@@ -59,7 +59,7 @@ import {
   publishTaskPrArtifacts,
   loadAllNextTasks,
 } from './mission-orchestration-worker-part-results.js';
-import { installBuiltinMissionWorkerCoreDispatcher } from './mission-orchestration-worker-dispatch-port.js';
+import { registerMissionWorkerCoreDispatcher } from './mission-orchestration-worker-dispatch-port.js';
 
 export async function dispatchPlannedMissionTaskCore(
   input: DispatchPlannedMissionTaskInput,
@@ -926,4 +926,21 @@ export async function dispatchPlannedMissionTaskCore(
   };
 }
 
-installBuiltinMissionWorkerCoreDispatcher(dispatchPlannedMissionTaskCore as any);
+// Unexported replace key: only this module can supersede its own registration
+// when it is evaluated a second time against the same dispatch port (see
+// registerMissionWorkerCoreDispatcher). It is a registry symbol because a
+// second evaluation must present the same key; it is not a security boundary,
+// and every supersede is logged.
+const BUILTIN_DISPATCHER_REPLACE_KEY = Symbol.for(
+  'kyberion.mission-orchestration-worker-part-core.builtin-dispatcher'
+);
+
+registerMissionWorkerCoreDispatcher(
+  dispatchPlannedMissionTaskCore as any,
+  {
+    provenance: 'builtin',
+    source: 'libs/core/mission/mission-orchestration-worker-part-core.ts',
+    reason: 'builtin mission worker core dispatcher',
+  },
+  { replaceKey: BUILTIN_DISPATCHER_REPLACE_KEY }
+);
