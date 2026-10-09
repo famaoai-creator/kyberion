@@ -4,6 +4,8 @@ import { safeLstat, safeReadFile, safeReaddir } from './secure-io.js';
 
 const ALLOWLIST = [
   /\/libs\/core\/secure-io\.ts$/,
+  // secure-io's permission guards (literal + canonical symlink checks).
+  /\/libs\/core\/secure-io-path-guard\.ts$/,
   /\/libs\/core\/fs-primitives\.ts$/,
   /\/libs\/core\/mlx-embedding-backend\.ts$/,
   /\/libs\/core\/python-voice-bridge\.ts$/,
