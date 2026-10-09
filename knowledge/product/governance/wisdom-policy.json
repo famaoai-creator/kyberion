@@ -26,7 +26,7 @@
         "command": "codex",
         "adapter": "codex-cli",
         "args": [],
-        "timeout_ms": 30000,
+        "timeout_ms": 120000,
         "response_format": "json_envelope"
       },
       "claude": {
