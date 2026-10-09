@@ -35,7 +35,7 @@
     "source": { "type": "string", "minLength": 1 },
     "scope_invalid": {
       "const": true,
-      "description": "The producer's scope could not be placed in a tier/tenant partition; the row was recorded in the system partition with its scope stripped (libs/core/metrics.ts)."
+      "description": "The producer's scope could not be placed: the row keeps its tier (unknown tier fails closed to confidential) and its own valid tenant, else the bound tenant or the shared segment; a tenant-less public row is a system row (libs/core/metrics.ts PartitionedMetricsLedger.append)."
     },
     "cause": {
       "type": "string",

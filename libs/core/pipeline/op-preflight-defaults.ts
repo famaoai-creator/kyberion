@@ -293,9 +293,7 @@ export function ensureDefaultOpPreflight(): void {
         if (!result.allowed) {
           return {
             decision: 'block',
-            reason: result.refused
-              ? `[OP_SPEND_DENIED] spend guard refused: ${result.refused}`
-              : `[OP_SPEND_DENIED] cap reached: ${result.breached.join(', ')}`,
+            reason: `[OP_SPEND_DENIED] cap reached: ${result.breached.join(', ')}`,
             terminate: true,
           };
         }

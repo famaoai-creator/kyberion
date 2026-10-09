@@ -32,6 +32,7 @@ import { validateReadPermission } from './tier-guard.js';
 import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 import { withExecutionContext } from './authority.js';
 import { withLockSync } from './foundation/lock-utils.js';
+import { isValidTenantSlug } from './foundation/scope.js';
 const logger = createLogger('metrics');
 
 interface SloTarget {
@@ -143,6 +144,15 @@ export function metricsRowPartition(row: { scope?: unknown }): StoragePartition 
   }
   const tenant = metricsRowTenant(row);
   if (!scope && !tenant) return SYSTEM_PARTITION;
+  if (!scope && !isValidTenantSlug(tenant)) {
+    // A pre-canonical row with no scope and an unplaceable top-level tenant
+    // field names no partition: it is a system row (public, as written).
+    debugOnce(
+      `unplaceable-top-level-tenant`,
+      `metrics ledger row treated as system — no scope and an unplaceable top-level tenant | next: none (legacy row) | evidence: tenant field '${tenant}'`
+    );
+    return SYSTEM_PARTITION;
+  }
   const partition = metricsLedgerPartition({
     tier: (scope as UsageScopeRef | undefined)?.tier,
     ...(tenant ? { tenant_slug: tenant } : {}),
@@ -151,14 +161,23 @@ export function metricsRowPartition(row: { scope?: unknown }): StoragePartition 
   return partition;
 }
 
+const debugOnceKeys = new Set<string>();
+function debugOnce(key: string, message: string): void {
+  if (debugOnceKeys.has(key)) return;
+  debugOnceKeys.add(key);
+  logger.debug(message);
+}
+
 /** Partition key of a stored record; a malformed scope never matches a scoped reader. */
 function recordPartitionKey(record: { scope?: unknown }): string {
   try {
     return partitionKey(metricsRowPartition(record));
   } catch {
-    return '(invalid)';
+    return INVALID_PARTITION_KEY;
   }
 }
+
+const INVALID_PARTITION_KEY = '(invalid)';
 
 export { metricsLedgerLockId, metricsRowTenant };
 
@@ -180,6 +199,15 @@ export type MetricsLedgerReadScope =
   | { all: true };
 export type ResourceUsageReadScope = MetricsLedgerReadScope;
 export type ExecutionMetricsReadScope = MetricsLedgerReadScope;
+
+/**
+ * How long an append waits for the ledger lock (default lock wait: 5 s). The
+ * only long holder is tenant offboarding's read-filter-rewrite of a system
+ * ledger, which on a large ledger (tens of MB of JSONL through secure-io's
+ * temp-file + rename) can exceed 5 s; an append runs once per call, so a
+ * rare 30 s wait is cheaper than dropping a cost row.
+ */
+const APPEND_LOCK_WAIT_MS = 30_000;
 
 /**
  * One metrics ledger split into its system file and tier/tenant partition
@@ -209,7 +237,10 @@ class PartitionedMetricsLedger {
    * drops its tenant fields, is flagged `scope_invalid: true`, and a warn
    * line names the producer's error.
    */
-  append(row: Record<string, unknown>, systemFile: () => string): void {
+  append(
+    row: Record<string, unknown>,
+    systemFile: () => string
+  ): { row: Record<string, unknown>; partition: StoragePartition } {
     let placed = row;
     let partition: StoragePartition;
     try {
@@ -228,14 +259,24 @@ class PartitionedMetricsLedger {
           : undefined;
       const tier: StorageDataTier =
         rawTier === 'public' || rawTier === 'personal' ? rawTier : 'confidential';
-      const bound = resolvePolicyIdentityContext().tenantSlug;
+      // Keep the row's own tenant when only the tier was bad (offboarding must
+      // still find it); fall back to the bound tenant / `shared` only when the
+      // slug itself is unplaceable. A tenant-less public row is a system row.
+      const ownTenant = metricsRowTenant(row);
+      const tenant = isValidTenantSlug(ownTenant)
+        ? ownTenant
+        : tier === 'public'
+          ? undefined
+          : resolvePolicyIdentityContext().tenantSlug || undefined;
       partition =
-        tier === 'public'
+        tier === 'public' && !tenant
           ? SYSTEM_PARTITION
-          : { kind: 'tier', tier, ...(bound ? { tenant: bound } : {}) };
+          : { kind: 'tier', tier, ...(tenant ? { tenant } : {}) };
       placed = {
         ...rest,
-        ...(tier === 'public' ? {} : { scope: { tier, ...(bound ? { tenant_slug: bound } : {}) } }),
+        ...(partition.kind === 'system'
+          ? {}
+          : { scope: { tier, ...(tenant ? { tenant_slug: tenant } : {}) } }),
         scope_invalid: true,
       };
       logger.warn(
@@ -244,17 +285,22 @@ class PartitionedMetricsLedger {
     }
     if (partition.kind === 'system') {
       const filePath = systemFile();
-      withLockSync(metricsLedgerLockId(filePath), () => {
-        ensureRegularFile(filePath);
-        appendJsonLine(filePath, placed);
-      });
-      return;
+      withLockSync(
+        metricsLedgerLockId(filePath),
+        () => {
+          ensureRegularFile(filePath);
+          appendJsonLine(filePath, placed);
+        },
+        APPEND_LOCK_WAIT_MS
+      );
+      return { row: placed, partition };
     }
     const filePath = this.partitionPath(partition);
     const dir = path.dirname(filePath);
     if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
     ensureRegularFile(filePath);
     appendJsonLine(filePath, placed);
+    return { row: placed, partition };
   }
 
   /**
@@ -324,7 +370,15 @@ class PartitionedMetricsLedger {
         } catch {
           allowed = false;
         }
-        if (!allowed) withheld.add(key);
+        // An unplaceable legacy row names no partition: hide it, but it is
+        // not a partition withheld from this reader (reports stay complete).
+        if (!allowed && key !== INVALID_PARTITION_KEY) withheld.add(key);
+        if (key === INVALID_PARTITION_KEY) {
+          debugOnce(
+            `${this.label}-invalid-legacy`,
+            `${this.label} legacy rows with an unplaceable scope hidden | next: none (they name no partition) | evidence: partition key ${INVALID_PARTITION_KEY}`
+          );
+        }
         readable.set(key, allowed);
       }
       return readable.get(key) === true;
@@ -594,6 +648,12 @@ export interface MetricsOptions {
    * `metricsDir`), else `active/shared/runtime/execution-metrics`.
    */
   executionMetricsRoot?: string;
+  /**
+   * This collector writes the shared ledgers the enforcers read, so its costed
+   * appends update their caches (onExecutionMetricsAppend). Default: true for
+   * the default ledgers (no metricsDir / executionMetricsRoot), else false.
+   */
+  sharedLedger?: boolean;
   /** Optional injected registry for deterministic tests or an isolated runtime. */
   costRegistry?: ModelCostRegistry;
 }
@@ -618,7 +678,11 @@ export interface ResourceUsageRecord {
   source: string;
   /** Canonical containment scope; legacy records may omit it. */
   scope?: EventScope;
-  /** Set when the producer's scope could not be placed; the row lives in the system partition. */
+  /**
+   * Set when the producer's scope could not be placed: the row keeps its tier
+   * (unknown tier: confidential), its own valid tenant (else the bound tenant
+   * or `shared`; a tenant-less public row is a system row).
+   */
   scope_invalid?: true;
   metadata?: Record<string, unknown>;
   cause?: UsageCause;
@@ -632,6 +696,8 @@ export class MetricsCollector {
   private _resourceUsageFile: string;
   private _usageLedger: PartitionedMetricsLedger;
   private _executionLedger: PartitionedMetricsLedger;
+  /** Writes the shared ledgers enforcers read: announce costed appends. */
+  private _sharedLedger: boolean;
   private _costRegistry?: ModelCostRegistry;
   private _aggregates: Map<string, any>;
 
@@ -653,6 +719,8 @@ export class MetricsCollector {
           : pathResolver.shared('runtime/usage-ledger')),
       RESOURCE_USAGE_PARTITION_FILE
     );
+    this._sharedLedger =
+      options.sharedLedger ?? (!options.metricsDir && !options.executionMetricsRoot);
     this._executionLedger = new PartitionedMetricsLedger(
       'execution metrics',
       options.executionMetricsRoot ||
@@ -1175,15 +1243,17 @@ export class MetricsCollector {
   }
 
   private _appendToFile(entry: any) {
+    let appended: { row: Record<string, unknown>; partition: StoragePartition };
     try {
-      this._executionLedger.append(entry, () => this._systemFilePath(this._metricsFile));
-      executionMetricsGenerationCounter += 1;
+      appended = this._executionLedger.append(entry, () => this._systemFilePath(this._metricsFile));
     } catch (err) {
       // Best-effort: never block the operation, but never drop a row silently.
       logger.warn(
-        `execution metrics entry not recorded — ${err instanceof Error ? err.message : String(err)} | next: record with a scope this process may write (a tenant-bound process writes only its own tenant partition) | evidence: component=${String(entry.component ?? entry.type ?? 'unknown')}`
+        `execution metrics row dropped — ${err instanceof Error ? err.message : String(err)} | next: record with a scope this process may write (a tenant-bound process writes only its own tenant partition); a lock timeout means a long prune held the ledger | evidence: component=${String(entry.component ?? entry.type ?? 'unknown')} timestamp=${String(entry.timestamp ?? '')}`
       );
+      return;
     }
+    if (this._sharedLedger) notifyExecutionAppend(appended.row, appended.partition);
   }
 
   private _appendResourceUsage(entry: ResourceUsageRecord) {
@@ -1194,7 +1264,7 @@ export class MetricsCollector {
     } catch (err) {
       // Best-effort: never block the operation, but never drop a row silently.
       logger.warn(
-        `resource usage entry not recorded — ${err instanceof Error ? err.message : String(err)} | next: record with a scope this process may write (a tenant-bound process writes only its own tenant partition) | evidence: usage_id=${entry.usage_id}`
+        `resource usage row dropped — ${err instanceof Error ? err.message : String(err)} | next: record with a scope this process may write (a tenant-bound process writes only its own tenant partition); a lock timeout means a long prune held the ledger | evidence: usage_id=${entry.usage_id}`
       );
     }
   }
@@ -1238,15 +1308,51 @@ function ensureRegularFile(filePath: string): void {
   }
 }
 
-let executionMetricsGenerationCounter = 0;
+/**
+ * What an enforcement cache learns about a row THIS process just appended to
+ * the shared execution-metrics ledgers: numbers and placement only.
+ */
+export interface ExecutionAppendNotice {
+  /** Finite, > 0; rows without a cost are never announced. */
+  cost_usd: number;
+  /** Epoch ms of the row's timestamp, or NaN when unparseable. */
+  at: number;
+  mission_id?: string;
+  /** The partition the row landed in. */
+  partition: StoragePartition;
+}
+
+type ExecutionAppendListener = (notice: ExecutionAppendNotice) => void;
+const executionAppendListeners = new Set<ExecutionAppendListener>();
 
 /**
- * In-process generation of the execution-metrics ledgers: bumped on every
- * row this process appends, so cached enforcement totals are invalidated by
- * the process's own spend instead of lagging a burst by the cache TTL.
+ * Subscribe to costed rows this process appends to the shared execution-metrics
+ * ledgers (spend-guard keeps its cached totals current without a re-read).
+ * Returns the unsubscribe function.
  */
-export function executionMetricsGeneration(): number {
-  return executionMetricsGenerationCounter;
+export function onExecutionMetricsAppend(listener: ExecutionAppendListener): () => void {
+  executionAppendListeners.add(listener);
+  return () => executionAppendListeners.delete(listener);
+}
+
+function notifyExecutionAppend(row: Record<string, unknown>, partition: StoragePartition): void {
+  const cost = row.cost_usd;
+  if (typeof cost !== 'number' || !Number.isFinite(cost) || cost <= 0) return;
+  const notice: ExecutionAppendNotice = {
+    cost_usd: cost,
+    at: Date.parse(String(row.timestamp ?? '')),
+    ...(typeof row.mission_id === 'string' ? { mission_id: row.mission_id } : {}),
+    partition,
+  };
+  for (const listener of executionAppendListeners) {
+    try {
+      listener(notice);
+    } catch (err) {
+      logger.debug(
+        `execution append listener failed — ${err} | next: none (best-effort) | evidence: cost ${cost}`
+      );
+    }
+  }
 }
 
 export const metrics = new MetricsCollector();

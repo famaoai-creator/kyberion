@@ -513,7 +513,8 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
                             'Partial: {count} metrics partition(s) withheld for this persona',
                             locale
                           )
-                        : `${costSummary?.missionCount || 0} ${uxText('chronos_diagnostics_missions', locale)}`
+                        : costSummary?.partialNotice ||
+                          `${costSummary?.missionCount || 0} ${uxText('chronos_diagnostics_missions', locale)}`
                     }
                   />
                   <Metric

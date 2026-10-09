@@ -135,6 +135,23 @@ describe('execution-metrics ledger partitioning', () => {
     expect(read(partitionFile('public', 'tenant-c'))).toContain('new-top-level');
   });
 
+  it('L4: unplaceable legacy rows never make an aggregate read partial', () => {
+    const mc = collector();
+    record(mc, 'sys-1');
+    safeAppendFileSync(
+      systemFile,
+      // No scope + an unplaceable top-level tenant: a system row.
+      `${JSON.stringify({ component: 'bad-top-level', tenant_slug: 'Not A Slug' })}\n` +
+        // A scope that names no partition: hidden, but not a withheld partition.
+        `${JSON.stringify({ component: 'bad-scope', scope: { tier: 'internal' } })}\n`
+    );
+    const withheld: number[] = [];
+    const rows = mc.loadHistory({ read: { all: true }, onWithheld: (n) => withheld.push(n) });
+    expect(components(rows)).toEqual(['bad-top-level', 'sys-1']);
+    expect(withheld).toEqual([]);
+    expect(components(mc.loadHistory())).toEqual(['bad-top-level', 'sys-1']);
+  });
+
   it('numbers malformed lines through the system file and partitions as one file', () => {
     safeMkdir(metricsDir, { recursive: true });
     safeWriteFile(systemFile, '{"component":"s1","timestamp":"t1"}\n{torn\n');
