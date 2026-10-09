@@ -76,6 +76,7 @@ const MISSION = 'MSN-BESTOF-01';
 // and counts `route` calls. afterEach settles every dispatch a test started
 // before it cleans up, so a timeout fails only the test that timed out.
 const inflightDispatches = new Set<Promise<unknown>>();
+const DISPATCH_SETTLE_TIMEOUT_MS = 45_000;
 
 async function dispatch(missionId: string): Promise<unknown> {
   const { dispatchMissionNextTasks } =
@@ -167,18 +168,38 @@ describe('best-of-2 + judge (E2E-03 Task 5)', { concurrent: false }, () => {
 
   // Explicit hook timeout: after a timeout this hook waits for the abandoned
   // dispatch to finish, which may take longer than the 10s default under load.
+  // The wait is bounded (45s, inside the 60s hook budget) and the cleanup runs
+  // in `finally`, so a hung dispatch fails this hook instead of hanging it, and
+  // the fixture mission, coordination store and env are reset either way.
   afterEach(async () => {
-    await Promise.allSettled([...inflightDispatches]);
-    const { missionDir } = await import('../libs/core/path-resolver.js');
-    const { safeExistsSync, safeRmSync } = await import('../libs/core/secure-io.js');
-    const { clearWorkCoordinationStore, clearWorkCoordinationNamespace } =
-      await import('../libs/core/workforce/work-coordination.js');
-    const missionPath = missionDir(MISSION, 'public');
-    if (safeExistsSync(missionPath)) safeRmSync(missionPath);
-    clearWorkCoordinationStore();
-    clearWorkCoordinationNamespace();
-    delete process.env.KYBERION_BEST_OF_N;
-    delete process.env.KYBERION_DRAFT_REFINE;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const pending = [...inflightDispatches];
+      const settled = await Promise.race([
+        Promise.allSettled(pending).then(() => true),
+        new Promise<false>((resolve) => {
+          timer = setTimeout(() => resolve(false), DISPATCH_SETTLE_TIMEOUT_MS);
+        }),
+      ]);
+      if (!settled) {
+        throw new Error(
+          `${pending.length} dispatch(es) still running ${DISPATCH_SETTLE_TIMEOUT_MS}ms after the test ended`
+        );
+      }
+    } finally {
+      clearTimeout(timer);
+      inflightDispatches.clear();
+      delete process.env.KYBERION_BEST_OF_N;
+      delete process.env.KYBERION_DRAFT_REFINE;
+      const { missionDir } = await import('../libs/core/path-resolver.js');
+      const { safeExistsSync, safeRmSync } = await import('../libs/core/secure-io.js');
+      const { clearWorkCoordinationStore, clearWorkCoordinationNamespace } =
+        await import('../libs/core/workforce/work-coordination.js');
+      const missionPath = missionDir(MISSION, 'public');
+      if (safeExistsSync(missionPath)) safeRmSync(missionPath);
+      clearWorkCoordinationStore();
+      clearWorkCoordinationNamespace();
+    }
   }, 60_000);
 
   it('runs two candidates + judge for high-risk tasks and adopts the winner', async () => {

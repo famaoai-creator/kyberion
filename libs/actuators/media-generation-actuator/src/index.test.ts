@@ -13,9 +13,18 @@ import { describeOps, MEDIA_GENERATION_ACTIONS } from './op-catalog.js';
 // made a test pass or fail depending on whether an earlier test had already
 // loaded (and cached) the registries, so the file failed under
 // `--sequence.shuffle --sequence.seed=222` (operations-hygiene-runbook §5).
-const isGovernedProductPath = vi.hoisted(
-  () => (filePath: string) => String(filePath).replaceAll('\\', '/').includes('/knowledge/product/')
-);
+//
+// The prefix is the resolved `knowledge/product/` root, set by the secure-io
+// mock factory below (it runs before any module can call the mock). A
+// substring match would also have let `…/active/…/knowledge/product/…` and
+// similar non-catalog paths bypass the per-test mock.
+const governedProductRoot = vi.hoisted(() => ({ prefix: '' }));
+const isGovernedProductPath = vi.hoisted(() => (filePath: string): boolean => {
+  if (!governedProductRoot.prefix) {
+    throw new Error('governed product root is not resolved yet (secure-io mock not loaded)');
+  }
+  return String(filePath).replaceAll('\\', '/').startsWith(governedProductRoot.prefix);
+});
 
 const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
@@ -51,6 +60,9 @@ const COMFY_OUTPUT_DIR = pathResolver.sharedTmp('comfy/output');
 
 vi.mock('@agent/core/secure-io', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/secure-io')>();
+  // path-resolver does not import secure-io, so loading it here cannot recurse.
+  const { pathResolver: resolver } = await import('@agent/core/path-resolver');
+  governedProductRoot.prefix = `${resolver.rootResolve('knowledge/product').replaceAll('\\', '/')}/`;
   mocks.resetSafeReadFile.mockImplementation(() =>
     mocks.safeReadFile.mockImplementation((...args: Parameters<typeof actual.safeReadFile>) =>
       actual.safeReadFile(...args)
