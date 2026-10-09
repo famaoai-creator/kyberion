@@ -1,8 +1,18 @@
+/**
+ * TypeScript loader for `node --import ./scripts/ts-loader.mjs <script>.ts`.
+ *
+ * Bootstrap constraint: this file is what makes TypeScript importable, so it
+ * cannot import `@agent/core/secure-io` (a TypeScript module whose import graph
+ * would re-enter these hooks and load the tier-guard stack before the script
+ * runs). It reads workspace sources with `node:fs` directly (listed in
+ * tests/fixtures/governance-import-baseline.json). Transpiling, and the
+ * transpile cache, live in ./ts-loader-cache.mjs.
+ */
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, extname, resolve as resolvePath } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { registerHooks } from 'node:module';
-import ts from 'typescript';
+import { transpileWithCache } from './ts-loader-cache.mjs';
 
 const TS_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts']);
 const JS_LIKE_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']);
@@ -127,22 +137,8 @@ function loadTsLike(url, context, nextLoad) {
     return nextLoad(url, context);
   }
 
-  const loader = ext === '.tsx' ? 'tsx' : 'ts';
   const source = readFileSync(filePath, 'utf8');
-  const result = ts.transpileModule(source, {
-    compilerOptions: {
-      target: ts.ScriptTarget.ES2022,
-      module: ext === '.cts' ? ts.ModuleKind.CommonJS : ts.ModuleKind.ESNext,
-      jsx: loader === 'tsx' ? ts.JsxEmit.ReactJSX : ts.JsxEmit.Preserve,
-      sourceMap: true,
-      inlineSourceMap: true,
-      inlineSources: true,
-      esModuleInterop: true,
-      verbatimModuleSyntax: false,
-    },
-    fileName: filePath,
-    reportDiagnostics: false,
-  });
+  const result = transpileWithCache(filePath, source);
 
   return {
     format: ext === '.cts' ? 'commonjs' : 'module',
