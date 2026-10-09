@@ -2,11 +2,11 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getProcessEnv } from './foundation/process-env.js';
+import { readJsonIfPresent } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 import {
   safeExecResult,
   safeExistsSync,
-  safeReadFile,
   safeWriteFile,
   safeMkdir,
   assertSafeRepositoryPath,
@@ -333,10 +333,7 @@ function readDiscoveryDiskCache(key: string): LocalSttCandidate[] | null {
   if (ttl <= 0) return null;
   try {
     const file = localSttDiscoveryCachePath();
-    if (!safeExistsSync(file)) return null;
-    const parsed = JSON.parse(
-      String(safeReadFile(file, { encoding: 'utf8' }))
-    ) as DiscoveryDiskCache;
+    const parsed = readJsonIfPresent<DiscoveryDiskCache>(file);
     if (parsed?.version !== DISK_CACHE_VERSION || parsed.key !== key) return null;
     const age = Date.now() - Number(parsed.written_at_ms);
     if (!Number.isFinite(age) || age < 0 || age > ttl) return null;

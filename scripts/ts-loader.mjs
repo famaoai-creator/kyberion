@@ -12,7 +12,7 @@ import { readFileSync, existsSync, realpathSync } from 'node:fs';
 import { dirname, extname, resolve as resolvePath } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { registerHooks } from 'node:module';
-import { transpileWithCache } from './ts-loader-cache.mjs';
+import { transpileWithCache, tsLoaderFastResolveEnabled } from './ts-loader-cache.mjs';
 
 const TS_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts']);
 const JS_LIKE_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']);
@@ -87,10 +87,7 @@ function resolveWorkspacePackageToSource(specifier) {
 function resolveTsSourceDirectly(candidate) {
   const ext = extname(candidate);
   if (!TS_EXTENSIONS.has(ext)) return null;
-  const flag = String(process.env.KYBERION_TS_LOADER_FAST_RESOLVE ?? '')
-    .trim()
-    .toLowerCase();
-  if (flag === '0' || flag === 'false' || flag === 'off') return null;
+  if (!tsLoaderFastResolveEnabled()) return null;
   if (process.execArgv.includes('--preserve-symlinks')) return null;
   let real;
   try {
