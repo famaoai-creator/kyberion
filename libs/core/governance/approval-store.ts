@@ -12,7 +12,9 @@ import {
   type ApprovalDeciderIdentitySource,
 } from './approval-separation-of-duties.js';
 import type { HeldEffectSteeringAction } from './held-effect-bridge.js';
-import type { ApprovalRevocation } from './approval-revocation.js';
+import type { ApprovalConsumption, ApprovalRevocation } from './approval-revocation.js';
+import { validateHumanFinalDecision } from './approval-human-decision.js';
+export { validateHumanFinalDecision } from './approval-human-decision.js';
 import {
   appendGovernedArtifactJsonl,
   ensureGovernedArtifactDir,
@@ -262,6 +264,12 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
    * `evaluateApprovalUsability` refuses it for every consumer.
    */
   revocation?: ApprovalRevocation;
+  /** A one-shot effect used this approval (`markApprovalConsumed`); it cannot be revoked. */
+  consumption?: ApprovalConsumption;
+  /** Agent session the terminal decision was typed in (decider recorded as caller_supplied). */
+  decidedInAgentSession?: string;
+  /** `cli_tty_challenge`: a terminal approval confirmed by a typed challenge (best effort). */
+  decidedVia?: 'cli_tty_challenge';
 }
 
 export interface ApprovalChangeRequest {
@@ -440,42 +448,6 @@ const TERMINAL_DECIDED_STATUSES: ReadonlySet<ApprovalRequestRecord['status']> = 
   'applied',
   'failed',
 ]);
-
-export function validateHumanFinalDecision(params: {
-  accountability?: ApprovalAccountability;
-  decidedByType?: ApprovalRecord['decidedByType'];
-  authenticated?: boolean;
-  authMethod?: ApprovalRecord['authMethod'];
-  payloadHash?: string;
-  effectBinding?: string;
-}): void {
-  if (params.accountability?.finalDecision !== 'human_only') return;
-  if (params.decidedByType !== 'human') {
-    throw new Error('[POLICY_VIOLATION] Final approval requires a human decider');
-  }
-  if (params.authenticated !== true) {
-    throw new Error('[POLICY_VIOLATION] Final approval requires an authenticated human decider');
-  }
-  if (params.authMethod === 'local_token') {
-    throw new Error(
-      '[POLICY_VIOLATION] Final approval requires a human-authenticated surface; local_token is not sufficient'
-    );
-  }
-  if (
-    params.accountability.payloadHash &&
-    params.payloadHash !== params.accountability.payloadHash
-  ) {
-    throw new Error('[POLICY_VIOLATION] Approval payload hash does not match the requested effect');
-  }
-  if (
-    params.accountability.effectBinding &&
-    params.effectBinding !== params.accountability.effectBinding
-  ) {
-    throw new Error(
-      '[POLICY_VIOLATION] Approval effect binding does not match the requested operation'
-    );
-  }
-}
 
 export {
   APPROVAL_PLACEHOLDER_DECIDERS,
@@ -1010,6 +982,8 @@ function decideApprovalRequestUnlocked(
     decidedBy: string;
     /** Display name of the decider (see `cli-operator-principal.ts`). */
     decidedByDisplayName?: string;
+    decidedInAgentSession?: string;
+    decidedVia?: 'cli_tty_challenge';
     decidedByRole?: string;
     authMethod?: ApprovalRecord['authMethod'];
     decidedByType?: 'human' | 'ai_agent' | 'service';
@@ -1176,6 +1150,8 @@ function decideApprovalRequestUnlocked(
     changeRequest: priorChangeRequest,
     decidedByIdentitySource: _priorIdentitySource,
     decidedByDisplayName: _priorDisplayName,
+    decidedInAgentSession: _priorAgentSession,
+    decidedVia: _priorDecidedVia,
     ...recordWithoutChangeRequest
   } = record;
   const updated: ApprovalRequestRecord = {
@@ -1187,6 +1163,10 @@ function decideApprovalRequestUnlocked(
     decidedAt,
     decidedBy: params.decidedBy,
     ...(params.decidedByDisplayName ? { decidedByDisplayName: params.decidedByDisplayName } : {}),
+    ...(params.decidedInAgentSession
+      ? { decidedInAgentSession: params.decidedInAgentSession }
+      : {}),
+    ...(params.decidedVia ? { decidedVia: params.decidedVia } : {}),
     ...(params.deciderIdentitySource
       ? { decidedByIdentitySource: params.deciderIdentitySource }
       : {}),
@@ -1214,6 +1194,9 @@ function decideApprovalRequestUnlocked(
     correlation_id: updated.correlationId,
     decided_by: params.decidedBy,
     decided_by_role: params.decidedByRole,
+    decider_identity_source: params.deciderIdentitySource,
+    decided_in_agent_session: params.decidedInAgentSession,
+    decided_via: params.decidedVia,
     auth_method: params.authMethod,
     decided_by_type: params.decidedByType,
     authenticated: params.authenticated,

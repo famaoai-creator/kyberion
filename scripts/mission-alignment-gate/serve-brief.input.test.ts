@@ -52,11 +52,11 @@ describe('mission alignment decision request boundary', () => {
 
 describe('mission brief decider identity (separation of duties)', () => {
   it('resolves the decider server-side and keeps the page-typed name only as a note', () => {
-    expect(resolveBriefDecider({ decision: 'approved', decidedBy: 'mallory' })).toEqual({
+    expect(resolveBriefDecider({ decision: 'approved', decidedBy: 'mallory' }, {})).toEqual({
       decidedBy: 'operator-from-identity',
       pageName: 'mallory',
     });
-    expect(resolveBriefDecider({ decision: 'approved' })).toEqual({
+    expect(resolveBriefDecider({ decision: 'approved' }, {})).toEqual({
       decidedBy: 'operator-from-identity',
     });
   });
@@ -67,7 +67,7 @@ describe('mission brief decider identity (separation of duties)', () => {
         encoding: 'utf8',
       }) || ''
     );
-    expect(source).toContain('const { decidedBy, pageName, refusal } = resolveBriefDecider(body);');
+    expect(source).toContain('const decider = resolveBriefDecider(body);');
     expect(source.match(/body\?\.decidedBy/g)).toHaveLength(1);
   });
 });

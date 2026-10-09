@@ -166,7 +166,7 @@ export async function runSecretCli(
       requestedBy: requester.requestedBy,
       requestedByContext: {
         surface: 'terminal',
-        actorId: requester.requestedBy,
+        actorId: requester.actorId,
         actorRole: 'sovereign',
       },
     });
