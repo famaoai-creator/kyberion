@@ -3993,15 +3993,6 @@
       "subsystem": "governance"
     },
     {
-      "name": "KYBERION_VITEST_RUN_ID",
-      "category": "flag",
-      "type": "string",
-      "required": false,
-      "description": "Test-only: per-run nonce set by tests/vitest-run-id.ts (Vitest globalSetup). approvalStoreRoots() puts the Vitest approval store under vitest-approvals/run-<id>/pool-<n>/ so two Vitest runs in one checkout do not share or wipe each other's records; child processes of a test inherit it.",
-      "documented": true,
-      "subsystem": "governance"
-    },
-    {
       "name": "KYBERION_TEST_OBSERVABILITY_DIR",
       "category": "path",
       "type": "path",
@@ -4190,6 +4181,15 @@
       "description": "Chronos viewer tenant audit mode: off, warn, or enforce. Unregistered tenant expansion is denied in every mode; warn records the attempt first. Defaults to warn.",
       "documented": true,
       "subsystem": "surfaces"
+    },
+    {
+      "name": "KYBERION_VITEST_RUN_ID",
+      "category": "flag",
+      "type": "string",
+      "required": false,
+      "description": "Test-only: per-run nonce (<pid>-<base36 time>) that vitest.config.mts sets before the workers fork. approvalStoreRoots() puts the Vitest approval store under vitest-approvals/run-<id>/pool-<n>/ so two Vitest runs in one checkout do not share or wipe each other's records; child processes of a test inherit it, and tests/vitest-run-id.ts removes the run's directory at teardown.",
+      "documented": true,
+      "subsystem": "governance"
     },
     {
       "name": "KYBERION_VLLM_KEY",
