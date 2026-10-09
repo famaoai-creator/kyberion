@@ -105,6 +105,9 @@
     "scope_locale_reader": {
       "allow": []
     },
+    "metrics_cap_reader": {
+      "allow": []
+    },
     "audit_mirror_writer": {
       "allow": ["customer/${KYBERION_TENANT}/logs/audit/"]
     },

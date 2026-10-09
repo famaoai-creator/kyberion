@@ -125,7 +125,27 @@ describe('resource-usage ledger under a real tenant binding', () => {
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(
       new RegExp(
-        `^resource usage entry not recorded — .+ \\| next: .+ \\| evidence: usage_id=${RUN}-dropped$`
+        `^resource usage row dropped — .+ \\| next: .+ \\| evidence: usage_id=${RUN}-dropped$`
+      )
+    );
+  });
+
+  it('says "row dropped" with evidence when an execution row cannot be appended', () => {
+    const executionRoot = path.join(base, 'execution-ledger');
+    safeMkdir(path.join(executionRoot, 'personal', 'shared', 'execution-metrics.jsonl'), {
+      recursive: true,
+    });
+    delete process.env.KYBERION_TENANT;
+    new MetricsCollector({ metricsDir, executionMetricsRoot: executionRoot }).record(
+      `${RUN}-exec-dropped`,
+      1,
+      'success',
+      { scope: { tier: 'personal' } }
+    );
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(
+      new RegExp(
+        `^execution metrics row dropped — .+ \\| next: .+ \\| evidence: component=${RUN}-exec-dropped timestamp=\\d{4}-`
       )
     );
   });

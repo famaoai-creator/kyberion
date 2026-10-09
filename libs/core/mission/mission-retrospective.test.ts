@@ -495,6 +495,50 @@ describe('mission retrospective loop', () => {
       expect(stats.resource_usage).toEqual({ entries: 2, cost_usd: 0 });
       expect(stats.usage_unrecorded).toBe(false);
     });
+
+    it("counts a tenant mission's partitioned execution metrics, never another tenant's", async () => {
+      removeUsageFixtures();
+      completeTasks();
+      const statePath = path.join(missionDir, 'mission-state.json');
+      const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+      fs.writeFileSync(
+        statePath,
+        JSON.stringify({ ...state, tier: 'confidential', tenant_slug: 'tenant-a' })
+      );
+      const { MetricsCollector } = await import('../metrics.js');
+      const collector = new MetricsCollector();
+      const call = (tokens: number, scope?: { tier: 'confidential'; tenant_slug: string }) =>
+        collector.record('anthropic-sdk', 1, 'success', {
+          mission_id: MISSION,
+          model: 'claude-fable-5',
+          usage: { prompt_tokens: tokens, completion_tokens: 0 },
+          cost_usd: 0,
+          ...(scope ? { scope } : {}),
+        });
+      call(10, { tier: 'confidential', tenant_slug: 'tenant-a' });
+      call(20); // unscoped, attributed by mission id only (system partition)
+      // Same tenant, another tier: still this mission's spend.
+      collector.record('anthropic-sdk', 1, 'success', {
+        mission_id: MISSION,
+        model: 'claude-fable-5',
+        usage: { prompt_tokens: 5, completion_tokens: 0 },
+        cost_usd: 0,
+        scope: { tier: 'personal', tenant_slug: 'tenant-a' },
+      });
+      call(400, { tier: 'confidential', tenant_slug: 'tenant-b' });
+      const partition = (tenant: string) =>
+        path.join(
+          tmpRoot,
+          'active/shared/runtime/execution-metrics/confidential',
+          tenant,
+          'execution-metrics.jsonl'
+        );
+      expect(fs.readFileSync(partition('tenant-a'), 'utf8')).toContain(MISSION);
+      expect(fs.readFileSync(partition('tenant-b'), 'utf8')).toContain(MISSION);
+
+      const stats = mod.collectMissionExecutionStats(MISSION);
+      expect(stats.token_usage).toMatchObject({ prompt_tokens: 35, entries: 3 });
+    });
   });
 
   it('does not flag a closing burst for a short mission', () => {
