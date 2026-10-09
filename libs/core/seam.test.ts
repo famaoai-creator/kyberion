@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createSeam, createSeamCatalog, defineSeam, SeamError } from './seam.js';
 
 describe('defineSeam', () => {
@@ -102,6 +102,27 @@ describe('seam catalog re-registration', () => {
     expect(() =>
       createSeam<string>({ key: 'k', multiplicity: 'sole', catalog, owner: OWNER })
     ).toThrow('already registered in the catalog');
+  });
+
+  describe('outside Vitest', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('throws SEAM_DUPLICATE_PROVIDER even for the same owner and shape', () => {
+      const catalog = createSeamCatalog();
+      const first = createSeam<string>({ key: 'k', multiplicity: 'sole', catalog, owner: OWNER });
+      vi.stubEnv('VITEST', '');
+      let error: unknown;
+      try {
+        createSeam<string>({ key: 'k', multiplicity: 'sole', catalog, owner: OWNER });
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).toBeInstanceOf(SeamError);
+      expect((error as SeamError).code).toBe('SEAM_DUPLICATE_PROVIDER');
+      expect(catalog.get('k')).toBe(first);
+    });
   });
 
   it('rejects an empty owner', () => {
