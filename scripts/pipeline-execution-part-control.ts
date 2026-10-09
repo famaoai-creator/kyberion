@@ -418,13 +418,19 @@ export async function hasBoundApproval(
     return false;
   }
   try {
-    const { loadApprovalRequest } = await import('@agent/core/governance/approval-store');
+    const { assertApprovalUsable, loadApprovalRequest } =
+      await import('@agent/core/governance/approval-store');
     const request = loadApprovalRequest(decision.storage_channel, decision.approval_request_id);
-    return (
+    if (!(
       (request?.status === 'approved' || request?.status === 'applied') &&
       request.requestedByContext?.stepId === decision.step_id &&
       request.requestedByContext?.targetStepId === step.id
-    );
+    )) {
+      return false;
+    }
+    // Separation of duties: an unusable approval binds nothing (refusal audited).
+    assertApprovalUsable(request, { consumer: 'pipeline_bound_approval' });
+    return true;
   } catch {
     return false;
   }

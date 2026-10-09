@@ -250,20 +250,27 @@ the test passes against the sandbox while the writer leaks into live state.
     and `--approval-request-id <id>` records it once. `used`/`unknown` never open egress and need only
     `--apply --accept`. `pnpm tenant attest-provider` follows the same rules, store and audit
     action (`tenant.attest_provider`, with actor and approver). Never attest or approve on the
-    operator's behalf.
-  - The `--request-approval` output prints the apply command with every bound value (plan,
-    basis, attested-by, valid-for-days) shell-quoted, so it applies as-is when pasted. A printed
-    follow-up command for a hash-bound approval must never elide a bound value (`...`): build
-    it from `providerAttestationApplyArgs` + `shellQuoteArg` in `tenant-governance.ts`.
-  - By default the requester may approve their own request. Setting
-    `separation_of_duties.enabled: true` in `approval-policy.json` (or the customer overlay)
-    makes the approval store refuse an approval whose decider equals the requester
-    (`[POLICY_VIOLATION] Separation of duties`, audited as `separation_of_duties` / `denied`).
-    A request with no recorded requester is refused while it is on (fail closed). The switch
-    is global, not per tenant or organization. See
-    [approval-gate-design](./approval-gate-design.md). `pnpm onboarding llm show --tenant <slug>` and `tenant:activation plan`
+    operator's behalf. `pnpm onboarding llm show --tenant <slug>` and `tenant:activation plan`
     (`llm_availability`) show which providers each tier can use. See
     [onboarding-flow Step 5.1](./onboarding-flow.md).
+  - The `--request-approval` output prints the apply command for POSIX shells (sh, bash, zsh)
+    with every bound value (plan, basis, attested-by, valid-for-days) quoted, so it applies
+    as-is when pasted. A printed follow-up command for a hash-bound approval must never elide
+    a bound value (`...`): build it from `providerAttestationApplyArgs` + `shellQuoteArg` in
+    `tenant-governance.ts`, and reject values with a backslash or control characters at parse
+    time (`assertPrintableCommandValue`).
+- **Separation of duties is opt-in and enforced in two places.** By default the requester may
+  approve their own request. With `separation_of_duties.enabled: true` in `approval-policy.json`
+  (or the customer overlay; global, not per tenant or organization):
+  - `decideApprovalRequest` refuses an approval whose decider equals a recorded requester, a
+    request without a requester, an empty or placeholder decider (`APPROVAL_PLACEHOLDER_DECIDERS`),
+    and a decider the surface took from its caller (`deciderIdentitySource: 'caller_supplied'`).
+    Refusals are audited (`separation_of_duties` / `denied`).
+  - Every consumer that turns an approved record into an effect calls `assertApprovalUsable`
+    first, so a decision recorded while the setting was off cannot take effect after it is on.
+  - Known limits (string identities, the CLI persona-vs-name gap, flows outside the approval
+    store such as `service_recording review`) are listed in
+    [approval-gate-design](./approval-gate-design.md).
   - In `libs/core/mission/mission-llm.ts`, `runAdaptiveStructuredLlmProfile`,
     `runStructuredLlmProfile` and `invokeLlm` all take an `egress` option and apply this gate;
     `mission distill` passes the mission tier and tenant.
@@ -319,6 +326,12 @@ the test passes against the sandbox while the writer leaks into live state.
    `requestedBy` (and `requestedByContext.actorId`), never an empty string: with separation of
    duties on, a request without a requester cannot be approved (gate:
    `libs/core/governance/approval-separation-of-duties.test.ts`).
+6. When you add code that turns an approved record into an effect, call
+   `assertApprovalUsable(record, { consumer })` before the effect. When you add a decision surface
+   that takes the decider from its caller instead of a resolved session, pass
+   `deciderIdentitySource: 'caller_supplied'`; when it falls back to a placeholder decider id,
+   add that id to `APPROVAL_PLACEHOLDER_DECIDERS` (gates: approval-separation-of-duties.test.ts,
+   `approval-actuator-sod.test.ts`).
 
 ---
 

@@ -6,6 +6,10 @@ import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { randomUUID } from 'node:crypto';
 import { createApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
 import {
+  assertApprovalUsable,
+  type ApprovalRequestRecord,
+} from '@agent/core/governance/approval-store';
+import {
   activateApplication,
   detectFocusedInput,
   listKnownAppCapabilities,
@@ -23,6 +27,16 @@ import { emitComputerSurfacePatch } from '@agent/core/virtual/computer-surface';
 import { systemFocusHelpers } from './system-focus-helpers.js';
 import { executePipeline } from './system-pipeline-helpers.js';
 import { resolveSystemClickCoordinate } from './system-mark-target.js';
+
+/** Separation of duties: an unusable approval is treated as missing (refusal audited). */
+function isUsableComputerApproval(request: ApprovalRequestRecord): boolean {
+  try {
+    assertApprovalUsable(request, { consumer: 'system_actuator_computer' });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export interface SystemPipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
@@ -406,7 +420,11 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
     }
 
     const request = loadApprovalRequest('computer', approvalRequestId);
-    if (!request || (request.status !== 'approved' && request.status !== 'applied')) {
+    if (
+      !request ||
+      (request.status !== 'approved' && request.status !== 'applied') ||
+      !isUsableComputerApproval(request)
+    ) {
       emitPatch('blocked', interaction.type, 'approval required', application || 'Google Chrome', {
         title: interaction.title || '',
         approvalRequired: true,
@@ -519,7 +537,11 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
     }
 
     const request = loadApprovalRequest('computer', approvalRequestId);
-    if (!request || (request.status !== 'approved' && request.status !== 'applied')) {
+    if (
+      !request ||
+      (request.status !== 'approved' && request.status !== 'applied') ||
+      !isUsableComputerApproval(request)
+    ) {
       emitPatch('blocked', interaction.type, 'approval required', application || 'Google Chrome', {
         url: interaction.url || interaction.title || '',
         approvalRequired: true,
@@ -675,7 +697,11 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
     }
 
     const request = loadApprovalRequest('computer', approvalRequestId);
-    if (!request || (request.status !== 'approved' && request.status !== 'applied')) {
+    if (
+      !request ||
+      (request.status !== 'approved' && request.status !== 'applied') ||
+      !isUsableComputerApproval(request)
+    ) {
       emitPatch('blocked', interaction.type, 'approval required', 'Finder', {
         approvalRequired: true,
       });

@@ -21,10 +21,12 @@ import { withExecutionContext } from '../authority.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { checkProviderEgress } from '../provider/provider-egress-gate.js';
 import {
+  assertPrintableCommandValue,
   attestTenantProvider,
   mutateTenant,
   PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
   requestTenantProviderAttestationApproval,
+  shellQuoteArg,
 } from './tenant-governance.js';
 import {
   approvalEventLogicalPath,
@@ -327,18 +329,17 @@ describe('training_use none attestations go through the human approval gate', ()
   describe('with approval separation of duties switched on', () => {
     const overlayPath = pathResolver.sharedTmp(`tenant-governance-sod-${process.pid}.json`);
 
-    beforeEach(() => {
+    function setSeparationOfDuties(enabled: boolean): void {
       const product = JSON.parse(
         safeReadFile(pathResolver.knowledge('product/governance/approval-policy.json'), {
           encoding: 'utf8',
         }) as string
       );
-      safeWriteFile(
-        overlayPath,
-        JSON.stringify({ ...product, separation_of_duties: { enabled: true } })
-      );
+      safeWriteFile(overlayPath, JSON.stringify({ ...product, separation_of_duties: { enabled } }));
       sod.overlayPath = overlayPath;
-    });
+    }
+
+    beforeEach(() => setSeparationOfDuties(true));
 
     afterEach(() => {
       sod.overlayPath = null;
@@ -371,6 +372,48 @@ describe('training_use none attestations go through the human approval gate', ()
       expect(egress('beta')).toBe(false);
     });
 
+    it('a self-approval recorded while OFF is refused at apply with the exact re-request command, and is never reused', () => {
+      setSeparationOfDuties(false);
+      const selfRequested = () =>
+        withExecutionContext('sovereign_concierge', () =>
+          requestTenantProviderAttestationApproval({
+            ...claim,
+            rootDir,
+            invoker: { actor: 'human-owner' },
+          })
+        );
+      const first = selfRequested();
+      requestIds.push(first.request_id);
+      decide(first.request_id, 'approved');
+
+      setSeparationOfDuties(true);
+      expect(() => apply(first.request_id)).toThrow(
+        /cannot be used because the decider is the same principal.*request a new approval with `pnpm onboarding llm attest --tenant beta --provider codex --training-use none --plan 'ChatGPT Enterprise' --basis https:\/\/openai\.com\/enterprise-privacy --attested-by human:owner --request-approval`/
+      );
+      expect(egress('beta')).toBe(false);
+      expect(
+        loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, first.request_id)?.applyClaim
+      ).toBeUndefined();
+
+      // Re-requesting opens a fresh request instead of handing back the unusable one.
+      const second = withExecutionContext('sovereign_concierge', () =>
+        requestTenantProviderAttestationApproval({
+          ...claim,
+          rootDir,
+          invoker: { actor: 'agent-requester' },
+        })
+      );
+      requestIds.push(second.request_id);
+      expect(second.created).toBe(true);
+      expect(second.request_id).not.toBe(first.request_id);
+      decide(second.request_id, 'approved');
+      expect(apply(second.request_id).approval).toEqual({
+        request_id: second.request_id,
+        approved_by: 'human-owner',
+      });
+      expect(egress('beta')).toBe(true);
+    });
+
     it('still applies an agent-requested attestation approved by a different human', () => {
       const id = requestApproval();
       decide(id, 'approved');
@@ -378,5 +421,28 @@ describe('training_use none attestations go through the human approval gate', ()
       expect(result.approval).toEqual({ request_id: id, approved_by: 'human-owner' });
       expect(egress('beta')).toBe(true);
     });
+  });
+});
+
+describe('printed attestation commands (POSIX shell quoting)', () => {
+  it('quotes values whose first character a shell would expand', () => {
+    expect(shellQuoteArg('plain-value_1.0')).toBe('plain-value_1.0');
+    expect(shellQuoteArg('human:owner')).toBe('human:owner');
+    expect(shellQuoteArg('=cmd')).toBe("'=cmd'");
+    expect(shellQuoteArg('~root')).toBe("'~root'");
+    expect(shellQuoteArg('#comment')).toBe("'#comment'");
+    expect(shellQuoteArg('%1')).toBe("'%1'");
+    expect(shellQuoteArg("Acme's plan")).toBe("'Acme'\\''s plan'");
+    expect(shellQuoteArg('')).toBe("''");
+  });
+
+  it('refuses control characters and backslashes instead of printing them', () => {
+    expect(() => shellQuoteArg('line\nbreak')).toThrow(/control characters/);
+    expect(() => shellQuoteArg('esc\u001b[31m')).toThrow(/control characters/);
+    expect(() => shellQuoteArg('C:\\terms')).toThrow(/backslash/);
+    expect(() => assertPrintableCommandValue('--plan', 'tab\there')).toThrow(
+      /--plan must not contain control characters/
+    );
+    expect(() => assertPrintableCommandValue('--basis', undefined)).not.toThrow();
   });
 });

@@ -2,9 +2,22 @@ import { createApprovalRequest, listApprovalRequests } from '@agent/core/governa
 import { nowIso } from '@agent/core/foundation';
 import { enforceApprovalGate } from '@agent/core/governance/approval-gate';
 import { charterInputForDecision } from '@agent/core/governance/charter-call-site';
-import { isApprovalRequestExpired } from '@agent/core/governance/approval-store';
+import {
+  assertApprovalUsable,
+  isApprovalRequestExpired,
+  type ApprovalRequestRecord,
+} from '@agent/core/governance/approval-store';
 import { evaluateDecisionRights, resolveDecisionRightsMatrix } from '@agent/core/decision-rights';
 import type { GovernedArtifactRole } from '@agent/core/artifacts';
+
+function isUsableApproval(request: ApprovalRequestRecord): boolean {
+  try {
+    assertApprovalUsable(request, { consumer: 'approval_actuator_request_review' });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export interface EvaluateDecisionRightsInput {
   operation_id: string;
@@ -112,7 +125,12 @@ export function requestReviewOp(input: ReviewRequestInput) {
   }).find(
     // A lapsed review (or one with a malformed expiry) is neither approved nor
     // still pending; a fresh request is opened instead.
-    (request) => request.correlationId === correlationId && !isApprovalRequestExpired(request)
+    (request) =>
+      request.correlationId === correlationId &&
+      !isApprovalRequestExpired(request) &&
+      // Separation of duties: an unusable approval is never reported as
+      // approved; a fresh request is opened instead (refusal audited).
+      (request.status !== 'approved' || isUsableApproval(request))
   );
   if (existing) {
     return {

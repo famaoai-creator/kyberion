@@ -72,6 +72,7 @@ import {
 } from '../governance/approval-decision-routing.js';
 import { AUTONOMY_APPROVAL_CHANNEL } from '../governance/approval-decision-card.js';
 import {
+  assertApprovalUsable,
   expireApprovalRequest,
   isApprovalRequestExpired,
   loadApprovalRequest,
@@ -1403,6 +1404,21 @@ export function settleDotParkedActions(
           declineParked(charter, row, `approved but no longer in scope: ${scope.reason}`, deps)
         );
         return;
+      }
+      if (approval) {
+        try {
+          assertApprovalUsable(approval, { consumer: 'dot_dispatch' });
+        } catch (error) {
+          settled.push(
+            declineParked(
+              charter,
+              row,
+              error instanceof Error ? error.message : String(error),
+              deps
+            )
+          );
+          return;
+        }
       }
       settled.push(
         executeDotAction(
