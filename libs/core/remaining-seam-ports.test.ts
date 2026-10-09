@@ -15,6 +15,7 @@ import {
 } from './identity-context-bridge.js';
 import {
   dispatchThroughMissionWorkerCore,
+  installBuiltinMissionWorkerCoreDispatcher,
   registerMissionWorkerCoreDispatcher,
 } from './mission/mission-orchestration-worker-dispatch-port.js';
 
@@ -76,5 +77,31 @@ describe('remaining sole seam ports', () => {
     await expect(dispatchThroughMissionWorkerCore('payload', {})).rejects.toThrow(
       'Mission worker core dispatcher is not initialized'
     );
+  });
+
+  it('lets a re-evaluated builtin worker core supersede its stale registration', async () => {
+    // A module-registry reset racing an in-flight import evaluates
+    // mission-orchestration-worker-part-core twice against one port instance;
+    // the second module-level installation must not throw SEAM_DUPLICATE_PROVIDER.
+    const releaseStale = installBuiltinMissionWorkerCoreDispatcher(async () => 'stale');
+    const release = installBuiltinMissionWorkerCoreDispatcher(async () => 'fresh');
+    await expect(dispatchThroughMissionWorkerCore('payload', {})).resolves.toBe('fresh');
+    releaseStale(); // a no-op once superseded
+    await expect(dispatchThroughMissionWorkerCore('payload', {})).resolves.toBe('fresh');
+    release();
+    await expect(dispatchThroughMissionWorkerCore('payload', {})).rejects.toThrow(
+      'Mission worker core dispatcher is not initialized'
+    );
+  });
+
+  it('keeps rejecting the builtin worker core when another provider holds the seam', () => {
+    const dispose = registerMissionWorkerCoreDispatcher(async () => 'double');
+    try {
+      expect(() => installBuiltinMissionWorkerCoreDispatcher(async () => 'builtin')).toThrow(
+        /already registered/
+      );
+    } finally {
+      dispose();
+    }
   });
 });
