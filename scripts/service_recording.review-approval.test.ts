@@ -60,7 +60,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import type { ServiceRecording } from '@agent/core/service/service-recording';
 import { decideApprovalFromCli } from './lib/approval-cli-decision.js';
-import { ttyIo } from './lib/tty-io.test-support.js';
+import { withTtyAnswer } from './lib/tty-io.test-support.js';
 import {
   assertServiceRecordingReviewApproval,
   consumeServiceRecordingReviewApproval,
@@ -166,11 +166,11 @@ describe('service_recording review goes through the approval store', () => {
     );
     // Interactive and past the challenge: the store refuses the self-approval.
     await expect(
-      decideApprovalFromCli(stored(requestId), {
-        decision: 'approved',
-        note: 'self review',
-        io: ttyIo((code) => code),
-      })
+      withTtyAnswer(
+        (code) => code,
+        () =>
+          decideApprovalFromCli(stored(requestId), { decision: 'approved', note: 'self review' })
+      )
     ).rejects.toThrow(
       /\[POLICY_VIOLATION\] Separation of duties: approval refused because the decider is the same principal/
     );
@@ -186,11 +186,11 @@ describe('service_recording review goes through the approval store', () => {
       requestedByContext: expect.objectContaining({ actorId: 'user:owner' }),
     });
     await expect(
-      decideApprovalFromCli(stored(requestId), {
-        decision: 'approved',
-        note: 'self review',
-        io: ttyIo((code) => code),
-      })
+      withTtyAnswer(
+        (code) => code,
+        () =>
+          decideApprovalFromCli(stored(requestId), { decision: 'approved', note: 'self review' })
+      )
     ).rejects.toThrow(/the decider is the same principal/);
   });
 
@@ -202,11 +202,10 @@ describe('service_recording review goes through the approval store', () => {
 
     plainTerminal();
     // The human answers the TTY challenge (the review command then finds the approval).
-    await decideApprovalFromCli(stored(requestId), {
-      decision: 'approved',
-      note: 'review',
-      io: ttyIo((code) => code),
-    });
+    await withTtyAnswer(
+      (code) => code,
+      () => decideApprovalFromCli(stored(requestId), { decision: 'approved', note: 'review' })
+    );
     const result = (await main(['review', '--recording', ref, '--approve'])) as {
       value: { status: string; review_request_id: string };
     };

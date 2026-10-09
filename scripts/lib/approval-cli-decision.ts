@@ -10,11 +10,15 @@
  * flag to skip it, and without a TTY the approval is refused with a pointer to
  * the authenticated surfaces.
  *
- * Trust: this is best effort. An agent that drives a PTY (for example through
- * terminal-actuator) can read the code and type it, and agent-session markers
- * are advisory environment variables an agent can clear. The challenge stops
- * an agent running the command non-interactively; it does not authenticate a
- * person. A separated approval that must hold against an agent belongs on an
+ * The challenge waits `CLI_TTY_CHALLENGE_TIMEOUT_MS` (120s) for the code and
+ * then refuses, closing the reader.
+ *
+ * Trust: this is best effort. Anything that gives an agent a pseudo-terminal
+ * can read the code and type it: terminal-actuator, but equally `script`,
+ * `expect`, `unbuffer` or a shell coproc. Agent-session markers are advisory
+ * environment variables an agent can clear. The challenge stops an agent
+ * running the command non-interactively; it does not authenticate a person. A
+ * separated approval that must hold against an agent belongs on an
  * authenticated surface (Chronos or presence-studio).
  *
  * Separation of duties off: no challenge (unchanged). A decision typed inside
@@ -42,24 +46,27 @@ import {
   type CliOperatorPrincipalOptions,
 } from '@agent/core/governance/cli-operator-principal';
 
-/** The terminal the challenge talks to (injectable for tests). */
-export interface CliTtyIo {
-  stdin: NodeJS.ReadableStream & { isTTY?: boolean };
-  stdout: NodeJS.WritableStream & { isTTY?: boolean };
-}
+import {
+  CLI_TTY_CHALLENGE_TIMEOUT_MS,
+  resolveCliTtyChallengeTerminal,
+  type CliTtyIo,
+} from './cli-tty-io.js';
 
-function readOneLine(stdin: NodeJS.ReadableStream): Promise<string> {
+/** One typed line, or `null` when nothing arrives within `timeoutMs`. */
+function readOneLine(stdin: NodeJS.ReadableStream, timeoutMs: number): Promise<string | null> {
   return new Promise((resolve) => {
     const rl = createInterface({ input: stdin, terminal: false });
-    let answered = false;
-    rl.once('line', (line) => {
-      answered = true;
+    let settled = false;
+    const settle = (value: string | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       rl.close();
-      resolve(line);
-    });
-    rl.once('close', () => {
-      if (!answered) resolve('');
-    });
+      resolve(value);
+    };
+    const timer = setTimeout(() => settle(null), timeoutMs);
+    rl.once('line', (line) => settle(line));
+    rl.once('close', () => settle(''));
   });
 }
 
@@ -68,9 +75,10 @@ function readOneLine(stdin: NodeJS.ReadableStream): Promise<string> {
  * refuses without a TTY, else prints the request and a one-time code and
  * proceeds only when the typed answer matches.
  */
-export async function confirmApprovalByTtyChallenge(
+async function confirmApprovalByTtyChallenge(
   request: ApprovalRequestRecord,
-  io: CliTtyIo = { stdin: process.stdin, stdout: process.stdout }
+  io: CliTtyIo,
+  timeoutMs: number
 ): Promise<void> {
   if (!io.stdin.isTTY || !io.stdout.isTTY) {
     throw new Error(
@@ -90,7 +98,17 @@ export async function confirmApprovalByTtyChallenge(
       `Type ${code} to approve (anything else cancels): `,
     ].join('\n')
   );
-  const answer = (await readOneLine(io.stdin)).trim();
+  const typed = await readOneLine(io.stdin, timeoutMs);
+  if (typed === null) {
+    io.stdout.write('\n');
+    throw new Error(
+      '[POLICY_VIOLATION] challenge timed out — no code was typed within ' +
+        `${Math.round(timeoutMs / 1000)}s, so the approval was not recorded ` +
+        '| next: re-run the command and type the code it prints, or approve on Chronos or presence-studio ' +
+        `| evidence: request ${request.id}, timeout ${timeoutMs}ms (default ${CLI_TTY_CHALLENGE_TIMEOUT_MS}ms)`
+    );
+  }
+  const answer = typed.trim();
   if (answer !== code) {
     throw new Error(
       '[POLICY_VIOLATION] approval decision cancelled — the typed challenge did not match ' +
@@ -105,12 +123,14 @@ export async function decideApprovalFromCli(
   params: CliOperatorPrincipalOptions & {
     decision: 'approved' | 'rejected';
     note: string;
-    io?: CliTtyIo;
   }
 ): Promise<ApprovalRequestRecord> {
   const decider = resolveCliApprovalDecider({ ...params, decision: params.decision });
   const challenged = params.decision === 'approved' && isSeparationOfDutiesEnabled();
-  if (challenged) await confirmApprovalByTtyChallenge(request, params.io);
+  if (challenged) {
+    const terminal = resolveCliTtyChallengeTerminal();
+    await confirmApprovalByTtyChallenge(request, terminal.io, terminal.timeoutMs);
+  }
   const decided = decideApprovalRequest('mission_controller', {
     channel: request.channel,
     storageChannel: request.storageChannel,
