@@ -220,6 +220,12 @@ the test passes against the sandbox while the writer leaks into live state.
   `PartitionedMetricsLedger` and the offboarding `METRICS_LEDGERS` table
   (`libs/core/scope-offboarding.ts`: export, approval-gated legacy-row prune, audit) instead of a
   new mechanism.
+- **A read gate never weakens a cap.** A cap or limit enforcer reads gated ledgers only through
+  `aggregateMetricsForEnforcement` (`libs/core/metrics.ts`; governed read-only role
+  `metrics_cap_reader`, numbers only), never through a row reader, so a persona that may not read
+  the rows still has its spend counted. A report or summary built from a gated read passes
+  `onWithheld` and shows `metricsWithheldNotice` (one diagnostic warn + a "partial" line in its
+  output). Gate: `libs/core/metrics-enforcement-aggregate.test.ts`.
 - **Evidence stays in the tenant's scope.** A per-tenant command (activation probe, readiness
   report) that runs a repository-wide check keeps only the lines about its own tenant in the
   evidence it writes, and points at the repository-wide command for the rest.

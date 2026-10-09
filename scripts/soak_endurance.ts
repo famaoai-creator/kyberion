@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { logger } from '@agent/core/core';
-import { MetricsCollector } from '@agent/core/metrics';
+import { MetricsCollector, metricsWithheldNotice } from '@agent/core/metrics';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -51,6 +51,8 @@ export interface SoakReport {
   samples: SoakSample[];
   resource_regressions: SoakRegressionFinding[];
   latency_regressions: Array<Record<string, unknown>>;
+  /** Set when tier-guard withheld metrics partitions: latency regressions are partial. */
+  partial_notice?: string;
   maintenance_summary: {
     auto_checkpoint_runs: number;
     tenant_drift_findings: number;
@@ -629,7 +631,17 @@ export async function runSoakEnduranceHarness(
     metricsFile,
     persist: false,
   });
-  const latencyRegressions = historyCollector.detectRegressions(1.2, { all: true });
+  let withheldPartitions = 0;
+  const latencyRegressions = historyCollector.detectRegressions(
+    1.2,
+    { all: true },
+    {
+      onWithheld: (partitions) => {
+        withheldPartitions = partitions;
+      },
+    }
+  );
+  const partialNotice = metricsWithheldNotice('soak latency regressions', withheldPartitions);
   const resourceSamples = evidenceRoot
     ? persistLiveResourceHistory(evidenceRoot, samples)
     : samples;
@@ -646,6 +658,7 @@ export async function runSoakEnduranceHarness(
     samples,
     resource_regressions: resourceRegressions,
     latency_regressions: latencyRegressions,
+    ...(partialNotice ? { partial_notice: partialNotice } : {}),
     maintenance_summary: {
       auto_checkpoint_runs: autoCheckpointRuns,
       tenant_drift_findings: tenantDriftFindings,

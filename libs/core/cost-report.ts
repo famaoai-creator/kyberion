@@ -1,5 +1,6 @@
 import {
   metrics,
+  metricsWithheldNotice,
   type ExecutionMetricsReadScope,
   type ResourceUsageReadScope,
   type ResourceUsageStatus,
@@ -75,6 +76,13 @@ export interface CostReport {
   by_organization: CostBucket[];
   by_project: CostBucket[];
   by_cause: CostBucket[];
+  /**
+   * Metrics partitions tier-guard withheld from this reader (persona tier rules
+   * or tenant binding); when set, every total above is partial.
+   */
+  withheld_partitions?: number;
+  /** User-facing sentence saying the report is partial (set with withheld_partitions). */
+  partial_notice?: string;
 }
 
 export function effectiveCostUsd(entry: CostLedgerEntry): number {
@@ -235,17 +243,24 @@ export function executionMetricsReadFor(filter?: EventScopeFilter): ExecutionMet
 export function buildCostReportFromHistory(
   options: { since?: string; until?: string; scopeFilter?: EventScopeFilter } = {}
 ): CostReport {
-  return buildCostReport(
+  let withheld = 0;
+  const onWithheld = (partitions: number) => {
+    withheld += partitions;
+  };
+  const report = buildCostReport(
     [
       ...(metrics.loadHistory({
         read: executionMetricsReadFor(options.scopeFilter),
+        onWithheld,
       }) as CostLedgerEntry[]),
-      ...(metrics.loadResourceUsageHistory(
-        resourceUsageReadFor(options.scopeFilter)
-      ) as CostLedgerEntry[]),
+      ...(metrics.loadResourceUsageHistory(resourceUsageReadFor(options.scopeFilter), {
+        onWithheld,
+      }) as CostLedgerEntry[]),
     ],
     options
   );
+  const notice = metricsWithheldNotice('cost report', withheld);
+  return notice ? { ...report, withheld_partitions: withheld, partial_notice: notice } : report;
 }
 
 export function formatCostReport(report: CostReport, topN = 5): string[] {
@@ -254,6 +269,7 @@ export function formatCostReport(report: CostReport, topN = 5): string[] {
       `$${report.total_usd.toFixed(4)} across ${report.calls} call(s)` +
       (report.estimated_usd > 0 ? ` (incl. ~$${report.estimated_usd.toFixed(4)} estimated)` : ''),
   ];
+  if (report.partial_notice) lines.push(`PARTIAL: ${report.partial_notice}`);
   const section = (title: string, buckets: CostBucket[]) => {
     lines.push(`${title}:`);
     for (const bucket of buckets.slice(0, topN)) {

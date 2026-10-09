@@ -15,7 +15,7 @@ import { logger } from './core.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { isVitestProcess } from './foundation/env.js';
-import { metrics } from './metrics.js';
+import { aggregateMetricsForEnforcement } from './metrics.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { pathResolver } from './path-resolver.js';
 
@@ -120,19 +120,39 @@ export function sumSpend(
   return { daily, mission };
 }
 
-// Reading the metrics history is file I/O; cache briefly so the guard adds
+// Reading the metrics ledgers is file I/O; cache briefly so the guard adds
 // no measurable latency to bursts of reasoning calls.
 const CACHE_TTL_MS = 30_000;
-let cachedAt = 0;
-let cachedEntries: UsageEntry[] | null = null;
+const cachedSpend = new Map<string, { at: number; spend: { daily: number; mission: number } }>();
 
-function loadUsageEntries(now: number): UsageEntry[] {
-  if (cachedEntries && now - cachedAt < CACHE_TTL_MS) return cachedEntries;
-  // Every partition this process may read: tier-guard withholds other
-  // tenants' partitions and tiers the persona may not read.
-  cachedEntries = metrics.loadHistory({ read: { all: true } }) as UsageEntry[];
-  cachedAt = now;
-  return cachedEntries;
+/** Test hook: drop cached spend totals. */
+export function resetSpendGuardCache(): void {
+  cachedSpend.clear();
+}
+
+/**
+ * Today's spend through the governed enforcement aggregate: every tier of
+ * this process's scope, whatever its persona (a cap must never under-count),
+ * as numbers only — the guard never receives ledger rows.
+ */
+function loadSpend(now: number, input: { sinceMs: number; missionId?: string }) {
+  const key = `${input.sinceMs}|${input.missionId ?? ''}`;
+  const hit = cachedSpend.get(key);
+  if (hit && now - hit.at < CACHE_TTL_MS) return hit.spend;
+  const totals = aggregateMetricsForEnforcement({
+    enforcer: 'spend_guard',
+    ledger: 'execution_metrics',
+    read: { all: true },
+    measures: ['daily', 'mission'] as const,
+    accumulate: (row, add) => {
+      const spend = sumSpend([row as UsageEntry], input);
+      add('daily', spend.daily);
+      add('mission', spend.mission);
+    },
+  });
+  const spend = { daily: totals.measures.daily, mission: totals.measures.mission };
+  cachedSpend.set(key, { at: now, spend });
+  return spend;
 }
 
 const alertedBreaches = new Set<string>();
@@ -152,8 +172,9 @@ export function checkSpendGuard(
   const policy = resolveSpendPolicyForTenant(options.policy ?? loadSpendPolicy(), tenantId);
   const startOfUtcDay = new Date(now).setUTCHours(0, 0, 0, 0);
   const missionId = options.missionId || getRegisteredEnvText('MISSION_ID') || undefined;
-  const entries = options.entries ?? loadUsageEntries(now);
-  const spend = sumSpend(entries, { sinceMs: startOfUtcDay, missionId });
+  const spend = options.entries
+    ? sumSpend(options.entries, { sinceMs: startOfUtcDay, missionId })
+    : loadSpend(now, { sinceMs: startOfUtcDay, missionId });
 
   const breached: Array<'daily' | 'mission'> = [];
   if (spend.daily >= policy.daily_cap_usd) breached.push('daily');
