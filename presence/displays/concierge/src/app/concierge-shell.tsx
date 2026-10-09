@@ -63,6 +63,14 @@ export function ConciergeShell({
   children?: React.ReactNode;
 }) {
   const density = useDisplayDensity();
+  React.useEffect(() => {
+    // A restored page must re-resolve its viewer after logout or another sign-in.
+    const restore = (event: PageTransitionEvent) => {
+      if (event.persisted) window.location.reload();
+    };
+    window.addEventListener('pageshow', restore);
+    return () => window.removeEventListener('pageshow', restore);
+  }, []);
   return (
     <ConciergeI18nProvider>
       <ConciergeUiProviders>

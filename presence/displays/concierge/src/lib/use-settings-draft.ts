@@ -1,5 +1,7 @@
 'use client';
 
+import { frontDeskFetch as fetch } from './front-desk-fetch';
+
 import * as React from 'react';
 import { parseSettingsMe } from './settings-types';
 

@@ -1,9 +1,10 @@
 'use client';
 
+import { frontDeskFetch as fetch } from '../lib/front-desk-fetch';
+
 import * as React from 'react';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { frontDeskText, type FrontDeskMessageKey } from '../lib/i18n';
-import { attachFrontDeskAuthHeaders } from '../lib/front-desk-auth-token';
 import {
   TENANT_CHANGED_EVENT,
   readSelectedTenant,
@@ -123,7 +124,6 @@ export function CommandPalette() {
     const controller = new AbortController();
     setCatalog(null);
     fetch(withSelectedTenant('/api/front-desk/nav?locale=' + locale, tenant), {
-      headers: attachFrontDeskAuthHeaders(),
       cache: 'no-store',
       signal: controller.signal,
     })

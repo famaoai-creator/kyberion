@@ -319,6 +319,8 @@ describe('mission-owned outcome files', () => {
     expect(headers['Content-Disposition']).toContain('attachment; filename="r_sum__.pdf"');
     expect(headers['Content-Disposition']).toContain("filename*=UTF-8''r%C3%A9sum%C3%A9%22.pdf");
     expect(headers['Cache-Control']).toContain('no-store');
+    // Next compression honors no-transform and preserves the exact decoded-byte length contract.
+    expect(headers['Cache-Control']).toContain('no-transform');
     expect(headers['X-Content-Type-Options']).toBe('nosniff');
     expect(headers['Content-Security-Policy']).toContain('sandbox');
   });

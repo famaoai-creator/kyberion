@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { createSigninRequestGuard } from '../../../lib/signin-request-guard';
 import { useConciergeI18n } from '../../../lib/use-concierge-i18n';
 import { frontDeskText } from '../../../lib/i18n';
 import { storeFrontDeskToken } from '../../../lib/front-desk-auth-token';
@@ -29,7 +30,10 @@ export default function FirstRunSetupPage() {
   const [tenantName, setTenantName] = React.useState('');
   const [displayName, setDisplayName] = React.useState('');
   const [busy, setBusy] = React.useState(false);
+  const requests = React.useRef(createSigninRequestGuard());
+  React.useEffect(() => () => requests.current.cancel(), []);
   const [error, setError] = React.useState<string | null>(null);
+  const [tokenStored, setTokenStored] = React.useState(false);
   const [claimed, setClaimed] = React.useState<Claimed | null>(null);
 
   React.useEffect(() => {
@@ -50,11 +54,17 @@ export default function FirstRunSetupPage() {
   }, []);
 
   const submit = async () => {
+    const attempt = requests.current.begin();
+    if (!attempt) return;
     setBusy(true);
     setError(null);
     try {
       const response = await fetch('/api/setup/first-run', {
         method: 'POST',
+        signal: attempt.signal,
+        credentials: 'same-origin',
+        mode: 'same-origin',
+        redirect: 'error',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code,
@@ -65,7 +75,9 @@ export default function FirstRunSetupPage() {
       });
       const data = await response.json().catch(() => null);
       if (response.ok && data?.ok) {
-        storeFrontDeskToken(String(data.token));
+        const saved = attempt.current() && storeFrontDeskToken(String(data.token));
+        setTokenStored(saved);
+        if (!saved) setError(frontDeskText('signin_storage_error', locale));
         setClaimed({
           token: String(data.token),
           tenant_slug: String(data.tenant_slug),
@@ -73,6 +85,7 @@ export default function FirstRunSetupPage() {
         });
         return;
       }
+      if (!attempt.current()) return;
       const errorCode = typeof data?.error === 'string' ? data.error : '';
       if (errorCode === 'claimed') setState('claimed');
       else if (errorCode.startsWith('code_'))
@@ -81,8 +94,9 @@ export default function FirstRunSetupPage() {
         setError(frontDeskText('first_run_error_input', locale));
       else setError(frontDeskText('first_run_error_generic', locale));
     } catch {
-      setError(frontDeskText('first_run_error_generic', locale));
+      if (attempt.current()) setError(frontDeskText('first_run_error_generic', locale));
     } finally {
+      attempt.finish();
       setBusy(false);
     }
   };
@@ -95,11 +109,29 @@ export default function FirstRunSetupPage() {
         <p>
           <code style={{ userSelect: 'all', wordBreak: 'break-all' }}>{claimed.token}</code>
         </p>
-        <SsoSettingsForm />
+        {error ? (
+          <p className="notice error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {tokenStored ? <SsoSettingsForm /> : null}
         <div className="button-row">
-          <a className="action-button" href="/">
-            {frontDeskText('first_run_finish', locale)}
-          </a>
+          {tokenStored ? (
+            <a className="action-button" href="/">
+              {frontDeskText('first_run_finish', locale)}
+            </a>
+          ) : (
+            <button
+              className="action-button"
+              onClick={() => {
+                const saved = storeFrontDeskToken(claimed.token);
+                setTokenStored(saved);
+                setError(saved ? null : frontDeskText('signin_storage_error', locale));
+              }}
+            >
+              {frontDeskText('signin_submit', locale)}
+            </button>
+          )}
         </div>
       </section>
     );
