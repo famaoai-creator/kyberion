@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { loadGateManifest, main, selectGates, validateGateManifest } from './run_checks.js';
+import {
+  DEFAULT_GATE_TIMEOUT_MS,
+  loadGateManifest,
+  main,
+  selectGates,
+  validateGateManifest,
+} from './run_checks.js';
 
 const gate = (id: string, scope: 'pr' | 'full' | 'release') => ({
   id,
@@ -19,6 +25,18 @@ describe('manifest-driven check runner', () => {
     expect(source).not.toContain('readJson<{ scripts?: Record<string, string> }>(');
     expect(source).not.toContain('console.error');
     expect(source).toContain('print(`[check] ERROR ${message}`)');
+  });
+
+  it('gives the role-assumption analyzer a justified budget instead of a larger global default', () => {
+    // It builds one TypeScript program over scripts/ and libs/; under the
+    // 6-gate concurrent pr run it exceeded the 120s default (runbook §1).
+    expect(DEFAULT_GATE_TIMEOUT_MS).toBe(120_000);
+    const reachability = loadGateManifest().gates.find(
+      (entry) => entry.id === 'role-assumption-reachability'
+    );
+    expect(reachability?.timeout_ms).toBeGreaterThan(DEFAULT_GATE_TIMEOUT_MS);
+    expect(reachability?.timeout_ms).toBeLessThanOrEqual(300_000);
+    expect(reachability?.rationale).toMatch(/Budget:/);
   });
 
   it('keeps --only inside the requested scope', () => {
