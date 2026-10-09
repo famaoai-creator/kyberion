@@ -9,16 +9,24 @@ import {
   getStoredFrontDeskToken,
   storeFrontDeskToken,
 } from '../../lib/front-desk-auth-token';
-import { sanitizeNextPath } from '@agent/core/surface/surface-session-cookie';
+import {
+  isSurfaceAuthPath,
+  sanitizeNextPath,
+  trimTrailingSlashes,
+} from '@agent/core/surface/surface-session-cookie';
 
 function readNextPath(): string {
   const next = sanitizeNextPath(new URLSearchParams(window.location.search).get('next'));
   try {
-    const pathname = decodeURIComponent(new URL(next, window.location.origin).pathname).replace(
-      /\/+$/,
-      ''
-    );
-    return pathname === '/signin' ? '/' : next;
+    const target = new URL(next, window.location.origin);
+    // Validate the browser's normalized URL, not only the original string.
+    if (target.origin !== window.location.origin || target.username || target.password) return '/';
+    const pathname = trimTrailingSlashes(decodeURIComponent(target.pathname));
+    // Encoded path separators/control bytes and nested escapes have no place in a return path.
+    if (/%(?:2f|5c|25|0[0-9a-f]|1[0-9a-f]|7f)/i.test(target.pathname)) return '/';
+    if (target.pathname.startsWith('//') || pathname === '/signin' || isSurfaceAuthPath(pathname))
+      return '/';
+    return target.pathname + target.search + target.hash;
   } catch {
     return '/';
   }
@@ -64,7 +72,10 @@ export default function SignInPage() {
         setError('storage');
         return;
       }
-      window.location.assign(readNextPath());
+      const target = new URL(readNextPath(), window.location.origin);
+      // Keep the origin check at the navigation sink; never reinterpret a // pathname as a host.
+      if (target.origin === window.location.origin) window.location.assign(target.href);
+      else window.location.assign('/');
     } catch {
       if (attempt.current()) setError('token');
     } finally {
