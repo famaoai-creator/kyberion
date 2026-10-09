@@ -269,11 +269,20 @@ export function validateFileSize(filePath: string, maxSizeMB = DEFAULT_MAX_FILE_
  * and the canonical path names the physical location the OS will touch,
  * which is exactly what the guard must judge.
  *
- * No per-directory realpath cache: a cached "known real" directory can be
- * replaced by a symlink by any process between calls, which would silently
- * reopen this hole. Only the repository root's realpath is cached (it is not
- * writable through secure-io). See the runbook section "secure-io symlink
- * canonicalization" for the measured cost.
+ * Cost: realpath(3) walks every component (~30 us at depth 15 on the CI
+ * VM), so parent directories are served from a small per-process cache that
+ * is re-verified on every hit instead of trusted: stat(literal dir) must
+ * still reach the cached (dev, ino) — so the bytes land in the very same
+ * directory object that was fully resolved — and lstat(cached real path)
+ * must still be that directory, not a link. A dir swapped for a link to
+ * anywhere else changes the inode and misses, and so does the directory
+ * itself renamed away with a link left at its old path (lstat sees the
+ * link). The one case a hit cannot see is an ANCESTOR of the cached real
+ * path renamed into another location with a link left behind; that needs
+ * write permission at the new location plus a link secure-io itself refuses
+ * to create (target outside the caller's write scope), and every secure-io
+ * move / rm / rmdir / unlink / symlink clears the cache anyway. See the runbook section "secure-io
+ * symlink canonicalization" for the measured cost.
  * ---------------------------------------------------------------------------
  */
 type CanonicalMode = 'follow' | 'leaf';
@@ -301,6 +310,13 @@ function physicalPath(absPath: string, hops = 0): string {
   // this before lexical bindings initialize. 40 matches Linux MAXSYMLINKS.
   if (hops > 40) {
     throw Object.assign(new Error('too many symbolic links'), { code: 'ELOOP' });
+  }
+  // Fast path: an existing, fully resolvable path costs one realpath call.
+  try {
+    return fs.realpathSync.native(absPath);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== 'ENOENT' && code !== 'ENOTDIR') throw error;
   }
   const missing: string[] = [];
   let existing = absPath;
@@ -338,14 +354,76 @@ function isInside(base: string, candidate: string): string | undefined {
  * Fails closed: a component that cannot be resolved (loop, permission error)
  * throws instead of falling back to the literal path.
  */
+// eslint-disable-next-line no-var
+var realDirCache: Map<string, { dev: number; ino: number; real: string }> | undefined;
+
+/** Drop every cached directory resolution (called after structural mutations). */
+function invalidateRealDirCache(): void {
+  realDirCache?.clear();
+}
+
+/** True when `p` is itself (not via a final symlink) the directory (dev, ino). */
+function sameInode(p: string, dev: number, ino: number): boolean {
+  try {
+    const st = fs.lstatSync(p);
+    return st.dev === dev && st.ino === ino;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Real path of an existing directory, from the verified cache when possible.
+ * Returns undefined when `dir` is not an existing directory (callers then
+ * take the full physicalPath walk).
+ */
+function cachedRealDir(dir: string): string | undefined {
+  let st: fs.Stats;
+  try {
+    st = fs.statSync(dir);
+  } catch {
+    return undefined;
+  }
+  if (!st.isDirectory()) return undefined;
+  const cache = (realDirCache ??= new Map());
+  const hit = cache.get(dir);
+  if (hit && hit.dev === st.dev && hit.ino === st.ino && sameInode(hit.real, st.dev, st.ino)) {
+    return hit.real;
+  }
+  const real = fs.realpathSync.native(dir);
+  if (!sameInode(real, st.dev, st.ino)) return undefined; // raced: let the slow path decide
+  if (cache.size >= 4096) cache.clear();
+  cache.set(dir, { dev: st.dev, ino: st.ino, real });
+  return real;
+}
+
+/** physicalPath with the parent served from cachedRealDir; leaf handled per mode. */
+function fastPhysicalPath(absolute: string, mode: CanonicalMode): string {
+  const parent = path.dirname(absolute);
+  const leaf = path.basename(absolute);
+  if (parent === absolute) return physicalPath(absolute);
+  const realParent = cachedRealDir(parent);
+  if (realParent === undefined) {
+    return mode === 'follow' ? physicalPath(absolute) : path.join(physicalPath(parent), leaf);
+  }
+  const candidate = path.join(realParent, leaf);
+  if (mode === 'leaf') return candidate;
+  let leafStat: fs.Stats;
+  try {
+    leafStat = fs.lstatSync(candidate);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') return candidate; // missing leaf under a real parent
+    throw error;
+  }
+  return leafStat.isSymbolicLink() ? physicalPath(candidate) : candidate;
+}
+
 function canonicalGuardPath(resolved: string, mode: CanonicalMode): string {
   const absolute = path.resolve(resolved);
   let physical: string;
   try {
-    physical =
-      mode === 'follow'
-        ? physicalPath(absolute)
-        : path.join(physicalPath(path.dirname(absolute)), path.basename(absolute));
+    physical = fastPhysicalPath(absolute, mode);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code ?? 'unknown';
     throw new Error(
@@ -814,6 +892,7 @@ export function safeMoveSync(srcPath: string, destPath: string): void {
   assertCanonicalReadable(resolvedSrc, srcPath, 'leaf');
   assertCanonicalWritable(resolvedSrc, srcPath, 'leaf');
   assertCanonicalWritable(resolvedDest, destPath, 'leaf');
+  invalidateRealDirCache();
   fs.renameSync(resolvedSrc, resolvedDest);
 }
 
@@ -877,6 +956,7 @@ export function safeSymlinkSync(
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
+  invalidateRealDirCache();
   fs.symlinkSync(path.relative(dir, resolvedTarget), resolvedLink, type);
 }
 
@@ -891,6 +971,7 @@ export function safeRmSync(
   // not descend through links, but a symlinked PARENT would redirect the
   // removal into another scope — so the parent is canonicalized.
   const { resolved } = guardWritePath(targetPath, 'leaf');
+  invalidateRealDirCache();
   if (fs.existsSync(resolved)) {
     fs.rmSync(resolved, options);
   }
@@ -902,6 +983,7 @@ export function safeRmSync(
 export function safeUnlinkSync(filePath: string): void {
   // unlink removes the entry itself; only a symlinked parent can redirect it.
   const { resolved } = guardWritePath(filePath, 'leaf');
+  invalidateRealDirCache();
   if (fs.existsSync(resolved)) fs.unlinkSync(resolved);
 }
 
@@ -911,6 +993,7 @@ export function safeUnlinkSync(filePath: string): void {
  */
 export function safeRmdirSync(dirPath: string): void {
   const { resolved } = guardWritePath(dirPath, 'leaf');
+  invalidateRealDirCache();
   if (fs.existsSync(resolved)) fs.rmdirSync(resolved);
 }
 

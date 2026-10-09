@@ -213,6 +213,32 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     );
   });
 
+  it('does not reuse a cached directory resolution after the directory is swapped for a link', () => {
+    // Warm the per-process directory cache with a real directory...
+    safeMkdir(`${scratchRel}/swap`);
+    safeWriteFile(`${scratchRel}/swap/first.txt`, 'ok');
+    // ...then replace it, outside secure-io, with a link into the protected dir.
+    fs.rmSync(abs(`${scratchRel}/swap`), { recursive: true, force: true });
+    fs.symlinkSync(abs(protectedRel), abs(`${scratchRel}/swap`), 'dir');
+    expect(() => safeWriteFile(`${scratchRel}/swap/second.ts`, 'pwned')).toThrow(
+      /Write through symbolic link denied/
+    );
+    expect(fs.existsSync(path.join(abs(protectedRel), 'second.ts'))).toBe(false);
+  });
+
+  it('does not reuse a cached resolution after the directory is renamed away and replaced', () => {
+    safeMkdir(`${scratchRel}/moved`);
+    safeWriteFile(`${scratchRel}/moved/first.txt`, 'ok');
+    // Same inode, new path: rename the real directory into the protected tree
+    // (as a privileged actor would) and leave a link at the old path.
+    fs.renameSync(abs(`${scratchRel}/moved`), path.join(abs(protectedRel), 'moved'));
+    fs.symlinkSync(path.join(abs(protectedRel), 'moved'), abs(`${scratchRel}/moved`), 'dir');
+    expect(() => safeWriteFile(`${scratchRel}/moved/second.ts`, 'pwned')).toThrow(
+      /Write through symbolic link denied/
+    );
+    expect(fs.existsSync(path.join(abs(protectedRel), 'moved', 'second.ts'))).toBe(false);
+  });
+
   it('keeps legitimate symlinks inside the caller write scope working', () => {
     safeMkdir(`${scratchRel}/real`);
     safeSymlinkSync(`${scratchRel}/real`, `${scratchRel}/alias`, 'dir');
