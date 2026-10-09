@@ -37,7 +37,7 @@ describe('execution-metrics ledger partitioning', () => {
       mission_id: 'MSN-EXEC-PARTITION-1',
       ...(scope ? { scope } : {}),
     });
-  const components = (rows: Array<Record<string, any>>) =>
+  const components = (rows: Array<Record<string, unknown>>) =>
     rows.map((row) => String(row.component)).sort();
   const legacyRow = (component: string, tenant: string, timestamp = '2026-10-01T00:00:00.000Z') =>
     `${JSON.stringify({
