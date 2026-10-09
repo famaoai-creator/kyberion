@@ -8,9 +8,9 @@
 import {
   decideApprovalRequest,
   listApprovalRequests,
-  revokeApprovalRequest,
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
+import { revokeApprovalRequest } from '@agent/core/governance/approval-revocation';
 import {
   detectCliAgentPrincipal,
   resolveCliApprovalDecider,

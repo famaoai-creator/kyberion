@@ -23,9 +23,9 @@ import {
   loadApprovalRequest,
   lookupSessionApprovalCache,
   clearSessionApprovalCache,
-  revokeApprovalRequest,
   type ApprovalRequestRecord,
 } from './approval-store.js';
+import { revokeApprovalRequest } from './approval-revocation.js';
 import {
   clearSeparationOfDuties,
   setSeparationOfDuties,

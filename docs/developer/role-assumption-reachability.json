@@ -836,6 +836,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/service/service-recording-review-approval.ts#requestServiceRecordingReview (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/stimuli-journal.ts#appendStimulus",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
@@ -2161,16 +2166,6 @@
       "unresolved": []
     },
     {
-      "site": "scripts/kyberion_home.ts#handleApprovalsSubcommand (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
-      "roles": ["mission_controller"],
-      "unresolved": []
-    },
-    {
-      "site": "scripts/kyberion_home.ts#handleApprovalsSubcommand (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": ["mission_controller"],
-      "unresolved": []
-    },
-    {
       "site": "scripts/kyberion_home.ts#handleIntentSubcommand",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -2183,6 +2178,26 @@
     {
       "site": "scripts/kyberion_home.ts#handleProcedureRun",
       "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/lib/approval-cli-decision.ts#decideApprovalFromCli (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/lib/approval-cli-decision.ts#decideApprovalFromCli (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/lib/approval-cli-decision.ts#revokeApprovalFromCli (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/lib/approval-cli-decision.ts#revokeApprovalFromCli (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
       "unresolved": []
     },
     {
