@@ -245,8 +245,11 @@ Writers and readers of the same file must resolve the path the same way. A reade
 the test passes against the sandbox while the writer leaks into live state.
 
 **Real-process tests: size the budget from the child count.** A test that spawns
-`node --import ./scripts/ts-loader.mjs` children pays a cold start per child: the loader transpiles
-every imported `libs/core` source again (about 5s of CPU per child, 10s on a loaded 4-vCPU host).
+`node --import ./scripts/ts-loader.mjs` children pays a start-up per child. Before 2026-10-09 that
+was about 5s of CPU (10s on a loaded 4-vCPU host), mostly re-transpiling every imported
+`libs/core` source; with the start-up caches below a warm child that loads the `libs/core` sources
+costs about 1.3s of CPU, but the first child after a source change or on a fresh checkout still
+pays the cold cost. Size budgets from the cold cost.
 `front-desk-recovery.engine.integration.test.ts` runs up to 17 sequential child batches. Its 180s
 local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
 
@@ -256,6 +259,40 @@ local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
 - In `afterAll`, stop the children and wait for `'exit'`, not `'close'`, because a grandchild can
   hold the pipes. Bound the wait with a grace period, then send SIGKILL to any survivor. Remove the
   fixture roots in a `finally` block, and give the hook an explicit timeout.
+
+**Child start-up cost: where it goes and what keeps it down** (MSN-OPS-ROUND5-20261009). Each
+mechanism has an off switch and a test that compares its output with the switch off.
+
+| Cost (cold child)                                                                                                                                                                                                           | Mechanism                                                                                                                                                                                                                                                                     | Off switch                                     | Test                                                          |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------- |
+| `ts.transpileModule` for every TypeScript module, in every process                                                                                                                                                          | Transpile cache in `active/shared/cache/system/ts-loader/` (`scripts/ts-loader-cache.mjs`): key = SHA-256 of loader cache version, TypeScript version, options, absolute path and source; temp file + rename; trailer-verified on read; TypeScript is required only on a miss | `KYBERION_TS_LOADER_CACHE=0`                   | `scripts/ts-loader-cache.test.ts` (invalidation, concurrency) |
+| Node's default resolver runs `getPackageScopeConfig` for each `.ts` URL (type stripping is on by default in Node 24), and that call re-parses the whole `exports` string of the nearest package.json: 290KB for `libs/core` | `scripts/ts-loader.mjs` answers workspace TypeScript resolutions itself (`resolveTsSourceDirectly`, realpath URL)                                                                                                                                                             | `KYBERION_TS_LOADER_FAST_RESOLVE=0`            | `scripts/ts-loader-resolve.test.ts` (differential)            |
+| The same re-parse for each `libs/core/dist/*.js` module                                                                                                                                                                     | The core build writes `libs/core/dist/package.json` (`type` + `#imports` only) and one-line shims re-exporting the real `.mjs` modules (`scripts/write_core_dist_scope.mjs`). External consumers still resolve `@agent/core/*` through the full exports map                   | `KYBERION_CORE_DIST_SCOPE=0` (build)           | `scripts/write_core_dist_scope.test.ts` (differential)        |
+| `local-stt-discovery` probed every `python3.x` once per bridge installer                                                                                                                                                    | Per-process memo keyed on platform, PATH and registry content, plus `active/shared/cache/system/local-stt-discovery/candidates.json` for 10 minutes                                                                                                                           | `KYBERION_STT_DISCOVERY_CACHE_TTL_MS=0` (disk) | `libs/core/local-stt-discovery.cache.test.ts`                 |
+
+Rules:
+
+- **A `#imports` entry needs a `./<file>.mjs` target in `libs/core/package.json`.** The dist scope
+  shims only that shape, and the build fails with `CORE_DIST_SCOPE_UNSUPPORTED_IMPORT` for any
+  other. A nested `dist/package.json` without `imports` breaks `#imports` in dist modules
+  (`ERR_PACKAGE_IMPORT_NOT_DEFINED`); that was the failure of the first attempt.
+- **Change the loader's compiler options → bump `TS_LOADER_CACHE_VERSION`** in
+  `scripts/ts-loader-cache.mjs`. The key names the options symbolically so that a cache hit does not
+  load TypeScript.
+- **Never cache data.** The transpile cache skips `active/`, `knowledge/`, `customer/` and `vault/`
+  sources: the system partition holds repository code only.
+- **Tests point caches at a sandbox.** Unit tests pass `KYBERION_TS_LOADER_CACHE_DIR` /
+  `projectRoot`. Child processes that tests spawn share the checkout's transpile cache, which is in a
+  leak-guard sandbox prefix (`active/shared/cache/`). The STT disk cache is off under Vitest unless
+  the TTL is set, and its path is in `VITEST_LIVE_SUBTREES`.
+
+Procedure when a child is slow: profile it (`node --cpu-prof --import ./scripts/ts-loader.mjs …`)
+and sum self time per function. Large `get` (`package_json_reader`) plus garbage-collector time
+means a large package.json is being re-parsed: look for a new resolution path that bypasses the
+mechanisms above. Measure each change separately in alternating runs and compare CPU (user + sys),
+as in §1. Reference numbers (4 vCPU, load average 8–10, median CPU of 5–7 alternating runs, before → after):
+`scripts/bindings.ts --help` (libs/core from sources) 13.8s → 1.3s; `scripts/org.ts --help` (dist)
+2.4s → 0.4s.
 
 ## §6 Tenant scope and governed facades
 

@@ -1,0 +1,9 @@
+---
+category: Changed
+---
+
+- **`node --import ./scripts/ts-loader.mjs` children start much faster.** On a loaded 4-vCPU host a child that loads `libs/core` from TypeScript sources (`scripts/bindings.ts --help`) went from about 13.8s to 1.3s of CPU, and one that loads the built `dist` (`scripts/org.ts --help`) from about 2.4s to 0.4s.
+  - The loader caches transpiled output in `active/shared/cache/system/ts-loader/` (7-day TTL). `KYBERION_TS_LOADER_CACHE=0` turns the cache off.
+  - The loader resolves workspace TypeScript itself instead of handing it to Node's default resolver, which re-parsed the 290KB `libs/core/package.json` for every module. `KYBERION_TS_LOADER_FAST_RESOLVE=0` restores the old path.
+  - The `@agent/core` build writes a small `libs/core/dist/package.json` (with the `#imports` map and shims), so Node no longer re-parses the 290KB package manifest for every `dist` module. Run `pnpm run build` once to get it. `KYBERION_CORE_DIST_SCOPE=0` at build time leaves it out.
+  - Local STT discovery probes the host's Python interpreters once per process instead of once per bridge installer. The result is shared across processes for 10 minutes (`KYBERION_STT_DISCOVERY_CACHE_TTL_MS`, `0` = off), so a newly installed STT backend can take up to that long to be detected unless you delete `active/shared/cache/system/local-stt-discovery/`.
