@@ -26,7 +26,6 @@ import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core
 import { applySurfaceApprovalDecision } from '@agent/core/surface/surface-approval-ui';
 import { isSeparationOfDutiesEnabled } from '@agent/core/governance/approval-store';
 import {
-  CLI_OPERATOR_PROVISION_COMMAND,
   detectCliAgentPrincipal,
   resolveCliOperatorIdentity,
 } from '@agent/core/governance/cli-operator-principal';
@@ -67,13 +66,16 @@ export function parseDecisionRequestBody(raw: string): Record<string, unknown> {
  * (`resolveCliOperatorIdentity()`) — never the page's `decidedBy`. A name
  * typed on the page is kept only as a note for the audit trail.
  *
- * Same rules as the terminal (`scripts/lib/approval-cli-decision.ts`): with
- * separation of duties on, approvals are refused when this server runs in an
- * agent session or has no owner member (the page token proves possession
- * only; the strong path is Chronos or presence-studio). With it off, a server
- * started in an agent session records its decisions as `caller_supplied`
- * with the agent principal, so they can never pass a later re-check.
- * Agent-session markers are advisory environment variables (best effort).
+ * With separation of duties on, the page refuses every approval. Its token
+ * proves only possession, and any local process can GET the page and read
+ * it, so an approval from here says nothing about who approved. The operator
+ * approves on Chronos or presence-studio, or with the terminal TTY challenge
+ * (`pnpm kyberion approvals --approve <id>`). Rejections stay allowed.
+ *
+ * With it off (unchanged), a server started in an agent session records its
+ * decisions as `caller_supplied` with the agent principal, so they can never
+ * pass a later re-check. Agent-session markers are advisory environment
+ * variables (best effort).
  */
 export function resolveBriefDecider(
   body: Record<string, unknown>,
@@ -90,12 +92,14 @@ export function resolveBriefDecider(
   const decidedBy = identity.principalId ?? identity.displayName;
   const typed = typeof body?.decidedBy === 'string' ? body.decidedBy.trim().slice(0, 200) : '';
   let refusal: string | undefined;
-  if (body?.decision === 'approved' && (agent || !identity.principalId)) {
+  if (body?.decision === 'approved') {
     try {
       if (isSeparationOfDutiesEnabled()) {
-        refusal = agent
-          ? `separation of duties is on and this brief server runs inside an agent session (${agent}); approve on an authenticated surface (Chronos or presence-studio), or serve the brief from your own terminal`
-          : `separation of duties is on and this machine has no stable operator identity; run \`${CLI_OPERATOR_PROVISION_COMMAND}\` and reload`;
+        refusal =
+          '[POLICY_VIOLATION] approval refused on the brief page — separation of duties is on and the page token proves only possession ' +
+          '(any local process can open this page), so it cannot show who approved ' +
+          '| next: approve on Chronos or presence-studio, or run `pnpm kyberion approvals --approve <id>` in an interactive terminal and answer its challenge; rejecting here still works ' +
+          `| evidence: surface=brief${agent ? `, server in agent session ${agent}` : ''}`;
       }
     } catch (error) {
       refusal = error instanceof Error ? error.message : String(error);
