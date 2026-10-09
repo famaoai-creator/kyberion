@@ -564,7 +564,8 @@ function ensurePluginApprovalRequest(params: {
 
 type PluginIntegrity = 'verified' | 'legacy' | 'mismatch';
 
-function resolveActivationStatus(params: {
+/** Exported for tests only. */
+export function resolveActivationStatus(params: {
   diagnostics: PluginManifestDiagnostic[];
   trust: PluginTrustLabel;
   integrity: PluginIntegrity;
