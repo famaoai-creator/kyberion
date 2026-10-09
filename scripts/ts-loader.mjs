@@ -8,7 +8,7 @@
  * tests/fixtures/governance-import-baseline.json). Transpiling, and the
  * transpile cache, live in ./ts-loader-cache.mjs.
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, realpathSync } from 'node:fs';
 import { dirname, extname, resolve as resolvePath } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { registerHooks } from 'node:module';
@@ -73,6 +73,38 @@ function resolveWorkspacePackageToSource(specifier) {
   return null;
 }
 
+/**
+ * Answer a workspace TypeScript resolution here instead of through the default
+ * resolver. The default resolver detects the format of every `.ts` URL (Node
+ * 24 strips types by default) with `getPackageScopeConfig`, which re-parses
+ * the nearest package.json's whole `exports` map each time: for a
+ * `libs/core/*.ts` module that is the ~290KB `libs/core/package.json`, about
+ * half of a cold child's start-up. The load hook decides the format of these
+ * files anyway, so nothing is lost. Same URL as the default resolver (realpath,
+ * as without --preserve-symlinks); `KYBERION_TS_LOADER_FAST_RESOLVE=0` restores
+ * the default-resolver path (differential test: ts-loader-resolve.test.ts).
+ */
+function resolveTsSourceDirectly(candidate) {
+  const ext = extname(candidate);
+  if (!TS_EXTENSIONS.has(ext)) return null;
+  const flag = String(process.env.KYBERION_TS_LOADER_FAST_RESOLVE ?? '')
+    .trim()
+    .toLowerCase();
+  if (flag === '0' || flag === 'false' || flag === 'off') return null;
+  if (process.execArgv.includes('--preserve-symlinks')) return null;
+  let real;
+  try {
+    real = realpathSync(candidate);
+  } catch {
+    return null;
+  }
+  return {
+    url: pathToFileURL(real).href,
+    format: ext === '.cts' ? 'commonjs' : 'module',
+    shortCircuit: true,
+  };
+}
+
 function resolveTsLike(specifier, context, nextResolve) {
   if (!(specifier.startsWith('.') || specifier.startsWith('/'))) {
     const workspaceSource = resolveWorkspacePackageToSource(specifier);
@@ -110,6 +142,8 @@ function resolveTsLike(specifier, context, nextResolve) {
   for (const candidate of candidates) {
     const resolved = resolveCandidatePath(candidate);
     if (resolved) {
+      const fast = resolveTsSourceDirectly(candidate);
+      if (fast) return fast;
       // The CJS default resolver cannot handle file:// URL specifiers; when the
       // specifier already resolves as-is (no .js→.ts rewrite), pass it through.
       if (candidate === sourcePath) {
