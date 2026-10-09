@@ -26,6 +26,9 @@ import { auditChain } from './audit-chain.js';
 import { resolveSeparationOfDutiesPolicy } from './approval-policy.js';
 import { decideApprovalFromCowork } from './approval-cowork-adapter.js';
 import { enforceApprovalGate } from './approval-gate.js';
+import { createApprovalStorePromptPort } from '../agent/agent-prompt-approval.js';
+import { resolveActivationStatus } from '../plugin/plugin-managed-install.js';
+import { clearSessionApprovalCache } from './approval-store.js';
 import {
   APPROVAL_PLACEHOLDER_DECIDERS,
   evaluateApprovalUsability,
@@ -325,6 +328,151 @@ describe('approval separation of duties', () => {
     expect(() => resolveSeparationOfDutiesPolicy()).toThrow(
       /\[POLICY_VIOLATION\] approval decision blocked — approval-policy\.json unreadable \| next: fix .* \| evidence: /
     );
+  });
+
+  it('ON: the approval gate re-checks the decision that seeded a session cache grant', () => {
+    const payload = { operation: 'restart', service: 'sod-cache' };
+    const descriptor = { action: 'inspect-service', targetClass: 'service:sod-cache' };
+    try {
+      setSeparationOfDuties(false);
+      const seed = track(
+        createApprovalRequest('mission_controller', {
+          channel,
+          threadTs: '1',
+          correlationId: `sod-cache-seed-${process.pid}`,
+          requestedBy: 'alice',
+          draft: { title: 'seed', summary: 'session cache seed' },
+          accountability: {
+            finalDecision: 'human_only',
+            payloadHash: computeApprovalPayloadHash(payload),
+            effectBinding: 'inspect-service',
+          },
+        })
+      );
+      decideApprovalRequest('mission_controller', {
+        channel,
+        requestId: seed.id,
+        decision: 'approved',
+        decidedBy: 'alice',
+        decidedByType: 'human',
+        authenticated: true,
+        authMethod: 'manual',
+        payloadHash: computeApprovalPayloadHash(payload),
+        effectBinding: 'inspect-service',
+        sessionCache: descriptor,
+      });
+      const gate = (correlationId: string) =>
+        enforceApprovalGate({
+          intentId: 'inspect-service',
+          operationId: 'inspect-service',
+          agentId: 'alice',
+          correlationId,
+          channel,
+          payload,
+          actionDescriptor: descriptor,
+        });
+      expect(gate(`sod-cache-a-${process.pid}`)).toMatchObject({
+        allowed: true,
+        requestId: seed.id,
+      });
+
+      setSeparationOfDuties(true);
+      const refused = gate(`sod-cache-b-${process.pid}`);
+      expect(refused.allowed).toBe(false);
+      created.push(refused.requestId!);
+      expect(audit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: 'separation_of_duties',
+          metadata: expect.objectContaining({ stage: 'use:approval_gate_session_cache' }),
+        })
+      );
+    } finally {
+      clearSessionApprovalCache();
+    }
+  });
+
+  it('ON: the approval gate audits a stale unusable approval once, not on every call', () => {
+    setSeparationOfDuties(false);
+    const gate = () =>
+      enforceApprovalGate({
+        intentId: 'inspect-service',
+        operationId: 'inspect-service',
+        agentId: 'alice',
+        correlationId: `sod-gate-once-${process.pid}`,
+        channel,
+        payload: { operation: 'restart', service: 'sod-once' },
+      });
+    const opened = loadApprovalRequest(channel, gate().requestId!)!;
+    created.push(opened.id);
+    decide(opened, 'alice');
+    setSeparationOfDuties(true);
+    const sodAudits = () =>
+      audit.mock.calls.filter(
+        ([entry]) => (entry as { operation?: string }).operation === 'separation_of_duties'
+      ).length;
+    const replacement = gate();
+    created.push(replacement.requestId!);
+    expect(sodAudits()).toBe(1);
+    expect(gate().requestId).toBe(replacement.requestId);
+    expect(gate().requestId).toBe(replacement.requestId);
+    expect(sodAudits()).toBe(1);
+  });
+
+  it('ON: the agent prompt port opens a new request instead of reusing an unusable self-approval', () => {
+    const port = createApprovalStorePromptPort();
+    const request = {
+      agentName: `sod-agent-${process.pid}`,
+      provider: 'test',
+      signatureId: 'workspace_trust',
+      cwd: '/tmp',
+      excerpt: 'trust this folder?',
+    };
+    setSeparationOfDuties(false);
+    const first = port.open(request);
+    const record = loadApprovalRequest('agent-runtime', first.id)!;
+    decideApprovalRequest('mission_controller', {
+      channel: record.channel,
+      requestId: record.id,
+      decision: 'approved',
+      decidedBy: request.agentName,
+      decidedByType: 'human',
+      authenticated: true,
+      authMethod: 'manual',
+      payloadHash: record.accountability?.payloadHash,
+      effectBinding: record.accountability?.effectBinding,
+    });
+    expect(port.open(request)).toEqual({ id: first.id, created: false });
+    setSeparationOfDuties(true);
+    expect(port.status(first.id)).toBe('closed');
+    const second = port.open(request);
+    expect(second.created).toBe(true);
+    expect(second.id).not.toBe(first.id);
+    withExecutionContext('mission_controller', () => {
+      for (const id of [first.id, second.id]) {
+        safeRmSync(pathResolver.rootResolve(approvalRequestLogicalPath('agent-runtime', id)), {
+          force: true,
+        });
+      }
+    });
+  });
+
+  it('plugin activation degrades to pending (no throw) when SoD refuses or the policy is unreadable', () => {
+    const base = { diagnostics: [], trust: 'third-party' as const, integrity: 'verified' as const };
+    const approved = {
+      id: '123e4567-e89b-12d3-a456-426614174000',
+      status: 'approved',
+      requestedBy: 'alice',
+      decidedBy: 'alice',
+      correlationId: 'c',
+      channel: 'plugin',
+    } as ApprovalRequestRecord;
+    setSeparationOfDuties(false);
+    expect(resolveActivationStatus({ ...base, approval: approved })).toBe('activatable');
+    setSeparationOfDuties(true);
+    expect(resolveActivationStatus({ ...base, approval: approved })).toBe('pending_approval');
+    safeWriteFile(overlayPath, '{ not json');
+    expect(() => resolveActivationStatus({ ...base, approval: approved })).not.toThrow();
+    expect(resolveActivationStatus({ ...base, approval: approved })).toBe('pending_approval');
   });
 
   it('normalises principal ids and classifies violations', () => {
