@@ -1,6 +1,11 @@
 import path from 'node:path';
 import { isRecord } from '@agent/core/foundation';
-import { metrics, RESOURCE_USAGE_LEDGER_ROOT } from '@agent/core/metrics';
+import {
+  metrics,
+  metricsWithheldNotice,
+  EXECUTION_METRICS_LEDGER_ROOT,
+  RESOURCE_USAGE_LEDGER_ROOT,
+} from '@agent/core/metrics';
 import { pathResolver } from '@agent/core/path-resolver';
 import { traceLogDir } from '@agent/core/trace';
 import { validateTraceReplay } from '@agent/core/analysis/trace-schema';
@@ -29,6 +34,8 @@ export interface StatsData {
   regressions: string[];
   usageByKind: Array<{ kind: string; count: number }>;
   traces: TraceLine[];
+  /** Set when tier-guard withheld metrics partitions from this persona: counts are partial. */
+  partialNotice?: string;
 }
 
 function parseTraceRecord(value: unknown): Record<string, unknown> | null {
@@ -55,9 +62,19 @@ export function countUsageByKind(
 }
 
 export function loadStats(): StatsData {
+  let executionWithheld = 0;
+  let usageWithheld = 0;
   let components: StatsData['components'] = [];
   try {
-    const report: any = metrics.reportFromHistory();
+    // Operator HUD: the governed aggregate over every partition this process may read.
+    const report: any = metrics.reportFromHistory(
+      { all: true },
+      {
+        onWithheld: (partitions) => {
+          executionWithheld = partitions;
+        },
+      }
+    );
     const bySkill: Record<string, ComponentStats> = report?.bySkill ?? report ?? {};
     components = Object.entries(bySkill)
       .filter(([, stats]) => typeof stats === 'object' && stats !== null && 'count' in stats)
@@ -69,7 +86,7 @@ export function loadStats(): StatsData {
   }
   let regressions: string[] = [];
   try {
-    const detected: any = metrics.detectRegressions();
+    const detected: any = metrics.detectRegressions(undefined, { all: true });
     if (Array.isArray(detected)) {
       regressions = detected
         .slice(0, 5)
@@ -81,7 +98,16 @@ export function loadStats(): StatsData {
   let usageByKind: StatsData['usageByKind'] = [];
   try {
     // Operator HUD: the governed aggregate over every partition this process may read.
-    usageByKind = countUsageByKind(metrics.loadResourceUsageHistory({ all: true }));
+    usageByKind = countUsageByKind(
+      metrics.loadResourceUsageHistory(
+        { all: true },
+        {
+          onWithheld: (partitions) => {
+            usageWithheld = partitions;
+          },
+        }
+      )
+    );
   } catch {
     // no resource usage history yet
   }
@@ -97,11 +123,16 @@ export function loadStats(): StatsData {
       };
     }
   );
+  const partialNotice = metricsWithheldNotice(
+    'terminal HUD stats',
+    executionWithheld + usageWithheld
+  );
   return {
     components,
     regressions,
     usageByKind,
     traces,
+    ...(partialNotice ? { partialNotice } : {}),
   };
 }
 
@@ -110,6 +141,7 @@ export function statsWatchPaths(): string[] {
     traceLogDir(),
     pathResolver.resolve('work/metrics'),
     pathResolver.rootResolve(RESOURCE_USAGE_LEDGER_ROOT),
+    pathResolver.rootResolve(EXECUTION_METRICS_LEDGER_ROOT),
   ];
 }
 
@@ -124,10 +156,13 @@ export function statsViewModel(data: StatsData, i18n: I18n): PanelViewModel {
       ),
     });
   }
-  if (data.usageByKind.length > 0) {
+  if (data.usageByKind.length > 0 || data.partialNotice) {
     sections.push({
       title: i18n.tr('tui:tui_stats_cost'),
-      lines: data.usageByKind.map((usage) => `${usage.kind}: ${usage.count}`),
+      lines: [
+        ...(data.partialNotice ? [data.partialNotice] : []),
+        ...data.usageByKind.map((usage) => `${usage.kind}: ${usage.count}`),
+      ],
     });
   }
   if (data.regressions.length > 0) {
