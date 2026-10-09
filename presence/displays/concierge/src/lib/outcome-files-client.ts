@@ -1,3 +1,4 @@
+import { frontDeskFetch } from './front-desk-fetch';
 import { parseOutcomeFilesResponse, type OutcomeFile } from './outcome-files-response';
 export interface OutcomeFilesState {
   open: boolean;
@@ -15,7 +16,10 @@ const initial = (): OutcomeFilesState => ({
   total: 0,
 });
 /** Owns one card revision. Closing, refresh and unmount invalidate every outstanding response. */
-export function createOutcomeFilesController(entryId: string, request: typeof fetch = fetch) {
+export function createOutcomeFilesController(
+  entryId: string,
+  request: (path: string, init?: RequestInit) => Promise<Response> = frontDeskFetch
+) {
   let state = initial();
   let generation = 0;
   let abort: AbortController | undefined;

@@ -1,5 +1,7 @@
 'use client';
 
+import { frontDeskFetch as fetch } from '../lib/front-desk-fetch';
+
 import * as React from 'react';
 import { Button, Section } from '@agent/shared-ui';
 import { frontDeskText } from '../lib/i18n';
