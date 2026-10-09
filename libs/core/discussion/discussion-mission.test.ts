@@ -14,6 +14,7 @@ import { withExecutionContext, withExecutionContextAsync } from '@agent/core/aut
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReadFile, safeReaddir, safeRmSync } from '@agent/core/secure-io';
 import { decideApprovalRequest } from '../governance/approval-store.js';
+import { auditChain } from '../governance/audit-chain.js';
 import { loadArtifactRecord } from '../workforce/artifact-record.js';
 import {
   clearWorkCoordinationNamespace,
@@ -177,6 +178,20 @@ describe('approved decision → mission, separation of duties', () => {
         reviewDiscussion(SOD_ID, 'reviewer', { verdict: 'accept', request_mission: true })
       );
       const approvalId = result.mission_approval_id!;
+      // Still pending with SoD on: the normal "not approved yet" path, no SoD audit.
+      setSeparationOfDuties(true);
+      const auditSpy = vi.spyOn(auditChain, 'record');
+      try {
+        await expect(
+          withExecutionContextAsync(ROLE, () => issueMissionForDiscussion(SOD_ID, 'reviewer'))
+        ).rejects.toThrow(/not been approved/u);
+        expect(auditSpy).not.toHaveBeenCalledWith(
+          expect.objectContaining({ operation: 'separation_of_duties' })
+        );
+      } finally {
+        auditSpy.mockRestore();
+      }
+      setSeparationOfDuties(false);
       // The reviewer who requested the mission also approves it (allowed while off).
       withExecutionContext('mission_controller', () =>
         decideApprovalRequest('mission_controller', {

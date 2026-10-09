@@ -130,10 +130,12 @@ export async function issueMissionForDiscussion(
     throw new DiscussionUserError('No mission start was requested for this discussion');
   if (mission.mission_id)
     throw new DiscussionUserError(`Mission already started: ${mission.mission_id}`);
-  const sodRefusal = approvalUsabilityRefusal(
-    loadApprovalRequest(mission.approval_channel, mission.approval_id),
-    'discussion_mission'
-  );
+  // Separation of duties applies to a decided approval only: a pending
+  // request takes the normal "not approved yet" path below (and is not audited).
+  const record = loadApprovalRequest(mission.approval_channel, mission.approval_id);
+  const decided =
+    record?.status === 'approved' || record?.status === 'applied' || record?.status === 'failed';
+  const sodRefusal = decided ? approvalUsabilityRefusal(record, 'discussion_mission') : undefined;
   if (sodRefusal) throw new DiscussionUserError(sodRefusal);
   if (approvalStatus(room) !== 'approved') {
     throw new DiscussionUserError('The mission start has not been approved yet');
