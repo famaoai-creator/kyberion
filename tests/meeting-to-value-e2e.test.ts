@@ -7,9 +7,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 // case on CI and in a fresh worktree. The flow under test never uses a
 // provider (the reasoning backend is the stub), so answer discovery with a
 // fixed, installed-nothing list instead of probing the host.
-vi.mock('../libs/core/provider/provider-discovery.js', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../libs/core/provider/provider-discovery.js')>();
+vi.mock('@agent/core/provider/provider-discovery', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/provider/provider-discovery')>();
   return { ...actual, discoverProviders: () => [] };
 });
 import {
