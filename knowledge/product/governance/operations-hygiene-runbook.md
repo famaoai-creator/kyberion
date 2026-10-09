@@ -1,7 +1,7 @@
 ---
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags: [governance, operations, ci, retention, daemons, tests, recurrence-prevention]
-last_updated: 2026-10-08
+last_updated: 2026-10-09
 ---
 
 # Operations Hygiene Runbook
@@ -158,6 +158,32 @@ gets clean JSON.
   `beforeAll` with an explicit hook timeout (e.g. `60_000`) so its one-time load is not charged
   to the first test's 10s budget ([WRITING_TESTS](../../../docs/developer/WRITING_TESTS.md#fixture-roots)
   lists the accepted exceptions).
+- A test must not depend on load or order. Run a suspect file with
+  `--sequence.shuffle --sequence.seed=<n>` (at least 222, 7 and 20261008) and under parallel load
+  before calling it fixed. Four defect classes caused the 2026-10 load and order failures:
+  - **A real child process for code the test could call in process.** A spawned
+    `node --import ts-loader.mjs scripts/x.ts` or `dist/...` CLI spends seconds on start-up
+    (transpiling, loading the core stack, re-reading the 290KB `libs/core/package.json` for every
+    module) and almost nothing on the behaviour under test. Call the script's exported
+    `main(argv, print)` / render function after a `beforeAll` import instead. Keep a child only when
+    the CLI process itself is the subject (an end-to-end suite). Then pass
+    `KYBERION_REASONING_BACKEND=stub` so the child does not probe the host's provider CLIs, and pass
+    an explicit `timeoutMs` sized from a measurement under load, with the measurement in a comment.
+  - **Hidden real work behind a mocked edge.** `recordMissionContextTask` spawned
+    `mission_controller record-task` per dispatch, and the first dispatch installed the real
+    reasoning and STT backends, probing every `python3.x` and `claude auth status`. Both happened
+    although the transport was mocked. Mock them at the module seam.
+  - **Abandoned async work after a timeout.** Vitest does not cancel a timed-out test. Its dispatch
+    keeps calling mocks and writing the fixture while the next test runs. A module-registry reset
+    racing such an in-flight import evaluated a module twice against one seam port
+    (`SeamError: Provider mission-worker-core is already registered`). Track the promises a test
+    starts and `await Promise.allSettled(...)` them in `afterEach` (with an explicit hook timeout)
+    before cleanup. A module-level seam registration must be safe to re-evaluate
+    (`installBuiltinMissionWorkerCoreDispatcher`).
+  - **A per-test mock that reaches a cached catalog.** `safeExistsSync.mockReturnValue(false)`,
+    meant for one artifact, also answered the media-backend registry's directory check. The test
+    passed only when an earlier test had already cached the registry. Route governed catalog paths
+    (`knowledge/product/`) to the real implementation inside the mock.
 
 **Procedure when the leak guard reports a file** (`active/shared/tmp/vitest-active-leaks.json`):
 
@@ -181,6 +207,21 @@ gets clean JSON.
 6. **A suite must write a live registry** (tenant index, trust ledger, design index): snapshot it in
    `beforeAll` and restore it in `afterAll` through one fixture helper, so a failing test cannot
    leave the registry changed for the next suite.
+
+**Procedure when a test times out only under load or in a shuffled order:**
+
+1. Reproduce: run the file alone, then with `--sequence.shuffle --sequence.seed=<n>`, then under
+   synthetic load (busy-looping `node -e 'for(;;){}'` processes, 3x the core count, while the file
+   runs).
+2. Measure where the time goes before changing anything. Profile the Vitest worker with
+   `--execArgv=--cpu-prof --execArgv=--cpu-prof-dir=<dir>`, and log every `spawnSync` /
+   `execFileSync` with its caller (a `--require` preload in `NODE_OPTIONS` that wraps
+   `node:child_process` and calls `syncBuiltinESMExports()`). Large `(idle)` time in the worker
+   means it is waiting on a child or on transforms.
+3. Fix the cause (the four classes above). Raise a timeout only for work that is legitimately heavy,
+   such as a cold stack import in `beforeAll` or a real CLI end-to-end suite, and record the
+   measurement next to it.
+4. Force a timeout (`--testTimeout=<small>`) and check that only the timed-out test fails.
 
 Writers and readers of the same file must resolve the path the same way. A reader through
 `pathResolver.shared()` and a writer through `path.join(rootDir, …)` diverge under the sandbox:
