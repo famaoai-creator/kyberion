@@ -32,6 +32,7 @@
  *   pnpm plugin:install --reload my-plugin [--managed-root <dir>] [--json]
  *   pnpm plugin:install --deactivate my-plugin [--json]
  */
+import { resolveCliApprovalRequester } from '@agent/core/governance/cli-operator-principal';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { importPluginPack } from '@agent/core/plugin/plugin-pack';
 import {
@@ -89,12 +90,20 @@ export function runPluginInstall(args: string[] = [], print: Print = () => undef
     .option('json', { type: 'boolean', default: false })
     .parseSync();
 
+  // Third-party installs open an approval: requested by the agent session or
+  // the local owner unless --requested-by names someone.
+  const cliRequester = () =>
+    resolveCliApprovalRequester({
+      explicit: argv['requested-by'] ? String(argv['requested-by']) : undefined,
+      legacy: 'plugin-installer',
+    }).requestedBy;
+
   if (argv.pack) {
     const result = importPluginPack({
       url: String(argv.pack),
       ...(argv.ref ? { ref: String(argv.ref) } : {}),
       syncMode: argv.tracked ? 'tracked' : 'pinned',
-      ...(argv['requested-by'] ? { requestedBy: String(argv['requested-by']) } : {}),
+      requestedBy: cliRequester(),
       ...(argv.channel ? { approvalChannel: String(argv.channel) } : {}),
       ...(argv['managed-root'] ? { managedRoot: String(argv['managed-root']) } : {}),
     });
@@ -131,7 +140,7 @@ export function runPluginInstall(args: string[] = [], print: Print = () => undef
     record = installPluginManaged({
       pluginId,
       sourcePath: source,
-      ...(argv['requested-by'] ? { requestedBy: String(argv['requested-by']) } : {}),
+      requestedBy: cliRequester(),
       ...(argv.channel ? { approvalChannel: String(argv.channel) } : {}),
       ...(argv['managed-root'] ? { managedRoot: String(argv['managed-root']) } : {}),
       ...(argv.tenant ? { tenantSlug: String(argv.tenant) } : {}),
