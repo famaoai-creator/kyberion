@@ -1,7 +1,17 @@
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { getProcessEnv } from './foundation/process-env.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExecResult, safeExistsSync, assertSafeRepositoryPath } from './secure-io.js';
+import {
+  safeExecResult,
+  safeExistsSync,
+  safeReadFile,
+  safeWriteFile,
+  safeMkdir,
+  assertSafeRepositoryPath,
+} from './secure-io.js';
+import { resolveStorageFloor, SYSTEM_PARTITION } from './storage-layout.js';
 import { resolveManagedToolPythonBin } from './tool/tool-runtime-registry.js';
 
 export type LocalSttBackend = string;
@@ -240,6 +250,133 @@ function buildCandidate(
 export function discoverLocalSttBackends(
   options: LocalSttDiscoveryOptions = {}
 ): LocalSttCandidate[] {
+  // Only the host probe (default exec, registry and script check) is cached:
+  // an injected exec or registry is a test or a what-if and always runs.
+  const hostProbe =
+    !options.exec &&
+    !options.registry &&
+    options.scriptAvailable === undefined &&
+    (options.platform === undefined || options.platform === process.platform);
+  if (!hostProbe) return runLocalSttDiscovery(options);
+  const key = hostDiscoveryKey();
+  if (processMemo?.key === key) return cloneCandidates(processMemo.candidates);
+  const candidates = readDiscoveryDiskCache(key) ?? runLocalSttDiscovery(options);
+  processMemo = { key, candidates };
+  writeDiscoveryDiskCache(key, candidates);
+  return cloneCandidates(candidates);
+}
+
+/**
+ * Host discovery cache. Discovery runs `which` / `--version` / `python -c import`
+ * for every python3.x in the registry, and a process asks for it from several
+ * bridge installers, so one process probed every interpreter twice.
+ *
+ * - Per process: one probe per key (platform, PATH, registry content).
+ * - Across processes: the same result in the cache floor
+ *   (`active/shared/cache/system/local-stt-discovery/candidates.json`) for
+ *   `KYBERION_STT_DISCOVERY_CACHE_TTL_MS` (default 10 minutes). It holds host
+ *   binary paths and versions only (system partition, no tenant data). A newly
+ *   installed backend is therefore seen at the latest one TTL later, or at once
+ *   after `resetLocalSttDiscoveryCache({ disk: true })` or deleting the file.
+ *   Set the TTL to 0 to switch the disk cache off. It is off under Vitest unless
+ *   the TTL is set explicitly, so a test never reads the operator's probe.
+ */
+let processMemo: { key: string; candidates: LocalSttCandidate[] } | null = null;
+
+const DEFAULT_DISK_CACHE_TTL_MS = 10 * 60 * 1000;
+const DISK_CACHE_VERSION = 1;
+
+interface DiscoveryDiskCache {
+  version: number;
+  key: string;
+  written_at_ms: number;
+  candidates: LocalSttCandidate[];
+}
+
+function cloneCandidates(candidates: LocalSttCandidate[]): LocalSttCandidate[] {
+  return structuredClone(candidates);
+}
+
+function hostDiscoveryKey(): string {
+  let registryText: string;
+  try {
+    registryText = JSON.stringify(loadLocalSttDiscoveryRegistry());
+  } catch {
+    registryText = 'unreadable';
+  }
+  return createHash('sha256')
+    .update(`v${DISK_CACHE_VERSION}\0${process.platform}\0${process.arch}\0`)
+    .update(`${getProcessEnv('PATH') ?? ''}\0`)
+    .update(registryText)
+    .digest('hex');
+}
+
+function diskCacheTtlMs(): number {
+  const raw = getProcessEnv('KYBERION_STT_DISCOVERY_CACHE_TTL_MS');
+  if (raw === undefined || raw.trim() === '') {
+    return getProcessEnv('VITEST') ? 0 : DEFAULT_DISK_CACHE_TTL_MS;
+  }
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+export function localSttDiscoveryCachePath(): string {
+  // vitestLivePath: under Vitest the file lives in the per-worker sandbox, so a
+  // test that enables the disk cache never rewrites the operator's file.
+  return pathResolver.vitestLivePath(
+    resolveStorageFloor('cache', SYSTEM_PARTITION, 'local-stt-discovery', 'candidates.json')
+  );
+}
+
+function readDiscoveryDiskCache(key: string): LocalSttCandidate[] | null {
+  const ttl = diskCacheTtlMs();
+  if (ttl <= 0) return null;
+  try {
+    const file = localSttDiscoveryCachePath();
+    if (!safeExistsSync(file)) return null;
+    const parsed = JSON.parse(
+      String(safeReadFile(file, { encoding: 'utf8' }))
+    ) as DiscoveryDiskCache;
+    if (parsed?.version !== DISK_CACHE_VERSION || parsed.key !== key) return null;
+    const age = Date.now() - Number(parsed.written_at_ms);
+    if (!Number.isFinite(age) || age < 0 || age > ttl) return null;
+    return Array.isArray(parsed.candidates) ? parsed.candidates : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDiscoveryDiskCache(key: string, candidates: LocalSttCandidate[]): void {
+  if (diskCacheTtlMs() <= 0) return;
+  try {
+    const file = localSttDiscoveryCachePath();
+    safeMkdir(path.dirname(file), { recursive: true });
+    const body: DiscoveryDiskCache = {
+      version: DISK_CACHE_VERSION,
+      key,
+      written_at_ms: Date.now(),
+      candidates,
+    };
+    // safeWriteFile writes a temp file and renames it: concurrent readers see a whole file.
+    safeWriteFile(file, `${JSON.stringify(body, null, 2)}\n`);
+  } catch {
+    // A cache that cannot be written only costs the next process a probe.
+  }
+}
+
+/** Forget the per-process result; `{ disk: true }` also drops the cross-process file. */
+export function resetLocalSttDiscoveryCache(options: { disk?: boolean } = {}): void {
+  processMemo = null;
+  if (!options.disk) return;
+  try {
+    const file = localSttDiscoveryCachePath();
+    if (safeExistsSync(file)) safeWriteFile(file, '{}\n');
+  } catch {
+    /* best effort */
+  }
+}
+
+function runLocalSttDiscovery(options: LocalSttDiscoveryOptions): LocalSttCandidate[] {
   const platform = options.platform ?? process.platform;
   const exec = options.exec ?? DEFAULT_EXEC;
   const registry = options.registry ?? loadLocalSttDiscoveryRegistry();
