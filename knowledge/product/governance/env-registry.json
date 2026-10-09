@@ -958,7 +958,7 @@
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "Core build step (scripts/write_core_dist_scope.mjs): 0 removes the generated libs/core/dist/package.json scope marker and #imports shims, so Node falls back to the 290KB libs/core/package.json for every dist module (old behaviour). Default on.",
+      "description": "Core build step (scripts/write_core_dist_scope.mjs --run): 0 removes the generated libs/core/dist/package.json scope marker and #imports shims, so Node falls back to the 290KB libs/core/package.json for every dist module (old behaviour). Default on.",
       "documented": true,
       "subsystem": "runtime"
     },
@@ -3701,7 +3701,7 @@
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "Lifetime of the cross-process local STT discovery cache (active/shared/cache/system/local-stt-discovery/). Default 600000 (10 min); 0 turns the disk cache off. Off under Vitest unless set.",
+      "description": "Lifetime of the local STT discovery result, in process and in active/shared/cache/system/local-stt-discovery/. Default 600000 (10 min); 0 turns both off. The disk copy is off under Vitest unless set; managed-tool installers reset it.",
       "documented": true,
       "subsystem": "runtime"
     },
@@ -4098,7 +4098,7 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "Directory of the ts-loader transpile cache. Default active/shared/cache/system/ts-loader/ (cache floor, system partition); tests point it at a sandbox.",
+      "description": "Directory of the ts-loader transpile cache (entries are executed as code). Default node_modules/.cache/kyberion-ts-loader/, outside every agent-writable tree; an override inside the checkout is honoured only under node_modules/, otherwise the cache is off.",
       "documented": true,
       "subsystem": "runtime"
     },

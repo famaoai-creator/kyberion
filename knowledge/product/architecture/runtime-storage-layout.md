@@ -71,24 +71,40 @@ The floors (`tmp`, `staging`, `cache`, `artifacts`) share one partition rule
 - A path directly under a floor root without a partition segment is
   **legacy**: it predates this layout and carries no governing tier.
 
-### Process start-up caches (cache floor, system partition)
+### Process start-up caches
 
 Two platform caches keep repeated child processes cheap. Both hold
-repository code or host facts only, never tenant data, so they live in
-`cache/system/`. Deleting either only costs the next process the work again.
+repository code or host facts only, never tenant data. Deleting either only
+costs the next process the work again.
 
-| Domain                              | Writer                                                          | Content and key                                                                                                                                                                                                                                                                         | Retention / off switch                                                               |
-| ----------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `cache/system/ts-loader/`           | `scripts/ts-loader-cache.mjs` (used by `scripts/ts-loader.mjs`) | One transpiled module per file, `<2 hex>/<sha256>.transpiled` (not a code extension, so repository scanners skip it); key = loader cache version + TypeScript version + options + absolute path + source. Sources under `active/`, `knowledge/`, `customer/`, `vault/` are never cached | 7 days (catalog entry); `KYBERION_TS_LOADER_CACHE=0`                                 |
-| `cache/system/local-stt-discovery/` | `libs/core/local-stt-discovery.ts`                              | `candidates.json`: detected local STT backends (binary paths, versions); key = platform + PATH + registry content                                                                                                                                                                       | 10 minutes in-file (`KYBERION_STT_DISCOVERY_CACHE_TTL_MS`, `0` = off), 1 day catalog |
+| Cache                                                   | Writer                                                          | Content and key                                                                                                                                                                                                                                                                      | Retention / off switch                                                                    |
+| ------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `node_modules/.cache/kyberion-ts-loader/` (not a floor) | `scripts/ts-loader-cache.mjs` (used by `scripts/ts-loader.mjs`) | One transpiled module per file, `<2 hex>/<sha256>.transpiled` (not a code extension, so repository scanners skip it); key = the cache module's own text + TypeScript version + absolute path + source. Sources under `active/`, `knowledge/`, `customer/`, `vault/` are never cached | Pruned by the loader (written > 30 days ago, at most daily); `KYBERION_TS_LOADER_CACHE=0` |
+| `active/shared/cache/system/local-stt-discovery/`       | `libs/core/local-stt-discovery.ts`                              | `candidates.json`: detected local STT backends (binary paths, versions); key = platform + PATH + registry content + managed python bins with mtimes                                                                                                                                  | 10 minutes in-file (`KYBERION_STT_DISCOVERY_CACHE_TTL_MS`, `0` = off), 1 day catalog      |
 
-The ts-loader cache is the one deliberate exception to "write through
-secure-io": the loader is what makes TypeScript importable, so it cannot
-import secure-io (itself TypeScript). It uses `node:fs` on its own cache
-tree only (governance import baseline), writes a unique temp file and
-renames it into place so concurrent processes read whole entries, and
-treats every cache error as a miss. The STT cache writes through secure-io
-(`safeWriteFile` is atomic).
+**Trust-model exception: the transpile cache is not on a floor.** Its
+entries are executed as code by whoever runs the loader (operator,
+mission_controller, CI). Every floor under `active/shared/` is writable by
+governed personas through secure-io (`default_allow`), so an entry there
+could be planted by a role that may write data but not code. The cache
+therefore lives in `node_modules/.cache/`, which secure-io denies to every
+persona and authority role (SUDO authority aside), and it is the one runtime
+store that bypasses secure-io and the retention catalog:
+
+- the loader is what makes TypeScript importable, so it cannot import
+  secure-io (itself TypeScript); it uses `node:fs` on this tree only
+  (governance import baseline);
+- the cache root must be owned by the running uid with no group/other write
+  bit; directories are created 0700 and entries 0600; each entry is opened
+  without following symlinks and `fstat`ed, and an entry with another owner
+  or a group/other write bit is deleted, never executed;
+- a `KYBERION_TS_LOADER_CACHE_DIR` override inside the checkout is honoured
+  only under `node_modules/`;
+- writes go to a unique temp file renamed into place, and every cache error
+  is a miss.
+
+The STT cache holds data only, stays on the cache floor and writes through
+secure-io (`safeWriteFile` is atomic).
 
 ### Owner scope (deterministic placement)
 
