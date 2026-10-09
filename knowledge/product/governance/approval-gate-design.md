@@ -57,7 +57,7 @@ mission brief
   reconcile-work、secret introduction、background review patch、peer runtime recovery、marketing
   publication、held action の apply、agent prompt approval、system-actuator の computer 操作、
   approval-actuator の `request_review`、および script 側の audit mirror reconcile、entity governance cleanup、
-  mission alignment gate、organization decision、security-policy の直接書き込み（`pnpm org`）、personal workbench。
+  mission alignment gate、organization decision、security-policy の直接書き込み（`scripts/org.ts`）、personal workbench。
 - **利用できない承認の扱い**: 承認済みレコードは取り消せない（cancel は pending だけが対象）。そのため
   利用時の拒否メッセージは「この承認は再利用されない。新しい承認を依頼し、別の、サーバーが識別した
   principal に決定してもらう」と、分かる場合は再依頼の正確なコマンドを示す。`enforceApprovalGate` と

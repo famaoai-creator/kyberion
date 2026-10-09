@@ -71,8 +71,8 @@ import {
   type RoutedDecision,
 } from '../governance/approval-decision-routing.js';
 import { AUTONOMY_APPROVAL_CHANNEL } from '../governance/approval-decision-card.js';
+import { approvalUsabilityRefusal } from '../governance/approval-linked-usability.js';
 import {
-  assertApprovalUsable,
   expireApprovalRequest,
   isApprovalRequestExpired,
   loadApprovalRequest,
@@ -1405,21 +1405,8 @@ export function settleDotParkedActions(
         );
         return;
       }
-      if (approval) {
-        try {
-          assertApprovalUsable(approval, { consumer: 'dot_dispatch' });
-        } catch (error) {
-          settled.push(
-            declineParked(
-              charter,
-              row,
-              error instanceof Error ? error.message : String(error),
-              deps
-            )
-          );
-          return;
-        }
-      }
+      const sodRefusal = approvalUsabilityRefusal(approval, 'dot_dispatch'); // separation of duties
+      if (sodRefusal) return void settled.push(declineParked(charter, row, sodRefusal, deps));
       settled.push(
         executeDotAction(
           charter,
