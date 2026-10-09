@@ -1,0 +1,25 @@
+{
+  "record_id": "mem-MSN-FIRST-USE-RECOVERY-20261008-2026_10_09",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Preserve member identity without widening local-operator authority",
+  "summary": "Carry the current member through every transport and recovery boundary while keeping device-owner capabilities explicitly separate.",
+  "candidate_id": "mem-MSN-FIRST-USE-RECOVERY-20261008-2026_10_09",
+  "evidence_refs": [
+    "active/missions/public/MSN-FIRST-USE-RECOVERY-20261008/evidence/implementation-report.md",
+    "active/missions/public/MSN-FIRST-USE-RECOVERY-20261008/evidence/test-report.md",
+    "active/missions/public/MSN-FIRST-USE-RECOVERY-20261008/evidence/REVIEW-execution-implement.md"
+  ],
+  "created_at": "2026-10-09T00:37:20.593Z",
+  "applicability": [
+    "mission",
+    "mission:MSN-FIRST-USE-RECOVERY-20261008"
+  ],
+  "reusable_steps": [
+    "Carry the current member through every transport and recovery boundary while keeping device-owner capabilities explicitly separate"
+  ],
+  "expected_outcome": "When a browser stores a member bearer separately from its cookie, verify all request paths, including indirect library fetches, event streams and downloads. A successful sign-in page does not prove later API calls use the same principal. Use an explicit same-origin allowlisted member transport, normalize Headers, reject redirects, and fence response and body completion against abort, token and authentication revision changes. Keep rejected or unavailable credentials fail-closed; never clear and retry as a credential-free loopback operator. Verify persistence before enabling first-run continuation, preserve an already-issued token for storage retry, and abort or invalidate repeated and interrupted sign-in attempts. Native EventSource and anchor downloads cannot carry a tab bearer: choose paced authenticated polling and bounded authenticated attachment streaming instead. Keep transport transformations compatible with exact byte validation, including no-transform when Content-Length is authoritative. Explicit logout must clear the tab bearer and scoped drafts only after the existing server logout validation, with honest blocked-storage recovery. Local-only operator service, OAuth, secrets and personal-avatar capabilities require their original authority boundary and must not be swept into a global interceptor. Validate with stale/ABA authentication, storage failures, repeat/cancel/unmount/Back navigation, stream limits and object-URL cleanup tests. Synthetic fixtures and builds do not establish live account issuance or provider connectivity.",
+  "source_branch": "fix/first-use-continuity-20261008",
+  "source_commit": "4a95fa254e98dc856fd55e5f92917ee7d7fa1b6a"
+}

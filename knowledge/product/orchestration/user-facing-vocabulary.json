@@ -25423,6 +25423,21 @@
         "en": "Inspect runtime diagnostics",
         "ja": "実行環境を診断",
         "qps-ploc": "⟦Ïñşṗėƈŧ řůñŧïɱė ḓïȧɠñőşŧïƈş ŀőřėɱ ïṗ⟧"
+      },
+      "signout_pending_title": {
+        "en": "Finishing sign-out",
+        "ja": "サインアウトの処理中です",
+        "qps-ploc": "⟦Ƒïñïşħïñɠ şïɠñ-őůŧ ŀőřėɱ⟧"
+      },
+      "signout_cleanup_fallback": {
+        "en": "If this page stays open, close this tab to remove its access token and request drafts. Sign-out is not complete until the tab data is removed.",
+        "ja": "この画面が表示されたままの場合は、このタブを閉じてアクセス用トークンと依頼の下書きを削除してください。タブ内のデータが削除されるまで、サインアウトは完了していません。",
+        "qps-ploc": "⟦Ïƒ ŧħïş ṗȧɠė şŧȧẏş őṗėñ, ƈŀőşė ŧħïş ŧȧƀ ŧő řėɱőṽė ïŧş ȧƈƈėşş ŧőķėñ ȧñḓ řėɋůėşŧ ḓřȧƒŧş. Şïɠñ-őůŧ ïş ñőŧ ƈőɱṗŀėŧė ůñŧïŀ ŧħė ŧȧƀ ḓȧŧȧ ïş řėɱőṽėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
+      },
+      "signin_storage_error": {
+        "en": "This tab could not safely update its saved access token. Close this tab and try again in a new tab.",
+        "ja": "このタブに保存されたアクセス用トークンを安全に更新できませんでした。このタブを閉じ、新しいタブでやり直してください。",
+        "qps-ploc": "⟦Ŧħïş ŧȧƀ ƈőůŀḓ ñőŧ şȧƒėŀẏ ůṗḓȧŧė ïŧş şȧṽėḓ ȧƈƈėşş ŧőķėñ. Ƈŀőşė ŧħïş ŧȧƀ ȧñḓ ŧřẏ ȧɠȧïñ ïñ ȧ ñėẇ ŧȧƀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
       }
     },
     "operator": {

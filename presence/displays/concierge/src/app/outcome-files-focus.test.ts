@@ -33,13 +33,13 @@ describe('outcome pagination/retry focus ownership (DOM doubles)', () => {
       () => doc as Pick<Document, 'activeElement' | 'body' | 'hasFocus'>
     );
   });
-  it('focuses the first appended link or unavailable status only after completion', () => {
+  it('focuses the first appended download control or unavailable status only after completion', () => {
     focus.begin(owner, html(source), 10);
     focus.complete(owner, { ...done, busy: true }, html(panel), html(alert));
     expect(added.focus).not.toHaveBeenCalled();
     focus.complete(owner, done, html(panel), html(alert));
     expect(panel.querySelector).toHaveBeenCalledWith(
-      '[data-outcome-file-index="10"] a, [data-outcome-file-index="10"] [tabindex="-1"]'
+      '[data-outcome-file-index="10"] a, [data-outcome-file-index="10"] button, [data-outcome-file-index="10"] [tabindex="-1"]'
     );
     expect(added.focus).toHaveBeenCalledOnce();
     focus.complete(owner, done, html(panel), html(alert));
@@ -88,6 +88,40 @@ describe('outcome pagination/retry focus ownership (DOM doubles)', () => {
     expect(added.focus).not.toHaveBeenCalled();
     expect(panel.focus).not.toHaveBeenCalled();
     expect(alert.focus).not.toHaveBeenCalled();
+  });
+  it('keeps ownership when a keyboard-focused button receives a pointer on its own child', () => {
+    focus.begin(owner, html(source), 10);
+    const child = {} as Node;
+    source.contains.mockReturnValue(true);
+    focus.pointed(child);
+    focus.complete(owner, done, html(panel), html(alert));
+    expect(added.focus).toHaveBeenCalledOnce();
+  });
+  it('does not treat body focus as a removed control while the source is still connected', () => {
+    focus.begin(owner, html(source), 10);
+    doc.activeElement = body;
+    focus.complete(owner, done, html(panel), html(alert));
+    expect(added.focus).not.toHaveBeenCalled();
+  });
+  it('clears removed-control focus ownership after a pointer elsewhere or explicit unmount cancellation', () => {
+    for (const cancel of [() => focus.pointed(body as unknown as Node), () => focus.cancel()]) {
+      source.isConnected = true;
+      doc.activeElement = source;
+      focus.begin(owner, html(source), 10);
+      source.isConnected = false;
+      doc.activeElement = body;
+      cancel();
+      focus.complete(owner, done, html(panel), html(alert));
+    }
+    expect(added.focus).not.toHaveBeenCalled();
+    expect(panel.focus).not.toHaveBeenCalled();
+  });
+  it('uses the next keyboard-owned request and never restores an older request focus target', () => {
+    focus.begin(owner, html(source), 0);
+    focus.begin(owner, html(source), 10);
+    focus.complete(owner, done, html(panel), html(alert));
+    expect(panel.querySelector.mock.calls[0][0]).toContain('index="10"');
+    expect(added.focus).toHaveBeenCalledOnce();
   });
   it('falls back to the focusable list status', () => {
     focus.begin(owner, html(source), 0);

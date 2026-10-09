@@ -28,7 +28,7 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     expect(palette).not.toContain('3031');
     expect(palette).not.toContain('3050');
     expect(palette).toContain('/api/front-desk/nav');
-    expect(palette).toContain('attachFrontDeskAuthHeaders');
+    expect(palette).toContain('frontDeskFetch');
   });
 
   it('drops the header nav links now that the rail carries them', () => {
@@ -415,7 +415,8 @@ describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
 describe('token sign-in coexists with the OIDC login', () => {
   it('the token page links back to the SSO /login', () => {
     const signin = read('src/app/signin/page.tsx');
-    expect(signin).toContain('href="/login"');
+    expect(signin).toContain("nextPath === '/' ? '/login'");
+    expect(signin).toContain('clearFrontDeskToken()');
     expect(signin).toContain("frontDeskText('signin_sso_link', locale)");
   });
 });

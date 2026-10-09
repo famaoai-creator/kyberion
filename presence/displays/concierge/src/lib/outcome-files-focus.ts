@@ -47,6 +47,9 @@ export function createOutcomeFilesFocus(getDocument: () => FocusDocument = () =>
               '"] a, ' +
               '[data-outcome-file-index="' +
               selected.index +
+              '"] button, ' +
+              '[data-outcome-file-index="' +
+              selected.index +
               '"] [tabindex="-1"]'
           );
       (target ?? panel)?.focus();

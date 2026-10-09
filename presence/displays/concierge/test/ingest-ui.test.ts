@@ -63,7 +63,7 @@ let client: typeof import('react-dom/client');
 let unmount: (() => void) | undefined;
 const originalOptions = Object.getOwnPropertyDescriptor(FakeElement.prototype, 'options');
 beforeAll(async () => {
-  dom = installFakeDom();
+  dom = installFakeDom({ sessionStorage: { getItem: () => null } });
   Object.defineProperty(FakeElement.prototype, 'options', {
     configurable: true,
     get(this: FakeElement) {

@@ -1,11 +1,15 @@
 /**
- * FD-07 item 7 (「どなたですか？」 remote sign-in): a bearer token pasted on
- * `/signin` is kept for the browser session only (`sessionStorage`, cleared
- * when the tab closes) — never `localStorage`, never sent anywhere but this
- * origin's own `/api/*` routes. Loopback never touches this module's state:
- * the rail only calls `attachFrontDeskAuthHeaders` when it already has a
- * token to attach, and the token is only ever set from the `/signin` form.
+ * The signed-in member's bearer stays in this tab's sessionStorage. It is
+ * attached explicitly to member API calls, never to local-operator APIs.
+ * No rejected credential is cleared automatically: that could silently fall
+ * back to the broader credential-free loopback identity.
  */
+
+let authRevision = 0;
+let storageFailed = false;
+export function getFrontDeskAuthRevision(): number {
+  return authRevision;
+}
 
 const TOKEN_STORAGE_KEY = 'front-desk.token';
 /**
@@ -33,32 +37,54 @@ export function getStoredFrontDeskToken(): string | null {
   }
 }
 
-export function storeFrontDeskToken(token: string): void {
+export function storeFrontDeskToken(token: string): boolean {
+  authRevision++;
   try {
     window.sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+    if (window.sessionStorage.getItem(TOKEN_STORAGE_KEY) !== token)
+      throw new Error('Credential storage unavailable');
+    storageFailed = false;
     setTokenHintCookie(true);
+    return true;
   } catch {
-    // best-effort only — a token that cannot persist still works for this fetch.
+    storageFailed = true;
+    return false;
   }
 }
 
-export function clearFrontDeskToken(): void {
+export function clearFrontDeskToken(): boolean {
+  authRevision++;
   try {
     window.sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    if (window.sessionStorage.getItem(TOKEN_STORAGE_KEY) !== null) return false;
   } catch {
-    // best-effort
+    return false;
   }
+  storageFailed = false;
   setTokenHintCookie(false);
+  return true;
+}
+
+/** Network callers fail closed when browser storage is inaccessible or a save failed. */
+export function readFrontDeskRequestToken(): string | null {
+  if (storageFailed) throw new Error('Credential storage unavailable');
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  } catch {
+    throw new Error('Credential storage unavailable');
+  }
 }
 
 /** Merge an `Authorization: Bearer <token>` header in, when a token is stored. */
 export function attachFrontDeskAuthHeaders(init: HeadersInit = {}): HeadersInit {
+  const headers = new Headers(init);
   const token = getStoredFrontDeskToken();
-  if (!token) return init;
-  return { ...init, Authorization: `Bearer ${token}` };
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  return headers;
 }
 
-/** Loopback never sees `/signin` — this is the client-side half of that rule (the server's half is IP-based). */
+/** Credential-free loopback can use local-operator mode; rejected bearer sessions still require sign-in. */
 export function isLoopbackHostname(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
 }

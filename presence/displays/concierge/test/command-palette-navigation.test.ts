@@ -12,6 +12,9 @@ vi.mock('../src/lib/use-concierge-i18n', () => ({
 }));
 vi.mock('../src/lib/front-desk-auth-token', () => ({
   attachFrontDeskAuthHeaders: () => ({ Authorization: 'Bearer test-session' }),
+  getStoredFrontDeskToken: () => 'test-session',
+  readFrontDeskRequestToken: () => 'test-session',
+  getFrontDeskAuthRevision: () => 0,
 }));
 vi.mock('../src/lib/i18n', () => ({
   frontDeskText: (key: string) => key,
@@ -62,7 +65,7 @@ let dom: ReturnType<typeof installFakeDom>;
 let client: typeof import('react-dom/client');
 let unmount: (() => void) | undefined;
 beforeAll(async () => {
-  dom = installFakeDom();
+  dom = installFakeDom({ sessionStorage: { getItem: () => null } });
   client = await import('react-dom/client');
 });
 afterEach(() => {
@@ -131,10 +134,12 @@ describe('server-gated command palette', () => {
     expect(m.fetcher).toHaveBeenCalledWith(
       '/api/front-desk/nav?locale=en&tenant=alpha',
       expect.objectContaining({
-        headers: { Authorization: 'Bearer test-session' },
+        headers: expect.any(Headers),
         cache: 'no-store',
       })
     );
+    const [, init] = m.fetcher.mock.calls[0] as unknown as [string, RequestInit];
+    expect(new Headers(init.headers).get('authorization')).toBe('Bearer test-session');
     const text = m.container.textContent;
     expect(text).toContain('work-items');
     expect(text).toContain('palette.dock');
