@@ -1,7 +1,7 @@
 ---
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags: [governance, operations, ci, retention, daemons, tests, recurrence-prevention]
-last_updated: 2026-10-08
+last_updated: 2026-10-09
 ---
 
 # Operations Hygiene Runbook
@@ -64,6 +64,23 @@ had regressed.
    `tests/workflow-operations-contract.test.ts` asserts parts of the workflows.
 4. Run `pnpm check -- --only ci-workflow-contract` and the prettier format check over the workflow
    files.
+
+**Gate budgets (`pnpm check`).** `scripts/run_checks.ts` runs up to 6 gates at once with a 120s
+default per gate (`DEFAULT_GATE_TIMEOUT_MS`). A gate that times out on busy runs:
+
+1. Time it alone and under the concurrent run, and profile it (`node --cpu-prof`). Make it faster
+   first, and measure each optimisation separately, comparing CPU time across alternating runs in
+   separate processes. Wall time on a shared host is too noisy. Example: `role-assumption-reachability`
+   saved about 20% of its CPU (~41s to ~32s) by memoising workspace lookups, with a byte-identical
+   report. A member-name prefilter looked faster in one wall-clock run but saved nothing in CPU, so it
+   was dropped rather than kept as unproven soundness risk in a security gate.
+2. If it still needs more time, give that gate a `timeout_ms` in `ci-gates.json` and state the
+   measurement in its rationale (`Budget: …`). Do not raise the global default.
+   `scripts/run_checks.test.ts` pins the default and the role-assumption budget.
+3. Prove the gate still fails on a stale or broken input after the speed-up.
+4. A pruning optimisation that a gate's verdict depends on needs a switch that turns it off, plus a
+   differential test that compares the output with the switch on and off over fixtures for every
+   case the pruning reasons about.
 
 ## §2 Runtime stores and retention
 
@@ -158,6 +175,32 @@ gets clean JSON.
   `beforeAll` with an explicit hook timeout (e.g. `60_000`) so its one-time load is not charged
   to the first test's 10s budget ([WRITING_TESTS](../../../docs/developer/WRITING_TESTS.md#fixture-roots)
   lists the accepted exceptions).
+- A test must not depend on load or order. Run a suspect file with
+  `--sequence.shuffle --sequence.seed=<n>` (at least 222, 7 and 20261008) and under parallel load
+  before calling it fixed. Four defect classes caused the 2026-10 load and order failures:
+  - **A real child process for code the test could call in process.** A spawned
+    `node --import ts-loader.mjs scripts/x.ts` or `dist/...` CLI spends seconds on start-up
+    (transpiling, loading the core stack, re-reading the 290KB `libs/core/package.json` for every
+    module) and almost nothing on the behaviour under test. Call the script's exported
+    `main(argv, print)` / render function after a `beforeAll` import instead. Keep a child only when
+    the CLI process itself is the subject (an end-to-end suite). Then pass
+    `KYBERION_REASONING_BACKEND=stub` so the child does not probe the host's provider CLIs, and pass
+    an explicit `timeoutMs` sized from a measurement under load, with the measurement in a comment.
+  - **Hidden real work behind a mocked edge.** `recordMissionContextTask` spawned
+    `mission_controller record-task` per dispatch, and the first dispatch installed the real
+    reasoning and STT backends, probing every `python3.x` and `claude auth status`. Both happened
+    although the transport was mocked. Mock them at the module seam.
+  - **Abandoned async work after a timeout.** Vitest does not cancel a timed-out test. Its dispatch
+    keeps calling mocks and writing the fixture while the next test runs. A module-registry reset
+    racing such an in-flight import evaluated a module twice against one seam port
+    (`SeamError: Provider mission-worker-core is already registered`). Track the promises a test
+    starts and `await Promise.allSettled(...)` them in `afterEach` (with an explicit hook timeout)
+    before cleanup. A module-level seam registration must be safe to re-evaluate
+    (part-core registers with an unexported `replaceKey`; a supersede logs a warning).
+  - **A per-test mock that reaches a cached catalog.** `safeExistsSync.mockReturnValue(false)`,
+    meant for one artifact, also answered the media-backend registry's directory check. The test
+    passed only when an earlier test had already cached the registry. Route governed catalog paths
+    (`knowledge/product/`) to the real implementation inside the mock.
 
 **Procedure when the leak guard reports a file** (`active/shared/tmp/vitest-active-leaks.json`):
 
@@ -182,9 +225,37 @@ gets clean JSON.
    `beforeAll` and restore it in `afterAll` through one fixture helper, so a failing test cannot
    leave the registry changed for the next suite.
 
+**Procedure when a test times out only under load or in a shuffled order:**
+
+1. Reproduce: run the file alone, then with `--sequence.shuffle --sequence.seed=<n>`, then under
+   synthetic load (busy-looping `node -e 'for(;;){}'` processes, 3x the core count, while the file
+   runs).
+2. Measure where the time goes before changing anything. Profile the Vitest worker with
+   `--execArgv=--cpu-prof --execArgv=--cpu-prof-dir=<dir>`, and log every `spawnSync` /
+   `execFileSync` with its caller (a `--require` preload in `NODE_OPTIONS` that wraps
+   `node:child_process` and calls `syncBuiltinESMExports()`). Large `(idle)` time in the worker
+   means it is waiting on a child or on transforms.
+3. Fix the cause (the four classes above). Raise a timeout only for work that is legitimately heavy,
+   such as a cold stack import in `beforeAll` or a real CLI end-to-end suite, and record the
+   measurement next to it.
+4. Force a timeout (`--testTimeout=<small>`) and check that only the timed-out test fails.
+
 Writers and readers of the same file must resolve the path the same way. A reader through
 `pathResolver.shared()` and a writer through `path.join(rootDir, …)` diverge under the sandbox:
 the test passes against the sandbox while the writer leaks into live state.
+
+**Real-process tests: size the budget from the child count.** A test that spawns
+`node --import ./scripts/ts-loader.mjs` children pays a cold start per child: the loader transpiles
+every imported `libs/core` source again (about 5s of CPU per child, 10s on a loaded 4-vCPU host).
+`front-desk-recovery.engine.integration.test.ts` runs up to 17 sequential child batches. Its 180s
+local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
+
+- Bound each child with its own timer, using the same value locally and on CI.
+- Size each test's timeout from its sequential child batches at the loaded per-batch cost
+  (`engineTestBudget(batches)`). Use the same value locally and on CI, not a flat local constant.
+- In `afterAll`, stop the children and wait for `'exit'`, not `'close'`, because a grandchild can
+  hold the pipes. Bound the wait with a grace period, then send SIGKILL to any survivor. Remove the
+  fixture roots in a `finally` block, and give the hook an explicit timeout.
 
 ## §6 Tenant scope and governed facades
 
@@ -209,6 +280,35 @@ the test passes against the sandbox while the writer leaks into live state.
   fence, they fail with `ROLE_VIOLATION` on `knowledge/personal/tenants/`. Validate on creation and
   whenever an update changes the tenant; a plain re-sync of an existing item does not re-validate,
   so suspending a tenant does not strand its imported items.
+- **Tier data outside `knowledge/` keeps the knowledge tier's read rules.** A runtime ledger that
+  holds tenant or personal/confidential rows is partitioned
+  `active/shared/runtime/<ledger>/<tier>/<tenant|shared>/`, never appended to a repo-wide file.
+  Register its root in `PARTITIONED_RUNTIME_LEDGER_ROOTS` (`libs/core/storage-layout.ts`) and its
+  `<root>/{personal,confidential}/` prefixes in `tenant_scope.protected_prefixes`. Tier-guard then
+  applies the tenant check **and** the persona decision of `knowledge/<tier>/` to every read
+  (`personaTierReadDecision`) — never a second persona table. Aggregate readers skip a denied
+  partition with a diagnostic `debug` line instead of failing. Reuse the metrics ledgers'
+  `PartitionedMetricsLedger` and the offboarding `METRICS_LEDGERS` table
+  (`libs/core/scope-offboarding.ts`: export, approval-gated legacy-row prune, audit) instead of a
+  new mechanism.
+- **A read gate never weakens a cap.** A cap or limit enforcer reads gated ledgers only through
+  `aggregateMetricsForEnforcement` (`libs/core/metrics.ts`; governed read-only role
+  `metrics_cap_reader`, numbers only), never through a row reader, so a persona that may not read
+  the rows still has its spend counted. A report or summary built from a gated read passes
+  `onWithheld` and shows `metricsWithheldNotice` (one diagnostic warn + a "partial" line in its
+  output). Gate: `libs/core/metrics-enforcement-aggregate.test.ts`.
+- **Caps are evaluated where they are read.** A tenant-bound process evaluates spend caps per
+  bound tenant — policy (`spend-policy.json` `tenant_overrides`) and ledgers from the same
+  tenant — and ignores (debug-logs) a different requested tenant instead of mixing them; it never
+  refuses one, because tenant authorization is the scope layer's job (brokered missions, warn
+  posture). An unbound process evaluates the requested tenant, else globally. Compare slugs
+  trimmed and lower-cased. Any enforcement cache is keyed by tenant/day/mission, bounded, and kept
+  current by adding the process's own costed appends (zero-cost rows never invalidate it); only an
+  unattributable costed row invalidates. A budget evaluated over a scope wider
+  than what the process could read is `cost_status: 'partial'` with `withheld_partitions`.
+- **Never rewrite a hot ledger from a stale plan.** A prune of an append-only ledger (tenant
+  offboarding) recomputes, exports and rewrites under the same lock its appenders take
+  (`metricsLedgerLockId` + `withLockSync`); a plan computed earlier only sizes the dry run.
 - **Evidence stays in the tenant's scope.** A per-tenant command (activation probe, readiness
   report) that runs a repository-wide check keeps only the lines about its own tenant in the
   evidence it writes, and points at the repository-wide command for the rest.
@@ -219,7 +319,13 @@ the test passes against the sandbox while the writer leaks into live state.
    the read through a governed system-scope reader instead of widening the policy. Add a
    `tier-guard-tenant.test.ts` case proving a tenant-bound context still cannot write (or, unless
    brokered, read) the file.
-2. Verify onboarding-flow commands with the real CLI in a throwaway worktree.
+2. When a store moves tenant rows out of a shared file, find every reader first
+   (`grep` the loader, e.g. `loadHistory(` / `loadResourceUsageHistory(`) and give each an explicit
+   read scope; a reader left on the default silently loses the tenant rows it used to see. Prove the
+   gate with the real tier-guard (pattern: `libs/core/metrics-ledger-persona-gate.test.ts` — one
+   persona allowed, one denied, aggregate read skips instead of throwing) and add a
+   `scope-offboarding.test.ts` case for the purge.
+3. Verify onboarding-flow commands with the real CLI in a throwaway worktree.
    - Create the throwaway company with `pnpm onboarding company … --slug probe-co --tenant-slug probe-co`.
    - Then run `tenant:activation plan|probe` and `work create-item` with `KYBERION_CUSTOMER`,
      `KYBERION_TENANT_SCOPE_REQUIRED=true` and `KYBERION_PERSONA=sovereign`.
@@ -339,6 +445,27 @@ the test passes against the sandbox while the writer leaks into live state.
    `deciderIdentitySource: 'caller_supplied'`; when it falls back to a placeholder decider id,
    add that id to `APPROVAL_PLACEHOLDER_DECIDERS` (gates: approval-separation-of-duties.test.ts,
    `approval-actuator-sod.test.ts`).
+
+**Profile timeouts are hard limits.** Since #1006 the codex/gemini structured runners honour a
+profile's `timeout_ms`; before that they used their 5-minute adapter default. A timeout is not a
+quota error, so `runAdaptiveStructuredLlmProfile` does not fall through to the next profile: the
+call fails.
+
+- Size `timeout_ms` for a full provider CLI turn, not for the model's answer alone. A `codex exec`
+  turn includes process start, sandbox setup and the user's default model and effort. The only
+  in-repo latency figure (4.3s, `realtime-media-session-architecture.md`) is for a one-sentence
+  reply on a fast model at `low` effort, which the wisdom profiles do not request.
+- `wisdom-policy.json` profiles stay between the 120s built-in fallback and 300s. The codex `light`
+  profile (summarize, classify) was 30s and is now 120s, the same as `standard` (gemini) and
+  `BUILTIN_FALLBACK`. `heavy` (codex) and `claude` stay at 180s for distillation.
+  `mission-llm.test.ts` enforces this range for provider-CLI adapters (`codex-cli`, `gemini-cli`,
+  `claude-cli`). A profile without `timeout_ms` counts as its runtime default (300s for the
+  codex/gemini runners, 120s for the shell runner). Going above the 300s ceiling needs a recorded
+  justification in that test.
+- These limits suit batch callers. Today the only production caller is `mission distill`
+  (`runAdaptiveStructuredLlmProfile('distill', ...)`, run by `mission_controller`). No interactive
+  or surface path calls a wisdom profile synchronously. Such a caller must set its own shorter
+  timeout rather than rely on the profile value.
 
 ---
 

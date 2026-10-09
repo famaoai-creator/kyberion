@@ -26,7 +26,7 @@ import { formatEnvValidationReport, validateEnv } from '@agent/core/env-validato
 import { evaluateDegradation, loadHealthThresholds } from '@agent/core/health-degradation';
 import { discoverProviders } from '@agent/core/provider/provider-discovery';
 import { listDemotedProviders } from '@agent/core/provider/provider-health-view';
-import { metrics } from '@agent/core/metrics';
+import { metrics, metricsWithheldNotice } from '@agent/core/metrics';
 import type { EnvValidationReport } from '@agent/core/env-validator';
 import type { LatencyRegression } from '@agent/core/health-degradation';
 import { getEmbeddingBackend } from '@agent/core/embedding-backend';
@@ -104,12 +104,22 @@ export function collectHealthRollupLines(
     else verdict = 'yellow';
   };
 
+  let partialNotice: string | undefined;
   try {
     const thresholds = loadHealthThresholds();
+    let withheld = 0;
+    const regressions = metrics.detectRegressions(
+      thresholds.regression_multiplier,
+      { all: true },
+      {
+        onWithheld: (partitions) => {
+          withheld = partitions;
+        },
+      }
+    ) as LatencyRegression[];
+    partialNotice = metricsWithheldNotice('doctor latency regressions', withheld);
     const degradation = evaluateDegradation({
-      regressions: metrics.detectRegressions(
-        thresholds.regression_multiplier
-      ) as LatencyRegression[],
+      regressions,
       demotedProviders: listDemotedProviders(discoverProviders()),
       thresholds,
     });
@@ -132,12 +142,17 @@ export function collectHealthRollupLines(
   }
 
   const icon = verdict === 'green' ? '🟢' : verdict === 'yellow' ? '🟡' : '🔴';
+  const partial = partialNotice ? [`  - PARTIAL: ${partialNotice}`] : [];
   if (reasons.length === 0) {
-    return [`System health: ${icon} green — no degradation, env, or capability findings`];
+    return [
+      `System health: ${icon} green — no degradation, env, or capability findings`,
+      ...partial,
+    ];
   }
   return [
     `System health: ${icon} ${verdict}`,
     ...reasons.slice(0, 3).map((reason) => `  - ${reason}`),
+    ...partial,
   ];
 }
 

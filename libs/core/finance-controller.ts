@@ -10,6 +10,12 @@ export interface FinanceControllerCostReport {
   promptTokens: number | null;
   completionTokens: number | null;
   sourcePath: string | null;
+  /**
+   * Metrics partitions the report's reader was denied (cost report
+   * `withheld_partitions`): when > 0 the totals understate spend and are
+   * never read as complete.
+   */
+  withheldPartitions?: number | null;
 }
 
 export interface FinanceControllerThresholds {
@@ -148,6 +154,7 @@ function resolveCostReport(baseDir: string): FinanceControllerCostReport | null 
         promptTokens,
         completionTokens,
         sourcePath: candidate,
+        withheldPartitions: toNumber(totals.withheld_partitions ?? parsed.withheld_partitions),
       };
     }
   }
@@ -224,6 +231,12 @@ export function resolveFinanceControllerDecision(
     costReport.totalTokens >= thresholds.highTokenUsageWarning
   ) {
     reasons.push(`Cost report token usage is elevated (${costReport.totalTokens} tokens)`);
+  }
+
+  if ((costReport?.withheldPartitions ?? 0) > 0) {
+    reasons.push(
+      `Cost report is partial (${costReport?.withheldPartitions} metrics partition(s) withheld) — totals understate spend`
+    );
   }
 
   const shouldCutCosts = Boolean(

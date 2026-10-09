@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   resolveMissionTeamReceiver: vi.fn(),
   record: vi.fn(),
   emitMissionTaskEvent: vi.fn(),
+  recordMissionContextTask: vi.fn(),
+  ensureWorkerBackendsInstalled: vi.fn(),
 }));
 
 function makeTaskResultText(summary: string): string {
@@ -43,6 +45,22 @@ vi.mock('../libs/core/mission/mission-team-plan-composer.js', () => ({
   resolveMissionTeamReceiver: mocks.resolveMissionTeamReceiver,
 }));
 vi.mock('../libs/core/ledger.js', () => ({ ledger: { record: mocks.record } }));
+// Measured under load (operations-hygiene-runbook §5): each dispatch spawned a
+// real `node dist/scripts/mission_controller.js record-task` child (0.7-0.9s
+// idle, several seconds at load 10+), and the first dispatch installed the real
+// reasoning/STT backends, probing host CLIs (`claude auth status`, every
+// python3.x for mlx_whisper; ~1.4s). Both were charged to the 10s test budget
+// although `a2aBridge.route` is mocked, so no backend or controller is needed.
+vi.mock(
+  '../libs/core/mission/mission-orchestration-worker-part-context.js',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../libs/core/mission/mission-orchestration-worker-part-context.js')
+    >()),
+    recordMissionContextTask: mocks.recordMissionContextTask,
+    ensureWorkerBackendsInstalled: mocks.ensureWorkerBackendsInstalled,
+  })
+);
 vi.mock('../libs/core/mission/mission-task-events.js', () => ({
   emitMissionTaskEvent: mocks.emitMissionTaskEvent,
   // Must stay inside the repository: the secure-io resource-path scope rejects
@@ -52,6 +70,25 @@ vi.mock('../libs/core/mission/mission-task-events.js', () => ({
 }));
 
 const MISSION = 'MSN-BESTOF-01';
+
+// A timed-out test does not cancel its dispatch: it keeps running, calling
+// `route` and writing the mission, while the next test seeds the same mission
+// and counts `route` calls. afterEach settles every dispatch a test started
+// before it cleans up, so a timeout fails only the test that timed out.
+const inflightDispatches = new Set<Promise<unknown>>();
+const DISPATCH_SETTLE_TIMEOUT_MS = 45_000;
+
+async function dispatch(missionId: string): Promise<unknown> {
+  const { dispatchMissionNextTasks } =
+    await import('../libs/core/mission/mission-orchestration-worker.js');
+  const run = dispatchMissionNextTasks(missionId);
+  inflightDispatches.add(run);
+  try {
+    return await run;
+  } finally {
+    inflightDispatches.delete(run);
+  }
+}
 
 async function seedMission(risk: string): Promise<void> {
   const { missionDir } = await import('../libs/core/path-resolver.js');
@@ -96,10 +133,14 @@ describe('best-of-2 + judge (E2E-03 Task 5)', { concurrent: false }, () => {
   // it up front also keeps that one-time load out of the first test's timeout.
   // Per-test state is reset through the work-coordination namespace/store and
   // the mocks in beforeEach.
+  //
+  // The cold load of the worker stack is legitimately heavy: ~7s at load 9,
+  // and it exceeded a 60s hook budget at load ~26 on 4 cores, which skipped
+  // every test in the file. 120s covers it without charging any test.
   beforeAll(async () => {
     process.env.MISSION_ROLE = 'mission_controller';
     await import('../libs/core/mission/mission-orchestration-worker.js');
-  }, 60_000);
+  }, 120_000);
 
   beforeEach(async () => {
     vi.resetAllMocks();
@@ -125,18 +166,41 @@ describe('best-of-2 + judge (E2E-03 Task 5)', { concurrent: false }, () => {
     });
   });
 
+  // Explicit hook timeout: after a timeout this hook waits for the abandoned
+  // dispatch to finish, which may take longer than the 10s default under load.
+  // The wait is bounded (45s, inside the 60s hook budget) and the cleanup runs
+  // in `finally`, so a hung dispatch fails this hook instead of hanging it, and
+  // the fixture mission, coordination store and env are reset either way.
   afterEach(async () => {
-    const { missionDir } = await import('../libs/core/path-resolver.js');
-    const { safeExistsSync, safeRmSync } = await import('../libs/core/secure-io.js');
-    const { clearWorkCoordinationStore, clearWorkCoordinationNamespace } =
-      await import('../libs/core/workforce/work-coordination.js');
-    const missionPath = missionDir(MISSION, 'public');
-    if (safeExistsSync(missionPath)) safeRmSync(missionPath);
-    clearWorkCoordinationStore();
-    clearWorkCoordinationNamespace();
-    delete process.env.KYBERION_BEST_OF_N;
-    delete process.env.KYBERION_DRAFT_REFINE;
-  });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const pending = [...inflightDispatches];
+      const settled = await Promise.race([
+        Promise.allSettled(pending).then(() => true),
+        new Promise<false>((resolve) => {
+          timer = setTimeout(() => resolve(false), DISPATCH_SETTLE_TIMEOUT_MS);
+        }),
+      ]);
+      if (!settled) {
+        throw new Error(
+          `${pending.length} dispatch(es) still running ${DISPATCH_SETTLE_TIMEOUT_MS}ms after the test ended`
+        );
+      }
+    } finally {
+      clearTimeout(timer);
+      inflightDispatches.clear();
+      delete process.env.KYBERION_BEST_OF_N;
+      delete process.env.KYBERION_DRAFT_REFINE;
+      const { missionDir } = await import('../libs/core/path-resolver.js');
+      const { safeExistsSync, safeRmSync } = await import('../libs/core/secure-io.js');
+      const { clearWorkCoordinationStore, clearWorkCoordinationNamespace } =
+        await import('../libs/core/workforce/work-coordination.js');
+      const missionPath = missionDir(MISSION, 'public');
+      if (safeExistsSync(missionPath)) safeRmSync(missionPath);
+      clearWorkCoordinationStore();
+      clearWorkCoordinationNamespace();
+    }
+  }, 60_000);
 
   it('runs two candidates + judge for high-risk tasks and adopts the winner', async () => {
     await seedMission('high');
@@ -162,14 +226,17 @@ describe('best-of-2 + judge (E2E-03 Task 5)', { concurrent: false }, () => {
       return { payload: { text: makeTaskResultText('unexpected single-shot call') } };
     });
 
-    const { dispatchMissionNextTasks } =
-      await import('../libs/core/mission/mission-orchestration-worker.js');
     const { missionDir } = await import('../libs/core/path-resolver.js');
     const { safeReadFile, safeExistsSync } = await import('../libs/core/secure-io.js');
 
-    await dispatchMissionNextTasks(MISSION);
+    await dispatch(MISSION);
 
     expect(mocks.route).toHaveBeenCalledTimes(3);
+    expect(mocks.recordMissionContextTask).toHaveBeenCalledWith(
+      MISSION,
+      'Completed work item task-1',
+      expect.objectContaining({ task_id: 'task-1' })
+    );
     const stored = JSON.parse(
       safeReadFile(`${missionDir(MISSION, 'public')}/NEXT_TASKS.json`, {
         encoding: 'utf8',
@@ -194,9 +261,7 @@ describe('best-of-2 + judge (E2E-03 Task 5)', { concurrent: false }, () => {
     await seedMission('medium');
     mocks.route.mockResolvedValue({ payload: { text: makeTaskResultText('Single shot result.') } });
 
-    const { dispatchMissionNextTasks } =
-      await import('../libs/core/mission/mission-orchestration-worker.js');
-    await dispatchMissionNextTasks(MISSION);
+    await dispatch(MISSION);
     expect(mocks.route).toHaveBeenCalledTimes(1);
   });
 
@@ -205,9 +270,7 @@ describe('best-of-2 + judge (E2E-03 Task 5)', { concurrent: false }, () => {
     await seedMission('high');
     mocks.route.mockResolvedValue({ payload: { text: makeTaskResultText('Single shot result.') } });
 
-    const { dispatchMissionNextTasks } =
-      await import('../libs/core/mission/mission-orchestration-worker.js');
-    await dispatchMissionNextTasks(MISSION);
+    await dispatch(MISSION);
     expect(mocks.route).toHaveBeenCalledTimes(1);
   });
 });
