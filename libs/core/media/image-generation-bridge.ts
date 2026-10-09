@@ -56,7 +56,6 @@ import {
 import { matchSeamSelectionRule } from '../seam-selection-rules.js';
 
 const IMAGE_GENERATION_PROVIDER_SEAM = 'image-generation-provider';
-
 const imageGenerationProviderSeam = createSeam<ImageGenerationProvider>({
   key: 'image-generation-provider',
   multiplicity: 'named',
