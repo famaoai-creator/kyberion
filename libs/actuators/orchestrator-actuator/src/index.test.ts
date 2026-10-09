@@ -392,8 +392,8 @@ describe('orchestrator-actuator', () => {
           },
         },
       ],
-    } as any);
-    expect(result.results.find((entry: any) => entry.error)?.error).toContain(
+    } as unknown as Parameters<typeof handleAction>[0]);
+    expect(result.results.find((entry: { error?: string }) => entry.error)?.error).toContain(
       "type must be 'dir' or 'file'"
     );
     expect(mocks.safeSymlinkSync).not.toHaveBeenCalled();

@@ -25,11 +25,17 @@
       "source": "libs/core/secure-io.ts",
       "target": "libs/core/tier-guard.ts",
       "reason": "secure-io enforces tenant and tier permissions at every governed filesystem boundary"
+    },
+    {
+      "source": "libs/core/secure-io-path-guard.ts",
+      "target": "libs/core/tier-guard.ts",
+      "reason": "secure-io's permission guards (split out of secure-io.ts) check tier permissions on literal and canonical paths"
     }
   ],
   "patterns": [
     { "layer": "foundation", "pattern": "libs/core/foundation/**" },
     { "layer": "foundation", "pattern": "libs/core/secure-io.ts" },
+    { "layer": "foundation", "pattern": "libs/core/secure-io-path-guard.ts" },
     { "layer": "foundation", "pattern": "libs/core/fs-primitives.ts" },
     { "layer": "foundation", "pattern": "libs/core/path-resolver.ts" },
     { "layer": "foundation", "pattern": "libs/core/schema-loader.ts" },
