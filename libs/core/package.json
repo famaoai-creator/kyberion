@@ -9,7 +9,7 @@
   },
   "description": "Core utilities and wrappers for Kyberion.",
   "scripts": {
-    "build": "tsc -p tsconfig.json && node ../../scripts/write_core_dist_scope.mjs",
+    "build": "tsc -p tsconfig.json && node ../../scripts/write_core_dist_scope.mjs --run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "main": "./dist/index.js",

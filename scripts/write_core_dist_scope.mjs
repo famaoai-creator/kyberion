@@ -30,8 +30,23 @@ import { fileURLToPath } from 'node:url';
 
 const CORE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'libs', 'core');
 
-/** The dist scope manifest derived from libs/core/package.json. */
-export function buildDistScope(corePackage) {
+const DEFAULT_EXPORT_PATTERN =
+  /(^|\n)\s*export\s+default\b|export\s*\{[^}]*\b(?:as\s+)?default\b[^}]*\}/u;
+
+function isScopeOff(env) {
+  return ['0', 'false', 'off'].includes(
+    String(env.KYBERION_CORE_DIST_SCOPE ?? '')
+      .trim()
+      .toLowerCase()
+  );
+}
+
+/**
+ * The dist scope manifest derived from libs/core/package.json. `readTarget(file)`
+ * returns a target module's text, so its shim also re-exports `default` when the
+ * target has one (`export *` never forwards a default export).
+ */
+export function buildDistScope(corePackage, readTarget = () => '') {
   const imports = {};
   const shims = [];
   for (const [key, target] of Object.entries(corePackage.imports ?? {})) {
@@ -42,7 +57,11 @@ export function buildDistScope(corePackage) {
     }
     const file = target.slice(2);
     imports[key] = `./${file}`;
-    shims.push({ file, body: `export * from '../${file}';\n` });
+    const hasDefault = DEFAULT_EXPORT_PATTERN.test(readTarget(file));
+    shims.push({
+      file,
+      body: `export * from '../${file}';\n${hasDefault ? `export { default } from '../${file}';\n` : ''}`,
+    });
   }
   return {
     manifest: {
@@ -56,12 +75,21 @@ export function buildDistScope(corePackage) {
   };
 }
 
+function loadExpected(coreDir) {
+  const corePackage = JSON.parse(readFileSync(join(coreDir, 'package.json'), 'utf8'));
+  return buildDistScope(corePackage, (file) => {
+    try {
+      return readFileSync(join(coreDir, file), 'utf8');
+    } catch {
+      return '';
+    }
+  });
+}
+
 export function writeDistScope({ coreDir = CORE_DIR, env = process.env } = {}) {
   const distDir = join(coreDir, 'dist');
-  const corePackage = JSON.parse(readFileSync(join(coreDir, 'package.json'), 'utf8'));
-  const { manifest, shims } = buildDistScope(corePackage);
-  const off = ['0', 'false', 'off'].includes(String(env.KYBERION_CORE_DIST_SCOPE ?? '').trim());
-  if (off) {
+  const { manifest, shims } = loadExpected(coreDir);
+  if (isScopeOff(env)) {
     rmSync(join(distDir, 'package.json'), { force: true });
     for (const shim of shims) rmSync(join(distDir, shim.file), { force: true });
     return { written: false, distDir };
@@ -72,6 +100,71 @@ export function writeDistScope({ coreDir = CORE_DIR, env = process.env } = {}) {
   return { written: true, distDir };
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  writeDistScope();
+/**
+ * Staleness check: the dist scope must match what the current
+ * libs/core/package.json would generate. A dist built before an `#imports`
+ * change would otherwise resolve the old map (or none). No dist/ → nothing to check.
+ */
+export function findDistScopeDrift({ coreDir = CORE_DIR, env = process.env } = {}) {
+  const distDir = join(coreDir, 'dist');
+  if (!existsSync(distDir)) return [];
+  const { manifest, shims } = loadExpected(coreDir);
+  const manifestPath = join(distDir, 'package.json');
+  if (isScopeOff(env)) {
+    return existsSync(manifestPath)
+      ? ['dist/package.json exists although KYBERION_CORE_DIST_SCOPE=0']
+      : [];
+  }
+  if (!existsSync(manifestPath)) {
+    return ['dist/package.json is missing — run `pnpm --filter @agent/core run build`'];
+  }
+  const drift = [];
+  let actual;
+  try {
+    actual = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  } catch {
+    return ['dist/package.json is not valid JSON — rebuild @agent/core'];
+  }
+  if (actual.type !== manifest.type) {
+    drift.push(
+      `dist/package.json type ${JSON.stringify(actual.type)} ≠ ${JSON.stringify(manifest.type)}`
+    );
+  }
+  const expectedImports = JSON.stringify(manifest.imports);
+  const actualImports = JSON.stringify(actual.imports ?? {});
+  if (expectedImports !== actualImports) {
+    drift.push(
+      `dist/package.json imports ${actualImports} ≠ libs/core/package.json imports ${expectedImports}`
+    );
+  }
+  for (const shim of shims) {
+    const shimPath = join(distDir, shim.file);
+    let body = null;
+    try {
+      body = readFileSync(shimPath, 'utf8');
+    } catch {
+      /* missing */
+    }
+    if (body !== shim.body)
+      drift.push(`dist/${shim.file} is ${body === null ? 'missing' : 'stale'}`);
+  }
+  return drift.map((line) => `${line} — rebuild with \`pnpm --filter @agent/core run build\``);
+}
+
+// import.meta.main (Node >= 24.2) instead of comparing argv[1] with this
+// file's path: that comparison silently skipped the write under a symlinked
+// checkout. Only a direct run acts (an import, e.g. from a test, never writes);
+// the build passes --run explicitly, --check reports drift with exit code 1.
+if (import.meta.main) {
+  const cliArgs = process.argv.slice(2);
+  if (cliArgs.includes('--check')) {
+    const drift = findDistScopeDrift();
+    for (const line of drift) process.stderr.write(`[core-dist-scope] ${line}\n`);
+    process.exitCode = drift.length > 0 ? 1 : 0;
+  } else if (cliArgs.includes('--run')) {
+    writeDistScope();
+  } else {
+    process.stderr.write('usage: node scripts/write_core_dist_scope.mjs --run | --check\n');
+    process.exitCode = 2;
+  }
 }
