@@ -11,11 +11,11 @@ import {
   TS_LOADER_CACHE_ENTRY_EXTENSION,
   isTrustedStat,
   pruneTsLoaderCache,
+  resolvePrivateCacheDir,
   transpileWithCache,
   tsLoaderCacheDir,
   tsLoaderCacheKey,
 } from './ts-loader-cache.mjs';
-import { resolvePrivateCacheDir } from '../libs/core/private-host-cache.mjs';
 
 // Sources live in a per-test sandbox under active/shared/tmp/ (passed as
 // `projectRoot`); the cache lives in a private os tmp directory, so neither the

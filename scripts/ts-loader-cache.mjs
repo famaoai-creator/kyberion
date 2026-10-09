@@ -58,7 +58,7 @@ import {
   writeTrustedFile,
 } from '../libs/core/private-host-cache.mjs';
 
-export { isTrustedStat };
+export { isTrustedStat, resolvePrivateCacheDir };
 
 const PROJECT_ROOT = resolvePath(dirname(fileURLToPath(import.meta.url)), '..');
 
