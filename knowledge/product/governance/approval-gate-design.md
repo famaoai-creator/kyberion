@@ -75,7 +75,7 @@ mission brief
     `audit_mirror_reconcile` の `--request-approval`、`pnpm plugin:install`（third-party）、
     `service_recording capture` / `request-review`。
 - **承認の取り消し（revoke）**: 承認済みで、まだ claim も適用もされていないレコードは
-  `pnpm kyberion approvals --revoke <id> [--reason "…"]`（store では `revokeApprovalRequest`）で取り消せる。
+  `pnpm kyberion approvals --revoke <id> [--reason "…"]`（`libs/core/governance/approval-revocation.ts` の `revokeApprovalRequest`）で取り消せる。
   - status は `approved` のまま（決定があった事実は証跡として残る）で、`revocation`（誰が・いつ・理由）が
     付く。`evaluateApprovalUsability` は SoD の設定に関係なく取り消されたレコードを拒否するので、下記の
     すべての consumer で効果にならない。再依頼の入口は取り消されたレコードを返さず、新しい依頼を開く。
