@@ -72,7 +72,8 @@ mission brief
     attestation）、`pnpm kyberion project-trust request`、`pnpm kyberion hooks trust`（external hooks）、
     `kyberion secret introduce`、mission の `scope-approve --request-approval` と `reconcile-work`、
     organization decision の `transition … --request-approval`、`entity_governance_cleanup` と
-    `audit_mirror_reconcile` の `--request-approval`、`service_recording capture` / `request-review`。
+    `audit_mirror_reconcile` の `--request-approval`、`pnpm plugin:install`（third-party）、
+    `service_recording capture` / `request-review`。
 - **承認の取り消し（revoke）**: 承認済みで、まだ claim も適用もされていないレコードは
   `pnpm kyberion approvals --revoke <id> [--reason "…"]`（store では `revokeApprovalRequest`）で取り消せる。
   - status は `approved` のまま（決定があった事実は証跡として残る）で、`revocation`（誰が・いつ・理由）が
