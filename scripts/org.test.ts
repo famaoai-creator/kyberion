@@ -1,9 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execFileSync } from 'node:child_process';
-import { describe, expect, it } from 'vitest';
-import { approvalRequestLogicalPath } from '@agent/core/governance/approval-store';
-import { pathResolver } from '@agent/core/path-resolver';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 function makeTempRoot(): string {
   const workspaceRoot = process.cwd();
@@ -49,7 +46,11 @@ function makeTempRoot(): string {
   return root;
 }
 
-function seedSecurityPolicyApproval(root: string, id: string): void {
+function seedSecurityPolicyApproval(
+  root: string,
+  id: string,
+  approvalRequestLogicalPath: (channel: string, id: string) => string
+): void {
   const requestPath = path.join(root, approvalRequestLogicalPath('terminal', id));
   fs.mkdirSync(path.dirname(requestPath), { recursive: true });
   fs.writeFileSync(
@@ -66,299 +67,271 @@ function seedSecurityPolicyApproval(root: string, id: string): void {
   );
 }
 
+const APPROVAL_IDS = {
+  create: '00000000-0000-4000-8000-000000000001',
+  promote: '00000000-0000-4000-8000-000000000002',
+} as const;
+
 describe('org role create', () => {
+  // `org.ts` used to run in a child `node --import ts-loader.mjs scripts/org.ts`
+  // per call. Measured (operations-hygiene-runbook §5): 2.5-3.3s per child at
+  // load ~18, almost all of it start-up (transpiling the script graph, loading
+  // the authority stack, Node re-reading the 290KB libs/core/package.json per
+  // module), so the promote test's two children alone took 6.4s and crossed the
+  // 10s budget under load. The CLI's `main(argv, print)` runs the same code in
+  // process against one hermetic fixture root for the file.
+  //
+  // Nothing from @agent/core is imported statically: KYBERION_ROOT and the
+  // persona are set first, then the stack is imported once, here. A static
+  // import would load the stack against the repository root first, and
+  // vi.resetModules() cannot undo that for the process-global singletons
+  // (the policy engine keeps the first root and fails closed on the fixture).
+  let tempRoot: string;
+  let org: typeof import('./org.js');
+
+  beforeAll(async () => {
+    tempRoot = makeTempRoot();
+    vi.stubEnv('KYBERION_ROOT', tempRoot);
+    vi.stubEnv('KYBERION_PERSONA', 'ecosystem_architect');
+    const { approvalRequestLogicalPath } = await import('@agent/core/governance/approval-store');
+    seedSecurityPolicyApproval(tempRoot, APPROVAL_IDS.create, approvalRequestLogicalPath);
+    seedSecurityPolicyApproval(tempRoot, APPROVAL_IDS.promote, approvalRequestLogicalPath);
+    org = await import('./org.js');
+  }, 60_000);
+
+  afterAll(() => {
+    vi.unstubAllEnvs();
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  async function runOrgCli(argv: string[]): Promise<string> {
+    const printed: string[] = [];
+    await org.main(argv, (value) => printed.push(String(value)));
+    return printed.join('\n');
+  }
+
   it('resolves existing authority roles through the governed directory loader', () => {
-    const source = fs.readFileSync(
-      pathResolver.rootResolve(path.join('scripts', 'org.ts')),
-      'utf8'
-    );
+    const source = fs.readFileSync(path.join(process.cwd(), 'scripts', 'org.ts'), 'utf8');
 
     expect(source).toContain('loadAuthorityRoleDirectory(rootDir)[authorityRoleId]');
     expect(source).not.toContain('readJsonIfExists');
   });
 
-  it('creates aligned authority, team, policy, and role docs', () => {
-    const tempRoot = makeTempRoot();
-    const repoRoot = process.cwd();
-    const scriptPath = path.join(repoRoot, 'scripts', 'org.ts');
-    const loaderPath = path.join(repoRoot, 'scripts', 'ts-loader.mjs');
-    const approvalId = '00000000-0000-4000-8000-000000000001';
-    seedSecurityPolicyApproval(tempRoot, approvalId);
+  it('creates aligned authority, team, policy, and role docs', async () => {
+    const approvalId = APPROVAL_IDS.create;
+    const stdout = await runOrgCli([
+      'role',
+      'create',
+      '--name',
+      'CFO',
+      '--domain',
+      'leadership',
+      '--authority',
+      'finance_controller',
+      '--persona',
+      'analyst',
+      '--description',
+      'Chief financial officer authority',
+      '--ownership-scope',
+      'Owns finance governance and planning artifacts.',
+      '--capability',
+      'budgeting',
+      '--capability',
+      'forecasting',
+      '--scope-class',
+      'financial_governance',
+      '--write-scope',
+      'knowledge/product/governance/finance/',
+      '--actuator',
+      'artifact-actuator',
+      '--tier',
+      'public',
+      '--tier',
+      'confidential',
+      '--approval-id',
+      approvalId,
+      '--autonomy',
+      'medium',
+      '--parent-team-role',
+      'owner',
+      '--delegate-role',
+      'planner',
+      '--delegate-role',
+      'reviewer',
+    ]);
 
-    try {
-      const stdout = execFileSync(
-        'node',
-        [
-          '--import',
-          loaderPath,
-          scriptPath,
-          'role',
-          'create',
-          '--name',
-          'CFO',
-          '--domain',
-          'leadership',
-          '--authority',
-          'finance_controller',
-          '--persona',
-          'analyst',
-          '--description',
-          'Chief financial officer authority',
-          '--ownership-scope',
-          'Owns finance governance and planning artifacts.',
-          '--capability',
-          'budgeting',
-          '--capability',
-          'forecasting',
-          '--scope-class',
-          'financial_governance',
-          '--write-scope',
-          'knowledge/product/governance/finance/',
-          '--actuator',
-          'artifact-actuator',
-          '--tier',
-          'public',
-          '--tier',
-          'confidential',
-          '--approval-id',
-          approvalId,
-          '--autonomy',
-          'medium',
-          '--parent-team-role',
-          'owner',
-          '--delegate-role',
-          'planner',
-          '--delegate-role',
-          'reviewer',
-        ],
-        {
-          cwd: tempRoot,
-          env: {
-            ...process.env,
-            KYBERION_ROOT: tempRoot,
-            KYBERION_PERSONA: 'ecosystem_architect',
-          },
-          encoding: 'utf8',
-        }
-      );
+    const result = JSON.parse(stdout) as {
+      status: string;
+      role_id: string;
+      authority_role_id: string;
+      persona: string;
+    };
+    expect(result).toMatchObject({
+      status: 'ok',
+      role_id: 'cfo',
+      authority_role_id: 'finance_controller',
+      persona: 'analyst',
+    });
 
-      const result = JSON.parse(stdout.trim()) as {
-        status: string;
-        role_id: string;
-        authority_role_id: string;
-        persona: string;
-      };
-      expect(result).toMatchObject({
-        status: 'ok',
-        role_id: 'cfo',
-        authority_role_id: 'finance_controller',
-        persona: 'analyst',
-      });
+    const readText = (relativePath: string) =>
+      fs.readFileSync(path.join(tempRoot, relativePath), 'utf8');
+    const readJson = <T>(relativePath: string): T => JSON.parse(readText(relativePath)) as T;
 
-      const readText = (relativePath: string) =>
-        fs.readFileSync(path.join(tempRoot, relativePath), 'utf8');
-      const readJson = <T>(relativePath: string): T => JSON.parse(readText(relativePath)) as T;
+    const authorityRole = readJson<{
+      role: string;
+      description: string;
+      default_persona?: string;
+      write_scopes: string[];
+      scope_classes: string[];
+      allowed_actuators: string[];
+      tier_access: string[];
+    }>('knowledge/product/governance/authority-roles/finance_controller.json');
+    expect(authorityRole.role).toBe('finance_controller');
+    expect(authorityRole.default_persona).toBe('analyst');
+    expect(authorityRole.write_scopes).toContain('knowledge/product/governance/finance/');
 
-      const authorityRole = readJson<{
-        role: string;
-        description: string;
-        default_persona?: string;
-        write_scopes: string[];
-        scope_classes: string[];
-        allowed_actuators: string[];
-        tier_access: string[];
-      }>('knowledge/product/governance/authority-roles/finance_controller.json');
-      expect(authorityRole.role).toBe('finance_controller');
-      expect(authorityRole.default_persona).toBe('analyst');
-      expect(authorityRole.write_scopes).toContain('knowledge/product/governance/finance/');
+    const teamRole = readJson<{
+      role: string;
+      required_capabilities: string[];
+      compatible_authority_roles: string[];
+      required_scope_classes: string[];
+      autonomy_level: string;
+    }>('knowledge/product/orchestration/team-roles/cfo.json');
+    expect(teamRole.role).toBe('cfo');
+    expect(teamRole.compatible_authority_roles).toEqual(['finance_controller']);
+    expect(teamRole.required_capabilities).toEqual(
+      expect.arrayContaining(['budgeting', 'forecasting'])
+    );
 
-      const teamRole = readJson<{
-        role: string;
-        required_capabilities: string[];
-        compatible_authority_roles: string[];
-        required_scope_classes: string[];
-        autonomy_level: string;
-      }>('knowledge/product/orchestration/team-roles/cfo.json');
-      expect(teamRole.role).toBe('cfo');
-      expect(teamRole.compatible_authority_roles).toEqual(['finance_controller']);
-      expect(teamRole.required_capabilities).toEqual(
-        expect.arrayContaining(['budgeting', 'forecasting'])
-      );
+    const roleMap = readJson<{
+      context_roles?: Array<{ role: string; authority_role?: string; persona: string }>;
+    }>('knowledge/product/governance/role-authority-map.json');
+    expect(
+      roleMap.context_roles?.some(
+        (entry) =>
+          entry.role === 'cfo' &&
+          entry.authority_role === 'finance_controller' &&
+          entry.persona === 'analyst'
+      )
+    ).toBe(true);
 
-      const roleMap = readJson<{
-        context_roles?: Array<{ role: string; authority_role?: string; persona: string }>;
-      }>('knowledge/product/governance/role-authority-map.json');
-      expect(
-        roleMap.context_roles?.some(
-          (entry) =>
-            entry.role === 'cfo' &&
-            entry.authority_role === 'finance_controller' &&
-            entry.persona === 'analyst'
-        )
-      ).toBe(true);
+    const policy = readJson<{
+      authority_role_permissions?: Record<
+        string,
+        { allow_read?: string[]; allow_write?: string[] }
+      >;
+    }>('knowledge/product/governance/security-policy.json');
+    expect(policy.authority_role_permissions?.finance_controller?.allow_write).toEqual(
+      expect.arrayContaining(['knowledge/product/governance/finance/'])
+    );
 
-      const policy = readJson<{
-        authority_role_permissions?: Record<
-          string,
-          { allow_read?: string[]; allow_write?: string[] }
-        >;
-      }>('knowledge/product/governance/security-policy.json');
-      expect(policy.authority_role_permissions?.finance_controller?.allow_write).toEqual(
-        expect.arrayContaining(['knowledge/product/governance/finance/'])
-      );
+    const roleWriteAccess = readJson<{
+      roles?: Record<string, { allow?: string[] }>;
+    }>('knowledge/product/governance/role-write-access.json');
+    expect(roleWriteAccess.roles?.finance_controller?.allow).toEqual(
+      expect.arrayContaining(['knowledge/product/governance/finance/'])
+    );
 
-      const roleWriteAccess = readJson<{
-        roles?: Record<string, { allow?: string[] }>;
-      }>('knowledge/product/governance/role-write-access.json');
-      expect(roleWriteAccess.roles?.finance_controller?.allow).toEqual(
-        expect.arrayContaining(['knowledge/product/governance/finance/'])
-      );
+    const procedure = readText('knowledge/product/roles/cfo/PROCEDURE.md');
+    expect(procedure).toContain('Role Procedure: CFO');
+    expect(procedure).toContain('finance_controller');
 
-      const procedure = readText('knowledge/product/roles/cfo/PROCEDURE.md');
-      expect(procedure).toContain('Role Procedure: CFO');
-      expect(procedure).toContain('finance_controller');
-
-      const mission = readText('knowledge/product/roles/cfo/mission.md');
-      expect(mission).toContain('CFO Mission Statement');
-      expect(mission).toContain('finance_controller');
-    } finally {
-      fs.rmSync(tempRoot, { recursive: true, force: true });
-    }
+    const mission = readText('knowledge/product/roles/cfo/mission.md');
+    expect(mission).toContain('CFO Mission Statement');
+    expect(mission).toContain('finance_controller');
   });
 
-  it('promotes an existing role to explicit act authority', () => {
-    const tempRoot = makeTempRoot();
-    const repoRoot = process.cwd();
-    const scriptPath = path.join(repoRoot, 'scripts', 'org.ts');
-    const loaderPath = path.join(repoRoot, 'scripts', 'ts-loader.mjs');
-    const approvalId = '00000000-0000-4000-8000-000000000002';
-    seedSecurityPolicyApproval(tempRoot, approvalId);
+  it('promotes an existing role to explicit act authority', async () => {
+    const approvalId = APPROVAL_IDS.promote;
+    await runOrgCli([
+      'role',
+      'create',
+      '--name',
+      'Sales Advisor',
+      '--domain',
+      'leadership',
+      '--authority',
+      'strategic_sales',
+      '--persona',
+      'analyst',
+      '--approval-id',
+      approvalId,
+    ]);
 
-    try {
-      execFileSync(
-        'node',
-        [
-          '--import',
-          loaderPath,
-          scriptPath,
-          'role',
-          'create',
-          '--name',
-          'Sales Advisor',
-          '--domain',
-          'leadership',
-          '--authority',
-          'strategic_sales',
-          '--persona',
-          'analyst',
-          '--approval-id',
-          approvalId,
-        ],
-        {
-          cwd: tempRoot,
-          env: {
-            ...process.env,
-            KYBERION_ROOT: tempRoot,
-            KYBERION_PERSONA: 'ecosystem_architect',
-          },
-          encoding: 'utf8',
-        }
-      );
+    const stdout = await runOrgCli([
+      'role',
+      'promote',
+      '--role',
+      'sales_advisor',
+      '--authority',
+      'strategic_sales',
+      '--persona',
+      'analyst',
+      '--write-scope',
+      'active/projects/contracts/',
+      '--scope-class',
+      'project_delivery',
+      '--actuator',
+      'artifact-actuator',
+      '--tier',
+      'confidential',
+      '--approval-id',
+      approvalId,
+    ]);
 
-      const stdout = execFileSync(
-        'node',
-        [
-          '--import',
-          loaderPath,
-          scriptPath,
-          'role',
-          'promote',
-          '--role',
-          'sales_advisor',
-          '--authority',
-          'strategic_sales',
-          '--persona',
-          'analyst',
-          '--write-scope',
-          'active/projects/contracts/',
-          '--scope-class',
-          'project_delivery',
-          '--actuator',
-          'artifact-actuator',
-          '--tier',
-          'confidential',
-          '--approval-id',
-          approvalId,
-        ],
-        {
-          cwd: tempRoot,
-          env: {
-            ...process.env,
-            KYBERION_ROOT: tempRoot,
-            KYBERION_PERSONA: 'ecosystem_architect',
-          },
-          encoding: 'utf8',
-        }
-      );
+    const result = JSON.parse(stdout) as {
+      status: string;
+      role_id: string;
+      authority_role_id: string;
+      persona: string;
+      files: { promotion_notes: string };
+    };
+    expect(result).toMatchObject({
+      status: 'ok',
+      role_id: 'sales_advisor',
+      authority_role_id: 'strategic_sales',
+      persona: 'analyst',
+    });
+    expect(result.files.promotion_notes).toBe('knowledge/product/roles/sales_advisor/PROMOTION.md');
 
-      const result = JSON.parse(stdout.trim()) as {
-        status: string;
-        role_id: string;
-        authority_role_id: string;
-        persona: string;
-        files: { promotion_notes: string };
-      };
-      expect(result).toMatchObject({
-        status: 'ok',
-        role_id: 'sales_advisor',
-        authority_role_id: 'strategic_sales',
-        persona: 'analyst',
-      });
-      expect(result.files.promotion_notes).toBe(
-        'knowledge/product/roles/sales_advisor/PROMOTION.md'
-      );
+    const readText = (relativePath: string) =>
+      fs.readFileSync(path.join(tempRoot, relativePath), 'utf8');
+    const readJson = <T>(relativePath: string): T => JSON.parse(readText(relativePath)) as T;
 
-      const readText = (relativePath: string) =>
-        fs.readFileSync(path.join(tempRoot, relativePath), 'utf8');
-      const readJson = <T>(relativePath: string): T => JSON.parse(readText(relativePath)) as T;
+    const authorityRole = readJson<{
+      write_scopes: string[];
+      scope_classes: string[];
+      allowed_actuators: string[];
+      tier_access: string[];
+    }>('knowledge/product/governance/authority-roles/strategic_sales.json');
+    expect(authorityRole.write_scopes).toContain('active/projects/contracts/');
+    expect(authorityRole.tier_access).toContain('confidential');
 
-      const authorityRole = readJson<{
-        write_scopes: string[];
-        scope_classes: string[];
-        allowed_actuators: string[];
-        tier_access: string[];
-      }>('knowledge/product/governance/authority-roles/strategic_sales.json');
-      expect(authorityRole.write_scopes).toContain('active/projects/contracts/');
-      expect(authorityRole.tier_access).toContain('confidential');
+    const teamRole = readJson<{ compatible_authority_roles: string[] }>(
+      'knowledge/product/orchestration/team-roles/sales_advisor.json'
+    );
+    expect(teamRole.compatible_authority_roles).toEqual(
+      expect.arrayContaining(['strategic_sales'])
+    );
 
-      const teamRole = readJson<{ compatible_authority_roles: string[] }>(
-        'knowledge/product/orchestration/team-roles/sales_advisor.json'
-      );
-      expect(teamRole.compatible_authority_roles).toEqual(
-        expect.arrayContaining(['strategic_sales'])
-      );
+    const roleMap = readJson<{
+      context_roles?: Array<{ role: string; authority_role?: string; persona: string }>;
+    }>('knowledge/product/governance/role-authority-map.json');
+    expect(
+      roleMap.context_roles?.some(
+        (entry) => entry.role === 'sales_advisor' && entry.authority_role === 'strategic_sales'
+      )
+    ).toBe(true);
 
-      const roleMap = readJson<{
-        context_roles?: Array<{ role: string; authority_role?: string; persona: string }>;
-      }>('knowledge/product/governance/role-authority-map.json');
-      expect(
-        roleMap.context_roles?.some(
-          (entry) => entry.role === 'sales_advisor' && entry.authority_role === 'strategic_sales'
-        )
-      ).toBe(true);
+    const promotionNotes = readText('knowledge/product/roles/sales_advisor/PROMOTION.md');
+    expect(promotionNotes).toContain('explicit advise-to-act promotion');
+    expect(promotionNotes).toContain('strategic_sales');
 
-      const promotionNotes = readText('knowledge/product/roles/sales_advisor/PROMOTION.md');
-      expect(promotionNotes).toContain('explicit advise-to-act promotion');
-      expect(promotionNotes).toContain('strategic_sales');
-
-      const promotedRoleWriteAccess = readJson<{
-        roles?: Record<string, { allow?: string[] }>;
-      }>('knowledge/product/governance/role-write-access.json');
-      expect(promotedRoleWriteAccess.roles?.strategic_sales?.allow).toEqual(
-        expect.arrayContaining(['active/projects/contracts/'])
-      );
-    } finally {
-      fs.rmSync(tempRoot, { recursive: true, force: true });
-    }
+    const promotedRoleWriteAccess = readJson<{
+      roles?: Record<string, { allow?: string[] }>;
+    }>('knowledge/product/governance/role-write-access.json');
+    expect(promotedRoleWriteAccess.roles?.strategic_sales?.allow).toEqual(
+      expect.arrayContaining(['active/projects/contracts/'])
+    );
   });
 });
