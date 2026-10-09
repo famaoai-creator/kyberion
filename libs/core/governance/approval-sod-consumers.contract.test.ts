@@ -20,6 +20,7 @@ const SOD_CONSUMERS: ReadonlyArray<{ file: string; consumer: string }> = [
   { file: 'libs/core/surface/front-desk-execution.ts', consumer: 'front_desk_execution' },
   { file: 'libs/core/discussion/discussion-mission.ts', consumer: 'discussion_mission' },
   { file: 'libs/core/plugin/plugin-view-actions.ts', consumer: 'plugin_view_action' },
+  { file: 'libs/core/plugin/plugin-activation-status.ts', consumer: 'plugin_activation' },
   { file: 'libs/shared-network/src/mcp-server-engine.ts', consumer: 'mcp_governed_tool' },
   { file: 'scripts/pipeline-execution-part-execution.ts', consumer: 'pipeline_await_decision' },
   { file: 'scripts/pipeline-execution-part-control.ts', consumer: 'pipeline_bound_approval' },
@@ -56,11 +57,38 @@ const CALLER_SUPPLIED_SURFACES = [
 const read = (file: string) =>
   String(safeReadFile(pathResolver.rootResolve(file), { encoding: 'utf8' }));
 
+/**
+ * The id must be passed to a separation-of-duties check, not merely appear:
+ * `assertApprovalUsable(x, { consumer: '<id>' })`,
+ * `evaluateApprovalUsability(x, { consumer: '<id>' })` or
+ * `approvalUsabilityRefusal(x, '<id>')`.
+ */
+function callShapeFor(consumer: string): RegExp {
+  const id = consumer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(
+    `(?:assertApprovalUsable|evaluateApprovalUsability)\\([^;]*?\\{[^}]*\\bconsumer: '${id}'` +
+      `|approvalUsabilityRefusal\\([^;]*?,\\s*'${id}'\\s*\\)`,
+    's'
+  );
+}
+
 describe('separation-of-duties consumer registry', () => {
   const doc = read('knowledge/product/governance/approval-gate-design.md');
 
+  it('accepts only the call shapes, not a bare mention of the id', () => {
+    const shape = callShapeFor('demo_consumer');
+    expect("assertApprovalUsable(record, { consumer: 'demo_consumer' });").toMatch(shape);
+    expect("evaluateApprovalUsability(record, { consumer: 'demo_consumer' })").toMatch(shape);
+    expect("approvalUsabilityRefusal(record, 'demo_consumer');").toMatch(shape);
+    expect("// consumer: 'demo_consumer'").not.toMatch(shape);
+    expect("const id = 'demo_consumer';").not.toMatch(shape);
+    expect(
+      "assertApprovalUsable(record, { consumer: 'other' }); log('demo_consumer');"
+    ).not.toMatch(shape);
+  });
+
   it.each(SOD_CONSUMERS)('$file checks approvals as `$consumer`', ({ file, consumer }) => {
-    expect(read(file)).toContain(`'${consumer}'`);
+    expect(read(file)).toMatch(callShapeFor(consumer));
     expect(doc).toContain(`\`${consumer}\``);
   });
 

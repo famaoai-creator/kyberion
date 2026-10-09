@@ -61,8 +61,8 @@ mission brief
   - DOT: `dot_release`、`dot_dispatch`、`dot_autonomy_promotion`（拒否時は昇格待ちを監査付きで取り消す）、
     `front_desk_execution`
   - mission と discussion: `mission_scope_approve`、`mission_reconcile_work`、`discussion_mission`
-  - plugin と MCP: `plugin_view_action`、`mcp_governed_tool`（plugin の有効化判定は監査なしで判定し、
-    使えない承認は `pending_approval` にする）
+  - plugin と MCP: `plugin_view_action`、`plugin_activation`（plugin の有効化判定。監査なしで判定し、
+    使えない承認は `pending_approval` にする）、`mcp_governed_tool`
   - pipeline: `pipeline_await_decision`、`pipeline_bound_approval`
   - その他の効果: `project_trust`、`secret_introduction`、`background_review_patch`、`peer_runtime_recovery`、
     `marketing_publication`、`held_action_apply`（held action は取り消され、依存する held action も取り消される。
