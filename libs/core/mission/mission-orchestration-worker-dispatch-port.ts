@@ -1,3 +1,4 @@
+import { logger } from '../core.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 export type MissionWorkerCoreDispatcher = (
@@ -19,38 +20,53 @@ const DEFAULT_METADATA: SeamProviderMetadata = {
   reason: 'mission worker core dispatch registration',
 };
 
-export function registerMissionWorkerCoreDispatcher(
-  next: MissionWorkerCoreDispatcher,
-  metadata: SeamProviderMetadata = DEFAULT_METADATA
-): () => void {
-  return missionWorkerCoreDispatcherSeam.register('mission-worker-core', next, metadata);
+export interface MissionWorkerCoreDispatcherRegistrationOptions {
+  /**
+   * Marks the registration as re-installable by its owner. A later
+   * registration that presents the same key supersedes it (with a warning)
+   * instead of failing with SEAM_DUPLICATE_PROVIDER. Without the key, or with
+   * a different one, the sole seam still rejects a second provider.
+   */
+  replaceKey?: symbol;
 }
 
-let releaseBuiltinDispatcher: (() => void) | null = null;
+let replaceableRegistration: { key: symbol; release: () => void } | null = null;
 
 /**
- * Module-level installation of the builtin dispatcher
- * (`mission-orchestration-worker-part-core.ts`). A second evaluation of that
- * module against this same port instance supersedes the stale builtin
- * registration instead of throwing SEAM_DUPLICATE_PROVIDER. That happens when
- * a module-registry reset races an import that is still in flight, e.g. a
- * timed-out test whose dynamic import keeps evaluating after the next test
- * called `vi.resetModules()` (operations-hygiene-runbook §5). Only a
- * registration made by this installer is superseded: a provider registered
- * through `registerMissionWorkerCoreDispatcher` (a plugin or test double) still
- * makes the sole seam reject the builtin.
+ * Register the mission worker core dispatcher. The builtin owner
+ * (`mission-orchestration-worker-part-core.ts`) passes its own unexported
+ * `replaceKey`: a second evaluation of that module against this port instance
+ * (a module-registry reset racing an import still in flight, as when a
+ * timed-out test keeps evaluating after the next test called
+ * `vi.resetModules()`, operations-hygiene-runbook §5) supersedes the stale
+ * builtin registration instead of throwing. Any other caller cannot evict it.
  */
-export function installBuiltinMissionWorkerCoreDispatcher(
-  next: MissionWorkerCoreDispatcher
+export function registerMissionWorkerCoreDispatcher(
+  next: MissionWorkerCoreDispatcher,
+  metadata: SeamProviderMetadata = DEFAULT_METADATA,
+  options: MissionWorkerCoreDispatcherRegistrationOptions = {}
 ): () => void {
-  releaseBuiltinDispatcher?.();
-  const dispose = registerMissionWorkerCoreDispatcher(next);
-  const release = () => {
-    dispose();
-    if (releaseBuiltinDispatcher === release) releaseBuiltinDispatcher = null;
+  const { replaceKey } = options;
+  if (replaceKey !== undefined && replaceableRegistration?.key === replaceKey) {
+    logger.warn(
+      `[MISSION_WORKER_CORE] superseding the registered mission-worker-core dispatcher — ` +
+        `its owner registered it again with the same replace key (module re-evaluated) | ` +
+        `next: none if this follows a module-registry reset; otherwise find the second evaluation of ${metadata.source} | ` +
+        `evidence: seam=mission-worker-core-dispatcher source=${metadata.source}`
+    );
+    replaceableRegistration.release();
+  }
+  const dispose = missionWorkerCoreDispatcherSeam.register('mission-worker-core', next, metadata);
+  if (replaceKey === undefined) return dispose;
+  const registration = {
+    key: replaceKey,
+    release: () => {
+      dispose();
+      if (replaceableRegistration === registration) replaceableRegistration = null;
+    },
   };
-  releaseBuiltinDispatcher = release;
-  return release;
+  replaceableRegistration = registration;
+  return registration.release;
 }
 
 export async function dispatchThroughMissionWorkerCore(
