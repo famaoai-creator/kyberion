@@ -1,5 +1,16 @@
 import * as nodePath from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('../customer-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../customer-resolver.js')>();
+  const { customerRootWithSodOverlay } =
+    await import('../governance/__tests__/sod-overlay-state.js');
+  return { ...actual, customerRoot: customerRootWithSodOverlay(actual.customerRoot) };
+});
+import {
+  clearSeparationOfDuties,
+  setSeparationOfDuties,
+} from '../governance/__tests__/sod-overlay.js';
+
 import * as pathResolver from '../path-resolver.js';
 import {
   approvalEventLogicalPath,
@@ -147,6 +158,30 @@ describe('mission scope approval requests', () => {
     expect(request.details).toContain('delivered scope goal');
     expect(request.details).toContain('delivered work diverged legitimately');
     expect(request.details).toContain(missionId);
+  });
+
+  it('re-request opens a new request instead of reusing a self-approval that separation of duties makes unusable', () => {
+    prepareMission();
+    const input = {
+      missionId,
+      goalSummary: 'delivered scope goal',
+      reason: 'sod reason',
+      requestedBy: humanDecider,
+    };
+    try {
+      setSeparationOfDuties(false);
+      const first = createMissionScopeApprovalRequest(input);
+      approvalIds.push(first.id);
+      approveRequest(first);
+      expect(createMissionScopeApprovalRequest(input).id).toBe(first.id);
+      setSeparationOfDuties(true);
+      const second = createMissionScopeApprovalRequest(input);
+      approvalIds.push(second.id);
+      expect(second.id).not.toBe(first.id);
+      expect(second.status).toBe('pending');
+    } finally {
+      clearSeparationOfDuties();
+    }
   });
 
   it('dedupes an identical pending request instead of filing a second one', () => {
