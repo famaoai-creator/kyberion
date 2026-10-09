@@ -71,7 +71,7 @@ import {
 import { evaluateApprovalUsability } from '@agent/core/governance/approval-store';
 import { decideApprovalFromCli } from './lib/approval-cli-decision.js';
 import { captureCliAttestationInvoker } from './lib/cli-attestation-invoker.js';
-import { ttyIo } from './lib/tty-io.test-support.js';
+import { withTtyAnswer } from './lib/tty-io.test-support.js';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { main as kyberionHome } from './kyberion_home.js';
@@ -133,12 +133,16 @@ describe('terminal approvals record one stable operator principal', () => {
   }
 
   /** The shared terminal decision with an interactive terminal answering `answer`. */
-  function approveAtTty(id: string, answer: (code: string) => string = (code) => code) {
-    return decideApprovalFromCli(stored(id), {
-      decision: 'approved',
-      note: 'tty test',
-      io: ttyIo(answer),
-    });
+  function approveAtTty(
+    id: string,
+    answer: (code: string) => string | null = (code) => code,
+    options: { timeoutMs?: number } = {}
+  ) {
+    return withTtyAnswer(
+      answer,
+      () => decideApprovalFromCli(stored(id), { decision: 'approved', note: 'tty test' }),
+      options
+    );
   }
 
   const stored = (id: string) => loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id)!;
@@ -203,6 +207,17 @@ describe('terminal approvals record one stable operator principal', () => {
     plainTerminal();
     await expect(approveAtTty(id, () => 'not-the-code')).rejects.toThrow(
       /approval decision cancelled — the typed challenge did not match/
+    );
+    expect(stored(id).status).toBe('pending');
+  });
+
+  it('with SoD on, an unanswered TTY challenge times out and records nothing', async () => {
+    setSeparationOfDuties(true);
+    vi.stubEnv('CLAUDECODE', '1');
+    const id = requestFromCli();
+    plainTerminal();
+    await expect(approveAtTty(id, () => null, { timeoutMs: 50 })).rejects.toThrow(
+      /^\[POLICY_VIOLATION\] challenge timed out/
     );
     expect(stored(id).status).toBe('pending');
   });
