@@ -1,13 +1,16 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeRmSync } from '../secure-io.js';
+import { safeExistsSync, safeRmSync } from '../secure-io.js';
 import {
   WorkCoordinationError,
   assertWorkClaimsAllowed,
 } from '../workforce/work-coordination-error.js';
 import { resolveSurfaceApprovalReply } from '../surface/surface-approval-ui.js';
 import { t } from '../t.js';
+import { AUTONOMY_APPROVAL_CHANNEL } from './approval-decision-card.js';
 import { routeAutonomousDecision } from './approval-decision-routing.js';
+import { approvalStoreRoots } from './approval-store.js';
 import { tickVetoWindows } from './approval-veto-window.js';
 import type { AutonomousOpsGateResult } from './autonomous-ops-gate.js';
 import {
@@ -24,6 +27,15 @@ afterEach(() => {
   safeRmSync(pathResolver.shared('runtime/vitest-operations-halt'), {
     recursive: true,
     force: true,
+  });
+  // routeAutonomousDecision on 'auto' records a digest notice (and a parked
+  // decision may record a request) in the per-pool test approval store, which
+  // the next file in this pool would read (approval-decision-routing.test.ts).
+  withExecutionContext('mission_controller', () => {
+    for (const root of Object.values(approvalStoreRoots())) {
+      const dir = pathResolver.rootResolve(`${root}/${AUTONOMY_APPROVAL_CHANNEL}`);
+      if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
