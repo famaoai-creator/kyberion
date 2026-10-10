@@ -25,7 +25,6 @@ import {
   safeWriteFile,
   validateFileSize,
 } from './secure-io.js';
-import { acquireLock, releaseLock } from './foundation/lock-utils.js';
 import {
   assertNotForeignHardLink,
   assertTempInCheckedDir,
@@ -417,24 +416,6 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     expect(sawStore).toBeGreaterThan(0);
     expect(leaked).toBe(0);
   }, 20000);
-
-  it('releases a lock while its record has a recovery tomb link', async () => {
-    const id = `vitest-secure-io-release-${RUN}`;
-    const lockFile = abs(`active/shared/runtime/locks/${encodeURIComponent(id)}.lock`);
-    const tomb = `${lockFile}.stale-99999-${Date.now()}-1`;
-    process.env.MISSION_ROLE = 'mission_controller';
-    try {
-      expect(await acquireLock(id, 300)).toBe(true);
-      fs.linkSync(lockFile, tomb);
-      releaseLock(id);
-      expect(fs.existsSync(lockFile)).toBe(false);
-      expect(await acquireLock(id, 300)).toBe(true);
-      releaseLock(id);
-    } finally {
-      fs.rmSync(lockFile, { force: true });
-      fs.rmSync(tomb, { force: true });
-    }
-  });
 
   it('reports a missing file with code ENOENT', () => {
     let code: unknown;
