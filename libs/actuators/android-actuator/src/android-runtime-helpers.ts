@@ -1,4 +1,5 @@
 import { executeLlmDecideOp } from '@agent/core/semantic-decide';
+import { decodeEntities } from '@agent/core/text-escaping';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -957,11 +958,11 @@ function parseUiTreeNodes(xml: string): AndroidUiNode[] {
     const attrs = match[1];
     nodes.push({
       index: Number(readXmlAttr(attrs, 'index') || nodes.length),
-      text: decodeXml(readXmlAttr(attrs, 'text') || ''),
-      resourceId: decodeXml(readXmlAttr(attrs, 'resource-id') || ''),
-      className: decodeXml(readXmlAttr(attrs, 'class') || ''),
-      packageName: decodeXml(readXmlAttr(attrs, 'package') || ''),
-      contentDesc: decodeXml(readXmlAttr(attrs, 'content-desc') || ''),
+      text: decodeEntities(readXmlAttr(attrs, 'text') || ''),
+      resourceId: decodeEntities(readXmlAttr(attrs, 'resource-id') || ''),
+      className: decodeEntities(readXmlAttr(attrs, 'class') || ''),
+      packageName: decodeEntities(readXmlAttr(attrs, 'package') || ''),
+      contentDesc: decodeEntities(readXmlAttr(attrs, 'content-desc') || ''),
       bounds: readXmlAttr(attrs, 'bounds') || '',
       clickable: readXmlAttr(attrs, 'clickable') === 'true',
       enabled: readXmlAttr(attrs, 'enabled') !== 'false',
@@ -1286,15 +1287,6 @@ function boundsCenter(bounds: string): { x: number; y: number } {
 function readXmlAttr(attrs: string, name: string): string | undefined {
   const match = attrs.match(new RegExp(`${escapeRegExp(name)}="([^"]*)"`, 'i'));
   return match?.[1];
-}
-
-function decodeXml(input: string): string {
-  return input
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&');
 }
 
 function escapeRegExp(input: string): string {

@@ -9,6 +9,7 @@ import {
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { htmlToPreviewText } from '../html-sanitize.js';
+import { decodeEntities } from '../text-escaping.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { parseSurfaceActuatorResult } from './surface-runtime-result.js';
@@ -844,12 +845,7 @@ export async function handleTaskSessionRoute(
       const rawHtml = extractExternalResponseText(fetchResult);
 
       // 2. Strip HTML tags and extract readable text
-      const plainTextRaw = htmlToPreviewText(String(rawHtml))
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&amp;/g, '&')
+      const plainTextRaw = decodeEntities(htmlToPreviewText(String(rawHtml)))
         .replace(/\s{2,}/g, ' ')
         .trim();
       const plainTextPreview = truncateTextWithCount(plainTextRaw, 4000);

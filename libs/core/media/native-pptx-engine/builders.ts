@@ -1,6 +1,8 @@
 import { resolveEastAsianFontFamily, resolveLatinFontFamily } from '../../design-fonts.js';
 import type { PptxElement, PptxStyle } from '../../contracts/pptx-protocol.js';
 import { clamp } from '../../foundation/text.js';
+import { stripTags } from '../../html-sanitize.js';
+import { decodeEntities, sanitizeXmlText } from '../../text-escaping.js';
 
 function inToEmu(inches: number): number {
   return Math.round(inches * 914400);
@@ -26,28 +28,6 @@ function cornerRadiusGuideValue(r: number): number {
 function lineSpacingPctValue(ls: number): number {
   const pct = ls <= 10 ? ls * 100000 : ls * 1000;
   return Math.max(1000, Math.round(pct));
-}
-
-function sanitizeXmlText(input: string): string {
-  return String(input || '')
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-/**
- * Remove tags until stable so malformed markup (`<<a:t>`) cannot leave a
- * re-formed tag behind when comparing stored XML to user text.
- */
-function stripTags(xml: string): string {
-  let out = xml;
-  while (out.includes('<')) {
-    const next = out.replace(/<[^<>]+>/g, '');
-    if (next === out) break;
-    out = next;
-  }
-  return out;
 }
 
 function ptToEmu(pt: number): number {
@@ -218,11 +198,7 @@ export function buildShape(
     el.text !== undefined &&
     el.pXmlLst &&
     el.text.replace(/\s/g, '') !==
-      stripTags(el.pXmlLst.join(''))
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&amp;/g, '&')
-        .replace(/\s/g, '');
+      decodeEntities(stripTags(el.pXmlLst.join(''), '')).replace(/\s/g, '');
 
   if (el.pXmlLst && el.pXmlLst.length > 0 && !isTextModified) {
     const bodyPr = el.bodyPrXml || '<a:bodyPr/>';

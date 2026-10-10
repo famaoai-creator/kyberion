@@ -1,14 +1,7 @@
 import type { TranscriptSegment } from './video-ingest-types.js';
+import { decodeEntities } from '../../text-escaping.js';
 
 const TIMESTAMP = /^(?:(\d{1,3}):)?(\d{2}):(\d{2})[.,](\d{3})$/;
-const ENTITIES: Record<string, string> = {
-  '&amp;': '&',
-  '&lt;': '<',
-  '&gt;': '>',
-  '&quot;': '"',
-  '&#39;': "'",
-  '&nbsp;': ' ',
-};
 
 export function parseVttTimestamp(value: string): number | null {
   const match = TIMESTAMP.exec(value.trim());
@@ -26,10 +19,7 @@ function cleanCueLine(line: string): string {
     else if (char === '>' && inTag) inTag = false;
     else if (!inTag) text += char;
   }
-  return text
-    .replace(/&(?:amp|lt|gt|quot|#39|nbsp);/g, (entity) => ENTITIES[entity] ?? entity)
-    .replace(/\s+/g, ' ')
-    .trim();
+  return decodeEntities(text).replace(/\s+/g, ' ').trim();
 }
 
 interface RawCue {

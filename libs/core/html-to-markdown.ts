@@ -11,39 +11,8 @@
  * deterministic: no locale-, platform- or time-dependent behavior.
  */
 
-const BASIC_ENTITIES: Record<string, string> = {
-  '&amp;': '&',
-  '&lt;': '<',
-  '&gt;': '>',
-  '&quot;': '"',
-  '&#39;': "'",
-  '&apos;': "'",
-  '&nbsp;': ' ',
-};
-
-function decodeEntities(text: string): string {
-  return text
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex: string) =>
-      String.fromCodePoint(Number.parseInt(hex, 16))
-    )
-    .replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(Number.parseInt(dec, 10)))
-    .replace(/&(amp|lt|gt|quot|#39|apos|nbsp);/g, (entity) => BASIC_ENTITIES[entity] ?? entity);
-}
-
-/**
- * Remove tags repeatedly until stable: a single pass over `<[^<>]*>` can leave
- * a partial tag behind (`<<script>` → `<` + removed), which then re-forms a
- * tag with neighbouring text. Iterating closes that multi-character gap.
- */
-function stripTags(html: string): string {
-  let out = html;
-  while (out.includes('<')) {
-    const next = out.replace(/<[^<>]*>/g, '');
-    if (next === out) break;
-    out = next;
-  }
-  return out;
-}
+import { decodeEntities } from './text-escaping.js';
+import { stripElementBlocks, stripTags } from './html-sanitize.js';
 
 /** Remove comments with a linear scan — no regex backtracking on `<!--` runs. */
 function stripComments(html: string): string {
@@ -57,21 +26,9 @@ function stripComments(html: string): string {
   return out;
 }
 
-/** Drop whole element blocks (script/style/head) until none remain. */
-function stripElementBlocks(html: string): string {
-  const pattern = /<(script|style|head)\b[^>]*>[\s\S]*?<\/\1[^>]*>/gi;
-  let out = html;
-  let prev: string;
-  do {
-    prev = out;
-    out = out.replace(pattern, '');
-  } while (out !== prev);
-  return out;
-}
-
 /** Strip any remaining tags and collapse inline whitespace. */
 function inlineText(html: string): string {
-  return stripTags(html)
+  return stripTags(html, '')
     .replace(/[ \t\r\n]+/g, ' ')
     .trim();
 }
@@ -135,12 +92,12 @@ export function htmlToMarkdown(html: string): string {
 
   // Drop non-content blocks entirely.
   out = stripComments(out);
-  out = stripElementBlocks(out);
+  out = stripElementBlocks(out, ['script', 'style', 'head'], '');
 
   // Protect <pre> blocks from inline/whitespace processing.
   const preBlocks: string[] = [];
   out = out.replace(/<pre\b[^>]*>([\s\S]*?)<\/pre>/gi, (_, body: string) => {
-    const code = decodeEntities(stripTags(body)).replace(/^\n+|\n+$/g, '');
+    const code = decodeEntities(stripTags(body, '')).replace(/^\n+|\n+$/g, '');
     preBlocks.push(`\`\`\`\n${code}\n\`\`\``);
     return `\n\n@@KYB_PRE_${preBlocks.length - 1}@@\n\n`;
   });
@@ -162,7 +119,7 @@ export function htmlToMarkdown(html: string): string {
   out = out.replace(/<\/(div|section|article|blockquote)>/gi, '\n\n');
 
   out = convertInline(out);
-  out = stripTags(out);
+  out = stripTags(out, '');
   out = decodeEntities(out);
 
   // Whitespace normalization: per-line trim, collapse 3+ newlines to 2.

@@ -1,6 +1,8 @@
 import * as path from 'path';
 import JSZip from 'jszip';
 import { safeReadFile } from '../secure-io.js';
+import { stripTags } from '../html-sanitize.js';
+import { decodeEntities } from '../text-escaping.js';
 import { nowIso } from '../foundation/time.js';
 import {
   XlsxDesignProtocol,
@@ -65,20 +67,6 @@ function getAllTags(xml: string, tag: string): string[] {
     results.push(match[0]);
   }
   return results;
-}
-
-/**
- * Remove tags until stable so malformed markup (`<<t>`) cannot leave a
- * re-formed tag behind.
- */
-function stripTags(xml: string): string {
-  let out = xml;
-  while (out.includes('<')) {
-    const next = out.replace(/<[^<>]+>/g, '');
-    if (next === out) break;
-    out = next;
-  }
-  return out;
 }
 
 function emuToNum(emu: string | undefined): number {
@@ -330,7 +318,7 @@ async function extractStyles(zip: JSZip): Promise<XlsxDesignProtocol['styles']> 
     // Attribute values are XML-escaped (`"▲"` arrives as `&quot;▲&quot;`);
     // keep the real format code so formatting works and the writer's
     // escXml does not double-escape it on a round trip.
-    const code = decodeXmlAttribute(getAttr(nf, 'formatCode') || '');
+    const code = decodeEntities(getAttr(nf, 'formatCode') || '');
     styles.numFmts.push({ id, formatCode: code });
   }
 
@@ -982,7 +970,7 @@ async function extractWorkbook(zip: JSZip): Promise<{
   const dnSource = dnTags.length > 0 ? dnTags : getAllTags(xml, 'x:definedName');
   for (const dn of dnSource) {
     const name = getAttr(dn, 'name') || '';
-    const value = stripTags(dn).trim();
+    const value = stripTags(dn, '').trim();
     const localSheetId = getAttr(dn, 'localSheetId');
     result.definedNames.push({
       name,
@@ -1011,17 +999,6 @@ async function resolveSheetPaths(zip: JSZip): Promise<Map<string, string>> {
     }
   }
   return map;
-}
-
-function decodeXmlAttribute(value: string): string {
-  return value
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&#x([0-9a-f]+);/gi, (_m, hex: string) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_m, dec: string) => String.fromCodePoint(Number(dec)))
-    .replace(/&amp;/g, '&');
 }
 
 // ─── Main Entry Point ────────────────────────────────────────

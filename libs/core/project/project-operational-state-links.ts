@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
 import { nowIso } from '../foundation/time.js';
+import { sanitizeIdSegment } from '../foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -34,13 +35,7 @@ function trackStateCatalog(filePath: string) {
 }
 
 function normalizeSegment(value: string, fallback = 'shared'): string {
-  return (
-    String(value || '')
-      .trim()
-      .replace(/[\\/]+/g, '-')
-      .replace(/[^a-zA-Z0-9._-]+/g, '-')
-      .replace(/^-+|-+$/g, '') || fallback
-  );
+  return sanitizeIdSegment(value, { fallback });
 }
 
 function projectStateWorkspaceDir(

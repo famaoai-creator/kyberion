@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { tryResolveOwnerScope } from './owner-scope.js';
 import { writeScopedArtifact } from './workforce/artifact-store.js';
 import { pathResolver } from './path-resolver.js';
+import { sanitizeIdSegment } from './foundation/text.js';
 import { safeMkdir, safeWriteFile } from './secure-io.js';
 
 export const DEFAULT_INLINE_OUTPUT_CHARS = 16_000;
@@ -25,12 +26,7 @@ export interface OutputArtifactOptions {
 }
 
 function slug(value: string, fallback: string): string {
-  const sanitized = String(value || '')
-    .trim()
-    .split(/[^a-zA-Z0-9._-]+/)
-    .filter(Boolean)
-    .join('-');
-  return sanitized || fallback;
+  return sanitizeIdSegment(value, { fallback });
 }
 
 function previewText(text: string, maxChars: number): string {

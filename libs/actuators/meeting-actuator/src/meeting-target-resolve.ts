@@ -9,6 +9,8 @@
  */
 
 import { resolveMeetingPlatformByHost } from '@agent/core/meeting/meeting-platform-registry';
+import { stripTags } from '@agent/core/html-sanitize';
+import { decodeEntities } from '@agent/core/text-escaping';
 
 export type JoinablePlatform = 'meet' | 'zoom' | 'teams';
 
@@ -82,12 +84,7 @@ function cleanUrl(raw: string): string {
 }
 
 function stripMarkup(text: string): string {
-  return text
-    .replace(/<[^<>]*>/gu, ' ')
-    .replace(/&nbsp;/gu, ' ')
-    .replace(/&lt;/gu, '<')
-    .replace(/&gt;/gu, '>')
-    .replace(/&amp;/gu, '&');
+  return decodeEntities(stripTags(text));
 }
 
 /** First known meeting URL in `location`, then `description`. */

@@ -23,6 +23,7 @@ import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
+import { sanitizeIdSegment } from '../foundation/text.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 import { MobileBetaDeploymentAdapter } from './deployment-adapters/mobile-beta.js';
@@ -131,11 +132,7 @@ export interface ShellDeploymentAdapterConfig {
 }
 
 function normalizeDeploymentProjectName(value: string): string {
-  return String(value || '')
-    .trim()
-    .replace(/[\\/]+/g, '-')
-    .replace(/[^a-zA-Z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  return sanitizeIdSegment(value);
 }
 
 function resolveDeploymentConfigPath(env: NodeJS.ProcessEnv): string | null {

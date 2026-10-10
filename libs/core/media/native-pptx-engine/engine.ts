@@ -7,7 +7,7 @@ import {
 import AdmZip from 'adm-zip';
 import * as path from 'path';
 import { safeExistsSync, safeReadFile } from '../../secure-io.js';
-import { escapeXml, stripXmlControlCharacters } from '../../text-escaping.js';
+import { decodeEntities, sanitizeXmlText } from '../../text-escaping.js';
 import type { PptxDesignProtocol } from '../../contracts/pptx-protocol.js';
 import { generateContentTypes } from './content-types.js';
 import {
@@ -71,8 +71,8 @@ export async function generateNativePptx(
       // Apply text replacements to raw XML using proven <a:t> patching
       if (Object.keys(textReplacements).length > 0) {
         for (const [orig, repl] of Object.entries(textReplacements)) {
-          const escapedOrig = escapePptxXml(orig);
-          const escapedRepl = escapePptxXml(repl);
+          const escapedOrig = sanitizeXmlText(orig);
+          const escapedRepl = sanitizeXmlText(repl);
 
           // Strategy 1: Direct <a:t> replacement
           const pattern = `<a:t>${escapedOrig}</a:t>`;
@@ -687,7 +687,7 @@ export function patchPptxParagraphs(
     for (const para of paragraphs) {
       const textParts = para.match(/<a:t>([^<]*)<\/a:t>/g);
       if (!textParts || textParts.length === 0) continue;
-      const combined = textParts.map((t) => unescapeXml(t.replace(/<\/?a:t>/g, ''))).join('');
+      const combined = textParts.map((t) => decodeEntities(t.replace(/<\/?a:t>/g, ''))).join('');
 
       for (const { original, replacement, mode = 'exact' } of paragraphReplacements) {
         const match =
@@ -700,7 +700,7 @@ export function patchPptxParagraphs(
 
         const newCombined =
           mode === 'contains' ? combined.split(original).join(replacement) : replacement;
-        const escapedNew = escapePptxXml(newCombined);
+        const escapedNew = sanitizeXmlText(newCombined);
 
         let firstRun = true;
         const newPara = para.replace(/<a:t>[^<]*<\/a:t>/g, () => {
@@ -750,7 +750,7 @@ export function patchPptxText(
   // Build a mapping of escaped XML text for safe replacement
   const xmlReplacements: { original: string; replacement: string }[] = [];
   for (const [orig, repl] of Object.entries(textReplacements)) {
-    xmlReplacements.push({ original: escapePptxXml(orig), replacement: escapePptxXml(repl) });
+    xmlReplacements.push({ original: sanitizeXmlText(orig), replacement: sanitizeXmlText(repl) });
   }
 
   // Process each slide XML
@@ -774,9 +774,9 @@ export function patchPptxText(
     // Strategy 2: For multi-run text, try to find and replace concatenated text
     // across adjacent <a:t> tags within the same <a:p> paragraph
     for (const [orig, repl] of Object.entries(textReplacements)) {
-      if (modified && !xml.includes(escapePptxXml(orig))) continue;
+      if (modified && !xml.includes(sanitizeXmlText(orig))) continue;
       // Find paragraphs containing the text spread across runs
-      const escapedOrig = escapePptxXml(orig);
+      const escapedOrig = sanitizeXmlText(orig);
       const paragraphs = xml.match(/<a:p[> ][\s\S]*?<\/a:p>/g) || [];
       for (const para of paragraphs) {
         const textParts = para.match(/<a:t>([^<]*)<\/a:t>/g);
@@ -784,7 +784,7 @@ export function patchPptxText(
         const combined = textParts.map((t) => t.replace(/<\/?a:t>/g, '')).join('');
         if (combined === escapedOrig) {
           // Replace: keep the first run's formatting, put all text there, empty others
-          const escapedRepl = escapePptxXml(repl);
+          const escapedRepl = sanitizeXmlText(repl);
           let newPara = para;
           let firstRun = true;
           newPara = newPara.replace(/<a:t>[^<]*<\/a:t>/g, (match) => {
@@ -806,19 +806,6 @@ export function patchPptxText(
   }
 
   zip.writeZip(outputPath);
-}
-
-function escapePptxXml(value: string): string {
-  return escapeXml(stripXmlControlCharacters(value));
-}
-
-function unescapeXml(str: string): string {
-  return str
-    .replace(/&apos;/g, "'")
-    .replace(/&quot;/g, '"')
-    .replace(/&gt;/g, '>')
-    .replace(/&lt;/g, '<')
-    .replace(/&amp;/g, '&');
 }
 
 function xmlBlocks(xml: string, tag: string): string[] {
@@ -849,7 +836,7 @@ function xmlBlockText(block: string, tag: string): string {
   const openEnd = block.indexOf('>');
   const closeStart = block.lastIndexOf(`</${tag}>`);
   return openEnd >= 0 && closeStart > openEnd
-    ? unescapeXml(block.slice(openEnd + 1, closeStart))
+    ? decodeEntities(block.slice(openEnd + 1, closeStart))
     : '';
 }
 
@@ -864,26 +851,6 @@ function paragraphTexts(xml: string): string[] {
     .filter((text) => text.trim());
 }
 
-/** Slice each `<p:sp ...>...</p:sp>` block with a linear scan (no regex backtracking). */
-function shapeBlocks(xml: string): string[] {
-  const blocks: string[] = [];
-  let cursor = 0;
-  for (;;) {
-    const start = xml.indexOf('<p:sp', cursor);
-    if (start < 0) break;
-    const next = xml[start + '<p:sp'.length];
-    if (next !== ' ' && next !== '>') {
-      cursor = start + '<p:sp'.length;
-      continue;
-    }
-    const end = xml.indexOf('</p:sp>', start);
-    if (end < 0) break;
-    blocks.push(xml.slice(start, end + '</p:sp>'.length));
-    cursor = end + '</p:sp>'.length;
-  }
-  return blocks;
-}
-
 /**
  * Extract text per shape from raw slide XML.
  * Groups <a:t> text by their parent <p:sp> shape, returning one string per
@@ -892,7 +859,7 @@ function shapeBlocks(xml: string): string[] {
  */
 function extractTextFromSlideXml(xml: string): string[] {
   const results: string[] = [];
-  const shapes = shapeBlocks(xml);
+  const shapes = xmlBlocks(xml, 'p:sp');
   for (const shape of shapes) {
     const txBodyStart = shape.indexOf('<p:txBody>');
     const txBodyEnd = shape.indexOf('</p:txBody>');

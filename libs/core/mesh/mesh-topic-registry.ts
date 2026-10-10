@@ -1,6 +1,7 @@
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { readJsonLines } from '../foundation/json.js';
 import { normalizeIso } from '../foundation/time.js';
+import { sanitizeIdSegment } from '../foundation/text.js';
 
 import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 import { withExecutionContext } from '../authority.js';
@@ -29,11 +30,7 @@ export interface MeshTopicSubscriptionFilter {
 }
 
 function normalizeNamespace(namespace?: string): string {
-  return String(namespace || '')
-    .trim()
-    .replace(/[^a-zA-Z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 64);
+  return sanitizeIdSegment(namespace || '', { maxLength: 64 });
 }
 
 function meshHubRuntimeRoot(namespace?: string): string {

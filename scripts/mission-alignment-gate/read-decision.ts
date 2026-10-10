@@ -12,6 +12,7 @@
  */
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
+import { decodeEntities } from '@agent/core/text-escaping';
 import { t as catalogT } from '@agent/core/t';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { loadMissionBriefAtPath } from './mission-brief.js';
@@ -41,8 +42,7 @@ export function main(argv: string[] = [], print: Print = () => undefined): void 
   const comments: string[] = [];
   const reNote = /data-note="([^"]*)"/g;
   let mm: RegExpExecArray | null;
-  while ((mm = reNote.exec(html)))
-    comments.push(mm[1].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));
+  while ((mm = reNote.exec(html))) comments.push(decodeEntities(mm[1]));
 
   const safeJsonPath = resolveDecisionResourcePath(jsonPath, true);
   const b =
