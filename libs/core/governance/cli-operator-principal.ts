@@ -29,8 +29,10 @@
  * recorded as before. With it on, a missing identity is reported instead of
  * silently recording a value that cannot prove separation.
  */
-import { getRegisteredEnvText } from '../foundation/env.js';
-import { listCliReasoningProviderDescriptors } from '../reasoning/reasoning-provider-registry.js';
+import {
+  agentExecutionContextEnvNames,
+  detectAgentExecutionContext,
+} from '../agent-execution-context.js';
 import { resolveMemberByPrincipal } from '../organization/member-registry.js';
 import { resolveOperatorDisplayName } from '../surface/operator-identity.js';
 import { resolveSeparationOfDutiesPolicy } from './approval-policy.js';
@@ -54,62 +56,19 @@ export interface CliOperatorIdentity {
 /** The command that provisions the owner member from the terminal. */
 export const CLI_OPERATOR_PROVISION_COMMAND = 'pnpm organization member ensure-owner';
 
-/**
- * Environment markers of an agent session. Kyberion's own agent runtime sets
- * `KYBERION_AGENT_ID` / `KYBERION_NHI_ID` / `KYBERION_RUN_ORIGIN=agent` (the
- * same signals `deriveTraceOrigin` classifies as `agent`); provider CLI
- * harnesses set their own marker in every child process they spawn. Those
- * harness markers come from the reasoning-provider registry
- * (`cli.session_markers` / `cli.session_principal` in
- * `knowledge/product/governance/reasoning-providers/`), read on use.
- */
-function agentHarnessMarkers(): Array<{ env: string; equals?: string; agent: string }> {
-  return listCliReasoningProviderDescriptors().flatMap((descriptor) =>
-    (descriptor.cli.session_markers ?? []).map((marker) => ({
-      env: marker.env,
-      ...(marker.equals !== undefined ? { equals: marker.equals.toLowerCase() } : {}),
-      agent: descriptor.cli.session_principal ?? descriptor.mode,
-    }))
-  );
-}
-
 /** Every environment variable {@link detectCliAgentPrincipal} reads (tests blank them). */
 export function cliAgentSessionEnv(): string[] {
-  return [
-    'KYBERION_AGENT_ID',
-    'KYBERION_NHI_ID',
-    'KYBERION_RUN_ORIGIN',
-    ...new Set(agentHarnessMarkers().map((marker) => marker.env)),
-    'AI_AGENT',
-  ];
-}
-
-function envText(env: Env, name: string): string {
-  return getRegisteredEnvText(name, { env })?.trim() ?? '';
+  return agentExecutionContextEnvNames();
 }
 
 /**
  * The agent principal this CLI process runs under, or null for a plain
- * terminal. A human typing a command into an agent session's shell is
- * indistinguishable from the agent and is treated as the agent.
+ * terminal (see `detectAgentExecutionContext`). A human typing a command into
+ * an agent session's shell is indistinguishable from the agent and is treated
+ * as the agent.
  */
 export function detectCliAgentPrincipal(env: Env = process.env): string | null {
-  const agentId = envText(env, 'KYBERION_AGENT_ID');
-  if (agentId) return agentId.includes(':') ? agentId : `agent:${agentId}`;
-  const nhiId = envText(env, 'KYBERION_NHI_ID');
-  if (nhiId) return nhiId;
-  if (envText(env, 'KYBERION_RUN_ORIGIN').toLowerCase() === 'agent') {
-    return 'agent:kyberion-runtime';
-  }
-  for (const marker of agentHarnessMarkers()) {
-    const value = envText(env, marker.env);
-    if (!value) continue;
-    if (marker.equals !== undefined && value.toLowerCase() !== marker.equals) continue;
-    return `agent:${marker.agent}`;
-  }
-  const generic = envText(env, 'AI_AGENT');
-  if (generic) return `agent:${generic.split(/[_\s]/u)[0] || 'unknown-harness'}`;
-  return null;
+  return detectAgentExecutionContext({ env }).principal;
 }
 
 /** The local owner member as the CLI's operator principal (never throws). */

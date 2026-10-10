@@ -7,6 +7,7 @@ import {
   loadApprovalRequest,
   type ApprovalRequestRecord,
 } from '../governance/approval-store.js';
+import { NON_HUMAN_PROOF_AUTH_METHODS } from '../governance/approval-assurance.js';
 import {
   appendGovernedArtifactJsonl,
   type GovernedArtifactRole,
@@ -249,7 +250,7 @@ function requireApproval(
     approval.accountability?.finalDecision !== 'human_only' ||
     !approval.decidedBy ||
     !approval.decidedAuthMethod ||
-    approval.decidedAuthMethod === 'local_token'
+    NON_HUMAN_PROOF_AUTH_METHODS.has(approval.decidedAuthMethod)
   ) {
     throw new Error('peer_recovery_approval_requires_authenticated_human');
   }
