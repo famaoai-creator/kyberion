@@ -1,4 +1,4 @@
-import { getRegisteredEnvText } from './env.js';
+import { getRegisteredEnvText, isVitestProcess } from './env.js';
 import { isValidTenantSlug } from './scope.js';
 import { rawExistsSync, rawLstatSync, rawReadTextFile } from '../fs-primitives.js';
 import { assertSafeRepositoryPath, pathResolver } from '../path-resolver.js';
@@ -23,12 +23,18 @@ export function resolveProjectScope(): ProjectScopeBinding {
   let persisted: Record<string, string> = {};
   try {
     const configuredPath = getRegisteredEnvText('KYBERION_SCOPE_ENV_PATH')?.trim();
-    const scopePath = assertSafeRepositoryPath(
-      configuredPath || pathResolver.shared('runtime/scope.env'),
-      { allowMissingLeaf: true }
-    );
-    if (rawExistsSync(scopePath) && rawLstatSync(scopePath).isFile()) {
-      for (const line of rawReadTextFile(scopePath).split(/\r?\n/u)) {
+    // Hermetic-test contract: under vitest the operator's persisted scope
+    // (written by `pnpm scope use`) must not leak tenant/org bindings into
+    // test identity resolution. Tests that need a persisted scope point
+    // KYBERION_SCOPE_ENV_PATH at their own fixture file.
+    const persistedPath =
+      isVitestProcess() && !configuredPath
+        ? undefined
+        : assertSafeRepositoryPath(configuredPath || pathResolver.shared('runtime/scope.env'), {
+            allowMissingLeaf: true,
+          });
+    if (persistedPath && rawExistsSync(persistedPath) && rawLstatSync(persistedPath).isFile()) {
+      for (const line of rawReadTextFile(persistedPath).split(/\r?\n/u)) {
         const match = line.match(
           /^(KYBERION_PROJECT_ID|KYBERION_TENANT|MISSION_ID|KYBERION_TASK_ID)=(.*)$/u
         );

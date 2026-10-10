@@ -225,7 +225,10 @@ Step 0 の baseline をもう一度実行する。初回は次の層が `needs_a
 
 - **L10（scheduler）**: 有効なスケジュールが一つもなければ通る。スケジュールを登録したら chronos
   daemon を常駐させる。macOS では `pnpm kyberion scheduler install` で内容を確認し、`--apply` で
-  LaunchAgent に登録する。その場で動かすだけなら `pnpm scheduler`。
+  LaunchAgent に登録する。その場で動かすだけなら `pnpm scheduler`。daemon が生きているのに
+  heartbeat が古い（err ログに `EPERM` が並ぶ）ときは OS のファイルアクセス権を失っている
+  ため、再登録ではなく `pnpm kyberion scheduler restart --apply` で再起動する（プラットフォーム
+  抽象化済み: launchd `kickstart` / `systemctl --user restart`。[runbook](./operations-hygiene-runbook.md)）。
 - **L11（監査台帳）**: 監査記録が一つもないか古いと落ちる。Step 3 の identity 保存などの
   governed 操作を行えば記録される。
 
@@ -399,7 +402,8 @@ pnpm tenant:activation activate \
   --apply --accept
 ```
 
-`--accept` は人間の受け入れを表す。成功すると
+`--accept` は人間の受け入れを表す。現状このフラグは CLI 実行者の声明で、attest のような
+承認依頼との hash 照合はない。運用では人間が実行すること。成功すると
 `customer/<customer-slug>/onboarding/tenant-activation/<tenant>/<organization>/<tier>/activation.json`
 に activation receipt が保存され、status が `active` になる。receipt には stance、tenant、
 organization、tier、owner、NHI、次の行動、operation contract（task lease、heartbeat watchdog、
@@ -435,7 +439,15 @@ pnpm tenant:activation probe --customer-slug <customer-slug> --tenant-slug <tena
 **NHI について**: `onboard company` は、宣言した AI worker（`ceo-operator`）の NHI
 `kyberion://agent/<organization-id>/ceo-operator` を責任者付きで ledger に発行する（結果の
 `workerNhiId`）。そのため新しい組織でもそのまま `--nhi-id` に指定すれば `nhi_provisioned` が通る。
-個別コマンドで登録したルート 3 では、同じ組織で mission が staffing した NHI を指定するか、外部の
+個別コマンドで登録したルート 3 では、 governed facade `pnpm nhi` で NHI を発行できる:
+
+```bash
+pnpm nhi issue --slug <agent-slug> --organization-id <organization-id> \
+  --accountable-human human:<owner> [--tenant-slug <tenant-slug>] --apply
+pnpm nhi list --organization-id <organization-id>
+```
+
+その他の経路として、同じ組織で mission が staffing した NHI を指定するか、外部の
 証跡（`--probe-ref nhi_provisioned=audit://...`）を人間が確認して受け入れる。
 
 `plan` の `blockers` が空になるまで `activate` しない。

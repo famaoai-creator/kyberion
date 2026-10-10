@@ -19,6 +19,13 @@ The home always states its limited supported-source coverage. An unavailable
 source is not an empty source, and zero visible attention is not an all-clear
 when a source is unavailable or partial.
 
+Work Home covers work records, not host or surface readiness. When the operator
+cannot open a surface or needs to diagnose sign-in, run
+`pnpm kyberion setup report --persona first-time-user`; it checks live surface
+health and gives one prioritized next action. `pnpm kyberion doctor` and
+`pnpm surfaces status` provide the broader operator diagnostics. A healthy
+baseline does not imply that a surface process is running or reachable.
+
 ## Status and evidence rules
 
 - A conversation answer is **answered**, never evidence that external work ran.
@@ -91,3 +98,13 @@ and no approval/conversation mutation during reads.
 DOM tests are not visual browser validation. Browser rendering checks, aggregate
 repository gates, full locale-stable suite results, and any environment limits
 are recorded separately in the delivery evidence and PR test plan.
+
+First-run acceptance has separate levels: `pnpm check -- --only first-win-smoke`
+checks the documented first-win contract, `pnpm check -- --only first-win-lifecycle`
+exercises the governed lifecycle in dry-run mode, and the explicit live lifecycle
+harness requires a disposable identity plus its double opt-in. After building,
+replace both placeholders with real values (do not type the angle brackets)
+and run it as
+`KYBERION_FIRST_WIN_LIVE=1 node dist/scripts/first_win_lifecycle_smoke.js --live --identity <identity-file> --run-id <unique-run-id> --confirm-live FIRST-WIN-LIFECYCLE-LIVE`.
+Surface/voice acceptance also requires the relevant services and credentials to
+be available; record those results separately from the repository baseline.

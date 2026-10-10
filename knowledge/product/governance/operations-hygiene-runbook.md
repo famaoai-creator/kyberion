@@ -173,6 +173,24 @@ revision changes, unchanged summary refreshes and timeout recovery in
 **Review checklist** (when a PR adds a loop or a spawn): in-flight guard, signal handlers, stopped
 heartbeat, child deadline, `'error'` listener, test with a mocked child.
 
+**Stale heartbeat on a live daemon.** baseline-check L10 fails when the chronos heartbeat is
+older than 10 minutes while schedules are enabled. If the daemon process is alive
+(`pnpm kyberion scheduler status`) but its ticks end in `EPERM`/`EACCES` on repo paths, it lost
+its OS file-access grants (macOS TCC, e.g. after the repo volume remounted) — restarting is the
+fix, not reinstalling. Daemon persistence is platform-abstracted via
+`libs/core/daemon/service-manager.ts` (launchd on macOS, systemd --user on Linux), so the same
+command works everywhere:
+
+```bash
+pnpm kyberion scheduler status            # live state via the platform manager
+pnpm kyberion scheduler restart --apply   # launchctl kickstart -k / systemctl --user restart
+cat active/shared/runtime/heartbeats/chronos-daemon.json  # fresh timestamp = recovered
+```
+
+Reinstall with `pnpm kyberion scheduler install --apply` only when the unit itself is missing
+(`status` shows it unloaded). A restart that still hits EPERM on macOS is a real TCC denial —
+check Full Disk Access / Files-and-Folders grants for the node binary that runs the unit.
+
 ## §4 stdout and logging in library code
 
 **Rules:**
@@ -210,6 +228,11 @@ gets clean JSON.
   `beforeAll` with an explicit hook timeout (e.g. `60_000`) so its one-time load is not charged
   to the first test's 10s budget ([WRITING_TESTS](../../../docs/developer/WRITING_TESTS.md#fixture-roots)
   lists the accepted exceptions).
+- The persisted operator scope (`active/shared/runtime/scope.env`, written by `pnpm scope use`)
+  must never leak into test processes. `readScopeEnv` (scope-context.ts) and
+  `resolveProjectScope` (project-scope-env.ts) ignore the persisted file under vitest unless
+  `KYBERION_SCOPE_ENV_PATH` explicitly points at a fixture — tests that need a persisted scope
+  set that variable; they must not rely on the operator's file.
 - A test must not depend on load or order. Run a suspect file with
   `--sequence.shuffle --sequence.seed=<n>` (at least 222, 7 and 20261008) and under parallel load
   before calling it fixed. Five defect classes caused the 2026-10 load and order failures:

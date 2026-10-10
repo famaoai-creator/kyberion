@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-08-28T13:16:52.969Z",
+  "generated_at": "2026-10-10T14:34:15.766Z",
   "pipeline_id": "vital-check",
   "pipeline_path": "pipelines/vital-check.json",
-  "result_hash": "c22f030d38c55c748275ef2d411f1121895b9995c07f06123f7a23b75ea999ff",
+  "result_hash": "436719365cbb7b0044760af5b5ca011b1c2ed406caf894f0441086b369522820",
   "result": {
     "status": "succeeded",
     "results": [
@@ -87,16 +87,6 @@
         "path": "knowledge/product/governance/active-surfaces.json",
         "exists": true,
         "kind": "file"
-      },
-      "p_identity": {
-        "path": "my-identity.json",
-        "exists": false,
-        "kind": "unknown"
-      },
-      "p_vision": {
-        "path": "my-vision.md",
-        "exists": false,
-        "kind": "unknown"
       },
       "trace_summary": "ok"
     }

@@ -2328,6 +2328,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/nhi.ts#main",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/oauth_callback_surface.ts#<module>",
       "roles": ["surface_runtime"],
       "unresolved": []
