@@ -9,7 +9,10 @@
  *      outside the root's plugins/ tree so it is third-party by provenance);
  *   2. installs the fixture through the governed CLI (`plugin_install.js
  *      --tenant`) and approves the pending install request through the
- *      operator CLI (`kyberion_home.js approvals --approve`);
+ *      operator CLI (`kyberion_home.js approvals --approve`) in a
+ *      pseudo-terminal, typing back its terminal challenge code (HA-04: run
+ *      the check from a plain terminal — from an agent harness the CLI
+ *      refuses by design);
  *   3. starts the built Chronos (`next start`) on a free loopback port with
  *      the plugin host enabled for that tenant and a random localadmin token —
  *      once directly and once with the environment surface_runtime gives every
@@ -60,6 +63,7 @@ import {
 import { writeTenantProfile } from '@agent/core/organization/tenant-registry';
 import { resolveVocabularyEntry } from '@agent/core/knowledge/vocabulary-catalog';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { runCliAnsweringTtyChallenge } from './lib/cli-tty-challenge-driver.js';
 
 export const PLUGIN_ID = 'plugin-view-e2e-fixture';
 export const VIEW_ID = 'panel';
@@ -361,8 +365,25 @@ function runKyberionCli(root: string, script: string, args: string[]): string {
   return result.stdout;
 }
 
-function approveViaOperatorCli(root: string, approvalRequestId: string): void {
-  runKyberionCli(root, 'kyberion_home.js', ['approvals', '--approve', approvalRequestId]);
+/**
+ * Approves a human-only request the way an operator does: the CLI runs in a
+ * pseudo-terminal and the code its terminal challenge prints is typed back
+ * (HA-04). From inside an agent session the CLI refuses by design; the error
+ * then says to run the check from a plain terminal.
+ */
+async function approveViaOperatorCli(root: string, approvalRequestId: string): Promise<void> {
+  await runCliAnsweringTtyChallenge({
+    command: process.execPath,
+    args: [
+      pathResolver.rootResolve('dist/scripts/kyberion_home.js'),
+      'approvals',
+      '--approve',
+      approvalRequestId,
+    ],
+    cwd: root,
+    env: { KYBERION_ROOT: root, KYBERION_REASONING_BACKEND: 'stub' },
+    timeoutMs: 60_000,
+  });
 }
 
 async function freeLoopbackPort(): Promise<number> {
@@ -824,7 +845,7 @@ async function scenario(
   });
 
   await step('approve-action', async () => {
-    approveViaOperatorCli(root, approvalRequestId);
+    await approveViaOperatorCli(root, approvalRequestId);
     await waitFor('the action request to become executable', async () =>
       (await readListing(context, server.baseUrl)).action_requests?.some(
         (entry) =>
@@ -872,7 +893,11 @@ async function scenario(
     const install = readJson<Record<string, unknown>>(
       path.join(root, approvalRequestLogicalPath('plugin-install', installApprovalId))
     );
-    if (install.status !== 'approved') throw new Error('install approval is not approved');
+    if (install.status !== 'approved' || install.decidedAuthMethod !== 'terminal_attested') {
+      throw new Error(
+        `install approval is not a terminal-attested approval (status=${String(install.status)} decidedAuthMethod=${String(install.decidedAuthMethod)})`
+      );
+    }
     const approval = readJson<Record<string, unknown>>(
       path.join(root, approvalRequestLogicalPath('chronos', approvalRequestId))
     );
@@ -881,9 +906,12 @@ async function scenario(
       approval.status !== 'approved' ||
       approval.decidedByType !== 'human' ||
       approval.authenticated !== true ||
+      approval.decidedAuthMethod !== 'terminal_attested' ||
       applyResult?.result !== 'success'
     ) {
-      throw new Error(`action approval record is not an executed human approval`);
+      throw new Error(
+        `action approval record is not an executed, terminal-attested human approval (decidedAuthMethod=${String(approval.decidedAuthMethod)})`
+      );
     }
     const missing = missingAuditEvidence(readAuditEntries(root), approvalRequestId);
     if (missing.length > 0) throw new Error(`audit chain lacks: ${missing.join('; ')}`);
