@@ -588,11 +588,17 @@ describe('concierge surface contract', () => {
     // One explicit upload per ceremony — no scheduler, no auto-retry timer
     // (the deliberate absence of a watch/auto-ingest mode mirrors the CLI).
     expect(route).not.toMatch(/setInterval\(|setTimeout\(/);
-    // Exit code 0 alone is not success: the route reads the ceremony's own
-    // verdict lines before claiming anything.
-    expect(route).toContain('[ingest] DRY RUN');
-    expect(route).toContain('[ingest] committed ');
-    expect(route).toContain('[ingest] NOT committed');
+    // Exit code 0 alone is not success: only the validated ceremony receipt
+    // determines the route's result. Runtime malformed-receipt cases live in
+    // ingest-result-route.test.ts.
+    expect(route).toContain(
+      'parseIngestCliVerdict(result.stdout, { dryRun, tenant, sourceId: safeName })'
+    );
+    expect(route).toContain('outcome: verdict.outcome');
+    const parser = safeReadFile(path.join(appDir, 'src/app/api/ingest-output-parser.ts'));
+    expect(parser).toContain('[ingest] DRY RUN');
+    expect(parser).toContain('[ingest] committed ');
+    expect(parser).toContain('[ingest] NOT committed');
     // Tenant candidates are validated against the tenant registry.
     expect(route).toContain('listTenantProfileSlugs');
 
