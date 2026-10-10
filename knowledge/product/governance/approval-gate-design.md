@@ -204,8 +204,17 @@ mission brief
     入力させ、承認 JSON には入らない。理由: ローカルの operator が自分の credential を登録する操作に、
     同じ人の 2 回目の確認を挟んでも分離にならないため。`--no-auto-approve`（Web は
     `autoApprove: false`）で通常の承認待ちになり、そのときは SoD が効く。
-    注意: risk と自動承認の有無は依頼側が指定する（既定は `low` と自動承認あり）ので、
-    これは依頼者の自己申告に基づく例外である。
+    ON では、人がその場にいて追加だけの変更であることが分かる場合に限る。次のどれかに当たる依頼は
+    自動承認せず、通常の人の承認に回す（結果の `autoApproveWithheld` と ledger の
+    `auto_approve_withheld` に理由が残る）。
+    - 依頼者が agent（`requestedBy` か、検出した principal `requestedByContext.actorId` が `agent:*`）:
+      `agent_requester`。`--requested-by` で別の名前を付けても検出した principal で判定する。
+    - 値を対話的に入力しない（`--from-file`、TTY が無い、Web の API、値の入手方法の指定なし）:
+      `non_interactive_value`。対話的とみなすのは CLI の hidden TTY prompt（`valueSource: 'interactive'`）だけ。
+    - 既存の値がある状態での `rotate`（上書き）: `rotate_existing_value`。
+      policy が読めないときは ON とみなす（fail closed）。OFF では従来どおり。
+      注意: risk と自動承認の有無は依頼側が指定する（既定は `low` と自動承認あり）ので、
+      これは依頼者の自己申告に基づく例外である。
 - **対象外の承認経路。** approval-store を通らない独自の承認は設定の対象外（`service_recording review`
   は store を通るようにした）。
 - 確実に分離するには、承認を依頼者とは別の認証済み member（chronos / presence-studio の `user:<member_id>`）が行う。
