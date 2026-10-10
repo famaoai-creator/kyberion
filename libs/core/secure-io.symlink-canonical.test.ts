@@ -10,6 +10,7 @@ import {
   safeAppendFileSync,
   safeChmodSync,
   safeCopyFileSync,
+  safeExec,
   safeFsyncFile,
   safeMkdir,
   safeMoveSync,
@@ -76,6 +77,36 @@ const abs = (rel: string) => path.join(ROOT, rel);
 function asDataOnlyPersona(): void {
   process.env.KYBERION_PERSONA = 'worker';
   process.env.MISSION_ROLE = 'finance_controller';
+}
+
+/** Child process that keeps re-pointing symlink `sw` at each of `targets` in turn. */
+function startFlipper(sw: string, targets: string[], ms = 9000) {
+  const flipper = `
+    const fs = require('node:fs');
+    const [sw, ...targets] = process.argv.slice(1);
+    const end = Date.now() + ${ms};
+    let i = 0;
+    while (Date.now() < end) {
+      const tmp = sw + '.tmp';
+      try { fs.rmSync(tmp, { force: true }); fs.symlinkSync(targets[i++ % targets.length], tmp); fs.renameSync(tmp, sw); } catch {}
+    }`;
+  return safeSpawn(process.execPath, ['-e', flipper, sw, ...targets], { stdio: 'ignore' });
+}
+
+/** Run `op` for `ms`, yielding now and then; returns how many calls ran. */
+async function hammer(ms: number, op: () => void): Promise<number> {
+  let tries = 0;
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    tries += 1;
+    try {
+      op();
+    } catch {
+      // refused or raced
+    }
+    if (tries % 50 === 0) await new Promise((r) => setImmediate(r));
+  }
+  return tries;
 }
 
 describe('secure-io symlink canonicalization (data-only persona)', () => {
@@ -384,6 +415,97 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     } finally {
       fs.rmSync(outsideDir, { recursive: true, force: true });
     }
+  });
+
+  it('never chmods a protected file or directory through a flipped symlink', async () => {
+    const pubdir = abs(`${scratchRel}/pubdir`);
+    fs.mkdirSync(pubdir);
+    fs.writeFileSync(abs(`${scratchRel}/pub.txt`), 'pub');
+    const pdir = path.join(abs(personalRel), 'zz-dir');
+    fs.mkdirSync(pdir, { recursive: true });
+    fs.chmodSync(pdir, 0o755);
+    const secretPath = path.join(abs(personalRel), 'secret.txt');
+    fs.chmodSync(secretPath, 0o644);
+    const sw = abs(`${scratchRel}/sw`);
+    fs.symlinkSync(pubdir, sw);
+    const child = startFlipper(sw, [pubdir, pdir, abs(`${scratchRel}/pub.txt`), secretPath]);
+    let tries = 0;
+    try {
+      tries = await hammer(2500, () => safeChmodSync(`${scratchRel}/sw`, 0o700));
+    } finally {
+      child.kill('SIGKILL');
+    }
+    expect(tries).toBeGreaterThan(50);
+    expect(fs.statSync(pdir).mode & 0o777).toBe(0o755);
+    expect(fs.statSync(secretPath).mode & 0o777).toBe(0o644);
+  }, 20000);
+
+  it('never creates a file through a dangling symlink flipped into a protected tree', async () => {
+    const real = abs(`${scratchRel}/real.log`);
+    fs.writeFileSync(real, '');
+    const sw = abs(`${scratchRel}/sw`);
+    fs.symlinkSync(real, sw);
+    const targets = [real];
+    for (let i = 0; i < 4; i += 1) targets.push(path.join(abs(personalRel), `created-by-${i}.txt`));
+    const child = startFlipper(sw, targets);
+    let tries = 0;
+    try {
+      tries = await hammer(2500, () => safeAppendFileSync(`${scratchRel}/sw`, 'x'));
+    } finally {
+      child.kill('SIGKILL');
+    }
+    expect(tries).toBeGreaterThan(50);
+    expect(fs.readdirSync(abs(personalRel)).filter((n) => n.startsWith('created-by-'))).toEqual([]);
+  }, 20000);
+
+  it('never lists a protected directory through a flipped symlink', async () => {
+    const pubdir = abs(`${scratchRel}/pubdir`);
+    fs.mkdirSync(pubdir);
+    fs.writeFileSync(path.join(pubdir, 'visible.txt'), 'v');
+    const sw = abs(`${scratchRel}/sw`);
+    fs.symlinkSync(pubdir, sw);
+    const child = startFlipper(sw, [pubdir, abs(personalRel)]);
+    let leaked = 0;
+    let listed = 0;
+    let tries = 0;
+    try {
+      tries = await hammer(2500, () => {
+        const names = safeReaddir(`${scratchRel}/sw`);
+        listed += 1;
+        if (names.includes('secret.txt')) leaked += 1;
+      });
+    } finally {
+      child.kill('SIGKILL');
+    }
+    expect(tries).toBeGreaterThan(50);
+    expect(listed).toBeGreaterThan(0);
+    expect(leaked).toBe(0);
+  }, 20000);
+
+  it('never hangs on a FIFO (reads open non-blocking and refuse non-regular files)', () => {
+    const fifo = abs(`${scratchRel}/pipe`);
+    process.env.MISSION_ROLE = 'mission_controller';
+    safeExec('mkfifo', [fifo]);
+    process.env.MISSION_ROLE = 'finance_controller';
+    expect(() => safeReadFile(`${scratchRel}/pipe`)).toThrow(/Not a regular file/);
+    expect(() => safeReadFileTail(`${scratchRel}/pipe`, 16)).toThrow(/Not a regular file/);
+    expect(() => safeReadFileRange(`${scratchRel}/pipe`, 0, 16)).toThrow(/Not a regular file/);
+    expect(() => safeCopyFileSync(`${scratchRel}/pipe`, `${scratchRel}/out.txt`)).toThrow(
+      /Not a regular file/
+    );
+    expect(() => safeChmodSync(`${scratchRel}/pipe`, 0o600)).toThrow(/not a file or directory/);
+  }, 5000);
+
+  it('does not reveal the protected location in a denial message', () => {
+    fs.symlinkSync(path.join(abs(personalRel), 'secret.txt'), abs(`${scratchRel}/to-secret`));
+    let message = '';
+    try {
+      safeReadFile(`${scratchRel}/to-secret`);
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).not.toBe('');
+    expect(message).not.toContain('vitest-secure-io-symlink');
   });
 
   it('never leaks through a symlink flipped between check and open (read, range, tail, stat, size)', async () => {
