@@ -64,6 +64,8 @@ pnpm onboarding company --vertical saas-product-company --slug acme-ai \
 
 Full routes (personal-only / AI company / existing tenant), the `probe` → `activate` evidence flow, and Path B (`onboarding apply --identity <json>`) live in the [onboarding standard flow](../knowledge/product/governance/onboarding-flow.md) and [INITIALIZATION](./INITIALIZATION.md). Start there, not here.
 
+Customer-specific identity and onboarding artifacts: `customer/{slug}/ preferred when KYBERION_CUSTOMER is set`.
+
 ### Onboarding entry points
 
 Several commands and pipelines carry "onboarding" in their name. They are not alternatives for the same job; pick by what you want to achieve.
