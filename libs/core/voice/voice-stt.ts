@@ -6,6 +6,7 @@ import {
   resolveSeamProviderDecision,
 } from '../seam-provider-selection.js';
 import { matchSeamSelectionRule } from '../seam-selection-rules.js';
+import { trimEndChars } from '../foundation/text.js';
 
 export type VoiceSttBackend =
   | 'auto'
@@ -34,7 +35,7 @@ export interface VoiceSttServerConfig {
 }
 
 function normalizeBaseUrl(value: string): string | null {
-  const normalized = value.trim().replace(/\/+$/, '');
+  const normalized = trimEndChars(value.trim(), '/');
   if (!normalized || normalized.length > 2048) return null;
   try {
     const parsed = new URL(normalized);

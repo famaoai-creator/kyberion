@@ -127,12 +127,10 @@ export async function readOsClipboardText(): Promise<
       ok: false,
       error: 'OS clipboard read unsupported on this platform; paste manually',
     };
-  } catch (error) {
+  } catch {
     return {
       ok: false,
-      error:
-        (error instanceof Error ? error.message : String(error)) ||
-        'clipboard tool unavailable; paste manually',
+      error: 'clipboard tool unavailable; paste manually',
     };
   }
 }
@@ -418,9 +416,11 @@ export async function main(
               );
             } catch (error) {
               const message = error instanceof Error ? error.message : String(error);
+              // 400s get the curated validation string; 500s stay generic so
+              // exception details never leave the server log (stack-trace-exposure).
               jsonResponse(res, message === 'items required' ? 400 : 500, {
                 ok: false,
-                error: message,
+                error: message === 'items required' ? message : 'internal server error',
               });
             }
           } catch (e: unknown) {
@@ -433,7 +433,7 @@ export async function main(
             } else if (!res.headersSent) {
               jsonResponse(res, 500, {
                 ok: false,
-                error: e instanceof Error ? e.message : String(e),
+                error: 'internal server error',
               });
             }
             print(`[clipboard-inbox] ${e instanceof Error ? e.message : String(e)}`);

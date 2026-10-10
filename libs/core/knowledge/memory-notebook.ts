@@ -88,9 +88,32 @@ export function recallBody(body: string): string {
  * becomes `[claimed source: X]`.
  */
 export function neutralizeUntrustedProvenance(text: string): string {
-  return text
-    .replace(/^\((\d{4}-\d\d-\d\d)\)\s*/, 'on $1: ')
-    .replace(/\s+\(said in ([^)]+)\)/giu, ' [claimed source: $1]');
+  let out = text;
+  if (out.startsWith('(') && out[11] === ')' && /^\d{4}-\d{2}-\d{2}$/u.test(out.slice(1, 11))) {
+    out = `on ${out.slice(1, 11)}: ${out.slice(12).trimStart()}`;
+  }
+  // Replace ` (said in X)` suffixes without the `[^)]+` regex.
+  const marker = '(said in ';
+  const lower = out.toLowerCase();
+  const parts: string[] = [];
+  let cursor = 0;
+  for (;;) {
+    const index = lower.indexOf(marker, cursor);
+    if (index < 0) break;
+    const end = out.indexOf(')', index + marker.length);
+    if (end < 0) break;
+    const precededByWhitespace = index > 0 && ' \t\n\r\v\f\u00a0'.includes(out[index - 1]);
+    if (!precededByWhitespace) {
+      parts.push(out.slice(cursor, index + marker.length));
+      cursor = index + marker.length;
+      continue;
+    }
+    parts.push(out.slice(cursor, index).trimEnd());
+    parts.push(` [claimed source: ${out.slice(index + marker.length, end)}]`);
+    cursor = end + 1;
+  }
+  parts.push(out.slice(cursor));
+  return parts.join('');
 }
 
 export interface FoldCaptureResult {
@@ -143,7 +166,7 @@ export function foldCapture(
   if (!added.length) return { body: existing, added: 0 };
 
   let body = existing.trim()
-    ? `${existing.replace(/\s+$/, '')}\n${added.join('\n')}`
+    ? `${existing.trimEnd()}\n${added.join('\n')}`
     : `${MEMORY_HEADER}\n\n${added.join('\n')}`;
 
   return { body: boundNotebook(body), added: added.length };
@@ -218,18 +241,33 @@ export function parseConsolidationActions(out: string): ConsolidationAction[] {
   for (const raw of out.split('\n')) {
     const line = raw.trim();
     if (!line || /^none$/i.test(line)) continue;
-    let m = /^UPDATE\s+(\d+)\s*:\s*(.+)$/i.exec(line);
-    if (m) {
-      actions.push({ kind: 'update', index: Number(m[1]), text: m[2]!.trim() });
+    const upper = line.toUpperCase();
+    if (upper.startsWith('UPDATE ') || upper.startsWith('UPDATE\t')) {
+      const rest = line.slice(6).trimStart();
+      const digits = rest.match(/^\d+/u);
+      if (digits) {
+        const afterDigits = rest.slice(digits[0].length).trimStart();
+        if (afterDigits.startsWith(':')) {
+          const text = afterDigits.slice(1).trim();
+          if (text) actions.push({ kind: 'update', index: Number(digits[0]), text });
+          continue;
+        }
+      }
       continue;
     }
-    m = /^DELETE\s+(\d+)\s*$/i.exec(line);
-    if (m) {
-      actions.push({ kind: 'delete', index: Number(m[1]) });
+    if (upper.startsWith('DELETE ') || upper.startsWith('DELETE\t')) {
+      const rest = line.slice(6).trim();
+      if (/^\d+$/u.test(rest)) actions.push({ kind: 'delete', index: Number(rest) });
       continue;
     }
-    m = /^ADD\s*:\s*(.+)$/i.exec(line);
-    if (m) actions.push({ kind: 'add', text: m[1]!.trim() });
+    if (upper.startsWith('ADD')) {
+      const rest = line.slice(3).trimStart();
+      if (rest.startsWith(':')) {
+        const text = rest.slice(1).trim();
+        if (text) actions.push({ kind: 'add', text });
+      }
+      continue;
+    }
   }
   return actions;
 }
@@ -323,7 +361,7 @@ export function applyConsolidationActions(
   const trimmed = out
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
-    .replace(/\s+$/, '');
+    .trimEnd();
   return `${trimmed}\n\n${consolidationMarker(at)}`;
 }
 

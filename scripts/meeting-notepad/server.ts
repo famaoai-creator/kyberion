@@ -590,7 +590,7 @@ export async function main(
                   text: '',
                   backend: 'unavailable',
                   audio_path: portableProtocolServicePathRef(audioPath),
-                  warning: error instanceof Error ? error.message : String(error),
+                  warning: 'transcription backend unavailable',
                 });
               }
               return;
@@ -613,7 +613,7 @@ export async function main(
             } else if (!res.headersSent) {
               jsonResponse(res, 500, {
                 ok: false,
-                error: e instanceof Error ? e.message : String(e),
+                error: 'internal server error',
               });
             }
             print(`[meeting-notepad] ${e instanceof Error ? e.message : String(e)}`);
