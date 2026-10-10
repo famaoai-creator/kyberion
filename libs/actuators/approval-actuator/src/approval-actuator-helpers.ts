@@ -17,6 +17,7 @@ import {
   decideApprovalRequest,
   loadApprovalRequest,
   listApprovalRequests,
+  refuseHumanOnlyDecisionOnAgentPath,
   type ApprovalJustification,
   type ApprovalRequesterContext,
   type ApprovalRequestDraft,
@@ -182,10 +183,15 @@ export async function handleApprovalAction(input: ApprovalAction) {
           buildRetryOptions()
         ),
       };
-    case 'decide':
+    case 'decide': {
       if (!params.requestId || !params.decision || !params.decidedBy) {
         throw new Error('requestId, decision, and decidedBy are required');
       }
+      // HA-02: an ADF step is an agent acting — it never settles a human-only
+      // request, and anything else it decides is recorded as an agent
+      // decision regardless of the caller-supplied decider type/auth fields.
+      const target = loadApprovalRequest(params.storageChannel || params.channel, params.requestId);
+      if (target) refuseHumanOnlyDecisionOnAgentPath(target, 'approval-actuator decide');
       return {
         status: 'ok',
         request: decideApprovalRequest(role, {
@@ -199,15 +205,15 @@ export async function handleApprovalAction(input: ApprovalAction) {
           // approvals.
           deciderIdentitySource: 'caller_supplied',
           decidedByRole: params.decidedByRole,
-          authMethod: params.authMethod,
-          decidedByType: params.decidedByType,
-          authenticated: params.authenticated,
+          decidedByType: 'ai_agent',
+          authenticated: false,
           payloadHash: params.payloadHash,
           effectBinding: params.effectBinding,
           note: params.note,
           reasonCategory: normalizeRejectionReasonCategory(params.reasonCategory),
         }),
       };
+    }
     case 'list_pending': {
       const storageChannel = params.storageChannel || params.channel;
       const requests = await retry(
