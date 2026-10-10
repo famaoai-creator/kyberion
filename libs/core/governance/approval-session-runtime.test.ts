@@ -98,10 +98,25 @@ vi.mock('../workforce/work-design.js', () => ({
 }));
 // The hermetic KYBERION_ROOT has no knowledge tree, so the approval-policy
 // catalog cannot load; separation of duties (default off) is covered by
-// approval-separation-of-duties.test.ts.
+// approval-separation-of-duties.test.ts; the governed assurance mode by
+// approval-assurance-migration.test.ts.
 vi.mock('./approval-policy.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./approval-policy.js')>()),
   resolveSeparationOfDutiesPolicy: () => ({ enabled: false }),
+  resolvePolicyApprovalAssuranceMode: () => undefined,
+  resolvePolicyAssuranceFloor: () => undefined,
+}));
+
+// The hermetic root has no reasoning-provider registry either; the store-level
+// agent refusal is covered by approval-human-proof.test.ts.
+vi.mock('../agent-execution-context.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../agent-execution-context.js')>()),
+  detectAgentExecutionContext: () => ({
+    isAgent: false,
+    principal: null,
+    harnesses: [],
+    signals: [],
+  }),
 }));
 
 type ApprovalStoreModule = typeof import('./approval-store.js');
@@ -156,6 +171,7 @@ describe('approval runtime hardening (KC-03)', () => {
         decision: 'approved',
         decidedBy: 'human:operator',
         decidedByType: 'human',
+        authMethod: 'surface_session',
         authenticated: true,
         payloadHash: store.computeApprovalPayloadHash({ secret: 'approved' }),
         effectBinding: 'secret:set',
@@ -234,6 +250,7 @@ describe('approval runtime hardening (KC-03)', () => {
           decision: 'approved',
           decidedBy: 'human:operator',
           decidedByType: 'human',
+          authMethod: 'surface_session',
           authenticated: false,
           sessionCache: descriptor,
         })
@@ -263,6 +280,7 @@ describe('approval runtime hardening (KC-03)', () => {
         decision: 'rejected',
         decidedBy: 'human:operator',
         decidedByType: 'human',
+        authMethod: 'surface_session',
         authenticated: true,
         payloadHash: store.computeApprovalPayloadHash({ secret: 'approved' }),
         effectBinding: 'secret:set',
@@ -303,6 +321,7 @@ describe('approval runtime hardening (KC-03)', () => {
         decision: 'approved',
         decidedBy: 'human:operator',
         decidedByType: 'human',
+        authMethod: 'surface_session',
         authenticated: true,
         payloadHash: store.computeApprovalPayloadHash({ secret: 'approved' }),
         effectBinding: 'secret:set',

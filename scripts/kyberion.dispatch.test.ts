@@ -200,6 +200,13 @@ describe('kyberion script-command dispatch', () => {
     expect(pnpmExecutable('darwin')).toBe('pnpm');
   });
 
+  it('rejects a removed alias without spawning (onboard apply --identity x)', async () => {
+    await expect(main(['onboard', 'apply', '--identity', 'x'], () => undefined)).rejects.toThrow(
+      /onboard apply/u
+    );
+    expect(mocks.spawnManagedProcess).not.toHaveBeenCalled();
+  });
+
   it('routes a canonical command with its passthrough arguments (onboarding apply --identity x)', async () => {
     mocks.spawnManagedProcess.mockImplementation(() => ({ child: fakeChild(0) }));
     await main(['onboarding', 'apply', '--identity', 'x'], () => undefined);

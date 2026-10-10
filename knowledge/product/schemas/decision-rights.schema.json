@@ -75,6 +75,10 @@
         },
         "requires_human_acceptance": {
           "type": "boolean"
+        },
+        "charter_delegable": {
+          "description": "An accountability charter that delegates this decision type by name may stand in for the human acceptance (not for a role mismatch or an over-threshold value).",
+          "type": "boolean"
         }
       },
       "additionalProperties": false

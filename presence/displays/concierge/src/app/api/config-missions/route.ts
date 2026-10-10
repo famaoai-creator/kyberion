@@ -18,6 +18,7 @@ import * as secureIo from '@agent/core/secure-io';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
 import { readRequestObject } from '../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
+import { resolveConciergeSelectedViewer } from '../../../lib/selected-tenant';
 import { conciergeText, resolveConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
 import {
   parseConfigMissionBrief,
@@ -139,7 +140,7 @@ function readRecentMissions(tenants: string[]): RecentConfigMission[] {
 }
 
 export function GET(req: NextRequest) {
-  const resolved = resolveConciergeViewer(req);
+  const resolved = resolveConciergeSelectedViewer(req);
   if (resolved.response) return resolved.response;
   try {
     const payload = withExecutionContext('sovereign_concierge', () => {

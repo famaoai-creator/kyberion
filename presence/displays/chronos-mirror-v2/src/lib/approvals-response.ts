@@ -37,8 +37,10 @@ export type ClientApproval = {
   requestedBy: string;
   missionId?: string;
   tenantSlug?: string;
+  tenantSource?: 'record' | 'mission';
   status: string;
   kind?: string;
+  presentedDigest?: string;
 };
 
 export type ClientApprovalsResponse = {
@@ -148,6 +150,12 @@ function parseWorkLoop(value: unknown): ClientApproval['workLoop'] | undefined {
   };
 }
 
+/** The request's project as stored in `work_loop.context`, the field the presented digest covers. */
+export function approvalProjectId(approval: Pick<ClientApproval, 'workLoop'>): string | undefined {
+  const projectId = approval.workLoop?.context?.project_id;
+  return typeof projectId === 'string' && projectId ? projectId : undefined;
+}
+
 function parseApproval(value: unknown): ClientApproval | undefined {
   if (
     !isRecord(value) ||
@@ -162,8 +170,12 @@ function parseApproval(value: unknown): ClientApproval | undefined {
     !nonEmptyString(value.requestedBy) ||
     !optionalString(value.missionId) ||
     !optionalString(value.tenantSlug) ||
+    (value.tenantSource !== undefined &&
+      value.tenantSource !== 'record' &&
+      value.tenantSource !== 'mission') ||
     !nonEmptyString(value.status) ||
-    !optionalString(value.kind)
+    !optionalString(value.kind) ||
+    !optionalString(value.presentedDigest)
   ) {
     return undefined;
   }
@@ -196,8 +208,12 @@ function parseApproval(value: unknown): ClientApproval | undefined {
     requestedBy: value.requestedBy,
     ...(value.missionId !== undefined ? { missionId: value.missionId } : {}),
     ...(value.tenantSlug !== undefined ? { tenantSlug: value.tenantSlug } : {}),
+    ...(value.tenantSource === 'record' || value.tenantSource === 'mission'
+      ? { tenantSource: value.tenantSource }
+      : {}),
     status: value.status,
     ...(value.kind !== undefined ? { kind: value.kind } : {}),
+    ...(value.presentedDigest !== undefined ? { presentedDigest: value.presentedDigest } : {}),
   };
 }
 

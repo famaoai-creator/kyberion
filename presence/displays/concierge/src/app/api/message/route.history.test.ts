@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   guard: vi.fn(() => null),
   resolve: vi.fn(),
   read: vi.fn(),
+  readRequest: vi.fn(),
   begin: vi.fn(),
   complete: vi.fn(),
   uncertain: vi.fn(),
@@ -31,7 +32,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('../../../lib/api-guard', () => ({ requireConciergeMutationAccess: mocks.guard }));
 vi.mock('../../../lib/viewer-context', () => ({ resolveConciergeViewer: mocks.resolve }));
-vi.mock('../../../lib/conversation-store', async () => {
+vi.mock('@agent/core/surface/front-desk-conversation-store', async () => {
   const actual = await vi.importActual<
     typeof import('@agent/core/surface/front-desk-conversation-store')
   >('@agent/core/surface/front-desk-conversation-store');
@@ -52,6 +53,9 @@ vi.mock('../../../lib/conversation-store', async () => {
 });
 vi.mock('@agent/core/surface/channel-surface', () => ({
   runSurfaceMessageConversation: mocks.run,
+}));
+vi.mock('@agent/core/surface/front-desk-request-result', () => ({
+  readFrontDeskRequest: mocks.readRequest,
 }));
 vi.mock('../../../lib/i18n', () => ({
   conciergeText: (key: string) => key,
@@ -80,7 +84,7 @@ beforeEach(() => {
 describe('server-owned durable conversation API', () => {
   it('restores only the resolved viewer and prevents caching', async () => {
     const response = GET(request());
-    expect(mocks.read).toHaveBeenCalledWith(mocks.viewer);
+    expect(mocks.read).toHaveBeenCalledWith(mocks.viewer, { readOnly: true });
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(await response.json()).toMatchObject({ sessionId: 'server-thread' });
   });
@@ -88,6 +92,38 @@ describe('server-owned durable conversation API', () => {
     mocks.resolve.mockReturnValue({ response: new Response(null, { status: 403 }) });
     expect(GET(request()).status).toBe(403);
     expect(mocks.read).not.toHaveBeenCalled();
+  });
+  it('reads a request only inside the authenticated narrowed partition', async () => {
+    const snapshot = {
+      requestId: REQUEST_ID,
+      sessionId: 'server-thread',
+      replyStatus: 'answered',
+      reply: 'Earlier answer',
+      work: [],
+    };
+    mocks.readRequest.mockReturnValueOnce(snapshot);
+    const response = GET(request({}, `http://localhost/api/message?requestId=${REQUEST_ID}`));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.json()).toEqual(snapshot);
+    expect(mocks.readRequest).toHaveBeenCalledWith(mocks.viewer, REQUEST_ID);
+    expect(mocks.read).not.toHaveBeenCalled();
+    expect(mocks.begin).not.toHaveBeenCalled();
+    expect(mocks.run).not.toHaveBeenCalled();
+  });
+  it('does not fall back to another conversation when a request is absent', async () => {
+    mocks.readRequest.mockReturnValueOnce(undefined);
+    const response = GET(request({}, `http://localhost/api/message?requestId=${REQUEST_ID}`));
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ ok: false, error: 'conversation_request_not_found' });
+    expect(mocks.read).not.toHaveBeenCalled();
+  });
+  it('rejects malformed IDs and widened selections before request readback', () => {
+    expect(GET(request({}, 'http://localhost/api/message?requestId=bad')).status).toBe(400);
+    expect(
+      GET(request({}, `http://localhost/api/message?tenant=denied&requestId=${REQUEST_ID}`)).status
+    ).toBe(403);
+    expect(mocks.readRequest).not.toHaveBeenCalled();
   });
   it('validates GET organization/project selection before reading the matching history', () => {
     const response = GET(

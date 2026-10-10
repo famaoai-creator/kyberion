@@ -4,6 +4,8 @@
   "separation_of_duties": {
     "enabled": false
   },
+  "assurance_mode": "warn",
+  "passkey_enrollment_cooldown_hours": 24,
   "rules": [
     {
       "id": "service-mutation",
@@ -19,13 +21,15 @@
       "id": "secret-grant-access",
       "intent_ids": ["secret:grant_access"],
       "requires_approval": true,
-      "missing_requirements": ["dual_key_confirmation"]
+      "missing_requirements": ["dual_key_confirmation"],
+      "min_assurance": "A3"
     },
     {
       "id": "auth-grant-authority",
       "intent_ids": ["auth:grant_authority"],
       "requires_approval": true,
-      "missing_requirements": ["dual_key_confirmation"]
+      "missing_requirements": ["dual_key_confirmation"],
+      "min_assurance": "A3"
     },
     {
       "id": "config-policy-update",
@@ -35,13 +39,15 @@
         "any_of": ["governance", "policy", "review_gate"]
       },
       "requires_approval": true,
-      "missing_requirements": ["approval_confirmation"]
+      "missing_requirements": ["approval_confirmation"],
+      "min_assurance": "A3"
     },
     {
       "id": "vault-direct-write",
       "intent_ids": ["vault:write"],
       "requires_approval": true,
-      "missing_requirements": ["dual_key_confirmation"]
+      "missing_requirements": ["dual_key_confirmation"],
+      "min_assurance": "A3"
     },
     {
       "id": "claude-browser-interactive",
@@ -95,7 +101,20 @@
       "id": "decision-rights-escalation",
       "when": {
         "payload_field": "decision_type",
-        "any_of": ["operational_spend", "contract_signature", "headcount_expansion"]
+        "any_of": [
+          "operational_spend",
+          "contract_signature",
+          "headcount_expansion",
+          "quote_issuance",
+          "expense_reimbursement",
+          "vendor_invoice_payment",
+          "meeting_scheduling",
+          "external_reply",
+          "public_announcement",
+          "access_grant",
+          "internal_task_assignment",
+          "internal_document_approval"
+        ]
       },
       "requires_approval": true,
       "missing_requirements": ["approval_confirmation"]

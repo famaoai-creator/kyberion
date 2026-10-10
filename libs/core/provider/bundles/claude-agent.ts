@@ -3,6 +3,7 @@ import {
   cliProviderEnvText,
   registerCliProviderBundle,
 } from '../../cli-provider-bundle.js';
+import { isInsideProviderHarness } from '../../agent-execution-context.js';
 import { maybeWrapWithDispatcher } from '../../agent/agent-dispatch.js';
 import { ClaudeAgentIntentExtractor } from '../claude-agent-intent-extractor.js';
 import { ClaudeAgentReasoningBackend } from '../claude-agent-reasoning-backend.js';
@@ -12,7 +13,7 @@ registerCliProviderBundle('claude-agent', (options) => {
   const env = cliProviderEnv(options);
   const { mode, provider } = options;
   if (
-    !cliProviderEnvText(env, 'CLAUDECODE') &&
+    !isInsideProviderHarness('claude-cli', env) &&
     !cliProviderEnvText(env, 'ANTHROPIC_API_KEY') &&
     !options.force
   ) {

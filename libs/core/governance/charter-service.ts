@@ -18,7 +18,18 @@ import type { ActorRef } from '../actor.js';
 import { isValidMemberId } from '../organization/member-id-grammar.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
 import { t } from '../t.js';
-import type { Charter, ReputationalClass } from './accountability-charter.js';
+import type {
+  Charter,
+  CharterEnvelope,
+  ExternalEffectClass,
+  ReputationalClass,
+} from './accountability-charter.js';
+import {
+  delegableCharterDecisions,
+  findCharterDecision,
+  loadCharterDecisionVocabulary,
+  type CharterDecisionVocabulary,
+} from './charter-decision-vocabulary.js';
 import {
   acceptCharter,
   readCharterLedger,
@@ -37,6 +48,7 @@ const CURRENCY = 'JPY';
 const MAX_AMOUNT = 1_000_000_000_000;
 const MAX_DAYS = 365;
 const MAX_DEPUTIES = 5;
+const LIST_SEPARATOR: Record<'ja' | 'en', string> = { ja: '、', en: ', ' };
 
 export interface CharterForm {
   tenant_slug: string;
@@ -48,6 +60,8 @@ export interface CharterForm {
   allow_named_spend: boolean;
   /** Let messages to customers go out unattended (names `customer_outbound`, allows `send_message_external`). */
   allow_customer_outbound: boolean;
+  /** Vocabulary decision types delegated by name (charter-decision-vocabulary.json). */
+  delegated_decisions: string[];
   supersedes_decision_rights: boolean;
   deputies: string[]; // user:<member_id>
   expires_in_days: number;
@@ -64,7 +78,10 @@ function amount(value: unknown, label: string): number | string {
   return value;
 }
 
-export function parseCharterForm(raw: unknown): ParsedForm {
+export function parseCharterForm(
+  raw: unknown,
+  vocabulary: CharterDecisionVocabulary = loadCharterDecisionVocabulary()
+): ParsedForm {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return { ok: false, error: 'form must be an object' };
   }
@@ -103,6 +120,20 @@ export function parseCharterForm(raw: unknown): ParsedForm {
   if (rep !== 'A' && rep !== 'B' && rep !== 'C' && rep !== 'D') {
     return { ok: false, error: 'reputational_class_max must be A, B, C or D' };
   }
+  const decisionsRaw = r.delegated_decisions ?? [];
+  const delegable = new Set(delegableCharterDecisions(vocabulary).map((e) => e.decision_type));
+  if (!Array.isArray(decisionsRaw) || decisionsRaw.length > delegable.size) {
+    return { ok: false, error: 'delegated_decisions must be a list of decision types' };
+  }
+  const delegatedDecisions: string[] = [];
+  for (const d of decisionsRaw) {
+    if (typeof d !== 'string' || !delegable.has(d)) {
+      return { ok: false, error: `delegated decision '${String(d)}' is not delegable` };
+    }
+    if (!delegatedDecisions.includes(d)) delegatedDecisions.push(d);
+  }
+  // Canonical order keeps the signed statement independent of click order.
+  delegatedDecisions.sort();
   return {
     ok: true,
     form: {
@@ -113,6 +144,7 @@ export function parseCharterForm(raw: unknown): ParsedForm {
       max_loss_per_incident: nums.max_loss_per_incident,
       allow_named_spend: r.allow_named_spend === true,
       allow_customer_outbound: r.allow_customer_outbound === true,
+      delegated_decisions: delegatedDecisions,
       supersedes_decision_rights: r.supersedes_decision_rights === true,
       deputies,
       expires_in_days: days,
@@ -135,8 +167,17 @@ export function renderAcceptanceStatement(input: {
   accountableId: string;
   displayName: string;
   now: Date;
+  vocabulary?: CharterDecisionVocabulary;
 }): string {
   const { form, accountableId, displayName, now } = input;
+  const vocabulary = input.vocabulary ?? loadCharterDecisionVocabulary();
+  const decisionLabels = (locale: 'ja' | 'en'): string =>
+    form.delegated_decisions
+      .map((type) => {
+        const label = findCharterDecision(type, vocabulary)?.label[locale];
+        return label ? `${label}(${type})` : type;
+      })
+      .join(LIST_SEPARATOR[locale]);
   const expires = new Date(now.getTime() + form.expires_in_days * 86_400_000)
     .toISOString()
     .slice(0, 10);
@@ -153,6 +194,9 @@ export function renderAcceptanceStatement(input: {
       say('loss', { loss: yen(form.max_loss_per_incident) }),
       say(form.allow_named_spend ? 'spend_on' : 'spend_off'),
       say(form.allow_customer_outbound ? 'outbound_on' : 'outbound_off'),
+      form.delegated_decisions.length > 0
+        ? say('decisions_on', { decisions: decisionLabels(locale) })
+        : say('decisions_off'),
       say(form.supersedes_decision_rights ? 'matrix_on' : 'matrix_off'),
       say('stop'),
       say('deputies', {
@@ -168,6 +212,52 @@ export function renderAcceptanceStatement(input: {
 
 export function statementDigest(statement: string): string {
   return createHash('sha256').update(statement, 'utf8').digest('hex');
+}
+
+/**
+ * A delegated decision opens exactly what it needs: its own name, its external
+ * effect class, and (when irreversible) its entry on the named list. Each
+ * evaluation still checks the type's own name, so opening a shared effect
+ * class for one type does not delegate another.
+ */
+export function envelopeFromForm(
+  form: CharterForm,
+  vocabulary: CharterDecisionVocabulary = loadCharterDecisionVocabulary()
+): CharterEnvelope {
+  const externalEffects: CharterEnvelope['external_effects'] = {
+    ...(form.per_action > 0 ? { payment: 'allow' as const } : {}),
+    ...(form.allow_customer_outbound ? { send_message_external: 'allow' as const } : {}),
+  };
+  const namedIrreversible = [
+    ...(form.allow_named_spend ? ['operational_spend'] : []),
+    ...(form.allow_customer_outbound ? ['customer_outbound'] : []),
+  ];
+  const delegatedDecisions: NonNullable<CharterEnvelope['delegated_decisions']> = {};
+  for (const type of form.delegated_decisions) {
+    const entry = findCharterDecision(type, vocabulary);
+    if (!entry?.requires_delegation) {
+      throw new Error(`[charter] decision type '${type}' is not delegable`);
+    }
+    delegatedDecisions[type] = 'allow';
+    if (entry.action_class !== 'internal_decision') {
+      externalEffects[entry.action_class as ExternalEffectClass] = 'allow';
+    }
+    if (!entry.reversible) namedIrreversible.push(type);
+  }
+  return {
+    money: {
+      currency: CURRENCY,
+      per_action: form.per_action,
+      per_day: form.per_day,
+      per_month: form.per_month,
+    },
+    data_tier: { read: [], write: [] },
+    external_effects: externalEffects,
+    irreversible: namedIrreversible.length > 0 ? 'named_actions_only' : 'forbid',
+    ...(namedIrreversible.length > 0 ? { irreversible_named_actions: namedIrreversible } : {}),
+    ...(form.supersedes_decision_rights ? { supersedes_decision_rights: true } : {}),
+    ...(form.delegated_decisions.length > 0 ? { delegated_decisions: delegatedDecisions } : {}),
+  };
 }
 
 export interface AcceptFromFormInput {
@@ -205,10 +295,6 @@ export function acceptCharterFromForm(
       '[charter] the statement changed since it was shown (or the day rolled over); review it again before accepting'
     );
   }
-  const namedIrreversible = [
-    ...(form.allow_named_spend ? ['operational_spend'] : []),
-    ...(form.allow_customer_outbound ? ['customer_outbound'] : []),
-  ];
   const memberId = input.acceptedBy.id.replace(/^user:/, '');
   const stamp = now.toISOString().slice(0, 10).replace(/-/g, '');
   const nonce = (input.idNonce ?? Math.random().toString(36).slice(2, 6)).replace(/[^a-z0-9]/g, '');
@@ -226,24 +312,7 @@ export function acceptCharterFromForm(
           expires_at: new Date(now.getTime() + form.expires_in_days * 86_400_000).toISOString(),
           deputies: form.deputies,
         },
-        envelope: {
-          money: {
-            currency: CURRENCY,
-            per_action: form.per_action,
-            per_day: form.per_day,
-            per_month: form.per_month,
-          },
-          data_tier: { read: [], write: [] },
-          external_effects: {
-            ...(form.per_action > 0 ? { payment: 'allow' as const } : {}),
-            ...(form.allow_customer_outbound ? { send_message_external: 'allow' as const } : {}),
-          },
-          irreversible: namedIrreversible.length > 0 ? 'named_actions_only' : 'forbid',
-          ...(namedIrreversible.length > 0
-            ? { irreversible_named_actions: namedIrreversible }
-            : {}),
-          ...(form.supersedes_decision_rights ? { supersedes_decision_rights: true } : {}),
-        },
+        envelope: envelopeFromForm(form),
         appetite: {
           max_loss_per_incident: form.max_loss_per_incident,
           reputational_class_max: form.reputational_class_max,
@@ -272,6 +341,7 @@ export interface CharterView {
   max_loss_per_incident: number;
   allows_named_spend: boolean;
   allows_customer_outbound: boolean;
+  delegated_decisions: string[];
   supersedes_decision_rights: boolean;
   report: AccountabilityReport;
   report_text: string;
@@ -303,6 +373,10 @@ export function viewCharter(
     allows_customer_outbound: (charter.envelope.irreversible_named_actions ?? []).includes(
       'customer_outbound'
     ),
+    delegated_decisions: Object.entries(charter.envelope.delegated_decisions ?? {})
+      .filter(([, policy]) => policy !== 'forbid')
+      .map(([type]) => type)
+      .sort(),
     supersedes_decision_rights: charter.envelope.supersedes_decision_rights === true,
     report,
     report_text: renderAccountabilityReportText(report, { locale }),

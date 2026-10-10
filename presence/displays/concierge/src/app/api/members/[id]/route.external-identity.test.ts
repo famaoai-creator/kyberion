@@ -85,6 +85,34 @@ describe('concierge member PATCH — SSO identity binding', () => {
     expect(written.external_identities).toHaveLength(1);
   });
 
+  it('takes over a SCIM-made binding the owner re-asserts (SCIM can no longer move it)', async () => {
+    mocks.readMemberProfile.mockReturnValue(
+      member({
+        external_identities: [
+          {
+            issuer: 'https://accounts.google.com/',
+            subject: '1122334455',
+            provisioned_by: 'scim:scim-0123456789abcdef',
+          },
+          {
+            issuer: 'https://slack.com',
+            subject: 'U1',
+            provisioned_by: 'scim:scim-0123456789abcdef',
+          },
+        ],
+      })
+    );
+    const response = await PATCH(request({ external_identity: identity }), params);
+    expect(response.status).toBe(200);
+    const written = mocks.writeMemberProfile.mock.calls[0]![0] as {
+      external_identities: unknown[];
+    };
+    expect(written.external_identities).toEqual([
+      { issuer: 'https://accounts.google.com/', subject: '1122334455' },
+      { issuer: 'https://slack.com', subject: 'U1', provisioned_by: 'scim:scim-0123456789abcdef' },
+    ]);
+  });
+
   it('removes a bound identity', async () => {
     mocks.readMemberProfile.mockReturnValue(
       member({

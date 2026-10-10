@@ -114,6 +114,32 @@ describe('decision-rights', () => {
     expect(evaluation?.requiresHumanAcceptance).toBe(true);
     expect(evaluation?.requiresEscalation).toBe(true);
     expect(evaluation?.escalationReason).toBe('final decision holder is human');
+    expect(evaluation?.escalationKind).toBe('human_acceptance');
+    expect(evaluation?.charterDelegable).toBe(false);
+  });
+
+  it('reports the escalation kind and whether a charter may stand in', () => {
+    const m = {
+      version: '1.0.0',
+      company_id: 'default',
+      tenant_slug: null,
+      source_kind: 'public' as const,
+      source_path: 'decision-rights.json',
+      decisions: [
+        {
+          decision_type: 'expense_reimbursement',
+          authorized_role: 'finance_controller',
+          threshold: { metric: 'amount_jpy', value: 100_000 },
+          requires_human_acceptance: true,
+          charter_delegable: true,
+        },
+      ],
+    };
+    const at = (amount: number, actorRole?: string) =>
+      evaluateDecisionRights(m, { decisionType: 'expense_reimbursement', amount, actorRole });
+    expect(at(5_000)).toMatchObject({ escalationKind: 'human_acceptance', charterDelegable: true });
+    expect(at(150_000)?.escalationKind).toBe('over_threshold');
+    expect(at(5_000, 'intern')?.escalationKind).toBe('role_mismatch');
   });
 
   it('fails closed when a present decision-rights catalog violates its schema', () => {
