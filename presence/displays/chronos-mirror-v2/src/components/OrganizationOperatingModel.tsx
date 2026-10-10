@@ -220,10 +220,14 @@ export function organizationReadinessLabel(
 
 export function OrganizationOperatingModel({
   tenant,
+  organizationId,
+  projectId,
   onOpenGovernance,
   onOpenOperations,
 }: {
   tenant?: string;
+  organizationId?: string;
+  projectId?: string;
   onOpenGovernance?: () => void;
   onOpenOperations?: () => void;
 }) {
@@ -243,21 +247,33 @@ export function OrganizationOperatingModel({
     try {
       const params = new URLSearchParams();
       if (tenant) params.set('tenant', tenant);
+      if (organizationId) params.set('organization_id', organizationId);
+      if (projectId) params.set('project_id', projectId);
       const response = await fetch(
         `/api/organization-operating-model${params.size ? `?${params.toString()}` : ''}`,
         { cache: 'no-store' }
       );
       const rawPayload: unknown = await response.json().catch(() => null);
       const payload = parseOrganizationOperatingModelResponse(rawPayload);
-      if (!response.ok || !payload) throw new Error(`organization ${response.status}`);
+      if (!response.ok || !payload) {
+        const message =
+          rawPayload &&
+          typeof rawPayload === 'object' &&
+          'error' in rawPayload &&
+          typeof rawPayload.error === 'string'
+            ? rawPayload.error
+            : `organization ${response.status}`;
+        throw new Error(message);
+      }
       setView(payload.view);
       setError(null);
     } catch (err) {
+      setView(null);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
-  }, [tenant]);
+  }, [tenant, organizationId, projectId]);
 
   React.useEffect(() => {
     void refresh();
