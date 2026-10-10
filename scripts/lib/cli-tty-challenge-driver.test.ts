@@ -18,8 +18,16 @@ const FAKE_CHALLENGE_CLI = [
   "process.stdin.on('data', (chunk) => { typed += chunk; if (/[\\r\\n]/.test(typed)) { process.stdout.write(typed.trim() === '0a1b2c' ? '\\napproved\\n' : '\\nmismatch\\n'); process.exit(typed.trim() === '0a1b2c' ? 0 : 4); } });",
 ].join('\n');
 
-/** Linux CI always has a terminal (node-pty, else util-linux `script`); see the driver module. */
-const terminalUnavailable = await probeTtyChallengeTerminal();
+/**
+ * Linux CI always has a terminal (node-pty, else util-linux `script`); see the
+ * driver module. Elsewhere the native addon is never loaded in the test worker:
+ * a failed macOS spawn leaves node-pty in a state that can crash the reused
+ * worker on a later file (SIGSEGV).
+ */
+const terminalUnavailable =
+  process.platform === 'linux'
+    ? await probeTtyChallengeTerminal()
+    : 'pseudo-terminal round trips run on Linux only';
 
 describe('cli tty challenge driver', () => {
   it('reads the challenge code through terminal control sequences', () => {
