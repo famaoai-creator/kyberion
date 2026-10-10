@@ -8,6 +8,7 @@ vi.mock('@agent/core/secret/secret-introduction', () => ({
     approvalId: '11111111-1111-1111-1111-111111111111',
     status: 'approved',
     autoApproved: true,
+    autoApproveWithheld: [],
     identity: {
       serviceId: 'gemini',
       secretKey: 'API_KEY',
@@ -69,6 +70,11 @@ describe('secret_introduce CLI', () => {
 
       expect(applySecretIntroduction).toHaveBeenCalledWith(
         expect.objectContaining({ value: secretValue })
+      );
+      // A file is a non-interactive value source (never auto-approved with SoD on).
+      const { proposeSecretIntroduction } = await import('@agent/core/secret/secret-introduction');
+      expect(proposeSecretIntroduction).toHaveBeenCalledWith(
+        expect.objectContaining({ valueSource: 'non_interactive' })
       );
       expect(JSON.stringify(result)).not.toContain(secretValue);
       expect(lines.join('\n')).not.toContain(secretValue);

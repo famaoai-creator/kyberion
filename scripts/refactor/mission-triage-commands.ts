@@ -14,6 +14,7 @@ import {
   draftScopeRebaselineGoal,
 } from '@agent/core/mission/mission-triage';
 import { logger } from '@agent/core/core';
+import { missionControllerRequester } from '../lib/cli-approval-requester.js';
 import type { ApprovalRequestRecord } from '@agent/core/governance/approval-store';
 
 type Print = (value: unknown) => void;
@@ -58,7 +59,7 @@ export async function runScopeApproveRequestApproval(
     goalSummary: options?.goalSummary || draftScopeRebaselineGoal(missionId),
     reason: options?.reason || 'Approved scope adjustment.',
     successCondition: options?.successCondition,
-    requestedBy: options?.requestedBy,
+    requester: missionControllerRequester(options?.requestedBy),
     currentGoal: report.current_goal,
     drift: report.drift
       ? { message: report.drift.message, driftScore: report.drift.drift_score }
@@ -92,7 +93,7 @@ export async function runMissionTriage(
       goalSummary: draftScopeRebaselineGoal(upperId, options?.goal),
       reason: options?.reason || 'Intent drift rebaseline requested via mission triage.',
       successCondition: options?.successCondition,
-      requestedBy: options?.requestedBy,
+      requester: missionControllerRequester(options?.requestedBy),
       currentGoal: report.current_goal,
       drift: report.drift
         ? { message: report.drift.message, driftScore: report.drift.drift_score }

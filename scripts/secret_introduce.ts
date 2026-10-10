@@ -6,6 +6,7 @@
  * Values come from a TTY hidden prompt or --from-file under active/shared/tmp/.
  */
 
+import { resolveCliApprovalRequester } from '@agent/core/governance/cli-operator-principal';
 import * as path from 'node:path';
 import * as readline from 'node:readline';
 import {
@@ -155,16 +156,21 @@ export async function runSecretCli(
       typeof flags.reason === 'string' && flags.reason.trim()
         ? flags.reason.trim()
         : `Introduce ${identity.envName}`;
+    const requester = resolveCliApprovalRequester({ legacy: 'operator' });
+    // A value typed at the hidden TTY prompt is interactive; --from-file (or
+    // no TTY) is not, and is never policy auto-approved with SoD on.
+    const fromFile = typeof flags['from-file'] === 'string' && flags['from-file'].trim() !== '';
     const proposed = proposeSecretIntroduction({
       serviceId,
       secretKey,
       reason,
       autoApproveLocal: flags['no-auto-approve'] !== true,
+      valueSource: !fromFile && process.stdin.isTTY ? 'interactive' : 'non_interactive',
       channel: 'terminal',
-      requestedBy: 'operator',
+      requestedBy: requester.requestedBy,
       requestedByContext: {
         surface: 'terminal',
-        actorId: 'operator',
+        actorId: requester.actorId,
         actorRole: 'sovereign',
       },
     });
@@ -174,6 +180,9 @@ export async function runSecretCli(
       approval_id: proposed.approvalId,
       status: proposed.status,
       auto_approved: proposed.autoApproved,
+      ...(proposed.autoApproveWithheld.length
+        ? { auto_approve_withheld: proposed.autoApproveWithheld }
+        : {}),
       env_name: proposed.identity.envName,
       storage_channel: proposed.storageChannel,
     };
@@ -202,6 +211,11 @@ export async function runSecretCli(
       print(`approval_id=${result.approval_id}`);
       print(`status=${result.status}`);
       print(`env_name=${result.env_name}`);
+      if (proposed.autoApproveWithheld.length) {
+        print(
+          `auto-approval withheld (separation of duties): ${proposed.autoApproveWithheld.join(', ')}`
+        );
+      }
       if (result.next) print(String(result.next));
       if (result.phase === 'applied') print('applied=true (value not printed)');
     }

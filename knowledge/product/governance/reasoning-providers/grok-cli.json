@@ -75,7 +75,12 @@
             "args": ["--permission-mode", "plan"],
             "notes": "Grok Build plan mode produces a plan without executing tools."
           }
-        }
+        },
+        "session_markers": [
+          {
+            "env": "GROK_CLI"
+          }
+        ]
       }
     }
   ]
