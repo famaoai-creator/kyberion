@@ -595,14 +595,16 @@ export function enforceApprovalGate(
         })
       : null;
   // A standing session grant is only as good as the decision that seeded it:
-  // re-check that decision under the current separation-of-duties setting.
-  // An unusable seed falls through to opening a fresh request.
+  // re-check that decision (revoked — possibly from another process — or
+  // unusable under the current separation-of-duties setting). An unusable
+  // seed falls through to opening a fresh request. With the setting off a
+  // seed record that can no longer be read keeps the cached grant, as before.
   const cachedUsable =
     cached !== null &&
     (() => {
-      if (!isSeparationOfDutiesEnabled()) return true;
       const seed = loadApprovalRequest(cached.storageChannel, cached.grantedByRequestId);
-      return !!seed && !approvalUsabilityRefusal(seed, 'approval_gate_session_cache');
+      if (!seed) return !isSeparationOfDutiesEnabled();
+      return !approvalUsabilityRefusal(seed, 'approval_gate_session_cache');
     })();
   if (cached && cachedUsable) {
     auditChain.record({

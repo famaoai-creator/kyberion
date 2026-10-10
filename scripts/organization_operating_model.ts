@@ -1,3 +1,4 @@
+import { cliApprovalRequester } from './lib/cli-approval-requester.js';
 import {
   buildOrganizationManagementView,
   buildOrganizationOperationRecord,
@@ -64,6 +65,7 @@ import {
 } from '@agent/core/organization/organization-interventions';
 import {
   requestDecisionApproval,
+  consumeDecisionApprovalRef,
   verifyDecisionApprovalRef,
 } from './organization_decision_approval.js';
 import {
@@ -1124,13 +1126,21 @@ const ORGANIZATION_COMMAND_HANDLERS: Record<string, OrgCommandHandler> = {
       approvalRef,
       followUpRefs: parsed.followUpRefs,
     });
+    // One-shot: the approval is consumed before the approved decision is saved,
+    // so it cannot settle a decision twice and a later revoke reports it used.
+    if (mode === 'apply' && target === 'approved' && approvalRef) {
+      consumeDecisionApprovalRef(approvalRef, process.env.MISSION_ROLE || 'organization-cli');
+    }
     const savedPath = mode === 'apply' ? saveOrganizationDecision(decision) : null;
     const approvalRequest =
       parsed.requestApproval && mode === 'apply'
         ? requestDecisionApproval({
             decision,
             chosenOption: parsed.chosenOption!,
-            requestedBy: parsed.requestedBy || process.env.MISSION_ROLE || 'organization-cli',
+            requester: cliApprovalRequester(
+              parsed.requestedBy,
+              process.env.MISSION_ROLE || 'organization-cli'
+            ),
             rationale: parsed.rationale,
           })
         : undefined;

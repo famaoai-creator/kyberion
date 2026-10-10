@@ -22,6 +22,12 @@
  * apply side would close a dependency cycle.
  */
 
+import {
+  approvalRequesterActorId,
+  resolveApprovalRequesterInput,
+  type ApprovalRequesterInput,
+  type ApprovalRequesterRef,
+} from '../governance/approval-requester.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import {
   evaluateApprovalUsability,
@@ -95,6 +101,12 @@ export function createMissionScopeApprovalRequest(input: {
   successCondition?: string;
   requestedBy?: string;
   /**
+   * The requester the entry point resolved (the terminal: agent session or
+   * local owner, `cli-operator-principal.ts`). Without it, `requestedBy` or
+   * the legacy persona/USER default is recorded.
+   */
+  requester?: ApprovalRequesterInput;
+  /**
    * Display context the caller gathers (e.g. via collectMissionTriageReport)
    * so the human sees what they approve. Kept as inputs — this module
    * deliberately does not import mission-state/intent machinery, which would
@@ -135,11 +147,16 @@ export function createMissionScopeApprovalRequest(input: {
   );
   if (existing) return existing;
 
-  const requestedBy =
-    input.requestedBy?.trim() ||
-    getRegisteredEnvText('KYBERION_PERSONA') ||
-    getRegisteredEnvText('USER') ||
-    'mission_controller';
+  const requester: ApprovalRequesterRef = input.requester
+    ? resolveApprovalRequesterInput(input.requester)
+    : {
+        requestedBy:
+          input.requestedBy?.trim() ||
+          getRegisteredEnvText('KYBERION_PERSONA') ||
+          getRegisteredEnvText('USER') ||
+          'mission_controller',
+      };
+  const requestedBy = requester.requestedBy;
   const details = buildScopeApprovalDetails({
     missionId,
     currentGoal: String(input.currentGoal || '').trim(),
@@ -157,6 +174,7 @@ export function createMissionScopeApprovalRequest(input: {
     threadTs: missionId,
     correlationId: effectBinding,
     requestedBy,
+    ...(requester.displayName ? { requestedByDisplayName: requester.displayName } : {}),
     expiresAt,
     kind: 'mission_gate',
     draft: {
@@ -168,7 +186,7 @@ export function createMissionScopeApprovalRequest(input: {
     source: { missionId },
     requestedByContext: {
       surface: 'terminal',
-      actorId: requestedBy,
+      actorId: approvalRequesterActorId(requester),
       actorRole: 'mission-scope-approval',
       missionId,
     },
