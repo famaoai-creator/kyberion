@@ -311,7 +311,7 @@ export function assertCanonicalWritable(
   const guard = validateWritePermission(canonical);
   if (!guard.allowed) {
     throw new Error(
-      `[SECURITY] Write through symbolic link denied: ${displayPath} resolves to ${canonical}. ${guard.reason ?? ''}`.trim()
+      `[SECURITY] Write through symbolic link denied: ${displayPath} resolves to a location outside the caller's write scope`
     );
   }
   return canonical;
@@ -329,7 +329,7 @@ export function assertCanonicalReadable(
   const guard = validateReadPermission(canonical);
   if (!guard.allowed) {
     throw new Error(
-      `[SECURITY] Read through symbolic link denied: ${displayPath} resolves to ${canonical}. ${guard.reason ?? ''}`.trim()
+      `[SECURITY] Read through symbolic link denied: ${displayPath} resolves to a location outside the caller's read scope`
     );
   }
   return canonical;
@@ -407,21 +407,121 @@ export function openInPlace(
   noFollow = false,
   authorizedCanonical?: string
 ): number {
+  const c = fs.constants;
   // In-place access must not change the inode before it is vetted: a
   // truncating or replacing flag would act on a foreign hard link first.
-  if (!/^(?:r\+?|a[x]?\+?)$/.test(flags)) {
+  const base: Record<string, number> = {
+    r: c.O_RDONLY,
+    'r+': c.O_RDWR,
+    a: c.O_WRONLY | c.O_APPEND,
+    'a+': c.O_RDWR | c.O_APPEND,
+    ax: c.O_WRONLY | c.O_APPEND,
+    'ax+': c.O_RDWR | c.O_APPEND,
+  };
+  if (!Object.hasOwn(base, flags)) {
     throw new Error(`[SECURITY] Unsupported in-place open flag '${flags}' for ${displayPath}`);
   }
-  const { O_RDONLY, O_NOFOLLOW } = fs.constants;
-  const openFlags = noFollow && flags === 'r' && O_NOFOLLOW ? O_RDONLY | O_NOFOLLOW : flags;
-  const fd = fs.openSync(resolved, openFlags, mode);
+  // Non-blocking: a FIFO (or a link flipped to one) must not hang the caller.
+  let open = base[flags] | (c.O_NONBLOCK ?? 0);
+  if (noFollow) open |= c.O_NOFOLLOW ?? 0;
+  const creates = flags.startsWith('a');
+  let fd: number | undefined;
+  if (!flags.startsWith('ax')) {
+    try {
+      fd = fs.openSync(resolved, open);
+    } catch (error) {
+      if (!creates || errnoCode(error) !== 'ENOENT') rethrowAsErrno(error, 'open');
+    }
+  }
+  let created = false;
+  if (fd === undefined) {
+    // Create only a new entry, never through a (dangling) link: O_EXCL with
+    // O_NOFOLLOW fails on any existing leaf instead of creating its target.
+    const exclusive = open | c.O_CREAT | c.O_EXCL | (c.O_NOFOLLOW ?? 0);
+    fd = fs.openSync(resolved, exclusive, mode);
+    created = true;
+  }
   let accepted = false;
   try {
+    const held = fs.fstatSync(fd);
+    if (!held.isFile()) {
+      throw new Error(`Not a regular file: ${displayPath} (refusing to ${operation} it)`);
+    }
+    vetOpenedFd(fd, resolved, displayPath, operation, authorizedCanonical);
+    accepted = true;
+    return fd;
+  } finally {
+    if (!accepted) {
+      if (created) removeCreatedEntry(fd, resolved);
+      fs.closeSync(fd);
+    }
+  }
+}
+
+/**
+ * Undo a create whose vetting failed: unlink the new entry at `resolved`
+ * only while it is still the inode just created (no leaf link: it was
+ * created O_NOFOLLOW) and inside the checkout.
+ */
+function removeCreatedEntry(fd: number, resolved: string): void {
+  try {
+    const mine = fs.fstatSync(fd);
+    const target = path.resolve(resolved);
+    let entry: fs.Stats | undefined;
+    if (target.startsWith(path.resolve(pathResolver.rootDir()) + path.sep))
+      entry = fs.lstatSync(target);
+    else if (target.startsWith(realRoot().real + path.sep)) entry = fs.lstatSync(target);
+    if (entry && entry.dev === mine.dev && entry.ino === mine.ino && entry.size === 0)
+      fs.unlinkSync(target);
+  } catch {
+    // best effort: a concurrent change already moved the entry
+  }
+}
+
+/**
+ * Open a directory and vet the descriptor (like openInPlace for files):
+ * non-blocking, refuses anything but a directory.
+ */
+export function openDirVetted(
+  resolved: string,
+  displayPath: string,
+  operation: HardLinkOperation,
+  authorizedCanonical?: string
+): number {
+  const c = fs.constants;
+  const fd = fs.openSync(resolved, c.O_RDONLY | (c.O_DIRECTORY ?? 0) | (c.O_NONBLOCK ?? 0));
+  let accepted = false;
+  try {
+    if (!fs.fstatSync(fd).isDirectory()) {
+      throw new Error(`[SECURITY] Refusing to ${operation} ${displayPath}: not a directory`);
+    }
     vetOpenedFd(fd, resolved, displayPath, operation, authorizedCanonical);
     accepted = true;
     return fd;
   } finally {
     if (!accepted) fs.closeSync(fd);
+  }
+}
+
+/** readdir of the directory actually opened and vetted (not of whatever the path names later). */
+export function readdirVetted(resolved: string, displayPath: string): string[] {
+  const fd = openDirVetted(resolved, displayPath, 'read');
+  try {
+    if (process.platform === 'linux') {
+      try {
+        return fs.readdirSync(`/proc/self/fd/${fd}`);
+      } catch {
+        // /proc unavailable: path fallback below
+      }
+    }
+    const held = fs.fstatSync(fd);
+    const canonical = canonicalGuardPath(resolved, 'follow');
+    if (!leafIsInode(canonical, held)) throw new Error(`[SECURITY] ${displayPath} changed`);
+    const names = fs.readdirSync(canonical);
+    if (!leafIsInode(canonical, held)) throw new Error(`[SECURITY] ${displayPath} changed`);
+    return names;
+  } finally {
+    fs.closeSync(fd);
   }
 }
 
@@ -520,7 +620,7 @@ function assertAuthorizedAt(
     operation === 'read' ? validateReadPermission(actual) : validateWritePermission(actual);
   if (!guard.allowed) {
     throw new Error(
-      `[SECURITY] ${operation === 'read' ? 'Read' : 'Write'} denied: ${displayPath} opened ${actual}. ${guard.reason ?? ''}`.trim()
+      `[SECURITY] ${operation === 'read' ? 'Read' : 'Write'} denied: ${displayPath} resolves to a location outside the caller's ${operation} scope`
     );
   }
 }
@@ -724,7 +824,7 @@ export function assertSymlinkTargetWritable(resolvedTarget: string, displayPath:
   const canonicalTarget = canonicalGuardPath(resolvedTarget, 'follow');
   if (isInside(path.resolve(pathResolver.rootDir()), canonicalTarget) === undefined) {
     throw new Error(
-      `[SECURITY] Refusing to create a symbolic link to ${displayPath}: it resolves outside the repository (${canonicalTarget})`
+      `[SECURITY] Refusing to create a symbolic link to ${displayPath}: it resolves outside the repository`
     );
   }
   for (const candidate of new Set([path.resolve(resolvedTarget), canonicalTarget])) {
@@ -732,7 +832,7 @@ export function assertSymlinkTargetWritable(resolvedTarget: string, displayPath:
     const writeGuard = validateWritePermission(candidate);
     if (!writeGuard.allowed) {
       throw new Error(
-        `[SECURITY] Refusing to create a symbolic link to ${displayPath}: the target is outside the caller's write scope. ${writeGuard.reason ?? ''}`.trim()
+        `[SECURITY] Refusing to create a symbolic link to ${displayPath}: the target is outside the caller's write scope`
       );
     }
   }
@@ -783,17 +883,16 @@ export function chmodInPlace(
   mode: number,
   authorizedCanonical?: string
 ): void {
-  if (!fs.statSync(resolved).isFile()) return fs.chmodSync(resolved, mode);
-  const fd = openInPlace(
-    resolved,
-    displayPath,
-    'r',
-    'write',
-    undefined,
-    false,
-    authorizedCanonical
-  );
+  // Through a vetted descriptor for both files and directories; any other
+  // type (FIFO, socket, device) is refused rather than chmod'ed by path.
+  const c = fs.constants;
+  const fd = fs.openSync(resolved, c.O_RDONLY | (c.O_NONBLOCK ?? 0));
   try {
+    const held = fs.fstatSync(fd);
+    if (!held.isFile() && !held.isDirectory()) {
+      throw new Error(`[SECURITY] Refusing to chmod ${displayPath}: not a file or directory`);
+    }
+    vetOpenedFd(fd, resolved, displayPath, 'write', authorizedCanonical);
     fs.fchmodSync(fd, mode);
   } finally {
     fs.closeSync(fd);
