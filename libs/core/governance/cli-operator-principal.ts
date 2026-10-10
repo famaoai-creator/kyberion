@@ -30,6 +30,7 @@
  * silently recording a value that cannot prove separation.
  */
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { listCliReasoningProviderDescriptors } from '../reasoning/reasoning-provider-registry.js';
 import { resolveMemberByPrincipal } from '../organization/member-registry.js';
 import { resolveOperatorDisplayName } from '../surface/operator-identity.js';
 import { resolveSeparationOfDutiesPolicy } from './approval-policy.js';
@@ -57,27 +58,31 @@ export const CLI_OPERATOR_PROVISION_COMMAND = 'pnpm organization member ensure-o
  * Environment markers of an agent session. Kyberion's own agent runtime sets
  * `KYBERION_AGENT_ID` / `KYBERION_NHI_ID` / `KYBERION_RUN_ORIGIN=agent` (the
  * same signals `deriveTraceOrigin` classifies as `agent`); provider CLI
- * harnesses set their own marker in every child process they spawn.
+ * harnesses set their own marker in every child process they spawn. Those
+ * harness markers come from the reasoning-provider registry
+ * (`cli.session_markers` / `cli.session_principal` in
+ * `knowledge/product/governance/reasoning-providers/`), read on use.
  */
-const AGENT_HARNESS_MARKERS: ReadonlyArray<{ env: string; equals?: string; agent: string }> = [
-  { env: 'CLAUDECODE', agent: 'claude-code' },
-  { env: 'CODEX_CLI', agent: 'codex-cli' },
-  { env: 'CODEX_VERSION', agent: 'codex-cli' },
-  { env: 'TERM_PROGRAM', equals: 'codex', agent: 'codex-cli' },
-  { env: 'GEMINI_CLI', agent: 'gemini-cli' },
-  { env: 'GROK_CLI', agent: 'grok-cli' },
-  { env: 'CURSOR_AGENT', agent: 'cursor-cli' },
-  { env: 'OPENCODE_CLI', agent: 'opencode-cli' },
-];
+function agentHarnessMarkers(): Array<{ env: string; equals?: string; agent: string }> {
+  return listCliReasoningProviderDescriptors().flatMap((descriptor) =>
+    (descriptor.cli.session_markers ?? []).map((marker) => ({
+      env: marker.env,
+      ...(marker.equals !== undefined ? { equals: marker.equals.toLowerCase() } : {}),
+      agent: descriptor.cli.session_principal ?? descriptor.mode,
+    }))
+  );
+}
 
 /** Every environment variable {@link detectCliAgentPrincipal} reads (tests blank them). */
-export const CLI_AGENT_SESSION_ENV: readonly string[] = [
-  'KYBERION_AGENT_ID',
-  'KYBERION_NHI_ID',
-  'KYBERION_RUN_ORIGIN',
-  ...new Set(AGENT_HARNESS_MARKERS.map((marker) => marker.env)),
-  'AI_AGENT',
-];
+export function cliAgentSessionEnv(): string[] {
+  return [
+    'KYBERION_AGENT_ID',
+    'KYBERION_NHI_ID',
+    'KYBERION_RUN_ORIGIN',
+    ...new Set(agentHarnessMarkers().map((marker) => marker.env)),
+    'AI_AGENT',
+  ];
+}
 
 function envText(env: Env, name: string): string {
   return getRegisteredEnvText(name, { env })?.trim() ?? '';
@@ -96,7 +101,7 @@ export function detectCliAgentPrincipal(env: Env = process.env): string | null {
   if (envText(env, 'KYBERION_RUN_ORIGIN').toLowerCase() === 'agent') {
     return 'agent:kyberion-runtime';
   }
-  for (const marker of AGENT_HARNESS_MARKERS) {
+  for (const marker of agentHarnessMarkers()) {
     const value = envText(env, marker.env);
     if (!value) continue;
     if (marker.equals !== undefined && value.toLowerCase() !== marker.equals) continue;

@@ -69,7 +69,12 @@
             "args": ["--mode", "ask"],
             "notes": "Cursor Agent ask mode is Q&A-only and does not execute mutating tools."
           }
-        }
+        },
+        "session_markers": [
+          {
+            "env": "CURSOR_AGENT"
+          }
+        ]
       },
       "runtime_instructions": [
         "Provider note: Cursor subagents inherit parent tools (no per-tool allowlist); honor readonly and the declared work-item scope anyway.",

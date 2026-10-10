@@ -383,7 +383,7 @@ local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
     script opens a request and as `decidedBy` for `pnpm kyberion approvals --approve`; the
     onboarding name goes to `requestedByDisplayName` / `decidedByDisplayName` and is never
     compared. A CLI run inside an agent session (`KYBERION_AGENT_ID`, `KYBERION_NHI_ID`,
-    `KYBERION_RUN_ORIGIN=agent`, or a provider harness marker such as `CLAUDECODE`) opens requests
+    `KYBERION_RUN_ORIGIN=agent`, or a provider harness marker such as `CLAUDECODE`, declared per CLI as `cli.session_markers` in `reasoning-providers/`) opens requests
     as `agent:<…>`, so a human approving it is not a self-approval. The detected principal is always
     kept as `requestedByContext.actorId`; `--requested-by` only adds an identity. With the setting
     on, a terminal with no owner member (`pnpm organization member ensure-owner` provisions it) or an

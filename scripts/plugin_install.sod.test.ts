@@ -25,7 +25,7 @@ vi.mock('@agent/core/organization/member-registry', async (importOriginal) => {
 });
 
 import { withExecutionContext } from '@agent/core/authority';
-import { CLI_AGENT_SESSION_ENV } from '@agent/core/governance/cli-operator-principal';
+import { cliAgentSessionEnv } from '@agent/core/governance/cli-operator-principal';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { runPluginInstall } from './plugin_install.js';
@@ -40,7 +40,7 @@ function tmp(name: string): string {
 
 describe('plugin_install with separation of duties on and no owner member', () => {
   beforeEach(() => {
-    for (const name of CLI_AGENT_SESSION_ENV) vi.stubEnv(name, '');
+    for (const name of cliAgentSessionEnv()) vi.stubEnv(name, '');
     sod.file = path.join(tmp('overlay'), 'approval-policy.json');
     const product = JSON.parse(
       String(

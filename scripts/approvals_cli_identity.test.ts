@@ -65,7 +65,7 @@ import {
   requestTenantProviderAttestationApproval,
 } from '@agent/core/organization/tenant-governance';
 import {
-  CLI_AGENT_SESSION_ENV,
+  cliAgentSessionEnv,
   resolveCliApprovalRequester,
 } from '@agent/core/governance/cli-operator-principal';
 import { evaluateApprovalUsability } from '@agent/core/governance/approval-store';
@@ -99,7 +99,7 @@ function clearSeparationOfDuties(): void {
 }
 
 function plainTerminal(): void {
-  for (const name of CLI_AGENT_SESSION_ENV) vi.stubEnv(name, '');
+  for (const name of cliAgentSessionEnv()) vi.stubEnv(name, '');
 }
 
 const claim = {
