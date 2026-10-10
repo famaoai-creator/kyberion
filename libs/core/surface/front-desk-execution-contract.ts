@@ -4,8 +4,8 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
-import type { SurfaceViewerScope } from './surface-mutation-guard.js';
-import { canonicalHumanOwner } from './verified-human-request-identity.js';
+import type { SurfaceViewerScope } from './surface-viewer-scope-contract.js';
+import { canonicalHumanOwner } from './verified-human-request-contract.js';
 
 export const FRONT_DESK_EXECUTION_POLICY_PATH =
   'knowledge/product/governance/front-desk-execution-policy.json';

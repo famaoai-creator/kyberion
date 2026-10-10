@@ -12,3 +12,17 @@ export function isReservedScopeName(value: string): value is ReservedScopeName {
 export function isValidTenantSlug(value: string): boolean {
   return TENANT_SLUG_PATTERN.test(value) && !isReservedScopeName(value);
 }
+
+/** Member identifiers use the tenant slug grammar without reserved-tier exclusions. */
+const MEMBER_ID_PATTERN = /^[a-z][a-z0-9-]{1,30}$/;
+
+export function isValidMemberId(value: string): boolean {
+  return MEMBER_ID_PATTERN.test(value);
+}
+
+/** Organization/project scope identifiers cannot contain whitespace or path separators. */
+const CHRONOS_SCOPE_ID_PATTERN = /^[^\s/]+$/u;
+
+export function isValidChronosScopeId(value: string): boolean {
+  return typeof value === 'string' && CHRONOS_SCOPE_ID_PATTERN.test(value);
+}

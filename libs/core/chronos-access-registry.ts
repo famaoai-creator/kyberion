@@ -1,14 +1,16 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import { isValidTenantSlug } from './entity-scope.js';
+import { isValidChronosScopeId } from './foundation/scope.js';
 import type { OsKnowledgeTier } from './cloudflare-os-control-plane.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, withSensitivePathMediation } from './secure-io.js';
 import { secretGuard } from './secret/secret-guard.js';
 
-const SCOPE_ID_PATTERN = /^[^\s/]+$/u;
+export { isValidChronosScopeId } from './foundation/scope.js';
+
 const TOKEN_HASH_PATTERN = /^[0-9a-f]{64}$/u;
-// FD-07: local copy of the member-id grammar (member-registry.ts owns the
+// FD-07: local copy of the member-id grammar (foundation/scope.ts owns the
 // canonical definition) — kept local on purpose so this low-level registry
 // module never depends on the higher-level member-registry module.
 const MEMBER_ID_PATTERN = /^[a-z][a-z0-9-]{1,30}$/u;
@@ -40,11 +42,7 @@ export interface ChronosTokenRegistration {
 }
 
 function isScopeId(value: unknown): value is string {
-  return typeof value === 'string' && SCOPE_ID_PATTERN.test(value);
-}
-
-export function isValidChronosScopeId(value: string): boolean {
-  return isScopeId(value);
+  return typeof value === 'string' && isValidChronosScopeId(value);
 }
 
 function hasTokenList(document: unknown): document is { tokens: unknown[] } {
