@@ -116,16 +116,20 @@ function realRoot(): { real: string; caseInsensitive: boolean } {
     // An unresolvable root leaves the logical root as the comparison base;
     // every path below it then fails canonicalization and is refused.
   }
+  // Probe the nearest component (the root or an ancestor) whose name has
+  // letters: on a case-folding volume its swapped spelling is the same entry.
   let caseInsensitive = false;
-  const swapped = path.join(path.dirname(real), swapCase(path.basename(real)));
-  if (swapped !== real) {
+  for (let probe = real; path.dirname(probe) !== probe; probe = path.dirname(probe)) {
+    const swapped = path.join(path.dirname(probe), swapCase(path.basename(probe)));
+    if (swapped === probe) continue;
     try {
-      const a = fs.lstatSync(real);
+      const a = fs.lstatSync(probe);
       const b = fs.lstatSync(swapped);
-      caseInsensitive = a.dev === b.dev && a.ino === b.ino;
+      caseInsensitive = a.ino !== 0 && a.dev === b.dev && a.ino === b.ino;
     } catch {
       caseInsensitive = false;
     }
+    break;
   }
   realRootCache = { root, real, caseInsensitive };
   return realRootCache;
@@ -158,8 +162,8 @@ function physicalPath(absPath: string, hops = 0): string {
   }
   // Fast path: an existing, fully resolvable path costs one realpath call.
   try {
-    const real = fs.realpathSync.native(absPath);
-    return path.join(path.dirname(real), onDiskLeaf(path.dirname(real), path.basename(real)));
+    // realpath already returns the on-disk case on case-folding platforms.
+    return fs.realpathSync.native(absPath);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code !== 'ENOENT' && code !== 'ENOTDIR') throw error;
@@ -317,6 +321,8 @@ export function assertTempInCheckedDir(checked: CheckedDir, tempPath: string, fd
   const tempNow = fs.lstatSync(tempPath);
   const opened = fs.fstatSync(fd);
   if (
+    checked.ino === 0 ||
+    opened.ino === 0 ||
     dirNow.dev !== checked.dev ||
     dirNow.ino !== checked.ino ||
     tempNow.dev !== opened.dev ||
@@ -337,6 +343,11 @@ export function openInPlace(
   operation: HardLinkOperation,
   mode?: number
 ): number {
+  // In-place access must not change the inode before it is vetted: a
+  // truncating or replacing flag would act on a foreign hard link first.
+  if (!/^(?:r\+?|a[x]?\+?)$/.test(flags)) {
+    throw new Error(`[SECURITY] Unsupported in-place open flag '${flags}' for ${displayPath}`);
+  }
   const fd = fs.openSync(resolved, flags, mode);
   let accepted = false;
   try {
@@ -409,20 +420,69 @@ export function safeRealpath(filePath: string): string {
 /*
  * Hard links. A hard link is a second name for the same inode, and nothing
  * on the path says where the other names live: `tmp/x/hl.txt` may be the
- * very inode of `knowledge/personal/a.txt`. Path canonicalization cannot see
- * that, so operations that read or modify the existing inode in place
- * (read, append, copy source, chmod, fsync, open-for-append) refuse a
- * regular file with more than one link unless every link lives in the same
- * directory as the checked path (e.g. lock recovery's `<file>` +
- * `<file>.stale-*` tomb pair while a displaced record is put back). Writes
- * that replace the entry (safeWriteFile, copy destination: temp + rename)
- * never touch the old inode and need no check.
+ * very inode of `knowledge/personal/a.txt`, and a later move can give it any
+ * writable name. Operations that read or modify the existing inode in place
+ * (read, size, append, copy source, chmod, fsync, open-for-append, move,
+ * hard-link source) therefore refuse a regular file with more than one link.
  *
- * Reads under `node_modules/` are exempt: the pnpm store links every package
- * file into each project. Files outside the repository (vault mounts) are
- * judged by the vault allowance, not by link count.
+ * Two narrow exceptions:
+ * - Lock recovery: in `active/shared/runtime/locks/`, exactly two links named
+ *   `<base>` and `<base>.stale-<pid>-<ms>-<n>` (the tomb pair that exists
+ *   while safeLinkExclusiveSync puts a displaced record back).
+ * - Reads of package files under the root `node_modules/`, or under a
+ *   workspace package's `node_modules/` the caller cannot write: the pnpm
+ *   store links every package file into each project. The literal path must
+ *   be one of those prefixes; nothing under `active/` or another writable
+ *   tree qualifies.
+ *
+ * Writes that replace the entry (safeWriteFile, the copy destination: temp +
+ * rename) never touch the old inode and need no check. Files outside the
+ * repository (vault mounts) are judged by the vault allowance.
  */
 export type HardLinkOperation = 'read' | 'write';
+
+const STALE_TOMB = /^(.+)\.stale-\d+-\d+-\d+$/;
+const WORKSPACE_NODE_MODULES =
+  /^(?:libs\/core|libs\/shared-[^/]+|libs\/actuators\/[^/]+|satellites\/[^/]+|presence\/displays\/[^/]+|presence\/bridge\/[^/]+)\/node_modules\//;
+
+/** Read exemption for pnpm store links (see the block comment above). */
+function isTrustedNodeModulesRead(resolved: string): boolean {
+  const logicalRoot = path.resolve(pathResolver.rootDir());
+  const relative = isInside(logicalRoot, path.resolve(resolved));
+  if (relative === undefined) return false;
+  const posix = relative.split(path.sep).join('/');
+  if (posix.startsWith('node_modules/')) return true;
+  if (!WORKSPACE_NODE_MODULES.test(posix)) return false;
+  // A caller that could plant a link there gets no exemption.
+  return !validateWritePermission(path.resolve(resolved)).allowed;
+}
+
+/** Lock recovery's `<base>` / `<base>.stale-*` pair in the locks directory. */
+function isLockTombPair(canonical: string, stat: fs.Stats): boolean {
+  if (stat.nlink !== 2 || stat.ino === 0) return false;
+  const locksDir = path.join(path.resolve(pathResolver.rootDir()), 'active/shared/runtime/locks');
+  const dir = path.dirname(canonical);
+  if (dir !== locksDir && !dir.startsWith(locksDir + path.sep)) return false;
+  const name = path.basename(canonical);
+  const tombOf = STALE_TOMB.exec(name);
+  let partners: string[];
+  if (tombOf) {
+    partners = [tombOf[1]];
+  } else {
+    const names = fs.readdirSync(dir);
+    // Bounded: a lock directory holds a handful of records.
+    if (names.length > 10000) return false;
+    partners = names.filter((n) => n.startsWith(`${name}.stale-`) && STALE_TOMB.test(n));
+  }
+  return partners.some((partner) => {
+    try {
+      const st = fs.lstatSync(path.join(dir, partner));
+      return st.dev === stat.dev && st.ino === stat.ino;
+    } catch {
+      return false;
+    }
+  });
+}
 
 export function assertNotForeignHardLink(
   stat: fs.Stats,
@@ -432,27 +492,11 @@ export function assertNotForeignHardLink(
 ): void {
   if (!stat.isFile() || stat.nlink <= 1) return;
   const canonical = canonicalGuardPath(resolved, 'follow');
-  const logicalRoot = path.resolve(pathResolver.rootDir());
-  const relative = isInside(logicalRoot, canonical);
-  if (relative === undefined) return;
-  if (operation === 'read' && relative.split(path.sep).includes('node_modules')) return;
-  const dir = path.dirname(canonical);
-  let sameInodeNames = 0;
-  try {
-    for (const name of fs.readdirSync(dir)) {
-      try {
-        const st = fs.lstatSync(path.join(dir, name));
-        if (st.dev === stat.dev && st.ino === stat.ino) sameInodeNames += 1;
-      } catch {
-        // raced entry: not a link of this inode
-      }
-    }
-  } catch {
-    sameInodeNames = 0;
-  }
-  if (sameInodeNames >= stat.nlink) return;
+  if (isInside(path.resolve(pathResolver.rootDir()), canonical) === undefined) return;
+  if (operation === 'read' && isTrustedNodeModulesRead(resolved)) return;
+  if (isLockTombPair(canonical, stat)) return;
   throw new Error(
-    `[SECURITY] Refusing to ${operation} ${displayPath}: it is a hard link (nlink=${stat.nlink}) to a file that also lives outside this directory`
+    `[SECURITY] Refusing to ${operation} ${displayPath}: it is a hard link (nlink=${stat.nlink}); its other names may live in another scope`
   );
 }
 
@@ -488,7 +532,6 @@ export function assertSymlinkTargetWritable(resolvedTarget: string, displayPath:
  * destination is refused, as in safeWriteFile.
  */
 export function copyReplacing(resolvedSrc: string, srcPath: string, resolvedDest: string): void {
-  assertNotForeignHardLink(fs.statSync(resolvedSrc), resolvedSrc, srcPath, 'read');
   let destIsLink = false;
   try {
     destIsLink = fs.lstatSync(resolvedDest).isSymbolicLink();
@@ -496,13 +539,26 @@ export function copyReplacing(resolvedSrc: string, srcPath: string, resolvedDest
     destIsLink = false;
   }
   if (destIsLink) throw new Error(`[SECURITY] Refusing to replace symbolic link: ${resolvedDest}`);
+  // Copy from the descriptor that passed the hard-link check, not the path.
+  const src = openInPlace(resolvedSrc, srcPath, 'r', 'read');
   const temp = `${resolvedDest}.tmp.${process.pid}.${Math.random().toString(36).slice(2)}`;
   let renamed = false;
   try {
-    fs.copyFileSync(resolvedSrc, temp, fs.constants.COPYFILE_EXCL);
+    const out = fs.openSync(temp, 'wx', fs.fstatSync(src).mode & 0o7777);
+    try {
+      const buffer = Buffer.alloc(64 * 1024);
+      let read: number;
+      while ((read = fs.readSync(src, buffer, 0, buffer.length, null)) > 0) {
+        let written = 0;
+        while (written < read) written += fs.writeSync(out, buffer, written, read - written);
+      }
+    } finally {
+      fs.closeSync(out);
+    }
     fs.renameSync(temp, resolvedDest);
     renamed = true;
   } finally {
+    fs.closeSync(src);
     if (!renamed) fs.rmSync(temp, { force: true });
   }
 }
@@ -515,5 +571,49 @@ export function chmodInPlace(resolved: string, displayPath: string, mode: number
     fs.fchmodSync(fd, mode);
   } finally {
     fs.closeSync(fd);
+  }
+}
+
+/**
+ * mkdir -p for a directory whose canonical path the caller has already
+ * checked. Missing components are created one at a time, and before each
+ * mkdir the parent must still canonicalize to the location that was checked,
+ * so a component swapped for a link mid-way cannot leave directories in
+ * another scope. Only creates inside the checkout.
+ */
+export function mkdirGuarded(resolvedDir: string, displayPath: string, mode?: number): void {
+  const target = path.resolve(resolvedDir);
+  const missing: string[] = [];
+  let existing = target;
+  while (!entryExists(existing)) {
+    const parent = path.dirname(existing);
+    if (parent === existing) break;
+    missing.unshift(path.basename(existing));
+    existing = parent;
+  }
+  if (missing.length === 0) return;
+  const logicalRoot = path.resolve(pathResolver.rootDir());
+  const physicalRoot = realRoot().real;
+  let expected = canonicalGuardPath(existing, 'follow');
+  let current = existing;
+  for (const name of missing) {
+    current = path.join(current, name);
+    if (
+      !current.startsWith(logicalRoot + path.sep) &&
+      !current.startsWith(physicalRoot + path.sep)
+    ) {
+      throw new Error(`[SECURITY] Refusing to create ${displayPath}: outside the repository`);
+    }
+    if (canonicalGuardPath(path.dirname(current), 'follow') !== expected) {
+      throw new Error(
+        `[SECURITY] Refusing to create ${displayPath}: a parent changed between the permission check and mkdir`
+      );
+    }
+    try {
+      fs.mkdirSync(current, { mode });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+    expected = path.join(expected, name);
   }
 }
