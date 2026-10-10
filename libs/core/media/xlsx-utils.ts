@@ -913,7 +913,7 @@ async function extractTables(zip: JSZip, sheetPath: string): Promise<XlsxTable[]
     if (!target) continue;
     const tablePath = target.startsWith('/')
       ? target.substring(1)
-      : path.join(sheetDir, target).replace(/\\/g, '/');
+      : resolveZipEntryPath(sheetDir, target);
 
     const tableFile = zip.file(tablePath) || zip.file('xl/' + target.replace('../', ''));
     if (!tableFile) continue;
@@ -999,6 +999,17 @@ async function resolveSheetPaths(zip: JSZip): Promise<Map<string, string>> {
     }
   }
   return map;
+}
+
+/** Resolve a workbook-relative rel target into a normalized zip entry path. */
+function resolveZipEntryPath(sheetDir: string, target: string): string {
+  const out: string[] = [];
+  for (const seg of `${sheetDir}/${target.replace(/\\/g, '/')}`.split('/')) {
+    if (seg === '' || seg === '.') continue;
+    if (seg === '..') out.pop();
+    else out.push(seg);
+  }
+  return out.join('/');
 }
 
 // ─── Main Entry Point ────────────────────────────────────────

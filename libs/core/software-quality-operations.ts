@@ -83,8 +83,10 @@ export function parseReasoningItems(raw: string): TestInventoryItem[] {
   const trimmed = raw.trim();
   const firstJsonToken = trimmed.search(/[\[{]/u);
   if (firstJsonToken >= 0 && trimmed[firstJsonToken] === '[') return [];
-  const match = raw.match(/\{[\s\S]*\}/u);
-  if (!match) return [];
+  const braceStart = raw.indexOf('{');
+  const braceEnd = raw.lastIndexOf('}');
+  if (braceStart < 0 || braceEnd <= braceStart) return [];
+  const match = [raw.slice(braceStart, braceEnd + 1)];
   try {
     const parsed = parseSafeJsonObjectInput(match[0], 'reasoning test inventory');
     if (!parsed || !Array.isArray(parsed.items)) return [];

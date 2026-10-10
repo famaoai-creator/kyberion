@@ -18,6 +18,12 @@ export interface DecisionRight {
   escalates_to?: string;
   final_decision_holder?: 'human' | 'delegated';
   requires_human_acceptance?: boolean;
+  /**
+   * The organization lets an accountability charter that names this decision
+   * type stand in for the human acceptance above (never for a role mismatch or
+   * an over-threshold value).
+   */
+  charter_delegable?: boolean;
 }
 
 export interface DecisionRightsMatrix {
@@ -45,8 +51,10 @@ export interface DecisionRightsEvaluation {
   thresholdValue: number | string | null;
   requiresEscalation: boolean;
   escalationReason: string | null;
+  escalationKind: 'role_mismatch' | 'over_threshold' | 'human_acceptance' | null;
   finalDecisionHolder: 'human' | 'delegated' | null;
   requiresHumanAcceptance: boolean;
+  charterDelegable: boolean;
 }
 
 const DEFAULT_DECISION_RIGHTS_PATHS = [
@@ -210,13 +218,21 @@ export function evaluateDecisionRights(
   const requiresHumanAcceptance =
     matched.requires_human_acceptance === true || finalDecisionHolder === 'human';
   const requiresEscalation = roleMismatch || overThreshold || requiresHumanAcceptance;
-  const escalationReason = roleMismatch
-    ? `actor role ${actorRole} is not authorized for ${decisionType}`
+  const escalationKind = roleMismatch
+    ? 'role_mismatch'
     : overThreshold
-      ? `decision value exceeds threshold ${String(thresholdValue)}`
+      ? 'over_threshold'
       : requiresHumanAcceptance
-        ? 'final decision holder is human'
+        ? 'human_acceptance'
         : null;
+  const escalationReason =
+    escalationKind === 'role_mismatch'
+      ? `actor role ${actorRole} is not authorized for ${decisionType}`
+      : escalationKind === 'over_threshold'
+        ? `decision value exceeds threshold ${String(thresholdValue)}`
+        : escalationKind === 'human_acceptance'
+          ? 'final decision holder is human'
+          : null;
 
   return {
     decisionType,
@@ -225,7 +241,9 @@ export function evaluateDecisionRights(
     thresholdValue,
     requiresEscalation,
     escalationReason,
+    escalationKind,
     finalDecisionHolder,
     requiresHumanAcceptance,
+    charterDelegable: matched.charter_delegable === true,
   };
 }

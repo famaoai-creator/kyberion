@@ -1,0 +1,26 @@
+{
+  "record_id": "mem-MSN-UX-SIMPLIFY-20261010-2026_10_10-R1",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "CLI旧名削除時は2つのdocs検査の走査範囲差に注意",
+  "summary": "deprecated pnpm script削除時はdocs-drift(改善計画除外)とscript-integrity(改善計画含む)が別々に落ちる。参照側の正名置換が正規フロー。",
+  "candidate_id": "mem-MSN-UX-SIMPLIFY-20261010-2026_10_10-R1",
+  "evidence_refs": [
+    "active/missions/public/MSN-UX-SIMPLIFY-20261010/evidence/implementation-report.md",
+    "active/missions/public/MSN-UX-SIMPLIFY-20261010/evidence/test-report.md",
+    "active/missions/public/MSN-UX-SIMPLIFY-20261010/evidence/retrospective.md"
+  ],
+  "created_at": "2026-10-10T08:27:26.827Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "旧名参照の残存はdocs-driftでは改善計画ディレクトリが除外されるため検出されず、script-integrityで検出される。対応は参照側を正名に置換する(履歴文書でも1語置換で可)。bare単語旧名(pnpm onboard等)はcolon名のみ検出するscript-integrityの対象外のため、docs-driftのalias警告消失で確認する。"
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-UX-SIMPLIFY-20261010/evidence/implementation-report.md",
+    "active/missions/public/MSN-UX-SIMPLIFY-20261010/evidence/test-report.md",
+    "active/missions/public/MSN-UX-SIMPLIFY-20261010/evidence/retrospective.md"
+  ],
+  "source_branch": "ux/cli-simplify-20261010",
+  "source_commit": "c9f6970b3edce6dadc2b6cccf4c91c0f016c0f3a"
+}

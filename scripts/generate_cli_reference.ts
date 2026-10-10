@@ -173,6 +173,13 @@ export function renderCliReference(manifest: CliManifest): string {
 
   const scriptAliases = manifest.deprecated_script_aliases ?? [];
   const commandAliases = manifest.deprecated_command_aliases ?? [];
+  if (scriptAliases.length === 0 && commandAliases.length === 0) {
+    sections.push(
+      '## Deprecated aliases',
+      'No deprecated aliases. Every entry below is the canonical name — use it as written.'
+    );
+    return sections.join('\n\n') + '\n';
+  }
   sections.push(
     '## Deprecated aliases',
     'Renamed entries keep working and print a one-line deprecation warning. Prefer the replacement.'

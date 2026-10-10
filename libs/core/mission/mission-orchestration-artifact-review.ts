@@ -18,8 +18,16 @@ export function resolveReviewTargetForTask(task: PlannedNextTask): string | unde
     return task.review_target.trim();
   }
   const deliverable = String(task.deliverable || '').trim();
-  const match = deliverable.match(/(?:^|\/)REVIEW-(.+)\.md$/u);
-  return match?.[1] ? match[1] : undefined;
+  const markerIndex = deliverable.startsWith('REVIEW-')
+    ? 0
+    : deliverable.lastIndexOf('/REVIEW-') >= 0
+      ? deliverable.lastIndexOf('/REVIEW-') + 1
+      : -1;
+  const match =
+    markerIndex >= 0 && deliverable.endsWith('.md') && deliverable.length > markerIndex + 10
+      ? deliverable.slice(markerIndex + 7, -3)
+      : undefined;
+  return match || undefined;
 }
 
 export function resolveReviewArtifact(input: {

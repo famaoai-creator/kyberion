@@ -73,8 +73,11 @@ export class GrokCliVoiceBridge implements VoiceBridge {
       schema: OneOnOneResultSchema,
       options: this.options,
     })) as z.infer<typeof OneOnOneResultSchema>;
-    const slugMatch = input.counterpartyRef.match(/([^/\\]+?)(?:\.json)?$/u);
-    const personSlug = slugMatch ? slugMatch[1] : input.counterpartyRef;
+    const lastSegment = input.counterpartyRef.split(/[/\\]/u).pop() ?? '';
+    const personSlug =
+      lastSegment.length > 5 && lastSegment.endsWith('.json')
+        ? lastSegment.slice(0, -5)
+        : lastSegment || input.counterpartyRef;
     return {
       written_to: input.outputPath,
       person_slug: personSlug,
