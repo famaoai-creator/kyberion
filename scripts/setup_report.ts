@@ -30,7 +30,7 @@ export type SurfaceRecommendation = {
   whenToUse: string;
   surfaces: string[];
   optional: boolean;
-  readiness: 'ready' | 'needs_setup' | 'unavailable' | 'unverified';
+  readiness: 'ready' | 'needs_setup' | 'needs_attention' | 'unavailable' | 'unverified';
   reason: string;
   suggestedCommand?: string;
   openUrl?: string;
@@ -196,7 +196,7 @@ function inspectTaskSurfaces(report: SetupReadinessInput, ids: string[]): TaskRe
         ? `Surface ${id} rejected the health request (${health.detail}); verify the local viewer identity and scope before using it.`
         : `Surface ${id} is not healthy (${health.detail}). If it is still starting, check status again; otherwise use the targeted repair.`;
       return {
-        readiness: 'needs_setup',
+        readiness: 'needs_attention',
         reason,
         nextAction: buildNextAction({
           title: accessDenied ? `Check access to ${id}` : `Start or repair ${id}`,
@@ -204,7 +204,7 @@ function inspectTaskSurfaces(report: SetupReadinessInput, ids: string[]): TaskRe
           next_action_type: accessDenied ? 'inspect_artifact' : 'repair_surface',
           suggested_command: accessDenied
             ? 'pnpm surfaces status'
-            : `pnpm surfaces repair --surface ${id}`,
+            : `pnpm surfaces repair -- --surface ${id}`,
         }),
       };
     }

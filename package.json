@@ -46,6 +46,7 @@
     "check:apple-fm": "node --import ./scripts/ts-loader.mjs scripts/check_apple_fm.ts",
     "i18n:report": "node --import ./scripts/ts-loader.mjs scripts/report_i18n_translation_coverage.ts",
     "tenant": "node --import ./scripts/ts-loader.mjs scripts/tenant.ts",
+    "nhi": "node --import ./scripts/ts-loader.mjs scripts/nhi.ts",
     "tenant:activation": "node --import ./scripts/ts-loader.mjs scripts/tenant_activation.ts",
     "namespace:migrate-physical": "node --import ./scripts/ts-loader.mjs scripts/migrate_physical_namespaces.ts",
     "peer:migrate-tenant-runtime": "node --import ./scripts/ts-loader.mjs scripts/migrate_peer_tenant_runtime.ts",

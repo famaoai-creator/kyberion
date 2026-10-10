@@ -330,7 +330,7 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     // In-process (no fetch to another surface), owner-gated per tenant the
     // overview actually covers — a resolved member sees progress only for
     // tenants where their membership is `owner` (F2).
-    expect(progressRoute).toContain('resolveConciergeViewer');
+    expect(progressRoute).toContain('resolveConciergeSelectedViewer(req)');
     expect(progressRoute).toContain('conciergeFrontDeskRoleForTenant');
     expect(progressRoute).toContain("=== 'owner'");
     expect(progressRoute).toContain('summarizeTrainingProgress');

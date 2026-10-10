@@ -1060,6 +1060,22 @@
       "types": "./dist/core.d.ts",
       "default": "./dist/core.js"
     },
+    "./daemon/service-manager": {
+      "types": "./dist/daemon/service-manager.d.ts",
+      "default": "./dist/daemon/service-manager.js"
+    },
+    "./daemon/launchd": {
+      "types": "./dist/daemon/launchd.d.ts",
+      "default": "./dist/daemon/launchd.js"
+    },
+    "./daemon/systemd-user": {
+      "types": "./dist/daemon/systemd-user.d.ts",
+      "default": "./dist/daemon/systemd-user.js"
+    },
+    "./daemon/specs": {
+      "types": "./dist/daemon/specs.d.ts",
+      "default": "./dist/daemon/specs.js"
+    },
     "./daemon-heartbeat": {
       "types": "./dist/daemon-heartbeat.d.ts",
       "default": "./dist/daemon-heartbeat.js"
@@ -3807,6 +3823,30 @@
     "./governance/approval-store": {
       "types": "./dist/governance/approval-store.d.ts",
       "default": "./dist/governance/approval-store.js"
+    },
+    "./governance/approval-store-paths": {
+      "types": "./dist/governance/approval-store-paths.d.ts",
+      "default": "./dist/governance/approval-store-paths.js"
+    },
+    "./governance/approval-passkey-challenge": {
+      "types": "./dist/governance/approval-passkey-challenge.d.ts",
+      "default": "./dist/governance/approval-passkey-challenge.js"
+    },
+    "./authn/webauthn-verifier": {
+      "types": "./dist/authn/webauthn-verifier.d.ts",
+      "default": "./dist/authn/webauthn-verifier.js"
+    },
+    "./authn/passkey-credential-store": {
+      "types": "./dist/authn/passkey-credential-store.d.ts",
+      "default": "./dist/authn/passkey-credential-store.js"
+    },
+    "./authn/passkey-step-up": {
+      "types": "./dist/authn/passkey-step-up.d.ts",
+      "default": "./dist/authn/passkey-step-up.js"
+    },
+    "./governance/approval-human-decision": {
+      "types": "./dist/governance/approval-human-decision.d.ts",
+      "default": "./dist/governance/approval-human-decision.js"
     },
     "./governance/approval-requester": {
       "types": "./dist/governance/approval-requester.d.ts",
@@ -7466,6 +7506,7 @@
     }
   },
   "dependencies": {
+    "@simplewebauthn/server": "^13.3.3",
     "axios": "^1.20.0",
     "chalk": "^6.0.0",
     "fontkit": "^2.0.4",

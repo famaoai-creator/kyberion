@@ -98,10 +98,13 @@ vi.mock('../workforce/work-design.js', () => ({
 }));
 // The hermetic KYBERION_ROOT has no knowledge tree, so the approval-policy
 // catalog cannot load; separation of duties (default off) is covered by
-// approval-separation-of-duties.test.ts.
+// approval-separation-of-duties.test.ts; the governed assurance mode by
+// approval-assurance-migration.test.ts.
 vi.mock('./approval-policy.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./approval-policy.js')>()),
   resolveSeparationOfDutiesPolicy: () => ({ enabled: false }),
+  resolvePolicyApprovalAssuranceMode: () => undefined,
+  resolvePolicyAssuranceFloor: () => undefined,
 }));
 
 // The hermetic root has no reasoning-provider registry either; the store-level

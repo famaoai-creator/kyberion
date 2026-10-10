@@ -5,9 +5,16 @@ import {
   listApprovalRequests,
   type ApprovalRequestRecord,
 } from './approval-store.js';
-import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
+import {
+  listGovernedArtifacts,
+  readGovernedArtifactJson,
+  resolveGovernedArtifactPath,
+  type GovernedArtifactRole,
+} from '../workforce/artifact-store.js';
+import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync } from '../secure-io.js';
+import { safeExistsSync, safeUnlinkSync } from '../secure-io.js';
+import { approvalStoreRoots } from './approval-store-paths.js';
 import { appendRetentionAudit, softDeleteToTrash, TRASH_REPO_SUBPATH } from '../storage-janitor.js';
 import { validateWritePermission } from '../tier-guard.js';
 
@@ -22,7 +29,10 @@ import { validateWritePermission } from '../tier-guard.js';
  *  - records left behind by test runs (before approvalStoreRoots isolated
  *    them) move to `active/archive/.trash/` — restorable, never hard-deleted.
  *    Only the request records move; their lines in the append-only
- *    `approvals.jsonl` event logs stay as history.
+ *    `approvals.jsonl` event logs stay as history;
+ *  - passkey challenges (HA-07) past their expiry are deleted: each is single
+ *    use and dead once expired, and the decision it settled keeps its id in
+ *    the event log.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -261,5 +271,81 @@ export function purgeFixtureApprovals(options: {
       );
     }
   }
+  return result;
+}
+
+/** Expired passkey challenges are kept this long (for incident review) before removal. */
+export const PASSKEY_CHALLENGE_RETENTION_MS = 60 * 60 * 1000;
+
+const PASSKEY_CHALLENGE_FILE = /^[0-9a-f-]{36}\.json$/u;
+
+export interface ExpiredPasskeyChallenge {
+  storageChannel: string;
+  logicalPath: string;
+  /** The challenge's expiry, or null when the file is unreadable (removed too). */
+  expiresAt: string | null;
+}
+
+/** Challenge files whose expiry (plus the retention grace) has passed. */
+export function findExpiredPasskeyChallenges(
+  options: { now?: number; retainMs?: number } = {}
+): ExpiredPasskeyChallenge[] {
+  const now = options.now ?? Date.now();
+  const retainMs = options.retainMs ?? PASSKEY_CHALLENGE_RETENTION_MS;
+  const root = approvalStoreRoots().coordination;
+  const selected: ExpiredPasskeyChallenge[] = [];
+  for (const storageChannel of listGovernedArtifacts(root)) {
+    const dir = `${root}/${storageChannel}/approvals/passkey-challenges`;
+    let files: string[];
+    try {
+      files = listGovernedArtifacts(dir);
+    } catch {
+      continue;
+    }
+    for (const file of files) {
+      if (!PASSKEY_CHALLENGE_FILE.test(file)) continue;
+      const logicalPath = `${dir}/${file}`;
+      let expiresAt: string | null = null;
+      try {
+        const value = readGovernedArtifactJson<{ expires_at?: unknown }>(logicalPath);
+        expiresAt = typeof value?.expires_at === 'string' ? value.expires_at : null;
+      } catch {
+        expiresAt = null;
+      }
+      const expiry = expiresAt ? Date.parse(expiresAt) : Number.NaN;
+      if (Number.isFinite(expiry) && expiry + retainMs > now) continue;
+      selected.push({ storageChannel, logicalPath, expiresAt });
+    }
+  }
+  return selected;
+}
+
+export function sweepExpiredPasskeyChallenges(options: {
+  dryRun: boolean;
+  role?: GovernedArtifactRole;
+  now?: number;
+  retainMs?: number;
+}): ApprovalSweepResult<ExpiredPasskeyChallenge> {
+  const candidates = findExpiredPasskeyChallenges(options);
+  const result: ApprovalSweepResult<ExpiredPasskeyChallenge> = {
+    candidates,
+    applied: [],
+    errors: [],
+    dryRun: options.dryRun,
+  };
+  if (options.dryRun) return result;
+  withExecutionContext(options.role ?? 'infrastructure_sentinel', () => {
+    for (const candidate of candidates) {
+      try {
+        const absolute = resolveGovernedArtifactPath(candidate.logicalPath);
+        if (safeExistsSync(absolute)) safeUnlinkSync(absolute);
+        result.applied.push(candidate.logicalPath);
+      } catch (err) {
+        result.errors.push(
+          `${candidate.logicalPath}: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
+  });
   return result;
 }

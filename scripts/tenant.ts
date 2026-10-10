@@ -8,11 +8,41 @@ import {
   mutateTenant,
   type TenantLifecycleVerb,
   listTenants,
+  renameTenant,
+  deleteTenant,
 } from '@agent/core/organization/tenant-governance';
 import { captureCliAttestationInvoker } from './lib/cli-attestation-invoker.js';
 import { readTenantProfile } from '@agent/core/organization/tenant-registry';
 import { withExecutionContext } from '@agent/core/authority';
+import { setRegisteredEnv } from '@agent/core/foundation/env';
+import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript } from './lib/harness.js';
+
+/**
+ * Run `fn` with no tenant binding. rename/delete touch the registry AND a
+ * confidential tenant dir — a move spanning two slugs, which no single-tenant
+ * binding can authorize (and an archived tenant cannot even be bound, since
+ * bindings require an active registration). The scope is unbound, not the
+ * ambient one: the persisted scope.env must not leak in via
+ * resolveProjectScope, so the lookup path is pointed at an absent fixture.
+ */
+function runUnbound<T>(fn: () => T): T {
+  const scopeKeys = [
+    'KYBERION_TENANT',
+    'KYBERION_PROJECT_ID',
+    'KYBERION_TASK_ID',
+    'MISSION_ID',
+    'KYBERION_SCOPE_ENV_PATH',
+  ] as const;
+  const previous = scopeKeys.map((key) => [key, process.env[key]] as const);
+  for (const key of scopeKeys) setRegisteredEnv(key, undefined);
+  setRegisteredEnv('KYBERION_SCOPE_ENV_PATH', pathResolver.shared('tmp/tenant-admin-no-scope.env'));
+  try {
+    return fn();
+  } finally {
+    for (const [key, value] of previous) setRegisteredEnv(key, value);
+  }
+}
 
 type Args = {
   command:
@@ -21,11 +51,15 @@ type Args = {
     | 'suspend'
     | 'resume'
     | 'archive'
+    | 'rename'
+    | 'delete'
     | 'list'
     | 'show'
     | 'attest-provider'
     | 'help';
   slug?: string;
+  to?: string;
+  purgeData?: boolean;
   displayName?: string;
   assignedRole?: string;
   knowledgeRoot?: string;
@@ -53,6 +87,8 @@ function parseArgs(argv: string[]): Args {
       'suspend',
       'resume',
       'archive',
+      'rename',
+      'delete',
       'list',
       'show',
       'attest-provider',
@@ -72,6 +108,8 @@ function parseArgs(argv: string[]): Args {
     else if (arg === '--approval-request-id') result.approvalRequestId = rest[++i];
     else if (arg === '--json') result.json = true;
     else if (arg === '--slug' || arg === '--tenant') result.slug = rest[++i];
+    else if (arg === '--to') result.to = rest[++i];
+    else if (arg === '--purge-data') result.purgeData = true;
     else if (arg === '--display-name') result.displayName = rest[++i];
     else if (arg === '--assigned-role') result.assignedRole = rest[++i];
     else if (arg === '--knowledge-root') result.knowledgeRoot = rest[++i];
@@ -88,7 +126,13 @@ function parseArgs(argv: string[]): Args {
 
 function usage(): string {
   return [
-    'Usage: pnpm tenant <create|update|suspend|resume|archive|list|show|attest-provider> [slug] [options]',
+    'Usage: pnpm tenant <create|update|suspend|resume|archive|rename|delete|list|show|attest-provider> [slug] [options]',
+    '  rename <slug> --to <new-slug> --apply',
+    '      Renames the registry entry; the default knowledge/confidential/<slug>',
+    '      directory moves with it (a custom --knowledge-root path is left as-is).',
+    '  delete <slug> --apply --accept [--purge-data]',
+    '      Removes an ARCHIVED tenant from the registry (irreversible). Data stays',
+    '      unless --purge-data also removes the knowledge root directory.',
     '  attest-provider records how this installation is contracted with a provider:',
     '    --provider <id> --training-use <none|used|unknown> [--plan <text>] [--basis <url|ref>]',
     '    [--attested-by <who>] [--valid-for-days <n>]   (none requires all three evidence fields)',
@@ -123,6 +167,29 @@ export function main(
     return;
   }
   if (!args.slug) throw new Error(`${args.command} requires a tenant slug`);
+  if (args.command === 'rename') {
+    const result = runUnbound(() =>
+      withExecutionContext('sovereign_concierge', () =>
+        renameTenant({ slug: args.slug!, to: args.to ?? '', apply: args.apply })
+      )
+    );
+    print(JSON.stringify(result, null, 2));
+    return;
+  }
+  if (args.command === 'delete') {
+    const result = runUnbound(() =>
+      withExecutionContext('sovereign_concierge', () =>
+        deleteTenant({
+          slug: args.slug!,
+          apply: args.apply,
+          accept: args.accept,
+          purgeData: args.purgeData === true,
+        })
+      )
+    );
+    print(JSON.stringify(result, null, 2));
+    return;
+  }
   if (args.command === 'show') {
     const profile = readTenantProfile(args.slug);
     if (!profile) throw new Error(`Tenant '${args.slug}' does not exist.`);
@@ -236,15 +303,22 @@ export function main(
     print(JSON.stringify(result.attestation, null, 2));
     return;
   }
-  const result = withExecutionContext('sovereign_concierge', () =>
-    mutateTenant({
-      verb: args.command as TenantLifecycleVerb,
-      slug: args.slug!,
-      displayName: args.displayName,
-      assignedRole: args.assignedRole,
-      knowledgeRoot: args.knowledgeRoot,
-      apply: args.apply,
-    })
+  // Bind to the target tenant (as attest-provider does above) so the mutation
+  // carries its own scope: creating or mutating tenant data must not depend on
+  // whichever tenant the operator's persisted scope happens to point at.
+  const result = withExecutionContext(
+    'sovereign_concierge',
+    () =>
+      mutateTenant({
+        verb: args.command as TenantLifecycleVerb,
+        slug: args.slug!,
+        displayName: args.displayName,
+        assignedRole: args.assignedRole,
+        knowledgeRoot: args.knowledgeRoot,
+        apply: args.apply,
+      }),
+    undefined,
+    args.slug
   );
   print(JSON.stringify(result, null, 2));
 }

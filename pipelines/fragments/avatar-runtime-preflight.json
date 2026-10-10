@@ -15,13 +15,15 @@
       }
     },
     {
+      "id": "preflight_personal_profile",
       "role": "gate",
-      "op": "core:include",
+      "op": "system:shell",
+      "produces": {
+        "channel": "preflight_personal_result",
+        "type": "ShellResult"
+      },
       "params": {
-        "fragment": "fragments/runtime-preflight.json",
-        "context": {
-          "preflight_cmd": "test -d knowledge/personal && echo ok"
-        }
+        "cmd": "test -d knowledge/personal && echo ok"
       }
     }
   ]

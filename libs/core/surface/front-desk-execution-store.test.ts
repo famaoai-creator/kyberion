@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { runWithReplyLocale } from '../locale.js';
 import type {
   FrontDeskExecutionMapping,
   FrontDeskExecutionProjection,
@@ -80,7 +81,11 @@ const charter = {
   },
 };
 const id = (n: number) => '00000000-0000-4000-8000-' + String(n).padStart(12, '0');
-const reserve = (n = 1) => reserveConversationTurn(viewer, FRONT_DESK_RECEIPT_COMMAND, id(n));
+// Pin the reply locale: assertions match English reply text, and the
+// ambient operator locale (identity file / LANG) must not leak in.
+const enReply = <T>(fn: () => T): T => runWithReplyLocale('en', fn);
+const reserve = (n = 1) =>
+  enReply(() => reserveConversationTurn(viewer, FRONT_DESK_RECEIPT_COMMAND, id(n)));
 const current = () => listConfiguredFrontDeskExecutions()[0];
 const transcript = () => state.files.get(conversationRef(viewer).path) as any;
 beforeEach(() => {
@@ -231,7 +236,7 @@ describe('bounded opt-in atomic request admission', () => {
   it('records cancel_requested separately from completed cancellation', () => {
     reserve();
     const binding = current().binding;
-    const turn = reserveConversationTurn(viewer, 'Cancel ' + id(1), id(2));
+    const turn = enReply(() => reserveConversationTurn(viewer, 'Cancel ' + id(1), id(2)));
     expect(turn.routing).toMatchObject({
       kind: 'cancellation',
       authority: 'none',

@@ -89,7 +89,7 @@
       "op": "system:log",
       "consumes": ["p_identity", "p_vision"],
       "params": {
-        "message": "✅ Identity & Vision:  ID:{{p_identity.exists}} / Vision:{{p_vision.exists}}"
+        "message": "✅ Identity & Vision:  ID:{{p_identity.exists}} ({{p_identity.kind}}) / Vision:{{p_vision.exists}} ({{p_vision.kind}})"
       }
     },
     {

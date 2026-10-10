@@ -14,7 +14,7 @@
       },
       "cwd": ".",
       "shutdownPolicy": "detached",
-      "startupMode": "background",
+      "startupMode": "on-demand",
       "ownerType": "surface-runtime-manifest",
       "enabled": true,
       "operatorNotesKey": "surface:surface_notes_mcp_server_cowork",

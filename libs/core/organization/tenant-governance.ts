@@ -36,7 +36,14 @@ import {
 } from '../provider/provider-egress-gate.js';
 import { resolveIdentityContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync, safeMkdir } from '../secure-io.js';
+import { isReservedScopeName, isValidTenantSlug } from '../entity-scope.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeMoveSync,
+  safeRmSync,
+  safeUnlinkSync,
+} from '../secure-io.js';
 
 export type TenantLifecycleVerb = 'create' | 'update' | 'suspend' | 'resume' | 'archive';
 
@@ -114,7 +121,11 @@ export function mutateTenant(input: TenantMutationInput): TenantMutationResult {
   const options: TenantRegistryPathOptions = { rootDir: input.rootDir, env: input.env };
   const current = readTenantProfile(input.slug, options);
   if (input.verb === 'create' && current) {
-    throw new Error(`Tenant '${input.slug}' already exists.`);
+    throw new Error(
+      `Tenant '${input.slug}' already exists. ` +
+        `If this is a partially created tenant (e.g. its knowledge root is missing), ` +
+        `repair it with 'pnpm tenant update ${input.slug} --knowledge-root ${current.knowledge_root || defaultTenantKnowledgeRoot(input.slug)} --apply'.`
+    );
   }
   if (input.verb !== 'create' && !current) {
     throw new Error(`Tenant '${input.slug}' does not exist.`);
@@ -164,6 +175,197 @@ export function showTenant(slug: string, options: TenantRegistryPathOptions = {}
   const profile = readTenantProfile(slug, options);
   if (!profile) throw new Error(`Tenant '${slug}' does not exist.`);
   return profile;
+}
+
+export interface TenantRenameInput extends TenantRegistryPathOptions {
+  slug: string;
+  /** Target slug — must pass tenant-slug grammar and be unclaimed. */
+  to: string;
+  apply?: boolean;
+  actor?: string;
+}
+
+export interface TenantRenameResult {
+  status: 'dry-run' | 'applied';
+  slug: string;
+  to: string;
+  profile_path: string;
+  to_profile_path: string;
+  /** True when the default knowledge root moves with the slug. A tenant whose
+   *  knowledge_root was set to a custom path keeps that path unchanged. */
+  knowledge_root_renamed: boolean;
+  knowledge_root_path: string;
+  profile: TenantProfile;
+}
+
+/**
+ * Rename a registered tenant. Unlike the lifecycle verbs this works on any
+ * status — an archived tenant's record is still worth naming correctly (the
+ * slug is a permanent, human-facing identifier and the registry has no other
+ * way to fix a typo'd one). The knowledge root is structurally bound to the
+ * slug (`knowledge/confidential/<slug>[...]` per the profile schema), so the
+ * tenant's knowledge directory always moves with the rename; any nested
+ * custom root beneath it keeps its suffix.
+ */
+export function renameTenant(input: TenantRenameInput): TenantRenameResult {
+  const options: TenantRegistryPathOptions = { rootDir: input.rootDir, env: input.env };
+  const slug = input.slug.trim();
+  const to = input.to?.trim() ?? '';
+  if (!to) throw new Error(`rename requires a target slug (--to)`);
+  if (!isValidTenantSlug(to) || isReservedScopeName(to)) {
+    throw new Error(`rename target '${to}' is not a valid tenant slug`);
+  }
+  const current = readTenantProfile(slug, options);
+  if (!current) throw new Error(`Tenant '${slug}' does not exist.`);
+  if (to === slug) throw new Error(`rename target equals the current slug '${slug}'`);
+  if (readTenantProfile(to, options)) {
+    throw new Error(`Tenant '${to}' already exists — choose an unclaimed slug`);
+  }
+  const rootDir = input.rootDir ?? pathResolver.rootDir();
+  const defaultRoot = defaultTenantKnowledgeRoot(slug);
+  const oldKnowledgeRoot = current.knowledge_root ?? defaultRoot;
+  const suffix = oldKnowledgeRoot.startsWith(`${defaultRoot}/`)
+    ? oldKnowledgeRoot.slice(defaultRoot.length)
+    : '';
+  const nextKnowledgeRoot = defaultTenantKnowledgeRoot(to) + suffix;
+  const nextProfile: TenantProfile = {
+    ...current,
+    tenant_slug: to,
+    tenant_id: to,
+    knowledge_root: nextKnowledgeRoot,
+  };
+  const profilePath = tenantProfilePath(slug, options);
+  const toProfilePath = tenantProfilePath(to, options);
+  // The tenant directory (knowledge/confidential/<slug>) is moved wholesale so
+  // a nested knowledge_root comes along inside it.
+  const oldTenantDir = path.resolve(rootDir, defaultRoot);
+  const newTenantDir = path.resolve(rootDir, defaultTenantKnowledgeRoot(to));
+  const knowledgeRootPath = path.resolve(rootDir, nextKnowledgeRoot);
+
+  if (!input.apply) {
+    return {
+      status: 'dry-run',
+      slug,
+      to,
+      profile_path: profilePath,
+      to_profile_path: toProfilePath,
+      knowledge_root_renamed: safeExistsSync(oldTenantDir),
+      knowledge_root_path: knowledgeRootPath,
+      profile: nextProfile,
+    };
+  }
+
+  // Order matters: move the data directory first so writeTenantProfile finds
+  // the root already present and does not mint an empty one; then write the
+  // renamed profile and finally drop the old file.
+  const rootMoved = safeExistsSync(oldTenantDir);
+  if (rootMoved) {
+    safeMoveSync(oldTenantDir, newTenantDir);
+  }
+  try {
+    writeTenantProfile(nextProfile, options);
+  } catch (error) {
+    if (rootMoved) {
+      try {
+        safeMoveSync(newTenantDir, oldTenantDir);
+      } catch {
+        // best-effort rollback; surface the original failure
+      }
+    }
+    throw error;
+  }
+  safeUnlinkSync(profilePath);
+  auditChain.record({
+    agentId: input.actor || getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
+    action: 'tenant.rename',
+    operation: `tenant:${slug}`,
+    result: 'completed',
+    tenantSlug: to,
+    metadata: { from: slug, to, knowledge_root_renamed: rootMoved },
+  });
+  return {
+    status: 'applied',
+    slug,
+    to,
+    profile_path: profilePath,
+    to_profile_path: toProfilePath,
+    knowledge_root_renamed: rootMoved,
+    knowledge_root_path: knowledgeRootPath,
+    profile: nextProfile,
+  };
+}
+
+export interface TenantDeleteInput extends TenantRegistryPathOptions {
+  slug: string;
+  apply?: boolean;
+  /**
+   * Human confirmation — deleting the registry entry is irreversible.
+   * Mirrors the `--accept` contract on suspend/attest.
+   */
+  accept?: boolean;
+  /** Also delete the tenant's knowledge root directory (default: keep). */
+  purgeData?: boolean;
+  actor?: string;
+}
+
+export interface TenantDeleteResult {
+  status: 'dry-run' | 'applied';
+  slug: string;
+  removed_profile_path: string;
+  removed_knowledge_root_path?: string;
+  /** Present when the delete was refused before writing anything. */
+  blocked?: string;
+}
+
+/**
+ * Permanently remove a tenant's registry entry. Archived only — a live or
+ * suspended tenant must be archived first so nothing disappears underneath
+ * work that may still reference it. The knowledge root is kept unless
+ * purgeData is set: deleting the name is not deleting the data.
+ */
+export function deleteTenant(input: TenantDeleteInput): TenantDeleteResult {
+  const options: TenantRegistryPathOptions = { rootDir: input.rootDir, env: input.env };
+  const slug = input.slug.trim();
+  const current = readTenantProfile(slug, options);
+  if (!current) throw new Error(`Tenant '${slug}' does not exist.`);
+  const profilePath = tenantProfilePath(slug, options);
+  const knowledgeRootPath = path.resolve(
+    input.rootDir ?? pathResolver.rootDir(),
+    current.knowledge_root ?? defaultTenantKnowledgeRoot(slug)
+  );
+  if (current.status !== 'archived') {
+    throw new Error(
+      `Tenant '${slug}' is ${current.status} — archive it first ('pnpm tenant archive ${slug} --apply') before deleting`
+    );
+  }
+  if (input.apply && !input.accept) {
+    throw new Error(
+      `delete --apply requires --accept: removing '${slug}' from the registry is irreversible`
+    );
+  }
+  const result: TenantDeleteResult = {
+    status: input.apply ? 'applied' : 'dry-run',
+    slug,
+    removed_profile_path: profilePath,
+    ...(input.purgeData ? { removed_knowledge_root_path: knowledgeRootPath } : {}),
+  };
+  if (!input.apply) return result;
+
+  if (input.purgeData) {
+    safeRmSync(knowledgeRootPath);
+  }
+  safeUnlinkSync(profilePath);
+  auditChain.record({
+    agentId: input.actor || getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
+    action: 'tenant.delete',
+    operation: `tenant:${slug}`,
+    result: 'completed',
+    metadata: {
+      previous_status: current.status,
+      knowledge_root_purged: Boolean(input.purgeData),
+    },
+  });
+  return result;
 }
 
 export interface TenantProviderAttestationResult {

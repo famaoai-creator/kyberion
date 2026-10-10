@@ -123,7 +123,7 @@ describe('install_chronos_launchd plist generation', () => {
 
   it('keeps uninstall dry-run output injectable and side-effect free', async () => {
     const output: string[] = [];
-    await main(['--uninstall'], (value) => output.push(String(value)));
+    await main(['--uninstall'], (value) => output.push(String(value)), { platform: 'darwin' });
 
     expect(output).toHaveLength(1);
     expect(output[0]).toContain('Uninstall steps (dry-run: nothing was changed)');
@@ -173,7 +173,9 @@ describe('install_chronos_launchd --daemon', () => {
 
   it('generates an interval (not KeepAlive) agent for the watchdog', async () => {
     const output: string[] = [];
-    await main(['--daemon', 'daemon-watchdog'], (value) => output.push(String(value)));
+    await main(['--daemon', 'daemon-watchdog'], (value) => output.push(String(value)), {
+      platform: 'darwin',
+    });
 
     expect(output).toHaveLength(1);
     expect(output[0]).toContain('com.kyberion.daemon-watchdog');
@@ -185,7 +187,9 @@ describe('install_chronos_launchd --daemon', () => {
 
   it('generates a plist for a non-chronos daemon via --daemon', async () => {
     const output: string[] = [];
-    await main(['--daemon', 'generation-schedule'], (value) => output.push(String(value)));
+    await main(['--daemon', 'generation-schedule'], (value) => output.push(String(value)), {
+      platform: 'darwin',
+    });
 
     expect(output).toHaveLength(1);
     expect(output[0]).toContain('com.kyberion.generation-schedule');
@@ -201,7 +205,9 @@ describe('install_chronos_launchd --daemon', () => {
     expect(spec.keepAliveOnCrashOnly).toBe(true);
 
     const output: string[] = [];
-    await main(['--daemon', 'agent-runtime-supervisor'], (value) => output.push(String(value)));
+    await main(['--daemon', 'agent-runtime-supervisor'], (value) => output.push(String(value)), {
+      platform: 'darwin',
+    });
 
     expect(output).toHaveLength(1);
     expect(output[0]).toContain('agent_runtime_supervisor_daemon.js');
@@ -211,7 +217,7 @@ describe('install_chronos_launchd --daemon', () => {
   });
 
   it('rejects an unknown daemon id before touching the filesystem', async () => {
-    await expect(main(['--daemon', 'bogus'], () => {})).rejects.toThrow(
+    await expect(main(['--daemon', 'bogus'], () => {}, { platform: 'darwin' })).rejects.toThrow(
       /unknown daemon 'bogus'.*chronos.*generation-schedule/
     );
   });

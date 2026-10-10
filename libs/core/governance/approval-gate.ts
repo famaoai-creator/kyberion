@@ -4,8 +4,12 @@
  * until required approvals are obtained.
  */
 
-import { resolveApprovalPolicy } from './approval-policy.js';
-import { DEFAULT_HUMAN_ONLY_MIN_ASSURANCE, DUAL_KEY_MIN_ASSURANCE } from './approval-assurance.js';
+import { resolveApprovalPolicy, type ApprovalPolicyResolution } from './approval-policy.js';
+import {
+  DEFAULT_HUMAN_ONLY_MIN_ASSURANCE,
+  DUAL_KEY_MIN_ASSURANCE,
+  strongerAssurance,
+} from './approval-assurance.js';
 import { nowIso } from '../foundation/time.js';
 import { summarizeApprovalGate } from './approval-gate-summary.js';
 import { evaluateDecisionRights, resolveDecisionRightsMatrix } from '../decision-rights.js';
@@ -389,7 +393,7 @@ export function enforceApprovalGate(
   }
 
   // --- Step 1: Resolve policy ---
-  const policy =
+  const policy: ApprovalPolicyResolution =
     forceApproval && !resolvedPolicy.requiresApproval
       ? {
           requiresApproval: true,
@@ -692,9 +696,13 @@ export function enforceApprovalGate(
     source: params.source,
     accountability: {
       finalDecision: 'human_only',
-      min_assurance: policy.missingRequirements.includes('dual_key_confirmation')
-        ? DUAL_KEY_MIN_ASSURANCE
-        : DEFAULT_HUMAN_ONLY_MIN_ASSURANCE,
+      min_assurance: strongerAssurance(
+        policy.missingRequirements.includes('dual_key_confirmation')
+          ? DUAL_KEY_MIN_ASSURANCE
+          : DEFAULT_HUMAN_ONLY_MIN_ASSURANCE,
+        policy.minAssurance ?? DEFAULT_HUMAN_ONLY_MIN_ASSURANCE
+      ),
+      ...(policy.matchedRuleId ? { policy_rule_id: policy.matchedRuleId } : {}),
       payloadHash: computeApprovalPayloadHash(payload),
       effectBinding: operationId,
     },
