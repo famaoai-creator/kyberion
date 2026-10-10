@@ -3475,12 +3475,54 @@
           "kind": "apply",
           "input_schema": {
             "type": "object",
-            "title": "browser:click_ref",
-            "description": "Open legacy parameter contract for browser:click_ref (apply); replace with typed fields during operation migration.",
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "required": ["ref"],
+            "properties": {
+              "classification": {
+                "type": "string"
+              },
+              "dom_path": {
+                "type": "string"
+              },
+              "field": {
+                "type": "string"
+              },
+              "high_risk": {
+                "type": "boolean"
+              },
+              "key": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "role": {
+                "type": "string"
+              },
+              "secret_ref": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "timeout": {
+                "type": "number"
+              },
+              "variable": {}
+            },
+            "additionalProperties": true
           },
-          "examples": [{}]
+          "examples": [
+            {
+              "ref": "@e1"
+            }
+          ]
         },
         {
           "op": "delete_passkey",
@@ -3550,12 +3592,87 @@
           "kind": "apply",
           "input_schema": {
             "type": "object",
-            "title": "browser:fill_ref",
-            "description": "Open legacy parameter contract for browser:fill_ref (apply); replace with typed fields during operation migration.",
+            "required": ["ref"],
+            "properties": {
+              "classification": {
+                "type": "string"
+              },
+              "dom_path": {
+                "type": "string"
+              },
+              "field": {
+                "type": "string"
+              },
+              "high_risk": {
+                "type": "boolean"
+              },
+              "key": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "role": {
+                "type": "string"
+              },
+              "secret_ref": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "timeout": {
+                "type": "number"
+              },
+              "variable": {}
+            },
             "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "anyOf": [
+              {
+                "required": ["text"]
+              },
+              {
+                "required": ["secret_ref"],
+                "properties": {
+                  "secret_ref": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              {
+                "required": ["classification", "variable"],
+                "properties": {
+                  "classification": {
+                    "const": "secret_ref"
+                  },
+                  "variable": {
+                    "type": "object",
+                    "required": ["name"],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  }
+                }
+              }
+            ]
           },
-          "examples": [{}]
+          "examples": [
+            {
+              "ref": "@e1",
+              "text": "hello"
+            }
+          ]
         },
         {
           "op": "fill_secret_ref",
@@ -3690,7 +3807,8 @@
                 "type": "string"
               },
               "ref": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1
               },
               "role": {
                 "type": "string"
@@ -3709,7 +3827,7 @@
               },
               "variable": {}
             },
-            "additionalProperties": false
+            "additionalProperties": true
           },
           "examples": [
             {
@@ -3876,7 +3994,8 @@
                 "type": "string"
               },
               "ref": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1
               },
               "role": {
                 "type": "string"
@@ -3895,7 +4014,7 @@
               },
               "variable": {}
             },
-            "additionalProperties": false
+            "additionalProperties": true
           },
           "examples": [
             {
@@ -4021,7 +4140,8 @@
                 "type": "string"
               },
               "ref": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1
               },
               "role": {
                 "type": "string"
@@ -4040,7 +4160,7 @@
               },
               "variable": {}
             },
-            "additionalProperties": false
+            "additionalProperties": true
           },
           "examples": [
             {

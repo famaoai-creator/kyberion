@@ -1,0 +1,39 @@
+---
+record_id: mem-MSN-ACTUATOR-PATTERNS-20261010-2026_10_10
+kind: knowledge_hint
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-ACTUATOR-PATTERNS-20261010-2026_10_10
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-10-10T05:12:34.288Z
+source_branch: fix/actuator-agent-usability-20261010
+source_commit: 94eafe62023dc81ebee63412a8c38438bcfc0809
+---
+
+# Actuator mutations require explicit inputs and observable outcomes
+
+Validate mutation inputs before acting, propagate failures consistently, and verify outcomes through fresh observations.
+
+## Hint Scope
+
+mission
+
+## Trigger Phrases
+
+- Browser fill operations must reject missing or non-string text, including templates resolving to null or numeric values, before changing page state. An explicit empty string remains a valid request to clear a field. Ambiguous selector clicks must fail without choosing a target or changing the page. Failed actuator results must remain failures in the outer CLI envelope and process exit status. Terminal resize must report unsupported pipe-backed capability as failure. Usability probes should follow observe -> act -> observe, checking both successful outcomes and preservation of state after rejected actions. Bounded browser and terminal probes do not establish desktop interaction or native PTY behavior.
+
+## Recommended References
+
+- active/missions/public/MSN-ACTUATOR-PATTERNS-20261010/evidence/distillation.md
+
+## Evidence
+
+- active/missions/public/MSN-ACTUATOR-PATTERNS-20261010/evidence/distillation.md
+
+## Artifacts

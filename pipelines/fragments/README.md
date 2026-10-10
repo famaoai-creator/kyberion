@@ -25,37 +25,37 @@
 ### 4. `browser-point-site-hop.json`
 
 - **目的**: ポイントサイトを経由して特定のショッピングサイトへ遷移し、ポイント付与対象の状態を確立する。
-- **主要操作**: `browser:goto`, `browser:fill_ref`, `browser:click_ref`
+- **主要操作**: `browser:goto`, `browser:fill`, `browser:click`
 
 ### 5. `browser-purchase-checkout.json`
 
 - **目的**: カート確認、チェックアウト、承認ゲート、決済実行、領収書保存、ブロックチェーン記録。
-- **主要操作**: `approval:request`, `browser:click_ref`, `blockchain:record_event`
+- **主要操作**: `approval:request`, `browser:click`, `blockchain:record_event`
 
 ### 6. `browser-travel-search-select.json`
 
 - **目的**: 航空券や宿の検索、検索結果の抽出、指定条件に基づく最適案の推薦・選択。
-- **主要操作**: `browser:fill_bulk`, `wisdom:recommend`, `browser:click_ref`
+- **主要操作**: `browser:fill_bulk`, `wisdom:recommend`, `browser:click`
 
 ### 7. `google-meet-join-button.json`
 
 - **目的**: Google Meet の参加画面を開き、名前を入力して join / ask-to-join ボタンを押す。
-- **主要操作**: `browser:goto`, `browser:fill_ref`, `browser:click_ref`
+- **主要操作**: `browser:goto`, `browser:fill`, `browser:click`
 
 ### 8. `microsoft-teams-join-button.json`
 
 - **目的**: Microsoft Teams の join-a-meeting 画面を開き、会議 ID / パスコードを入力して join ボタンを押す。
-- **主要操作**: `browser:goto`, `browser:fill_ref`, `browser:click_ref`
+- **主要操作**: `browser:goto`, `browser:fill`, `browser:click`
 
 ### 9. `google-meet-join-self-contained.json`
 
 - **目的**: ブラウザ起動の前段を含めて Google Meet の join ボタン押下までを一括で実行する。
-- **主要操作**: `core:include`, `browser:goto`, `browser:fill_ref`, `browser:click_ref`
+- **主要操作**: `core:include`, `browser:goto`, `browser:fill`, `browser:click`
 
 ### 10. `microsoft-teams-join-self-contained.json`
 
 - **目的**: ブラウザ起動の前段を含めて Microsoft Teams の join ボタン押下までを一括で実行する。
-- **主要操作**: `core:include`, `browser:goto`, `browser:fill_ref`, `browser:click_ref`
+- **主要操作**: `core:include`, `browser:goto`, `browser:fill`, `browser:click`
 
 ### 11. `html-web-preview.json`
 
