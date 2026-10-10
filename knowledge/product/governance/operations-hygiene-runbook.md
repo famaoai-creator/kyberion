@@ -295,8 +295,11 @@ Writers and readers of the same file must resolve the path the same way. A reade
 the test passes against the sandbox while the writer leaks into live state.
 
 **Real-process tests: size the budget from the child count.** A test that spawns
-`node --import ./scripts/ts-loader.mjs` children pays a cold start per child: the loader transpiles
-every imported `libs/core` source again (about 5s of CPU per child, 10s on a loaded 4-vCPU host).
+`node --import ./scripts/ts-loader.mjs` children pays a start-up per child. Before 2026-10-09 that
+was about 5s of CPU (10s on a loaded 4-vCPU host), mostly re-transpiling every imported
+`libs/core` source; with the start-up caches below a warm child that loads the `libs/core` sources
+costs about 1.3s of CPU, but the first child after a source change or on a fresh checkout still
+pays the cold cost. Size budgets from the cold cost.
 `front-desk-recovery.engine.integration.test.ts` runs up to 17 sequential child batches. Its 180s
 local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
 
@@ -306,6 +309,85 @@ local budget failed on a busy host while CI (`CI=true`, 600s) stayed green.
 - In `afterAll`, stop the children and wait for `'exit'`, not `'close'`, because a grandchild can
   hold the pipes. Bound the wait with a grace period, then send SIGKILL to any survivor. Remove the
   fixture roots in a `finally` block, and give the hook an explicit timeout.
+
+**Child start-up cost: where it goes and what keeps it down** (MSN-OPS-ROUND5-20261009). Each
+mechanism has an off switch and a test that compares its output with the switch off.
+
+| Cost (cold child)                                                                                                                                                                                                           | Mechanism                                                                                                                                                                                                                                                                                                                                                          | Off switch                              | Test                                                                                                                     |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `ts.transpileModule` for every TypeScript module, in every process                                                                                                                                                          | Transpile cache in `node_modules/.cache/kyberion-ts-loader/` (`scripts/ts-loader-cache.mjs`), outside every agent-writable tree: key = SHA-256 of the cache module's own text (it holds the options), TypeScript version, absolute path and source; 0700 dirs, 0600 entries, owner/mode checked on read; temp file + rename; TypeScript is required only on a miss | `KYBERION_TS_LOADER_CACHE=0`            | `scripts/ts-loader-cache.test.ts` (invalidation, poisoning, concurrency), `libs/core/tier-guard-ts-loader-cache.test.ts` |
+| Node's default resolver runs `getPackageScopeConfig` for each `.ts` URL (type stripping is on by default in Node 24), and that call re-parses the whole `exports` string of the nearest package.json: 290KB for `libs/core` | `scripts/ts-loader.mjs` answers workspace TypeScript resolutions itself (`resolveTsSourceDirectly`, realpath URL)                                                                                                                                                                                                                                                  | `KYBERION_TS_LOADER_FAST_RESOLVE=0`     | `scripts/ts-loader-resolve.test.ts` (differential)                                                                       |
+| The same re-parse for each `libs/core/dist/*.js` module                                                                                                                                                                     | The core build writes `libs/core/dist/package.json` (`type` + `#imports` only) and one-line shims re-exporting the real `.mjs` modules (`scripts/write_core_dist_scope.mjs --run`; `--check` drift runs in the packaging-contract gate). External consumers still resolve `@agent/core/*` through the full exports map                                             | `KYBERION_CORE_DIST_SCOPE=0` (build)    | `scripts/write_core_dist_scope.test.ts` (differential)                                                                   |
+| `local-stt-discovery` probed every `python3.x` once per bridge installer                                                                                                                                                    | Memo + private host cache `node_modules/.cache/kyberion-stt-discovery/candidates.json`, both for 10 minutes, keyed on platform, PATH, registry content and the managed runtimes' bin lstat and site-packages mtimes; managed installers reset it; a hit rebuilds candidates from the registry and accepts only binaries the probe could have found                 | `KYBERION_STT_DISCOVERY_CACHE_TTL_MS=0` | `libs/core/local-stt-discovery.cache.test.ts`, `scripts/voice_setup.discovery-cache.test.ts`                             |
+
+Rules:
+
+- **A `#imports` entry needs a `./<file>.mjs` target in `libs/core/package.json`.** The dist scope
+  shims only that shape, and the build fails with `CORE_DIST_SCOPE_UNSUPPORTED_IMPORT` for any
+  other. A nested `dist/package.json` without `imports` breaks `#imports` in dist modules
+  (`ERR_PACKAGE_IMPORT_NOT_DEFINED`); that was the failure of the first attempt.
+- **A cache whose content decides what runs never lives in an agent-writable tree** (reviews
+  H1/H2, MSN-OPS-ROUND5). Two such caches exist: the ts-loader transpile cache (entries run as
+  code) and the local STT discovery result (its binary paths are what the speech-to-text bridge
+  executes). In `active/shared/cache/` (security-policy `default_allow`) a data-only persona such
+  as `finance_controller` could plant an entry through secure-io that the next run executed. Both
+  use `libs/core/private-host-cache.mjs`:
+  - location `node_modules/.cache/<name>/`, which secure-io denies to every persona and authority
+    role (`tier-guard-ts-loader-cache.test.ts`; the operator-equivalent SUDO authority is the only
+    exception); an override is honoured only outside the checkout or under its `node_modules/`,
+    decided on the realpath of its deepest existing ancestor (a pnpm workspace link such as
+    `node_modules/@actuator/x -> libs/actuators/x` cannot escape);
+  - the cache root must be owned by the running uid with no group/other write bit; directories
+    0700, files 0600; files are opened without following symlinks, `fstat`ed, and deleted unless
+    they have the reader's uid and no group/other write bit;
+  - off on Windows unless `KYBERION_WINDOWS_PRIVATE_CACHE=1`: there is no uid or POSIX mode to
+    check, so the checks would fail open;
+  - no MAC: a process that can write the cache as this uid can also read any per-user key and
+    edit the checkout's code directly.
+
+  Defence in depth for the STT cache: it stores only (backend, source, binary, version); a hit
+  rebuilds each candidate from the governed registry and accepts a binary only where the probe
+  could have found it (the tool's own managed python, or a PATH directory outside `active/`,
+  `knowledge/`, `customer/`, `vault/`). **Trust-model exception:** these are the only runtime
+  stores outside `active/`, outside secure-io and outside the retention catalog; the transpile
+  cache prunes entries written more than 30 days ago (at most daily), the STT cache is one file.
+  **Symlink write-through is closed in secure-io (V4, #1019).** Before it, secure-io checked a
+  path as written while the OS followed symlinks, so a persona could link `active/shared/tmp/x`
+  to `node_modules/.cache/<cache>` and write through the link (same uid, 0644, so the owner/mode
+  checks did not catch it). secure-io now refuses to create such a link and refuses writes
+  through one; re-verified for both caches as `finance_controller` and `worker`.
+
+- **The cache key covers the loader itself.** It hashes `scripts/ts-loader-cache.mjs`, where the
+  compiler options live, so editing the options invalidates every entry with no version to bump.
+- **Cached code never carries a code extension.** Transpile-cache entries end in `.transpiled`.
+  Repository scanners (the foundation-io, process-boundary and runtime-child-process boundary
+  tests, lint and governance gates) select files by extension and not all of them skip `active/`;
+  `.js` entries made every cached `libs/core` module a second, unregistered importer.
+- **Never cache data.** The transpile cache skips `active/`, `knowledge/`, `customer/` and `vault/`
+  sources (compared case-insensitively on darwin and win32).
+- **Keep caches fresh across installs.** Managed-tool installers (`voice setup --apply`,
+  `tool-runtime setup --apply`, `env:bootstrap --apply`) call
+  `resetLocalSttDiscoveryCache({ disk: true })` when they finish. A new installer that can add a
+  local STT backend does the same.
+- **Run build helpers by `import.meta.main`, not by comparing `process.argv[1]`** with the
+  module's own path: under a symlinked checkout they differ and the dist-scope write was silently
+  skipped (review M2). The build passes `--run` explicitly. `import.meta.main` needs Node 24.2
+  while `engines` admits 24.0, so a direct run without it exits 1 with a diagnostic (review L2).
+- **Tests point caches at a sandbox.** Unit tests pass `KYBERION_TS_LOADER_CACHE_DIR` (a private
+  os tmp directory) and `projectRoot`. Child processes that tests spawn share the checkout's
+  transpile cache in `node_modules/.cache/`, outside the leak guard's live-state roots. The STT
+  disk cache is off under Vitest unless the TTL is set; its tests set
+  `KYBERION_STT_DISCOVERY_CACHE_DIR` to a private os tmp directory.
+- **Fast resolve stands aside when Node preserves symlinks** (`--preserve-symlinks[-main]` in argv
+  or `NODE_OPTIONS`, or `NODE_PRESERVE_SYMLINKS=1`): it returns realpaths.
+
+Procedure when a child is slow: profile it (`node --cpu-prof --import ./scripts/ts-loader.mjs …`)
+and sum self time per function. Large `get` (`package_json_reader`) plus garbage-collector time
+means a large package.json is being re-parsed: look for a new resolution path that bypasses the
+mechanisms above. Measure each change separately in alternating runs and compare CPU (user + sys),
+as in §1. Reference numbers (4 vCPU, load average 8–10, median CPU of 5–7 alternating runs, before → after):
+`scripts/bindings.ts --help` (libs/core from sources) 13.8s → 1.3s; `scripts/org.ts --help` (dist)
+2.4s → 0.4s.
 
 ## §6 Tenant scope and governed facades
 

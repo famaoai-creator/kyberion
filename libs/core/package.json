@@ -5,11 +5,12 @@
   "type": "module",
   "imports": {
     "#binary-availability": "./binary-availability.mjs",
+    "#private-host-cache": "./private-host-cache.mjs",
     "#repository-path-boundary": "./repository-path-boundary.mjs"
   },
   "description": "Core utilities and wrappers for Kyberion.",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node ../../scripts/write_core_dist_scope.mjs --run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "main": "./dist/index.js",

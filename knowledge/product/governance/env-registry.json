@@ -954,6 +954,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_CORE_DIST_SCOPE",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Core build step (scripts/write_core_dist_scope.mjs --run): 0 removes the generated libs/core/dist/package.json scope marker and #imports shims, so Node falls back to the 290KB libs/core/package.json for every dist module (old behaviour). Default on.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
       "name": "KYBERION_CURATION_ARCHIVE_HISTORY_PATH",
       "category": "path",
       "type": "path",
@@ -3688,6 +3697,24 @@
       "documented": true
     },
     {
+      "name": "KYBERION_STT_DISCOVERY_CACHE_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Directory of the cross-process local STT discovery cache (it names binaries the speech-to-text bridge runs). Default node_modules/.cache/kyberion-stt-discovery/; an override is honoured only outside the checkout or under its node_modules/ (judged on its realpath). Tests point it at a private tmp directory.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
+      "name": "KYBERION_STT_DISCOVERY_CACHE_TTL_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Lifetime of the local STT discovery result, in process and in the private host cache node_modules/.cache/kyberion-stt-discovery/. Default 600000 (10 min); 0 turns both off. The disk copy is off under Vitest unless set; managed-tool installers reset it.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
       "name": "KYBERION_STT_LANGUAGE",
       "category": "runtime",
       "type": "string",
@@ -4067,6 +4094,33 @@
       "subsystem": "surfaces"
     },
     {
+      "name": "KYBERION_TS_LOADER_CACHE",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Kill switch for the scripts/ts-loader.mjs transpile cache: 0/false/off transpiles every TypeScript module again in each process. Default on.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
+      "name": "KYBERION_TS_LOADER_CACHE_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Directory of the ts-loader transpile cache (entries are executed as code). Default node_modules/.cache/kyberion-ts-loader/, outside every agent-writable tree; an override is honoured only outside the checkout or under its node_modules/ (judged on its realpath), otherwise the cache is off.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
+      "name": "KYBERION_TS_LOADER_FAST_RESOLVE",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "0 makes scripts/ts-loader.mjs hand workspace TypeScript resolutions back to Node's default resolver, which re-parses the nearest package.json exports map per module (old behaviour). Default on.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
       "name": "KYBERION_TTS_ARGS",
       "category": "runtime",
       "type": "string",
@@ -4418,6 +4472,15 @@
       "required": false,
       "description": "Optional runtime setting for windows image generator; leave unset to use the built-in configuration.",
       "documented": true
+    },
+    {
+      "name": "KYBERION_WINDOWS_PRIVATE_CACHE",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Set to 1 to enable the private host caches (ts-loader transpile cache, local STT discovery) on Windows, where there are no owner or mode bits to check them by; off by default there. Only for single-user hosts.",
+      "documented": true,
+      "subsystem": "runtime"
     },
     {
       "name": "KYBERION_WINDOWS_STT_BACKEND",

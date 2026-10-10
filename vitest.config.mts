@@ -24,14 +24,17 @@ function preferTypeScriptSourceForJsImports() {
       const importerPath = importer.startsWith('file://') ? fileURLToPath(importer) : importer;
       const resolved = path.resolve(path.dirname(importerPath), source);
       const base = resolved.slice(0, resolved.lastIndexOf('.'));
-      const candidates = [
-        `${base}.ts`,
-        `${base}.mts`,
-        `${base}.tsx`,
-        path.join(path.dirname(base), 'index.ts'),
-        path.join(path.dirname(base), 'index.mts'),
-        path.join(path.dirname(base), 'index.tsx'),
-      ];
+      const candidates = [`${base}.ts`, `${base}.mts`, `${base}.tsx`];
+      // The directory-index fallback is for a `.js` specifier with no file
+      // behind it. A real `.mjs`/`.js` module (e.g. libs/core/*.mjs) must not
+      // resolve to its directory's index.ts.
+      if (!fs.existsSync(resolved)) {
+        candidates.push(
+          path.join(path.dirname(base), 'index.ts'),
+          path.join(path.dirname(base), 'index.mts'),
+          path.join(path.dirname(base), 'index.tsx')
+        );
+      }
 
       for (const candidate of candidates) {
         if (fs.existsSync(candidate)) {
