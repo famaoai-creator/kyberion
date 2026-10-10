@@ -544,7 +544,8 @@ function createInVettedDir(
     const dirAt = heldDir.isDirectory() ? openedLocation(dirFd, parent, heldDir) : undefined;
     if (dirAt === undefined) throw new Error(changed);
     assertAuthorizedAt(path.join(dirAt, name), displayPath, operation);
-    const viaFd = procFdAvailable();
+    // /proc may be missing even on Linux (a sandbox): fall back to the by-path create.
+    const viaFd = procFdResolves(dirFd);
     const noFollowAny = process.platform === 'darwin';
     if (!viaFd && !noFollowAny && path.resolve(parent) !== dirAt) {
       throw new Error(
@@ -556,7 +557,7 @@ function createInVettedDir(
     const noFollow = noFollowAny ? 0x20000000 : (c.O_NOFOLLOW ?? 0);
     const exclusive = (open & ~(c.O_NOFOLLOW ?? 0)) | c.O_CREAT | c.O_EXCL | noFollow;
     let target = resolved;
-    if (viaFd) target = `/proc/self/fd/${dirFd}/${name}`;
+    if (viaFd) target = `${procFdPath(dirFd)}/${name}`;
     else if (noFollowAny) target = path.join(toPhysicalRoot(dirAt), name);
     let fd: number;
     try {
@@ -613,7 +614,7 @@ export function readdirVetted(resolved: string, displayPath: string): string[] {
   try {
     if (procFdAvailable()) {
       try {
-        return fs.readdirSync(`/proc/self/fd/${fd}`);
+        return fs.readdirSync(procFdPath(fd));
       } catch {
         // /proc unavailable: path fallback below
       }
@@ -655,8 +656,122 @@ export function vetOpenedFd(
   // Opened exactly what the caller's check authorized: no need to re-judge.
   if (actual !== authorizedCanonical)
     assertAuthorizedAt(actual, displayPath, operation, readOperation);
-  assertNotForeignHardLink(held, actual, displayPath, operation);
-  return held;
+  // Hard-link churn (`rm name; ln secret name` in a loop): the first fstat
+  // can run while the name is unlinked (nlink 1) and the location check after
+  // it is relinked. Re-fstat now and refuse a link or unlink in between
+  // (sameLinkState), then require that the name opened through still exists
+  // — unless nothing does (an orphaned inode cannot be a protected file) —
+  // and judge hard links on this last fstat.
+  const now = fs.fstatSync(fd);
+  if (
+    now.dev !== held.dev ||
+    now.ino !== held.ino ||
+    !sameLinkState(held, now) ||
+    !stillNamed(fd, resolved, now)
+  ) {
+    throw new Error(
+      `[SECURITY] Refusing to ${operation} ${displayPath}: the file changed between the permission check and the open`
+    );
+  }
+  assertNotForeignHardLink(now, actual, displayPath, operation);
+  return now;
+}
+
+/**
+ * After the final fstat: the name the descriptor was opened through is still
+ * linked, so a single-link count is not a name caught mid-unlink.
+ *
+ * Linux: its /proc entry is not "(deleted)" unless the inode itself is
+ * fully unlinked (nlink 0 — an unlinked name never comes back; a new link
+ * is a new name, and an inode with no names cannot be a protected file).
+ * unlink(2) drops the link count before it marks the name deleted, both
+ * under the parent directory's lock, so for a single-link file the parent
+ * is read once (which waits for that lock) and the entry must still read
+ * the same afterwards. Elsewhere: the canonical leaf is still this inode
+ * (an unlink caught between two syscalls there is residual).
+ */
+function stillNamed(fd: number, resolved: string, held: fs.Stats): boolean {
+  if (procFdAvailable()) {
+    let link: string;
+    try {
+      link = fs.readlinkSync(procFdPath(fd));
+    } catch {
+      return stillNamedByPath(resolved, held);
+    }
+    if (!path.isAbsolute(link)) return false;
+    if (link.endsWith(DELETED_MARK)) return unnameableInode(fd);
+    if (!held.isFile() || held.nlink !== 1 || !recentlyChanged(held)) return true;
+    if (!settleDirectory(path.dirname(link))) return false;
+    try {
+      // A rename can land while the parent settles: an entry now marked
+      // deleted is still fine while the inode kept no name.
+      const again = fs.readlinkSync(procFdPath(fd));
+      return again === link || (again.endsWith(DELETED_MARK) && unnameableInode(fd));
+    } catch {
+      return false;
+    }
+  }
+  return stillNamedByPath(resolved, held);
+}
+
+/**
+ * The opened name is gone. Only a fully unlinked inode can never be reached
+ * through a protected name, so the one deleted name still served is the
+ * atomic write-then-rename replacement — the stale content is exactly what
+ * the caller opened.
+ */
+function unnameableInode(fd: number): boolean {
+  try {
+    return fs.fstatSync(fd).nlink === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * No /proc: settle the parent, then the leaf must still be this inode with
+ * the link count and ctime of the last fstat, so no unlink or relink (a
+ * different name for the same inode) happened in between.
+ */
+function stillNamedByPath(resolved: string, held: fs.Stats): boolean {
+  const canonical = canonicalGuardPath(resolved, 'follow');
+  if (!held.isFile()) return leafIsInode(canonical, held);
+  if (recentlyChanged(held) && !settleDirectory(toPhysicalRoot(path.dirname(canonical)))) {
+    return false;
+  }
+  return leafIsInode(canonical, held, true);
+}
+
+/**
+ * The inode's ctime moved within the last second. An unlink caught in
+ * progress has just set it (unlink(2) moves the ctime of a file it leaves
+ * linked), so a file untouched for longer cannot be mid-unlink; the margin
+ * covers the coarse clock the kernel stamps ctimes with.
+ */
+function recentlyChanged(held: fs.Stats): boolean {
+  return held.ctimeMs > Date.now() - 1000;
+}
+
+/**
+ * Read one entry of `dir` (getdents takes the directory lock, so an unlink
+ * in progress there completes first). Only inside the checkout; a vault
+ * mount target outside it is read-only and not settled.
+ */
+function settleDirectory(dir: string): boolean {
+  const target = path.resolve(dir);
+  const physicalRoot = realRoot().real;
+  if (target !== physicalRoot && !target.startsWith(physicalRoot + path.sep)) return true;
+  try {
+    const handle = fs.opendirSync(target, { bufferSize: 1 });
+    try {
+      handle.readSync();
+    } finally {
+      handle.closeSync();
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -696,6 +811,32 @@ export function statVetted(
 
 // eslint-disable-next-line no-var
 var procFdDisabled: boolean | undefined;
+// eslint-disable-next-line no-var
+var procFdRoot: string | undefined;
+
+/** The mark /proc/self/fd appends to a link whose name was unlinked. */
+const DELETED_MARK = ' (deleted)';
+
+/** `/proc/self/fd/<fd>` (tests point the base at a missing directory). */
+function procFdPath(fd: number): string {
+  return `${procFdRoot ?? '/proc/self/fd'}/${fd}`;
+}
+
+/** Test seam: a Linux host whose /proc is unavailable (base path missing). */
+export function setProcFdRootForTesting(root: string | undefined): void {
+  procFdRoot = root;
+}
+
+/** The descriptor resolves through /proc (Linux with /proc mounted). */
+function procFdResolves(fd: number): boolean {
+  if (!procFdAvailable()) return false;
+  try {
+    fs.readlinkSync(procFdPath(fd));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /** Whether /proc/self/fd may be used (Linux); tests force the portable fallback. */
 function procFdAvailable(): boolean {
@@ -718,8 +859,14 @@ function openedLocation(fd: number, resolved: string, held: fs.Stats): string | 
   if (held.ino === 0) return undefined;
   if (procFdAvailable()) {
     try {
-      const link = fs.readlinkSync(`/proc/self/fd/${fd}`);
-      if (path.isAbsolute(link) && !link.endsWith(' (deleted)')) return toLogicalRoot(link);
+      const link = fs.readlinkSync(procFdPath(fd));
+      if (!path.isAbsolute(link)) return undefined;
+      // A "(deleted)" mark is the name the descriptor was opened through,
+      // since unlinked — still its true location, judged under that name.
+      // stillNamed then serves it only while the inode has no name at all
+      // (nlink 0); an inode with a name left could be a protected file.
+      const opened = link.endsWith(DELETED_MARK) ? link.slice(0, -DELETED_MARK.length) : link;
+      return toLogicalRoot(opened);
     } catch {
       // /proc unavailable: fall back to the path identity check below
     }
@@ -729,24 +876,44 @@ function openedLocation(fd: number, resolved: string, held: fs.Stats): string | 
 }
 
 /** The canonical path's leaf entry (not followed) is the inode `held`. */
-function leafIsInode(canonical: string, held: fs.Stats): boolean {
+function leafIsInode(canonical: string, held: fs.Stats, exact = false): boolean {
   if (held.ino === 0) return false;
   const target = path.resolve(canonical);
   const logicalRoot = path.resolve(pathResolver.rootDir());
   const physicalRoot = realRoot().real;
-  let now: { dev: number; ino: number } | undefined;
+  let now: fs.Stats | undefined;
   try {
     // The checkout root itself is a valid target (a walk starts by listing
     // it); it is neither "under" the root nor a vault target.
-    if (target === logicalRoot) now = fs.lstatSync(logicalRoot);
-    else if (target === physicalRoot) now = fs.lstatSync(physicalRoot);
+    // The root may itself be a configured symlink (KYBERION_ROOT): follow it.
+    if (target === logicalRoot) now = fs.statSync(logicalRoot);
+    else if (target === physicalRoot) now = fs.statSync(physicalRoot);
     else if (target.startsWith(logicalRoot + path.sep)) now = fs.lstatSync(target);
     else if (target.startsWith(physicalRoot + path.sep)) now = fs.lstatSync(target);
     else now = vaultTargetIdentity(target);
   } catch {
     return false;
   }
-  return now !== undefined && now.dev === held.dev && now.ino === held.ino;
+  if (now === undefined || now.dev !== held.dev || now.ino !== held.ino) return false;
+  // exact: no link or unlink since `held` was taken.
+  return !exact || sameLinkState(held, now);
+}
+
+/**
+ * No link or unlink between two stats of one inode: the same link count —
+ * or none left, an inode no name reaches cannot be a protected file — and a
+ * ctime that either did not move or belongs to a data write. link(2) and
+ * unlink(2) move only the ctime, but so does utimes(2), which can stamp
+ * ctime == mtime without writing; the write exemption therefore also
+ * requires the size to have moved, a change only writing the target itself
+ * can fake.
+ */
+// Exported for the guard-internals tests.
+export function sameLinkState(before: fs.Stats, after: fs.Stats): boolean {
+  if (after.nlink === 0) return true;
+  if (before.nlink !== after.nlink) return false;
+  if (after.ctimeMs === before.ctimeMs) return true;
+  return after.size !== before.size && after.ctimeMs === after.mtimeMs;
 }
 
 function assertAuthorizedAt(

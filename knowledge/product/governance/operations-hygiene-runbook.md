@@ -850,6 +850,24 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   a regular file, so a FIFO (or a link flipped to one) cannot hang the caller. Range and tail open
   no-follow. Errors from these opens and stats carry only the errno (`open failed (ENOENT)`),
   never an absolute path.
+- **Hard-link churn cannot pass the link count.** An attacker that loops
+  `rm name; ln knowledge/personal/…/secret name` makes the first `fstat` see `nlink=1` while the
+  name is unlinked and the location check pass once it is relinked. `vetOpenedFd` therefore
+  re-`fstat`s after the location check and refuses any change between the two: inode, link
+  count, or a ctime that moved without a size change — a data write moves the size as well as
+  ctime and mtime, while `link`/`unlink` move only the ctime and `utimes` can stamp
+  ctime == mtime without writing. A fully unlinked inode (`nlink` 0) is exempt: no name reaches
+  it, so it cannot be a protected file. `vetOpenedFd` then judges hard links on that last
+  `fstat` and requires the name opened through to be still linked: on Linux a `/proc` entry
+  ending in `(deleted)` is served only while the inode itself has `nlink` 0 — the atomic
+  write-then-rename replacement, whose stale content is exactly what the caller opened — never
+  re-derived from the path. `unlink(2)` drops the link count before it marks the name deleted,
+  both under the parent directory's lock, so for a single-link file whose ctime moved within
+  the last second (an unlink in progress has just set it) the parent is read once first —
+  `getdents` waits for that lock — and the entry must read the same afterwards. Off Linux the
+  canonical leaf must still be the inode with the same link state, after the same parent read
+  for a recently changed file. Appends are vetted this way before any byte is written. Cost on
+  the CI VM: about +20 µs per in-place read, +15 µs more for a file changed in the last second.
 - **Appends create only inside the directory that was opened and authorized.** An append opens
   without `O_CREAT` first. A missing entry is created with `O_CREAT|O_EXCL|O_NOFOLLOW` (never
   through a leaf link) after the parent directory is opened and its own location authorized for
@@ -857,8 +875,9 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   Linux the create goes through that held descriptor (`/proc/self/fd/<n>/<name>`, an `openat`); on
   macOS it opens the authorized physical path with `O_NOFOLLOW_ANY` (`0x20000000`, not exported by
   Node; it replaces `O_NOFOLLOW`, since open(2) rejects both together with `EINVAL`), which fails
-  if any component is a link at create time. Elsewhere there is no `openat`: a create through a
-  linked parent directory is refused, and the parent must still be the inode held afterwards.
+  if any component is a link at create time. Elsewhere — and on Linux when `/proc` is not
+  mounted (a sandbox) — there is no `openat`: a create through a linked parent directory is
+  refused, and the parent must still be the inode held afterwards.
   When a concurrent appender wins the create (`EEXIST`), the loser opens that file without
   `O_CREAT` and appends, so no line is lost; a dangling leaf link is refused, even when its target
   would be allowed. A created file whose vetting fails is left in place, empty, and the call
@@ -868,12 +887,18 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   non-blocking, vets the descriptor and `fchmod`s it. Sockets, FIFOs and devices are refused:
   Node has no `lchmod` on Linux, so a chmod by path could follow a leaf flipped to a link onto a
   protected file. A process that needs a private Unix socket binds it under a restrictive umask
-  (the agent runtime supervisor binds with `umask 0177`, so the socket is created 0600).
+  (the agent runtime supervisor binds with `umask 0177`, so the socket is created 0600, and
+  restores the umask in a `finally`). The umask is process-wide: threadpool file work that races
+  this one synchronous `listen()` at daemon startup would also be created under it.
 - **Listings and stats are pinned too.** `safeReaddir` lists the directory it opened and vetted
   (`readdirVetted`: `/proc/self/fd/<n>` on Linux, an identity-pinned path otherwise); a pin that
   does not hold throws. `walk` / `getAllFiles` yield nothing only for a missing root (`ENOENT`,
-  `ENOTDIR`) and rethrow every other failure to list it, so a refusal never becomes `[]`. Linux CI
-  runs the portable branch through the `setProcFdLookupDisabledForTesting` seam. `safeStat` and
+  `ENOTDIR`) and rethrow every other failure to list it, so a refusal never becomes `[]`; scope
+  offboarding's directory listing does the same, so `verifyScopeOffboarded` never reports a
+  refused listing as clean. The checkout root is pinned by `stat`, so a `KYBERION_ROOT` that is
+  itself a symlink still lists off Linux. Linux CI runs the portable branch through the
+  `setProcFdLookupDisabledForTesting` seam, and a Linux host without `/proc` through
+  `setProcFdRootForTesting`. `safeStat` and
   `validateFileSize` stat through a vetted non-blocking descriptor (`statVetted`; sockets, FIFOs
   and devices fall back to the leaf-identity pin). A target outside the repository is pinned only
   under a registered vault mount (`vaultTargetIdentity`). Denial messages name only the caller's
@@ -906,8 +931,13 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   swapped for a link between the check and the create can still leave an empty file in another
   directory (the call is refused, nothing is written, nothing is deleted). "Never creates through
   a link" holds for every component on Linux and macOS.
-- _Hard links created after the check_ (between the descriptor's `fstat` and the operation) and
-  hard links to files outside the repository (vault targets) are not detected. Path-only helpers
+- _Hard-link churn off Linux._ Without `/proc` a name is identified by path, link count and
+  ctime; a filesystem with coarse ctime granularity lets a link and an unlink inside one tick go
+  unseen, an attacker that can also write the target can move its size along, and a name held
+  on a protected inode for the whole open-and-vet window — a park, not a churn — is
+  indistinguishable from a file that was always there. Linux is pinned by the `(deleted)`
+  marker and is not affected.
+- _Hard links to files outside the repository_ (vault targets) are not detected. Path-only helpers
   (`safeLstat`, `safeExistsSync`, `safeReaddir`) reveal metadata of a hard-linked file but no
   content.
 - _Per-process state_: nothing is cached, because cache clearing is per-process only and never

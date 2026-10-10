@@ -35,7 +35,9 @@ import {
   assertTempInCheckedDir,
   captureCheckedDir,
   registerSensitivePathMediationProbe,
+  sameLinkState,
   setProcFdLookupDisabledForTesting,
+  setProcFdRootForTesting,
 } from './secure-io-path-guard.js';
 import { getAllFiles } from './fs-utils.js';
 
@@ -135,6 +137,37 @@ async function hammer(ms: number, op: () => void): Promise<number> {
     if (tries % 50 === 0) await new Promise((r) => setImmediate(r));
   }
   return tries;
+}
+
+/**
+ * Hard-link churn: a child loops `rm name; ln secret name` while reads and
+ * appends go through `name`. Returns how often the secret was read or grew.
+ */
+async function hardLinkChurn(ms: number): Promise<Record<string, number>> {
+  const secretPath = path.join(abs(personalRel), 'secret.txt');
+  const before = fs.statSync(secretPath).size;
+  const name = abs(`${scratchRel}/churn.log`);
+  const churn = `
+    const fs = require('node:fs');
+    const [name, secret] = process.argv.slice(1);
+    const end = Date.now() + ${2 * ms + 2000};
+    while (Date.now() < end) {
+      try { fs.rmSync(name, { force: true }); } catch {}
+      try { fs.linkSync(secret, name); } catch {}
+    }`;
+  const child = safeSpawn(process.execPath, ['-e', churn, name, secretPath], { stdio: 'ignore' });
+  const result = { reads: 0, readLeaks: 0, appends: 0, secretGrew: 0 };
+  const rel = `${scratchRel}/churn.log`;
+  try {
+    result.reads = await hammer(ms, () => {
+      if (String(safeReadFile(rel)).includes('personal-tier secret')) result.readLeaks += 1;
+    });
+    result.appends = await hammer(ms, () => safeAppendFileSync(rel, 'X'));
+  } finally {
+    child.kill('SIGKILL');
+  }
+  result.secretGrew = fs.statSync(secretPath).size - before;
+  return result;
 }
 
 describe('secure-io symlink canonicalization (data-only persona)', () => {
@@ -488,6 +521,96 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     expect(fs.readdirSync(abs(personalRel)).filter((n) => n.startsWith('created-by-'))).toEqual([]);
   }, 20000);
 
+  it('never reads or appends to a protected file through hard-link churn (bounded race)', async () => {
+    const result = await hardLinkChurn(2500);
+    expect(result.reads).toBeGreaterThan(50);
+    expect(result.appends).toBeGreaterThan(50);
+    expect({ readLeaks: result.readLeaks, secretGrew: result.secretGrew }).toEqual({
+      readLeaks: 0,
+      secretGrew: 0,
+    });
+  }, 30000);
+
+  it('reads a file another process keeps appending to', async () => {
+    const log = abs(`${scratchRel}/busy.log`);
+    fs.writeFileSync(log, 'start\n');
+    const writer = `
+      const fs = require('node:fs');
+      const [log] = process.argv.slice(1);
+      const end = Date.now() + 5000;
+      while (Date.now() < end) fs.appendFileSync(log, 'line\\n');`;
+    const child = safeSpawn(process.execPath, ['-e', writer, log], { stdio: 'ignore' });
+    let refused = 0;
+    let read = 0;
+    try {
+      const end = Date.now() + 2000;
+      while (Date.now() < end) {
+        try {
+          safeReadFile(`${scratchRel}/busy.log`);
+          read += 1;
+        } catch {
+          refused += 1;
+        }
+        if ((read + refused) % 50 === 0) await new Promise((r) => setImmediate(r));
+      }
+    } finally {
+      child.kill('SIGKILL');
+    }
+    expect(read).toBeGreaterThan(50);
+    expect(refused).toBe(0);
+  }, 20000);
+
+  it('keeps reading while another process atomically replaces the file', async () => {
+    // A runtime store writes a temp file and renames it over the old one.
+    // The reader may open the inode being unlinked: its /proc entry reads
+    // "(deleted)", but with nlink 0 it can never be relinked to a secret,
+    // so it is still served. Off Linux the portable pin cannot know which
+    // name the descriptor was opened through and refuses (as on main).
+    if (process.platform !== 'linux') return;
+    const log = abs(`${scratchRel}/replaced.log`);
+    fs.writeFileSync(log, 'v0\n');
+    const replacer = `
+      const fs = require('node:fs');
+      const [name] = process.argv.slice(1);
+      const tmp = name + '.tmp';
+      let i = 0;
+      const end = Date.now() + 5000;
+      while (Date.now() < end) {
+        try { fs.writeFileSync(tmp, 'v' + ++i + '\\n'); fs.renameSync(tmp, name); } catch {}
+      }`;
+    const child = safeSpawn(process.execPath, ['-e', replacer, log], { stdio: 'ignore' });
+    let refused = 0;
+    let read = 0;
+    try {
+      const end = Date.now() + 2000;
+      while (Date.now() < end) {
+        try {
+          const text = String(safeReadFile(`${scratchRel}/replaced.log`));
+          if (/^v\d+\n$/.test(text)) read += 1;
+        } catch {
+          refused += 1;
+        }
+        if ((read + refused) % 50 === 0) await new Promise((r) => setImmediate(r));
+      }
+    } finally {
+      child.kill('SIGKILL');
+    }
+    expect(read).toBeGreaterThan(50);
+    expect(refused).toBe(0);
+  }, 20000);
+
+  it('creates new files when /proc is unavailable on Linux', () => {
+    setProcFdRootForTesting('/nonexistent-proc-self-fd');
+    try {
+      safeAppendFileSync(`${scratchRel}/no-proc.log`, 'a');
+      safeAppendFileSync(`${scratchRel}/no-proc.log`, 'b');
+      expect(safeReadFile(`${scratchRel}/no-proc.log`)).toBe('ab');
+      expect(safeReaddir(scratchRel)).toContain('no-proc.log');
+    } finally {
+      setProcFdRootForTesting(undefined);
+    }
+  });
+
   it('loses no line when concurrent appenders create the same new files', async () => {
     // Each child appends its tag to the same 400 new files in turn: the
     // processes race to create every file, and the losers must append too.
@@ -500,7 +623,7 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     const loader = path.join(ROOT, 'scripts/ts-loader.mjs');
     const runs = ['a', 'b', 'c'].map(
       (tag) =>
-        new Promise<number | null>((resolve) => {
+        new Promise<string>((resolve) => {
           const proc = safeSpawn(
             process.execPath,
             [
@@ -514,12 +637,14 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
               tag,
               String(files),
             ],
-            { stdio: 'ignore', cwd: ROOT }
+            { stdio: ['ignore', 'ignore', 'pipe'], cwd: ROOT }
           );
-          proc.on('exit', (code) => resolve(code));
+          let stderr = '';
+          proc.stderr?.on('data', (chunk) => (stderr += String(chunk)));
+          proc.on('close', (code) => resolve(code === 0 ? 'ok' : `exit ${code}: ${stderr}`));
         })
     );
-    expect(await Promise.all(runs)).toEqual([0, 0, 0]);
+    expect(await Promise.all(runs)).toEqual(['ok', 'ok', 'ok']);
     let lost = 0;
     for (let i = 0; i < files; i += 1) {
       const lines = fs
@@ -876,6 +1001,16 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
       setProcFdLookupDisabledForTesting(previous);
     });
 
+    it('never reads or appends to a protected file through hard-link churn (bounded race)', async () => {
+      const result = await hardLinkChurn(2500);
+      expect(result.reads).toBeGreaterThan(50);
+      expect(result.appends).toBeGreaterThan(50);
+      expect({ readLeaks: result.readLeaks, secretGrew: result.secretGrew }).toEqual({
+        readLeaks: 0,
+        secretGrew: 0,
+      });
+    }, 30000);
+
     it('lists and stats the checkout root (a repository walk starts there)', () => {
       expect(safeReaddir(ROOT)).toContain('package.json');
       expect(safeStat(ROOT).isDirectory()).toBe(true);
@@ -1025,5 +1160,28 @@ describe('secure-io guard internals', () => {
   it('reads pnpm store files under node_modules despite their link count', () => {
     const pkg = 'node_modules/vitest/package.json';
     expect(() => safeReadFile(pkg)).not.toThrow();
+  });
+
+  it('accepts only a real write between the two link-state samples', () => {
+    // The masked-churn finding: utimes(2), a same-size truncate or an
+    // in-place write can stamp ctime == mtime without a link or unlink, so
+    // "ctime moved together with mtime" alone cannot prove a data write —
+    // only a size change can.
+    const stat = (over: Partial<fs.Stats>) =>
+      ({ nlink: 1, ctimeMs: 100, mtimeMs: 100, size: 10, ...over }) as fs.Stats;
+    const before = stat({});
+    // Untouched, and a name fully unlinked in between (an orphan inode can
+    // never be a protected file — the atomic write+rename replacement).
+    expect(sameLinkState(before, stat({}))).toBe(true);
+    expect(sameLinkState(before, stat({ nlink: 0 }))).toBe(true);
+    // A link or unlink moved the link count, or only the ctime.
+    expect(sameLinkState(before, stat({ nlink: 2 }))).toBe(false);
+    expect(sameLinkState(before, stat({ ctimeMs: 200 }))).toBe(false);
+    // The mask: ctime stamped equal to mtime, the size unmoved.
+    expect(sameLinkState(before, stat({ ctimeMs: 200, mtimeMs: 200 }))).toBe(false);
+    // A real write: size, ctime and mtime all moved.
+    expect(sameLinkState(before, stat({ ctimeMs: 200, mtimeMs: 200, size: 11 }))).toBe(true);
+    // A moving size alone is not enough (ctime must belong to the write).
+    expect(sameLinkState(before, stat({ ctimeMs: 200, mtimeMs: 100, size: 11 }))).toBe(false);
   });
 });
