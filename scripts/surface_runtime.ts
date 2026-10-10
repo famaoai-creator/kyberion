@@ -216,6 +216,9 @@ function buildSurfaceRepairHint(
   record: any,
   health: Awaited<ReturnType<typeof probeSurfaceHealth>>
 ): string {
+  if (definition.startupMode === 'on-demand') {
+    return 'client-spawned surface (on-demand): its client starts it; not supervised';
+  }
   if (record && !isRunning(record.pid)) {
     return 'stale state record: run pnpm surfaces repair -- --surface <surface-id>';
   }
@@ -292,6 +295,16 @@ export async function startSurfaceById(surfaceId: string, manifestPath: string) 
   const normalized = normalizeSurfaceDefinition(definition);
   if (!normalized.enabled) {
     throw new Error(`Surface "${surfaceId}" is disabled in manifest ${manifestPath}`);
+  }
+  if (normalized.startupMode === 'on-demand') {
+    // Client-spawned surface (e.g. a stdio MCP server): the client launches
+    // and owns the process; starting it here would just respawn a process
+    // that exits on stdin EOF.
+    return {
+      status: 'skipped_on_demand',
+      id: surfaceId,
+      detail: 'client-spawned surface (on-demand): started by its client, not supervised',
+    };
   }
 
   // --- AUTH VALIDATION ---
@@ -556,25 +569,25 @@ async function statusSurfaces() {
     const record = state.surfaces[definition.id];
     const surfaceHealth = await probeSurfaceHealth(definition);
     health[definition.id] = surfaceHealth;
-    diagnostics[definition.id] = {
-      stateHealth:
-        record && isRunning(record.pid)
-          ? surfaceHealth.status === 'healthy'
-            ? 'healthy'
-            : 'degraded'
+    const stateHealth =
+      record && isRunning(record.pid)
+        ? // 'unknown' = no probe configured: a live supervised pid is the only
+          // signal we have — calling that "degraded" is a false positive that
+          // nags repair forever.
+          surfaceHealth.status === 'unhealthy'
+          ? 'degraded'
+          : 'healthy'
+        : definition.startupMode === 'on-demand'
+          ? 'untracked'
           : record
             ? 'stale'
-            : 'untracked',
+            : 'untracked';
+    diagnostics[definition.id] = {
+      stateHealth,
       repairHint: buildSurfaceRepairHint(definition, record, surfaceHealth),
       nextAction: buildSurfaceNextAction(
         definition.id,
-        record && isRunning(record.pid)
-          ? surfaceHealth.status === 'healthy'
-            ? 'healthy'
-            : 'degraded'
-          : record
-            ? 'stale'
-            : 'untracked',
+        stateHealth,
         buildSurfaceRepairHint(definition, record, surfaceHealth)
       ),
       lastKnownState: record
@@ -797,6 +810,15 @@ async function repairSurfaceById(surfaceId: string, manifestPath: string) {
         status: 'skipped_disabled',
         id: surfaceId,
         repairHint: 'surface is disabled in the manifest',
+        health,
+      };
+    }
+    if (normalized.startupMode === 'on-demand') {
+      return {
+        status: 'skipped_on_demand',
+        id: surfaceId,
+        repairHint:
+          'client-spawned surface (on-demand): its client starts it; stale records cleared, no supervised restart',
         health,
       };
     }

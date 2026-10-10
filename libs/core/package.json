@@ -1056,6 +1056,22 @@
       "types": "./dist/core.d.ts",
       "default": "./dist/core.js"
     },
+    "./daemon/service-manager": {
+      "types": "./dist/daemon/service-manager.d.ts",
+      "default": "./dist/daemon/service-manager.js"
+    },
+    "./daemon/launchd": {
+      "types": "./dist/daemon/launchd.d.ts",
+      "default": "./dist/daemon/launchd.js"
+    },
+    "./daemon/systemd-user": {
+      "types": "./dist/daemon/systemd-user.d.ts",
+      "default": "./dist/daemon/systemd-user.js"
+    },
+    "./daemon/specs": {
+      "types": "./dist/daemon/specs.d.ts",
+      "default": "./dist/daemon/specs.js"
+    },
     "./daemon-heartbeat": {
       "types": "./dist/daemon-heartbeat.d.ts",
       "default": "./dist/daemon-heartbeat.js"
