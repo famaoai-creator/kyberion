@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import {
   applyOnboardingContextBinding,
@@ -80,7 +80,24 @@ function bindAndActivate(): void {
   });
 }
 
+// Onboarding bootstrap is an owner-context operation: the core CI suites run
+// under KYBERION_PERSONA=worker, so the fixture must declare its persona.
+const previousPersona = process.env.KYBERION_PERSONA;
+const previousRole = process.env.MISSION_ROLE;
+
+beforeEach(() => {
+  process.env.KYBERION_PERSONA = 'sovereign';
+  process.env.MISSION_ROLE = 'sovereign';
+});
+
 afterEach(() => safeRmSync(rootDir, { recursive: true, force: true }));
+
+afterAll(() => {
+  if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+  else process.env.KYBERION_PERSONA = previousPersona;
+  if (previousRole === undefined) delete process.env.MISSION_ROLE;
+  else process.env.MISSION_ROLE = previousRole;
+});
 
 describe('onboarding context binding', () => {
   it('reads only regular existing files for onboarding snapshots', () => {
