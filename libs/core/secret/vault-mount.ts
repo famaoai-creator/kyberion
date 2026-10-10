@@ -149,11 +149,14 @@ export function isAllowedVaultMountPath(targetPath: string): boolean {
 /**
  * Identity (lstat, not followed) of a path under a registered vault mount
  * target, for secure-io's opened-file pin; undefined for any other path.
+ * The full stat is returned so the pin can also compare link state (a
+ * link/unlink between the two samples moves the link count or the ctime).
  */
-export function vaultTargetIdentity(targetPath: string): { dev: number; ino: number } | undefined {
+export function vaultTargetIdentity(
+  targetPath: string
+): ReturnType<typeof rawLstatSync> | undefined {
   if (!isAllowedVaultMountPath(targetPath)) return undefined;
-  const stat = rawLstatSync(path.resolve(targetPath));
-  return { dev: stat.dev, ino: stat.ino };
+  return rawLstatSync(path.resolve(targetPath));
 }
 
 /**
