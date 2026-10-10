@@ -39,9 +39,9 @@ describe('parseIngestCliVerdict', () => {
       const stdout = output(previewMarker, { ...plan, would_commit });
       for (const text of [
         stdout,
-        stdout.replace(
-          '\n',
-          '\n[ingest] no --target given: the card would land in ingest/. Existing folders in acme: (none)\n'
+        output(
+          `${previewMarker}\n[ingest] no --target given: the card would land in ingest/. Existing folders in acme: (none)`,
+          { ...plan, would_commit }
         ),
       ]) {
         expect(parseIngestCliVerdict(text, { ...expected, dryRun: true })).toEqual({
