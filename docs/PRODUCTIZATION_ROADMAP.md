@@ -236,7 +236,7 @@ Phase A〜D' は OSS / self-hosted / FDE の基盤レーンであり、SaaS の�
 | C-4 | 拡張点 semver 化           | actuator / pipeline / plugin / skill 仕様を v1 として宣言、semver 違反を CI で検出 | `scripts/check_contract_semver.ts`       | D4, D5 |
 | C-5 | プラグイン authoring guide | "新しい actuator を 30 分で書く" チュートリアル + テンプレ                         | `docs/developer/plugin-authoring/`       | D4, D5 |
 | C-6 | doctest 相当               | docs 内の code block を CI で実行検証                                              | `scripts/check_doc_examples.ts`          | D5     |
-| C-7 | ローカル開発体験           | watch モード、局所テスト、`pnpm dev` の改善                                        | tooling                                  | D5     |
+| C-7 | ローカル開発体験           | watch モード、局所テスト、`pnpm verify` の改善                                     | tooling                                  | D5     |
 | C-8 | issue triage rotation      | weekly triage / monthly contributor sync の運用ルール                              | `docs/MAINTAINERSHIP.md`                 | D5     |
 | C-9 | コードベース縮小           | 死んだコード／重複 actuator／使われていない pipeline を archive                    | inventory + cleanup PR                   | D5     |
 

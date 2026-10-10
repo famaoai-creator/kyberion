@@ -50,7 +50,7 @@ the canonical surface(s) involved.
 | B2  | Mission lifecycle          | `mission_controller {create,start,checkpoint,verify,distill,finish}`                                                                                       | ✅     |
 | B3  | Health pipelines (7)       | `vital-check` / `full-health-report` / `system-diagnostics` / `dev-productivity-audit` / `agent-provider-check` / `daily-summary` / `ceo-strategic-report` | ✅     |
 | B4  | Audit chain inspection     | `cat active/audit/system-ledger.jsonl` or MOS `/audit`                                                                                                     | ✅     |
-| B5  | Read-only Web (MOS)        | `pnpm dev` in `presence/displays/operator-surface`                                                                                                         | ✅     |
+| B5  | Read-only Web (MOS)        | `pnpm --dir presence/displays/operator-surface dev` (Next.js dev server, port 3331)                                                                        | ✅     |
 | B6  | Recovery from interruption | `mission_controller resume`                                                                                                                                | ✅     |
 | B7  | System self-upgrade        | `system-upgrade-check` → `system-upgrade-execute`                                                                                                          | ✅     |
 
