@@ -104,9 +104,11 @@ export async function executePipeline(
   inputOptions: any,
   initialCtx: any = {}
 ) {
-  const steps = inputSteps.map((step) =>
-    step && typeof step === 'object' && step.op === 'navigate' ? { ...step, op: 'goto' } : step
-  );
+  const steps = inputSteps.map((step) => {
+    if (!step || typeof step.op !== 'string') return step;
+    const op = step.op.startsWith('browser:') ? step.op.slice('browser:'.length) : step.op;
+    return { ...step, op: op === 'navigate' ? 'goto' : op };
+  });
   const { sessionId, options } = preflightAutomationRuntime(
     steps,
     inputSessionId,

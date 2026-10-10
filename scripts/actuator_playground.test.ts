@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { safeReadFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
+import * as discovery from '@agent/core/actuator/actuator-op-discovery';
 import {
   actuatorAcceptsPipeline,
   buildPipelineWrappedPayload,
@@ -136,6 +137,155 @@ describe('actuator playground JSON input boundary', () => {
 });
 
 describe('actuator playground discovery merge and pipeline wrap', () => {
+  it('reports the actual apply handler for live mutations', async () => {
+    const result = await runPlayground(
+      [
+        '--actuator',
+        'file-actuator',
+        '--op',
+        'write',
+        '--params',
+        '{"path":"active/shared/tmp/test.txt","content":"hello"}',
+      ],
+      {
+        json: true,
+        resolveExecutable: () => '/tmp/fake-file.js',
+        executeActuator: () => '{"status":"succeeded"}',
+      }
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      kind: 'apply',
+      handler: 'apply',
+      handler_invoked: true,
+    });
+  });
+
+  it('returns structured failure evidence when the actuator process fails', async () => {
+    const result = await runPlayground(
+      ['--actuator', 'browser-actuator', '--op', 'snapshot', '--params', '{}'],
+      {
+        json: true,
+        resolveExecutable: () => '/tmp/fake-browser.js',
+        executeActuator: () => {
+          throw Object.assign(new Error('browser failed'), { stdout: '{"status":"failed"}' });
+        },
+      }
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      handler_invoked: true,
+      error: 'browser failed',
+      stdout: '{"status":"failed"}',
+    });
+  });
+  it('stops before execution when the discovery catalog cannot be loaded', async () => {
+    const executeActuator = vi.fn();
+    const loader = vi.spyOn(discovery, 'loadActuatorOpDiscoveryAtPath').mockImplementation(() => {
+      throw new Error('Invalid catalog');
+    });
+    try {
+      await expect(
+        runPlayground(['--actuator', 'agent-actuator', '--op', 'snapshot', '--params', '{}'], {
+          json: true,
+          executeActuator,
+        })
+      ).rejects.toThrow('Invalid catalog');
+      expect(executeActuator).not.toHaveBeenCalled();
+    } finally {
+      loader.mockRestore();
+    }
+  });
+  it('describes an operation schema without invoking or resolving an executable', async () => {
+    const executeActuator = vi.fn();
+    const resolveExecutable = vi.fn();
+    const result = await runPlayground(
+      ['--actuator', 'file-actuator', '--op', 'read', '--describe'],
+      { json: true, executeActuator, resolveExecutable }
+    );
+    expect(result).toMatchObject({ mode: 'describe', handler_invoked: false });
+    expect(result?.actuators).toEqual([
+      expect.objectContaining({
+        ops: [expect.objectContaining({ op: 'read', input_schema: expect.any(Object) })],
+      }),
+    ]);
+    expect(executeActuator).not.toHaveBeenCalled();
+    expect(resolveExecutable).not.toHaveBeenCalled();
+  });
+
+  it('filters operation discovery and fails explicitly on unknown selections', async () => {
+    const result = await runPlayground(
+      ['--actuator', 'file-actuator', '--list', '--search', 'read'],
+      { json: true }
+    );
+    expect(result?.actuators).toEqual([
+      expect.objectContaining({
+        ops: expect.arrayContaining([expect.objectContaining({ op: 'read' })]),
+      }),
+    ]);
+    await expect(
+      runPlayground(['--actuator', 'missing', '--list'], { json: true })
+    ).rejects.toThrow('Unknown --actuator');
+    await expect(
+      runPlayground(['--actuator', 'file-actuator', '--op', 'missing', '--describe'], {
+        json: true,
+      })
+    ).rejects.toThrow('Unknown --op');
+    await expect(runPlayground(['--describe'], { json: true })).rejects.toThrow(
+      '--describe requires'
+    );
+  });
+
+  it('rejects missing fine-grained parameters before checking or executing a handler', async () => {
+    const executeActuator = vi.fn();
+    const args = ['--actuator', 'agent-actuator', '--op', 'snapshot', '--params', '{}'];
+    const result = await runPlayground(args, { json: true, check: true, executeActuator });
+    expect(result).toMatchObject({
+      ok: false,
+      validated: false,
+      parameter_validation: 'authored-schema',
+      handler_invoked: false,
+    });
+    await expect(runPlayground(args, { json: true, executeActuator })).rejects.toThrow(
+      'Invalid parameters'
+    );
+    expect(executeActuator).not.toHaveBeenCalled();
+  });
+
+  it('requires an explicit fill value while preserving clear and secret inputs', async () => {
+    const executeActuator = vi.fn();
+    for (const params of [{ ref: '@e1' }, { ref: '@e1', secret_ref: '' }]) {
+      const result = await runPlayground(
+        ['--actuator', 'browser-actuator', '--op', 'fill_ref', '--params', JSON.stringify(params)],
+        { json: true, check: true, executeActuator }
+      );
+      expect(result).toMatchObject({ ok: false, handler_invoked: false });
+    }
+    for (const params of [
+      { ref: '@e1', text: '' },
+      { ref: '@e1', secret_ref: 'TOKEN' },
+      { ref: '@e1', classification: 'secret_ref', variable: { name: 'TOKEN' } },
+    ]) {
+      const result = await runPlayground(
+        ['--actuator', 'browser-actuator', '--op', 'fill_ref', '--params', JSON.stringify(params)],
+        { json: true, check: true, executeActuator }
+      );
+      expect(result).toMatchObject({ ok: true, handler_invoked: false });
+    }
+    expect(executeActuator).not.toHaveBeenCalled();
+  });
+
+  it('labels unavailable parameter validation honestly', () => {
+    expect(
+      evaluatePlaygroundDryRun({
+        actuatorId: 'legacy',
+        operation: 'read',
+        payload: {},
+        inputSchema: { 'x-kyberion-contract': 'legacy-open' },
+      })
+    ).toMatchObject({ parameter_validation: 'not-available' });
+  });
+
   it('merges describeOps step ops into manifest capabilities', () => {
     const caps = resolvePlaygroundCapabilities(
       {
