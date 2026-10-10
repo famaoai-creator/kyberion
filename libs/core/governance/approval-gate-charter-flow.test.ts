@@ -75,6 +75,27 @@ describe('enforceApprovalGate × accountability charter', () => {
     expect(charterGate.mock.calls[1][0]).toMatchObject({ decisionRightsEscalates: false });
   });
 
+  it('a charter may stand in only for a human-acceptance escalation the matrix marks delegable', () => {
+    charterGate.mockReturnValue({ kind: 'none' });
+    policy.mockReturnValue({ requiresApproval: false, missingRequirements: [] });
+    const cases = [
+      [{ escalationKind: 'human_acceptance', charterDelegable: true }, true],
+      [{ escalationKind: 'human_acceptance', charterDelegable: false }, false],
+      [{ escalationKind: 'over_threshold', charterDelegable: true }, false],
+      [{ escalationKind: 'role_mismatch', charterDelegable: true }, false],
+    ] as const;
+    cases.forEach(([evaluation, expected], i) => {
+      vi.mocked(evaluateDecisionRights).mockReturnValueOnce({
+        requiresEscalation: true,
+        ...evaluation,
+      } as never);
+      enforceApprovalGate({ ...params, correlationId: `corr-d${i}` });
+      expect(charterGate.mock.calls[i][0]).toMatchObject({
+        decisionRightsCharterDelegable: expected,
+      });
+    });
+  });
+
   it('inside the charter: allowed without any approval request', () => {
     charterGate.mockReturnValue({ kind: 'allow', message: 'Within accountability charter chr-1' });
     const r = enforceApprovalGate(params);
