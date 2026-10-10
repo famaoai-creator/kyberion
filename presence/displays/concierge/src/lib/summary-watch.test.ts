@@ -80,6 +80,16 @@ describe('member summary watch', () => {
     source.addEventListener.mock.calls[0]![1]({ data: 'late' });
     expect(onSummary).not.toHaveBeenCalled();
   });
+  it("opens the stream with this tab's own URL selection, not the shared cookie", () => {
+    vi.stubGlobal('window', {
+      sessionStorage: { getItem: () => null, setItem: () => {} },
+      location: { search: '?tenant=beta', protocol: 'http:' },
+    });
+    vi.stubGlobal('document', { cookie: 'kyberion_selected_tenant=acme' });
+    const stop = startSummaryWatch({ refresh: async () => {}, onSummary: vi.fn() });
+    expect(EventSource).toHaveBeenCalledWith('/api/events?tenant=beta');
+    stop();
+  });
   it('drops stale SSE and polling after member changes', async () => {
     const onSummary = vi.fn();
     const stop = startSummaryWatch({ refresh: async () => {}, onSummary });

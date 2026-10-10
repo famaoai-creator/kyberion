@@ -17,6 +17,8 @@ import {
   decideApprovalRequest,
   loadApprovalRequest,
   normalizeRejectionReasonCategory,
+  surfaceDecisionAuthMethod,
+  surfaceDecisionBinding,
   enqueueSurfaceNotification,
   emitChannelSurfaceEvent,
   emitMissionOrchestrationObservation,
@@ -250,11 +252,16 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
       decision,
       decidedBy: decisionMember ? `user:${decisionMember.member_id}` : 'chronos-localadmin',
       decidedByRole: decisionRole,
-      authMethod: 'surface_session',
+      // HA-05: the sovereign fallback (no resolved member) is the
+      // localadmin bearer, never a verified surface session.
+      authMethod: surfaceDecisionAuthMethod(
+        resolvedViewer.context.principal,
+        Boolean(decisionMember)
+      ),
       decidedByType: 'human',
       authenticated: true,
-      payloadHash: approvalRecord.accountability?.payloadHash,
-      effectBinding: approvalRecord.accountability?.effectBinding,
+      deciderPrincipal: resolvedViewer.context.principal,
+      ...surfaceDecisionBinding(approvalRecord, body?.presentedDigest),
       note: decisionNote || 'Decision captured from Chronos approval panel.',
       reasonCategory: decisionReasonCategory,
     });

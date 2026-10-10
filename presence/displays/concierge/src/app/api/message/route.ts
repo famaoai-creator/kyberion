@@ -4,7 +4,7 @@ import type { SurfaceConversationResult } from '@agent/core/surface/channel-surf
 import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract-parser';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
 import { readRequestObject } from '../../../lib/request-input';
-import { resolveConciergeViewer } from '../../../lib/viewer-context';
+import { conversationViewerForSelection } from '../../../lib/selected-tenant';
 import {
   SurfaceConversationAdmissionError,
   SurfaceConversationCapabilityError,
@@ -37,7 +37,7 @@ const NO_STORE = { 'Cache-Control': 'no-store' };
 
 /** Restore only the current server-owned conversation; query IDs never select an owner. */
 export function GET(req: NextRequest) {
-  const resolved = resolveConciergeViewer(req);
+  const resolved = conversationViewerForSelection(req);
   if (resolved.response) return resolved.response;
   let viewer: ReturnType<typeof narrowFrontDeskConversationViewer>;
   try {
@@ -196,7 +196,7 @@ export async function POST(req: NextRequest) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
 
-  const resolved = resolveConciergeViewer(req);
+  const resolved = conversationViewerForSelection(req);
   if (resolved.response) return resolved.response;
   let viewer: ReturnType<typeof narrowFrontDeskConversationViewer> = resolved.context;
 
