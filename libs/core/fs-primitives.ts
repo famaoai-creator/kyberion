@@ -126,7 +126,12 @@ function sameSnapshotFile(left: fs.BigIntStats, right: fs.BigIntStats): boolean 
  * raced leaf symlink from being followed. Platforms without either guarantee
  * fail closed. Existing range/tail readers intentionally keep their semantics.
  */
-export function rawReadFileSnapshot(filePath: string, rootDir: string, maxBytes: number): Buffer {
+export function rawReadFileSnapshot(
+  filePath: string,
+  rootDir: string,
+  maxBytes: number,
+  expected?: { dev: number; ino: number }
+): Buffer {
   if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > MAX_SNAPSHOT_READ_BYTES) {
     throw new Error(
       `Invalid maxBytes for snapshot read: ${maxBytes} (limit: ${MAX_SNAPSHOT_READ_BYTES})`
@@ -202,6 +207,11 @@ export function rawReadFileSnapshot(filePath: string, rootDir: string, maxBytes:
       ) {
         throw new Error('[SECURITY] Snapshot ancestor changed during read');
       }
+    }
+    // The caller vetted an inode (e.g. its link count) before this function
+    // ran; the bytes are returned only if they came from that inode.
+    if (expected && (opened.dev !== BigInt(expected.dev) || opened.ino !== BigInt(expected.ino))) {
+      throw new Error(`[SECURITY] File changed before snapshot read: ${resolved}`);
     }
     return buffer.subarray(0, offset);
   } finally {
