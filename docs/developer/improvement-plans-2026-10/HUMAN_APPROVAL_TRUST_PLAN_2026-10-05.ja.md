@@ -1,13 +1,13 @@
 ---
 title: '人間承認の信頼性 改善計画 (HA-01〜08)'
 tags: [improvement-plan, governance, approval, authn, security]
-last_updated: 2026-10-05
-status: planned
+last_updated: 2026-10-10
+status: partial
 ---
 
 # 人間承認の信頼性 改善計画 (HA-01〜08)
 
-- 状態: **計画確定(実装待ち)**
+- 状態: **HA-01〜03 実装済み、HA-04〜08 実装待ち**
 - 発端: PR #915 のレビューで「`pnpm kyberion approve` は端末上の任意の呼び出し元を認証済みの人間として記録する」ことが残課題になった。調査の結果、問題は CLI だけではなく承認経路全体に共通していると分かった。
 - 関連:
   - [AUTONOMOUS_OPERATION_MOBILE_DECISION_PLAN](../improvement-plans-2026-09/AUTONOMOUS_OPERATION_MOBILE_DECISION_PLAN_2026-09-27.ja.md) の P5(passkey 承認)
@@ -176,6 +176,21 @@ status: planned
 
 ## 6. 状況
 
-| ID        | 状態                                       |
-| --------- | ------------------------------------------ |
-| HA-01〜08 | 未着手(すべて決定済み。実装待ち) |
+| ID        | 状態                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| HA-01     | **実装済み**。`libs/core/agent-execution-context.ts` の `detectAgentExecutionContext()`(env を注入可能)。判定材料は `KYBERION_AGENT_ID` / `KYBERION_NHI_ID` / `KYBERION_RUN_ORIGIN=agent`、reasoning-provider レジストリの `cli.session_markers`(agy-cli に `AGY_CLI` / `ANTIGRAVITY_CLI` を追加)、`AI_AGENT`、agent 種別の authn principal。`cli-operator-principal.ts`、`claude-agent.ts`、`image-generation-bridge.ts`、`scripts/generate_avatar.ts` の個別判定をこのヘルパに集約した                                                  |
+| HA-02     | **実装済み(最初から enforce)**。`approval-cowork-adapter.ts`(MCP `kyberion.approval.decide`)と approval-actuator `decide` は human_only を approve / reject とも `[APPROVAL_HUMAN_PROOF_REQUIRED]` で拒否し、それ以外は `decidedByType: 'ai_agent'`、`authenticated: false` で記録する(呼び出し元の申告は無視)。共通の拒否は `approval-human-decision.ts` の `refuseHumanOnlyDecisionOnAgentPath`。MCP は拒否コードだけを wire に返す                                                                                                     |
+| HA-03     | **実装済み(既定は warn)**。`libs/core/governance/approval-assurance.ts` に A0〜A3 と authMethod の allow-list を置いた。`min_assurance` は作成時に既定 A2、dual-key(approval-gate)は A3。`validateHumanFinalDecision` は authMethod 未指定・未知・`local_token` / `local_admin_token` を常に拒否し、水準不足は `KYBERION_APPROVAL_ASSURANCE=enforce` で拒否、warn では通してレコードとイベントに `assurance_shortfall` を残し監査と運用者通知を行う。チャットブリッジは `channel_identity`、presence のテキスト決定は `manual` を記録する |
+| HA-04〜08 | 未着手(すべて決定済み。実装待ち)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+
+HA-01〜03 の補足:
+
+- `surface_session` は「サーフェスが検証済みセッションからメンバーを解決した」前提で A2 とした。localadmin bearer と Chronos の sovereign フォールバックを `local_admin_token` に移すのは HA-05 で行う。
+- 決定済みレコードを効果適用時に再検査する箇所(scope-approve、reconcile-work、EG-11、SA-01、provider attestation)は `phase: 'recheck'` で呼ぶ。assurance は決定時に判定済みとして再判定しない(§4 の「遡及しない」)。それ以外の規則は再検査する。
+- 要求側は human_only の `min_assurance` を引き上げられるが、A2 未満には下げられない(作成時に A2 へ引き上げる)。
+- Cloudflare OS の held action は `HeldActionDecision.authMethod` を承認ストアへ引き渡す。Presence Studio からの決定はメンバー解決後なので `surface_session` とする。
+- A3 を要求するのは現時点では dual-key のみ。project の trust、policy や charter の変更を A3 にするのは、passkey 経路(HA-07)ができてからにする。それまでに enforce にすると承認できなくなるため。
+- HA-04 のうち「エージェント実行コンテキストでの拒否」は前倒しした。`pnpm kyberion approvals --approve/--reject` はエージェントのセッション内では、職務分離の設定にかかわらず human_only を `[APPROVAL_HUMAN_PROOF_REQUIRED]` で拒否する(`scripts/lib/approval-cli-decision.ts`)。端末アテステーション(`terminal_attested`)は HA-04 の残りとして 2 本目の PR で行う。
+- レビューで残した課題(2 本目以降):
+  - `decideApprovalRequest` は呼び出し元が申告する `decidedByType` / `authenticated` / `authMethod` をそのまま信じる。ストア側でも、決定するプロセスがエージェントなら human_only を拒否する。ただしエージェントのセッションから起動したサーフェスのサーバは除外が必要なので、その設計とあわせて 2 本目の PR で行う。
+  - warn / enforce は決定するプロセスの環境変数から読むため、エージェントが外せる。HA-08 で、モードを統治されたポリシーから読むように移す。

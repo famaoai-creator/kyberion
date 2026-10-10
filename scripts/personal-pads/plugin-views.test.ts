@@ -113,6 +113,7 @@ function install(
     decision: 'approved',
     decidedBy: 'human:operator',
     decidedByType: 'human',
+    authMethod: 'surface_session',
     authenticated: true,
     payloadHash: pending?.accountability?.payloadHash,
     effectBinding: pending?.accountability?.effectBinding,

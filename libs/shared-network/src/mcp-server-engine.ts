@@ -1374,6 +1374,7 @@ export function createKyberionMcpServer(): McpServer {
       'Submit an approval decision (approved/rejected) for a pending Kyberion request.',
       'IMPORTANT: You MUST call kyberion.approval.list_pending first to obtain a valid request_id.',
       'This is a two-step operation — blind approval without listing first will be rejected.',
+      'Human-only requests are refused with [APPROVAL_HUMAN_PROOF_REQUIRED]; other decisions are recorded as an agent decision.',
     ].join(' '),
     {
       request_id: z
@@ -1398,9 +1399,18 @@ export function createKyberionMcpServer(): McpServer {
         });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
+        // The refusal code is a fixed contract the agent must act on (hand the
+        // decision to a human); the rest of the message stays off the wire.
+        const humanProofRequired =
+          err instanceof Error && err.message.startsWith('[APPROVAL_HUMAN_PROOF_REQUIRED]');
         return {
           content: [
-            { type: 'text' as const, text: formatWireError(err, 'Approval decision failed') },
+            {
+              type: 'text' as const,
+              text: humanProofRequired
+                ? '[APPROVAL_HUMAN_PROOF_REQUIRED] This request needs a human decision; ask the operator to decide it on Concierge, Chronos or presence-studio.'
+                : formatWireError(err, 'Approval decision failed'),
+            },
           ],
           isError: true,
         };
