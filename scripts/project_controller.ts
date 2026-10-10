@@ -82,15 +82,26 @@ function printProjectList(): void {
 }
 
 function printHelp(): void {
-  const trackHelp =
-    '  track update <TRACK_ID> [--name <TEXT>] [--summary <TEXT>] [--status <planned|active|paused|completed|archived>] [--tenant-slug <SLUG>] [--track-type <TYPE>] [--lifecycle-model <MODEL>] [--primary-locale <LOCALE>] [--release-id <ID>] [--change-scope <TEXT>] [--gate-profile-id <ID>] [--required-artifacts <CSV>] [--metadata <JSON>] [--json]';
-  const lifecycleHelp =
-    '  restore <PROJECT_ID> [--reason <TEXT>] [--json]; track pause|resume|complete|archive <TRACK_ID> [--reason <TEXT>] [--json]';
   printOutput(
-    `Project controller\n\nCommands:\n  list [--json]\n  show <PROJECT_ID> [--json]\n  create --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--project-path <PATH>] [--pipeline-refs <CSV>] [--objective-ids <CSV>] [--status <STATUS>] [--primary-locale <LOCALE>] [--dry-run] [--json]\n  scaffold <PROJECT_ID> [--json]\n  track create --track-id <ID> --project-id <ID> --name <NAME> --summary <TEXT> [--track-type <TYPE>] [--lifecycle-model <MODEL>] [--status <STATUS>] [--release-id <ID>] [--required-artifacts <CSV>] [--json]\n  track update --track-id <ID> --tenant-slug <SLUG> [--json]\n  update|update-status <PROJECT_ID> [--name <NAME>] [--summary <TEXT>] [--status <STATUS>] [--primary-locale <LOCALE>] [--pipeline-refs <CSV>] [--objective-ids <CSV>] [--metadata <JSON>] [--json]\n  archive <PROJECT_ID> [--reason <TEXT>] [--json]\n  reconcile [PROJECT_ID] [--dry-run|--apply] [--cross-scope] [--json]\n  bootstrap --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--utterance <TEXT>] [--track-id <ID>] [--track-name <NAME>] [--pipeline-refs <CSV>] [--service-bindings <CSV>] [--json]\n\nReconcile defaults to dry-run; pass --apply to repair registry and operational state. Pass --cross-scope as sovereign to audit state records outside the project's tenant/tier.`.replace(
-      '  track update --track-id <ID> --tenant-slug <SLUG> [--json]',
-      `${trackHelp}\n${lifecycleHelp}`
-    )
+    [
+      'Project controller',
+      '',
+      'Commands:',
+      '  list [--json]',
+      '  show <PROJECT_ID> [--json]',
+      '  create --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--project-path <PATH>] [--pipeline-refs <CSV>] [--objective-ids <CSV>] [--status <STATUS>] [--primary-locale <LOCALE>] [--dry-run] [--json]',
+      '  scaffold <PROJECT_ID> [--json]',
+      '  track create --track-id <ID> --project-id <ID> --name <NAME> --summary <TEXT> [--track-type <TYPE>] [--lifecycle-model <MODEL>] [--status <STATUS>] [--release-id <ID>] [--change-scope <TEXT>] [--gate-profile-id <ID>] [--primary-locale <LOCALE>] [--required-artifacts <CSV>] [--metadata <JSON>] [--json]',
+      '  track update <TRACK_ID> [--name <TEXT>] [--summary <TEXT>] [--status <planned|active|paused|completed|archived>] [--tenant-slug <SLUG>] [--track-type <TYPE>] [--lifecycle-model <MODEL>] [--primary-locale <LOCALE>] [--release-id <ID>] [--change-scope <TEXT>] [--gate-profile-id <ID>] [--required-artifacts <CSV>] [--metadata <JSON>] [--json]',
+      '  track pause|resume|complete|archive <TRACK_ID> [--reason <TEXT>] [--json]',
+      '  update|update-status <PROJECT_ID> [--name <NAME>] [--summary <TEXT>] [--status <STATUS>] [--primary-locale <LOCALE>] [--pipeline-refs <CSV>] [--objective-ids <CSV>] [--metadata <JSON>] [--json]',
+      '  archive <PROJECT_ID> [--reason <TEXT>] [--json]',
+      '  restore <PROJECT_ID> [--reason <TEXT>] [--json]',
+      '  reconcile [PROJECT_ID] [--dry-run|--apply] [--cross-scope] [--json]',
+      '  bootstrap --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--utterance <TEXT>] [--track-id <ID>] [--track-name <NAME>] [--pipeline-refs <CSV>] [--service-bindings <CSV>] [--json]',
+      '',
+      "Reconcile defaults to dry-run; pass --apply to repair registry and operational state. Pass --cross-scope as sovereign to audit state records outside the project's tenant/tier.",
+    ].join('\n')
   );
 }
 
@@ -161,12 +172,14 @@ async function mainImpl(args: string[] = []): Promise<void> {
 
   switch (command) {
     case 'list': {
+      validateOptions(argv, []);
       const projects = listManagedProjects();
       if (json) jsonOutput(projects);
       else printProjectList();
       return;
     }
     case 'show': {
+      validateOptions(argv, ['--project-id']);
       const projectId = positional || requiredOption(argv, '--project-id');
       const view = getProjectManagementView(projectId);
       if (json) jsonOutput(view);
@@ -187,6 +200,7 @@ async function mainImpl(args: string[] = []): Promise<void> {
       return;
     }
     case 'scaffold': {
+      validateOptions(argv, ['--project-id']);
       const projectId = positional || requiredOption(argv, '--project-id');
       const view = getProjectManagementView(projectId);
       const projectPath = ensureProjectOsScaffold(
@@ -269,6 +283,21 @@ async function mainImpl(args: string[] = []): Promise<void> {
       }
       if (trackCommand !== 'create')
         throw new Error(`Unknown track command: ${trackCommand || '(missing)'}`);
+      validateOptions(trackArgv, [
+        '--track-id',
+        '--project-id',
+        '--name',
+        '--summary',
+        '--track-type',
+        '--lifecycle-model',
+        '--status',
+        '--release-id',
+        '--change-scope',
+        '--gate-profile-id',
+        '--primary-locale',
+        '--required-artifacts',
+        '--metadata',
+      ]);
       const record = createManagedProjectTrack({
         track_id: requiredOption(trackArgv, '--track-id'),
         project_id: requiredOption(trackArgv, '--project-id'),
@@ -307,6 +336,23 @@ async function mainImpl(args: string[] = []): Promise<void> {
       return;
     }
     case 'create': {
+      validateOptions(
+        argv,
+        [
+          '--project-id',
+          '--name',
+          '--summary',
+          '--tier',
+          '--organization-id',
+          '--tenant-slug',
+          '--status',
+          '--primary-locale',
+          '--project-path',
+          '--pipeline-refs',
+          '--objective-ids',
+        ],
+        ['--dry-run', '--json']
+      );
       const input = {
         project_id: requiredOption(argv, '--project-id'),
         name: requiredOption(argv, '--name'),
@@ -394,6 +440,7 @@ async function mainImpl(args: string[] = []): Promise<void> {
       return;
     }
     case 'reconcile': {
+      validateOptions(argv, [], ['--dry-run', '--apply', '--cross-scope', '--json']);
       const projectIds = positional
         ? [positional]
         : listManagedProjects().map((view) => view.project.project_id);
@@ -409,6 +456,22 @@ async function mainImpl(args: string[] = []): Promise<void> {
       return;
     }
     case 'bootstrap': {
+      validateOptions(argv, [
+        '--project-id',
+        '--name',
+        '--summary',
+        '--tier',
+        '--organization-id',
+        '--tenant-slug',
+        '--status',
+        '--primary-locale',
+        '--project-path',
+        '--utterance',
+        '--track-id',
+        '--track-name',
+        '--pipeline-refs',
+        '--service-bindings',
+      ]);
       const result = bootstrapManagedProject({
         project_id: requiredOption(argv, '--project-id'),
         name: requiredOption(argv, '--name'),
