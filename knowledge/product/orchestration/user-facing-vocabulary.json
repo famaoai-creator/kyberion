@@ -2774,7 +2774,7 @@
       "chronos_tenant_from_mission": {
         "en": "from the mission, not on the request",
         "ja": "ミッションから取得・要求には未記載",
-        "qps-ploc": "⟦ƒřőɱ ŧħė ɱïşşïőñ, ñőŧ őñ ŧħė řėɋůėşŧ ŀőřėɱ ïṗşůɱ⟧"
+        "qps-ploc": "⟦ƒřőɱ ŧħė ɱïşşïőñ, ñőŧ őñ ŧħė řėɋůėşŧ ŀőřėɱ ïṗşůɱ ⟧"
       },
       "chronos_mission_plan_title": {
         "en": "Plan a mission",
@@ -21208,7 +21208,7 @@
       "approval_changed_since_shown": {
         "en": "This approval request changed after this card was shown. Review the latest request and decide again.",
         "ja": "このカードの表示後に承認要求が変更されました。最新の内容を確認してから、もう一度判断してください。",
-        "qps-ploc": "⟦Ŧħïş ȧṗṗřőṽȧŀ řėɋůėşŧ ƈħȧñģėḓ ȧƒŧėř ŧħïş ƈȧřḓ ẇȧş şħőẇñ. Řėṽïėẇ ŧħė ŀȧŧėşŧ řėɋůėşŧ ȧñḓ ḓėƈïḓė ȧģȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+        "qps-ploc": "⟦Ŧħïş ȧṗṗřőṽȧŀ řėɋůėşŧ ƈħȧñɠėḓ ȧƒŧėř ŧħïş ƈȧřḓ ẇȧş şħőẇñ. Řėṽïėẇ ŧħė ŀȧŧėşŧ řėɋůėşŧ ȧñḓ ḓėƈïḓė ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
       },
       "approval_expired": {
         "en": "This approval request has expired.",
