@@ -45,6 +45,7 @@ import { findChronosTokenRegistration } from '../chronos-access-registry.js';
 import type { OsKnowledgeTier } from '../cloudflare-os-control-plane.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { isValidMemberId } from '../organization/member-id-grammar.js';
+import { isScimProvisioningTokenFormat } from '../organization/scim-protocol.js';
 import {
   AuthnError,
   resolveAuthnPrincipal,
@@ -113,6 +114,12 @@ export function resolveAuthnSurfaceViewerScope(
   const serverTenant = options.serverTenant?.trim() || undefined;
   if (serverTenant && !isValidTenantSlug(serverTenant)) {
     throw new SurfaceViewerScopeError(403, 'server tenant scope is invalid.');
+  }
+  // A SCIM provisioning token reaches only its tenant's /scim/v2 endpoint:
+  // no viewer provider may ever judge it (nor an operator who reused one as
+  // an env token).
+  if (isScimProvisioningTokenFormat(token)) {
+    throw new SurfaceViewerScopeError(401, 'Unknown viewer token.');
   }
 
   const credentialFree = !token;
