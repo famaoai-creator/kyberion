@@ -763,11 +763,11 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   source and hard-link source refuse a regular file with `nlink > 1`, checked on the opened
   descriptor where the helper opens one (copies read from that descriptor; snapshots return bytes
   only from the vetted inode, and a file missing at check time must be single-link when opened).
-  Every exemption below — and the early return for paths outside the repository — is judged on
-  the canonical path re-derived after the open, so it applies only when that canonical path still
-  names the inode the caller holds (`(dev, ino)` of `stat(canonical)` equals the descriptor's).
-  Without that pin, a symlink flipped between the open and the check let a planted hard link be
-  read as if it were a pnpm-store or out-of-repository file. There are two exceptions, both
+  Every exemption below is judged on the canonical path re-derived after the open, so it applies
+  only when that canonical path still names the inode the caller holds (`(dev, ino)` of
+  `stat(canonical)` equals the descriptor's). Without that pin, a symlink flipped between the open
+  and the check let a planted hard link be read as if it were a pnpm-store or out-of-repository
+  file. A multi-link file outside the repository (a vault mount target) gets no exemption. There are two exceptions, both
   narrow on purpose (a broader "all links in one directory" rule was defeated by moving the link
   next to its protected sibling):
   - _Lock recovery tombs, probe-only_: in `active/shared/runtime/locks/`, a file named
