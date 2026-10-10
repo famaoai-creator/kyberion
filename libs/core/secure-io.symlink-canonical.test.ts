@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
+import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
@@ -10,6 +11,7 @@ import {
   safeAppendFileSync,
   safeChmodSync,
   safeCopyFileSync,
+  safeExec,
   safeFsyncFile,
   safeMkdir,
   safeMoveSync,
@@ -33,7 +35,9 @@ import {
   assertTempInCheckedDir,
   captureCheckedDir,
   registerSensitivePathMediationProbe,
+  setProcFdLookupDisabledForTesting,
 } from './secure-io-path-guard.js';
+import { getAllFiles } from './fs-utils.js';
 
 // Denials emit best-effort audit events; keep them off the real audit chain.
 vi.mock('./governance/audit-chain.js', () => ({
@@ -76,6 +80,36 @@ const abs = (rel: string) => path.join(ROOT, rel);
 function asDataOnlyPersona(): void {
   process.env.KYBERION_PERSONA = 'worker';
   process.env.MISSION_ROLE = 'finance_controller';
+}
+
+/** Child process that keeps re-pointing symlink `sw` at each of `targets` in turn. */
+function startFlipper(sw: string, targets: string[], ms = 9000) {
+  const flipper = `
+    const fs = require('node:fs');
+    const [sw, ...targets] = process.argv.slice(1);
+    const end = Date.now() + ${ms};
+    let i = 0;
+    while (Date.now() < end) {
+      const tmp = sw + '.tmp';
+      try { fs.rmSync(tmp, { force: true }); fs.symlinkSync(targets[i++ % targets.length], tmp); fs.renameSync(tmp, sw); } catch {}
+    }`;
+  return safeSpawn(process.execPath, ['-e', flipper, sw, ...targets], { stdio: 'ignore' });
+}
+
+/** Run `op` for `ms`, yielding now and then; returns how many calls ran. */
+async function hammer(ms: number, op: () => void): Promise<number> {
+  let tries = 0;
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    tries += 1;
+    try {
+      op();
+    } catch {
+      // refused or raced
+    }
+    if (tries % 50 === 0) await new Promise((r) => setImmediate(r));
+  }
+  return tries;
 }
 
 describe('secure-io symlink canonicalization (data-only persona)', () => {
@@ -386,6 +420,268 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     }
   });
 
+  it('never chmods a protected file or directory through a flipped symlink', async () => {
+    const pubdir = abs(`${scratchRel}/pubdir`);
+    fs.mkdirSync(pubdir);
+    fs.writeFileSync(abs(`${scratchRel}/pub.txt`), 'pub');
+    const pdir = path.join(abs(personalRel), 'zz-dir');
+    fs.mkdirSync(pdir, { recursive: true });
+    fs.chmodSync(pdir, 0o755);
+    const secretPath = path.join(abs(personalRel), 'secret.txt');
+    fs.chmodSync(secretPath, 0o644);
+    const sw = abs(`${scratchRel}/sw`);
+    fs.symlinkSync(pubdir, sw);
+    const child = startFlipper(sw, [pubdir, pdir, abs(`${scratchRel}/pub.txt`), secretPath]);
+    let tries = 0;
+    try {
+      tries = await hammer(2500, () => safeChmodSync(`${scratchRel}/sw`, 0o700));
+    } finally {
+      child.kill('SIGKILL');
+    }
+    expect(tries).toBeGreaterThan(50);
+    expect(fs.statSync(pdir).mode & 0o777).toBe(0o755);
+    expect(fs.statSync(secretPath).mode & 0o777).toBe(0o644);
+  }, 20000);
+
+  it('never creates a file through a dangling symlink flipped into a protected tree', async () => {
+    const real = abs(`${scratchRel}/real.log`);
+    fs.writeFileSync(real, '');
+    const sw = abs(`${scratchRel}/sw`);
+    fs.symlinkSync(real, sw);
+    const targets = [real];
+    for (let i = 0; i < 4; i += 1) targets.push(path.join(abs(personalRel), `created-by-${i}.txt`));
+    const child = startFlipper(sw, targets);
+    let tries = 0;
+    try {
+      tries = await hammer(2500, () => safeAppendFileSync(`${scratchRel}/sw`, 'x'));
+    } finally {
+      child.kill('SIGKILL');
+    }
+    expect(tries).toBeGreaterThan(50);
+    expect(fs.readdirSync(abs(personalRel)).filter((n) => n.startsWith('created-by-'))).toEqual([]);
+  }, 20000);
+
+  it('loses no line when concurrent appenders create the same new files', async () => {
+    // Each child appends its tag to the same 400 new files in turn: the
+    // processes race to create every file, and the losers must append too.
+    const files = 400;
+    const child = `
+      const { safeAppendFileSync } = await import(process.argv[1]);
+      const [dir, tag, n] = process.argv.slice(2);
+      for (let i = 0; i < Number(n); i += 1) safeAppendFileSync(dir + '/f' + i + '.log', tag + '\\n');`;
+    const secureIo = path.join(ROOT, 'libs/core/secure-io.ts');
+    const loader = path.join(ROOT, 'scripts/ts-loader.mjs');
+    const runs = ['a', 'b', 'c'].map(
+      (tag) =>
+        new Promise<number | null>((resolve) => {
+          const proc = safeSpawn(
+            process.execPath,
+            [
+              '--import',
+              loader,
+              '--input-type=module',
+              '-e',
+              child,
+              secureIo,
+              scratchRel,
+              tag,
+              String(files),
+            ],
+            { stdio: 'ignore', cwd: ROOT }
+          );
+          proc.on('exit', (code) => resolve(code));
+        })
+    );
+    expect(await Promise.all(runs)).toEqual([0, 0, 0]);
+    let lost = 0;
+    for (let i = 0; i < files; i += 1) {
+      const lines = fs
+        .readFileSync(abs(`${scratchRel}/f${i}.log`), 'utf8')
+        .split('\n')
+        .filter(Boolean);
+      lost += 3 - lines.length;
+    }
+    expect(lost).toBe(0);
+  }, 60000);
+
+  it('refuses to append through a dangling leaf link, even to an allowed target', () => {
+    fs.symlinkSync(abs(`${scratchRel}/not-yet.log`), abs(`${scratchRel}/dangling`));
+    expect(() => safeAppendFileSync(`${scratchRel}/dangling`, 'x')).toThrow(/dangling link/);
+    expect(fs.existsSync(abs(`${scratchRel}/not-yet.log`))).toBe(false);
+  });
+
+  it('refuses to chmod a Unix socket, and never chmods a protected file through a flipped one', async () => {
+    const sock = abs(`${scratchRel}/sk`);
+    const server = net.createServer();
+    // Bind by a short relative path (sun_path is ~104 bytes); bind is synchronous.
+    const cwd = process.cwd();
+    process.chdir(abs(scratchRel));
+    try {
+      server.listen('sk');
+    } finally {
+      process.chdir(cwd);
+    }
+    await new Promise<void>((resolve) => server.once('listening', () => resolve()));
+    try {
+      expect(() => safeChmodSync(`${scratchRel}/sk`, 0o600)).toThrow(/not a file or directory/);
+      const secretPath = path.join(abs(personalRel), 'secret.txt');
+      fs.chmodSync(secretPath, 0o644);
+      // `sw` flips between the socket itself (a hard link to it) and a
+      // symlink to the secret: a chmod by path after an identity pin follows it.
+      const sw = abs(`${scratchRel}/sw`);
+      fs.linkSync(sock, sw);
+      const flipper = `
+        const fs = require('node:fs');
+        const [sw, sock, secret] = process.argv.slice(1);
+        const end = Date.now() + 9000;
+        let i = 0;
+        while (Date.now() < end) {
+          const tmp = sw + '.tmp';
+          try {
+            fs.rmSync(tmp, { force: true });
+            if (i++ % 2) fs.linkSync(sock, tmp);
+            else fs.symlinkSync(secret, tmp);
+            fs.renameSync(tmp, sw);
+          } catch {}
+        }`;
+      const child = safeSpawn(process.execPath, ['-e', flipper, sw, sock, secretPath], {
+        stdio: 'ignore',
+      });
+      let tries = 0;
+      try {
+        tries = await hammer(2500, () => safeChmodSync(`${scratchRel}/sw`, 0o600));
+      } finally {
+        child.kill('SIGKILL');
+      }
+      expect(tries).toBeGreaterThan(50);
+      expect(fs.statSync(secretPath).mode & 0o777).toBe(0o644);
+    } finally {
+      server.close();
+    }
+  }, 20000);
+
+  it('never creates in, nor deletes from, a protected directory flipped in as a parent', async () => {
+    // `d` flips between a writable directory and two protected ones; the
+    // append's create (and, on vulnerable code, its cleanup unlink) follows
+    // whichever directory `d` names at that instant.
+    const sub = abs(`${scratchRel}/sub`);
+    fs.mkdirSync(sub);
+    const psub = path.join(abs(personalRel), 'sub');
+    fs.mkdirSync(psub);
+    const victim = path.join(abs(personalRel), 'victim.txt');
+    fs.writeFileSync(victim, '');
+    const d = abs(`${scratchRel}/d`);
+    fs.symlinkSync(sub, d);
+    const child = startFlipper(d, [sub, psub, abs(personalRel)]);
+    let tries = 0;
+    let n = 0;
+    let deleted = 0;
+    try {
+      tries = await hammer(2500, () => {
+        fs.rmSync(path.join(sub, 'victim.txt'), { force: true });
+        fs.rmSync(path.join(psub, 'victim.txt'), { force: true });
+        n += 1;
+        try {
+          safeAppendFileSync(`${scratchRel}/d/victim.txt`, '');
+        } finally {
+          if (!fs.existsSync(victim)) deleted += 1;
+          safeAppendFileSync(`${scratchRel}/d/new-${n}.txt`, '');
+        }
+      });
+    } finally {
+      child.kill('SIGKILL');
+    }
+    expect(tries).toBeGreaterThan(50);
+    expect(deleted).toBe(0);
+    expect(fs.existsSync(victim)).toBe(true);
+    const planted = [...fs.readdirSync(psub), ...fs.readdirSync(abs(personalRel))].filter((f) =>
+      f.startsWith('new-')
+    );
+    expect(planted).toEqual([]);
+  }, 20000);
+
+  it('never lists a protected directory through a flipped symlink', async () => {
+    const pubdir = abs(`${scratchRel}/pubdir`);
+    fs.mkdirSync(pubdir);
+    fs.writeFileSync(path.join(pubdir, 'visible.txt'), 'v');
+    const sw = abs(`${scratchRel}/sw`);
+    fs.symlinkSync(pubdir, sw);
+    const child = startFlipper(sw, [pubdir, abs(personalRel)]);
+    let leaked = 0;
+    let listed = 0;
+    let tries = 0;
+    try {
+      tries = await hammer(2500, () => {
+        const names = safeReaddir(`${scratchRel}/sw`);
+        listed += 1;
+        if (names.includes('secret.txt')) leaked += 1;
+      });
+    } finally {
+      child.kill('SIGKILL');
+    }
+    expect(tries).toBeGreaterThan(50);
+    expect(listed).toBeGreaterThan(0);
+    expect(leaked).toBe(0);
+  }, 20000);
+
+  it('never hangs on a FIFO (reads open non-blocking and refuse non-regular files)', () => {
+    const fifo = abs(`${scratchRel}/pipe`);
+    process.env.MISSION_ROLE = 'mission_controller';
+    safeExec('mkfifo', [fifo]);
+    process.env.MISSION_ROLE = 'finance_controller';
+    expect(() => safeReadFile(`${scratchRel}/pipe`)).toThrow(/Not a regular file/);
+    expect(() => safeReadFileTail(`${scratchRel}/pipe`, 16)).toThrow(/Not a regular file/);
+    expect(() => safeReadFileRange(`${scratchRel}/pipe`, 0, 16)).toThrow(/Not a regular file/);
+    expect(() => safeCopyFileSync(`${scratchRel}/pipe`, `${scratchRel}/out.txt`)).toThrow(
+      /Not a regular file/
+    );
+    expect(() => safeChmodSync(`${scratchRel}/pipe`, 0o600)).toThrow(/not a file or directory/);
+  }, 5000);
+
+  it('does not reveal the protected location in a denial message', () => {
+    fs.symlinkSync(path.join(abs(personalRel), 'secret.txt'), abs(`${scratchRel}/to-secret`));
+    let message = '';
+    try {
+      safeReadFile(`${scratchRel}/to-secret`);
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).not.toBe('');
+    expect(message).not.toContain('vitest-secure-io-symlink');
+  });
+
+  it('keeps the guard classification, but not the location it names, in a denial', () => {
+    fs.symlinkSync(abs(protectedRel), abs(`${scratchRel}/to-protected`));
+    let message = '';
+    try {
+      safeWriteFile(`${scratchRel}/to-protected/x.txt`, 'x');
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toMatch(/Write through symbolic link denied: .*\[POLICY_VIOLATION\]$/);
+    expect(message).not.toContain('coordination');
+  });
+
+  it('creates through a linked parent only where the create can be pinned to it', () => {
+    fs.mkdirSync(abs(`${scratchRel}/real`));
+    fs.symlinkSync(abs(`${scratchRel}/real`), abs(`${scratchRel}/alias`));
+    const previous = setProcFdLookupDisabledForTesting(true);
+    try {
+      const append = () => safeAppendFileSync(`${scratchRel}/alias/new.log`, 'x');
+      if (process.platform === 'darwin') {
+        // O_NOFOLLOW_ANY at the authorized physical path.
+        append();
+        expect(fs.readFileSync(abs(`${scratchRel}/real/new.log`), 'utf8')).toBe('x');
+      } else {
+        // No openat and no O_NOFOLLOW_ANY: refused, nothing created.
+        expect(append).toThrow(/linked parent directory cannot be pinned/);
+        expect(fs.existsSync(abs(`${scratchRel}/real/new.log`))).toBe(false);
+      }
+    } finally {
+      setProcFdLookupDisabledForTesting(previous);
+    }
+  });
+
   it('never leaks through a symlink flipped between check and open (read, range, tail, stat, size)', async () => {
     // No hard link: `sw` flips between a readable file, a regular file and a
     // symlink straight to the personal-tier secret (nlink 1).
@@ -538,6 +834,87 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     expect(safeReaddir(`${scratchRel}/alias`).sort()).toEqual(['moved.txt', 'note.txt']);
     // The link is stored relative, so it keeps pointing inside the checkout.
     expect(path.isAbsolute(fs.readlinkSync(abs(`${scratchRel}/alias`)))).toBe(false);
+  });
+
+  // macOS and Windows have no /proc/self/fd: the opened descriptor is located
+  // by re-deriving the canonical path and requiring its leaf to be the inode
+  // held. The seam forces that branch here so Linux CI covers it.
+  describe('without /proc/self/fd (portable fallback)', () => {
+    let previous = false;
+    beforeEach(() => {
+      previous = setProcFdLookupDisabledForTesting(true);
+    });
+    afterEach(() => {
+      setProcFdLookupDisabledForTesting(previous);
+    });
+
+    it('lists and stats the checkout root (a repository walk starts there)', () => {
+      expect(safeReaddir(ROOT)).toContain('package.json');
+      expect(safeStat(ROOT).isDirectory()).toBe(true);
+      expect(getAllFiles(ROOT, { maxDepth: 0 })).toContain(path.join(ROOT, 'package.json'));
+      expect(getAllFiles(abs('libs/core/foundation'))).toContain(
+        abs('libs/core/foundation/lock-utils.ts')
+      );
+    });
+
+    it('reads, stats and lists ordinary files and directories', () => {
+      safeWriteFile(`${scratchRel}/note.txt`, 'hello');
+      expect(safeReadFile(`${scratchRel}/note.txt`)).toBe('hello');
+      expect(safeStat(`${scratchRel}/note.txt`).size).toBe(5);
+      expect(safeStat(scratchRel).isDirectory()).toBe(true);
+      expect(safeReaddir(scratchRel)).toEqual(['note.txt']);
+      expect(() => safeReaddir(personalRel)).toThrow(/ROLE_VIOLATION/);
+    });
+
+    it('never lists a protected directory, nor returns an empty listing, while a symlink flips', async () => {
+      const pubdir = abs(`${scratchRel}/pubdir`);
+      fs.mkdirSync(pubdir);
+      fs.writeFileSync(path.join(pubdir, 'visible.txt'), 'v');
+      const sw = abs(`${scratchRel}/sw`);
+      fs.symlinkSync(pubdir, sw);
+      const child = startFlipper(sw, [pubdir, abs(personalRel)]);
+      let leaked = 0;
+      let listed = 0;
+      let wrong = 0; // any listing other than the public directory's own
+      let tries = 0;
+      try {
+        tries = await hammer(2500, () => {
+          const names = safeReaddir(`${scratchRel}/sw`);
+          listed += 1;
+          if (names.includes('secret.txt')) leaked += 1;
+          if (names.join() !== 'visible.txt') wrong += 1;
+        });
+      } finally {
+        child.kill('SIGKILL');
+      }
+      expect(tries).toBeGreaterThan(50);
+      expect(listed).toBeGreaterThan(0);
+      expect(leaked).toBe(0);
+      expect(wrong).toBe(0);
+    }, 20000);
+
+    it('never reads a protected file through a symlink flipped between check and open', async () => {
+      const readable = abs(`${scratchRel}/readable.txt`);
+      fs.writeFileSync(readable, 'readable');
+      const sw = abs(`${scratchRel}/sw`);
+      fs.symlinkSync(readable, sw);
+      const child = startFlipper(sw, [readable, path.join(abs(personalRel), 'secret.txt')]);
+      let leaked = 0;
+      let read = 0;
+      let tries = 0;
+      try {
+        tries = await hammer(2500, () => {
+          const text = String(safeReadFile(`${scratchRel}/sw`));
+          read += 1;
+          if (text.includes('personal-tier secret')) leaked += 1;
+        });
+      } finally {
+        child.kill('SIGKILL');
+      }
+      expect(tries).toBeGreaterThan(50);
+      expect(read).toBeGreaterThan(0);
+      expect(leaked).toBe(0);
+    }, 20000);
   });
 });
 
