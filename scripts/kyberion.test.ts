@@ -291,31 +291,41 @@ describe('kyberion command router', () => {
   });
 });
 
-describe('CU-08 deprecated command aliases', () => {
+describe('CU-08 removed command aliases stay removed', () => {
   const manifest = loadCliManifest();
 
-  it('passes former alias names through untouched after the alias drop', () => {
+  it('leaves removed command names unrouted and silent (no alias, no scope)', () => {
     const warnings: string[] = [];
-    const routed = rewriteRoutedArgs(
-      ['customer', 'create', '--slug', 'acme'],
-      manifest,
-      (message) => warnings.push(message)
-    );
-    expect(routed).toEqual(['customer', 'create', '--slug', 'acme']);
-    expect(warnings).toHaveLength(0);
+    const warn = (message: string): void => {
+      warnings.push(message);
+    };
+    expect(rewriteRoutedArgs(['customer', 'create', '--slug', 'acme'], manifest, warn)).toEqual([
+      'customer',
+      'create',
+      '--slug',
+      'acme',
+    ]);
+    expect(rewriteRoutedArgs(['onboard', 'apply'], manifest, warn)).toEqual(['onboard', 'apply']);
+    expect(rewriteRoutedArgs(['chronos'], manifest, warn)).toEqual(['chronos']);
+    expect(rewriteRoutedArgs(['dev'], manifest, warn)).toEqual(['dev']);
+    expect(rewriteRoutedArgs(['ingest', '--file', 'a.pdf'], manifest, warn)).toEqual([
+      'ingest',
+      '--file',
+      'a.pdf',
+    ]);
+    // `chronos dev` (Chronos Mirror UI) stays a live command, not an alias.
+    expect(rewriteRoutedArgs(['chronos', 'dev'], manifest, warn)).toEqual(['chronos', 'dev']);
+    expect(warnings).toEqual([]);
   });
 
-  it('leaves every former alias token unchanged', () => {
-    const silent = (): void => undefined;
-    for (const args of [
-      ['onboard', 'apply'],
-      ['chronos'],
-      ['dev'],
-      ['ingest', '--file', 'a.pdf'],
-      ['chronos', 'dev'],
-    ]) {
-      expect(rewriteRoutedArgs(args, manifest, silent)).toEqual(args);
-    }
+  it('rejects removed command names end to end', async () => {
+    await expect(main(['customer', 'create', '--slug', 'acme'], () => undefined)).rejects.toThrow(
+      /customer create/u
+    );
+    await expect(main(['onboard', 'apply'], () => undefined)).rejects.toThrow(/onboard apply/u);
+    await expect(main(['chronos', 'uninstall'], () => undefined)).rejects.toThrow(
+      /chronos uninstall/u
+    );
   });
 
   it('still runs the canonical command end to end', async () => {
