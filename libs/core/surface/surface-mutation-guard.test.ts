@@ -127,6 +127,37 @@ describe('surface-mutation-guard', () => {
     expect(decision.reason).toBe('same-origin');
   });
 
+  it('never accepts a SCIM provisioning token, however it is configured', () => {
+    const scimToken = `kscim~acme~scim-0123456789abcdef~${'s'.repeat(43)}`;
+    process.env.KYBERION_API_TOKEN = scimToken;
+    process.env.KYBERION_LOCALADMIN_TOKEN = scimToken;
+    const decision = authorizeSurfaceMutation(
+      makeRequest('https://kyberion.example.com/api/x', {
+        authorization: `Bearer ${scimToken}`,
+        origin: 'https://kyberion.example.com',
+      })
+    );
+    expect(decision).toMatchObject({ ok: false, status: 403 });
+
+    const configured = {
+      registrations: [
+        {
+          token_hash: createHash('sha256').update(scimToken).digest('hex'),
+          role: 'localadmin' as const,
+          tenant_slugs: ['acme'],
+          label: 'misconfigured',
+        },
+      ],
+      apiToken: scimToken,
+      localadminToken: scimToken,
+      configuredCredentials: [{ token: scimToken, role: 'localadmin' as const }],
+    };
+    expect(resolveSurfaceViewerToken(scimToken, configured)).toBeNull();
+    expect(() =>
+      resolveSurfaceViewerScope({ token: scimToken, local: true, ...configured })
+    ).toThrow(/Unknown viewer token/);
+  });
+
   it('denies cross-origin requests without a token', () => {
     const decision = authorizeSurfaceMutation(
       makeRequest('https://kyberion.example.com/api/x', { origin: 'https://evil.example.com' })

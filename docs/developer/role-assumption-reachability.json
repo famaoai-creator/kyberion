@@ -1745,6 +1745,11 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/lib/scim-server.ts#withScimContext",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/lib/viewer-context.ts#registrations",
       "roles": ["chronos_token_registry_reader"],
       "unresolved": []
@@ -2398,6 +2403,11 @@
     {
       "site": "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked",
       "roles": ["organization_operator"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/organization_scim_token.ts#runOrganizationScimToken",
+      "roles": ["sovereign_concierge"],
       "unresolved": []
     },
     {
@@ -3642,6 +3652,11 @@
         "presence/displays/concierge/src/app/outcome-files.tsx",
         "presence/displays/concierge/src/app/page.tsx",
         "presence/displays/concierge/src/app/review-checkin.tsx",
+        "presence/displays/concierge/src/app/scim/v2/ResourceTypes/route.ts",
+        "presence/displays/concierge/src/app/scim/v2/Schemas/route.ts",
+        "presence/displays/concierge/src/app/scim/v2/ServiceProviderConfig/route.ts",
+        "presence/displays/concierge/src/app/scim/v2/Users/[id]/route.ts",
+        "presence/displays/concierge/src/app/scim/v2/Users/route.ts",
         "presence/displays/concierge/src/app/settings/operator-services-api.ts",
         "presence/displays/concierge/src/app/settings/page.tsx",
         "presence/displays/concierge/src/app/settings/sections/AdvancedSection.tsx",
@@ -3717,6 +3732,7 @@
         "presence/displays/concierge/src/lib/recording-consent-types.ts",
         "presence/displays/concierge/src/lib/request-input.ts",
         "presence/displays/concierge/src/lib/review-watch.ts",
+        "presence/displays/concierge/src/lib/scim-server.ts",
         "presence/displays/concierge/src/lib/settings-types.ts",
         "presence/displays/concierge/src/lib/settings-view.ts",
         "presence/displays/concierge/src/lib/setup-auxiliary-response.ts",

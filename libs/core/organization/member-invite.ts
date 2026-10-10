@@ -243,7 +243,8 @@ export function previewInvite(
   return toPublic(invite, now);
 }
 
-function externalMemberId(issuer: string, subject: string): string {
+/** Member id for a not-yet-registered external identity (invites and SCIM agree on it). */
+export function externalMemberId(issuer: string, subject: string): string {
   return `u-${createHash('sha256').update(`${issuer}\n${subject}`).digest('hex').slice(0, 10)}`;
 }
 
