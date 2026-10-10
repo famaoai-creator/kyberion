@@ -1,3 +1,4 @@
+import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { createLogger } from '../logger.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import * as path from 'node:path';
@@ -374,7 +375,11 @@ class AuditChainImpl {
 
       const scope = resolveAuditScope(entry.scope, tenantSlug);
 
-      const nextEntry: AuditEntry = {
+      // Hash the same field order the persisted reader reconstructs. Otherwise
+      // additive actor/scope fields supplied in a different order corrupt a
+      // freshly written chain on its first verification. Existing history is
+      // never changed; only new entries use this canonical construction.
+      const nextEntry: AuditEntry = normalizePersistedAuditEntry({
         id,
         timestamp,
         ...entryWithoutTenantSlug,
@@ -388,8 +393,8 @@ class AuditChainImpl {
         chain_alg: 'hmac-sha256',
         chain_key_id: getAuditChainKeyId(chainKey),
         previousHash: this.lastHash,
-        currentHash: '', // computed below
-      };
+        currentHash: 'pending', // validated placeholder; excluded from the hash below
+      });
 
       nextEntry.currentHash = computeAuditEntryHash(
         nextEntry as unknown as Record<string, unknown>,
@@ -793,11 +798,16 @@ function scopeForAuditEntry(entry: AuditEntry): EventScope | null | undefined {
 }
 
 /**
- * Best-effort tenant slug resolution. Reads `KYBERION_TENANT` env first,
- * falling back to the active mission's `tenant_slug`. Kept synchronous
- * and dependency-free to avoid circular imports with `authority.ts`.
+ * Request-local tenant binding wins, including an explicit empty binding.
+ * Without a request binding, use the environment then the active mission.
+ * The foundation scope reader avoids importing authority.ts here.
  */
 function resolveCurrentTenantSlug(): string | undefined {
+  const scope = currentExecutionScope();
+  if (scope?.tenantBound) {
+    const tenant = scope.tenantSlug?.trim();
+    return tenant && isValidTenantSlug(tenant) ? tenant : undefined;
+  }
   const fromEnv = (getRegisteredEnvText('KYBERION_TENANT') || '').trim();
   // A tier name is syntactically a valid slug, so the shape check alone lets
   // `KYBERION_TENANT=public` through and taints every audit entry it stamps.

@@ -987,6 +987,12 @@
           "action": "delete"
         }
       ]
+    },
+    {
+      "path": "active/shared/runtime/surface-management",
+      "artifact_class": "evidence",
+      "action": "review_required",
+      "note": "Tenant-partitioned Web organization/project idempotency receipts and pending completion-audit evidence. Deleting a receipt can permit replay of an already committed mutation; never auto-delete. Review only after reconciling its entity and audit record."
     }
   ]
 }

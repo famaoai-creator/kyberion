@@ -224,6 +224,7 @@ describe('optional destinations', () => {
       'ingest',
       'first-job',
       'help',
+      'organization',
       'settings',
     ]);
     expect(
@@ -317,5 +318,17 @@ describe('readAvailableFrontDeskSurfaces', () => {
       throw new Error('missing');
     });
     expect(await readAvailableFrontDeskSurfaces()).toEqual({});
+  });
+});
+
+it('keeps organization management available without optional Chronos', () => {
+  const item = resolveFrontDeskMenu({ currentSurface: 'concierge', role: 'owner' }).find(
+    (entry) => entry.id === 'organization'
+  );
+  expect(item).toMatchObject({
+    href: '/management',
+    surface: 'concierge',
+    allowed: true,
+    scope_query_style: 'camel',
   });
 });

@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { parseEventScopeInput } from '../event-scope.js';
+import { assertScopeContext } from '../scope-context-validation.js';
 
 import { pathResolver } from '../path-resolver.js';
 import {
@@ -539,7 +541,12 @@ export interface MissionIssuanceParams {
   /** Team Channel P2: principal that confirmed the proposal (`user:<member_id>`). */
   confirmedBy?: string;
   /** Team Channel P2: tenant scope of the originating channel; progress replies stay in it. */
-  scope?: { tenant_slug: string; tier?: 'public' | 'confidential' | 'personal' };
+  scope?: {
+    tenant_slug: string;
+    organization_id?: string;
+    project_id?: string;
+    tier?: 'public' | 'confidential' | 'personal';
+  };
 }
 
 /**
@@ -552,6 +559,24 @@ export interface MissionIssuanceParams {
 export async function issueMissionFromProposal(
   params: MissionIssuanceParams
 ): Promise<SlackMissionIssuanceResult> {
+  if (params.scope) {
+    for (const [key, value] of Object.entries(params.scope)) {
+      if (
+        !['tenant_slug', 'organization_id', 'project_id', 'tier'].includes(key) ||
+        (value !== undefined &&
+          (typeof value !== 'string' || !value.trim() || value !== value.trim()))
+      ) {
+        throw new Error('[MISSION_ISSUANCE_SCOPE_INVALID] Invalid canonical scope field: ' + key);
+      }
+    }
+    assertScopeContext(
+      parseEventScopeInput({
+        ...params.scope,
+        tier: params.scope.tier ?? params.proposal.tier ?? 'public',
+      }),
+      { requireTenant: true }
+    );
+  }
   const surface = params.surface.trim().toLowerCase() || 'slack';
   const missionId = buildSurfaceMissionId(
     surface.toUpperCase(),
@@ -566,7 +591,16 @@ export async function issueMissionFromProposal(
     params.scope?.tier && TIER_RANK[proposedTier] > TIER_RANK[params.scope.tier]
       ? params.scope.tier
       : proposedTier;
-  const tenantArgs = params.scope ? ['--tenant-slug', params.scope.tenant_slug] : [];
+  const tenantArgs = params.scope
+    ? [
+        '--tenant-slug',
+        params.scope.tenant_slug,
+        ...(params.scope.organization_id
+          ? ['--organization-id', params.scope.organization_id]
+          : []),
+        ...(params.scope.project_id ? ['--project-id', params.scope.project_id] : []),
+      ]
+    : [];
   const missionType = params.proposal.mission_type || 'development';
   const persona = params.proposal.assigned_persona || 'Ecosystem Architect';
   const env = buildExecutionEnv(process.env, 'mission_controller');
@@ -616,7 +650,7 @@ export async function issueMissionFromProposal(
           ...(params.confirmedBy ? { confirmedBy: params.confirmedBy } : {}),
           ...(params.scope ? { scope: params.scope } : {}),
         },
-        ...(params.scope ? { scope: { tenant_slug: params.scope.tenant_slug, tier } } : {}),
+        ...(params.scope ? { scope: { ...params.scope, tier } } : {}),
       });
       return startMissionOrchestrationWorker(orchestrationEvent);
     });
@@ -701,6 +735,7 @@ export async function issueSlackMissionFromProposal(params: {
 
 export async function issueChronosMissionFromProposal(params: {
   sessionId: string;
+  scope?: MissionIssuanceParams['scope'];
   proposal: MissionProposal;
   sourceText?: string;
   routingDecision?: AgentRoutingDecision;
@@ -713,5 +748,6 @@ export async function issueChronosMissionFromProposal(params: {
     sourceText: params.sourceText,
     routingDecision: params.routingDecision,
     requestedBy: 'chronos_gateway',
+    ...(params.scope ? { scope: params.scope } : {}),
   });
 }

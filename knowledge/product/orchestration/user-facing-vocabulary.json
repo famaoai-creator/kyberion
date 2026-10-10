@@ -14365,6 +14365,276 @@
         "en": "Saving quiet hours…",
         "ja": "おやすみ時間を保存しています…",
         "qps-ploc": "⟦Şȧṽïñɠ ɋůïėŧ ħőůřş… ŀőřėɱ ⟧"
+      },
+      "management.title": {
+        "en": "Management",
+        "ja": "管理",
+        "qps-ploc": "⟦Ɱȧñȧɠėɱėñŧ ŀőř⟧"
+      },
+      "management.description": {
+        "en": "Choose a tenant, then manage its organizations and projects. Continue to missions in the same scope.",
+        "ja": "テナントを選び、組織とプロジェクトを管理します。同じ対象のミッション一覧へ進めます。",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ŧėñȧñŧ, ŧħėñ ɱȧñȧɠė ïŧş őřɠȧñïẑȧŧïőñş ȧñḓ ṗřőĵėƈŧş. Ƈőñŧïñůė ŧő ɱïşşïőñş ïñ ŧħė şȧɱė şƈőṗė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "management.navigation": {
+        "en": "Management navigation",
+        "ja": "管理メニュー",
+        "qps-ploc": "⟦Ɱȧñȧɠėɱėñŧ ñȧṽïɠȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "management.settings": {
+        "en": "Settings",
+        "ja": "設定",
+        "qps-ploc": "⟦Şėŧŧïñɠş ŀőř⟧"
+      },
+      "management.missions": {
+        "en": "Open mission list",
+        "ja": "ミッション一覧へ",
+        "qps-ploc": "⟦Őṗėñ ɱïşşïőñ ŀïşŧ ŀőřėɱ⟧"
+      },
+      "management.scope": {
+        "en": "Tenant → Organization → Project → Mission",
+        "ja": "テナント → 組織 → プロジェクト → ミッション",
+        "qps-ploc": "⟦Ŧėñȧñŧ → Őřɠȧñïẑȧŧïőñ → Ṗřőĵėƈŧ → Ɱïşşïőñ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "management.scope_hint": {
+        "en": "Changing scope clears unsaved drafts. Only existing tenants are available.",
+        "ja": "対象を変更すると未保存の入力は破棄されます。既存テナントのみ選択できます。",
+        "qps-ploc": "⟦Ƈħȧñɠïñɠ şƈőṗė ƈŀėȧřş ůñşȧṽėḓ ḓřȧƒŧş. Őñŀẏ ėẋïşŧïñɠ ŧėñȧñŧş ȧřė ȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "management.tenant": {
+        "en": "Tenant",
+        "ja": "テナント",
+        "qps-ploc": "⟦Ŧėñȧñŧ ŀőř⟧"
+      },
+      "management.organization": {
+        "en": "Organization",
+        "ja": "組織",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
+      },
+      "management.project": {
+        "en": "Project",
+        "ja": "プロジェクト",
+        "qps-ploc": "⟦Ṗřőĵėƈŧ ŀőř⟧"
+      },
+      "management.mission": {
+        "en": "Mission",
+        "ja": "ミッション",
+        "qps-ploc": "⟦Ɱïşşïőñ ŀőř⟧"
+      },
+      "management.choose_tenant": {
+        "en": "Choose a tenant",
+        "ja": "テナントを選択",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ŧėñȧñŧ ŀőřė⟧"
+      },
+      "management.choose_organization": {
+        "en": "Choose an organization",
+        "ja": "組織を選択",
+        "qps-ploc": "⟦Ƈħőőşė ȧñ őřɠȧñïẑȧŧïőñ ŀőřėɱ ï⟧"
+      },
+      "management.choose_project": {
+        "en": "Choose a project",
+        "ja": "プロジェクトを選択",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ṗřőĵėƈŧ ŀőřėɱ⟧"
+      },
+      "management.select_organization": {
+        "en": "Select an organization to view and edit its purpose.",
+        "ja": "組織を選択すると目的を確認・編集できます。",
+        "qps-ploc": "⟦Şėŀėƈŧ ȧñ őřɠȧñïẑȧŧïőñ ŧő ṽïėẇ ȧñḓ ėḓïŧ ïŧş ṗůřṗőşė. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "management.no_organizations": {
+        "en": "No organizations yet. Create the first organization in this tenant.",
+        "ja": "組織はまだありません。このテナントに最初の組織を作成できます。",
+        "qps-ploc": "⟦Ñő őřɠȧñïẑȧŧïőñş ẏėŧ. Ƈřėȧŧė ŧħė ƒïřşŧ őřɠȧñïẑȧŧïőñ ïñ ŧħïş ŧėñȧñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "management.select_project": {
+        "en": "Select a project to view and edit its summary.",
+        "ja": "プロジェクトを選択すると概要を確認・編集できます。",
+        "qps-ploc": "⟦Şėŀėƈŧ ȧ ṗřőĵėƈŧ ŧő ṽïėẇ ȧñḓ ėḓïŧ ïŧş şůɱɱȧřẏ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "management.no_projects": {
+        "en": "No projects in this scope. Select an active organization to create one.",
+        "ja": "この対象にプロジェクトはありません。有効な組織を選択して作成できます。",
+        "qps-ploc": "⟦Ñő ṗřőĵėƈŧş ïñ ŧħïş şƈőṗė. Şėŀėƈŧ ȧñ ȧƈŧïṽė őřɠȧñïẑȧŧïőñ ŧő ƈřėȧŧė őñė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "management.create_organization": {
+        "en": "Create organization",
+        "ja": "組織を作成",
+        "qps-ploc": "⟦Ƈřėȧŧė őřɠȧñïẑȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "management.edit_organization": {
+        "en": "Edit organization",
+        "ja": "組織を編集",
+        "qps-ploc": "⟦Ėḓïŧ őřɠȧñïẑȧŧïőñ ŀőřėɱ⟧"
+      },
+      "management.create_project": {
+        "en": "Create project",
+        "ja": "プロジェクトを作成",
+        "qps-ploc": "⟦Ƈřėȧŧė ṗřőĵėƈŧ ŀőřė⟧"
+      },
+      "management.edit_project": {
+        "en": "Edit project",
+        "ja": "プロジェクトを編集",
+        "qps-ploc": "⟦Ėḓïŧ ṗřőĵėƈŧ ŀőř⟧"
+      },
+      "management.organization_create": {
+        "en": "Create organization",
+        "ja": "組織を作成",
+        "qps-ploc": "⟦Ƈřėȧŧė őřɠȧñïẑȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "management.organization_update": {
+        "en": "Edit organization",
+        "ja": "組織を編集",
+        "qps-ploc": "⟦Ėḓïŧ őřɠȧñïẑȧŧïőñ ŀőřėɱ⟧"
+      },
+      "management.project_create": {
+        "en": "Create project",
+        "ja": "プロジェクトを作成",
+        "qps-ploc": "⟦Ƈřėȧŧė ṗřőĵėƈŧ ŀőřė⟧"
+      },
+      "management.project_update": {
+        "en": "Edit project",
+        "ja": "プロジェクトを編集",
+        "qps-ploc": "⟦Ėḓïŧ ṗřőĵėƈŧ ŀőř⟧"
+      },
+      "management.mission_hint": {
+        "en": "Open the existing mission list with the selected tenant, organization and project.",
+        "ja": "選択中のテナント・組織・プロジェクトを引き継いで既存のミッション一覧を開きます。",
+        "qps-ploc": "⟦Őṗėñ ŧħė ėẋïşŧïñɠ ɱïşşïőñ ŀïşŧ ẇïŧħ ŧħė şėŀėƈŧėḓ ŧėñȧñŧ, őřɠȧñïẑȧŧïőñ ȧñḓ ṗřőĵėƈŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "management.links_unavailable": {
+        "en": "The mission link is unavailable. Refresh this page to try again.",
+        "ja": "ミッションへのリンクを取得できません。ページを再読み込みしてください。",
+        "qps-ploc": "⟦Ŧħė ɱïşşïőñ ŀïñķ ïş ůñȧṽȧïŀȧƀŀė. Řėƒřėşħ ŧħïş ṗȧɠė ŧő ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "management.owner_only": {
+        "en": "Sign in as an active owner of the selected tenant to manage organizations and projects.",
+        "ja": "組織・プロジェクトを管理するには、選択したテナントの有効なownerとしてログインしてください。",
+        "qps-ploc": "⟦Şïɠñ ïñ ȧş ȧñ ȧƈŧïṽė őẇñėř őƒ ŧħė şėŀėƈŧėḓ ŧėñȧñŧ ŧő ɱȧñȧɠė őřɠȧñïẑȧŧïőñş ȧñḓ ṗřőĵėƈŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "management.sign_in": {
+        "en": "Sign in",
+        "ja": "ログイン",
+        "qps-ploc": "⟦Şïɠñ ïñ ŀőř⟧"
+      },
+      "management.loading": {
+        "en": "Loading management scope…",
+        "ja": "管理対象を読み込み中…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ɱȧñȧɠėɱėñŧ şƈőṗė… ŀőřėɱ ïṗ⟧"
+      },
+      "management.refresh": {
+        "en": "Reload current values",
+        "ja": "最新の情報を読み込む",
+        "qps-ploc": "⟦Řėŀőȧḓ ƈůřřėñŧ ṽȧŀůėş ŀőřėɱ ⟧"
+      },
+      "management.name": {
+        "en": "Name",
+        "ja": "名前",
+        "qps-ploc": "⟦Ñȧɱė ŀőř⟧"
+      },
+      "management.purpose": {
+        "en": "Purpose",
+        "ja": "目的",
+        "qps-ploc": "⟦Ṗůřṗőşė ŀőř⟧"
+      },
+      "management.summary": {
+        "en": "Summary",
+        "ja": "概要",
+        "qps-ploc": "⟦Şůɱɱȧřẏ ŀőř⟧"
+      },
+      "management.review": {
+        "en": "Review changes",
+        "ja": "変更内容を確認",
+        "qps-ploc": "⟦Řėṽïėẇ ƈħȧñɠėş ŀőřė⟧"
+      },
+      "management.cancel": {
+        "en": "Cancel",
+        "ja": "キャンセル",
+        "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
+      },
+      "management.confirm": {
+        "en": "Confirm the target and values before saving.",
+        "ja": "保存前に対象と内容を確認してください。",
+        "qps-ploc": "⟦Ƈőñƒïřɱ ŧħė ŧȧřɠėŧ ȧñḓ ṽȧŀůėş ƀėƒőřė şȧṽïñɠ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "management.new_organization": {
+        "en": "New organization",
+        "ja": "新しい組織",
+        "qps-ploc": "⟦Ñėẇ őřɠȧñïẑȧŧïőñ ŀőřėɱ⟧"
+      },
+      "management.saving": {
+        "en": "Saving…",
+        "ja": "保存中…",
+        "qps-ploc": "⟦Şȧṽïñɠ… ŀőř⟧"
+      },
+      "management.confirm_save": {
+        "en": "Confirm and save",
+        "ja": "確認して保存",
+        "qps-ploc": "⟦Ƈőñƒïřɱ ȧñḓ şȧṽė ŀőřėɱ⟧"
+      },
+      "management.retry": {
+        "en": "Retry the same request",
+        "ja": "同じリクエストを再試行",
+        "qps-ploc": "⟦Řėŧřẏ ŧħė şȧɱė řėɋůėşŧ ŀőřėɱ ï⟧"
+      },
+      "management.expired": {
+        "en": "Your session expired. Sign in again before continuing.",
+        "ja": "セッションの有効期限が切れました。再度ログインしてください。",
+        "qps-ploc": "⟦Ẏőůř şėşşïőñ ėẋṗïřėḓ. Şïɠñ ïñ ȧɠȧïñ ƀėƒőřė ƈőñŧïñůïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "management.forbidden": {
+        "en": "This account cannot manage the selected scope.",
+        "ja": "このアカウントでは選択した対象を管理できません。",
+        "qps-ploc": "⟦Ŧħïş ȧƈƈőůñŧ ƈȧññőŧ ɱȧñȧɠė ŧħė şėŀėƈŧėḓ şƈőṗė. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "management.conflict": {
+        "en": "The saved version changed or this request is stale. Reload current values and review your changes again.",
+        "ja": "保存済みの内容が変更されたか、リクエストが古くなっています。最新情報を読み込み、改めて変更を確認してください。",
+        "qps-ploc": "⟦Ŧħė şȧṽėḓ ṽėřşïőñ ƈħȧñɠėḓ őř ŧħïş řėɋůėşŧ ïş şŧȧŀė. Řėŀőȧḓ ƈůřřėñŧ ṽȧŀůėş ȧñḓ řėṽïėẇ ẏőůř ƈħȧñɠėş ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "management.failed": {
+        "en": "The request failed. Check the selected scope and try again explicitly.",
+        "ja": "リクエストに失敗しました。対象を確認して再試行してください。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ƒȧïŀėḓ. Ƈħėƈķ ŧħė şėŀėƈŧėḓ şƈőṗė ȧñḓ ŧřẏ ȧɠȧïñ ėẋṗŀïƈïŧŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "management.uncertain": {
+        "en": "The result could not be confirmed. Retrying sends the same request ID to avoid duplicates.",
+        "ja": "結果を確認できませんでした。再試行では重複を防ぐため同じリクエストIDを使用します。",
+        "qps-ploc": "⟦Ŧħė řėşůŀŧ ƈőůŀḓ ñőŧ ƀė ƈőñƒïřɱėḓ. Řėŧřẏïñɠ şėñḓş ŧħė şȧɱė řėɋůėşŧ ÏḒ ŧő ȧṽőïḓ ḓůṗŀïƈȧŧėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "management.saved": {
+        "en": "Changes saved.",
+        "ja": "変更を保存しました。",
+        "qps-ploc": "⟦Ƈħȧñɠėş şȧṽėḓ. ŀőřė⟧"
+      },
+      "management.audit_pending": {
+        "en": "Changes are committed; the operation record is still pending. Do not submit a new copy.",
+        "ja": "変更は反映済みです。操作記録の完了を待っています。同じ内容を新規送信しないでください。",
+        "qps-ploc": "⟦Ƈħȧñɠėş ȧřė ƈőɱɱïŧŧėḓ; ŧħė őṗėřȧŧïőñ řėƈőřḓ ïş şŧïŀŀ ṗėñḓïñɠ. Ḓő ñőŧ şůƀɱïŧ ȧ ñėẇ ƈőṗẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "management.changed": {
+        "en": "Your sign-in context changed. Drafts were cleared. Reload and sign in to continue.",
+        "ja": "ログイン状態が変わったため入力内容を破棄しました。再読み込みしてログインしてください。",
+        "qps-ploc": "⟦Ẏőůř şïɠñ-ïñ ƈőñŧėẋŧ ƈħȧñɠėḓ. Ḓřȧƒŧş ẇėřė ƈŀėȧřėḓ. Řėŀőȧḓ ȧñḓ şïɠñ ïñ ŧő ƈőñŧïñůė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "management.purpose_reapproval": {
+        "en": "Changing the purpose returns it to draft and requires approval again. Organization and project status will stay unchanged.",
+        "ja": "目的を変更すると、目的のみ下書きに戻り再承認が必要になります。組織・プロジェクトの稼働状態は変わりません。",
+        "qps-ploc": "⟦Ƈħȧñɠïñɠ ŧħė ṗůřṗőşė řėŧůřñş ïŧ ŧő ḓřȧƒŧ ȧñḓ řėɋůïřėş ȧṗṗřőṽȧŀ ȧɠȧïñ. Őřɠȧñïẑȧŧïőñ ȧñḓ ṗřőĵėƈŧ şŧȧŧůş ẇïŀŀ şŧȧẏ ůñƈħȧñɠėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+      },
+      "management.description_unchanged": {
+        "en": "Unchanged; this field will not be submitted.",
+        "ja": "変更なし。この項目は送信しません。",
+        "qps-ploc": "⟦Ůñƈħȧñɠėḓ; ŧħïş ƒïėŀḓ ẇïŀŀ ñőŧ ƀė şůƀɱïŧŧėḓ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "management.description_omitted": {
+        "en": "Not provided (optional).",
+        "ja": "未入力（任意）。",
+        "qps-ploc": "⟦Ñőŧ ṗřőṽïḓėḓ (őṗŧïőñȧŀ). ŀőřėɱ ï⟧"
+      },
+      "management.retry_audit": {
+        "en": "Retry recording the saved change",
+        "ja": "保存済みの変更の操作記録を再試行",
+        "qps-ploc": "⟦Řėŧřẏ řėƈőřḓïñɠ ŧħė şȧṽėḓ ƈħȧñɠė ŀőřėɱ ïṗşů⟧"
       }
     },
     "onboarding": {

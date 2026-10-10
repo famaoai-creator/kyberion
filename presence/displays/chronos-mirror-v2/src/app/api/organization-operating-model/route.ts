@@ -6,6 +6,8 @@ import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,
   strictViewerScopeTenantSlugs,
+  strictViewerScopeOrganizationIds,
+  strictViewerScopeProjectIds,
   viewerErrorResponse,
   withViewerExecutionContext,
   ViewerContextError,
@@ -30,6 +32,17 @@ export async function GET(req: NextRequest) {
 
   try {
     const viewer = resolvedViewer.context;
+    // This legacy projection contains organization-wide lineage and aggregates.
+    // Until every aggregate is project-scoped, never expose it to project-limited viewers.
+    const requestedProject = readChronosOptionalStringParam(
+      req.nextUrl.searchParams.get('project_id')
+    );
+    if (requestedProject || strictViewerScopeProjectIds(viewer) !== 'all') {
+      throw new ViewerContextError(
+        403,
+        'The organization-wide overview is unavailable for project scope. Use Management for authorized project details.'
+      );
+    }
     const requestedTenant = readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'));
     const tenantSlugs = strictViewerScopeTenantSlugs(viewer, requestedTenant);
     const selectedTenant =
@@ -40,9 +53,14 @@ export async function GET(req: NextRequest) {
       throw new ViewerContextError(403, `tenant is not registered: ${selectedTenant}`);
     }
     const company = resolveCompany(selectedTenant);
+    const requestedOrganization = readChronosOptionalStringParam(
+      req.nextUrl.searchParams.get('organization_id')
+    );
+    const organizationId = requestedOrganization || company.company_id;
+    strictViewerScopeOrganizationIds(viewer, organizationId);
     const view = withViewerExecutionContext(viewer, () =>
       buildOrganizationManagementView({
-        organizationId: company.company_id,
+        organizationId,
         tier: 'confidential',
         tenantSlug: company.tenant_slug,
       })
@@ -50,7 +68,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       view,
       tenant: {
-        company_id: company.company_id,
+        company_id: organizationId,
         tenant_slug: company.tenant_slug,
         name: view.purpose?.name || view.operational_state?.name || company.name,
       },

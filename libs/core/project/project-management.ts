@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
-import { executionPersonaText } from '../foundation/execution-scope.js';
+import { executionPersonaText, currentExecutionScope } from '../foundation/execution-scope.js';
+import { currentResourceAccessScope } from '../foundation/resource-access-scope.js';
 import { listTenantProfileSlugs } from '../organization/tenant-registry.js';
 import { readTextFile } from '../foundation/text.js';
 import {
@@ -13,6 +14,8 @@ import {
   type ProjectRecord,
 } from './project-registry.js';
 import {
+  loadProjectOperationalState,
+  validateProjectOperationalState,
   listProjectOperationalStates,
   listProjectOperationalStatePaths,
   projectOperationalStatePath,
@@ -448,6 +451,78 @@ export function buildManagedProjectRecord(input: ManagedProjectCreateInput): Pro
 
 export function createManagedProject(input: ManagedProjectCreateInput): ProjectRecord {
   return createManagedProjectInternal(input, false);
+}
+
+/** Only the admitted surface mediator may defer the legacy ambient-persona audit. */
+export function createManagedProjectForSurface(input: ManagedProjectCreateInput): ProjectRecord {
+  assertSurfaceProjectMutationScope(input.project_id, input.tenant_slug, input.organization_id);
+  return createManagedProjectInternal(input, true);
+}
+
+function assertSurfaceProjectMutationScope(
+  projectId: string,
+  tenantSlug?: string,
+  organizationId?: string
+): void {
+  const scope = currentResourceAccessScope();
+  if (
+    currentExecutionScope()?.assumedRole !== 'concierge_management_writer' ||
+    !scope ||
+    scope.tenantSlug !== tenantSlug ||
+    scope.organizationId !== organizationId ||
+    scope.projectId !== projectId
+  ) {
+    throw new Error('Project surface mutation requires an admitted exact resource scope.');
+  }
+}
+
+/** Bounded facade: updates only metadata and its existing exact projection. */
+export function updateManagedProjectMetadata(
+  scope: { projectId: string; tenantSlug: string; organizationId: string },
+  patch: { name?: string; summary?: string }
+): ProjectRecord {
+  assertProjectLifecycleOwner();
+  assertSurfaceProjectMutationScope(scope.projectId, scope.tenantSlug, scope.organizationId);
+  if (
+    !Object.keys(patch).length ||
+    Object.keys(patch).some((key) => key !== 'name' && key !== 'summary')
+  )
+    throw new Error('Only project name and summary may be edited.');
+  const current = loadProjectRecord(assertManagedProjectId(scope.projectId));
+  if (
+    !current ||
+    current.tier !== 'confidential' ||
+    current.tenant_slug !== scope.tenantSlug ||
+    current.organization_id !== scope.organizationId
+  )
+    throw new Error('Project not found in the authorized organization.');
+  const query = { tier: current.tier, tenantSlug: current.tenant_slug };
+  const state = loadProjectOperationalState(current.project_id, query);
+  const statePath = projectOperationalStatePath(
+    current.project_id,
+    current.tier,
+    current.tenant_slug
+  );
+  if (safeExistsSync(statePath) && !state) throw new Error('Project operational state is invalid.');
+  const recordPath = projectRecordPath(current.project_id);
+  const oldRecord = readTextFile(recordPath);
+  const oldState = state ? readTextFile(statePath) : null;
+  const next = { ...current, ...patch };
+  try {
+    saveProjectRecord(next);
+    if (state) {
+      const projection = { ...state, name: next.name, summary: next.summary, updated_at: nowIso() };
+      if (!validateProjectOperationalState(projection))
+        throw new Error('Invalid project metadata projection.');
+      // Preserve absence of optional fields; the general saver normalizes them.
+      safeWriteFile(statePath, JSON.stringify(projection, null, 2));
+    }
+  } catch (error) {
+    safeWriteFile(recordPath, oldRecord);
+    if (oldState !== null) safeWriteFile(statePath, oldState);
+    throw error;
+  }
+  return next;
 }
 
 function createManagedProjectInternal(

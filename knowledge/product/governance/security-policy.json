@@ -683,6 +683,38 @@
       ],
       "allow_write": ["active/shared/observability/retrospectives/"]
     },
+    "concierge_management_reader": {
+      "allow_read": [
+        "knowledge/personal/members/",
+        "knowledge/personal/tenants/${KYBERION_TENANT}.json",
+        "active/organizations/confidential/${KYBERION_TENANT}/",
+        "active/organizations/public/${KYBERION_TENANT}/",
+        "active/projects/confidential/${KYBERION_TENANT}/",
+        "active/projects/public/${KYBERION_TENANT}/",
+        "active/shared/runtime/projects/",
+        "active/shared/runtime/surface-management/confidential/${KYBERION_TENANT}/"
+      ],
+      "allow_write": []
+    },
+    "concierge_management_writer": {
+      "allow_read": [
+        "knowledge/personal/tenants/${KYBERION_TENANT}.json",
+        "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
+        "active/organizations/public/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
+        "active/projects/confidential/${KYBERION_TENANT}/",
+        "active/projects/public/${KYBERION_TENANT}/",
+        "active/shared/runtime/projects/",
+        "active/shared/runtime/surface-management/confidential/${KYBERION_TENANT}/"
+      ],
+      "allow_write": [
+        "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
+        "active/organizations/public/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
+        "active/projects/confidential/${KYBERION_TENANT}/",
+        "active/projects/public/${KYBERION_TENANT}/",
+        "active/shared/runtime/projects/",
+        "active/shared/runtime/surface-management/confidential/${KYBERION_TENANT}/"
+      ]
+    },
     "organization_operator": {
       "allow_read": [
         "active/organizations/confidential/${KYBERION_TENANT}/",
