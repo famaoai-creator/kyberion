@@ -84,13 +84,11 @@ import {
   clipboardRead,
   listChromeTabs,
 } from '@agent/core/virtual/os-automation';
-import type { FocusedInputState } from '@agent/core/virtual/os-automation';
 import { validateOpInput } from '@agent/core/pipeline/op-input-contracts';
 import {
   systemDisplayHelpers,
   type ResolvedScreenDisplaySelection,
 } from './system-display-helpers.js';
-import { systemFocusHelpers } from './system-focus-helpers.js';
 import * as visionJudge from '@agent/shared-vision';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -676,15 +674,21 @@ export const SYSTEM_CAPTURE_OP_HANDLERS: Readonly<Record<string, SystemCaptureOp
         async () => safeExistsSync(targetPath),
         buildRetryOptions(params.retry as Record<string, unknown> | undefined)
       );
-      if (exists) {
+    } catch {
+      exists = false;
+    }
+    if (exists) {
+      // A stat denial must not be reported as "missing": the path exists, we
+      // just cannot inspect it under this role (e.g. Sovereign Sanctuary).
+      try {
         const stats = await retry(
           async () => safeStat(targetPath),
           buildRetryOptions(params.retry as Record<string, unknown> | undefined)
         );
         kind = stats.isDirectory() ? 'dir' : 'file';
+      } catch {
+        kind = 'denied';
       }
-    } catch {
-      exists = false;
     }
     return {
       ...ctx,
@@ -709,12 +713,18 @@ export const SYSTEM_CAPTURE_OP_HANDLERS: Readonly<Record<string, SystemCaptureOp
     let kind = 'unknown';
     try {
       exists = safeExistsSync(targetPath);
-      if (exists) {
-        const stats = safeStat(targetPath);
-        kind = stats.isDirectory() ? 'dir' : 'file';
-      }
     } catch {
       exists = false;
+    }
+    if (exists) {
+      // Same distinction as system:probe — a stat denial means the path exists
+      // but is not inspectable under this role, not that it is missing.
+      try {
+        const stats = safeStat(targetPath);
+        kind = stats.isDirectory() ? 'dir' : 'file';
+      } catch {
+        kind = 'denied';
+      }
     }
     return {
       ...ctx,
@@ -1341,122 +1351,18 @@ export async function resolveScreenDisplaySelection(
   return systemDisplayHelpers.resolveScreenDisplaySelection(params, resolve);
 }
 
-export const SYSTEM_ACTUATOR_CAPTURE_ALIAS_OPS = new Set<string>([
-  'screenshot',
-  'clipboard_read',
-  'get_focused_input',
-  'get_screen_size',
-  'macos_automation_probe',
-  'window_list',
-  'chrome_tab_list',
-  'read_file',
-  'read_json',
-  'probe',
-  'probe_active_profile',
-  'glob_files',
-  'scan_directory',
-  'pulse_status',
-  'exec',
-  'shell',
-  'cli_health_check',
-  'list_missions',
-  'list_projects',
-  'list_capabilities',
-  'list_incidents',
-  'list_knowledge',
-  'list_running_apps',
-  'list_input_devices',
-  'list_displays',
-  'list_media_devices',
-  'list_tool_runtimes',
-  'list_service_runtimes',
-  'control_media_devices',
-  'collect_artifacts',
-  'resolve_path',
-  'sample_traces',
-  'vision_consult',
-  'test_screen_stream',
-  'test_screen_mp4_roundtrip',
-  'test_camera_injection',
-  'list',
-]);
+export { SYSTEM_ACTUATOR_CAPTURE_ALIAS_OPS } from './system-capture-alias-ops.js';
 
-export function loadFocusTargetStore(): import('./system-focus-helpers.js').FocusTargetStore {
-  return systemFocusHelpers.loadFocusTargetStore();
-}
-
-export function saveFocusTargetStore(store: import('./system-focus-helpers.js').FocusTargetStore) {
-  systemFocusHelpers.saveFocusTargetStore(store);
-}
-
-export function rememberFocusedTarget(
-  explicitId: string | undefined,
-  focusedInput: FocusedInputState
-) {
-  return systemFocusHelpers.rememberFocusedTarget(explicitId, focusedInput);
-}
-
-export function loadRememberedFocusTarget(targetId?: string) {
-  return systemFocusHelpers.loadRememberedFocusTarget(targetId);
-}
-
-export function detectFocusedInputWithGuard(
-  rememberedTarget: {
-    application?: string;
-    windowTitle?: string;
-    role?: string;
-  } | null,
-  targetId?: string,
-  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict'
-) {
-  return systemFocusHelpers.detectFocusedInputWithGuard(rememberedTarget, targetId, matchPolicy);
-}
-
-export function assertFocusedTargetMatches(
-  rememberedTarget: {
-    application?: string;
-    windowTitle?: string;
-    role?: string;
-  } | null,
-  focusedInput: {
-    application?: string;
-    windowTitle?: string;
-    role?: string;
-  },
-  targetId?: string,
-  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict'
-) {
-  return systemFocusHelpers.assertFocusedTargetMatches(
-    rememberedTarget,
-    focusedInput,
-    targetId,
-    matchPolicy
-  );
-}
-
-export function getFocusedTargetMismatches(
-  rememberedTarget: {
-    application?: string;
-    windowTitle?: string;
-    role?: string;
-  } | null,
-  focusedInput: {
-    application?: string;
-    windowTitle?: string;
-    role?: string;
-  },
-  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict'
-) {
-  return systemFocusHelpers.getFocusedTargetMismatches(rememberedTarget, focusedInput, matchPolicy);
-}
-
-export function windowTitleMatches(
-  expected: string,
-  actual: string,
-  matchPolicy: 'strict' | 'prefix' | 'contains'
-) {
-  return systemFocusHelpers.windowTitleMatches(expected, actual, matchPolicy);
-}
+export {
+  assertFocusedTargetMatches,
+  detectFocusedInputWithGuard,
+  getFocusedTargetMismatches,
+  loadFocusTargetStore,
+  loadRememberedFocusTarget,
+  rememberFocusedTarget,
+  saveFocusTargetStore,
+  windowTitleMatches,
+} from './system-focus-target-delegates.js';
 
 interface SystemControlOpHandlerInput {
   op: string;
