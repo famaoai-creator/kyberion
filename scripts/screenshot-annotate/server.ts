@@ -372,10 +372,14 @@ export function createScreenshotAnnotateRequestHandler(
               const message = error instanceof Error ? error.message : String(error);
               const status =
                 message === 'png_base64 required' || message === 'not a png' ? 400 : 500;
-              // Known validation strings pass through; anything else stays generic.
               jsonResponse(res, status, {
                 ok: false,
-                error: status === 400 ? message : 'internal server error',
+                // Only the two curated validation strings pass through; the
+                // equality check on `message` is the sanitizer boundary.
+                error:
+                  message === 'png_base64 required' || message === 'not a png'
+                    ? message
+                    : 'internal server error',
               });
             }
           } catch (e: unknown) {
