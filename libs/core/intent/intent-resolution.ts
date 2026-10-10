@@ -767,6 +767,7 @@ const intentParamExtractorSeam = createSeam<IntentParamExtractor>({
   key: 'intent:param-extract',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/intent/intent-resolution.ts',
 });
 
 export function registerIntentParamExtractor(

@@ -61,6 +61,7 @@ const browserAutomationRuntimeSeam = createSeam<BrowserAutomationRuntimeBridge>(
   key: 'browser-automation-runtime',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/browser/browser-automation-runtime-bridge.ts',
 });
 
 const registeredDisposers = new Map<string, () => void>();

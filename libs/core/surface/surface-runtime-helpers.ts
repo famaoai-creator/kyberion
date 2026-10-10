@@ -154,6 +154,7 @@ const serviceOptionSectionSeam = createSeam<ServiceOptionSectionProvider>({
   key: 'surface-task-reply-section',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/surface/surface-runtime-helpers.ts',
 });
 
 export function registerServiceOptionSection(

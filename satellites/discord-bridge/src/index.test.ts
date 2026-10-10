@@ -1,8 +1,9 @@
 import { runWithReplyLocale } from '@agent/core/locale';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import type { Message } from 'discord.js';
 import {
   approvalRequestLogicalPath,
+  approvalStoreRoots,
   loadApprovalRequest,
 } from '@agent/core/governance/approval-store';
 import { createSurfaceApprovalRequest } from '@agent/core/surface/channel-surface';
@@ -75,6 +76,21 @@ afterEach(() => {
     );
   });
   delete process.env.KYBERION_SURFACE_ALLOWLISTS;
+});
+
+afterAll(() => {
+  // The test approval store is per Vitest pool: clear the channels this file
+  // writes so the next file in the pool does not read them (operations-hygiene-runbook §5).
+  withExecutionContext('surface_runtime', () => {
+    for (const root of Object.values(approvalStoreRoots())) {
+      for (const channel of ['discord']) {
+        safeRmSync(pathResolver.rootResolve(`${root}/${channel}`), {
+          recursive: true,
+          force: true,
+        });
+      }
+    }
+  });
 });
 
 describe('discord bridge thread context', () => {

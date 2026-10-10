@@ -7,6 +7,7 @@ const a2aRouteSeam = createSeam<A2ARoute>({
   key: 'a2a-route',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/mesh/a2a-route-port.ts',
 });
 
 const DEFAULT_METADATA: SeamProviderMetadata = {

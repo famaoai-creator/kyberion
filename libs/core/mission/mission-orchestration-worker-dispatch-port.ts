@@ -12,6 +12,7 @@ const missionWorkerCoreDispatcherSeam = createSeam<MissionWorkerCoreDispatcher>(
   key: 'mission-worker-core-dispatcher',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/mission/mission-orchestration-worker-dispatch-port.ts',
 });
 
 const DEFAULT_METADATA: SeamProviderMetadata = {

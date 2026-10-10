@@ -40,6 +40,7 @@ const cliProviderBundleSeam = createSeam<CliProviderBundleFactory>({
   key: 'cli-provider-bundle',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/cli-provider-bundle.ts',
 });
 
 export function registerCliProviderBundle(

@@ -27,6 +27,7 @@ const ocrProviderSeam = createSeam<OcrProvider>({
   key: 'ocr-provider',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/ocr-bridge.ts',
 });
 
 const ocrProviderDisposers = new Map<string, () => void>();

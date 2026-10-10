@@ -63,6 +63,7 @@ const virtualCameraCaptureSeam = createSeam<VirtualCameraCaptureBackend>({
   key: 'virtual-camera-capture',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/virtual/virtual-camera-bridge.ts',
 });
 
 const virtualCameraCaptureDisposers = new Map<string, () => void>();
