@@ -172,7 +172,7 @@ mission brief
   - 依頼を作った人間ではなく component 名を依頼者として記録する作成元
     （`<surface>_surface_steering`、`system-actuator`、`pipeline:<runId>` など）。
 - **端末の判定は best effort で、セキュリティ境界ではない。** 端末は操作している人を認証できない。
-  - agent のセッションの目印（`KYBERION_AGENT_ID` など、provider CLI の `CLAUDECODE` など）は参考情報に
+  - agent のセッションの目印（`KYBERION_AGENT_ID` など、provider CLI の `CLAUDECODE` など。provider ごとの目印は `reasoning-providers/` の `cli.session_markers` で宣言する）は参考情報に
     すぎない環境変数で、agent は消せる（`env -u CLAUDECODE …`）。目印の無い agent の依頼は owner として
     記録され、人の承認は自己承認として拒否される（拒否側）。人が agent のセッションのシェルに打った依頼は
     agent の依頼として記録され、本人の承認が通る（false negative）。

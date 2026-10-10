@@ -34,7 +34,7 @@ import {
 import { compileSchemaFromPath } from '../schema-loader.js';
 import * as pathResolver from '../path-resolver.js';
 import {
-  CLI_AGENT_SESSION_ENV,
+  cliAgentSessionEnv,
   resolveCliApprovalRequester,
 } from '../governance/cli-operator-principal.js';
 import {
@@ -462,7 +462,7 @@ describe('mission existing work reconciliation', () => {
     writeManifest(buildManifest());
     delete process.env.KYBERION_PERSONA;
     process.env.USER = actorId;
-    for (const name of CLI_AGENT_SESSION_ENV) vi.stubEnv(name, '');
+    for (const name of cliAgentSessionEnv()) vi.stubEnv(name, '');
     ownerMember.present = false;
     try {
       const request = createMissionWorkReconciliationApprovalRequest({ missionId, manifestPath });
@@ -477,7 +477,7 @@ describe('mission existing work reconciliation', () => {
   it('records the requester the entry point resolved, keeping the detected principal as actorId', () => {
     prepareMission();
     writeManifest(buildManifest());
-    for (const name of CLI_AGENT_SESSION_ENV) vi.stubEnv(name, '');
+    for (const name of cliAgentSessionEnv()) vi.stubEnv(name, '');
     try {
       vi.stubEnv('CLAUDECODE', '1');
       const byAgent = createMissionWorkReconciliationApprovalRequest({
