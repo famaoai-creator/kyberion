@@ -34,6 +34,8 @@ export interface LockIo {
   linkExclusive?(fromPath: string, toPath: string): void;
   /** Directory listing (names), used for best-effort housekeeping of lock litter. */
   readdir?(dirPath: string): string[];
+  /** True when both paths are links of one inode (entries compared, not followed). */
+  sameFile?(a: string, b: string): boolean;
 }
 
 let lockIo: LockIo | undefined;
@@ -226,15 +228,21 @@ function loadLockRecord<T>(io: LockIo, file: string): T {
     return io.loadJson<T>(file);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '';
-    if (!message.includes('hard link') || !io.readdir) throw error;
+    const sameFile = io.sameFile;
+    if (!message.includes('hard link') || !io.readdir || !sameFile) throw error;
     const dir = path.dirname(file);
     const prefix = `${path.basename(file)}.stale-`;
     for (const name of io.readdir(dir)) {
       if (!name.startsWith(prefix) || !TOMB_PATTERN.test(name)) continue;
+      const tomb = path.join(dir, name);
       try {
-        return io.loadJson<T>(path.join(dir, name));
+        // Only a tomb that is this record's own inode (a leftover tomb from an
+        // older recovery holds another owner's record), before and after.
+        if (!sameFile(file, tomb)) continue;
+        const record = io.loadJson<T>(tomb);
+        if (sameFile(file, tomb)) return record;
       } catch {
-        // not the tomb of this record, or gone: try the next one
+        // gone or swapped: try the next one
       }
     }
     throw error;
