@@ -489,6 +489,35 @@ function checkTenantGroupScope(
  * Validates write permission based on security-policy.json ADF and Persona.
  */
 /**
+ * A scoped management write may need to create the shared structural tier
+ * directory before its own tenant directory exists. This is only a tenant
+ * classification exception; the ordinary role policy must still authorize it.
+ */
+function isScopedStructuralMkdir(
+  relativePath: string,
+  protectedPrefix: string,
+  tenantSlug: string | undefined,
+  access: { kind: 'read' | 'write' | 'mkdir'; role?: string }
+): boolean {
+  if (access.kind !== 'mkdir' || access.role !== 'concierge_management_writer') return false;
+  const resource = currentResourceAccessScope();
+  if (
+    !tenantSlug ||
+    !isValidTenantSlug(tenantSlug) ||
+    resource?.tenantSlug !== tenantSlug ||
+    relativePath !== normalizePath(protectedPrefix) ||
+    !resource.mkdirExact.includes(relativePath) ||
+    resourceAccessDenial(relativePath, 'mkdir') ||
+    !isRegisteredActiveTenant(tenantSlug)
+  )
+    return false;
+  const tenantPrefix = normalizePath(protectedPrefix) + '/' + tenantSlug + '/';
+  return resource.writeExact.some(
+    (target) => target.startsWith(tenantPrefix) && !resourceAccessDenial(target, 'write')
+  );
+}
+
+/**
  * Tenant scope check — when the active identity is bound to a tenant,
  * deny writes to other tenants' confidential prefixes (`knowledge/confidential/{other}/`
  * or `active/missions/confidential/{other}/`). SUDO bypasses this check
@@ -514,7 +543,7 @@ function checkTenantScope(
       }
     | undefined,
   authorities: Authority[],
-  access: { kind: 'read' | 'write'; role?: string } = { kind: 'write' }
+  access: { kind: 'read' | 'write' | 'mkdir'; role?: string } = { kind: 'write' }
 ): { allowed: boolean; reason?: string } | null {
   if (authorities.includes('SUDO')) return null;
   const cfg = tenantScopeConfig(policy);
@@ -577,6 +606,7 @@ function checkTenantScope(
   }
   const targetTenant = scoped.tenant;
   if (!targetTenant || !cfg.slugPattern.test(targetTenant) || !isValidTenantSlug(targetTenant)) {
+    if (isScopedStructuralMkdir(relativePath, scoped.prefix, tenantSlug, access)) return null;
     // Pre-tenant migrations stored a mission directly under
     // active/missions/confidential/{MISSION_ID}/. Keep that layout usable
     // only for an unmistakable legacy mission directory. A non-slug mission
@@ -872,7 +902,8 @@ export function validateWritePermission(
     tenantSlug,
     brokeredTenants,
     brokerApproval,
-    authorities
+    authorities,
+    { kind: operation, role: currentRole }
   );
   if (tenantDenial) return tenantDenial;
 
