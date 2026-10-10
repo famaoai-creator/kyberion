@@ -1760,6 +1760,16 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/presence-studio/approval-inbox-routes.ts#registerApprovalInboxRoutes (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/presence-studio/approval-inbox-routes.ts#registerApprovalInboxRoutes (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/presence-studio/avatar-routes.ts#readPersonal",
       "roles": ["ecosystem_architect"],
       "unresolved": []
@@ -1802,16 +1812,6 @@
     {
       "site": "presence/displays/presence-studio/server.ts#<module>",
       "roles": ["ecosystem_architect", "sovereign_concierge"],
-      "unresolved": []
-    },
-    {
-      "site": "presence/displays/presence-studio/server.ts#<module> (via libs/core/governance/approval-store.ts#withApprovalRecordLock)",
-      "roles": ["surface_runtime"],
-      "unresolved": []
-    },
-    {
-      "site": "presence/displays/presence-studio/server.ts#<module> (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": ["surface_runtime"],
       "unresolved": []
     },
     {
