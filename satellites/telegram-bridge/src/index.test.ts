@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { Readable } from 'node:stream';
 import {
   approvalRequestLogicalPath,
+  approvalStoreRoots,
   loadApprovalRequest,
 } from '@agent/core/governance/approval-store';
 import { buildBridgeEmptyReplyText } from '@agent/core/bridge-error-reply';
@@ -82,6 +83,21 @@ afterEach(() => {
       ),
       { force: true }
     );
+  });
+});
+
+afterAll(() => {
+  // The test approval store is per Vitest pool: clear the channels this file
+  // writes so the next file in the pool does not read them (operations-hygiene-runbook §5).
+  withExecutionContext('surface_runtime', () => {
+    for (const root of Object.values(approvalStoreRoots())) {
+      for (const channel of ['telegram']) {
+        safeRmSync(pathResolver.rootResolve(`${root}/${channel}`), {
+          recursive: true,
+          force: true,
+        });
+      }
+    }
   });
 });
 

@@ -11,6 +11,7 @@ import {
   computeApprovalPayloadHash,
   createApprovalRequest,
   decideApprovalRequest,
+  isSeparationOfDutiesEnabled,
   loadApprovalRequest,
   recordApprovalApplyResult,
   type ApprovalRequestRecord,
@@ -57,13 +58,26 @@ export interface ProposeSecretIntroductionInput {
   /** Enable policy auto-approval only for low-risk local surfaces; never bypasses risk checks. */
   autoApproveLocal?: boolean;
   decidedBy?: string;
+  /**
+   * How the value will be collected after approval: `interactive` when a
+   * person types it at a hidden TTY prompt. Anything else (a file, an API
+   * body, or not stated) is non-interactive. Matters only with separation of
+   * duties on, where only an interactive value may be auto-approved.
+   */
+  valueSource?: 'interactive' | 'non_interactive';
 }
+
+/** Why policy auto-approval was withheld with separation of duties on. */
+export type SecretAutoApproveWithheldReason =
+  'agent_requester' | 'non_interactive_value' | 'rotate_existing_value';
 
 export interface ProposeSecretIntroductionResult {
   approvalId: string;
   status: ApprovalRequestRecord['status'];
   identity: SecretIdentity;
   autoApproved: boolean;
+  /** Reasons auto-approval was withheld under separation of duties (empty otherwise). */
+  autoApproveWithheld: SecretAutoApproveWithheldReason[];
   storageChannel: string;
   channel: string;
 }
@@ -142,6 +156,39 @@ function shouldAutoApprove(input: ProposeSecretIntroductionInput): boolean {
   if (risk !== 'low') return false;
   const surface = input.requestedByContext?.surface;
   return surface === 'terminal' || surface === 'chronos' || surface === 'api' || !surface;
+}
+
+function separationOfDutiesOn(): boolean {
+  try {
+    return isSeparationOfDutiesEnabled();
+  } catch {
+    // An unreadable policy fails closed: no auto-approval, the human decides.
+    return true;
+  }
+}
+
+/**
+ * With separation of duties on, the policy auto-approval stands in for a
+ * person only when one is demonstrably present and the change is additive:
+ * never for an agent requester, a value that is not typed at a TTY, or a
+ * rotation that overwrites an existing value. Those go to human approval.
+ * With it off, nothing is withheld.
+ */
+function autoApproveWithheldReasons(
+  input: ProposeSecretIntroductionInput,
+  facts: { requestedBy: string; mutation: 'set' | 'rotate'; existingValuePresent: boolean }
+): SecretAutoApproveWithheldReason[] {
+  if (!separationOfDutiesOn()) return [];
+  const reasons: SecretAutoApproveWithheldReason[] = [];
+  const principals = [facts.requestedBy, input.requestedByContext?.actorId];
+  if (principals.some((value) => typeof value === 'string' && /^agent:/i.test(value.trim()))) {
+    reasons.push('agent_requester');
+  }
+  if (input.valueSource !== 'interactive') reasons.push('non_interactive_value');
+  if (facts.mutation === 'rotate' && facts.existingValuePresent) {
+    reasons.push('rotate_existing_value');
+  }
+  return reasons;
 }
 
 /**
@@ -230,7 +277,14 @@ export function proposeSecretIntroduction(
 
   let status = record.status;
   let autoApproved = false;
-  if (shouldAutoApprove(input)) {
+  const autoApproveWithheld = shouldAutoApprove(input)
+    ? autoApproveWithheldReasons(input, {
+        requestedBy,
+        mutation,
+        existingValuePresent: existingPresent,
+      })
+    : [];
+  if (shouldAutoApprove(input) && autoApproveWithheld.length === 0) {
     const decided = decideApprovalRequest('mission_controller', {
       channel: record.channel,
       storageChannel: record.storageChannel,
@@ -255,6 +309,7 @@ export function proposeSecretIntroduction(
     changed_keys: [identity.secretKey],
     approval_id: record.id,
     auto_approved: autoApproved,
+    ...(autoApproveWithheld.length ? { auto_approve_withheld: autoApproveWithheld } : {}),
   });
 
   return {
@@ -262,6 +317,7 @@ export function proposeSecretIntroduction(
     status,
     identity,
     autoApproved,
+    autoApproveWithheld,
     storageChannel: record.storageChannel,
     channel: record.channel,
   };

@@ -16,6 +16,14 @@ import { startServiceRecordingSession } from '@agent/core/service/service-record
 import { withExecutionContext } from '@agent/core/authority';
 import { nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
+import { assertApprovalUsable } from '@agent/core/governance/approval-store';
+import { resolveCliApprovalRequester } from '@agent/core/governance/cli-operator-principal';
+import type { ApprovalRequesterInput } from '@agent/core/governance/approval-requester';
+import {
+  findServiceRecordingReviewRequest,
+  requestServiceRecordingReview,
+} from '@agent/core/service/service-recording-review-approval';
+import { decideApprovalFromCli, revokeApprovalFromCli } from './lib/approval-cli-decision.js';
 import {
   defineScript,
   isDirectScript,
@@ -82,6 +90,7 @@ function printUsage(): string {
   service_recording capture --target-name <name> --calls <json|@path> [--recording-id <id>]
   service_recording compile --recording <path> --procedure-id <id> --intent-phrases <json> [--output <path>] [--dry-run]
   service_recording candidate --recording <path> --procedure-id <id> --intent-phrases <json> [--mission-id <id>] [--tenant-slug <slug>] [--tier <personal|confidential>] [--title <text>]
+  service_recording request-review --recording <path> [--requested-by <id>]
   service_recording review --recording <path> --approve|--reject [--reviewer <id>] [--note <text>]
   service_recording promote --recording <path> --procedure-id <id> --intent-phrases <json>`;
 }
@@ -133,10 +142,32 @@ function compile(args: Record<string, string>): CommandResult {
   };
 }
 
+/** Who asks for a recording's review: `--requested-by`, the agent session or the local owner. */
+function reviewRequester(args: Record<string, string>) {
+  return resolveCliApprovalRequester({
+    explicit: args['requested-by'],
+    legacy: 'service-recording-cli',
+  });
+}
+
+function openReview(
+  loaded: { absolute: string; value: ServiceRecording },
+  requester: ApprovalRequesterInput
+) {
+  return requestServiceRecordingReview({
+    recording: loaded.value,
+    recordingRef: pathResolver.toRepoRelative(loaded.absolute),
+    requester,
+  });
+}
+
 function capture(args: Record<string, string>): CommandResult {
   if (!args['target-name'] || !args.calls)
     throw new Error('capture requires --target-name and --calls');
   const calls = requireCalls(readJsonArgument(args.calls, 'calls'));
+  // Resolved before anything is written: with separation of duties on and no
+  // stable identity this reports instead of recording an unprovable requester.
+  const requester = reviewRequester(args);
   const session = startServiceRecordingSession({
     target_name: args['target-name'],
     recording_id: args['recording-id'],
@@ -152,8 +183,29 @@ function capture(args: Record<string, string>): CommandResult {
       ...(Array.isArray(call.consumes) ? { consumes: call.consumes.map(String) } : {}),
     });
   const recordingRef = withExecutionContext('surface_runtime', () => session.persist());
+  // The review is requested by whoever captured the recording.
+  const review = openReview(loadRecording(recordingRef), requester);
   return {
-    value: { status: 'recorded', recording_ref: recordingRef, recording: session.toRecording() },
+    value: {
+      status: 'recorded',
+      recording_ref: recordingRef,
+      review_request_id: review.id,
+      recording: session.toRecording(),
+    },
+  };
+}
+
+function requestReview(args: Record<string, string>): CommandResult {
+  if (!args.recording) throw new Error('request-review requires --recording');
+  const loaded = loadRecording(args.recording);
+  const review = openReview(loaded, () => reviewRequester(args));
+  return {
+    value: {
+      status: review.status === 'pending' ? 'review-requested' : `review-${review.status}`,
+      recording_ref: pathResolver.toRepoRelative(loaded.absolute),
+      review_request_id: review.id,
+      requested_by: review.requestedBy,
+    },
   };
 }
 
@@ -192,19 +244,42 @@ function candidate(args: Record<string, string>): CommandResult {
   };
 }
 
-function review(args: Record<string, string>): CommandResult {
+async function review(args: Record<string, string>): Promise<CommandResult> {
   if (!args.recording || (args.approve !== 'true' && args.reject !== 'true')) {
     throw new Error('review requires --recording and exactly one of --approve/--reject');
   }
   const loaded = loadRecording(args.recording);
   const status: 'approved' | 'rejected' = args.approve === 'true' ? 'approved' : 'rejected';
+  const recordingRef = pathResolver.toRepoRelative(loaded.absolute);
+  // The decision goes through the approval store (separation of duties,
+  // audit). A recording captured before reviews were requested at capture
+  // gets its request here — with no prior requester on record.
+  let request = findServiceRecordingReviewRequest(loaded.value);
+  if (!request) request = openReview(loaded, () => reviewRequester(args));
+  if (request.status === 'approved' && status === 'rejected') {
+    request = revokeApprovalFromCli(request, {
+      reason: args.note || 'recording review rejected after approval',
+    });
+  } else if (request.status === 'pending') {
+    request = await decideApprovalFromCli(request, {
+      decision: status,
+      note: args.note || `service recording review of ${recordingRef}`,
+    });
+  }
+  if (status === 'approved') {
+    assertApprovalUsable(request, {
+      consumer: 'service_recording_review',
+      rerequestHint: `re-request the review with \`service_recording request-review --recording ${recordingRef}\``,
+    });
+  }
   const updated: ServiceRecording = {
     ...loaded.value,
     review: {
       status,
-      reviewer: args.reviewer || 'human:operator',
+      reviewer: args.reviewer || request.decidedBy || 'human:operator',
       reviewed_at: nowIso(),
       decisions: loaded.value.steps.map((step) => ({ step_id: step.step_id, status })),
+      approval_request_id: request.id,
       ...(args.note ? { note: args.note } : {}),
     },
   };
@@ -218,7 +293,7 @@ function review(args: Record<string, string>): CommandResult {
   withExecutionContext('surface_runtime', () =>
     safeWriteFile(loaded.absolute, `${JSON.stringify(updated, null, 2)}\n`)
   );
-  return { value: { status, recording_ref: pathResolver.toRepoRelative(loaded.absolute) } };
+  return { value: { status, recording_ref: recordingRef, review_request_id: request.id } };
 }
 
 function promote(args: Record<string, string>): CommandResult {
@@ -257,6 +332,7 @@ export async function main(
   if (command === 'capture') return capture(args);
   if (command === 'compile') return compile(args);
   if (command === 'candidate') return candidate(args);
+  if (command === 'request-review') return requestReview(args);
   if (command === 'review') return review(args);
   if (command === 'promote') return promote(args);
   throw new Error(`unknown command: ${command}`);

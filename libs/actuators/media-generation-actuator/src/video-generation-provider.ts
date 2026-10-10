@@ -95,6 +95,7 @@ const directVideoProviderAdapters = createSeam<DirectVideoProviderAdapter>({
   key: VIDEO_GENERATION_ADAPTER_SEAM,
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/actuators/media-generation-actuator/src/video-generation-provider.ts',
 });
 let directVideoBuiltinsRegistered = false;
 

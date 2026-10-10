@@ -12,6 +12,9 @@ import {
   type ApprovalDeciderIdentitySource,
 } from './approval-separation-of-duties.js';
 import type { HeldEffectSteeringAction } from './held-effect-bridge.js';
+import type { ApprovalConsumption, ApprovalRevocation } from './approval-revocation.js';
+import { validateHumanFinalDecision } from './approval-human-decision.js';
+export { validateHumanFinalDecision } from './approval-human-decision.js';
 import {
   appendGovernedArtifactJsonl,
   ensureGovernedArtifactDir,
@@ -204,9 +207,13 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   threadTs: string;
   correlationId: string;
   requestedBy: string;
+  /** Human-readable name of the requester (display only, never compared). */
+  requestedByDisplayName?: string;
   requestedAt: string;
   decidedAt?: string;
   decidedBy?: string;
+  /** Human-readable name of the decider (display only, never compared). */
+  decidedByDisplayName?: string;
   /** Durable copy of the decision identity used by fail-closed consumers. */
   decidedByType?: ApprovalRecord['decidedByType'];
   /** How the surface obtained `decidedBy` (see ApprovalDeciderIdentitySource). */
@@ -251,6 +258,18 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   changeRequest?: ApprovalChangeRequest;
   /** Autonomous-operation P1-7: present when silence after delivery lets the request proceed. */
   veto?: ApprovalVetoWindow;
+  /**
+   * Set by `revokeApprovalRequest`: the approval was revoked and further uses
+   * are refused. The status stays `approved` (the decision happened), but
+   * `evaluateApprovalUsability` refuses it for every consumer.
+   */
+  revocation?: ApprovalRevocation;
+  /** A one-shot effect used this approval (`markApprovalConsumed`); it cannot be revoked. */
+  consumption?: ApprovalConsumption;
+  /** Agent session the terminal decision was typed in (decider recorded as caller_supplied). */
+  decidedInAgentSession?: string;
+  /** `cli_tty_challenge`: a terminal approval confirmed by a typed challenge (best effort). */
+  decidedVia?: 'cli_tty_challenge';
 }
 
 export interface ApprovalChangeRequest {
@@ -369,6 +388,13 @@ export function clearSessionApprovalCache(): void {
   sessionApprovalCache.clear();
 }
 
+/** Drop the session-cache grants a request seeded (its approval was revoked). */
+export function forgetSessionApprovalCacheFor(requestId: string): void {
+  for (const [key, entry] of sessionApprovalCache) {
+    if (entry.grantedByRequestId === requestId) sessionApprovalCache.delete(key);
+  }
+}
+
 /** KC-03: make cache-based auto-approvals durable in the decision event stream. */
 export function recordSessionCacheAutoApproval(
   role: GovernedArtifactRole,
@@ -423,45 +449,10 @@ const TERMINAL_DECIDED_STATUSES: ReadonlySet<ApprovalRequestRecord['status']> = 
   'failed',
 ]);
 
-export function validateHumanFinalDecision(params: {
-  accountability?: ApprovalAccountability;
-  decidedByType?: ApprovalRecord['decidedByType'];
-  authenticated?: boolean;
-  authMethod?: ApprovalRecord['authMethod'];
-  payloadHash?: string;
-  effectBinding?: string;
-}): void {
-  if (params.accountability?.finalDecision !== 'human_only') return;
-  if (params.decidedByType !== 'human') {
-    throw new Error('[POLICY_VIOLATION] Final approval requires a human decider');
-  }
-  if (params.authenticated !== true) {
-    throw new Error('[POLICY_VIOLATION] Final approval requires an authenticated human decider');
-  }
-  if (params.authMethod === 'local_token') {
-    throw new Error(
-      '[POLICY_VIOLATION] Final approval requires a human-authenticated surface; local_token is not sufficient'
-    );
-  }
-  if (
-    params.accountability.payloadHash &&
-    params.payloadHash !== params.accountability.payloadHash
-  ) {
-    throw new Error('[POLICY_VIOLATION] Approval payload hash does not match the requested effect');
-  }
-  if (
-    params.accountability.effectBinding &&
-    params.effectBinding !== params.accountability.effectBinding
-  ) {
-    throw new Error(
-      '[POLICY_VIOLATION] Approval effect binding does not match the requested operation'
-    );
-  }
-}
-
 export {
   APPROVAL_PLACEHOLDER_DECIDERS,
   approvalRequesterIdentities,
+  approvalRevokeCommand,
   approvalUsabilityRefusal,
   assertApprovalUsable,
   evaluateApprovalUsability,
@@ -469,6 +460,7 @@ export {
   isSeparationOfDutiesEnabled,
   normalizeApprovalPrincipalId,
   type ApprovalDeciderIdentitySource,
+  type ApprovalUnusableReason,
   type SeparationOfDutiesViolation,
 } from './approval-separation-of-duties.js';
 
@@ -531,11 +523,16 @@ export function approvalStoreRoots(env: Record<string, string | undefined> = pro
   observability: string;
 } {
   if (isVitestProcess(env)) {
-    // Per worker: parallel test files that clear a channel must not race each other.
+    // Per run (KYBERION_VITEST_RUN_ID, set by tests/vitest-run-id.ts) and per
+    // worker: two Vitest runs in one checkout, and parallel files that clear a
+    // channel, must not race each other.
+    const run = env.KYBERION_VITEST_RUN_ID
+      ? `/run-${env.KYBERION_VITEST_RUN_ID.replace(/[^\w-]/g, '')}`
+      : '';
     const pool = env.VITEST_POOL_ID ? `/pool-${env.VITEST_POOL_ID.replace(/[^\w-]/g, '')}` : '';
     return {
-      coordination: `${VITEST_APPROVAL_STORE_ROOT}${pool}/coordination/channels`,
-      observability: `${VITEST_APPROVAL_STORE_ROOT}${pool}/observability/channels`,
+      coordination: `${VITEST_APPROVAL_STORE_ROOT}${run}${pool}/coordination/channels`,
+      observability: `${VITEST_APPROVAL_STORE_ROOT}${run}${pool}/observability/channels`,
     };
   }
   return {
@@ -564,6 +561,8 @@ export function createApprovalRequest(
     threadTs: string;
     correlationId: string;
     requestedBy: string;
+    /** Display name of the requester (see `cli-operator-principal.ts`). */
+    requestedByDisplayName?: string;
     draft: ApprovalRequestDraft;
     sourceText?: string;
     kind?: ApprovalRequestRecord['kind'];
@@ -601,6 +600,9 @@ export function createApprovalRequest(
     threadTs: params.threadTs,
     correlationId: params.correlationId,
     requestedBy: params.requestedBy,
+    ...(params.requestedByDisplayName
+      ? { requestedByDisplayName: params.requestedByDisplayName }
+      : {}),
     requestedAt: nowIso(),
     status: 'pending',
     title: params.draft.title,
@@ -668,7 +670,7 @@ export function createApprovalRequest(
  * surface renders the same approval dialog from one contract. The jsonl
  * event log above stays the SSoT; this projection is best-effort.
  */
-function projectApprovalWorkerEvent<K extends 'approval_request' | 'approval_response'>(
+export function projectApprovalWorkerEvent<K extends 'approval_request' | 'approval_response'>(
   type: K,
   payload: WorkerEventPayloadMap[K],
   source?: WorkerEventSource
@@ -680,7 +682,7 @@ function projectApprovalWorkerEvent<K extends 'approval_request' | 'approval_res
   }
 }
 
-function approvalWorkerEventSource(record: ApprovalRequestRecord): WorkerEventSource {
+export function approvalWorkerEventSource(record: ApprovalRequestRecord): WorkerEventSource {
   return {
     ...(record.source?.missionId ? { mission_id: record.source.missionId } : {}),
     ...(record.source?.taskId ? { task_id: record.source.taskId } : {}),
@@ -698,8 +700,8 @@ export function isApprovalRequestExpired(
   return !Number.isFinite(expiresAt) || expiresAt <= now;
 }
 
-/** Serialize competing decision/cancellation/expiry transitions for one canonical record. */
-function withApprovalRecordLock<T>(
+/** Serialize competing decision/cancellation/expiry/revocation transitions for one canonical record. */
+export function withApprovalRecordLock<T>(
   role: GovernedArtifactRole,
   params: { channel: string; storageChannel?: string; requestId: string },
   fn: () => T
@@ -983,6 +985,10 @@ function decideApprovalRequestUnlocked(
     requestId: string;
     decision: 'approved' | 'rejected';
     decidedBy: string;
+    /** Display name of the decider (see `cli-operator-principal.ts`). */
+    decidedByDisplayName?: string;
+    decidedInAgentSession?: string;
+    decidedVia?: 'cli_tty_challenge';
     decidedByRole?: string;
     authMethod?: ApprovalRecord['authMethod'];
     decidedByType?: 'human' | 'ai_agent' | 'service';
@@ -1148,6 +1154,9 @@ function decideApprovalRequestUnlocked(
   const {
     changeRequest: priorChangeRequest,
     decidedByIdentitySource: _priorIdentitySource,
+    decidedByDisplayName: _priorDisplayName,
+    decidedInAgentSession: _priorAgentSession,
+    decidedVia: _priorDecidedVia,
     ...recordWithoutChangeRequest
   } = record;
   const updated: ApprovalRequestRecord = {
@@ -1158,6 +1167,11 @@ function decideApprovalRequestUnlocked(
     status: params.decision,
     decidedAt,
     decidedBy: params.decidedBy,
+    ...(params.decidedByDisplayName ? { decidedByDisplayName: params.decidedByDisplayName } : {}),
+    ...(params.decidedInAgentSession
+      ? { decidedInAgentSession: params.decidedInAgentSession }
+      : {}),
+    ...(params.decidedVia ? { decidedVia: params.decidedVia } : {}),
     ...(params.deciderIdentitySource
       ? { decidedByIdentitySource: params.deciderIdentitySource }
       : {}),
@@ -1185,6 +1199,9 @@ function decideApprovalRequestUnlocked(
     correlation_id: updated.correlationId,
     decided_by: params.decidedBy,
     decided_by_role: params.decidedByRole,
+    decider_identity_source: params.deciderIdentitySource,
+    decided_in_agent_session: params.decidedInAgentSession,
+    decided_via: params.decidedVia,
     auth_method: params.authMethod,
     decided_by_type: params.decidedByType,
     authenticated: params.authenticated,

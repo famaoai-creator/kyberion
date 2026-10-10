@@ -6,6 +6,12 @@
  * the master still contains entries for that tenant. The operation is dry-run
  * by default and requires an authenticated Sovereign approval to apply.
  */
+import {
+  approvalRequesterActorId,
+  resolveApprovalRequesterInput,
+  type ApprovalRequesterInput,
+} from '@agent/core/governance/approval-requester';
+import { cliApprovalRequester } from './lib/cli-approval-requester.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { auditChain, normalizePersistedAuditEntry } from '@agent/core/governance/audit-chain';
@@ -227,6 +233,8 @@ export function computeAuditMirrorApprovalPayloadHash(
 export function openAuditMirrorApproval(input: {
   missionId: string;
   requestedBy?: string;
+  /** The requester the CLI resolved; resolved only when a request is opened. */
+  requester?: ApprovalRequesterInput;
   rootDir?: string;
 }): OpenAuditMirrorApprovalResult {
   const missionId = input.missionId.trim().toUpperCase();
@@ -252,12 +260,16 @@ export function openAuditMirrorApproval(input: {
     };
   }
 
+  const requester = input.requester
+    ? resolveApprovalRequesterInput(input.requester)
+    : { requestedBy: input.requestedBy || 'audit-mirror-controller' };
   const record = createApprovalRequest('mission_controller', {
     channel: AUDIT_MIRROR_APPROVAL_CHANNEL,
     storageChannel: AUDIT_MIRROR_APPROVAL_CHANNEL,
     threadTs: missionId,
     correlationId: `audit-mirror-reconcile-${missionId}`,
-    requestedBy: input.requestedBy || 'audit-mirror-controller',
+    requestedBy: requester.requestedBy,
+    ...(requester.displayName ? { requestedByDisplayName: requester.displayName } : {}),
     kind: 'mission_gate',
     draft: {
       title: `SA-01 audit mirror reconciliation: ${missionId}`,
@@ -268,7 +280,7 @@ export function openAuditMirrorApproval(input: {
     source: { missionId },
     requestedByContext: {
       surface: 'terminal',
-      actorId: input.requestedBy || 'audit-mirror-controller',
+      actorId: approvalRequesterActorId(requester),
       actorRole: 'mission_controller',
       missionId,
     },
@@ -493,7 +505,10 @@ export function main(argv: string[] = []) {
   const requestedByIndex = argv.indexOf('--requested-by');
   const requestedBy = requestedByIndex >= 0 ? argv[requestedByIndex + 1] : undefined;
   if (requestApproval) {
-    const result = openAuditMirrorApproval({ missionId, ...(requestedBy ? { requestedBy } : {}) });
+    const result = openAuditMirrorApproval({
+      missionId,
+      requester: cliApprovalRequester(requestedBy, 'audit-mirror-controller'),
+    });
     return { result, failed: Boolean(result.reason) };
   }
   return {

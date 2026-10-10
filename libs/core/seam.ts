@@ -7,6 +7,10 @@
  */
 
 import { assertModuleInvariant } from './invariants.js';
+import { isVitestProcess } from './foundation/env.js';
+import { createLogger } from './logger.js';
+
+const logger = createLogger('seam');
 
 export type SeamMultiplicity = 'sole' | 'named';
 export type SeamProviderProvenance = 'builtin' | 'plugin' | 'tenant-overlay' | 'generated';
@@ -29,6 +33,24 @@ export interface SeamDefinition<T> {
   multiplicity: SeamMultiplicity;
   select?: (providers: readonly SeamProviderRecord<T>[], selector?: string) => T | undefined;
   catalog?: SeamCatalog;
+  /**
+   * Repo-relative path of the module that defines this seam (e.g.
+   * `libs/core/task/task-session.ts`). Required for every module-level seam
+   * registered in a catalog (`seam-reevaluation.test.ts` enforces it for
+   * `coreSeamCatalog`).
+   *
+   * A module that creates a seam at load time can be evaluated twice against
+   * one catalog instance — a `vi.resetModules()` racing an import still in
+   * flight (operations-hygiene-runbook §5). Under Vitest only, the catalog
+   * then lets the second evaluation replace the entry its owner registered
+   * before, with a warning, instead of throwing. A definition with a different
+   * (or no) owner, or a different multiplicity, is still rejected as a
+   * duplicate. Outside Vitest every re-registration throws
+   * `SEAM_DUPLICATE_PROVIDER`: there it means a real double load, and the owner
+   * is a plain string anyone can copy — an identity for test re-evaluation,
+   * not a security boundary.
+   */
+  owner?: string;
 }
 
 export interface SeamBindingSnapshot {
@@ -46,6 +68,8 @@ export interface SeamCatalog {
 export interface Seam<T> {
   readonly key: string;
   readonly multiplicity: SeamMultiplicity;
+  /** The defining module, when declared (`SeamDefinition.owner`). */
+  readonly owner?: string;
   register(id: string, implementation: T, metadata: SeamProviderMetadata): () => void;
   get(selector?: string): T;
   getOptional(selector?: string): T | undefined;
@@ -80,11 +104,25 @@ export function createSeamCatalog(): SeamCatalog {
   const seams = new Map<string, Seam<unknown>>();
   return {
     register<T>(seam: Seam<T>) {
-      if (seams.has(seam.key)) {
-        throw new SeamError(
-          'SEAM_DUPLICATE_PROVIDER',
-          seam.key,
-          `Seam ${seam.key} is already registered in the catalog`
+      const existing = seams.get(seam.key);
+      if (existing) {
+        if (!isVitestProcess() || !isReevaluationOf(existing, seam)) {
+          throw new SeamError(
+            'SEAM_DUPLICATE_PROVIDER',
+            seam.key,
+            `Seam ${seam.key} is already registered in the catalog`
+          );
+        }
+        logger.warn(
+          `superseding seam ${seam.key} in the catalog — its defining module ${seam.owner} ` +
+            `was evaluated again; providers registered on the stale seam are dropped | ` +
+            `next: none if this follows a module-registry reset; otherwise find the second evaluation of ${seam.owner} | ` +
+            `evidence: seam=${seam.key} owner=${seam.owner} stale_providers=${
+              existing
+                .list()
+                .map((provider) => provider.id)
+                .join(',') || '-'
+            }`
         );
       }
       seams.set(seam.key, seam as Seam<unknown>);
@@ -107,6 +145,21 @@ export function createSeamCatalog(): SeamCatalog {
         }));
     },
   };
+}
+
+/**
+ * Under Vitest, a second definition may replace a catalog entry only when it
+ * comes from the same declared owner with the same multiplicity: that is the
+ * defining module evaluated again after a module-registry reset, not a
+ * competing definition. Outside Vitest no replacement is allowed.
+ */
+function isReevaluationOf(existing: Seam<unknown>, next: Seam<unknown>): boolean {
+  return (
+    typeof next.owner === 'string' &&
+    next.owner.length > 0 &&
+    existing.owner === next.owner &&
+    existing.multiplicity === next.multiplicity
+  );
 }
 
 /** Catalog for the production core seams; tests can create isolated catalogs. */
@@ -180,9 +233,11 @@ export function defineSeam<T>(definition: SeamDefinition<T>): Seam<T> {
     );
   };
 
+  if (definition.owner !== undefined) assertNonEmpty(definition.owner, 'owner', definition.key);
   const seam: Seam<T> = {
     key: definition.key,
     multiplicity: definition.multiplicity,
+    ...(definition.owner !== undefined ? { owner: definition.owner } : {}),
     register(id, implementation, metadata) {
       assertNonEmpty(id, 'provider id', definition.key);
       assertModuleInvariant('seam', 'provider-metadata', { metadata });

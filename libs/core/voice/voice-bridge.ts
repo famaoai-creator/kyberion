@@ -144,6 +144,7 @@ const voiceBridgeSeam = createSeam<VoiceBridge>({
   key: 'voice-bridge',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/voice/voice-bridge.ts',
 });
 let registeredDisposer: (() => void) | null = null;
 

@@ -48,6 +48,7 @@ const taskPlanCoordinatorSeam = createSeam<TaskPlanCoordinatorPort>({
   key: 'task-plan-coordinator',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/task/task-plan-coordinator-port.ts',
 });
 let registeredDisposer: (() => void) | null = null;
 

@@ -201,6 +201,7 @@ identity の保存先と、baseline-check の L3 が確認する場所は、ア�
   - `pnpm onboarding apply --identity <path/to/identity.json>` — JSON ファイルからアイデンティティを適用（Path B）
     - ひな形は [`knowledge/public/templates/onboarding/identity.example.json`](../knowledge/public/templates/onboarding/identity.example.json) をコピーして使ってください。まず `--dry-run` で検証すると安全です。
   - `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 pnpm onboarding` — 意図的に default 値で進める（評価環境向け）
+- **承認に使う operator の identity**: 端末は承認を local owner member（`user:owner`、`knowledge/personal/members/owner.json`）として記録し、onboarding の名前は表示用に別に残します。concierge か presence-studio を開くとこの member が作られます。端末だけで使う場合は `pnpm organization member ensure-owner`（冪等）を実行します。職務分離（`approval-policy.json` の `separation_of_duties.enabled`）を有効にするときに必要で、無いと端末からの承認依頼と承認は診断メッセージを出して止まります。
 - **やり直す場合**: `pnpm onboarding reset` で onboarding state と生成された identity / vision / agent の成果物を削除します。
 - **物理的変化**:
   - `customer/{slug}/my-identity.json` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/my-identity.json` になります。

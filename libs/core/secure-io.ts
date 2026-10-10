@@ -68,6 +68,7 @@ const SAFE_EXEC_ENV_ALLOWLIST = [
   // Unset outside Vitest, so production children are unaffected.
   'VITEST',
   'VITEST_POOL_ID',
+  'KYBERION_VITEST_RUN_ID',
   // Non-secret CI metadata: detached checkouts (PR merge refs) cannot resolve
   // a branch via git, so runners spawned through safeExec (vitest workers,
   // pipelines) need these to bind git-bound scaffolds. Never add GITHUB_TOKEN

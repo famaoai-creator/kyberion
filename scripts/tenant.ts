@@ -1,7 +1,6 @@
 import {
   attestTenantProvider,
   assertPrintableCommandValue,
-  captureAttestationInvoker,
   providerAttestationApplyArgs,
   requestTenantProviderAttestationApproval,
   shellQuoteArg,
@@ -10,6 +9,7 @@ import {
   type TenantLifecycleVerb,
   listTenants,
 } from '@agent/core/organization/tenant-governance';
+import { captureCliAttestationInvoker } from './lib/cli-attestation-invoker.js';
 import { readTenantProfile } from '@agent/core/organization/tenant-registry';
 import { withExecutionContext } from '@agent/core/authority';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -184,7 +184,7 @@ export function main(
       return;
     }
     // Capture who asked (and their tenant binding) before elevating.
-    const invoker = captureAttestationInvoker();
+    const invoker = captureCliAttestationInvoker();
     const attestInput: AttestTenantProviderInput = {
       invoker,
       slug: args.slug!,
