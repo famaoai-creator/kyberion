@@ -285,9 +285,7 @@ export async function runActuatorStepSequence<
  * from implementation field usage.
  */
 const LEGACY_OPEN_OPERATION_IDS = new Set([
-  'browser:click_ref',
   'browser:close_session',
-  'browser:fill_ref',
   'browser:import_session_handoff',
   'media:apply_pattern',
   'media:document_diagram_asset_from_brief',

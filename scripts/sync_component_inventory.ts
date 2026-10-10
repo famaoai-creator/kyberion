@@ -350,6 +350,9 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
     "- Single-op dry-run: `pnpm playground -- --actuator <id> --op <op> --params '{…}' --dry-run --json`"
   );
   lines.push(
+    '- Agent discovery: `pnpm playground -- --list --search browser --json`; inspect arguments without execution with `--actuator <id> --op <op> --describe --json`. See [agent actuator usage](knowledge/product/orchestration/actuator-agent-usage.md) for checks, observation loops and the computer-use / Browser Use comparison.'
+  );
+  lines.push(
     '- Discovery without build: `pnpm capabilities` (source entry). Execution still needs `pnpm build`. Doctor: `pnpm run doctor` (not bare `pnpm doctor`).'
   );
   lines.push(

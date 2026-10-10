@@ -32,6 +32,7 @@ had regressed.
 | Mission evidence overwrites   | generator and phase-pipeline tests in `mission-retrospective.test.ts` | §8      |
 | Project lifecycle facades     | lifecycle regressions in `project-management.test.ts`                 | §9      |
 | secure-io link escapes        | `secure-io.symlink-canonical.test.ts`, `secure-io.symlink-root-alias` | §10     |
+| Actuator failure receipts     | cli-utils / actuator tests, `pty-engine.resize.test.ts`, probes       | §11     |
 
 ---
 
@@ -747,6 +748,31 @@ swap between check and temp open, single probe registration, `node_modules` read
 legitimate links in scope, Vitest remap, vault reads), `libs/core/secure-io.symlink-root-alias.test.ts`
 (checkout behind a linked prefix) and the import boundary in
 `libs/core/security-boundary.contract.test.ts`. Each attack case fails on the pre-fix code.
+
+---
+
+## §11 Actuator failure receipts and terminal capabilities
+
+**Rule.** A failed or denied actuator result must remain a failure in both the
+resident CLI envelope and the one-shot process exit code. Preserve the result
+payload for diagnosis. A pipe terminal cannot resize and must report that limit.
+
+**Procedure.** Verify the result status and observed outcome after acting. Reject
+ambiguous browser targets and empty target sets before recording success. Require
+explicit string fill values, including after template resolution; an explicit
+empty string may clear a field. Re-observe after a rejected reference or timeout.
+For terminal operations, retain the session ID and command exit code, and return
+missing-session or unsupported-capability diagnostics instead of false success.
+
+**Gate.** Run `scripts/actuator_playground.test.ts`, `libs/core/cli-utils.test.ts`,
+the browser and terminal actuator tests, and `libs/core/shell/pty-engine.resize.test.ts`.
+Replay `scripts/browser_actuator_usability_probe.ts` and
+`scripts/terminal_actuator_usability_probe.ts` for live outcomes and recovery.
+Native PTY and desktop GUI checks require the corresponding host capabilities.
+When adding probe scratch with `sharedTmp()`, register the exact call count and
+the consumable diagnostic purpose in `shared-tmp-allowlist.json`, then run
+`tests/shared-tmp-ratchet.test.ts`. Preserve durable conclusions in mission
+evidence instead of relying on scratch files after their retention window.
 
 ---
 

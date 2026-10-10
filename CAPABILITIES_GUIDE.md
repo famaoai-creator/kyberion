@@ -1,7 +1,7 @@
 # Kyberion Capabilities Guide
 
 Total Actuators: 37
-Last updated: 2026-10-07
+Last updated: 2026-10-10
 
 This guide is generated from `libs/actuators/*/manifest.json` (actuator table) and `knowledge/product/orchestration/actuator-op-discovery.json` (op tables, sourced from each actuator describeOps). Human-readable counterpart to `global_actuator_index.json`.
 
@@ -616,5 +616,6 @@ See also:
 - Meeting daily path: `pnpm meeting:participate` (browser-playwright). `zoom-sdk` / `recall-ai` are **unimplemented seams** (docs-only / deferred). Do not call them.
 - Actuator dry-run: capture always executes (side-effect-free); apply `--dry-run` validates contract/params only (`pnpm playground` and `createStandardYargs --dry-run` / `pnpm kyberion run … --dry-run`).
 - Single-op dry-run: `pnpm playground -- --actuator <id> --op <op> --params '{…}' --dry-run --json`
+- Agent discovery: `pnpm playground -- --list --search browser --json`; inspect arguments without execution with `--actuator <id> --op <op> --describe --json`. See [agent actuator usage](knowledge/product/orchestration/actuator-agent-usage.md) for checks, observation loops and the computer-use / Browser Use comparison.
 - Discovery without build: `pnpm capabilities` (source entry). Execution still needs `pnpm build`. Doctor: `pnpm run doctor` (not bare `pnpm doctor`).
 - Cloud Agent VM: [docs/developer/CLOUD_AGENT_ENVIRONMENT.md](docs/developer/CLOUD_AGENT_ENVIRONMENT.md) — Node `>=24`, `pnpm build` before pipeline / MCP / full doctor.

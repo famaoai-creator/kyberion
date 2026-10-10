@@ -139,6 +139,12 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
 
     case 'poll': {
       if (!params.sessionId) throw new Error('sessionId is required for poll action');
+      if (!ptyEngine.get(params.sessionId)) {
+        return {
+          status: 'failed',
+          error: `Terminal session ${params.sessionId} does not exist; list sessions or spawn a new terminal.`,
+        };
+      }
       const result = await retry(
         async () => ptyEngine.poll(params.sessionId, params.offset, params.limit),
         buildRetryOptions()
@@ -205,7 +211,13 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
       }
 
       const success = ptyEngine.write(params.sessionId, dataToWrite);
-      return { success };
+      return success
+        ? { success }
+        : {
+            success,
+            status: 'failed',
+            error: `Terminal session ${params.sessionId} is missing or exited; spawn a new terminal before writing.`,
+          };
     }
 
     case 'resize': {
@@ -214,13 +226,29 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
         throw new Error('cols and rows are required for resize action');
       }
       const success = ptyEngine.resize(params.sessionId, params.cols, params.rows);
-      return { success };
+      const session = ptyEngine.get(params.sessionId);
+      return success
+        ? { success }
+        : {
+            success,
+            status: 'failed',
+            error:
+              session?.status === 'running' && session.adapter.supportsResize === false
+                ? `Terminal session ${params.sessionId} uses a pipe fallback that cannot resize; use a native PTY environment for terminal dimensions.`
+                : `Terminal session ${params.sessionId} is missing or exited; spawn a new terminal before resizing.`,
+          };
     }
 
     case 'kill': {
       if (!params.sessionId) throw new Error('sessionId is required for kill action');
       const success = ptyEngine.kill(params.sessionId);
-      return { success };
+      return success
+        ? { success }
+        : {
+            success,
+            status: 'failed',
+            error: `Terminal session ${params.sessionId} does not exist; list sessions to select an active terminal.`,
+          };
     }
 
     case 'list': {
