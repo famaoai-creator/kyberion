@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 // Install the full identity resolver (MISSION_ROLE / persona) the production
@@ -367,12 +368,20 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     expect(() =>
       assertNotForeignHardLink(fs.statSync(planted), abs(`${scratchRel}/sw`), 'sw', 'read')
     ).toThrow(/hard link/);
-    // ... and an outside-repository path is no exemption either.
-    fs.rmSync(abs(`${scratchRel}/sw`));
-    fs.symlinkSync('/etc/hostname', abs(`${scratchRel}/sw`));
-    expect(() =>
-      assertNotForeignHardLink(fs.statSync(planted), abs(`${scratchRel}/sw`), 'sw', 'read')
-    ).toThrow(/hard link/);
+    // ... and an existing outside-repository file is no exemption either (a
+    // file we create: /etc/hostname does not exist on macOS runners).
+    const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'secure-io-outside-'));
+    try {
+      const outside = path.join(outsideDir, 'hostname');
+      fs.writeFileSync(outside, 'host');
+      fs.rmSync(abs(`${scratchRel}/sw`));
+      fs.symlinkSync(outside, abs(`${scratchRel}/sw`));
+      expect(() =>
+        assertNotForeignHardLink(fs.statSync(planted), abs(`${scratchRel}/sw`), 'sw', 'read')
+      ).toThrow(/hard link/);
+    } finally {
+      fs.rmSync(outsideDir, { recursive: true, force: true });
+    }
   });
 
   it('never leaks a hard-linked secret while a symlink flips into the pnpm store (bounded race)', async () => {
