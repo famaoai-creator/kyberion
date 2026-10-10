@@ -1,8 +1,24 @@
-import { readFileSync, existsSync } from 'node:fs';
+/**
+ * TypeScript loader for `node --import ./scripts/ts-loader.mjs <script>.ts`.
+ *
+ * Bootstrap constraint: this file is what makes TypeScript importable, so it
+ * cannot import `@agent/core/secure-io` (a TypeScript module whose import graph
+ * would re-enter these hooks and load the tier-guard stack before the script
+ * runs). It reads workspace sources with `node:fs` directly (listed in
+ * tests/fixtures/governance-import-baseline.json). Transpiling, and the
+ * transpile cache, live in ./ts-loader-cache.mjs.
+ */
+import { readFileSync, existsSync, realpathSync } from 'node:fs';
 import { dirname, extname, resolve as resolvePath } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { registerHooks } from 'node:module';
-import ts from 'typescript';
+import {
+  preservesSymlinks,
+  transpileWithCache,
+  tsLoaderFastResolveEnabled,
+} from './ts-loader-cache.mjs';
+
+const PRESERVE_SYMLINKS = preservesSymlinks();
 
 const TS_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts']);
 const JS_LIKE_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']);
@@ -63,6 +79,35 @@ function resolveWorkspacePackageToSource(specifier) {
   return null;
 }
 
+/**
+ * Answer a workspace TypeScript resolution here instead of through the default
+ * resolver. The default resolver detects the format of every `.ts` URL (Node
+ * 24 strips types by default) with `getPackageScopeConfig`, which re-parses
+ * the nearest package.json's whole `exports` map each time: for a
+ * `libs/core/*.ts` module that is the ~290KB `libs/core/package.json`, about
+ * half of a cold child's start-up. The load hook decides the format of these
+ * files anyway, so nothing is lost. Same URL as the default resolver (realpath,
+ * as without --preserve-symlinks; with it, in argv or NODE_OPTIONS, it stands aside); `KYBERION_TS_LOADER_FAST_RESOLVE=0` restores
+ * the default-resolver path (differential test: ts-loader-resolve.test.ts).
+ */
+function resolveTsSourceDirectly(candidate) {
+  const ext = extname(candidate);
+  if (!TS_EXTENSIONS.has(ext)) return null;
+  if (!tsLoaderFastResolveEnabled()) return null;
+  if (PRESERVE_SYMLINKS) return null;
+  let real;
+  try {
+    real = realpathSync(candidate);
+  } catch {
+    return null;
+  }
+  return {
+    url: pathToFileURL(real).href,
+    format: ext === '.cts' ? 'commonjs' : 'module',
+    shortCircuit: true,
+  };
+}
+
 function resolveTsLike(specifier, context, nextResolve) {
   if (!(specifier.startsWith('.') || specifier.startsWith('/'))) {
     const workspaceSource = resolveWorkspacePackageToSource(specifier);
@@ -100,6 +145,8 @@ function resolveTsLike(specifier, context, nextResolve) {
   for (const candidate of candidates) {
     const resolved = resolveCandidatePath(candidate);
     if (resolved) {
+      const fast = resolveTsSourceDirectly(candidate);
+      if (fast) return fast;
       // The CJS default resolver cannot handle file:// URL specifiers; when the
       // specifier already resolves as-is (no .js→.ts rewrite), pass it through.
       if (candidate === sourcePath) {
@@ -127,22 +174,8 @@ function loadTsLike(url, context, nextLoad) {
     return nextLoad(url, context);
   }
 
-  const loader = ext === '.tsx' ? 'tsx' : 'ts';
   const source = readFileSync(filePath, 'utf8');
-  const result = ts.transpileModule(source, {
-    compilerOptions: {
-      target: ts.ScriptTarget.ES2022,
-      module: ext === '.cts' ? ts.ModuleKind.CommonJS : ts.ModuleKind.ESNext,
-      jsx: loader === 'tsx' ? ts.JsxEmit.ReactJSX : ts.JsxEmit.Preserve,
-      sourceMap: true,
-      inlineSourceMap: true,
-      inlineSources: true,
-      esModuleInterop: true,
-      verbatimModuleSyntax: false,
-    },
-    fileName: filePath,
-    reportDiagnostics: false,
-  });
+  const result = transpileWithCache(filePath, source);
 
   return {
     format: ext === '.cts' ? 'commonjs' : 'module',

@@ -29,6 +29,7 @@ import { isDirectScript } from './lib/harness.js';
 import { defineScript, ScriptExitError } from './lib/harness.js';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
 import { setRegisteredEnv } from '@agent/core/foundation';
+import { resetLocalSttDiscoveryCache } from '@agent/core/local-stt-discovery';
 
 // Register every probe so the manifest's `kind: 'probe'` entries
 // resolve. This import is for side effects only.
@@ -92,6 +93,10 @@ async function processManifest(
     apply: true,
     force_yes: opts.force_yes,
   });
+  if (receipt.installs_performed.length > 0) {
+    // An install may have added a local STT backend: drop the cached discovery probe.
+    resetLocalSttDiscoveryCache({ disk: true });
+  }
   logger.info(`📋 ${manifest.manifest_id} bootstrap receipt:`);
   logger.info(`   satisfied:    ${receipt.satisfied.length}`);
   logger.info(`   unsatisfied:  ${receipt.unsatisfied.length}`);

@@ -568,6 +568,20 @@ export function resolveToolRuntimeCommand(
   return probeToolRuntime(toolId, requestedMode).selected_backend;
 }
 
+/**
+ * The managed runtime's python bin for `toolId` if it exists, found from the
+ * registry record alone: unlike resolveManagedToolPythonBin it runs no
+ * `which` probes, so a cache key may call it on every lookup.
+ */
+export function locateManagedToolPythonBin(toolId: string): string | null {
+  const record = getToolRuntimeRecord(toolId);
+  if (record.tool_id !== toolId) return null;
+  for (const candidate of resolveManagedPythonCandidates(resolveManagedEnvPath(record))) {
+    if (safeExistsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
 export function resolveManagedToolPythonBin(toolId?: string): string | null {
   const resolution = probeToolRuntime(toolId, 'installed');
   for (const candidate of resolveManagedPythonCandidates(resolution.managed_env_path)) {
