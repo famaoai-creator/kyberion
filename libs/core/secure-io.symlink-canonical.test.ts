@@ -216,13 +216,18 @@ async function concurrentChange(
     stdio: 'ignore',
   });
   const rel = `${scratchRel}/changing.log`;
-  const result = { reads: 0, appends: 0, stats: 0, refused: 0, torn: 0 };
+  // refused: the documented fail-closed refusal; otherErrors: anything else
+  // (hammer swallows throws, so they are counted here); torn: a read that
+  // returned anything but a whole version of this file.
+  const result = { reads: 0, appends: 0, stats: 0, refused: 0, otherErrors: 0, torn: 0 };
+  const changed =
+    /^\[SECURITY\] Refusing to \w+ .*: the file changed between the permission check and the open$/;
   const attempt = (op: () => void) => {
     try {
       op();
     } catch (error) {
-      if (String((error as Error).message).includes('[SECURITY]')) result.refused += 1;
-      else throw error;
+      if (changed.test(String((error as Error).message))) result.refused += 1;
+      else result.otherErrors += 1;
     }
   };
   try {
@@ -591,21 +596,31 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     expect(fs.readdirSync(abs(personalRel)).filter((n) => n.startsWith('created-by-'))).toEqual([]);
   }, 20000);
 
-  // With /proc the link count is pinned by the "(deleted)" mark, so even a
-  // writer that never pauses refuses nothing. Without /proc (macOS) the ctime
-  // is the only churn evidence and a writer faster than one vet is refused by
-  // design (runbook §10); the paced variant below covers that path everywhere.
-  it.runIf(fs.existsSync('/proc/self/fd'))(
-    'never refuses a file another process keeps chmod-ing or touching, unpaced (with /proc)',
-    async () => {
-      for (const kind of ['chmod', 'utimes'] as const) {
-        const result = await concurrentChange(kind, 1000);
-        expect(Math.min(result.reads, result.appends, result.stats)).toBeGreaterThan(50);
-        expect({ kind, refused: result.refused }).toEqual({ kind, refused: 0 });
-      }
-    },
-    30000
-  );
+  /**
+   * A writer that never pauses. With /proc the link count is pinned by the
+   * "(deleted)" mark, so nothing is refused. Without it (macOS) the ctime is
+   * the only churn evidence and such a writer leaves no quiet window: the
+   * documented contract is fail-closed — every failure is the "changed"
+   * refusal, no read returns anything but this file, and nothing hangs.
+   */
+  async function expectUnpacedStormContract(pinnedByProc: boolean): Promise<void> {
+    for (const kind of ['chmod', 'utimes'] as const) {
+      const started = Date.now();
+      const result = await concurrentChange(kind, 1000);
+      expect(Date.now() - started).toBeLessThan(15000);
+      expect(Math.min(result.reads, result.appends, result.stats)).toBeGreaterThan(50);
+      expect({ kind, otherErrors: result.otherErrors, torn: result.torn }).toEqual({
+        kind,
+        otherErrors: 0,
+        torn: 0,
+      });
+      if (pinnedByProc) expect({ kind, refused: result.refused }).toEqual({ kind, refused: 0 });
+    }
+  }
+
+  it('serves a file another process keeps chmod-ing or touching unpaced where /proc pins it, and fails closed elsewhere', async () => {
+    await expectUnpacedStormContract(fs.existsSync('/proc/self/fd'));
+  }, 40000);
 
   it('never reads or appends to a protected file through hard-link churn that forges a data write (bounded race)', async () => {
     const result = await hardLinkChurn(2500, 'mtime');
@@ -620,7 +635,11 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
   it('never refuses a file another process replaces atomically', async () => {
     const result = await concurrentChange('replace', 1500);
     expect(Math.min(result.reads, result.appends, result.stats)).toBeGreaterThan(50);
-    expect({ refused: result.refused, torn: result.torn }).toEqual({ refused: 0, torn: 0 });
+    expect({ refused: result.refused, other: result.otherErrors, torn: result.torn }).toEqual({
+      refused: 0,
+      other: 0,
+      torn: 0,
+    });
   }, 30000);
 
   it('never reads or appends to a protected file through hard-link churn (bounded race)', async () => {
@@ -1113,18 +1132,36 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
       });
     }, 30000);
 
+    it('fails closed, never leaking or hanging, under a chmod or touch writer that never pauses', async () => {
+      await expectUnpacedStormContract(false);
+    }, 40000);
+
     it('never refuses a file another process keeps chmod-ing or touching every millisecond', async () => {
       for (const kind of ['chmod', 'utimes'] as const) {
         const result = await concurrentChange(kind, 1000, 1);
         expect(Math.min(result.reads, result.appends, result.stats)).toBeGreaterThan(50);
-        expect({ kind, refused: result.refused }).toEqual({ kind, refused: 0 });
+        expect({
+          kind,
+          refused: result.refused,
+          other: result.otherErrors,
+          torn: result.torn,
+        }).toEqual({
+          kind,
+          refused: 0,
+          other: 0,
+          torn: 0,
+        });
       }
     }, 30000);
 
     it('never refuses a file another process replaces atomically', async () => {
       const result = await concurrentChange('replace', 1500);
       expect(Math.min(result.reads, result.appends, result.stats)).toBeGreaterThan(50);
-      expect({ refused: result.refused, torn: result.torn }).toEqual({ refused: 0, torn: 0 });
+      expect({ refused: result.refused, other: result.otherErrors, torn: result.torn }).toEqual({
+        refused: 0,
+        other: 0,
+        torn: 0,
+      });
     }, 30000);
 
     it('never reads or appends to a protected file through hard-link churn (bounded race)', async () => {
