@@ -1,0 +1,54 @@
+---
+record_id: mem-MSN-APPROVAL-TRUST-B2-20261010-2026_10_10
+kind: knowledge_hint
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-APPROVAL-TRUST-B2-20261010-2026_10_10
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-10-10T12:37:27.208Z
+source_branch: feat/human-approval-trust-b2-20261010
+source_commit: 77fc4eef0fd03713018a8481d79a5a7761c27c9b
+---
+
+# A presented-content digest must cover every field any renderer shows
+
+Binding an approval to a digest of what the human saw only works if the digest covers every field every surface renders. Audit each renderer against the digest inputs, hash whole creation-time objects instead of picking sub-fields, and keep renderers on the same fields the digest and the store scope use.
+
+## Hint Scope
+
+mission
+
+## Trigger Phrases
+
+- ## Lesson
+
+When a decision is bound to a digest of the content the human was shown (HA-06), the digest is only as strong as its coverage of the widest renderer. In this mission three successive reviews each found displayed fields outside the digest (decision-card text, then risk/justification/effects, then work-loop intent and a tenant read from a different field).
+
+- **Audit renderers, not the record type.** List every surface (web, chat cards, Slack, CLI prompt, side panels) and every field each shows, including fallbacks a view helper reads.
+- **Hash whole creation-time objects** (`risk`, `justification`, `work_loop`, `requestedByContext`, workflow shape) instead of picking sub-fields; exclude only fields that legitimately change while pending (approval progress, delivery bookkeeping) and say why.
+- **Keep renderers on hashed, typed fields.** A view that resolves the tenant or project from a different field than the digest (or the store scope) shows unbound content; prefer the store scope field first and label off-record fallbacks.
+- **Prove each guard**: revert the field from the digest and confirm the targeted test fails.
+
+## Related
+
+Process-lineage checks for agent harnesses are advisory: match argv[0], interpreter script/module and registry install-path markers only, walk to pid 1, and never honour test shortcuts from env alone.
+
+## Recommended References
+
+- active/missions/public/MSN-APPROVAL-TRUST-B2-20261010/evidence/REVIEW-execution-implement.md
+- active/missions/public/MSN-APPROVAL-TRUST-B2-20261010/evidence/design-spec.json
+- active/missions/public/MSN-APPROVAL-TRUST-B2-20261010/evidence/test-report.md
+
+## Evidence
+
+- active/missions/public/MSN-APPROVAL-TRUST-B2-20261010/evidence/REVIEW-execution-implement.md
+- active/missions/public/MSN-APPROVAL-TRUST-B2-20261010/evidence/design-spec.json
+- active/missions/public/MSN-APPROVAL-TRUST-B2-20261010/evidence/test-report.md
+
+## Artifacts
