@@ -17,7 +17,12 @@ import {
   listBrowserConversationSessions,
   saveBrowserConversationSession,
 } from '@agent/core/browser/browser-conversation-session';
-import { decideApprovalRequest, listApprovalRequests } from '@agent/core/governance/approval-store';
+import {
+  decideApprovalRequest,
+  listApprovalRequests,
+  surfaceDecisionAuthMethod,
+  surfaceDecisionBinding,
+} from '@agent/core/governance/approval-store';
 import { listArtifactRecords } from '@agent/core/workforce/artifact-record';
 import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
@@ -533,7 +538,7 @@ presenceStudioData.app.post('/api/approvals/:requestId/decision', (req, res) => 
     );
     return res.status(400).json({ ok: false, error: 'decision must be approved or rejected' });
   }
-  const { decision } = parsed.data;
+  const { decision, presentedDigest } = parsed.data;
 
   const record = listApprovalRequests({ status: 'pending' }).find((item) => item.id === requestId);
   if (!record) {
@@ -584,11 +589,11 @@ presenceStudioData.app.post('/api/approvals/:requestId/decision', (req, res) => 
       decision,
       decidedBy: decisionActor.actorId,
       decidedByRole: decisionActor.role,
-      authMethod: 'surface_session',
+      // HA-05: a loopback viewer proves local access only — no verified session.
+      authMethod: surfaceDecisionAuthMethod({ provider: 'loopback-local' }, true),
       decidedByType: 'human',
       authenticated: true,
-      payloadHash: record.accountability?.payloadHash,
-      effectBinding: record.accountability?.effectBinding,
+      ...surfaceDecisionBinding(record, presentedDigest),
       note: 'Decision captured from Presence Studio approval inbox.',
     });
     logger.info(

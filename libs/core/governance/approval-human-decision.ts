@@ -3,9 +3,20 @@
  * 'human_only'`), shared by the approval store and the consumers that re-check
  * a decision before applying it.
  */
-import type { ApprovalAccountability, ApprovalRecord } from './approval-store.js';
+import type {
+  ApprovalAccountability,
+  ApprovalRecord,
+  ApprovalRequestRecord,
+} from './approval-store.js';
 import { auditChain } from './audit-chain.js';
 import { notifyOperator } from '../surface/operator-notifications.js';
+import { detectAgentExecutionContext } from '../agent-execution-context.js';
+import type { ResolvedPrincipal } from '../authn-principal-resolver.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import {
+  approvalPresentedDigestMatches,
+  computeApprovalPresentedDigest,
+} from './approval-presentation.js';
 import {
   assuranceMeets,
   assuranceOfAuthMethod,
@@ -29,9 +40,133 @@ export function refuseHumanOnlyDecisionOnAgentPath(
   if (record.accountability?.finalDecision !== 'human_only') return;
   throw new Error(
     `[APPROVAL_HUMAN_PROOF_REQUIRED] ${path} cannot decide human-only approval ${record.id} — an agent-facing path cannot prove a human decider ` +
-      '| next: decide it on Concierge, Chronos or presence-studio, or from your own terminal outside the agent session ' +
+      '| next: decide it in a signed-in Concierge or Chronos session, or answer the terminal challenge from your own terminal outside the agent session ' +
       `| evidence: accountability.finalDecision=human_only on ${record.id}`
   );
+}
+
+/**
+ * `SYSTEM_ROLE` of the surface servers that decide for a person they
+ * authenticated themselves (surface_runtime sets it, `buildSurfaceLaunchEnv`).
+ * Such a server inherits the environment of whoever launched it — an agent
+ * session that ran `pnpm surfaces start` included — so its environment says
+ * nothing about the decider; the principal the route resolved does. Agent-facing
+ * surfaces (MCP, terminal-bridge, nexus-daemon, …) are deliberately absent.
+ */
+export const HUMAN_DECISION_SURFACE_SYSTEM_ROLES: ReadonlySet<string> = new Set([
+  'chronos_mirror_v2',
+  'concierge',
+  'presence_studio',
+  'operator_surface',
+  'slack_bridge',
+  'telegram_bridge',
+  'discord_bridge',
+  'imessage_bridge',
+]);
+
+export type ApprovalDeciderPrincipal = Pick<
+  ResolvedPrincipal,
+  'actor' | 'source' | 'provider' | 'principalId'
+>;
+
+/**
+ * Store-level refusal: a human-only request is never settled by a process
+ * acting for an agent, whatever the caller declares. A human-decision surface
+ * server is exempt from its inherited environment markers, but not from an
+ * agent principal its route resolved. Environment markers are advisory (an
+ * agent can clear them); this stops the agent that does not.
+ */
+export function refuseHumanOnlyDecisionByAgentProcess(
+  record: { id: string; accountability?: ApprovalAccountability },
+  options: {
+    principal?: ApprovalDeciderPrincipal | null;
+    env?: Record<string, string | undefined>;
+  } = {}
+): void {
+  if (record.accountability?.finalDecision !== 'human_only') return;
+  const env = options.env ?? process.env;
+  const context = detectAgentExecutionContext({ env, principal: options.principal ?? null });
+  if (!context.isAgent) return;
+  const agentPrincipal = context.signals.some((signal) => signal.kind === 'agent_principal');
+  const systemRole = getRegisteredEnvText('SYSTEM_ROLE', { env })?.trim() ?? '';
+  if (!agentPrincipal && HUMAN_DECISION_SURFACE_SYSTEM_ROLES.has(systemRole)) return;
+  const evidence = context.signals
+    .map((signal) => ('env' in signal ? signal.env : `principal:${signal.provider}`))
+    .join(', ');
+  throw new Error(
+    `[APPROVAL_HUMAN_PROOF_REQUIRED] approval store refused human-only request ${record.id} — the deciding process acts for an agent (${context.principal}) ` +
+      '| next: decide it in a signed-in Concierge or Chronos session, or answer the terminal challenge from your own terminal outside the agent session ' +
+      `| evidence: ${evidence}${systemRole ? `, SYSTEM_ROLE=${systemRole}` : ''}`
+  );
+}
+
+export interface PresentedDecisionBinding {
+  /** The effect hash / binding the decision is recorded against. */
+  payloadHash?: string;
+  effectBinding?: string;
+  /** True when the surface's presented digest matched the stored request. */
+  presentedDigestVerified: boolean;
+}
+
+/**
+ * HA-06: a presented digest that matches binds the decision to the record's
+ * own effect hash and binding (the digest covers both). A mismatch is refused
+ * for every request. Without a digest, the caller's values are used as before.
+ */
+export function bindPresentedDecision(
+  record: ApprovalRequestRecord,
+  params: { presentedDigest?: string; payloadHash?: string; effectBinding?: string }
+): PresentedDecisionBinding {
+  if (params.presentedDigest === undefined) {
+    return {
+      payloadHash: params.payloadHash,
+      effectBinding: params.effectBinding,
+      presentedDigestVerified: false,
+    };
+  }
+  if (!approvalPresentedDigestMatches(record, params.presentedDigest)) {
+    throw new Error(
+      `[POLICY_VIOLATION] approval decision refused — request ${record.id} changed since it was shown to the decider ` +
+        '| next: reload the request and decide on what it says now ' +
+        `| evidence: presented digest ${params.presentedDigest.slice(0, 16)}…, current ${computeApprovalPresentedDigest(record).slice(0, 16)}…`
+    );
+  }
+  return {
+    payloadHash: params.payloadHash ?? record.accountability?.payloadHash,
+    effectBinding: params.effectBinding ?? record.accountability?.effectBinding,
+    presentedDigestVerified: true,
+  };
+}
+
+/**
+ * HA-06 rollout: a human-only decision without a presented digest falls back
+ * to the caller's own hash (self-matching). `warn` lets it through with an
+ * audit entry; `enforce` refuses it.
+ */
+export function settleUnpresentedHumanDecision(
+  record: ApprovalRequestRecord,
+  binding: PresentedDecisionBinding,
+  decidedBy: string,
+  mode: ApprovalAssuranceMode = resolveApprovalAssuranceMode()
+): void {
+  if (binding.presentedDigestVerified) return;
+  if (record.accountability?.finalDecision !== 'human_only') return;
+  if (mode === 'enforce') {
+    throw new Error(
+      `[POLICY_VIOLATION] approval decision refused — human-only request ${record.id} was decided without the digest of what the decider was shown ` +
+        '| next: decide it on a surface that sends the presented digest (a signed-in Concierge or Chronos session, or the terminal challenge) ' +
+        '| evidence: KYBERION_APPROVAL_ASSURANCE=enforce, no presentedDigest'
+    );
+  }
+  auditChain.record({
+    agentId: decidedBy,
+    action: 'approval_decision',
+    operation: 'presented_digest_missing',
+    result: 'allowed',
+    reason: `human-only decision accepted without a presented digest — KYBERION_APPROVAL_ASSURANCE=${mode}`,
+    correlationId: record.correlationId,
+    metadata: { requestId: record.id, channel: record.channel },
+  });
 }
 
 /**

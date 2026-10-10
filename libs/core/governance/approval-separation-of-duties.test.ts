@@ -376,7 +376,7 @@ describe('approval separation of duties', () => {
         decidedBy: 'alice',
         decidedByType: 'human',
         authenticated: true,
-        authMethod: 'manual',
+        authMethod: 'surface_session',
         payloadHash: computeApprovalPayloadHash(payload),
         effectBinding: 'inspect-service',
         sessionCache: descriptor,
