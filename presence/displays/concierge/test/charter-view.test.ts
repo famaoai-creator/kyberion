@@ -7,8 +7,10 @@ import {
   draftToForm,
   isManuallyStopped,
   parseAmount,
+  parseCharterDecisionOptions,
   parseCharterOverview,
   parseDeputies,
+  setDelegatedDecision,
   type CharterFormDraft,
 } from '../src/lib/charter-view';
 
@@ -65,10 +67,46 @@ describe('form <-> draft', () => {
       max_loss_per_incident: 100000,
       allow_named_spend: true,
       allow_customer_outbound: false,
+      delegated_decisions: [],
       supersedes_decision_rights: false,
       deputies: ['user:carol', 'user:dave'],
       expires_in_days: 90,
     });
+  });
+  it('delegated decisions toggle sorted and duplicate-free, and survive an amendment', () => {
+    let d = setDelegatedDecision(draft({}), 'meeting_scheduling', true);
+    d = setDelegatedDecision(d, 'external_reply', true);
+    d = setDelegatedDecision(d, 'meeting_scheduling', true);
+    expect(d.delegated_decisions).toEqual(['external_reply', 'meeting_scheduling']);
+    expect(setDelegatedDecision(d, 'external_reply', false).delegated_decisions).toEqual([
+      'meeting_scheduling',
+    ]);
+    expect(draftToForm('acme', d).delegated_decisions).toEqual([
+      'external_reply',
+      'meeting_scheduling',
+    ]);
+    expect(
+      draftFromCharter({
+        money: { per_action: 0, per_day: 0, per_month: 0 },
+        max_loss_per_incident: 0,
+        deputies: [],
+        allows_named_spend: false,
+        delegated_decisions: ['meeting_scheduling'],
+        supersedes_decision_rights: false,
+      }).delegated_decisions
+    ).toEqual(['meeting_scheduling']);
+  });
+  it('decision options from the server drop malformed entries', () => {
+    expect(
+      parseCharterDecisionOptions({
+        decision_options: [
+          { decision_type: 'meeting_scheduling', label: '社外との日程の確定' },
+          { decision_type: 3 },
+          null,
+        ],
+      })
+    ).toEqual([{ decision_type: 'meeting_scheduling', label: '社外との日程の確定' }]);
+    expect(parseCharterDecisionOptions(null)).toEqual([]);
   });
   it('an amendment starts from the charter in force', () => {
     const d = draftFromCharter({

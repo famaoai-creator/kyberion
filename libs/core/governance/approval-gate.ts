@@ -338,6 +338,9 @@ export function enforceApprovalGate(
         correlationId,
         payload,
         decisionRightsEscalates: decisionRightsEvaluation?.requiresEscalation === true,
+        decisionRightsCharterDelegable:
+          decisionRightsEvaluation?.escalationKind === 'human_acceptance' &&
+          decisionRightsEvaluation.charterDelegable,
       })
     : ({ kind: 'none' } as const);
   if (charterOutcome.kind === 'stop') {
@@ -348,7 +351,10 @@ export function enforceApprovalGate(
   }
   // Outside the charter: a human decides, even where decision rights or the
   // legacy policy would have let the action through (the charter only tightens).
-  const forceApproval = charterOutcome.kind === 'require_approval';
+  // A matrix escalation needs a human whether or not a policy rule lists its type.
+  const charterForcesApproval = charterOutcome.kind === 'require_approval';
+  const decisionRightsForcesApproval = decisionRightsEvaluation?.requiresEscalation === true;
+  const forceApproval = charterForcesApproval || decisionRightsForcesApproval;
 
   if (
     !forceApproval &&
@@ -387,7 +393,9 @@ export function enforceApprovalGate(
       ? {
           requiresApproval: true,
           missingRequirements: ['approval_confirmation'],
-          matchedRuleId: 'charter-outside-envelope',
+          matchedRuleId: charterForcesApproval
+            ? 'charter-outside-envelope'
+            : 'decision-rights-escalation',
         }
       : resolvedPolicy;
 
