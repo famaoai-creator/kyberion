@@ -672,20 +672,38 @@ export function vetOpenedFd(
   // and judge hard links on this last fstat. With /proc the "(deleted)" mark
   // after a settled parent already proves the name was counted, so ctime
   // moves (a concurrent chmod, utimes or write) are not compared there.
-  const now = fs.fstatSync(fd);
-  if (
-    now.dev !== held.dev ||
-    now.ino !== held.ino ||
-    (!procFdResolves(fd) && !sameLinkState(held, now)) ||
-    // Replaced by an atomic rename while being judged: no name left.
-    (!stillNamed(fd, resolved, now) && !unnameableInode(fd))
-  ) {
+  const now = pinnedFinalStat(fd, resolved, held);
+  if (now === undefined) {
     throw new Error(
       `[SECURITY] Refusing to ${operation} ${displayPath}: the file changed between the permission check and the open`
     );
   }
   assertNotForeignHardLink(now, actual, displayPath, operation);
   return now;
+}
+
+/**
+ * The final fstat of vetOpenedFd, or undefined to refuse. Without /proc a
+ * ctime that moved since the previous fstat (a chmod, utimes or write — or a
+ * link and unlink) proves nothing either way, so the comparison is retaken
+ * from that fstat, a bounded number of times: a file changed occasionally
+ * (a heartbeat touch) is judged on a quiet window; a link churn never gets
+ * one, because every link and unlink moves the ctime again.
+ */
+function pinnedFinalStat(fd: number, resolved: string, held: fs.Stats): fs.Stats | undefined {
+  const viaProc = procFdResolves(fd);
+  let previous = held;
+  for (let attempt = 0; attempt < (viaProc ? 1 : 8); attempt += 1) {
+    const now = fs.fstatSync(fd);
+    if (now.dev !== held.dev || now.ino !== held.ino) return undefined;
+    // Replaced by an atomic rename while being judged: no name left.
+    if (now.nlink === 0 || unnameableInode(fd)) return now;
+    const linkStateHeld = viaProc || sameLinkState(previous, now);
+    if (linkStateHeld && stillNamed(fd, resolved, now)) return now;
+    if (viaProc) return undefined;
+    previous = now;
+  }
+  return undefined;
 }
 
 /**

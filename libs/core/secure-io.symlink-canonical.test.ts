@@ -189,16 +189,19 @@ async function hardLinkChurn(
  */
 async function concurrentChange(
   kind: 'replace' | 'chmod' | 'utimes',
-  ms: number
+  ms: number,
+  pauseMs = 0
 ): Promise<Record<string, number>> {
   const name = abs(`${scratchRel}/changing.log`);
   fs.writeFileSync(name, 'v0\n');
   const writer = `
     const fs = require('node:fs');
-    const [name, kind] = process.argv.slice(1);
+    const [name, kind, pause] = process.argv.slice(1);
     const end = Date.now() + ${3 * ms + 3000};
+    const sleeper = new Int32Array(new SharedArrayBuffer(4));
     let i = 0;
     while (Date.now() < end) {
+      if (Number(pause) > 0) Atomics.wait(sleeper, 0, 0, Number(pause));
       try {
         i += 1;
         if (kind === 'replace') {
@@ -209,7 +212,9 @@ async function concurrentChange(
         else fs.utimesSync(name, new Date(), new Date(Date.now() - (i % 1000)));
       } catch {}
     }`;
-  const child = safeSpawn(process.execPath, ['-e', writer, name, kind], { stdio: 'ignore' });
+  const child = safeSpawn(process.execPath, ['-e', writer, name, kind, String(pauseMs)], {
+    stdio: 'ignore',
+  });
   const rel = `${scratchRel}/changing.log`;
   const result = { reads: 0, appends: 0, stats: 0, refused: 0, torn: 0 };
   const attempt = (op: () => void) => {
@@ -586,13 +591,21 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     expect(fs.readdirSync(abs(personalRel)).filter((n) => n.startsWith('created-by-'))).toEqual([]);
   }, 20000);
 
-  it('never refuses a file another process keeps chmod-ing or touching (Linux)', async () => {
-    for (const kind of ['chmod', 'utimes'] as const) {
-      const result = await concurrentChange(kind, 1000);
-      expect(Math.min(result.reads, result.appends, result.stats)).toBeGreaterThan(50);
-      expect({ kind, refused: result.refused }).toEqual({ kind, refused: 0 });
-    }
-  }, 30000);
+  // With /proc the link count is pinned by the "(deleted)" mark, so even a
+  // writer that never pauses refuses nothing. Without /proc (macOS) the ctime
+  // is the only churn evidence and a writer faster than one vet is refused by
+  // design (runbook §10); the paced variant below covers that path everywhere.
+  it.runIf(fs.existsSync('/proc/self/fd'))(
+    'never refuses a file another process keeps chmod-ing or touching, unpaced (with /proc)',
+    async () => {
+      for (const kind of ['chmod', 'utimes'] as const) {
+        const result = await concurrentChange(kind, 1000);
+        expect(Math.min(result.reads, result.appends, result.stats)).toBeGreaterThan(50);
+        expect({ kind, refused: result.refused }).toEqual({ kind, refused: 0 });
+      }
+    },
+    30000
+  );
 
   it('never reads or appends to a protected file through hard-link churn that forges a data write (bounded race)', async () => {
     const result = await hardLinkChurn(2500, 'mtime');
@@ -1098,6 +1111,14 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
         readLeaks: 0,
         secretGrew: 0,
       });
+    }, 30000);
+
+    it('never refuses a file another process keeps chmod-ing or touching every millisecond', async () => {
+      for (const kind of ['chmod', 'utimes'] as const) {
+        const result = await concurrentChange(kind, 1000, 1);
+        expect(Math.min(result.reads, result.appends, result.stats)).toBeGreaterThan(50);
+        expect({ kind, refused: result.refused }).toEqual({ kind, refused: 0 });
+      }
     }, 30000);
 
     it('never refuses a file another process replaces atomically', async () => {
