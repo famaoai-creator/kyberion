@@ -11,7 +11,7 @@ vi.mock('./approval-store.js', async (importOriginal) => ({
   isApprovalRequestExpired: (await importOriginal<typeof import('./approval-store.js')>())
     .isApprovalRequestExpired,
   expireApprovalRequest: vi.fn(),
-  createApprovalRequest: vi.fn(),
+  createApprovalRequest: vi.fn(() => ({ id: 'req-1', status: 'pending' })),
   listApprovalRequests: vi.fn(() => []),
   lookupSessionApprovalCache: vi.fn(() => null),
   recordSessionCacheAutoApproval: vi.fn(),

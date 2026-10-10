@@ -164,8 +164,11 @@ describe('accountability charter — everyday business decisions', () => {
       internal_task_assignment: 'allow',
       meeting_scheduling: 'allow',
     });
-    // Hiring is irreversible: named; scheduling is reversible: not named.
-    expect(charter.envelope.irreversible_named_actions).toEqual(['headcount_expansion']);
+    // Hiring and a sent invitation are irreversible: named; task assignment is not.
+    expect(charter.envelope.irreversible_named_actions).toEqual([
+      'headcount_expansion',
+      'meeting_scheduling',
+    ]);
     expect(viewCharter(charter, new Date(), opts()).delegated_decisions).toEqual([
       'headcount_expansion',
       'internal_task_assignment',
@@ -215,6 +218,43 @@ describe('accountability charter — everyday business decisions', () => {
   it('hiring: within the declared loss it runs; above it a human decides — and no budget is spent', () => {
     expect(decide('headcount_expansion', 'm-7', { amount: 800_000 }).allowed).toBe(true);
     expect(decide('headcount_expansion', 'm-8', { amount: 1_500_000 }).allowed).toBe(false);
+  });
+
+  it('a decision that commits money without a usable amount goes to a human', () => {
+    expect(decide('headcount_expansion', 'm-9').allowed).toBe(false);
+    expect(decide('headcount_expansion', 'm-10', { amount: Number.NaN }).allowed).toBe(false);
+    expect(decide('headcount_expansion', 'm-11', { amount: -1 }).allowed).toBe(false);
+  });
+
+  it('the delegated type must be the one the matrix evaluated', () => {
+    matrix('human_acceptance', true);
+    const charter = charterInputForDecision(
+      { tenantSlug: TENANT, agentId: 'secretary', decisionType: 'meeting_scheduling' },
+      opts()
+    )!;
+    const r = enforceApprovalGate({
+      operationId: 'business.mismatch',
+      agentId: 'secretary',
+      correlationId: 'm-12',
+      channel: 'mission',
+      payload: { decision_type: 'external_reply', tenant_slug: TENANT },
+      hasHuman: false,
+      charter,
+    });
+    expect(r.allowed).toBe(false);
+  });
+
+  it('without a charter, a matrix escalation needs a human even when no policy rule lists the type', () => {
+    matrix('human_acceptance', true);
+    const r = enforceApprovalGate({
+      operationId: 'business.unlisted',
+      agentId: 'secretary',
+      correlationId: 'm-13',
+      channel: 'mission',
+      payload: { decision_type: 'not_in_any_policy_rule', tenant_slug: TENANT },
+      hasHuman: false,
+    });
+    expect(r).toMatchObject({ allowed: false, status: 'pending' });
   });
 
   it('a charter that delegates nothing keeps every business decision with a human', () => {

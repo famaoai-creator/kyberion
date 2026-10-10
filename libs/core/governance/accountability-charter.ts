@@ -191,7 +191,14 @@ export function delegatedDecisionPolicy(
   env: CharterEnvelope,
   decisionType: string
 ): ExternalEffectPolicy {
-  return env.delegated_decisions?.[decisionType] ?? 'forbid';
+  const table = env.delegated_decisions;
+  if (!table || !Object.hasOwn(table, decisionType)) return 'forbid';
+  const policy = table[decisionType];
+  return isEffectPolicy(policy) ? policy : 'forbid';
+}
+
+function isEffectPolicy(value: unknown): value is ExternalEffectPolicy {
+  return typeof value === 'string' && Object.hasOwn(EFFECT_RANK, value);
 }
 
 function dataScopeToken(tier: DataTier, tenant?: string): string {
@@ -262,6 +269,13 @@ export function validateCharter(charter: Charter, ctx: CharterValidationContext)
     violations.push(
       'supersedes_decision_rights requires an owner/officer authority basis with evidence_ref; authority cannot be exceeded'
     );
+  }
+  for (const [type, policy] of Object.entries(envelope.delegated_decisions ?? {})) {
+    if (!isEffectPolicy(policy)) {
+      violations.push(
+        `delegated_decisions.${type} must be forbid, allow_with_review or allow (got '${String(policy)}')`
+      );
+    }
   }
   if (envelope.money.per_action > 0 && effectPolicy(envelope, 'payment') === 'forbid') {
     violations.push('money.per_action > 0 requires external_effects.payment to be permitted');

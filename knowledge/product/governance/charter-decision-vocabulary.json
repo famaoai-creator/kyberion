@@ -59,7 +59,7 @@
       "decision_type": "meeting_scheduling",
       "label": { "ja": "社外との日程の確定", "en": "Confirming a meeting with an outside party" },
       "action_class": "send_message_external",
-      "reversible": true,
+      "reversible": false,
       "amount_semantics": "none",
       "reputational_class": "A",
       "default_recipients": 1,
