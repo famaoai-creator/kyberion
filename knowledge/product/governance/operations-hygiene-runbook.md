@@ -31,7 +31,7 @@ had regressed.
 | LLM / provider calls          | per-call-site egress tests (e.g. `mission-distill-egress.test.ts`)    | §7      |
 | Mission evidence overwrites   | generator and phase-pipeline tests in `mission-retrospective.test.ts` | §8      |
 | Project lifecycle facades     | lifecycle regressions in `project-management.test.ts`                 | §9      |
-| secure-io symlink escapes     | `secure-io.symlink-canonical.test.ts`, `secure-io.symlink-root-alias` | §10     |
+| secure-io link escapes        | `secure-io.symlink-canonical.test.ts`, `secure-io.symlink-root-alias` | §10     |
 
 ---
 
@@ -539,21 +539,24 @@ These cover archive entry-point parity, restore, and track state/projection chan
 
 ---
 
-## §10 secure-io symlink canonicalization
+## §10 secure-io symlink and hard-link canonicalization
 
 **Defect class.** The tier guard (`validateWritePermission` / `validateReadPermission`) judges a
-path as written, but the OS follows symbolic links in every component. On main before this fix a
-data-only persona (`KYBERION_PERSONA=worker MISSION_ROLE=finance_controller`) could call
+path as written, but the OS follows symbolic links in every component, and a hard link is a second
+name for an inode that lives elsewhere. Before this fix a data-only persona
+(`KYBERION_PERSONA=worker MISSION_ROLE=finance_controller`) could call
 `safeSymlinkSync('scripts', 'active/shared/tmp/link')` (the target needed only _read_ permission)
 and then `safeWriteFile('active/shared/tmp/link/x.ts', …)` — landing code in `scripts/`. The same
-link turned every write helper (append, copy, move, mkdir, rm) into a write anywhere readable, and
-a link in a readable location exposed `knowledge/personal/` to readers below that tier.
+link turned every write helper (append, copy, move, mkdir, rm) into a write anywhere readable; a
+link in a readable location exposed `knowledge/personal/` to readers below that tier; and a hard
+link planted with raw fs let append / copy / chmod / fsync / read act on a protected inode.
 
 **Rules:**
 
 - **Every guarded path is checked twice: literal and canonical.** secure-io routes every write-type
   helper through `guardWritePath` and every read through `guardReadPath` /
-  `assertCanonicalReadable` (`libs/core/secure-io-path-guard.ts`, used only by `secure-io.ts`). Both the literal path and the canonical
+  `assertCanonicalReadable` (`libs/core/secure-io-path-guard.ts`; only `secure-io.ts` may import
+  it, enforced by `security-boundary.contract.test.ts`). Both the literal path and the canonical
   path (realpath of the deepest existing ancestor plus the missing tail, a dangling link followed by
   hand) must pass. Never add a write or read helper that calls `validate*Permission` on the literal
   path only.
@@ -561,41 +564,73 @@ a link in a readable location exposed `knowledge/personal/` to readers below tha
   (open, append, copy, chmod, mkdir, read, stat, statfs). `leaf` for operations on the entry itself
   (rename source and destination, unlink, rm, rmdir, lstat, readlink, link creation, hard-link
   source): only the parent is canonicalized, so removing or moving a link stays possible.
+- **No realpath cache.** Every check walks the path afresh. A per-process cache was tried and
+  removed: an ANCESTOR renamed into a protected tree with a link left at its old path (through raw
+  fs, or by another process) re-verified as "same inode", and cache clearing on secure-io mutations
+  is per-process only, so it never sees such a rename.
 - **The canonical path lives in the logical root space.** A canonical path under
   `realpath(rootDir())` is re-expressed under `rootDir()`, so a checkout reached through a linked
   prefix (macOS `/var`, a fixture root) keeps matching policy prefixes. The Vitest live-subtree
   remap is applied once, by `pathResolver.resolve`, to the literal path; the canonical path is the
   physical location and is never remapped again.
+- **Case-insensitive volumes judge the on-disk spelling.** Whether the root's volume folds case is
+  probed once per root. On such a volume the leaf of a canonical path takes its on-disk spelling
+  (`knowledge/PERSONAL` is judged as `knowledge/personal`); ancestors already come back from the
+  platform realpath in their on-disk case. Tier detection itself stays case-sensitive.
+- **Foreign hard links are refused for in-place access.** Read, copy source, append,
+  open-for-append, chmod and fsync refuse a regular file with `nlink > 1` (checked on the opened
+  descriptor where the helper opens one) unless every link of the inode lives in the same
+  directory as the checked path — which covers lock recovery's `<file>` + `<file>.stale-*` tomb
+  pair while `safeLinkExclusiveSync` puts a displaced record back. Reads under `node_modules/`
+  are exempt (pnpm links every store file into each project). Writes that replace the entry —
+  `safeWriteFile` and the copy destination (now temp + rename) — never touch the old inode.
 - **A symlink is a standing write grant.** `safeSymlinkSync` requires write permission on the
   canonical target, refuses targets that resolve outside the repository, stores the link relative,
   and accepts only `dir` / `file`. `junction` is refused there and in the orchestrator `symlink`
   pipeline op: a junction needs no privilege on Windows and always stores an absolute target.
-- **Hard links need write on the source.** `safeLinkExclusiveSync` requires write permission on the
-  source as well, because appending through the new name modifies the original inode.
+  `safeLinkExclusiveSync` also needs write permission on its source.
 - **Out-of-repository reads stay vault-only.** A read whose canonical path leaves the repository
-  passes only through a registered vault mount (`isAllowedVaultMountPath`), the same rule as a
-  literal absolute path. Vault mounts are read-only; writes through them are refused.
+  passes only through a registered vault mount (`isAllowedVaultMountPath`, which also accepts the
+  mount target's realpath). Vault mounts are read-only; writes through them are refused.
+- **Check late; re-verify after open.** `safeWriteFile` runs the literal check first, the policy
+  engine next (with the tier of the canonical path), and the canonical permission check last,
+  just before creating directories. It writes its temp file in the checked (canonical) directory
+  and, once the temp descriptor is open, requires that directory to still be the same `(dev, ino)`,
+  still canonicalize to itself, and to hold the descriptor just opened before renaming into place.
+
+**Residual risk (documented, not closed).**
+
+- _Check-to-use race._ Other helpers still run their syscall on the literal path after the check;
+  a concurrent process that swaps a component for a link between the two can redirect one
+  operation. `safeWriteFile` narrows the window to the rename after its re-verification.
+- _Hard links created after the check_ (between the fd's `fstat` and a later re-open) and hard links
+  to files outside the repository (vault targets) are not detected. Path-only helpers (`safeStat`,
+  `safeExistsSync`, `safeReaddir`) reveal metadata of a hard-linked file but no content.
+- A raw-fs or out-of-process actor can always bypass secure-io; these rules govern what a persona
+  can do through secure-io.
 
 **Procedure.** When you add a filesystem helper to secure-io, call `guardWritePath(path, mode)` or
-`guardReadPath(...)` instead of the bare tier-guard functions, and pick the mode from the table
-above. When a test needs a link, create it inside `active/shared/tmp/` with a target the test
-persona may write (`safeSymlinkSync`), or plant it with raw `node:fs` when the test models a link
-created outside secure-io. A link target in `os.tmpdir()` is outside the repository and is refused.
+`guardReadPath(...)` instead of the bare tier-guard functions, pick the mode from the rule above,
+and use `openInPlace` for any operation that reads or modifies an existing inode in place. When a
+test needs a link, create it inside `active/shared/tmp/` with a target the test persona may write
+(`safeSymlinkSync`), or plant it with raw `node:fs` when the test models a link created outside
+secure-io. A link target in `os.tmpdir()` is outside the repository and is refused. A fixture root
+needs copies, not links, of catalogs from the real checkout.
 
-**Cost.** realpath(3) walks every component: about 30 µs per call at depth 15 on the CI VM. Parent
-directories are therefore served from a per-process cache that is re-verified on every hit
-(`stat(literal dir)` and `lstat(cached real dir)` must both match the cached inode); every secure-io
-move / rm / rmdir / unlink / symlink clears it. Measured on the shared CI VM (median µs/op, 2,000
-ops × 5 runs, deep path in `active/shared/tmp/`), main → this fix: append 423–538 → 412–540,
-read 108–146 → 114–140, stat 53–79 → 64–82, mkdir (existing) 380–503 → 391–466; safeWriteFile is
-dominated by fsync (1.4–8 ms) and unchanged within noise. Without the cache the same run cost
-+25–40 µs per read and +60–130 µs per mkdir.
+**Cost.** realpath(3) walks every component: about 30 µs per call at depth 15. Measured on an idle
+CI VM (median µs/op, 2,000 ops × 5 runs, deep path in `active/shared/tmp/`, two runs each),
+main → this fix: append 378–393 → 437, read 107 → 86–93 (fd-based read does fewer syscalls),
+stat 52–54 → 72–78, mkdir (existing) 376–378 → 429, safeWriteFile (atomic + fsync) 1114–1129 →
+1277–1283.
 
 **Gate.** `libs/core/secure-io.symlink-canonical.test.ts` (symlink-then-write, append, mkdir,
 dangling link, copy/move through a linked parent, rm/unlink, reads into `knowledge/personal/`,
-junction refusal, legitimate links in scope, cache invalidation after a directory swap, Vitest
-remap) and `libs/core/secure-io.symlink-root-alias.test.ts` (checkout behind a linked prefix).
-Each attack case fails on the pre-fix code.
+junction refusal, ancestor rename after an earlier resolution, hard-link append / copy / chmod /
+fsync / read, lock-recovery tomb pair, `validateFileSize` tier guard, directory swap between check
+and temp open, single probe registration, `node_modules` read exemption, legitimate links in scope,
+Vitest remap, vault reads), `libs/core/secure-io.symlink-root-alias.test.ts` (checkout behind a
+linked prefix) and the import boundary in `libs/core/security-boundary.contract.test.ts`. Each
+attack case fails on the pre-fix code.
 
 ---
 
