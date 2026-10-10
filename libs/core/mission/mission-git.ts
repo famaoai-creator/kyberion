@@ -31,8 +31,9 @@ export function deriveMissionBranchName(missionId: string): string {
   const normalized = missionId
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .join('-');
   return `mission/${normalized || 'unnamed'}`;
 }
 

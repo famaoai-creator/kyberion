@@ -723,8 +723,9 @@ export function enforceBrowserExtensionApproval(input: {
 function sanitizeReceiptFileName(receiptId: string): string {
   const normalized = String(receiptId || '')
     .trim()
-    .replace(/[^A-Za-z0-9_-]+/g, '_')
-    .replace(/^_+|_+$/g, '');
+    .split(/[^A-Za-z0-9_-]+/)
+    .filter(Boolean)
+    .join('_');
   return normalized.length > 0 ? normalized : `receipt-${randomUUID()}`;
 }
 
@@ -1079,7 +1080,7 @@ export function isSafeStructuralDomPath(value: string): boolean {
  */
 export function redactObservationText(value: string): string {
   return String(value)
-    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+    .replace(/[\w.+%-]+@[\w-]+(?:\.[\w-]+)+/gi, '[redacted-email]')
     .replace(/\b(?:\d[ -]?){13,16}\b/g, '[redacted-card]')
     .replace(/(?:\+?\d{1,3}[-\s]?)?\(?\d{2,4}\)?[-\s]?\d{2,4}[-\s]?\d{3,4}\b/g, '[redacted-phone]')
     .replace(/〒?\s?\d{3}-\d{4}\b/g, '[redacted-postal]')

@@ -1,5 +1,6 @@
 import { secureFetch } from '../network.js';
 import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning/reasoning-egress-scope.js';
+import { trimEndChars } from '../foundation/text.js';
 
 const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com';
 
@@ -12,10 +13,7 @@ export async function probeAnthropicApiBackendAvailability(
     return { available: false, reason: 'ANTHROPIC_API_KEY is not set' };
   }
 
-  const baseUrl = (env.ANTHROPIC_BASE_URL?.trim() || DEFAULT_ANTHROPIC_BASE_URL).replace(
-    /\/+$/u,
-    ''
-  );
+  const baseUrl = trimEndChars(env.ANTHROPIC_BASE_URL?.trim() || DEFAULT_ANTHROPIC_BASE_URL, '/');
   const url = `${baseUrl}/v1/models`;
   try {
     assertReasoningEgressAllowedAtEndpoint('anthropic', url);

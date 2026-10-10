@@ -148,9 +148,9 @@ export function selectMacPhysicalAudioDevice(listing: string): string | undefine
       continue;
     }
     if (!inAudioSection) continue;
-    const match = line.match(/\]\s+\[(\d+)\]\s+(.+?)\s*$/u);
+    const match = line.match(/\]\s+\[(\d+)\]\s+(.+)$/u);
     if (!match) continue;
-    const name = match[2].trim();
+    const name = match[2].trimEnd().trim();
     if (MAC_VIRTUAL_AUDIO_DEVICE_RE.test(name)) continue;
     return `:${match[1]}`;
   }

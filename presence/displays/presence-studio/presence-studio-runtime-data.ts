@@ -880,10 +880,14 @@ export function playTimeline(timeline: PresenceTimelineAdf): {
   }
   // Cap scheduled timers — an unbounded events array could exhaust the
   // Node timer queue for this dev surface.
+  const MAX_TIMELINE_DELAY_MS = 24 * 60 * 60 * 1000;
   const timers = timeline.events.slice(0, 500).map((event) =>
-    setTimeout(() => {
-      applyTimelineEvent(surfaceId, timeline, event);
-    }, event.at_ms)
+    setTimeout(
+      () => {
+        applyTimelineEvent(surfaceId, timeline, event);
+      },
+      Math.min(Math.max(0, event.at_ms), MAX_TIMELINE_DELAY_MS)
+    )
   );
   activeTimelineTimers.set(surfaceId, timers);
   return { accepted: true, surfaceId, scheduled: timeline.events.length };

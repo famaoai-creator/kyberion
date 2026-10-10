@@ -10,6 +10,7 @@ import { tryResolveOwnerScope } from '../owner-scope.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
+import { extractFencedBlock } from '../foundation/text.js';
 
 /** Artifact path inside the existing mission's own directory; null when the mission is unknown. */
 function safeMissionArtifactPath(missionId: string, relativePath: string): string | null {
@@ -142,8 +143,10 @@ export function buildPlannerRetryPrompt(
 
 function extractJsonObject(text: string): string | null {
   const trimmed = text.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/iu);
-  const content = fenced ? fenced[1].trim() : trimmed;
+  const fence =
+    trimmed.startsWith('```') && trimmed.endsWith('```') ? extractFencedBlock(trimmed) : null;
+  const content =
+    fence && (!fence.lang || fence.lang.toLowerCase() === 'json') ? fence.content.trim() : trimmed;
   const start = content.indexOf('{');
   const end = content.lastIndexOf('}');
   if (start === -1 || end === -1 || end <= start) return null;
