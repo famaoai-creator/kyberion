@@ -367,6 +367,9 @@ describe('secure-io core', () => {
       const fifo = path.join(tmpDir, 'snapshot-fifo');
       fs.writeFileSync(file, 'aaa');
       safeExec('mkfifo', [fifo]);
+      // safeExec's policy load reads through safeReadFile (fd-based), which
+      // closes its own descriptor; count only the snapshot's closes below.
+      vi.mocked(fs.closeSync).mockClear();
       vi.mocked(fs.openSync).mockImplementationOnce((_target, flags) => {
         // Assert before the real open, so a regression cannot hang this test.
         expect(Number(flags) & fs.constants.O_NONBLOCK).not.toBe(0);

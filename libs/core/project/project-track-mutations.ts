@@ -173,7 +173,9 @@ export function createProjectTrackMutations(dependencies: {
     if (!current) throw new Error(`Project track not found: ${trackId}`);
     const project = loadProjectRecord(current.project_id);
     if (!project) throw new Error(`Project not found: ${current.project_id}`);
-    if (patch.status && patch.status !== current.status) {
+    const nextStatus = patch.status;
+    const statusChanged = nextStatus !== undefined && nextStatus !== current.status;
+    if (statusChanged) {
       const transitions: Record<ProjectTrackRecord['status'], ProjectTrackRecord['status'][]> = {
         planned: ['active', 'completed', 'archived'],
         active: ['paused', 'completed', 'archived'],
@@ -181,8 +183,8 @@ export function createProjectTrackMutations(dependencies: {
         completed: ['archived'],
         archived: [],
       };
-      if (!transitions[current.status].includes(patch.status)) {
-        throw new Error(`Invalid track transition: ${current.status} -> ${patch.status}`);
+      if (!transitions[current.status].includes(nextStatus)) {
+        throw new Error(`Invalid track transition: ${current.status} -> ${nextStatus}`);
       }
       if (project.status === 'archived')
         throw new Error(`Restore project before changing track status: ${project.project_id}`);
@@ -192,9 +194,9 @@ export function createProjectTrackMutations(dependencies: {
           mission.relationships?.track?.track_id === current.track_id &&
           ACTIVE_MISSION_STATUSES.has(mission.status)
       );
-      if (patch.status !== 'active' && activeMissions.length) {
+      if (nextStatus !== 'active' && activeMissions.length) {
         throw new Error(
-          `Cannot ${patch.status} track with active missions: ${activeMissions.map((mission) => mission.mission_id).join(', ')}`
+          `Cannot ${nextStatus} track with active missions: ${activeMissions.map((mission) => mission.mission_id).join(', ')}`
         );
       }
       const activeSessions = projectSessions(project.project_id).filter(
@@ -203,9 +205,9 @@ export function createProjectTrackMutations(dependencies: {
           session.project_context?.track_id === current.track_id &&
           ACTIVE_TASK_SESSION_STATUSES.has(session.status)
       );
-      if (patch.status !== 'active' && activeSessions.length) {
+      if (nextStatus !== 'active' && activeSessions.length) {
         throw new Error(
-          `Cannot ${patch.status} track with active task sessions: ${activeSessions.map((session) => session.session_id).join(', ')}`
+          `Cannot ${nextStatus} track with active task sessions: ${activeSessions.map((session) => session.session_id).join(', ')}`
         );
       }
     }
@@ -235,15 +237,18 @@ export function createProjectTrackMutations(dependencies: {
     const previousStates = listProjectOperationalStates(stateQuery);
     saveProjectTrackRecord(next);
     try {
-      const activeTracks = listProjectTracksForProject(project.project_id).filter(
-        (track) => isTrackInProjectScope(track, project) && track.status === 'active'
-      );
-      const nextProject = { ...project };
-      if (!activeTracks.some((track) => track.track_id === project.default_track_id)) {
-        if (activeTracks.length) nextProject.default_track_id = activeTracks[0].track_id;
-        else delete nextProject.default_track_id;
+      if (statusChanged) {
+        const activeTracks = listProjectTracksForProject(project.project_id).filter(
+          (track) => isTrackInProjectScope(track, project) && track.status === 'active'
+        );
+        const nextProject = { ...project };
+        if (!activeTracks.some((track) => track.track_id === project.default_track_id)) {
+          if (activeTracks.length) nextProject.default_track_id = activeTracks[0].track_id;
+          else delete nextProject.default_track_id;
+        }
+        if (nextProject.default_track_id !== project.default_track_id)
+          saveProjectRecord(nextProject);
       }
-      saveProjectRecord(nextProject);
       dependencies.reconcile(current.project_id);
       auditChain.record({
         agentId: kyberionEnv('KYBERION_PERSONA') || 'project_controller',

@@ -4,10 +4,13 @@ import {
   safeExistsSync,
   safeExecResult,
   safeMkdir,
+  safeReadFile,
   safeRmSync,
+  safeSymlinkSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
 import {
+  copyTree,
   parseBackupArgs,
   parseRestoredBackupManifest,
   main,
@@ -457,5 +460,21 @@ describe('backup cli', () => {
       status: 'fresh',
     });
     expect(status.latestSizeBytes).toBe(6);
+  });
+});
+
+describe('restore drill dist fallback', () => {
+  const root = `${FIXTURE_DIR}-copytree`;
+
+  afterEach(() => safeRmSync(root, { recursive: true, force: true }));
+
+  it('copies dist/ instead of linking it (regular files and directories only)', () => {
+    safeWriteFile(`${root}/src/scripts/run_pipeline.js`, 'run();');
+    safeWriteFile(`${root}/src/top.js`, 'top();');
+    safeSymlinkSync(`${root}/src/top.js`, `${root}/src/alias.js`, 'file');
+    copyTree(`${root}/src`, `${root}/dest`);
+    expect(safeReadFile(`${root}/dest/scripts/run_pipeline.js`)).toBe('run();');
+    expect(safeReadFile(`${root}/dest/top.js`)).toBe('top();');
+    expect(safeExistsSync(`${root}/dest/alias.js`)).toBe(false);
   });
 });
