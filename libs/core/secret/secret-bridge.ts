@@ -387,6 +387,16 @@ export class FileSecretProvider implements SecretProvider {
     // prototype chain of the in-memory secrets map.
     assertSafeSecretMapKey(service, 'service');
     assertSafeSecretMapKey(account, 'account');
+    if (
+      service === '__proto__' ||
+      account === '__proto__' ||
+      service === 'constructor' ||
+      account === 'constructor' ||
+      service === 'prototype' ||
+      account === 'prototype'
+    ) {
+      throw new Error('[SECRET_BRIDGE_INVALID_KEY] service/account may not be a prototype key');
+    }
     const secrets = this.readSecretsFile();
     if (!secrets[service]) secrets[service] = {};
     secrets[service][account] = value;
@@ -398,6 +408,16 @@ export class FileSecretProvider implements SecretProvider {
     assertSafeSecretMapKey(service, 'service');
     assertSafeSecretMapKey(account, 'account');
     const secrets = this.readSecretsFile();
+    if (
+      service === '__proto__' ||
+      account === '__proto__' ||
+      service === 'constructor' ||
+      account === 'constructor' ||
+      service === 'prototype' ||
+      account === 'prototype'
+    ) {
+      throw new Error('[SECRET_BRIDGE_INVALID_KEY] service/account may not be a prototype key');
+    }
     if (secrets[service]) {
       delete secrets[service][account];
       if (Object.keys(secrets[service]).length === 0) {
