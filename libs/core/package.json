@@ -3808,6 +3808,30 @@
       "types": "./dist/governance/approval-store.d.ts",
       "default": "./dist/governance/approval-store.js"
     },
+    "./governance/approval-store-paths": {
+      "types": "./dist/governance/approval-store-paths.d.ts",
+      "default": "./dist/governance/approval-store-paths.js"
+    },
+    "./governance/approval-passkey-challenge": {
+      "types": "./dist/governance/approval-passkey-challenge.d.ts",
+      "default": "./dist/governance/approval-passkey-challenge.js"
+    },
+    "./authn/webauthn-verifier": {
+      "types": "./dist/authn/webauthn-verifier.d.ts",
+      "default": "./dist/authn/webauthn-verifier.js"
+    },
+    "./authn/passkey-credential-store": {
+      "types": "./dist/authn/passkey-credential-store.d.ts",
+      "default": "./dist/authn/passkey-credential-store.js"
+    },
+    "./authn/passkey-step-up": {
+      "types": "./dist/authn/passkey-step-up.d.ts",
+      "default": "./dist/authn/passkey-step-up.js"
+    },
+    "./governance/approval-human-decision": {
+      "types": "./dist/governance/approval-human-decision.d.ts",
+      "default": "./dist/governance/approval-human-decision.js"
+    },
     "./governance/approval-requester": {
       "types": "./dist/governance/approval-requester.d.ts",
       "default": "./dist/governance/approval-requester.js"
@@ -7470,6 +7494,7 @@
     }
   },
   "dependencies": {
+    "@simplewebauthn/server": "^13.3.3",
     "axios": "^1.20.0",
     "chalk": "^6.0.0",
     "fontkit": "^2.0.4",
