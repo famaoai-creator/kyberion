@@ -1,5 +1,6 @@
 /**
- * Iterative HTML → text stripping shared by surface/observation previews.
+ * Iterative HTML → text stripping shared by surface/observation previews and
+ * tag-stripping readers.
  *
  * Element-block removal and tag stripping run until stable so malformed
  * markup (`<<script>`, `</script foo>`) cannot leave a re-formed element or
@@ -7,22 +8,22 @@
  */
 
 /** Remove `<tag>…</tag>` blocks (close-tag variants included) until none remain. */
-export function stripElementBlocks(html: string, tags: string[]): string {
+export function stripElementBlocks(html: string, tags: string[], replacement = ' '): string {
   const pattern = new RegExp(`<(${tags.join('|')})\\b[^>]*>[\\s\\S]*?<\\/\\1[^>]*>`, 'gi');
   let out = html;
   let prev: string;
   do {
     prev = out;
-    out = out.replace(pattern, ' ');
+    out = out.replace(pattern, replacement);
   } while (out !== prev);
   return out;
 }
 
 /** Remove every `<…>` tag until stable. */
-export function stripTags(html: string): string {
+export function stripTags(html: string, replacement = ' '): string {
   let out = html;
   while (out.includes('<')) {
-    const next = out.replace(/<[^<>]+>/g, ' ');
+    const next = out.replace(/<[^<>]+>/g, replacement);
     if (next === out) break;
     out = next;
   }

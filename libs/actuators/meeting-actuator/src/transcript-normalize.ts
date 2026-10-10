@@ -8,6 +8,9 @@
  * Pure functions only — no IO, no LLM.
  */
 
+import { stripTags } from '@agent/core/html-sanitize';
+import { decodeEntities } from '@agent/core/text-escaping';
+
 export interface NormalizedCue {
   startSec: number;
   speaker: string;
@@ -44,21 +47,10 @@ function formatSec(totalSec: number): string {
 }
 
 function stripCueMarkup(text: string): string {
-  let out = text.replace(/<\s*v\s+([^<>]+)>/giu, '$1: ').replace(/<\/\s*v\s*>/giu, '');
-  // Iterate the tag strip until stable so malformed markup such as `<<b>`
-  // cannot leave a re-formed tag behind.
-  while (out.includes('<')) {
-    const next = out.replace(/<[^<>]*>/gu, '');
-    if (next === out) break;
-    out = next;
-  }
-  // Decode &amp; last so entity text like `&amp;lt;` is not unescaped twice.
-  return out
-    .replace(/&nbsp;/gu, ' ')
-    .replace(/&lt;/gu, '<')
-    .replace(/&gt;/gu, '>')
-    .replace(/&amp;/gu, '&')
-    .trim();
+  const voiceTagsResolved = text
+    .replace(/<\s*v\s+([^<>]+)>/giu, '$1: ')
+    .replace(/<\/\s*v\s*>/giu, '');
+  return decodeEntities(stripTags(voiceTagsResolved, '')).trim();
 }
 
 function splitSpeaker(line: string): { speaker: string; text: string } {

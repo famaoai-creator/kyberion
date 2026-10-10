@@ -2,7 +2,7 @@ import * as crypto from 'node:crypto';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonInput } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
-import { isRecord, readTextFile } from '../foundation/text.js';
+import { isRecord, readTextFile, sanitizeIdSegment } from '../foundation/text.js';
 
 import {
   appendGovernedArtifactJsonl,
@@ -89,11 +89,7 @@ export interface MeshHubDispatchInput {
 }
 
 function normalizeNamespace(namespace?: string): string {
-  return String(namespace || '')
-    .trim()
-    .replace(/[^a-zA-Z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 64);
+  return sanitizeIdSegment(namespace || '', { maxLength: 64 });
 }
 
 function normalizeTenantId(tenantId: string): string {

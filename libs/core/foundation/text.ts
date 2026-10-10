@@ -26,6 +26,24 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+/**
+ * Id-safe path/name segment: runs of characters outside [a-zA-Z0-9._-]
+ * collapse to a single '-' and edge separators are trimmed. Unlike
+ * {@link slugify}, case and the `._-` characters are preserved.
+ */
+export function sanitizeIdSegment(
+  value: string,
+  options: { maxLength?: number; fallback?: string } = {}
+): string {
+  let cleaned = String(value ?? '')
+    .trim()
+    .split(/[^a-zA-Z0-9._-]+/)
+    .filter((part) => part.length > 0)
+    .join('-');
+  if (options.maxLength !== undefined) cleaned = cleaned.slice(0, options.maxLength);
+  return cleaned || (options.fallback ?? '');
+}
+
 export function slugify(
   value: string,
   options: {
