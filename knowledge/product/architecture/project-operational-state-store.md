@@ -166,10 +166,13 @@ Both paths use the same lifecycle checks. Active missions, live task sessions,
 and unfinished tracks must be closed first; archiving never silently drops their
 ownership links.
 
-An archived project returns to active state only through
-`pnpm project restore <PROJECT_ID>`. Restore validates the linked organization
-and reconciles the operational snapshot. Name, summary, and other descriptive
-fields can be edited while the project remains archived.
+An archived project returns only through
+`pnpm project restore <PROJECT_ID>`. Restore validates the linked organization,
+reconciles the operational snapshot, and reactivates the status recorded at
+archive time in `metadata.status_before_archive` (falling back to `active`).
+Name, summary, and other descriptive fields can be edited while the project
+remains archived. `paused` stays available while work is live — it is the
+reversible wind-down hold; only `archived` requires settled work.
 
 Track creation and mutation belong to the same project facade:
 
@@ -183,9 +186,11 @@ Track creation and mutation belong to the same project facade:
   completed or archived. A completed track may be archived. Archived tracks are
   terminal.
 - Moving a track out of active state requires closing its live missions first.
-  Mutation reconciles active track membership and selects an active replacement
-  for the default track, or clears the default when none remains.
+  When a track changes status, mutation reconciles active track membership and
+  selects an active replacement for the default track, or clears the default
+  when none remains. Descriptive updates do not reselect the default track.
 
-Project and track mutations require the mission owner: a worker view cannot
-prove that sibling missions have finished. Lifecycle writes use scoped records,
-audit events and rollback on reconciliation failure. IDs and ownership are immutable.
+Project and track creation and mutation — including `create` and `bootstrap` —
+require the mission owner: a worker view cannot prove that sibling missions
+have finished. Lifecycle writes use scoped records, audit events and rollback
+on reconciliation failure. IDs and ownership are immutable.
