@@ -822,20 +822,38 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   the descriptor (`vetOpenedFd`): the opened file's own location — `/proc/self/fd/<n>` on Linux,
   otherwise the re-derived canonical path whose leaf (not followed) must be the inode held — is
   re-authorized unless it is exactly the canonical path the caller's check approved, then the
-  hard-link rule runs on it. In-place opens are non-blocking and refuse anything but a regular
-  file, so a FIFO (or a link flipped to one) cannot hang the caller. Range and tail open
-  no-follow. An append opens without `O_CREAT` first; a missing entry is created only with
-  `O_CREAT|O_EXCL|O_NOFOLLOW` (never through a dangling link), and a created file whose vetting
-  fails is removed again. `safeChmodSync` opens files and directories non-blocking, vets the
-  descriptor and `fchmod`s it; a Unix socket (which cannot be opened) is pinned by inode at its
-  canonical path and chmod'ed there; FIFOs and devices are refused. `safeReaddir` lists the directory it
-  opened and vetted (`readdirVetted`: `/proc/self/fd/<n>` on Linux, an identity-pinned path
-  otherwise). `safeStat` and `validateFileSize` stat through a vetted non-blocking descriptor
-  (`statVetted`; sockets, FIFOs and devices fall back to the leaf-identity pin). A target outside
-  the repository is pinned only under a registered vault mount (`vaultTargetIdentity`). Denial
-  messages name only the caller's path — never the resolved location or a tier-guard reason
-  that embeds it. Cost on the CI VM: about +45 µs per read or stat, none for appends (their
-  canonical path is passed through).
+  hard-link rule runs on it. The identity pin covers the checkout root itself (a repository walk
+  starts by listing it). In-place opens are non-blocking with `O_NOCTTY` and refuse anything but
+  a regular file, so a FIFO (or a link flipped to one) cannot hang the caller. Range and tail open
+  no-follow. Errors from these opens and stats carry only the errno (`open failed (ENOENT)`),
+  never an absolute path.
+- **Appends create only inside the directory that was opened and authorized.** An append opens
+  without `O_CREAT` first. A missing entry is created with `O_CREAT|O_EXCL|O_NOFOLLOW` (never
+  through a leaf link) after the parent directory is opened and its own location authorized for
+  the new name: on Linux the create goes through that held descriptor
+  (`/proc/self/fd/<n>/<name>`, an `openat`), so a parent component flipped after the check cannot
+  redirect it; elsewhere it is by path and the parent must still be the inode held afterwards.
+  When a concurrent appender wins the create (`EEXIST`), the loser opens that file without
+  `O_CREAT` and appends, so no line is lost; a dangling leaf link is refused, even when its target
+  would be allowed. A created file whose vetting fails is left in place, empty, and the call
+  throws — secure-io never deletes it by path, because a flipped parent could redirect that
+  unlink onto a protected file.
+- **chmod only through a descriptor.** `safeChmodSync` opens files and directories
+  non-blocking, vets the descriptor and `fchmod`s it. Sockets, FIFOs and devices are refused:
+  Node has no `lchmod` on Linux, so a chmod by path could follow a leaf flipped to a link onto a
+  protected file. A process that needs a private Unix socket binds it under a restrictive umask
+  (the agent runtime supervisor binds with `umask 0177`, so the socket is created 0600).
+- **Listings and stats are pinned too.** `safeReaddir` lists the directory it opened and vetted
+  (`readdirVetted`: `/proc/self/fd/<n>` on Linux, an identity-pinned path otherwise); a pin that
+  does not hold throws. `walk` / `getAllFiles` yield nothing only for a missing root (`ENOENT`,
+  `ENOTDIR`) and rethrow every other failure to list it, so a refusal never becomes `[]`. Linux CI
+  runs the portable branch through the `setProcFdLookupDisabledForTesting` seam. `safeStat` and
+  `validateFileSize` stat through a vetted non-blocking descriptor (`statVetted`; sockets, FIFOs
+  and devices fall back to the leaf-identity pin). A target outside the repository is pinned only
+  under a registered vault mount (`vaultTargetIdentity`). Denial messages name only the caller's
+  path — never the resolved location or a tier-guard reason that embeds it. Cost on the CI VM:
+  about +45 µs per read or stat, none for appends to an existing file (their canonical path is
+  passed through).
 - **Not-found errors carry `code: 'ENOENT'`.** `safeReadFile`, `safeReadFileRange` and
   `safeReadFileTail` throw `File not found` with `code: 'ENOENT'`, so callers that classify
   errors by code (lock inspection: missing vs unreadable) see a missing file as missing.
@@ -854,6 +872,11 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   act on the literal path after the check; a concurrent swap can redirect one such operation. On
   platforms without `/proc/self/fd` the fallback pin re-derives the canonical path, so an
   attacker would have to win two consecutive races.
+- _Append creates off Linux._ Without `/proc/self/fd` there is no `openat`: the create is by path,
+  so a parent directory flipped between the check and the create can leave an empty file in
+  another directory, `knowledge/personal/` included (the call is refused, nothing is written,
+  nothing is deleted). "Never creates through a link" holds for the leaf on every platform and
+  for parent components on Linux only.
 - _Hard links created after the check_ (between the descriptor's `fstat` and the operation) and
   hard links to files outside the repository (vault targets) are not detected. Path-only helpers
   (`safeLstat`, `safeExistsSync`, `safeReaddir`) reveal metadata of a hard-linked file but no
