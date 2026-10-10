@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/governance/approval-store';
+import {
+  decideApprovalRequest,
+  loadApprovalRequest,
+  surfaceDecisionAuthMethod,
+  surfaceDecisionBinding,
+} from '@agent/core/governance/approval-store';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { conciergeText, resolveConciergeLocale } from '../../../../lib/i18n';
 import { readRequestObject } from '../../../../lib/request-input';
@@ -26,6 +31,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       'channel',
       'storageChannel',
       'reason',
+      'presentedDigest',
     ]);
     if (!parsedBody.ok)
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
@@ -73,11 +79,11 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       decision,
       decidedBy: decidedBy?.id ?? 'concierge',
       decidedByRole: decidedBy?.role ?? 'sovereign',
-      authMethod: 'surface_session',
+      authMethod: surfaceDecisionAuthMethod(resolved.context.principal, Boolean(decidedBy)),
       decidedByType: 'human',
       authenticated: true,
-      payloadHash: record.accountability?.payloadHash,
-      effectBinding: record.accountability?.effectBinding,
+      deciderPrincipal: resolved.context.principal,
+      ...surfaceDecisionBinding(record, body?.presentedDigest),
       note:
         typeof body?.reason === 'string' && body.reason.trim()
           ? body.reason.trim()

@@ -19,23 +19,34 @@
  * environment variables an agent can clear. The challenge stops an agent
  * running the command non-interactively; it does not authenticate a person. A
  * separated approval that must hold against an agent belongs on an
- * authenticated surface (Chronos or presence-studio).
+ * signed-in Concierge or Chronos session.
  *
- * Separation of duties off: no challenge (unchanged). A decision typed inside
- * an agent session is still recorded as the owner, but marked
- * `caller_supplied` with the agent principal, so it can never pass a later
- * separation-of-duties re-check.
+ * Separation of duties off: no challenge for ordinary requests (unchanged). A
+ * decision typed inside an agent session is still recorded as the owner, but
+ * marked `caller_supplied` with the agent principal, so it can never pass a
+ * later separation-of-duties re-check.
+ *
+ * Human-only requests (HA-04, terminal attestation): approve and reject are
+ * refused inside an agent session (environment markers or a provider CLI among
+ * the parent processes) and without an interactive terminal; otherwise the
+ * same challenge runs, showing the action, target, tenant, effect and the
+ * presented digest, with a code derived from that digest, the request id, a
+ * nonce and a 60 s expiry. A typed match records `terminal_attested` (A2) and
+ * sends the digest to the store, which checks it against the request; the OS
+ * user, tty and parent process lineage go to the audit trail. A2 stops a
+ * mistaken or agent-driven decision, not a compromised account (plan §5.1).
  */
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { createInterface } from 'node:readline';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import {
+  computeApprovalPresentedDigest,
   decideApprovalRequest,
   isSeparationOfDutiesEnabled,
   listApprovalRequests,
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
-import { refuseHumanOnlyDecisionOnAgentPath } from '@agent/core/governance';
+import { providerHarnessInProcessLineage } from '@agent/core/agent-execution-context';
 import {
   revokeApprovalAsLocalOwner,
   revokeApprovalRequest,
@@ -49,9 +60,14 @@ import {
 
 import {
   CLI_TTY_CHALLENGE_TIMEOUT_MS,
+  resolveCliTerminalEvidence,
   resolveCliTtyChallengeTerminal,
+  type CliTerminalEvidence,
   type CliTtyIo,
 } from './cli-tty-io.js';
+
+/** How long a terminal attestation code stays valid (plan §5.1). */
+export const CLI_TERMINAL_ATTESTATION_TTL_MS = 60_000;
 
 /** One typed line, or `null` when nothing arrives within `timeoutMs`. */
 function readOneLine(stdin: NodeJS.ReadableStream, timeoutMs: number): Promise<string | null> {
@@ -71,52 +87,160 @@ function readOneLine(stdin: NodeJS.ReadableStream, timeoutMs: number): Promise<s
   });
 }
 
-/**
- * Best-effort confirmation that a person at an interactive terminal approves:
- * refuses without a TTY, else prints the request and a one-time code and
- * proceeds only when the typed answer matches.
- */
-async function confirmApprovalByTtyChallenge(
+interface TtyChallenge {
+  decision: 'approved' | 'rejected';
+  /** Human-only: terminal attestation (60 s code, refusal code `APPROVAL_HUMAN_PROOF_REQUIRED`). */
+  humanOnly: boolean;
+}
+
+interface TtyAttestation {
+  presentedDigest: string;
+  codeExpiresAt: string;
+}
+
+/** The code is derived from what is shown, so it changes with the request and every run. */
+function challengeCode(
+  digest: string,
+  requestId: string,
+  expiresAt: string,
+  nonce: string
+): string {
+  return createHash('sha256')
+    .update(`${nonce}:${digest}:${requestId}:${expiresAt}`)
+    .digest('hex')
+    .slice(0, 6);
+}
+
+function describeRequest(request: ApprovalRequestRecord, digest: string): string[] {
+  const via =
+    request.requestedByContext?.actorId &&
+    request.requestedByContext.actorId !== request.requestedBy
+      ? ` (via ${request.requestedByContext.actorId})`
+      : '';
+  const target = request.target
+    ? `${request.target.serviceId}/${request.target.secretKey} (${request.target.mutation})`
+    : undefined;
+  return [
+    `  ${request.summary}`,
+    `  requested by ${request.requestedBy}${via}`,
+    ...(target ? [`  target: ${target}`] : []),
+    ...(request.scope?.tenant_slug ? [`  tenant: ${request.scope.tenant_slug}`] : []),
+    ...(request.accountability?.effectBinding
+      ? [`  effect: ${request.accountability.effectBinding}`]
+      : []),
+    `  presented digest: ${digest}`,
+  ];
+}
+
+/** The challenge needs a person at an interactive terminal; anything else is refused. */
+function refuseNonInteractiveTerminal(
   request: ApprovalRequestRecord,
   io: CliTtyIo,
-  timeoutMs: number
-): Promise<void> {
+  challenge: TtyChallenge
+): void {
   if (!io.stdin.isTTY || !io.stdout.isTTY) {
+    const evidence = `stdin.isTTY=${Boolean(io.stdin.isTTY)} stdout.isTTY=${Boolean(io.stdout.isTTY)}, request ${request.id}`;
     throw new Error(
-      '[POLICY_VIOLATION] approval decision blocked — separation of duties is on and this terminal is not interactive, ' +
-        'so the approval cannot be confirmed at the keyboard ' +
-        '| next: approve it on an authenticated surface (Chronos or presence-studio), or run the command in an interactive terminal and answer its challenge ' +
-        `| evidence: stdin.isTTY=${Boolean(io.stdin.isTTY)} stdout.isTTY=${Boolean(io.stdout.isTTY)}, request ${request.id}`
+      challenge.humanOnly
+        ? `[APPROVAL_HUMAN_PROOF_REQUIRED] approval decision blocked — human-only request ${request.id} needs terminal attestation and this terminal is not interactive ` +
+            '| next: run the command in an interactive terminal and type the code it prints, or decide it in a signed-in Concierge or Chronos session ' +
+            `| evidence: ${evidence}`
+        : '[POLICY_VIOLATION] approval decision blocked — separation of duties is on and this terminal is not interactive, ' +
+            'so the approval cannot be confirmed at the keyboard ' +
+            '| next: approve it in a signed-in Concierge or Chronos session, or run the command in an interactive terminal and answer its challenge ' +
+            `| evidence: ${evidence}`
     );
   }
-  const code = randomBytes(3).toString('hex');
+}
+
+/**
+ * Best-effort confirmation that a person at an interactive terminal decides:
+ * refuses without a TTY, else prints the request, its presented digest and a
+ * one-time code and proceeds only when the typed answer matches in time.
+ */
+async function confirmDecisionByTtyChallenge(
+  request: ApprovalRequestRecord,
+  io: CliTtyIo,
+  timeoutMs: number,
+  challenge: TtyChallenge
+): Promise<TtyAttestation> {
+  const verb = challenge.decision === 'approved' ? 'approve' : 'reject';
+  refuseNonInteractiveTerminal(request, io, challenge);
+  const digest = computeApprovalPresentedDigest(request);
+  const ttlMs = challenge.humanOnly
+    ? Math.min(timeoutMs, CLI_TERMINAL_ATTESTATION_TTL_MS)
+    : timeoutMs;
+  const expiresAtMs = Date.now() + ttlMs;
+  const codeExpiresAt = new Date(expiresAtMs).toISOString();
+  const code = challengeCode(digest, request.id, codeExpiresAt, randomBytes(8).toString('hex'));
   io.stdout.write(
     [
       '',
-      `Approve ${request.id}: ${request.title}`,
-      `  ${request.summary}`,
-      `  requested by ${request.requestedBy}${request.requestedByContext?.actorId && request.requestedByContext.actorId !== request.requestedBy ? ` (via ${request.requestedByContext.actorId})` : ''}`,
-      `Type ${code} to approve (anything else cancels): `,
+      `${challenge.decision === 'approved' ? 'Approve' : 'Reject'} ${request.id}: ${request.title}`,
+      ...describeRequest(request, digest),
+      `  the code expires at ${codeExpiresAt}`,
+      `Type ${code} to ${verb} (anything else cancels): `,
     ].join('\n')
   );
-  const typed = await readOneLine(io.stdin, timeoutMs);
-  if (typed === null) {
+  const typed = await readOneLine(io.stdin, ttlMs);
+  if (typed === null || Date.now() > expiresAtMs) {
     io.stdout.write('\n');
     throw new Error(
       '[POLICY_VIOLATION] challenge timed out — no code was typed within ' +
-        `${Math.round(timeoutMs / 1000)}s, so the approval was not recorded ` +
-        '| next: re-run the command and type the code it prints, or approve on Chronos or presence-studio ' +
-        `| evidence: request ${request.id}, timeout ${timeoutMs}ms (default ${CLI_TTY_CHALLENGE_TIMEOUT_MS}ms)`
+        `${Math.round(ttlMs / 1000)}s, so the decision was not recorded ` +
+        '| next: re-run the command and type the code it prints, or decide it in a signed-in Concierge or Chronos session ' +
+        `| evidence: request ${request.id}, timeout ${ttlMs}ms (default ${CLI_TTY_CHALLENGE_TIMEOUT_MS}ms)`
     );
   }
-  const answer = typed.trim();
-  if (answer !== code) {
+  if (typed.trim().toLowerCase() !== code) {
     throw new Error(
-      '[POLICY_VIOLATION] approval decision cancelled — the typed challenge did not match ' +
+      `[POLICY_VIOLATION] ${challenge.decision === 'approved' ? 'approval' : 'rejection'} decision cancelled — the typed challenge did not match ` +
         '| next: re-run the command and type the code it prints ' +
         `| evidence: request ${request.id}`
     );
   }
+  return { presentedDigest: digest, codeExpiresAt };
+}
+
+/** A provider CLI among the parent processes makes this an agent session (plan §5.1). */
+function refuseProviderHarnessLineage(
+  request: ApprovalRequestRecord,
+  evidence: CliTerminalEvidence
+) {
+  const harness = providerHarnessInProcessLineage(evidence.lineage.map((entry) => entry.command));
+  if (!harness) return;
+  throw new Error(
+    `[APPROVAL_HUMAN_PROOF_REQUIRED] approval decision blocked — this command runs under a provider CLI (${harness}) and request ${request.id} is human-only ` +
+      '| next: run the decision from your own terminal, outside the agent session, or decide it in a signed-in Concierge or Chronos session ' +
+      `| evidence: parent process lineage ${evidence.lineage.map((entry) => entry.command).join(' < ')}`
+  );
+}
+
+function recordTerminalAttestation(
+  decided: ApprovalRequestRecord,
+  params: { decision: 'approved' | 'rejected'; decidedBy: string },
+  attestation: TtyAttestation,
+  evidence: CliTerminalEvidence
+): void {
+  auditChain.record({
+    agentId: params.decidedBy,
+    action: 'approval_decision',
+    operation: 'terminal_attested',
+    result: 'completed',
+    reason: `human-only ${params.decision} confirmed at an interactive terminal by OS user ${evidence.osUser} (A2, terminal_attested)`,
+    correlationId: decided.correlationId,
+    metadata: {
+      requestId: decided.id,
+      decision: params.decision,
+      decidedBy: params.decidedBy,
+      operatorId: params.decidedBy,
+      osUser: evidence.osUser,
+      tty: evidence.tty,
+      parentLineage: evidence.lineage,
+      presentedDigest: attestation.presentedDigest,
+      codeExpiresAt: attestation.codeExpiresAt,
+    },
+  });
 }
 
 export async function decideApprovalFromCli(
@@ -126,14 +250,22 @@ export async function decideApprovalFromCli(
     note: string;
   }
 ): Promise<ApprovalRequestRecord> {
-  const decider = resolveCliApprovalDecider({ ...params, decision: params.decision });
-  if (decider.decidedInAgentSession) {
-    refuseHumanOnlyDecisionOnAgentPath(request, 'the terminal inside an agent session');
+  const humanOnly = request.accountability?.finalDecision === 'human_only';
+  const decider = resolveCliApprovalDecider({ ...params, humanOnly });
+  const challenged = humanOnly || (params.decision === 'approved' && isSeparationOfDutiesEnabled());
+  const terminal = challenged ? resolveCliTtyChallengeTerminal() : undefined;
+  let evidence: CliTerminalEvidence | undefined;
+  if (humanOnly && terminal) {
+    refuseNonInteractiveTerminal(request, terminal.io, { decision: params.decision, humanOnly });
+    evidence = resolveCliTerminalEvidence();
+    refuseProviderHarnessLineage(request, evidence);
   }
-  const challenged = params.decision === 'approved' && isSeparationOfDutiesEnabled();
-  if (challenged) {
-    const terminal = resolveCliTtyChallengeTerminal();
-    await confirmApprovalByTtyChallenge(request, terminal.io, terminal.timeoutMs);
+  let attestation: TtyAttestation | undefined;
+  if (terminal) {
+    attestation = await confirmDecisionByTtyChallenge(request, terminal.io, terminal.timeoutMs, {
+      decision: params.decision,
+      humanOnly,
+    });
   }
   const decided = decideApprovalRequest('mission_controller', {
     channel: request.channel,
@@ -150,13 +282,25 @@ export async function decideApprovalFromCli(
       : {}),
     ...(challenged ? { decidedVia: 'cli_tty_challenge' as const } : {}),
     decidedByRole: 'sovereign',
-    authMethod: 'manual',
+    authMethod: humanOnly ? 'terminal_attested' : 'manual',
     decidedByType: 'human',
     authenticated: true,
-    payloadHash: request.accountability?.payloadHash,
-    effectBinding: request.accountability?.effectBinding,
+    ...(attestation
+      ? { presentedDigest: attestation.presentedDigest }
+      : {
+          payloadHash: request.accountability?.payloadHash,
+          effectBinding: request.accountability?.effectBinding,
+        }),
     note: params.note,
   });
+  if (attestation && evidence) {
+    recordTerminalAttestation(
+      decided,
+      { ...params, decidedBy: decider.decidedBy },
+      attestation,
+      evidence
+    );
+  }
   if (decider.decidedInAgentSession) {
     auditChain.record({
       agentId: decider.decidedInAgentSession,

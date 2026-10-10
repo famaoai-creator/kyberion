@@ -3,6 +3,7 @@ import {
   agentExecutionContextEnvNames,
   detectAgentExecutionContext,
   isInsideProviderHarness,
+  providerHarnessInProcessLineage,
 } from './agent-execution-context.js';
 import { listCliReasoningProviderDescriptors } from './reasoning/reasoning-provider-registry.js';
 
@@ -117,5 +118,71 @@ describe('detectAgentExecutionContext', () => {
     ]) {
       expect(names).toContain(name);
     }
+  });
+});
+
+describe('providerHarnessInProcessLineage', () => {
+  it('finds a provider CLI among the ancestors by binary name', () => {
+    expect(
+      providerHarnessInProcessLineage(['/bin/zsh', '/Users/a/.local/bin/cursor-agent', '-zsh'])
+    ).toBe('cursor-cli');
+    expect(providerHarnessInProcessLineage(['zsh', 'claude'])).toBe('claude-cli');
+    expect(providerHarnessInProcessLineage(['-codex'])).toBe('codex-cli');
+  });
+
+  it('ignores ordinary shells and providers that are not agent harnesses', () => {
+    expect(
+      providerHarnessInProcessLineage([
+        '-zsh',
+        'login',
+        '/System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal',
+      ])
+    ).toBeNull();
+    // `gh` backs the copilot provider but declares no session markers.
+    expect(providerHarnessInProcessLineage(['gh'])).toBeNull();
+    expect(providerHarnessInProcessLineage(['claude-wrapper'])).toBeNull();
+  });
+
+  it('matches full command lines, including interpreter-wrapped provider CLIs', () => {
+    expect(
+      providerHarnessInProcessLineage([
+        '/bin/zsh -c pnpm kyberion approvals --approve x',
+        'node /usr/local/lib/node_modules/@openai/codex/bin/codex.js --yolo',
+      ])
+    ).toBe('codex-cli');
+    expect(
+      providerHarnessInProcessLineage([
+        'node --import ./loader.mjs /home/a/.local/share/cursor-agent/index.js',
+      ])
+    ).toBe('cursor-cli');
+    expect(
+      providerHarnessInProcessLineage(['/usr/bin/node --import ./loader.mjs /opt/bin/claude chat'])
+    ).toBe('claude-cli');
+    expect(providerHarnessInProcessLineage(['bun /opt/tools/cursor-agent'])).toBe('cursor-cli');
+    expect(providerHarnessInProcessLineage(['python3 -m codex run'])).toBe('codex-cli');
+    // Claude Code runs as `node …/cli.js`: matched by its install path.
+    expect(
+      providerHarnessInProcessLineage([
+        'node /usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js --dangerously',
+      ])
+    ).toBe('claude-cli');
+    expect(
+      providerHarnessInProcessLineage([
+        'node /Users/a/.npm/_npx/6f1c2a/node_modules/@anthropic-ai/claude-code/cli.js',
+      ])
+    ).toBe('claude-cli');
+    expect(providerHarnessInProcessLineage(['/Users/a/.local/share/claude/versions/2.1.0'])).toBe(
+      'claude-cli'
+    );
+    expect(
+      providerHarnessInProcessLineage(['node /opt/node_modules/@google/gemini-cli/dist/index.js'])
+    ).toBe('gemini-cli');
+    // A marker in an argument after the script is not the running program.
+    expect(
+      providerHarnessInProcessLineage(['node server.js /tmp/@anthropic-ai/claude-code/x'])
+    ).toBeNull();
+    // A provider name as an ordinary argument is not the running program.
+    expect(providerHarnessInProcessLineage(['/usr/bin/git log --author claude'])).toBeNull();
+    expect(providerHarnessInProcessLineage(['node server.js claude'])).toBeNull();
   });
 });

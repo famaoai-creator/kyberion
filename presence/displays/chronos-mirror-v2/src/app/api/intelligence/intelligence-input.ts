@@ -10,6 +10,7 @@ const ACTION_FIELDS: Record<string, readonly string[]> = {
     'note',
     'reasonCategory',
     'tenant',
+    'presentedDigest',
   ],
   memory_promote_candidate: ['action', 'candidateId', 'tenant'],
   memory_approve_candidate: ['action', 'candidateId', 'tenant'],
@@ -142,6 +143,7 @@ export function parseChronosIntelligenceInput(value: unknown): ChronosIntelligen
       requireString(value, 'storageChannel');
       requireString(value, 'channel');
       requireEnum(value, 'decision', APPROVAL_DECISIONS);
+      optionalString(value, 'presentedDigest');
       break;
     case 'memory_promote_candidate':
     case 'memory_approve_candidate':

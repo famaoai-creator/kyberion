@@ -21,6 +21,7 @@ import {
   resolveConciergeViewer,
   type ConciergeViewerContext,
 } from '../../../lib/viewer-context';
+import { resolveConciergeSelectedViewer, scopeMembershipList } from '../../../lib/selected-tenant';
 import { conciergeFrontDeskRoleForTenant } from '../../../lib/front-desk-member';
 import { frontDeskText, resolveConciergeLocale } from '../../../lib/i18n';
 
@@ -67,14 +68,17 @@ function requireViewer(
 
 /** FD-07 「設定 › 組織とメンバー」member list. Any authenticated viewer may read it — the settings nav item itself already gates to owner. */
 export function GET(req: NextRequest) {
-  const resolved = resolveConciergeViewer(req);
+  const resolved = resolveConciergeSelectedViewer(req);
   if (resolved.response) return resolved.response;
   try {
     const members = withExecutionContext('sovereign_concierge', () =>
-      listMemberIds()
-        .map((memberId) => readMemberProfile(memberId))
-        .filter((profile): profile is MemberProfile => profile !== null)
-        .map(toListItem)
+      scopeMembershipList(
+        listMemberIds()
+          .map((memberId) => readMemberProfile(memberId))
+          .filter((profile): profile is MemberProfile => profile !== null)
+          .map(toListItem),
+        resolved.context
+      )
     );
     return NextResponse.json({ ok: true, members }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {

@@ -16,6 +16,7 @@ import {
 import { listSurfaceNotificationsAcrossChannels } from './surface/surface-ux.js';
 import { t, type VocabularyKey } from './t.js';
 import { nowIso } from './foundation/time.js';
+import { computeApprovalPresentedDigest } from './governance/approval-presentation.js';
 
 export interface CeoIntentItem {
   mission_id: string;
@@ -38,6 +39,8 @@ export interface CeoApprovalItem {
   /** Whose decision this is. Lets a member of several organizations see which one is asking. */
   tenant_slug?: string;
   organization_id?: string;
+  /** HA-06: digest of what this item shows; the decision sends it back. */
+  presented_digest?: string;
 }
 
 export interface CeoOutcomeItem {
@@ -138,7 +141,7 @@ function nextActionJapanese(action: OperatorHomeSummary['nextAction']): string |
 }
 const EXCEPTION_NOTIFICATION_STATUSES = new Set(['attention', 'blocked', 'failed', 'error']);
 
-function notificationMatchesScope(
+export function notificationMatchesScope(
   notification: Record<string, unknown>,
   scope?: OperatorHomeScopeFilter
 ): boolean {
@@ -150,16 +153,22 @@ function notificationMatchesScope(
   );
   if (!scoped) return true;
   const notificationScope = notification.scope;
-  if (!notificationScope || typeof notificationScope !== 'object') return false;
-  const scopedRecord = notificationScope as Record<string, unknown>;
+  const scopeless = !notificationScope || typeof notificationScope !== 'object';
+  if (scopeless && !scope?.includeUntenanted) return false;
+  // A legacy notification without a scope object is read from its own
+  // top-level fields; it is untenanted unless it names a tenant there.
+  const scopedRecord = scopeless ? notification : (notificationScope as Record<string, unknown>);
   if (
     Array.isArray(scope?.tiers) &&
+    !(scopeless && scopedRecord.tier === undefined) &&
     !scope.tiers.includes(scopedRecord.tier as 'personal' | 'confidential' | 'public')
   )
     return false;
+  const notificationTenant = String(scopedRecord.tenant_slug || '');
   if (
     Array.isArray(scope?.tenantSlugs) &&
-    !scope.tenantSlugs.includes(String(scopedRecord.tenant_slug || ''))
+    !scope.tenantSlugs.includes(notificationTenant) &&
+    !(scope.includeUntenanted && !notificationTenant)
   )
     return false;
   if (
@@ -210,6 +219,9 @@ function toApprovalItem(
     organization_id: record.scope?.organization_id
       ? String(record.scope.organization_id)
       : undefined,
+    ...(record.id && record.title
+      ? { presented_digest: computeApprovalPresentedDigest(approval) }
+      : {}),
   };
 }
 

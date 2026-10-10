@@ -5,7 +5,10 @@ import {
   readSkillPluginsConfig,
 } from '@agent/core/plugin/skill-plugin-loader';
 import { listManagedPlugins } from '@agent/core/plugin/plugin-managed-install';
-import { loadApprovalRequest } from '@agent/core/governance/approval-store';
+import {
+  computeApprovalPresentedDigest,
+  loadApprovalRequest,
+} from '@agent/core/governance/approval-store';
 import { pathResolver } from '@agent/core/path-resolver';
 import { withExecutionContext } from '@agent/core/authority';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
@@ -39,7 +42,8 @@ export interface PluginListEntry {
   source: 'configured' | 'managed';
   requested_by?: string;
   /** Present only while a human decision is still possible/relevant. */
-  approval?: { id: string; channel: string };
+  /** `presented_digest`: HA-06 digest of the request as listed; the decision sends it back. */
+  approval?: { id: string; channel: string; presented_digest: string };
   approval_status?: string;
 }
 
@@ -79,7 +83,13 @@ export function GET(req: NextRequest) {
           source: 'managed',
           ...(approval?.requestedBy ? { requested_by: approval.requestedBy } : {}),
           ...(approval && record.activationStatus === 'pending_approval'
-            ? { approval: { id: approval.id, channel: record.approvalChannel as string } }
+            ? {
+                approval: {
+                  id: approval.id,
+                  channel: record.approvalChannel as string,
+                  presented_digest: computeApprovalPresentedDigest(approval),
+                },
+              }
             : {}),
           ...(approval ? { approval_status: approval.status } : {}),
         });

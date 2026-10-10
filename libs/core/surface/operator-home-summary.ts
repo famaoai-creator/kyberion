@@ -140,6 +140,11 @@ export interface OperatorHomeScopeFilter {
   tenantSlugs?: string[] | 'all';
   organizationIds?: string[] | 'all';
   projectIds?: string[] | 'all';
+  /**
+   * Also admit records that carry no tenant. With `tenantSlugs: []` this
+   * selects only company-less (system-scope) records.
+   */
+  includeUntenanted?: boolean;
 }
 
 function scopeAllows(allowed: string[] | 'all' | undefined, value: string | undefined): boolean {
@@ -147,13 +152,41 @@ function scopeAllows(allowed: string[] | 'all' | undefined, value: string | unde
   return Boolean(value && allowed.includes(value));
 }
 
+const LEGACY_TENANT_FIELDS = ['tenant_slug', 'tenantSlug', 'tenant_id', 'tenantId'] as const;
+
+/** The first tenant a record names under any current or legacy field. */
+function legacyTenantOf(record: unknown): string | undefined {
+  if (!record || typeof record !== 'object') return undefined;
+  const fields = record as Record<string, unknown>;
+  for (const key of LEGACY_TENANT_FIELDS) {
+    const value = fields[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+/**
+ * `legacyTenant` only decides whether a record without `tenantSlug` really
+ * belongs to no company; tenant matching itself still uses `tenantSlug`.
+ */
+function tenantScopeAllows(
+  scope: OperatorHomeScopeFilter | undefined,
+  tenantSlug: string | undefined,
+  legacyTenant?: string
+) {
+  if (!tenantSlug && scope?.includeUntenanted && !legacyTenant) return true;
+  return scopeAllows(scope?.tenantSlugs, tenantSlug);
+}
+
 function missionMatchesScope(
-  mission: Pick<OperatorHomeMissionItem, 'tier' | 'tenantSlug' | 'organizationId' | 'projectId'>,
+  mission: Pick<OperatorHomeMissionItem, 'tier' | 'tenantSlug' | 'organizationId' | 'projectId'> & {
+    legacyTenant?: string;
+  },
   scope?: OperatorHomeScopeFilter
 ): boolean {
   return (
     scopeAllows(scope?.tiers, mission.tier) &&
-    scopeAllows(scope?.tenantSlugs, mission.tenantSlug) &&
+    tenantScopeAllows(scope, mission.tenantSlug, mission.legacyTenant) &&
     scopeAllows(scope?.organizationIds, mission.organizationId) &&
     scopeAllows(scope?.projectIds, mission.projectId)
   );
@@ -262,7 +295,13 @@ function collectMissionStates(scope?: OperatorHomeScopeFilter): OperatorHomeMiss
           const projectId = state.project_id || state.relationships?.project?.project_id;
           if (
             !missionMatchesScope(
-              { tier: state.tier, tenantSlug: state.tenant_slug, organizationId, projectId },
+              {
+                tier: state.tier,
+                tenantSlug: state.tenant_slug,
+                legacyTenant: legacyTenantOf(state),
+                organizationId,
+                projectId,
+              },
               scope
             )
           ) {
@@ -504,6 +543,10 @@ export function collectOperatorHomeSummary(
     const missionId =
       scope?.mission_id || approval.requestedByContext?.missionId || approval.steering?.missionId;
     const tenantSlug = scope?.tenant_slug;
+    const legacyTenant =
+      legacyTenantOf(approval.requestedByContext) ||
+      legacyTenantOf(approval.work_loop?.context) ||
+      legacyTenantOf(approval);
     const tier = scope?.tier;
     const organizationId = scope?.organization_id;
     const projectId = scope?.project_id;
@@ -512,20 +555,21 @@ export function collectOperatorHomeSummary(
         return Boolean(missionId && scopedMissionIds.has(missionId.toUpperCase()));
       }
       return (
-        scopeAllows(input.scope.tenantSlugs, tenantSlug) &&
+        tenantScopeAllows(input.scope, tenantSlug, legacyTenant) &&
         scopeAllows(input.scope.organizationIds, organizationId) &&
         scopeAllows(input.scope.projectIds, projectId)
       );
     }
-    return Boolean(missionId && scopedMissionIds.has(missionId.toUpperCase()));
+    if (missionId) return scopedMissionIds.has(missionId.toUpperCase());
+    return Boolean(input.scope.includeUntenanted && !legacyTenant);
   };
   const inboxMatchesScope = (entry: DeliverableInboxEntry): boolean => {
     if (!input.scope || !isScoped) return true;
     if (Array.isArray(input.scope.tiers)) {
-      if (!entry.mission_id) return false;
+      if (!entry.mission_id) return Boolean(input.scope.includeUntenanted && !entry.tenant_slug);
       if (!scopedMissionIds.has(entry.mission_id.toUpperCase())) return false;
     }
-    if (!scopeAllows(input.scope.tenantSlugs, entry.tenant_slug)) return false;
+    if (!tenantScopeAllows(input.scope, entry.tenant_slug)) return false;
     if (Array.isArray(input.scope.organizationIds) || Array.isArray(input.scope.projectIds)) {
       return Boolean(entry.mission_id && scopedMissionIds.has(entry.mission_id.toUpperCase()));
     }

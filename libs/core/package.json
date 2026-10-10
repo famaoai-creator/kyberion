@@ -3796,6 +3796,10 @@
       "types": "./dist/governance/approval-policy.d.ts",
       "default": "./dist/governance/approval-policy.js"
     },
+    "./governance/approval-presentation": {
+      "types": "./dist/governance/approval-presentation.d.ts",
+      "default": "./dist/governance/approval-presentation.js"
+    },
     "./governance/approval-store-hygiene": {
       "types": "./dist/governance/approval-store-hygiene.d.ts",
       "default": "./dist/governance/approval-store-hygiene.js"

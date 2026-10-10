@@ -21,6 +21,7 @@ import { TENANT_CHANGED_EVENT, tenantFromChangeEvent } from '../lib/tenant-conte
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { frontDeskText } from '../lib/i18n';
 import { ReviewCheckin } from './review-checkin';
+import { PersonalOverview } from './personal-overview';
 import { OutcomeFiles } from './outcome-files';
 import {
   parseConciergeSummaryEvent,
@@ -55,10 +56,8 @@ type ResponseStatus = ConciergeResponseStatus;
 
 // FD-04: the viewer identity used only to render "決める人" (decide_by) on
 // every card — the same identity every card shares, since a browser session
-// is always a single human. Read-only: this page never switches tenant, it
-// only follows whichever tenant the shared rail (front-desk-rail.tsx) last
-// stored, so the two stay consistent without duplicating the switcher UI.
-const TENANT_STORAGE_KEY = 'front-desk.tenant';
+// is always a single human. Read-only: this page never switches company; the
+// server resolves the rail's selection (URL/cookie) for every request.
 const DEFERRED_STORAGE_KEY = 'front-desk.deferred';
 
 type DecideRole = 'owner' | 'approver' | 'viewer';
@@ -116,14 +115,6 @@ function relativeWhen(value: string | undefined, locale: 'en' | 'ja'): string | 
     if (absMs >= ms) return formatter.format(Math.round(diffMs / ms), unit);
   }
   return formatter.format(Math.round(diffMs / 1000), 'second');
-}
-
-function readStoredTenant(): string | null {
-  try {
-    return window.localStorage.getItem(TENANT_STORAGE_KEY);
-  } catch {
-    return null;
-  }
 }
 
 function readStoredDeferredIds(): Set<string> {
@@ -252,12 +243,22 @@ export default function ConciergePage() {
   const [viewer, setViewer] = React.useState<DecideViewerInfo | null>(null);
   const [roleLabels, setRoleLabels] = React.useState<DecideRoleLabels | null>(null);
 
+  // The company this page was narrowed to by the server, or the personal
+  // aggregate. Until /api/me answers, the (already narrowed) queue renders.
+  const [selection, setSelection] = React.useState<
+    { mode: 'tenant'; tenant_slug: string } | { mode: 'personal'; aggregate: boolean } | null
+  >(null);
+
   React.useEffect(() => {
-    const tenant = readStoredTenant();
-    const query = tenant ? `?tenant=${encodeURIComponent(tenant)}` : '';
-    fetch(`/api/me${query}`)
+    fetch('/api/me')
       .then((response) => (response.ok ? response.json() : null))
       .then((data: unknown) => {
+        const resolved = (data as { selection?: Record<string, unknown> } | null)?.selection;
+        if (resolved?.mode === 'tenant' && typeof resolved.tenant_slug === 'string') {
+          setSelection({ mode: 'tenant', tenant_slug: resolved.tenant_slug });
+        } else if (resolved?.mode === 'personal') {
+          setSelection({ mode: 'personal', aggregate: resolved.aggregate === true });
+        }
         if (
           data &&
           typeof data === 'object' &&
@@ -454,6 +455,7 @@ export default function ConciergePage() {
             decision,
             channel: item.channel,
             storageChannel: item.storage_channel,
+            presentedDigest: item.presented_digest,
           }),
         });
         if (!response.ok) throw new Error('Approval failed');
@@ -1049,6 +1051,10 @@ export default function ConciergePage() {
     .filter(Boolean)
     .join(' ');
 
+  const reviewTenant =
+    tenantFilter === 'all' && selection?.mode === 'tenant' ? selection.tenant_slug : tenantFilter;
+  const personalAggregate = selection?.mode === 'personal' && selection.aggregate;
+
   const responseStatusPill =
     responseStatus?.state === 'ready'
       ? 'ready'
@@ -1059,113 +1065,121 @@ export default function ConciergePage() {
   return (
     <>
       {notice ? <Callout tone={notice.error ? 'danger' : 'success'} title={notice.text} /> : null}
-      <ReviewCheckin key={tenantFilter} tenant={tenantFilter} />
+      <ReviewCheckin key={reviewTenant} tenant={reviewTenant} />
 
-      {nextEntry ? (
-        <NextAction
-          eyebrow={`${t('decide.next_eyebrow')} · ${t(
-            `queue.type.${nextEntry.kind}` as Parameters<typeof t>[0]
-          )}`}
-          title={entryTitle(nextEntry)}
-          reason={nextReason || undefined}
-          primary={{ label: t('decide.next_review'), href: `#decide-${nextEntry.id}` }}
-        />
+      {personalAggregate ? (
+        <PersonalOverview locale={locale} />
       ) : (
-        <NextAction
-          state="empty"
-          title={frontDeskText('decide_empty', locale)}
-          reason={t('decide.next_empty_reason')}
-        />
-      )}
-
-      {/* With nothing queued or set aside, the next-action empty state says
-          it all — no empty tab bar repeating the same sentence. */}
-      {totalQueueCount > 0 || deferred.length > 0 ? (
-        <section className="decide-queue" aria-labelledby="decide-heading">
-          <header className="decide-queue-header">
-            <h2 id="decide-heading" className="decide-heading">
-              {frontDeskText('nav_decide', locale)}
-            </h2>
-            <p className="decide-lead">{frontDeskText('decide_lead', locale)}</p>
-          </header>
-
-          <Tabs
-            label={frontDeskText('nav_decide', locale)}
-            active={kindFilter}
-            onSelect={(id) => setKindFilter(id as DecideKind | 'all')}
-            items={[
-              {
-                id: 'all',
-                label: frontDeskText('decide_filter_all', locale),
-                count: totalQueueCount,
-              },
-              ...visibleKinds.map((kind) => ({
-                id: kind,
-                label: t(`queue.type.${kind}` as Parameters<typeof t>[0]),
-                count: countsByKind[kind],
-              })),
-            ]}
-          />
-
-          {showTenantFilter ? (
-            <Tabs
-              label={frontDeskText('decide_filter_tenant', locale)}
-              active={activeTenantFilter}
-              onSelect={(id) => setTenantFilter(id)}
-              items={[
-                {
-                  id: 'all',
-                  label: frontDeskText('decide_filter_all', locale),
-                  count: totalQueueCount,
-                },
-                ...tenantOptions.tenants.map((entry) => ({
-                  id: entry.slug,
-                  label: entry.slug,
-                  count: entry.count,
-                })),
-                ...(tenantOptions.unassigned > 0
-                  ? [
-                      {
-                        id: NO_TENANT_FILTER,
-                        label: frontDeskText('decide_filter_no_tenant', locale),
-                        count: tenantOptions.unassigned,
-                      },
-                    ]
-                  : []),
-              ]}
+        <>
+          {nextEntry ? (
+            <NextAction
+              eyebrow={`${t('decide.next_eyebrow')} · ${t(
+                `queue.type.${nextEntry.kind}` as Parameters<typeof t>[0]
+              )}`}
+              title={entryTitle(nextEntry)}
+              reason={nextReason || undefined}
+              primary={{ label: t('decide.next_review'), href: `#decide-${nextEntry.id}` }}
             />
-          ) : null}
-
-          {filteredQueue.length === 0 ? (
-            <p className="decide-muted decide-empty">{frontDeskText('decide_empty', locale)}</p>
           ) : (
-            <div className="decide-list">{filteredQueue.map((entry) => renderEntry(entry))}</div>
+            <NextAction
+              state="empty"
+              title={frontDeskText('decide_empty', locale)}
+              reason={t('decide.next_empty_reason')}
+            />
           )}
 
-          {deferred.length > 0 ? (
-            <Disclosure
-              summary={frontDeskText('decide_deferred', locale, { count: deferred.length })}
-            >
-              <ul className="decide-deferred-list">
-                {deferred.map((entry) => (
-                  <li key={entry.id} className="decide-deferred-item">
-                    <Badge
-                      label={t(`queue.type.${entry.kind}` as Parameters<typeof t>[0])}
-                      tone={KIND_TONES[entry.kind]}
-                    />
-                    <span className="decide-deferred-title">{entryTitle(entry)}</span>
-                    <Button
-                      label={frontDeskText('decide_undefer', locale)}
-                      variant="ghost"
-                      onClick={() => undeferItem(entry.id)}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </Disclosure>
+          {/* With nothing queued or set aside, the next-action empty state says
+              it all — no empty tab bar repeating the same sentence. */}
+          {totalQueueCount > 0 || deferred.length > 0 ? (
+            <section className="decide-queue" aria-labelledby="decide-heading">
+              <header className="decide-queue-header">
+                <h2 id="decide-heading" className="decide-heading">
+                  {frontDeskText('nav_decide', locale)}
+                </h2>
+                <p className="decide-lead">{frontDeskText('decide_lead', locale)}</p>
+              </header>
+
+              <Tabs
+                label={frontDeskText('nav_decide', locale)}
+                active={kindFilter}
+                onSelect={(id) => setKindFilter(id as DecideKind | 'all')}
+                items={[
+                  {
+                    id: 'all',
+                    label: frontDeskText('decide_filter_all', locale),
+                    count: totalQueueCount,
+                  },
+                  ...visibleKinds.map((kind) => ({
+                    id: kind,
+                    label: t(`queue.type.${kind}` as Parameters<typeof t>[0]),
+                    count: countsByKind[kind],
+                  })),
+                ]}
+              />
+
+              {showTenantFilter ? (
+                <Tabs
+                  label={frontDeskText('decide_filter_tenant', locale)}
+                  active={activeTenantFilter}
+                  onSelect={(id) => setTenantFilter(id)}
+                  items={[
+                    {
+                      id: 'all',
+                      label: frontDeskText('decide_filter_all', locale),
+                      count: totalQueueCount,
+                    },
+                    ...tenantOptions.tenants.map((entry) => ({
+                      id: entry.slug,
+                      label: entry.slug,
+                      count: entry.count,
+                    })),
+                    ...(tenantOptions.unassigned > 0
+                      ? [
+                          {
+                            id: NO_TENANT_FILTER,
+                            label: frontDeskText('decide_filter_no_tenant', locale),
+                            count: tenantOptions.unassigned,
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
+              ) : null}
+
+              {filteredQueue.length === 0 ? (
+                <p className="decide-muted decide-empty">{frontDeskText('decide_empty', locale)}</p>
+              ) : (
+                <div className="decide-list">
+                  {filteredQueue.map((entry) => renderEntry(entry))}
+                </div>
+              )}
+
+              {deferred.length > 0 ? (
+                <Disclosure
+                  summary={frontDeskText('decide_deferred', locale, { count: deferred.length })}
+                >
+                  <ul className="decide-deferred-list">
+                    {deferred.map((entry) => (
+                      <li key={entry.id} className="decide-deferred-item">
+                        <Badge
+                          label={t(`queue.type.${entry.kind}` as Parameters<typeof t>[0])}
+                          tone={KIND_TONES[entry.kind]}
+                        />
+                        <span className="decide-deferred-title">{entryTitle(entry)}</span>
+                        <Button
+                          label={frontDeskText('decide_undefer', locale)}
+                          variant="ghost"
+                          onClick={() => undeferItem(entry.id)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </Disclosure>
+              ) : null}
+            </section>
           ) : null}
-        </section>
-      ) : null}
+        </>
+      )}
 
       {responseStatus ? (
         <Section title={t('home.response_title')} description={t('home.response_description')}>
