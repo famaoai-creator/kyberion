@@ -883,9 +883,23 @@ export function chmodInPlace(
   mode: number,
   authorizedCanonical?: string
 ): void {
-  // Through a vetted descriptor for both files and directories; any other
-  // type (FIFO, socket, device) is refused rather than chmod'ed by path.
+  // Through a vetted descriptor for files and directories. A Unix socket
+  // cannot be opened: it is chmod'ed at its canonical path after an identity
+  // pin. FIFOs and devices are refused.
   const c = fs.constants;
+  const peek = fs.statSync(resolved);
+  if (peek.isSocket()) {
+    const canonical = canonicalGuardPath(resolved, 'follow');
+    if (!leafIsInode(canonical, peek)) {
+      throw new Error(`[SECURITY] Refusing to chmod ${displayPath}: the entry changed`);
+    }
+    if (canonical !== authorizedCanonical) assertAuthorizedAt(canonical, displayPath, 'write');
+    const target = path.resolve(canonical);
+    if (target.startsWith(path.resolve(pathResolver.rootDir()) + path.sep))
+      return fs.chmodSync(target, mode);
+    if (target.startsWith(realRoot().real + path.sep)) return fs.chmodSync(target, mode);
+    throw new Error(`[SECURITY] Refusing to chmod ${displayPath}: outside the repository`);
+  }
   const fd = fs.openSync(resolved, c.O_RDONLY | (c.O_NONBLOCK ?? 0));
   try {
     const held = fs.fstatSync(fd);

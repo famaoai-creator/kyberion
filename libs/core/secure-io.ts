@@ -317,16 +317,8 @@ export interface SafeReadTailResult {
 }
 
 /**
- * Read at most `maxBytes` from the END of a regular file without loading
- * the rest into memory. Used by log-tailing call sites (terminal-hud,
- * the collaboration projection) that previously read the whole file and
- * then sliced the tail in memory.
- *
- * Applies the same sensitive-path and read-permission checks as
- * `safeReadFile`, plus explicit symlink/regular-file rejection since this
- * primitive operates on raw file descriptors rather than
- * `fs.readFileSync` (which would otherwise silently follow a symlink or
- * surface a confusing low-level error for a directory).
+ * safeReadFileTail (below) reads the last `maxBytes` of a regular file through
+ * a vetted no-follow descriptor, for log tailing without loading the file.
  */
 /** Upper bound for one `safeReadFileRange` window; larger reads must be chunked. */
 export const MAX_RANGE_READ_BYTES = 64 * 1024 * 1024;
