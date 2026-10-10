@@ -211,64 +211,34 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Exit code 0 alone is not success: read the ceremony's own verdict lines.
-    if (dryRun) {
-      const plan = parseIngestCliVerdict(result.stdout, '[ingest] DRY RUN');
-      if (!plan || plan.dry_run !== true) {
-        return NextResponse.json({ ok: false, error: t('api.ingest.failed') }, { status: 502 });
-      }
-      const duplicate = plan.would_commit !== true;
-      const summary: IngestSummary = {
-        dry_run: true,
-        outcome: duplicate ? 'duplicate' : 'would_commit',
-        ...(toDisplayPath(plan.target_path)
-          ? { target_path: toDisplayPath(plan.target_path) }
-          : {}),
-        file_name: safeName,
-        tenant,
-      };
-      return NextResponse.json({
-        ok: true,
-        dry_run: true,
-        summary,
-        message: t(duplicate ? 'api.ingest.duplicate' : 'api.ingest.previewed', { name: safeName }),
-      });
+    // Only a complete, request-matching receipt can become a success summary.
+    // A malformed post-write receipt stays 502: the client must preserve uncertainty.
+    const verdict = parseIngestCliVerdict(result.stdout, { dryRun, tenant, sourceId: safeName });
+    if (!verdict) {
+      return NextResponse.json({ ok: false, error: t('api.ingest.failed') }, { status: 502 });
     }
-
-    if (result.stdout.includes('[ingest] committed ')) {
-      const asset = parseIngestCliVerdict(result.stdout, '[ingest] committed ');
-      const summary: IngestSummary = {
-        dry_run: false,
-        outcome: 'committed',
-        ...(toDisplayPath(asset?.target_path)
-          ? { target_path: toDisplayPath(asset?.target_path) }
-          : {}),
-        file_name: safeName,
-        tenant,
-      };
-      return NextResponse.json({
-        ok: true,
-        dry_run: false,
-        summary,
-        message: t('api.ingest.committed', { name: safeName }),
-      });
-    }
-    if (result.stdout.includes('[ingest] NOT committed')) {
-      // Honest non-write outcome (duplicate content) — nothing changed on disk.
-      const summary: IngestSummary = {
-        dry_run: false,
-        outcome: 'duplicate',
-        file_name: safeName,
-        tenant,
-      };
-      return NextResponse.json({
-        ok: true,
-        dry_run: false,
-        summary,
-        message: t('api.ingest.duplicate', { name: safeName }),
-      });
-    }
-    return NextResponse.json({ ok: false, error: t('api.ingest.failed') }, { status: 502 });
+    const summary: IngestSummary = {
+      dry_run: dryRun,
+      outcome: verdict.outcome,
+      ...(verdict.outcome === 'duplicate'
+        ? {}
+        : { target_path: toDisplayPath(verdict.target_path) }),
+      file_name: safeName,
+      tenant,
+    };
+    return NextResponse.json({
+      ok: true,
+      dry_run: dryRun,
+      summary,
+      message: t(
+        verdict.outcome === 'duplicate'
+          ? 'api.ingest.duplicate'
+          : verdict.outcome === 'committed'
+            ? 'api.ingest.committed'
+            : 'api.ingest.previewed',
+        { name: safeName }
+      ),
+    });
   } catch (error) {
     console.error(
       `[concierge/ingest] route failed: ${error instanceof Error ? error.stack || error.message : String(error)}`

@@ -410,3 +410,23 @@ it('bounds a multipart request with a timeout signal', async () => {
     timeout.mockRestore();
   }
 });
+
+it('keeps an unverified preview retryable without offering filing or claiming a duplicate', async () => {
+  let count = 0;
+  const m = mount(async () =>
+    ++count === 1 ? json({ ok: false, error: 'Could not verify the CLI receipt.' }, 502) : verdict()
+  );
+  await flush();
+  m.choose();
+  await m.click('Check the document');
+  expect(m.button('Looks good — file it')).toBeUndefined();
+  expect(m.container.textContent).not.toContain('Matching content');
+  expect(m.container.textContent).not.toContain('Filed');
+  expect(m.container.textContent).toContain('check the document again');
+  expect(enabled(m.button('Check the document'))).toBe(true);
+  expect(m.posts).toHaveLength(1);
+  await m.click('Check the document');
+  expect(m.button('Looks good — file it')).toBeDefined();
+  expect(m.posts).toHaveLength(2);
+  expect(m.posts.every((body) => body.has('dry_run'))).toBe(true);
+});
