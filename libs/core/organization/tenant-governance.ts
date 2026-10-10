@@ -2,6 +2,10 @@ import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { auditChain } from '../governance/audit-chain.js';
 import {
+  approvalRequesterActorId,
+  type ApprovalRequesterRef,
+} from '../governance/approval-requester.js';
+import {
   evaluateApprovalUsability,
   claimApprovalApply,
   computeApprovalPayloadHash,
@@ -176,6 +180,14 @@ export interface AttestationInvoker {
   actor: string;
   /** The tenant scope the invoking process was bound to, if any. */
   tenantSlug?: string;
+  /**
+   * The approval requester the entry point resolved (the terminal uses
+   * `cli-operator-principal.ts`: the agent session or the local owner
+   * member). This module never reads it from the environment itself.
+   */
+  approvalRequester?: ApprovalRequesterRef;
+  /** Why the entry point could not resolve a requester (separation of duties on). */
+  approvalRequesterError?: string;
 }
 
 /**
@@ -474,8 +486,19 @@ export function requestTenantProviderAttestationApproval(
       approve_command: approveCommand(existing.id),
     };
   }
+  if (input.invoker?.approvalRequesterError) {
+    throw new Error(input.invoker.approvalRequesterError);
+  }
+  const resolved = input.invoker?.approvalRequester;
   const requestedBy =
-    input.actor || input.invoker?.actor || getRegisteredEnvText('KYBERION_PERSONA') || 'operator';
+    input.actor ||
+    resolved?.requestedBy ||
+    input.invoker?.actor ||
+    getRegisteredEnvText('KYBERION_PERSONA') ||
+    'operator';
+  // The detected principal is always kept; an explicit actor only adds one.
+  const requesterActor = resolved ? approvalRequesterActorId(resolved) : requestedBy;
+  const requestedByDisplayName = resolved?.displayName;
   // A stale approval must not open egress long after the decision context
   // moved on (72h, the scope-approve precedent).
   const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
@@ -496,6 +519,7 @@ export function requestTenantProviderAttestationApproval(
     threadTs: `${slug}:${provider}`,
     correlationId: effectBinding,
     requestedBy,
+    ...(requestedByDisplayName ? { requestedByDisplayName } : {}),
     expiresAt,
     kind: 'mission_gate',
     draft: {
@@ -506,7 +530,7 @@ export function requestTenantProviderAttestationApproval(
     },
     requestedByContext: {
       surface: 'terminal',
-      actorId: requestedBy,
+      actorId: requesterActor,
       actorRole: 'tenant-provider-attestation',
     },
     justification: {

@@ -70,7 +70,19 @@
           "planner": {
             "refused": "codex CLI has no text-only / no-exec headless mode: even --sandbox read-only still lets the model run shell commands, which would violate the planner tier's no-exec invariant. Refusing delegation rather than granting an under-restricted approximation."
           }
-        }
+        },
+        "session_markers": [
+          {
+            "env": "CODEX_CLI"
+          },
+          {
+            "env": "CODEX_VERSION"
+          },
+          {
+            "env": "TERM_PROGRAM",
+            "equals": "codex"
+          }
+        ]
       },
       "runtime_instructions": [
         "Provider note: inspect before editing, use governed file I/O, and report the exact verification performed.",

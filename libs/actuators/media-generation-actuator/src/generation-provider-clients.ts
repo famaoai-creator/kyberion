@@ -26,6 +26,7 @@ const generationHistoryClientSeam = createSeam<GenerationProviderHistoryClientFa
   key: 'media-generation-history-client',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/actuators/media-generation-actuator/src/generation-provider-clients.ts',
 });
 
 export function registerGenerationProviderHistoryClient(

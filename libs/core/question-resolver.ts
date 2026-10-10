@@ -343,6 +343,7 @@ const profileQuestionProviderSeam = createSeam<ProfileQuestionProvider>({
   key: 'question-profile-provider',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/question-resolver.ts',
 });
 
 export function registerProfileQuestionProvider(

@@ -5,15 +5,20 @@ import {
   linkMemberExternalIdentity,
   unlinkMemberExternalIdentity,
 } from '@agent/core/organization/member-identity-link';
+import { ensureOwnerMember } from '@agent/core/organization/member-registry';
 import { CHANNEL_IDENTITY_ISSUERS } from '@agent/core/surface/channel-speaker-principal';
 
 type Print = (value: string) => void;
 
 const HELP = [
   'Usage: pnpm organization member <link-identity|unlink-identity> <member-id> [options]',
+  '       pnpm organization member ensure-owner',
   '',
   'Links a chat or IdP identity to an existing member (knowledge/personal/members/).',
   'Team channels resolve the speaker through this link (Team Channel P1).',
+  '',
+  'ensure-owner provisions the local owner member (idempotent). The terminal records',
+  'approvals as this member (user:owner), so separation of duties can tell who acted.',
   '',
   'Options:',
   '  --slack <user-id>        Slack user id (issuer https://slack.com)',
@@ -38,9 +43,12 @@ function readFlag(args: string[], name: string): string | undefined {
   return value.trim();
 }
 
-export function parseMemberCommand(args: string[]): MemberCommand | null {
+export function parseMemberCommand(
+  args: string[]
+): MemberCommand | { action: 'ensure-owner' } | null {
   const [action, memberId, ...rest] = args;
   if (!action || action === '--help' || action === 'help') return null;
+  if (action === 'ensure-owner') return { action };
   if (action !== 'link-identity' && action !== 'unlink-identity') {
     throw new Error(`unknown member command '${action}'`);
   }
@@ -61,6 +69,30 @@ export async function runOrganizationMember(
   const command = parseMemberCommand(args);
   if (!command) {
     print(HELP);
+    return;
+  }
+  if (command.action === 'ensure-owner') {
+    const owner = withExecutionContext('sovereign_concierge', () => ensureOwnerMember());
+    auditChain.record({
+      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
+      action: 'member.ensure-owner',
+      operation: `user:${owner.member_id}`,
+      result: 'completed',
+      metadata: { tenants: owner.memberships.map((membership) => membership.tenant_slug) },
+    });
+    print(
+      JSON.stringify(
+        {
+          status: 'ok',
+          member_id: owner.member_id,
+          principal: `user:${owner.member_id}`,
+          display_name: owner.display_name,
+          memberships: owner.memberships,
+        },
+        null,
+        2
+      )
+    );
     return;
   }
   const identity = {

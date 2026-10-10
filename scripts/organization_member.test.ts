@@ -30,6 +30,10 @@ describe('organization member command', () => {
     });
   });
 
+  it('parses ensure-owner (provisions the local owner member the terminal approves as)', () => {
+    expect(parseMemberCommand(['ensure-owner'])).toEqual({ action: 'ensure-owner' });
+  });
+
   it('returns help and rejects incomplete input', () => {
     expect(parseMemberCommand([])).toBeNull();
     expect(() => parseMemberCommand(['rename', 'alice'])).toThrow(/unknown member command/);

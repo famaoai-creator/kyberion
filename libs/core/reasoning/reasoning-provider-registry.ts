@@ -117,6 +117,13 @@ export type ReasoningProviderPermissionProjection =
   | { args: readonly string[]; notes?: string; requires_full_sandbox_enforcement?: boolean }
   | { refused: string };
 
+/** An environment variable the CLI harness sets in every child it spawns (agent-session detection). */
+export interface ReasoningProviderCliSessionMarker {
+  env: string;
+  /** Match only this value (case-insensitive); any non-empty value otherwise. */
+  equals?: string;
+}
+
 export interface ReasoningProviderCli {
   binary: string;
   version_args: readonly string[];
@@ -130,6 +137,10 @@ export interface ReasoningProviderCli {
   permission_profiles?: Partial<
     Record<ReasoningProviderPermissionTier, ReasoningProviderPermissionProjection>
   >;
+  /** Env markers that show a process runs inside this CLI's agent session. */
+  session_markers?: readonly ReasoningProviderCliSessionMarker[];
+  /** Principal name recorded as `agent:<name>` for such a session (default: the mode). */
+  session_principal?: string;
 }
 
 export interface ReasoningProviderDescriptor {
@@ -513,6 +524,26 @@ function parseCli(value: unknown): ReasoningProviderCli | string {
       };
     }
   }
+  let sessionMarkers: ReasoningProviderCliSessionMarker[] | undefined;
+  if (value.session_markers !== undefined) {
+    const raw = value.session_markers;
+    if (!Array.isArray(raw)) return 'cli.session_markers must be an array';
+    sessionMarkers = [];
+    for (const entry of raw) {
+      if (!isRecord(entry) || typeof entry.env !== 'string' || !ENV_KEY_PATTERN.test(entry.env)) {
+        return 'cli.session_markers[].env must be an env var name';
+      }
+      if (entry.equals !== undefined && (typeof entry.equals !== 'string' || !entry.equals)) {
+        return 'cli.session_markers[].equals must be a non-empty string';
+      }
+      sessionMarkers.push({
+        env: entry.env,
+        ...(typeof entry.equals === 'string' ? { equals: entry.equals } : {}),
+      });
+    }
+  }
+  const sessionPrincipal = optionalString(value, 'session_principal', /^[a-z0-9][a-z0-9-]*$/u);
+  if (!sessionPrincipal.ok) return 'cli.session_principal must be a lowercase name';
   return {
     binary: value.binary,
     version_args: [...value.version_args],
@@ -524,6 +555,8 @@ function parseCli(value: unknown): ReasoningProviderCli | string {
     ...(install ? { install } : {}),
     ...(capabilityProbe ? { capability_probe: capabilityProbe } : {}),
     ...(permissionProfiles ? { permission_profiles: permissionProfiles } : {}),
+    ...(sessionMarkers ? { session_markers: sessionMarkers } : {}),
+    ...(sessionPrincipal.value ? { session_principal: sessionPrincipal.value } : {}),
   };
 }
 

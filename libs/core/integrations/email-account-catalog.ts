@@ -65,6 +65,7 @@ const emailAccountProviderSeam = createSeam<EmailAccountDescriptor>({
   key: 'email-account-provider',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/integrations/email-account-catalog.ts',
 });
 
 export function registerEmailAccountProvider(

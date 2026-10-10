@@ -6,6 +6,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { withExecutionContext } from '@agent/core/authority';
 import {
   approvalRequestLogicalPath,
+  approvalStoreRoots,
   decideApprovalRequest,
   loadApprovalRequest,
 } from '@agent/core/governance/approval-store';
@@ -204,6 +205,18 @@ afterEach(() => {
 
 afterAll(() => {
   withExecutionContext('mission_controller', () => safeRmSync(TMP_ROOT));
+  // The test approval store is per Vitest pool: clear the channels this file
+  // writes so the next file in the pool does not read them (operations-hygiene-runbook §5).
+  withExecutionContext('mission_controller', () => {
+    for (const root of Object.values(approvalStoreRoots())) {
+      for (const channel of ['plugin-install', 'chronos']) {
+        safeRmSync(pathResolver.rootResolve(`${root}/${channel}`), {
+          recursive: true,
+          force: true,
+        });
+      }
+    }
+  });
 });
 
 describe('GET /api/headless/a2ui/plugin-views', () => {

@@ -43,6 +43,7 @@ const capabilityProbeSeam = createSeam<ActuatorCapabilityProbe>({
   key: 'actuator.capability-probe',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/actuator/actuator-capability.ts',
 });
 let actuatorCatalogOrderCache: Map<string, number> | null = null;
 

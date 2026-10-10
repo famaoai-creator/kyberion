@@ -101,6 +101,7 @@ const structuredRunnerSeam = createSeam<StructuredRunner>({
   key: 'structured-runner',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/mission/mission-llm.ts',
 });
 
 export function registerStructuredRunner(

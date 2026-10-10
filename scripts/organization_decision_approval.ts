@@ -4,6 +4,12 @@ import {
   createApprovalRequest,
   loadApprovalRequest,
 } from '@agent/core/governance/approval-store';
+import { markApprovalConsumed } from '@agent/core/governance/approval-revocation';
+import {
+  approvalRequesterActorId,
+  resolveApprovalRequesterInput,
+  type ApprovalRequesterInput,
+} from '@agent/core/governance/approval-requester';
 import type { OrganizationDecisionRecord } from '@agent/core/organization/organization-operating-model';
 
 /** Storage channel for organization decision approval requests. */
@@ -32,7 +38,9 @@ export function decisionApprovalPayloadHash(
 export function requestDecisionApproval(input: {
   decision: OrganizationDecisionRecord;
   chosenOption: string;
-  requestedBy: string;
+  requestedBy?: string;
+  /** The requester the CLI resolved (detected principal kept as actorId); overrides requestedBy. */
+  requester?: ApprovalRequesterInput;
   rationale?: string;
 }): { ref: string; request_id: string; effect: string } {
   const { decision, chosenOption } = input;
@@ -42,11 +50,15 @@ export function requestDecisionApproval(input: {
     );
   }
   const effect = decisionEffect(decision.decision_id, 'approved');
+  const requester = input.requester
+    ? resolveApprovalRequesterInput(input.requester)
+    : { requestedBy: input.requestedBy || 'organization-cli' };
   const record = createApprovalRequest('mission_controller', {
     channel: DECISION_APPROVAL_CHANNEL,
     threadTs: `organization-decision-${decision.decision_id}`,
     correlationId: `organization:${decision.organization_id}:decision:${decision.decision_id}`,
-    requestedBy: input.requestedBy,
+    requestedBy: requester.requestedBy,
+    ...(requester.displayName ? { requestedByDisplayName: requester.displayName } : {}),
     kind: 'mission_gate',
     draft: {
       title: `Organization decision: ${decision.title}`,
@@ -62,7 +74,7 @@ export function requestDecisionApproval(input: {
     },
     requestedByContext: {
       surface: 'terminal',
-      actorId: input.requestedBy,
+      actorId: approvalRequesterActorId(requester),
       actorRole: 'organization_operator',
     },
     justification: {
@@ -129,4 +141,20 @@ export function verifyDecisionApprovalRef(
     );
   }
   return ref!;
+}
+
+/**
+ * Applying an approved decision is a one-shot effect: record it on the
+ * approval (`markApprovalConsumed`, consumer `organization_decision`) so the
+ * same approval cannot settle the decision again and a later revoke reports
+ * it as consumed.
+ */
+export function consumeDecisionApprovalRef(ref: string, consumedBy: string): void {
+  const [channel, id] = ref.split(':');
+  markApprovalConsumed('mission_controller', {
+    channel: channel!,
+    requestId: id!,
+    consumer: 'organization_decision',
+    consumedBy,
+  });
 }

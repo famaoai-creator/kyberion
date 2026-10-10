@@ -20,6 +20,10 @@ import {
 import { validatePipelineAdf, type PipelineAdf } from '../pipeline/pipeline-contract.js';
 import { validatePipelineGuardrails } from '../pipeline/adf-guardrails.js';
 import { loadServiceRecordingAtPath } from './service-recording.js';
+import {
+  assertServiceRecordingReviewApproval,
+  consumeServiceRecordingReviewApproval,
+} from './service-recording-review-approval.js';
 import type { ProcedureCatalog, ProcedureEntry } from '../knowledge/procedure-types.js';
 
 const PROCEDURE_ID_RE = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/i;
@@ -63,6 +67,9 @@ export function promoteServiceProcedure(
   if (recording.review?.status !== 'approved') {
     throw new Error('recording review must be approved before promotion');
   }
+  // The approval the review points at must still be usable (not revoked,
+  // and separate under separation of duties).
+  assertServiceRecordingReviewApproval(recording, pathResolver.toRepoRelative(recordingAbs));
 
   const compiled = compileServiceRecording(recording, {
     procedureId,
@@ -113,6 +120,8 @@ export function promoteServiceProcedure(
   compiled.procedureEntry.golden_scenario_ref = pathResolver.toRepoRelative(goldenPath);
   catalog.procedures.push(compiled.procedureEntry);
   validateProcedureCatalog(catalog, catalogPath);
+  // One-shot: the review approval is consumed before anything is written.
+  consumeServiceRecordingReviewApproval(recording, 'service-procedure-promotion');
   saveGoldenScenario(compiled.goldenScenario, goldenPath);
   safeMkdir(path.dirname(pipelinePath), { recursive: true });
   safeWriteFile(pipelinePath, `${JSON.stringify(pipeline, null, 2)}\n`);

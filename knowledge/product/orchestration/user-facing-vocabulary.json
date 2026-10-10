@@ -9445,6 +9445,11 @@
         "ja": "承認待ちが見つかりません: {id}",
         "qps-ploc": "⟦Ṗėñḓïñɠ ȧṗṗřőṽȧŀ ñőŧ ƒőůñḓ: {id} ŀőřėɱ ïṗşů⟧"
       },
+      "recorder_approvals_revoke_not_found": {
+        "en": "Revocable approved approval not found: {id}",
+        "ja": "取り消せる承認済みの承認が見つかりません: {id}",
+        "qps-ploc": "⟦Řėṽőƈȧƀŀė ȧṗṗřőṽėḓ ȧṗṗřőṽȧŀ ñőŧ ƒőůñḓ: {id} ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
       "recorder_approval_updated": {
         "en": "✓ {id} → {status}: {title}",
         "ja": "✓ {id} → {status}: {title}",
@@ -9461,9 +9466,9 @@
         "qps-ploc": "⟦Ṗėñḓïñɠ ȧṗṗřőṽȧŀş ({count}): ŀőřėɱ ïṗş⟧"
       },
       "recorder_approvals_summary": {
-        "en": "Decide: pnpm kyberion approvals --approve <id> / --deny <id> [--note \"...\"]",
-        "ja": "裁可: pnpm kyberion approvals --approve <id> / --deny <id> [--note \"...\"]",
-        "qps-ploc": "⟦Ḓėƈïḓė: ṗñṗɱ ķẏƀėřïőñ ȧṗṗřőṽȧŀş --ȧṗṗřőṽė <ïḓ> / --ḓėñẏ <ïḓ> [--ñőŧė \"...\"] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+        "en": "Decide: pnpm kyberion approvals --approve <id> / --deny <id> [--note \"...\"] / withdraw an approval: --revoke <id> [--reason \"...\"]",
+        "ja": "裁可: pnpm kyberion approvals --approve <id> / --deny <id> [--note \"...\"] / 承認の取り消し: --revoke <id> [--reason \"...\"]",
+        "qps-ploc": "⟦Ḓėƈïḓė: ṗñṗɱ ķẏƀėřïőñ ȧṗṗřőṽȧŀş --ȧṗṗřőṽė <ïḓ> / --ḓėñẏ <ïḓ> [--ñőŧė \"...\"] / ẇïŧħḓřȧẇ ȧñ ȧṗṗřőṽȧŀ: --řėṽőķė <ïḓ> [--řėȧşőñ \"...\"] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
       },
       "recorder_ask_usage": {
         "en": "Usage: pnpm kyberion ask \"<request>\"",

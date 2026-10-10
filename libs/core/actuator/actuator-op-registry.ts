@@ -234,6 +234,7 @@ const scenarioOpOverrideSeam = createSeam<ScenarioOpOverride>({
   key: 'scenario-op-override',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/actuator/actuator-op-registry.ts',
 });
 
 const SCENARIO_OVERRIDE_METADATA: SeamProviderMetadata = {

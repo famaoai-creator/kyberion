@@ -70,7 +70,12 @@
             "args": ["--sandbox", "--approval-mode", "plan"],
             "notes": "Gemini CLI plan mode is the provider no-write projection."
           }
-        }
+        },
+        "session_markers": [
+          {
+            "env": "GEMINI_CLI"
+          }
+        ]
       },
       "runtime_instructions": [
         "Provider note: this provider is retained only for compatibility; do not assume personal Gemini availability.",

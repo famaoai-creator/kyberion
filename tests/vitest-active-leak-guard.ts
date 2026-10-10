@@ -17,8 +17,9 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPORT = path.join(ROOT, 'active', 'shared', 'tmp', 'vitest-active-leaks.json');
 
 /** Repo-relative roots holding live (gitignored) operator state a test run must not change. */

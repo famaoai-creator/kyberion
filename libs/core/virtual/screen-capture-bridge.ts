@@ -40,6 +40,7 @@ const screenCaptureBackendSeam = createSeam<ScreenCaptureBackendAdapter>({
   key: 'screen.capture-backend',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/virtual/screen-capture-bridge.ts',
 });
 
 export function registerScreenCaptureBackend(

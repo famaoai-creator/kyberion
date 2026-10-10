@@ -1,4 +1,5 @@
 import { appendJsonLine, readJson, readJsonLines } from '../foundation/json.js';
+import type { PluginApprovalRequester } from './plugin-managed-install.js';
 import { isRecord } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 /**
@@ -152,7 +153,8 @@ export interface ImportPluginPackParams {
   url: string;
   ref?: string;
   syncMode?: PluginPackSyncMode;
-  requestedBy?: string;
+  /** Resolved lazily, only when an install actually opens an approval request. */
+  requestedBy?: PluginApprovalRequester;
   approvalChannel?: string;
   managedRoot?: string;
   registryDir?: string;

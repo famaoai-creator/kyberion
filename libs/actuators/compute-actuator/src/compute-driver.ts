@@ -130,6 +130,7 @@ const computeDriverSeam = createSeam<ComputeDriver>({
   key: 'compute-execution-provider',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/actuators/compute-actuator/src/compute-driver.ts',
 });
 
 function validateComputeDriver(providerId: string, candidate: unknown): ComputeDriver {

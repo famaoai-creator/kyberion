@@ -31,6 +31,7 @@ provider list, switch, or map in TypeScript. Fields:
 | `cli.install`                                                        | `pnpm` managed provider CLI install metadata                                                                           |
 | `cli.discovery`                                                      | chain construction skips CLIs that provider discovery reports absent                                                   |
 | `cli.model_flag`                                                     | pane-agent model forwarding                                                                                            |
+| `cli.session_markers`, `cli.session_principal`                       | agent-session detection for approval requesters and deciders (`detectCliAgentPrincipal`)                               |
 | `aliases`, `model_vendor`                                            | identifier resolution (runtime backend names, model-registry vendors)                                                  |
 | `endpoint`, `egress_provider_id`                                     | reasoning egress gate; omitted endpoint fails closed                                                                   |
 | `model_env_keys`                                                     | per-mode model env override precedence                                                                                 |

@@ -524,6 +524,7 @@ const voicePlaybackPlatformSeam = createSeam<VoicePlaybackPlatformAdapter>({
   key: 'voice-playback-platform',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/actuators/voice-actuator/src/voice-runtime-helpers.ts',
 });
 
 export function registerVoicePlaybackPlatformAdapter(

@@ -55,6 +55,7 @@ const cameraOutputSeam = createSeam<CameraOutputBridge>({
   key: 'camera-output-bridge',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/camera-output-bridge.ts',
 });
 
 const registeredDisposers = new Map<string, () => void>();

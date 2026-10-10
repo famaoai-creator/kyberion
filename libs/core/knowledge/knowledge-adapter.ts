@@ -44,6 +44,7 @@ const knowledgeAdapterSeam = createSeam<KnowledgeAdapter>({
   key: 'knowledge-adapter',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
+  owner: 'libs/core/knowledge/knowledge-adapter.ts',
 });
 
 const registeredDisposers = new Map<string, () => void>();
