@@ -8,6 +8,9 @@
  *   - All approval operations are self-audited via auditChain.record()
  *   - `decide` requires the caller to present a valid requestId obtained from
  *     `listPending` (two-step: list→confirm→decide) to prevent blind approval.
+ *   - HA-02: `decide` refuses human-only requests with
+ *     `[APPROVAL_HUMAN_PROOF_REQUIRED]` and records every other decision as
+ *     `decidedByType: 'ai_agent'` — the MCP caller is an agent.
  *   - kill-switch is gated behind a separate explicit confirm flag.
  *   - Storage role: 'sovereign_concierge' (operator-facing surface)
  *
@@ -21,6 +24,8 @@ import {
   decideApprovalRequest,
   type ApprovalRequestRecord,
 } from './approval-store.js';
+import { refuseHumanOnlyDecisionOnAgentPath } from './approval-human-decision.js';
+import { detectAgentExecutionContext } from '../agent-execution-context.js';
 import { auditChain } from './audit-chain.js';
 import { nowIso } from '../foundation/time.js';
 import type { EventScopeInput } from '../event-scope.js';
@@ -125,7 +130,24 @@ export function decideApprovalFromCowork(params: {
     );
   }
 
-  // Step 2: apply the decision
+  // HA-02: this tool is agent-facing — it never settles a human-only request.
+  try {
+    refuseHumanOnlyDecisionOnAgentPath(target, 'kyberion.approval.decide');
+  } catch (error) {
+    auditChain.record({
+      agentId: COWORK_AGENT_ID,
+      action: 'cowork.approval.decide',
+      operation: 'write',
+      result: 'denied',
+      reason: 'human_only request cannot be decided through an agent-facing tool',
+      metadata: { request_id: params.requestId, attempted_decision: params.decision },
+    });
+    throw error;
+  }
+
+  // Step 2: apply the decision — recorded as an agent decision, whatever the
+  // caller claims.
+  const agentSession = detectAgentExecutionContext().principal;
   const updated = decideApprovalRequest(GOVERNED_ROLE, {
     channel: target.channel,
     storageChannel: target.storageChannel,
@@ -135,8 +157,9 @@ export function decideApprovalFromCowork(params: {
     // `decided_by` is free text from the MCP caller, not resolved here: with
     // separation of duties on, the store refuses such approvals.
     deciderIdentitySource: 'caller_supplied',
-    decidedByType: 'human',
-    authenticated: true,
+    ...(agentSession ? { decidedInAgentSession: agentSession } : {}),
+    decidedByType: 'ai_agent',
+    authenticated: false,
     payloadHash: target.accountability?.payloadHash,
     effectBinding: target.accountability?.effectBinding,
     note: params.note,

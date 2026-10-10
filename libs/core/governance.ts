@@ -19,6 +19,7 @@ export {
   decideApprovalRequest,
   listApprovalRequests,
 } from './governance/approval-store.js';
+export { refuseHumanOnlyDecisionOnAgentPath } from './governance/approval-human-decision.js';
 export type {
   ApprovalApplyResult,
   ApprovalDecisionPayload,

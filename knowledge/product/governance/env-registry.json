@@ -405,6 +405,17 @@
       "documented": true
     },
     {
+      "name": "KYBERION_APPROVAL_ASSURANCE",
+      "category": "runtime",
+      "type": "enum",
+      "enum": ["warn", "enforce"],
+      "required": false,
+      "default": "warn",
+      "subsystem": "governance",
+      "description": "Human-approval assurance rollout (HA-03): warn (default) accepts a human-only decision whose authMethod is below the request's min_assurance but records assurance_shortfall in the audit and notifies the operator; enforce rejects it. A missing or local-token authMethod is rejected in both modes, and agent-facing decision paths never settle human-only requests.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_AUDIO_BUS",
       "category": "runtime",
       "type": "string",
