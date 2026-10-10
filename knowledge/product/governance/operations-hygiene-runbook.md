@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-10-09
+last_updated: 2026-10-10
 ---
 
 # Operations Hygiene Runbook
@@ -158,6 +158,17 @@ that do not map to a simplified preset. For quiet hours, run `quiet-hours-view.t
 `quiet-hours-ui.test.ts` alongside the notification-preferences API tests, covering failed and
 malformed reads, delayed replies, reload, repeated clicks, sign-in changes, unmount, explicit
 validation rejection, malformed/mismatched saved receipts and overnight/timezone values.
+
+**Surface preview ownership.** A response belongs to the current visible selection, not to the
+last request that finishes. Select synchronously, clear old data immediately, and keep Close usable
+while loading. Abort on replacement/dismissal and also guard every success, error and finalizer
+with request generation; cancellation alone cannot stop an already-read body or an uncooperative
+request. Bind the selection to its entry ID, artifact revision and current member context. Close
+when actual rendered visibility changes (including derived tenant filters, deferral or a failed
+queue read), when navigation hides the page, and on unmount. Verify a matching receipt and bound
+the request lifetime. Exercise delayed fetch/body/error permutations, same-entry reopen, auth
+revision changes, unchanged summary refreshes and timeout recovery in
+`presence/displays/concierge/test/outcome-preview-ui.test.ts`; history must stay untouched.
 
 **Review checklist** (when a PR adds a loop or a spawn): in-flight guard, signal handlers, stopped
 heartbeat, child deadline, `'error'` listener, test with a mocked child.
