@@ -638,6 +638,10 @@ the browser and terminal actuator tests, and `libs/core/shell/pty-engine.resize.
 Replay `scripts/browser_actuator_usability_probe.ts` and
 `scripts/terminal_actuator_usability_probe.ts` for live outcomes and recovery.
 Native PTY and desktop GUI checks require the corresponding host capabilities.
+When adding probe scratch with `sharedTmp()`, register the exact call count and
+the consumable diagnostic purpose in `shared-tmp-allowlist.json`, then run
+`tests/shared-tmp-ratchet.test.ts`. Preserve durable conclusions in mission
+evidence instead of relying on scratch files after their retention window.
 
 ---
 

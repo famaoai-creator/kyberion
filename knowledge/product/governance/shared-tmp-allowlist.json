@@ -6,6 +6,18 @@
   "plan": "docs/developer/improvement-plans-2026-07/ARTIFACT_AGENT_LIFECYCLE_NHI_PLAN_2026-07-26.ja.md",
   "entries": [
     {
+      "file": "scripts/browser_actuator_usability_probe.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "Re-generable isolated Chromium probe scratch: per-run screenshots and diagnostic results are consumed by usability verification; durable conclusions are recorded separately in mission evidence."
+    },
+    {
+      "file": "scripts/terminal_actuator_usability_probe.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "Re-generable isolated terminal probe scratch: transient session diagnostics are consumed by capability/recovery verification; durable conclusions are recorded separately in mission evidence."
+    },
+    {
       "file": "libs/actuators/video-composition-actuator/src/video-composition-action-helpers.ts",
       "count": 1,
       "classification": "legit-tmp",
