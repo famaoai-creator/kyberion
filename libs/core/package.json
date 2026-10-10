@@ -7384,6 +7384,18 @@
       "types": "./dist/surface/front-desk-conversation-store.d.ts",
       "default": "./dist/surface/front-desk-conversation-store.js"
     },
+    "./surface/front-desk-request-result": {
+      "types": "./dist/surface/front-desk-request-result.d.ts",
+      "default": "./dist/surface/front-desk-request-result.js"
+    },
+    "./surface/front-desk-request-service": {
+      "types": "./dist/surface/front-desk-request-service.d.ts",
+      "default": "./dist/surface/front-desk-request-service.js"
+    },
+    "./surface/front-desk-request-projection": {
+      "types": "./dist/surface/front-desk-request-projection.d.ts",
+      "default": "./dist/surface/front-desk-request-projection.js"
+    },
     "./surface/surface-conversation-runtime-context": {
       "types": "./dist/surface/surface-conversation-runtime-context.d.ts",
       "default": "./dist/surface/surface-conversation-runtime-context.js"
