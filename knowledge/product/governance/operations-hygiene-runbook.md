@@ -135,6 +135,15 @@ generation-schedule, bridges.
 - Probes of external CLIs (`--version`, keychain, osascript) are bounded at about 10 s. Report a
   timeout as "unavailable (timed out)", never as a hang.
 
+**Surface result receipts.** A zero exit code or a human-readable success marker is not proof of
+completion. Before projecting a child result into a user-facing success or duplicate status,
+validate one complete, phase-appropriate structured receipt and correlate its destination and
+source with the request. Reject conflicting verdicts, incomplete JSON and mismatched provenance.
+For document ingest, exercise the parser and API together (`ingest-output-parser.test.ts`,
+`ingest-result-route.test.ts`), including genuine duplicate and superseding receipts. Invalid
+post-write receipts must stay uncertain (HTTP 502), never become a pre-execution rejection or
+trigger an automatic retry; keep the interrupted/repeated-flow tests in `ingest-ui.test.ts`.
+
 **Review checklist** (when a PR adds a loop or a spawn): in-flight guard, signal handlers, stopped
 heartbeat, child deadline, `'error'` listener, test with a mocked child.
 
