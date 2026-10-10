@@ -280,12 +280,51 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     expect(fs.statSync(victim).nlink).toBe(1);
   });
 
-  it('allows hard links whose names all live in one directory (lock recovery tombs)', () => {
-    fs.writeFileSync(abs(`${scratchRel}/lock.json`), '{"pid":1}');
-    fs.linkSync(abs(`${scratchRel}/lock.json`), abs(`${scratchRel}/lock.json.stale-1-2-3`));
-    expect(safeReadFile(`${scratchRel}/lock.json`)).toBe('{"pid":1}');
-    safeAppendFileSync(`${scratchRel}/lock.json`, '\n');
-    safeFsyncFile(`${scratchRel}/lock.json`);
+  it('allows only lock recovery tomb pairs in the locks directory', () => {
+    const locks = `active/shared/runtime/locks/vitest-secure-io-${RUN}`;
+    try {
+      fs.mkdirSync(abs(locks), { recursive: true });
+      fs.writeFileSync(abs(`${locks}/res.lock`), '{"pid":1}');
+      fs.linkSync(abs(`${locks}/res.lock`), abs(`${locks}/res.lock.stale-1-2-3`));
+      expect(safeReadFile(`${locks}/res.lock`)).toBe('{"pid":1}');
+      expect(safeReadFile(`${locks}/res.lock.stale-1-2-3`)).toBe('{"pid":1}');
+      safeAppendFileSync(`${locks}/res.lock`, '\n');
+      safeFsyncFile(`${locks}/res.lock`);
+      // Any other name for the inode, even in the same directory, is refused.
+      fs.linkSync(abs(`${locks}/res.lock`), abs(`${locks}/other.json`));
+      expect(() => safeReadFile(`${locks}/res.lock`)).toThrow(/hard link/);
+    } finally {
+      fs.rmSync(abs(locks), { recursive: true, force: true });
+    }
+    // The same pair outside the locks directory gets no exception.
+    fs.writeFileSync(abs(`${scratchRel}/res.lock`), 'x');
+    fs.linkSync(abs(`${scratchRel}/res.lock`), abs(`${scratchRel}/res.lock.stale-1-2-3`));
+    expect(() => safeAppendFileSync(`${scratchRel}/res.lock`, 'y')).toThrow(/hard link/);
+  });
+
+  it('refuses to move a hard link to a protected file under a writable name', () => {
+    fs.linkSync(path.join(abs(protectedRel), 'existing.txt'), abs(`${scratchRel}/hl`));
+    expect(() => safeMoveSync(`${scratchRel}/hl`, `${scratchRel}/MEMORY.md`)).toThrow(/hard link/);
+    expect(fs.existsSync(abs(`${scratchRel}/MEMORY.md`))).toBe(false);
+  });
+
+  it('never truncates through a hard link (append accepts only append flags)', () => {
+    fs.linkSync(path.join(abs(protectedRel), 'existing.txt'), abs(`${scratchRel}/hl`));
+    expect(() => safeAppendFileSync(`${scratchRel}/hl`, '', { flag: 'w' })).toThrow(/only appends/);
+    expect(() => safeAppendFileSync(`${scratchRel}/hl`, '', { flag: 'r+' })).toThrow(
+      /only appends/
+    );
+    expect(fs.readFileSync(path.join(abs(protectedRel), 'existing.txt'), 'utf8')).toBe('protected');
+  });
+
+  it('gives no node_modules exemption to a node_modules directory in a writable tree', () => {
+    fs.mkdirSync(abs(`${scratchRel}/node_modules/pkg`), { recursive: true });
+    fs.linkSync(
+      path.join(abs(personalRel), 'secret.txt'),
+      abs(`${scratchRel}/node_modules/pkg/index.js`)
+    );
+    expect(() => safeReadFile(`${scratchRel}/node_modules/pkg/index.js`)).toThrow(/hard link/);
+    expect(() => validateFileSize(`${scratchRel}/node_modules/pkg/index.js`)).toThrow(/hard link/);
   });
 
   it('refuses reads of a higher-tier file through a hard link', () => {
