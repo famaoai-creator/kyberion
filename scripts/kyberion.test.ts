@@ -291,44 +291,36 @@ describe('kyberion command router', () => {
   });
 });
 
-describe('CU-08 deprecated command aliases', () => {
+describe('CU-08 removed command aliases stay removed', () => {
   const manifest = loadCliManifest();
 
-  it('routes a renamed command to its replacement with one warning line', () => {
+  it('leaves removed command names unrouted and silent (no alias, no scope)', () => {
     const warnings: string[] = [];
-    const routed = rewriteRoutedArgs(
-      ['customer', 'create', '--slug', 'acme'],
-      manifest,
-      (message) => warnings.push(message)
+    const warn = (message: string): void => {
+      warnings.push(message);
+    };
+    expect(rewriteRoutedArgs(['customer', 'create', '--slug', 'acme'], manifest, warn)).toEqual([
+      'customer',
+      'create',
+      '--slug',
+      'acme',
+    ]);
+    expect(rewriteRoutedArgs(['onboard', 'apply'], manifest, warn)).toEqual(['onboard', 'apply']);
+    expect(rewriteRoutedArgs(['chronos'], manifest, warn)).toEqual(['chronos']);
+    expect(rewriteRoutedArgs(['dev'], manifest, warn)).toEqual(['dev']);
+    expect(warnings).toEqual([]);
+  });
+
+  it('rejects removed command names end to end', async () => {
+    await expect(main(['customer', 'create', '--slug', 'acme'], () => undefined)).rejects.toThrow(
+      /不明な kyberion コマンド/u
     );
-    expect(routed).toEqual(['stance', 'create', '--slug', 'acme']);
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain('kyberion customer create');
-    expect(warnings[0]).toContain('kyberion stance create');
-  });
-
-  it('maps every old `<noun> default` name to the renamed command', () => {
-    const silent = (): void => undefined;
-    expect(rewriteRoutedArgs(['onboard', 'apply'], manifest, silent)).toEqual([
-      'onboarding',
-      'apply',
-    ]);
-    expect(rewriteRoutedArgs(['chronos'], manifest, silent)).toEqual(['scheduler']);
-    expect(rewriteRoutedArgs(['dev'], manifest, silent)).toEqual(['verify']);
-    expect(rewriteRoutedArgs(['ingest', '--file', 'a.pdf'], manifest, silent)).toEqual([
-      'knowledge',
-      'ingest',
-      '--file',
-      'a.pdf',
-    ]);
-    // `chronos dev` (Chronos Mirror UI) is a live command, not an alias.
-    expect(rewriteRoutedArgs(['chronos', 'dev'], manifest, silent)).toEqual(['chronos', 'dev']);
-  });
-
-  it('still runs the old command name end to end', async () => {
-    const output: unknown[] = [];
-    await main(['chronos', 'uninstall'], (value) => output.push(value));
-    expect(output[0]).toEqual(expect.stringContaining('Uninstall steps'));
+    await expect(main(['onboard', 'apply'], () => undefined)).rejects.toThrow(
+      /不明な kyberion コマンド/u
+    );
+    await expect(main(['chronos', 'uninstall'], () => undefined)).rejects.toThrow(
+      /不明な kyberion コマンド/u
+    );
   });
 
   it('leaves current command names untouched and silent', () => {
