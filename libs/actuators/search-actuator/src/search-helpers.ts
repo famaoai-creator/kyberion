@@ -4,6 +4,8 @@ import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import * as pathResolver from '@agent/core/path-resolver';
 import { persistTrace, TraceContext } from '@agent/core/trace';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
+import { stripElementBlocks, stripTags } from '@agent/core/html-sanitize';
+import { decodeEntities } from '@agent/core/text-escaping';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { createAjv } from '@agent/core/foundation';
 import type { ValidateFunction } from 'ajv';
@@ -95,19 +97,8 @@ function assertHttpUrl(raw: string): URL {
 }
 
 function extractPlainText(html: string): string {
-  const withoutScripts = html
-    .replace(/<script[\s\S]*?<\/script\s*>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style\s*>/gi, ' ');
-  const withoutTags = withoutScripts.replace(/<[^>]*>/g, ' ');
-  return withoutTags
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/\s+/g, ' ')
-    .trim();
+  const withoutTags = stripTags(stripElementBlocks(html, ['script', 'style']));
+  return decodeEntities(withoutTags).replace(/\s+/g, ' ').trim();
 }
 
 export async function webSearch(

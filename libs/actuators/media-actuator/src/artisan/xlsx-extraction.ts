@@ -1,4 +1,5 @@
 import * as xlsxUtils from '@agent/core/xlsx-utils';
+import { decodeEntities } from '@agent/core/text-escaping';
 import { runGovernedCommand } from '@agent/core/command-runner';
 import type {
   Aesthetic,
@@ -74,7 +75,7 @@ function readWorkbook(filePath: string): WorkbookInfo {
     const target = relTargets.get(match[2]);
     if (!target) continue;
     sheets.push({
-      name: decodeXmlText(match[1]),
+      name: decodeEntities(match[1]),
       path: target.startsWith('xl/') ? target : `xl/${target.replace(/^\/+/, '')}`,
     });
   }
@@ -120,7 +121,7 @@ function extractMetadata(workbook: WorkbookInfo, filePath: string) {
       definedNames: collectXmlCaptures(
         readZipEntryText(filePath, 'xl/workbook.xml'),
         /<definedName[^>]*>([\s\S]*?)<\/definedName>/g
-      ).map(decodeXmlText),
+      ).map(decodeEntities),
     },
   };
 }
@@ -168,7 +169,7 @@ function readSharedStrings(filePath: string): SharedStrings {
 
   return [...sharedXml.matchAll(/<si[\s\S]*?<\/si>/g)].map((match) => {
     const block = match[0] ?? '';
-    const textParts = collectXmlCaptures(block, /<t[^>]*>([\s\S]*?)<\/t>/g).map(decodeXmlText);
+    const textParts = collectXmlCaptures(block, /<t[^>]*>([\s\S]*?)<\/t>/g).map(decodeEntities);
     return textParts.join('');
   });
 }
@@ -196,14 +197,14 @@ function parseCellValue(attrs: string, body: string, sharedStrings: SharedString
   const cellType = firstCapture(attrs, /t="([^"]+)"/);
   if (cellType === 'inlineStr') {
     return collectXmlCaptures(body, /<t[^>]*>([\s\S]*?)<\/t>/g)
-      .map(decodeXmlText)
+      .map(decodeEntities)
       .join('');
   }
 
   const rawValue = firstCapture(body, /<v>([\s\S]*?)<\/v>/);
   if (rawValue === undefined) {
     return collectXmlCaptures(body, /<t[^>]*>([\s\S]*?)<\/t>/g)
-      .map(decodeXmlText)
+      .map(decodeEntities)
       .join('');
   }
 
@@ -212,7 +213,7 @@ function parseCellValue(attrs: string, body: string, sharedStrings: SharedString
     return sharedStrings[sharedIndex] ?? '';
   }
 
-  return decodeXmlText(rawValue);
+  return decodeEntities(rawValue);
 }
 
 function rowToCsv(cells: string[]): string {
@@ -238,16 +239,6 @@ function readZipEntryText(filePath: string, entryName: string): string {
 function firstCapture(xml: string, pattern: RegExp): string | undefined {
   const match = pattern.exec(xml);
   return match?.[1];
-}
-
-function decodeXmlText(value: string): string {
-  return value
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&');
 }
 
 function columnLettersToNumber(ref: string): number {

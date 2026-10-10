@@ -69,9 +69,7 @@ function resolveBuildPath(ref: string): string {
 export function extractErrorSummary(logText: string): string[] {
   return logText
     .split('\n')
-    .filter((line) =>
-      /(?:\berror\b|\bFAILED\b|\bBUILD FAILED\b|\*\* [^\n]*FAILED \*\*)/i.test(line)
-    )
+    .filter((line) => /(?:\berror\b|\bFAILED\b)/i.test(line))
     .slice(-ERROR_SUMMARY_MAX_LINES)
     .map((line) => line.trim());
 }

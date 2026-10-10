@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import type { ScopeContext } from '../scope-context.js';
 import { assertScopeContext, scopeContextKey } from '../scope-context.js';
 import { isValidTenantSlug } from '../entity-scope.js';
+import { sanitizeIdSegment } from '../foundation/text.js';
 
 /**
  * Positive knowledge roots derived from the canonical containment chain.
@@ -56,10 +57,7 @@ export function knowledgeWritePathFor(
   extension = '.md'
 ): string {
   const scope = assertScopeContext(scopeInput, { requireTenant: false, allowShared: true });
-  const name = slug
-    .trim()
-    .replace(/[^a-zA-Z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  const name = sanitizeIdSegment(slug);
   if (!name) throw new Error('[KNOWLEDGE_WRITE_INVALID] slug is required');
   const suffix = extension.startsWith('.') ? extension : `.${extension}`;
   if (!/^\.[a-zA-Z0-9]+(?:\.[a-zA-Z0-9]+)*$/.test(suffix)) {

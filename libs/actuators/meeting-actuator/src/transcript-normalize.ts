@@ -8,6 +8,9 @@
  * Pure functions only — no IO, no LLM.
  */
 
+import { stripTags } from '@agent/core/html-sanitize';
+import { decodeEntities } from '@agent/core/text-escaping';
+
 export interface NormalizedCue {
   startSec: number;
   speaker: string;
@@ -44,15 +47,10 @@ function formatSec(totalSec: number): string {
 }
 
 function stripCueMarkup(text: string): string {
-  return text
+  const voiceTagsResolved = text
     .replace(/<\s*v\s+([^<>]+)>/giu, '$1: ')
-    .replace(/<\/\s*v\s*>/giu, '')
-    .replace(/<[^<>]*>/gu, '')
-    .replace(/&nbsp;/gu, ' ')
-    .replace(/&amp;/gu, '&')
-    .replace(/&lt;/gu, '<')
-    .replace(/&gt;/gu, '>')
-    .trim();
+    .replace(/<\/\s*v\s*>/giu, '');
+  return decodeEntities(stripTags(voiceTagsResolved, '')).trim();
 }
 
 function splitSpeaker(line: string): { speaker: string; text: string } {

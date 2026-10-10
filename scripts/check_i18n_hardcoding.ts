@@ -245,7 +245,7 @@ export function scanHtmlForKanaLiterals(text: string, repoRelativePath: string):
   const originalLines = text.split('\n');
   let markup = text.replace(/<!--[\s\S]*?-->/gu, blankOut);
   markup = markup.replace(
-    /(<script\b[^<>]*>)([\s\S]*?)(<\/script\s*>)/giu,
+    /(<script\b[^<>]*>)([\s\S]*?)(<\/script[^<>]*>)/giu,
     (_match, open: string, body: string, close: string) => {
       const result = scanFileForKanaLiterals(body, `${repoRelativePath}.inline.js`);
       count += result.count;
@@ -254,7 +254,7 @@ export function scanHtmlForKanaLiterals(text: string, repoRelativePath: string):
     }
   );
   markup = markup.replace(
-    /(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>)/giu,
+    /(<style\b[^>]*>)([\s\S]*?)(<\/style[^<>]*>)/giu,
     (_match, open: string, body: string, close: string) => `${open}${blankOut(body)}${close}`
   );
 
