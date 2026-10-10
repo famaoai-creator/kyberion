@@ -116,20 +116,31 @@ async function hammer(ms: number, op: () => void): Promise<number> {
 /**
  * Hard-link churn: a child loops `rm name; ln secret name` while reads and
  * appends go through `name`. Returns how often the secret was read or grew.
+ * `mtime`: the child also truncates the secret to its own size after each
+ * step, which sets its mtime equal to its ctime (a data write's signature).
  */
-async function hardLinkChurn(ms: number): Promise<Record<string, number>> {
+async function hardLinkChurn(
+  ms: number,
+  variant: 'plain' | 'mtime' = 'plain'
+): Promise<Record<string, number>> {
   const secretPath = path.join(abs(personalRel), 'secret.txt');
   const before = fs.statSync(secretPath).size;
   const name = abs(`${scratchRel}/churn.log`);
   const churn = `
     const fs = require('node:fs');
-    const [name, secret] = process.argv.slice(1);
+    const [name, secret, variant] = process.argv.slice(1);
+    const size = fs.statSync(secret).size;
+    const touch = () => { if (variant === 'mtime') { try { fs.truncateSync(secret, size); } catch {} } };
     const end = Date.now() + ${2 * ms + 2000};
     while (Date.now() < end) {
       try { fs.rmSync(name, { force: true }); } catch {}
+      touch();
       try { fs.linkSync(secret, name); } catch {}
+      touch();
     }`;
-  const child = safeSpawn(process.execPath, ['-e', churn, name, secretPath], { stdio: 'ignore' });
+  const child = safeSpawn(process.execPath, ['-e', churn, name, secretPath, variant], {
+    stdio: 'ignore',
+  });
   const result = { reads: 0, readLeaks: 0, appends: 0, secretGrew: 0 };
   const rel = `${scratchRel}/churn.log`;
   try {
@@ -141,6 +152,60 @@ async function hardLinkChurn(ms: number): Promise<Record<string, number>> {
     child.kill('SIGKILL');
   }
   result.secretGrew = fs.statSync(secretPath).size - before;
+  return result;
+}
+
+/**
+ * Another process keeps changing `name` — replacing it atomically
+ * (write-then-rename) or chmod/utimes-ing it — while reads, appends and stats
+ * go through it. Returns how many of each were refused and whether a read
+ * ever saw anything but a whole version.
+ */
+async function concurrentChange(
+  kind: 'replace' | 'chmod' | 'utimes',
+  ms: number
+): Promise<Record<string, number>> {
+  const name = abs(`${scratchRel}/changing.log`);
+  fs.writeFileSync(name, 'v0\n');
+  const writer = `
+    const fs = require('node:fs');
+    const [name, kind] = process.argv.slice(1);
+    const end = Date.now() + ${3 * ms + 3000};
+    let i = 0;
+    while (Date.now() < end) {
+      try {
+        i += 1;
+        if (kind === 'replace') {
+          const tmp = name + '.tmp' + (i % 2);
+          fs.writeFileSync(tmp, 'v' + i + '\\n');
+          fs.renameSync(tmp, name);
+        } else if (kind === 'chmod') fs.chmodSync(name, i % 2 ? 0o644 : 0o664);
+        else fs.utimesSync(name, new Date(), new Date(Date.now() - (i % 1000)));
+      } catch {}
+    }`;
+  const child = safeSpawn(process.execPath, ['-e', writer, name, kind], { stdio: 'ignore' });
+  const rel = `${scratchRel}/changing.log`;
+  const result = { reads: 0, appends: 0, stats: 0, refused: 0, torn: 0 };
+  const attempt = (op: () => void) => {
+    try {
+      op();
+    } catch (error) {
+      if (String((error as Error).message).includes('[SECURITY]')) result.refused += 1;
+      else throw error;
+    }
+  };
+  try {
+    await new Promise((r) => setTimeout(r, 100));
+    result.reads = await hammer(ms, () =>
+      attempt(() => {
+        if (!/^v\d+\n/.test(String(safeReadFile(rel)))) result.torn += 1;
+      })
+    );
+    result.appends = await hammer(ms, () => attempt(() => safeAppendFileSync(rel, '')));
+    result.stats = await hammer(ms, () => attempt(() => safeStat(rel)));
+  } finally {
+    child.kill('SIGKILL');
+  }
   return result;
 }
 
@@ -492,6 +557,30 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     expect(tries).toBeGreaterThan(50);
     expect(fs.readdirSync(abs(personalRel)).filter((n) => n.startsWith('created-by-'))).toEqual([]);
   }, 20000);
+
+  it('never refuses a file another process keeps chmod-ing or touching (Linux)', async () => {
+    for (const kind of ['chmod', 'utimes'] as const) {
+      const result = await concurrentChange(kind, 1000);
+      expect(Math.min(result.reads, result.appends, result.stats)).toBeGreaterThan(50);
+      expect({ kind, refused: result.refused }).toEqual({ kind, refused: 0 });
+    }
+  }, 30000);
+
+  it('never reads or appends to a protected file through hard-link churn that forges a data write (bounded race)', async () => {
+    const result = await hardLinkChurn(2500, 'mtime');
+    expect(result.reads).toBeGreaterThan(50);
+    expect(result.appends).toBeGreaterThan(50);
+    expect({ readLeaks: result.readLeaks, secretGrew: result.secretGrew }).toEqual({
+      readLeaks: 0,
+      secretGrew: 0,
+    });
+  }, 30000);
+
+  it('never refuses a file another process replaces atomically', async () => {
+    const result = await concurrentChange('replace', 1500);
+    expect(Math.min(result.reads, result.appends, result.stats)).toBeGreaterThan(50);
+    expect({ refused: result.refused, torn: result.torn }).toEqual({ refused: 0, torn: 0 });
+  }, 30000);
 
   it('never reads or appends to a protected file through hard-link churn (bounded race)', async () => {
     const result = await hardLinkChurn(2500);
@@ -933,6 +1022,22 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
       setProcFdLookupDisabledForTesting(previous);
     });
 
+    it('never reads or appends to a protected file through hard-link churn that forges a data write (bounded race)', async () => {
+      const result = await hardLinkChurn(2500, 'mtime');
+      expect(result.reads).toBeGreaterThan(50);
+      expect(result.appends).toBeGreaterThan(50);
+      expect({ readLeaks: result.readLeaks, secretGrew: result.secretGrew }).toEqual({
+        readLeaks: 0,
+        secretGrew: 0,
+      });
+    }, 30000);
+
+    it('never refuses a file another process replaces atomically', async () => {
+      const result = await concurrentChange('replace', 1500);
+      expect(Math.min(result.reads, result.appends, result.stats)).toBeGreaterThan(50);
+      expect({ refused: result.refused, torn: result.torn }).toEqual({ refused: 0, torn: 0 });
+    }, 30000);
+
     it('never reads or appends to a protected file through hard-link churn (bounded race)', async () => {
       const result = await hardLinkChurn(2500);
       expect(result.reads).toBeGreaterThan(50);
@@ -1031,22 +1136,27 @@ describe('secure-io symlink canonicalization keeps the Vitest live-subtree remap
     expect(safeReadFile(`${liveRel}/state.json`)).toBe('{"ok":true}');
   });
 
-  it('still reads through a registered vault mount outside the repository, and never writes', async () => {
-    const os = await import('node:os');
-    const { mountToVault, unmountFromVault } = await import('./secret/vault-mount.js');
-    const host = fs.mkdtempSync(path.join(os.tmpdir(), 'secure-io-vault-'));
-    const name = `vitest-secure-io-${RUN}`;
-    fs.writeFileSync(path.join(host, 'doc.txt'), 'mounted');
-    try {
-      mountToVault(host, name);
-      expect(safeReadFile(`vault/mounts/${name}/doc.txt`)).toBe('mounted');
-      expect(() => safeWriteFile(`vault/mounts/${name}/new.txt`, 'x')).toThrow();
-      expect(fs.existsSync(path.join(host, 'new.txt'))).toBe(false);
-    } finally {
-      unmountFromVault(name);
-      fs.rmSync(host, { recursive: true, force: true });
-    }
-  });
+  // Without /proc (macOS) the opened vault file is pinned by path identity.
+  for (const portable of [false, true]) {
+    it(`still reads through a registered vault mount outside the repository, and never writes${portable ? ' (no /proc/self/fd)' : ''}`, async () => {
+      const os = await import('node:os');
+      const { mountToVault, unmountFromVault } = await import('./secret/vault-mount.js');
+      const host = fs.mkdtempSync(path.join(os.tmpdir(), 'secure-io-vault-'));
+      const name = `vitest-secure-io-${RUN}`;
+      fs.writeFileSync(path.join(host, 'doc.txt'), 'mounted');
+      const previous = setProcFdLookupDisabledForTesting(portable);
+      try {
+        mountToVault(host, name);
+        expect(safeReadFile(`vault/mounts/${name}/doc.txt`)).toBe('mounted');
+        expect(() => safeWriteFile(`vault/mounts/${name}/new.txt`, 'x')).toThrow();
+        expect(fs.existsSync(path.join(host, 'new.txt'))).toBe(false);
+      } finally {
+        setProcFdLookupDisabledForTesting(previous);
+        unmountFromVault(name);
+        fs.rmSync(host, { recursive: true, force: true });
+      }
+    });
+  }
 
   it('judges a link into the sandbox by the sandbox location, and allows it', () => {
     safeMkdir(scratchRel2);

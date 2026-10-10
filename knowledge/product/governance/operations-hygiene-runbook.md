@@ -828,20 +828,29 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   no-follow. Errors from these opens and stats carry only the errno (`open failed (ENOENT)`),
   never an absolute path.
 - **Hard-link churn cannot pass the link count.** An attacker that loops
-  `rm name; ln knowledge/personal/…/secret name` makes the first `fstat` see `nlink=1` while the
-  name is unlinked and the location check pass once it is relinked. `vetOpenedFd` therefore
-  refuses a `/proc` entry ending in `(deleted)` (never re-derives it from the path), re-`fstat`s
-  after the location check and refuses any change between the two (inode, link count, or a ctime
-  that moved without the mtime — a data write moves both, `link`/`unlink` only the ctime), and
-  judges hard links on that last `fstat`. It then requires the name opened through to be still
-  linked: on Linux its `/proc` entry is not `(deleted)`. `unlink(2)` drops the link count before
-  it marks the name deleted, both under the parent directory's lock, so for a single-link file
-  whose ctime moved within the last second (an unlink in progress has just set it) the parent is
-  read once first — `getdents` waits for that lock — and the entry must read the same afterwards.
-  Off Linux the canonical leaf must still be the inode with the same link count and ctime, after
-  the same parent read for a recently changed file. Appends are vetted this way before any byte
-  is written. Cost on the CI VM: about +20 µs per in-place read, +15 µs more for a file changed in
-  the last second.
+  `rm name; ln knowledge/personal/…/secret name` makes a first `fstat` see `nlink=1` while the
+  name is unlinked and the location check pass once it is relinked. `vetOpenedFd` therefore judges
+  hard links only on a link count proven to include the name it opened through
+  (`pinnedLinkState`); the inode must be the one first held. A file with no names left (`nlink 0`,
+  e.g. replaced by an atomic write-then-rename) cannot be a link to anything and is accepted, at
+  the name it had.
+  - _Linux_: after the final `fstat` the `/proc` entry must not read `(deleted)` — an unlinked
+    name never comes back; a new link is a new name. `unlink(2)` drops the link count before it
+    marks the name deleted, both under the parent directory's lock, so for a single-link file whose
+    ctime moved in the last second the parent is read once first (`getdents` waits for that lock)
+    and the entry must read the same afterwards. Churn stamps the ctime on every link and unlink.
+    Always settling would cost about 20% per read, so the one-second gate stays (residual below).
+    A concurrent chmod, utimes or rewrite does not refuse anything.
+  - _Without `/proc`_ (macOS, Windows): a consistent snapshot — `fstat`, parent read, leaf
+    `lstat`, `fstat` — in which the leaf is this inode and all three agree exactly on link count
+    and ctime; the leaf was then linked throughout. Any change inside the snapshot (link, chmod,
+    utimes, write) moves the ctime and the snapshot is retaken, up to eight times. The ctime is the
+    only evidence there, so no mtime or size relation is trusted, and a file under a continuous
+    stream of chmod/utimes/writes faster than a snapshot is refused rather than judged on its link
+    count alone (lookups convoy behind the unlinker on the parent lock, so repeated link-count
+    lookups can each catch a name mid-unlink).
+  - Appends are vetted this way before any byte is written. Cost on the CI VM: about +5% per
+    in-place read or stat, about +15% per append to a file changed in the last second.
 - **Appends create only inside the directory that was opened and authorized.** An append opens
   without `O_CREAT` first. A missing entry is created with `O_CREAT|O_EXCL|O_NOFOLLOW` (never
   through a leaf link) after the parent directory is opened and its own location authorized for
@@ -905,10 +914,11 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
   swapped for a link between the check and the create can still leave an empty file in another
   directory (the call is refused, nothing is written, nothing is deleted). "Never creates through
   a link" holds for every component on Linux and macOS.
-- _Hard-link churn off Linux._ Without `/proc` a name is identified by path, link count and
-  ctime; a filesystem with coarse ctime granularity lets a link and an unlink inside one tick go
-  unseen, and an attacker that can also write the target can move its mtime along. Linux is
-  pinned by the `(deleted)` marker and is not affected.
+- _Hard-link churn off Linux._ Without `/proc` a name is identified by path, link count and ctime;
+  a filesystem with coarse ctime granularity lets a link and an unlink inside one tick go unseen.
+- _A single slow unlink on Linux._ A hard link older than one second, unlinked exactly while a
+  read runs, is not settled (ext4 drops the link count before it stamps the ctime). Churn — every
+  repeated link and unlink — is settled.
 - _Hard links to files outside the repository_ (vault targets) are not detected. Path-only helpers
   (`safeLstat`, `safeExistsSync`, `safeReaddir`) reveal metadata of a hard-linked file but no
   content.
