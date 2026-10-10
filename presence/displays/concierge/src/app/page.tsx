@@ -37,6 +37,7 @@ import {
   type ConciergeResponseStatus,
 } from '../lib/concierge-advisory-response';
 import { useOutcomePreview } from '../lib/use-outcome-preview';
+import { decideWithPasskey } from '../lib/passkey-client';
 import { parseConciergeMutationResponse } from '../lib/mutation-response';
 import {
   deriveCardFields,
@@ -448,17 +449,27 @@ export default function ConciergePage() {
     async (item: ConciergeSummary['approval_queue'][number], decision: 'approved' | 'rejected') => {
       setBusyId(item.id);
       try {
-        const response = await fetch(`/api/approvals/${encodeURIComponent(item.id)}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        if (item.min_assurance === 'A3') {
+          await decideWithPasskey({
+            requestId: item.id,
             decision,
             channel: item.channel,
             storageChannel: item.storage_channel,
             presentedDigest: item.presented_digest,
-          }),
-        });
-        if (!response.ok) throw new Error('Approval failed');
+          });
+        } else {
+          const response = await fetch(`/api/approvals/${encodeURIComponent(item.id)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              decision,
+              channel: item.channel,
+              storageChannel: item.storage_channel,
+              presentedDigest: item.presented_digest,
+            }),
+          });
+          if (!response.ok) throw new Error('Approval failed');
+        }
         setNotice({
           text: t(decision === 'approved' ? 'home.approved_notice' : 'home.rejected_notice', {
             title: item.title,
@@ -683,7 +694,11 @@ export default function ConciergePage() {
       >
         <div className="decide-actions">
           <Button
-            label={frontDeskText('decide_approve', locale)}
+            label={
+              item.min_assurance === 'A3'
+                ? frontDeskText('decide_approve_passkey', locale)
+                : frontDeskText('decide_approve', locale)
+            }
             variant="primary"
             disabled={busyId === item.id}
             onClick={() => void decideApproval(item, 'approved')}

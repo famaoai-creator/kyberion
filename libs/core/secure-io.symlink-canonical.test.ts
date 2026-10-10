@@ -96,6 +96,31 @@ function startFlipper(sw: string, targets: string[], ms = 9000) {
   return safeSpawn(process.execPath, ['-e', flipper, sw, ...targets], { stdio: 'ignore' });
 }
 
+/** A flipper still running into the next test would race its fixture reset. */
+async function stopFlipper(child: ReturnType<typeof safeSpawn>): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
+  child.kill('SIGKILL');
+  await exited;
+}
+
+/**
+ * Give the owner back rwx on every directory under `root` so a fixture reset
+ * cannot fail on a mode a previous test legitimately set inside scratch.
+ */
+function restoreOwnerAccess(root: string): void {
+  let entries: fs.Dirent[];
+  try {
+    fs.chmodSync(root, fs.statSync(root).mode | 0o700);
+    entries = fs.readdirSync(root, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (entry.isDirectory()) restoreOwnerAccess(path.join(root, entry.name));
+  }
+}
+
 /** Run `op` for `ms`, yielding now and then; returns how many calls ran. */
 async function hammer(ms: number, op: () => void): Promise<number> {
   let tries = 0;
@@ -128,6 +153,7 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
   afterAll(() => {
     fs.rmSync(abs(protectedRel), { recursive: true, force: true });
     fs.rmSync(abs(personalRel), { recursive: true, force: true });
+    restoreOwnerAccess(abs(scratchRel));
     fs.rmSync(abs(scratchRel), { recursive: true, force: true });
   });
 
@@ -136,6 +162,7 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
       saved[key] = process.env[key];
       delete process.env[key];
     }
+    restoreOwnerAccess(abs(scratchRel));
     fs.rmSync(abs(scratchRel), { recursive: true, force: true });
     fs.mkdirSync(abs(scratchRel), { recursive: true });
     resetFixtures();
@@ -436,7 +463,7 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     try {
       tries = await hammer(2500, () => safeChmodSync(`${scratchRel}/sw`, 0o700));
     } finally {
-      child.kill('SIGKILL');
+      await stopFlipper(child);
     }
     expect(tries).toBeGreaterThan(50);
     expect(fs.statSync(pdir).mode & 0o777).toBe(0o755);
@@ -455,7 +482,7 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
     try {
       tries = await hammer(2500, () => safeAppendFileSync(`${scratchRel}/sw`, 'x'));
     } finally {
-      child.kill('SIGKILL');
+      await stopFlipper(child);
     }
     expect(tries).toBeGreaterThan(50);
     expect(fs.readdirSync(abs(personalRel)).filter((n) => n.startsWith('created-by-'))).toEqual([]);
@@ -551,10 +578,11 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
       try {
         tries = await hammer(2500, () => safeChmodSync(`${scratchRel}/sw`, 0o600));
       } finally {
-        child.kill('SIGKILL');
+        await stopFlipper(child);
       }
       expect(tries).toBeGreaterThan(50);
       expect(fs.statSync(secretPath).mode & 0o777).toBe(0o644);
+      expect(fs.statSync(abs(scratchRel)).mode & 0o700).toBe(0o700);
     } finally {
       server.close();
     }
@@ -589,7 +617,7 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
         }
       });
     } finally {
-      child.kill('SIGKILL');
+      await stopFlipper(child);
     }
     expect(tries).toBeGreaterThan(50);
     expect(deleted).toBe(0);
@@ -617,7 +645,7 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
         if (names.includes('secret.txt')) leaked += 1;
       });
     } finally {
-      child.kill('SIGKILL');
+      await stopFlipper(child);
     }
     expect(tries).toBeGreaterThan(50);
     expect(listed).toBeGreaterThan(0);
@@ -736,7 +764,7 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
         }
       }
     } finally {
-      child.kill('SIGKILL');
+      await stopFlipper(child);
     }
     for (const name of Object.keys(ops)) expect(tries[name]).toBeGreaterThan(50);
     expect(leaks).toEqual({ read: 0, range: 0, tail: 0, stat: 0, size: 0 });
@@ -777,7 +805,7 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
         if (tries % 50 === 0) await new Promise((r) => setImmediate(r));
       }
     } finally {
-      child.kill('SIGKILL');
+      await stopFlipper(child);
     }
     expect(tries).toBeGreaterThan(100);
     expect(sawStore).toBeGreaterThan(0);
@@ -885,7 +913,7 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
           if (names.join() !== 'visible.txt') wrong += 1;
         });
       } finally {
-        child.kill('SIGKILL');
+        await stopFlipper(child);
       }
       expect(tries).toBeGreaterThan(50);
       expect(listed).toBeGreaterThan(0);
@@ -909,7 +937,7 @@ describe('secure-io symlink canonicalization (data-only persona)', () => {
           if (text.includes('personal-tier secret')) leaked += 1;
         });
       } finally {
-        child.kill('SIGKILL');
+        await stopFlipper(child);
       }
       expect(tries).toBeGreaterThan(50);
       expect(read).toBeGreaterThan(0);
