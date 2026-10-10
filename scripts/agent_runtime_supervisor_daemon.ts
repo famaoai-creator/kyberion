@@ -80,7 +80,6 @@ import {
   safeMkdir,
   safeUnlinkSync,
   safeCreateExclusiveFileSync,
-  safeChmodSync,
 } from '@agent/core/secure-io';
 import type { TaskModelHint } from '@agent/core/reasoning/reasoning-model-routing';
 import { installProcessGuards } from '@agent/core/process-guards';
@@ -1391,6 +1390,9 @@ export async function startAgentRuntimeSupervisorDaemon(
       clearTimeout(timeout);
       resolve();
     };
+    // Bind the Unix socket private (0600) under a restrictive umask; bind(2) is
+    // synchronous in listen(). A later chmod by path could follow a flipped link.
+    const previousUmask = transport === 'unix' ? process.umask(0o177) : undefined;
     server.listen(listenTarget, () => {
       try {
         const address = server.address();
@@ -1402,7 +1404,6 @@ export async function startAgentRuntimeSupervisorDaemon(
           pid: process.pid,
           socket_path: socketLabel || socketPath,
         });
-        if (transport === 'unix') safeChmodSync(socketPath, 0o600);
         recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
           status: 'running',
           details: { socket_path: socketLabel || socketPath, transport },
@@ -1412,6 +1413,7 @@ export async function startAgentRuntimeSupervisorDaemon(
         finish();
       }
     });
+    if (previousUmask !== undefined) process.umask(previousUmask);
     timeout.unref?.();
   });
 
