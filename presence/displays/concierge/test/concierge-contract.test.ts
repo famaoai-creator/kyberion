@@ -554,7 +554,10 @@ describe('concierge surface contract', () => {
     // the toggled-open "hide" state keeps the pre-FD-04 `home.preview_hide`.
     expect(page).toContain("frontDeskText('action_open', locale)");
     expect(page).toContain("t('home.preview_hide')");
-    expect(page).toContain('/preview');
+    expect(page).toContain('useOutcomePreview');
+    const preview = fs.readFileSync(path.join(appDir, 'src/lib/use-outcome-preview.ts'), 'utf8');
+    expect(preview).toContain('/preview');
+    expect(preview).toContain('parsed.entry_id !== item.entry_id');
     expect(page).toContain('data_uri');
     expect(messages).toContain('このファイル形式はここでは表示できません');
     expect(messages).toContain('冒頭のみ表示');
