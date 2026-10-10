@@ -49,6 +49,7 @@ import {
   guardReadPath,
   guardWritePath,
   openInPlace,
+  readdirVetted,
   statVetted,
   registerSensitivePathMediationProbe,
 } from './secure-io-path-guard.js';
@@ -1432,7 +1433,7 @@ export function safeReaddir(dirPath: string): string[] {
     );
   }
   assertCanonicalReadable(resolved, dirPath, 'follow');
-  return fs.readdirSync(resolved);
+  return readdirVetted(resolved, dirPath);
 }
 
 /**
