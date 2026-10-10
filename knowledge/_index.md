@@ -70,6 +70,7 @@
 - [Corporate Memory Loop](./product/architecture/corporate-memory-loop.md) (public | Ecosystem Architect)
 - [DOCX Markdown Ingestion Model](./product/architecture/docx-markdown-ingestion-model.md) (public | Unknown)
 - [Decision-Support Design Rationale](./product/architecture/decision-support-design-rationale.md) (public | famao)
+- [Default-disabled HTTP MCP human request resource server](./product/architecture/mcp-http-human-requests.md) (public | Unknown)
 - [Discussion Room — facilitated multi-agent discussion](./product/architecture/discussion-room.md) (public | Ecosystem Architect)
 - [Enterprise Operating Kernel](./product/architecture/enterprise-operating-kernel.md) (public | Ecosystem Architect)
 - [Execution Improvement Report](./product/architecture/execution-improvement-report.md) (public | Unknown)
