@@ -818,15 +818,23 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
 - **Authorize what was opened, not only what was checked.** The path check runs before
   `open(2)`, which follows symlinks, so a link flipped in between hands over another file — a
   `knowledge/personal/` file has one link, so no hard-link rule fires. Every in-place open
-  (`openInPlace`: read, append, open-for-append, fsync, chmod, copy source) therefore vets the
-  descriptor (`vetOpenedFd`): the opened file's own location — `/proc/self/fd/<n>` on Linux,
+  (`openInPlace`: read, range, tail, append, open-for-append, fsync, copy source) therefore vets
+  the descriptor (`vetOpenedFd`): the opened file's own location — `/proc/self/fd/<n>` on Linux,
   otherwise the re-derived canonical path whose leaf (not followed) must be the inode held — is
   re-authorized unless it is exactly the canonical path the caller's check approved, then the
-  hard-link rule runs on it. Range and tail open no-follow. `safeStat` and `validateFileSize`
-  stat through a vetted non-blocking descriptor (`statVetted`; sockets, FIFOs and devices fall
-  back to the leaf-identity pin). A target outside the repository is pinned only under a
-  registered vault mount (`vaultTargetIdentity`). Cost on the CI VM: about +45 µs per read or
-  stat, none for appends (their canonical path is passed through).
+  hard-link rule runs on it. In-place opens are non-blocking and refuse anything but a regular
+  file, so a FIFO (or a link flipped to one) cannot hang the caller. Range and tail open
+  no-follow. An append opens without `O_CREAT` first; a missing entry is created only with
+  `O_CREAT|O_EXCL|O_NOFOLLOW` (never through a dangling link), and a created file whose vetting
+  fails is removed again. `safeChmodSync` opens files and directories non-blocking, vets the
+  descriptor and `fchmod`s it; any other type is refused. `safeReaddir` lists the directory it
+  opened and vetted (`readdirVetted`: `/proc/self/fd/<n>` on Linux, an identity-pinned path
+  otherwise). `safeStat` and `validateFileSize` stat through a vetted non-blocking descriptor
+  (`statVetted`; sockets, FIFOs and devices fall back to the leaf-identity pin). A target outside
+  the repository is pinned only under a registered vault mount (`vaultTargetIdentity`). Denial
+  messages name only the caller's path — never the resolved location or a tier-guard reason
+  that embeds it. Cost on the CI VM: about +45 µs per read or stat, none for appends (their
+  canonical path is passed through).
 - **Not-found errors carry `code: 'ENOENT'`.** `safeReadFile`, `safeReadFileRange` and
   `safeReadFileTail` throw `File not found` with `code: 'ENOENT'`, so callers that classify
   errors by code (lock inspection: missing vs unreadable) see a missing file as missing.
@@ -841,14 +849,14 @@ link planted with raw fs let append / copy / chmod / fsync / read act on a prote
 
 - _Check-to-use race._ In-place opens and stats are pinned to the descriptor (above) and
   `safeWriteFile` re-verifies its directory before the rename. Path-only operations that cannot
-  hold a descriptor (rename, unlink, rm, mkdir, `safeLstat`, `safeReadlink`, `safeReaddir`) still
+  hold a descriptor (rename, unlink, rm, mkdir, `safeLstat`, `safeReadlink`) still
   act on the literal path after the check; a concurrent swap can redirect one such operation. On
   platforms without `/proc/self/fd` the fallback pin re-derives the canonical path, so an
   attacker would have to win two consecutive races.
 - _Hard links created after the check_ (between the descriptor's `fstat` and the operation) and
   hard links to files outside the repository (vault targets) are not detected. Path-only helpers
-  (`safeStat`, `safeLstat`, `safeExistsSync`, `safeReaddir`) reveal metadata of a hard-linked
-  file but no content.
+  (`safeLstat`, `safeExistsSync`, `safeReaddir`) reveal metadata of a hard-linked file but no
+  content.
 - _Per-process state_: nothing is cached, because cache clearing is per-process only and never
   sees a rename done through raw fs or by another process.
 - A raw-fs or out-of-process actor can always bypass secure-io; these rules govern what a persona
@@ -875,7 +883,9 @@ fsync / read / move / stat / snapshot, probe-only lock tomb rule and tomb moves,
 flags, `node_modules` planted in a writable tree, `node_modules/@actuator/service` workspace alias
 read as `software_developer`, exemption pinned to the held inode (unit + bounded symlink-flip race),
 SUDO pnpm-store reads, ENOENT code, direct symlink flip between check and open for read / range /
-tail / stat / size (bounded race), `validateFileSize` tier and hard-link guard, directory
+tail / stat / size, chmod of a file or directory, append-create through a dangling link and
+readdir (bounded races), FIFO reads that must not block, denial messages without the resolved
+location, `validateFileSize` tier and hard-link guard, directory
 swap between check and temp open, single probe registration, `node_modules` read exemption,
 legitimate links in scope, Vitest remap, vault reads), `libs/core/secure-io.symlink-root-alias.test.ts`
 (checkout behind a linked prefix), `libs/core/foundation/lock-utils.tomb-release.test.ts` (release
