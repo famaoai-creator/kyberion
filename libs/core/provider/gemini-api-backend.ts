@@ -1,7 +1,7 @@
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { secureFetch, type SecureFetchOptions } from '../network.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { isRecord } from '../foundation/text.js';
+import { isRecord, trimEndChars } from '../foundation/text.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { safeReadFile, safeStat, validateUrl } from '../secure-io.js';
 import { runStructuredReasoningOp, structuredReasoningSpecs } from '../structured-reasoning.js';
@@ -194,7 +194,7 @@ interface GeminiGenerateContentRequest {
 }
 
 function normalizeBaseUrl(baseURL: string): string {
-  const normalized = baseURL.trim().replace(/\/+$/u, '');
+  const normalized = trimEndChars(baseURL.trim(), '/');
   if (!normalized) throw new Error('Missing baseURL for Gemini API backend');
   validateUrl(normalized);
   return normalized;

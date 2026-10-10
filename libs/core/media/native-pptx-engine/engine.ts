@@ -82,7 +82,7 @@ export async function generateNativePptx(
           }
 
           // Strategy 2: Multi-run concatenated text within paragraphs
-          const paragraphs = slideXml.match(/<a:p[> ][\s\S]*?<\/a:p>/g) || [];
+          const paragraphs = xmlBlocks(slideXml, 'a:p');
           for (const para of paragraphs) {
             const textParts = para.match(/<a:t>([^<]*)<\/a:t>/g);
             if (!textParts) continue;
@@ -683,7 +683,7 @@ export function patchPptxParagraphs(
     let xml = entry.getData().toString('utf8');
     let slideModified = false;
 
-    const paragraphs = xml.match(/<a:p[> ][\s\S]*?<\/a:p>/g) || [];
+    const paragraphs = xmlBlocks(xml, 'a:p');
     for (const para of paragraphs) {
       const textParts = para.match(/<a:t>([^<]*)<\/a:t>/g);
       if (!textParts || textParts.length === 0) continue;
@@ -777,7 +777,7 @@ export function patchPptxText(
       if (modified && !xml.includes(sanitizeXmlText(orig))) continue;
       // Find paragraphs containing the text spread across runs
       const escapedOrig = sanitizeXmlText(orig);
-      const paragraphs = xml.match(/<a:p[> ][\s\S]*?<\/a:p>/g) || [];
+      const paragraphs = xmlBlocks(xml, 'a:p');
       for (const para of paragraphs) {
         const textParts = para.match(/<a:t>([^<]*)<\/a:t>/g);
         if (!textParts) continue;
@@ -873,13 +873,38 @@ function extractTextFromSlideXml(xml: string): string[] {
 }
 
 /** Tables (<a:tbl> inside graphic frames) as rows of cell text. */
+function tableCellBlocks(row: string): string[] {
+  // `<a:tc>` in either open-close or self-closing form — linear scan.
+  const blocks: string[] = [];
+  let cursor = 0;
+  for (;;) {
+    const start = row.indexOf('<a:tc', cursor);
+    if (start < 0) break;
+    const boundary = row[start + 5];
+    if (boundary === '/') {
+      const end = row.indexOf('>', start);
+      if (end < 0) break;
+      blocks.push(row.slice(start, end + 1));
+      cursor = end + 1;
+      continue;
+    }
+    if (boundary !== '>' && boundary !== ' ') {
+      cursor = start + 5;
+      continue;
+    }
+    const close = row.indexOf('</a:tc>', start);
+    if (close < 0) break;
+    blocks.push(row.slice(start, close + 7));
+    cursor = close + 7;
+  }
+  return blocks;
+}
+
 function extractTablesFromSlideXml(xml: string): string[][][] {
-  return (xml.match(/<a:tbl>[\s\S]*?<\/a:tbl>/g) || [])
+  return xmlBlocks(xml, 'a:tbl')
     .map((table) =>
-      (table.match(/<a:tr[ >][\s\S]*?<\/a:tr>/g) || []).map((row) =>
-        (row.match(/<a:tc[ >][\s\S]*?<\/a:tc>|<a:tc\/>/g) || []).map((cell) =>
-          paragraphTexts(cell).join('\n')
-        )
+      xmlBlocks(table, 'a:tr').map((row) =>
+        tableCellBlocks(row).map((cell) => paragraphTexts(cell).join('\n'))
       )
     )
     .filter((rows) => rows.some((row) => row.some((cell) => cell.trim())));

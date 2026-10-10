@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/charter-decision-vocabulary.schema.json",
+  "title": "Charter Decision Vocabulary",
+  "description": "Business decision types an accountability charter can speak about, with the action facts the charter evaluates. A decision type absent from this catalog never reaches the charter.",
+  "type": "object",
+  "required": ["version", "decisions"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "decisions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/decision" }
+    }
+  },
+  "$defs": {
+    "decision": {
+      "type": "object",
+      "required": [
+        "decision_type",
+        "label",
+        "action_class",
+        "reversible",
+        "amount_semantics",
+        "requires_delegation"
+      ],
+      "properties": {
+        "decision_type": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "label": {
+          "type": "object",
+          "required": ["ja", "en"],
+          "properties": {
+            "ja": { "type": "string", "minLength": 1 },
+            "en": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        },
+        "action_class": {
+          "type": "string",
+          "enum": [
+            "send_message_external",
+            "publish_public",
+            "sign_contract",
+            "payment",
+            "credential_change",
+            "internal_decision"
+          ]
+        },
+        "reversible": { "type": "boolean" },
+        "amount_semantics": {
+          "description": "spend: the amount is money paid now (budgets apply). exposure: the amount is a commitment counted as worst-case loss only. none: no amount.",
+          "type": "string",
+          "enum": ["spend", "exposure", "none"]
+        },
+        "reputational_class": { "type": "string", "enum": ["A", "B", "C", "D"] },
+        "default_recipients": { "type": "integer", "minimum": 0 },
+        "systems": { "type": "integer", "minimum": 0 },
+        "requires_delegation": {
+          "description": "True: the charter must name the type in envelope.delegated_decisions. False only for the two types that predate per-type delegation (their irreversible name is the delegation).",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
