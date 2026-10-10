@@ -5,6 +5,7 @@ import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
 import type { SurfaceViewerScope } from './surface-mutation-guard.js';
+import { canonicalHumanOwner } from './verified-human-request-identity.js';
 
 export const FRONT_DESK_EXECUTION_POLICY_PATH =
   'knowledge/product/governance/front-desk-execution-policy.json';
@@ -90,10 +91,15 @@ function canonicalSet(values: string[] | 'all'): string[] | 'all' {
   return values === 'all' ? values : [...new Set(values)].sort();
 }
 function canonicalViewer(viewer: SurfaceViewerScope) {
+  const human = canonicalHumanOwner(viewer);
   return {
-    principal: viewer.principalId ?? null,
-    member: viewer.memberId ?? null,
-    source: viewer.source,
+    ...(human
+      ? { human }
+      : {
+          principal: viewer.principalId ?? null,
+          member: viewer.memberId ?? null,
+          source: viewer.source,
+        }),
     role: viewer.role,
     tenants: canonicalSet(viewer.tenantSlugs),
     organizations: canonicalSet(viewer.organizationIds),
@@ -120,6 +126,9 @@ export function frontDeskExecutionViewerMatches(
   mapping: FrontDeskExecutionMapping
 ): boolean {
   return (
+    // Remote verified-human requests never acquire the separate local diagnostic grant.
+    viewer.canonicalHuman === undefined &&
+    mapping.viewer.canonicalHuman === undefined &&
     isFrontDeskExecutionPublicViewer(viewer) &&
     isFrontDeskExecutionPublicViewer(mapping.viewer) &&
     viewer.source !== 'anonymous' &&

@@ -7392,6 +7392,10 @@
       "types": "./dist/surface/front-desk-request-service.d.ts",
       "default": "./dist/surface/front-desk-request-service.js"
     },
+    "./surface/verified-human-request-identity": {
+      "types": "./dist/surface/verified-human-request-identity.d.ts",
+      "default": "./dist/surface/verified-human-request-identity.js"
+    },
     "./surface/front-desk-request-projection": {
       "types": "./dist/surface/front-desk-request-projection.d.ts",
       "default": "./dist/surface/front-desk-request-projection.js"
