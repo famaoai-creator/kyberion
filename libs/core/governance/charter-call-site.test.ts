@@ -159,12 +159,13 @@ describe('charterInputForDecision', () => {
     expect(meeting?.action).toMatchObject({
       action_class: 'send_message_external',
       decision_type: 'meeting_scheduling',
-      reversible: true,
+      reversible: false,
+      irreversible_action_name: 'meeting_scheduling',
       estimated_loss: 0,
       blast_radius: { recipients: 4 },
     });
     expect(meeting?.action.amount).toBeUndefined();
-    expect(meeting?.action.irreversible_action_name).toBeUndefined();
+    expect(meeting?.amountUnknown).toBeUndefined();
 
     // The two pre-vocabulary types keep their exact legacy facts (no per-type delegation).
     const spend = charterInputForDecision(

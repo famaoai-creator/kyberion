@@ -315,4 +315,21 @@ describe('delegated decisions in a delegation chain', () => {
     );
     expect(envelopeExceeds({ ...parent, delegated_decisions: {} }, parent)).toEqual([]);
   });
+
+  it('an unknown policy value is refused by validation and grants nothing', () => {
+    const c = charter();
+    c.envelope.delegated_decisions = { meeting_scheduling: 'yes' as never };
+    const ctx = { holder_role: 'owner' as const, now: NOW };
+    expect(validateCharter(c, ctx).some((m) => m.includes('delegated_decisions.'))).toBe(true);
+    const evaluate = (type: string) =>
+      evaluateAgainstCharter({
+        charter: c,
+        action: act({ decision_type: type }),
+        usage: USAGE,
+        availability: HERE,
+        now: NOW,
+      }).decision;
+    expect(evaluate('meeting_scheduling')).toBe('deny');
+    expect(evaluate('constructor')).toBe('deny');
+  });
 });
