@@ -220,10 +220,21 @@ function nativeScriptAvailable(
 
 function interpolateConnection(value: unknown, variables: Record<string, string>): unknown {
   if (typeof value === 'string') {
-    return value.replace(
-      /\{\{([^{}]*)\}\}/gu,
-      (match: string, key: string) => variables[key.trim()] ?? match
-    );
+    const out: string[] = [];
+    let cursor = 0;
+    for (;;) {
+      const open = value.indexOf('{{', cursor);
+      if (open < 0) break;
+      const close = value.indexOf('}}', open + 2);
+      if (close < 0) break;
+      const inner = value.slice(open + 2, close);
+      if (inner.includes('{') || inner.includes('}')) break;
+      out.push(value.slice(cursor, open));
+      out.push(variables[inner.trim()] ?? value.slice(open, close + 2));
+      cursor = close + 2;
+    }
+    out.push(value.slice(cursor));
+    return out.join('');
   }
   if (Array.isArray(value)) return value.map((entry) => interpolateConnection(entry, variables));
   if (value && typeof value === 'object') {

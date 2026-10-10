@@ -1,0 +1,9 @@
+---
+category: Added
+---
+
+- **Everyday business decisions in the accountability charter** — `knowledge/product/governance/charter-decision-vocabulary.json` lists the decision types a charter can speak about (hiring, quotes, expense and invoice payment, confirming a meeting, replying to an outside party, public announcement, granting system access, assigning internal work, approving an internal document) with the facts the charter evaluates: external effect class, reversibility, and whether an amount is spend or a commitment counted as worst-case loss. `approval:evaluate_decision_rights` maps any listed type (new optional `recipients` input); unlisted types keep the legacy approval path.
+- **Delegation by name** — `envelope.delegated_decisions` names each decision type the accountable human hands over. A listed type that is not named is denied with an amendment proposal ("silence is never a grant"); naming a type does not waive money, loss, reputation, blast-radius, irreversible or hardened-policy limits. A delegated charter cannot name a type its parent does not.
+- **Organization-level opt-in on the decision-rights matrix** — a matrix entry with `charter_delegable: true` lets a charter that names the type stand in for the matrix's human acceptance. It never stands in for a role mismatch or an over-threshold value (those still need `supersedes_decision_rights`). The product default matrix adds the new types with human acceptance required and `charter_delegable: true`, so a tenant without a charter is unchanged and a human decides.
+- **Charter screen** — the owner turns on each decision to hand over; the signed bilingual statement lists them, and the read model shows them.
+- **Calendar confirmation asks first** — `confirm-appointment-calendar` now creates the event only after `meeting_scheduling` is allowed (inside the charter, or approved by a human).

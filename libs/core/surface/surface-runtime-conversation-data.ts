@@ -427,9 +427,11 @@ export async function handleSurfaceQueryRoute(
     answer = `Unsupported live query type for: ${queryText}`;
   }
 
-  const surfacedAnswer = answer.startsWith('Provider:')
-    ? answer.replace(/^Provider:\s*[^\n]+\n/u, '').trim()
-    : answer;
+  const providerLineEnd = answer.indexOf('\n');
+  const surfacedAnswer =
+    answer.startsWith('Provider:') && providerLineEnd >= 0
+      ? answer.slice(providerLineEnd + 1).trim()
+      : answer;
   const completionAction = buildDirectReplyCompletionAction({
     request: queryText,
     response: surfacedAnswer,

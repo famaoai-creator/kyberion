@@ -50,6 +50,7 @@ import {
   guardReadPath,
   guardWritePath,
   openInPlace,
+  statVetted,
   registerSensitivePathMediationProbe,
 } from './secure-io-path-guard.js';
 export { safeRealpath } from './secure-io-path-guard.js';
@@ -256,9 +257,7 @@ export function buildSafeExecEnv(
 export function validateFileSize(filePath: string, maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB): number {
   // Size is file metadata of a possibly higher tier: same read guard as content.
   const resolved = assertReadableRepositoryFile(filePath, 'input');
-  const stat = fs.statSync(resolved);
-  assertNotForeignHardLink(stat, resolved, filePath, 'read');
-  return assertSizeWithin(stat.size, resolved, maxSizeMB);
+  return assertSizeWithin(statVetted(resolved, filePath).size, resolved, maxSizeMB);
 }
 
 function assertSizeWithin(size: number, resolved: string, maxSizeMB: number): number {
@@ -357,13 +356,12 @@ export function safeReadFileRange(filePath: string, position: number, length: nu
   if (fs.lstatSync(resolved).isSymbolicLink()) {
     throw new Error(`[SECURITY] Refusing to read symbolic link: ${resolved}`);
   }
-  const fd = fs.openSync(resolved, 'r');
+  const fd = openInPlace(resolved, filePath, 'r', 'read', undefined, true);
   try {
     const stat = fs.fstatSync(fd);
     if (!stat.isFile()) {
       throw new Error(`Not a regular file: ${resolved}`);
     }
-    assertNotForeignHardLink(stat, resolved, filePath, 'read');
     const readLength = Math.max(0, Math.min(length, stat.size - position));
     const buffer = Buffer.alloc(readLength);
     let offset = 0;
@@ -402,13 +400,12 @@ export function safeReadFileTail(filePath: string, maxBytes: number): SafeReadTa
     throw new Error(`[SECURITY] Refusing to read symbolic link: ${resolved}`);
   }
 
-  const fd = fs.openSync(resolved, 'r');
+  const fd = openInPlace(resolved, filePath, 'r', 'read', undefined, true);
   try {
     const stat = fs.fstatSync(fd);
     if (!stat.isFile()) {
       throw new Error(`Not a regular file: ${resolved}`);
     }
-    assertNotForeignHardLink(stat, resolved, filePath, 'read');
 
     const size = stat.size;
     const readLength = Math.min(maxBytes, size);
@@ -617,13 +614,14 @@ export function safeAppendFileSync(
   data: string | Buffer,
   options: any = 'utf8'
 ): void {
-  const { resolved } = guardWritePath(filePath);
+  const { resolved, canonical } = guardWritePath(filePath);
   const opts = typeof options === 'string' ? { encoding: options } : options || {};
   if (opts.flag !== undefined && !['a', 'a+', 'ax', 'ax+'].includes(opts.flag)) {
     throw new Error(`[SECURITY] safeAppendFileSync only appends (flag '${String(opts.flag)}')`);
   }
   // Appends modify the existing inode: refuse a foreign hard link (on the fd).
-  const fd = openInPlace(resolved, filePath, opts.flag ?? 'a', 'write', opts.mode);
+  const flag = opts.flag ?? 'a';
+  const fd = openInPlace(resolved, filePath, flag, 'write', opts.mode, false, canonical);
   try {
     fs.appendFileSync(fd, data, { encoding: opts.encoding });
   } finally {
@@ -784,7 +782,7 @@ export function safeOpenAppendFile(filePath: string): number {
   const { resolved, canonical } = guardWritePath(filePath);
   const dir = path.dirname(resolved);
   if (!fs.existsSync(dir)) mkdirGuarded(dir, path.dirname(canonical), filePath);
-  return openInPlace(resolved, filePath, 'a', 'write');
+  return openInPlace(resolved, filePath, 'a', 'write', undefined, false, canonical);
 }
 
 /**
@@ -903,8 +901,8 @@ export function safeFileAgeMs(filePath: string): number | undefined {
  * Safely fsync an existing file for durability.
  */
 export function safeFsyncFile(filePath: string): void {
-  const { resolved } = guardWritePath(filePath);
-  const fd = openInPlace(resolved, filePath, 'r+', 'write');
+  const { resolved, canonical } = guardWritePath(filePath);
+  const fd = openInPlace(resolved, filePath, 'r+', 'write', undefined, false, canonical);
   try {
     fs.fsyncSync(fd);
   } finally {
@@ -918,8 +916,8 @@ export function safeFsyncFile(filePath: string): void {
  * Only allowed within write-permitted paths.
  */
 export function safeChmodSync(filePath: string, mode: number): void {
-  const { resolved } = guardWritePath(filePath);
-  chmodInPlace(resolved, filePath, mode);
+  const { resolved, canonical } = guardWritePath(filePath);
+  chmodInPlace(resolved, filePath, mode, canonical);
 }
 
 /**
@@ -1452,25 +1450,23 @@ export function safeStat(filePath: string): fs.Stats {
     );
   }
   assertCanonicalReadable(resolved, filePath, 'follow', 'metadata');
-  const stat = fs.statSync(resolved);
-  // Metadata of a hard link to a higher tier is as sensitive as its size.
-  assertNotForeignHardLink(stat, resolved, filePath, 'read');
-  return stat;
+  // Pinned to what was stat'ed (and hard-link checked), like a read.
+  return statVetted(resolved, filePath, 'metadata');
 }
 
 /**
  * Safely get symbolic-link-aware file status with permission validation.
  */
 export function safeLstat(filePath: string): fs.Stats {
-  assertSensitivePathAllowed(filePath, 'read', isSensitivePathMediated());
-  const resolved = pathResolver.resolve(filePath);
-  const check = validateReadPermission(resolved, 'metadata');
-  if (!check.allowed) {
-    throw new Error(
-      `[ROLE_VIOLATION] Role is NOT authorized to lstat path '${filePath}'. ${check.reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`
-    );
-  }
-  assertCanonicalReadable(resolved, filePath, 'leaf', 'metadata');
+  const resolved = guardReadPath(
+    filePath,
+    (reason) =>
+      `[ROLE_VIOLATION] Role is NOT authorized to lstat path '${filePath}'. ${reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`,
+    'leaf',
+    'metadata'
+  );
+  // `resolved` passed validateReadPermission + assertCanonicalReadable above;
+  // this wrapper IS the path-injection sanitizer boundary.
   return fs.lstatSync(resolved);
 }
 
@@ -1572,5 +1568,9 @@ registerOptionalAuditIo('registerLockIo', {
   readdir: safeReaddir,
   unlink: safeUnlinkSync,
   loadJson: secureLoadJson,
+  sameFile: (a, b) => {
+    const [x, y] = [safeLstat(a), safeLstat(b)];
+    return x.ino !== 0 && x.dev === y.dev && x.ino === y.ino;
+  },
 });
 secureIoInitialized = true;

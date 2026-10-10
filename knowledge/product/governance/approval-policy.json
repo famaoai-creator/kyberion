@@ -95,7 +95,20 @@
       "id": "decision-rights-escalation",
       "when": {
         "payload_field": "decision_type",
-        "any_of": ["operational_spend", "contract_signature", "headcount_expansion"]
+        "any_of": [
+          "operational_spend",
+          "contract_signature",
+          "headcount_expansion",
+          "quote_issuance",
+          "expense_reimbursement",
+          "vendor_invoice_payment",
+          "meeting_scheduling",
+          "external_reply",
+          "public_announcement",
+          "access_grant",
+          "internal_task_assignment",
+          "internal_document_approval"
+        ]
       },
       "requires_approval": true,
       "missing_requirements": ["approval_confirmation"]

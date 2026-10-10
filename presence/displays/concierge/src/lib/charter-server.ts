@@ -34,6 +34,7 @@ import {
   viewCharter,
   type CharterView,
 } from '@agent/core/governance/charter-service';
+import { delegableCharterDecisions } from '@agent/core/governance/charter-decision-vocabulary';
 import { ensureOwnerMember } from '@agent/core/organization/member-registry';
 import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
 import { resolveConciergeDecidedBy } from './front-desk-member';
@@ -92,7 +93,11 @@ export function readCharterOverview(
   options: CharterPathOptions = {},
   now: Date = new Date(),
   locale: 'ja' | 'en' = 'ja'
-): { tenants: CharterTenantEntry[]; member: { id: string; display_name: string } | null } {
+): {
+  tenants: CharterTenantEntry[];
+  member: { id: string; display_name: string } | null;
+  decision_options: { decision_type: string; label: string }[];
+} {
   const tenants = charterTenants(viewer, requested);
   let member: { id: string; display_name: string } | null = null;
   const entries = tenants.map((tenant): CharterTenantEntry => {
@@ -111,7 +116,11 @@ export function readCharterOverview(
       charter: charter ? viewCharter(charter, now, options, locale) : null,
     };
   });
-  return { tenants: entries, member };
+  const decision_options = delegableCharterDecisions().map((entry) => ({
+    decision_type: entry.decision_type,
+    label: entry.label[locale],
+  }));
+  return { tenants: entries, member, decision_options };
 }
 
 function requireTenant(viewer: Viewer, tenant: unknown): CharterFailure | string {

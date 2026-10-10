@@ -15,10 +15,11 @@ import {
   decideApprovalRequest,
   expireApprovalRequest,
   listApprovalRequests,
+  resolveApprovalAssuranceMode,
   validateHumanFinalDecision,
 } from './approval-store.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync, safeRmSync } from '../secure-io.js';
+import { safeExistsSync, safeReadFile, safeRmSync } from '../secure-io.js';
 import { withExecutionContext } from '../authority.js';
 
 describe('approval-store test isolation', () => {
@@ -280,6 +281,7 @@ describe('approval-store path normalization', () => {
         accountability,
         decidedByType: 'human',
         authenticated: true,
+        authMethod: 'surface_session',
         payloadHash: 'changed',
         effectBinding: 'payment:create',
       })
@@ -289,10 +291,232 @@ describe('approval-store path normalization', () => {
         accountability,
         decidedByType: 'human',
         authenticated: true,
+        authMethod: 'surface_session',
         payloadHash,
         effectBinding: 'payment:create',
       })
     ).not.toThrow();
+  });
+
+  describe('HA-03 assurance allow-list', () => {
+    const human = { decidedByType: 'human' as const, authenticated: true };
+    const humanOnly = { finalDecision: 'human_only' as const };
+
+    afterEach(() => {
+      withExecutionContext('mission_controller', () => {
+        for (const root of Object.values(approvalStoreRoots())) {
+          const dir = pathResolver.rootResolve(`${root}/assurance-test`);
+          if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
+        }
+      });
+    });
+
+    it('rejects a missing or unrecognised authMethod in every mode', () => {
+      for (const mode of ['warn', 'enforce'] as const) {
+        expect(() =>
+          validateHumanFinalDecision({ accountability: humanOnly, ...human, mode })
+        ).toThrow('recognised authMethod (got none)');
+        expect(() =>
+          validateHumanFinalDecision({
+            accountability: humanOnly,
+            ...human,
+            authMethod: 'sms' as never,
+            mode,
+          })
+        ).toThrow('recognised authMethod (got sms)');
+      }
+    });
+
+    it('refuses local-credential methods for human-only decisions in every mode', () => {
+      for (const authMethod of ['local_token', 'local_admin_token'] as const) {
+        for (const mode of ['warn', 'enforce'] as const) {
+          expect(() =>
+            validateHumanFinalDecision({ accountability: humanOnly, ...human, authMethod, mode })
+          ).toThrow(`${authMethod} is not sufficient`);
+        }
+      }
+    });
+
+    it('defaults to A2 and accepts methods at or above it', () => {
+      for (const authMethod of [
+        'surface_session',
+        'terminal_attested',
+        'totp',
+        'passkey',
+      ] as const) {
+        expect(
+          validateHumanFinalDecision({
+            accountability: humanOnly,
+            ...human,
+            authMethod,
+            mode: 'enforce',
+          })
+        ).toBeUndefined();
+      }
+    });
+
+    it('warn mode lets a below-level method through and reports the shortfall', () => {
+      for (const authMethod of ['manual', 'channel_identity'] as const) {
+        expect(
+          validateHumanFinalDecision({
+            accountability: humanOnly,
+            ...human,
+            authMethod,
+            mode: 'warn',
+          })
+        ).toEqual({ required: 'A2', provided: 'A1', authMethod, mode: 'warn' });
+      }
+    });
+
+    it('enforce mode rejects a below-level method', () => {
+      expect(() =>
+        validateHumanFinalDecision({
+          accountability: humanOnly,
+          ...human,
+          authMethod: 'manual',
+          mode: 'enforce',
+        })
+      ).toThrow('requires assurance A2; manual provides A1');
+      expect(() =>
+        validateHumanFinalDecision({
+          accountability: { ...humanOnly, min_assurance: 'A3' },
+          ...human,
+          authMethod: 'surface_session',
+          mode: 'enforce',
+        })
+      ).toThrow('requires assurance A3; surface_session provides A2');
+    });
+
+    it('takes the rollout mode from KYBERION_APPROVAL_ASSURANCE', () => {
+      expect(resolveApprovalAssuranceMode({})).toBe('warn');
+      expect(resolveApprovalAssuranceMode({ KYBERION_APPROVAL_ASSURANCE: 'enforce' })).toBe(
+        'enforce'
+      );
+      expect(resolveApprovalAssuranceMode({ KYBERION_APPROVAL_ASSURANCE: 'bogus' })).toBe('warn');
+    });
+
+    it('does not re-grade assurance on recheck, but keeps the hard rules', () => {
+      expect(
+        validateHumanFinalDecision({
+          accountability: humanOnly,
+          ...human,
+          phase: 'recheck',
+          mode: 'enforce',
+        })
+      ).toBeUndefined();
+      expect(() =>
+        validateHumanFinalDecision({
+          accountability: humanOnly,
+          ...human,
+          authMethod: 'local_token',
+          phase: 'recheck',
+        })
+      ).toThrow('local_token is not sufficient');
+    });
+
+    it('stamps min_assurance A2 on human-only requests and rejects unknown levels', () => {
+      const record = createApprovalRequest('mission_controller', {
+        channel: 'assurance-test',
+        threadTs: '1',
+        correlationId: 'assurance-default',
+        requestedBy: 'assurance-test-agent',
+        draft: { title: 'Assurance default', summary: 'HA-03 fixture' },
+        accountability: { finalDecision: 'human_only' },
+      });
+      expect(record.accountability?.min_assurance).toBe('A2');
+      expect(() =>
+        createApprovalRequest('mission_controller', {
+          channel: 'assurance-test',
+          threadTs: '1',
+          correlationId: 'assurance-invalid',
+          requestedBy: 'assurance-test-agent',
+          draft: { title: 'Assurance invalid', summary: 'HA-03 fixture' },
+          accountability: { finalDecision: 'human_only', min_assurance: 'A9' as never },
+        })
+      ).toThrow('Invalid approval min_assurance');
+    });
+
+    it('lets a requester raise but never lower the human-only floor', () => {
+      const create = (min_assurance: 'A0' | 'A3', correlationId: string) =>
+        createApprovalRequest('mission_controller', {
+          channel: 'assurance-test',
+          threadTs: '1',
+          correlationId,
+          requestedBy: 'assurance-test-agent',
+          draft: { title: 'Assurance floor', summary: 'HA-03 fixture' },
+          accountability: { finalDecision: 'human_only', min_assurance },
+        });
+      expect(create('A0', 'assurance-lowered').accountability?.min_assurance).toBe('A2');
+      expect(create('A3', 'assurance-raised').accountability?.min_assurance).toBe('A3');
+    });
+
+    it('records a warn-mode shortfall on the record and in the event log', () => {
+      const record = createApprovalRequest('mission_controller', {
+        channel: 'assurance-test',
+        threadTs: '1',
+        correlationId: 'assurance-shortfall',
+        requestedBy: 'assurance-test-agent',
+        draft: { title: 'Assurance shortfall', summary: 'HA-03 fixture' },
+        accountability: { finalDecision: 'human_only' },
+      });
+      const decided = decideApprovalRequest('mission_controller', {
+        channel: record.channel,
+        requestId: record.id,
+        decision: 'approved',
+        decidedBy: 'operator',
+        decidedByType: 'human',
+        authenticated: true,
+        authMethod: 'manual',
+      });
+      expect(decided.status).toBe('approved');
+      expect(decided.assuranceShortfall).toEqual({
+        required: 'A2',
+        provided: 'A1',
+        authMethod: 'manual',
+        mode: 'warn',
+      });
+      const events = withExecutionContext('mission_controller', () =>
+        safeReadFile(pathResolver.rootResolve(approvalEventLogicalPath('assurance-test')), {
+          encoding: 'utf8',
+        })
+      ) as string;
+      const decidedEvent = events
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line))
+        .find((event) => event.request_id === record.id && event.event === 'approved');
+      expect(decidedEvent.assurance_shortfall).toMatchObject({ required: 'A2', provided: 'A1' });
+    });
+
+    it('rejects the same decision in enforce mode without persisting it', () => {
+      const previous = process.env.KYBERION_APPROVAL_ASSURANCE;
+      process.env.KYBERION_APPROVAL_ASSURANCE = 'enforce';
+      try {
+        const record = createApprovalRequest('mission_controller', {
+          channel: 'assurance-test',
+          threadTs: '1',
+          correlationId: 'assurance-enforce',
+          requestedBy: 'assurance-test-agent',
+          draft: { title: 'Assurance enforce', summary: 'HA-03 fixture' },
+          accountability: { finalDecision: 'human_only' },
+        });
+        expect(() =>
+          decideApprovalRequest('mission_controller', {
+            channel: record.channel,
+            requestId: record.id,
+            decision: 'approved',
+            decidedBy: 'operator',
+            decidedByType: 'human',
+            authenticated: true,
+            authMethod: 'channel_identity',
+          })
+        ).toThrow('requires assurance A2; channel_identity provides A1');
+        expect(loadApprovalRequest(record.channel, record.id)?.status).toBe('pending');
+      } finally {
+        if (previous === undefined) delete process.env.KYBERION_APPROVAL_ASSURANCE;
+        else process.env.KYBERION_APPROVAL_ASSURANCE = previous;
+      }
+    });
   });
 
   it('canonicalizes payload key order before hashing', () => {

@@ -147,6 +147,16 @@ export function isAllowedVaultMountPath(targetPath: string): boolean {
 }
 
 /**
+ * Identity (lstat, not followed) of a path under a registered vault mount
+ * target, for secure-io's opened-file pin; undefined for any other path.
+ */
+export function vaultTargetIdentity(targetPath: string): { dev: number; ino: number } | undefined {
+  if (!isAllowedVaultMountPath(targetPath)) return undefined;
+  const stat = rawLstatSync(path.resolve(targetPath));
+  return { dev: stat.dev, ino: stat.ino };
+}
+
+/**
  * Mount a host path into vault/mounts/<name>.
  */
 export function mountToVault(sourcePath: string, customName?: string): VaultMountEntry {

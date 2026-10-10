@@ -16,6 +16,7 @@ import {
 import { buildVideoDesignCssVars } from './video-design-system.js';
 import { slugify } from '../foundation/text.js';
 import { escapeHtml } from '../text-escaping.js';
+import { replaceElementBlocks } from '../html-sanitize.js';
 import type {
   CompiledVideoCompositionScene,
   VideoCompositionADF,
@@ -339,7 +340,8 @@ function injectIntoHead(html: string, markup: string): string {
 }
 
 export function applyVideoThemeTokens(html: string, direction?: VideoVisualDirection): string {
-  const tokenized = html.replace(/<style([^>]*)>([\s\S]*?)<\/style>/gi, (_match, attrs, css) => {
+  const tokenized = replaceElementBlocks(html, 'style', (css, openTag) => {
+    const attrs = openTag.slice('<style'.length, -1);
     return `<style${attrs}>${tokenizeVideoCss(css)}</style>`;
   });
   const typed = injectIntoHead(tokenized, VIDEO_SCENE_TYPOGRAPHY_CSS);

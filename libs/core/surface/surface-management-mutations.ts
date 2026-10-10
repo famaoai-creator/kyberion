@@ -1,9 +1,8 @@
+import { checkAuthorizationShape, validate } from './surface-management-validation.js';
 import {
-  checkAuthorizationShape,
   digest,
   fail,
   requireGrant,
-  validate,
   version,
   type SurfaceManagementAuthorization,
   type SurfaceManagementCommand,
