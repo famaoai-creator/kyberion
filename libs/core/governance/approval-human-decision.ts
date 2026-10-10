@@ -18,15 +18,21 @@ import {
   computeApprovalPresentedDigest,
 } from './approval-presentation.js';
 import {
+  APPROVAL_CHANNEL_MIN_ASSURANCE,
   assuranceMeets,
   assuranceOfAuthMethod,
   DEFAULT_HUMAN_ONLY_MIN_ASSURANCE,
   isApprovalAssuranceLevel,
   NON_HUMAN_PROOF_AUTH_METHODS,
   resolveApprovalAssuranceMode,
+  strongerAssurance,
+  type ApprovalAssuranceLevel,
   type ApprovalAssuranceMode,
   type ApprovalAssuranceShortfall,
 } from './approval-assurance.js';
+import { consumeApprovalPasskeyChallenge } from './approval-passkey-challenge.js';
+import { resolvePolicyAssuranceFloor } from './approval-policy.js';
+import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 
 /**
  * HA-02: agent-facing decision paths (MCP `kyberion.approval.decide`, the
@@ -84,6 +90,26 @@ export function refuseHumanOnlyDecisionByAgentProcess(
   } = {}
 ): void {
   if (record.accountability?.finalDecision !== 'human_only') return;
+  refuseAgentHumanProof(
+    `approval store refused human-only request ${record.id}`,
+    'decide it in a signed-in Concierge or Chronos session, or answer the terminal challenge from your own terminal outside the agent session',
+    options
+  );
+}
+
+/**
+ * The same refusal for any human-proof step (HA-07 passkey enrollment): an
+ * agent principal, or a process carrying agent markers outside a
+ * human-decision surface server, throws `[APPROVAL_HUMAN_PROOF_REQUIRED]`.
+ */
+export function refuseAgentHumanProof(
+  subject: string,
+  next: string,
+  options: {
+    principal?: ApprovalDeciderPrincipal | null;
+    env?: Record<string, string | undefined>;
+  } = {}
+): void {
   const env = options.env ?? process.env;
   const context = detectAgentExecutionContext({ env, principal: options.principal ?? null });
   if (!context.isAgent) return;
@@ -94,8 +120,8 @@ export function refuseHumanOnlyDecisionByAgentProcess(
     .map((signal) => ('env' in signal ? signal.env : `principal:${signal.provider}`))
     .join(', ');
   throw new Error(
-    `[APPROVAL_HUMAN_PROOF_REQUIRED] approval store refused human-only request ${record.id} — the deciding process acts for an agent (${context.principal}) ` +
-      '| next: decide it in a signed-in Concierge or Chronos session, or answer the terminal challenge from your own terminal outside the agent session ' +
+    `[APPROVAL_HUMAN_PROOF_REQUIRED] ${subject} — the deciding process acts for an agent (${context.principal}) ` +
+      `| next: ${next} ` +
       `| evidence: ${evidence}${systemRole ? `, SYSTEM_ROLE=${systemRole}` : ''}`
   );
 }
@@ -155,7 +181,7 @@ export function settleUnpresentedHumanDecision(
     throw new Error(
       `[POLICY_VIOLATION] approval decision refused — human-only request ${record.id} was decided without the digest of what the decider was shown ` +
         '| next: decide it on a surface that sends the presented digest (a signed-in Concierge or Chronos session, or the terminal challenge) ' +
-        '| evidence: KYBERION_APPROVAL_ASSURANCE=enforce, no presentedDigest'
+        '| evidence: assurance mode enforce, no presentedDigest'
     );
   }
   auditChain.record({
@@ -163,10 +189,72 @@ export function settleUnpresentedHumanDecision(
     action: 'approval_decision',
     operation: 'presented_digest_missing',
     result: 'allowed',
-    reason: `human-only decision accepted without a presented digest — KYBERION_APPROVAL_ASSURANCE=${mode}`,
+    reason: `human-only decision accepted without a presented digest — assurance mode ${mode}`,
     correlationId: record.correlationId,
     metadata: { requestId: record.id, channel: record.channel },
   });
+}
+
+/**
+ * HA-07: `passkey` (A3) is never taken on a caller's word. A decision that
+ * declares it consumes the challenge whose assertion the verifier checked
+ * (approval-passkey-challenge.ts) — same member, request, decision and
+ * presented digest — or is refused. A challenge id without `passkey` is
+ * refused too, so a proof is never silently discarded.
+ */
+export function settlePasskeyDecisionProof(
+  role: GovernedArtifactRole,
+  record: ApprovalRequestRecord,
+  params: {
+    storageChannel: string;
+    decision: 'approved' | 'rejected';
+    decidedBy: string;
+    authMethod?: ApprovalRecord['authMethod'];
+    presentedDigest?: string;
+    passkeyChallengeId?: string;
+  }
+): void {
+  if (params.authMethod !== 'passkey') {
+    if (params.passkeyChallengeId) {
+      throw new Error(
+        `[POLICY_VIOLATION] approval decision refused — a passkey challenge was sent with authMethod ${params.authMethod ?? 'none'} ` +
+          '| next: record the decision as passkey through the passkey verify route ' +
+          `| evidence: request ${record.id}`
+      );
+    }
+    return;
+  }
+  consumeApprovalPasskeyChallenge(role, {
+    storageChannel: params.storageChannel,
+    challengeId: params.passkeyChallengeId,
+    requestId: record.id,
+    decidedBy: params.decidedBy,
+    decision: params.decision,
+    presentedDigest: params.presentedDigest,
+  });
+}
+
+/**
+ * The level a human-only decision on `channel` needs now: the record's own
+ * `min_assurance` (A2 when absent — a request created before HA-03), raised
+ * to the channel's current floor and to the floor today's approval policy
+ * puts on the record's rule / effect (`resolvePolicyAssuranceFloor`). Applied
+ * at decision time, so a request still pending from before a class was
+ * raised meets today's rule; decided records are never re-graded.
+ */
+export function requiredDecisionAssurance(
+  accountability: ApprovalAccountability,
+  channel?: string
+): ApprovalAssuranceLevel {
+  let required = accountability.min_assurance ?? DEFAULT_HUMAN_ONLY_MIN_ASSURANCE;
+  const channelFloor = channel ? APPROVAL_CHANNEL_MIN_ASSURANCE[channel] : undefined;
+  if (channelFloor) required = strongerAssurance(required, channelFloor);
+  const policyFloor = resolvePolicyAssuranceFloor({
+    ruleId: accountability.policy_rule_id,
+    effectBinding: accountability.effectBinding,
+  });
+  if (policyFloor) required = strongerAssurance(required, policyFloor);
+  return required;
 }
 
 /**
@@ -188,6 +276,8 @@ export function validateHumanFinalDecision(params: {
   effectBinding?: string;
   phase?: 'decision' | 'recheck';
   mode?: ApprovalAssuranceMode;
+  /** The request's channel, for its decision-time floor (`requiredDecisionAssurance`). */
+  channel?: string;
 }): ApprovalAssuranceShortfall | undefined {
   if (params.accountability?.finalDecision !== 'human_only') return undefined;
   if (params.decidedByType !== 'human') {
@@ -209,12 +299,15 @@ export function validateHumanFinalDecision(params: {
         `[POLICY_VIOLATION] Final approval requires a recognised authMethod (got ${params.authMethod ?? 'none'})`
       );
     }
-    const required = params.accountability.min_assurance ?? DEFAULT_HUMAN_ONLY_MIN_ASSURANCE;
+    const required = requiredDecisionAssurance(params.accountability, params.channel);
     if (!assuranceMeets(provided, required)) {
       const mode = params.mode ?? resolveApprovalAssuranceMode();
       if (mode === 'enforce') {
         throw new Error(
-          `[POLICY_VIOLATION] Final approval requires assurance ${required}; ${params.authMethod} provides ${provided}`
+          `[POLICY_VIOLATION] Final approval requires assurance ${required}; ${params.authMethod} provides ${provided}` +
+            (required === 'A3'
+              ? ' | next: approve it with a passkey on the Concierge approval card (register one under Settings › Profile › Passkeys)'
+              : '')
         );
       }
       shortfall = { required, provided, authMethod: params.authMethod, mode };
@@ -275,7 +368,7 @@ export function reportAssuranceShortfall(
     action: 'approval_decision',
     operation: 'assurance_shortfall',
     result: 'allowed',
-    reason: `human-only decision accepted below min_assurance ${shortfall.required} (${shortfall.authMethod} provides ${shortfall.provided}) — KYBERION_APPROVAL_ASSURANCE=${shortfall.mode}`,
+    reason: `human-only decision accepted below min_assurance ${shortfall.required} (${shortfall.authMethod} provides ${shortfall.provided}) — assurance mode ${shortfall.mode}`,
     correlationId: record.correlationId,
     metadata: {
       requestId: record.id,
@@ -291,7 +384,7 @@ export function reportAssuranceShortfall(
     body:
       `A human-only approval was accepted with ${shortfall.authMethod} (${shortfall.provided}) ` +
       `below the required ${shortfall.required}. It will be rejected once ` +
-      'KYBERION_APPROVAL_ASSURANCE=enforce. Next: decide human-only requests on a surface ' +
+      'the assurance mode is enforce (approval-policy.json assurance_mode). Next: decide human-only requests on a surface ' +
       `that provides ${shortfall.required} before enabling enforce.`,
     correlation_id: `approval-assurance-shortfall:${shortfall.authMethod}:${shortfall.required}`,
   });
